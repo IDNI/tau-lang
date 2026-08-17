@@ -153,6 +153,21 @@ TEST_SUITE("adt flatten") {
 		check_flat(PT "x:Point = x && x.a = 1.",
 			"x.a:sbf = x.a:sbf && x.b:sbf = x.b:sbf && x.a:sbf = 1.");
 	}
+	TEST_CASE("inner quantifier shadows an outer tuple type") {
+		// Outer x:Point, inner x:Q -- the inner scope's own binder wins for
+		// the inner body, the outer stays intact outside it (pass 1's
+		// collect stops at a nested quantifier, so no spurious conflict).
+		check_flat(PT "type Q = {c: sbf}. "
+			"ex x:Point (x.a = 0 && ex x:Q x.c = 0).",
+			"ex x.a:sbf, x.b:sbf (x.a = 0 && ex x.c:sbf x.c = 0).");
+	}
+	TEST_CASE("member access resolves through an outer scope") {
+		// y is typed only in the OUTER binder; the inner quantifier binds
+		// an unrelated z, and y.a in the inner body resolves through the
+		// outer entry (the scope stack is searched innermost-out).
+		check_flat(PT "ex y:Point ex z (z = 0 && y.a = 0).",
+			"ex y.a:sbf, y.b:sbf ex z (z = 0 && y.a = 0).");
+	}
 	TEST_CASE("same member path, different base types fails") {
 		// Reaches the "differ in member type" half of the C1 structural
 		// check -- the cross-name/cross-depth cases above only ever hit
@@ -381,6 +396,82 @@ TEST_SUITE("adt io defs") {
 	// -- all within this SAME parse -- so a later reference to the bare
 	// root name (e.g. a separate REPL line's `i[t]`) would pick up a
 	// phantom "Point" type.
+	TEST_CASE("io member with a shift offset keeps the shift") {
+		io_context<node_t> ctx;
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t] = p[t-1].", { .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		std::string printed = tau::get(t).to_str();
+		// The shifted occurrence's members keep the t-1 offset, printed
+		// base-name-then-bracket-then-suffix like every io member.
+		CHECK(printed.find("p[t-1].a") != std::string::npos);
+		CHECK(printed.find("p[t-1].b") != std::string::npos);
+		CHECK(printed.find("p.a[t-1]") == std::string::npos);
+	}
+	TEST_CASE("io def and variable occurrence with conflicting types fail") {
+		io_context<node_t> ctx;
+		CHECK(tau::get("type Point = {a: sbf}. type Q = {c: sbf}. "
+			"p:Point := in console. always p[t]:Q = 0.",
+			{ .infer_ba_types = false, .context = &ctx }) == nullptr);
+	}
+	TEST_CASE("output def with a member path head is rejected too") {
+		// Same I4-alt rejection as test_adt_parsing.cpp's input-side case;
+		// adt_flatten_check_io_def_head has a separate select_all pass per
+		// def kind, so the output side needs its own case.
+		CHECK(tau::get(std::string(
+			"p.a := out console. always p[t].a = 0.")) == nullptr);
+	}
+	TEST_CASE("tuple io def without a context is dropped, parse survives") {
+		tref t = tau::get("type Point = {a: sbf}. p:Point := in console. "
+			"always x = 0.", { .infer_ba_types = false });
+		REQUIRE(t != nullptr);
+		std::string printed = tau::get(t).to_str();
+		CHECK(printed.find("console") == std::string::npos); // def dropped
+		CHECK(printed.find("Point") == std::string::npos);   // type_def erased
+	}
+	TEST_CASE("re-declaring a root as non-tuple retires the stale layout") {
+		io_context<node_t> ctx;
+		// First parse: p is a tuple stream.
+		REQUIRE(tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			!= nullptr);
+		REQUIRE(ctx.adt_streams.contains(dict("p")));
+		// Second parse, SAME ctx: p re-declared plain. The registry must be
+		// non-empty (any type_def) or the empty-registry fast path would
+		// skip the io-def rewrite entirely -- hence the unused type Q.
+		REQUIRE(tau::get("type Q = {z: sbf}. p:sbf := in console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			!= nullptr);
+		CHECK(!ctx.adt_streams.contains(dict("p"))); // stale layout retired
+	}
+	TEST_CASE("re-declaring a tuple root currently loses the file stream id (defect, pinned)") {
+		// NOTE the newlines between the two file() defs: `file_name` is
+		// `printable+` (parser/tau.tgf), so two quoted file names on ONE
+		// line of a spec-start parse let the capture span greedily from the
+		// first opening quote to the last closing one (pre-existing,
+		// non-ADT parser behavior -- the REPL never hits it because it
+		// splits commands at periods before parsing). Spec files put defs
+		// on separate lines, which is what this mirrors.
+		// FIXME (MEDIUM): this pins a DEFECT, found 2026-08-17 while writing
+		// this case. A plain stream re-declared in one spec is last-def-wins
+		// (process_io_def overwrites the root's entry during construction).
+		// A TUPLE root re-declared in one spec instead ends up on stream_id
+		// 0 (console): the FIRST def's adt_flatten_rewrite_io_def consumes
+		// the root's inputs entry (which construction had already set to the
+		// LAST def's file id) and erases it, so the SECOND def's rewrite
+		// finds no root entry and defaults to 0 -- silently rerouting a
+		// file-declared stream to the console. When fixed (last-def-wins,
+		// matching plain streams), flip the CHECKs below to
+		// `dict(it->second.stream_id) == "y.in"`.
+		io_context<node_t> ctx;
+		REQUIRE(tau::get("type Point = {a: sbf}.\n"
+			"p:Point := in file(\"x.in\").\np:Point := in file(\"y.in\").\n"
+			"always p[t].a = 0.",
+			{ .infer_ba_types = false, .context = &ctx }) != nullptr);
+		auto it = ctx.adt_streams.find(dict("p"));
+		REQUIRE(it != ctx.adt_streams.end());
+		CHECK(it->second.stream_id == 0); // current (wrong) behavior: console
+	}
 	TEST_CASE("flattened members get their own inferred BA types") {
 		// Unlike the rest of this suite, inference is ON (default options):
 		// the point is the SEAM -- the flattener's per-member annotations
