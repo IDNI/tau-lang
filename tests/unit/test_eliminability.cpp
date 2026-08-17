@@ -445,4 +445,138 @@ TEST_SUITE("eliminability") {
 			[w](tref v) { return v != w; });
 		CHECK(el.verdict_of(y) == elim_verdict::frozen);
 	}
+
+	TEST_CASE("analysis descends every transparent connective") {
+		// One formula per connective the transparency list admits;
+		// the assertion is that analysis terminates and classifies the
+		// variables underneath (a reference-free formula: eliminable).
+		const char* samples[] = {
+			"x = 0 ^^ y = 0.",           // wff_xor (single ^ is bf-level)
+			"x = 0 -> y = 0.",           // wff_imply
+			"x = 0 <- y = 0.",           // wff_rimply
+			"x = 0 <-> y = 0.",          // wff_equiv
+			"x = 0 ? y = 0 : z = 0.",    // wff_conditional
+			"(x = 0).",                  // wff_parenthesis
+		};
+		for (const char* s : samples) {
+			tref fm = get_nso_rr(s).value().main->get();
+			auto el = analyse_formula<node_t>(fm,
+				analysis_context<node_t>{});
+			for (tref v : get_free_vars<node_t>(fm))
+				CHECK( el.verdict_of(v)
+					== elim_verdict::eliminable );
+		}
+	}
+
+	TEST_CASE("analyse_block fail-closes on an unrecognized conjunct shape") {
+		// The fail-closed freeze for a wff-level shape none of the
+		// classifier's other rules recognise lives in analyse_block's
+		// conjunct classifier (eliminability.tmpl.h:352-363), NOT in
+		// analyse_formula: analyse_formula's own visit lambda
+		// (eliminability.tmpl.h:502-544) only branches on quantifiers,
+		// wff_ref, and is_atomic_fm -- everything else just descends,
+		// so it has no fail-closed arm at all (the earlier version of
+		// this case targeted analyse_formula and could never have
+		// exercised :352-363, whatever shape it was given).
+		//
+		// bf_interval is the shape that reaches analyse_block's
+		// fail-closed branch: deliberately excluded from is_atomic_fm
+		// (tau_tree_queries.tmpl.h), so it falls through analyse_block's
+		// "none of the above" arm and must freeze, not silently stay
+		// eliminable.
+		//
+		// A bare T conjunct cannot be used for this case: "$X && T ::=
+		// $X" is a CONSTRUCTION-TIME hook (hooks.tmpl.h's wff_and,
+		// applied while the parse tree itself is built, before any
+		// reget step runs) -- so no parse, hooks on or off, ever keeps
+		// a bare T conjunct in the tree; disabling reget_with_hooks
+		// does not help.
+		//
+		// Two separate raw wff parses (no trailing '.': spec-level
+		// punctuation is not part of a bare wff), passed to
+		// analyse_block as two conjuncts -- following this file's other
+		// analyse_block cases above (e.g. "a variable sharing no atom
+		// with a reference is eliminable"). bf_interval spelling
+		// verified against test_integration-ba_types_inference.cpp's
+		// "tau bf_interval symbol" case.
+		auto raw_wff = [](const char* s) {
+			return tau::get(s, tau::get_options{
+				.parse = { .start = tau::wff },
+				.reget_with_hooks = false });
+		};
+		tref c1 = raw_wff("w = 0");
+		tref c2 = raw_wff("x:tau <= y <= z");
+		REQUIRE(c1 != nullptr);
+		REQUIRE(c2 != nullptr);
+		trefs vars = conj_vars(c1);
+		for (tref v : conj_vars(c2)) vars.push_back(v);
+		auto a = analyse_block<node_t>(vars, { c1, c2 },
+			analysis_context<node_t>{});
+		// w, the OTHER conjunct's only variable, shares no component
+		// with the interval: still eliminable.
+		CHECK( a.verdict_of(conj_vars(c1)[0]) == elim_verdict::eliminable );
+		// x, y, z -- the interval's own variables -- fail-close frozen.
+		for (tref v : conj_vars(c2))
+			CHECK( a.verdict_of(v) == elim_verdict::frozen );
+	}
+
+	TEST_CASE("re-registration joins verdicts upward") {
+		// The same variable reached through an eliminable path and a
+		// frozen path must end frozen and change bucket
+		// (eliminability.tmpl.h:487-496 join-upgrade).
+		tref fm = get_nso_rr("x y = 0 && f(x).").value().main->get();
+		auto el = analyse_formula<node_t>(fm,
+			analysis_context<node_t>{});
+		for (tref v : get_free_vars<node_t>(fm))
+			CHECK( el.verdict_of(v) == elim_verdict::frozen );
+		// No stale entry left behind in a lower bucket.
+		for (tref v : get_free_vars<node_t>(fm))
+			CHECK( !el.members[elim_verdict::eliminable].contains(v) );
+	}
+}
+
+TEST_SUITE("scoped_verdict_resolver") {
+
+	static tref var(const char* s) {
+		tref fm = get_nso_rr(s).value().main->get();
+		return get_free_vars<node_t>(fm)[0];
+	}
+
+	TEST_CASE("unseen defaults to eliminable") {
+		scoped_verdict_resolver<node_t> r;
+		CHECK( r.kind_of(var("x = 0."))
+			== elim_verdict::eliminable );
+	}
+
+	TEST_CASE("insert then assign joins upward, never downward") {
+		scoped_verdict_resolver<node_t> r;
+		tref x = var("x = 0.");
+		r.insert(x, elim_verdict::blasteable);
+		CHECK( r.kind_of(x) == elim_verdict::blasteable );
+		r.assign(x, elim_verdict::eliminable); // join: no demotion
+		CHECK( r.kind_of(x) == elim_verdict::blasteable );
+		r.assign(x, elim_verdict::frozen);
+		CHECK( r.kind_of(x) == elim_verdict::frozen );
+	}
+
+	TEST_CASE("merge unions kinds") {
+		scoped_verdict_resolver<node_t> r;
+		tref x = var("x = 0."), y = var("y = 0.");
+		r.insert(x, elim_verdict::eliminable);
+		r.insert(y, elim_verdict::arithmetic);
+		r.merge(x, y);
+		CHECK( r.kind_of(x) == elim_verdict::arithmetic );
+		CHECK( r.kind_of(y) == elim_verdict::arithmetic );
+	}
+
+	TEST_CASE("a closed scope's binder does not leak outward") {
+		scoped_verdict_resolver<node_t> r;
+		tref x = var("x = 0.");
+		r.insert(x, elim_verdict::eliminable);
+		r.open();
+		r.insert(x, elim_verdict::frozen); // inner shadow
+		CHECK( r.kind_of(x) == elim_verdict::frozen );
+		CHECK( !r.close().has_value() ); // no scope error
+		CHECK( r.kind_of(x) == elim_verdict::eliminable );
+	}
 }
