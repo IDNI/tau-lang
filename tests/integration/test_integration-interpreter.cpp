@@ -371,6 +371,83 @@ TEST_SUITE("Execution") {
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
 	}
+
+	// I1 (factored spec storage): an update that conflicts with the spec
+	// for SOME inputs only (the plain-conjunction sat check treats inputs
+	// universally) appends the update clause as a last-resort alternative
+	// instead of embedding the guarded ¬∃outs.(S∧U) ∨ (S∧U) disjunction
+	// into one stored formula. The stored alternatives must stay
+	// quantifier-free (no embedded guard), the strong S∧U alternative must
+	// fire when the inputs allow it and the update-only alternative when
+	// they do not.
+	TEST_CASE("u[t] = i1[t]: factored_fallback_storage") {
+		bdd_init<Bool>();
+		auto spec = create_spec("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
+		strings i1_values = { "F", "o1[t] = 0", "F", "F" };
+		strings i2_values = { "F", "F", "T", "F" };
+		// Pre-update o1 covers i2; post-update the S∧U alternative
+		// (i2 <= o1 && o1 = 0, i.e. o1 = 0 && i2 = 0) fires at step 3
+		// (i2 = F) and the update-only alternative (o1 = 0) at step 2
+		// (i2 = T).
+		strings o1_expected = { "F", "F", "F", "F" };
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto i2 = std::make_shared<vector_input_stream>(i2_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_input( "i2", tau_type_id<node_t>(), i2);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == o1_expected );
+		size_t max_alts = 0;
+		bool has_quantifier = false;
+		for (const auto& [alts, _] : maybe_i.value().original_spec) {
+			max_alts = std::max(max_alts, alts.size());
+			for (const auto& h : alts)
+				if (tau::get(h->get()).find_top(
+						is<node_t, tau::wff_ex>)
+					|| tau::get(h->get()).find_top(
+						is<node_t, tau::wff_all>))
+					has_quantifier = true;
+		}
+		CHECK( max_alts == 2 );
+		CHECK( !has_quantifier );
+	}
+
+	// I1: repeated input-conflicting updates keep the stored specification
+	// bounded -- per-part alternatives grow by at most one per update and
+	// dead or duplicate alternatives are dropped, where the old
+	// guarded-disjunction embedding doubled the stored formula on every
+	// conflicting update.
+	TEST_CASE("u[t] = i1[t]: additive_revision_growth") {
+		bdd_init<Bool>();
+		auto spec = create_spec("u[t] = i1[t] && o1[t] = i2[t].");
+		strings i1_values = { "F", "o1[t] = 1", "F", "o1[t] = i2[t]'",
+			"F", "o1[t] = 1", "F", "F" };
+		strings i2_values = { "F", "F", "T", "F", "F", "T", "F", "F" };
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto i2 = std::make_shared<vector_input_stream>(i2_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_input( "i2", tau_type_id<node_t>(), i2);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 8);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values().size() == 8 );
+		size_t spec_size = 0;
+		for (const auto& [alts, _] : maybe_i.value().original_spec) {
+			CHECK( alts.size() <= 3 );
+			for (const auto& h : alts)
+				spec_size += tau::get(h->get()).to_str().size();
+		}
+		CHECK( spec_size < 1000 );
+	}
 }
 
 TEST_SUITE("only outputs") {

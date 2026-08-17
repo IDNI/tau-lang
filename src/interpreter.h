@@ -51,13 +51,16 @@ struct interpreter {
 
 	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
-	 * @param ubt_ctn Unbounded continuation formulas.
-	 * @param original_spec Specification partition (formula, representative pairs).
+	 * @param ubt_ctn Per spec part, the ordered unbounded continuation
+	 *        formulas of its alternatives (parallel to @p original_spec).
+	 * @param original_spec Specification partition; per part an ordered
+	 *        list of alternative formulas plus its representative.
 	 * @param output_partition Union-find structure over output stream groups.
 	 * @param memory Current memory (variable-to-value map).
 	 * @param ctx I/O context for reading/writing streams.
 	 */
-	interpreter(htrefs& ubt_ctn, auto& original_spec, auto& output_partition,
+	interpreter(std::vector<htrefs>& ubt_ctn, auto& original_spec,
+		auto& output_partition,
 		assignment<node>& memory, const io_context<node>& ctx);
 
 	/**
@@ -103,9 +106,20 @@ struct interpreter {
 	 */
 	void collect_live_refs(std::unordered_set<tref>& keep) const;
 
-	htrefs ubt_ctn;
-	/// Partition of spec each with representative for set of output streams.
-	std::vector<std::pair<htref, htref>> original_spec;
+	// I1 (factored spec storage): each spec part holds an ORDERED list of
+	// alternative formulas, strongest first. Semantically the part is the
+	// disjunction of its alternatives; operationally step() tries them in
+	// order and the first solvable one wins, which implements the
+	// pointwise-revision preference "follow the accumulated spec when the
+	// current inputs allow it, else fall back to the newer update" without
+	// ever embedding the ¬∃outs.(S∧U) guard (and thus a second copy of the
+	// whole spec) into a stored formula. Stored size grows additively per
+	// update instead of doubling.
+	/// Per spec part, the executable continuations of its alternatives.
+	std::vector<htrefs> ubt_ctn;
+	/// Partition of spec: per part the ordered alternative formulas with a
+	/// representative for its set of output streams.
+	std::vector<std::pair<htrefs, htref>> original_spec;
 	assignment<node> memory;
 	size_t time_point = 0;
 	input_streams<node>     inputs;
@@ -117,7 +131,8 @@ private:
 		return tau::subtree_less(s1, s2);
 	};
 	union_find_with_sets<decltype(stream_comp), node> output_partition;
-	trefs step_spec;
+	/// Per spec part, the alternatives' continuations at the current step.
+	std::vector<trefs> step_spec;
 	bool final_system = false;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
@@ -163,8 +178,9 @@ private:
 	/// @brief Return the set of output stream variables present in @p dnf.
 	subtree_map<node, size_t> collect_output_streams(tref dnf);
 
-	/// @brief Return the unbounded continuation formulas at time @p t.
-	trefs get_ubt_ctn_at(int_t t);
+	/// @brief Return the unbounded continuation formulas at time @p t,
+	/// per spec part in alternative order.
+	std::vector<trefs> get_ubt_ctn_at(int_t t);
 
 	/// @brief Compute and store the initial specification.
 	bool calculate_initial_spec();
@@ -189,8 +205,22 @@ private:
 	/// @brief Find an executable specification clause from DNF.
 	static tref get_executable_spec(tref& clause, const size_t start_time = 0);
 
-	/// @brief Apply the pointwise revision algorithm to produce an updated specification.
-	tref pointwise_revision(tref spec, tref update, const int_t start_time);
+	/// @brief Recompute the executable continuations of a part's ordered
+	/// alternatives. Alternatives that are not executable are dropped from
+	/// @p alts (they could never fire in step()).
+	/// @return false when no alternative survives.
+	static bool compute_part_continuations(htrefs& alts, htrefs& ctns,
+		const size_t start_time);
+
+	/// @brief Apply the pointwise revision algorithm to a part's ordered
+	/// alternatives (I1). Conjoins @p update into every alternative; when
+	/// the plain conjunction is unsat, appends the update clause as a
+	/// last-resort alternative instead of embedding the guarded
+	/// ¬∃outs.(S∧U) disjunction into a stored formula.
+	/// @return The revised ordered alternatives, or `std::nullopt` when no
+	/// update clause yields a satisfiable revision.
+	std::optional<htrefs> pointwise_revision(const htrefs& alts,
+		tref update, const int_t start_time);
 
 	/// @brief Find the maximal update-stream solution for @p spec.
 	std::optional<assignment<node>> solution_with_max_update(tref spec);
