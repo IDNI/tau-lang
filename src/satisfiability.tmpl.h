@@ -633,6 +633,15 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	// tests/integration/test_integration-solver.cpp reach single digits), so
 	// this leaves a very wide margin while remaining finite.
 	constexpr int_t max_fixpoint_steps = 500;
+	// Checking the implication on the RAW iterates is deliberate. A
+	// variant that normalized each iterate once (normalize_non_temp per
+	// step) and ran is_nso_impl on the normal forms -- hoping the
+	// positive-polarity block eliminations would be cache hits and equal
+	// normal forms would shortcut the query -- measured ~10% SLOWER on
+	// bv[64]x14 interpreter stress (22.0-22.9s vs 19.0-21.1s wall over
+	// repeated runs, 2026-08-17): the extra per-step normalization of the
+	// accumulated telescope costs more than it saves, buying only a ~21%
+	// peak-RSS reduction. Do not reintroduce it for wall-clock reasons.
 	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
 		if (step_num >= max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
