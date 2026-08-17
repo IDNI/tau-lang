@@ -52,6 +52,17 @@ TEST_SUITE("eliminability") {
 	// (they can differ by inferred BA type).
 	static trefs conj_vars(tref c) { return get_free_vars<node_t>(c); }
 
+	// Helper: parse a single bare wff, bypassing get_nso_rr's normalization
+	// hooks. Two uses: (1) some shapes -- e.g. bf_interval -- are only
+	// classifiable at all if they survive un-simplified; (2) analyse_block
+	// wants a single wff PER CONJUNCT, and get_nso_rr's grammar entry point
+	// is a whole spec (trailing '.' and all), not a bare wff.
+	static tref raw_wff(const char* s) {
+		return tau::get(s, tau::get_options{
+			.parse = { .start = tau::wff },
+			.reget_with_hooks = false });
+	}
+
 	TEST_CASE("a variable sharing no atom with a reference is eliminable") {
 		// x reaches f; y does not.
 		tref c1 = get_nso_rr("f(x).").value().main->get();
@@ -446,25 +457,40 @@ TEST_SUITE("eliminability") {
 		CHECK(el.verdict_of(y) == elim_verdict::frozen);
 	}
 
-	TEST_CASE("analysis descends every transparent connective") {
-		// One formula per connective the transparency list admits;
-		// the assertion is that analysis terminates and classifies the
-		// variables underneath (a reference-free formula: eliminable).
+	TEST_CASE("analyse_block descends every transparent connective") {
+		// The transparency list this covers (eliminability.tmpl.h:
+		// 261-271) is consulted only inside analyse_block's conjunct
+		// classifier -- analyse_formula's own visit lambda has no such
+		// gate at all and descends through every connective
+		// unconditionally, so a case built on analyse_formula could
+		// never fail here regardless of what the list admits (that was
+		// the bug in an earlier version of this case).
+		//
+		// One formula per connective the list names, each parsed as a
+		// SINGLE conjunct (raw_wff, no trailing '.') and run through
+		// analyse_block: the classifier must descend transparently
+		// through the connective down to the plain equality atoms
+		// underneath, so every free variable comes out eliminable. If
+		// the list ever stopped admitting one of these connectives, the
+		// conjunct would instead fall into the fail-closed arm
+		// (:352-363) and freeze -- eliminable here is the passing
+		// signal, frozen would be the regression.
 		const char* samples[] = {
-			"x = 0 ^^ y = 0.",           // wff_xor (single ^ is bf-level)
-			"x = 0 -> y = 0.",           // wff_imply
-			"x = 0 <- y = 0.",           // wff_rimply
-			"x = 0 <-> y = 0.",          // wff_equiv
-			"x = 0 ? y = 0 : z = 0.",    // wff_conditional
-			"(x = 0).",                  // wff_parenthesis
+			"x = 0 ^^ y = 0",            // wff_xor (single ^ is bf-level)
+			"x = 0 -> y = 0",            // wff_imply
+			"x = 0 <- y = 0",            // wff_rimply
+			"x = 0 <-> y = 0",           // wff_equiv
+			"x = 0 ? y = 0 : z = 0",     // wff_conditional
+			"(x = 0)",                   // wff_parenthesis
 		};
 		for (const char* s : samples) {
-			tref fm = get_nso_rr(s).value().main->get();
-			auto el = analyse_formula<node_t>(fm,
+			tref c = raw_wff(s);
+			REQUIRE(c != nullptr);
+			trefs vars = conj_vars(c);
+			auto a = analyse_block<node_t>(vars, { c },
 				analysis_context<node_t>{});
-			for (tref v : get_free_vars<node_t>(fm))
-				CHECK( el.verdict_of(v)
-					== elim_verdict::eliminable );
+			for (tref v : vars)
+				CHECK( a.verdict_of(v) == elim_verdict::eliminable );
 		}
 	}
 
@@ -492,18 +518,13 @@ TEST_SUITE("eliminability") {
 		// a bare T conjunct in the tree; disabling reget_with_hooks
 		// does not help.
 		//
-		// Two separate raw wff parses (no trailing '.': spec-level
+		// Two separate raw_wff parses (no trailing '.': spec-level
 		// punctuation is not part of a bare wff), passed to
 		// analyse_block as two conjuncts -- following this file's other
 		// analyse_block cases above (e.g. "a variable sharing no atom
 		// with a reference is eliminable"). bf_interval spelling
 		// verified against test_integration-ba_types_inference.cpp's
 		// "tau bf_interval symbol" case.
-		auto raw_wff = [](const char* s) {
-			return tau::get(s, tau::get_options{
-				.parse = { .start = tau::wff },
-				.reget_with_hooks = false });
-		};
 		tref c1 = raw_wff("w = 0");
 		tref c2 = raw_wff("x:tau <= y <= z");
 		REQUIRE(c1 != nullptr);
@@ -520,10 +541,14 @@ TEST_SUITE("eliminability") {
 			CHECK( a.verdict_of(v) == elim_verdict::frozen );
 	}
 
-	TEST_CASE("re-registration joins verdicts upward") {
-		// The same variable reached through an eliminable path and a
-		// frozen path must end frozen and change bucket
-		// (eliminability.tmpl.h:487-496 join-upgrade).
+	TEST_CASE("re-registration joins verdicts upward (resolver-level)") {
+		// x reaches BOTH the atom `x y = 0` and the reference `f(x)`
+		// within the SAME (global) scope, so this upgrade happens
+		// inside ref_res's own union-find join (assign/merge, already
+		// covered directly by scoped_verdict_resolver's "insert then
+		// assign joins upward" case below) -- not in snapshot_scope's
+		// cross-scope bookkeeping. See "re-registration across scopes
+		// joins verdicts upward" for the snapshot_scope join proper.
 		tref fm = get_nso_rr("x y = 0 && f(x).").value().main->get();
 		auto el = analyse_formula<node_t>(fm,
 			analysis_context<node_t>{});
@@ -532,6 +557,37 @@ TEST_SUITE("eliminability") {
 		// No stale entry left behind in a lower bucket.
 		for (tref v : get_free_vars<node_t>(fm))
 			CHECK( !el.members[elim_verdict::eliminable].contains(v) );
+	}
+
+	TEST_CASE("re-registration across scopes joins verdicts upward") {
+		// snapshot_scope's join-upgrade branch (eliminability.tmpl.h:
+		// 487-497) fires only when the SAME tref is snapshotted twice
+		// with two different verdicts -- once when its quantifier
+		// scope closes, and again at the final global snapshot.
+		// scoped_union_find::insert cannot find an element pushed into
+		// an already-closed scope (that scope's index is no longer in
+		// the `scopes` deque, union_find.h:216-221), so a variable
+		// touched again after its binder's scope closes gets a
+		// brand-new, UNCONNECTED root at global scope: the two
+		// registrations of x below never share a union-find root, and
+		// it is only res.verdicts' own join(existing, new) inside
+		// snapshot_scope that reconciles them into one verdict.
+		//
+		// x is merged with the atom `q x = 0` inside `ex q`'s scope
+		// (snapshotted eliminable when that scope closes), then
+		// reached again -- at the global scope, after the binder has
+		// already closed -- by the unresolved reference `f(x)`
+		// (frozen). The second registration must join upward over the
+		// first, not overwrite or ignore it.
+		tref fm = get_nso_rr("(ex q (q x = 0)) && f(x).")
+			.value().main->get();
+		auto el = analyse_formula<node_t>(fm,
+			analysis_context<node_t>{});
+		tref x = get_free_vars<node_t>(fm)[0]; // x is the only free var
+		REQUIRE(el.verdicts.contains(x));
+		CHECK( el.verdict_of(x) == elim_verdict::frozen );
+		// No stale entry left behind in a lower bucket.
+		CHECK( !el.members[elim_verdict::eliminable].contains(x) );
 	}
 }
 
