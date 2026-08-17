@@ -1284,6 +1284,27 @@ whereas the REPL specific options are:
 | -x, --experimental | enable transitioning features                          |
 | -d, --debug        | debug mode (Debug builds only)                         |
 
+and the limit options, which bound the engine's iterative searches. Every
+cap defaults to unlimited (`0`); the two gc knobs keep their tuned defaults.
+Each has a matching REPL option (see [REPL options](#repl-options)):
+
+| Option                        | Description                                                                            |
+|-------------------------------|----------------------------------------------------------------------------------------|
+| -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
+| -a, --max-revision-alts       | cap the revision alternatives kept per specification part (0 = unlimited)              |
+| -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
+| -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
+| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
+| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (0 = unlimited) |
+| -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
+| -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
+| -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
+| -P, --max-def-passes          | cap definition-expansion passes (0 = unlimited)                                        |
+| -E, --max-enum-steps          | cap recurrence-relation enumeration steps (0 = unlimited)                              |
+| -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (0 = unlimited)                                         |
+| -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)                              |
+| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
+
 # **The Tau REPL**
 
 The Tau REPL is a command line application that allows you to interact with the Tau
@@ -1360,6 +1381,56 @@ benchmarks after each command. It's on by default.
 
 * `d|dbg|debug`: Can be on/off. Controls debug mode. Only available in Debug
 builds, where it's on by default.
+
+Besides the boolean options above, the REPL exposes every limit option as a
+numeric option. These take a count via `set <option> <n>` (so `enable`,
+`disable` and `toggle` do not apply); `0` means unlimited, except for the two
+gc knobs, which keep their tuned defaults (`gcgrowth` at or below `0` disables
+gc). Each mirrors the command line option shown alongside:
+
+* `maxsplits|blockmaxsplits`: per-block Boole-decomposition split budget in
+anti-prenexing (`--block-max-splits`). Unlimited by default.
+
+* `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
+(`--block-max-rounds`). Unlimited by default.
+
+* `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
+(`--max-fixpoint-steps`). Unlimited by default.
+
+* `flagsteps|maxflagsearchsteps`: cap on the eventual-flag search past the
+flag boundary; a bounded give-up reports unsatisfiable
+(`--max-flag-search-steps`). Unlimited by default.
+
+* `blastdepth|maxblastreentrydepth`: blast-block re-entry nesting cap in
+anti-prenexing (`--max-blast-reentry-depth`). Unlimited by default.
+
+* `squeezecap|blocksqueezecap`: operand-set size above which block squeezing
+declines (`--block-squeeze-cap`). Unlimited by default.
+
+* `simplifyrounds|maxsimplifyrounds`: bitvector simplification rewrite round
+cap (`--max-simplify-rounds`). Unlimited by default.
+
+* `defpasses|maxdefpasses`: definition-expansion pass cap
+(`--max-def-passes`). Unlimited by default.
+
+* `enumsteps|maxenumsteps`: recurrence-relation enumeration step cap
+(`--max-enum-steps`). Unlimited by default.
+
+* `rewriterounds|maxrewriterounds`: rewrite-to-fixpoint round cap
+(`--max-rewrite-rounds`). Unlimited by default.
+
+* `gcminsize`: tree-node count floor before the interpreter's gc may trigger
+(`--gc-min-size`). 256 by default.
+
+* `gcgrowth|gcgrowthfactor`: gc growth-factor trigger; accepts decimals such
+as `1.5` (`--gc-growth-factor`). 1.5 by default; a value at or below 0
+disables gc.
+
+* `specsizewarn`: warn when an updated specification exceeds this many printed
+characters (`--spec-size-warn`). 0 (off) by default.
+
+* `revisionalts|maxrevisionalts`: cap on revision alternatives kept per
+specification part (`--max-revision-alts`). Unlimited by default.
 
 ## **Functions, predicates and input/output stream variables**
 
