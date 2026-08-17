@@ -442,6 +442,14 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 #endif // TAU_CACHE
 
 	subtree_map<node, bv> vars, free_vars;
+	// A fresh solver per query is deliberate, do NOT share one like
+	// normalize_bv's (B12): cvc5 forbids a second checkSat without
+	// incremental mode ("cannot make multiple queries unless incremental
+	// solving is enabled" -- resetAssertions does not lift this), and a
+	// pair of long-lived incremental solvers measured strictly worse on
+	// bv[64]x14 stress: 19.4s -> 30.0s wall and 227MB -> 1.1GB peak RSS
+	// (2026-08-17). The engine construction cost per query is the price of
+	// the non-incremental option set, which is the larger win.
 	cvc5::Solver solver(cvc5_term_manager);
 	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
 	// quantifiers too, not just the innermost one; without that it does not
