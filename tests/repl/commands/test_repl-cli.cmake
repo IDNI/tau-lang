@@ -107,3 +107,32 @@ add_test(NAME "test_repl-cli-spec_file_no_quit"
 	COMMAND bash -c "printf 'o[t] = i[t].\\n' > cli_noquit_fixture.tau && $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> cli_noquit_fixture.tau < /dev/null; r=$?; rm -f cli_noquit_fixture.tau; exit $r")
 set_tests_properties("test_repl-cli-spec_file_no_quit" PROPERTIES
 	PASS_REGULAR_EXPRESSION "Press ENTER to continue")
+
+# --- limit options (2026-08-17 unified limit options) ------------------------
+# One end-to-end round trip per wiring style: the CLI flag must land in the
+# library global the REPL's `get` reads back. One cap, one gc knob (decimal
+# value), and one of the pre-existing interpreter options now readable from
+# the REPL cover the three distinct code paths in main.cpp's apply block.
+add_test(NAME "test_repl-cli-max_fixpoint_steps_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 9 -e \"get fixpointsteps\"")
+set_tests_properties("test_repl-cli-max_fixpoint_steps_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "fixpointsteps: *9"
+	FAIL_REGULAR_EXPRESSION "Error")
+
+add_test(NAME "test_repl-cli-gc_growth_factor_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --gc-growth-factor 2.5 -e \"get gcgrowth\"")
+set_tests_properties("test_repl-cli-gc_growth_factor_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "gcgrowth: *2.5"
+	FAIL_REGULAR_EXPRESSION "Error")
+
+add_test(NAME "test_repl-cli-max_revision_alts_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-revision-alts 4 -e \"get revisionalts\"")
+set_tests_properties("test_repl-cli-max_revision_alts_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "revisionalts: *4"
+	FAIL_REGULAR_EXPRESSION "Error")
+
+# --help lists the new options.
+add_test(NAME "test_repl-cli-help_lists_limit_options"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --help")
+set_tests_properties("test_repl-cli-help_lists_limit_options" PROPERTIES
+	PASS_REGULAR_EXPRESSION "max-fixpoint-steps")
