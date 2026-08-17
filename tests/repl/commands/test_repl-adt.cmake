@@ -218,6 +218,60 @@ set_tests_properties("test_repl-adt-run_retry_on_bad_tuple_value" PROPERTIES
 # SECOND run's grouped output) is asserted, since reaching it at all proves
 # every earlier step (including the crash-prone normalize right after the
 # first run) already completed without crashing or being cut short.
+# Coverage round 2026-08-17 (test-coverage plan, Task 7) --------------------
+
+# R1: the tuple console prompt is labeled with the ROOT name and a
+# wire-shaped hint (continue_running's ADT branch: find_adt_stream_for_member
+# + adt_wire_hint, repl_evaluator.tmpl.h/io_context.tmpl.h) -- the only
+# automated assertion on that code path. Transcript verified live 2026-08-17:
+# the prompt renders as `i[0] := { a: "", b: "" } `.
+add_test(NAME "test_repl-adt-run_prompt_hint"
+	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-adt-run_prompt_hint" PROPERTIES
+	PASS_REGULAR_EXPRESSION "i\\[0\\] := \\{ a: \"\", b: \"\" \\}"
+	FAIL_REGULAR_EXPRESSION "Error")
+
+# R2: an alias-typed io def stays ONE plain stream through the REPL: the
+# def's typed rewrites to bv[8], run prompts per-value (`i[0] : bv[8] :=`,
+# no tuple hint) and the output prints as a single bv value (canonical
+# decimal), all verified live 2026-08-17.
+add_test(NAME "test_repl-adt-run_alias_stream"
+	COMMAND bash -c "printf 'type byte = bv[8]. i:byte := in console. o:byte := out console. run o[0] = i[0].\\n#b00000001\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-adt-run_alias_stream" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o\\[0\\] := 1"
+	FAIL_REGULAR_EXPRESSION "Error")
+
+# R3: type_def echo with parents exercises the printer's type_parents
+# on_enter/on_between/on_leave (" of (" + ", "-separated + ")") -- canonical
+# "of"/"=" spelling regardless of the "is" the input used.
+add_repl_test(adt-type_def_echo_parents
+	"type Tagged = {tag: bv[8]}. type Line of (Tagged) is {p: bv[8]}"
+	"\\[2\\] type Line of \\(Tagged\\) = \\{p:bv\\[8\\]\\}")
+
+# R4: alias type_def echo exercises the printer's alias type_body (" = "
+# followed by type + subtype brackets).
+add_repl_test(adt-type_def_echo_alias
+	"type byte = bv[8]"
+	"\\[1\\] type byte = bv\\[8\\]")
+
+# R5: member access on an indexed stream variable in a non-run command --
+# must be parenthesized (the documented REPL quirk: without parens the REPL
+# splits the command at the period after "]"). Pins the WORKING form; the
+# echo renders the flattened member as `always i[t].a:sbf = 0`.
+add_repl_test(adt-normalize_io_member
+	"type Point = {a: sbf, b: sbf}. i:Point := in console. n always (i[t].a = 0)"
+	"always i\\[t\\]\\.a")
+
+# R6: solve reports only the constrained member; an unconstrained tuple
+# member is OMITTED from the solution rather than defaulted (by design --
+# contrast with the interpreter's partial-copy defaulting, which emits the
+# BA's 0). Verified live 2026-08-17: the solution block lists x.a only.
+add_test(NAME "test_repl-adt-solve_omits_unconstrained"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1\" -S trace")
+set_tests_properties("test_repl-adt-solve_omits_unconstrained" PROPERTIES
+	PASS_REGULAR_EXPRESSION "x\\.a := \\{ 1 \\}:sbf"
+	FAIL_REGULAR_EXPRESSION "x\\.b :=;Error")
+
 add_test(NAME "test_repl-adt-run_then_normalize_then_run"
 	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\ntype Point = {a: sbf, b: sbf}. n ex x:Point (x = 0)\\ntype Point = {a: sbf, b: sbf}. i2:Point := in console. o2:Point := out console. run o2[0] = i2[0].\\n{ a: \"0\", b: \"1\" }\\nq\\nquit\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-adt-run_then_normalize_then_run" PROPERTIES
