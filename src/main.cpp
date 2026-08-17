@@ -68,6 +68,10 @@ cli::options tau_options() {
 	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
 		.set_description("warn when an updated specification exceeds "
 			"this many characters (0 = off)");
+	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
+		.set_description("cap the revision alternatives kept per "
+			"specification part, dropping middle preference tiers "
+			"(0 = unlimited)");
 	return opts;
 }
 
@@ -182,6 +186,8 @@ int main(int argc, char** argv) {
 	bool exp = opts["experimental"].get<bool>();
 	interpreter<node_t>::spec_size_warn_threshold = (size_t)std::atoll(
 		opts["spec-size-warn"].get<string>().c_str());
+	interpreter<node_t>::max_revision_alts = (size_t)std::atoll(
+		opts["max-revision-alts"].get<string>().c_str());
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "

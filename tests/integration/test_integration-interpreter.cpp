@@ -448,6 +448,37 @@ TEST_SUITE("Execution") {
 		}
 		CHECK( spec_size < 1000 );
 	}
+
+	// --max-revision-alts: the runtime cap keeps the strongest prefix and
+	// the newest last-resort clause of a revised part and the run still
+	// completes on the same conflicting-update workload.
+	TEST_CASE("u[t] = i1[t]: max_revision_alts cap") {
+		bdd_init<Bool>();
+		struct cap_guard {
+			~cap_guard() {
+				interpreter<node_t>::max_revision_alts = 0;
+			}
+		} guard;
+		interpreter<node_t>::max_revision_alts = 2;
+		auto spec = create_spec("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
+		strings i1_values = { "F", "o1[t] = 0", "F", "o1[t] = i2[t]'",
+			"F", "o1[t] = 0", "F", "F" };
+		strings i2_values = { "F", "F", "T", "F", "F", "T", "F", "F" };
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto i2 = std::make_shared<vector_input_stream>(i2_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_input( "i2", tau_type_id<node_t>(), i2);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 8);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values().size() == 8 );
+		for (const auto& [alts, _] : maybe_i.value().original_spec)
+			CHECK( alts.size() <= 2 );
+	}
 }
 
 TEST_SUITE("only outputs") {

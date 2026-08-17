@@ -50,6 +50,22 @@ struct interpreter {
 	static inline size_t spec_size_warn_threshold = 0;
 
 	/**
+	 * @brief Runtime cap on the revision alternatives kept per spec part.
+	 *
+	 * Every per-update cost of the factored pointwise revision (I1) is
+	 * proportional to the number of alternatives a part carries, and a
+	 * conflicting update can add one each time. When nonzero and a
+	 * revision produces more than this many alternatives, the first
+	 * `max_revision_alts - 1` (the strongest accumulated behavior) and
+	 * the last one (the newest update clause, the part's universally
+	 * executable anchor) are kept and the middle preference tiers are
+	 * dropped with a WARNING. 0 disables the cap. Set from the
+	 * `--max-revision-alts` CLI option; a runtime parameter by policy,
+	 * never a header constant.
+	 */
+	static inline size_t max_revision_alts = 0;
+
+	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
 	 * @param ubt_ctn Per spec part, the ordered unbounded continuation
 	 *        formulas of its alternatives (parallel to @p original_spec).

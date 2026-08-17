@@ -1473,6 +1473,19 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			if (!dup) result.push_back(d);
 		}
 		if (result.empty()) continue;
+		// Runtime cap on the alternatives kept per part: retain the
+		// strongest prefix and the newest last-resort clause, drop the
+		// middle preference tiers (see max_revision_alts).
+		if (max_revision_alts && result.size() > max_revision_alts) {
+			LOG_WARNING << "Pointwise revision produced "
+				<< result.size() << " alternatives; keeping "
+				"the first " << max_revision_alts - 1
+				<< " and the newest one per "
+				"--max-revision-alts\n";
+			tref last = result.back();
+			result.resize(max_revision_alts - 1);
+			result.push_back(last);
+		}
 		return to_htrefs(result);
 	}
 	// No update clause yields a satisfiable revision
