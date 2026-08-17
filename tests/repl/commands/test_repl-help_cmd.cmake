@@ -45,3 +45,7 @@ add_repl_test(help_shortened-history_cmd "h history" "the history")
 add_repl_test(help_history_cmd "help history" "the history")
 add_repl_test(help_shortened-history_shortened_m_cmd "h hist" "the history")
 add_repl_test(help-history_shortened_m_cmd "help hist" "the history")
+
+# help set / help get list the numeric limit options (2026-08-17)
+add_repl_test(help_set_lists_numeric_options "help set" "fixpointsteps")
+add_repl_test(help_get_lists_gc_options "help get" "gcgrowth")

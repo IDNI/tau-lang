@@ -66,6 +66,22 @@ struct interpreter {
 	static inline size_t max_revision_alts = 0;
 
 	/**
+	 * @brief Adaptive tree-node gc trigger knobs.
+	 *
+	 * A sweep fires when bintree<node>::M() has both crossed the
+	 * gc_min_size floor AND grown by at least gc_growth_factor since the
+	 * last sweep. Set gc_growth_factor <= 0 to disable. Self-tunes across
+	 * workloads — fast-growing M triggers frequent sweeps at small peak;
+	 * slow-growing M sweeps rarely. Runtime parameters (defaults kept at
+	 * the tuned 256 / 1.5), public like the two limits above so the REPL
+	 * `get` printers can read them back: set via
+	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
+	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`.
+	 */
+	static inline size_t gc_min_size      = 256;
+	static inline double gc_growth_factor = 1.5;
+
+	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
 	 * @param ubt_ctn Per spec part, the ordered unbounded continuation
 	 *        formulas of its alternatives (parallel to @p original_spec).
@@ -155,16 +171,6 @@ private:
 	int_t lookback = 0;
 	int_t announced_step_ = -1;
 
-	/// Adaptive tree-node gc trigger: a sweep fires when bintree<node>::M()
-	/// has both crossed the gc_min_size floor AND grown by at least
-	/// gc_growth_factor since the last sweep. Set gc_growth_factor <= 0 to
-	/// disable. Self-tunes across workloads — fast-growing M triggers
-	/// frequent sweeps at small peak; slow-growing M sweeps rarely.
-	/// Runtime parameters (defaults kept at the tuned 256 / 1.5): set via
-	/// `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
-	/// or `api::set_gc_min_size`/`api::set_gc_growth_factor`.
-	static inline size_t gc_min_size      = 256;
-	static inline double gc_growth_factor = 1.5;
 	size_t m_at_last_gc = 0;
 	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
 	void maybe_gc();
