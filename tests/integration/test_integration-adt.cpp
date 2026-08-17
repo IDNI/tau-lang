@@ -277,11 +277,11 @@ TEST_SUITE("adt integration") {
 		// (interpreter.tmpl.h): one physical FILE per tuple stream, wire
 		// literals one per line -- previously only covered manually by
 		// demos/demo_4.1 (file fixtures under demos/fixture/). The two
-		// file() defs sit on SEPARATE lines: file_name is printable+
-		// (parser/tau.tgf), so two quoted file names on one line of a
-		// spec-start parse let the capture span greedily from the first
-		// opening quote to the last closing one (pre-existing, non-ADT
-		// parser behavior; see test_adt_flatten.cpp's re-declaration case).
+		// file() defs sit on SEPARATE lines: two quoted file names on one
+		// line of a spec-start parse are a greedy-capture mis-parse
+		// (file_name is printable+, parser/tau.tgf), rejected outright by
+		// adt_flatten's upfront scan -- see test_adt_parsing.cpp's
+		// "two file streams on one line" case.
 		bdd_init<Bool>();
 		namespace fs = std::filesystem;
 		fs::path in_p  = fs::temp_directory_path() / "tau_test_adt_in.txt";

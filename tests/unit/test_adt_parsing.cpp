@@ -56,4 +56,25 @@ TEST_SUITE("adt grammar") {
 	TEST_CASE("anonymous tuple annotation on a variable fails to parse") {
 		CHECK(parse_no_infer("x:{a: sbf} = 0.") == nullptr);
 	}
+	// `file_name` is `printable+` (parser/tau.tgf), so with TWO file(...)
+	// stream defs on one source line the quoted capture can span greedily
+	// from the first def's opening quote to the last def's closing one,
+	// silently swallowing the second def and registering the first under a
+	// garbage name (found 2026-08-17; the REPL is unaffected -- it splits
+	// commands at periods before parsing). The grammar stays as committed
+	// (nonterminal-id shifts trip the latent anti_prenex assertion, see the
+	// I4-alt note above), so adt_flatten's upfront scan turns the mis-parse
+	// into a hard error instead: a captured file name containing '"' is
+	// never legitimate. Default options here: flattening performs the
+	// rejection, not parsing.
+	TEST_CASE("two file streams on one line are rejected, not mis-captured") {
+		CHECK(tau::get(std::string(
+			"i1:sbf := in file(\"a.in\"). i2:sbf := in file(\"b.in\"). "
+			"always o1[t] = i1[t].")) == nullptr);
+	}
+	TEST_CASE("two file streams on separate lines parse fine") {
+		CHECK(tau::get(std::string(
+			"i1:sbf := in file(\"a.in\").\ni2:sbf := in file(\"b.in\").\n"
+			"always o1[t] = i1[t] && o2[t] = i2[t].")) != nullptr);
+	}
 }

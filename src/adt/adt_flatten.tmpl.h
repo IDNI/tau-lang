@@ -1038,6 +1038,34 @@ bool adt_flatten_check_io_def_head(tref n) {
 	return false;
 }
 
+// A parsed io stream def whose file name contains a double quote is always a
+// greedy-capture mis-parse, never legitimate input: `file_name` is
+// `printable+` (parser/tau.tgf), delimited by '"', so with TWO file(...)
+// stream defs on one source line the capture can span from the first def's
+// opening quote to the last def's closing one -- silently swallowing the
+// second def and registering the first under the whole garbage span (found
+// 2026-08-17; the REPL is unaffected, it splits commands at periods before
+// parsing; newline-separated defs are unaffected too, printable excludes
+// newline). The grammar itself stays as committed -- tightening file_name's
+// char class would add a synthetic char-class nonterminal and shift ids,
+// the exact landmine adt_flatten_check_io_def_head's comment below
+// documents -- so the mis-parse is turned into a hard error here instead,
+// same pattern as that head check.
+template <NodeType node>
+bool adt_flatten_check_io_def_file_name(tref n) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	tref f = tt(n) | tau::stream | tau::q_file_name | tau::file_name
+		| tt::ref;
+	if (!f) return true;
+	std::string name = dict(tau::get(f).data());
+	if (name.find('"') == std::string::npos) return true;
+	LOG_ERROR << "stream file name " << name << " captured a '\"' -- "
+		"two file(...) stream definitions on one line mis-parse; put "
+		"each stream definition on its own line\n";
+	return false;
+}
+
 // -----------------------------------------------------------------------------
 // Top-level entry point.
 
@@ -1056,9 +1084,13 @@ tref adt_flatten(tref spec, io_context<node>* ctx) {
 	// def (under def_input_cmd/def_output_cmd) alike, with no separate
 	// per-path handling needed.
 	for (tref d : tau::get(spec).select_all(is<node, tau::input_def>))
-		if (!adt_flatten_check_io_def_head<node>(d)) return nullptr;
+		if (!adt_flatten_check_io_def_head<node>(d)
+			|| !adt_flatten_check_io_def_file_name<node>(d))
+			return nullptr;
 	for (tref d : tau::get(spec).select_all(is<node, tau::output_def>))
-		if (!adt_flatten_check_io_def_head<node>(d)) return nullptr;
+		if (!adt_flatten_check_io_def_head<node>(d)
+			|| !adt_flatten_check_io_def_file_name<node>(d))
+			return nullptr;
 
 	// Fast path. Idempotence relies on this being solely "registry empty",
 	// not also "no member_path nodes": the first flatten erases every
