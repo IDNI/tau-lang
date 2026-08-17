@@ -3,6 +3,9 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+#include <filesystem>
+#include <fstream>
+
 // Task 10: end-to-end ADT integration coverage. The same "type Point =
 // {a: sbf, b: sbf}" tuple type is exercised through normalize, sat/unsat,
 // solve and the interpreter, borrowing each area's own integration fixture
@@ -205,5 +208,46 @@ TEST_SUITE("adt integration") {
 		auto o_values = o->get_values();
 		REQUIRE( o_values.size() == i_values.size() );
 		CHECK( o_values == i_values );
+	}
+
+	TEST_CASE("interpreter: tuple io through file streams") {
+		// Exercises rebuild_inputs'/rebuild_outputs' stream_id != 0 branch
+		// (interpreter.tmpl.h): one physical FILE per tuple stream, wire
+		// literals one per line -- previously only covered manually by
+		// demos/demo_4.1 (file fixtures under demos/fixture/). The two
+		// file() defs sit on SEPARATE lines: file_name is printable+
+		// (parser/tau.tgf), so two quoted file names on one line of a
+		// spec-start parse let the capture span greedily from the first
+		// opening quote to the last closing one (pre-existing, non-ADT
+		// parser behavior; see test_adt_flatten.cpp's re-declaration case).
+		bdd_init<Bool>();
+		namespace fs = std::filesystem;
+		fs::path in_p  = fs::temp_directory_path() / "tau_test_adt_in.txt";
+		fs::path out_p = fs::temp_directory_path() / "tau_test_adt_out.txt";
+		{
+			std::ofstream f(in_p);
+			f << "{ a: \"0\", b: \"1\" }\n" << "{ a: \"1\", b: \"0\" }\n";
+		}
+		io_context<node_t> ctx;
+		std::string spec_src =
+			"type Point = {a: sbf, b: sbf}.\n"
+			"i:Point := in file(\"" + in_p.string() + "\").\n"
+			"o:Point := out file(\"" + out_p.string() + "\").\n"
+			"o[t] = i[t].";
+		tref parsed = tau::get(spec_src, { .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		std::vector<std::string> lines;
+		{
+			std::ifstream f(out_p.string());
+			for (std::string l; std::getline(f, l);) lines.push_back(l);
+		}
+		REQUIRE( lines.size() == 2 );
+		CHECK( lines[0] == "{ a: \"0\", b: \"1\" }" );
+		CHECK( lines[1] == "{ a: \"1\", b: \"0\" }" );
+		std::error_code ec;
+		fs::remove(in_p, ec); fs::remove(out_p, ec);
 	}
 }
