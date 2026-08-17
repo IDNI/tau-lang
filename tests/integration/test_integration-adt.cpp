@@ -210,6 +210,68 @@ TEST_SUITE("adt integration") {
 		CHECK( o_values == i_values );
 	}
 
+	TEST_CASE("interpreter: partial member copy defaults the others to 0") {
+		// Time point 0 copies only member a; b is emitted as sbf's 0 even
+		// though the input has b:"1" there. Time point 1 copies the whole
+		// tuple. Defaulting relies on EVERY member appearing at SOME time
+		// point of the spec -- see the companion "never-mentioned member"
+		// case below for what happens when one doesn't. (Automates the
+		// demo_4.1 partial-copy example, commit 308af029.)
+		bdd_init<Bool>();
+		io_context<node_t> ctx;
+		tref parsed = tau::get(
+			"type Point = {a: sbf, b: sbf}. "
+			"i:Point := in console. o:Point := out console. "
+			"(o[0].a = i[0].a) && o[1] = i[1].",
+			{ .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		strings i_values = {
+			"{ a: \"1\", b: \"1\" }",
+			"{ a: \"0\", b: \"1\" }"
+		};
+		ctx.add_input("i", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i_values));
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", tau_type_id<node_t>(), o);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		auto o_values = o->get_values();
+		REQUIRE( o_values.size() == 2 );
+		CHECK( o_values[0] == "{ a: \"1\", b: \"0\" }" ); // b defaulted, not copied
+		CHECK( o_values[1] == "{ a: \"0\", b: \"1\" }" ); // full copy
+	}
+
+	TEST_CASE("interpreter: a member mentioned at NO time point drops the whole output") {
+		// FIXME (MEDIUM): known gap (2026-08-07, see the partial-copy demo
+		// commentary in demos/demo_4.1): o.b appears at no time point, so
+		// rebuild_outputs (interpreter.tmpl.h, keyed on the spec's
+		// current_outputs) never registers it, the shared adt_tuple_writer
+		// never sees its component complete, and the run silently writes
+		// NOTHING for o -- no error, no literal (reconfirmed live
+		// 2026-08-17). When this is fixed (defaulting never-mentioned
+		// members like partially-mentioned ones, or rejecting the spec),
+		// update this test to the new contract; it exists so the change is
+		// conscious.
+		bdd_init<Bool>();
+		io_context<node_t> ctx;
+		tref parsed = tau::get(
+			"type Point = {a: sbf, b: sbf}. "
+			"i:Point := in console. o:Point := out console. "
+			"o[0].a = i[0].a.",
+			{ .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		strings i_values = { "{ a: \"1\", b: \"1\" }" };
+		ctx.add_input("i", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i_values));
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", tau_type_id<node_t>(), o);
+		auto maybe_i = run<node_t>(spec, ctx, 1);
+		(void)maybe_i; // success/failure is not the contract being pinned
+		CHECK( o->get_values().empty() ); // current behavior: silently nothing
+	}
+
 	TEST_CASE("interpreter: tuple io through file streams") {
 		// Exercises rebuild_inputs'/rebuild_outputs' stream_id != 0 branch
 		// (interpreter.tmpl.h): one physical FILE per tuple stream, wire
