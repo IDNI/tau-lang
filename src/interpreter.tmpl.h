@@ -901,9 +901,36 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 	// Uninterpreted constants are solved per alternative here; a model is
 	// baked into the alternative it was solved on, so each alternative
 	// stays self-consistent even when the chosen values differ.
+	//
+	// Only the first alternative and the last one (the most recent
+	// last-resort update clause, the part's universally executable anchor)
+	// get the full executability transform: it runs a phi-fixpoint with a
+	// cvc5 implication check per unroll step, and for a middle alternative
+	// its only effects are fixpoint tightening of a step formula that is
+	// solved in milliseconds anyway, or an F verdict that would send a
+	// conditional alternative to the body continuation regardless. Stack
+	// samples on bv[64]x14 put ~80% of the per-update wall in these
+	// transforms, one per alternative. Middle alternatives that need the
+	// transform's machinery (sometimes clauses, uninterpreted constants)
+	// still take it.
 	htrefs kept;
 	ctns.clear();
-	for (const htref& alt : alts) {
+	for (size_t idx = 0; idx < alts.size(); ++idx) {
+		const htref& alt = alts[idx];
+		if (idx != 0 && idx != alts.size() - 1) {
+			const tau& c = tau::get(alt->get());
+			tref aw = c.find_top(is_child<node, tau::wff_always>);
+			if (aw && !c.find_top(
+					is_child<node, tau::wff_sometimes>)
+				&& !c.find_top(is<node, tau::uconst>))
+			{
+				kept.push_back(alt);
+				ctns.push_back(tree<node>::geth(
+					rewriter::replace<node>(alt->get(),
+						aw, tau::trim2(aw))));
+				continue;
+			}
+		}
 		tref clause_t = alt->get();
 		tref ctn = get_executable_spec(clause_t, start_time);
 		if (ctn == nullptr) {
