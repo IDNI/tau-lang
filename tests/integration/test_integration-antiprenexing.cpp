@@ -82,6 +82,10 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// disjunct order flipped by the 8f1a74c1 parser regen
+			// (Debug's matches_to_any_of only checks expected[0] --
+			// see test_helpers.h); actual current shape first.
+			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
 			// block pipeline, 2026-08-04 (canonical shape first):
 			// under y = 0 the kept universal reduces to
 			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0

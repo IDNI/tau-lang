@@ -126,7 +126,10 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
 			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
 			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
@@ -363,9 +366,11 @@ TEST_SUITE("Normalizer bv mixed-type") {
 	// Free bitvector variables with no quantifier at all must stay put: there
 	// is nothing to decide, so the arithmetic atom survives verbatim.
 	TEST_CASE("bv_arith_all_free_with_sbf_conjunct") {
+		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "x+y = 0 && s = 0",
-					       "s = 0 && x+y = 0" }) );
+			" && s = 0.", strings{ "s = 0 && x+y = 0",
+					       "x+y = 0 && s = 0" }) );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf

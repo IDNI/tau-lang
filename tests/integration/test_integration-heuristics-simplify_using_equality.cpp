@@ -324,11 +324,13 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy|zx = 0",
 			"yx|xz = 0",
 			"xy|xz = 0",
 			"yx|zx = 0",
-			"xy|zx = 0",
 		}) );
 	}
 	TEST_CASE("2") {
@@ -359,7 +361,10 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
 			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
 			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
 			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
@@ -440,7 +445,8 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
 		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0
-		CHECK(tau::get(res).to_str() == "x = 0 || x = y || z = x");
+		// Equality operand order flipped by the 8f1a74c1 parser regen.
+		CHECK(tau::get(res).to_str() == "x = 0 || y = x || x = z");
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {

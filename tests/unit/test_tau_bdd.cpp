@@ -127,7 +127,9 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK(tau::get(t).to_str() == "x&(yz)'|x'");
+		// Order flipped by the 8f1a74c1 parser regen (subtree interning
+		// order for the "yz" conjunct changed): actual is now "x&(zy)'|x'".
+		CHECK(tau::get(t).to_str() == "x&(zy)'|x'");
 	}
 	TEST_CASE("xyzqwert no var") {
 		using bdd = tau_term_bdd<node_t>;
@@ -186,7 +188,10 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		CHECK((result == "xycdabfe" || result == "xycdabef"
+		// "ab" sub-block order flipped by the 8f1a74c1 parser regen
+		// (subtree interning order changed); actual is now "xycdbafe".
+		CHECK((result == "xycdbafe" || result == "xycdabfe"
+			|| result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab" ));
 	}
