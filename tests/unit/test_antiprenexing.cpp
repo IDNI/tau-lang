@@ -1612,8 +1612,10 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	// only as a side effect of the failed first call; LOG_ERROR at
 	// src/tau_tree.tmpl.h:471), and the inference layer Debug-asserts on
 	// that null. Warming the factory through the tolerant tree-level
-	// path (returns nullptr, no assert) makes every later parse
-	// deterministic. A raw wff-level parse does NOT warm it -- constants
+	// path (returns nullptr, no assert) was an attempted mitigation for
+	// that; it is retained defensively but did NOT resolve the order
+	// dependence -- the instability survives the warm-up (see the skip
+	// notes below). A raw wff-level parse does NOT warm it -- constants
 	// only bind during type INFERENCE, not during parsing itself, so an
 	// earlier warm-up TEST_CASE using tau::get(..., wff-start options)
 	// was inert (confirmed: the crash tracked whichever case's SAMPLE
@@ -1679,7 +1681,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 		REQUIRE( res != nullptr );
 		// Both binders survive around their references.
 		CHECK( tau::get(res).select_top(
-			is<node_t, tau::wff_ex>).size() >= 1 );
+			is<node_t, tau::wff_ex>).size() == 1 );
 		CHECK( tau::get(res).select_top(
 			is<node_t, tau::wff_ref>).size() == 2 );
 	}
@@ -1789,8 +1791,8 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 		REQUIRE( res != nullptr );
 		// The formula holds a reference, so semantic equivalence is not
 		// checkable; assert the category outcome structurally instead.
-		// The sat bv conjunct and the eliminable conjunct dissolve, and
-		// the frozen component survives with its binder.
+		// Expected: the sat bv conjunct and the eliminable conjunct
+		// dissolve, and the frozen component survives with its binder.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>)
 			!= nullptr );
 		CHECK( tau::get(res).select_top(

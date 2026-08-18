@@ -1020,6 +1020,12 @@ TEST_SUITE("with inputs and outputs") {
 	// constant). The `all i2[1]:bv[8] (...)` block was then left standing with
 	// nothing able to resolve it, the step system became unsolvable, and the
 	// run declared the spec unsat.
+	//
+	// REVIEW (HIGH): bisect-proven 2026-08-18 that 8f1a74c1's parser
+	// regeneration (nonterminal renumbering -> term-order change ->
+	// different cvc5 queries) regressed this case from <600s (old parser)
+	// to >1500s hang (4/4 attempts, up to 3h+); previously 12-271s
+	// nondeterministic (GitHub #70 family).
 	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat") {
 		const char* sample =
 			"o0seal[0]:tau = 1 && o0law[0]:tau = 1 && "

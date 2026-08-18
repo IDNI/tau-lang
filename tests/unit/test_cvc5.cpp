@@ -366,12 +366,14 @@ TEST_SUITE("config_cvc5_solver option sets") {
 	static std::string opt_under(cvc5_option_set set, const char* name,
 		bool decision_only = false)
 	{
-		const cvc5_option_set saved = cvc5_options;
+		struct cvc5_options_guard {
+			cvc5_option_set saved = cvc5_options;
+			~cvc5_options_guard() { cvc5_options = saved; }
+		} guard;
 		cvc5_options = set;
 		cvc5::Solver s(cvc5_term_manager);
 		config_cvc5_solver(s, decision_only);
 		std::string v = s.getOption(name);
-		cvc5_options = saved;
 		return v;
 	}
 

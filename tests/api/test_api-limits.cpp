@@ -71,6 +71,8 @@ TEST_SUITE("Tau API - runtime limits") {
 	// Enum setters: in-range casts, out-of-range clamps to the default.
 	TEST_CASE("set_blast_placement clamps to per_leaf") {
 		const blast_site saved = blast_placement;
+		tau_api::set_blast_placement(0);
+		CHECK( blast_placement == blast_site::per_leaf );
 		tau_api::set_blast_placement(1);
 		CHECK( blast_placement == blast_site::per_block );
 		tau_api::set_blast_placement(2);
@@ -84,6 +86,8 @@ TEST_SUITE("Tau API - runtime limits") {
 
 	TEST_CASE("set_blast_method clamps to anti_prenex_result") {
 		const blast_mode saved = blast_method;
+		tau_api::set_blast_method(0);
+		CHECK( blast_method == blast_mode::anti_prenex_result );
 		tau_api::set_blast_method(1);
 		CHECK( blast_method == blast_mode::defer );
 		tau_api::set_blast_method(5);
@@ -93,6 +97,8 @@ TEST_SUITE("Tau API - runtime limits") {
 
 	TEST_CASE("set_solver_placement clamps to eager") {
 		const solver_site saved = solver_placement;
+		tau_api::set_solver_placement(0);
+		CHECK( solver_placement == solver_site::eager );
 		tau_api::set_solver_placement(1);
 		CHECK( solver_placement == solver_site::per_closed_block );
 		tau_api::set_solver_placement(2);

@@ -445,8 +445,13 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
 		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0
-		// Equality operand order flipped by the 8f1a74c1 parser regen.
-		CHECK(tau::get(res).to_str() == "x = 0 || y = x || x = z");
+		// Equality operand order flipped by the 8f1a74c1 parser regen
+		// (Debug's matches_to_any_of only checks expected[0] -- see
+		// test_helpers.h).
+		CHECK( matches_to_str_to_any_of(res, {
+			"x = 0 || y = x || x = z",
+			"x = 0 || x = y || z = x",
+		}) );
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {

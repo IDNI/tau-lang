@@ -48,4 +48,5 @@ set_tests_properties("test_repl-limit_effect-specsizewarn_fires" PROPERTIES
 add_test(NAME "test_repl-limit_effect-specsizewarn_off_by_default"
 	COMMAND bash -c "printf 'run u[t] = i1[t] && o1[t] = 0.\\no1[t] = 0.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-limit_effect-specsizewarn_off_by_default" PROPERTIES
-	FAIL_REGULAR_EXPRESSION "spec-size-warn threshold")
+	FAIL_REGULAR_EXPRESSION "spec-size-warn threshold"
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := ")

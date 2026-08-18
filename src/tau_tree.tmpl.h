@@ -468,6 +468,9 @@ tref tree<node>::get_ba_constant_from_source(
 	tref r = get_ba_constant(ba_constants<node>::get(
 					dict(constant_source_sid),
 					ba_types<node>::type_tree(ba_type_id)));
+	// REVIEW (MEDIUM): first BA-constant parse for bv/:tau sources in some
+	// test packs fails order-dependently (lazy provider init; see the skip
+	// notes in tests/unit/test_antiprenexing.cpp, 2026-08-18).
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
 		<< ba_types<node>::name(ba_type_id) << "`.";

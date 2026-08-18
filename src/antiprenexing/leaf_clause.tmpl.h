@@ -159,6 +159,12 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// needs -- no kept variable occurs in a free conjunct, and no live
 	// variable occurs in a kept conjunct -- by construction rather than by
 	// assumption.
+	// REVIEW (MEDIUM): this `!= eliminable` gate routes every blasteable
+	// variable into `kept_set` (and so into the re-wrapped part below)
+	// before it can reach the solver/blast loop at :317-362, making that
+	// loop unreachable through this path (empirically confirmed
+	// 2026-08-18; pinned in tests/unit/test_leaf_clause.cpp -- the pins
+	// must flip if this gate narrows).
 	subtree_unordered_set<node> kept_set, reserved;
 	for (tref v : block)
 		if (elim.verdict_of(v) != elim_verdict::eliminable)

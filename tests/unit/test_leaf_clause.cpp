@@ -234,9 +234,9 @@ TEST_SUITE("leaf_clause direct calls") {
 		auto [binder_block, body] = strip_block(fm, 1);
 		tref v = newly_freed_var(fm, body);
 		REQUIRE( v != nullptr );
-		// Diagnostic: records whether the binder-side node and the
-		// body-side occurrence actually differ (the suspected cause of
-		// verdict_of missing on the binder-side lookup).
+		// Invariant: the binder-side variable node and the body-side
+		// occurrence must be interned identically, or verdict_of's
+		// binder-side lookup would miss.
 		CHECK( tau::get(binder_block[0]) == tau::get(v) );
 		auto elim = production_style_elim(el, { v });
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
@@ -279,7 +279,11 @@ TEST_SUITE("leaf_clause direct calls") {
 		// Two bv variables, only one in the block: not closed, and with
 		// blasting off the keep-binder fall-through
 		// (leaf_clause.tmpl.h:361-362 / 486-491) must retain ex.
-		const bool saved = bv_blasting; bv_blasting = false;
+		struct bv_blasting_guard {
+			bool saved = bv_blasting;
+			~bv_blasting_guard() { bv_blasting = saved; }
+		} guard;
+		bv_blasting = false;
 		tref fm = parse("ex x : bv[8] x + x = y.");
 		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
@@ -294,7 +298,6 @@ TEST_SUITE("leaf_clause direct calls") {
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			body, { v }, elim, order);
-		bv_blasting = saved;
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}

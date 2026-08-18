@@ -129,7 +129,8 @@ TEST_SUITE("BDD creation terms") {
 		tref t = bdd::to_tau_term(xx, 1);
 		// Order flipped by the 8f1a74c1 parser regen (subtree interning
 		// order for the "yz" conjunct changed): actual is now "x&(zy)'|x'".
-		CHECK(tau::get(t).to_str() == "x&(zy)'|x'");
+		CHECK((tau::get(t).to_str() == "x&(zy)'|x'"
+			|| tau::get(t).to_str() == "x&(yz)'|x'"));
 	}
 	TEST_CASE("xyzqwert no var") {
 		using bdd = tau_term_bdd<node_t>;
