@@ -547,7 +547,16 @@ TEST_SUITE("Execution") {
 	// alternatives plus the newest clause, landing on exactly 1.
 	TEST_CASE("u[t] = i1[t]: max_revision_alts cap trim") {
 		bdd_init<Bool>();
-		const size_t saved_cap = interpreter<node_t>::max_revision_alts;
+		// RAII restore: run_with_cap's REQUIRE can throw past a
+		// trailing plain-assignment restore, leaking the cap into
+		// every later case -- restore unconditionally in ~dtor
+		// instead, matching the cap_guard pattern above.
+		struct cap_guard {
+			size_t saved = interpreter<node_t>::max_revision_alts;
+			~cap_guard() {
+				interpreter<node_t>::max_revision_alts = saved;
+			}
+		} guard;
 		auto run_with_cap = [&](size_t cap) {
 			interpreter<node_t>::max_revision_alts = cap;
 			auto spec = create_spec(
@@ -578,7 +587,6 @@ TEST_SUITE("Execution") {
 		};
 		size_t uncapped_max_alts = run_with_cap(0); // growth guard
 		size_t capped_max_alts   = run_with_cap(1); // trim proof
-		interpreter<node_t>::max_revision_alts = saved_cap;
 		CHECK( uncapped_max_alts == 2 );
 		CHECK( capped_max_alts == 1 );
 		CHECK( capped_max_alts < uncapped_max_alts );
@@ -590,8 +598,18 @@ TEST_SUITE("Execution") {
 	// runtime-not-hardcoded policy).
 	TEST_CASE("gc knobs preserve semantics") {
 		bdd_init<Bool>();
-		const size_t saved_min = interpreter<node_t>::gc_min_size;
-		const double saved_gf = interpreter<node_t>::gc_growth_factor;
+		// RAII restore: run_with's REQUIRE can throw past a trailing
+		// plain-assignment restore, leaking both knobs into every
+		// later case -- restore unconditionally in ~dtor instead,
+		// matching the cap_guard pattern above.
+		struct gc_guard {
+			size_t saved_min = interpreter<node_t>::gc_min_size;
+			double saved_gf = interpreter<node_t>::gc_growth_factor;
+			~gc_guard() {
+				interpreter<node_t>::gc_min_size = saved_min;
+				interpreter<node_t>::gc_growth_factor = saved_gf;
+			}
+		} guard;
 		auto run_with = [&](size_t min_sz, double growth) {
 			interpreter<node_t>::gc_min_size = min_sz;
 			interpreter<node_t>::gc_growth_factor = growth;
@@ -612,8 +630,6 @@ TEST_SUITE("Execution") {
 		};
 		auto aggressive = run_with(1, 0.1);   // sweep on every step
 		auto disabled   = run_with(1, 0.0);   // gc off entirely
-		interpreter<node_t>::gc_min_size = saved_min;
-		interpreter<node_t>::gc_growth_factor = saved_gf;
 		CHECK( aggressive.first  == disabled.first );
 		CHECK( aggressive.second == disabled.second );
 	}
