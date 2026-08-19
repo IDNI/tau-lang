@@ -1503,17 +1503,19 @@ tref process_quantifier_blocks(tref fm, const eliminability<node>& el,
 			return scoped;
 		return m;
 	};
-	// The cap is unconditional: the termination argument documented below is
-	// subtle enough that a regression in it must fail loudly rather than hang
-	// Release forever. The DBG assert stays so a Debug run stops at the
-	// offending formula instead of silently returning it unprocessed.
+	// The cap takes the documented graceful give-up (log + return the
+	// formula unprocessed) in every build. A DBG assert used to guard this
+	// spot, but once block_max_rounds became a runtime parameter whose
+	// default is unlimited it could never fire at the default (rounds
+	// never reaches SIZE_MAX) — it only aborted Debug runs of users who
+	// set a FINITE cap, contradicting api::set_block_max_rounds's
+	// contract. Removed 2026-08-19; the LOG_ERROR below is the loud
+	// failure channel in all configurations.
 	// Read once into a local: a caller retuning it mid-pass would otherwise
-	// move the goalposts between the assert and the comparison.
+	// move the goalposts between iterations.
 	const size_t max_rounds = block_max_rounds;
 	size_t rounds = 0;
 	for (;;) {
-		DBG(assert(rounds < max_rounds
-			&& "process_quantifier_blocks did not converge");)
 		if (++rounds > max_rounds) {
 			LOG_ERROR << "process_quantifier_blocks: no convergence "
 				"after " << max_rounds << " rounds, returning the "
