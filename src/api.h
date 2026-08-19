@@ -250,6 +250,9 @@ struct api {
 	static void set_max_revision_alts(size_t n);
 	/** @brief Enable/disable indenting in pretty-printed output. */
 	static void set_indenting(bool state);
+	/// Enable/disable support-component factoring of the Tau-BA
+	/// constant/valid tests (tau_ba.tmpl.h). Off by default.
+	static void set_ba_component_factoring(bool state);
 	/** @brief Enable/disable ANSI colour highlighting in output. */
 	static void set_highlighting(bool state);
 	/** @brief Enable/disable JSON output mode. */

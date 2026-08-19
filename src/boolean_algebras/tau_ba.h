@@ -24,6 +24,13 @@
 
 namespace idni::tau_lang {
 
+/// Opt-in for support-component factoring of the Tau-BA constant/valid
+/// tests (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h). Off by
+/// default; enabled via `api::set_ba_component_factoring(true)` or the
+/// environment variable TAU_BA_COMPONENT_FACTORING (a value of "0"
+/// disables).
+inline bool ba_component_factoring = false;
+
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.
 // See also (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html)
