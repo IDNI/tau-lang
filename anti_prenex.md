@@ -40,7 +40,7 @@ atom shapes reaching the core (post phase 3), each optionally under one ¬:
     — never f ≠ g, and no mirrored/negated order operator (≰ ≮ ≥ > ≱ ≯)
     — equations stay as written (invariant 4); order atoms are never rewritten
       into equations — decomposed only by BOOLE_DECOMPOSE_NON_EQUALITY_PIVOT,
-      consumed only by ELIMINATE_BITVECTOR_CLAUSE
+      consumed only by ELIMINATE_BITVECTOR_CLAUSE's solver path
 
 discharge (both valid in ANY BA — thm:boole-const):
     ∃X. f = 0   ≡   ∀_X f = 0
@@ -52,20 +52,34 @@ discharge (both valid in ANY BA — thm:boole-const):
 term representation, per component (PREPARE_TERMS):
     A term is a BDD whose DECISION VARIABLES are exactly the block's variables
     and whose LEAVES hold everything else: free variables, constants, references,
-    foreign-typed sub-terms. This is thm:mnf over X only,
+    foreign-typed sub-terms, and functional quantifiers over block-free bodies.
+    This is thm:mnf over X only,
     f(x⃗,y⃗) = ⋃_{a ∈ 2^|X|} f(a,y⃗) · x⃗^a, with arbitrary BA coefficients.
     Consequences:
       - cofactoring on x ∈ X is CHILD SELECTION; nothing else is ever cofactored on
       - ∀_X f = meet of the leaves,  ∃_X f = join of the leaves — one traversal
-      - substitution (unique-zero arm, TRY_WITNESS) is a BDD compose PLUS
-        rewriting x inside the leaves (r(x) ↦ r(t)) — sound for any term, reaches
-        every occurrence, needs no leaf guard
+      - substitution (unique-zero arm, TRY_WITNESS, the clamp) is a BDD compose
+        PLUS rewriting x inside the leaves (r(x) ↦ r(t)) — sound for any term,
+        reaches every occurrence, needs no leaf guard
       - depth is bounded by |X|, not by the formula's variable count
+      - FUNCTIONAL QUANTIFIERS ARE TRANSPARENT — term operators binding their
+        subscript: Y is excluded from FV and alpha-renamed with the formula
+        binders. Cofactoring on x ∉ Y commutes with them, so PREPARE_TERMS
+        backs the BODY over P and slides the quantifier onto the body's
+        leaves — ∀_Y(x·b₁ ∪ x′·b₀) = x·∀_Y b₁ ∪ x′·∀_Y b₀, dually for ∃_Y: a
+        Y-substitution is a homomorphism fixing x, and meet/join distribute
+        over an orthogonal decomposition. Linear in the body's BDD; nesting
+        recurses innermost-first. Under keep_functional, deep block nesting
+        stacks quantifier chains at the leaves — linear per level, amortised
+        by hash-consing and quant_memo, inherent to symbolic mode.
       - LEAF HAZARD: a block variable may occur inside a leaf (a reference
         argument), where cofactoring does not reach — a leaf is opaque, its
         Shannon expansion may not be assumed — so a leaf-x makes f₀/f₁ not
-        cofactors at all. Guarded by `usable`, COFACTOR_REDUCE's FV check, and
-        the absorb arm's equation-only license
+        cofactors at all. A functional quantifier never hides a block
+        variable — only a reference or foreign subterm does, including one
+        inside a quantifier's body. Guarded by `usable`, COFACTOR_REDUCE's FV
+        check, and ABSORB_PIVOT's per-conjunct cofactor test (a leaf-x
+        conjunct is clamped by substitution instead)
 ```
 
 `ctx` carries:
@@ -77,48 +91,80 @@ term representation, per component (PREPARE_TERMS):
 | `prio` | pivot priority. inner → **higher** rank |
 | `used` | pivots barred on the current path. Needed by **both** decomposition forms: the non-equality split retains the pivot, the equality form's β re-introduces it negated |
 | `subsume_max` | constant threshold on a clause's negative count, above which O4's subsumption scan is skipped |
-| `keep_functional` | emit `∀_X`/`∃_X` symbolically instead of discharging them |
-| `push_memo` | `(φ, X) → formula`, per component. `used` is not in the key; an in-progress entry is a miss (see `PUSH_BLOCK`) |
-| `elim_memo` | `(clause, X) → formula`, per component. `used` plays no role in elimination, so the key is exact |
-| `quant_memo` | `(term, ∀ or ∃) → term`, per component |
-| `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable)`, per component. Filled by `CLASSIFY`, read by `BOOLE_DECOMPOSE_EQUALITY_PIVOT`; the facts are ψ-independent |
-| `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`. Per RUN — shared across components and blocks, never reset |
+| `qbf_node_max` | constant node budget for `DECIDE_FINITE`'s BDD sweep, past which it falls back to `ASK` |
+| `keep_functional` | emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below) |
+| `push_memo` | `(φ, X, keep_functional) → formula`, GLOBAL (cache scope, below). `used` is not in the key; an in-progress entry is a miss (see `PUSH_BLOCK`) |
+| `elim_memo` | `(clause, X, keep_functional) → formula`, GLOBAL. `used` plays no role in elimination, so the key is exact |
+| `quant_memo` | `(term, ∀ or ∃) → term`, per COMPONENT — the key elides the quantified block (see `DISCHARGE`) |
+| `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable)`, GLOBAL. Filled by `CLASSIFY`, read by `BOOLE_DECOMPOSE_EQUALITY_PIVOT`; pure functions of the key — the settled term already reflects `keep_functional` |
+| `pool` | `atom → (x(atm), class, admission index)`, per COMPONENT — ψ-independent, but which of an atom's variables are block variables is contextual. Filled lazily by `ADMIT` (§6, 2e) |
+| `occ_memo` | `formula node → { atom ↦ (bare, in_or, count) }`, GLOBAL. Filled by `OCC` (§6, 2e); purely structural |
+| `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
+| `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
 
 The two rank conventions are opposite and cannot be merged: `order` is consumed
 innermost-first by BDD quantification; `prio` is read by pivot selection, which
 prefers the atom carrying the innermost variable.
+
+**Cache scope** follows one rule: a table is GLOBAL — outliving the call,
+shared across `ANTI_PRENEX` runs, components, and blocks — exactly when its key
+names everything its entries depend on. The variable set is explicit: the
+ordered `X` of `push_memo`/`elim_memo` fixes the type, every atom's block
+subset (`FV(atm) ∩ P = FV(atm) ∩ X`), and the relative prios; `cof_memo`
+carries its `x`; `occ_memo`, `solver_memo`, and `qbf_memo` involve none. The mode:
+`keep_functional` joins `push_memo`'s and `elim_memo`'s keys alone — their
+entries embed `DISCHARGE`'s output, which the flag switches — while `cof_memo`
+needs no flag, its settled-term key being formed AFTER `SETTLE_FUNCTIONAL`
+applied the mode, and `occ_memo` is purely structural. `quant_memo` and `pool`
+elide their variable set — the block is implied by the component — so they
+reset with it. Two caveats: a global `push_memo` entry embeds the criterion-6
+tie-breaks (§6, 2e) of the component that FIRST computed it — deterministic,
+admission order being a function of the component input alone, but canonical
+per table lifetime, not per component. And two configuration knobs sit in no
+key: the solver configuration and `qbf_node_max`. `solver_memo` is valid per
+solver configuration and is flushed when it changes; a result-cache entry that
+embedded an `unknown`- or budget-based re-wrap stays sound (inv. 3) yet blind
+to a stronger solver or a raised budget — flush `push_memo`/`elim_memo` on
+either change to reclaim that precision. `qbf_memo` is exempt from every flush:
+`DECIDE_FINITE` records there only verdicts its own BDD sweep produced —
+mathematical truths, valid under any configuration — while verdicts that came
+through its `ASK` fallback live in `solver_memo` under that table's flush rule.
 
 ---
 
 ## 2. Invariants
 
 1. **The push holds no type-specific reasoning and discharges nothing itself.**
-   Every identity it uses holds in any BA; the single exception is 2a, which
-   *asks* the type table (`EX_DISTRIBUTES_OVER_NEGATIVES`) rather than deciding
-   anything. Every elimination goes through §7. Atomlessness is asserted in
-   exactly two places — that capability and `ELIMINATE_ATOMLESS_CLAUSE`'s
-   negative rule — and they are two uses of **one** theorem
-   (`cor:Multivariate-BFs-over`).
+   Every identity it uses holds in any BA; the exceptions are 2a and its
+   rank-1 mirror in `PUSH_OVER_DISJUNCTION`, which *ask* the type table
+   (`EX_DISTRIBUTES_OVER_NEGATIVES`) rather than deciding anything. Every
+   elimination goes through §7. Atomlessness is asserted in exactly two
+   places — that capability and `ELIMINATE_ATOMLESS_CLAUSE`'s per-negative
+   split (one `NEGATIVE_CONDITION` conjoined per negative) — and they are two
+   uses of **one** theorem (`cor:Multivariate-BFs-over`).
 2. **Type homogeneity is derived, not required.** A term carries one BA type, so
    no atom mentions variables of two types, so the shared-atom partition in
    `PUSH_EX_BLOCK` cannot merge across types — every component is
    type-homogeneous, which makes `ctx.type` well defined. `COLLECT_RUN` does no
    type test. A mixed-type component arises only through a non-atomic conjunct
    (a reference with arguments of several types, a nested binder), and every
-   elimination method freezes those.
+   elimination method freezes those it cannot read — a reference always, a
+   surviving binder unless its body is translatable for the method's engine, in
+   which case the unit is swallowed whole into a query (§7), never opened.
 3. **A surviving quantifier is sound.** Callers read it as *undecided*, never as
    false. Every graceful exit re-wraps; no method may answer `F` for "cannot
    decide".
 4. **Negation is at formula level** from phase 3 onward — `¬(f = 0)`, never
    `f ≠ 0`, and no fused negated order operator. Equations are *not*
-   zero-normalised; `ELIMINATE_ATOMLESS_CLAUSE` is the only method that rewrites
-   one.
+   zero-normalised; `SQUEEZE_AND_SUBSUME` — shared by
+   `ELIMINATE_ATOMLESS_CLAUSE` and `ELIMINATE_FINITE_CLAUSE` (§7, shared
+   helpers) — is the only place that rewrites one.
 5. **A positive pivot survives only in the plain split** — the last arm of
    `BOOLE_DECOMPOSE_EQUALITY_PIVOT` and all of
    `BOOLE_DECOMPOSE_NON_EQUALITY_PIVOT`. Every other arm absorbs the pivot away
    (2j), substitutes it out (unique zero), or folds it. A retained or negated
    pivot is barred from re-selection by `ctx.used`, which keeps the recursion
-   well-founded given that `CHOOSE_PIVOT` descends through `¬`.
+   well-founded given that `CHOOSE_PIVOT` sees atoms under `¬`.
 6. **Everything the algorithm builds is simplified at the point of
    construction** — an atom by `SIMPLIFY_ATOM`, a cofactor by `SIMPLIFY_TERM`, a
    formula built by substituting into one or conjoining onto one by `SIMPLIFY` —
@@ -135,6 +181,19 @@ prefers the atom carrying the innermost variable.
    A guard is a term comparison; a body is a recursion. No body is built until
    its guard has survived, a guard that folds to `T` makes the later branches
    dead, and a conjunct that folds to `F` decides its clause immediately.
+8. **Constant-time work before linear before exponential — the cost ladder is
+   strict.** Every dispatch tries its options cheapest class first, and a
+   cheaper rung's success makes the dearer rungs unreachable: a memo or pool
+   hit, a syntactic test on hash-consed values, a `T`/`F` fold — constant —
+   before one traversal (`SIGN_CENSUS`, `TRY_WITNESS`, the union-find
+   re-partition) before anything that multiplies (a Boole decomposition, 2b's
+   cross product, a solver call). Sound because every rung is one-way (§3): it
+   decides or falls through, never approximates. It is why the memo wrappers
+   sit outside the workers, the dispatcher tries the fast paths before 2d/2e,
+   `PUSH_OVER_DISJUNCTION` ranks its disjuncts, `PUSH_OVER_CONJUNCTION`
+   re-partitions before its fast paths, elimination tries witnesses before
+   methods, and the decided arms precede the live split. A new branch joins
+   the ladder at its cost class — never ahead of a cheaper one.
 
 ---
 
@@ -143,7 +202,12 @@ prefers the atom carrying the innermost variable.
 ```
 ANTI_PRENEX(φ, keep_functional = false):
     if φ carries no quantifier: return φ
- 0. φ ← CANONICALISE_BINDER_IDS(φ)     // makes every later substitution capture-safe
+ 0. φ ← CANONICALISE_BINDER_IDS(φ)     // formula binders AND functional-
+                                       //   quantifier subscripts: makes every
+                                       //   later substitution capture-safe and
+                                       //   the canonical query keys (ASK,
+                                       //   DECIDE_FINITE) collide across
+                                       //   alpha-variants
  1. φ ← TO_NNF(φ) ; φ ← SIMPLIFY(φ)
  2. φ ← ELIMINATE_BY_SUBSTITUTION(φ) ; φ ← SIMPLIFY(φ)
  3. φ ← NORMALIZE_OPERATORS(φ)
@@ -196,8 +260,10 @@ NORMALIZE_OPERATORS(φ):
 elimination, and equality propagation — see below; one IMPLICIT parameter, the
 block `X` in scope), `FOLD_DEGENERATE_BINDERS` (drop a binder over a constant
 scope or an absent variable), `NORM_EQUATION` (`l = r ↦ l + r = 0`, descending
-through one `¬`) and `TERM_OF` (for an atom `l = r`, the term `l + r`) are
-primitives. So are the two aggressive normalisers of invariant 6:
+through one `¬`), `TERM_OF` (for an atom `l = r`, the term `l + r`) and
+`REWRAP(φ, X)` (re-attach `∃X` around `φ`, in `X`'s order — every graceful
+exit of invariant 3) are primitives. So are the two aggressive normalisers of
+invariant 6:
 
 - `SIMPLIFY_TERM(t)` — constant folding, absorption and complement laws, per-path
   contradiction, and reduction to the canonical form of the BDD backing `t`.
@@ -252,9 +318,10 @@ unequal until `y := a` turns `f` into `a`.
   component's `X`; phases 1–2 and 5 bind it to `∅` (nothing is BDD-backed
   there), making the guard vacuous.
 - **The pinning conjunct stays.** `y` is free, so `y + t = 0` still constrains
-  it; only the siblings change. Harmless for the squeeze: an X-free positive
-  contributes the same term to both cofactors, which can only make `f₀ = f₁`
-  more likely.
+  it; only the siblings change — which is also why a binder-unit sibling may be
+  skipped (§4, what may touch a unit). Harmless for the squeeze: an X-free
+  positive contributes the same term to both cofactors, which can only make
+  `f₀ = f₁` more likely.
 
 A heuristic, not a monotone gain: a `t` larger than `y` enlarges terms, and
 larger terms compare equal less often.
@@ -266,7 +333,7 @@ the equality-pivot arm tests, O1–O4, `COFACTOR_REDUCE`. All are one-way; failu
 falls through to a more general path.
 
 `NORM_EQUATION` rewrites an atom and is called in exactly one place:
-`ELIMINATE_ATOMLESS_CLAUSE` step 2, whose squeeze needs zero form. Everywhere
+`SQUEEZE_AND_SUBSUME` step 1, whose squeeze needs zero form. Everywhere
 else equations stay as written — `TERM_OF` reads a term off an atom without
 touching it, and every substitution keyed on an atom uses the atom as it occurs
 in the formula.
@@ -305,9 +372,31 @@ COLLECT_RUN(h) → { kind, vars, matrix }:
 ```
 
 No fixpoint is needed: a run is always eliminated over a final matrix, and a
-binder that survives elimination is itself final — re-examining it yields the
-same result. One left standing at the top of a processed matrix stays inside
-that matrix rather than joining the enclosing run.
+binder that survives elimination is final AS A UNIT — its inner structure is
+never re-opened, and one left standing at the top of a processed matrix stays
+inside that matrix rather than joining the enclosing run. Final is not
+untouchable: an outer block pushed down to such a unit hands it whole to §7,
+where a method may swallow it into a solver or `DECIDE_FINITE` query and decide
+it — so a clause that re-wrapped open is decided the moment enough enclosing
+blocks have closed it. Re-running elimination on the unit alone would yield the
+same re-wrap; deciding the LARGER query is new information, not re-examination,
+and each enclosing block makes exactly one such attempt (§8) — still no
+fixpoint.
+
+**What may touch a unit.** Exactly one class of REWRITE reaches inside a
+unit's body: substitution of a free variable. (Reading is different: a
+query-based method swallows a unit wholesale, and its translation — the
+solver's, `BIT_BLAST`'s — consumes the body without rewriting it.)
+`TRY_WITNESS`, the unique-zero
+arm, and `ABSORB_PIVOT`'s clamp MUST descend — each deletes the conjunct that
+licensed the substitution (the pinning `x = t`, the pivot), so an untouched
+inner occurrence would desynchronise from the outer rewrite — and binder-id
+canonicalisation (§3, phase 0) makes the descent capture-safe. Equality
+propagation MAY skip a unit and stays sound: its pinning conjunct remains in
+place (§3). Everything else treats a unit as an opaque leaf — `OCC` and the
+census do not descend, no pivot is chosen inside one, and "holds no
+disjunction" (§6) is judged with units opaque. The one whole-unit rewrite is
+§5's dualisation, which flips a unit's quantifiers in and back out.
 
 ---
 
@@ -323,8 +412,9 @@ PROCESS_BLOCK(blk, kf):
 ```
 
 The two negations flip already-pushed inner quantifiers in and back out; the ∃
-machinery treats an inner binder as opaque, so inner structure is transported,
-not rewritten.
+machinery treats an inner binder as opaque and transports it — free-variable
+substitution is the one operation that reaches inside a unit's body (§4, what
+may touch a unit).
 
 ```
 PUSH_EX_BLOCK(body, X, kf):
@@ -340,13 +430,23 @@ PUSH_EX_BLOCK(body, X, kf):
         ctx.prio  ← { P[i] ↦ i+1 }                // inner → HIGHER, ranks 1..|P|
         ctx.used  ← ∅
         ctx.keep_functional ← kf
-        ctx.subsume_max ← K                       // constant, see §7
-        ctx.push_memo ← ∅ ; ctx.elim_memo ← ∅
-        ctx.quant_memo ← ∅ ; ctx.cof_memo ← ∅
-        ctx.solver_memo ← the run's shared table  // the one field not fresh per
-                                                  //   component (§7, ASK)
+        ctx.subsume_max ← K ; ctx.qbf_node_max ← K′   // constants, see §7/§9
+        ctx.quant_memo ← ∅ ; ctx.pool ← ∅         // the two component-scoped
+                                                  //   caches (§1, cache scope)
+        ctx.push_memo, ctx.elim_memo, ctx.cof_memo, ctx.occ_memo,
+            ctx.solver_memo, ctx.qbf_memo ← the global tables
+                                                  // cross-run, never reset (§1)
         body ← PREPARE_TERMS(body, P, ctx.order)  // BDD-back both sides of every
-                                                  //   atom touching P (§1)
+                                                  //   atom touching P (§1). Two
+                                                  //   binder kinds, two rules: a
+                                                  //   FORMULA-level binder unit is
+                                                  //   transported opaque — §7
+                                                  //   translates one syntactically
+                                                  //   at query time — while a
+                                                  //   TERM-level functional
+                                                  //   quantifier IS prepared: it
+                                                  //   slides onto its body's
+                                                  //   leaves (§1 transparency)
         body ← PUSH_BLOCK(body, P, ctx)
     return body
 ```
@@ -361,11 +461,15 @@ PUSH_BLOCK(φ, X, ctx):                            // memo wrapper
                                        //   quantification. FV includes leaf
                                        //   occurrences (§1)
     if X = ∅: return φ
-    k ← (φ, X)     // the rest of ctx is component-constant; `used` is not in the
-                   //   key — a COMPLETED entry answers ∃X.φ whatever `used`
-                   //   produced it (no recursion on a hit), and an IN-PROGRESS
-                   //   entry is a miss: meeting (φ, X) inside its own computation
-                   //   is the recursion `used` exists to stop.
+    k ← (φ, X, ctx.keep_functional)
+                   // global: the key names all the entry depends on (§1, cache
+                   //   scope), so it suffices across components and runs. `used`
+                   //   is not in the key — a COMPLETED entry answers ∃X.φ
+                   //   whatever `used` produced it (no recursion on a hit), and
+                   //   an IN-PROGRESS entry is a miss: meeting the key inside
+                   //   its own computation is the recursion `used` exists to
+                   //   stop. Components — and runs — execute sequentially, so a
+                   //   foreign entry is always complete.
     if ctx.push_memo[k] is complete:    return ctx.push_memo[k]
     if ctx.push_memo[k] is in progress: return PUSH_BLOCK_UNCACHED(φ, X, ctx)
     mark ctx.push_memo[k] in progress
@@ -380,10 +484,16 @@ PUSH_BLOCK_UNCACHED(φ, X, ctx):                   // dispatcher
         if r ≠ ⊥: return r
     if φ = ⋁ dᵢ:  return PUSH_OVER_DISJUNCTION(φ, X, ctx)
     if φ = ⋀ cᵢ:  return PUSH_OVER_CONJUNCTION(φ, X, ctx)
-    if φ is an atom or a negated atom:
-        return ELIMINATE_BLOCK(φ, X, ctx)             // a one-literal clause
-    return REWRAP(φ, X)      // reference, nested binder, temporal operator, or ¬
-                             //   over one: pushed as far as it goes (inv. 3)
+    if φ is an atom, a negated atom, or a nested binder:
+        return ELIMINATE_BLOCK(φ, X, ctx)
+                             // a one-literal (or one-unit) clause. A nested
+                             //   binder reaches §7 so a method may swallow the
+                             //   unit into a query — once enough blocks close
+                             //   it, it must be DECIDED, not wrapped deeper;
+                             //   if nothing fires, the method's re-wrap is
+                             //   exactly the REWRAP below
+    return REWRAP(φ, X)      // reference, temporal operator, or ¬ over one:
+                             //   pushed as far as it goes (inv. 3)
 ```
 
 ### 2a / 2b — the two whole-formula fast paths
@@ -436,9 +546,9 @@ DISTRIBUTE_TO_ATOMS(φ, X, ctx):
 
 ```
 PUSH_OVER_DISJUNCTION(⋁dᵢ, X, ctx):
-    // Ranked by cost — tiers 0–2 fully eliminate without splitting: a clause is
-    // ONE ELIMINATE_BLOCK call, 2a is |atoms| calls, 2b multiplies only up to
-    // the squeeze cap; tier 3 decomposes.
+    // Ranked by cost (inv. 8) — tiers 0–2 fully eliminate without splitting: a
+    // clause is ONE ELIMINATE_BLOCK call, 2a is |atoms| calls, 2b multiplies
+    // only up to the squeeze cap; tier 3 decomposes.
     rank(d) = 0 if d holds no disjunction                       // already a clause
               1 if EX_DISTRIBUTES_OVER_NEGATIVES(ctx.type)
                    and every X-touching leaf of d is a negated equation       // 2a
@@ -463,8 +573,8 @@ PUSH_OVER_CONJUNCTION(⋀cᵢ, X, ctx):
     // connections. ∃ distributes over variable-disjoint parts, each keeping its
     // own variables: ∃X(ψ₁ ∧ ψ₂) = ∃X₁ψ₁ ∧ ∃X₂ψ₂, Xᵢ = X ∩ FV(ψᵢ). Splitting
     // BEFORE the fast paths keeps 2b's cross product per part and turns
-    // 2^(k₁+k₂) into 2^k₁ + 2^k₂. Union-find, near-linear; the narrowed Xᵢ
-    // keeps the memo key canonical.
+    // 2^(k₁+k₂) into 2^k₁ + 2^k₂ (inv. 8). Union-find, near-linear; the
+    // narrowed Xᵢ keeps the memo key canonical.
     parts ← conjuncts of dep grouped by shared block variables
     if |parts| > 1:
         acc ← a SIMPLIFIED_AND_JOIN holding indep
@@ -486,23 +596,52 @@ PUSH_OVER_CONJUNCTION(⋀cᵢ, X, ctx):
 
 ### 2e — pivot
 
+**The candidate index.** `CHOOSE_PIVOT` walks nothing: candidates come from two
+caches keyed on immutable values, so neither is ever invalidated — a formula an
+arm rebuilds is a NEW key that pays only for its fresh spine, an unchanged
+subtree hits (asm. 1). Keeping candidates current costs the size of the change.
+
+```
+OCC(n, ctx) → { atom ↦ (bare, in_or, count) }:     // memoized in ctx.occ_memo
+    atom a             ↦  { a ↦ (true, false, 1) }
+    ¬ over an atom a   ↦  { a ↦ (false, false, 1) }        // the INNER atom
+    ∧/∨ node           ↦  merge the children's maps LEFT TO RIGHT, a key
+                          keeping its first position, so keys sit in document
+                          order — bare/in_or OR-ed, counts summed (tree count:
+                          a shared subtree contributes through each parent);
+                          a ∨ node then sets in_or on every atom of the map
+    anything else      ↦  ∅      // quantifier, temporal operator, reference:
+                                 //   not descended
+
+ADMIT(atm, ctx):                  // one-time pool record; no-op when present
+    // LAZY — paid on the atom's first CHOOSE_PIVOT touch, so a formula the
+    // fast paths fully handle classifies nothing. ψ-independent, computed
+    // once: at every call X = P ∩ FV(φ) ⊇ FV(atm) ∩ P, so x(atm), and with
+    // it class, never varies. Admission order — query order across calls,
+    // document order within one (OCC's merge) — is a function of the
+    // component input alone, making the criterion-6 tie-break canonical.
+    x ← the block variable in atm with the highest prio
+    ctx.pool[atm] ← (x, CLASSIFY(atm, x, ctx), the next admission index)
+```
+
 ```
 CHOOSE_PIVOT(ψ, X, ctx) → (atom, variable) | ⊥:
-    // ALL atoms are candidates, including those under ¬ — the INNER atom is
-    // collected: splitting on f = 0 inside ¬(f = 0) is the same case analysis,
-    // and ψ[atm ↦ T] turns ¬atm into ¬T, folded to F. Non-negated is preference
+    // ALL atoms are candidates, including those under ¬ — OCC keeps the INNER
+    // atom: splitting on f = 0 inside ¬(f = 0) is the same case analysis, and
+    // ψ[atm ↦ T] turns ¬atm into ¬T, folded to F. Non-negated is preference
     // (1), not a filter.
-    cands ← atoms of ψ, top-down, descending through ¬ but not into quantifiers
-              or temporal operators; atoms in ctx.used are skipped
-    keep only atoms in which some x ∈ X occurs free        // "x explicit in f"
-    for atm in cands: x(atm) ← the X-variable in atm with the highest prio
-    order candidates by, in decreasing priority:
-      0. CLASSIFY(atm, x(atm), ctx):  DECIDED > XFREE > UNIQUE > ZERO > PLAIN
-      1. has a BARE (non-negated) occurrence in ψ     — the paper's preference
-      2. occurs inside a DISJUNCTION of ψ             — see below
+    cands ← keys of OCC(ψ, ctx), in map order, skipping ctx.used and every
+              atom in which no x ∈ X occurs free       // "x explicit in f"
+    ADMIT each candidate, in cands order
+    order candidates by, in decreasing priority:       // 1/2/5 read OCC(ψ);
+                                                       //   0/6 read the pool
+      0. class:  DECIDED > XFREE > UNIQUE > ZERO > PLAIN
+      1. bare  — a non-negated occurrence in ψ     — the paper's preference
+      2. in_or — occurs inside a DISJUNCTION of ψ  — see below
       3. is an equation
-      4. max{ ctx.prio[v] : v ∈ FV(atm) ∩ X }         — innermost variable
-      5. occurrence count of atm in ψ         — more collapse under [atm ↦ T/F]
+      4. max{ ctx.prio[v] : v ∈ FV(atm) ∩ X }      — innermost variable
+      5. count — more collapse under [atm ↦ T/F]
+      6. admission index — the stable tie-break of last resort
     return (best candidate, its x(atm))
 
     // Why (2): a negated-only atom occurring solely as a top-level conjunct
@@ -521,16 +660,16 @@ CLASSIFY(atm, x, ctx) → DECIDED | XFREE | UNIQUE | ZERO | PLAIN:
         f₀ ← SIMPLIFY_TERM(f[x←0]) ; f₁ ← SIMPLIFY_TERM(f[x←1])
         usable ← (x ∉ FV(f₀) ∪ FV(f₁))          // §1 leaf hazard
         p ← usable ? SIMPLIFY_TERM(f₀·f₁) : ⊥   // f has a zero iff p = 0
-    // ψ-independent facts, computed once per (f, x) per component; the entry is
+    // ψ-independent facts, computed once per (f, x) across runs; the entry is
     // the handover BOOLE_DECOMPOSE_EQUALITY_PIVOT reads instead of recomputing.
     if not usable:                 return PLAIN
     if p is a nonzero constant
        or (f₀ = f₁, f₀ constant):  return DECIDED   // one call, no new atom
     if f₀ = f₁:                    return XFREE     // x-free guard replaces pivot
     if f₀ = f₁′:                   return UNIQUE    // x substituted out of T-part
-    if p = 0:                      return ZERO      // absorb — OPTIMISTIC: its
-                                                    //   ψ-dependent guard is
-                                                    //   re-checked in the arm
+    if p = 0:                      return ZERO      // absorb/clamp — firm: the
+                                                    //   arm's guard is exactly
+                                                    //   this entry, ψ-free
     return PLAIN
 ```
 
@@ -589,12 +728,10 @@ BOOLE_DECOMPOSE_EQUALITY_PIVOT(ψ, atm, x, X, ctx):
                                                            //   restored on every exit
         if usable and f₀ = f₁′:                // unique zero, at x := f₀
             τ ← PUSH_BLOCK(SIMPLIFY(φ₁[x ← f₀]), X, ctx)   // x substituted out
-        else if usable and p = 0               // f has a zero, PROVEN
-                and every atom of φ₁ carrying x is a (¬)equation with x only a
-                decision variable, never in a leaf:
-            // The absorb rewrites each x-atom via ITS cofactors, so every
-            // x-atom must have them; an unrewritten conjunct would escape the
-            // pivot's solution interval once the pivot is deleted.
+        else if usable and p = 0:              // f has a zero, PROVEN — and the
+            // arm is TOTAL over conjunct shapes: a (¬)equation with genuine
+            // cofactors is absorbed, every other x-conjunct is clamped by
+            // substituting the reproductive solution (ABSORB_PIVOT).
             τ ← PUSH_BLOCK(SIMPLIFY(ABSORB_PIVOT(φ₁, f₀, f₁, x)), X, ctx)  // 2i, 2j
         else:                                  // nothing proven → pivot retained
             τ ← PUSH_BLOCK(SIMPLIFY(atm ∧ φ₁), X, ctx)
@@ -608,20 +745,32 @@ BOOLE_DECOMPOSE_EQUALITY_PIVOT(ψ, atm, x, X, ctx):
 
 ```
 ABSORB_PIVOT(φ₁, f₀, f₁, x):                                   // 2i, then 2j
-    // Sound only under the caller's TWO licenses; nothing here re-checks.
-    // (1) f₀·f₁ = 0 PROVEN — else unsound: f = a, 0 < a < 1, φ₁ = (g ≠ 0),
-    // g = 1 gives truth F but absorbed form a′ ≠ 0. (2) Every x-atom of φ₁ a
-    // (¬)equation with x only a decision variable, so the loop reaches every
-    // x-carrying conjunct and each g₀/g₁ is a genuine cofactor.
-    // Terms grow here — hence SIMPLIFY_ATOM on emission (inv. 6), which is what
-    // the caller's syntactic tests compare against.
-    for every atom a of φ₁ in which x occurs explicitly:
-        g  ← TERM_OF(a)
-        g₀ ← SIMPLIFY_TERM(g[x←0]) ; g₁ ← SIMPLIFY_TERM(g[x←1])
-        a positive  ↦  SIMPLIFY_ATOM( x′(f₀ ∪ g₀) ∪ x(f₁ ∪ g₁) = 0 )   // squeeze f in
-        a negative  ↦  the atom UNDER the kept ¬ becomes
-                       SIMPLIFY_ATOM( x′f₀′g₀ ∪ x f₁′g₁ = 0 )          // absorb f′ in
-                       // a ≠ atom under the ¬ would double-negate
+    // Sound only under the caller's ONE license — f₀·f₁ = 0 PROVEN, else
+    // unsound: f = a, 0 < a < 1, φ₁ = (g ≠ 0), g = 1 gives truth F but
+    // absorbed form a′ ≠ 0. Under it the pivot's solutions are the interval
+    // W = [f₀, f₁′], and r(x) = f₀ ∪ x·f₁′ is its REPRODUCTIVE solution:
+    // f(r(x)) = 0 everywhere, r maps into W, r fixes W pointwise. The arm is
+    // TOTAL: a (¬)equation with genuine cofactors is absorbed via them; any
+    // other x-conjunct — a reference, a binder unit, a leaf-x atom — is
+    // CLAMPED by substituting r, which reaches leaves and unit bodies (§1,
+    // §4 what may touch a unit). One witness map proves the mix exact in ANY
+    // BA: a rewritten-clause witness x* transfers to x° = r(x*) ∈ W — a
+    // clamped conjunct holds at x° by construction, an absorbed positive
+    // forces x* ∈ W so x° = x*, and an absorbed negative transfers by
+    // g(r(x)) ⊇ x·f₁′g₁ ∪ x′·f₀′g₀ = (f′g)(x).
+    // Terms grow here — hence SIMPLIFY_ATOM on emission (inv. 6), which is
+    // what the caller's syntactic tests compare against; inside a reference
+    // argument nothing simplifies, so clamps may accumulate there.
+    for every conjunct c of φ₁ in which x occurs free:
+        if c is a (¬)equation whose g₀/g₁ below are x-free:  // genuine cofactors
+            g  ← TERM_OF(c)
+            g₀ ← SIMPLIFY_TERM(g[x←0]) ; g₁ ← SIMPLIFY_TERM(g[x←1])
+            c positive  ↦  SIMPLIFY_ATOM( x′(f₀ ∪ g₀) ∪ x(f₁ ∪ g₁) = 0 )  // squeeze f in
+            c negative  ↦  the atom UNDER the kept ¬ becomes
+                           SIMPLIFY_ATOM( x′f₀′g₀ ∪ x f₁′g₁ = 0 )         // absorb f′ in
+                           // a ≠ atom under the ¬ would double-negate
+        else:
+            c ← SIMPLIFY(c[x ← f₀ ∪ x·f₁′])                  // clamp into W
     return φ₁                    // the pivot is NOT re-attached (2j)
 
 SETTLE_FUNCTIONAL(f, ctx):                                     // 2f
@@ -656,8 +805,8 @@ ELIMINATE_BLOCK(clause, X, ctx):                      // memo wrapper
     // Reached only when the block is pushed home: a single conjunctive clause,
     // every conjunct of which mentions some x ∈ X.
     if clause ∈ {T, F}: return clause
-    k ← (clause, X)   // exact key (ctx table); nothing below recurses back
-                      //   here, so no in-progress state
+    k ← (clause, X, ctx.keep_functional)   // exact key (ctx table); nothing
+                      //   below recurses back here, so no in-progress state
     if ctx.elim_memo[k] exists: return ctx.elim_memo[k]
     r ← ELIMINATE_BLOCK_UNCACHED(clause, X, ctx)
     ctx.elim_memo[k] ← r
@@ -666,7 +815,7 @@ ELIMINATE_BLOCK(clause, X, ctx):                      // memo wrapper
 ELIMINATE_BLOCK_UNCACHED(clause, X, ctx):
     // Type-agnostic pre-steps — pure identities, run once here, not per method.
  1. for x in X:                                // a witness beats any method:
-        if clause ∈ {T, F}: break              //   cheaper and exact
+        if clause ∈ {T, F}: break              //   cheaper and exact (inv. 8)
         ψ* ← TRY_WITNESS(x, clause)
         if ψ* ≠ ⊥: clause ← ψ* ; X ← X ∖ {x}   // ⊥ leaves x and clause untouched
     if clause ∈ {T, F}: return clause
@@ -682,7 +831,7 @@ The type table — adding a type is one row plus one method obeying the contract
 | `τ` | `METHOD(τ)` | `EX_DISTRIBUTES_OVER_NEGATIVES(τ)` |
 |---|---|---|
 | atomless | `ELIMINATE_ATOMLESS_CLAUSE` | **true** — `cor:Multivariate-BFs-over` |
-| bitvector | `ELIMINATE_BITVECTOR_CLAUSE` | **false** — `bv[1]`: `∃x(x≠0 ∧ x′≠0)` is F |
+| bitvector | `ELIMINATE_BITVECTOR_CLAUSE` — a router: pure Boolean ↦ `ELIMINATE_FINITE_CLAUSE`, arithmetic ↦ solver | **false** — `bv[1]`: `∃x(x≠0 ∧ x′≠0)` is F |
 | anything else | `⊥` → re-wrap | **false** — fail closed |
 
 **Method contract.**
@@ -694,9 +843,63 @@ The type table — adding a type is one row plus one method obeying the contract
   (invariant 3).
 - **Freezing is the method's own job** — which conjunct shapes are unusable is
   method-specific: an order atom blocks the atomless squeeze yet is native to
-  the solver. Freeze per COMPONENT, never per clause: close
-  `{opaque conjuncts} × {variables reaching them}` to a fixpoint, re-wrap `∃`
-  around that part only, and continue with the rest.
+  the solver, and a surviving binder is opaque to the atomless engine yet
+  swallowed whole — never opened — by a query-based method whose engine can
+  translate its body (§4 finality). Freeze per COMPONENT, never per clause:
+  close `{opaque conjuncts} × {variables reaching them}` to a fixpoint, re-wrap
+  `∃` around that part only, and continue with the rest.
+
+### Shared helpers
+
+Shared by the atomless and finite methods — both engines' mathematics is
+any-BA up to this point. `SQUEEZE_AND_SUBSUME` normalises and prunes the
+clause and is the only place an equation is rewritten (invariant 4).
+`NEGATIVE_CONDITION` emits the exact condition for ONE negative; conjoining
+one per negative is the atomless method's licence alone (inv. 1).
+
+```
+SQUEEZE_AND_SUBSUME(clause, X, ctx) → (f, negatives, clause, X):
+ 1. clause ← NORM_EQUATION applied to every (¬)equation conjunct
+    //   zero form for the squeeze; "positives"/"negatives" mean f = 0 / ¬(f = 0).
+    //   A swallowed binder unit (finite method) is not an atom — it rides
+    //   along untouched
+ 2. f ← ⋃ { positives of clause }                        // squeeze; ⋃{} = 0
+    // O4, term-order subsumption: gᵢ ≤ gⱼ makes ¬(gⱼ = 0) redundant. Only the
+    //   BA order relates the two atoms — propositional simplification cannot
+    //   see it. Tested modulo the positive part as f′gᵢgⱼ′ = 0: under f = 0,
+    //   f′ = 1 and the test collapses to gᵢ ≤ gⱼ. Dropping now saves the
+    //   per-negative work downstream — a DISCHARGE or a fatter query — and
+    //   costs no precision (∃_X f′gᵢ ≤ ∃_X f′gⱼ). Gated: k(k−1)/2 tests save
+    //   at most k−1 DISCHARGEs, and BDD size is not monotone under ≤ — no
+    //   cheap prescreen.
+    if |negatives of clause| ≤ ctx.subsume_max:
+        keep ← []
+        for each negative ¬(gⱼ = 0) of clause, in order:
+            // survivors only: mutually subsuming negatives are equal — testing
+            //   against all would drop both
+            if no gᵢ in keep has SIMPLIFY_TERM(f′·gᵢ·gⱼ′) = 0: keep += gⱼ
+        clause ← clause with every negative not in keep dropped
+ 3. drop from X every variable not occurring in clause
+    //   subsumption can remove a variable's last occurrence; such a variable
+    //   sat only in dropped negatives, never in f
+    return (f, the negatives of clause, clause, X)
+```
+
+```
+NEGATIVE_CONDITION(g, f, f_indep, X, ctx) → formula:
+    // The condition for ONE negative ¬(g = 0), modulo the sibling pos =
+    // (∀_X f = 0): exact in ANY BA — the tier-1 lemma (Finite section).
+    // The shortcuts rest on:  ∃_X f′ = (∀_X f)′,  and  ∃_X(f′·g) = g · ∃_X f′
+    // for g independent of X.
+    if g ≡ 1: return T               // O1: ∃_X f′g = (∀_X f)′ = 0′ ≠ 0, by pos
+    if f_indep:                      // O2: f indep of X + pos ⇒ f′ = 1
+        return DISCHARGE(∃X. g ≠ 0, ctx)                          // ⇒ ∃_X g ≠ 0
+    if g* ← COFACTOR_REDUCE(g, X) ; g* ≠ ⊥:
+        // O3: ∃_X f′g = g · (∀_X f)′ = g. Emit the REDUCED term: g may still
+        //   spell an X-variable, and that variable has no binder here.
+        return SIMPLIFY_ATOM(g* ≠ 0)
+    return DISCHARGE(∃X. f′·g ≠ 0, ctx)                           // ⇒ ∃_X f′g ≠ 0
+```
 
 ### Atomless
 
@@ -704,51 +907,24 @@ The type table — adding a type is one row plus one method obeying the contract
 ELIMINATE_ATOMLESS_CLAUSE(clause, X, ctx):
     //  ∃X.( f=0 ∧ ⋀ⱼ gⱼ≠0 )  ≡  ∀_X f=0 ∧ ⋀ⱼ ∃_X f′·gⱼ ≠ 0     (cor:qelim-main)
 
- 1. // Opaque = not a (¬)equation (a reference, a binder, an order atom) — and
-    // ALSO a (¬)equation hiding a block variable in a leaf: quantification is
-    // cofactoring (§1 leaf hazard), so DISCHARGE would emit that x free.
+ 1. // Opaque = not a (¬)equation: a reference, an order atom, and EVERY binder
+    // unit — this engine answers no queries, so it can swallow none. ALSO
+    // opaque: a (¬)equation hiding a block variable in a leaf — quantification
+    // is cofactoring (§1 leaf hazard), so DISCHARGE would emit that x free.
     frozen, clause, X ← FREEZE_OPAQUE_COMPONENTS(clause, X)
     if X = ∅: return frozen
- 2. clause ← NORM_EQUATION applied to every conjunct
-    //   zero form for the squeeze; "positives"/"negatives" mean f = 0 / ¬(f = 0)
- 3. f ← ⋃ { positives of clause }                        // squeeze; ⋃{} = 0
-    // O4, term-order subsumption: gᵢ ≤ gⱼ makes ¬(gⱼ = 0) redundant. Only the
-    //   BA order relates the two atoms — propositional simplification cannot
-    //   see it. Tested modulo the positive part as f′gᵢgⱼ′ = 0: under f = 0,
-    //   f′ = 1 and the test collapses to gᵢ ≤ gⱼ. Dropping now
-    //   saves the DISCHARGE and costs no precision (∃_X f′gᵢ ≤ ∃_X f′gⱼ).
-    //   Gated: k(k−1)/2 tests save at most k−1 DISCHARGEs, and BDD size is not
-    //   monotone under ≤ — no cheap prescreen.
-    if |negatives of clause| ≤ ctx.subsume_max:
-        keep ← []
-        for each negative ¬(gⱼ = 0) of clause, in order:
-            // survivors only: mutually subsuming negatives are equal — testing
-            //   against all would drop both
-            if no gᵢ in keep has SIMPLIFY_TERM(f′·gᵢ·gⱼ′) = 0: keep += gⱼ
-        clause ← ⋀ { positives } ∧ ⋀ { ¬(g = 0) : g ∈ keep }
-    drop from X every variable not occurring in clause
-    //   subsumption can remove a variable's last occurrence; such a variable
-    //   sat only in dropped negatives, never in f
+ 2. f, negatives, clause, X ← SQUEEZE_AND_SUBSUME(clause, X, ctx)
     if X = ∅: return SIMPLIFIED_AND_JOIN(frozen, clause)
     // pos holds even where it folds to T (no positives ⇒ f = 0 vacuously);
     //   O1–O3 reason under it as a sibling assumption.
     pos ← DISCHARGE(∃X. f = 0, ctx)                               // ⇒ ∀_X f = 0
     if pos = F: return F                  // f has no common zero: ∃X.clause is F
     f_indep ← (COFACTOR_REDUCE(f, X) ≠ ⊥)     // loop-invariant, computed once
-    // Per-negative ∃_X conjuncts are the OTHER use of atomlessness (inv. 1).
-    // The shortcuts rest on:  ∃_X f′ = (∀_X f)′,  and  ∃_X(f′·g) = g · ∃_X f′
-    // for g independent of X.
+    // ONE condition PER negative is the OTHER use of atomlessness (inv. 1);
+    // each condition alone is any-BA-exact (NEGATIVE_CONDITION).
     neg ← an empty SIMPLIFIED_AND_JOIN
-    for each negative ¬(g = 0) of clause:
-        if g ≡ 1: continue           // O1: ∃_X f′g = (∀_X f)′ = 0′ ≠ 0, by pos
-        if f_indep:                  // O2: f indep of X + pos ⇒ f′ = 1
-            insert DISCHARGE(∃X. g ≠ 0, ctx) into neg             // ⇒ ∃_X g ≠ 0
-        else if g* ← COFACTOR_REDUCE(g, X) ; g* ≠ ⊥:
-            // O3: ∃_X f′g = g · (∀_X f)′ = g. Emit the REDUCED term: g may
-            //   still spell an X-variable, and that variable has no binder here.
-            insert SIMPLIFY_ATOM(g* ≠ 0) into neg
-        else:
-            insert DISCHARGE(∃X. f′·g ≠ 0, ctx) into neg          // ⇒ ∃_X f′g ≠ 0
+    for g in negatives:
+        insert NEGATIVE_CONDITION(g, f, f_indep, X, ctx) into neg
         if neg decided F: return F   // one unsatisfiable negative decides
     return SIMPLIFIED_AND_JOIN(frozen, pos, neg's result)
 
@@ -771,40 +947,242 @@ COFACTOR_REDUCE(t, X) → term | ⊥:
 ```
 DISCHARGE(∃X.atom, ctx):
     // ∃X. f = 0  ⇒  ∀_X f = 0            ∃X. h ≠ 0  ⇒  ∃_X h ≠ 0
+    // Sole reader of quant_memo. Its X-free key means "quantify the whole
+    // block" — sound here alone: a discharged term's block variables lie in X,
+    // and P is component-fixed. SETTLE_FUNCTIONAL's single-variable discharges
+    // must not share the table: (t, ∀) would collide between ∀ₓt and ∀_X t.
     if ctx.keep_functional: emit the functional-quantifier term as written
     else: read ctx.quant_memo[(term, ∀ or ∃)]; on a miss, one BDD quantification
           over ctx.order, recorded. Emit SIMPLIFY_ATOM of the result. For
           |X| = 1: two substitutions and a meet/join (lem:xelim), no traversal.
 ```
 
-### Bitvector
+### Bitvector — the router
+
+Two engines serve `bv[n]`, split by translatability. A block variable under an
+arithmetic operator admits no Shannon expansion — over `bv[2]`, `f(x) = x + 1`
+has `x·f(11) ∪ x′·f(00) = x′·01 ≠ f(x)` — so an arithmetic subterm containing a
+block variable is the §1 leaf hazard: no BDD-engine move applies, only the
+solver sees inside it. Order atoms are arithmetic by the §9 standing
+assumption. The pure remainder — (¬)equations over `∪ · ′ +` and constants —
+is exactly what `ELIMINATE_FINITE_CLAUSE` decides without the solver.
+
+Functional quantifiers cut the other way: over same-type pure content they are
+BA polynomials (lem:xelim; §1 transparency), hence PURE — the finite side
+reads them natively — while the solver has no term-level binder, so an IMPURE
+conjunct carrying one is unreadable for both engines and freezes (step 1). For
+`|Y| = 1` the two-cofactor expansion `∀_y f = f₀·f₁` is a cheap refinement
+that returns such a conjunct to the solver.
 
 ```
 ELIMINATE_BITVECTOR_CLAUSE(clause, X, ctx):
- 1. // Opaque = a conjunct with a reference or surviving binder in its terms —
-    // untranslatable. Order and equality atoms are both native to the solver.
+ 1. // Opaque = a conjunct with a reference in its terms, a binder unit whose
+    // body is not bv-translatable (a reference or foreign type inside), or an
+    // IMPURE conjunct carrying a functional quantifier (no term-level binder
+    // in the solver's language — see above) — unreadable for BOTH engines. A
+    // binder unit with a translatable body is
+    // NOT opaque: it is swallowed whole into a query below, which is what lets
+    // a clause that re-wrapped open be decided once enclosing blocks have
+    // closed it (§4 finality).
     frozen, clause, X ← FREEZE_OPAQUE_COMPONENTS(clause, X)
     if X = ∅: return frozen
- 2. q ← ∃X.clause
-    if q is closed:
-        ASK(q, ctx):  sat ⇒ return frozen,  unsat ⇒ return F,  unknown ⇒ step 3
+ 2. // The split. PURE = a (¬)equation over BA operations only — functional-
+    // quantifier terms count (see above) — or a binder unit whose body is
+    // recursively pure; everything else — an order atom,
+    // arithmetic anywhere, a binder unit with arithmetic inside — is the
+    // solver's. Same closure discipline as freezing, aimed at the solver
+    // instead of a re-wrap: {impure conjuncts} × {variables reaching them} to
+    // a fixpoint. The fixpoint makes X_A and X_B disjoint, so
+    // ∃X(A ∧ B) ≡ ∃X_A.A ∧ ∃X_B.B.
+    (A, X_A), (B, X_B) ← SPLIT_ARITHMETIC(clause, X)
+ 3. b ← T if B = ∅ else ELIMINATE_FINITE_CLAUSE(B, X_B, ctx)
+    if b = F: return F                                // one side false decides
+ 4. a ← T if A = ∅ else SOLVE_ARITHMETIC(A, X_A, ctx)
+ 5. // ∀Z distributes over ∧, so the per-side closings lose no VALIDITY; joint
+    // UNSATISFIABILITY does not distribute — the sides may share free
+    // variables and each be satisfiable only under incompatible assignments.
+    // When the solver side survives beside a non-constant Boolean result, one
+    // joint ask restores the pre-split single-query precision. frozen is
+    // rightly excluded: unsat of a sub-conjunction already decides. Skipped
+    // when b carries a functional quantifier (keep_functional emissions, a
+    // re-wrapped pure body): the solver has no term-level binder, and this is
+    // the one site that would hand it one.
+    if a is a surviving binder and b ∉ {T, F} and FV(a) ∩ FV(b) ≠ ∅
+       and b carries no functional quantifier:
+        if ASK(∃Z.(a ∧ b), ctx) = unsat: return F
+ 6. return SIMPLIFIED_AND_JOIN(frozen, b, a)
+```
+
+```
+SOLVE_ARITHMETIC(clause, X, ctx):                     // the solver path
+ 1. q ← ∃X.clause     // binder units enter q as written — the solver accepts
+                      //   quantified bv formulas; alternation depth = how many
+                      //   enclosing blocks re-wrapped (§4)
+ 2. if q is closed:
+        ASK(q, ctx):  sat ⇒ return T,  unsat ⇒ return F,  unknown ⇒ step 3
     else:               // close the free variables Z both ways
-        if ASK(∀Z.q, ctx) = sat:    return frozen  // q valid
-        if ASK(∃Z.q, ctx) = unsat:  return F       // q unsatisfiable
- 3. return SIMPLIFIED_AND_JOIN(frozen, REWRAP(clause, X))    // undecided (inv. 3)
+        if ASK(∀Z.q, ctx) = sat:    return T          // q valid
+        if ASK(∃Z.q, ctx) = unsat:  return F          // q unsatisfiable
+ 3. return REWRAP(clause, X)                          // undecided (inv. 3)
 ```
 
 ```
 ASK(q, ctx) → sat | unsat | unknown:
     // Key = CANONICALISE_BINDER_IDS(q): alpha-variants collide across
-    // components, blocks, and the two closings. `unknown` is cached too — the
-    // solver configuration is fixed for the run. elim_memo cannot subsume this:
-    // it is per component, and different (clause, X) can normalise to the same
-    // query after freezing.
+    // components, blocks, runs, and the two closings. `unknown` is cached too —
+    // the table is valid per solver configuration, flushed when it changes
+    // (§1, cache scope). elim_memo cannot subsume this: different (clause, X)
+    // can normalise to the same query after freezing.
     k ← CANONICALISE_BINDER_IDS(q)
     if ctx.solver_memo[k] exists: return ctx.solver_memo[k]
     r ← the solver's verdict on k
     ctx.solver_memo[k] ← r ; return r
+```
+
+### Finite (pure Boolean)
+
+The pure side of the bitvector router — and `METHOD(τ)` for any finite BA of
+known width whose term language is pure BA (none routed directly yet; §9).
+Everything through one negative is the atomless mathematics — exact in EVERY
+BA — and finiteness is consulted only at tier 2, exactly where atomlessness
+would have been: invariant 1's two sites stay two.
+
+Tier-1 exactness (one negative, ANY BA): `∃X.(f=0 ∧ g≠0) ≡ ∀_X f=0 ∧
+∃_X f′g ≠ 0`. One variable, under `f₀f₁ = 0`: the witness `x = f₀ ∪ f₁′g₁` has
+`f(x) = 0` and `g(x) ≥ f₁′g₁`, and `x = f₀` has `g(x) ≥ f₀′g₀` — one of the two
+is nonzero whenever `∃ₓ(f′g) = f₀′g₀ ∪ f₁′g₁ ≠ 0`. A block by induction, the
+intermediate factor collapsing under the absorption `∃_y(f′g) ≤ ∃_y f′ =
+(∀_y f)′`. Competition for atoms needs a SECOND negative — the type-table row:
+`bv[1]`, `∃x(x≠0 ∧ x′≠0)` is F while both single-negative conditions hold.
+
+```
+ELIMINATE_FINITE_CLAUSE(clause, X, ctx):
+ 1. // Opaque = the atomless step-1 condition plus anything arithmetic — MINUS
+    // binder units whose bodies are recursively pure, which are swallowed into
+    // the tier-2 query (§4 finality). A no-op when called from the router,
+    // whose split already guarantees purity.
+    frozen, clause, X ← FREEZE_OPAQUE_COMPONENTS(clause, X)
+    if X = ∅: return frozen
+ 2. f, negatives, clause, X ← SQUEEZE_AND_SUBSUME(clause, X, ctx)
+    if X = ∅: return SIMPLIFIED_AND_JOIN(frozen, clause)
+ 3. pos ← DISCHARGE(∃X. f = 0, ctx)       // exact in ANY BA (thm:boole-const);
+    if pos = F: return F                  //   implied by the clause, so F here
+                                          //   decides even before tier 2
+ 4. if clause holds no binder unit and |negatives| ≤ 1:
+        // Tiers 0–1 — the shared emission, exact here by the tier-1 lemma.
+        // A binder unit forces tier 2: the clause does not factor around it.
+        if negatives = ∅: return SIMPLIFIED_AND_JOIN(frozen, pos)
+        f_indep ← (COFACTOR_REDUCE(f, X) ≠ ⊥)
+        neg ← NEGATIVE_CONDITION(the single negative g, f, f_indep, X, ctx)
+        if neg = F: return F
+        return SIMPLIFIED_AND_JOIN(frozen, pos, neg)
+ 5. // Tier 2 — k ≥ 2 negatives competing for atoms, or a swallowed binder
+    // unit. NP-complete even closed, so the ladder inside the tier is by
+    // representation cost (inv. 8): one shared BDD sweep, then the solver
+    // (inside DECIDE_FINITE), then surrender — never the 2^k formula
+    // expansion.
+    q ← ∃X.clause
+    if q is closed:
+        r ← DECIDE_FINITE(q, ctx)
+        if r ≠ unknown: return SIMPLIFIED_AND_JOIN(frozen, r)
+        return SIMPLIFIED_AND_JOIN(frozen, REWRAP(clause, X))   // inv. 3
+ 6. // Open: close the free variables Z both ways — detection only, the solver
+    // path's shape. Sound and still pure: every variable in a pure clause's
+    // terms has the block's finite type (inv. 2).
+    if DECIDE_FINITE(∀Z.q, ctx) = T: return frozen              // q valid
+    if DECIDE_FINITE(∃Z.q, ctx) = F: return F                   // q unsat
+ 7. return SIMPLIFIED_AND_JOIN(frozen, REWRAP(clause, X))
+    // Open and undecided: re-wrap BY DESIGN and wait for an enclosing block to
+    // close the unit (§4). Exact open elimination exists — the paper's atomic
+    // case, Hall's theorem on the minterms of the negatives' coefficients
+    // (ch. 2 §Distinct Representatives, thm:main-ineq and its corollary) — and
+    // was deliberately not taken (§9).
+```
+
+**The blast.** `bv[n]` is the powerset algebra of its `n` atoms `a₁ … aₙ`, and
+`u ↦ (a₁ ≤ u, …, aₙ ≤ u)` is a BA isomorphism `bv[n] ≅ bool^n`: every PURE
+operation acts per bit, and no operation couples two bit positions — the same
+coordinatewise-ness whose failure under arithmetic (a carry couples bits)
+drives the router's split. `BIT_BLAST` rides the isomorphism compositionally —
+terms, atoms, connectives, quantifiers — so `q` holds in `bv[n]` iff its blast
+holds as a QBF over `bool`: soundness is inherited from the isomorphism, not
+argued per case.
+
+```
+BIT_BLAST(φ) → QBF over two-valued variables:
+    // ⟦t⟧ᵢ ≜ "bit i of t", i = 1..n; per bv variable x, n fresh two-valued
+    // variables x⁽ⁱ⁾ ≜ (aᵢ ≤ x). Bits of variables and constants are read
+    // against ONE atom enumeration per type — mixing two enumerations within
+    // a blast misaligns coordinates.
+
+    // Terms — coordinatewise, which is the whole translation:
+    ⟦x⟧ᵢ = x⁽ⁱ⁾                      ⟦c⟧ᵢ = bit i of the constant c
+    ⟦s · t⟧ᵢ = ⟦s⟧ᵢ ∧ ⟦t⟧ᵢ           ⟦s ∪ t⟧ᵢ = ⟦s⟧ᵢ ∨ ⟦t⟧ᵢ
+    ⟦t′⟧ᵢ    = ¬⟦t⟧ᵢ                 ⟦s + t⟧ᵢ = ⟦s⟧ᵢ ⊕ ⟦t⟧ᵢ
+    ⟦∀ₓt⟧ᵢ = ⟦t⟧ᵢ[x⁽ⁱ⁾←F] ∧ ⟦t⟧ᵢ[x⁽ⁱ⁾←T]     // functional-quantifier terms
+    ⟦∃ₓt⟧ᵢ = ⟦t⟧ᵢ[x⁽ⁱ⁾←F] ∨ ⟦t⟧ᵢ[x⁽ⁱ⁾←T]     //   (keep_functional emissions,
+                                     //   or ch. 6 input surviving kf = false —
+                                     //   2f settles pivot terms only) are
+                                     //   cofactor meets/joins — pure, and
+                                     //   slice i sees only x's bit i; a block
+                                     //   ∀_X/∃_X iterates per variable of X
+
+    // Atoms — the GENERAL form: a swallowed unit's body is not zero-normalised
+    // (SQUEEZE_AND_SUBSUME rewrites only the clause it was handed), so l = r
+    // may not be assumed to be zero form; f = 0 is the special case ⋀ᵢ ¬⟦f⟧ᵢ.
+    l = r   ↦   ⋀_{i=1..n} ( ⟦l⟧ᵢ ↔ ⟦r⟧ᵢ )
+
+    // Connectives ¬/∧/∨ map unchanged, atoms rewritten in place. There is NO
+    // ≠ case: ¬(g = 0) is a formula-level ¬ (inv. 4), and De Morgan alone
+    // gives ¬⋀ᵢ¬⟦g⟧ᵢ = ⋁ᵢ⟦g⟧ᵢ — the "linearly many equations" of the n-fold
+    // expansion appear as n branches of ONE shared BDD, never as n formula
+    // copies. Equalities decompose per bit; the negatives' ⋁ᵢ all read the
+    // SAME existential bits — that shared coupling IS the k ≥ 2 competition.
+    ∃x.ψ   ↦   ∃x⁽¹⁾ … ∃x⁽ⁿ⁾. BIT_BLAST(ψ)     // ∀x dually; nesting kept.
+                                     //   Exact with no guard formulas: every
+                                     //   bit assignment IS an element of bv[n]
+
+    anything else ↦ FAIL             // an order atom, arithmetic, a reference
+                                     //   here is a routing bug — the
+                                     //   coordinatewise rules would be
+                                     //   SILENTLY WRONG, so never approximate.
+                                     //   FAIL aborts; it is NOT `unknown` —
+                                     //   mapping it there would mask the bug
+                                     //   as a sound re-wrap
+```
+
+```
+DECIDE_FINITE(q, ctx) → T | F | unknown:
+    // q: CLOSED, pure Boolean, every variable of one finite type of width n.
+    // BIT_BLAST(q) is a QBF; one BDD sweep decides it: abstract each block's
+    // bits (∃ = ∨ of cofactors, ∀ = ∧) innermost-out — alternation depth, one
+    // level per enclosing block that re-wrapped (§4), is just repetition —
+    // and abstract a bound block's bits AS SOON AS its sub-BDD is built, so
+    // intermediates stay small. COMPLETE on this fragment; `unknown` arises
+    // only from the node budget. The BDD is propositional — two-valued
+    // decision variables, T/F leaves — NOT §1's term BDD: nothing of
+    // PREPARE_TERMS carries over (§5), the blast is syntactic from q.
+    // Variable order: indices never mix (BIT_BLAST), so the matrix is a
+    // Boolean combination of n single-index slices — slice-major order keeps
+    // the equalities' ⋀ᵢ linear; the negatives' ⋁ᵢ is what can still force
+    // width, the honest exponential (inv. 8) behind ctx.qbf_node_max. Past
+    // the budget, ASK: solver search and BDD sweep blow up on different
+    // instances, so the fallback is genuinely complementary.
+    k ← CANONICALISE_BINDER_IDS(q)
+    if ctx.qbf_memo[k] exists: return ctx.qbf_memo[k]
+    if ctx.solver_memo[k] = sat:   return T   // constant before exponential
+    if ctx.solver_memo[k] = unsat: return F   //   (inv. 8): a verdict from an
+                                              //   earlier budget fallback
+                                              //   decides without re-running
+                                              //   the sweep; a cached
+                                              //   `unknown` stays a miss —
+                                              //   the sweep may still succeed
+    r ← the BDD sweep over BIT_BLAST(q), budgeted by ctx.qbf_node_max
+    if r ∈ {T, F}: ctx.qbf_memo[k] ← r ; return r    // mathematical truth —
+                                                     //   never flushed (§1)
+    ASK(q, ctx): sat ⇒ return T, unsat ⇒ return F, unknown ⇒ return unknown
+                                                     // cached in solver_memo
+                                                     //   under ITS flush rule
 ```
 
 ---
@@ -818,22 +1196,36 @@ ASK(q, ctx) → sat | unsat | unknown:
 | `BOOLE_DECOMPOSE_EQUALITY_PIVOT` | the block never shrinks here, so the measure is on the formula: every recursive argument has strictly fewer (atom, block-variable) incidences than `ψ` — `atm` is folded away, replaced by the `x`-free `g`, absorbed, or substituted out. The two parts that keep it — the last arm's `atm ∧ φ₁` and every F-part's `¬atm` — are covered by `ctx.used` instead. Each part is pushed by its own call, so no call receives two copies of `ψ` |
 | `BOOLE_DECOMPOSE_NON_EQUALITY_PIVOT` | `ctx.used`: each split bars its pivot and `CHOOSE_PIVOT` skips barred atoms, so a splitting path is bounded by the clause's non-equality-atom count `k`, and the tree by `2^k` — finite per clause, but not by a constant |
 | `ELIMINATE_BLOCK` pre-steps | `X` shrinks or the clause is decided |
+| `ELIMINATE_BITVECTOR_CLAUSE` (router) | two variable-disjoint sub-clauses, each handed to its engine exactly once; no re-entry into the push |
+| swallowed binder units (`ELIMINATE_FINITE_CLAUSE`, `SOLVE_ARITHMETIC`) | a unit is decided wholesale or re-wrapped, never opened; each enclosing block makes exactly one attempt on it (one post-order pass, §4) — no fixpoint across blocks |
+| `DECIDE_FINITE` | one syntactic `BIT_BLAST` pass, then one BDD sweep over a finite bit set, budgeted by `ctx.qbf_node_max` |
 | `PROCESS_ALL_BLOCKS` | one post-order pass over a finite tree; each run is eliminated once |
 
 No elimination method re-enters `ANTI_PRENEX`, so the phases of §3 run once per
-call. `ABSORB_PIVOT` rewrites the surviving atoms without removing `x` from
-them: the decrease comes from `atm`'s own incidences vanishing, not from `x`
-leaving the rest.
+call. `ABSORB_PIVOT` rewrites the surviving conjuncts — absorbed or clamped —
+without removing `x` from them: the decrease comes from `atm`'s own incidences
+vanishing, not from `x` leaving the rest.
 
 ---
 
 ## 9. Open items
 
-- **No method for a finite/atomic BA type.** `bool` — a 2-element, hence atomic,
-  BA — hits `METHOD(τ) = ⊥` and re-wraps. The method that belongs there is the
-  paper's atomic case: positives by squeeze + Boole consistency (any BA),
-  negatives by Hall's theorem on minterms (ch. 2 §Distinct Representatives,
-  `thm:main-ineq` and the corollary after it).
+- **`bool` still hits `METHOD(τ) = ⊥`.** `ELIMINATE_FINITE_CLAUSE` now covers
+  the pure-Boolean fragment of `bv[n]`, and `bool` — a 2-element, hence atomic
+  and finite, BA — is mathematically its width-1 case. Routing it is one
+  type-table row (direct, no router), pending confirmation that `bool`'s term
+  language is pure BA — an arithmetic or order operator there would need the
+  router instead.
+- **Open finite clauses re-wrap BY DESIGN.** Tier 2 gives an open clause the
+  two-way closing (valid/unsat detection) and otherwise lets it survive for an
+  enclosing block to close — and then decide — the unit (§4). Exact open
+  elimination exists: the paper's atomic case, positives by squeeze + Boole
+  consistency (any BA), negatives by Hall's theorem on the minterms of the
+  coefficients (ch. 2 §Distinct Representatives, `thm:main-ineq` and the
+  corollary after it). It is 2^k-governed and its cardinality conditions leave
+  the pure fragment (popcount arithmetic), which is why it was not taken.
+- `ctx.qbf_node_max`: value, and whether `DECIDE_FINITE`'s `ASK` fallback earns
+  its solver dependence on the pure fragment.
 - `TODO (HIGH)` at `normal_forms.tmpl.h:114` — guard the four negated-order
   rewrites to operators bound to arithmetic comparison (today: `bv[n]`), as
   `NORMALIZE_OPERATORS` specifies.
