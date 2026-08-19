@@ -60,7 +60,20 @@ term representation, per component (PREPARE_TERMS):
       - ∀_X f = meet of the leaves,  ∃_X f = join of the leaves — one traversal
       - substitution (unique-zero arm, TRY_WITNESS, the clamp) is a BDD compose
         PLUS rewriting x inside the leaves (r(x) ↦ r(t)) — sound for any term,
-        reaches every occurrence, needs no leaf guard
+        reaches every occurrence, needs no leaf guard. Every REFERENCE ARGUMENT
+        the leaf-rewrite touched is re-emitted through SIMPLIFY_TERM (a formula
+        argument through SIMPLIFY). This is the authoritative site: substitution
+        is the ONLY operation that rewrites inside a reference (§4, what may
+        touch a unit), and phase 1's `ref_args = true` call (§3) simplifies
+        arguments once at entry, so by
+        induction arguments are ALWAYS simplified — invariant 6 extended to
+        reference arguments, paid only where a rewrite happened, never for
+        re-traversing an unchanged argument. Not cosmetic: references are
+        leaves, leaf merging is what the syntactic tests live on (§3), and the
+        FV-reading guards — X ∩ FV, the step-2 X-drop, `usable`,
+        COFACTOR_REDUCE — stay spuriously conservative while a dead occurrence
+        like x·x′ ∪ a survives inside an argument. Type-safe whatever the
+        argument's type: SIMPLIFY_TERM is any-BA
       - depth is bounded by |X|, not by the formula's variable count
       - FUNCTIONAL QUANTIFIERS ARE TRANSPARENT — term operators binding their
         subscript: Y is excluded from FV and alpha-renamed with the formula
@@ -208,7 +221,14 @@ ANTI_PRENEX(φ, keep_functional = false):
                                        //   the canonical query keys (ASK,
                                        //   DECIDE_FINITE) collide across
                                        //   alpha-variants
- 1. φ ← TO_NNF(φ) ; φ ← SIMPLIFY(φ)
+ 1. φ ← TO_NNF(φ) ; φ ← SIMPLIFY(φ, ref_args = true)
+                                       // the ONE ref_args caller (the flag:
+                                       //   primitives, below): canonical entry
+                                       //   state for reference arguments.
+                                       //   Thereafter only substitution
+                                       //   dirties one, and it re-simplifies
+                                       //   what it touched (§1), so no later
+                                       //   call sets the flag
  2. φ ← ELIMINATE_BY_SUBSTITUTION(φ) ; φ ← SIMPLIFY(φ)
  3. φ ← NORMALIZE_OPERATORS(φ)
  4. φ ← PROCESS_ALL_BLOCKS(φ, keep_functional)
@@ -258,7 +278,12 @@ NORMALIZE_OPERATORS(φ):
 
 `TO_NNF`, `SIMPLIFY` (constant folding, absorption, per-path contradiction, unit
 elimination, and equality propagation — see below; one IMPLICIT parameter, the
-block `X` in scope), `FOLD_DEGENERATE_BINDERS` (drop a binder over a constant
+block `X` in scope, and one flag, `ref_args = false`: when set, the traversal
+also descends into reference arguments — recursively, an argument may itself
+hold a reference — running each through `SIMPLIFY_TERM`, a formula argument
+through `SIMPLIFY`. Default off: arguments are already simplified (§1), so
+descending would re-traverse unchanged terms for nothing; phase 1 is the one
+caller that sets it), `FOLD_DEGENERATE_BINDERS` (drop a binder over a constant
 scope or an absent variable), `NORM_EQUATION` (`l = r ↦ l + r = 0`, descending
 through one `¬`), `TERM_OF` (for an atom `l = r`, the term `l + r`) and
 `REWRAP(φ, X)` (re-attach `∃X` around `φ`, in `X`'s order — every graceful
@@ -759,8 +784,8 @@ ABSORB_PIVOT(φ₁, f₀, f₁, x):                                   // 2i, the
     // forces x* ∈ W so x° = x*, and an absorbed negative transfers by
     // g(r(x)) ⊇ x·f₁′g₁ ∪ x′·f₀′g₀ = (f′g)(x).
     // Terms grow here — hence SIMPLIFY_ATOM on emission (inv. 6), which is
-    // what the caller's syntactic tests compare against; inside a reference
-    // argument nothing simplifies, so clamps may accumulate there.
+    // what the caller's syntactic tests compare against; a clamped reference
+    // argument is re-simplified by the substitution itself (§1).
     for every conjunct c of φ₁ in which x occurs free:
         if c is a (¬)equation whose g₀/g₁ below are x-free:  // genuine cofactors
             g  ← TERM_OF(c)
