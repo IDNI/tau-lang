@@ -2043,16 +2043,35 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 		if (!is_assignment_l && is_assignment_r) return false;
 		if (min_l > min_r) return true;
 		if (min_r > min_l) return false;
-		// Deterministic tie-breaks: structural comparison instead of
-		// raw pointer order (both vectors are subtree_less-sorted)
-		if (std::lexicographical_compare(
-			free_vars_l.begin(), free_vars_l.end(),
-			free_vars_r.begin(), free_vars_r.end(),
-			tree<node>::subtree_less)) return true;
-		if (std::lexicographical_compare(
-			free_vars_r.begin(), free_vars_r.end(),
-			free_vars_l.begin(), free_vars_l.end(),
-			tree<node>::subtree_less)) return false;
+		// Grammar-regeneration-stable tie-breaks. subtree_less compares
+		// node values, which embed parser nonterminal NUMBERS: a
+		// `./dev regen` with a newer pinned generator renumbers them and
+		// silently reorders every id-based tie. The 8f1a74c1
+		// regeneration did exactly that and re-rolled the
+		// Boole-decomposition pivot choice into a hang (GitHub #70
+		// family; bisected 2026-08-19). Ties therefore break on PRINTED
+		// form — surface syntax is the one ordering a regeneration
+		// cannot change. Variable sets compare as name-sorted sequences
+		// so the verdict is also independent of get_free_vars's internal
+		// (subtree_less-sorted) vector order.
+		auto var_names = [](const trefs& vs) {
+			std::vector<std::string> ns;
+			ns.reserve(vs.size());
+			for (tref v : vs)
+				ns.push_back(tree<node>::get(v).to_str());
+			std::sort(ns.begin(), ns.end());
+			return ns;
+		};
+		const auto ns_l = var_names(free_vars_l);
+		const auto ns_r = var_names(free_vars_r);
+		if (ns_l < ns_r) return true;
+		if (ns_r < ns_l) return false;
+		const std::string str_l = tree<node>::get(l).to_str();
+		const std::string str_r = tree<node>::get(r).to_str();
+		if (str_l < str_r) return true;
+		if (str_r < str_l) return false;
+		// Identically printed but physically distinct atoms: any pick is
+		// equivalent for cost; subtree_less only keeps the order strict.
 		return tree<node>::subtree_less(l, r);
 	};
 	return comp;

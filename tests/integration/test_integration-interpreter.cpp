@@ -1035,7 +1035,11 @@ TEST_SUITE("with inputs and outputs") {
 	// re-wraps the block and the pipeline re-enters on the grown
 	// formula). The durable fix is #70's decomposition-order work —
 	// pivot selection must not be sensitive to grammar renumbering.
-	// Un-skip when this case completes within the ctest timeout again.
+	// 2026-08-19: pivot tie-breaking is now regeneration-stable
+	// (printed-form ties, normal_forms.tmpl.h) — cost no longer
+	// re-rolls on regen — but the stable order is still slow for THIS
+	// case (>600s measured), so the skip stands. Un-skip when this
+	// case completes within the ctest timeout again.
 	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat"
 		* doctest::skip())
 	{
