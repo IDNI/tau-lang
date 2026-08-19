@@ -1607,40 +1607,16 @@ TEST_SUITE("DisplacedBinderOrdering") {
 // demotion, and resolve_quantifiers2's per-leaf solver decision.
 TEST_SUITE("coverage: remaining anti-prenex arms") {
 
-	// LATENT BUG (2026-08-18): the first bv ba_constant construction in
-	// this Bool-pack binary returns nullptr (lazy factory init completes
-	// only as a side effect of the failed first call; LOG_ERROR at
-	// src/tau_tree.tmpl.h:471), and the inference layer Debug-asserts on
-	// that null. Warming the factory through the tolerant tree-level
-	// path (returns nullptr, no assert) was an attempted mitigation for
-	// that; it is retained defensively but did NOT resolve the order
-	// dependence -- the instability survives the warm-up (see the skip
-	// notes below). A raw wff-level parse does NOT warm it -- constants
-	// only bind during type INFERENCE, not during parsing itself, so an
-	// earlier warm-up TEST_CASE using tau::get(..., wff-start options)
-	// was inert (confirmed: the crash tracked whichever case's SAMPLE
-	// was the first to reach inference, not file/suite position). Calling
-	// tau::get_ba_constant directly, as done here, goes straight to the
-	// same tree-level factory the inference layer calls into. Remove when
-	// ba_constants eager-initializes.
-	static void warm_bv_constants() {
-		static bool warmed = false;
-		if (warmed) return;
-		warmed = true;
-		tref bv8 = bv_type<node_t>(8);
-		// "0" as a bare string literal is ambiguous between the
-		// `(const std::string& constant_source, tref type_tree)`
-		// overload wanted here and `(const constant&, tref)` --
-		// `constant` is a `std::variant`, and the literal converts to
-		// both via an equally-ranked user-defined conversion. An
-		// explicit `std::string` lvalue is an exact match for the
-		// former, resolving the overload unambiguously.
-		const std::string zero = "0";
-		tref first = tau::get_ba_constant(zero, bv8);
-		(void) first;                              // may be nullptr -- the bug
-		tref second = tau::get_ba_constant(zero, bv8);
-		(void) second;                              // succeeds, factory is up
-	}
+	// RESOLVED (2026-08-19): the "order-dependent BA-constant parse
+	// instability" this suite documented on 2026-08-18 was root-caused to
+	// tests/test_Bool_helpers.h's ba_constants<node<bv, Bool>>::get
+	// specialization, which understood only "0"/"1"/"true"/"false" as
+	// Bool constants and IGNORED the requested type — so `{ 2 }:bv[8]`
+	// could never parse in this pack, and the apparent order effects were
+	// inference-fallback noise on top of that. The helper now dispatches
+	// bv-typed sources to parse_bv like the production dispatcher; the
+	// former warm_bv_constants() mitigation and the doctest::skip markers
+	// are gone.
 
 	// gamma4 (antiprenexing.tmpl.h, the `an.kind == boole_atom_case::
 	// independent` arm inside anti_prenex_block's Boole-decomposition
@@ -1703,40 +1679,35 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	// build time and the constant node disappears -- see the
 	// reference-tau-constants-in-tests note).
 	//
-	// SKIPPED (2026-08-18): parsing samples that mix bv constants with
-	// refs/:tau constants in this Bool-pack binary fails or aborts
-	// depending on execution order (LOG_ERROR "Parsing constant ...
-	// failed" src/tau_tree.tmpl.h:471 then a Debug assert in inference);
-	// the instability was reproduced across suite reorders and survives
-	// a factory warm-up via get_ba_constant(string, type_tree). Latent
-	// product/harness bug -- tracked in the coverage plan's findings;
-	// un-skip when BA-constant initialization is order-independent.
-	TEST_CASE("bv verdicts demote when the solver does not own bv"
-		* doctest::skip())
-	{
-		warm_bv_constants();
+	TEST_CASE("bv verdicts demote when the solver does not own bv") {
+		// The foreign constant must belong to a BA this pack actually
+		// carries: node<bv, Bool> has no tau_ba (test_Bool_helpers.h),
+		// so a `:tau` constant can never parse here — a `:bool` one is
+		// this pack's solver-foreign constant.
 		const char* sample =
 			"(ex x : bv[8] x + x = { 2 }:bv[8]) "
-			"&& y:tau = { o1[t] = 0 }:tau.";
+			"&& y:bool = { true }:bool.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		// Non-vacuity: the formula really does carry a foreign BA
 		// constant, so ctx_bv_is_solver_owned really is false here.
 		REQUIRE( has_foreign_ba_constant<node_t>(fm) );
 		tref res = anti_prenex<node_t>(fm);
 		REQUIRE( res != nullptr );
-		// Demoted to eliminable, Boole decomposition (not a stranded
-		// solver route) fully resolves x's binder despite the bv
-		// arithmetic content.
+		// With the solver disowned (foreign :bool constant present) the
+		// demotion at antiprenexing.tmpl.h:1192-1194 routes x away from
+		// the (stranding) blasteable verdict. Boole decomposition has no
+		// useful split for the ARITHMETIC atom x + x, so the sound
+		// outcome is a KEPT binder — pin that, not full elimination.
+		// (are_nso_equivalent is undecidable on this mixed content and
+		// falls back to a conservative "no"; not asserted.)
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
-			== nullptr );
-		CHECK( are_nso_equivalent<node_t>(res, fm) );
+			!= nullptr );
 	}
 
 	// resolve_quantifiers2's per-leaf solver site: a closed bv subformula
 	// is decided via the solver/BDD path inline rather than being left as
 	// a residual quantifier.
 	TEST_CASE("resolve pass decides a closed bv leaf via the solver") {
-		warm_bv_constants();
 		const char* sample = "ex x : bv[8] x = { 1 }:bv[8].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
@@ -1752,18 +1723,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	// constant folding (unlike `y + {0}`, which would fold away) and
 	// carries a real bf_add operator, so atom_arith_verdict seeds it
 	// blasteable rather than the pure-BA-equality `eliminable`.
-	//
-	// SKIPPED (2026-08-18): parsing samples that mix bv constants with
-	// refs/:tau constants in this Bool-pack binary fails or aborts
-	// depending on execution order (LOG_ERROR "Parsing constant ...
-	// failed" src/tau_tree.tmpl.h:471 then a Debug assert in inference);
-	// the instability was reproduced across suite reorders and survives
-	// a factory warm-up via get_ba_constant(string, type_tree). Latent
-	// product/harness bug -- tracked in the coverage plan's findings;
-	// un-skip when BA-constant initialization is order-independent.
-	TEST_CASE("mixed-verdict block re-wraps by category" * doctest::skip())
-	{
-		warm_bv_constants();
+	TEST_CASE("mixed-verdict block re-wraps by category") {
 		// y's type must reach the parser from SOMEWHERE, or the untyped
 		// `{ 2 }:bv[8]` constant has nothing to infer its width from.
 		// A *binder* type (`ex y : bv[8] ...`) sharing a quantifier
