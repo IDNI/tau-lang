@@ -110,17 +110,25 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
+		// Each atom is a commutative product whose printed orientation
+		// flips under parser regeneration; accept every combination.
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
+			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
 			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
-			"yx = 0 && vw = 0 && yw = 0 && xv = 0",
 			"xy = 0 && vw = 0 && yw = 0 && vx = 0",
 			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
+			"xy = 0 && wv = 0 && wy = 0 && vx = 0",
+			"xy = 0 && wv = 0 && yw = 0 && xv = 0",
+			"xy = 0 && wv = 0 && yw = 0 && vx = 0",
+			"yx = 0 && vw = 0 && wy = 0 && xv = 0",
+			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
+			"yx = 0 && vw = 0 && yw = 0 && xv = 0",
 			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
+			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
+			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
 			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
 			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
-			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
-			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 		}) );
 	}
 	TEST_CASE("8") {
@@ -229,7 +237,10 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
 			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
 			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
@@ -446,7 +457,9 @@ TEST_SUITE("Normalizer bv mixed-type") {
 	// Several independent conjuncts must all be lifted, not just the first.
 	TEST_CASE("bv_arith_with_two_sbf_conjuncts") {
 		CHECK( normalize_and_check("ex x ex y (x:bv[8] + y:bv[8] ="
-			" { 0 }:bv[8]) && s = 0 && r = 0.", "s = 0 && r = 0") );
+			" { 0 }:bv[8]) && s = 0 && r = 0.",
+			// Conjunct order flips under parser regeneration.
+			strings{ "s = 0 && r = 0", "r = 0 && s = 0" }) );
 	}
 
 	// A scope left open by a free bitvector variable cannot be closed by
@@ -468,9 +481,11 @@ TEST_SUITE("Normalizer bv mixed-type") {
 	// Free bitvector variables with no quantifier at all must stay put: there
 	// is nothing to decide, so the arithmetic atom survives verbatim.
 	TEST_CASE("bv_arith_all_free_with_sbf_conjunct") {
+		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "x+y = 0 && s = 0",
-					       "s = 0 && x+y = 0" }) );
+			" && s = 0.", strings{ "s = 0 && x+y = 0",
+					       "x+y = 0 && s = 0" }) );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf
@@ -687,6 +702,90 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 	}
 }
 
+// analyse_formula computes eliminability verdicts whole-formula with a flat
+// cross-scope join, so a bv arithmetic atom in a SIBLING DNF clause that
+// shares free variables with atoms inside a quantified block lifts those
+// variables above `eliminable` and the binder survives -- even though the
+// block alone (or with a disjoint-variable or non-arithmetic sibling) is
+// eliminated. Reproducers R5/R6 of
+// private/review-pointwise-revision-2026-08-16.md §3; the pointwise-revision
+// fallback ¬∃outs.(S∧U) ∨ (S∧U) produces exactly the R6 configuration
+// whenever S∧U carries bv arithmetic.
+TEST_SUITE("Normalizer bv sibling-taint") {
+	static bool normalizes_quantifier_free(const char* sample) {
+		tref spec = tau::get(sample);
+		REQUIRE( spec != nullptr );
+		// Use the api entry (inference + io_var resolution +
+		// normalizer), the path the interpreter-built formulas take
+		// and the one the R6 residues were observed through.
+		tref res = api<node_t>::normalize_formula(spec);
+		REQUIRE( res != nullptr );
+		return tau::get(res).find_top(
+			is_quantifier<node_t>) == nullptr;
+	}
+
+	TEST_CASE("arithmetic block alone eliminates without blasting") {
+		// One-point eliminable (∀b1 (A≠b1 ∨ b1≠C) ≡ A≠C) but the var
+		// carries the `arithmetic` verdict, which the block core skips
+		// with blasting off; reaches ex_subs through the dual retry.
+		CHECK( normalizes_quantifier_free(
+			"always (all b1 (i99[t]:bv[1] + i95[t]:bv[1] +"
+			" { 1 }:bv[1] != b1:bv[1]"
+			" || b1:bv[1] != i913[t]:bv[1])).") );
+	}
+
+	TEST_CASE("R6: sibling arithmetic sharing variables must not freeze"
+		" the block")
+	{
+		// ∀b1 (i95+1 != b1 || i99+i93+i94 != b1) ≡ i95+1 != i99+i93+i94; the
+		// sibling clause shares i99,i93,i94 with the block's atoms.
+		CHECK( normalizes_quantifier_free(
+			"always (i95[t]:bv[1] + { 1 }:bv[1] = o91[t]:bv[1]"
+			" && (all b1 (i95[t]:bv[1] + { 1 }:bv[1] != b1:bv[1]"
+			"  || i99[t]:bv[1] + i93[t]:bv[1] + i94[t]:bv[1] !="
+			" b1:bv[1]))"
+			" || i95[t]:bv[1] + { 1 }:bv[1] = o91[t]:bv[1]"
+			" && i99[t]:bv[1] + i93[t]:bv[1] + i94[t]:bv[1] ="
+			" o91[t]:bv[1]).") );
+	}
+
+	TEST_CASE("R6 nested: the ¬∃-fallback shape with a sharing sibling") {
+		// The nested two-binder residue the pointwise-revision fallback
+		// leaves behind (aux binders introduced by + decomposition).
+		CHECK( normalizes_quantifier_free(
+			"always (o91[t]:bv[1] = i91[t]:bv[1]"
+			" && (all b3 (b3 != i91[t]:bv[1]"
+			"  || (all b2, b1 (b1 != { 0 }:bv[1]"
+			"   || (i92[t]:bv[1] & i91[t]:bv[1]'"
+			"    | i92[t]:bv[1]' & i91[t]:bv[1]) != b2"
+			"   || b3 != b2))))"
+			" || o91[t]:bv[1] = i91[t]:bv[1]"
+			" && i92[t]:bv[1] + i91[t]:bv[1] = i91[t]:bv[1]).") );
+	}
+
+	TEST_CASE("R5 guard: single clause with in-block arithmetic stays"
+		" eliminated")
+	{
+		CHECK( normalizes_quantifier_free(
+			"always (o91[t]:bv[1] = i91[t]:bv[1]"
+			" && (all b1 (i99[t]:bv[1] + i95[t]:bv[1] + { 1 }:bv[1]"
+			"  != b1:bv[1] || b1:bv[1] != i913[t]:bv[1]))).") );
+	}
+
+	TEST_CASE("R5 guard: sibling arithmetic on disjoint variables stays"
+		" eliminated")
+	{
+		CHECK( normalizes_quantifier_free(
+			"always (o91[t]:bv[1] = i91[t]:bv[1]"
+			" && (all b3 (b3 != i91[t]:bv[1]"
+			"  || (all b2, b1 (b1 != { 0 }:bv[1]"
+			"   || (i92[t]:bv[1] & i91[t]:bv[1]'"
+			"    | i92[t]:bv[1]' & i91[t]:bv[1]) != b2"
+			"   || b3 != b2))))"
+			" || o91[t]:bv[1] = i91[t]:bv[1]"
+			" && i97[t]:bv[1] + i98[t]:bv[1] = i97[t]:bv[1]).") );
+	}
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

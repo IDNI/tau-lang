@@ -17,6 +17,21 @@ namespace idni::tau_lang {
 
 inline static bool use_debug_output_in_sat = false;
 
+/// Cap on the fixpoint searches in `find_fixpoint_phi`/`find_fixpoint_chi`;
+/// 0 = unlimited (the default). A runtime parameter by policy, never a header
+/// constant — set via `--max-fixpoint-steps` or REPL `fixpointsteps`, or
+/// `api::set_max_fixpoint_steps`. SO-1 caveat: these searches have no
+/// convergence guarantee, so an unlimited run on a non-converging spec does
+/// not terminate; set a bound to get a loud give-up instead of a hang.
+inline size_t max_fixpoint_steps = 0;
+
+/// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
+/// boundary; 0 = unlimited (the default). Same SO-1 caveat as
+/// `max_fixpoint_steps` — and a bounded give-up here reports unsatisfiable,
+/// which is wrong but bounded and loud. Set via `--max-flag-search-steps`,
+/// REPL `flagsteps`, or `api::set_max_flag_search_steps`.
+inline size_t max_flag_search_steps = 0;
+
 /**
  * @internal
  * @brief Print a diagnostic message describing a fixpoint computation's
@@ -632,22 +647,29 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(phi);
 
 	int_t lookback = get_max_shift<node>(io_vars);
-	// Limit iterations to guard against non-convergent formulas (e.g. bug #47).
-	// SO-1: this search has no convergence guarantee; cap the step count so
-	// a non-converging formula fails loudly instead of hanging forever.
-	// This is a safety net, not full error propagation: callers still
-	// receive a (non-fixpoint) result rather than a failure signal.
+	// Find fix point once all initial conditions have been passed and
+	// the time_point is greater equal the step_num
+	// SO-1: this search has no convergence guarantee; the global
+	// max_fixpoint_steps (0 = unlimited, the default) lets a caller cap the
+	// step count so a non-converging formula fails loudly instead of
+	// hanging forever. This is a safety net, not full error propagation:
+	// callers still receive a (non-fixpoint) result rather than a failure
+	// signal. Real specs settle in a handful of steps (the flag_boundary
+	// tests in tests/integration/test_integration-solver.cpp reach single
+	// digits), so any generous bound leaves a wide margin.
 	//
-	// The cap has to be reachable to be a cap. Every step runs a full
-	// normalize_non_temp plus an is_nso_impl over a formula that grows with
-	// the step count, so the previous 1'000'000 could never be hit in a
-	// human timescale -- a non-converging spec still hung. Real specs settle
-	// in a handful of steps (the flag_boundary tests in
-	// tests/integration/test_integration-solver.cpp reach single digits), so
-	// this leaves a very wide margin while remaining finite.
-	constexpr int_t max_fixpoint_steps = 500;
+	// Checking the implication on the RAW iterates is deliberate. A
+	// variant that normalized each iterate once (normalize_non_temp per
+	// step) and ran is_nso_impl on the normal forms -- hoping the
+	// positive-polarity block eliminations would be cache hits and equal
+	// normal forms would shortcut the query -- measured ~10% SLOWER on
+	// bv[64]x14 interpreter stress (22.0-22.9s vs 19.0-21.1s wall over
+	// repeated runs, 2026-08-17): the extra per-step normalization of the
+	// accumulated telescope costs more than it saves, buying only a ~21%
+	// peak-RSS reduction. Do not reintroduce it for wall-clock reasons.
 	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
-		if (step_num >= max_fixpoint_steps) {
+		if (max_fixpoint_steps
+			&& step_num >= (int_t)max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
 				<< " steps without reaching a fixpoint, giving up";
 			break;
@@ -721,12 +743,12 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
 
 	// Find fix point once the lookback is greater the step_num
-	// SO-1: same unbounded-search concern, and the same reachable cap, as
-	// find_fixpoint_phi above.
-	constexpr int_t max_fixpoint_steps = 500;
+	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
+	// the same opt-in cap (global max_fixpoint_steps, 0 = unlimited).
 	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
 	{
-		if (step_num >= max_fixpoint_steps) {
+		if (max_fixpoint_steps
+			&& step_num >= (int_t)max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_chi: exceeded " << max_fixpoint_steps
 				<< " steps without reaching a fixpoint, giving up";
 			break;
@@ -1434,14 +1456,17 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	// the is_run_satisfiable check *above*, made before this loop starts
 	// conjoining !current_flag into `run` on every iteration -- so the
 	// property it depends on is not preserved and the search is not
-	// guaranteed to terminate. Cap it: a give-up here reports unsatisfiable,
-	// which is wrong but bounded and loud, where before it hung forever.
-	// Deciding this properly needs a tri-state (sat/unsat/unknown) result
-	// threaded through transform_to_execution.
-	constexpr int_t max_flag_search_steps = 500;
-	const int_t flag_search_limit = flag_boundary + 1 + max_flag_search_steps;
+	// guaranteed to terminate. The global max_flag_search_steps (0 =
+	// unlimited, the default) lets a caller bound it: a give-up reports
+	// unsatisfiable, which is wrong but bounded and loud, where an
+	// unlimited run on such a spec hangs. Deciding this properly needs a
+	// tri-state (sat/unsat/unknown) result threaded through
+	// transform_to_execution.
+	const bool flag_search_bounded = max_flag_search_steps > 0;
+	const int_t flag_search_limit = flag_boundary + 1
+					+ (int_t)max_flag_search_steps;
 	for (int_t i = flag_boundary + 1; true; ++i) {
-		if (i > flag_search_limit) {
+		if (flag_search_bounded && i > flag_search_limit) {
 			LOG_ERROR << "to_unbounded_continuation: the eventual "
 				"variable flag could not be raised within "
 				<< max_flag_search_steps << " steps past the flag "

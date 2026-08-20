@@ -6,6 +6,7 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "eliminability.h"
 
 namespace idni::tau_lang {
 
@@ -16,9 +17,9 @@ namespace idni::tau_lang {
  * Chapter 5's steps 2a and 2b are guarded by whole-formula sign predicates:
  * 2a fires when *every* atom is negated, 2b when *no* atom is negated. This
  * struct answers both, and additionally reports whether the formula holds any
- * `skip`-matched (e.g. bitvector) node at all -- neither fast path may fire in
- * that case, because both rewrite atoms that `skip` reserves for predicate
- * blasting or the solver.
+ * skipped (e.g. bitvector) node at all -- neither fast path may fire in that
+ * case, because both rewrite atoms the eliminability analysis reserves for
+ * predicate blasting or the solver.
  * @tparam node Tree node type.
  * @endinternal
  */
@@ -31,7 +32,7 @@ struct block_atom_profile {
 	/// Count of atoms neither fast path can handle: `bf_lt`, `bf_lteq`,
 	/// `wff_ref`, nested quantifiers, negations of any of those.
 	size_t others = 0;
-	/// Any `skip`-matched node anywhere in the formula.
+	/// Any node the eliminability analysis skips, anywhere in the formula.
 	bool skip_content = false;
 	/// Any node carrying a BA type from a *finite* (hence atomic) family --
 	/// `bv[n]` or `bool`. Only computed when the sign census would otherwise
@@ -46,9 +47,9 @@ struct block_atom_profile {
 	/// `ex x (x != 0) && ex x (x' != 0)` is T. Its header names the
 	/// precondition and delegates it to the caller, but the caller only ever
 	/// established `!skip_content` -- i.e. atomlessness rode entirely on the
-	/// caller's choice of `skip`, which is exactly what went wrong when
-	/// `blast_block` re-entered with `no_skip`. `finite_ba_content` checks it
-	/// directly instead.
+	/// caller's choice of analysis, which is exactly what went wrong when
+	/// `blast_block` re-entered with a skip-nothing one. `finite_ba_content`
+	/// checks it directly instead.
 	bool all_negated() const {
 		return !skip_content && !finite_ba_content && others == 0
 			&& positives == 0 && negatives > 0;
@@ -74,7 +75,8 @@ struct block_atom_profile {
  * `!(f = 0)` and never as `bf_neq`.
  * @tparam node Tree node type.
  * @param formula Matrix of a quantifier block.
- * @param skip Predicate marking content this pass must not rewrite.
+ * @param el Eliminability analysis marking content this pass must not
+ *        rewrite (`el.skip(n)`).
  * @param guards_only When `true`, stop the census as soon as neither
  *        `all_negated()` nor `all_positive()` can still hold. Both predicates
  *        stay exact -- they require `others == 0` and one of the sign counts to
@@ -88,7 +90,7 @@ struct block_atom_profile {
  */
 template<NodeType node>
 block_atom_profile<node> profile_block_atoms(tref formula,
-	const std::function<bool(tref)>& skip, bool guards_only = false);
+	const eliminability<node>& el, bool guards_only = false);
 
 } // namespace idni::tau_lang
 

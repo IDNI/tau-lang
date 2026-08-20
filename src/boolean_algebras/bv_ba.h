@@ -39,6 +39,7 @@
 #include <cvc5/cvc5.h>
 
 #include "boolean_algebras/cvc5/cvc5.h"
+#include "boolean_algebras/cvc5/cvc5_options.h"
 #include "tau_tree.h"
 #include "splitter_types.h"
 
@@ -69,14 +70,64 @@ size_t get_bv_size(const tref t);
 /**
  * @brief Configures the given cvc5 solver instance for bit-vector logic.
  *
- * Sets the solver options to produce models and configures the logic to "BV" (Bit-Vector).
- * This function prepares the solver for solving bit-vector problems.
+ * Applies the option set selected by `cvc5_options`
+ * (boolean_algebras/cvc5/cvc5_options.h -- the considered sets, the measured
+ * matrix and the selection rationale live there), then the base
+ * configuration: model production, no proofs, logic "BV". Options must be
+ * set before `setLogic`, which is where cvc5 resolves its module defaults.
  *
  * @param solver Reference to a cvc5::Solver instance to be configured.
+ * @param decision_only The caller will only read the checkSat verdict --
+ * never a model (`getValue`) and never a `simplify` result. This admits
+ * satisfiability-preserving-only preprocessing (see
+ * `cvc5_option_set::decision_no_models`); passing it from a call site that
+ * later extracts a model throws in cvc5, and from a `simplify` site would
+ * silently corrupt the rewritten term, so it defaults to false.
  */
-inline void config_cvc5_solver(cvc5::Solver& solver) {
-	// configure the solver
-	solver.setOption("produce-models", "true");
+inline void config_cvc5_solver(cvc5::Solver& solver, bool decision_only = false) {
+	switch (cvc5_options) {
+	case cvc5_option_set::baseline: break;
+	case cvc5_option_set::decision_no_models: break; // handled below
+	case cvc5_option_set::miniscope_agg:
+		solver.setOption("miniscope-quant", "agg"); break;
+	case cvc5_option_set::ext_rewrite_quant:
+		solver.setOption("ext-rewrite-quant", "true"); break;
+	case cvc5_option_set::pre_skolem_agg:
+		solver.setOption("pre-skolem-quant", "agg"); break;
+	case cvc5_option_set::sygus_inst:
+		// sygus-inst refuses incremental solving (cvc5's API default);
+		// single-checkSat usage makes non-incremental safe, see below
+		solver.setOption("incremental", "false");
+		solver.setOption("sygus-inst", "true"); break;
+	case cvc5_option_set::mbqi:
+		solver.setOption("mbqi", "true"); break;
+	case cvc5_option_set::enum_inst:
+		solver.setOption("enum-inst", "true"); break;
+	case cvc5_option_set::cegqi_bv_ineq_keep:
+		solver.setOption("cegqi-bv-ineq", "keep"); break;
+	case cvc5_option_set::non_incremental:
+		// every solver instance here performs exactly ONE checkSat and
+		// no push/pop, so cvc5's incremental API default buys nothing
+		solver.setOption("incremental", "false"); break;
+	case cvc5_option_set::ext_rewrite_no_models:
+		solver.setOption("incremental", "false");
+		solver.setOption("ext-rewrite-quant", "true"); break;
+	case cvc5_option_set::combined_best:
+		solver.setOption("incremental", "false");
+		solver.setOption("ext-rewrite-quant", "true");
+		solver.setOption("cegqi-bv-ineq", "keep"); break;
+	}
+	const bool drop_models = decision_only
+		&& (cvc5_options == cvc5_option_set::decision_no_models
+		|| cvc5_options == cvc5_option_set::ext_rewrite_no_models
+		|| cvc5_options == cvc5_option_set::combined_best);
+	solver.setOption("produce-models", drop_models ? "false" : "true");
+	// NOTE: unconstrained-simp looked like the natural companion here but
+	// cvc5 rejects it outright in any logic admitting quantifiers ("Cannot
+	// use unconstrained simplification in this logic"), and the
+	// decision-only path is exactly the quantified one -- so the no-models
+	// sets reduce to dropping models and incrementality.
+	if (drop_models) solver.setOption("incremental", "false");
 	solver.setOption("produce-proofs", "false");
 	//solver.setOption("incremental", "true");
 	solver.setLogic("BV");
@@ -227,6 +278,39 @@ template <NodeType node>
 bool has_foreign_ba_constant(tref form);
 
 /**
+ * @brief Does @p form contain the residue of a blasted bitvector predicate?
+ *
+ * `bit` (bv_predicate_blasting_logic.tmpl.h) extracts bit @e i of an operand as
+ * `operand & bit_mask_cte(i)`, a conjunction with a bitvector constant having
+ * exactly one bit set. Every blasted comparison and every blasted arithmetic
+ * constraint is built out of those bit extractions, so a one-hot masking
+ * conjunction is what blasting leaves behind and nothing else in the pipeline
+ * produces in bulk.
+ *
+ * `resolve_quantifiers` uses this to keep its "ask the solver before blasting"
+ * rule true across passes: it queries cvc5 for a bv scope because cvc5 handles
+ * bitvector arithmetic natively, but `eliminate_bv_and_quantifiers` runs
+ * `resolve_quantifiers` three times and is itself re-entered from the
+ * interpreter's fixpoint loops, so a later pass can meet a scope an earlier one
+ * already blasted. Only its *open*-scope branch screens on this, because only
+ * that branch synthesises the universal block which -- wrapped around the
+ * auxiliary quantifiers blasting introduced -- gives cvc5's
+ * counterexample-guided instantiation the alternation it does not terminate on.
+ * See that branch for the measurements and the reproducing spec.
+ *
+ * A hand-written `x & { 1 }:bv[N]` matches too. That costs nothing beyond the
+ * solver shortcut for that one open scope -- blasting, the same fallback taken
+ * for any scope the solver cannot own, still applies, and by the caller's own
+ * reasoning blasting "neither closes a formula nor makes this check succeed
+ * later", so no scope that cvc5 would have decided is lost.
+ *
+ * @param form The formula to scan
+ * @return true if a one-hot bitvector masking conjunction occurs in @p form
+ */
+template <NodeType node>
+bool has_blasting_residue(tref form);
+
+/**
  * @brief Checks whether a given bit-vector formula is valid.
  *
  * This function analyzes the provided formula and determines if it is valid
@@ -309,17 +393,40 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 // get_inv_sym.)
 
 /** @brief Normalise a BV term via cvc5's simplifier.
- * NOTE (BA1-17, attempted + reverted): reusing one static Solver here
- * SIGSEGVs Release LTL execution mid-run (test_ltl_correctness
- * LT2-EXEC-03, test_ltl_qlt_bv) -- cvc5 solver reuse across the hook
- * call pattern is not safe as-is. The per-call construction stays until
- * the cvc5 lifecycle interaction is understood; treat this as the
- * documented cost, not an oversight. */
+ *
+ * One long-lived solver plus a result cache: constructing a solver per
+ * call pays full engine initialization (theory stack + statistics
+ * registry) on its first simplify -- sampled as the dominant cost of a
+ * bv[64] interpreter step once the spec grows past a few thousand printed
+ * chars, since the constant-folding term hooks route every rebuilt bv
+ * operation through here. simplify() adds no assertions, so solver reuse
+ * is state-safe, and it is deterministic for a fixed option set (options
+ * are fixed before the first query, see cvc5_options.h), so the cache is
+ * sound. The solver is deliberately leaked: a static Solver object could
+ * destruct after the global cvc5_term_manager it references (see at_exit
+ * in main.cpp for the cleanup-order minefield).
+ *
+ * NOTE (BA1-17): an earlier attempt at a plain static Solver here (owned,
+ * not leaked) SIGSEGVed Release LTL execution mid-run (test_ltl_correctness
+ * LT2-EXEC-03, test_ltl_qlt_bv); the deliberate leak above avoids the
+ * destruction-order interaction. Do not convert it back to an owned
+ * static object. */
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
-	cvc5::Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
+#ifdef TAU_CACHE
+	static std::unordered_map<cvc5::Term, cvc5::Term> cache;
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	static cvc5::Solver* solver = [] {
+		auto* s = new cvc5::Solver(cvc5_term_manager);
+		config_cvc5_solver(*s);
+		return s;
+	}();
 	// Use general simplification procedure
-	return solver.simplify(fm);
+	cvc5::Term res = solver->simplify(fm);
+#ifdef TAU_CACHE
+	cache.emplace(fm, res);
+#endif // TAU_CACHE
+	return res;
 }
 
 /** @brief Return `true` if @p fm is the all-zeros bitvector constant. */

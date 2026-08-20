@@ -92,17 +92,17 @@ TEST_SUITE("execution: repeat_all") {
 	// oscillates between x and x' instead of growing and is caught by
 	// visited -- the other failure mode, not this one.
 	//
-	// max_rounds is currently unbounded pending the runtime parameter it is
-	// marked TODO (HIGH) for, and this case does not terminate without a
-	// finite cap. It runs as soon as one is set.
-	TEST_CASE("ever-growing rewrite is bounded and reports failure"
-		* doctest::skip(repeat_all<node_t, step<node_t>>::max_rounds
-			== std::numeric_limits<size_t>::max()))
-	{
+	// The cap is the max_rewrite_rounds runtime parameter (0 = unlimited,
+	// the default); this case does not terminate without a finite cap, so
+	// it sets one for its own duration.
+	TEST_CASE("ever-growing rewrite is bounded and reports failure") {
 		use_hooks_guard<node_t> g(false);
+		const size_t saved = max_rewrite_rounds;
+		max_rewrite_rounds = 64;
 		tref x = bf_var("x");
 		step<node_t> grow({ swap_rule(x, build_bf_neg<node_t>(x)) });
 		repeat_all<node_t, step<node_t>> ra(grow);
 		CHECK( ra(x) == nullptr );
+		max_rewrite_rounds = saved;
 	}
 }

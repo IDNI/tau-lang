@@ -914,6 +914,39 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
+	// Full names only: every single letter that would fit is taken (see
+	// RE-1 above). These two are numeric options, not flags.
+	//
+	// No underscore in the spelling: the grammar has
+	// `option_name => alnum+` (parser/tau.tgf:231), so `block_max_splits`
+	// does not even parse as an option name. Every existing option is a
+	// single alnum word for the same reason (`charvar`, `benchmarks`).
+	if (x == "maxsplits"
+		|| x == "blockmaxsplits")    return block_max_splits_opt;
+	if (x == "maxrounds"
+		|| x == "blockmaxrounds")    return block_max_rounds_opt;
+	if (x == "fixpointsteps"
+		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
+	if (x == "flagsteps"
+		|| x == "maxflagsearchsteps") return flag_search_steps_opt;
+	if (x == "blastdepth"
+		|| x == "maxblastreentrydepth") return blast_depth_opt;
+	if (x == "squeezecap"
+		|| x == "blocksqueezecap")   return squeeze_cap_opt;
+	if (x == "simplifyrounds"
+		|| x == "maxsimplifyrounds") return simplify_rounds_opt;
+	if (x == "defpasses"
+		|| x == "maxdefpasses")      return def_passes_opt;
+	if (x == "enumsteps"
+		|| x == "maxenumsteps")      return enum_steps_opt;
+	if (x == "rewriterounds"
+		|| x == "maxrewriterounds")  return rewrite_rounds_opt;
+	if (x == "gcminsize")                return gc_min_size_opt;
+	if (x == "gcgrowth"
+		|| x == "gcgrowthfactor")    return gc_growth_opt;
+	if (x == "specsizewarn")             return spec_size_warn_opt;
+	if (x == "revisionalts"
+		|| x == "maxrevisionalts")   return revision_alts_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -973,6 +1006,47 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ print_benchmarks_opt, [this]() {
 		std::cout << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } }
 	};
+	// Read from the library globals, not from `opt`: they are what the
+	// algorithm actually consults, and a caller using the api setters
+	// directly would otherwise be misreported here. Both "unlimited"
+	// representations print alike: 0 for the caps and SIZE_MAX for the
+	// two decrementing block budgets.
+	auto climit = [](size_t v) -> std::string {
+		return v == 0 || v == std::numeric_limits<size_t>::max()
+			? "unlimited" : std::to_string(v); };
+	std::map<repl_option, std::function<void()>> limit_printers = {
+	{ block_max_splits_opt, [climit]() {
+		std::cout << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
+	{ block_max_rounds_opt, [climit]() {
+		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ fixpoint_steps_opt, [climit]() {
+		std::cout << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
+	{ flag_search_steps_opt, [climit]() {
+		std::cout << "flagsteps:           " << climit(max_flag_search_steps) << "\n"; } },
+	{ blast_depth_opt, [climit]() {
+		std::cout << "blastdepth:          " << climit(max_blast_reentry_depth) << "\n"; } },
+	{ squeeze_cap_opt, [climit]() {
+		std::cout << "squeezecap:          " << climit(block_squeeze_cap) << "\n"; } },
+	{ simplify_rounds_opt, [climit]() {
+		std::cout << "simplifyrounds:      " << climit(max_simplify_rounds) << "\n"; } },
+	{ def_passes_opt, [climit]() {
+		std::cout << "defpasses:           " << climit(max_def_passes) << "\n"; } },
+	{ enum_steps_opt, [climit]() {
+		std::cout << "enumsteps:           " << climit(max_enum_steps) << "\n"; } },
+	{ rewrite_rounds_opt, [climit]() {
+		std::cout << "rewriterounds:       " << climit(max_rewrite_rounds) << "\n"; } },
+	{ gc_min_size_opt, []() {
+		std::cout << "gcminsize:           " << interpreter<node>::gc_min_size << "\n"; } },
+	{ gc_growth_opt, []() {
+		std::cout << "gcgrowth:            " << interpreter<node>::gc_growth_factor << "\n"; } },
+	{ spec_size_warn_opt, []() {
+		const size_t v = interpreter<node>::spec_size_warn_threshold;
+		std::cout << "specsizewarn:        "
+			<< (v ? std::to_string(v) : "off") << "\n"; } },
+	{ revision_alts_opt, [climit]() {
+		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } }
+	};
+	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
 #ifndef DEBUG
 	// RE-2: answering a query about an option this build does not carry is
@@ -1010,6 +1084,35 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		return;
 	}
 #endif // DEBUG
+	// A count. Zero is accepted and means "unlimited" (specsizewarn: off)
+	// by the unified limit-option convention -- the api setters translate
+	// it to each knob's internal representation.
+	auto str2count = [&v](void) -> std::optional<size_t> {
+		size_t n = 0;
+		if (v.empty()) { TAU_LOG_ERROR << "Invalid value\n"; return {}; }
+		for (char c : v) {
+			if (c < '0' || c > '9') {
+				TAU_LOG_ERROR << "Invalid value: expected a "
+					"count\n";
+				return {};
+			}
+			n = n * 10 + static_cast<size_t>(c - '0');
+		}
+		return n;
+	};
+	// A decimal number (gcgrowth); the grammar admits digits and '.'.
+	auto str2double = [&v](void) -> std::optional<double> {
+		try {
+			size_t pos = 0;
+			double d = std::stod(v, &pos);
+			if (pos != v.size())
+				throw std::invalid_argument(v);
+			return d;
+		} catch (const std::exception&) {
+			TAU_LOG_ERROR << "Invalid value: expected a number\n";
+			return {};
+		}
+	};
 	auto update_bool_value = [&v](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
 			|| v == "y" || v == "yes") opt = true;
@@ -1047,7 +1150,37 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		if (!sev.has_value()) return;
 		opt.severity = sev.value();
 		logging::set_filter(opt.severity);
-	} } };
+	} },
+	// Every numeric option funnels through its api setter, the same
+	// surface the CLI options use, so the two stay in lockstep.
+	{ block_max_splits_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_block_max_splits(*n); } },
+	{ block_max_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_block_max_rounds(*n); } },
+	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_fixpoint_steps(*n); } },
+	{ flag_search_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_flag_search_steps(*n); } },
+	{ blast_depth_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_blast_reentry_depth(*n); } },
+	{ squeeze_cap_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_block_squeeze_cap(*n); } },
+	{ simplify_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_simplify_rounds(*n); } },
+	{ def_passes_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_def_passes(*n); } },
+	{ enum_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_enum_steps(*n); } },
+	{ rewrite_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_rewrite_rounds(*n); } },
+	{ gc_min_size_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_gc_min_size(*n); } },
+	{ gc_growth_opt, [&]() { if (auto d = str2double(); d)
+		api<node>::set_gc_growth_factor(*d); } },
+	{ spec_size_warn_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_spec_size_warn(*n); } },
+	{ revision_alts_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_revision_alts(*n); } } };
 	setters[o]();
 }
 
@@ -1086,6 +1219,23 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
 	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
+	case block_max_splits_opt:
+	case block_max_rounds_opt:
+	case fixpoint_steps_opt:
+	case flag_search_steps_opt:
+	case blast_depth_opt:
+	case squeeze_cap_opt:
+	case simplify_rounds_opt:
+	case def_passes_opt:
+	case enum_steps_opt:
+	case rewrite_rounds_opt:
+	case gc_min_size_opt:
+	case gc_growth_opt:
+	case spec_size_warn_opt:
+	case revision_alts_opt:
+		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
+			"`set <option> <n>`\n", error = true;
+		return;
 	default: TAU_LOG_ERROR << "Invalid option\n", error = true; return;
 	}
 }
@@ -1335,7 +1485,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	static const std::string bool_options =
 		"  <option>               <description>                        <value>\n"
 #ifdef DEBUG
-		"  debug-repl             show REPL commands             on/off\n"
+		"  debug-repl             show REPL commands                   on/off\n"
 #endif // DEBUG
 		"  status                 show status                          on/off\n"
 		"  colors                 use term colors                      on/off\n"
@@ -1344,9 +1494,29 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  charvar (V)            character-variable notation          on/off\n"
 		"  blasting (B)           bitvector predicate blasting         on/off\n"
 		"  benchmarks (b)         print timing benchmarks              on/off\n";
+	static const std::string numeric_options =
+		"and the numeric limit options, set with `set <option> <n>` "
+		"(0 = unlimited;\nspecsizewarn: 0 = off; gcgrowth <= 0 disables "
+		"gc; each mirrors the CLI option\nof the same meaning):\n"
+		"  <option>               <description>                        <default>\n"
+		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
+		"  maxrounds              anti-prenex driver rounds            unlimited\n"
+		"  fixpointsteps          temporal-normalization fixpoint steps unlimited\n"
+		"  flagsteps              eventual-flag search steps           unlimited\n"
+		"  blastdepth             blast-block re-entry nesting         unlimited\n"
+		"  squeezecap             block-squeeze operand-set size cap   unlimited\n"
+		"  simplifyrounds         bitvector simplification rounds      unlimited\n"
+		"  defpasses              definition-expansion passes          unlimited\n"
+		"  enumsteps              recurrence enumeration steps         unlimited\n"
+		"  rewriterounds          rewrite-to-fixpoint rounds           unlimited\n"
+		"  gcminsize              gc trigger floor (tree nodes)        256\n"
+		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
+		"  specsizewarn           updated-spec size warning (chars)    off\n"
+		"  revisionalts           revision alternatives kept per part  unlimited\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options +
-		"  severity               severity                             error/info/debug/trace\n";
+		"  severity               severity                             error/info/debug/trace\n"
+		+ numeric_options;
 	static const std::string bool_available_options = std::string{} +
 		"Available options and values:\n" + bool_options;
 	switch (nt) {

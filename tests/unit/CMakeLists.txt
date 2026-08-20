@@ -16,6 +16,7 @@ set(TESTS
 	bv_ba-simplification
 	bv_ba-cast
 	cvc5
+	eliminability
 	execution
 	gc
 	hooks
@@ -67,15 +68,14 @@ set(TESTS
 	gr1_detect
 	liveness_decomp
 	mealy_extract
+	leaf_clause
 	normal_forms
-	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
 	omcat_types
 	rr
 	spec_decompose
 	product_ba
-	ref_variables_resolver
 	sbf_ba_splitter
 	tau_bdd
 	tau_tree

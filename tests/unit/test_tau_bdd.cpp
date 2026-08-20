@@ -201,7 +201,13 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		CHECK((result == "xycdabfe" || result == "xycdabef"
+		// "ab" sub-block order flipped by the 8f1a74c1 parser regen
+		// (subtree interning order changed); actual on Debug is
+		// "xycdbafe". Release's NDEBUG paths produce yet another
+		// permutation, "xycdbaef" (same letters).
+		CHECK((result == "xycdbafe" || result == "xycdbaef"
+			|| result == "xycdabfe"
+			|| result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab" ));
 	}
@@ -233,10 +239,29 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		CHECK((tau::get(xx).to_str() == "ab&(f'e')'bccd"
-			|| tau::get(xx).to_str() == "cabb&(e'f')'d"
-			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"
-			|| tau::get(xx).to_str() == "abbccd&(f'e')'"));
+		// The product's factor order and duplicate-literal spelling are
+		// a subtree_less / NDEBUG-dependent artifact that shifts with
+		// every parser regeneration (three regens produced five distinct
+		// spellings, differing even in duplicate counts -- idempotent in
+		// a product, so harmless). Pin the content instead: the negated
+		// factor in either orientation, the variables {a, b, c, d}, and
+		// nothing else.
+		std::string res = tau::get(xx).to_str();
+		// The factor prints with or without an explicit `&` (Release
+		// spells the product by juxtaposition: "(f'e')'dccbba").
+		bool factor_found = false;
+		for (const char* f : {"&(e'f')'", "&(f'e')'",
+			"(e'f')'", "(f'e')'"}) {
+			auto pos = res.find(f);
+			if (pos == std::string::npos) continue;
+			factor_found = true;
+			res.erase(pos, std::string(f).size());
+			break;
+		}
+		CHECK( factor_found );
+		std::sort(res.begin(), res.end());
+		res.erase(std::unique(res.begin(), res.end()), res.end());
+		CHECK( res == "abcd" );
 	}
 }
 
@@ -629,7 +654,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		CHECK(tau::get(result).to_str() == "ba");
+		// Product order flipped by the 8f1a74c1 parser regen on Release
+		// (NDEBUG subtree interning order changed); actual is "ab".
+		CHECK((tau::get(result).to_str() == "ab"
+			|| tau::get(result).to_str() == "ba"));
 	}
 }
 

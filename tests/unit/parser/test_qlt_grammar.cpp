@@ -16,7 +16,7 @@ struct qlt_parser_instance : public idni::parser<char, char> {
 
 	qlt_parser_instance() : idni::parser<char, char>(
 		qlt_parser_data::grammar,
-		qlt_parser_data::parser_options) {}
+		qlt_parser_data::make_parser_options()) {}
 
 	size_t id(const std::basic_string<char>& name) {
 		return qlt_parser_data::nts.get(name);

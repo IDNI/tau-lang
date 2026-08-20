@@ -28,15 +28,34 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());
 	}
-	// The next three cases check that squeeze/absorb runs on the scoped
-	// formula of each quantifier inside inner_quant (B4): the redundant
-	// xyz = 0 conjunct must be absorbed into xy = 0 before elimination,
-	// so it cannot survive in the kept clause around the unresolved f
+	// The next three cases originally pinned the legacy algorithm's B4
+	// squeeze/absorb; since its deletion they pin the block pipeline on the
+	// same inputs. The expected shapes changed with the switch -- each new
+	// shape was checked equivalent to its input by hand (the conservative
+	// are_nso_equivalent cannot decide reference-carrying formulas) before
+	// being added here, per the redesign's acceptance rule: expectations may
+	// be rewritten, semantics may not. The old shapes are kept in the lists
+	// deliberately -- they are equivalent too, and a future simplification
+	// improvement may legitimately return to them.
 	TEST_CASE("b4 squeeze_absorb below ex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// 2026-08-20 (bare-atom leaf routing; canonical shape
+			// FIRST): same two disjuncts as the 2026-08-04 shape below,
+			// with disjunct and conjunct order flipped by the regen
+			// tie-breaks; equivalent by the same hand-check.
+			"(ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0)) "
+			"|| (ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1)))",
+			// block pipeline, 2026-08-04: carries a redundant second
+			// disjunct (its two conjuncts force w = 0 and w != 0, so
+			// it is F) and an unabsorbed b1 yz != 0 literal (dead
+			// under b1 y = 0); verified equivalent by hand.
+			"(ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))) "
+			"|| (ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0))",
+			// pre-deletion shapes, equivalent; a future simplification
+			// improvement may legitimately return to them.
 			"w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))",
 			"w = 0 || (ex b1 b1 y = 0 && b1 w = 0 && f(b1))",
 			"(ex b1 b1 w = 0 && b1 y = 0 && f(b1)) || w = 0",
@@ -48,6 +67,17 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// 2026-08-20 (bare-atom leaf routing; canonical first):
+			// dual of the ex case, conjunct/disjunct order flipped by
+			// the regen tie-breaks; equivalent by the same hand-check.
+			"(all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0) "
+			"&& (all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1))",
+			// block pipeline, 2026-08-04: the dual, second conjunct is
+			// identically T, and the first folds to the old shape
+			// (b1 = 0 forces w != 0); verified equivalent by hand.
+			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0)",
+			// pre-deletion shapes, equivalent.
 			"w != 0 && (all b1 b1 w != 0 || b1 y != 0 || !f(b1))",
 			"w != 0 && (all b1 b1 y != 0 || b1 w != 0 || !f(b1))",
 			"(all b1 b1 w != 0 || b1 y != 0 || !f(b1)) && w != 0",
@@ -61,6 +91,17 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// disjunct order flipped by the 8f1a74c1 parser regen
+			// (Debug's matches_to_any_of only checks expected[0] --
+			// see test_helpers.h); actual current shape first.
+			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
+			// block pipeline, 2026-08-04 (canonical shape first):
+			// under y = 0 the kept universal reduces to
+			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
+			// is w = 0 -- so this is y = 0 && w = 0 in a bulkier
+			// spelling; verified equivalent by hand.
+			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
+			// pre-deletion shapes, equivalent.
 			"y = 0 && w = 0",
 			"w = 0 && y = 0",
 		}) );
@@ -157,27 +198,28 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 
 // AN-1: qlt_dlo_qe records free-variable (symbolic) endpoints only for
 // contradiction detection; absent a contradiction it still returns its `top`
-// accumulator as a *determined* interval.  treat_ex_quantified_clause accepted
+// accumulator as a *determined* interval.  The old leaf elimination accepted
 // that verdict unconditionally, so `ex x (a < x && x < b)` with free a, b was
 // rewritten to T -- but over Q the truth is `a < b`, false at a = b.
-// resolve_quantifiers' omcat branch already gates on a closed scope; the treat
-// call site did not.
+// resolve_quantifiers' omcat branch already gates on a closed scope; the
+// leaf-clause call site (eliminate_block_over_clause's qlt/DLO branch) keeps
+// the binder when an ordering atom survives an undetermined interval.
 TEST_SUITE("AN-1 symbolic qlt bounds") {
 
 	TEST_CASE("ex x (a < x && x < b) with free a, b is not resolved to T") {
 		const char* sample = "ex x:qlt (a:qlt < x && x < b:qlt).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		tref res = anti_prenex<node_t>(fm);
 		CHECK( !tau::get(res).equals_T() );
-		CHECK( !quant_eliminated );
+		// The binder survives (elimination declined).
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
+			!= nullptr );
 	}
 
 	TEST_CASE("closed qlt scope is still resolved (AN-1 control)") {
 		const char* sample = "ex x:qlt ({1/4}:qlt < x && x < {3/4}:qlt).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		tref res = anti_prenex<node_t>(fm);
 		CHECK( tau::get(res).equals_T() );
 	}
 }

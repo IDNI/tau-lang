@@ -81,7 +81,9 @@ function(target_setup target)
 			-Wstrict-aliasing=2
 			-Wfloat-equal
 			-Wwrite-strings
-			-Werror           # warning as errors
+			# warnings as errors in dev configs only, so a newly
+			# introduced warning is caught there, not in Release
+			$<$<OR:$<CONFIG:Debug>,$<CONFIG:Coverage>,$<CONFIG:RelWithDebInfo>>:-Werror>
 			-Wfatal-errors    # first error stops compilation
 			# -ftemplate-backtrace-limit=0
 		)

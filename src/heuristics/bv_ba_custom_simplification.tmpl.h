@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include "bv_simplify_options.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_simplification"
 
@@ -76,12 +78,22 @@ std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operat
 
 	for (const tref& op : arguments) {
 		auto nt = tau::get(op).get_type();
-		const bool constant = nt == tau::ba_constant
-			|| nt == tau::bf_t || nt == tau::bf_f;
-		tref& side = constant ? ctes : vars;
-		side = side
-			? tau::get(operation, tau::get(tau::bf, side), tau::get(tau::bf, op))
-			: op;
+		switch (nt) {
+			case tau::ba_constant: case tau::bf_t: case tau::bf_f:
+				ctes = ctes ? tau::get(operation, tau::get(tau::bf, ctes), tau::get(tau::bf, op))
+					: op;
+				break;
+			// a variable, or a term headed by an operator this
+			// block cannot absorb (`X >> {1}`, `X & Y`, ...).
+			// Both are opaque values that constant folding
+			// cannot combine, so both fold on the non-constant
+			// side; letting the latter fall through instead
+			// would drop it from the block.
+			default:
+				vars = vars ? tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, op))
+					: op;
+				break;
+		}
 	}
 	return {vars, ctes};
 }
@@ -205,27 +217,176 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 
 /**
  * @internal
- * @brief Single pass over @p n: finds every maximal associative `+`/`-` or
- * `*`/`/` block and records the folded replacement for its top node.
+ * @brief `true` if @p nt is one of the four operators that form associative
+ * blocks: `+`, `-`, `*` and `/`.
+ * @endinternal
+ */
+template<NodeType node>
+bool is_block_operation(size_t nt) {
+	using tau = tree<node>;
+
+	return nt == tau::bf_add || nt == tau::bf_sub
+		|| nt == tau::bf_mul || nt == tau::bf_div;
+}
+
+/**
+ * @internal
+ * @brief The direct operator of the block @p nt belongs to: `bf_add` for both
+ * `+` and `-`, `bf_mul` for both `*` and `/`.
+ * @endinternal
+ */
+template<NodeType node>
+size_t block_operation_of(size_t nt) {
+	using tau = tree<node>;
+
+	return (nt == tau::bf_sub || nt == tau::bf_div)
+		? size_t(inverse_of<node>(nt)) : nt;
+}
+
+/**
+ * @internal
+ * @brief Strips the `bf` wrapper the grammar puts around each operand of an
+ * operation, so operands are handed around bare, as `build_simplification`
+ * expects them.
+ * @endinternal
+ */
+template<NodeType node>
+tref bare_operand(tref n) {
+	using tau = tree<node>;
+
+	return tau::get(n).get_type() == tau::bf ? tau::trim(n) : n;
+}
+
+template<NodeType node>
+void collect_block_changes(tref n, subtree_map<node, tref>& changes, size_t type);
+
+/**
+ * @internal
+ * @brief Splits the operands of the maximal associative block rooted at @p n
+ * into the direct side @p args and the inverse side @p invs.
  *
- * A block is discovered top-down. `collect` descends from a block top only
- * through nodes of the *same* family (`+`/`-`, or `*`/`/`), flipping the
- * args/inverses side each time it crosses an inverse operator, and stops at
- * everything else. Every other node kind -- `&`, `|`, `^`, shifts, `%`, a
- * cast, a `bf_ref` call, a parenthesis, a quantified term -- is therefore an
- * opaque block operand, kept whole on the variable side by
- * `build_simplification`. The driver then re-visits each collected operand,
- * so the operands of a non-block operator really are scanned as fresh,
- * independent blocks (and a block under a cast takes its BA type from its own
- * top node, not from the root).
+ * Descends only through nodes belonging to @p operation's own block family, so
+ * `a - b - c` and `a - (b - c)` both reach the same block with `a` (resp.
+ * `a`, `c`) on the direct side. Anything else -- a leaf, or a term headed by an
+ * operator no block can absorb such as `>>` -- is opaque to the block and
+ * enters it as one operand; the blocks nested inside such an operand are
+ * collected into @p changes as blocks of their own.
+ * @tparam node Tree node type.
+ * @param n Bare node to split.
+ * @param operation The block's direct operator (`bf_add` or `bf_mul`).
+ * @param inverse `true` if @p n sits on the inverse side of the block.
+ * @param args Direct-side operands, appended to.
+ * @param invs Inverse-side operands, appended to.
+ * @param changes Rewrite map for blocks nested inside opaque operands.
+ * @param type BA type identifier for building identity/zero terms.
+ * @endinternal
+ */
+template<NodeType node>
+void collect_block_operands(tref n, size_t operation, bool inverse,
+	trefs& args, trefs& invs, subtree_map<node, tref>& changes, size_t type)
+{
+	using tau = tree<node>;
+
+	if (size_t nt = tau::get(n).get_type();
+		nt == operation || nt == inverse_of<node>(operation))
+	{
+		// only the operands *after* the first are flipped by a `-` or
+		// a `/` node: `a - b - c` is `a - b - c`, not `a - b + c`
+		bool flips = (nt == tau::bf_sub || nt == tau::bf_div);
+		bool first = true;
+		for (tref c : tau::get(n).children()) {
+			collect_block_operands<node>(bare_operand<node>(c),
+				operation, (first || !flips) ? inverse : !inverse,
+				args, invs, changes, type);
+			first = false;
+		}
+		return;
+	}
+
+	DBG(LOG_TRACE << "collect_block_operands/operand: "
+		<< tau::get(n).to_str() << " inverse: " << inverse << "\n";)
+
+	collect_block_changes<node>(n, changes, type);
+	(inverse ? invs : args).push_back(n);
+}
+
+/**
+ * @internal
+ * @brief Records in @p changes the folded replacement of every maximal
+ * `+`/`-`/`*`/`/` block reachable from @p n.
  *
- * This replaces a post-order traversal that maintained a stack of operand
- * frames. That stack could not hold its invariant: a node hitting the
- * traversal's `default` arm pushed no frame, yet `variable`/`ba_constant`
- * leaves *inside* it did, so the frames of a non-block operator's operands
- * survived and were folded into the next block -- `(x & y) + z` folded to
- * `y + z`, `f(x) + y` to `x + y`, and `((a + b) & c) + d` popped a one-frame
- * stack and read past the end of an empty vector.
+ * A block's operands are collected by `collect_block_operands` and folded by
+ * `build_simplification`; nodes that head no block are descended into so that
+ * blocks below a non-block operator are found too. A block whose folded form
+ * is the node it came from records no change.
+ * @tparam node Tree node type.
+ * @param n Node to scan.
+ * @param changes Rewrite map, appended to.
+ * @param type BA type identifier for building identity/zero terms.
+ * @endinternal
+ */
+template<NodeType node>
+void collect_block_changes(tref n, subtree_map<node, tref>& changes, size_t type)
+{
+	using tau = tree<node>;
+
+	size_t nt = tau::get(n).get_type();
+	if (is_block_operation<node>(nt)) {
+		size_t operation = block_operation_of<node>(nt);
+		trefs args, invs;
+		collect_block_operands<node>(n, operation, false, args, invs,
+			changes, type);
+
+		// The block's BA type: its own top node when typed, else the
+		// first typed operand, else the inherited one. Taking the
+		// inherited (root) type alone gives sub-blocks under a
+		// width-changing cast the wrong width.
+		size_t block_type = tau::get(n).get_ba_type();
+		if (!block_type) {
+			for (tref op : args)
+				if ((block_type = tau::get(op).get_ba_type()))
+					break;
+			if (!block_type) for (tref op : invs)
+				if ((block_type = tau::get(op).get_ba_type()))
+					break;
+			if (!block_type) block_type = type;
+		}
+
+		tref folded = build_simplification<node>(args, invs, operation,
+			block_type);
+
+		DBG(LOG_TRACE << "collect_block_changes/block: " << tau::get(n).to_str()
+			<< " -> " << (folded ? tau::get(folded).to_str() : "(none)") << "\n";)
+
+		if (folded) {
+			if (folded != n) changes[n] = folded;
+		} else
+			// No sound fold for this block (a multiplicative block
+			// holding a division): scan the top node's operands
+			// separately instead, so a pure product below it is
+			// still folded (see build_simplification's doc).
+			for (tref c : tau::get(n).children())
+				collect_block_changes<node>(
+					bare_operand<node>(c), changes, type);
+		return;
+	}
+
+	for (tref c : tau::get(n).children())
+		collect_block_changes<node>(c, changes, type);
+}
+
+/**
+ * @internal
+ * @brief Single pass: groups adjacent `+`/`-`/`*`/`/` operators into maximal
+ * associative blocks and folds each block's variable and constant operands
+ * together via `build_simplification`.
+ *
+ * Non-block operators (`&`, `|`, `shl`, `shr`, `mod`, `cast`, ...) cannot be
+ * absorbed into a block: such a term enters its enclosing block as a single
+ * opaque operand, and its own operands are scanned as fresh, independent
+ * blocks. Repeatedly re-run by `bv_ba_custom_simplification` until a fixpoint
+ * is reached, which is also what folds a block nested inside an operand of an
+ * outer block that was itself rewritten in this pass.
  * @tparam node Tree node type.
  * @param n Term to scan for foldable blocks.
  * @return Rewrite map from original block-top node to its folded replacement.
@@ -248,84 +409,7 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
-
-	auto is_block_operator = [](size_t nt) {
-		return nt == tau::bf_add || nt == tau::bf_sub
-			|| nt == tau::bf_mul || nt == tau::bf_div;
-	};
-	// bf_add and bf_mul are the canonical (non-inverse) family operators.
-	auto family_of = [](size_t nt) {
-		return (nt == tau::bf_sub) ? size_t(tau::bf_add)
-			: (nt == tau::bf_div) ? size_t(tau::bf_mul) : nt;
-	};
-
-	// Collects the operands of the maximal block of family `family` rooted at
-	// `top`, in left-to-right order, splitting them between the direct side
-	// (`args`) and the inverse side (`invs`). `operands` receives them all,
-	// in the same order, for the driver to re-visit.
-	auto collect = [&](tref top, size_t family,
-			trefs& args, trefs& invs, trefs& operands)
-	{
-		const size_t inverse_op = inverse_of<node>(family);
-		std::vector<std::pair<tref, bool>> pending{ { top, false } };
-		while (!pending.empty()) {
-			auto [t, inverted] = pending.back(); pending.pop_back();
-			const size_t nt = tau::get(t).get_type();
-			if (nt == family || nt == inverse_op) {
-				const bool inverse = nt == inverse_op;
-				// right first, so the left subtree is drained first
-				// and the operand order matches the source order
-				pending.emplace_back(tau::trim(tau::get(t).child(1)),
-					inverted != inverse);
-				pending.emplace_back(tau::trim(tau::get(t).child(0)),
-					inverted);
-				continue;
-			}
-			(inverted ? invs : args).push_back(t);
-			operands.push_back(t);
-		}
-	};
-
-	// The block's BA type: its own top node when typed, else the first typed
-	// operand, else the root's. Taking it from the root alone gives sub-blocks
-	// under a width-changing cast the wrong width.
-	auto block_type = [&](tref top, const trefs& operands) {
-		if (size_t t = tau::get(top).get_ba_type(); t) return t;
-		for (tref operand : operands)
-			if (size_t t = tau::get(operand).get_ba_type(); t) return t;
-		return tau::get(n).get_ba_type();
-	};
-
-	std::vector<tref> to_visit{ n };
-	while (!to_visit.empty()) {
-		tref t = to_visit.back(); to_visit.pop_back();
-		const size_t nt = tau::get(t).get_type();
-		if (is_block_operator(nt)) {
-			const size_t family = family_of(nt);
-			trefs args, invs, operands;
-			collect(t, family, args, invs, operands);
-			tref folded = build_simplification<node>(args, invs,
-				family, block_type(t, operands));
-			if (folded) {
-				if (folded != t) changes[t] = folded;
-				// the block absorbed these operands; each is a
-				// fresh, independent block of its own
-				for (tref operand : operands)
-					to_visit.push_back(operand);
-			} else {
-				// no sound fold for this block (a multiplicative
-				// block holding a division): fall back to scanning
-				// the top node's two operands separately, so a pure
-				// product below it is still folded
-				to_visit.push_back(tau::trim(tau::get(t).child(0)));
-				to_visit.push_back(tau::trim(tau::get(t).child(1)));
-			}
-			continue;
-		}
-		for (tref c : tau::get(t).get_children())
-			to_visit.push_back(c);
-	}
-
+	collect_block_changes<node>(n, changes, tau::get(n).get_ba_type());
 	return changes;
 }
 
@@ -336,12 +420,12 @@ tref bv_ba_custom_simplification(const tref term) {
 	// checked for it, so the condition was always false and the loop ran
 	// exactly once, discarding any further simplification. Guard against
 	// a longer oscillating cycle (as done in repeat_all, see RR-2) with a
-	// visited set, and against an ever-growing rewrite with max_rounds.
+	// visited set, and against an ever-growing rewrite with the global
+	// max_simplify_rounds (0 = unlimited).
 	tref current = term;
 	std::unordered_set<tref> visited{current};
-	constexpr size_t max_rounds = 1'000'000;
 	size_t round = 0;
-	for (; round < max_rounds; ++round) {
+	for (; !max_simplify_rounds || round < max_simplify_rounds; ++round) {
 		auto changes = simplify_blocks<node>(current);
 		tref next = rewriter::replace<node>(current, changes);
 		if (next == current) break;
@@ -349,9 +433,10 @@ tref bv_ba_custom_simplification(const tref term) {
 		visited.insert(next);
 		current = next;
 	}
-	if (round == max_rounds)
-		LOG_ERROR << "bv_ba_custom_simplification: exceeded " << max_rounds
-			<< " rounds without reaching a fixpoint or cycle, giving up";
+	if (max_simplify_rounds && round == max_simplify_rounds)
+		LOG_ERROR << "bv_ba_custom_simplification: exceeded "
+			<< max_simplify_rounds << " rounds (max-simplify-rounds)"
+			" without reaching a fixpoint or cycle, giving up";
 
 #ifdef DEBUG
 	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";

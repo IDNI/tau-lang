@@ -940,3 +940,48 @@ TEST_SUITE("UseHooksGuard") {
 	}
 }
 
+TEST_SUITE("atm_formula_order_for_quant_elim stability") {
+
+	// Pivot selection must not depend on parser nonterminal numbering:
+	// a `./dev regen` with a newer pinned generator renumbers the
+	// nonterminals, and the comparator's old subtree_less tie-breaks
+	// flipped with them — the 8f1a74c1 regeneration re-rolled the
+	// Boole-decomposition pivot order this way and with it the
+	// decomposition cost (bisected 2026-08-18/19, GitHub #70 family).
+	// Ties must therefore break on PRINTED form: surface syntax is the
+	// one ordering a regeneration cannot change.
+	TEST_CASE("ties break on printed form, not grammar numbering") {
+		// All four equations tie on every semantic key: the same
+		// quantified variable x (same max/min priority), none an
+		// equational assignment, one extra unquantified variable each.
+		tref fm = get_nso_rr(
+			"ex x (x d = 0 && x b = 0 && x c = 0 && x a = 0).")
+				.value().main->get();
+		// The comparator receives wff-level atoms (wff{bf_eq ...}),
+		// exactly what anti_prenex_block's candidate scan collects.
+		trefs atms = tau::get(fm).select_top(
+			[](tref n) {
+				const auto& t = tau::get(n);
+				return t.is(tau::wff) && t.child_is(tau::bf_eq);
+			});
+		REQUIRE( atms.size() == 4 );
+		// x's binder node is interned identically to its occurrences.
+		tref x = tau::get(fm).find_top(is<node_t, tau::variable>);
+		REQUIRE( x != nullptr );
+		subtree_unordered_map<node_t, int_t> qp;
+		qp.emplace(x, 1);
+		auto comp = atm_formula_order_for_quant_elim<node_t>(qp);
+		// Spec: among fully tied candidates the minimum is the one with
+		// the lexicographically smallest printed form.
+		std::vector<std::string> strs;
+		for (tref a : atms) strs.push_back(tau::get(a).to_str());
+		const std::string smallest =
+			*std::min_element(strs.begin(), strs.end());
+		tref m = *std::min_element(atms.begin(), atms.end(), comp);
+		CHECK( tau::get(m).to_str() == smallest );
+		// Strict-weak-order sanity: irreflexive and asymmetric.
+		for (tref p : atms) CHECK( !comp(p, p) );
+		for (tref p : atms) for (tref q : atms)
+			if (comp(p, q)) CHECK( !comp(q, p) );
+	}
+}

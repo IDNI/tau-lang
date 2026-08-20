@@ -6,6 +6,7 @@ set(TESTS
 	bf_hooks
 	bv_hooks
 	bf_normalization
+	eliminability
 	interpreter
 	interpreter_ltl_multiio
 	pointwise_revision
@@ -13,6 +14,7 @@ set(TESTS
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
+	placement_matrix
 	quantifiers
 	satisfiability6
 	normalizer_helpers
@@ -42,6 +44,7 @@ set(TESTS
 	blasting_correctness_check5
 	ctl_star
 	ocfuncs
+	bv_stress_check
 )
 
 foreach(X IN LISTS TESTS)

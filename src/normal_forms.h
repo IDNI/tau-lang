@@ -522,6 +522,8 @@ tref pnf(tref n);
 // of the heuristics themselves and also they could need definitions from the
 // header (as is the case in 'heuristics/bv_ba_simplification.h'). Also, they
 // need to be included before the definitions as they can be used in there.
+#include "antiprenexing/eliminability.h"
+#include "antiprenexing/leaf_clause.h"
 #include "antiprenexing/block_atom_profile.h"
 #include "antiprenexing/block_squeeze.h"
 #include "antiprenexing/boole_atom_analysis.h"
@@ -535,6 +537,8 @@ tref pnf(tref n);
 // normalize_atomic_formula_operators, term_boole_decomposition,
 // squeeze_absorb, atm_formula_order_for_quant_elim), four of which have no
 // header declarations at all. Moving this line earlier breaks the build.
+#include "antiprenexing/eliminability.tmpl.h"
+#include "antiprenexing/leaf_clause.tmpl.h"
 #include "antiprenexing/antiprenexing.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__

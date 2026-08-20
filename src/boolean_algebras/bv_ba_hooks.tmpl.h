@@ -662,8 +662,15 @@ tref term_shl(tref symbol) {
 }
 
 inline int compare_bv_consts(const bv& c1, const bv& c2) {
-	const std::string s1 = c1.getBitVectorValue(2);
-	const std::string s2 = c2.getBitVectorValue(2);
+	// A ba_constant can hold a constant EXPRESSION rather than a value:
+	// the generic BA fold combines two constants with the raw Term
+	// operators (cvc5.tmpl.h operator|/&/^/~ build unsimplified bvor/...),
+	// and nothing between that fold and this comparison normalizes.
+	// getBitVectorValue on such a term throws, so fold it here first.
+	const bv v1 = c1.isBitVectorValue() ? c1 : normalize_bv(c1);
+	const bv v2 = c2.isBitVectorValue() ? c2 : normalize_bv(c2);
+	const std::string s1 = v1.getBitVectorValue(2);
+	const std::string s2 = v2.getBitVectorValue(2);
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
 }
 

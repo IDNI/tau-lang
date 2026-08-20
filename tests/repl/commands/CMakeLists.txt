@@ -75,6 +75,9 @@ include(test_repl-run_cmd.cmake)
 # --version, the interactive REPL loop, and the specification-file path.
 include(test_repl-cli.cmake)
 
+# Limit options that change algorithm behavior (give-up branches).
+include(test_repl-limit_effects.cmake)
+
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
 # TODO (VERY_HIGH) add tests  definition command

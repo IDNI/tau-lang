@@ -67,7 +67,19 @@ namespace idni::tau_lang {
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
-	print_benchmarks_opt, debug_opt };
+	print_benchmarks_opt, debug_opt,
+	// Numeric, unlike every option above: they take a count, not a flag, so
+	// enable/disable/toggle do not apply to them. Full names only -- the
+	// single-letter space is exhausted (see the RE-1 note at the name
+	// lookup: "b" is benchmarks and "B" is blasting). One per runtime
+	// limit; each sets the library global through its api setter, and `get`
+	// reads the global back, so the REPL and the CLI options stay two views
+	// of the same knob.
+	block_max_splits_opt, block_max_rounds_opt, fixpoint_steps_opt,
+	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
+	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
+	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
+	spec_size_warn_opt, revision_alts_opt };
 
 // Logic fragment: determines which operators are available
 enum logic_fragment { fragment_ltl, fragment_ctl_star };
@@ -103,6 +115,11 @@ struct repl_evaluator {
 		bool charvar             = true;  ///< Use character-variable notation.
 		bool blasting            = true;  ///< Enable bitvector predicate blasting.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
+		// The numeric limit options deliberately have no mirror fields
+		// here: `set` writes the library globals through the api setters
+		// and `get` reads the globals back, so a mirror could only fall
+		// out of sync (and the two that used to exist did, holding dead
+		// 512/1000 defaults the constructor never applied).
 #ifdef DEBUG
 		bool debug_repl          = true;
 		boost::log::trivial::severity_level

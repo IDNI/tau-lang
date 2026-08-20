@@ -39,7 +39,7 @@ tref not_equal_to_unequal(tref fm) {
 // so it's tempting to drop this pass and rely on those. Both attempts
 // regressed the test suite, empirically:
 //  - Removing the pass entirely crashes an assertion in
-//    push_ex_block_into_clause (`!find_top(is<bf_neq>)`) and aborts most
+//    eliminate_block_over_clause (`!find_top(is<bf_neq>)`) and aborts most
 //    of the satisfiability/solver/splitter/interpreter/api tests: several
 //    downstream matchers (this one, trivial_skolem_ex's bf_eq-only
 //    matcher, the is_atomic filters gating Boole decomposition) hard-
@@ -64,6 +64,18 @@ tref not_equal_to_unequal(tref fm) {
 template<NodeType node>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	// Unlike ex_subs_based_elimination's cache (ex_subs_based_elimination.tmpl.h),
+	// this stores the value untrimmed: apply_unique preserves the input
+	// root's right sibling in its result. That is deliberate parity with
+	// the core traversal slot memo (tree.h ~1055), which already stores
+	// sibling-carrying rebuilt nodes under sibling-insensitive keys; every
+	// consumer here compares content, not siblings, so an untrimmed value
+	// is safe. (Same note applies to to_nnf's cache below.)
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
@@ -93,7 +105,11 @@ tref normalize_atomic_formula_operators(tref fm) {
 	tref result = pre_order<node>(fm)
 				.apply_unique(normalize_operators, visit_wff<node>);
 	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
+#ifdef TAU_CACHE
+	return cache.emplace(fm, result).first->second;
+#else
 	return result;
+#endif // TAU_CACHE
 }
 
 template<NodeType node>
@@ -129,10 +145,21 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 
 template <NodeType node>
 tref to_nnf(tref fm) {
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// Untrimmed value cache; see normalize_atomic_formula_operators above
+	// for why (sibling-hygiene parity with the tree.h ~1055 traversal memo).
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
 	auto result = push_negation_in<node>(fm);
 	LOG_TRACE << "to_nnf result: " << LOG_FM(result);
+#ifdef TAU_CACHE
+	return cache.emplace(fm, result).first->second;
+#else
 	return result;
+#endif // TAU_CACHE
 }
 
 template<NodeType node>

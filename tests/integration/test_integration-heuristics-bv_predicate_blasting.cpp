@@ -1850,6 +1850,43 @@ TEST_SUITE("more complex formulas") {
 	TEST_CASE("complex formula 6") {
 		CHECK(blast_normalize("ex x:bv[4] (x << { 1 }:bv[4] = { 1 }:bv[4])") == "F");
 	}
+}
+
+// Regression: resolve_quantifiers must not hand an already-blasted open bv
+// scope to cvc5. eliminate_bv_and_quantifiers runs resolve_quantifiers three
+// times and the interpreter re-enters it from its fixpoint loops, so a later
+// pass meets scopes an earlier one blasted. Closing such a scope's free
+// variables wraps blasting's auxiliary quantifiers in a universal block, and
+// cvc5's counterexample-guided instantiation does not terminate on the result:
+// checkSat never returns, with no time or resource bound to stop it, so the
+// whole process hangs. `has_blasting_residue` is what keeps that query from
+// being issued.
+TEST_SUITE("blasted scopes stay off the solver path") {
+
+	// The one-hot masking conjunction `bit` leaves behind is the marker.
+	TEST_CASE("blasting output is recognised as residue") {
+		tref blasted = blast_formula(
+			"ex x (x:bv[4] + y:bv[4] = { 1 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		CHECK( has_blasting_residue<node_t>(blasted) );
+	}
+
+	// A formula the solver owns natively must keep its shortcut: bv
+	// arithmetic carries no bit masks, so the screen leaves it alone.
+	TEST_CASE("unblasted bv arithmetic is not residue") {
+		tref plain = parse_wff("ex x (x:bv[4] + y:bv[4] = { 1 }:bv[4])");
+		REQUIRE(plain != nullptr);
+		CHECK( !has_blasting_residue<node_t>(plain) );
+	}
+
+	// Guards the screen against matching everything: a hand-written mask is
+	// residue by this test's own definition, but ordinary bitwise content
+	// over whole bitvectors is not.
+	TEST_CASE("non-masking bitwise bv content is not residue") {
+		tref plain = parse_wff("ex x (x:bv[4] & y:bv[4] = z:bv[4])");
+		REQUIRE(plain != nullptr);
+		CHECK( !has_blasting_residue<node_t>(plain) );
+	}
 
 }
 

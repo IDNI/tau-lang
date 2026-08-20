@@ -92,6 +92,20 @@ struct repeat_each {
  * @tparam node Tree node type.
  * @tparam step_t Individual step type.
  */
+/// Round cap for `repeat_all` — a rewrite that neither settles nor cycles;
+/// 0 = unlimited (the default). A rewriting system given by user definitions
+/// need not terminate, and a non-terminating one typically *grows* the
+/// formula rather than revisiting an earlier state, so `repeat_all`'s
+/// `visited` cycle check never fires on it — only a bound set here stops it.
+/// Legitimate definition expansion needs few rounds: a round rewrites every
+/// match at once and applies the whole rule set, so a call chain of depth k
+/// collapses in O(k) rounds at worst. A namespace-level global (not a
+/// `repeat_all` member) because `repeat_all` is templated on the step type —
+/// a member would be one knob per instantiation. Set via
+/// `--max-rewrite-rounds`, REPL `rewriterounds`, or
+/// `api::set_max_rewrite_rounds`.
+inline size_t max_rewrite_rounds = 0;
+
 template <NodeType node, typename step_t>
 struct repeat_all {
 	/** @brief Construct with a `steps` sequence @p s. */
@@ -102,28 +116,11 @@ struct repeat_all {
 	/**
 	 * @brief Apply all steps, restarting until no step fires.
 	 * @param n Formula to rewrite.
-	 * @return Fixpoint formula, or `nullptr` if neither a fixpoint nor a
-	 *         cycle was reached within `max_rounds` rounds.
+	 * @return Fixpoint formula, or `nullptr` if `max_rewrite_rounds` is
+	 *         set and neither a fixpoint nor a cycle was reached within
+	 *         that many rounds.
 	 */
 	tref operator()(tref n) const;
-
-	/**
-	 * @brief Round cap for a rewrite that neither settles nor cycles.
-	 *
-	 * A rewriting system given by user definitions need not terminate, and a
-	 * non-terminating one typically *grows* the formula rather than revisiting
-	 * an earlier state, so the `visited` cycle check never fires.
-	 *
-	 * STATUS (RR-2, issue #36): the cap is currently UNREACHABLE
-	 * (size_t::max), so the non-termination report below is dead and a
-	 * growing rewrite hangs. Per project policy the effective cap belongs
-	 * in a runtime parameter, not a header constant; when that lands, pick
-	 * a value small enough that hitting it is reported in seconds
-	 * (legitimate expansion collapses a depth-k call chain in O(k) rounds),
-	 * and un-skip the regression test in tests/unit/test_execution.cpp.
-	 */
-	// TODO (HIGH) This should be a runtime parameter, not a compile-time constant.
-	static constexpr size_t max_rounds = std::numeric_limits<size_t>::max();
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };

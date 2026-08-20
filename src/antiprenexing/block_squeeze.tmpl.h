@@ -36,7 +36,8 @@ std::optional<trefs> squeeze_positive_disjuncts(tref formula, size_t ba_type) {
 		if (!l) return std::nullopt;
 		auto r = squeeze_positive_disjuncts<node>(t[0].second(), ba_type);
 		if (!r) return std::nullopt;
-		if (l->size() + r->size() > block_squeeze_cap)
+		if (block_squeeze_cap
+			&& l->size() + r->size() > block_squeeze_cap)
 			return std::nullopt;
 		l->insert(l->end(), r->begin(), r->end());
 		return l;
@@ -46,7 +47,8 @@ std::optional<trefs> squeeze_positive_disjuncts(tref formula, size_t ba_type) {
 		if (!l) return std::nullopt;
 		auto r = squeeze_positive_disjuncts<node>(t[0].second(), ba_type);
 		if (!r) return std::nullopt;
-		if (l->size() * r->size() > block_squeeze_cap)
+		if (block_squeeze_cap
+			&& l->size() * r->size() > block_squeeze_cap)
 			return std::nullopt;
 		trefs out;
 		out.reserve(l->size() * r->size());

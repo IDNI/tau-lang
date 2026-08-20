@@ -27,7 +27,11 @@ while kill -0 "$PID" 2>/dev/null; do
     # SW-13: sum RSS over the whole process group (like bench.sh) -- the
     # kill acts on the group, so metering only the leader let spawned
     # tools (ltlsynt) blow past the limit unobserved.
-    RSS=$(ps -o rss= -g "$PGID" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+    # `|| RSS=0`: the test can exit during the sleep above, and `ps -g` on
+    # a vanished process group fails -- under `set -eo pipefail` that made
+    # the wrapper itself exit 1, reporting every sub-2s test as FAILED.
+    RSS=$(ps -o rss= -g "$PGID" 2>/dev/null \
+        | awk '{s+=$1} END{print s+0}') || RSS=0
     [ -z "$RSS" ] && RSS=0
     if [ "$RSS" -gt "$MEM_LIMIT_KB" ]; then
         kill_group "(RSS=${RSS}kB > ${MEM_LIMIT_KB}kB limit)"
