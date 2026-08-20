@@ -377,6 +377,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Run update if update stream is present and unequal to 0
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
+	else warn_if_update_dropped<node>(i, output.value());
 
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
@@ -421,6 +422,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Run update if update stream is present and unequal to 0
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
+	else warn_if_update_dropped<node>(i, output.value());
 
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";

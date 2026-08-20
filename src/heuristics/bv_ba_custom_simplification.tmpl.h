@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include "bv_simplify_options.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_simplification"
 
@@ -354,12 +356,12 @@ tref bv_ba_custom_simplification(const tref term) {
 	// checked for it, so the condition was always false and the loop ran
 	// exactly once, discarding any further simplification. Guard against
 	// a longer oscillating cycle (as done in repeat_all, see RR-2) with a
-	// visited set, and against an ever-growing rewrite with max_rounds.
+	// visited set, and against an ever-growing rewrite with the global
+	// max_simplify_rounds (0 = unlimited).
 	tref current = term;
 	std::unordered_set<tref> visited{current};
-	constexpr size_t max_rounds = 1'000'000;
 	size_t round = 0;
-	for (; round < max_rounds; ++round) {
+	for (; !max_simplify_rounds || round < max_simplify_rounds; ++round) {
 		auto changes = simplify_blocks<node>(current);
 		tref next = rewriter::replace<node>(current, changes);
 		if (next == current) break;
@@ -367,9 +369,10 @@ tref bv_ba_custom_simplification(const tref term) {
 		visited.insert(next);
 		current = next;
 	}
-	if (round == max_rounds)
-		LOG_ERROR << "bv_ba_custom_simplification: exceeded " << max_rounds
-			<< " rounds without reaching a fixpoint or cycle, giving up";
+	if (max_simplify_rounds && round == max_simplify_rounds)
+		LOG_ERROR << "bv_ba_custom_simplification: exceeded "
+			<< max_simplify_rounds << " rounds (max-simplify-rounds)"
+			" without reaching a fixpoint or cycle, giving up";
 
 #ifdef DEBUG
 	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";

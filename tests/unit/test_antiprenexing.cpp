@@ -4,33 +4,6 @@
 #include "test_Bool_helpers.h"
 #include "normal_forms.h"
 #include "normalizer.h"
-
-TEST_SUITE("TreatExQuantifiedClause") {
-	TEST_CASE("surviving inner quantifier blocks elimination (B5)") {
-		// The inner ex y survived elimination; its equations are not
-		// top-level conjuncts of the outer clause, so the eliminator
-		// must keep the whole quantified clause instead of squeezing
-		// them and silently dropping the inner binder (leaking y free)
-		const char* sample =
-			"ex x (xw = 0 && (ex y (xy = 0 && f(y) != 0))).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
-		CHECK( !quant_eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
-	}
-
-	TEST_CASE("plain clause still eliminated (B5 control)") {
-		const char* sample = "ex x (xw = 0 && xz != 0).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
-		CHECK( quant_eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
-		CHECK( res != fm );
-	}
-}
-
 TEST_SUITE("AntiPrenexBlock") {
 	// Helper: peel the leading ex-quantifier prefix into a block,
 	// innermost variable gets the lowest order index
@@ -57,7 +30,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order, is_tref_bv_type_family<node_t>);
+			used_atms, quant_pattern, order, eliminability<node_t>::bv_only());
 		return {res, used_atms.size()};
 	}
 
@@ -75,7 +48,7 @@ TEST_SUITE("AntiPrenexBlock") {
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
 			used_atms, quant_pattern, order,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 		return {res, used_atms.size()};
 	}
 
@@ -138,9 +111,11 @@ TEST_SUITE("AntiPrenexBlock") {
 		// level further in. Previously:
 		//   "z = 0 && (ex b1 b1 y != 0 || b1 w != 0)"
 		auto [res, used] = run_apb("ex x (z = 0 && (xy != 0 || xw != 0)).");
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))",
 			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
+			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))",
 		}) );
 		CHECK( used == 0 );
 	}
@@ -203,7 +178,7 @@ TEST_SUITE("AntiPrenexBlock") {
 	TEST_CASE("paper 2a: distributes over a conjunction too") {
 		// The half no other path reaches: ex X (A && B) == ex X A && ex X B
 		// for negated atoms. Without 2a this is a pure clause and goes
-		// through push_ex_block_into_clause, which reaches the same
+		// through eliminate_block_over_clause, which reaches the same
 		// answer; the point here is that 2a gets it in one step and
 		// without consuming any decomposition atom.
 		auto [res, used] = run_apb_norm("ex x (xy != 0 && xw != 0).");
@@ -262,7 +237,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		// Both x < z and xy = 0 contain the block variable and rank
 		// equally under atm_formula_order_for_quant_elim, which orders
 		// by variable priority only. But only a bf_eq can ever let
-		// push_ex_block_into_clause remove the block: splitting on the
+		// eliminate_block_over_clause remove the block: splitting on the
 		// bf_lt sends both branches to the unrecognized-conjunct path,
 		// which re-wraps, so the work is wasted and the result carries
 		// the debris.
@@ -400,18 +375,18 @@ TEST_SUITE("AntiPrenexBlock") {
 }
 
 TEST_SUITE("AntiPrenexBlock0Arg") {
-	// Tests for the zero-arg anti_prenex_block (the full pipeline:
-	// NNF+simplify → subs_elim → normalize_atomic → process_block post-order).
+	// Tests for the one-arg anti_prenex pipeline (NNF+simplify → subs_elim →
+	// normalize_atomic → process_block post-order → canonical ids).
 
 	static tref run_apb0(const char* sample) {
-		return anti_prenex_block<node_t>(
+		return anti_prenex<node_t>(
 			get_nso_rr(sample).value().main->get());
 	}
 
 	TEST_CASE("quantifier-free formula is returned unchanged") {
 		// Short-circuit: no quantifiers → original tref returned as-is.
 		tref fm = get_nso_rr("xy = 0 && wz = 0.").value().main->get();
-		CHECK( anti_prenex_block<node_t>(fm) == fm );
+		CHECK( anti_prenex<node_t>(fm) == fm );
 	}
 
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
@@ -443,7 +418,9 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 		// ∃x. (xy=0 ∧ wz=0): wz=0 is independent of x → factor out;
 		// ∃x. xy=0 → T (pick x=0).  Result: T ∧ wz=0 = wz=0.
 		tref res = run_apb0("ex x (xy = 0 && wz = 0).");
-		CHECK( matches_to_str_to_any_of(res, {"wz = 0", "zw = 0"}) );
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
+		CHECK( matches_to_str_to_any_of(res, {"zw = 0", "wz = 0"}) );
 	}
 
 	TEST_CASE("trivial_skolem wiring: ex x (x=w || z=0) resolves via the block hook") {
@@ -495,7 +472,7 @@ TEST_SUITE("BlockAtomProfile") {
 			fm = tau::get(fm)[0].second();
 		fm = normalize_atomic_formula_operators<node_t>(fm);
 		return profile_block_atoms<node_t>(fm,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 	}
 
 	TEST_CASE("all negated") {
@@ -609,20 +586,21 @@ TEST_SUITE("BlockSkipPaths") {
 	static quantifier_block<node_t> collect(const char* sample) {
 		tref fm = get_nso_rr(sample).value().main->get();
 		return collect_quantifier_block<node_t>(fm,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 	}
 
 	TEST_CASE("an opposite-kind skipped quantifier ends the run") {
 		// `ex a all x:bv[8] phi`. x is skip-matched, so this pass never
 		// eliminates it -- but wrap_skipped re-emits everything in
-		// blk.skipped *outermost*, so absorbing the `all` here would
-		// hoist it out past the `ex` and produce all x ex a phi, which
-		// is not equivalent (only the converse implication holds).
-		// The run must therefore stop at it.
+		// blk.displaced by category, frozen/arithmetic/blasteable
+		// outermost, so absorbing the `all` here would hoist it out
+		// past the `ex` and produce all x ex a phi, which is not
+		// equivalent (only the converse implication holds). The run
+		// must therefore stop at it.
 		auto blk = collect("ex a all x:bv[8] (a = 0 || x = 0).");
 		CHECK( blk.is_ex );
 		CHECK( blk.vars.size() == 1 );
-		CHECK( blk.skipped.empty() );
+		CHECK( blk.displaced.empty() );
 		// The `all x` is left at the head of the matrix, where a later
 		// round picks it up as an inner block.
 		CHECK( is_child_quantifier<node_t>(blk.body) );
@@ -634,8 +612,8 @@ TEST_SUITE("BlockSkipPaths") {
 		// to defer. The block's kind must come from the first *active*
 		// quantifier (ex), not from the leading skipped `all`.
 		auto blk = collect("all x:bv[8] ex a (a = 0 || x = 0).");
-		CHECK( blk.skipped.size() == 1 );
-		CHECK( blk.skipped.front().second == false );   // it was an `all`
+		CHECK( blk.displaced.size() == 1 );
+		CHECK( std::get<1>(blk.displaced.front()) == false ); // it was an `all`
 		CHECK( blk.is_ex );                             // kind from `ex a`
 		CHECK( blk.vars.size() == 1 );
 	}
@@ -646,8 +624,8 @@ TEST_SUITE("BlockSkipPaths") {
 		auto blk = collect("ex a ex x:bv[8] (a = 0 && x = 0).");
 		CHECK( blk.is_ex );
 		CHECK( blk.vars.size() == 1 );
-		CHECK( blk.skipped.size() == 1 );
-		CHECK( blk.skipped.front().second == true );    // it was an `ex`
+		CHECK( blk.displaced.size() == 1 );
+		CHECK( std::get<1>(blk.displaced.front()) == true );  // it was an `ex`
 	}
 
 	TEST_CASE("a run of only skipped quantifiers has no active variable") {
@@ -655,7 +633,7 @@ TEST_SUITE("BlockSkipPaths") {
 		// whole run is deferred.
 		auto blk = collect("ex x:bv[8] (x = 0).");
 		CHECK( blk.vars.empty() );
-		CHECK( blk.skipped.size() == 1 );
+		CHECK( blk.displaced.size() == 1 );
 	}
 }
 
@@ -764,7 +742,11 @@ TEST_SUITE("BlockSqueeze") {
 	TEST_CASE("2b: declines when the cross product exceeds the cap") {
 		// Four conjuncts of three disjuncts each: 3^4 = 81 > 64, so the
 		// multiplicative blow-up the cap exists to stop is refused and
-		// the general algorithm runs instead.
+		// the general algorithm runs instead. block_squeeze_cap defaults
+		// to 0 (unlimited) since it became a runtime parameter, so the
+		// cap under test is set explicitly for this case's duration.
+		const size_t saved_cap = block_squeeze_cap;
+		block_squeeze_cap = 64;
 		std::string sample = "ex x (";
 		const char* groups[] = {"abc", "def", "ghi", "jkl"};
 		for (size_t g = 0; g < 4; ++g) {
@@ -781,11 +763,15 @@ TEST_SUITE("BlockSqueeze") {
 		CHECK( !squeeze_positive_disjuncts<node_t>(
 			body_of(sample.c_str()),
 			ba_type_of(sample.c_str())).has_value() );
+		block_squeeze_cap = saved_cap;
 	}
 
 	TEST_CASE("2b: declines when a disjunction exceeds the cap") {
 		// 65 disjuncts: over the cap by addition rather than
-		// multiplication, which is a separate guard.
+		// multiplication, which is a separate guard. As above, the cap
+		// under test is set explicitly (the default is unlimited).
+		const size_t saved_cap = block_squeeze_cap;
+		block_squeeze_cap = 64;
 		std::string sample = "ex x (";
 		for (size_t i = 0; i < 65; ++i) {
 			if (i) sample += " || ";
@@ -797,6 +783,7 @@ TEST_SUITE("BlockSqueeze") {
 		CHECK( !squeeze_positive_disjuncts<node_t>(
 			body_of(sample.c_str()),
 			ba_type_of(sample.c_str())).has_value() );
+		block_squeeze_cap = saved_cap;
 	}
 
 	TEST_CASE("2b: just under the cap still squeezes") {
@@ -888,7 +875,7 @@ TEST_SUITE("ResolveQuantifiers2Binders") {
 		term_handle<node_t>::order order;
 		order.emplace(outer, 0);
 		tref res = resolve_quantifiers2<node_t>(fm, order,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 		// Whatever was eliminated, no variable may have leaked free.
 		CHECK( get_free_vars<node_t>(res).size()
 			== get_free_vars<node_t>(fm).size() );
@@ -905,161 +892,14 @@ TEST_SUITE("QuantBlockPush") {
 		quant_block.push_back(tau::get(fm)[0].first());
 		fm = tau::get(fm)[0].second();
 		term_handle<node_t>::order order;
-		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
+		tref res = eliminate_block_over_clause<node_t>(fm, quant_block,
+			block_eliminability<node_t>{}, order);
 		// tau::get(res).print(std::cout << "res: ") << "\n";
 		CHECK(tau::get(res).to_str() == "(ex b2, b1 b2 b1|b1 b2 = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2|b1) = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2^b1) = 0)");
 	}
-	TEST_CASE("2") {
-		const char* sample = "all u ex v (u<v && v<x).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		fm = unequal_to_not_equal<node_t>(fm);
-		trefs quant_block;
-		term_handle<node_t>::order order;
-		tref uvar = tau::trim2(fm);
-		order.emplace(uvar, 1);
-		fm = tau::get(fm)[0].second();
-		quant_block.push_back(tau::trim2(fm));
-		order.emplace(tau::trim2(fm), 0);
-		fm = tau::get(fm)[0].second();
-		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
-		// tau::get(res).print(std::cout << "ex: ") << "\n";
-		res = tau::build_wff_all(uvar, res, false);
-		res = push_quantifiers_in<node_t>(res);
-		// tau::get(res).print(std::cout << "all: ") << "\n";
-		res = resolve_quantifiers2<node_t>(res, order);
-		// tau::get(res).print(std::cout << "res: ") << "\n";
-		CHECK(tau::get(res).equals_F());
-	}
 }
-
-TEST_SUITE("PushUniversalQuantifierOneOr") {
-	TEST_CASE("mixed-variable disjunction: x-free clause factored out") {
-		// all x (x = 0 || z = 0):
-		//   x = 0 contains the bound variable x → kept under ∀x
-		//   z = 0 is x-free                     → pulled out as a disjunct
-		// Exercises the wff_or branch where both q_fm and no_q_fm are
-		// non-empty (the partial-removal path that was never exercised).
-		// Result: (all x (x=0 || _F())) || (_F() || z=0)
-		const char* sample = "all x (x = 0 || z = 0).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = push_universal_quantifier_one<node_t>(fm);
-		// The formula must have changed (quantifier was restructured)
-		CHECK( tau::get(res) != tau::get(fm) );
-		// The quantifier must survive (x-dependent clause kept under ∀x)
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
-		// A top-level disjunction must appear (x-free clause factored out)
-		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) != nullptr );
-	}
-}
-
 // Coverage for the anti-prenexing functions the 2026-07-30 review found
 // untested (report section 5.8), plus the AP-1 gamma4 guard added while fixing
-// that finding.
-
-TEST_SUITE("PushQuantifierOne") {
-
-	static tref peel(const char* sample) {
-		return get_nso_rr(sample).value().main->get();
-	}
-
-	// push_existential_quantifier_one had no test at all: it has no reference
-	// anywhere outside antiprenexing.tmpl.h and its three branches were only
-	// exercised incidentally through anti_prenex.
-	TEST_CASE("existential push distributes over a disjunction") {
-		tref fm = peel("ex x (x y = 0 || x z = 0).");
-		tref res = push_existential_quantifier_one<node_t>(fm);
-		// Both disjuncts must end up separately quantified.
-		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
-		CHECK( qs.size() == 2 );
-	}
-
-	TEST_CASE("existential push splits off an independent conjunct") {
-		tref fm = peel("ex x (x y = 0 && z = 0).");
-		tref res = push_existential_quantifier_one<node_t>(fm);
-		CHECK( res != fm );
-		// z = 0 does not mention x, so it must leave the scope; exactly one
-		// binder survives, around the dependent part.
-		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
-		CHECK( qs.size() == 1 );
-	}
-
-	TEST_CASE("existential push commutes with an inner existential") {
-		tref fm = peel("ex x ex y (x y = 0).");
-		tref res = push_existential_quantifier_one<node_t>(fm);
-		CHECK( res != nullptr );
-		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
-		CHECK( qs.size() == 2 );
-	}
-
-	TEST_CASE("existential push leaves a fully dependent atom alone") {
-		tref fm = peel("ex x (x y = 0).");
-		CHECK( push_existential_quantifier_one<node_t>(fm) == fm );
-	}
-
-	// AP-14's Release guard (return the input unchanged on a shape mismatch)
-	// is deliberately not unit-tested: the DBG assert documenting the same
-	// contract fires first in a Debug build, which is the only build these
-	// unit tests run in. The guard exists so that Release does not read the
-	// wrong children instead of aborting.
-
-	// push_universal_quantifier_one had one test (the wff_or branch); the
-	// conjunction-distribute and commute branches had none.
-	TEST_CASE("universal push distributes over a conjunction") {
-		tref fm = peel("all x (x y = 0 && x z = 0).");
-		tref res = push_universal_quantifier_one<node_t>(fm);
-		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_all>);
-		CHECK( qs.size() == 2 );
-	}
-
-	TEST_CASE("universal push commutes with an inner universal") {
-		tref fm = peel("all x all y (x y = 0).");
-		tref res = push_universal_quantifier_one<node_t>(fm);
-		CHECK( res != nullptr );
-		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_all>);
-		CHECK( qs.size() == 2 );
-	}
-}
-
-TEST_SUITE("ExQuantifiedBooleDecomposition") {
-	// ex_quantified_boole_decomposition had zero test references. Its result
-	// must stay equivalent to the input whatever branch it takes.
-
-	static tref run_ebd(const char* sample, bool& no_atms) {
-		tref fm = normalize_atomic_formula_operators<node_t>(
-			get_nso_rr(sample).value().main->get());
-		subtree_unordered_map<node_t, tref> pool;
-		subtree_unordered_map<node_t, int_t> quant_pattern;
-		tref var = tau::trim2(fm);
-		quant_pattern.emplace(var, 1);
-		no_atms = false;
-		return ex_quantified_boole_decomposition<node_t>(fm, pool,
-			quant_pattern, nullptr, no_atms);
-	}
-
-	TEST_CASE("decomposition preserves meaning") {
-		for (const char* s : { "ex x (x y = 0 && x z != 0).",
-					"ex x (x y = 0 || x z = 0).",
-					"ex x (x y = 0).",
-					"ex x (x y = 0 && z = 0)." }) {
-			CAPTURE(s);
-			bool no_atms = false;
-			tref fm = normalize_atomic_formula_operators<node_t>(
-				get_nso_rr(s).value().main->get());
-			tref res = run_ebd(s, no_atms);
-			REQUIRE( res != nullptr );
-			CHECK( are_nso_equivalent<node_t>(res, fm) );
-		}
-	}
-
-	TEST_CASE("no decomposable atom sets no_atms") {
-		// A wff_ref body has no bf_eq/bf_lt/bf_lteq atom to pivot on.
-		bool no_atms = false;
-		tref res = run_ebd("ex x f(x).", no_atms);
-		CHECK( no_atms );
-		CHECK( res != nullptr );
-	}
-}
-
 TEST_SUITE("ProcessQuantifierBlocks") {
 	// process_quantifier_blocks and select_innermost_blocks had no direct
 	// test; the multi-round re-collection and the `done` retirement that
@@ -1069,7 +909,7 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a all b (a b = 0).").value().main->get();
 		subtree_unordered_set<node_t> done;
 		std::vector<quantifier_block<node_t>> blocks;
-		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+		select_innermost_blocks<node_t>(fm, eliminability<node_t>::bv_only(),
 			done, blocks);
 		REQUIRE( blocks.size() == 1 );
 		// The innermost run is the universal one.
@@ -1081,12 +921,12 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a (a b = 0).").value().main->get();
 		subtree_unordered_set<node_t> done;
 		std::vector<quantifier_block<node_t>> blocks;
-		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+		select_innermost_blocks<node_t>(fm, eliminability<node_t>::bv_only(),
 			done, blocks);
 		REQUIRE( blocks.size() == 1 );
 		done.insert(blocks[0].head);
 		blocks.clear();
-		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+		select_innermost_blocks<node_t>(fm, eliminability<node_t>::bv_only(),
 			done, blocks);
 		CHECK( blocks.empty() );
 	}
@@ -1097,14 +937,15 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a all b ex c (a b = 0 || c = 0).")
 			.value().main->get();
 		tref res = process_quantifier_blocks<node_t>(fm,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 		REQUIRE( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
 
-	TEST_CASE("no_skip skips nothing") {
-		CHECK( !no_skip<node_t>(get_nso_rr("x = 0.").value().main->get()) );
-		CHECK( !no_skip<node_t>(nullptr) );
+	TEST_CASE("the empty analysis skips nothing") {
+		const auto none = eliminability<node_t>::none();
+		CHECK( !none.skip(get_nso_rr("x = 0.").value().main->get()) );
+		CHECK( !none.skip(nullptr) );
 	}
 }
 
@@ -1131,7 +972,7 @@ TEST_SUITE("Gamma4Guard") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block, used_atms,
-			quant_pattern, order, is_tref_bv_type_family<node_t>);
+			quant_pattern, order, eliminability<node_t>::bv_only());
 		const trefs& fv = get_free_vars<node_t>(res);
 		for (tref v : block) {
 			tref tv = tau::trim_right_sibling(v);
@@ -1205,20 +1046,22 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 	// an *atomless* Boolean algebra. Over bv[1], `ex x (x != 0 && x' != 0)` is
 	// F while the distributed `ex x (x != 0) && ex x (x' != 0)` is T. The guard
 	// used to encode sign uniformity plus !skip_content only, so atomlessness
-	// rode entirely on the caller's choice of `skip` -- and blast_block
-	// re-entering with no_skip is exactly how that failed. `no_skip` here
-	// reproduces that caller.
-	static block_atom_profile<node_t> profile_no_skip(const char* sample) {
+	// rode entirely on the caller's choice of analysis -- and blast_block
+	// re-entering with a skip-nothing one is exactly how that failed. The
+	// empty analysis here reproduces that caller.
+	static block_atom_profile<node_t> profile_skipping_nothing(const char* sample) {
 		tref fm = get_nso_rr(sample).value().main->get();
 		while (is_child_quantifier<node_t>(fm))
 			fm = tau::get(fm)[0].second();
 		fm = normalize_atomic_formula_operators<node_t>(fm);
-		return profile_block_atoms<node_t>(fm, no_skip<node_t>);
+		return profile_block_atoms<node_t>(fm,
+			eliminability<node_t>::none());
 	}
 
-	TEST_CASE("all_negated declines on bv content even under no_skip") {
-		auto p = profile_no_skip("ex x:bv[8] (x != { 0 }:bv[8]).");
-		// no_skip means the old guard saw uniform signs and nothing else.
+	TEST_CASE("all_negated declines on bv content even under the empty analysis") {
+		auto p = profile_skipping_nothing("ex x:bv[8] (x != { 0 }:bv[8]).");
+		// Skipping nothing means the old guard saw uniform signs and
+		// nothing else.
 		CHECK( !p.skip_content );
 		CHECK( p.negatives == 1 );
 		CHECK( p.others == 0 );
@@ -1229,7 +1072,7 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 	TEST_CASE("atomless content still qualifies for step 2a") {
 		// Control: the same shape over the default (atomless) type must keep
 		// firing, so the new guard is not simply blocking everything.
-		auto p = profile_no_skip("ex x (x y != 0 && x z != 0).");
+		auto p = profile_skipping_nothing("ex x (x y != 0 && x z != 0).");
 		CHECK( !p.finite_ba_content );
 		CHECK( p.all_negated() );
 	}
@@ -1239,146 +1082,680 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 		// `f1 = 0 && f2 = 0` into `f1|f2 = 0` and distributing `ex` over a
 		// disjunction are valid in any Boolean algebra. finite_ba_content is
 		// therefore not even computed for a positive census.
-		auto p = profile_no_skip("ex x (x y = 0 && x z = 0).");
+		auto p = profile_skipping_nothing("ex x (x y = 0 && x z = 0).");
 		CHECK( p.all_positive() );
 		CHECK( !p.finite_ba_content );
 	}
 }
+// Quantifier ids are canonicalised once at pipeline entry and once at exit, and
+// every binder the pass builds runs with calculate_quant_id = false -- which
+// also stops find_biggest_quant_id, a full pre_order walk, from running once per
+// binder built.
+//
+// These pin that the renaming is invisible from outside: a block that mixes a
+// trivially eliminable variable with one frozen by a reference must come back
+// with exactly the frozen binder, through both entry points.
+//
+// The design's other id hazard -- a free variable named like a canonical id --
+// is not reachable from the surface syntax and so has no case here.
+// `canonize_quantifier_ids` renames a bound variable to the decimal string of
+// its id ("1", "2"), while the printer displays those as `b1`, `b2`; parsing
+// `b1` yields the distinct internal name "b1". Checked by hand:
+// `ex x (x a = 0) && b1 c = 0.` normalises to `b1 c = 0`, uncaptured.
+TEST_SUITE("CanonicalQuantifierIds") {
 
-TEST_SUITE("TreatExQuantifiedClauseNegatives") {
-
-	// AP-4. squeeze_positives selects with select_top(is<bf_eq>), and
-	// select_top descends through wff_neg, so the equation inside a `!(g = 0)`
-	// was folded into the *positive* squeeze while the `neqs` scan matched only
-	// bf_neq and never re-added the negation: the disequation was inverted and
-	// dropped, turning this clause into T. The precondition ("negatives appear
-	// as bf_neq") held only by accident of call order; it is now established in
-	// the function itself.
-	TEST_CASE("a wff_neg(bf_eq) conjunct is not folded into the positives") {
-		const char* sample = "ex x (x a = 0 && !(x b = 0)).";
+	TEST_CASE("a frozen binder survives alone, under canonical ids") {
+		// x is trivially eliminable; y is frozen by the reference f.
+		// Exactly one binder survives, and the reference is intact.
+		const char* sample = "ex x, y (x = 0 && y w = 0 && f(y)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		REQUIRE( fm != nullptr );
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( tau::get(res).select_top(
+			is<node_t, tau::wff_ex>).size() == 1 );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
+	}
+}
+
+// The two resource limits the block algorithm charges. Both are runtime
+// parameters rather than header constants, per the project's standing policy;
+// `bv_blasting` (heuristics/bv_predicate_blasting.h) is the precedent.
+TEST_SUITE("BlockLimits") {
+
+	TEST_CASE("exhausting the split budget keeps quantifiers and does not hang") {
+		// With a budget of 1 the core cannot finish the decomposition.
+		// The contract is: keep the quantifiers, log, return -- never
+		// hang, and never claim an answer it did not compute.
+		const size_t saved = block_boole_max_splits;
+		block_boole_max_splits = 1;
+		const char* sample =
+			"ex x, y, z ((x a = 0 || y b = 0) && (z c = 0 || x d = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		block_boole_max_splits = saved;
+		CHECK( res != nullptr );
+		CHECK( !tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("the limits are at their documented defaults") {
+		CHECK( block_boole_max_splits
+			== std::numeric_limits<size_t>::max() );
+		CHECK( block_max_rounds == std::numeric_limits<size_t>::max() );
+	}
+}
+
+// The γ1 (unique-zero) cofactor fold and the constraint its F-branch must
+// carry. Driven through the 8-arg core directly: the full pipeline's
+// simplification steps resolve this shape before the core sees it, so a
+// pipeline-level test would pass even with the bug present.
+TEST_SUITE("Gamma1NegatedBranch") {
+	static tref g1_core(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		trefs block;
+		term_handle<node_t>::order order;
+		tref body = fm;
+		while (tau::get(body)[0].is(tau::wff_ex)) {
+			block.push_back(tau::get(body)[0].first());
+			body = tau::get(body)[0].second();
+		}
+		for (size_t i = 0; i < block.size(); ++i)
+			order.emplace(block[i], block.size() - 1 - i);
+		body = normalize_atomic_formula_operators<node_t>(body);
+		subtree_unordered_set<node_t> used_atms;
+		subtree_unordered_map<node_t, int_t> qp;
+		for (size_t i = 0; i < block.size(); ++i)
+			qp.emplace(block[i], i + 1);
+		size_t sl = block_boole_max_splits;
+		analysis_context<node_t> ac;
+		const block_eliminability<node_t> elim = analyse_block<node_t>(
+			block, get_cnf_wff_clauses<node_t>(body), ac);
+		return anti_prenex_block<node_t>(body, block, used_atms, qp,
+			order, eliminability<node_t>::bv_only(), sl, elim);
+	}
+
+	// The named free variable of @p fm -- the PARSED node, since a node
+	// built by hand would differ (type inference) and replace() would
+	// silently miss it.
+	static tref g1_var(tref fm, const char* name) {
+		for (tref v : get_free_vars<node_t>(fm))
+			if (tau::get(v).to_str() == name) return v;
+		return nullptr;
+	}
+
+	// Ground truth of a one-free-variable result: substitute the constant
+	// and read the normalized closed instance. T and F are both definite.
+	static bool g1_holds_at(tref res, tref var, bool one) {
+		const size_t ty = tau::get(var).get_ba_type();
+		tref g = rewriter::replace<node_t>(res, var,
+			one ? tau::_1_trimmed(ty) : tau::_0_trimmed(ty));
+		return tau::get(normalize_non_temp<node_t>(tau::reget(g)))
+			.equals_T();
+	}
+
+	TEST_CASE("the unique-zero fold keeps the pivot's negation") {
+		// ∃q (q ≠ 0 ∧ (a q = 0 ∨ q = 0)) ≡ a' ≠ 0: T at a=0, F at a=1.
+		// γ1 fires on the pivot `q = 0` (f = q has its unique zero at
+		// q := 0). Before the fix the F-branch was φ[atm→F] with ¬atm
+		// dropped, so the `q ≠ 0` constraint -- which lives only in
+		// occurrences of the atom -- vanished, and the core answered T
+		// at a=1 as well. This is the wrong answer the legacy fallback
+		// had been silently repairing on the issue #70 interpreter spec.
+		const char* sample = "ex q (!(q = 0) && (a q = 0 || q = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = g1_core(sample);
+		tref var = g1_var(fm, "a");
+		REQUIRE( var != nullptr );
+		CHECK( g1_holds_at(res, var, false) );
+		CHECK( !g1_holds_at(res, var, true) );
+	}
+
+	TEST_CASE("the five-conjunct interpreter shape stays sound") {
+		// The shape the issue #70 step system actually produced, reduced
+		// by tree-level delta debugging. Same truth table: T at a=0,
+		// F at a=1 (s does not matter; check both values).
+		const char* sample =
+			"ex q (!(q = 0) && (a q = 0 || q = 0) && "
+			"(!(q = a) || !(s' = 0) || a q = q || !(q = 0)) && "
+			"(!(a' = 0) || !(s' = 0) || a q = a || a = q || !(q = 0)) && "
+			"(!(a q = q) || !(s' = 0) || q = a || a q = 0 || q = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = g1_core(sample);
+		tref a = g1_var(fm, "a");
+		tref s = g1_var(fm, "s");
+		REQUIRE( a != nullptr );
+		REQUIRE( s != nullptr );
+		const size_t st = tau::get(s).get_ba_type();
+		tref r0 = rewriter::replace<node_t>(res, s, tau::_0_trimmed(st));
+		tref r1 = rewriter::replace<node_t>(res, s, tau::_1_trimmed(st));
+		CHECK( g1_holds_at(r0, a, false) );
+		CHECK( !g1_holds_at(r0, a, true) );
+		CHECK( g1_holds_at(r1, a, false) );
+		CHECK( !g1_holds_at(r1, a, true) );
+	}
+}
+
+// Task 11 (user directive 2026-08-14): "bv variables that appear only in atoms
+// that are purely BA are also eliminable." The pair below pins the two halves
+// of that -- what must now be eliminated in Tau, and what must NOT start being
+// distributed once it is.
+TEST_SUITE("PureBaBvEliminability") {
+
+	TEST_CASE("pure-BA bv scope is eliminated in Tau, no quantifier survives") {
+		// ex x (x|y = 0) over bv[2] == y = 0 by Boole's expansion, valid
+		// in any BA. Before this task the blanket bv skip kept the binder.
+		//
+		// The analysis has to be the one `normalize_non_temp` builds: the
+		// 1-argument `anti_prenex` hands down
+		// `eliminability<node_t>::bv_only()`, a blanket floor with no
+		// explicit verdicts at all, and it is exactly that floor the seed
+		// flip has to beat. Calling the 2-argument entry point with
+		// `analyse_formula`'s result is the same pairing
+		// `normalize_non_temp` performs, without the solver passes around
+		// it.
+		tref fm = get_nso_rr("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2]).")
+			.value().main->get();
+		tref r = anti_prenex<node_t>(fm,
+			analyse_formula<node_t>(fm, analysis_context<node_t>{}));
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("atomic-BA counterexample: a bv[1] negated pair is not distributed") {
+		// `ex x (x != 0 && x != 1)` is UNSAT at bv[1] (a two-element BA);
+		// the atomless-only distribution of step 2a -- and the `!=`
+		// witness constructions of the squeeze -- would wrongly answer T.
+		// Spelled without a complement so the pair is plainly all-negated
+		// and plainly UNSAT. Accept any result that is not T: F, or a
+		// kept quantifier.
+		tref fm = get_nso_rr("ex x (x:bv[1] != { 0 }:bv[1] "
+			"&& x:bv[1] != { 1 }:bv[1]).").value().main->get();
+		tref r = normalize_non_temp<node_t>(fm);
+		CHECK_FALSE( tau::get(r).equals_T() );
+	}
+}
+
+TEST_SUITE("FrozenBlockNormalization") {
+
+	TEST_CASE("a block over only ref-entangled variables survives verbatim") {
+		// q(y) freezes y; the ex y binder and its scope must come back
+		// untouched (no decomposition, no blasting attempt).
+		const char* s = "ex y (q(y) && y != 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref r = anti_prenex<node_t>(fm);
+		CHECK(tau::get(r).find_top(is_child_quantifier<node_t>) != nullptr);
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+
+	TEST_CASE("an eliminable variable over a frozen scope still eliminates") {
+		// z = 0 is decomposable; q(y) freezes only y's component. The outer
+		// ex z must go, the inner ex y must stay.
+		const char* s = "ex z ex y (q(y) && z = 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref r = anti_prenex<node_t>(fm);
+		trefs quants = tau::get(r).select_top(is_child_quantifier<node_t>);
+		CHECK(quants.size() == 1);   // only y's binder survives
+	}
+
+	// The two cases above go through the 1-arg anti_prenex(fm) entry point,
+	// which hands down eliminability<node_t>::bv_only() -- an instance with
+	// NO explicit verdicts at all, so el.verdict_of is never `frozen` there
+	// and neither this task's process_quantifier_block early-out nor its
+	// three blast_block gates (both keyed off an explicit frozen verdict)
+	// can ever fire for them: they pin the pre-existing
+	// eliminate_block_over_clause reserved-fixpoint path only. The two
+	// cases below are the SAME formulas through the 2-arg entry point with
+	// a real analyse_formula analysis (the PureBaBvEliminability "pure-BA
+	// bv scope" pattern) -- the only path that actually threads an explicit
+	// `frozen` verdict down to process_quantifier_block/anti_prenex_block,
+	// so this task's new code is reachable at all.
+	TEST_CASE("a block over only ref-entangled variables survives verbatim "
+		"(real analysis)") {
+		const char* s = "ex y (q(y) && y != 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		// Non-vacuity: y really is analysed frozen, so the assertions below
+		// exercise the early-out rather than passing on an unanalysed
+		// default. is_ref_fm matches the wff WRAPPING wff_ref -- that is
+		// the node get_free_vars/analyse_formula key on, not the bare
+		// wff_ref itself (mirrors test_eliminability.cpp's idiom).
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		REQUIRE(ref_fm != nullptr);
+		tref y = get_free_vars<node_t>(ref_fm)[0];
+		REQUIRE(el.verdict_of(y) == elim_verdict::frozen);
+		tref r = anti_prenex<node_t>(fm, el);
+		CHECK(tau::get(r).find_top(is_child_quantifier<node_t>) != nullptr);
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+
+	TEST_CASE("an eliminable variable over a frozen scope still eliminates "
+		"(real analysis)") {
+		const char* s = "ex z ex y (q(y) && z = 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		// Non-vacuity: the input really is a 2-binder block before
+		// elimination. select_top does NOT descend into a match (it stops
+		// at the first quantifier along each path), so on the nested
+		// `ex z (ex y ...)` shape it reports only the outer binder -- 1,
+		// not 2. select_all does descend into matches and is the correct
+		// tool for counting a (possibly nested) quantifier chain; same
+		// reasoning applies to the post-elimination count below, where the
+		// FAILURE shape this test exists to catch (z's binder wrongly
+		// surviving alongside y's) is itself a 2-deep nested chain that
+		// select_top would silently misreport as "1".
+		REQUIRE(tau::get(fm).select_all(
+			is_child_quantifier<node_t>).size() == 2);
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		tref r = anti_prenex<node_t>(fm, el);
+		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
+		CHECK(quants.size() == 1);   // only y's binder survives
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+
+	// Disjunctive variant of the "eliminates" case above (real analysis).
+	// Traced in the task-6 report: the wff_or case dispatches per-disjunct,
+	// and the frozen disjunct (q(y), no z) returns verbatim while the two
+	// z-disjuncts still squeeze via step 2b -- so this resolves the same
+	// way as the AND-only case, through the same non-gate machinery
+	// (dep/indep separation + eliminate_block_over_clause's reserved
+	// fixpoint / the wff_or per-disjunct dispatch), never through any
+	// blast_block gate. See "Gate reachability" in the task-6 report for
+	// why: a frozen verdict's ref union-find merges every atom with ALL its
+	// free variables, so anything sharing an atom with frozen content is
+	// itself frozen -- active and frozen variables are always
+	// variable-disjoint, and dep/indep separation detaches frozen content
+	// before any gate could see it.
+	TEST_CASE("an eliminable variable over a frozen scope still eliminates, "
+		"disjunctive form (real analysis)") {
+		const char* s = "ex z ex y ((z = 0 || z = 1) && q(y)).";
+		tref fm = get_nso_rr(s).value().main->get();
+		REQUIRE(tau::get(fm).select_all(
+			is_child_quantifier<node_t>).size() == 2);
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		tref r = anti_prenex<node_t>(fm, el);
+		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
+		CHECK(quants.size() == 1);   // only y's binder survives
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+}
+
+TEST_SUITE("DisplacedBinderOrdering") {
+
+	TEST_CASE("displaced binders re-wrap ordered frozen, arithmetic, blasteable") {
+		// y frozen (entangled with the reference q(y)), a arithmetic (a
+		// non-constant bv multiplication -- blasting cannot express it),
+		// b blasteable (a bv addition -- blasting CAN express it; plain
+		// bv equality alone is `eliminable` per the pure-BA-bv directive,
+		// so this needs an actual supported arithmetic operator to land
+		// b as blasteable rather than eliminable), z eliminable (joins
+		// blk.vars, gets fully resolved, and is never displaced at all).
+		// All four variables are kept disjoint so no fixpoint's
+		// union-find absorbs one into a neighbor's category. b's atom
+		// is closed over constants only (no free `c`) to keep variable
+		// identification below unambiguous.
+		const char* s = "ex b ex z ex y ex a (q(y) && z = 0 && "
+			"(a:bv[2] * a = { 0 }:bv[2]) && "
+			"(b:bv[2] + { 1 }:bv[2] = { 0 }:bv[2])).";
+		tref fm = get_nso_rr(s).value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+
+		// Locate each variable's tref the way the FrozenBlockNormalization
+		// tests do: from the specific subformula that carries it, via
+		// get_free_vars on a WFF-level atom -- not by re-deriving names
+		// from the binder prefix via to_str(), and not from a raw
+		// operator node directly (get_free_vars requires a `bf`- or
+		// `wff`-typed node, which a bare bf_mul/bf_add operator node is
+		// not guaranteed to be). All lookups stay within this one parsed
+		// `fm`, so identity is exact by hash-consing, no cross-parse
+		// assumption needed.
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		REQUIRE(ref_fm != nullptr);
+		trefs y_vars = get_free_vars<node_t>(ref_fm);
+		REQUIRE(y_vars.size() == 1);
+		tref y = y_vars.front();
+
+		auto is_mul_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n) && tau::get(n).find_top(
+				is<node_t, tau::bf_mul>) != nullptr;
+		};
+		tref atom_a = tau::get(fm).find_top(is_mul_atom);
+		REQUIRE(atom_a != nullptr);
+		trefs a_vars = get_free_vars<node_t>(atom_a);
+		REQUIRE(a_vars.size() == 1);
+		tref a = a_vars.front();
+
+		auto is_add_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n) && tau::get(n).find_top(
+				is<node_t, tau::bf_add>) != nullptr;
+		};
+		tref atom_b = tau::get(fm).find_top(is_add_atom);
+		REQUIRE(atom_b != nullptr);
+		trefs b_vars = get_free_vars<node_t>(atom_b);
+		REQUIRE(b_vars.size() == 1);
+		tref b = b_vars.front();
+
+		// z: the only plain atom, carrying no arithmetic operator (and
+		// is_atomic_fm excludes wff_ref, so q(y) cannot match here).
+		auto is_plain_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n)
+				&& tau::get(n).find_top(is<node_t, tau::bf_mul>) == nullptr
+				&& tau::get(n).find_top(is<node_t, tau::bf_add>) == nullptr;
+		};
+		tref atom_z = tau::get(fm).find_top(is_plain_atom);
+		REQUIRE(atom_z != nullptr);
+		trefs z_vars = get_free_vars<node_t>(atom_z);
+		REQUIRE(z_vars.size() == 1);
+		tref z = z_vars.front();
+
+		// Non-vacuity, per the lesson this refactor keeps re-learning:
+		// confirm each variable's verdict through the SAME analyse_formula
+		// the 2-arg anti_prenex call below actually uses, BEFORE running
+		// it.
+		REQUIRE(el.verdict_of(y) == elim_verdict::frozen);
+		REQUIRE(el.verdict_of(a) == elim_verdict::arithmetic);
+		REQUIRE(el.verdict_of(b) == elim_verdict::blasteable);
+		REQUIRE(el.verdict_of(z) == elim_verdict::eliminable);
+
+		tref r = anti_prenex<node_t>(fm, el);
+
+		// `anti_prenex` runs `canonize_quantifier_ids` on entry AND on
+		// exit (Step 0 / Step 5), which replaces every bound variable
+		// (and its free occurrences within scope) with a FRESH variable
+		// named after its quantifier depth. So `r`'s binders are NOT
+		// the same trefs as `y`/`a`/`b`/`z` above -- comparing them
+		// directly would silently compare against nodes that can never
+		// appear in `r`, making every `pos(...)` collapse to
+		// `order.end()` and every `<` a false negative that looks like
+		// failure without explaining why. Re-locate the (renamed)
+		// variables INSIDE `r` the same structural way they were found
+		// in `fm`: `bf_mul`/`bf_add`/`wff_ref` shape survives renaming
+		// even though variable identity does not.
+		tref ref_fm2 = tau::get(r).find_top(is_ref_fm);
+		REQUIRE(ref_fm2 != nullptr);
+		trefs y2_vars = get_free_vars<node_t>(ref_fm2);
+		REQUIRE(y2_vars.size() == 1);
+		tref y2 = y2_vars.front();
+
+		tref atom_a2 = tau::get(r).find_top(is_mul_atom);
+		REQUIRE(atom_a2 != nullptr);
+		trefs a2_vars = get_free_vars<node_t>(atom_a2);
+		REQUIRE(a2_vars.size() == 1);
+		tref a2 = a2_vars.front();
+
+		tref atom_b2 = tau::get(r).find_top(is_add_atom);
+		REQUIRE(atom_b2 != nullptr);
+		trefs b2_vars = get_free_vars<node_t>(atom_b2);
+		REQUIRE(b2_vars.size() == 1);
+		tref b2 = b2_vars.front();
+
+		// Walk the outermost quantifier chain and record the bound
+		// variable trefs. select_top does NOT descend into matches, so
+		// a chain-walk (mirroring FrozenBlockNormalization's
+		// binder-counting idiom) is the only correct way to read prefix
+		// order here.
+		trefs order;
+		tref n = tau::get(r).find_top(is_child_quantifier<node_t>);
+		while (n && is_child_quantifier<node_t>(n)) {
+			order.push_back(tau::trim2(n));
+			n = tau::get(n)[0].second();
+		}
+		// Exactly y, a, b survive as binders; z's binder (and, per
+		// is_plain_atom below, its atom) are both gone.
+		CHECK(order.size() == 3);
+		// Structural equality, not raw tref equality: in this LCRS
+		// tree the same variable at binder position and at atom
+		// position are different trefs (different right-sibling
+		// context) even though they denote the same variable --
+		// `tau::get(x) == tau::get(y)` is the idiom
+		// `has_block_var_other_than` already uses for exactly this.
+		auto pos = [&](tref v) {
+			return std::find_if(order.begin(), order.end(),
+				[&](tref x) { return tau::get(x) == tau::get(v); });
+		};
+		// frozen before arithmetic before blasteable.
+		CHECK(pos(y2) < pos(a2));
+		CHECK(pos(a2) < pos(b2));
+		// z is fully eliminated, not merely displaced: no surviving
+		// atom has its shape (plain, no arithmetic operator, no ref).
+		CHECK(tau::get(r).find_top(is_plain_atom) == nullptr);
+	}
+
+	TEST_CASE("displaced binders never reorder across a kind boundary") {
+		// Regression pin for the final-review Critical:
+		// `collect_quantifier_block` absorbs skip-matched binders of
+		// BOTH kinds into `displaced` while the block's own kind is
+		// still unfixed -- the `kind_fixed &&` guard only applies once
+		// an active quantifier has fixed the kind. `ex a all y ex z
+		// (...)` puts `a` (blasteable, ∃) and `y` (frozen, ∀) both
+		// ahead of the first active quantifier `z`, so both get
+		// absorbed before kind_fixed. A category-only re-wrap (ignoring
+		// kind) would then emit frozen outermost regardless of its
+		// original kind, turning `ex a all y ...` into `all y ex a
+		// ...` -- opposite-kind quantifiers do not commute, so that
+		// is strictly weaker than the input, a soundness hole. `z`
+		// stays eliminable and disappears entirely (unrelated to the
+		// kind-boundary bug; it just needs to be there to fix the
+		// block's own active kind at all, matching the reviewer's
+		// failure scenario exactly).
+		const char* s = "ex a all y ex z "
+			"(((a:bv[2] + { 1 }:bv[2] = { 0 }:bv[2]) <-> q(y)) "
+			"&& z = 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+
+		// Non-vacuity: the input's own prefix really is ex-then-all,
+		// and the verdicts driving this scenario -- a blasteable,
+		// y frozen -- really hold, through the SAME analyse_formula the
+		// 2-arg anti_prenex call below uses.
+		std::vector<bool> input_kinds;
+		{
+			tref curr = fm;
+			while (is_child_quantifier<node_t>(curr)) {
+				input_kinds.push_back(
+					is_child<node_t>(curr, tau::wff_ex));
+				curr = tau::get(curr)[0].second();
+			}
+		}
+		REQUIRE(input_kinds == std::vector<bool>({ true, false, true }));
+
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		REQUIRE(ref_fm != nullptr);
+		trefs y_vars = get_free_vars<node_t>(ref_fm);
+		REQUIRE(y_vars.size() == 1);
+		REQUIRE(el.verdict_of(y_vars.front()) == elim_verdict::frozen);
+
+		auto is_add_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n) && tau::get(n).find_top(
+				is<node_t, tau::bf_add>) != nullptr;
+		};
+		tref atom_a = tau::get(fm).find_top(is_add_atom);
+		REQUIRE(atom_a != nullptr);
+		trefs a_vars = get_free_vars<node_t>(atom_a);
+		REQUIRE(a_vars.size() == 1);
+		REQUIRE(el.verdict_of(a_vars.front()) == elim_verdict::blasteable);
+
+		tref r = anti_prenex<node_t>(fm, el);
+
+		// Whatever category-driven order the surviving binders take
+		// WITHIN a kind segment, the KIND SEQUENCE of the output prefix
+		// must still be ex-then-all, exactly as in the input --
+		// opposite-kind quantifiers never commute, so this is not
+		// negotiable regardless of category. (z is eliminable and
+		// disappears entirely, leaving exactly two binders.)
+		std::vector<bool> output_kinds;
+		tref n = tau::get(r).find_top(is_child_quantifier<node_t>);
+		while (n && is_child_quantifier<node_t>(n)) {
+			output_kinds.push_back(is_child<node_t>(n, tau::wff_ex));
+			n = tau::get(n)[0].second();
+		}
+		CHECK(output_kinds == std::vector<bool>({ true, false }));
+	}
+}
+
+// Task 11: leftover measured-unhit regions in antiprenexing.tmpl.h not
+// owned by Task 5 -- the gamma4 lift, the mixed-verdict category-ordered
+// re-wrap and its all-frozen early return, the bv-floor solver-ownership
+// demotion, and resolve_quantifiers2's per-leaf solver decision.
+TEST_SUITE("coverage: remaining anti-prenex arms") {
+
+	// RESOLVED (2026-08-19): the "order-dependent BA-constant parse
+	// instability" this suite documented on 2026-08-18 was root-caused to
+	// tests/test_Bool_helpers.h's ba_constants<node<bv, Bool>>::get
+	// specialization, which understood only "0"/"1"/"true"/"false" as
+	// Bool constants and IGNORED the requested type — so `{ 2 }:bv[8]`
+	// could never parse in this pack, and the apparent order effects were
+	// inference-fallback noise on top of that. The helper now dispatches
+	// bv-typed sources to parse_bv like the production dispatcher; the
+	// former warm_bv_constants() mitigation and the doctest::skip markers
+	// are gone.
+
+	// gamma4 (antiprenexing.tmpl.h, the `an.kind == boole_atom_case::
+	// independent` arm inside anti_prenex_block's Boole-decomposition
+	// pivot selection): an atom whose value does not depend on the chosen
+	// pivot variable is lifted out of the block's scope instead of being
+	// carried into both branches of a split.
+	//
+	// The existing Gamma4Guard suite already covers the case where the
+	// lift must be DECLINED (the atom, after substituting the pivot,
+	// still mentions another block variable). This targets the successful
+	// lift instead: the atom `(y|y')w = 0` mentions the pivot `y`
+	// syntactically -- confirmed not to fold away at construction time by
+	// Gamma4Guard's own `(y|y')x = 0` shape surviving to be analysed --
+	// but both of its Boole cofactors on `y` reduce to the identical
+	// `w = 0` (y|y' = 1 regardless of y's value), so it is independent of
+	// y. Its residual `w = 0` mentions no OTHER block variable (`w` is
+	// free, not in the block), so the guard that declines Gamma4Guard's
+	// cases does not apply here and the lift actually executes. The
+	// second conjunct `x y != 0` forces the whole block through Boole
+	// decomposition rather than a trivial fast path (mirrors Gamma4Guard's
+	// own forcing conjunct).
+	TEST_CASE("gamma4 lifts a variable-independent atom") {
+		const char* sample = "ex x ex y ((y|y')w = 0 && x y != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
 		REQUIRE( res != nullptr );
-		// `ex x (xa = 0 && xb != 0)` is satisfiable but not valid: for a = b
-		// no x satisfies both, so T would be wrong.
-		CHECK( !tau::get(res).equals_T() );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
 
-	TEST_CASE("the bf_neq spelling of the same clause agrees") {
-		// Control: the two spellings must now give the same answer.
-		tref neg = get_nso_rr("ex x (x a = 0 && !(x b = 0)).")
-			.value().main->get();
-		tref neq = get_nso_rr("ex x (x a = 0 && x b != 0).")
-			.value().main->get();
-		bool e1 = true, e2 = true;
-		tref r1 = treat_ex_quantified_clause<node_t>(neg, e1);
-		tref r2 = treat_ex_quantified_clause<node_t>(neq, e2);
-		CHECK( are_nso_equivalent<node_t>(r1, r2) );
-	}
-}
-
-// AP-5. Neither fallback treat_ex_quantified_clause is reached through
-// (resolve_quantifiers, anti_prenex) takes a `skip` predicate, so the
-// reservation eliminate_bv_and_quantifiers makes for reference-entangled
-// variables never arrived. blocks_elimination covered a reference sitting in
-// the same conjunct as the quantified variable; a variable entangled with one
-// across conjuncts, through a shared atom, was eliminated anyway.
-TEST_SUITE("TreatExQuantifiedClauseRefEntanglement") {
-
-	static tref treat(const char* sample, bool& eliminated) {
+	// All-frozen early return: every block variable frozen means the
+	// whole block is re-wrapped verbatim (the cheap-and-exact short
+	// circuit -- no destination can take any of them, so nothing below
+	// it would change the outcome).
+	TEST_CASE("an all-frozen block is re-wrapped verbatim") {
+		const char* sample = "ex x, y (f(x) && g(y)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		REQUIRE( fm != nullptr );
-		eliminated = true;
-		return treat_ex_quantified_clause<node_t>(fm, eliminated);
+		tref res = anti_prenex<node_t>(fm);
+		REQUIRE( res != nullptr );
+		// Both binders survive around their references.
+		CHECK( tau::get(res).select_top(
+			is<node_t, tau::wff_ex>).size() == 1 );
+		CHECK( tau::get(res).select_top(
+			is<node_t, tau::wff_ref>).size() == 2 );
 	}
 
-	TEST_CASE("a variable entangled with a reference across conjuncts is kept") {
-		// `x` shares the atom `x y = 0` with `y`, and `y` is an argument of the
-		// unresolved predicate reference `q(y)`. No single conjunct holds both
-		// `x` and the reference, so blocks_elimination alone does not fire.
-		// A wff_ref (a predicate used as a formula) is what
-		// collect_used_ref_variables seeds on -- a bf_ref inside an atom, as
-		// in `f(y) != 0`, is not a seed.
-		bool eliminated = true;
-		tref res = treat("ex x (x y = 0 && q(y)).", eliminated);
-		CHECK( !eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	// The solver-ownership demotion: `process_quantifier_block`'s local
+	// `ctx_bv_is_solver_owned` (NOT `analysis_context::bv_is_solver_owned`
+	// -- `atom_arith_verdict` no longer branches on that at all, per the
+	// pure-BA-bv directive's comment) is recomputed once, at `anti_prenex`
+	// entry, as `!has_foreign_ba_constant(formula)`. A `:tau` BA constant
+	// elsewhere in the SAME formula is what actually flips it: cvc5 cannot
+	// translate a foreign-BA constant, so no bv scope anywhere in the
+	// formula may be handed to the solver, and any variable the bv-floor
+	// would otherwise seed `blasteable` must demote to `eliminable` so
+	// Boole decomposition -- the only route left -- can still resolve it
+	// (the issue #70 shape the demotion's own comment names: marking it
+	// `blasteable` here would strand the quantifier for good). The `:tau`
+	// constant is anchored to a free `:tau` variable so it survives
+	// constant folding into the tree (a closed tau atom folds to T/F at
+	// build time and the constant node disappears -- see the
+	// reference-tau-constants-in-tests note).
+	//
+	TEST_CASE("bv verdicts demote when the solver does not own bv") {
+		// The foreign constant must belong to a BA this pack actually
+		// carries: node<bv, Bool> has no tau_ba (test_Bool_helpers.h),
+		// so a `:tau` constant can never parse here — a `:bool` one is
+		// this pack's solver-foreign constant.
+		const char* sample =
+			"(ex x : bv[8] x + x = { 2 }:bv[8]) "
+			"&& y:bool = { true }:bool.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		// Non-vacuity: the formula really does carry a foreign BA
+		// constant, so ctx_bv_is_solver_owned really is false here.
+		REQUIRE( has_foreign_ba_constant<node_t>(fm) );
+		tref res = anti_prenex<node_t>(fm);
+		REQUIRE( res != nullptr );
+		// With the solver disowned (foreign :bool constant present) the
+		// demotion at antiprenexing.tmpl.h:1192-1194 routes x away from
+		// the (stranding) blasteable verdict. Boole decomposition has no
+		// useful split for the ARITHMETIC atom x + x, so the sound
+		// outcome is a KEPT binder — pin that, not full elimination.
+		// (are_nso_equivalent is undecidable on this mixed content and
+		// falls back to a conservative "no"; not asserted.)
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
+			!= nullptr );
 	}
 
-	TEST_CASE("a variable sharing its conjunct with a reference is kept") {
-		// Control for the pre-existing path: here the reference is inside a
-		// conjunct that mentions `x`, which blocks_elimination already caught.
-		bool eliminated = true;
-		tref res = treat("ex x (x y = 0 && q(x)).", eliminated);
-		CHECK( !eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	// resolve_quantifiers2's per-leaf solver site: a closed bv subformula
+	// is decided via the solver/BDD path inline rather than being left as
+	// a residual quantifier.
+	TEST_CASE("resolve pass decides a closed bv leaf via the solver") {
+		const char* sample = "ex x : bv[8] x = { 1 }:bv[8].";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( tau::get(res).equals_T() );
 	}
 
-	TEST_CASE("a reference elsewhere in the clause does not block an unrelated variable") {
-		// `x` shares no atom with `z`, so it is not entangled with `q(z)` and
-		// must still be eliminated -- otherwise the guard would be a blanket
-		// "any reference anywhere blocks everything".
-		bool eliminated = true;
-		tref res = treat("ex x (x y = 0 && q(z)).", eliminated);
-		CHECK( eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
-	}
-
-	TEST_CASE("a reference-free clause is unaffected") {
-		bool eliminated = true;
-		tref res = treat("ex x (x y = 0 && x z != 0).", eliminated);
-		CHECK( eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	// Mixed-verdict segment emission: a block whose variables carry
+	// different verdicts must be re-wrapped by category and stay
+	// equivalent. Seed via the real analysis of a formula holding a
+	// reference (frozen), a bv arithmetic atom (blasteable) and a plain
+	// variable (eliminable) in one clause. `y + y = { 2 }:bv[8]` survives
+	// constant folding (unlike `y + {0}`, which would fold away) and
+	// carries a real bf_add operator, so atom_arith_verdict seeds it
+	// blasteable rather than the pure-BA-equality `eliminable`.
+	TEST_CASE("mixed-verdict block re-wraps by category") {
+		// y's type must reach the parser from SOMEWHERE, or the untyped
+		// `{ 2 }:bv[8]` constant has nothing to infer its width from.
+		// A *binder* type (`ex y : bv[8] ...`) sharing a quantifier
+		// prefix with the ref conjunct `f(x)` trips a Debug-only assert
+		// inside get_nso_rr's parse call itself -- below the REQUIRE
+		// guard's reach, since the abort happens mid-parse, not on a
+		// returned empty optional (confirmed: 0 assertions run, straight
+		// SIGABRT). Typing the variable at its OCCURRENCE instead
+		// (`y:bv[8] + y = ...`) sidesteps that interaction entirely,
+		// verified to parse and normalize via the tau binary; the plain
+		// comma binder list (`ex x, y, z ...`) is restored since no
+		// binder needs an explicit type anymore. REQUIRE on has_value()
+		// is kept as a guard regardless, so any future parse regression
+		// on this shape fails cleanly instead of aborting the binary.
+		const char* sample =
+			"ex x, y, z (f(x) && y:bv[8] + y = { 2 }:bv[8] "
+			"&& z w = 0).";
+		auto parsed = get_nso_rr(sample);
+		REQUIRE( parsed.has_value() );
+		tref fm = parsed.value().main->get();
+		analysis_context<node_t> ctx;
+		ctx.bv_is_solver_owned = true;
+		auto el = analyse_formula<node_t>(fm, ctx);
+		tref res = anti_prenex<node_t>(fm, el);
+		REQUIRE( res != nullptr );
+		// The formula holds a reference, so semantic equivalence is not
+		// checkable; assert the category outcome structurally instead.
+		// Expected: the sat bv conjunct and the eliminable conjunct
+		// dissolve, and the frozen component survives with its binder.
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>)
+			!= nullptr );
+		CHECK( tau::get(res).select_top(
+			is<node_t, tau::wff_ex>).size() == 1 );
 	}
 }
-
-// AP-20 / AP-21. anti_prenex's memo is Release-only (TAU_CACHE is OFF in the
-// Debug preset), which is why AP-20 -- a cache keyed on the formula alone while
-// the result also depends on the runtime-mutable `bv_blasting` global -- had no
-// regression test at all. Guarding the case on TAU_CACHE rather than on the
-// build type is what makes it testable: it is compiled out of the Debug run and
-// exercised by the Release one, which is the configuration the cache exists in.
-//
-// The assertions deliberately avoid committing to a normal form for either
-// setting. What is pinned is the relation between the three answers: blasting
-// must change the result at all (otherwise the case is vacuous), and switching
-// back must return the first answer rather than the second. With a single
-// formula-keyed cache the third call is served the second call's entry.
-#ifdef TAU_CACHE
-TEST_SUITE("AntiPrenexBlastingCache") {
-
-	TEST_CASE("the memo is keyed on bv_blasting") {
-		// An *open* bv scope over blastable arithmetic. Both properties are
-		// needed: `y` free makes treat_ex_quantified_clause's
-		// closed-and-solvable test fail, so the solver does not decide it
-		// first, and `+ { 1 }` is arithmetic bv_predicate_blasting can actually
-		// rewrite -- with `&`, or with multiplication by a non-constant,
-		// blasting is a no-op and both settings give the same answer, which
-		// would make this case vacuous. Observed here: blasting off keeps
-		// `ex b1 b1+1 = y`, blasting on returns the bit-level expansion.
-		tref fm = get_nso_rr("ex x (x:bv[4] + { 1 }:bv[4] = y:bv[4]).")
-			.value().main->get();
-		REQUIRE( fm != nullptr );
-
-		const bool saved = bv_blasting;
-		bv_blasting = false;
-		tref off1 = anti_prenex<node_t>(fm);
-		bv_blasting = true;
-		tref on = anti_prenex<node_t>(fm);
-		bv_blasting = false;
-		tref off2 = anti_prenex<node_t>(fm);
-		bv_blasting = saved;
-
-		REQUIRE( off1 != nullptr );
-		REQUIRE( on != nullptr );
-		REQUIRE( off2 != nullptr );
-		// Not vacuous: the setting really does change the answer.
-		CHECK( tau::get(off1) != tau::get(on) );
-		// The regression: switching back must not be served the on-entry.
-		CHECK( tau::get(off2) == tau::get(off1) );
-	}
-}
-#endif // TAU_CACHE

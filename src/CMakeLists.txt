@@ -4,6 +4,7 @@ set(TAU_HEADERS
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
 	../parser/bitvector_parser.generated.h
+	boolean_algebras/cvc5/cvc5_options.h    # runtime cvc5 option-set and solver placement parameters
 	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
@@ -15,6 +16,7 @@ set(TAU_HEADERS
 	boolean_algebras/bv_ba.h
 	heuristics/bv_ba_simplification.h		# heuristic for simplifying boolean formulas with bitvectors
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
+	heuristics/blast_placement.h            # runtime placement parameters for blasting and the solver
 	heuristics/bv_predicate_blasting.h      # heuristic for predicate blasting bitvector formulas
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros

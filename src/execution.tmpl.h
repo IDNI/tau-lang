@@ -78,10 +78,11 @@ tref repeat_all<node, step_t>::operator()(tref n) const {
 	// == nn) or, using visited, a longer oscillating cycle -- previously
 	// the sequence was applied twice per round (once here, once again via
 	// s(nn)) and visited was never used, so a period-2+ oscillating
-	// sequence looped forever. max_rounds additionally bounds an
-	// ever-growing rewrite (one that never repeats a prior state), which
-	// visited alone cannot detect.
-	for (size_t round = 0; round < max_rounds; ++round) {
+	// sequence looped forever. max_rewrite_rounds (0 = unlimited)
+	// additionally bounds an ever-growing rewrite (one that never repeats
+	// a prior state), which visited alone cannot detect.
+	for (size_t round = 0;
+		!max_rewrite_rounds || round < max_rewrite_rounds; ++round) {
 		nn = s(nn);
 		if (visited.contains(nn)) return nn;
 		visited.insert(nn);
@@ -89,9 +90,10 @@ tref repeat_all<node, step_t>::operator()(tref n) const {
 	// Returning the partially rewritten formula would hand the caller a
 	// half-expanded term indistinguishable from a real result; a rewrite
 	// that never settles has no result, so report the failure instead.
-	LOG_ERROR << "Rewriting did not reach a fixpoint after " << max_rounds
-		<< " rounds and is still growing; the definitions in use are "
-		"most likely non-terminating for this argument";
+	LOG_ERROR << "Rewriting did not reach a fixpoint after "
+		<< max_rewrite_rounds << " rounds (max-rewrite-rounds) and is "
+		"still growing; the definitions in use are most likely "
+		"non-terminating for this argument";
 	return nullptr;
 }
 

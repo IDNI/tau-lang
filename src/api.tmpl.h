@@ -48,6 +48,109 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_blast_placement(int site) {
+	blast_placement = (site >= static_cast<int>(blast_site::per_leaf)
+		&& site <= static_cast<int>(blast_site::per_formula))
+			? static_cast<blast_site>(site) : blast_site::per_leaf;
+}
+
+template <NodeType node>
+void api<node>::set_blast_method(int mode) {
+	blast_method = (mode >= static_cast<int>(blast_mode::anti_prenex_result)
+		&& mode <= static_cast<int>(blast_mode::defer))
+			? static_cast<blast_mode>(mode)
+			: blast_mode::anti_prenex_result;
+}
+
+template <NodeType node>
+void api<node>::set_solver_placement(int site) {
+	solver_placement = (site >= static_cast<int>(solver_site::eager)
+		&& site <= static_cast<int>(solver_site::per_formula))
+			? static_cast<solver_site>(site) : solver_site::eager;
+}
+
+template <NodeType node>
+void api<node>::set_cvc5_options(int set) {
+	cvc5_options = (set >= static_cast<int>(cvc5_option_set::baseline)
+		&& set <= static_cast<int>(cvc5_option_set::combined_best))
+			? static_cast<cvc5_option_set>(set)
+			: cvc5_option_set::ext_rewrite_no_models;
+}
+
+// The two block budgets keep SIZE_MAX as their internal "unlimited" sentinel
+// (their loops decrement them); the option surface says 0 = unlimited, so the
+// setters translate.
+template <NodeType node>
+void api<node>::set_block_max_splits(size_t n) {
+	block_boole_max_splits = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
+void api<node>::set_block_max_rounds(size_t n) {
+	block_max_rounds = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
+void api<node>::set_max_blast_reentry_depth(size_t n) {
+	max_blast_reentry_depth = n;
+}
+
+template <NodeType node>
+void api<node>::set_block_squeeze_cap(size_t n) {
+	block_squeeze_cap = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_fixpoint_steps(size_t n) {
+	max_fixpoint_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_flag_search_steps(size_t n) {
+	max_flag_search_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_def_passes(size_t n) {
+	max_def_passes = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_enum_steps(size_t n) {
+	max_enum_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_rewrite_rounds(size_t n) {
+	max_rewrite_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_simplify_rounds(size_t n) {
+	max_simplify_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_gc_min_size(size_t n) {
+	interpreter<node>::gc_min_size = n;
+}
+
+template <NodeType node>
+void api<node>::set_gc_growth_factor(double f) {
+	interpreter<node>::gc_growth_factor = f;
+}
+
+template <NodeType node>
+void api<node>::set_spec_size_warn(size_t n) {
+	interpreter<node>::spec_size_warn_threshold = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_revision_alts(size_t n) {
+	interpreter<node>::max_revision_alts = n;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }

@@ -6,10 +6,12 @@ set(TESTS
 	bf_hooks
 	bv_hooks
 	bf_normalization
+	eliminability
 	interpreter
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
+	placement_matrix
 	quantifiers
 	satisfiability1
 	satisfiability2

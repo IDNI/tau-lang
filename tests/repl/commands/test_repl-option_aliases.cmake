@@ -75,3 +75,39 @@ add_repl_test(severity_value-info  "set severity info. get severity"  "severity:
 add_repl_test_fail(severity_value-invalid
 	"set severity zz. get severity"
 	"Invalid severity value: zz")
+
+# --- numeric limit option aliases (2026-08-17 unified limit options) ---------
+#
+# Same contract as above: each alias must select the same option its primary
+# name does. Verified via get's label, which always prints the primary name.
+
+add_repl_test(option_alias-maxfixpointsteps
+	"get maxfixpointsteps"    "fixpointsteps:")
+add_repl_test(option_alias-maxflagsearchsteps
+	"get maxflagsearchsteps"  "flagsteps:")
+add_repl_test(option_alias-maxblastreentrydepth
+	"get maxblastreentrydepth" "blastdepth:")
+add_repl_test(option_alias-blocksqueezecap
+	"get blocksqueezecap"     "squeezecap:")
+add_repl_test(option_alias-maxsimplifyrounds
+	"get maxsimplifyrounds"   "simplifyrounds:")
+add_repl_test(option_alias-maxdefpasses
+	"get maxdefpasses"        "defpasses:")
+add_repl_test(option_alias-maxenumsteps
+	"get maxenumsteps"        "enumsteps:")
+add_repl_test(option_alias-maxrewriterounds
+	"get maxrewriterounds"    "rewriterounds:")
+add_repl_test(option_alias-gcgrowthfactor
+	"get gcgrowthfactor"      "gcgrowth:")
+add_repl_test(option_alias-maxrevisionalts
+	"get maxrevisionalts"     "revisionalts:")
+add_repl_test(option_alias-blockmaxsplits
+	"get blockmaxsplits"      "maxsplits:")
+add_repl_test(option_alias-blockmaxrounds
+	"get blockmaxrounds"      "maxrounds:")
+
+# Numeric options take a count, not a flag: enable/disable/toggle must refuse.
+add_repl_test_fail(option_numeric-enable_refused
+	"enable fixpointsteps" "takes a count")
+add_repl_test_fail(option_numeric-toggle_refused
+	"toggle gcgrowth" "takes a count")

@@ -71,6 +71,52 @@ template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause)
 {
 	using tau = tree<node>;
+
+#ifdef TAU_CACHE
+	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	// Neither parameter is reassigned below, but both can arrive carrying a
+	// live right sibling: the 1-arg overload's tau::trim2(n) hands in a var
+	// whose right sibling is the scope it was split from (trim2 returns
+	// child(0), still linked to child(1) via first()'s raw left-child
+	// pointer), and ex_clause is not guaranteed sibling-free at every call
+	// site either. Neither the occurs-/capture-check logic below nor tau's
+	// own structural equality (lcrs_tree::operator==, which compares value
+	// and left-child only, never right_sibling) look past the operand's own
+	// content, so trimming is safe -- and it is what lets leaf_clause.tmpl.h's
+	// witness loop, which re-asks for the same logical (var, ex_clause) pair
+	// across anti_prenex_block's branch recursion, actually land on the same
+	// entry instead of missing on an incidental right-sibling difference.
+	// Caveat: the capture-guard's `bound == var` check below is a raw tref
+	// (pointer) compare, not the content compare above, so it is sibling-
+	// sensitive in principle. It is inert today because `bound` (child 0 of
+	// a 2-child quantifier) always carries its own scope as right sibling,
+	// and a caller's `var` can never carry that same scope as its sibling --
+	// a scope cannot contain itself.
+	const std::pair<tref, tref> key { tau::trim_right_sibling(var),
+		tau::trim_right_sibling(ex_clause) };
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	// Every return, including both identity returns (raw ex_clause) and the
+	// reget'd substitution result, must be trimmed before being stored: a
+	// cache hit serves back whatever was stored under this trimmed key to
+	// ANY call that hashes to it, not just the call that produced it. The
+	// reget path is not exempt just because it looks freshly built --
+	// replace_if's rebuild and reget's own `get(value, children,
+	// right_sibling())` both carry the *current* ex_clause's right sibling
+	// through unchanged, so an untrimmed return there would just as silently
+	// hand a later call the first call's sibling attachment. Trimming here
+	// (rather than only at the two identity-return call sites) closes the
+	// echo risk uniformly and is a no-op today, since both current callers
+	// already pass a sibling-free ex_clause (leaf_clause.tmpl.h's freshly
+	// built `scoped`; the 1-arg overload's `scope`, always the last child of
+	// a 2-child wff_ex).
+	auto memo = [&key](tref r) {
+		return cache.emplace(key, tau::trim_right_sibling(r)).first->second;
+	};
+#else
+	auto memo = [](tref r) { return r; };
+#endif // TAU_CACHE
+
 	if (auto res = preorder<node>(var, ex_clause); res) {
 		// Capture-check: if the substituted term contains a variable that
 		// is re-bound by a quantifier inside the clause, substituting under
@@ -85,7 +131,7 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 				&& term_vars.contains(tau::get(n).child(0));
 		};
 		if (tau::get(ex_clause).find_top(binds_term_var))
-			return ex_clause;
+			return memo(ex_clause);
 		// Scope-aware replacement: skip quantifiers that bind var to avoid
 		// replacing their bound variable (variable capture prevention)
 		auto query = [&var](tref n) -> bool {
@@ -99,9 +145,9 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 		// replace_if rebuilds nodes without invoking the construction
 		// hooks, so trivially foldable subformulas (constant equations,
 		// T/F connectives...) would survive; rebuild with hooks.
-		return tree<node>::reget(replaced);
+		return memo(tree<node>::reget(replaced));
 	}
-	else return ex_clause;
+	else return memo(ex_clause);
 }
 
 template <NodeType node>

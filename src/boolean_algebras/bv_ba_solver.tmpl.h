@@ -420,11 +420,14 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// One cvc5::Solver construction plus one checkSat per call, and the callers
 	// ask repeatedly: resolve_quantifiers is a whole-tree pre_order run at
 	// least three times per eliminate_bv_and_quantifiers, and its open-scope
-	// branch asks twice per scope. The answer depends only on `form` --
-	// config_cvc5_solver and config_cvc5_solver_alternating_quantifiers read no
-	// mutable global, and the alternation test is a function of the formula --
-	// so the formula alone is a complete key. Unlike anti_prenex's memo (which
-	// had to be split per bv_blasting setting) there is nothing else to key on.
+	// branch asks twice per scope. The answer depends only on `form`: the one
+	// global config_cvc5_solver reads, `cvc5_options`, is fixed at process
+	// start before the first query (documented at its definition -- flipping
+	// it mid-process would serve verdicts computed under the previous option
+	// set), config_cvc5_solver_alternating_quantifiers reads no global at all,
+	// and the alternation test is a function of the formula -- so the formula
+	// alone is a complete key. Unlike anti_prenex's memo (which had to be
+	// split per bv_blasting setting) there is nothing else to key on.
 	// nullopt is cached too: a formula the translator rejects gets rejected the
 	// same way every time, and re-deriving that costs a full tree walk.
 	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
@@ -439,6 +442,14 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 #endif // TAU_CACHE
 
 	subtree_map<node, bv> vars, free_vars;
+	// A fresh solver per query is deliberate, do NOT share one like
+	// normalize_bv's (B12): cvc5 forbids a second checkSat without
+	// incremental mode ("cannot make multiple queries unless incremental
+	// solving is enabled" -- resetAssertions does not lift this), and a
+	// pair of long-lived incremental solvers measured strictly worse on
+	// bv[64]x14 stress: 19.4s -> 30.0s wall and 227MB -> 1.1GB peak RSS
+	// (2026-08-17). The engine construction cost per query is the price of
+	// the non-incremental option set, which is the larger win.
 	cvc5::Solver solver(cvc5_term_manager);
 	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
 	// quantifiers too, not just the innermost one; without that it does not
@@ -453,7 +464,10 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// config_cvc5_solver_alternating_quantifiers) for no benefit.
 	if (has_alternating_quantifiers<node>(form))
 		config_cvc5_solver_alternating_quantifiers(solver);
-	config_cvc5_solver(solver);
+	// decision_only: this function only ever reads the checkSat verdict,
+	// never a model, so satisfiability-preserving preprocessing is admissible
+	// here (see cvc5_option_set::decision_no_models).
+	config_cvc5_solver(solver, true);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {

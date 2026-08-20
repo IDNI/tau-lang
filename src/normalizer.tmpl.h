@@ -2,14 +2,28 @@
 
 #include "normalizer.h"
 #include "normal_forms.h"
-#include "normalizer_uf_arithmetic.h"
-#include "ref_variables_resolver.h"
 #include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normalizer"
 
 namespace idni::tau_lang {
+
+/// Cap on `expand_defs_until_settled` passes; 0 = unlimited (the default).
+/// A real definition set settles in a handful of passes — each pass unfolds
+/// every applicable definition at every position at once — and oscillation is
+/// caught by a visited set regardless, so only an ever-growing expansion is
+/// unbounded when unlimited. Runtime parameter by policy: set via
+/// `--max-def-passes`, REPL `defpasses`, or `api::set_max_def_passes`.
+inline size_t max_def_passes = 0;
+
+/// Cap on recurrence-relation enumeration steps; 0 = unlimited (the default).
+/// A recurrence whose normalized steps are all distinct (e.g. one that keeps
+/// growing) iterates forever when unlimited, and each iteration runs a full
+/// normalization plus up to `previous.size()` equivalence proofs; real
+/// recurrences settle in single-digit steps. Set via `--max-enum-steps`,
+/// REPL `enumsteps`, or `api::set_max_enum_steps`.
+inline size_t max_enum_steps = 0;
 
 /**
  * @internal
@@ -147,7 +161,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	//
 	// NOTE: this is currently a no-op in every case measured. The block
 	// machinery already refuses to eliminate across an unresolved
-	// reference at *conjunct* granularity -- push_ex_block_into_clause's
+	// reference at *conjunct* granularity -- eliminate_block_over_clause's
 	// is_quant_removable_in_clause and treat_ex_quantified_clause's
 	// blocks_elimination both test individual conjuncts, independent
 	// conjuncts are split out before either applies, and
@@ -160,26 +174,50 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	//
 	// Recomputed before each pass: the set is keyed on tref nodes of the
 	// tree being scanned, and `form` is rebuilt in between.
-	auto ref_skip = make_ref_variables_skip<node>(form);
-	form = anti_prenex_block<node>(form, [ref_skip](tref n) {
-		return is_tref_bv_type_family<node>(n) || ref_skip(n);
-	});
+	//
+	// The two passes are NOT collapsible into one, measured 2026-08-04. The
+	// redesign plan's Task 9 proposed replacing them with a single call, on
+	// the reading that the second pass's skip subsumes the first's and that
+	// the per-block eliminability analysis has made the staging redundant.
+	// Both single-pass variants fail `test_integration-interpreter`'s
+	// "nested conditionals over mixed tau/bv streams stay sat" -- the issue
+	// #70 regression test -- in both configurations: keeping the second
+	// pass's conditional bv skip reports "Tau specification is unsat", and
+	// keeping the first pass's unconditional one SIGSEGVs. What the second
+	// pass depends on is not the first pass's *verdicts* but its having
+	// already run: it works on a formula whose non-bv structure is resolved.
+	//
+	// The analysis cannot substitute for that today, and the plan's premise
+	// that it could does not hold as built: `blasteable` is consumed only
+	// inside `eliminate_block_over_clause`, whereas the decisions that
+	// matter here -- which quantifiers `collect_quantifier_block` treats as
+	// transparent, and what `blast_block` hands to the solver -- still read
+	// only the boolean `el.skip(n)`, not the verdict behind it. Collapsing
+	// needs those rewired to the verdicts first (the plan's own Task 9
+	// step 2), not merely one call deleted.
+	{
+		analysis_context<node> ctx1;          // bv_is_solver_owned = true
+		const eliminability<node> el1 = analyse_formula<node>(form, ctx1);
+		form = anti_prenex<node>(form, el1);
+	}
 	form = resolve_quantifiers<node>(form);
-	auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
-	auto ref_skip_2 = make_ref_variables_skip<node>(form);
+	// Pass 2: bv floor only where the solver could own the content; the
+	// arithmetic/blasteable seeds still hold unconditionally.
+	//
 	// bv-typed content is skipped here as well, not just the arithmetic
-	// residue `arith_skip` marks. Blasting rewrites arithmetic into per-bit
-	// equality/comparison atoms that are still bv-typed but no longer
-	// arithmetic-tainted, so `arith_skip` stops matching them and they became
-	// eligible for generic Boole decomposition -- hundreds of atoms per
-	// blasted operation, each split copying the whole formula, and every BDD
-	// node operation on a bv leaf allocating cvc5 terms (bv BDD leaves are
-	// solver-term-backed, so this is never the cheap path atomless content
-	// enjoys). Skipping them leaves the quantifier in place instead, which is
-	// sound; whatever is closeable has already been decided by the solver via
-	// scope_out_independent_conjuncts and the resolve passes above, and a
-	// genuinely open bv scope (e.g. `ex x (x + y = 0)` with `y` free) could
-	// not be reduced by decomposing it anyway.
+	// residue the `arithmetic` verdict marks. Blasting rewrites arithmetic
+	// into per-bit equality/comparison atoms that are still bv-typed but no
+	// longer arithmetic-tainted, so that verdict stops applying to them and
+	// they became eligible for generic Boole decomposition -- hundreds of
+	// atoms per blasted operation, each split copying the whole formula, and
+	// every BDD node operation on a bv leaf allocating cvc5 terms (bv BDD
+	// leaves are solver-term-backed, so this is never the cheap path
+	// atomless content enjoys). Skipping them leaves the quantifier in place
+	// instead, which is sound; whatever is closeable has already been
+	// decided by the solver via scope_out_independent_conjuncts and the
+	// resolve passes above, and a genuinely open bv scope (e.g.
+	// `ex x (x + y = 0)` with `y` free) could not be reduced by decomposing
+	// it anyway.
 	//
 	// The completeness this gives up is bounded and pinned. "Already decided
 	// by the solver" holds only for a scope `is_bv_solvable_formula` accepts;
@@ -202,17 +240,31 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// and `:bv[N]` streams produces) is one cvc5 cannot translate at all, so
 	// neither the resolve passes nor blasting will ever decide its bv scopes;
 	// skipping them there strands the quantifier for good. Boole decomposition
-	// is the only route left, so let it have them -- `arith_skip` still keeps
-	// genuinely unsupported bv arithmetic out of it, and the atom counts in a
-	// mixed formula are the spec's own, not blasting's per-bit residue.
-	const bool bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
-	form = anti_prenex_block<node>(form,
-		[arith_skip, ref_skip_2, bv_is_solver_owned](tref n)
-	{
-		return (bv_is_solver_owned && is_tref_bv_type_family<node>(n))
-			|| arith_skip(n) || ref_skip_2(n);
-	});
+	// is the only route left, so let it have them -- the `arithmetic` verdict
+	// still keeps genuinely unsupported bv arithmetic out of it, and the atom
+	// counts in a mixed formula are the spec's own, not blasting's per-bit
+	// residue.
+	analysis_context<node> ctx2;
+	ctx2.bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
+	const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
+	form = anti_prenex<node>(form, el2);
 	form = resolve_quantifiers<node>(form);
+	// Option 5a -- the per-formula blasting destination: one attempt on the
+	// whole formula, after the last anti-prenex/resolve pass and before the
+	// final closed-formula check below. Inert at the shipped default
+	// (`blast_placement == per_leaf`).
+	//
+	// The final check itself is deliberately NOT gated on
+	// `solver_placement`: it is the single "final" solver site that both
+	// `per_closed_block` and `per_formula` rely on, so it runs under every
+	// setting.
+	if (bv_blasting && blast_placement == blast_site::per_formula)
+		if (tref blasted = bv_predicate_blasting<node>(form);
+			blasted && blasted != form)
+			form = blast_method == blast_mode::anti_prenex_result
+				? anti_prenex<node>(blasted,
+					eliminability<node>::bv_only())
+				: blasted;
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
 		// Only commit to T/F on a definite answer: cvc5
 		// returning unknown, or translation failing, means
@@ -229,6 +281,18 @@ tref eliminate_bv_and_quantifiers(tref form) {
 template <NodeType node>
 tref normalize(tref form) {
 	using tau = tree<node>;
+	// Caching architecture (see private/2026-08-15-normalizer-caching-plan.md,
+	// "Explicitly NOT cacheable as-is", for the full rationale):
+	// This entry cache (and normalize_non_temp's below) dedupes whole-formula
+	// calls -- measured 37/37 distinct on the probe case, i.e. no repetition
+	// at this level. The real repetition lives in the leaf passes: to_nnf
+	// (16x), normalize_atomic_formula_operators (16x),
+	// syntactic_path_simplification (66x) and ex_subs_based_elimination
+	// (44,795 calls on the probe case) -- those now carry their own
+	// TAU_CACHE-gated caches. anti_prenex_block / anti_prenex(el) /
+	// process_quantifier_blocks stay deliberately uncached: their key would
+	// have to include per-pass eliminability state and in/out recursion
+	// state, which would never hit.
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
@@ -267,6 +331,9 @@ tref normalize(tref form) {
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
 	//	using tt = tau::traverser;
+	// See normalize's cache comment above for the caching architecture
+	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
+	// stay uncached).
 	#ifdef TAU_CACHE
 	using tau = tree<node>;
 	using cache_t = subtree_unordered_map<node, tref>;
@@ -275,11 +342,24 @@ tref normalize_non_temp(tref fm) {
 #endif // TAU_CACHE
 	tref result = eliminate_bv_and_quantifiers<node>(fm);
 	result = term_boole_normal_form<node>(result);
-	// NOTE: Do NOT add fold_trivial_quantifiers or reget here.
-	// tau::reget strips the explicit bitwidth subtype from BV-typed nodes
-	// (io_vars and BV constants) causing get_bv_size assertions downstream.
-	// Residual trivial quantifiers are folded by normalize_with_temp_simp
-	// (which already calls fold_trivial_quantifiers after normalize).
+	// NOTE: Do NOT add `tau::reget` here. It strips the explicit bitwidth
+	// subtype from BV-typed nodes (io_vars and BV constants), causing
+	// get_bv_size assertions downstream. `fold_trivial_quantifiers` is a
+	// different matter and IS wanted: it rebuilds only the ancestors of the
+	// nodes it folds, not every node, so it does not have that effect.
+	//
+	// It has to run here, not only in normalize_with_temp_simp. Every
+	// `is_non_temp_nso_*` / `are_nso_equivalent` predicate reads THIS
+	// function's result as T, F or "undecided" via check_decided, and that
+	// happens well before normalize_with_temp_simp's fold. A residual
+	// `all b2, b1 T` -- which the resolve passes above can leave behind when
+	// a scope folds to a constant after its quantifier prefix was already
+	// re-attached -- was therefore being reported as a formula normalization
+	// could not decide, and `are_nso_equivalent` answered negatively on a
+	// formula that is plainly T. Pinned by
+	// "a term containing a bf_ref still normalizes"
+	// (test_integration-normalizer_helpers.cpp).
+	result = fold_trivial_quantifiers<node>(result);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -779,13 +859,10 @@ tref apply_defs_to_spec (tref spec) {
 template <NodeType node>
 tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 	using tau = tree<node>;
-	// A real definition set settles in a handful of passes: each pass
-	// unfolds every applicable definition at every position at once. The
-	// cap only has to be out of reach of those.
-	// TODO (HIGH) this should be a parameter, not a hardcoded constant.
-	constexpr size_t max_passes = std::numeric_limits<size_t>::max();;
+	// Pass cap: the global max_def_passes, 0 = unlimited (see its doc).
 	std::unordered_set<tref> visited;
-	for (size_t pass = 0; pass != max_passes; ++pass) {
+	for (size_t pass = 0; !max_def_passes || pass != max_def_passes;
+		++pass) {
 		// Unresolved symbol is still present
 		if (!tau::get(fm).find_top(is<node, tau::ref>)) return fm;
 		fm = pre(fm);
@@ -804,9 +881,10 @@ tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 			return nullptr;
 		}
 	}
-	LOG_ERROR << "Definition expansion did not settle after " << max_passes
-		<< " passes; the definitions in use are most likely "
-		"non-terminating for this argument";
+	LOG_ERROR << "Definition expansion did not settle after "
+		<< max_def_passes << " passes (max-def-passes); the "
+		"definitions in use are most likely non-terminating for this "
+		"argument";
 	return nullptr;
 }
 
@@ -962,6 +1040,58 @@ tref normalize_with_temp_simp(tref fm) {
 			resolved && resolved != fm)
 			fm = fold_trivial_quantifiers<node>(
 				tau::reget(resolved));
+		// A block that is eliminable in isolation can still be
+		// carrying its binder here: analyse_formula computes verdicts
+		// whole-formula with a flat cross-scope join, so an arithmetic
+		// atom in a SIBLING clause sharing free variables with the
+		// block's atoms lifts those variables above `eliminable` and
+		// the binder is kept (review-pointwise-revision §3, R6).
+		// Re-eliminate each surviving maximal block with block-local
+		// analysis, which sees no sibling content. Do not descend into
+		// terms: tau_ba constants carry their own wff_ex/wff_all over
+		// I/O variables, which must be left intact (the AP-7 guard).
+		if (trefs blocks = rewriter::select_top_until<node>(fm,
+			is_child_quantifier<node>, [](tref n) {
+				return tree<node>::get(n).is_term(); });
+			!blocks.empty())
+		{
+			subtree_map<node, tref> changes;
+			for (tref b : blocks) {
+				tref r = eliminate_bv_and_quantifiers<node>(b);
+				if (!r || r == b || tau::get(r).find_top(
+					is_quantifier<node>))
+				{
+					// Dual attempt: the substitution-based
+					// one-point pass inside anti_prenex only
+					// matches EXISTENTIAL scopes, so a
+					// universal block whose vars carry the
+					// `arithmetic` verdict (skipped by the
+					// block core, and blasting is off by
+					// default) never reaches it. Its negation
+					// is the ∃ form; eliminate that and negate
+					// back.
+					tref nb = eliminate_bv_and_quantifiers<
+						node>(tau::build_wff_neg(b));
+					if (nb && !tau::get(nb).find_top(
+						is_quantifier<node>))
+						r = normalize_non_temp<node>(
+							tau::build_wff_neg(nb));
+				}
+				// Adopt only a fully quantifier-free result: a
+				// partially processed block (anti-prenex
+				// distribution with the binders still in
+				// place) is typically LARGER than the
+				// original, and adopting it fattens the
+				// stored spec and multiplies its DNF paths on
+				// every later normalization.
+				if (r && r != b && !tau::get(r).find_top(
+					is_quantifier<node>))
+					changes.emplace(b, r);
+			}
+			if (!changes.empty())
+				fm = fold_trivial_quantifiers<node>(tau::reget(
+					rewriter::replace<node>(fm, changes)));
+		}
 	}
 	// Apply present function/predicate definitions
 	fm = expand_defs_until_settled<node>(fm, [](tref n) { return n; },
@@ -1411,15 +1541,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	subtree_unordered_set<node> seen;
 	tref current;
 
-	// Termination cap. Without one, a recurrence whose normalized steps are all
-	// distinct (e.g. one that keeps growing) iterates forever, and each
-	// iteration runs a full normalization plus up to `previous.size()`
-	// equivalence proofs. Same reasoning as satisfiability's
-	// `max_fixpoint_steps`: real recurrences settle in single-digit steps, so
-	// this is a very wide margin that still bounds the search.
-	//
-	// TODO (MEDIUM) this must be an option in the cli and/or the repl
-	constexpr size_t max_enumeration_steps = std::numeric_limits<size_t>::max();
+	// Termination cap: the global max_enum_steps, 0 = unlimited (see its
+	// doc for why an unlimited run on a growing recurrence never ends).
 	size_t steps = 0;
 
 	size_t max_lookback = 0;
@@ -1434,10 +1557,12 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	LOG_DEBUG << "max lookback " << max_lookback;
 
 	for (size_t i = max_lookback; ; i++) {
-		if (++steps > max_enumeration_steps) {
+		++steps;
+		if (max_enum_steps && steps > max_enum_steps) {
 			LOG_ERROR << "calculate_fixed_point: no fixed point and no "
-				"loop after " << max_enumeration_steps
-				<< " enumeration steps for " << LOG_FM(form)
+				"loop after " << max_enum_steps
+				<< " enumeration steps (max-enum-steps) for "
+				<< LOG_FM(form)
 				<< "; giving up. This is a bound on the search, "
 				"not a proof that no fixed point exists.";
 			return nullptr;

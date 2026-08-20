@@ -159,8 +159,18 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 template <>
 std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_constants<node<bv, Bool>>::get(
 		const std::string& constant_source,
-		[[maybe_unused]] tref type_tree,
+		tref type_tree,
 		[[maybe_unused]] const std::string options) {
+	// A bv-typed source must go to the real bitvector parser, exactly as
+	// the production dispatcher does (base_ba_dispatcher.tmpl.h). This
+	// harness previously understood only "0"/"1"/"true"/"false" as Bool
+	// constants and IGNORED the requested type, so `{ 2 }:bv[8]` could
+	// never parse in this pack and `{ 1 }:bv[8]` silently produced a
+	// Bool(true) where a bitvector was requested — the root cause of the
+	// order-dependent constant-parse failures test_antiprenexing's
+	// skipped cases documented on 2026-08-18.
+	if (type_tree && is_bv_type_family<node<bv, Bool>>(type_tree))
+		return parse_bv<bv, Bool>(constant_source, type_tree);
 	if (constant_source == "1" || constant_source == "true")
 		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(true), bool_type() };
 	if (constant_source == "0" || constant_source == "false")

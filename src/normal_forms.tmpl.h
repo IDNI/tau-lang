@@ -16,9 +16,6 @@ namespace idni::tau_lang {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
-// Forward declaration for impl-only helper used before normal_forms_transformations.tmpl.h is included.
-//template <NodeType node> tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
-
 /**
  * @internal
  * @brief Rewrites `!($X = 0)` to `$X != 0` throughout `fm`, the dual of `unequal_to_not_equal`.
@@ -79,7 +76,7 @@ tref not_equal_to_unequal(tref fm) {
  * so it's tempting to drop this pass and rely on those. Both attempts
  * regressed the test suite, empirically:
  *  - Removing the pass entirely crashes an assertion in
- *    push_ex_block_into_clause (`!find_top(is<bf_neq>)`) and aborts most
+ *    eliminate_block_over_clause (`!find_top(is<bf_neq>)`) and aborts most
  *    of the satisfiability/solver/splitter/interpreter/api tests: several
  *    downstream matchers (this one, trivial_skolem_ex's bf_eq-only
  *    matcher, the is_atomic filters gating Boole decomposition) hard-
@@ -106,6 +103,18 @@ tref not_equal_to_unequal(tref fm) {
 template<NodeType node>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	// Unlike ex_subs_based_elimination's cache (ex_subs_based_elimination.tmpl.h),
+	// this stores the value untrimmed: apply_unique preserves the input
+	// root's right sibling in its result. That is deliberate parity with
+	// the core traversal slot memo (tree.h ~1055), which already stores
+	// sibling-carrying rebuilt nodes under sibling-insensitive keys; every
+	// consumer here compares content, not siblings, so an untrimmed value
+	// is safe. (Same note applies to to_nnf's cache below.)
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
@@ -132,7 +141,18 @@ tref normalize_atomic_formula_operators(tref fm) {
 	tref result = pre_order<node>(fm)
 				.apply_unique(normalize_operators, while_is_formula<node>);
 	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
-	return result;
+#ifdef TAU_CACHE
+	auto memo = [&](tref r) {
+#else
+	auto memo = [](tref r) {
+#endif // TAU_CACHE
+#ifdef TAU_CACHE
+		return cache.emplace(fm, r).first->second;
+#else
+		return r;
+#endif // TAU_CACHE
+	};
+	return memo(result);
 }
 
 /**
@@ -181,10 +201,28 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 /** @internal @copydoc to_nnf @endinternal */
 template <NodeType node>
 tref to_nnf(tref fm) {
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// Untrimmed value cache; see normalize_atomic_formula_operators above
+	// for why (sibling-hygiene parity with the tree.h ~1055 traversal memo).
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
 	auto result = push_negation_in<node>(fm);
 	LOG_TRACE << "to_nnf result: " << LOG_FM(result);
-	return result;
+#ifdef TAU_CACHE
+	auto memo = [&](tref r) {
+#else
+	auto memo = [](tref r) {
+#endif // TAU_CACHE
+#ifdef TAU_CACHE
+		return cache.emplace(fm, r).first->second;
+#else
+		return r;
+#endif // TAU_CACHE
+	};
+	return memo(result);
 }
 
 /**
@@ -2005,16 +2043,35 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 		if (!is_assignment_l && is_assignment_r) return false;
 		if (min_l > min_r) return true;
 		if (min_r > min_l) return false;
-		// Deterministic tie-breaks: structural comparison instead of
-		// raw pointer order (both vectors are subtree_less-sorted)
-		if (std::lexicographical_compare(
-			free_vars_l.begin(), free_vars_l.end(),
-			free_vars_r.begin(), free_vars_r.end(),
-			tree<node>::subtree_less)) return true;
-		if (std::lexicographical_compare(
-			free_vars_r.begin(), free_vars_r.end(),
-			free_vars_l.begin(), free_vars_l.end(),
-			tree<node>::subtree_less)) return false;
+		// Grammar-regeneration-stable tie-breaks. subtree_less compares
+		// node values, which embed parser nonterminal NUMBERS: a
+		// `./dev regen` with a newer pinned generator renumbers them and
+		// silently reorders every id-based tie. The 8f1a74c1
+		// regeneration did exactly that and re-rolled the
+		// Boole-decomposition pivot choice into a hang (GitHub #70
+		// family; bisected 2026-08-19). Ties therefore break on PRINTED
+		// form — surface syntax is the one ordering a regeneration
+		// cannot change. Variable sets compare as name-sorted sequences
+		// so the verdict is also independent of get_free_vars's internal
+		// (subtree_less-sorted) vector order.
+		auto var_names = [](const trefs& vs) {
+			std::vector<std::string> ns;
+			ns.reserve(vs.size());
+			for (tref v : vs)
+				ns.push_back(tree<node>::get(v).to_str());
+			std::sort(ns.begin(), ns.end());
+			return ns;
+		};
+		const auto ns_l = var_names(free_vars_l);
+		const auto ns_r = var_names(free_vars_r);
+		if (ns_l < ns_r) return true;
+		if (ns_r < ns_l) return false;
+		const std::string str_l = tree<node>::get(l).to_str();
+		const std::string str_r = tree<node>::get(r).to_str();
+		if (str_l < str_r) return true;
+		if (str_r < str_l) return false;
+		// Identically printed but physically distinct atoms: any pick is
+		// equivalent for cost; subtree_less only keeps the order strict.
 		return tree<node>::subtree_less(l, r);
 	};
 	return comp;

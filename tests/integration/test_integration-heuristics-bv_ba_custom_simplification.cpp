@@ -351,6 +351,35 @@ TEST_SUITE("blocks around non-block operators") {
 	}
 }
 
+TEST_SUITE("max_simplify_rounds") {
+
+	TEST_CASE("max_simplify_rounds bounds the fixpoint loop and keeps "
+		"the result sound") {
+		struct max_simplify_rounds_guard {
+			size_t saved = max_simplify_rounds;
+			~max_simplify_rounds_guard() {
+				max_simplify_rounds = saved;
+			}
+		} guard;
+		tref src = parse_bf("{1}:bv[8] + X:bv[8] + {2}:bv[8]");
+		REQUIRE( src != nullptr );
+		// Unlimited: folds to X + {3} (accepted spellings as in the cases
+		// above).
+		max_simplify_rounds = 0;
+		tref full = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE( full != nullptr );
+		// Capped at 1: must terminate after one round; whatever it returns
+		// must still be reachable from src (no corruption), and running the
+		// simplification again uncapped must land on the same normal form.
+		max_simplify_rounds = 1;
+		tref capped = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE( capped != nullptr );
+		max_simplify_rounds = 0;
+		CHECK( tree<node_t>::get(bv_ba_custom_simplification<node_t>(capped))
+			== tree<node_t>::get(full) );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
