@@ -388,7 +388,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(move(x), move(r));
+		} else cache.emplace(std::move(x), std::move(r));
 	}
 
 	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
@@ -403,7 +403,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
 				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(std::pair<bdd_ref, uint_t>{move(x), v}, move(r));
+		} else cache.emplace(
+			std::pair<bdd_ref, uint_t>{std::move(x), v}, std::move(r));
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
@@ -420,7 +421,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 					      bdd_ref::to_shift_node(x, d),
 					      bdd_ref::to_shift_node(y, d)},
 				      bdd_ref::to_shift_node(r, d));
-		} else cache.emplace(std::array<bdd_ref,2>{move(x),move(y)},move(r));
+		} else cache.emplace(
+			std::array<bdd_ref, 2>{std::move(x), std::move(y)},
+			std::move(r));
 	}
 
 	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
@@ -970,7 +973,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if constexpr (o.has_varshift()) {
 			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
 				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(move(x), move(r));
+		} else cache.emplace(std::move(x), std::move(r));
 	}
 
 	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
@@ -985,7 +988,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 					      bdd_ref::to_shift_node(x, x.shift),
 					      v - (x.shift - 1)},
 				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(std::pair<bdd_ref, uint_t>{move(x), v}, move(r));
+		} else cache.emplace(
+			std::pair<bdd_ref, uint_t>{std::move(x), v}, std::move(r));
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
@@ -1002,7 +1006,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 					      bdd_ref::to_shift_node(x, d),
 					      bdd_ref::to_shift_node(y, d)},
 				      bdd_ref::to_shift_node(r, d));
-		} else cache.emplace(std::array<bdd_ref,2>{move(x),move(y)},move(r));
+		} else cache.emplace(
+			std::array<bdd_ref, 2>{std::move(x), std::move(y)},
+			std::move(r));
 	}
 
 	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
@@ -1175,7 +1181,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 				if (hasbc(x, l[n], am_cmp)) l.erase(l.begin() + n);
 				else ++n;
 			h.shrink_to_fit(), l.shrink_to_fit(), x.shrink_to_fit();
-			bdd_ref r = bdd_and_many(move(x));
+			bdd_ref r = bdd_and_many(std::move(x));
 			if (r == F) return res = F, 1;
 			if (r != T) {
 				if (!hasbc(h, r, am_cmp)) h.push_back(r), am_sort(h);
@@ -1211,12 +1217,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		uint_t m = 0;
 		std::vector<bdd_ref> vh, vl;
 		switch (bdd_and_many_iter(v, vh, vl, res, m)) {
-			case 0: l = bdd_and_many(move(vl)),
-					h = bdd_and_many(move(vh));
+			case 0: l = bdd_and_many(std::move(vl)),
+					h = bdd_and_many(std::move(vh));
 				break;
 			case 1: return and_many_memo.emplace(v, res), res;
-			case 2: h = bdd_and_many(move(vh)), l = F; break;
-			case 3: h = F, l = bdd_and_many(move(vl)); break;
+			case 2: h = bdd_and_many(std::move(vh)), l = F; break;
+			case 3: h = F, l = bdd_and_many(std::move(vl)); break;
 			default: { DBG(assert(false)); }
 		}
 		return and_many_memo.emplace(v, bdd::add(m, h, l)).first->second;

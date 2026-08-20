@@ -12,6 +12,9 @@
 #ifndef __IDNI__TAU__BA_CONSTANTS_H__
 #define __IDNI__TAU__BA_CONSTANTS_H__
 
+#include <cstdlib>
+#include <stdexcept>
+
 #include "tau_tree.h"
 
 namespace idni::tau_lang {

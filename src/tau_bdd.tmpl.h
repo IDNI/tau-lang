@@ -881,8 +881,8 @@ template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 convert_to_handle(tref tau_node) {
 	auto it = U.find(tau_node);
-	DBG(assert(it != U.end));
-	if (it != U.end) return it->second;
+	DBG(assert(it != U.end()));
+	if (it != U.end()) return it->second;
 	else return term_handle(tbdd::T);
 }
 
