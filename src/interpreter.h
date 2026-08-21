@@ -120,6 +120,13 @@ struct interpreter {
 	 * @brief Execute one time step with the given input @p values.
 	 * @param values Input variable assignments for this step.
 	 * @return Pair (output assignment if successful, whether execution should continue).
+	 *
+	 * Lifetime of the returned map (IN-M1): its nodes are owned by the
+	 * tree store and kept alive by the interpreter until the SECOND
+	 * following step() call -- the sweep at the start of step N+1 pins
+	 * step N's map, the sweep at the start of step N+2 does not. A host
+	 * that needs a step's outputs for longer must serialize them (or copy
+	 * the trees into its own htref-held storage) before then.
 	 */
 	std::pair<std::optional<assignment<node>>, bool> step(
 						const assignment<node>& values);
@@ -144,15 +151,33 @@ struct interpreter {
 	 *
 	 * Both the running spec and @p update must be normalized before calling.
 	 * @param update Normalized update formula.
+	 * @return true iff the update was accepted and committed; false leaves
+	 *         the interpreter exactly as it was (spec, streams, memory).
+	 *         The reason is logged.
 	 */
-	void update(tref update);
+	bool update(tref update);
 
 	// ── Inspection / introspection (added for tau-neuro runtime) ─────────
 
 	// Return the current running spec as a tau-syntax string. Reflects
 	// whatever the interpreter holds in `original_spec` after any PWR
 	// updates that have been applied — this is the "this[t]" view.
+	//
+	// IN-M2: a part with several revision alternatives is executed by
+	// step() as its FIRST solvable alternative, not as their disjunction.
+	// Once a step has run, this reports the alternatives that step chose;
+	// before the first step (or after an update, until the next step) it
+	// reports the disjunction, which over-approximates.
 	std::string current_spec() const;
+
+	// True once a pointwise-revision update has been committed after the
+	// Mealy strategy in `cached_solution` was synthesised (IN-N3): the
+	// automaton then no longer describes the running spec, and the
+	// strategy introspection below (visualise_mealy_dot, determinise,
+	// boundary_traces) reports nothing rather than a stale machine.
+	// The solution itself is kept because reset() still needs it to
+	// re-seed the aux state bits of the original spec parts.
+	bool strategy_stale() const { return cached_solution_stale_; }
 
 	// Reset the interpreter back to time t=0. Clears `memory`,
 	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
@@ -196,7 +221,11 @@ struct interpreter {
 	//
 	// Non-const because the dry-run needs to copy the output_partition
 	// union-find structure, which lacks a usable copy constructor;
-	// implementation defers to the same machinery as `update()`.
+	// implementation defers to the same machinery as `update()` --
+	// literally: both call plan_update(), so can_extend(psi) is true
+	// exactly when update(psi) would commit (PW-N9 / IN-M7). The one
+	// side effect both share is that unknown console streams named by
+	// psi get registered in the io_context during stream collection.
 	bool can_extend(tref psi);
 
 	// Enumerate output assignments admissible at the current step without
@@ -216,6 +245,11 @@ struct interpreter {
 	// the admissibility set, then constrained-argmax over it. The returned
 	// assignments are over OUTPUT stream variables; auxiliary state bits
 	// (`o__ltl_ms*`, `o__ltl_s*`) are filtered via `is_excluded_output`.
+	//
+	// IN-M2: for a part with several revision alternatives the constraint
+	// is the FIRST alternative that is solvable under the current memory
+	// -- the one step() would execute -- not the disjunction of all of
+	// them (which admitted outputs step() never emits).
 	//
 	// Non-const because lazy initialization of step_spec via
 	// `calculate_initial_spec()` may be required.
@@ -338,6 +372,9 @@ struct interpreter {
 	// whole spec) into a stored formula. Stored size grows additively per
 	// update instead of doubling.
 	/// Per spec part, the executable continuations of its alternatives.
+	/// Parallel to `original_spec` (same size, same part order) -- the
+	/// multi-state Mealy initial-output part pushed by make_interpreter
+	/// has a representative-less entry in `original_spec` too (IN-N11).
 	std::vector<htrefs> ubt_ctn;
 	/// Partition of spec: per part the ordered alternative formulas with a
 	/// representative for its set of output streams.
@@ -359,6 +396,7 @@ struct interpreter {
 	//   - emit DOT visualisations, extract boundary traces, etc. — without
 	//     re-running synthesis.
 	std::optional<LtlAbaSolution<node>> cached_solution;
+	bool cached_solution_stale_ = false;
 
 	// Open-stream handlers (declared via declare_open). Iteration order
 	// matches insertion order via std::vector<std::string> open_streams_order_;
@@ -385,10 +423,57 @@ private:
 	int_t announced_step_ = -1;
 
 	size_t m_at_last_gc = 0;
+	/// The output map returned by the previous step(); pinned through the
+	/// next sweep so a host may still read it while feeding the next step
+	/// (IN-M1, see step()'s lifetime note).
+	assignment<node> last_outputs_;
+	/// Per part, the index (into the part's alternatives) step() executed
+	/// last; empty until the first step and after every update (IN-M2).
+	std::vector<size_t> chosen_alt_;
 	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
 	/// @param pin Optional caller-held map whose nodes must survive the
 	/// sweep (collect_live_refs cannot see locals).
 	void maybe_gc(const assignment<node>* pin = nullptr);
+
+	/// @brief Everything update() needs to commit, computed without
+	/// mutating the interpreter (PW-4 / PW-N9 / IN-M7).
+	struct update_plan {
+		std::vector<htrefs> ubt_ctn;
+		std::vector<std::pair<htrefs, htref>> spec;
+		union_find_with_sets<decltype(stream_comp), node> partition;
+		input_streams<node>  inputs;
+		output_streams<node> outputs;
+		std::string spec_str;
+		// The union-find's move constructor is explicit, so the members
+		// are direct-initialized here rather than brace-aggregated.
+		update_plan(std::vector<htrefs>&& c,
+			std::vector<std::pair<htrefs, htref>>&& s,
+			union_find_with_sets<decltype(stream_comp), node>&& p,
+			input_streams<node>&& i, output_streams<node>&& o,
+			std::string&& str)
+			: ubt_ctn(std::move(c)), spec(std::move(s)),
+			  partition(std::move(p)), inputs(std::move(i)),
+			  outputs(std::move(o)), spec_str(std::move(str)) {}
+	};
+	/// @brief Dry-run the pointwise revision of the running spec by
+	/// @p update: the first update clause that yields an entirely
+	/// executable revised spec (with its streams resolvable) wins.
+	/// @return The plan, or std::nullopt (reason logged) when no clause does.
+	std::optional<update_plan> plan_update(tref update);
+
+	/// @brief The index of the first alternative of part @p part whose
+	/// continuation is solvable at the current time point under the
+	/// current memory -- the one step() would execute (IN-M2).
+	std::optional<size_t> first_solvable_alternative(size_t part);
+	/// @brief The running spec as step() executes it: per part its chosen
+	/// alternative when known (@p use_memory picks by solvability under
+	/// the current memory, else the last step's choice), the
+	/// disjunction otherwise.
+	tref executed_spec_fm(bool use_memory);
+
+	/// @brief Drop dead and duplicate alternatives (keeping the earliest,
+	/// i.e. strongest, position) and apply the max_revision_alts cap.
+	static htrefs finalize_alternatives(const trefs& alts);
 
 	/// @brief Partition @p spec by output stream representatives.
 	static std::vector<std::pair<htref, htref>>
@@ -408,6 +493,13 @@ private:
 	/// @brief Rebuild the output stream map from @p current_outputs.
 	/// @return false if a stream could not be found (interpretation should stop).
 	bool rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
+	/// @brief Build the input stream map for @p current_inputs into @p dst
+	/// (the member map is untouched) -- update() validates before it swaps.
+	bool build_inputs(const subtree_map<node, size_t>& current_inputs,
+		input_streams<node>& dst);
+	/// @brief Build the output stream map for @p current_outputs into @p dst.
+	bool build_outputs(const subtree_map<node, size_t>& current_outputs,
+		output_streams<node>& dst);
 
 	/// @brief Collect all input stream variables from @p dnf into @p current_inputs.
 	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);

@@ -23,6 +23,12 @@
 
 using namespace idni::tau_lang;
 
+// PW-N4: the semantic fallback ships OFF; this file is its test surface.
+static const bool semantic_fallback_enabled_for_tests = [] {
+	pwr_semantic_fallback = true;
+	return true;
+}();
+
 static tref spec(const char* s) {
 	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
 	if (!nso_rr.has_value()) return nullptr;

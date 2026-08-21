@@ -57,6 +57,17 @@ TEST_SUITE("Tau API - runtime limits") {
 		block_max_rounds = s2;
 	}
 
+	// PW-N4: the semantic PWR fallback is a runtime knob, OFF by default.
+	TEST_CASE("pwr semantic fallback ships off and round-trips") {
+		const bool saved = pwr_semantic_fallback;
+		CHECK_FALSE( pwr_semantic_fallback );
+		tau_api::set_pwr_semantic_fallback(true);
+		CHECK( pwr_semantic_fallback );
+		tau_api::set_pwr_semantic_fallback(false);
+		CHECK_FALSE( pwr_semantic_fallback );
+		pwr_semantic_fallback = saved;
+	}
+
 	TEST_CASE("interpreter statics") {
 		const size_t sw = interpreter<node_t>::spec_size_warn_threshold;
 		const size_t ra = interpreter<node_t>::max_revision_alts;

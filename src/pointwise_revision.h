@@ -76,6 +76,23 @@ bool is_atom_leaf(tref fm) {
 	return !is_temporal<node>(fm) && !is_wff_boolean<node>(fm);
 }
 
+// PW-N2: a non-temporal formula -- an atom or any Boolean combination of
+// atoms with no temporal operator anywhere inside. The semantic per-step
+// revision (semantic_revise_atoms) is defined for these as a whole: its
+// ∃o.(α∧β) → α construction only needs α and β to be step formulas, not
+// atoms. Without this, `revise()` sent a conjunction such as
+// `(i1 = 1 -> o1 = 1) && o2 = 0` against an atom update into the
+// operator-mismatch case and dropped the spec side entirely, so the
+// second of two conflicting updates forgot the first's revision.
+template <NodeType node>
+bool is_non_temporal_fm(tref fm) {
+	using tau = tree<node>;
+	if (!fm) return false;
+	return tau::get(fm).find_top([](tref n) {
+		return is_temporal<node>(n);
+	}) == nullptr;
+}
+
 // ---------------------------------------------------------------------------
 // Role decomposition: invariant side vs commitment side
 // ---------------------------------------------------------------------------
@@ -206,8 +223,9 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time) {
 	if (is_tau_formula_sat<node>(conj, start_time))
 		return phi;
 
-	// Case 1: Both atoms → semantic per-step formula
-	if (is_atom_leaf<node>(phi) && is_atom_leaf<node>(psi))
+	// Case 1: Both non-temporal (atoms or Boolean combinations of atoms,
+	// PW-N2) → semantic per-step formula over the whole subformulas.
+	if (is_non_temporal_fm<node>(phi) && is_non_temporal_fm<node>(psi))
 		return semantic_revise_atoms<node>(phi, psi);
 
 	temporal_op op_phi = get_temporal_op<node>(phi);
@@ -254,13 +272,14 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time) {
 		// each handled above.
 	}
 
-	// Case 3: Atom vs binary temporal — lift atom
-	// α ≡ op(α, α) under non-strict semantics
-	if (is_atom_leaf<node>(phi) && is_binary_temporal(op_psi)) {
+	// Case 3: Non-temporal vs binary temporal — lift the step formula
+	// α ≡ op(α, α) under non-strict semantics (PW-N2: any non-temporal
+	// formula, not only an atom leaf)
+	if (is_non_temporal_fm<node>(phi) && is_binary_temporal(op_psi)) {
 		tref lifted = rebuild_from_roles<node>(op_psi, phi, phi);
 		return revise<node>(lifted, psi, psi_f, start_time);
 	}
-	if (is_binary_temporal(op_phi) && is_atom_leaf<node>(psi)) {
+	if (is_binary_temporal(op_phi) && is_non_temporal_fm<node>(psi)) {
 		tref lifted = rebuild_from_roles<node>(op_phi, psi, psi);
 		return revise<node>(phi, lifted, psi_f, start_time);
 	}
@@ -457,10 +476,17 @@ tref pointwise_revision_temporal(
 
 		// Step 3: Recursive revision against best-matching update clause
 		tref best = nullptr;
+		// PW-R1: F and sometimes are the same eventually operator under
+		// two node kinds (LS-3 matched them inside revise(); the clause
+		// selection here still told them apart and fell back to the
+		// first update clause).
+		auto eventually_normal = [](temporal_op op) {
+			return op == temporal_op::F ? temporal_op::SOMETIMES : op;
+		};
 		for (tref uc : update_clauses) {
 			// Step 4: Clause selection — try same-structure match first
-			temporal_op op_sc = get_temporal_op<node>(sc);
-			temporal_op op_uc = get_temporal_op<node>(uc);
+			temporal_op op_sc = eventually_normal(get_temporal_op<node>(sc));
+			temporal_op op_uc = eventually_normal(get_temporal_op<node>(uc));
 			if (op_sc == op_uc && op_sc != temporal_op::NONE) {
 				best = uc;
 				break;
@@ -475,7 +501,16 @@ tref pointwise_revision_temporal(
 			// Optimal mode fallback (pwr-ltl.tex §11): if fast mode
 			// returned the update clause unchanged (dropped the spec
 			// clause), try semantic winning-region revision.
-			if (r == best || r == update) {
+			// PW-N5: structural comparison -- revise() rebuilds nodes,
+			// so pointer identity missed an unchanged result.
+			// PW-N4: gated by the pwr_semantic_fallback runtime
+			// parameter (default OFF): the fallback runs Algorithm D's
+			// game solver, whose dead-end override is known to
+			// under-correct (AL-R1), and it is the one production
+			// route to that solver.
+			if (pwr_semantic_fallback
+				&& (tau::subtree_equals(r, best)
+					|| tau::subtree_equals(r, update))) {
 				tref opt = semantic_pwr_optimal<node>(
 					sc, update, start_time);
 				if (opt) {

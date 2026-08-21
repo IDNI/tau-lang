@@ -77,7 +77,6 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 		       return {};
 		}
 		std::string line = maybe_line.value();
-		// std::cout << line << "\n"; // ???
 
 		if (line.empty()) return { value, true }; // no more inputs
 		size_t type = ctx.type_of(vn);
@@ -230,6 +229,14 @@ bool interpreter<node>::rebuild_inputs(
 {
 	// Close all input streams
 	inputs.clear();
+	return build_inputs(current_inputs, inputs);
+}
+
+template<NodeType node>
+bool interpreter<node>::build_inputs(
+	const subtree_map<node, size_t>& current_inputs,
+	input_streams<node>& inputs)
+{
 	// open the corresponding streams for input and store them in streams
 	for (auto& [current_var, stream_id] : current_inputs) {
 		DBG(LOG_TRACE << "rebuild_inputs[current_var]: " << LOG_FM_DUMP(current_var) << "\n";)
@@ -264,6 +271,14 @@ bool interpreter<node>::rebuild_outputs(
 {
 	// Delete old streams
 	outputs.clear();
+	return build_outputs(current_outputs, outputs);
+}
+
+template<NodeType node>
+bool interpreter<node>::build_outputs(
+	const subtree_map<node, size_t>& current_outputs,
+	output_streams<node>& outputs)
+{
 	// open the corresponding streams for output and store them in streams
 	for (auto& [current_var, stream_id] : current_outputs) {
 		tref var = canonize<node>(current_var);
@@ -456,8 +471,18 @@ post_normalization:
 					// One single-alternative continuation part;
 					// ubt_ctn holds a htrefs (alternatives) per
 					// part since the factored-revision redesign.
+					// IN-N11: it needs its matching entry in
+					// original_spec -- without one, update()'s
+					// size invariant failed (Debug abort on any
+					// update of a multi-state Mealy spec) and
+					// in Release every later update paired
+					// parts with the wrong continuations. No
+					// representative: the initial-output
+					// constraint is never revised.
 					i.ubt_ctn.push_back(htrefs{
 						tree<node>::geth(init_out) });
+					i.original_spec.emplace_back(htrefs{
+						tree<node>::geth(init_out) }, nullptr);
 					i.compute_lookback_and_initial();
 				}
 			}
@@ -656,15 +681,19 @@ std::pair<std::optional<assignment<node>>, bool>
 	if (has_this_stream) {
 		tref current_this_stream = build_in_var_at_n<node>(
 			"this", time_point, get_ba_type_id<node>(tau_type<node>()));
+		// IN-M2: feed back the spec this step will actually follow
+		// (first solvable alternative per part), not the disjunction.
 		tref wrapped_spec = build_bf_ba_constant<node>(
 			node::ba::pack_tau_ba(unsqueeze_always(
-				combined_spec_fm<node>(original_spec))),
+				executed_spec_fm(true))),
 				get_ba_type_id<node>(tau_type<node>()));
 		memory[current_this_stream] = wrapped_spec;
 	}
 
 	solution<node> global;
-	for (const trefs& part_alts : step_spec) {
+	chosen_alt_.assign(step_spec.size(), 0);
+	for (size_t part_idx = 0; part_idx < step_spec.size(); ++part_idx) {
+		const trefs& part_alts = step_spec[part_idx];
 		// Try the part's alternatives in their preference order; the
 		// first one with a solvable path wins. This trial order is what
 		// implements the pointwise-revision preference for the
@@ -672,7 +701,8 @@ std::pair<std::optional<assignment<node>>, bool>
 		// alternative only fires when no earlier one is solvable at
 		// this time point.
 		bool solved = false;
-		for (tref spec_part : part_alts) {
+		for (size_t alt_idx = 0; alt_idx < part_alts.size(); ++alt_idx) {
+		tref spec_part = part_alts[alt_idx];
 		for (tref path : expression_paths<node>(spec_part)) {
 			// rewriting the inputs and inserting them into memory
 			tref updated = update_to_time_point(path, formula_time_point);
@@ -713,14 +743,13 @@ std::pair<std::optional<assignment<node>>, bool>
 #endif // DEBUG
 			if (path_solution) {
 				solved = true;
+				chosen_alt_[part_idx] = alt_idx;
 				for (const auto& [var, value] : path_solution.value()) {
 					// Check if we are dealing with a stream variable
 					if (tt(var) | tau::variable | tau::io_var) {
 						DBG(LOG_TRACE << LOG_FM_TREE(value));
 						assert(tau::get(value).is(tau::bf));
 						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
-							// std::cout << "time_point: " << time_point << "\n";
-							// std::cout << "var: " << var << "\n";
 							memory.emplace(var, value);
 							// Exclude temporary streams in solution
 							if (!is_excluded_output(tau::trim(var)))
@@ -812,8 +841,10 @@ std::pair<std::optional<assignment<node>>, bool>
 	// the map's nodes' only remaining anchors. A sweep at this point frees
 	// them under the caller's feet (seen as nondeterministic garbage keys
 	// aborting write() on the qlt S-operator execution). The sweep runs at
-	// the START of the next step instead, when the previous step's outputs
-	// have been consumed.
+	// the START of the next step instead; the returned map is pinned
+	// through that sweep via last_outputs_ (IN-M1), so a host may keep
+	// reading it while it feeds the next step.
+	last_outputs_ = global;
 	return { global, auto_continue };
 }
 
@@ -844,7 +875,15 @@ void interpreter<node>::prune_memory(size_t completed_time_point) {
 		(int_t)formula_time_point - lookback,
 		(int_t)completed_time_point);
 	std::erase_if(memory, [&](const auto& kv) {
-		tref v = tau::trim(kv.first);
+		// IN-M5: a solution can key an aux bit by its complement
+		// (o__ltl_s0__[t]', bf_neg-wrapped; see write()). Unwrap so
+		// such entries age out like the stream entry they stand for,
+		// instead of accumulating one per step for the run's lifetime.
+		tref key = kv.first;
+		while (tau::get(key).has_child()
+			&& tau::get(key)[0].is(tau::bf_neg))
+			key = tau::get(key)[0].first();
+		tref v = tau::trim(key);
 		// Leave non-stream entries (e.g. solved uninterpreted constants)
 		// alone: they are not time-indexed and do not grow with time_point.
 		if (!is_io_var<node>(v) || !is_io_initial<node>(v)) return false;
@@ -864,6 +903,13 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 	for (auto& [k, v] : memory)  { keep.insert(k); keep.insert(v); }
 	for (auto& [k, _] : inputs)  keep.insert(k);
 	for (auto& [k, _] : outputs) keep.insert(k);
+	// IN-M1: the previous step's returned map (see step()'s lifetime
+	// note) and the raw atom trefs of the cached Mealy solution, which
+	// nothing else anchors.
+	for (auto& [k, v] : last_outputs_) { keep.insert(k); keep.insert(v); }
+	if (cached_solution)
+		for (const auto& [atom, _] : cached_solution->atoms)
+			keep.insert(atom);
 	output_partition.collect_live_refs(keep);
 }
 
@@ -1143,6 +1189,16 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 	// transforms, one per alternative. Middle alternatives that need the
 	// transform's machinery (sometimes clauses, uninterpreted constants)
 	// still take it.
+	// IN-M8: both shortcuts below skip get_executable_spec, and with it
+	// its rejection of constant time positions below 0. Apply that check
+	// here so a lookback-shifted alternative cannot slip through as a
+	// continuation with an unresolvable negative position.
+	auto has_negative_position = [](tref f) {
+		for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>))
+			if (is_io_initial<node>(v) && get_io_time_point<node>(v) < 0)
+				return true;
+		return false;
+	};
 	htrefs kept;
 	ctns.clear();
 	for (size_t idx = 0; idx < alts.size(); ++idx) {
@@ -1152,7 +1208,8 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 			tref aw = c.find_top(is_child<node, tau::wff_always>);
 			if (aw && !c.find_top(
 					is_child<node, tau::wff_sometimes>)
-				&& !c.find_top(is<node, tau::uconst>))
+				&& !c.find_top(is<node, tau::uconst>)
+				&& !has_negative_position(alt->get()))
 			{
 				kept.push_back(alt);
 				ctns.push_back(tree<node>::geth(
@@ -1180,7 +1237,8 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 			tref aw = c.find_top(is_child<node, tau::wff_always>);
 			if (aw && !c.find_top(
 					is_child<node, tau::wff_sometimes>)
-				&& !c.find_top(is<node, tau::uconst>))
+				&& !c.find_top(is<node, tau::uconst>)
+				&& !has_negative_position(alt->get()))
 			{
 				LOG_DEBUG << "update/keeping conditional "
 					"specification alternative: "
@@ -1220,8 +1278,10 @@ static bool pwr_contains_bv_content(tref f) {
 }
 
 template <NodeType node>
-void interpreter<node>::update(tref update) {
-	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
+std::optional<typename interpreter<node>::update_plan>
+	interpreter<node>::plan_update(tref update)
+{
+	DBG(LOG_TRACE << "interpreter::plan_update(update = \"" << LOG_FM(update) << "\")";)
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
 				.select_top(is_child<node, tau::io_var>);
@@ -1231,18 +1291,17 @@ void interpreter<node>::update(tref update) {
 						update, io_vars, time_point);
 	if (tau::get(shifted_update).equals_F()) {
 		LOG_WARNING << "No update performed: constant time position below 0 was found\n";
-		return;
+		return {};
 	}
 	io_vars = tau::get(shifted_update)
 				.select_top(is_child<node, tau::io_var>);
 	if (!is_memory_access_valid(io_vars)) {
 		LOG_WARNING << "No update performed: invalid memory access was found\n";
-		return;
+		return {};
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
 	shifted_update = normalizer<node>(shifted_update);
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
-	// std::cout << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
 	// The constant time positions in original_spec need to be replaced by
 	// present assignments from memory and already executed sometimes
@@ -1265,7 +1324,18 @@ void interpreter<node>::update(tref update) {
 	for (tref clause : expression_paths<node>(shifted_update)) {
 		auto current_spec = memory_spec;
 		auto current_ubd_ctn = ubt_ctn;
-		DBG(assert(current_spec.size() == current_ubd_ctn.size()));
+		// IN-N11: the two partitions are parallel by construction
+		// (make_interpreter pairs every ubt_ctn entry, including the
+		// Mealy initial-output part). Keep the check loud in both
+		// builds -- a mismatch would silently pair parts with the
+		// wrong continuations below.
+		if (current_spec.size() != current_ubd_ctn.size()) {
+			LOG_ERROR << "interpreter::update: spec partition ("
+				<< current_spec.size() << ") and continuation "
+				"partition (" << current_ubd_ctn.size()
+				<< ") are out of step; refusing the update\n";
+			return {};
+		}
 		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
 		auto upd_partition = create_spec_partition(clause, uf);
 		// Merge current output_partition into uf
@@ -1277,7 +1347,11 @@ void interpreter<node>::update(tref update) {
 		// their continuation recomputed below via get_executable_spec.
 		std::vector<bool> part_merged(current_spec.size(), false);
 		for (size_t i = 0; i < current_spec.size(); ++i) {
-			// If no output/uninterpreted constant present, skip
+			// A part with no representative has no output stream
+			// (or uninterpreted constant) to revise: it is an
+			// input-only constraint, or the Mealy initial-output
+			// part make_interpreter adds (IN-N11); it never merges
+			// and never receives an update (PW-10h).
 			if (!current_spec[i].second) continue;
 			for (size_t j = i+1; j < current_spec.size(); ++j) {
 				// If no output/uninterpreted constant present, skip
@@ -1311,14 +1385,11 @@ void interpreter<node>::update(tref update) {
 		for (size_t i = 0; i < current_spec.size(); ++i) {
 			// If no output/uninterpreted constant present, skip
 			if (!current_spec[i].second) continue;
-			// std::cout << "spec part i: " << tau::get(current_spec[i].first) << "\n";
 			for (size_t j = 0; j < upd_partition.size(); ++j) {
 				// If no output/uninterpreted constant present, skip
 				if (!upd_partition[j].second) continue;
-				// std::cout << "update part j: " << tau::get(upd_partition[j].first) << "\n";
 				// Check if current spec part overlaps with current update part
 				if (uf.connected(current_spec[i].second->get(), upd_partition[j].second->get())) {
-					// std::cout << "Merged.\n";
 					// Add current update part to update collection
 					collected_updates[i] = tau::build_wff_and(collected_updates[i], upd_partition[j].first->get());
 					// Now remove update part from upd_partition
@@ -1423,12 +1494,12 @@ void interpreter<node>::update(tref update) {
 		// collects auto-register unknown console streams and reject
 		// untyped ones, so a rebuild after successful collects cannot
 		// fail on a missing stream.
-		subtree_map<node, size_t> output_streams, input_streams;
+		subtree_map<node, size_t> out_stream_ids, in_stream_ids;
 		bool streams_ok = true;
 		for (const auto& [part_alts, _] : current_spec) {
 			for (const htref& alt : part_alts)
 				if (!collect_output_streams(alt->get(),
-					output_streams))
+					out_stream_ids))
 				{
 					streams_ok = false;
 					break;
@@ -1438,7 +1509,7 @@ void interpreter<node>::update(tref update) {
 		if (streams_ok) for (const auto& [part_alts, _] : current_spec) {
 			for (const htref& alt : part_alts)
 				if (!collect_input_streams(alt->get(),
-					input_streams))
+					in_stream_ids))
 				{
 					streams_ok = false;
 					break;
@@ -1451,43 +1522,73 @@ void interpreter<node>::update(tref update) {
 			continue;
 		}
 
+		// PW-4 (B1): open the revised streams into locals BEFORE
+		// anything is committed -- a failure here used to leave the
+		// interpreter half-updated (new spec, cleared stream maps).
+		output_streams<node> new_outputs;
+		input_streams<node>  new_inputs;
+		if (!build_outputs(out_stream_ids, new_outputs)) {
+			LOG_WARNING << "No update performed: output stream "
+				"rebuild failed for the revised specification\n";
+			continue;
+		}
+		if (!build_inputs(in_stream_ids, new_inputs)) {
+			LOG_WARNING << "No update performed: input stream "
+				"rebuild failed for the revised specification\n";
+			continue;
+		}
 		tref updated_spec = unsqueeze_always(
 			combined_spec_fm<node>(current_spec));
-		// I7: growth telemetry -- the only prior symptom of the
-		// revision doubling was the interpreter getting slower.
-		const std::string spec_str = TAU_TO_STR(updated_spec);
-		LOG_INFO << "Updated specification (" << spec_str.size()
-			<< " chars): " << spec_str << "\n\n";
-		if (spec_size_warn_threshold
-			&& spec_str.size() > spec_size_warn_threshold)
-			LOG_WARNING << "Updated specification size "
-				<< spec_str.size() << " chars exceeds the "
-				"spec-size-warn threshold "
-				<< spec_size_warn_threshold << "\n";
-
-		// Set new specification for interpreter
-		ubt_ctn = std::move(current_ubd_ctn);
-		original_spec = std::move(current_spec);
-		output_partition = std::move(uf);
-		// The systems for solver need to be recomputed at beginning of next step
-		final_system = false;
-		compute_lookback_and_initial();
-		LOG_TRACE << "interpreter::update/rebuild_outputs";
-		if (!rebuild_outputs(output_streams)) {
-			LOG_ERROR << "interpreter::update: output stream "
-				"rebuild failed after commit\n";
-			return;
-		}
-		LOG_TRACE << "interpreter::update/rebuild_inputs";
-		if (!rebuild_inputs(input_streams)) {
-			LOG_ERROR << "interpreter::update: input stream "
-				"rebuild failed after commit\n";
-			return;
-		}
-		return;
+		return update_plan(std::move(current_ubd_ctn),
+			std::move(current_spec), std::move(uf),
+			std::move(new_inputs), std::move(new_outputs),
+			TAU_TO_STR(updated_spec));
 	}
 	// No more clause left in update and all clauses are not realizable
 	LOG_WARNING << "No update performed: updated specification is unsat\n";
+	return {};
+}
+
+template <NodeType node>
+bool interpreter<node>::update(tref update) {
+	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
+	auto plan = plan_update(update);
+	if (!plan) return false;
+	// I7: growth telemetry -- the only prior symptom of the revision
+	// doubling was the interpreter getting slower.
+	LOG_INFO << "Updated specification (" << plan->spec_str.size()
+		<< " chars): " << plan->spec_str << "\n\n";
+	if (spec_size_warn_threshold
+		&& plan->spec_str.size() > spec_size_warn_threshold)
+		LOG_WARNING << "Updated specification size "
+			<< plan->spec_str.size() << " chars exceeds the "
+			"spec-size-warn threshold "
+			<< spec_size_warn_threshold << "\n";
+	// Commit: every component was validated by plan_update, so nothing
+	// below can fail and leave the interpreter half-updated.
+	ubt_ctn = std::move(plan->ubt_ctn);
+	original_spec = std::move(plan->spec);
+	output_partition = std::move(plan->partition);
+	outputs = std::move(plan->outputs);
+	inputs = std::move(plan->inputs);
+	// The systems for solver need to be recomputed at beginning of next step
+	final_system = false;
+	chosen_alt_.clear();
+	compute_lookback_and_initial();
+	// IN-N3: the synthesised strategy (if any) described the spec
+	// before this revision; keep it for reset()'s re-seeding, but mark
+	// it stale for the introspection API.
+	if (cached_solution) cached_solution_stale_ = true;
+	return true;
+}
+
+template <NodeType node>
+bool interpreter<node>::can_extend(tref psi) {
+	// Dry-run update(): plan_update computes everything update() would
+	// commit without mutating the interpreter, so the two agree by
+	// construction (PW-N9 / IN-M7).
+	if (psi == nullptr) return true;
+	return plan_update(psi).has_value();
 }
 
 template <NodeType node>
@@ -1533,17 +1634,38 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				break;
 			}
 		if (nested) {
-			htrefs out;
+			trefs out;
+			size_t failed = 0;
 			for (const htref& h : alts_in) {
 				tref r = pointwise_revision_temporal<node>(
 					h->get(), update, start_time);
-				// nullptr: the revision could not be built;
-				// F: the alternative is gone.
-				if (!r || tau::get(r).equals_F()) continue;
-				out.push_back(tree<node>::geth(r));
+				// IN-M6: nullptr (the revision could not be
+				// built) and F (the alternative is gone) are
+				// different outcomes; say which.
+				if (!r) {
+					++failed;
+					LOG_WARNING << "Pointwise revision of a "
+						"nested-temporal alternative could not "
+						"be built: " << TAU_TO_STR(h->get())
+						<< "\n";
+					continue;
+				}
+				if (tau::get(r).equals_F()) {
+					LOG_DEBUG << "update/nested-temporal "
+						"alternative revised to F, dropped: "
+						<< LOG_FM(h->get()) << "\n";
+					continue;
+				}
+				out.push_back(r);
 			}
-			if (out.empty()) return {};
-			return out;
+			if (out.empty()) {
+				if (failed) LOG_WARNING << "No update performed: "
+					"the temporal revision could not be built "
+					"for any alternative\n";
+				return {};
+			}
+			// Same dedupe and cap as the factored path below.
+			return finalize_alternatives(out);
 		}
 	}
 
@@ -1740,37 +1862,46 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				new_alts.push_back(clause);
 			}
 		}
-		// Drop dead alternatives and duplicates (keeping the earliest,
-		// i.e. strongest, position).
-		trefs result;
-		for (tref d : new_alts) {
-			if (tau::get(d).equals_F()) continue;
-			bool dup = false;
-			for (tref r : result)
-				if (tau::subtree_equals(r, d)) {
-					dup = true;
-					break;
-				}
-			if (!dup) result.push_back(d);
-		}
+		htrefs result = finalize_alternatives(new_alts);
 		if (result.empty()) continue;
-		// Runtime cap on the alternatives kept per part: retain the
-		// strongest prefix and the newest last-resort clause, drop the
-		// middle preference tiers (see max_revision_alts).
-		if (max_revision_alts && result.size() > max_revision_alts) {
-			LOG_WARNING << "Pointwise revision produced "
-				<< result.size() << " alternatives; keeping "
-				"the first " << max_revision_alts - 1
-				<< " and the newest one per "
-				"--max-revision-alts\n";
-			tref last = result.back();
-			result.resize(max_revision_alts - 1);
-			result.push_back(last);
-		}
-		return to_htrefs(result);
+		return result;
 	}
 	// No update clause yields a satisfiable revision
 	return {};
+}
+
+template <NodeType node>
+htrefs interpreter<node>::finalize_alternatives(const trefs& alts) {
+	// Drop dead alternatives and duplicates (keeping the earliest,
+	// i.e. strongest, position).
+	trefs result;
+	for (tref d : alts) {
+		if (tau::get(d).equals_F()) continue;
+		bool dup = false;
+		for (tref r : result)
+			if (tau::subtree_equals(r, d)) {
+				dup = true;
+				break;
+			}
+		if (!dup) result.push_back(d);
+	}
+	// Runtime cap on the alternatives kept per part: retain the
+	// strongest prefix and the newest last-resort clause, drop the
+	// middle preference tiers (see max_revision_alts).
+	if (max_revision_alts && result.size() > max_revision_alts) {
+		LOG_WARNING << "Pointwise revision produced "
+			<< result.size() << " alternatives; keeping "
+			"the first " << max_revision_alts - 1
+			<< " and the newest one per "
+			"--max-revision-alts\n";
+		tref last = result.back();
+		result.resize(max_revision_alts - 1);
+		result.push_back(last);
+	}
+	htrefs r;
+	r.reserve(result.size());
+	for (tref f : result) r.push_back(tree<node>::geth(f));
+	return r;
 }
 
 // ── step(values, u) — combined step + optional PWR ────────────────────────────
@@ -1795,8 +1926,49 @@ std::string interpreter<node>::current_spec() const {
 	// reports the post-revision spec to the log, and what the routing-
 	// clause-driven `this` stream feeds back at line 503-505.
 	if (original_spec.empty()) return "T.";
-	tref combined = unsqueeze_always(combined_spec_fm<node>(original_spec));
+	// IN-M2: a multi-alternative part is executed as its first solvable
+	// alternative, so once a step has chosen, report the chosen ones.
+	tref combined = unsqueeze_always(
+		const_cast<interpreter*>(this)->executed_spec_fm(false));
 	return TAU_TO_STR(combined);
+}
+
+template <NodeType node>
+std::optional<size_t> interpreter<node>::first_solvable_alternative(
+	size_t part)
+{
+	if (part >= step_spec.size()) return {};
+	const trefs& part_alts = step_spec[part];
+	for (size_t alt_idx = 0; alt_idx < part_alts.size(); ++alt_idx)
+		for (tref path : expression_paths<node>(part_alts[alt_idx])) {
+			tref current = normalize_non_temp<node>(
+				rewriter::replace<node>(update_to_time_point(
+					path, formula_time_point), memory));
+			if (solution_with_max_update(current)) return alt_idx;
+		}
+	return {};
+}
+
+template <NodeType node>
+tref interpreter<node>::executed_spec_fm(bool use_memory) {
+	// Parts are parallel between original_spec (alternatives) and
+	// step_spec/ubt_ctn (their continuations, same order): a chosen
+	// continuation index selects the spec alternative it came from.
+	const bool aligned = step_spec.size() == original_spec.size();
+	trefs part_fms;
+	part_fms.reserve(original_spec.size());
+	for (size_t i = 0; i < original_spec.size(); ++i) {
+		const htrefs& alts = original_spec[i].first;
+		std::optional<size_t> pick;
+		if (alts.size() > 1 && aligned) {
+			if (use_memory) pick = first_solvable_alternative(i);
+			else if (i < chosen_alt_.size()) pick = chosen_alt_[i];
+		}
+		if (pick && *pick < alts.size())
+			part_fms.push_back(alts[*pick]->get());
+		else part_fms.push_back(part_alts_fm<node>(alts));
+	}
+	return tau::build_wff_and(part_fms);
 }
 
 // ── reset ─────────────────────────────────────────────────────────────────────
@@ -1810,6 +1982,8 @@ void interpreter<node>::reset() {
 	final_system = false;
 	step_spec.clear();
 	announced_step_ = -1;
+	chosen_alt_.clear();
+	last_outputs_.clear();
 	// Recompute lookback from ubt_ctn (unchanged) so calculate_initial_spec
 	// will rebuild step_spec on the next step().
 	compute_lookback_and_initial();
@@ -1973,10 +2147,17 @@ interpreter<node>::admissible_outputs(size_t max_results)
 	// We use memory-substituted, time-updated step_spec parts so that the
 	// solver sees the same constraints step() would.
 	tref current_form = tau::_T();
-	for (const trefs& part_alts : step_spec) {
-		// A part is satisfied by any of its alternatives; for output
-		// enumeration the part's constraint is their disjunction.
-		tref part = tau::build_wff_or(part_alts);
+	for (size_t i = 0; i < step_spec.size(); ++i) {
+		const trefs& part_alts = step_spec[i];
+		// IN-M2: step() executes a part as its FIRST solvable
+		// alternative under the current memory; the admissible set is
+		// that alternative's. The disjunction is only the fallback
+		// when none is solvable (the step would fail anyway).
+		tref part = part_alts.size() == 1 ? part_alts[0] : nullptr;
+		if (!part)
+			if (auto pick = first_solvable_alternative(i))
+				part = part_alts[*pick];
+		if (!part) part = tau::build_wff_or(part_alts);
 		tref updated = update_to_time_point(part, formula_time_point);
 		updated = rewriter::replace<node>(updated, memory);
 		updated = normalize_non_temp<node>(updated);
@@ -2065,7 +2246,7 @@ std::string interpreter<node>::accumulator_state(const std::string& name) const
 
 template <NodeType node>
 std::string interpreter<node>::visualise_mealy_dot() const {
-	if (!cached_solution.has_value()) return "";
+	if (!cached_solution.has_value() || cached_solution_stale_) return "";
 	const auto& aut = cached_solution->aut;
 
 	auto escape = [](const std::string& s) {
@@ -2115,7 +2296,8 @@ std::string interpreter<node>::visualise_mealy_dot() const {
 
 template <NodeType node>
 HoaAutomaton interpreter<node>::determinise() const {
-	if (!cached_solution.has_value()) return HoaAutomaton{};
+	if (!cached_solution.has_value() || cached_solution_stale_)
+		return HoaAutomaton{};
 	return cached_solution->aut;
 }
 
@@ -2126,7 +2308,7 @@ std::vector<std::vector<int>>
 interpreter<node>::boundary_traces(int n, int max_length) const {
 	std::vector<std::vector<int>> traces;
 	if (n <= 0 || max_length <= 0) return traces;
-	if (!cached_solution.has_value()) return traces;
+	if (!cached_solution.has_value() || cached_solution_stale_) return traces;
 	const auto& aut = cached_solution->aut;
 	if (aut.num_states == 0) return traces;
 
@@ -2244,165 +2426,6 @@ std::vector<std::string> interpreter<node>::open_streams() const
 }
 
 // ── can_extend ────────────────────────────────────────────────────────────────
-
-template <NodeType node>
-bool interpreter<node>::can_extend(tref psi) {
-	// Dry-run the validity check that `update()` performs, without
-	// mutating any state. Mirrors update()'s loop over the factored
-	// alternatives partition:
-	//   - shift psi's constant time positions to current time_point,
-	//   - replace memory references, normalize,
-	//   - for each clause: partition the update, merge overlapping spec
-	//     parts (cross-product of alternatives), run the factored
-	//     pointwise_revision per part and require its continuations to be
-	//     computable; remaining update parts must be executable alone.
-	// Returns true iff at least one clause path produces an entirely
-	// executable revised spec.
-	if (psi == nullptr) return true;
-
-	trefs io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-	tref shifted = shift_const_io_vars_in_fm<node>(psi, io_vars, time_point);
-	if (tau::get(shifted).equals_F()) return false;
-	io_vars = tau::get(shifted).select_top(is_child<node, tau::io_var>);
-	if (!is_memory_access_valid(io_vars))
-		return false;
-	shifted = rewriter::replace<node>(shifted, memory);
-	shifted = normalizer<node>(shifted);
-
-	// Same memory-replaced working copy update() computes once per call.
-	auto memory_spec = original_spec;
-	for (auto& [alts, rep] : memory_spec)
-		for (htref& alt : alts)
-			alt = tree<node>::geth(rewriter::replace<node>(
-				alt->get(), memory));
-
-	for (tref clause : expression_paths<node>(shifted)) {
-		auto current_spec_copy = memory_spec;
-		auto current_ubd_ctn = ubt_ctn;
-
-		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
-		auto upd_partition = create_spec_partition(clause, uf);
-		uf.merge(output_partition);
-
-		// Merge overlapping spec parts (same logic as update()): the
-		// merged part's alternatives are the cross product of both
-		// parts' alternatives in lexicographic preference order.
-		std::vector<bool> part_merged(current_spec_copy.size(), false);
-		for (size_t i = 0; i < current_spec_copy.size(); ++i) {
-			if (!current_spec_copy[i].second) continue;
-			for (size_t j = i + 1; j < current_spec_copy.size(); ++j) {
-				if (!current_spec_copy[j].second) continue;
-				if (uf.connected(current_spec_copy[i].second->get(),
-				                 current_spec_copy[j].second->get())) {
-					htrefs merged;
-					merged.reserve(
-						current_spec_copy[i].first.size()
-						* current_spec_copy[j].first.size());
-					for (const htref& a : current_spec_copy[i].first)
-						for (const htref& b : current_spec_copy[j].first)
-							merged.push_back(tree<node>::geth(
-								tau::build_wff_and(
-									a->get(), b->get())));
-					current_spec_copy[i].first = std::move(merged);
-					part_merged[i] = true;
-					current_spec_copy.erase(current_spec_copy.begin() + j);
-					current_ubd_ctn.erase(current_ubd_ctn.begin() + j);
-					part_merged.erase(part_merged.begin() + j);
-					--j;
-				}
-			}
-		}
-
-		// Collect overlapping update parts.
-		trefs collected_updates(current_spec_copy.size(), tau::_T());
-		for (size_t i = 0; i < current_spec_copy.size(); ++i) {
-			if (!current_spec_copy[i].second) continue;
-			for (size_t j = 0; j < upd_partition.size(); ++j) {
-				if (!upd_partition[j].second) continue;
-				if (uf.connected(current_spec_copy[i].second->get(),
-				                 upd_partition[j].second->get())) {
-					collected_updates[i] = tau::build_wff_and(
-						collected_updates[i],
-						upd_partition[j].first->get());
-					upd_partition.erase(upd_partition.begin() + j);
-					--j;
-				}
-			}
-		}
-
-		for (auto& [part_alts, _] : current_spec_copy)
-			for (htref& alt : part_alts)
-				alt = tree<node>::geth(
-					unsqueeze_always(alt->get()));
-		for (tref& upd : collected_updates)
-			upd = unsqueeze_always(upd);
-
-		bool clause_valid = true;
-		for (size_t i = 0; i < current_spec_copy.size(); ++i) {
-			bool need_recompute = part_merged[i];
-			if (!tau::get(collected_updates[i]).equals_T()) {
-				auto revision = pointwise_revision(
-					current_spec_copy[i].first,
-					collected_updates[i], time_point);
-				// nullopt when no update clause yields a sat
-				// revision -- update() guards this same call.
-				if (!revision) { clause_valid = false; break; }
-				// Unchanged-revision early-out, same two tiers
-				// as update(): elementwise syntactic equality,
-				// then the bv-free semantic fallback.
-				bool unchanged = revision->size()
-					== current_spec_copy[i].first.size();
-				if (unchanged)
-					for (size_t k = 0; k < revision->size(); ++k)
-						if (!tau::subtree_equals(
-							current_spec_copy[i].first[k]->get(),
-							(*revision)[k]->get()))
-						{
-							unchanged = false;
-							break;
-						}
-				if (!unchanged) {
-					tref old_fm = part_alts_fm<node>(
-						current_spec_copy[i].first);
-					tref new_fm = part_alts_fm<node>(
-						*revision);
-					unchanged = !pwr_contains_bv_content<node>(old_fm)
-						&& !pwr_contains_bv_content<node>(new_fm)
-						&& are_tau_equivalent<node>(
-							old_fm, new_fm);
-				}
-				if (!unchanged) {
-					current_spec_copy[i].first =
-						std::move(*revision);
-					need_recompute = true;
-				}
-			}
-			if (!need_recompute) continue;
-			if (!compute_part_continuations(
-				current_spec_copy[i].first,
-				current_ubd_ctn[i], time_point))
-			{
-				clause_valid = false; break;
-			}
-		}
-		if (!clause_valid) continue;
-
-		// Remaining update parts must also be executable.
-		bool rest_valid = true;
-		for (auto& upd : upd_partition) {
-			tref upd_spec = upd.first->get();
-			tref new_part = get_executable_spec(upd_spec, time_point);
-			if (new_part == nullptr) {
-				rest_valid = false; break;
-			}
-		}
-		if (!rest_valid) continue;
-
-		// At least one clause path produces an entirely-executable revision.
-		return true;
-	}
-	return false;
-}
 
 template <NodeType node>
 std::optional<assignment<node>> interpreter<node>::solution_with_max_update(
@@ -2752,6 +2775,11 @@ bool interpreter<node>::collect_output_streams(tref dnf,
 	};
 	trefs out_vars = tau::get(dnf).select_all(is_out_var);
 	for (tref var_node : out_vars) {
+		// IN-N2: the LTL aux state bits (o__ltl_ms*, o__ltl_s*) are
+		// encoding artefacts, not user streams; registering them here
+		// made them console outputs that the complete-outputs loop in
+		// step() then emitted as default zeros.
+		if (is_excluded_output(var_node)) continue;
 		size_t type_id = tau::get(var_node).get_ba_type();
 		DBG(LOG_TRACE << "collect_output_streams[var_node]: " << LOG_FM_DUMP(var_node) << "\n";)
 		if (type_id == 0) {

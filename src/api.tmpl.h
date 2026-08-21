@@ -156,6 +156,11 @@ void api<node>::set_max_revision_alts(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_pwr_semantic_fallback(bool on) {
+	pwr_semantic_fallback = on;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }

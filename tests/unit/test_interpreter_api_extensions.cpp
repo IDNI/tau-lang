@@ -147,6 +147,22 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		REQUIRE(i->current_state() == s0);
 	}
 
+	// IN-N2: the LTL aux state bits (o__ltl_ms*) are encoding artefacts;
+	// they must not be registered as console output streams nor appear in
+	// a step's output map.
+	TEST_CASE("[IAX-MEALY-07] aux state bits are not output streams") {
+		auto i = make("always (F (o1[t] = 0)).");
+		if (!i.has_value()) return; // ltlsynt unavailable
+		for (const auto& [var, _] : i->outputs)
+			CHECK(get_var_name<node_t>(var).rfind("o__ltl_", 0)
+				== std::string::npos);
+		auto [out, _] = i->step();
+		REQUIRE(out.has_value());
+		for (const auto& [var, value] : *out)
+			CHECK(tau::get(var).to_str().find("o__ltl_")
+				== std::string::npos);
+	}
+
 	TEST_CASE("[IAX-MEALY-01] commit_realiser round-trip") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
@@ -240,6 +256,157 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		assignment<node_t> empty_inputs;
 		auto [out, _] = i->step(empty_inputs, std::nullopt);
 		REQUIRE(out.has_value());
+	}
+
+	// IN-N11: make_interpreter pushed the multi-state Mealy initial-output
+	// part onto ubt_ctn with no matching original_spec entry, so the first
+	// update() on such an interpreter tripped the partition-size assert
+	// (Debug SIGABRT) and, in Release, paired parts with the wrong
+	// continuations from then on. Requires ltlsynt on PATH.
+	TEST_CASE("[IAX-PWR-05] update() on a multi-state Mealy interpreter does not abort") {
+		auto i = make("always (F (o1[t] = 0)).");
+		if (!i.has_value()) return; // ltlsynt unavailable
+		if (!i->cached_solution
+			|| i->cached_solution->aut.num_states <= 1)
+			return; // single-state strategy: the init_out part n/a
+		REQUIRE(i->ubt_ctn.size() == i->original_spec.size());
+		(void)i->step();
+		tref psi = parse_formula("always o2[t]:tau = 1");
+		REQUIRE(psi != nullptr);
+		bool accepted = false;
+		REQUIRE_NOTHROW(accepted = i->update(psi));
+		REQUIRE(i->ubt_ctn.size() == i->original_spec.size());
+		if (accepted) {
+			// IN-N3: the synthesised automaton no longer describes
+			// the running spec; introspection says so instead of
+			// showing a stale machine (reset() still re-seeds).
+			CHECK(i->strategy_stale());
+			CHECK(i->visualise_mealy_dot().empty());
+			CHECK(i->determinise().num_states == 0);
+			auto [out, _] = i->step();
+			CHECK(out.has_value());
+		}
+	}
+
+	// IN-M7 / PW-RT4: can_extend is update()'s own plan, so the two agree
+	// in both directions -- including on the stream-collection and
+	// partition checks the old dry-run skipped.
+	TEST_CASE("[IAX-PWR-06] can_extend agrees with update in both directions") {
+		auto ok_spec = make("o1[t] = 1.");
+		REQUIRE(ok_spec.has_value());
+		tref compatible = parse_formula("always o1[t]:tau = 1");
+		REQUIRE(compatible != nullptr);
+		CHECK(ok_spec->can_extend(compatible));
+		CHECK(ok_spec->update(compatible));
+
+		auto bad_spec = make("o1[t] = 1.");
+		REQUIRE(bad_spec.has_value());
+		tref contradictory = parse_formula("always (o2[t]:tau = 0 && o2[t]:tau = 1)");
+		REQUIRE(contradictory != nullptr);
+		const bool ce = bad_spec->can_extend(contradictory);
+		const bool up = bad_spec->update(contradictory);
+		CHECK(ce == up);
+		CHECK_FALSE(up);
+		// A refused update leaves the interpreter untouched: it steps.
+		auto [out, _] = bad_spec->step();
+		CHECK(out.has_value());
+	}
+
+	// IN-M2: a part with several revision alternatives is executed as its
+	// FIRST solvable alternative. admissible_outputs() and current_spec()
+	// used to report the disjunction of all alternatives, admitting
+	// outputs step() never emits.
+	TEST_CASE("[IAX-PWR-07] admissible_outputs and current_spec follow the executed alternative") {
+		auto i = make("o1[t] = i1[t].");
+		REQUIRE(i.has_value());
+		// G(o1 = i1) ∧ G(o1 = i1' ∨ o1 = 0) is satisfiable only for
+		// cooperating inputs (i1 = 0), so the revision keeps the
+		// accumulated spec as a conditional first alternative and the
+		// update as the last resort: [G(o1=i1 ∧ …), G(o1=i1' ∨ o1=0)].
+		tref conditional = parse_formula(
+			"always (o1[t]:tau = i1[t]:tau' || o1[t]:tau = 0)");
+		REQUIRE(conditional != nullptr);
+		REQUIRE(i->update(conditional));
+		const std::string before = i->current_spec();
+		// With i1 = 0 the first alternative is solvable and forces
+		// o1 = 0; the disjunction of both alternatives would also admit
+		// o1 = 1 (the fallback's i1' branch), which step() never emits.
+		const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
+		assignment<node_t> in;
+		in[build_in_var_at_n<node_t>("i1", 0, tid)] = tau::_0(tid);
+		i->memory = in;
+		auto admissible = i->admissible_outputs(10);
+		REQUIRE(admissible.size() == 1);
+		for (const auto& [var, value] : admissible[0])
+			CHECK(tau::get(value).to_str() == "0");
+		auto [out, _] = i->step(in);
+		REQUIRE(out.has_value());
+		for (const auto& [var, value] : *out)
+			CHECK(tau::get(value).to_str() == "0");
+		// After the step the spec view is the executed alternative, not
+		// the disjunction of both.
+		const std::string after = i->current_spec();
+		CHECK(after != before);
+		CHECK(after.size() < before.size());
+	}
+
+	// IN-M1: the map returned by step N stays readable while the host
+	// feeds step N+1 (the sweep at the start of N+1 pins it), with the gc
+	// knobs forced to sweep on every step.
+	TEST_CASE("[IAX-PWR-08] previous step's outputs survive the next step's sweep") {
+		const size_t saved_min = interpreter<node_t>::gc_min_size;
+		const double saved_growth = interpreter<node_t>::gc_growth_factor;
+		interpreter<node_t>::gc_min_size = 1;
+		interpreter<node_t>::gc_growth_factor = 0.001;
+		{
+			auto i = make("o1[t] = i1[t].");
+			REQUIRE(i.has_value());
+			assignment<node_t> in;
+			std::vector<std::string> before;
+			std::optional<assignment<node_t>> prev;
+			for (size_t t = 0; t < 12; ++t) {
+				in.clear();
+				const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
+				in[build_in_var_at_n<node_t>("i1", t, tid)]
+					= t % 2 ? tau::_1(tid) : tau::_0(tid);
+				auto [out, _] = i->step(in);
+				REQUIRE(out.has_value());
+				if (prev) {
+					// read the previous map AFTER this step swept
+					std::vector<std::string> after;
+					for (const auto& [k, v] : *prev)
+						after.push_back(tau::get(k).to_str()
+							+ "=" + tau::get(v).to_str());
+					CHECK(after == before);
+				}
+				before.clear();
+				for (const auto& [k, v] : *out)
+					before.push_back(tau::get(k).to_str()
+						+ "=" + tau::get(v).to_str());
+				prev = out;
+			}
+		}
+		interpreter<node_t>::gc_min_size = saved_min;
+		interpreter<node_t>::gc_growth_factor = saved_growth;
+	}
+
+	// IN-M5: memory must not grow by one entry per step for the run's
+	// lifetime (complemented aux keys used to be un-evictable).
+	TEST_CASE("[IAX-PWR-09] memory stays bounded across steps") {
+		auto i = make("o1[t] = i1[t-1] && o2[t] = o1[t-1].");
+		REQUIRE(i.has_value());
+		assignment<node_t> in;
+		size_t at_10 = 0;
+		for (size_t t = 0; t < 40; ++t) {
+			in.clear();
+			const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
+			in[build_in_var_at_n<node_t>("i1", t, tid)]
+				= t % 3 ? tau::_1(tid) : tau::_0(tid);
+			auto [out, _] = i->step(in);
+			REQUIRE(out.has_value());
+			if (t == 10) at_10 = i->memory.size();
+		}
+		CHECK(i->memory.size() <= at_10 + 2);
 	}
 }
 

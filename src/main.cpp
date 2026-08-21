@@ -72,6 +72,9 @@ cli::options tau_options() {
 	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
 		.set_description("warn when an updated specification exceeds "
 			"this many characters (0 = off)");
+	opts["pwr-semantic"] = cli::option("pwr-semantic", 'W', false)
+		.set_description("enable the semantic (winning-region) fallback "
+			"of the temporal pointwise revision (off by default)");
 	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
 		.set_description("cap the revision alternatives kept per "
 			"specification part, dropping middle preference tiers "
@@ -236,6 +239,7 @@ int main(int argc, char** argv) {
 		return (size_t)std::atoll(opts[name].get<string>().c_str()); };
 	tau_api::set_spec_size_warn(optnum("spec-size-warn"));
 	tau_api::set_max_revision_alts(optnum("max-revision-alts"));
+	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));

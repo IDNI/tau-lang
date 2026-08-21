@@ -267,6 +267,11 @@ struct api {
 	 * (default).
 	 */
 	static void set_max_revision_alts(size_t n);
+	/**
+	 * @brief Enable the semantic (winning-region) fallback of the temporal
+	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
+	 */
+	static void set_pwr_semantic_fallback(bool on);
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable or disable ANSI color highlighting in pretty-printed output.

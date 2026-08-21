@@ -36,6 +36,15 @@ static bool is_realizable(tref fm) {
 	return fm && is_tau_formula_sat<node_t>(fm);
 }
 
+// PW-RT2: entailment oracle under synthesis semantics -- `a` entails `b`
+// iff no strategy realizing `a` can violate `b`, i.e. a ∧ ¬b is
+// unrealizable (the environment can only pick inputs, so a violation of
+// `b` must be forced on every input sequence).
+static bool entails(tref a, tref b) {
+	return a && b && !is_tau_formula_sat<node_t>(
+		tau::build_wff_and(a, tau::build_wff_neg(b)));
+}
+
 // ============================================================================
 // PWR-S: Safety fragment (backward compatibility)
 // ============================================================================
@@ -752,6 +761,69 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 }
 
+
+// PW-N2: revise() had no case for a NON-TEMPORAL formula that is not an
+// atom leaf (a Boolean combination of atoms): such a spec side against an
+// atom update fell through to the operator-mismatch case and was dropped
+// wholesale, so an obligation the update did not touch was forgotten.
+TEST_SUITE("[PWR-C: boolean-structured clauses]") {
+
+	// spec: for i1 = 1 emit o1 = 1, for i1 = 0 emit o2 = 1.
+	// update: o1 = 0 -- conflicts only at i1 = 1.
+	// Pointwise revision must keep the i1 = 0 branch's obligation o2 = 1.
+	TEST_CASE("[PWR-C-01] disjunctive spec keeps its untouched obligation") {
+		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
+		tref u = spec("G(o1[t] = 0).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref r = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(r != nullptr);
+		CHECK(is_realizable(r));
+		// AGM success: the update holds
+		CHECK(entails(r, u));
+		// the obligation at the cooperating input survives
+		tref obligation = spec("G(i1[t] = 0 -> o2[t] = 1).");
+		REQUIRE(obligation != nullptr);
+		CHECK(entails(r, obligation));
+	}
+
+	// Two conflicting updates in sequence: the first revision's retained
+	// obligation must survive the second revision too (no amnesia).
+	TEST_CASE("[PWR-C-02] sequential revisions keep earlier obligations") {
+		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
+		tref u1 = spec("G(o1[t] = 0).");
+		tref u2 = spec("G(i1[t] = 1 -> o1[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u1 != nullptr);
+		REQUIRE(u2 != nullptr);
+		tref r1 = pointwise_revision_temporal<node_t>(s, u1, 0);
+		REQUIRE(r1 != nullptr);
+		tref r2 = pointwise_revision_temporal<node_t>(r1, u2, 0);
+		REQUIRE(r2 != nullptr);
+		CHECK(is_realizable(r2));
+		CHECK(entails(r2, u2));
+		tref obligation = spec("G(i1[t] = 0 -> o2[t] = 1).");
+		REQUIRE(obligation != nullptr);
+		CHECK(entails(r2, obligation));
+		// and the first update is still honoured where u2 allows it
+		tref kept = spec("G(i1[t] = 0 -> o1[t] = 0).");
+		REQUIRE(kept != nullptr);
+		CHECK(entails(r2, kept));
+	}
+
+	// Case 3 generalised: a non-temporal Boolean spec side against a
+	// binary temporal update is lifted like an atom, not dropped.
+	TEST_CASE("[PWR-C-03] boolean spec vs until update is revised, not dropped") {
+		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
+		tref u = spec("(o1[t] = 0) W (i1[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref r = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(r != nullptr);
+		CHECK(is_realizable(r));
+		CHECK(entails(r, u));
+	}
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

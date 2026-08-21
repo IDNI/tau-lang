@@ -1885,6 +1885,7 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 |-------------------------------|----------------------------------------------------------------------------------------|
 | -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part (0 = unlimited)              |
+| -W, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (default 500; 0 = unlimited)                 |
