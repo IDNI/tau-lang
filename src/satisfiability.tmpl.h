@@ -1591,7 +1591,21 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	}
 	trefs st = tau::get(ev_t.first)
 				.select_top(is_child<node, tau::wff_sometimes>);
-	DBG(assert(st.size() < 2);)
+	// IN-N13: transform_to_eventual_variables folds every sometimes
+	// clause into one flag-carrying clause, so at most one may survive
+	// here. A second one (a nested `sometimes` leaking through, as the
+	// pre-IN-R1 A/E erasure produced) used to be a Debug-only assert and a
+	// silent "use the first, drop the rest" in Release. Refuse loudly in
+	// both builds: api::realizable/valid_spec/get_interpreter convert
+	// ltl_synthesis_error into a logged UNKNOWN.
+	if (st.size() >= 2) {
+		LOG_ERROR << "transform_to_execution: " << st.size()
+			<< " sometimes clauses survived the eventual-variable "
+			"transform; the formula cannot be decided by the "
+			"safety pipeline";
+		throw ltl_synthesis_error("nested or multiple `sometimes` "
+			"clauses survived the eventual-variable transform");
+	}
 
 	tref res;
 	if (!tau::get(aw_after_ev).equals_F() && !st.empty())

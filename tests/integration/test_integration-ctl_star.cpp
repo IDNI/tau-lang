@@ -795,16 +795,13 @@ TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE") {
 
 TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 
-	// The A / E witness reduction IS implemented (translate_ctl_star turns
-	// `E χ` into a fresh witness output w plus G(w → χ), and `A χ` into
-	// ¬(E ¬χ)).  These are the first assertions on its verdicts.
-	//
-	// NOTE: only satisfiable directions are asserted here.  The witness
-	// encoding of `A` is `¬w ∧ G(w → ¬χ)`, which any strategy satisfies by
-	// holding w false, so `A χ` currently imposes nothing on χ — that is
-	// LT-13's territory (unhandled/vacuous translation), not LT-5's, and it
-	// is deliberately NOT pinned by an assertion that would have to change
-	// when LT-13 is fixed.
+	// The A / E reduction (translate_ctl_star): positive `E χ` becomes a
+	// fresh witness output w plus G(w → χ) -- sound for synthesis, possibly
+	// over-strict; positive `A χ` in a universal context (root, ∧, G)
+	// reduces to χ itself; every other placement is REFUSED with
+	// ltl_synthesis_error (LA-N2: the old `A χ ≡ ¬E¬χ` rewrite was vacuous,
+	// any strategy satisfied `¬w ∧ G(w → ¬χ)` by holding w false, so
+	// `A (F i1 = 1)` came out REALIZABLE).  Both directions are pinned.
 	TEST_CASE("[CTLS-AE-01] E(always o1=1) is REALIZABLE") {
 		tref fm = create_spec("E (always o1[t] = 1).");
 		REQUIRE(fm != nullptr);
@@ -821,6 +818,60 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 		tref fm = create_spec("E (F o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// LA-N2: A now constrains χ. An input can never be forced, so
+	// `A (F i1 = 1)` and `A (always i1 = 1)` are UNREALIZABLE exactly like
+	// their LTL bodies (test_ltl_negative pins `F (i1 = 1)`).
+	TEST_CASE("[CTLS-AE-05] A(F i1=1) is UNREALIZABLE") {
+		tref fm = create_spec("A (F i1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-AE-06] A(always i1=1) is UNREALIZABLE") {
+		tref fm = create_spec("A (always i1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-AE-07] A(F o1=1) is REALIZABLE") {
+		tref fm = create_spec("A (F o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// A under G is still a universal context: G(A φ) ≡ G φ over a tree.
+	TEST_CASE("[CTLS-AE-08] always(A(o1=1)) is REALIZABLE, always(A(i1=1)) is not") {
+		tref fm = create_spec("always (A (o1[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+		tref fm2 = create_spec("always (A (i1[t] = 1)).");
+		REQUIRE(fm2 != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm2));
+	}
+
+	// Placements with no sound encoding are refused, never answered.
+	TEST_CASE("[CTLS-AE-09] A under F / || is refused") {
+		tref fm = create_spec("F (A (o1[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm),
+			ltl_synthesis_error);
+		tref fm2 = create_spec("(A (o1[t] = 1)) || (always o1[t] = 0).");
+		REQUIRE(fm2 != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm2),
+			ltl_synthesis_error);
+	}
+
+	TEST_CASE("[CTLS-AE-10] E in negative polarity is refused") {
+		tref fm = create_spec("(E (always o1[t] = 1)) -> (always o1[t] = 0).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm),
+			ltl_synthesis_error);
+		tref fm2 = create_spec("(E (always o1[t] = 1)) <-> (always o1[t] = 1).");
+		REQUIRE(fm2 != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm2),
+			ltl_synthesis_error);
 	}
 
 	// A / E must not make an outright contradictory conjunct disappear: the

@@ -311,6 +311,21 @@ tref normalize(tref form) {
 		subtree_map<node, tref> changes;
 		for (tref temp : temps) {
 			bool is_aw = is_child<node>(temp, tau::wff_always);
+			// IN-R1: is_child_temporal_quantifier also matches the
+			// full-LTL / CTL* operators (F/U/R/W/S/T, A/E, -). This
+			// loop predates them and rebuilt EVERY matched node as
+			// `sometimes(first operand)`: the right operand of a
+			// binary operator was silently dropped (`p U q` became
+			// `sometimes p`), A/E were erased into `sometimes`
+			// (nesting a temporal quantifier inside another and
+			// tripping the !find_top(wff_always) assert below), and
+			// `F φ` lost its realizability semantics on every
+			// api/REPL path. Those operators manage their own scope
+			// in the ltl_aba pipeline (which normalizes its own
+			// data atoms) -- leave them untouched here, exactly as
+			// normalize_temporal_quantifiers already does.
+			if (!is_aw && !is_child<node>(temp, tau::wff_sometimes))
+				continue;
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
 			f = eliminate_bv_and_quantifiers<node>(f);

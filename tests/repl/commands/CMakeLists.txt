@@ -14,6 +14,7 @@ include(test_repl-get_cmd.cmake)
 include(test_repl-get_set_extended_cmd.cmake)
 include(test_repl-set_cmd.cmake)
 include(test_repl-fragment_cmd.cmake)
+include(test_repl-ctl_star_cmd.cmake)
 include(test_repl-ba_constants_cmd.cmake)
 # enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd
 # files: it covers every option they did (and more) under the same test names,

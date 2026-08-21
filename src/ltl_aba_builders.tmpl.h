@@ -1478,17 +1478,31 @@ bool has_ctl_star_operators(tref fm) {
 
 // ── CTL* → LTL reduction ────────────────────────────────────────────────────
 //
-// Implements the Bloem/Schewe/Khalimov reduction (arXiv:1711.10636).
+// A restricted form of the Bloem/Schewe/Khalimov reduction
+// (arXiv:1711.10636), kept SOUND for synthesis at the price of completeness:
 //
-// Algorithm:
-//   1. Bottom-up traversal of the CTL* formula tree
-//   2. For each E χ subformula:
-//      - Create a fresh witness output variable w_i
-//      - Replace E χ with w_i
-//      - Add constraint G(w_i → translate_path(χ))
-//   3. For each A χ subformula:
-//      - Rewrite to ¬(E ¬χ) and apply step 2
-//   4. The final LTL formula is: translated_root ∧ ⋀_i G(w_i → χ_i_LTL)
+//   1. Bottom-up traversal of the CTL* formula tree, tracking the polarity
+//      of each node and whether it is reachable from the root only through
+//      universal contexts (∧, G/always, A).
+//   2. `E χ` in POSITIVE polarity: fresh witness output w_i replaces E χ and
+//      G(w_i → χ') is added, χ' the translated path formula. Without the
+//      paper's direction outputs this constraint ranges over ALL paths, so
+//      w_i asserts `A χ'`, which implies `E χ` on a non-empty tree: a
+//      REALIZABLE verdict is therefore correct, an UNREALIZABLE one may be
+//      over-strict (incomplete, never unsound).
+//   3. `A χ` in positive polarity inside a universal context: at the root
+//      state (and at every state reachable only through ∧/G from it)
+//      "all paths satisfy χ" IS the synthesis semantics of χ itself, so
+//      A χ reduces to χ'. `G(A φ) ≡ G φ` over a strategy tree because every
+//      path from an inner node is a suffix of a root path.
+//   4. Everything else -- A or E in negative polarity (under ¬, on the left
+//      of →, either side of ↔/⊕, in a conditional's guard), A under an
+//      existential/eventual context (∨, F, sometimes, U, ...), and `-φ` --
+//      has no sound encoding here and is REFUSED with ltl_synthesis_error.
+//      LA-N2: the previous `A χ ≡ ¬E¬χ` rewrite produced `¬w ∧ G(w → ¬χ)`,
+//      which every strategy satisfies by holding w false, so `A` imposed
+//      nothing and `A (F i1 = 1)` came out REALIZABLE.
+//   5. The final LTL formula is: translated_root ∧ ⋀_i G(w_i → χ_i')
 
 namespace ctl_star_detail {
 
@@ -1509,10 +1523,14 @@ static void reset_witness_counter() {
 // Recursive bottom-up translation of a CTL* state/path formula to LTL.
 // Witness constraints are accumulated in `constraints` (each is a G(w → χ) pair).
 // New witness output names are accumulated in `witnesses`.
+// `positive`: polarity of `fm` in the root formula; `universal`: `fm` is
+// reachable from the root only through ∧ / always / A (see the header
+// comment above for why both matter).
 template <NodeType node>
 static tref translate_ctl_star(tref fm,
 		std::vector<std::pair<std::string, tref>>& constraints,
-		std::vector<std::string>& witnesses) {
+		std::vector<std::string>& witnesses,
+		bool positive = true, bool universal = true) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
 	if (!t.has_child()) return fm;
@@ -1521,10 +1539,15 @@ static tref translate_ctl_star(tref fm,
 
 	// Handle E χ: introduce witness output
 	if (nt == tau::wff_E) {
+		if (!positive) throw ltl_synthesis_error(
+			"E in negative polarity has no sound LTL encoding here: "
+			"the witness constraint G(w -> chi) only bounds w from "
+			"above, so a negated witness would be vacuous");
 		tref inner = t[0].child(0);
-		// Recursively translate the inner path formula
+		// Recursively translate the inner path formula (positive,
+		// but no longer a universal context: w marks SOME state).
 		tref translated_inner = translate_ctl_star<node>(
-			inner, constraints, witnesses);
+			inner, constraints, witnesses, true, false);
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
 		witnesses.push_back(wname);
@@ -1543,17 +1566,18 @@ static tref translate_ctl_star(tref fm,
 		return witness_wff;
 	}
 
-	// Handle A χ: rewrite as ¬(E ¬χ)
+	// Handle A χ: only where "all paths from here" coincides with the
+	// all-paths synthesis semantics of the enclosing formula (LA-N2).
 	if (nt == tau::wff_A) {
-		tref inner = t[0].child(0);
-		// A χ ≡ ¬E¬χ
-		tref negated_inner = tau::build_wff_neg(inner);
-		// Build E(¬χ) and translate it
-		tref e_neg = tau::build_wff_E(negated_inner);
-		tref translated_e = translate_ctl_star<node>(
-			e_neg, constraints, witnesses);
-		// Return ¬(translated E(¬χ))
-		return tau::build_wff_neg(translated_e);
+		if (!positive) throw ltl_synthesis_error(
+			"A in negative polarity has no sound LTL encoding here");
+		if (!universal) throw ltl_synthesis_error(
+			"A under an existential or eventual context (||, F, "
+			"sometimes, U, R, W, S, T, E, conditional) is not "
+			"soundly encodable without CTL* direction outputs; "
+			"refusing rather than answering vacuously");
+		return translate_ctl_star<node>(t[0].child(0), constraints,
+			witnesses, true, true);
 	}
 
 	// Handle semantic negation -φ: unrealizability check.
@@ -1592,12 +1616,44 @@ static tref translate_ctl_star(tref fm,
 	}
 	if (!has_ctl) return fm;
 
+	// Polarity / context of each child. Both-polarity connectives (↔, ⊕,
+	// a conditional's guard) cannot host A/E soundly at all.
+	auto both = [&](size_t i) {
+		if (has_ctl_star_operators<node>(op.child(i)))
+			throw ltl_synthesis_error("A/E under a both-polarity "
+				"connective (<->, ^, conditional guard) has no "
+				"sound LTL encoding here");
+	};
+	std::vector<std::pair<bool,bool>> ctx(nch, {positive, false});
+	switch (nt) {
+	case tau::wff_and:
+	case tau::wff_always:
+		for (auto& c : ctx) c = {positive, universal};
+		break;
+	case tau::wff_neg:
+	case tau::wff_imply:
+		ctx[0] = {!positive, false};
+		break;
+	case tau::wff_rimply:
+		if (nch == 2) ctx[1] = {!positive, false};
+		break;
+	case tau::wff_equiv:
+	case tau::wff_xor:
+		for (size_t i = 0; i < nch; ++i) both(i);
+		break;
+	case tau::wff_conditional:
+		both(0);
+		break;
+	default: // or, sometimes, F, U, R, W, S, T: positive, not universal
+		break;
+	}
+
 	// Translate children and rebuild
 	std::vector<tref> new_children;
 	new_children.reserve(nch);
 	for (size_t i = 0; i < nch; ++i) {
-		new_children.push_back(
-			translate_ctl_star<node>(op.child(i), constraints, witnesses));
+		new_children.push_back(translate_ctl_star<node>(op.child(i),
+			constraints, witnesses, ctx[i].first, ctx[i].second));
 	}
 
 	// Rebuild node with same operator but new children
