@@ -1,0 +1,8 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlsynt: fails like a usage/internal
+# error (exit 2, no verdict line). The synthesis layer must report "no
+# verdict" (ltl_synthesis_error), never REALIZABLE/UNREALIZABLE, and every
+# caller must survive it. Used by test_repl-ctl_star_cmd.cmake (IN-RT7) and
+# test_repl-codegen_cli.cmake (CG-N6).
+echo "ltlsynt: internal error (test stub)" >&2
+exit 2

@@ -938,12 +938,17 @@ template <NodeType node>
 bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
 
-	// LT-5 backstop: a `wff_semantic_neg` that reaches here has no encoding
-	// (see apply_semantic_negation) and would be flattened to the constant
-	// "1" by skeleton_wff.  Refuse rather than answer wrongly.
-	if (has_semantic_negation<node>(fm))
+	// LT-5 / IN-1 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
+	// here was not handled by reduce_ctl_star_to_ltl (direct callers such
+	// as preferences.h skip the reduction entirely). None has a
+	// propositional encoding -- the skeleton would flatten it to "1" --
+	// and A/E left in place could bounce back into is_tau_formula_sat's
+	// CTL* branch forever. Refuse rather than answer wrongly.
+	if (has_ctl_star_operators<node>(fm))
 		throw ltl_synthesis_error(
-		    "semantic negation (-) over data formulas is not implemented");
+		    "CTL* operators (A / E / semantic negation) reached the LTL "
+		    "realizability check without a CTL* reduction; route the "
+		    "formula through is_tau_formula_sat");
 
 	// Safety fast-path: if the formula has no full-LTL operators AND
 	// no Boolean combinations of models, it is a pure G/safety formula
@@ -1309,6 +1314,17 @@ tref ltl_to_safety_formula(tref fm) {
 template <NodeType node>
 bool ltl_explain(tref fm, std::ostream& out) {
 	using tau = tree<node>;
+
+	// IN-R3: `ltl` used to hand A/E/- straight to the skeleton, where the
+	// tester variant flattened them to "1". Reduce like is_tau_formula_sat
+	// does (or refuse, via ltl_synthesis_error, where no sound encoding
+	// exists) before explaining anything.
+	if (has_ctl_star_operators<node>(fm)) {
+		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
+		out << "CTL* reduced to LTL: "
+			<< tau::get(reduction.ltl_formula).to_str() << "\n";
+		fm = reduction.ltl_formula;
+	}
 
 	if (!has_ltl_operators<node>(fm)) {
 		out << "Formula has no LTL operators (treated as G(phi))\n";
@@ -1689,13 +1705,15 @@ static tref translate_ctl_star(tref fm,
 		return tau::build_wff_conditional(
 			new_children[0], new_children[1], new_children[2]);
 	}
-	// LT-13: a silent identity here left embedded A/E/- untranslated in
-	// any connective missing from the switches above; be loud so the
-	// wrong-verdict mode is diagnosable.
+	// LT-13 / IN-1: a silent identity here left embedded A/E/- untranslated
+	// in any connective missing from the switches above; the survivor then
+	// reached the skeleton (constant "1") or bounced between
+	// is_tau_formula_sat and is_ltl_aba_realizable. Refuse instead.
 	LOG_ERROR << "translate_ctl_star: unhandled connective "
-		<< node::name(nt) << " with CTL* content in its subtree; "
-		"returning it untranslated";
-	return fm;
+		<< node::name(nt) << " with CTL* content in its subtree";
+	throw ltl_synthesis_error(std::string("translate_ctl_star: unhandled "
+		"connective ") + node::name(nt) + " with CTL* content in its "
+		"subtree; the formula cannot be reduced to LTL");
 }
 
 // True iff the formula contains a `wff_semantic_neg` node.

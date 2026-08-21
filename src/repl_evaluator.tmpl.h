@@ -432,7 +432,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
+	if (auto value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::eliminate_quantifiers(m, value);
 	return benchmarks(m), r;
 }
@@ -482,8 +483,17 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// handles io_var resolution for LTL and safety formulas.
 	tau_spec<node> spec;
 	spec.add(value);
-	for (const htref& d : rr_defs) spec.add(d->get());
-	for (const htref& d : io_defs) spec.add(d->get());
+	// IN-N5: definition bodies are conjoined into the spec; gate them
+	// like the main formula, or A/E smuggled through a def bypass the
+	// fragment check.
+	for (const htref& d : rr_defs) {
+		if (reject_ctl_star_if_disabled(d->get())) return;
+		spec.add(d->get());
+	}
+	for (const htref& d : io_defs) {
+		if (reject_ctl_star_if_disabled(d->get())) return;
+		spec.add(d->get());
+	}
 
 	auto maybe_i = tau_api::get_interpreter(m.part(), spec);
 	if (!maybe_i) return;
@@ -502,11 +512,23 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 
 	tref value = get_any(n[1].get());
 	if (!value) return;
+	// IN-N5: `ltl` was the one formula command with no fragment gate.
+	if (reject_ctl_star_if_disabled(value)) return;
 
 	t.start();
 	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
 
-	ltl_explain<node>(value, std::cout);
+	// IN-R4: the synthesis backend reports "no verdict" by throwing;
+	// nothing above this frame catches it, so a slow or missing ltlsynt
+	// (or a refused CTL* placement) used to terminate the REPL.
+	try {
+		ltl_explain<node>(value, std::cout);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, timed "
+			"out or refused the formula (" << e.what()
+			<< "); realizability could not be decided";
+		error = true;
+	}
 	benchmarks(m, t);
 }
 
@@ -520,7 +542,22 @@ void repl_evaluator<BAs...>::continue_running(
 	bool first = true;
 	while (running) {
 		auto& step_m = running->m.part();
-		auto maybe_outputs = tau_api::step(step_m, running->interp);
+		// IN-R4: a mid-run pointwise-revision update can reach ltlsynt
+		// (through update() -> pointwise_revision), whose failures are
+		// thrown; end the session with a diagnostic instead of the
+		// process.
+		decltype(tau_api::step(step_m, running->interp)) maybe_outputs;
+		try {
+			maybe_outputs = tau_api::step(step_m, running->interp);
+		} catch (const ltl_synthesis_error& e) {
+			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, "
+				"timed out or refused the formula during this step ("
+				<< e.what() << "); ending the run";
+			running->m.parts.pop_back();
+			running.reset();
+			error = true;
+			return;
+		}
 		// copy this step's timing before dropping the node (step_m is a
 		// reference into m.parts that pop_back() invalidates)
 		measuring step_m_copy = step_m;
@@ -727,7 +764,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
+	if (tref value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::valid(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }

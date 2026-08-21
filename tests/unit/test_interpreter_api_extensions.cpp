@@ -273,6 +273,38 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		tref result = apply_preferences<node_t>(spec_tref, po);
 		REQUIRE(result == spec_tref);
 	}
+
+	// IN-2 / IN-R4: apply_preferences calls is_ltl_aba_realizable directly;
+	// a spec it refuses (semantic negation, CTL*) throws, and that used to
+	// escape apply_preferences and end the process. The preference is
+	// dropped instead.
+	TEST_CASE("[IAX-PREF-03] refused spec (semantic negation) drops the preference, no throw") {
+		io_context<node_t> ctx;
+		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("-(F o1[t] = 1)."));
+		REQUIRE(nso_rr.has_value());
+		tref spec_tref = nso_rr.value().main->get();
+		REQUIRE(spec_tref != nullptr);
+
+		PreferenceOrder po;
+		po.entries.push_back({"o1", "1"});
+		tref result = nullptr;
+		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));
+		CHECK(result == spec_tref);
+	}
+
+	TEST_CASE("[IAX-PREF-04] CTL* spec (A) drops the preference, no throw") {
+		io_context<node_t> ctx;
+		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("F (A (o1[t] = 1))."));
+		REQUIRE(nso_rr.has_value());
+		tref spec_tref = nso_rr.value().main->get();
+		REQUIRE(spec_tref != nullptr);
+
+		PreferenceOrder po;
+		po.entries.push_back({"o1", "1"});
+		tref result = nullptr;
+		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));
+		CHECK(result == spec_tref);
+	}
 }
 
 

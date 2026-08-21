@@ -425,6 +425,19 @@ static std::string skeleton_wff_with_testers(
 		     + ") & (!" + cond
 		     + " -> " + skeleton_str_with_testers<node>(inner.third(), atoms, testers) + "))";
 	}
+	case tau::wff_A:
+	case tau::wff_E:
+	case tau::wff_semantic_neg:
+		// IN-R3: LT-5's fail-loudly guard landed only in skeleton_str,
+		// but every live call site (solve_ltl_aba, ltl_explain) builds
+		// the skeleton through THIS function, so A/E/- that survived the
+		// CTL* reduction still fell into the default case and became the
+		// propositional constant "1" (`ltl A (F o1 = 1)` printed
+		// "skeleton: 1" REALIZABLE). Same refusal as skeleton_str.
+		throw ltl_synthesis_error(
+		    "CTL* node (A / E / semantic negation) survived the CTL* "
+		    "reduction and reached the propositional skeleton; it has no "
+		    "sound propositional encoding");
 	default: {
 		if (has_io_var<node>(n)) {
 			auto p2 = find_prop<node>(n, atoms);

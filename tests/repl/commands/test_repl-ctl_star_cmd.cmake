@@ -34,9 +34,9 @@ add_repl_test(ctl_star-sat_E_always_output_no_abort
 	"fragment ctl_star. sat E (always o1[t] = 1)" ": T")
 add_repl_test(ctl_star-sat_A_sometimes_contradiction_no_abort
 	"fragment ctl_star. sat A (sometimes (o1[t] = 1 && o1[t] = 0))" ": F")
-# valid_cmd is not fragment-gated (IN-R5, Batch 2); it must at least not abort
+# valid used to abort the Debug REPL on this input (P11); it answers now
 add_repl_test_fail(ctl_star-valid_A_always_no_abort
-	"valid A (always o1[t] = 1)" ": [TF]")
+	"fragment ctl_star. valid A (always o1[t] = 1)" ": [TF]")
 
 # CTL* verdicts through the api path (IN-R7): A constrains its body
 add_repl_test(ctl_star-sat_A_F_input "fragment ctl_star. sat A (F i1[t] = 1)" ": F")
@@ -46,3 +46,41 @@ add_repl_test(ctl_star-sat_always_A_output
 # unsound placements are refused with a diagnostic, not answered
 add_repl_test_fail(ctl_star-sat_A_under_F_refused
 	"fragment ctl_star. sat F (A (o1[t] = 1))" "not soundly encodable")
+
+# ── Batch 2: gates, skeleton refusal, exception safety ─────────────────────
+
+# IN-N5: ltl / valid / qelim are fragment-gated like sat/normalize/run
+add_repl_test_fail(fragment_gate-ltl_blocks_A_by_default
+	"ltl A (F o1[t] = 1)" "require the ctl_star")
+add_repl_test_fail(fragment_gate-valid_blocks_A_by_default
+	"valid A (always o1[t] = 1)" "require the ctl_star")
+add_repl_test_fail(fragment_gate-qelim_blocks_A_by_default
+	"qelim A (o1[t] = 1)" "require the ctl_star")
+# (definition bodies conjoined by `run` are gated in run_cmd as well, but a
+# CTL*-bodied definition is already rejected at definition time, so that
+# gate is defense-in-depth with no black-box reproducer.)
+
+# IN-R3 / LA-M3: in the ctl_star fragment, `ltl` reduces A and refuses -,
+# instead of printing "skeleton: 1" REALIZABLE (P3 / P10)
+add_repl_test(ltl_cmd-ctl_star_A_F_output_reduced
+	"fragment ctl_star. ltl A (F o1[t] = 1)" "CTL\\* reduced to LTL")
+add_repl_test_fail(ltl_cmd-ctl_star_A_F_input_unrealizable
+	"fragment ctl_star. ltl A (F i1[t] = 1)" "UNREALIZABLE")
+add_repl_test_fail(ltl_cmd-ctl_star_semneg_refused
+	"fragment ctl_star. ltl -(F o1[t] = 1)" "UNKNOWN")
+add_test(NAME "test_repl-ltl_cmd-ctl_star_semneg_not_realizable"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl -(F o1[t] = 1)\""
+)
+set_tests_properties("test_repl-ltl_cmd-ctl_star_semneg_not_realizable" PROPERTIES
+	PASS_REGULAR_EXPRESSION "UNKNOWN"
+	FAIL_REGULAR_EXPRESSION "skeleton: 1|^REALIZABLE")
+
+# IN-R4 / IN-RT7: a backend that fails (usage/internal error, exit 2) must
+# produce a diagnostic and a live REPL, not a dead process; the second
+# command proves the REPL survived.
+add_test(NAME "test_repl-ltl_cmd-backend_failure_is_unknown"
+	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1. sat always o1[t] = 1\""
+)
+set_tests_properties("test_repl-ltl_cmd-backend_failure_is_unknown" PROPERTIES
+	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n(.*\n)*.*: T"
+	FAIL_REGULAR_EXPRESSION "REALIZABLE|Aborted|core dumped")
