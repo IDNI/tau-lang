@@ -983,7 +983,10 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	LOG_DEBUG << "[ltl_aba] atoms=" << sol.atoms.size()
 	          << " states=" << sol.aut.num_states;
 
-	// Trivially realizable: no states produced.
+	// Trivially realizable: no states produced. parse_hoa refuses a
+	// strategy with fewer than one state (LA-8), so only solutions an
+	// algorithm constructed deliberately without an automaton (the
+	// constant-output fast path) reach this branch.
 	if (sol.aut.num_states == 0) {
 		if (output) LOG_INFO << "[ltl_aba] REALIZABLE";
 		return true;
@@ -1286,9 +1289,17 @@ ltl_to_safety_formula_full(tref fm) {
 		return {encoded, std::move(sol)};
 	}
 
-	// Single-state strategy: the self-loop guard is the perpetual output constraint.
-	if (aut.edges.empty() || aut.edges[0].empty())
-		return {tau::build_wff_always(tau::_T()), std::move(sol)};
+	// Single-state strategy: the self-loop guard is the perpetual output
+	// constraint. LA-R6: ltlsynt Mealy machines are input-complete, so a
+	// state with no outgoing edge only arises from a degraded automaton;
+	// executing it as `always T` would drop every obligation (the 1-state
+	// analogue of LT-28). Not executable.
+	if (aut.edges.empty() || aut.edges[0].empty()) {
+		LOG_ERROR << "[ltl_aba] single-state strategy has no outgoing "
+		             "edge; the automaton is degraded and cannot be "
+		             "executed\n";
+		return {nullptr, std::nullopt};
+	}
 
 	// Build the disjunction of ABA guard formulas over all edges from state 0.
 	tref combined = tau::_F();

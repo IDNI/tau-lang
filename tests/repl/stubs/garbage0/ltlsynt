@@ -1,0 +1,5 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlsynt: exit 0 with output that is not a
+# verdict line (SY-R4). Must be UNKNOWN, never UNREALIZABLE.
+echo "this is not a verdict"
+exit 0

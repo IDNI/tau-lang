@@ -84,3 +84,38 @@ add_test(NAME "test_repl-ltl_cmd-backend_failure_is_unknown"
 set_tests_properties("test_repl-ltl_cmd-backend_failure_is_unknown" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n(.*\n)*.*: T"
 	FAIL_REGULAR_EXPRESSION "REALIZABLE|Aborted|core dumped")
+
+# ── Batch 3: error ≠ verdict ───────────────────────────────────────────────
+
+# IN-N1: no Spot on PATH is UNKNOWN, not "UNREALIZABLE (propositional)"
+add_test(NAME "test_repl-ltl_cmd-no_spot_is_unknown"
+	COMMAND bash -c "PATH=/nonexistent-dir-without-spot $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1\""
+)
+set_tests_properties("test_repl-ltl_cmd-no_spot_is_unknown" PROPERTIES
+	PASS_REGULAR_EXPRESSION "UNKNOWN"
+	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|Aborted|core dumped")
+
+# LA-8: a REALIZABLE line followed by a garbled HOA must not become a
+# REALIZABLE verdict with the oracle skipped (P4)
+add_test(NAME "test_repl-sat-garbled_hoa_is_unknown"
+	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/garbled:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. sat E (F o1[t] = 1)\""
+)
+set_tests_properties("test_repl-sat-garbled_hoa_is_unknown" PROPERTIES
+	PASS_REGULAR_EXPRESSION "UNKNOWN"
+	FAIL_REGULAR_EXPRESSION ": T|Aborted|core dumped")
+
+# SY-R4: exit 0 with no verdict line is UNKNOWN, not UNREALIZABLE
+add_test(NAME "test_repl-ltl_cmd-garbage_output_is_unknown"
+	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/garbage0:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1\""
+)
+set_tests_properties("test_repl-ltl_cmd-garbage_output_is_unknown" PROPERTIES
+	PASS_REGULAR_EXPRESSION "UNKNOWN"
+	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|Aborted|core dumped")
+
+# SY-R1: the Algorithm-D game path classifies backend failures too
+add_test(NAME "test_repl-sat-alg_d_no_verdict_is_unknown"
+	COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat F o1[t]:qlt = {1/2}:qlt\""
+)
+set_tests_properties("test_repl-sat-alg_d_no_verdict_is_unknown" PROPERTIES
+	PASS_REGULAR_EXPRESSION "UNKNOWN"
+	FAIL_REGULAR_EXPRESSION "Aborted|core dumped")

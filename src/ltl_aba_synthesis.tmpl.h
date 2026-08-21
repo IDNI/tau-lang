@@ -205,9 +205,12 @@ inline std::pair<bool, std::string> call_ltlsynt(
 	// wrong answer with nothing but a LOG_DEBUG trace behind it.
 	switch (classify_spot_exit(exit_code, out)) {
 	case spot_exit_kind::not_found:
+		// IN-N1: a missing backend is no verdict either; returning
+		// {false, ""} here made every caller print "UNREALIZABLE".
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		return {false, ""};
+		throw ltl_synthesis_error("ltlsynt not found on PATH; install "
+			"Spot (>= 2.10) -- realizability is UNKNOWN");
 	case spot_exit_kind::failed: {
 		std::string msg = "ltlsynt produced no verdict (exit "
 		                + std::to_string(exit_code) + ")";
@@ -294,7 +297,12 @@ inline std::pair<bool, std::string> call_ltlsynt(
 		}
 		return {true, hoa};
 	}
-	return {false, ""};
+	// SY-R4: output that starts with neither verdict line is no verdict
+	// (a crashed or foreign binary on PATH printing something else with
+	// exit 0); it used to fall through as UNREALIZABLE.
+	LOG_ERROR << "[ltl_aba] ltlsynt output carried no verdict line; the "
+	             "realizability of this specification is UNKNOWN\n";
+	throw ltl_synthesis_error("ltlsynt output carried no verdict line");
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
@@ -304,24 +312,39 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 	std::istringstream ss(hoa_text);
 	std::string line;
 
-	bool in_body = false;
+	bool in_body = false, seen_states = false, seen_end = false;
 	int cur_state = -1;
+	// A strategy with more states than this is not something ltlsynt
+	// produces for any specification this pipeline builds; an absurd
+	// count is a garbled header, not an automaton (SY-R3).
+	constexpr long max_states = 1L << 22;
 
 	while (std::getline(ss, line)) {
-		if (line.empty() || line == "--END--") continue;
+		if (line.empty()) continue;
+		// SY-4: the automaton ends here; anything after it (a second
+		// automaton, stray diagnostics) must not be spliced in.
+		if (line == "--END--") { seen_end = true; break; }
 		if (line == "--BODY--") { in_body = true; continue; }
 
 		if (!in_body) {
 			if (line.substr(0, 7) == "States:") {
-				// LT-10: a partially-written HOA (timed-out
-				// ltlsynt) must not throw or OOB; malformed
-				// headers yield the empty automaton.
+				// LA-8 / SY-1 / SY-R3: a garbled or absurd state
+				// count used to become the EMPTY automaton,
+				// which the verdict layer reads as trivially
+				// REALIZABLE. A strategy has at least one state;
+				// refuse anything else.
+				long n = -1;
 				try {
-					aut.num_states =
-						std::stoi(line.substr(7));
+					n = std::stol(line.substr(7));
 				} catch (const std::exception&) {
-					aut.num_states = 0;
+					n = -1;
 				}
+				if (n < 1 || n > max_states)
+					throw ltl_synthesis_error(
+						"malformed HOA strategy: bad "
+						"state count '" + line + "'");
+				aut.num_states = (int) n;
+				seen_states = true;
 				aut.edges.resize(aut.num_states);
 				aut.state_accepting.resize(aut.num_states, false);
 			} else if (line.substr(0, 6) == "Start:") {
@@ -385,6 +408,16 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 		// (will be fixed after all states are parsed)
 		aut.edges[cur_state].push_back(e);
 	}
+
+	// LA-8 / SY-1: no header, or a header with no body, is a truncated
+	// or garbled strategy (a timed-out or crashed ltlsynt, a stub on
+	// PATH) -- not an automaton. Refuse rather than execute an
+	// unconstrained program.
+	if (!seen_states || !in_body)
+		throw ltl_synthesis_error(std::string("malformed HOA strategy: ")
+			+ (!seen_states ? "no `States:` header" : "no `--BODY--`")
+			+ (seen_end ? "" : " (and no `--END--`)"));
+	(void) seen_end;
 
 	// Propagate state-based acceptance to edges (for Büchi with state marks)
 	for (int s = 0; s < aut.num_states; ++s)
@@ -456,11 +489,29 @@ inline SynthGame call_ltlsynt_game(
 	auto [hoa, exit_code] = spawn_capture(argv, timeout_sec);
 	std::remove(tmpfile_path.c_str());
 
-	// Don't cache a timeout, a missing binary, or any other transient failure:
-	// the output may be partial even when non-empty.  ltlsynt exits 0 for
-	// REALIZABLE and 1 for UNREALIZABLE — both are definitive.
-	if (exit_code != 0 && exit_code != 1) return {};
-	if (hoa.empty()) { cache[key] = {}; return {}; }
+	// SY-R1: a timeout, a missing binary or a usage error used to come
+	// back as the EMPTY game, which every caller (Algorithm D, the
+	// semantic-PWR fallback) reads as a definitive UNREALIZABLE. Classify
+	// like call_ltlsynt and throw: no verdict is not a verdict. Nothing
+	// transient is cached.
+	switch (classify_spot_exit(exit_code, hoa)) {
+	case spot_exit_kind::not_found:
+		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
+		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
+		throw ltl_synthesis_error("ltlsynt not found on PATH; install "
+			"Spot (>= 2.10) -- the parity game could not be built");
+	case spot_exit_kind::failed: {
+		std::string msg = "ltlsynt --print-game-hoa produced no game "
+			"(exit " + std::to_string(exit_code) + ")";
+		if (exit_code == 143)
+			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
+			     + std::to_string(timeout_sec) + "s)";
+		LOG_ERROR << "[ltl_aba] " << msg << "\n";
+		throw ltl_synthesis_error(msg);
+	}
+	case spot_exit_kind::ok:
+		break;
+	}
 	auto result = parse_synth_game_hoa(hoa);
 	cache[key] = result;
 	return result;
@@ -488,7 +539,8 @@ inline std::string call_ltl2tgba_dpa(const std::string& ltl_formula) {
 	if (rc == 127) {
 		LOG_ERROR << "[ltl_aba] ltl2tgba not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltl2tgba is on PATH.\n";
-		return {};
+		throw ltl_synthesis_error("ltl2tgba not found on PATH; install "
+			"Spot (>= 2.10)");
 	}
 	if (rc != 0) {
 		std::string msg = "ltl2tgba produced no automaton (exit "

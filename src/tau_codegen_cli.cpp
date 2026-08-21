@@ -108,6 +108,14 @@ int main(int argc, char** argv) {
 		if (!ifs) { std::cerr << "cannot open " << spec_path << "\n"; return 1; }
 		std::ostringstream oss; oss << ifs.rdbuf(); src = oss.str();
 	}
+	// CG-R7: the formula parser rejects trailing whitespace, so a spec piped
+	// through stdin (`echo 'G(o1[t] = 1)' | tau_codegen -`) failed to parse
+	// while the same text read from a file succeeded. Trim both ends.
+	{
+		auto b = src.find_first_not_of(" \t\r\n");
+		auto e = src.find_last_not_of(" \t\r\n");
+		src = b == std::string::npos ? "" : src.substr(b, e - b + 1);
+	}
 	if (src.empty()) { std::cerr << "empty input\n"; return 1; }
 
 	// Parse the spec as a wff (well-formed formula).  We use the api<node_t>
@@ -122,10 +130,33 @@ int main(int argc, char** argv) {
 	// Drive the LTL(ABA) synthesis pipeline.  solve_ltl_aba returns
 	// std::nullopt on propositional unrealizability; on success we receive
 	// the HoaAutomaton strategy.
-	auto sol = solve_ltl_aba<node_t>(fm);
+	//
+	// CG-N6: the backend reports "no verdict" (timeout, missing Spot,
+	// malformed strategy, refused CTL* placement) by throwing; without a
+	// handler the process died with an unhandled exception. Exit 4 =
+	// UNKNOWN, distinct from 3 = UNREALIZABLE.
+	std::optional<LtlAbaSolution<node_t>> sol;
+	try {
+		sol = solve_ltl_aba<node_t>(fm);
+	} catch (const ltl_synthesis_error& e) {
+		std::cerr << "UNKNOWN: synthesis failed (" << e.what() << ")\n";
+		return 4;
+	}
 	if (!sol) {
 		std::cerr << "spec is UNREALIZABLE\n";
 		return 3;
+	}
+	// CG-R1: Algorithm B's strategy ranges over bookkeeping bits (P_sigma /
+	// D) and the constant-output fast path carries no automaton at all;
+	// neither can be compiled into a program over the user's streams. The
+	// interpreter refuses these (ltl_to_safety_formula_full); so must the
+	// code generator, instead of emitting a wrong-but-compiling program.
+	if (!sol->executable) {
+		std::cerr << "spec is REALIZABLE but its strategy is not "
+			"executable: it cannot be compiled into a program over "
+			"the declared streams (Algorithm B / constant-output "
+			"fast path)\n";
+		return 5;
 	}
 
 	std::ostringstream ss;

@@ -128,8 +128,11 @@ inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) 
 	// ltlsynt exits 0 on REALIZABLE and 1 on UNREALIZABLE; every other code
 	// is a usage or internal error.
 	if (exit_code != 0 && exit_code != 1) return spot_exit_kind::failed;
-	// A non-zero exit with no output at all carries no verdict either.
-	if (exit_code != 0 && out.empty()) return spot_exit_kind::failed;
+	// SY-R4: ltlsynt always prints a verdict line, so no output at all is
+	// no verdict -- whatever the exit code (a 0 with empty stdout used to be
+	// read as UNREALIZABLE by call_ltlsynt and as an empty game by
+	// call_ltlsynt_game).
+	if (out.empty()) return spot_exit_kind::failed;
 	return spot_exit_kind::ok;
 }
 
@@ -137,9 +140,10 @@ inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) 
 // hoa_strategy_text is non-empty only when realizable == true.
 //
 // Throws ltl_synthesis_error when the subprocess produced no verdict (see
-// classify_spot_exit).  A missing binary keeps the historical behaviour of
-// logging an error and returning {false, ""} so that environments without
-// Spot degrade rather than abort.
+// classify_spot_exit) -- including when ltlsynt is not on PATH (IN-N1: the
+// old {false, ""} degradation made a missing Spot install print
+// "UNREALIZABLE (propositional)" for every specification). The api layer
+// converts the exception into a logged UNKNOWN verdict.
 std::pair<bool, std::string> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,
@@ -161,6 +165,13 @@ struct HoaAutomaton {
     std::vector<bool> state_accepting;  // true if state has acceptance mark
 };
 
+// Parses the HOA strategy text that follows ltlsynt's REALIZABLE line.
+// Throws ltl_synthesis_error on a malformed or truncated automaton (no
+// `States:` header, a non-positive or absurd state count, no `--BODY--`):
+// LA-8/SY-1 -- such text used to parse to the EMPTY automaton, which the
+// verdict layer read as trivially REALIZABLE with the ABA oracle skipped.
+// Parsing stops at `--END--`; out-of-range states and edges are still
+// dropped (LT-10).
 HoaAutomaton parse_hoa(const std::string& hoa_text);
 
 // ── DPA (Deterministic Parity Automaton) — Algorithm D Phase 1 ───────────────

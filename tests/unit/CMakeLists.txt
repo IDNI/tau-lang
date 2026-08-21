@@ -31,6 +31,7 @@ set(TESTS
 	#pwr_deepseek_3
 	#pwr_deepseek_4
 	ltl_aba
+	parse_hoa
 	#ltl_adversarial
 	#ltl_adversarial2
 	ltl_benchmarks
