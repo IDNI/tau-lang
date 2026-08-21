@@ -1874,7 +1874,11 @@ Whereas the REPL specific options are:
 | -d, --debug        | debug mode (Debug builds only)                         |
 
 and the limit options, which bound the engine's iterative searches. Every
-cap defaults to unlimited (`0`); the two gc knobs keep their tuned defaults.
+cap defaults to unlimited (`0`) except the two temporal-normalization caps
+(`--max-fixpoint-steps`, `--max-flag-search-steps`), which ship at `500`
+because those searches have no termination guarantee — unlimited turns a
+non-converging spec from a loud give-up into a hang (pass `0` to opt in); the
+two gc knobs keep their tuned defaults.
 Each has a matching REPL option (see [REPL options](#repl-options)):
 
 | Option                        | Description                                                                            |
@@ -1883,8 +1887,8 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part (0 = unlimited)              |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
-| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
-| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (0 = unlimited) |
+| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (default 500; 0 = unlimited)                 |
+| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (default 500; 0 = unlimited) |
 | -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
 | -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
@@ -2033,11 +2037,14 @@ anti-prenexing (`--block-max-splits`). Unlimited by default.
 (`--block-max-rounds`). Unlimited by default.
 
 * `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
-(`--max-fixpoint-steps`). Unlimited by default.
+(`--max-fixpoint-steps`). Default 500 — the search has no convergence
+guarantee, so unlimited (`0`) hangs on a non-converging spec instead of giving
+up loudly.
 
 * `flagsteps|maxflagsearchsteps`: cap on the eventual-flag search past the
 flag boundary; a bounded give-up reports unsatisfiable
-(`--max-flag-search-steps`). Unlimited by default.
+(`--max-flag-search-steps`). Default 500, for the same reason as
+`fixpointsteps`; a give-up reports unsatisfiable, which is wrong but bounded.
 
 * `blastdepth|maxblastreentrydepth`: blast-block re-entry nesting cap in
 anti-prenexing (`--max-blast-reentry-depth`). Unlimited by default.

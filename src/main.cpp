@@ -82,14 +82,16 @@ cli::options tau_options() {
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
-	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "0")
+	// The two SO-1-exposed caps ship FINITE (matching the inline defaults
+	// in satisfiability.tmpl.h): unlimited hangs on a non-converging spec.
+	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "500")
 		.set_description("cap temporal-normalization fixpoint steps "
-			"(0 = unlimited)");
+			"(default 500; 0 = unlimited)");
 	opts["max-flag-search-steps"] =
-		cli::option("max-flag-search-steps", 'F', "0")
+		cli::option("max-flag-search-steps", 'F', "500")
 		.set_description("cap the eventual-flag search past the flag "
 			"boundary; give-up reports unsatisfiable "
-			"(0 = unlimited)");
+			"(default 500; 0 = unlimited)");
 	opts["max-blast-reentry-depth"] =
 		cli::option("max-blast-reentry-depth", 'D', "0")
 		.set_description("cap blast-block re-entry nesting in "

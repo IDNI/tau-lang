@@ -18,19 +18,23 @@ namespace idni::tau_lang {
 inline static bool use_debug_output_in_sat = false;
 
 /// Cap on the fixpoint searches in `find_fixpoint_phi`/`find_fixpoint_chi`;
-/// 0 = unlimited (the default). A runtime parameter by policy, never a header
-/// constant — set via `--max-fixpoint-steps` or REPL `fixpointsteps`, or
+/// 0 = unlimited. A runtime parameter by policy, never a header constant —
+/// set via `--max-fixpoint-steps` or REPL `fixpointsteps`, or
 /// `api::set_max_fixpoint_steps`. SO-1 caveat: these searches have no
 /// convergence guarantee, so an unlimited run on a non-converging spec does
-/// not terminate; set a bound to get a loud give-up instead of a hang.
-inline size_t max_fixpoint_steps = 0;
+/// not terminate. The shipped default is therefore FINITE (500, the value the
+/// pre-parameter constant had): a give-up is wrong-but-loud where an
+/// unlimited run hangs `sat`/`run`/pointwise revision. Pass 0 to opt into
+/// unlimited. The CLI default in main.cpp must agree with this value.
+inline size_t max_fixpoint_steps = 500;
 
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
-/// boundary; 0 = unlimited (the default). Same SO-1 caveat as
-/// `max_fixpoint_steps` — and a bounded give-up here reports unsatisfiable,
-/// which is wrong but bounded and loud. Set via `--max-flag-search-steps`,
-/// REPL `flagsteps`, or `api::set_max_flag_search_steps`.
-inline size_t max_flag_search_steps = 0;
+/// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps` — and a
+/// bounded give-up here reports unsatisfiable, which is wrong but bounded and
+/// loud. Shipped default 500 (finite, see above); set via
+/// `--max-flag-search-steps`, REPL `flagsteps`, or
+/// `api::set_max_flag_search_steps`.
+inline size_t max_flag_search_steps = 500;
 
 /**
  * @internal
@@ -744,7 +748,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 
 	// Find fix point once the lookback is greater the step_num
 	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
-	// the same opt-in cap (global max_fixpoint_steps, 0 = unlimited).
+	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
 	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
 	{
 		if (max_fixpoint_steps
@@ -1456,10 +1460,10 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	// the is_run_satisfiable check *above*, made before this loop starts
 	// conjoining !current_flag into `run` on every iteration -- so the
 	// property it depends on is not preserved and the search is not
-	// guaranteed to terminate. The global max_flag_search_steps (0 =
-	// unlimited, the default) lets a caller bound it: a give-up reports
-	// unsatisfiable, which is wrong but bounded and loud, where an
-	// unlimited run on such a spec hangs. Deciding this properly needs a
+	// guaranteed to terminate. The global max_flag_search_steps (default
+	// 500; 0 = unlimited) bounds it: a give-up reports unsatisfiable,
+	// which is wrong but bounded and loud, where an unlimited run on such
+	// a spec hangs. Deciding this properly needs a
 	// tri-state (sat/unsat/unknown) result threaded through
 	// transform_to_execution.
 	const bool flag_search_bounded = max_flag_search_steps > 0;

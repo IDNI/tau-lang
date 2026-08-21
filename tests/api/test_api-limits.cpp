@@ -7,6 +7,14 @@ using tau_api = api<node_t>;
 
 TEST_SUITE("Tau API - runtime limits") {
 
+	// IN-M3: the two SO-1-exposed temporal caps ship finite; an unlimited
+	// default turns a non-converging spec into a hang. Keep this case
+	// first so it observes the shipped values, not another case's leftovers.
+	TEST_CASE("temporal caps ship finite defaults") {
+		CHECK( max_fixpoint_steps == 500 );
+		CHECK( max_flag_search_steps == 500 );
+	}
+
 	// Raw-stored size_t caps: 0 means unlimited and is stored as 0.
 	TEST_CASE("plain caps write their globals verbatim") {
 		struct row { void (*set)(size_t); size_t* global; };
