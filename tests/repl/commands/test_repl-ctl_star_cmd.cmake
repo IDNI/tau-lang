@@ -119,3 +119,12 @@ add_test(NAME "test_repl-sat-alg_d_no_verdict_is_unknown"
 set_tests_properties("test_repl-sat-alg_d_no_verdict_is_unknown" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"
 	FAIL_REGULAR_EXPRESSION "Aborted|core dumped")
+
+# IN-M9 (Batch 6): `run` of a root-positive A never reached the CTL*
+# reducer -- the A node was handed to the solver as a G spec and the run
+# died with a false "unsat".  It executes as its body now.
+add_test(NAME "test_repl-ctl_star-run_A_always_executes"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. run A (always o1[t] = 1)\"")
+set_tests_properties("test_repl-ctl_star-run_A_always_executes" PROPERTIES
+	FAIL_REGULAR_EXPRESSION "unsat|Internal error"
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := T")

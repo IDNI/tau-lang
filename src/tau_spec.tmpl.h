@@ -42,8 +42,15 @@ tref tau_spec<node>::get() {
 		return nullptr;
 	};
 
+	// A get() while a continuation is pending IS an error for the caller
+	// that asked (the REPL reports "Syntax Error: Unexpected end" from it),
+	// but GR-R4: it must not be STICKY -- a later parse() may still
+	// complete the spec, so parse_part() removes this entry again.
 	if (is_eof()) {
-		errors_.push_back(eof_msg_.value());
+		if (!eof_error_reported_) {
+			errors_.push_back(eof_msg_.value());
+			eof_error_reported_ = true;
+		}
 		return fail();
 	}
 	if (!errors_.empty()) return fail();
@@ -112,8 +119,15 @@ bool tau_spec<node>::add(tref expr) {
 	};
 	switch (nt) {
 	case tau::spec:
+		// GR-R3: a second main is refused loudly, as parse() does,
+		// instead of vanishing behind a `true`.
 		if (tref wff = t | tau::main | tt::first | tt::ref; wff)
-			set_main(wff);
+			if (!set_main(wff)) {
+				errors_.push_back("Multiple main formulas: \""
+					+ TAU_TO_STR(main_) + "\" and \""
+					+ TAU_TO_STR(wff) + "\"");
+				return false;
+			}
 		if (trefs defs = t | tau::definitions
 			|| tau::rec_relation || tt::refs; defs.size())
 				for (tref def : defs) add_def(def);
@@ -129,7 +143,14 @@ bool tau_spec<node>::add(tref expr) {
 				for (tref def : defs) add_def(def);
 		break;
 	case tau::bf:
-	case tau::wff:          set_main(expr); break;
+	case tau::wff:
+		if (!set_main(expr)) {
+			errors_.push_back("Multiple main formulas: \""
+				+ TAU_TO_STR(main_) + "\" and \""
+				+ TAU_TO_STR(expr) + "\"");
+			return false;
+		}
+		break;
 	case tau::input_def:
 	case tau::output_def:
 	case tau::rec_relation: add_def(expr); break;
@@ -196,6 +217,13 @@ std::pair<bool, std::string> tau_spec<node>::parse_(
 
 template <NodeType node>
 bool tau_spec<node>::parse_part(size_t part) {
+	// GR-R4: the eof recorded by a premature get() is withdrawn once a
+	// continuation arrives; any OTHER error stays fatal.
+	if (eof_error_reported_ && eof_msg_) {
+		errors_.erase(std::remove(errors_.begin(), errors_.end(),
+			eof_msg_.value()), errors_.end());
+		eof_error_reported_ = false;
+	}
 	if (errors_.size()) return false;
 
 	if (!eof_msg_) current_part_ = parts_[part];

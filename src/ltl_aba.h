@@ -174,34 +174,6 @@ struct HoaAutomaton {
 // dropped (LT-10).
 HoaAutomaton parse_hoa(const std::string& hoa_text);
 
-// ── DPA (Deterministic Parity Automaton) — Algorithm D Phase 1 ───────────────
-//
-// A DPA edge carries a single parity color (0..num_colors-1).
-// color == -1 means the edge has no acceptance mark in the HOA; in min-even
-// parity this is treated as "worst priority" (never contributes to acceptance).
-struct DpaEdge {
-    std::string guard_label;
-    int dst    = 0;
-    int color  = -1;  // parity color; -1 = unmarked
-};
-
-// Deterministic Parity Automaton parsed from Spot's HOA output.
-struct DpaAutomaton {
-    int num_states    = 0;
-    int initial_state = 0;
-    int num_colors    = 0;  // total number of colors in the parity condition
-    bool min_even     = true; // true = min-even parity (Spot default for -D)
-    std::vector<std::string>            aps;   // atomic proposition names
-    std::vector<std::vector<DpaEdge>>   edges; // edges[src] = outgoing edges
-};
-
-// Call ltl2tgba with parity='min even' -D --complete on the given LTL formula.
-// Returns the raw HOA text, or empty string on error.
-std::string call_ltl2tgba_dpa(const std::string& ltl_formula);
-
-// Parse the HOA output of ltl2tgba (with parity acceptance) into a DpaAutomaton.
-DpaAutomaton parse_dpa_hoa(const std::string& hoa_text);
-
 // ── ABA oracle ────────────────────────────────────────────────────────────────
 
 // Given a HOA transition guard label and the proposition→data_atom mapping,

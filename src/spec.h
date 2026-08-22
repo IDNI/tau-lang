@@ -24,6 +24,7 @@
 #ifndef __IDNI__TAU__SPEC_H__
 #define __IDNI__TAU__SPEC_H__
 
+#include "gr1_detect.h"
 #include "ltl_aba.h"
 #include "tau_tree.h"
 
@@ -92,14 +93,14 @@ inline Spec<node> decompose_spec(tref main_fm) {
 				// already guarantees no wff_F exists, so the
 				// old wff_F half of this scan was dead (the
 				// sometimes half became live with RR-10).
+				// GR-4 / GR-R1: A/E/`-phi` nest a path formula
+				// and are not invariants either; the shared
+				// predicate keeps the three classifiers in step.
 				bool has_F = false;
 				tau::get(body).find_top([&](tref n) {
-					const auto& nt_node = tree<node>::get(n);
-					if (nt_node.has_child()
-					    && nt_node[0].value.nt
-							== tau::wff_sometimes) {
+					if (gr1_detect_internal::
+						is_temporal_operator_node<node>(n))
 						has_F = true;
-					}
 					return false;
 				});
 				if (has_F) append(s.reactive);

@@ -4108,6 +4108,52 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
 	}
 
+	// ── LA-13 / LA-N6: `!` before a group or constant; absurd AP index ──
+	//
+	// `parse_atom` accepted `!` only in front of digits: `!(...)` returned
+	// F WITHOUT consuming the group (the oracle then read the edge as dead
+	// and execution dropped it) and `!f` read as F instead of T.  Spot
+	// negates atoms only, so this was latent -- but the parser is shared
+	// by the oracle and execution, and hand-fed HOA reaches it.
+	TEST_CASE("[GF-20] LA-13: !(group) is negated structurally, not read as F") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		REQUIRE(atoms.size() == 2);
+		// ¬(p0 ∧ ¬p0) ≡ ⊤: must not collapse to F.
+		tref r = guard_to_aba<node_t>("!(0&!0)", aps, atoms);
+		REQUIRE(r != nullptr);
+		CHECK_FALSE(tau::get(r).equals_F());
+		// ¬(p0 ∨ p1) is feasible (o1 = 1/2 satisfies neither atom) ...
+		CHECK(guard_is_aba_feasible<node_t>("!(0|1)", aps, atoms));
+		// ... and ¬(p0 ∨ p1) ∧ p0 is not.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("!(0|1)&0", aps, atoms));
+		// The group is CONSUMED: what follows it still parses.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("!(1)&0&1", aps, atoms));
+	}
+
+	TEST_CASE("[GF-21] LA-13: !t is F and !f is T") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		CHECK(tau::get(guard_to_aba<node_t>("!t", aps, atoms)).equals_F());
+		CHECK(tau::get(guard_to_aba<node_t>("!f", aps, atoms)).equals_T());
+		// `!f` is an unconditional edge, `!t` a dead one; both "feasible".
+		CHECK(guard_is_aba_feasible<node_t>("!f", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!t", aps, atoms));
+		// Combined with a real atom the constants keep their meaning.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("!t|0&1", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!f&0", aps, atoms));
+	}
+
+	// LA-N6: std::stoi threw out of the oracle on a ≥10-digit AP index.
+	TEST_CASE("[GF-22] LA-N6: an absurd AP index is a bookkeeping AP, not an exception") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		CHECK_NOTHROW(guard_to_aba<node_t>("99999999999", aps, atoms));
+		CHECK(tau::get(guard_to_aba<node_t>("99999999999", aps, atoms)).equals_T());
+		CHECK_NOTHROW(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
+	}
+
 } // TEST_SUITE("[LT-3] ABA oracle guard parsing")
 
 

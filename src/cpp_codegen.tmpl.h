@@ -112,23 +112,26 @@ inline std::optional<std::vector<guard_cube>> parse_guard_cubes(
 	return cubes;
 }
 
-// Pick a concrete double witness from a non-empty qlt interval.
-inline double witness_from_qlt_interval(const qlt& interval) {
-	if (interval.is_empty()) return 0.0;
+// Pick a concrete double witness from a qlt interval.  CG-R3: nullopt
+// when no literal can be guaranteed to satisfy the cube -- the interval is
+// empty (jointly unsatisfiable literals) or a bound is symbolic -- so the
+// caller omits the cube instead of embedding a guess with ok=true.
+inline std::optional<double> witness_from_qlt_interval(const qlt& interval) {
+	if (interval.is_empty()) return std::nullopt;
 	const auto& piece = interval.pieces[0];
 	const auto& lo = piece.lo.val;
 	const auto& hi = piece.hi.val;
 	if (lo.is_neg_inf() && hi.is_pos_inf()) return 0.0;
 	if (lo.is_neg_inf()) {
-		if (hi.is_sym()) return -1.0;
+		if (hi.is_sym()) return std::nullopt;
 		return (double)hi.p / (double)hi.q - 1.0;
 	}
 	if (hi.is_pos_inf()) {
-		if (lo.is_sym()) return 1.0;
+		if (lo.is_sym()) return std::nullopt;
 		return (double)lo.p / (double)lo.q + 1.0;
 	}
 	// Bounded: midpoint
-	if (lo.is_sym() || hi.is_sym()) return 0.0;
+	if (lo.is_sym() || hi.is_sym()) return std::nullopt;
 	double l = (double)lo.p / (double)lo.q;
 	double h = (double)hi.p / (double)hi.q;
 	return (l + h) / 2.0;
@@ -535,17 +538,29 @@ void emit_cpp_program_data(
 
 			// Compute qlt witnesses at code-generation time.
 			std::map<std::string, double> witnesses;
+			std::string no_witness;   // CG-R3: first variable without one
 			if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
 				for (auto& [var, atom_refs] : var_qlt_lits) {
 					tref conj = atom_refs[0];
 					for (size_t ai = 1; ai < atom_refs.size(); ++ai)
 						conj = tau::build_wff_and(conj, atom_refs[ai]);
 					tref io_ref = var_io_ref[var];
+					std::optional<double> w;
 					if (auto interval = qlt_dlo_qe<node>(io_ref, conj); interval)
-						witnesses[var] = witness_from_qlt_interval(interval.value());
-					else
-						witnesses[var] = 1.0; // qlt_dlo_qe undetermined: use 1.0 as fallback
+						w = witness_from_qlt_interval(interval.value());
+					if (w) witnesses[var] = *w;
+					else if (no_witness.empty()) no_witness = var;
 				}
+			}
+			// CG-R3: a cube whose qlt literals admit no concrete value
+			// (empty interval, symbolic bound, undetermined QE) is not
+			// emitted at all -- the old picker embedded 0.0 / 1.0 and
+			// the program reported ok=true while violating the guard.
+			if (!no_witness.empty()) {
+				out << "\t\t\t// cube of [" << e.guard_label
+				    << "] omitted: no concrete witness for "
+				    << no_witness << "\n";
+				continue;
 			}
 
 			// Emit edge.
@@ -915,45 +930,55 @@ inline void emit_cpp_program_open_prop(
 		const auto& edges = aut.edges.size() > (size_t)q
 			? aut.edges[q] : std::vector<HoaEdge>{};
 		for (const auto& e : edges) {
-			// Evaluate the FULL guard (including output APs that
-			// the oracle has filled into ap[]). If true, take edge.
-			out << "\t\t\tif (" << codegen_detail::guard_to_cpp(
-			    e.guard_label) << ") {\n";
-
-			// Assign undeclared output APs from this edge's guard.
-			//
-			// The guard is evaluated in full above, so the branch is
-			// already correct for a disjunctive label; only the
-			// assignments need the cubes.  An AP whose polarity differs
-			// between cubes is not determined by the guard alone, so it
-			// is left at its default rather than guessed (LG-4 — the old
-			// tokenisation would have taken whichever spelling happened
-			// to survive its digit scan).
-			{
-				auto cubes = codegen_detail::parse_guard_cubes(
-					e.guard_label);
-				std::map<int, int> polarity;  // ap → +1 / -1 / 0 (conflict)
-				if (cubes) for (const auto& cube : *cubes)
-					for (const auto& [parsed, positive] : cube) {
-						int want = positive ? 1 : -1;
-						auto it2 = polarity.find(parsed);
-						if (it2 == polarity.end()) polarity[parsed] = want;
-						else if (it2->second != want) it2->second = 0;
-					}
-				for (const auto& [parsed, pol] : polarity) {
-					if (pol == 0) continue;
+			// CG-N3: evaluate each cube on its INPUT + DECLARED
+			// projection only.  An undeclared output AP is not in
+			// ap[] (nobody filled it), so evaluating the full guard
+			// made every cube with a positive undeclared literal
+			// false -- the edge could never fire.  The undeclared
+			// outputs are instead ASSIGNED from the matching cube,
+			// exactly as the standard step() derives them.  A label
+			// that cannot be expanded (to_dnf refused) falls back to
+			// the full-guard evaluation, which is at worst
+			// conservative.
+			auto cubes = codegen_detail::parse_guard_cubes(e.guard_label);
+			if (!cubes) {
+				out << "\t\t\tif (" << codegen_detail::guard_to_cpp(
+				    e.guard_label) << ") {\n";
+				out << "\t\t\t\tstate_ = State::q" << e.dst << ";\n";
+				out << "\t\t\t\treturn o;\n";
+				out << "\t\t\t}\n";
+				continue;
+			}
+			for (const auto& cube : *cubes) {
+				std::string cond;
+				for (const auto& [parsed, positive] : cube) {
+					if (parsed < 0 || parsed >= (int)aut.aps.size())
+						continue;
 					bool is_out = false;
 					for (int oi : out_idx)
 						if (oi == parsed) { is_out = true; break; }
-					if (!is_out) continue;
-					if (declared_idx.count(parsed)) continue;  // oracle set it
-					out << "\t\t\t\to." << labels[parsed] << " = "
-					    << (pol > 0 ? "true" : "false") << ";\n";
+					if (is_out && !declared_idx.count(parsed))
+						continue;   // assigned below, not tested
+					if (!cond.empty()) cond += " && ";
+					cond += (positive ? "" : "!") + std::string("ap[")
+					      + std::to_string(parsed) + "]";
 				}
+				if (cond.empty()) cond = "true";
+				out << "\t\t\tif (" << cond << ") {\n";
+				for (const auto& [parsed, positive] : cube) {
+					if (parsed < 0 || parsed >= (int)aut.aps.size())
+						continue;
+					bool is_out = false;
+					for (int oi : out_idx)
+						if (oi == parsed) { is_out = true; break; }
+					if (!is_out || declared_idx.count(parsed)) continue;
+					out << "\t\t\t\to." << labels[parsed] << " = "
+					    << (positive ? "true" : "false") << ";\n";
+				}
+				out << "\t\t\t\tstate_ = State::q" << e.dst << ";\n";
+				out << "\t\t\t\treturn o;\n";
+				out << "\t\t\t}\n";
 			}
-			out << "\t\t\t\tstate_ = State::q" << e.dst << ";\n";
-			out << "\t\t\t\treturn o;\n";
-			out << "\t\t\t}\n";
 		}
 		out << "\t\t\to.ok = false; return o;\n";
 		out << "\t\t}\n";

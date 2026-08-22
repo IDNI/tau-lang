@@ -254,9 +254,65 @@ TEST_SUITE("cpp_codegen_bench") {
             MESSAGE("Interpreter : " << i_rate << " steps/sec"
                     "  (" << s.N_interp << " steps in " << i_sec << "s)");
             MESSAGE("Speedup     : " << speedup << "x");
-            CHECK(c_rate > i_rate);
+            // CG-RT3: the speed comparison is a load-sensitive race on a
+            // shared CI box; it is informative by default and asserted only
+            // when TAU_BENCH_ASSERT is set.
+            if (std::getenv("TAU_BENCH_ASSERT")) CHECK(c_rate > i_rate);
+            else if (!(c_rate > i_rate))
+                MESSAGE("compiled program not faster than the interpreter "
+                        "(not asserted; set TAU_BENCH_ASSERT to enforce)");
         }
     }
+}
+
+
+
+TEST_SUITE("cpp_codegen_bench_correctness") {
+
+	// CG-RT3: the benchmark's `sum` accumulates `o.ok` but is never compared
+	// to the step count — a generated program returning ok=false on every
+	// single step would still pass the timing suite. This asserts the
+	// omitted invariant directly, with a small N so it stays fast.
+	TEST_CASE("[CG-BENCH-CORR-01] every step of the echo spec reports ok=true") {
+		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		tref fm = parse_formula(ECHO_FORMULA);
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		std::ostringstream hdr_os;
+		emit_cpp_program<node_t>(*sol, hdr_os, "BenchCorr");
+
+		const char* hdr_path  = "/tmp/_tau_bench_corr_hdr.h";
+		const char* main_path = "/tmp/_tau_bench_corr_main.cpp";
+		const char* exe_path  = "/tmp/_tau_bench_corr_exe";
+		{ std::ofstream f(hdr_path); f << hdr_os.str(); }
+		const long N = 10000L;
+		{
+			std::ofstream f(main_path);
+			f << "#include \"_tau_bench_corr_hdr.h\"\n"
+			     "#include <cstdio>\n"
+			     "int main() {\n"
+			     "  BenchCorr c;\n"
+			     "  BenchCorr::Inputs in{};\n"
+			     "  unsigned sum = 0;\n"
+			  << "  for (long i = 0; i < " << N << "L; ++i) {\n"
+			     "    auto o = c.step(in);\n"
+			     "    sum += (unsigned)o.ok;\n"
+			     "  }\n"
+			     "  std::printf(\"%u\\n\", sum);\n"
+			     "  return 0;\n"
+			     "}\n";
+		}
+		std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ")
+		                + exe_path + " " + main_path + " 2>&1";
+		REQUIRE(::system(cmd.c_str()) == 0);
+		REQUIRE(::system((std::string(exe_path)
+			+ " >/tmp/_tau_bench_corr_out").c_str()) == 0);
+		std::ifstream out("/tmp/_tau_bench_corr_out");
+		unsigned sum = 0; out >> sum;
+		CHECK(sum == (unsigned)N);
+	}
+
 }
 
 

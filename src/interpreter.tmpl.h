@@ -323,6 +323,25 @@ std::optional<interpreter<node>>
 		const io_context<node>& ctx)
 {
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
+	// IN-M9 (found by the IN-RT4 api-level execution tests): CTL* specs
+	// reached this point unreduced.  A/E are not full-LTL operators, so
+	// `A (always phi)` was classified as a plain G spec, normalised as
+	// such and handed to the solver, which refused the A node ("Found
+	// clause containing non-equation") and reported a false "unsat".
+	// is_tau_formula_sat reduces first; so must execution.  The reducer
+	// throws ltl_synthesis_error for placements it cannot encode soundly
+	// (LA-N2); the api/REPL callers already catch it.  Residual: E's
+	// witness outputs w_<n> are not registered streams (IN-R6), so an E
+	// reduction that keeps a witness still cannot be executed.
+	if (has_ctl_star_operators<node>(spec)) {
+		auto reduction = reduce_ctl_star_to_ltl<node>(spec);
+		if (!reduction.ltl_formula) {
+			LOG_ERROR << "Tau specification is not executable (CTL* reduction failed)\n";
+			return {};
+		}
+		spec = reduction.ltl_formula;
+		DBG(LOG_TRACE << "make_interpreter[ctl* reduced]: " << LOG_FM_DUMP(spec) << "\n";)
+	}
 	// Handle G(phi_A) && G(phi_B) with different BA types:
 	// the normalizer merges them into G(phi_A && phi_B) which breaks on mixed
 	// types.  Normalize each G formula independently then combine.

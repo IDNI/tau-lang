@@ -309,6 +309,67 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 }
 
 
+
+TEST_SUITE("cpp_codegen_pwr_ndebug") {
+
+	// CG-RT4 / CG-N5 (OPEN, hence skip): revise()'s validation is
+	// assert()-only; under -DNDEBUG (the flag customer release builds use,
+	// and which g++ -O2 alone does NOT define) those asserts compile out,
+	// so an invalid Strategy (initial_state out of range for num_states)
+	// causes OOB std::vector indexing (UB) on the next step() instead of
+	// being rejected. This test compiles WITH -DNDEBUG specifically to
+	// reproduce the customer-build configuration where CG-N5 manifests.
+	// Un-skip when revise() returns a real runtime verdict.
+	TEST_CASE("[CG-PWR-NDEBUG-01] revise() with an invalid Strategy under -DNDEBUG"
+	          * doctest::skip(true)) {
+		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrNdebug");
+		REQUIRE(gen1.has_value());
+
+		const char* hdr = "/tmp/_tau_pwr_ndebug_test.h";
+		const char* main_f = "/tmp/_tau_pwr_ndebug_main.cpp";
+		const char* exe = "/tmp/_tau_pwr_ndebug_exe";
+		{ std::ofstream f(hdr); f << *gen1; }
+		{
+			std::ofstream f(main_f);
+			// initial_state=99 is out of range for a 1-state Strategy;
+			// edges has only 1 entry (matching num_states=1), so
+			// strat_.edges[99] is an OOB vector access on the next step().
+			f << "#include \"_tau_pwr_ndebug_test.h\"\n"
+			     "#include <cstdio>\n"
+			     "int main() {\n"
+			     "  PwrNdebug c;\n"
+			     "  PwrNdebug::Inputs in;\n"
+			     "  PwrNdebug::Strategy bad;\n"
+			     "  bad.num_states = 1;\n"
+			     "  bad.initial_state = 99;\n"
+			     "  bad.edges.resize(1);\n"
+			     "  c.revise(std::move(bad));\n"
+			     "  if (c.state() >= 0 && c.state() < c.strategy().num_states) {\n"
+			     "    std::printf(\"OK\\n\");\n"
+			     "  } else {\n"
+			     "    std::printf(\"ACCEPTED_INVALID_STATE %d\\n\", c.state());\n"
+			     "  }\n"
+			     "  auto o = c.step(in);\n"
+			     "  (void)o;\n"
+			     "  return 0;\n"
+			     "}\n";
+		}
+		std::string cmd = std::string("g++ -O2 -DNDEBUG -std=c++17 -I/tmp -o ")
+			+ exe + " " + main_f + " >/tmp/_tau_pwr_ndebug_build 2>&1";
+		REQUIRE(::system(cmd.c_str()) == 0);
+		std::string run_cmd = std::string(exe)
+			+ " > /tmp/_tau_pwr_ndebug_out 2>&1";
+		int rc = ::system(run_cmd.c_str());
+		std::ifstream out("/tmp/_tau_pwr_ndebug_out");
+		std::string line;
+		std::getline(out, line);
+		CHECK(rc == 0);
+		CHECK(line == "OK");
+	}
+}
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

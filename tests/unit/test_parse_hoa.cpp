@@ -10,6 +10,10 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+#include <chrono>
+#include <csignal>
+#include <cstdlib>
+
 using namespace idni::tau_lang;
 
 static const char* good_hoa =
@@ -104,3 +108,101 @@ TEST_SUITE("parse_hoa") {
 		CHECK(aut.edges[0].empty());
 	}
 }
+
+// ── SY-RT2: spawn_capture contract (re-port of the pre-rebase SPAWN suite) ──
+//
+// classify_spot_exit depends on the 127 / 128+signo encodings, and the
+// pipe drain must outrun a child that writes more than the pipe buffer.
+
+TEST_SUITE("spawn_capture") {
+
+	struct EnvGuard {
+		std::string key;
+		std::string old_val;
+		bool had;
+		EnvGuard(const char* k, const char* v) : key(k) {
+			const char* c = std::getenv(k);
+			had = c != nullptr;
+			if (had) old_val = c;
+			setenv(k, v, 1);
+		}
+		~EnvGuard() {
+			if (had) setenv(key.c_str(), old_val.c_str(), 1);
+			else unsetenv(key.c_str());
+		}
+	};
+
+	// NOTE (SY-3): the missing SIGKILL escalation for TERM-ignoring children
+	// is deliberately not tested — a faithful test would hang the suite.
+	TEST_CASE("[SPAWN-01] timeout kills a slow child promptly with exit >= 128") {
+		auto t0 = std::chrono::steady_clock::now();
+		auto [out, code] = spawn_capture({"sleep", "10"}, 1);
+		auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+			std::chrono::steady_clock::now() - t0).count();
+		CHECK(elapsed < 5);
+		CHECK(code >= 128);
+		CHECK(out.empty());
+	}
+
+	TEST_CASE("[SPAWN-02] nonexistent binary returns exit code 127") {
+		auto [out, code] = spawn_capture({"definitely_not_a_binary_xyz_12345"});
+		CHECK(code == 127);
+		CHECK(out.empty());
+	}
+
+	// IN-N1 / Batch 3: a missing backend is no verdict -- call_ltlsynt
+	// throws instead of answering {false, ""} (= UNREALIZABLE).
+	TEST_CASE("[SPAWN-03] call_ltlsynt without Spot throws ltl_synthesis_error") {
+		EnvGuard g("PATH", "/nonexistent");
+		CHECK_THROWS_AS(call_ltlsynt("F(p0)", {}, {"p0"}), ltl_synthesis_error);
+	}
+
+	TEST_CASE("[SPAWN-04] 70KB of child output round-trips through the pipe") {
+		auto [out, code] = spawn_capture(
+			{"dd", "if=/dev/zero", "bs=70000", "count=1"});
+		CHECK(code == 0);
+		CHECK(out.size() == 70000);
+	}
+
+	TEST_CASE("[SPAWN-05] empty argv returns {empty, -1}") {
+		auto [out, code] = spawn_capture({});
+		CHECK(code == -1);
+		CHECK(out.empty());
+	}
+
+	TEST_CASE("[SPAWN-06] signal exit is encoded as 128 + signo") {
+		auto [out, code] = spawn_capture({"sh", "-c", "kill -TERM $$"});
+		CHECK(code == 128 + SIGTERM); // 143
+	}
+
+	// SY-RT4 / SY-R5: the TAU_LTL_TIMEOUT_SEC parser.
+	TEST_CASE("[TIMEOUT-01] unset keeps the 60s default") {
+		unsetenv("TAU_LTL_TIMEOUT_SEC");
+		CHECK(ltl_timeout_sec() == 60);
+	}
+	TEST_CASE("[TIMEOUT-02] a number is taken verbatim; 0 disables") {
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "5"); CHECK(ltl_timeout_sec() == 5); }
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "0"); CHECK(ltl_timeout_sec() == 0); }
+	}
+	TEST_CASE("[TIMEOUT-03] text garbage and negatives keep the default") {
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "abc"); CHECK(ltl_timeout_sec() == 60); }
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "12x"); CHECK(ltl_timeout_sec() == 60); }
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "-3");  CHECK(ltl_timeout_sec() == 60); }
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "");    CHECK(ltl_timeout_sec() == 60); }
+	}
+	// SY-R5: 2^32 used to truncate to 0 (watchdog silently off) and 2^31
+	// to a negative; both are clamped to the one-day maximum now.
+	TEST_CASE("[TIMEOUT-04] range garbage is clamped, never truncated to 0") {
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "4294967296");
+		  CHECK(ltl_timeout_sec() == (int)ltl_timeout_sec_max); }
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "2147483648");
+		  CHECK(ltl_timeout_sec() == (int)ltl_timeout_sec_max); }
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "99999999999999999999");
+		  CHECK(ltl_timeout_sec() == 60); }   // strtol ERANGE: not a number
+		{ EnvGuard g("TAU_LTL_TIMEOUT_SEC", "86400");
+		  CHECK(ltl_timeout_sec() == 86400); }
+	}
+
+} // TEST_SUITE("spawn_capture")
+
+

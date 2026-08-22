@@ -44,10 +44,26 @@ static tref parse_guard_expr(
 		}
 		bool neg = false;
 		if (s[pos] == '!') { neg = true; ++pos; skip_ws(); }
+		// LA-13: `!` used to be accepted only in front of digits, so
+		// `!(...)` returned F without consuming the group and `!f` read
+		// as F.  Negate a group or a constant structurally; the
+		// bookkeeping-AP drop-out below stays polarity-insensitive.
+		if (neg && pos < s.size()
+		    && (s[pos] == '(' || s[pos] == 't' || s[pos] == 'f')) {
+			tref inner = parse_atom();
+			const auto& it = tau::get(inner);
+			if (it.equals_T()) return tau::_F();
+			if (it.equals_F()) return tau::_T();
+			return tau::build_wff_neg(inner);
+		}
 		size_t start = pos;
 		while (pos < s.size() && std::isdigit(s[pos])) ++pos;
 		if (start == pos) return neg ? tau::_F() : tau::_T(); // no digits
-		int idx = std::stoi(s.substr(start, pos - start));
+		// LA-N6: a digit run longer than any AP index fits in an int
+		// is no user atom; treat it as a bookkeeping AP (T) instead of
+		// letting std::stoi throw out of the oracle.
+		int idx = pos - start > 9 ? -1
+			: std::stoi(s.substr(start, pos - start));
 		// User-data atoms map AP-name → atom tref via `atoms`.  APs that
 		// appear in the strategy but are NOT in `atoms` are bookkeeping
 		// propositions added by the synthesis encoding (Algorithm A's

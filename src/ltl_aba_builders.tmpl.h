@@ -1508,8 +1508,11 @@ bool has_ctl_star_operators(tref fm) {
 
 namespace ctl_star_detail {
 
-// Counter for generating unique witness variable names
-static int witness_counter = 0;
+// Counter for generating unique witness variable names.  LA-16: one per
+// thread -- it is reset at the start of every reduction, and two
+// concurrent reductions on a shared counter would hand out duplicate or
+// skipped witness names.
+static thread_local int witness_counter = 0;
 
 static std::string fresh_witness_name() {
 	return "w_" + std::to_string(witness_counter++);

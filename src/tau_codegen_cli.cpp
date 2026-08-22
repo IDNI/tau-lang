@@ -57,7 +57,11 @@ static void usage() {
 	    "        oracle-resolved at runtime (per declare_open_design.md §14).\n"
 	    "        V1: registration API only; per-step dispatch is V2.\n"
 	    "\n"
-	    "The generated header compiles with: g++ -O3 -flto -std=c++17\n";
+	    "The generated header compiles with: g++ -O3 -flto -std=c++17\n"
+	    "\n"
+	    "Exit codes: 0 program emitted; 1 input/output error; 2 usage;\n"
+	    "            3 UNREALIZABLE; 4 UNKNOWN (backend gave no verdict);\n"
+	    "            5 REALIZABLE but not compilable over the streams.\n";
 }
 
 int main(int argc, char** argv) {
@@ -65,6 +69,7 @@ int main(int argc, char** argv) {
 	std::string out_path;
 	std::string class_name = "TauProgram";
 	std::vector<std::string> open_streams;
+	bool seen_spec = false;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string a = argv[i];
@@ -93,10 +98,23 @@ int main(int argc, char** argv) {
 				start = (comma == std::string::npos)
 					? list.size() : comma + 1;
 			}
+			// CG-R6: an --open list that names nothing silently
+			// produced the non-open program.
+			if (open_streams.empty()) {
+				std::cerr << "--open: no stream names given\n";
+				usage(); return 2;
+			}
 		} else if (a.size() && a[0] == '-' && a != "-") {
 			std::cerr << "unknown option: " << a << "\n"; usage(); return 2;
+		} else if (seen_spec) {
+			// CG-R6: a second positional used to replace the first
+			// silently.
+			std::cerr << "more than one spec file given: " << spec_path
+			          << " and " << a << "\n";
+			usage(); return 2;
 		} else {
 			spec_path = a;
+			seen_spec = true;
 		}
 	}
 
@@ -172,6 +190,9 @@ int main(int argc, char** argv) {
 		std::ofstream ofs(out_path);
 		if (!ofs) { std::cerr << "cannot write " << out_path << "\n"; return 1; }
 		ofs << ss.str();
+		// CG-N12: a failed write (full disk, closed pipe) exited 0.
+		ofs.flush();
+		if (!ofs) { std::cerr << "write failed: " << out_path << "\n"; return 1; }
 	}
 	std::cerr << "[tau_codegen] emitted " << class_name << " ("
 	          << sol->aut.num_states << " states, "

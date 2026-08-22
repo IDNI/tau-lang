@@ -69,6 +69,10 @@ inline LivenessDecomp<node> decompose_liveness(tref fm) {
 	std::vector<tref> conjs;
 	liveness_decomp_internal::gather_conjuncts<node>(fm, conjs);
 
+	// GR-R2: a childless top node yields no conjunct at all; that is not
+	// a solved GR(1) instance, it is no formula.
+	if (conjs.empty()) return {};
+
 	std::vector<tref> safety_bodies;
 	for (tref c : conjs) {
 		const auto& t = tau::get(c);
@@ -77,7 +81,7 @@ inline LivenessDecomp<node> decompose_liveness(tref fm) {
 		if (nt != tau::wff_always) { d.is_gr1 = false; return {}; }
 		tref body = t[0].first();
 		const auto& bt = tau::get(body);
-		if (bt.has_child() && bt[0].value.nt == tau::wff_F) {
+		if (gr1_detect_internal::is_eventually_node<node>(body)) {
 			// GF: record the inner body. LG-8: only when it is
 			// non-temporal, matching is_gr1_fragment -- G(F(G p))
 			// is NOT GR(1) and must not be classified as such.

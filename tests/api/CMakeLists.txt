@@ -4,6 +4,7 @@ set(TESTS
 	tref_api
 	string_api
 	limits
+	ltl_execution
 )
 
 foreach(TEST IN LISTS TESTS)

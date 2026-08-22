@@ -10,16 +10,27 @@ namespace idni::tau_lang {
 // LS-9: one parser for the TAU_LTL_TIMEOUT_SEC watchdog (default 60s;
 // explicit "0" disables). Garbage keeps the DEFAULT instead of atoi's 0
 // silently removing the wall-clock cap on external ltlsynt/ltl2tgba.
+// SY-R5: range garbage is clamped to one day with the same warning --
+// `(int) v` used to turn 2^32 into 0 (watchdog silently OFF) and 2^31
+// into a negative, and values near INT_MAX overflowed the poll bound.
+inline constexpr long ltl_timeout_sec_max = 86400;
+
 inline int ltl_timeout_sec() {
 	int timeout_sec = 60;
 	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
 		char* end = nullptr;
+		errno = 0;
 		long v = std::strtol(env_sec, &end, 10);
-		if (end != env_sec && *end == '\0' && v >= 0)
-			timeout_sec = (int) v;
-		else TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
-			<< "' is not a number; keeping the default "
-			<< timeout_sec << "s";
+		if (end == env_sec || *end != '\0' || v < 0 || errno == ERANGE) {
+			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
+				<< "' is not a non-negative number; keeping the default "
+				<< timeout_sec << "s";
+		} else if (v > ltl_timeout_sec_max) {
+			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC=" << v
+				<< " exceeds the maximum; clamping to "
+				<< ltl_timeout_sec_max << "s";
+			timeout_sec = (int) ltl_timeout_sec_max;
+		} else timeout_sec = (int) v;
 	}
 	return timeout_sec;
 }
@@ -91,7 +102,8 @@ static std::pair<std::string, int> spawn_capture(
 	std::thread killer;
 	if (timeout_sec > 0) {
 		killer = std::thread([pid, timeout_sec, &done]() {
-			for (int i = 0; i < timeout_sec * 10 && !done.load(); ++i)
+			const long long polls = 10LL * timeout_sec;
+			for (long long i = 0; i < polls && !done.load(); ++i)
 				::usleep(100'000);
 			if (!done.load()) ::kill(pid, SIGTERM);
 		});
@@ -244,7 +256,9 @@ inline std::pair<bool, std::string> call_ltlsynt(
 				auto [neg_out, neg_rc] = spawn_capture(neg_argv, timeout_sec);
 				std::remove(neg_path.c_str());
 				if (neg_rc != 127 && neg_out.substr(0, 10) == "REALIZABLE") {
-					std::string env_hoa = neg_out.substr(neg_out.find('\n') + 1);
+					auto nl = neg_out.find('\n');
+					std::string env_hoa = nl == std::string::npos
+						? std::string() : neg_out.substr(nl + 1);
 					std::fprintf(stderr,
 					    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s\n",
 					    env_hoa.c_str());
@@ -519,116 +533,9 @@ inline SynthGame call_ltlsynt_game(
 
 } // namespace alg_d
 
-// ── DPA extraction — Algorithm D Phase 1 ─────────────────────────────────────
-
-inline std::string call_ltl2tgba_dpa(const std::string& ltl_formula) {
-	// Use posix_spawnp + argv vector so the formula is passed verbatim
-	// (no shell escaping; no MAX_ARG_STRLEN cap on a single quoted arg).
-	int timeout_sec = 60;
-	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
-		timeout_sec = std::atoi(env_sec);
-		if (timeout_sec < 0) timeout_sec = 0;
-	}
-	std::vector<std::string> argv = {
-	    "ltl2tgba", "--parity=min even", "-D", "--complete", "-f", ltl_formula
-	};
-	auto [out, rc] = spawn_capture(argv, timeout_sec);
-	// LT-7: the exit code used to be discarded, so a watchdog kill or a
-	// usage error was indistinguishable from "this formula has no DPA".
-	// ltl2tgba exits 0 on success, so anything else is a failure here.
-	if (rc == 127) {
-		LOG_ERROR << "[ltl_aba] ltl2tgba not found on PATH. "
-		             "Install Spot (>= 2.10) and ensure ltl2tgba is on PATH.\n";
-		throw ltl_synthesis_error("ltl2tgba not found on PATH; install "
-			"Spot (>= 2.10)");
-	}
-	if (rc != 0) {
-		std::string msg = "ltl2tgba produced no automaton (exit "
-		                + std::to_string(rc) + ")";
-		if (rc == 143)
-			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
-			     + std::to_string(timeout_sec) + "s)";
-		LOG_ERROR << "[ltl_aba] " << msg << "\n";
-		throw ltl_synthesis_error(msg);
-	}
-	return out;
-}
-
-inline DpaAutomaton parse_dpa_hoa(const std::string& hoa_text) {
-	DpaAutomaton dpa;
-	std::istringstream ss(hoa_text);
-	std::string line;
-	bool in_body = false;
-	int cur_state = -1;
-
-	while (std::getline(ss, line)) {
-		if (line.empty() || line == "--END--") continue;
-		if (line == "--BODY--") { in_body = true; continue; }
-
-		if (!in_body) {
-			if (line.substr(0, 7) == "States:") {
-				dpa.num_states = std::stoi(line.substr(7));
-				dpa.edges.resize(dpa.num_states);
-			} else if (line.substr(0, 6) == "Start:") {
-				dpa.initial_state = std::stoi(line.substr(6));
-			} else if (line.substr(0, 3) == "AP:") {
-				std::istringstream apl(line.substr(3));
-				int n; apl >> n;
-				for (int i = 0; i < n; ++i) {
-					std::string ap; apl >> ap;
-					if (ap.size() >= 2 && ap.front() == '"' && ap.back() == '"')
-						ap = ap.substr(1, ap.size() - 2);
-					dpa.aps.push_back(ap);
-				}
-			} else if (line.substr(0, 11) == "acc-name: p") {
-				// "acc-name: parity min even N" — extract N
-				std::istringstream al(line);
-				std::string tok;
-				int cnt = 0;
-				while (al >> tok) {
-					++cnt;
-					if (cnt == 5) { // field after "parity min even"
-						try { dpa.num_colors = std::stoi(tok); }
-						catch (...) { LOG_ERROR << "HOA: failed to parse num_colors"; }
-					}
-				}
-				dpa.min_even = (line.find("even") != std::string::npos);
-			} else if (line.substr(0, 11) == "Acceptance:") {
-				// Extract color count from "Acceptance: N ..."
-				std::istringstream al(line.substr(11));
-				al >> dpa.num_colors;
-			}
-			continue;
-		}
-
-		if (line.substr(0, 6) == "State:") {
-			std::istringstream sl(line.substr(6));
-			sl >> cur_state;
-			continue;
-		}
-		if (cur_state < 0 || line.front() != '[') continue;
-
-		size_t rb = line.find(']');
-		if (rb == std::string::npos) continue;
-		std::string guard = line.substr(1, rb - 1);
-		std::istringstream tl(line.substr(rb + 1));
-		int dst;
-		if (!(tl >> dst)) continue;
-
-		DpaEdge e;
-		e.guard_label = guard;
-		e.dst = dst;
-		// Look for acceptance mark {N}
-		std::string rest; tl >> rest;
-		if (!rest.empty() && rest.front() == '{') {
-			try {
-				e.color = std::stoi(rest.substr(1));
-			} catch (...) { LOG_ERROR << "HOA: failed to parse edge color"; }
-		}
-		dpa.edges[cur_state].push_back(e);
-	}
-
-	return dpa;
-}
+// (SY-R2: the "Algorithm D Phase 1" pair call_ltl2tgba_dpa / parse_dpa_hoa
+// was deleted -- zero production callers, superseded by the game-HOA path in
+// alg_d::call_ltlsynt_game / parse_synth_game_hoa, and it had missed the
+// LT-10 hardening.)
 
 } // namespace idni::tau_lang

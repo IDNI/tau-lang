@@ -11,6 +11,7 @@
 //              ALG-D-10..XX (Phase 2 product game correctness).
 
 #include "test_init.h"
+#include <set>
 #include "test_tau_helpers.h"
 #include "ltl_aba.h"
 #include "algorithm_d_game.h"
@@ -410,29 +411,83 @@ State: 2
 	}
 }
 
-// ── Phase 2: DPA extraction regression ───────────────────────────────────
+// ── CG-RT6: hoa_guard::to_dnf, the guard parser behind six consumers ─────
 
-TEST_SUITE("[Algorithm D Phase 1: DPA extraction]") {
+TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]") {
 
-	TEST_CASE("[ALG-D-11] G(F(p0)) produces a non-empty DPA") {
-		std::string hoa = call_ltl2tgba_dpa("G(F(p0))");
-		REQUIRE(!hoa.empty());
-		DpaAutomaton dpa = parse_dpa_hoa(hoa);
-		CHECK(dpa.num_states >= 1);
-		CHECK(dpa.aps.size() == 1u);
+	using alg_d::hoa_guard::to_dnf;
+
+	static std::set<std::vector<std::pair<int,bool>>> as_set(
+		const std::vector<alg_d::hoa_guard::cube>& d)
+	{
+		std::set<std::vector<std::pair<int,bool>>> out;
+		for (const auto& c : d) {
+			std::vector<std::pair<int,bool>> v;
+			for (const auto& l : c) v.emplace_back(l.ap, l.pos);
+			out.insert(v);
+		}
+		return out;
 	}
 
-	TEST_CASE("[ALG-D-12] DPA for G(F(p0)) is deterministic") {
-		std::string hoa = call_ltl2tgba_dpa("G(F(p0))");
-		REQUIRE(!hoa.empty());
-		DpaAutomaton dpa = parse_dpa_hoa(hoa);
-		REQUIRE(dpa.num_states >= 1);
-		int aps = (int)dpa.aps.size();
-		int expected = 1 << aps;
-		for (int s = 0; s < dpa.num_states; ++s)
-			CHECK((int)dpa.edges[s].size() == expected);
+	TEST_CASE("[DNF-01] constants and the empty label") {
+		auto t = to_dnf("t");  REQUIRE(t);  CHECK(t->size() == 1); CHECK((*t)[0].empty());
+		auto e = to_dnf("");   REQUIRE(e);  CHECK(e->size() == 1); CHECK((*e)[0].empty());
+		auto f = to_dnf("f");  REQUIRE(f);  CHECK(f->empty());
 	}
-}
+
+	TEST_CASE("[DNF-02] a disjunction is one cube per disjunct") {
+		auto d = to_dnf("0|1");
+		REQUIRE(d);
+		CHECK(as_set(*d) == as_set({{{0,true}}, {{1,true}}}));
+	}
+
+	TEST_CASE("[DNF-03] conjunction distributes over a parenthesised disjunction") {
+		auto d = to_dnf("(0|1)&2");
+		REQUIRE(d);
+		CHECK(as_set(*d) == as_set({{{0,true},{2,true}}, {{1,true},{2,true}}}));
+	}
+
+	TEST_CASE("[DNF-04] negation of a disjunction is the conjunction of negations") {
+		auto d = to_dnf("!(0|1)");
+		REQUIRE(d);
+		CHECK(as_set(*d) == as_set({{{0,false},{1,false}}}));
+		auto c = to_dnf("!(0&1)");
+		REQUIRE(c);
+		CHECK(as_set(*c) == as_set({{{0,false}}, {{1,false}}}));
+	}
+
+	TEST_CASE("[DNF-05] a contradictory cube is dropped, duplicates merged") {
+		auto d = to_dnf("0&!0");
+		REQUIRE(d);
+		CHECK(d->empty());
+		auto e = to_dnf("0&!0|1&1");
+		REQUIRE(e);
+		CHECK(as_set(*e) == as_set({{{1,true}}}));
+	}
+
+	TEST_CASE("[DNF-06] the cube cap refuses instead of truncating") {
+		// (0|1)&(2|3)&(4|5) = 8 cubes; a cap of 4 must refuse.
+		CHECK_FALSE(to_dnf("(0|1)&(2|3)&(4|5)", 4).has_value());
+		auto ok = to_dnf("(0|1)&(2|3)&(4|5)", 16);
+		REQUIRE(ok);
+		CHECK(ok->size() == 8);
+	}
+
+	TEST_CASE("[DNF-07] malformed labels are refused, not partially read") {
+		CHECK_FALSE(to_dnf("(0|1").has_value());
+		CHECK_FALSE(to_dnf("0&").has_value());
+		CHECK_FALSE(to_dnf("0 1").has_value());
+		CHECK_FALSE(to_dnf("&0").has_value());
+		CHECK_FALSE(to_dnf("x").has_value());
+	}
+
+	TEST_CASE("[DNF-08] whitespace and nested groups") {
+		auto d = to_dnf(" ( 0 & ( 1 | !2 ) ) | 3 ");
+		REQUIRE(d);
+		CHECK(as_set(*d) == as_set({{{0,true},{1,true}}, {{0,true},{2,false}}, {{3,true}}}));
+	}
+
+} // TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]")
 
 // ── Phase 2: product game correctness ────────────────────────────────────
 

@@ -241,6 +241,51 @@ TEST_SUITE("TauSpecAdd") {
 	}
 }
 
+TEST_SUITE("TauSpecAddAndEof") {
+	// GR-R3: add() used to swallow a second main and still return true.
+	TEST_CASE("[GR-R3] add() refuses a second main loudly") {
+		tau_spec<node_t> helper1, helper2;
+		helper1.parse("xy = 0.");
+		helper2.parse("xy = 1.");
+		tref m1 = helper1.get();
+		tref m2 = helper2.get();
+		REQUIRE( m1 != nullptr );
+		REQUIRE( m2 != nullptr );
+		tau_spec<node_t> spec;
+		CHECK( spec.add(m1) );
+		CHECK( spec.errors().empty() );
+		CHECK( !spec.add(m2) );
+		REQUIRE( !spec.errors().empty() );
+		CHECK( spec.errors().back().find("Multiple main") != std::string::npos );
+	}
+
+	// GR-R4: a premature get() while a continuation is pending used to
+	// record the eof message as a permanent error, bricking every later
+	// parse() of the same object.
+	TEST_CASE("[GR-R4] a premature get() does not poison the incremental parse") {
+		tau_spec<node_t> spec;
+		CHECK( spec.parse("o[t] =") );   // incomplete
+		CHECK( spec.is_eof() );
+		CHECK( spec.get() == nullptr );  // too early: reported ...
+		CHECK( !spec.errors().empty() );
+		CHECK( spec.parse(" i[t].") );   // ... but the continuation still completes it
+		CHECK( !spec.is_eof() );
+		REQUIRE( spec.get() != nullptr );
+		CHECK( spec.errors().empty() );
+	}
+
+	// GR-RT6 / TT2-2: operator<< had no call site, so its friend fix was
+	// never compiled into an instantiation.
+	TEST_CASE("[GR-RT6] operator<<(ostream&, const tau_spec&) instantiates") {
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("xy = 0.") );
+		REQUIRE( spec.get() != nullptr );
+		std::stringstream ss;
+		ss << spec;
+		CHECK( !ss.str().empty() );
+	}
+}
+
 TEST_SUITE("TauSpecGet") {
 	TEST_CASE("successful get() does not poison errors_ for later parse calls") {
 		// Regression test for TT-16: tau_spec::get() used to push
