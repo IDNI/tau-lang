@@ -121,10 +121,18 @@ static std::pair<std::string, int> spawn_capture(
 	}
 	::close(pipefd[0]);
 
-	int status = 0;
-	while (::waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+	// SY-N6: stop the watchdog BEFORE the child is reaped.  After waitpid
+	// returns the PID may already belong to another process, and a poll
+	// firing in the window between the reap and `done.store(true)` would
+	// SIGTERM it.  Once the pipe is drained (above) the child has closed
+	// its stdout and is exiting, so cancelling the kill here cannot let a
+	// still-running child escape the timeout: the watchdog's job -- bound
+	// the time we wait for OUTPUT -- is done.  (A pidfd_open/WNOWAIT
+	// scheme would close the remaining theoretical window.)
 	done.store(true);
 	if (killer.joinable()) killer.join();
+	int status = 0;
+	while (::waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
 
 	int exit_code;
 	if (WIFEXITED(status))        exit_code = WEXITSTATUS(status);

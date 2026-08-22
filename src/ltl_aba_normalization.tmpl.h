@@ -363,6 +363,17 @@ static bool aba_existential_feasible(tref fm) {
 				}
 			}
 		}
+		// LA-R5 -- KNOWN ONE-DIRECTIONAL OVER-APPROXIMATION.  A formula with
+		// an nlang-typed free variable is declared existentially feasible
+		// on sight, before any solving.  This is a deliberate trade from the
+		// nlang hot-path work (b0fa8143): the oracle round-trip per guard
+		// product was the blocking cost, and an nlang output can in
+		// practice be set to (almost) any proposition.  Consequences the
+		// caller must accept: a contradictory nlang guard product passes
+		// the oracle, and nlang atom PAIRS never receive a G(!(pi && pj))
+		// consistency constraint -- `F(o1 = p ∧ o1 = q)` with disjoint p,q
+		// is reported REALIZABLE and fails at runtime.  Fold the cached
+		// `normalize_nlang` contradiction check in here if that ever bites.
 		constexpr bool has_nlang_ba = ba_variant_includes_v<nlang_ba, typename tau::constant>;
 		if constexpr (has_nlang_ba) {
 			const trefs& fvars = tau::get(fm).get_free_vars();

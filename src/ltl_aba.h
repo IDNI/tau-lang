@@ -274,6 +274,56 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 template <NodeType node>
 struct LtlAbaSolution;
 
+// ── Interpreter-facing helpers (LT-29) ───────────────────────────────────────
+//
+// Defined in ltl_aba_builders.tmpl.h / ltl_aba_normalization.tmpl.h; declared
+// here so the contracts are visible without reading the template bodies.
+//
+// LtlAbaSolution conventions (every algorithm honours these):
+//   - `aut.num_states == 0` means "realizable with no strategy automaton":
+//     the constant-output fast path proves SOME fixed output works but does
+//     not record it (executable == false), and the pure-past compile-away
+//     returns no automaton either.  is_ltl_aba_realizable reports such a
+//     solution REALIZABLE without running the ABA oracle; parse_hoa never
+//     produces it (a strategy text with fewer than one state is refused).
+//   - `executable == false` marks a solution that cannot be compiled into a
+//     program over the user's streams (Algorithm B bookkeeping bits, the
+//     constant-output path); ltl_to_safety_formula_full and tau_codegen
+//     refuse it.
+//   - `atoms` carry the AP names the automaton uses (p_i on the default
+//     path, d_i on Algorithms A/D); the oracle and the safety encoding match
+//     by NAME, so a mismatch makes both vacuous (LT-8).
+
+// Run the whole LTL(ABA) pipeline on a (normalised) formula and return the
+// strategy solution, or nullopt when the formula is UNREALIZABLE.  Throws
+// ltl_synthesis_error when no verdict could be obtained.
+template <NodeType node>
+static std::optional<LtlAbaSolution<node>> solve_ltl_aba(tref fm);
+
+// Existential / synthesis feasibility dispatch for a data conjunction:
+// pure-input and pure-output omcat/nlang formulas use existential
+// satisfiability, everything else the safety-synthesis fixpoint.
+template <NodeType node>
+static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
+
+// Build the atom `<name>[t-<shift>] = <value>` over the Boolean type used
+// for the one-hot state bits.
+template <NodeType node>
+static tref parse_sv_eq(const std::string& name, int shift, int value);
+
+// Multi-state Mealy strategy -> always(phi) with one-hot auxiliary state
+// bits o__ltl_ms<i>__ (see the block comment at the definition).
+template <NodeType node>
+static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol);
+
+// Initial-state conditions for the encoding above: {init bits, first-step
+// output constraint}; the second element is nullptr when the initial state
+// has no outgoing edge.
+template <NodeType node>
+static std::pair<tref,tref>
+encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
+                                const std::vector<std::string>& sv);
+
 // Convert a realizable LTL formula to a tau-lang safety formula (always(phi))
 // that the existing interpreter pipeline can execute.
 //

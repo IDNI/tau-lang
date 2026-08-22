@@ -40,7 +40,9 @@ TEST_SUITE("Spec decomposition") {
 		REQUIRE(fm);
 		auto s = decompose_spec<node_t>(fm);
 		CHECK(s.reactive != nullptr);
-		// GF goes to reactive (has_F detects the inner F).
+		// GF goes to reactive: the G-body scan finds a temporal operator
+		// (after normalisation F is spelled `sometimes`; the scan accepts
+		// every temporal spelling via is_temporal_operator_node).
 		CHECK(s.invariant == nullptr);
 	}
 

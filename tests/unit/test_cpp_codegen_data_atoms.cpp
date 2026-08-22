@@ -15,8 +15,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <unistd.h>
 #include <sstream>
 #include <string>
+
+// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
+// predictable /tmp names -- concurrent checkouts running this suite used
+// to clobber each other's headers/binaries.
+static const std::string& cg_tmp_dir() {
+	static const std::string dir = [] {
+		std::string t = "/tmp/tau_cg_XXXXXX";
+		char* p = ::mkdtemp(t.data());
+		return std::string(p ? p : "/tmp");
+	}();
+	return dir;
+}
+static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+
 
 using namespace idni::tau_lang;
 
@@ -41,21 +56,21 @@ static std::string compile_and_run(
     const std::string& header_src,
     const std::string& main_src)
 {
-	const char* hdr  = "/tmp/_tau_cg_da_test.h";
-	const char* main_f = "/tmp/_tau_cg_da_main.cpp";
-	const char* exe  = "/tmp/_tau_cg_da_exe";
+	const std::string hdr = cg_tmp("_tau_cg_da_test.h");
+	const std::string main_f = cg_tmp("_tau_cg_da_main.cpp");
+	const std::string exe = cg_tmp("_tau_cg_da_exe");
 	{
 		std::ofstream f(hdr);  f << header_src;
 	}
 	{
 		std::ofstream f(main_f); f << main_src;
 	}
-	std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ") + exe
+	std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ") + exe
 	                + " " + main_f + " 2>&1";
 	if (::system(cmd.c_str()) != 0) return "";
-	std::string run_cmd = std::string(exe) + " > /tmp/_tau_cg_da_out 2>&1";
+	std::string run_cmd = std::string(exe) + " > " + cg_tmp("_tau_cg_da_out") + " 2>&1";
 	if (::system(run_cmd.c_str()) != 0) return "";
-	std::ifstream out("/tmp/_tau_cg_da_out");
+	std::ifstream out(cg_tmp("_tau_cg_da_out"));
 	std::string line; std::getline(out, line);
 	return line;
 }

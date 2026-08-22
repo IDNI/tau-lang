@@ -21,8 +21,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <unistd.h>
 #include <sstream>
 #include <string>
+
+// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
+// predictable /tmp names -- concurrent checkouts running this suite used
+// to clobber each other's headers/binaries.
+static const std::string& cg_tmp_dir() {
+	static const std::string dir = [] {
+		std::string t = "/tmp/tau_cg_XXXXXX";
+		char* p = ::mkdtemp(t.data());
+		return std::string(p ? p : "/tmp");
+	}();
+	return dir;
+}
+static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+
 
 using namespace idni::tau_lang;
 using clk = std::chrono::steady_clock;
@@ -93,9 +108,9 @@ static double compiled_seconds(const char* formula_str,
     std::ostringstream hdr_os;
     emit_cpp_program<node_t>(*sol, hdr_os, class_name);
 
-    const char* hdr_path  = "/tmp/_tau_bench_hdr.h";
-    const char* main_path = "/tmp/_tau_bench_main.cpp";
-    const char* exe_path  = "/tmp/_tau_bench_exe";
+    const std::string hdr_path = cg_tmp("_tau_bench_hdr.h");
+    const std::string main_path = cg_tmp("_tau_bench_main.cpp");
+    const std::string exe_path = cg_tmp("_tau_bench_exe");
     { std::ofstream f(hdr_path); f << hdr_os.str(); }
     {
         std::ofstream f(main_path);
@@ -117,12 +132,12 @@ static double compiled_seconds(const char* formula_str,
              "  return 0;\n"
              "}\n";
     }
-    std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I/tmp -o ")
+    std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I" + cg_tmp_dir() + " -o ")
                     + exe_path + " " + main_path + " 2>/dev/null";
     if (::system(cmd.c_str()) != 0) return -1.0;
-    if (::system((std::string(exe_path) + " >/tmp/_tau_bench_out 2>/dev/null").c_str()) != 0)
+    if (::system((std::string(exe_path) + " >" + cg_tmp("_tau_bench_out") + " 2>/dev/null").c_str()) != 0)
         return -1.0;
-    std::ifstream out("/tmp/_tau_bench_out");
+    std::ifstream out(cg_tmp("_tau_bench_out"));
     double sec = -1.0; unsigned s = 0;
     out >> sec >> s; (void)s;
     return sec;
@@ -282,9 +297,9 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 		std::ostringstream hdr_os;
 		emit_cpp_program<node_t>(*sol, hdr_os, "BenchCorr");
 
-		const char* hdr_path  = "/tmp/_tau_bench_corr_hdr.h";
-		const char* main_path = "/tmp/_tau_bench_corr_main.cpp";
-		const char* exe_path  = "/tmp/_tau_bench_corr_exe";
+		const std::string hdr_path = cg_tmp("_tau_bench_corr_hdr.h");
+		const std::string main_path = cg_tmp("_tau_bench_corr_main.cpp");
+		const std::string exe_path = cg_tmp("_tau_bench_corr_exe");
 		{ std::ofstream f(hdr_path); f << hdr_os.str(); }
 		const long N = 10000L;
 		{
@@ -303,12 +318,12 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 			     "  return 0;\n"
 			     "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ")
+		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
 		                + exe_path + " " + main_path + " 2>&1";
 		REQUIRE(::system(cmd.c_str()) == 0);
 		REQUIRE(::system((std::string(exe_path)
-			+ " >/tmp/_tau_bench_corr_out").c_str()) == 0);
-		std::ifstream out("/tmp/_tau_bench_corr_out");
+			+ " >" + cg_tmp("_tau_bench_corr_out")).c_str()) == 0);
+		std::ifstream out(cg_tmp("_tau_bench_corr_out"));
 		unsigned sum = 0; out >> sum;
 		CHECK(sum == (unsigned)N);
 	}

@@ -16,7 +16,7 @@
 //   - REALIZABLE  = ∃strategy. ∀env. formula holds on every infinite run.
 //   - UNREALIZABLE = ∀strategy. ∃env. formula fails on some infinite run.
 //   - G (globally/always) uses the existing safety pipeline.
-//   - F, U, R, W, S use the full LTL(ABA) pipeline (Spot + ABA oracle).
+//   - F, U, R, W, S, T use the full LTL(ABA) pipeline (Spot + ABA oracle).
 //
 // Environment variables that affect synthesis:
 //   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no

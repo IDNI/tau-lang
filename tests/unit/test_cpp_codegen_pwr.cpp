@@ -13,9 +13,24 @@
 
 #include <cstdlib>
 #include <fstream>
+#include <unistd.h>
 #include <optional>
 #include <sstream>
 #include <string>
+
+// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
+// predictable /tmp names -- concurrent checkouts running this suite used
+// to clobber each other's headers/binaries.
+static const std::string& cg_tmp_dir() {
+	static const std::string dir = [] {
+		std::string t = "/tmp/tau_cg_XXXXXX";
+		char* p = ::mkdtemp(t.data());
+		return std::string(p ? p : "/tmp");
+	}();
+	return dir;
+}
+static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+
 
 using namespace idni::tau_lang;
 
@@ -82,9 +97,9 @@ static bool has_gpp() {
 }
 
 static bool compile_and_run_ok_step(const std::string& header_src) {
-	const char* hdr = "/tmp/_tau_codegen_pwr_test.h";
-	const char* main_f = "/tmp/_tau_codegen_pwr_main.cpp";
-	const char* exe = "/tmp/_tau_codegen_pwr_exe";
+	const std::string hdr = cg_tmp("_tau_codegen_pwr_test.h");
+	const std::string main_f = cg_tmp("_tau_codegen_pwr_main.cpp");
+	const std::string exe = cg_tmp("_tau_codegen_pwr_exe");
 	{
 		std::ofstream f(hdr);
 		f << header_src;
@@ -105,12 +120,12 @@ static bool compile_and_run_ok_step(const std::string& header_src) {
 			"  return 0;\n"
 			"}\n";
 	}
-	std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ")
-		+ exe + " " + main_f + " >/tmp/_tau_codegen_pwr_build 2>&1";
+	std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
+		+ exe + " " + main_f + " >" + cg_tmp("_tau_codegen_pwr_build") + " 2>&1";
 	if (::system(cmd.c_str()) != 0) return false;
-	std::string run_cmd = std::string(exe) + " > /tmp/_tau_codegen_pwr_out 2>&1";
+	std::string run_cmd = std::string(exe) + " > " + cg_tmp("_tau_codegen_pwr_out") + " 2>&1";
 	if (::system(run_cmd.c_str()) != 0) return false;
-	std::ifstream out("/tmp/_tau_codegen_pwr_out");
+	std::ifstream out(cg_tmp("_tau_codegen_pwr_out"));
 	std::string line;
 	std::getline(out, line);
 	return line == "OK";
@@ -210,9 +225,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		auto generated = emit_pwr_class("G(o1[t] = 0).", "PwrTblRun");
 		REQUIRE(generated.has_value());
-		const char* hdr = "/tmp/_tau_pwr_tbl_test.h";
-		const char* main_f = "/tmp/_tau_pwr_tbl_main.cpp";
-		const char* exe = "/tmp/_tau_pwr_tbl_exe";
+		const std::string hdr = cg_tmp("_tau_pwr_tbl_test.h");
+		const std::string main_f = cg_tmp("_tau_pwr_tbl_main.cpp");
+		const std::string exe = cg_tmp("_tau_pwr_tbl_exe");
 		{
 			std::ofstream f(hdr);
 			f << *generated;
@@ -233,13 +248,13 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 				"  return 0;\n"
 				"}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ")
-			+ exe + " " + main_f + " >/tmp/_tau_pwr_tbl_build 2>&1";
+		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
+			+ exe + " " + main_f + " >" + cg_tmp("_tau_pwr_tbl_build") + " 2>&1";
 		CHECK(::system(cmd.c_str()) == 0);
 		std::string run_cmd = std::string(exe)
-			+ " > /tmp/_tau_pwr_tbl_out 2>&1";
+			+ " > " + cg_tmp("_tau_pwr_tbl_out") + " 2>&1";
 		CHECK(::system(run_cmd.c_str()) == 0);
-		std::ifstream out("/tmp/_tau_pwr_tbl_out");
+		std::ifstream out(cg_tmp("_tau_pwr_tbl_out"));
 		std::string line;
 		std::getline(out, line);
 		CHECK(line == "OK");
@@ -261,9 +276,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 			sol2->output_props, strat2_ss);
 		auto strat2 = strat2_ss.str();
 
-		const char* hdr = "/tmp/_tau_pwr_rev_test.h";
-		const char* main_f = "/tmp/_tau_pwr_rev_main.cpp";
-		const char* exe = "/tmp/_tau_pwr_rev_exe";
+		const std::string hdr = cg_tmp("_tau_pwr_rev_test.h");
+		const std::string main_f = cg_tmp("_tau_pwr_rev_main.cpp");
+		const std::string exe = cg_tmp("_tau_pwr_rev_exe");
 		{
 			std::ofstream f(hdr);
 			f << *gen1;
@@ -289,19 +304,19 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 			     "  return 0;\n"
 			     "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ")
-			+ exe + " " + main_f + " >/tmp/_tau_pwr_rev_build 2>&1";
+		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
+			+ exe + " " + main_f + " >" + cg_tmp("_tau_pwr_rev_build") + " 2>&1";
 		if (::system(cmd.c_str()) != 0) {
-			std::ifstream blog("/tmp/_tau_pwr_rev_build");
+			std::ifstream blog(cg_tmp("_tau_pwr_rev_build"));
 			std::string blog_str((std::istreambuf_iterator<char>(blog)),
 				std::istreambuf_iterator<char>());
 			MESSAGE("compile failed: ", blog_str);
 		}
 		CHECK(::system(cmd.c_str()) == 0);
 		std::string run_cmd = std::string(exe)
-			+ " > /tmp/_tau_pwr_rev_out 2>&1";
+			+ " > " + cg_tmp("_tau_pwr_rev_out") + " 2>&1";
 		CHECK(::system(run_cmd.c_str()) == 0);
-		std::ifstream out("/tmp/_tau_pwr_rev_out");
+		std::ifstream out(cg_tmp("_tau_pwr_rev_out"));
 		std::string line;
 		std::getline(out, line);
 		CHECK(line == "OK");
@@ -326,9 +341,9 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrNdebug");
 		REQUIRE(gen1.has_value());
 
-		const char* hdr = "/tmp/_tau_pwr_ndebug_test.h";
-		const char* main_f = "/tmp/_tau_pwr_ndebug_main.cpp";
-		const char* exe = "/tmp/_tau_pwr_ndebug_exe";
+		const std::string hdr = cg_tmp("_tau_pwr_ndebug_test.h");
+		const std::string main_f = cg_tmp("_tau_pwr_ndebug_main.cpp");
+		const std::string exe = cg_tmp("_tau_pwr_ndebug_exe");
 		{ std::ofstream f(hdr); f << *gen1; }
 		{
 			std::ofstream f(main_f);
@@ -355,13 +370,13 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 			     "  return 0;\n"
 			     "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -DNDEBUG -std=c++17 -I/tmp -o ")
-			+ exe + " " + main_f + " >/tmp/_tau_pwr_ndebug_build 2>&1";
+		std::string cmd = std::string("g++ -O2 -DNDEBUG -std=c++17 -I" + cg_tmp_dir() + " -o ")
+			+ exe + " " + main_f + " >" + cg_tmp("_tau_pwr_ndebug_build") + " 2>&1";
 		REQUIRE(::system(cmd.c_str()) == 0);
 		std::string run_cmd = std::string(exe)
-			+ " > /tmp/_tau_pwr_ndebug_out 2>&1";
+			+ " > " + cg_tmp("_tau_pwr_ndebug_out") + " 2>&1";
 		int rc = ::system(run_cmd.c_str());
-		std::ifstream out("/tmp/_tau_pwr_ndebug_out");
+		std::ifstream out(cg_tmp("_tau_pwr_ndebug_out"));
 		std::string line;
 		std::getline(out, line);
 		CHECK(rc == 0);

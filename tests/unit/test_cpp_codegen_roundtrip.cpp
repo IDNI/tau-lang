@@ -14,6 +14,20 @@
 #include <string>
 #include <unistd.h>
 
+// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
+// predictable /tmp names -- concurrent checkouts running this suite used
+// to clobber each other's headers/binaries.
+static const std::string& cg_tmp_dir() {
+	static const std::string dir = [] {
+		std::string t = "/tmp/tau_cg_XXXXXX";
+		char* p = ::mkdtemp(t.data());
+		return std::string(p ? p : "/tmp");
+	}();
+	return dir;
+}
+static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+
+
 using namespace idni::tau_lang;
 
 namespace {
@@ -22,7 +36,7 @@ namespace {
 // other codegen test files' fixed /tmp/_tau_* names when ctest runs them
 // concurrently.
 std::string unique_tmp(const std::string& suffix) {
-	return "/tmp/_tau_cg_rt_" + std::to_string(::getpid()) + "_" + suffix;
+	return cg_tmp("_tau_cg_rt_") + std::to_string(::getpid()) + "_" + suffix;
 }
 
 HoaAutomaton echo_spec() {
@@ -42,9 +56,9 @@ bool has_gpp() {
 }
 
 bool compile_and_run_echo(const std::string& header_src) {
-	const char* hdr_path = "/tmp/_tau_codegen_test_ctrl.h";
-	const char* main_path = "/tmp/_tau_codegen_test_main.cpp";
-	const char* exe_path  = "/tmp/_tau_codegen_test_exe";
+	const std::string hdr_path = cg_tmp("_tau_codegen_test_ctrl.h");
+	const std::string main_path = cg_tmp("_tau_codegen_test_main.cpp");
+	const std::string exe_path = cg_tmp("_tau_codegen_test_exe");
 
 	{
 		std::ofstream f(hdr_path);
@@ -69,16 +83,16 @@ bool compile_and_run_echo(const std::string& header_src) {
 		    "}\n";
 	}
 
-	std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I/tmp -o ")
+	std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I" + cg_tmp_dir() + " -o ")
 	                + exe_path + " " + main_path + " 2>&1";
-	// Ensure the header is findable via -I/tmp and the #include matches.
+	// Ensure the header is findable via -I<dir> and the #include matches.
 	int rc = system(cmd.c_str());
 	if (rc != 0) return false;
 
-	rc = system((std::string(exe_path) + " >/tmp/_tau_codegen_test_out").c_str());
+	rc = system((std::string(exe_path) + " >" + cg_tmp("_tau_codegen_test_out")).c_str());
 	if (rc != 0) return false;
 
-	std::ifstream out("/tmp/_tau_codegen_test_out");
+	std::ifstream out(cg_tmp("_tau_codegen_test_out"));
 	std::string line; std::getline(out, line);
 	return line == "OK";
 }
@@ -107,7 +121,7 @@ std::string compile_and_run(const std::string& header_src,
 		  << "int main() {\n" << main_body << "\n}\n";
 	}
 
-	std::string cmd = "g++ -O2 -std=c++17 -I/tmp -o " + exe_path
+	std::string cmd = "g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o " + exe_path
 	                 + " " + main_path + " 2>&1";
 	if (system(cmd.c_str()) != 0) return "";
 	if (system((exe_path + " >" + out_path).c_str()) != 0) return "";
@@ -154,9 +168,9 @@ TEST_SUITE("cpp_codegen_open") {
 		emit_cpp_program_open_prop(echo_spec(), {"in_sig"}, {"out_sig"},
 			{"o_out_sig"}, os, "EchoCtrl");
 
-		const char* hdr_path  = "/tmp/_tau_codegen_open_ctrl.h";
-		const char* main_path = "/tmp/_tau_codegen_open_main.cpp";
-		const char* exe_path  = "/tmp/_tau_codegen_open_exe";
+		const std::string hdr_path = cg_tmp("_tau_codegen_open_ctrl.h");
+		const std::string main_path = cg_tmp("_tau_codegen_open_main.cpp");
+		const std::string exe_path = cg_tmp("_tau_codegen_open_exe");
 		{ std::ofstream f(hdr_path); f << os.str(); }
 		{
 			std::ofstream f(main_path);
@@ -196,12 +210,12 @@ TEST_SUITE("cpp_codegen_open") {
 			    "  return 0;\n"
 			    "}\n";
 		}
-		std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ")
+		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
 		                + exe_path + " " + main_path + " 2>&1";
 		REQUIRE(system(cmd.c_str()) == 0);
 		REQUIRE(system((std::string(exe_path)
-			+ " >/tmp/_tau_codegen_open_out").c_str()) == 0);
-		std::ifstream out("/tmp/_tau_codegen_open_out");
+			+ " >" + cg_tmp("_tau_codegen_open_out")).c_str()) == 0);
+		std::ifstream out(cg_tmp("_tau_codegen_open_out"));
 		std::string line; std::getline(out, line);
 		CHECK(line == "OK");
 	}

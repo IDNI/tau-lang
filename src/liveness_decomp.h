@@ -14,9 +14,11 @@
 //                     fixpoint in the pruned arena.
 //
 // Returns the structured decomposition for the direct-game pipeline.
-// Non-GR(1) formulas fall back to returning `overall = fm` and an empty
-// `liveness_parts` vector — the caller should then dispatch to general
-// LTL via the DPW product game (Algorithm D, Phase 1).
+// Non-GR(1) formulas (and a null/empty input) come back as a
+// default-constructed LivenessDecomp -- `is_gr1 == false`, null
+// `safety_part`, empty `liveness_parts` (GR-2: there is no `overall`
+// field; the caller keeps its own handle on the formula and dispatches to
+// the general parity-game path).
 
 #ifndef __IDNI__TAU__LIVENESS_DECOMP_H__
 #define __IDNI__TAU__LIVENESS_DECOMP_H__

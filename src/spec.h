@@ -17,9 +17,13 @@
 // type for that decomposition, with a helper `decompose_spec` that does
 // the split once.
 //
-// This header is additive: existing code paths continue to use `rr`; new
-// code (Algorithms A/B/C/D, GR(1) detection, etc.) opt in by calling
-// `decompose_spec(main)` to get the three components explicitly.
+// This header is additive: existing code paths continue to use `rr`.
+//
+// NOT YET WIRED into production (GR-N1, same status as gr1_detect.h,
+// liveness_decomp.h and mealy_extract.h): at HEAD the only consumers of
+// `decompose_spec` are unit tests.  The intended consumers (the direct
+// game pipeline, GR(1) detection) would opt in by calling
+// `decompose_spec(main)`; until one does, treat this as staged work.
 
 #ifndef __IDNI__TAU__SPEC_H__
 #define __IDNI__TAU__SPEC_H__

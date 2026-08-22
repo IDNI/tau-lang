@@ -32,6 +32,7 @@
 #endif
 
 #include <cstring>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -62,6 +63,19 @@ static void usage() {
 	    "Exit codes: 0 program emitted; 1 input/output error; 2 usage;\n"
 	    "            3 UNREALIZABLE; 4 UNKNOWN (backend gave no verdict);\n"
 	    "            5 REALIZABLE but not compilable over the streams.\n";
+}
+
+// CG-N7: --class and --open names are interpolated into generated C++
+// (class name, struct fields, string literals); anything that is not an
+// identifier produces an invalid or mis-quoted program.
+static bool is_cpp_identifier(const std::string& s) {
+	if (s.empty()) return false;
+	auto ok_first = [](unsigned char c) { return std::isalpha(c) || c == '_'; };
+	auto ok_rest  = [](unsigned char c) { return std::isalnum(c) || c == '_'; };
+	if (!ok_first(s[0])) return false;
+	for (size_t i = 1; i < s.size(); ++i)
+		if (!ok_rest(s[i])) return false;
+	return true;
 }
 
 int main(int argc, char** argv) {
@@ -117,6 +131,18 @@ int main(int argc, char** argv) {
 			seen_spec = true;
 		}
 	}
+
+	if (!is_cpp_identifier(class_name)) {
+		std::cerr << "--class: '" << class_name
+		          << "' is not a C++ identifier\n";
+		return 2;
+	}
+	for (const auto& s : open_streams)
+		if (!is_cpp_identifier(s)) {
+			std::cerr << "--open: '" << s
+			          << "' is not a stream identifier\n";
+			return 2;
+		}
 
 	std::string src;
 	if (spec_path == "-") {
