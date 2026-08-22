@@ -370,6 +370,44 @@ State: 2
 		CHECK(g.player[1] == 1);
 		CHECK(g.player[2] == 1);
 	}
+
+	// AL-11 / AL-RT2 (re-port of the pre-rebase [ALG-D-45]): an HOA whose
+	// acceptance is `Acceptance: 0 t` and that carries NO acc-name: line is
+	// trivially-all.  Without this every state got priority 0 (env-good),
+	// the all-even game was won by env everywhere, and the formula was
+	// reported UNREALIZABLE regardless of structure.
+	TEST_CASE("[ALG-D-60] Acceptance: 0 t with no acc-name: is treated as trivially-all") {
+		const char* fixture =
+			"HOA: v1\n"
+			"States: 1\n"
+			"Start: 0\n"
+			"AP: 1 \"p0\"\n"
+			"Acceptance: 0 t\n"
+			"--BODY--\n"
+			"State: 0\n"
+			"[t] 0\n"
+			"--END--\n";
+		auto g = alg_d::parse_synth_game_hoa(fixture);
+		REQUIRE(g.state_priority.size() == 1);
+		CHECK(g.state_priority[0] == 1);
+	}
+
+	// ... and `Acceptance: 0 f` (never accepting) stays env-good.
+	TEST_CASE("[ALG-D-60b] Acceptance: 0 f with no acc-name: stays priority 0") {
+		const char* fixture =
+			"HOA: v1\n"
+			"States: 1\n"
+			"Start: 0\n"
+			"AP: 1 \"p0\"\n"
+			"Acceptance: 0 f\n"
+			"--BODY--\n"
+			"State: 0\n"
+			"[t] 0\n"
+			"--END--\n";
+		auto g = alg_d::parse_synth_game_hoa(fixture);
+		REQUIRE(g.state_priority.size() == 1);
+		CHECK(g.state_priority[0] == 0);
+	}
 }
 
 // ── Phase 2: DPA extraction regression ───────────────────────────────────
@@ -591,6 +629,55 @@ State: 1
 		CHECK(W1.count(2));
 	}
 
+	// AL-R1 / AL-RT4: the discriminating case [ALG-D-47] misses.  State 0
+	// (sys) chooses between the stuck state 1 and state 2, an env-owned
+	// EVEN self-loop (env wins there).  Both of sys's real options lose, so
+	// W1 must be empty.  Before the fix, `solve` scored the dead end 1 as a
+	// sys win by parity, handed {0,1} to sys, and the one-shot override
+	// only erased 1 — leaving 0 in W1 (false REALIZABLE).
+	TEST_CASE("[ALG-D-49] AL-R1: a dead end next to an env-won successor does not keep the predecessor") {
+		alg_d::ProductGame pg;
+		pg.n_states = 3;
+		pg.init     = 0;
+		pg.player   = {1, 1, 0};
+		pg.priority = {1, 1, 0};
+		pg.succs    = {{1, 2}, {}, {2}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());
+	}
+
+	// The symmetric shape keeps its documented asymmetry: an ENV state that
+	// could move into an env dead end is still NOT awarded to sys (the env
+	// over-approximation refusal), but the env dead end itself is.
+	TEST_CASE("[ALG-D-50] AL-R1: env edges into env dead ends are pruned, attractor still refused") {
+		alg_d::ProductGame pg;
+		pg.n_states = 3;
+		pg.init     = 0;
+		pg.player   = {0, 0, 0};
+		pg.priority = {0, 0, 0};
+		pg.succs    = {{1, 2}, {}, {2}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(1));      // env cannot move: lost for env
+		CHECK(!W1.count(2));     // even self-loop: env wins
+		CHECK(!W1.count(0));     // env avoids its dead end; attractor not awarded
+	}
+
+	// Pruning must not remove the live alternative: [ALG-D-47] with an
+	// extra sys edge from the dead end's sibling stays REALIZABLE.
+	TEST_CASE("[ALG-D-51] AL-R1: pruning keeps live alternatives") {
+		alg_d::ProductGame pg;
+		pg.n_states = 4;
+		pg.init     = 0;
+		pg.player   = {1, 1, 0, 1};
+		pg.priority = {1, 1, 0, 1};
+		pg.succs    = {{1, 2, 3}, {}, {2}, {3}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(0));
+		CHECK(!W1.count(1));
+		CHECK(!W1.count(2));
+		CHECK(W1.count(3));
+	}
+
 	// ── LS-10: call_ltlsynt_game's input mechanism ───────────────────────
 	//
 	// `call_ltlsynt` retired inline `--formula="…"` for tempfile +
@@ -677,6 +764,128 @@ State: 1
 		CHECK(alg_d_realizable("G (o1[t]:qlt > i1[t-1]:qlt)."));
 	}
 }
+
+
+// ── AL-RT1: build_product_game direct tests (re-ported from the pre-rebase
+// suite [ALG-D-55]/[ALG-D-56a]/[ALG-D-56b]) ───────────────────────────────
+
+TEST_SUITE("[Algorithm D: product game construction]") {
+
+	TEST_CASE("[ALG-D-55] edge-color layer creates intermediate stub states") {
+		alg_d::SynthGame g;
+		g.num_states = 2;
+		g.init = 0;
+		g.player = {1, 0};       // state 0 = sys, state 1 = env
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1, -1};
+		g.state_priority = {1, 1};
+		g.trans.resize(2);
+		g.trans[0].emplace_back("t", 1, 0);  // marked edge (color 0)
+		g.trans[1].emplace_back("t", 0, -1); // unmarked edge
+		g.edge_priority = {{1}, {-1}};
+
+		int T1_size = 1;
+		std::vector<omcat::QltType3> T3(1);
+		T3[0].pos_m = 0; T3[0].pos_y = 0;
+		std::vector<int> type_A = {1}; // pattern 1 (d_0 = true) feasible
+
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1);
+		int base_n = g.num_states * T1_size;
+		CHECK(pg.n_states > base_n);
+		// The sys base state (0,rho=0) = index 0 must reach a stub with the
+		// edge's priority (1), and that stub must have exactly one successor.
+		REQUIRE(!pg.succs[0].empty());
+		int stub = pg.succs[0][0];
+		REQUIRE(stub >= base_n);
+		CHECK(pg.priority[stub] == 1);
+		CHECK(pg.succs[stub].size() == 1);
+	}
+
+	TEST_CASE("[ALG-D-56a] pattern-feasible D-pattern: sys wins") {
+		alg_d::SynthGame g;
+		g.num_states = 1;
+		g.init = 0;
+		g.player = {1};
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1};
+		g.state_priority = {1};   // "all" acceptance: priority 1 everywhere
+		g.trans.resize(1);
+		g.trans[0].emplace_back("0", 0, -1); // self-loop, requires d_0 = true
+		g.edge_priority = {{-1}};
+
+		int T1_size = 1;
+		std::vector<omcat::QltType3> T3(1);
+		T3[0].pos_m = 0; T3[0].pos_y = 0;
+		std::vector<int> type_A = {1}; // D-pattern 1 feasible at (rho=0,rho'=0)
+
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1);
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(0));
+	}
+
+	TEST_CASE("[ALG-D-56b] pattern-infeasible D-pattern: dead end must NOT win for sys") {
+		alg_d::SynthGame g;
+		g.num_states = 1;
+		g.init = 0;
+		g.player = {1};
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1};
+		g.state_priority = {1};
+		g.trans.resize(1);
+		g.trans[0].emplace_back("0", 0, -1); // requires d_0 = true (pattern 1)
+		g.edge_priority = {{-1}};
+
+		int T1_size = 1;
+		std::vector<omcat::QltType3> T3(1);
+		T3[0].pos_m = 0; T3[0].pos_y = 0;
+		std::vector<int> type_A = {0}; // only pattern 0 feasible — guard needs 1
+
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1);
+		// Base sys state must have no successors (dead end).
+		CHECK(pg.succs[0].empty());
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());
+	}
+
+	// AL-R1 through the product game: sys state 0 has two edges under the
+	// same feasible D-pattern — one into sys state 1, whose only edge needs
+	// an infeasible pattern (a dead end after pruning), and one into env
+	// state 2 whose even self-loop env wins.  Both options lose.
+	TEST_CASE("[ALG-D-56c] AL-R1: dead-end edge plus env-won edge is UNREALIZABLE") {
+		alg_d::SynthGame g;
+		g.num_states = 3;
+		g.init = 0;
+		g.player = {1, 1, 0};
+		g.aps = {"d_0", "d_1"};
+		g.controllable = {true, true};
+		g.state_color = {-1, -1, -1};
+		g.state_priority = {1, 1, 0};
+		g.trans.resize(3);
+		g.trans[0].emplace_back("0", 1, -1);   // pattern 1 (d_0 only): feasible
+		g.trans[0].emplace_back("0", 2, -1);   // same pattern, into the env sink
+		g.trans[1].emplace_back("1", 1, -1);   // needs d_1: no feasible pattern
+		g.trans[2].emplace_back("t", 2, -1);   // env even sink
+		g.edge_priority = {{-1, -1}, {-1}, {-1}};
+
+		int T1_size = 1;
+		std::vector<omcat::QltType3> T3(1);
+		T3[0].pos_m = 0; T3[0].pos_y = 0;
+		std::vector<int> type_A = {1};         // only pattern 1 feasible
+
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/2);
+		REQUIRE(pg.n_states >= 3);
+		CHECK(pg.succs[1].empty());            // sys dead end
+		CHECK(pg.succs[0].size() == 2);
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(!W1.count(0));
+		CHECK(!W1.count(1));
+		CHECK(!W1.count(2));
+	}
+
+} // TEST_SUITE("[Algorithm D: product game construction]")
 
 
 TEST_SUITE("Cleanup") {

@@ -4,6 +4,7 @@
 // Algorithm D (direct parity-game construction).
 
 #include "test_init.h"
+#include <climits>
 #include "omcat_types.h"
 #include "omcat_constants.h"
 
@@ -71,6 +72,36 @@ TEST_SUITE("omcat type enumeration") {
 		auto ts = enumerate_qlt_T1({Rat(5, 1)});
 		auto w = ts[2].realize();
 		CHECK(cmp(w, Rat(5, 1)) > 0);
+	}
+
+	// AL-R2: `cmp` was widened to 128-bit (BA2-24) because long long
+	// cross-products overflow for parse-reachable magnitudes, but
+	// `realize()` kept multiplying the same p/q pairs in 64 bits.  Two
+	// constants with denominators around 3.04e9 make the old midpoint
+	// denominator `2*a.q*b.q` overflow (signed UB), and the corrupted
+	// witness then mis-orders T2/T3 enumeration.  The witness must lie
+	// strictly inside the interval and `qlt_type_of` must invert it.
+	TEST_CASE("[AL-R2] realize: interval witness does not overflow for large denominators") {
+		std::vector<Rat> cs = { Rat(1, 3037000499LL), Rat(1, 3037000500LL) };
+		auto ts = enumerate_qlt_T1(cs);
+		REQUIRE(ts.size() == 5u);
+		// sorted: 1/3037000500 < 1/3037000499
+		auto w = ts[2].realize();
+		CHECK(cmp(w, Rat(1, 3037000500LL)) > 0);
+		CHECK(cmp(w, Rat(1, 3037000499LL)) < 0);
+		for (const auto& t : ts) {
+			auto r = t.realize();
+			CHECK(r.q > 0);
+			CHECK(qlt_type_of(r, t.constants) == t.index());
+		}
+		// Outer intervals with extreme numerators: c-1 / c+1 must not wrap.
+		std::vector<Rat> big = { Rat(LLONG_MAX - 1, 1), Rat(LLONG_MIN + 2, 1) };
+		auto tb = enumerate_qlt_T1(big);
+		REQUIRE(tb.size() == 5u);
+		CHECK(cmp(tb[0].realize(), Rat(LLONG_MIN + 2, 1)) < 0);
+		CHECK(cmp(tb[4].realize(), Rat(LLONG_MAX - 1, 1)) > 0);
+		CHECK(cmp(tb[2].realize(), Rat(LLONG_MIN + 2, 1)) > 0);
+		CHECK(cmp(tb[2].realize(), Rat(LLONG_MAX - 1, 1)) < 0);
 	}
 
 	TEST_CASE("qlt_type_of inverts realize") {

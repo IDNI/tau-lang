@@ -4011,6 +4011,103 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1&2", aps, atoms));
 	}
 
+	// ── LA-R1 / LA-R2 / LA-N5 / LA-RT1: per-input-class semantics ─────────
+	//
+	// A strategy edge fires under EVERY input class its label admits; the
+	// system only gets to pick the output part.  So "some product feasible"
+	// is the wrong acceptance rule as soon as the products carry different
+	// pure-input literals: the environment can choose the input class whose
+	// only product has an infeasible output part.  The sound rule is
+	//   for every input-feasible class, some product of that class (or one
+	//   whose input part is weaker) has a feasible output part;
+	//   input-dead classes fire vacuously.
+	// Fixture (review probe 5): p0 = (i1 = 1/4), p1 = (i1 = 3/4) — mutually
+	// exclusive pure-input — and the pure-output pair p2 = (o1 < 0),
+	// p3 = (o1 > 1), individually feasible and jointly infeasible, so `2&3`
+	// is the infeasible output part and `!2` a feasible one.  (A single
+	// self-contradictory atom such as `o1 < o1` folds to F at parse time.)
+	static std::pair<std::vector<std::pair<tref, std::string>>,
+	                 std::vector<std::string>>
+	two_inputs_one_dead_output() {
+		tref fm = wff("(i1[t]:qlt = {1/4}:qlt) && (i1[t]:qlt = {3/4}:qlt)"
+		              " && (o1[t]:qlt < {0}:qlt) && (o1[t]:qlt > {1}:qlt)");
+		auto atoms = extract_data_atoms<node_t>(fm);
+		std::vector<std::string> aps;
+		for (auto& [f, name] : atoms) aps.push_back(name);
+		return {atoms, aps};
+	}
+
+	TEST_CASE("[GF-10] probe-5 fixture atoms behave as assumed") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK(is_pure_input_atom<node_t>(atoms[0].first));
+		CHECK(is_pure_input_atom<node_t>(atoms[1].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[2].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[3].first));
+		CHECK(guard_is_aba_feasible<node_t>("0", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("1", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!2", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3", aps, atoms));
+	}
+
+	// LA-R2: the edge fires under input class p0 (only product 0&2&3,
+	// output part infeasible) AND under class p1 (product 1, fine).  The
+	// old "some product feasible" rule accepted it; under inputs p0 the
+	// system has no satisfying output.
+	TEST_CASE("[GF-11] LA-R2: a live input class with only an infeasible product rejects the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | 1", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("1 | 0&2&3", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0 | 1&2&3", aps, atoms));
+		// Both classes served by a feasible product: accepted.
+		CHECK(guard_is_aba_feasible<node_t>("0&!2 | 1", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&2 | 1&3", aps, atoms));
+	}
+
+	// LA-R1: a dead input class (p0&p1 is input-contradictory) must skip
+	// only ITS product, not accept the whole edge; the remaining
+	// unconstrained-input product `2&3` is the only one that can fire and
+	// it is infeasible.
+	TEST_CASE("[GF-12] LA-R1: a dead product is skipped, not used to accept the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1&2 | 2&3", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3 | 0&1&2", aps, atoms));
+		// Every product input-dead: the edge can never fire → vacuous.
+		CHECK(guard_is_aba_feasible<node_t>("0&1&2&3", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&1&2&3 | 1&0&!2", aps, atoms));
+	}
+
+	// A product with a WEAKER input part covers the stronger class: under
+	// inputs p0 the system may take the input-unconstrained product `!2`.
+	TEST_CASE("[GF-13] a feasible product with weaker inputs covers a stronger class") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK(guard_is_aba_feasible<node_t>("0&2&3 | !2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&2&3 | 0&!2", aps, atoms));
+		// ... but a STRONGER input part does not cover the weaker class.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3 | 0&!2", aps, atoms));
+	}
+
+	// Negated input literals split the classes semantically: `!0` and `0`
+	// are complementary, so `0&2&3 | !0&!2` is rejected (inputs p0 only
+	// admit the infeasible product) while `!0&2&3 | 0&!2 | !0&!2` is
+	// accepted (every input class reaches a feasible product).
+	TEST_CASE("[GF-14] complementary input literals form disjoint classes") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | !0&!2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
+	}
+
 } // TEST_SUITE("[LT-3] ABA oracle guard parsing")
 
 

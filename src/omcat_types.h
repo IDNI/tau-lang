@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <utility>
+#include <limits>
 #include <vector>
 
 namespace idni::tau_lang::omcat {
@@ -75,6 +76,12 @@ struct QltType1 {
 		return hp > j; // BA2-14: both ternary branches were identical
 	}
 
+	// AL-R2: all arithmetic in 128 bits, reduced by gcd before narrowing
+	// (the BA2-24 rationale for `cmp` applies here verbatim: long long
+	// products of parse-reachable p/q pairs overflow, and a corrupted
+	// witness mis-orders T2/T3 enumeration).  The interior witness is the
+	// MEDIANT (a.p+b.p)/(a.q+b.q), which lies strictly between a < b for
+	// positive denominators and never needs a product at all.
 	Rat realize() const {
 		int k = (int)constants.size();
 		if (is_point()) return constants[pos >> 1];
@@ -83,17 +90,34 @@ struct QltType1 {
 			if (k == 0) return Rat(0, 1);
 			Rat c = constants[0];
 			// c - 1 as p/q - 1 = (p - q)/q.
-			return Rat(c.p - c.q, c.q);
+			return make_reduced((omcat_int128_)c.p - c.q, c.q);
 		}
 		if (i == k) {
 			Rat c = constants[k - 1];
-			return Rat(c.p + c.q, c.q);
+			return make_reduced((omcat_int128_)c.p + c.q, c.q);
 		}
 		Rat a = constants[i - 1], b = constants[i];
-		long long num = a.p * b.q + b.p * a.q;
-		long long den = 2 * a.q * b.q;
-		return Rat(num, den);
+		return make_reduced((omcat_int128_)a.p + b.p,
+		                    (omcat_int128_)a.q + b.q);
 	}
+
+private:
+	static Rat make_reduced(omcat_int128_ num, omcat_int128_ den) {
+		if (den < 0) { num = -num; den = -den; }
+		omcat_int128_ x = num < 0 ? -num : num, y = den;
+		while (y != 0) { omcat_int128_ r = x % y; x = y; y = r; }
+		if (x > 1) { num /= x; den /= x; }
+		// The reduced value fits long long for every parser-produced
+		// constant pair (|p|+|p'| < 2^63).  Beyond that the halving below
+		// is a best-effort approximation of the mediant that can land on a
+		// neighbour; `cmp` stays exact, so callers comparing witnesses see
+		// at worst a duplicate type, never UB.
+		const omcat_int128_ lim = std::numeric_limits<long long>::max();
+		while (num > lim || num < -lim || den > lim) { num /= 2; den /= 2; }
+		if (den == 0) den = 1;
+		return Rat((long long)num, (long long)den);
+	}
+public:
 };
 
 inline std::vector<QltType1> enumerate_qlt_T1(std::vector<Rat> constants) {

@@ -293,6 +293,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 	int cur_state = -1;
 	bool is_buchi = false, is_cobuchi = false, is_all = false;
 	bool is_parity = false, parity_min = false, parity_even = false;
+	std::string acc_cond;   // the condition after the colour count
 
 	auto parse_int_list = [](const std::string& s) {
 		std::vector<int> out;
@@ -359,6 +360,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 			} else if (line.substr(0,11) == "Acceptance:") {
 				std::istringstream al(line.substr(11));
 				al >> g.n_colors;
+				std::getline(al, acc_cond);
 			} else if (line.find("trans-acc") != std::string::npos) {
 				g.trans_acc = true;
 			}
@@ -425,6 +427,17 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 			: parity_even;
 		return win_even_after ? p + 1 : p;
 	};
+	// AL-11: a header without `acc-name:` but with the trivially-all
+	// condition `Acceptance: 0 t` would otherwise give every state
+	// priority 0 (env-good) and the all-even game is won by env everywhere
+	// — a blanket UNREALIZABLE for hand-fed HOA.  (Spot always emits
+	// acc-name; this only matters for fixtures and foreign tools.)
+	if (!is_all && !is_buchi && !is_cobuchi && !is_parity
+	    && g.n_colors == 0) {
+		auto first = acc_cond.find_first_not_of(" \t\r");
+		if (first != std::string::npos && acc_cond[first] == 't')
+			is_all = true;
+	}
 	for (int q = 0; q < g.num_states; ++q) {
 		int c = g.state_color[q];
 		if (is_all)
@@ -862,6 +875,18 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 	// statement as "cannot move" (a Zielonka sub-game is a trap for one player
 	// only), and it short-circuited the parity recursion.
 	//
+	// AL-R1 (2026-08-18 review): the one-shot override alone UNDER-corrects.
+	// `solve` scores a sys dead end with an odd priority as a sys win, so a
+	// sys predecessor that chooses between that dead end and a genuinely
+	// env-won successor is handed to sys by the recursion, and erasing the
+	// dead end afterwards leaves the predecessor in W1 (false REALIZABLE).
+	// Fix: before solving, delete each owner's edges INTO its own lost set —
+	// a player never voluntarily moves into a state it has already lost —
+	// re-run the closure on the pruned graph to a fixpoint, and solve the
+	// pruned game.  The override below then only has the dead ends
+	// themselves left to correct.  Symmetrically env edges into env-lost
+	// states are pruned, so env is never credited with a suicidal move.
+	//
 	// What is deliberately NOT done: the OPPONENT's attractor of the dead-end
 	// set is not awarded to the opponent, even though that is the textbook
 	// treatment.  `build_product_game`'s env transitions ignore the T3
@@ -872,10 +897,11 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 	// realizable `G(o1>0) U (o1<0)` into UNREALIZABLE (ALG-D-28).  Fixing the
 	// env-move modelling is its own piece of work; until then the rule is
 	// applied only where it cannot be wrong.
+	std::vector<std::vector<int>> succs = pg.succs;
 	auto closure_of_dead_ends = [&](int stuck_player) {
 		std::set<int> lost;
 		for (int u = 0; u < pg.n_states; ++u)
-			if (pg.succs[u].empty() && pg.player[u] == stuck_player)
+			if (succs[u].empty() && pg.player[u] == stuck_player)
 				lost.insert(u);
 		if (lost.empty()) return lost;
 		for (bool changed = true; changed; ) {
@@ -883,19 +909,32 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 			for (int u = 0; u < pg.n_states; ++u) {
 				if (lost.count(u)) continue;
 				if (pg.player[u] != stuck_player) continue;
-				if (pg.succs[u].empty()) continue;   // already seeded
+				if (succs[u].empty()) continue;   // already seeded
 				bool all_lost = true;
-				for (int v : pg.succs[u])
+				for (int v : succs[u])
 					if (!lost.count(v)) { all_lost = false; break; }
 				if (all_lost) { lost.insert(u); changed = true; }
 			}
 		}
 		return lost;
 	};
-	const std::set<int> sys_lost = closure_of_dead_ends(1);
-	const std::set<int> env_lost = closure_of_dead_ends(0);
+	std::set<int> sys_lost, env_lost;
+	for (;;) {
+		sys_lost = closure_of_dead_ends(1);
+		env_lost = closure_of_dead_ends(0);
+		bool pruned = false;
+		for (int u = 0; u < pg.n_states; ++u) {
+			const std::set<int>& own_lost = pg.player[u] == 1 ? sys_lost : env_lost;
+			if (own_lost.count(u)) continue;   // keep lost states as they are
+			auto& out = succs[u];
+			auto keep = std::remove_if(out.begin(), out.end(),
+				[&](int v) { return own_lost.count(v) != 0; });
+			if (keep != out.end()) { out.erase(keep, out.end()); pruned = true; }
+		}
+		if (!pruned) break;
+	}
 
-	auto [W0, W1] = zielonka_impl::solve(V, pg.n_states, pg.player, pg.priority, pg.succs);
+	auto [W0, W1] = zielonka_impl::solve(V, pg.n_states, pg.player, pg.priority, succs);
 	for (int u : sys_lost) W1.erase(u);    // sys cannot move there
 	for (int u : env_lost) W1.insert(u);   // env cannot move there
 	return W1;

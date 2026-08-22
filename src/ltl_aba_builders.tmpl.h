@@ -534,23 +534,9 @@ solve_ltl_aba_algorithm_b(
 	std::vector<int> t2_pos_m(T2_size);
 	for (int s = 0; s < T2_size; ++s) t2_pos_m[s] = T2[s].pos_m;
 
-	// Build phi* skeleton and rename p_i → d_i.
-	std::string phi_star = ltl_skeleton<node>(fm, atoms);
-	for (int i = K; i-- > 0; ) {
-		std::string fp = "p" + std::to_string(i);
-		std::string td = "d_" + std::to_string(i);
-		size_t pos = 0;
-		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-			size_t end = pos + fp.size();
-			bool l_ok = pos == 0 || (!std::isalnum((unsigned char)phi_star[pos-1])
-			                         && phi_star[pos-1] != '_');
-			bool r_ok = end >= phi_star.size()
-			         || (!std::isalnum((unsigned char)phi_star[end])
-			             && phi_star[end] != '_');
-			if (l_ok && r_ok) { phi_star.replace(pos, fp.size(), td); pos += td.size(); }
-			else pos = end;
-		}
-	}
+	// Build phi* skeleton and rename p_i → d_i (LT-16: shared helper).
+	std::string phi_star = rename_skeleton_props_to_d(
+		ltl_skeleton<node>(fm, atoms), K);
 
 	auto bundle = alg_b::build_algorithm_b_skeleton(
 		T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star);
@@ -677,20 +663,9 @@ solve_ltl_aba(tref fm)
 				}
 			}
 
-			// Build φ*(D_i)
-			std::string phi_star = ltl_skeleton<node>(fm, sol.atoms);
-			for (int i = K; i-- > 0; ) {
-				std::string fp = "p" + std::to_string(i);
-				std::string td = "d_" + std::to_string(i);
-				size_t pos = 0;
-				while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-					size_t end = pos + fp.size();
-					bool l_ok = pos == 0 || (!std::isalnum((unsigned char)phi_star[pos-1]) && phi_star[pos-1] != '_');
-					bool r_ok = end >= phi_star.size() || (!std::isalnum((unsigned char)phi_star[end]) && phi_star[end] != '_');
-					if (l_ok && r_ok) { phi_star.replace(pos, fp.size(), td); pos += td.size(); }
-					else pos = end;
-				}
-			}
+			// Build φ*(D_i) (LT-16: shared rename helper).
+			std::string phi_star = rename_skeleton_props_to_d(
+				ltl_skeleton<node>(fm, sol.atoms), K);
 
 			LOG_DEBUG << "[ltl_aba:algD] T3=" << T3.size() << " T1=" << T1_size
 			          << " K=" << K << " phi_star=" << phi_star;
@@ -701,37 +676,37 @@ solve_ltl_aba(tref fm)
 			if (!realizable) return std::nullopt;
 
 			// Realizable: call ltlsynt for the strategy automaton.
-			// Use the simplified propositional formula; data execution may need
-			// the full structural-constraint formula for perfect correctness but
-			// this gives a usable strategy for most test cases.
+			//
+			// LT-8 / LA-N1: the automaton carries the d_i names, so
+			// sol.atoms is renamed to d_i (as Algorithm A does) — without
+			// this the ABA oracle matched nothing by name and passed
+			// vacuously, and the safety encoding mapped every guard to
+			// TRUE.  The earlier straight rename was reverted because the
+			// propositional call below received φ* WITHOUT the ABA
+			// consistency constraints, so ltlsynt was free to choose an
+			// output-contradictory edge (`d_0 & d_1` for (o1>0) U (o1<0),
+			// ALG-D-28) that the un-vacuated oracle then rejected.  The
+			// strategy call therefore now carries the same
+			// add_consistency_constraints suffix the default path uses,
+			// over the renamed atoms: the data-infeasible combinations are
+			// excluded from the strategy instead of being scored by the
+			// oracle afterwards.  (Batch 5 of the 2026-08-18 review.)
+			for (int i = 0; i < K; ++i)
+				sol.atoms[i].second = "d_" + std::to_string(i);
+			std::string strategy_skeleton = phi_star;
+			add_consistency_constraints<node>(sol.atoms, strategy_skeleton,
+				nullptr, /*polarity_complete=*/false);
 			std::vector<std::string> D_outs;
 			for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
-			auto [real2, hoa_text] = call_ltlsynt(phi_star, {}, D_outs);
+			auto [real2, hoa_text] = call_ltlsynt(strategy_skeleton, {}, D_outs);
 			if (!real2) {
 				// Propositional call disagrees — fall through to default path
 				LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";
+				for (int i = 0; i < K; ++i)
+					sol.atoms[i].second = "p" + std::to_string(i);
 			} else {
-				// LT-8: rename atoms to the d_i names the
-				// automaton carries (Algorithm A does the same
-				// at its own site) -- without this the oracle
-				// matches nothing by name and vacuously passes,
-				// and the safety encoding maps every guard to
-				// TRUE.
-				// LT-8 (attempted + reverted): renaming
-				// sol.atoms to the automaton's d_i names (as
-				// Algorithm A does) un-vacuates the ABA oracle
-				// -- and the oracle then flips ALG-D-28
-				// ((o1>0) U (o1<0), realizable) to UNREAL,
-				// because a strategy edge whose OUTPUT guard is
-				// contradictory (d_0 & d_1) is scored as a
-				// required-infeasible edge instead of a
-				// never-taken one (the dead-edge skip only
-				// covers pure-input guards). Teaching the
-				// oracle to skip system-side contradictory
-				// edges must land first; until then the
-				// name mismatch keeps the oracle vacuous on
-				// this env-gated path, which at least matches
-				// ltlsynt's own verdict.
+				sol.skeleton = strategy_skeleton;
+				sol.output_props = D_outs;
 				sol.aut = parse_hoa(hoa_text);
 				return sol;
 			}

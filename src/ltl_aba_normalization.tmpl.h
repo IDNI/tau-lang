@@ -471,19 +471,69 @@ static bool guard_is_aba_feasible(
 	auto types_seen = FormulaTypeSet<node>::from_atoms(atoms);
 	const bool single_type = types_seen.single_type();
 
-	// Per-disjunct literal record.  `atom` is the underlying comparison and
-	// `neg` its polarity, recovered from the parsed literal so that the BA
-	// type and the pure-input classification are read off the atom rather
-	// than off its negation.
-	struct GuardLit { tref lit; tref atom; bool pure_input; };
+	// LA-R1 / LA-R2 / LA-N5: per-input-class semantics.
+	//
+	// The edge fires under EVERY input class its label admits — the
+	// environment picks the inputs, the system only picks the output part.
+	// "Some product feasible" (the LT-3 rule) is therefore exact only when
+	// all products share one input class; with different pure-input parts
+	// the environment can choose the class whose only product has an
+	// infeasible output part (LA-R2).  And a product whose input part is
+	// infeasible is a DEAD product, not a licence to accept the whole edge
+	// (LA-R1: the old code `return true`d on the first dead product).
+	//
+	// Rule: split each product P_k into its pure-input part I_k and the
+	// rest; drop input-dead products; P_k is feasible iff its full literal
+	// set is feasible (per BA type: different types are independent
+	// variables — LA-N5 applies that partition to the input check too);
+	// the edge is feasible iff every live product's input class is COVERED
+	// — by itself, by a feasible product whose input literals are a subset
+	// of its own (syntactic entailment; this is how Spot's ISOP printing
+	// produces overlapping cubes), or, when all atoms share one BA type,
+	// semantically: I_k ∧ ¬(∨_{j feasible} I_j) is infeasible.  No live
+	// product at all (every product input-dead) is a vacuous edge.
 
+	// Per-product literal record.  `atom` is the underlying comparison,
+	// recovered from the parsed literal so that the BA type and the
+	// pure-input classification are read off the atom rather than off its
+	// negation.
+	struct GuardLit { tref lit; tref atom; bool pure_input; };
+	struct Product {
+		std::vector<GuardLit> lits;
+		trefs input_lits;     // pure-input literals (sorted for subset tests)
+		bool feasible = false;
+	};
+
+	// Conjunction of literals, partitioned by BA type unless the whole atom
+	// set is single-typed.  `pick` selects which literals participate.
+	auto conj_feasible = [&](const std::vector<GuardLit>& lits,
+	                         auto&& pick) -> bool {
+		if (single_type) {
+			tref conj = tau::_T();
+			for (auto& gl : lits)
+				if (pick(gl)) conj = tau::build_wff_and(conj, gl.lit);
+			return aba_existential_feasible<node>(conj);
+		}
+		std::map<size_t, tref> per_type;
+		for (auto& gl : lits) {
+			if (!pick(gl)) continue;
+			auto [it, ins] = per_type.try_emplace(
+				find_ba_type<node>(gl.atom), tau::_T());
+			it->second = tau::build_wff_and(it->second, gl.lit);
+		}
+		for (auto& [tid, conj] : per_type)
+			if (!aba_existential_feasible<node>(conj)) return false;
+		return true;
+	};
+
+	std::vector<Product> live;
 	for (tref d : disjuncts) {
 		if (tau::get(d).equals_F()) continue;   // dead product
 
 		trefs raw_lits;
 		collect_guard_and<node>(d, raw_lits);
 
-		std::vector<GuardLit> lits;
+		Product p;
 		bool product_is_false = false;
 		for (tref l : raw_lits) {
 			const auto& lt = tau::get(l);
@@ -492,50 +542,61 @@ static bool guard_is_aba_feasible(
 			tref atom = l;
 			if (lt.has_child() && lt[0].value.nt == tau::wff_neg)
 				atom = lt[0].first();
-			lits.push_back({l, atom, is_pure_input_atom<node>(atom)});
+			const bool pure_input = is_pure_input_atom<node>(atom);
+			p.lits.push_back({l, atom, pure_input});
+			if (pure_input) p.input_lits.push_back(l);
 		}
 		if (product_is_false) continue;         // dead product
 
-		// Dead-edge check: if the input-only literals are already
-		// infeasible, the environment can never trigger this product —
-		// treat it as firing vacuously and accept the edge.  This handles
-		// the "catch-all" edges ltlsynt emits for input combinations that
-		// the G(!(pi && pj)) assumptions already exclude.
-		{
-			tref input_conj = tau::_T();
-			bool has_input = false;
-			for (auto& gl : lits) {
-				if (!gl.pure_input) continue;
-				has_input = true;
-				input_conj = tau::build_wff_and(input_conj, gl.lit);
-			}
-			if (has_input && !aba_existential_feasible<node>(input_conj))
-				return true;
-		}
-
-		// Full product check.  Group by BA type and verify each partition
-		// independently: different BA types involve independent variables.
-		if (single_type) {
-			tref conj = tau::_T();
-			for (auto& gl : lits) conj = tau::build_wff_and(conj, gl.lit);
-			if (aba_existential_feasible<node>(conj)) return true;
+		// Input-dead product: the environment can never trigger it.
+		if (!p.input_lits.empty()
+		    && !conj_feasible(p.lits, [](const GuardLit& gl) {
+		           return gl.pure_input; }))
 			continue;
-		}
 
-		std::map<size_t, std::vector<tref>> per_type;
-		for (auto& gl : lits)
-			per_type[find_ba_type<node>(gl.atom)].push_back(gl.lit);
-		bool all_ok = true;
-		for (auto& [tid, type_lits] : per_type) {
-			tref conj = tau::_T();
-			for (auto& lit : type_lits) conj = tau::build_wff_and(conj, lit);
-			if (!aba_existential_feasible<node>(conj)) { all_ok = false; break; }
-		}
-		if (all_ok) return true;
+		p.feasible = conj_feasible(p.lits, [](const GuardLit&) {
+			return true; });
+		std::sort(p.input_lits.begin(), p.input_lits.end());
+		live.push_back(std::move(p));
 	}
 
-	// Every product of the sum is infeasible.
-	return false;
+	// Every product input-dead (or the label was `f`): vacuous edge.
+	if (live.empty()) return true;
+
+	// Coverage.  A feasible product with NO input literals covers every
+	// class; otherwise try syntactic subset, then the semantic check.
+	tref feasible_inputs_disj = nullptr;   // ∨_{j feasible} I_j (single type)
+	for (auto& pj : live) {
+		if (!pj.feasible) continue;
+		if (pj.input_lits.empty()) return true;
+		if (single_type) {
+			tref ij = tau::_T();
+			for (tref l : pj.input_lits) ij = tau::build_wff_and(ij, l);
+			feasible_inputs_disj = feasible_inputs_disj
+				? tau::build_wff_or(feasible_inputs_disj, ij) : ij;
+		}
+	}
+	for (auto& pk : live) {
+		if (pk.feasible) continue;
+		bool covered = false;
+		for (auto& pj : live) {
+			if (!pj.feasible) continue;
+			if (std::includes(pk.input_lits.begin(), pk.input_lits.end(),
+			                  pj.input_lits.begin(), pj.input_lits.end())) {
+				covered = true;
+				break;
+			}
+		}
+		if (!covered && single_type && feasible_inputs_disj) {
+			tref ik = tau::_T();
+			for (tref l : pk.input_lits) ik = tau::build_wff_and(ik, l);
+			tref uncovered = tau::build_wff_and(ik,
+				tau::build_wff_neg(feasible_inputs_disj));
+			covered = !aba_existential_feasible<node>(uncovered);
+		}
+		if (!covered) return false;
+	}
+	return true;
 }
 
 
