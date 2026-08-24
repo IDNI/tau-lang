@@ -17,6 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include "dict.h"
+#include "io_context.h"
+
 namespace idni::tau_lang {
 
 namespace codegen_detail {
@@ -148,24 +151,16 @@ bool atom_is_data_typed(tref atom_ref, bool revisable) {
 	return false;
 }
 
-// Classify one atom for build_program_desc(): which io_vars it is over and
+// Classifies one atom for build_program_desc(): which io_vars it is over and
 // how their values are produced.
 //
-// Inputs are unconditionally flag (their truth is evaluated at runtime from
-// the atoms table). A multi-variable output atom cannot bake a constant
-// whatever its BA type -- carrier, reserved, or real data -- so it is
-// always witness_template, solved at runtime from the atom's own tree by
-// table_step_provider: every output-direction variable becomes a field the
-// solve fills, input-direction ones ground from memory. A single-variable
-// output atom over the bool carrier is flag (the guard bit IS the value);
-// so is one over the reserved tau type when @p revisable positively
-// marks this build a PWR revision (the tau-typed update stream's guard bit
-// is itself the value there) -- every other reserved core type is flag too.
-// Over a real data BA -- tau included, outside a PWR revision -- it yields a
-// witness when the owner bakes constants (codegen_witness), else
-// witness_template. Emission never downgrades a data output to a flag; the
-// one remaining hard error lives where an atom's ground constant cannot be
-// spelled at all (build_atom_term_expr).
+// Inputs are always flag. A multi-variable output atom is always
+// witness_template (no BA type can bake a constant for it), solved at
+// runtime by table_step_provider. A single-variable output atom is flag
+// over the bool carrier, or over the reserved tau type in a PWR revision
+// (@p revisable); every other reserved core type is flag too. Over a real
+// data BA otherwise, it yields a witness when the owner bakes constants
+// (codegen_witness), else witness_template.
 template <NodeType node>
 atom_field_info classify_atom_field(
 	tref atom_ref, bool is_output, bool revisable) {
@@ -540,7 +535,8 @@ std::optional<program_desc> build_program_desc(
     const ltl_aba_solution<node>& sol,
     const std::string& class_name,
     bool revisable,
-    const std::vector<std::string>& open_streams)
+    const std::vector<std::string>& open_streams,
+    const io_context<node>* stream_ctx)
 {
 	using tau = tree<node>;
 	using namespace codegen_detail;
@@ -690,6 +686,17 @@ std::optional<program_desc> build_program_desc(
 	// Real io streams, from the atoms' own variables; the counter's
 	// o__ltl_ctr streams are internal bookkeeping.
 	{
+		// Name -> stream_id from the spec's own io_context (0 == console,
+		// else a dict() id resolving to the bound filename), mirroring how
+		// the interpreter itself resolves a stream's binding
+		// (interpreter.tmpl.h's rebuild_inputs/rebuild_outputs).
+		std::map<std::string, size_t> stream_id_of_name;
+		if (stream_ctx) {
+			for (auto& [hv, sid] : stream_ctx->inputs)
+				stream_id_of_name[get_var_name<node>(hv->get())] = sid;
+			for (auto& [hv, sid] : stream_ctx->outputs)
+				stream_id_of_name[get_var_name<node>(hv->get())] = sid;
+		}
 		std::set<std::string> seen_streams;
 		for (auto& [atom_ref, prop] : sol.atoms)
 			for (tref v : get_free_vars<node>(atom_ref)) {
@@ -701,7 +708,15 @@ std::optional<program_desc> build_program_desc(
 					? v : tau::get(v).child(0);
 				auto& list = io_var_direction<node>(io_node) == 1
 					? d.input_streams : d.output_streams;
-				list.push_back({nm, tau::get(v).get_ba_type()});
+				stream_desc sd;
+				sd.name = nm;
+				sd.ba_type = tau::get(v).get_ba_type();
+				if (auto it = stream_id_of_name.find(nm);
+					it != stream_id_of_name.end() && it->second != 0) {
+					sd.bind = stream_desc::binding::file;
+					sd.filename = dict(it->second);
+				}
+				list.push_back(std::move(sd));
 			}
 	}
 	d.ba_type_table = snapshot_ba_type_registry<node>();

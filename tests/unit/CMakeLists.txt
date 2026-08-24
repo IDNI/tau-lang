@@ -49,6 +49,7 @@ set(TESTS
 	algorithm_c
 	algorithm_d
 	algorithm_picker
+	cli_options
 	codegen_parity
 	cpp_codegen
 	cpp_codegen_pwr

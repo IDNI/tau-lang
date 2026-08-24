@@ -17,6 +17,7 @@
 #else
 #	include "tau.h"
 #endif // DEBUG
+#include "cli_options.h"
 #include "repl_evaluator.h"
 #include "tau_compile.h"
 #include "utility/cli.h"
@@ -30,43 +31,7 @@ using tau = tree<node_t>;
 using tau_api = api<node_t>;
 
 cli::options tau_options() {
-	cli::options opts;
-	opts["help"] = cli::option("help", 'h', false)
-		.set_description("detailed information about options");
-	opts["version"] = cli::option("version", 'v', false)
-		.set_description("show the current Tau executable version");
-	opts["license"] = cli::option("license", 'l', false)
-		.set_description("show license for Tau");
-	opts["charvar"] = cli::option("charvar", 'V', true)
-		.set_description("charvar (enabled by default)");
-	opts["blasting"] = cli::option("blasting", 'B', true)
-		.set_description("blasting (enabled by default)");
-	opts["severity"] = cli::option("severity", 'S', "info")
-		.set_description("severity level (trace/debug/info/error)");
-	opts["indenting"] = cli::option("indenting", 'I', false)
-		.set_description("indenting of formulas");
-	opts["highlighting"] = cli::option("highlighting", 'H', false)
-		.set_description("syntax highlighting");
-	opts["benchmarks"] = cli::option("benchmarks", 'b', true)
-		.set_description("print benchmarks (enabled by default)");
-	opts["json"] = cli::option("json", 'J', false)
-		.set_description("output in JSON format");
-	opts["quit"] = cli::option("quit", 'q', false)
-		.set_description("quit when no input");
-	// REPL specific options
-	opts["evaluate"] = cli::option("evaluate", 'e', "")
-		.set_description("REPL command to evaluate");
-	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
-		.set_description("use legacy terminal REPL instead of FTXUI");
-	opts["status"] = cli::option("status", 's', true)
-		.set_description("display status");
-	opts["color"] = cli::option("color", 'c', true)
-		.set_description("use colors");
-	DBG(opts["debug"] = cli::option("debug", 'd', true)
-		.set_description("debug mode");)
-	opts["experimental"] = cli::option("experimental", 'x', false)
-		.set_description("enables transitioning features");
-	return opts;
+	return tau_cli_options(cli_option_set::full);
 }
 
 cli::commands tau_commands() {
@@ -177,11 +142,7 @@ int main(int argc, char** argv) {
 	if (opts["license"].get<bool>()) return std::cout << license, 0;
 
 	std::string sevstr = opts["severity"].get<string>();
-	boost::log::trivial::severity_level sev =
-		sevstr == "error" ? boost::log::trivial::error :
-		sevstr == "trace" ? boost::log::trivial::trace :
-		sevstr == "debug" ? boost::log::trivial::debug :
-				boost::log::trivial::info;
+	boost::log::trivial::severity_level sev = tau_cli_parse_severity(sevstr);
 
 
 	tau_api::set_highlighting(opts["highlighting"].get<bool>());

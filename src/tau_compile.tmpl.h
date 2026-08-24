@@ -149,6 +149,7 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"#include \"tau.h\"\n"
 		"#include \"tau_pack.h\"\n"
 		"#include \"table_step_provider.h\"\n"
+		"#include \"cli_options.h\"\n"
 		"#include <cstdio>\n"
 		"#include <cstdlib>\n"
 		"#include <cstring>\n"
@@ -161,9 +162,10 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 #ifdef TAU_CODEGEN_ARTIFACT_PREINST
 		"#include \"artifact_pack_extern.h\"\n"
 #endif
-		"using node_t = ::idni::tau_lang::tau_pack::node_t;\n"
+		"using namespace std;\n"
+		"using namespace idni::tau_lang;\n"
+		"using node_t = tau_pack::node_t;\n"
 		"using tref = ::idni::tref;\n"
-		"namespace tl = ::idni::tau_lang;\n"
 		"\n"
 		"static const char* spec_src() {\n"
 		"\treturn \"" << idni::escapes::encode(d.spec_src,
@@ -171,11 +173,27 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"}\n"
 		"\n"
 		"int main(int argc, char** argv) {\n"
-		"\tif (argc > 1 && std::strcmp(argv[1], \"--print-spec\") == 0) {\n"
-		"\t\tstd::puts(spec_src());\n"
+		"\tif (argc > 1 && strcmp(argv[1], \"--print-spec\") == 0) {\n"
+		"\t\tputs(spec_src());\n"
 		"\t\treturn 0;\n"
 		"\t}\n"
-		"\ttl::bdd_init<tl::Bool>();\n"
+		"\tvector<string> args;\n"
+		"\tfor (int i = 0; i < argc; ++i) args.push_back(argv[i]);\n"
+		"\tidni::cli cl(\"program\", args, idni::cli::commands{}, \"\",\n"
+		"\t\ttau_cli_options(cli_option_set::artifact));\n"
+		"\tcl.set_help_header(\"Usage: program [<options>]\");\n"
+		"\tif (cl.process_args() != 0) return cl.status();\n"
+		"\tauto opts = cl.get_processed_options();\n"
+		"\tif (opts[\"help\"].get<bool>()) return cl.help(), 0;\n"
+		"\tif (opts[\"version\"].get<bool>())\n"
+		"\t\treturn cout << full_version << \"\\n\", 0;\n"
+		"\tif (opts[\"license\"].get<bool>()) return cout << license, 0;\n"
+		"\tlogging::set_filter(\n"
+		"\t\ttau_cli_parse_severity(opts[\"severity\"].get<string>()));\n"
+		"\tprint_json = opts[\"json\"].get<bool>();\n"
+		"\tbool quit_on_idle = opts[\"quit\"].get<bool>();\n"
+		"\tbool print_benchmarks = opts[\"benchmarks\"].get<bool>();\n"
+		"\tbdd_init<Bool>();\n"
 		"\t// Replay the emitting process's ba-type registry so every baked\n"
 		"\t// numeric type id resolves to the same type here; entries the\n"
 		"\t// artifact's own static init already registered assert by identity.\n";
@@ -183,38 +201,38 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		f << "\t{\n\t\ttref tt = ";
 		switch (e.kind) {
 		case ba_type_entry::recipe::reserved:
-			f << "tl::" << e.name << "_type<node_t>()";
+			f << e.name << "_type<node_t>()";
 			break;
 		case ba_type_entry::recipe::family:
-			f << "tl::pack_type_tree<node_t>(\"" << e.name << "\"";
+			f << "pack_type_tree<node_t>(\"" << e.name << "\"";
 			if (e.param) f << ", (unsigned short)" << *e.param;
 			f << ")";
 			break;
 		case ba_type_entry::recipe::syntactic:
-			f << "tl::ba_types_detail::make_syntactic_type_tree"
+			f << "ba_types_detail::make_syntactic_type_tree"
 			     "<node_t>(\"" << e.name << "\")";
 			break;
 		}
 		f << ";\n"
-		  << "\t\tif (!tt || tl::ba_types<node_t>::id(tt) != " << e.id
+		  << "\t\tif (!tt || ba_types<node_t>::id(tt) != " << e.id
 		  << ") {\n"
-		  << "\t\t\tstd::fprintf(stderr, \"ba-type replay mismatch for "
+		  << "\t\t\tfprintf(stderr, \"ba-type replay mismatch for "
 		  << e.name;
 		if (e.param) f << "[" << (int)*e.param << "]";
 		f << " (expected id " << e.id << ")\\n\");\n"
 		     "\t\t\treturn 2;\n\t\t}\n\t}\n";
 	}
-	f << "\n\tstd::map<std::string, tref> atoms;\n";
+	f << "\n\tmap<string, tref> atoms;\n";
 	for (auto& a : d.atoms)
 		f << "\tatoms[\"" << a.prop << "\"] = " << a.ground_expr << ";\n";
-	f << "\n\ttl::codegen::strategy strat;\n"
+	f << "\n\tcodegen::strategy strat;\n"
 	  << "\tstrat.num_states = " << d.num_states << ";\n"
 	  << "\tstrat.initial_state = " << d.initial_state << ";\n"
 	  << "\tstrat.num_inputs = " << d.inputs.size() << ";\n"
 	  << "\tstrat.edges.resize(" << d.num_states << ");\n"
-	  << "\tstd::vector<std::vector<std::vector<tref>>> templates("
+	  << "\tvector<vector<vector<tref>>> templates("
 	  << d.num_states << ");\n"
-	  << "\tstd::vector<std::vector<std::vector<std::pair<std::string, tref>>>> "
+	  << "\tvector<vector<vector<pair<string, tref>>>> "
 	     "edge_witnesses(" << d.num_states << ");\n";
 	// witness_ctors keys by the field's sanitized cpp_name; edge_witnesses
 	// keys by the real output variable name (table_step_provider's own doc
@@ -246,39 +264,60 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 			f << "});\n";
 		}
 	}
-	f << "\n\tstd::vector<std::pair<std::string, tref>> input_atoms;\n";
+	f << "\n\tvector<pair<string, tref>> input_atoms;\n";
 	for (auto& fld : d.inputs)
 		f << "\tinput_atoms.emplace_back(\"" << fld.prop
 		  << "\", atoms.at(\"" << fld.prop << "\"));\n";
-	f << "\tstd::vector<std::string> flag_outputs;\n";
+	f << "\tvector<string> flag_outputs;\n";
 	for (auto& v : d.flag_output_vars)
 		f << "\tflag_outputs.push_back(\"" << v << "\");\n";
-	f << "\n\ttl::io_context<node_t> ctx;\n";
-	for (auto& s : d.input_streams)
-		f << "\tctx.add_input_console(\"" << s.name << "\", "
-		  << s.ba_type << ");\n";
-	for (auto& s : d.output_streams)
-		f << "\tctx.add_output_console(\"" << s.name << "\", "
-		  << s.ba_type << ");\n";
+	f << "\n\tio_context<node_t> ctx;\n";
+	for (auto& s : d.input_streams) {
+		if (s.bind == stream_desc::binding::file)
+			f << "\tctx.add_input_file(\"" << s.name << "\", "
+			  << s.ba_type << ", \""
+			  << idni::escapes::encode(s.filename, idni::escapes::c_like)
+			  << "\");\n";
+		else
+			f << "\tctx.add_input_console(\"" << s.name << "\", "
+			  << s.ba_type << ");\n";
+	}
+	for (auto& s : d.output_streams) {
+		if (s.bind == stream_desc::binding::file)
+			f << "\tctx.add_output_file(\"" << s.name << "\", "
+			  << s.ba_type << ", \""
+			  << idni::escapes::encode(s.filename, idni::escapes::c_like)
+			  << "\");\n";
+		else
+			f << "\tctx.add_output_console(\"" << s.name << "\", "
+			  << s.ba_type << ");\n";
+	}
 	f <<
-		"\n\tauto provider = std::make_shared<tl::table_step_provider<node_t>>(\n"
+		"\n\tauto provider = make_shared<table_step_provider<node_t>>(\n"
 		"\t\tstd::move(strat), std::move(input_atoms), std::move(flag_outputs),\n"
 		"\t\tstd::move(edge_witnesses), std::move(templates));\n"
-		"\tauto interp = tl::interpreter<node_t>::make_table_interpreter(\n"
+		"\tauto interp = interpreter<node_t>::make_table_interpreter(\n"
 		"\t\tctx, std::move(provider), " << d.lookback << ", "
 		<< d.highest_initial_pos << ");\n"
 		"\tif (!interp) {\n"
-		"\t\tstd::fprintf(stderr, \"interpreter initialization failed\\n\");\n"
+		"\t\tfprintf(stderr, \"interpreter initialization failed\\n\");\n"
 		"\t\treturn 2;\n"
 		"\t}\n"
-		"\tbool run_ok = interp->run_loop(0);\n"
+		"\tidni::measures::timer run_timer;\n"
+		"\trun_timer.start();\n"
+		"\tbool run_ok = interp->run_loop(0, quit_on_idle);\n"
+		"\tif (print_benchmarks) {\n"
+		"\t\tmeasuring run_m(\"run\");\n"
+		"\t\trun_m.ms = run_timer.stop();\n"
+		"\t\trun_m(cerr);\n"
+		"\t}\n"
 		"\t// Flush and leave without running static destructors: the pack's\n"
 		"\t// static state (caches, pools, the leaked cvc5 term manager) has no\n"
 		"\t// safe cross-TU destruction order, and a buffered-stdout artifact\n"
 		"\t// must not lose its written outputs to a teardown crash.\n"
-		"\tstd::cout.flush();\n"
-		"\tstd::fflush(nullptr);\n"
-		"\tstd::_Exit(run_ok ? 0 : 1);\n"
+		"\tcout.flush();\n"
+		"\tfflush(nullptr);\n"
+		"\t_Exit(run_ok ? 0 : 1);\n"
 		"}\n";
 }
 
@@ -359,7 +398,8 @@ codegen_result compile_spec(
 	const std::string class_name = "tau_program";
 	std::optional<program_desc> d;
 	try {
-		d = build_program_desc<Node>(*sol, class_name);
+		d = build_program_desc<Node>(*sol, class_name, /*revisable=*/false,
+			/*open_streams=*/{}, definitions<Node>::instance().get_io_context());
 	} catch (const std::exception& e) {
 		res.error = std::string("compile: ") + e.what();
 		return res;

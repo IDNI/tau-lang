@@ -231,12 +231,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// ── (b') untyped io var reaching codegen is a hard error ─────────────
 
 	TEST_CASE("build_program_desc: untyped io var is a hard emission error") {
-		// A var whose ba_type is 0 (never went through type inference,
-		// distinct from the real "untyped" BA type) reaching build_program_desc
-		// at all is the invariant violation under test, so it is hand-built
-		// here rather than reached through synth(). The entry-point scan
-		// catches this before classify_output_field's own deep check ever
-		// runs, so the message is that scan's, not "reached codegen".
+		// A var whose ba_type is 0 (never went through type inference) is
+		// hand-built here since it can't be reached through synth(). The
+		// entry-point scan catches this before classify_output_field's own
+		// deep check runs, so the message is that scan's.
 		tref untyped_var = build_out_var<node_t>(build_var_name<node_t>("o1"), 0);
 
 		ltl_aba_solution<node_t> sol;
@@ -398,9 +396,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	// o1[0]=1 relativizes to the same atom as F(o1[t]=1)'s own atom;
-	// apply_step_counter_encoding merges the duplicate away (see
-	// ltl_aba_normalization.tmpl.h), so exactly one output field reaches
-	// build_program_desc for "o1", not two dangling props.
+	// apply_step_counter_encoding merges the duplicate away, so exactly one
+	// output field reaches build_program_desc for "o1", not two.
 	TEST_CASE("build_program_desc: positional atom colliding with a same-instant "
 	          "natural atom over the same var yields one output, not two") {
 		tref p0_atom = wff("o1[0]:bv[2] = {1}");
@@ -563,11 +560,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	// Both positional atoms sit inside an implication -- an implication of
 	// purely-positional atoms is a hoistable Boolean shape (max-position
-	// hoisting, .local/positional_general_case_DESIGN.md section 4): the
-	// whole conjunct's k_max is max(1,3)=3, the input reference relativizes
-	// to a lookback (i[t-2]), and the two conjuncts (this branch and its
-	// complement) guard the same k_max step, so the strategy branches there
-	// on the input AP -- the design's own validation example (section 5).
+	// hoisting): the whole conjunct's k_max is max(1,3)=3, the input
+	// reference relativizes to a lookback (i[t-2]), and the two conjuncts
+	// (this branch and its complement) guard the same k_max step, so the
+	// strategy branches there on the input AP.
 	TEST_CASE("branching example: an implication of positional atoms hoists "
 	          "and branches at k_max on the input AP") {
 		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
@@ -607,12 +603,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK((has(exprs[0], "\"2\"") || has(exprs[1], "\"2\"")));
 	}
 
-	// Executed interpreter-match: run the SAME branching spec through a
-	// real interpreter with vector input streams for both input values,
-	// then walk the artifact-side program_desc's strategy deterministically
-	// (codegen::strategy_step, the SAME matching logic the emitted step()
-	// uses) for both values and confirm the edge reached at k_max carries a
-	// witness for "o" with the SAME constant the interpreter produced.
+	// Runs the branching spec through a real interpreter for both input
+	// values, then walks program_desc's strategy with the same matching
+	// logic the emitted step() uses, and confirms the edge reached at
+	// k_max carries the same witness constant the interpreter produced.
 	TEST_CASE("branching example: artifact program_desc matches the "
 	          "interpreter's per-branch output") {
 		bdd_init<Bool>();
@@ -689,11 +683,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(has(edge_2->witness_ctors[0].second, "\"" + interp_2 + "\""));
 	}
 
-	// Multi-position atom o1[1] = o2[3]: the max-position hoisting rewrite
-	// must give each io_var its own offset (k_max - j), not flatten every
-	// io_var to [t] -- the defect the general rewrite fixes (design section
-	// 4.5). k_max = max(1,3) = 3; o1 (position 1) becomes a lookback two
-	// steps behind the guard step, o2 (position 3) stays current-time.
+	// Multi-position atom o1[1] = o2[3]: max-position hoisting must give
+	// each io_var its own offset (k_max - j), not flatten every io_var to
+	// [t]. k_max = max(1,3) = 3; o1 becomes a lookback two steps behind
+	// the guard step, o2 stays current-time.
 	TEST_CASE("multi-position atom o1[1]=o2[3] hoists with per-variable "
 	          "offsets, not a flattened [t]") {
 		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
@@ -708,11 +701,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK_FALSE(has(atom_str, "o1[t]")); // not flattened to current-time
 		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
 
-		// Interplay: the hoist-introduced offset (o1[t-2]) is a real
-		// lookback shift now, so compute_auto_continue_bounds/get_max_shift
-		// must bake it into d->lookback exactly like any other relative
-		// atom -- counter_highest_initial_pos still comes from the
-		// pre-rewrite positions (k_max=3), not this shift.
+		// The hoist-introduced offset (o1[t-2]) is a real lookback shift, so
+		// compute_auto_continue_bounds must bake it into d->lookback;
+		// highest_initial_pos still comes from the pre-rewrite k_max=3.
 		auto d = build_program_desc<node_t>(*sol, "multi_pos");
 		REQUIRE(d.has_value());
 		CHECK(d->lookback == 2);
@@ -721,12 +712,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	// ── (g) hello_world.tau: the 12-position bv canary ────────────────────
 	//
-	// The compile+build+run coverage below (compile_spec) stays opt-in
-	// (TAU_CODEGEN_RUN_SDK_LINK_TEST) -- it drives a real, minutes-long cmake
-	// configure+build regardless of solve_ltl_aba's own cost. This structural
-	// test only calls solve_ltl_aba/build_program_desc directly, which the
-	// ground-equality consistency fast path keeps well within the default
-	// ctest budget.
+	// The compile+build+run coverage below stays opt-in
+	// (TAU_CODEGEN_RUN_SDK_LINK_TEST); this structural test only calls
+	// solve_ltl_aba/build_program_desc directly, kept fast by the
+	// ground-equality consistency fast path.
 
 	TEST_CASE("hello_world.tau: positional bv chain, one witness per prefix "
 	          "edge in order, silent final self-loop, baked bounds") {
@@ -827,10 +816,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		fs::remove_all(bdir, ec);
 	}
 
-	// End-to-end: echo has no bakeable witness (its value is each step's own
-	// input), so its edge carries a witness_template solved at runtime by
-	// table_step_provider; the artifact replays the baked ba-type table,
-	// reads i1 from stdin and echoes it to o1 until input ends.
+	// End-to-end: echo has no bakeable witness (each step's value is its own
+	// input), so its edge carries a witness_template solved at runtime.
+	// The artifact reads i1 from stdin and echoes it to o1 until input ends.
 	TEST_CASE("echo.tau: compile_spec emits the artifact, "
 	          "piped inputs come back in order, exit code 0") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
@@ -870,10 +858,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	// ── (h) program_desc::atoms (atom_desc) emission ──────────────────────
 
-	// A single-variable equality atom over a real (non-carrier) BA: ground_expr
-	// reconstructs it via build_bf_eq over a plain variable reference and the
-	// literal's own codegen_constant_expr rendering (qlt_rational(1, 2), not a
-	// re-parsed "1/2" string).
+	// ground_expr reconstructs a single-variable equality atom via build_bf_eq
+	// and the literal's own codegen_constant_expr rendering (qlt_rational(1, 2),
+	// not a re-parsed string).
 	TEST_CASE("build_program_desc: atom_desc captures a ground-equality atom "
 	          "over a real BA type") {
 		auto sol = synth("G(o1[t]:qlt = {1/2}:qlt)");
@@ -902,10 +889,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(d.atoms.empty());
 	}
 
-	// Two-io_var atom, no ground constant at all: both operands rebuild via
-	// the plain-variable branch, one with a baked lookback shift, the other
-	// at current time -- and both output variables become witness-template
-	// fields, their values solved at runtime rather than baked per edge.
+	// Two-io_var atom, no ground constant: both operands rebuild via the
+	// plain-variable branch (one lookback-shifted, one current-time), and
+	// both outputs become witness-template fields solved at runtime.
 	TEST_CASE("build_program_desc: atom_desc rebuilds a two-variable atom "
 	          "with per-variable shifts as a witness template") {
 		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
@@ -928,10 +914,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(tmpl_fields == 2);
 	}
 
-	// The tau BA's own complement operator (`x'`) wrapping a plain variable is
-	// neither a ground constant nor a bare variable reference itself, so
-	// build_atom_term_expr must recurse into its operand and re-wrap with the
-	// runtime build_bf_neg counterpart, rather than refusing the shape.
+	// tau's complement operator (`x'`) wrapping a plain variable is neither a
+	// ground constant nor a bare variable, so build_atom_term_expr recurses
+	// into its operand and re-wraps with the runtime build_bf_neg counterpart.
 	TEST_CASE("build_program_desc: atom_desc rebuilds a tau-BA complement "
 	          "operand via build_bf_neg") {
 		tref fm = wff("o1[t]:tau' = o2[t]:tau");
@@ -950,12 +935,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	// apply_step_counter_encoding relativizes every positional atom to a
-	// current-time equivalent before it reaches sol.atoms (the same rewrite
-	// counter_highest_initial_pos's own doc comment describes), so a bare
-	// position-0 atom rebuilds via the no-shift build_out_var_at_t branch,
-	// not build_out_var_at_n -- the constant side is the codegen_constant_expr
-	// under test here (build_out_var_at_n is exercised structurally by the
-	// build_atom_term_expr code path itself, not reachable through sol.atoms).
+	// current-time equivalent before it reaches sol.atoms, so a position-0
+	// atom rebuilds via the no-shift build_out_var_at_t branch, not
+	// build_out_var_at_n; the constant side is what's under test here.
 	TEST_CASE("build_program_desc: atom_desc rebuilds a relativized "
 	          "positional atom's constant side") {
 		tref fm = wff("o[0]:bv[8] = {5}:bv[8]");
@@ -973,12 +955,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	// Owner-without-capability refusal: qint's output classifies as a
-	// witness template (no codegen_witness to bake with), but its atom
-	// carries a ground constant qint cannot spell into the atoms table
-	// (no codegen_constant_expr) -- a hard build-time error, never a
-	// silently-dropped atom or a re-parsed fallback. qint is not the pack's
-	// bool carrier, so this goes through build_atom_term_expr's non-carrier
-	// refusal, naming qint, rather than the carrier's is_one/is_zero marker.
+	// witness template but its atom carries a ground constant qint cannot
+	// spell into the atoms table -- a hard build-time error, never a
+	// silently-dropped atom. Goes through build_atom_term_expr's non-carrier
+	// refusal, naming qint, not the carrier's is_one/is_zero marker.
 	TEST_CASE("build_program_desc: a data atom over a BA without "
 	          "codegen_constant_expr is a hard emission error") {
 		tref fm = wff("o1[t]:qint = {[0, 1)}:qint");
@@ -992,23 +972,12 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			std::runtime_error);
 	}
 
-	// Built with get_raw rather than the parser/solve_ltl_aba: "x:tau =
-	// {T.}:tau" written as spec text never reaches build_program_desc as a
-	// genuine ba_constant at all -- the ordinary hooked tree constructor
-	// folds any BA constant that is_one()/is_zero() straight to a bf_t/bf_f
-	// marker on construction (of any BA, not just the carrier's), the same
-	// simplification that turns a real {1/2}:qlt or {5}:bv[8] constant into
-	// nothing at all when it happens to equal 1 or 0 for its own algebra.
-	// get_raw bypasses that fold, so the tree handed to build_program_desc
-	// here is exactly the shape the interpreter keeps for real: a standing
-	// ba_constant, not yet collapsed to a marker.
-	// tau is not the pack's bool carrier (bv[1] is) and declares no
-	// codegen_constant_expr, so this ground constant is refused outright --
-	// it must never fall back to the bf_t/bf_f marker build_bf_t_type builds
-	// for the carrier, since that marker is not a real tau constant and
-	// downstream consumers (e.g. the splitter) require one. The atom is
-	// registered as an input, so it is collected unconditionally regardless
-	// of its flag/witness classification.
+	// Built with get_raw, not the parser: a real ba_constant folds to a
+	// bf_t/bf_f marker on construction once is_one()/is_zero(), so get_raw
+	// bypasses that fold to hand build_program_desc a standing ba_constant.
+	// tau is not the pack's bool carrier and declares no
+	// codegen_constant_expr, so this must be refused outright, never
+	// falling back to the carrier's bf_t/bf_f marker.
 	TEST_CASE("build_program_desc: a tau-typed ba_constant declining "
 	          "codegen_constant_expr is refused, not emitted as a marker") {
 		size_t tau_tid = ba_types<node_t>::id(tau_type<node_t>());
@@ -1037,14 +1006,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			std::runtime_error);
 	}
 
-	// Same hand-built shape, but over the pack's actual bool carrier
-	// (bv[1]): the non-carrier gate above must not catch this one too.
-	// bv answers codegen_constant_expr for every value it owns, including
-	// its bool-carrier width, so this reaches that success path rather than
-	// the is_one/is_zero marker fallback -- a pack whose bool carrier is a
-	// BA without codegen_constant_expr (e.g. sbf, in a pack built without
-	// bv) is what actually drives that fallback; not reproducible here
-	// without reconfiguring the pack.
+	// Same hand-built shape, over the pack's actual bool carrier (bv[1]):
+	// the non-carrier gate above must not catch this one. bv answers
+	// codegen_constant_expr for every value it owns, so this reaches the
+	// success path, not the is_one/is_zero marker fallback.
 	TEST_CASE("build_program_desc: a bool-carrier ba_constant still emits, "
 	          "not refused by the non-carrier gate") {
 		size_t carrier_tid = ba_types<node_t>::id(pack_bool_carrier_type<node_t>());
@@ -1075,13 +1040,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	// A bare literal ("o1[t] = 1", not "o1[t] = {1}") never parses as a
-	// ba_constant -- the grammar reserves that shape for the braced form --
-	// so it reaches codegen as a bf_t/bf_f node. It only arises typed once
-	// type inference has actually assigned it a BA (parse_like_compile_spec's
-	// defaults path, mirroring compile_spec's own get_spec parse); an
-	// untyped bf_t/bf_f (api::get_formula's no-defaults path) never reaches
-	// here because validate_atom_io_types already rejects the atom's
-	// still-untyped io variable first.
+	// ba_constant, so it reaches codegen as a bf_t/bf_f node, typed once
+	// type inference assigns it a BA; an untyped one never reaches here
+	// since validate_atom_io_types rejects the still-untyped io var first.
 	TEST_CASE("build_program_desc: atom_desc emits a bare literal operand "
 	          "as its owner's typed bf_t/bf_f constant") {
 		tref fm = wff("G(i1[t]:bv[8] = 1 -> o1[t] = 1)");
@@ -1101,12 +1062,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	// build_program_desc's own precondition, not classify_output_field's
-	// deep one: a hand-built solution whose atom carries a variable that
-	// never went through type inference (api::get_formula's no-defaults,
-	// no-inference-at-all path -- verified below to actually leave the
-	// variable at ba_type 0) is refused immediately, before any per-atom
-	// classification runs, with a message naming the variable and pointing
-	// at type inference rather than "reached codegen".
+	// deep one: a variable that never went through type inference is
+	// refused immediately, before any per-atom classification runs.
 	TEST_CASE("build_program_desc: an untyped variable is refused at the "
 	          "entry-point check, not classify_output_field's deep one") {
 		tref untyped = api<node_t>::get_formula("o1[t] = 1", false);
@@ -1129,13 +1086,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	// A self-lookback atom (o2[t] vs o2[t-1]) is two free-var nodes naming
-	// the same variable. Outside a PWR (revisable) build, tau is an
-	// ordinary data type -- it owns no codegen_witness, so classify_atom_field
-	// lands this on witness_template (atom_single_var_name's single-name
-	// merge still applies, keying the one template var on "o2" rather than
-	// refusing it as multi-variable) -- and the standalone emitter refuses a
-	// witness_template output outright, naming the table step provider as the
-	// supported path.
+	// the same variable. Outside a PWR build, tau owns no codegen_witness,
+	// so classify_atom_field lands this on witness_template, keyed on the
+	// shared name "o2"; the standalone emitter refuses that output kind.
 	TEST_CASE("build_program_desc: self-lookback tau-typed atom is "
 	          "witness_template outside a PWR build, refused by the "
 	          "standalone emitter") {
@@ -1161,13 +1114,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			std::runtime_error);
 	}
 
-	// Same self-lookback shape, but inside a PWR (revisable) build: the
-	// tau-typed update stream's guard bit is itself the value there, so it
-	// stays flag -- build_program_desc's flag-stream extraction must key
-	// this flag slot on the shared name "o2" instead of refusing it as
-	// multi-variable, and the resulting program_desc must emit_program
-	// cleanly, matching compile_spec's own refusal check
-	// (d->flag_output_vars[k].empty()) never tripping for it.
+	// Same self-lookback shape, inside a PWR build: the guard bit is itself
+	// the value, so it stays flag -- keyed on the shared name "o2" instead
+	// of refused as multi-variable, and emit_program must succeed cleanly.
 	TEST_CASE("build_program_desc: self-lookback tau-typed atom keys its "
 	          "flag slot on the shared variable name in a PWR build, not "
 	          "refused") {
@@ -1200,16 +1149,11 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(has(os.str(), "bool " + d->outputs[0].cpp_name));
 	}
 
-	// The ppLTLTT past-operator DFA testers (__past_s*/__past_t*,
-	// ltl_aba_helpers.tmpl.h's skeleton_wff_with_testers) are automaton
-	// bookkeeping registered straight into sol.output_props with no backing
-	// entry in sol.atoms at all -- unlike an ordinary atom, there is no io
-	// variable to key a flag slot on. build_program_desc must exclude them
-	// from the emitted Outputs surface the same way it already excludes the
-	// step-counter's o__ltl_ctr bits, instead of defaulting them to an
-	// unkeyable flag field (compile_spec's own hard-refusal gate would then
-	// reject the whole spec -- this is the ltl_past_since_trigger.tau parity
-	// mismatch).
+	// The ppLTLTT past-operator DFA testers (__past_s*/__past_t*) are
+	// automaton bookkeeping in sol.output_props with no backing sol.atoms
+	// entry, so there's no io variable to key a flag slot on.
+	// build_program_desc must exclude them from Outputs, like the
+	// step-counter's o__ltl_ctr bits, instead of an unkeyable flag field.
 	TEST_CASE("build_program_desc: ppLTLTT past-operator DFA tester props "
 	          "are excluded from Outputs, not emitted as unkeyable flags") {
 		tref fm = wff(
@@ -1235,6 +1179,64 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		std::ostringstream os;
 		emit_program(*d, os);
 		CHECK_FALSE(has(os.str(), "__past_"));
+	}
+
+	// ── (c) file-bound streams (tau_compile.tmpl.h Part C) ─────────────────
+
+	// A spec whose input_def binds i1 to a file must carry that binding
+	// through build_program_desc's stream_ctx param into d.input_streams,
+	// while a console-bound output stays console -- mirroring how the
+	// interpreter itself resolves a stream's binding (interpreter.tmpl.h's
+	// rebuild_inputs/rebuild_outputs).
+	TEST_CASE("build_program_desc: file-bound input stream is captured "
+	          "as binding::file with its filename, console output unchanged") {
+		compile_detail::scoped_clean_definitions<node_t> clean_defs;
+		std::string src =
+			"i1:tau := in file(\"/tmp/_tau_cg_pd_stream_test.in\").\n"
+			"o1:tau := out console.\n"
+			"G(o1[t]:tau = i1[t]:tau).";
+		tref fm = parse_like_compile_spec(src);
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+
+		auto d = build_program_desc<node_t>(*sol, "file_stream_test",
+			/*revisable=*/false, /*open_streams=*/{},
+			definitions<node_t>::instance().get_io_context());
+		REQUIRE(d.has_value());
+
+		REQUIRE(d->input_streams.size() == 1);
+		CHECK(d->input_streams[0].name == "i1");
+		CHECK(d->input_streams[0].bind == stream_desc::binding::file);
+		CHECK(d->input_streams[0].filename ==
+			"/tmp/_tau_cg_pd_stream_test.in");
+
+		REQUIRE(d->output_streams.size() == 1);
+		CHECK(d->output_streams[0].name == "o1");
+		CHECK(d->output_streams[0].bind == stream_desc::binding::console);
+		CHECK(d->output_streams[0].filename.empty());
+
+		std::ostringstream os;
+		compile_detail::emit_main(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "ctx.add_input_file(\"i1\", "));
+		CHECK(has(s, "\"/tmp/_tau_cg_pd_stream_test.in\")"));
+		CHECK(has(s, "ctx.add_output_console(\"o1\", "));
+		CHECK_FALSE(has(s, "add_input_console(\"i1\""));
+		CHECK_FALSE(has(s, "add_output_file(\"o1\""));
+	}
+
+	// No stream_ctx given (build_program_desc's default): every stream stays
+	// console-bound, matching every existing call site above verbatim.
+	TEST_CASE("build_program_desc: without stream_ctx, streams default to console") {
+		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "no_ctx_default");
+		REQUIRE(d.has_value());
+		for (auto& s : d->input_streams)
+			CHECK(s.bind == stream_desc::binding::console);
+		for (auto& s : d->output_streams)
+			CHECK(s.bind == stream_desc::binding::console);
 	}
 }
 
