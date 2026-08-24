@@ -97,6 +97,9 @@ struct eliminability {
 	bool bv_floor = false;
 
 	elim_verdict verdict_of(tref n) const {
+		// A null tref has no verdict to look up, and hashing it
+		// (hash_lcrs_tref) DBG-asserts non-null -- guard before that lookup.
+		if (!n) return elim_verdict::eliminable;
 		// An explicit verdict beats the floor in BOTH directions: an
 		// analysed node recorded `eliminable` stays eliminable even if
 		// bv-typed. This is the whole mechanism behind "bv variables that
