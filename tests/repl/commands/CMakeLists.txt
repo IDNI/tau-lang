@@ -56,6 +56,9 @@ include(test_repl-blasting_equiv.cmake)
 # LTL strategy execution
 include(test_repl-strategy_exec.cmake)
 
+# `tau compile` verb
+include(test_repl-compile_verb.cmake)
+
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
 # TODO (VERY_HIGH) add tests  definition command

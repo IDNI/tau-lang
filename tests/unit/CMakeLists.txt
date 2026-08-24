@@ -15,6 +15,7 @@ set(TESTS
 	hooks
 	interpreter
 	interpreter_api_extensions
+	table_step_provider
 	io_context
 	pointwise_revision
 	#pwr_debug
@@ -48,11 +49,13 @@ set(TESTS
 	algorithm_c
 	algorithm_d
 	algorithm_picker
+	codegen_parity
 	cpp_codegen
 	cpp_codegen_pwr
 	cpp_codegen_roundtrip
 	cpp_codegen_bench
 	cpp_codegen_data_atoms
+	cpp_codegen_program_desc
 	gr1_detect
 	liveness_decomp
 	mealy_extract
@@ -60,6 +63,9 @@ set(TESTS
 	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
+	ocltl_phi_delta
+	ocltl_runtime_witness
+	ocltl_types
 	rr
 	spec_decompose
 	product_ba
@@ -78,6 +84,15 @@ set(TESTS
 foreach(X IN LISTS TESTS)
 	add("test_${X}")
 endforeach()
+
+# codegen_parity's compile+run comparison needs the tau CLI, which unit-only
+# presets don't build; bake its path in when the target exists (TAU_CODEGEN_TAU_EXE
+# overrides at runtime for a binary built elsewhere), else the test skips.
+if(TARGET test_codegen_parity AND TARGET ${TAU_EXECUTABLE_NAME})
+	target_compile_definitions(test_codegen_parity PRIVATE
+		TAU_CLI_EXE_PATH="$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	add_dependencies(test_codegen_parity ${TAU_EXECUTABLE_NAME})
+endif()
 
 # Non-doctest evaluator for scripted fuzz testing
 add_executable(tau_eval tau_eval.cpp)
