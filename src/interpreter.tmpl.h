@@ -406,13 +406,16 @@ post_normalization:
 	// LtlAbaSolution on the interpreter for downstream introspection
 	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
 	std::optional<LtlAbaSolution<node>> ltl_sol;
+	std::vector<std::string> since_aux_anchor;
 	if (has_ltl_operators<node>(spec)) {
-		auto [safety_spec, sol_opt] = ltl_to_safety_formula_full<node>(spec);
+		auto [safety_spec, sol_opt, unanchored_aux] =
+			ltl_to_safety_formula_full<node>(spec);
 		if (!safety_spec) {
 			LOG_ERROR << "Tau specification is unsat (not LTL-realizable)\n";
 			return {};
 		}
 		ltl_sol = std::move(sol_opt);
+		since_aux_anchor = std::move(unanchored_aux);
 		// Normalize the derived safety formula and recurse with it.
 		spec = normalizer<node>(safety_spec);
 	}
@@ -446,6 +449,12 @@ post_normalization:
 		// introspection of the Mealy strategy. Empty for pure-safety /
 		// pure-past-LTL specs that bypassed solve_ltl_aba.
 		i.cached_solution = ltl_sol;
+
+		// LA-N3: anchor the inner-S auxiliaries of the pure-past
+		// compile-away at t = formula_time_point - 1 (S(-1) = false).
+		// Kept on the interpreter so reset() can re-seed.
+		i.since_aux_anchor_ = since_aux_anchor;
+		i.seed_since_aux_bits();
 
 		// For multi-state Mealy strategies we need two things:
 		//
@@ -2011,16 +2020,16 @@ void interpreter<node>::reset() {
 	// `memory` lost them, so the first steps after reset missed their
 	// state-bit lookback values.
 	seed_mealy_initial_state();
+	// LA-N3: same for the inner-S auxiliary anchors.
+	seed_since_aux_bits();
 }
 
 template <NodeType node>
-void interpreter<node>::seed_mealy_initial_state() {
+void interpreter<node>::seed_aux_lookback_bits(
+	const std::map<std::string, int>& bits)
+{
 	using tau = tree<node>;
-	if (!(cached_solution && cached_solution->aut.num_states > 1
-			&& formula_time_point >= 1)) return;
-	const int k      = cached_solution->aut.num_states;
-	const int init_s = cached_solution->aut.initial_state;
-	if (init_s < 0 || init_s >= k) return;
+	if (bits.empty() || formula_time_point < 1) return;
 	// Build BV constants for 1 and 0 (same pattern used by
 	// complete_outputs: bf-wrap via tau::get(tau::bf, {...})).
 	const size_t bv_tid = get_ba_type_id<node>(bv_type<node>());
@@ -2036,13 +2045,13 @@ void interpreter<node>::seed_mealy_initial_state() {
 		tau::get_ba_constant(
 			make_bitvector_bottom_elem(bv_sz), bv_tid)});
 	// The template variables must be the SPEC'S OWN interned io_var
-	// nodes: a freshly parsed `ms_j[t-1]` template can differ structurally
+	// nodes: a freshly parsed `name[t-1]` template can differ structurally
 	// from the encoded formula's node (inference context), and then the
 	// memory keys derived from it never substitute -- the solver
 	// re-chooses the state bits freely at the first step and the one-hot
 	// system goes unsat a step later (seen on the qlt F execution,
 	// Release). Harvest the lookback occurrences from ubt_ctn instead.
-	std::map<std::string, tref> ms_lookback;
+	std::map<std::string, tref> lookback_occ;
 	for (const htrefs& part : ubt_ctn) for (const htref& h : part)
 		for (tref v : tau::get(h->get()).select_top(
 			is_child<node, tau::io_var>)) {
@@ -2050,19 +2059,18 @@ void interpreter<node>::seed_mealy_initial_state() {
 			// the io_var child feeds the name/shift checks.
 			tref iov = tau::trim(v);
 			const std::string& n = get_var_name<node>(iov);
-			if (n.rfind("o__ltl_ms", 0) != 0) continue;
+			if (!bits.contains(n)) continue;
 			// Only the lookback ([t-1]) occurrence has the shape
 			// transform_io_var expects for the seed key.
 			if (is_io_initial<node>(iov)
 				|| get_io_var_shift<node>(iov) != 1) continue;
-			ms_lookback.emplace(n, v);
+			lookback_occ.emplace(n, v);
 		}
-	for (int j = 0; j < k; ++j) {
-		auto it = ms_lookback.find(
-			"o__ltl_ms" + std::to_string(j) + "__");
-		if (it == ms_lookback.end()) continue;
-		// transform_io_var(ms_j[t-1], formula_time_point)
-		// → ms_j[t = formula_time_point - 1]  (= ms_j[t=0])
+	for (const auto& [name, bit] : bits) {
+		auto it = lookback_occ.find(name);
+		if (it == lookback_occ.end()) continue;
+		// transform_io_var(name[t-1], formula_time_point)
+		// → name[t = formula_time_point - 1]  (= name[t=0])
 		// This is the exact key update_to_time_point produces for the
 		// lookback var when processing the G body.
 		// bf-wrapped, matching the level the step's own solution
@@ -2072,9 +2080,34 @@ void interpreter<node>::seed_mealy_initial_state() {
 		// seeds with zeros.
 		tref mem_key = tau::get(tau::bf, {transform_io_var<node>(
 			it->second, formula_time_point)});
-		tref mem_val = (j == init_s) ? bv_one_val : bv_zero_val;
-		memory.emplace(mem_key, mem_val);
+		memory.emplace(mem_key, bit ? bv_one_val : bv_zero_val);
 	}
+}
+
+template <NodeType node>
+void interpreter<node>::seed_mealy_initial_state() {
+	if (!(cached_solution && cached_solution->aut.num_states > 1
+			&& formula_time_point >= 1)) return;
+	const int k      = cached_solution->aut.num_states;
+	const int init_s = cached_solution->aut.initial_state;
+	if (init_s < 0 || init_s >= k) return;
+	std::map<std::string, int> bits;
+	for (int j = 0; j < k; ++j)
+		bits.emplace("o__ltl_ms" + std::to_string(j) + "__",
+			j == init_s ? 1 : 0);
+	seed_aux_lookback_bits(bits);
+}
+
+template <NodeType node>
+void interpreter<node>::seed_since_aux_bits() {
+	// LA-N3: every inner (off-spine) S auxiliary is anchored to 0 at the
+	// step before the first enforced one — S(-1) = false, and since a T
+	// compiles to a negated S, T(-1) = true is the same seed. Outermost
+	// auxiliaries are NOT in this list (their anchor is ψ@0 plus
+	// G(curr && rhs); a 0-seed would outlaw their φ-chain).
+	std::map<std::string, int> bits;
+	for (const std::string& n : since_aux_anchor_) bits.emplace(n, 0);
+	seed_aux_lookback_bits(bits);
 }
 
 // ── current_state ─────────────────────────────────────────────────────────────

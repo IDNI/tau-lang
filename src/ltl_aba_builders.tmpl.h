@@ -1158,7 +1158,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 // preserve the existing single-return API for callers that don't need it.
 
 template <NodeType node>
-std::tuple<tref, std::optional<LtlAbaSolution<node>>>
+std::tuple<tref, std::optional<LtlAbaSolution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm) {
 	using tau = tree<node>;
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
@@ -1167,7 +1167,8 @@ ltl_to_safety_formula_full(tref fm) {
 	// return G(curr && rhs) safety invariants for each S operator.
 	// No Mealy synthesis is needed on this path; the returned solution is empty.
 	{
-		auto [compiled_fast, safety_fm, init_fm, _aux] = compile_since_trigger<node>(fm);
+		auto [compiled_fast, safety_fm, init_fm, _aux, unanchored_aux] =
+			compile_since_trigger<node>(fm);
 		if (!has_ltl_operators<node>(compiled_fast)) {
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: "
 			          << "pure past-LTL, returning safety formula";
@@ -1215,14 +1216,16 @@ ltl_to_safety_formula_full(tref fm) {
 			tref obligation = wrap_always(compiled_fast);
 			tref out = tau::build_wff_and(obligation,
 			           tau::build_wff_and(safety_fm, init_fm));
-			return {out, std::nullopt};
+			// LA-N3: hand the inner-S auxiliaries to the caller so the
+			// interpreter can seed their t=0 anchor (S(-1) = false).
+			return {out, std::nullopt, std::move(unanchored_aux)};
 		}
 	}
 
 	auto maybe = solve_ltl_aba<node>(fm);
 	if (!maybe) {
 		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";
-		return {nullptr, std::nullopt};
+		return {nullptr, std::nullopt, {}};
 	}
 
 	auto& sol = *maybe;
@@ -1245,23 +1248,23 @@ ltl_to_safety_formula_full(tref fm) {
 		             "synthesised strategy cannot be encoded as a safety "
 		             "formula (Algorithm B / constant-output fast path) — "
 		             "it is not executable\n";
-		return {nullptr, std::nullopt};
+		return {nullptr, std::nullopt, {}};
 	}
 
 	// Purely propositional: realizable but no data constraints to encode.
-	if (sol.atoms.empty()) return {tau::_T(), std::move(sol)};
+	if (sol.atoms.empty()) return {tau::_T(), std::move(sol), {}};
 
 	const auto& aut = sol.aut;
 
 	// Trivially realizable: empty automaton.
-	if (aut.num_states == 0) return {tau::_T(), std::move(sol)};
+	if (aut.num_states == 0) return {tau::_T(), std::move(sol), {}};
 
 	if (aut.num_states > 1) {
 		LOG_INFO << "[ltl_aba] Multi-state strategy ("
 		         << aut.num_states
 		         << " states) — encoding with auxiliary one-hot state bits";
 		tref encoded = encode_mealy_as_safety<node>(sol);
-		return {encoded, std::move(sol)};
+		return {encoded, std::move(sol), {}};
 	}
 
 	// Single-state strategy: the self-loop guard is the perpetual output
@@ -1273,7 +1276,7 @@ ltl_to_safety_formula_full(tref fm) {
 		LOG_ERROR << "[ltl_aba] single-state strategy has no outgoing "
 		             "edge; the automaton is degraded and cannot be "
 		             "executed\n";
-		return {nullptr, std::nullopt};
+		return {nullptr, std::nullopt, {}};
 	}
 
 	// Build the disjunction of ABA guard formulas over all edges from state 0.
@@ -1286,12 +1289,12 @@ ltl_to_safety_formula_full(tref fm) {
 	tref simplified = normalize_non_temp<node>(combined);
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
 	          << LOG_FM(simplified) << ")";
-	return {tau::build_wff_always(simplified), std::move(sol)};
+	return {tau::build_wff_always(simplified), std::move(sol), {}};
 }
 
 template <NodeType node>
 tref ltl_to_safety_formula(tref fm) {
-	auto [safety, _sol] = ltl_to_safety_formula_full<node>(fm);
+	auto [safety, _sol, _aux] = ltl_to_safety_formula_full<node>(fm);
 	return safety;
 }
 

@@ -351,8 +351,14 @@ tref ltl_to_safety_formula(tref fm);
 //
 // On the multi-state encoding path, the caller can read sol.aut.num_states,
 // sol.aut.edges, sol.atoms etc. without re-running synthesis.
+//
+// The third element is the pure-past compile-away's list of UNANCHORED
+// auxiliary output names (`o__ltl_s<k>__` of every inner / off-spine S):
+// the interpreter must seed each to bv-0 at t = formula_time_point - 1
+// (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
+// other path (the ppLTLTT tester encoding anchors inside the skeleton).
 template <NodeType node>
-std::tuple<tref, std::optional<LtlAbaSolution<node>>>
+std::tuple<tref, std::optional<LtlAbaSolution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm);
 
 } // namespace idni::tau_lang

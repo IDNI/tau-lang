@@ -828,10 +828,10 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	//    temporal quantifier"), which is what the first draft hit.
 	//  * α is false at every step INCLUDING t=0, and it is both the φ and
 	//    the ψ of its Since, so `curr ↔ (ψ ∨ (φ ∧ prev))` pins that
-	//    auxiliary to 0 without needing a t=0 anchor — the unconstrained
-	//    `aux[-1]` cannot leak in through a false φ.  That keeps the
-	//    expected trace deterministic while the inner-S anchor stays out
-	//    (see the KNOWN GAP note in compile_since_trigger_rec).
+	//    auxiliary to 0 without even needing the t=0 anchor — a phantom
+	//    `aux[-1]` could never leak in through a false φ.  (Since LA-N3
+	//    both inner auxiliaries are additionally seeded to 0 by
+	//    seed_since_aux_bits, which agrees with the pinned value.)
 	//  * neither disjunct is an `always`, so the obligation wraps as
 	//    `G(curr0 || curr1)` rather than a nested `G(… || G(…))`.
 	//
@@ -940,6 +940,159 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 	}
 
 } // TEST_SUITE "LTL correctness: strategy must survive into execution (LT-6)"
+
+
+// ── LA-N3: the t = 0 anchor of an off-spine (inner) S/T ──────────────────────
+//
+// Strong-past semantics: S(-1) = false, so at the first step `φ S ψ` can hold
+// only through ψ.  The compile-away pass encodes each S as an auxiliary bv
+// output with the tracking invariant G(curr ↔ (ψ ∨ (φ ∧ prev))); for an
+// OUTERMOST S the anchor comes from `ψ@0` plus `G(curr && rhs)`, but an inner
+// S (anything under a disjunction, a negation, another S/T — or under
+// `always`, which drops off the conjunct spine too) had NO anchor: `prev` at
+// the first enforced step was a free system output, so the strategy could
+// claim the Since through phantom memory (`aux = 1` although ψ never held).
+//
+// The sat path is unaffected (the ppLTLTT tester encoding hard-codes
+// !state_var at t = 0), which is exactly the verdict/execution disagreement
+// these cases pin: the spec below is UNREALIZABLE, yet the unanchored
+// execution ran it forever.
+//
+// The fix seeds every inner S auxiliary to bv-0 at t = formula_time_point - 1
+// through the same memory pre-population the Mealy state bits use — a
+// single-type, non-negative-time encoding of S(-1) = false.  (The cross-type
+// `curr@0 ↔ ψ@0` initial condition remains a do-not-retry trap; see the
+// revert note in compile_since_trigger_rec.)
+
+TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
+
+	// o1 must always be 0, so the disjunct (o1 = 1) is unavailable and the
+	// inner S must hold at every enforced step.  Its φ = (o1 = 0) is TRUE
+	// throughout, so the phantom-memory arm (φ ∧ prev) is live: unanchored,
+	// the system sets the auxiliary's initial lookback to 1 and executes
+	// although ψ = (i1 = 1) never holds.  Anchored, the step-1 solve is
+	// unsat and the run stops short.
+	TEST_CASE("[LAN3-EXEC-01] inner S: phantom memory cannot satisfy it") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"0", "0", "0", "0"};
+		auto vals = run_qlt_with_i1(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt)) "
+		    "|| (o1[t]:qlt = {1}:qlt))).", i1_vals, 4);
+		CHECK(vals.size() < 4); // ψ never held: no complete violating trace
+	}
+
+	// The same spec with cooperative inputs: still refused, agreeing with
+	// the sat verdict (the spec is UNREALIZABLE — [LAN3-SAT-01]).  The
+	// interpreter's unbounded continuation is the synthesis fixpoint
+	// (∀ inputs ∃ outputs, sustainable forever), whose only invariant here
+	// is the aux chain the anchor now denies at its start; it does not
+	// execute unrealizable specs opportunistically on inputs that happen
+	// to cooperate.  Before the fix this ran 4 steps — through phantom
+	// memory, for cooperative and hostile inputs alike.
+	TEST_CASE("[LAN3-EXEC-02] inner S: cooperative inputs do not resurrect "
+	          "an unrealizable spec") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"1", "1", "1", "1"};
+		auto vals = run_qlt_with_i1(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt)) "
+		    "|| (o1[t]:qlt = {1}:qlt))).", i1_vals, 4);
+		CHECK(vals.size() < 4);
+	}
+
+	// T dual.  ¬(φ T ψ) = (¬φ) S (¬ψ) with ¬φ = (o1 ≠ 1) true throughout
+	// (o1 is pinned to 0) and ¬ψ = (i1 ≠ 1) false throughout (i1 is fed 1),
+	// so the required Since can only be claimed through phantom memory:
+	// T(-1) = true must anchor the rewritten S's auxiliary to 0.
+	TEST_CASE("[LAN3-EXEC-03] inner T: T(-1)=true is enforced") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"1", "1", "1", "1"};
+		auto vals = run_qlt_with_i1(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(! ((o1[t]:qlt = {1}:qlt) T (i1[t]:qlt = {1}:qlt)))).",
+		    i1_vals, 4);
+		CHECK(vals.size() < 4);
+	}
+
+	// S nested inside another S's operand (ψ position): both auxiliaries are
+	// inner and both must be anchored — the outer S reduces to the inner one
+	// (its own φ ∧ prev arm is anchored away at the first enforced step),
+	// and the inner one to an input the environment refuses.  Like
+	// [LAN3-EXEC-02], cooperative inputs make no difference: the spec is
+	// unrealizable and the anchored continuation refuses it either way.
+	TEST_CASE("[LAN3-EXEC-04] S-in-S: both auxiliaries anchored") {
+		bdd_init<Bool>();
+		const strings i1_zero = {"0", "0", "0", "0"};
+		auto vals = run_qlt_with_i1(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(((o1[t]:qlt = {0}:qlt) S "
+		    "((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt))) "
+		    "|| (o1[t]:qlt = {1}:qlt))).", i1_zero, 4);
+		CHECK(vals.size() < 4);
+
+		const strings i1_one = {"1", "1", "1", "1"};
+		auto vals2 = run_qlt_with_i1(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(((o1[t]:qlt = {0}:qlt) S "
+		    "((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt))) "
+		    "|| (o1[t]:qlt = {1}:qlt))).", i1_one, 4);
+		CHECK(vals2.size() < 4);
+	}
+
+	// Positive control: a REALIZABLE spec with an inner S still executes
+	// under the anchor.  S(χ, χ) ≡ χ, so the spec is G(o1 = 0 ∨ o1 = 1);
+	// the anchored auxiliary tracks χ from the first enforced step on and
+	// never needs phantom memory.
+	TEST_CASE("[LAN3-EXEC-06] realizable inner S executes under the anchor") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input(
+		    "always (((o1[t]:qlt = {0}:qlt) S (o1[t]:qlt = {0}:qlt)) "
+		    "|| (o1[t]:qlt = {1}:qlt)).", 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK((v == "0" || v == "1"));
+	}
+
+	// The sat path must agree: both reproducer specs are UNREALIZABLE (the
+	// environment refuses ψ at t = 0).  These already held before the fix —
+	// they pin that verdict and execution now agree.
+	TEST_CASE("[LAN3-SAT-01] the reproducer specs are UNREALIZABLE") {
+		bdd_init<Bool>();
+		CHECK_FALSE(realizable(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt)) "
+		    "|| (o1[t]:qlt = {1}:qlt)))."));
+		CHECK_FALSE(realizable(
+		    "always ((o1[t]:qlt = {0}:qlt) && "
+		    "(! ((o1[t]:qlt = {1}:qlt) T (i1[t]:qlt = {1}:qlt))))."));
+	}
+
+	// Regression guard: an OUTERMOST S keeps its free auxiliary (its anchor
+	// is ψ@0 + G(curr && rhs)); blanket-seeding it to 0 would force ψ at
+	// every step and outlaw the φ-chain.  ψ = (o1 = 3/4) must hold at t = 0,
+	// after which φ = (o1 = 0) may carry the Since indefinitely.
+	TEST_CASE("[LAN3-EXEC-05] outermost S: the φ-chain survives the anchor") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input(
+		    "(o1[t]:qlt = {0}:qlt) S (o1[t]:qlt = {3/4}:qlt).", 4);
+		REQUIRE(vals.size() == 4);
+		CHECK(vals[0] == "3/4"); // ψ@0
+		// Semantic check, straight from the S definition: at every step,
+		// ψ held at some k ≤ t and φ held on (k, t].
+		for (size_t t = 0; t < vals.size(); ++t) {
+			bool since = false;
+			for (size_t k = 0; k <= t && !since; ++k) {
+				if (vals[k] != "3/4") continue;
+				bool phi_after = true;
+				for (size_t j = k + 1; j <= t; ++j)
+					if (vals[j] != "0") { phi_after = false; break; }
+				since = phi_after;
+			}
+			CHECK(since);
+		}
+	}
+
+} // TEST_SUITE "LTL correctness: inner S/T anchored at t=0 (LA-N3)"
 
 
 TEST_SUITE("Cleanup") {

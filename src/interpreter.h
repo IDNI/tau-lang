@@ -182,7 +182,8 @@ struct interpreter {
 	// Reset the interpreter back to time t=0. Clears `memory`,
 	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
 	// the multi-state Mealy initial-state bits (see
-	// seed_mealy_initial_state). The spec (`original_spec`, `ubt_ctn`,
+	// seed_mealy_initial_state) and the inner-S auxiliary anchors (see
+	// seed_since_aux_bits). The spec (`original_spec`, `ubt_ctn`,
 	// `cached_solution`, IO streams) is preserved — only the execution
 	// snapshot is reset.
 	void reset();
@@ -195,6 +196,17 @@ struct interpreter {
 	// reset() that only cleared `memory` lost this pre-population, so
 	// "back to t=0" was not the real t=0 state).
 	void seed_mealy_initial_state();
+
+	// LA-N3: pre-populate `memory` with bv-0 for every INNER (off-spine)
+	// S/T auxiliary `o__ltl_s<k>__` in `since_aux_anchor_`, at
+	// t = formula_time_point - 1 — the strong-past anchor S(-1) = false
+	// (equivalently T(-1) = true) that the compile-away pass cannot state
+	// in the formula without a cross-BA-type or negative-time shape (both
+	// revert-pinned; see compile_since_trigger_rec). Without it the first
+	// enforced step's `φ ∧ prev` arm lets the strategy claim a Since
+	// through phantom memory. Called by make_interpreter and by reset();
+	// no-op when the list is empty or lookback is 0.
+	void seed_since_aux_bits();
 
 	// Opaque identifier for the current Mealy state (or interpreter
 	// snapshot if the spec has no Mealy strategy). Two states with the
@@ -398,6 +410,13 @@ struct interpreter {
 	std::optional<LtlAbaSolution<node>> cached_solution;
 	bool cached_solution_stale_ = false;
 
+	// LA-N3: auxiliary output names (`o__ltl_s<k>__`) of the inner /
+	// off-spine S operators from the pure-past compile-away, whose t=0
+	// anchor is not expressible in the safety formula itself. Set by
+	// make_interpreter from ltl_to_safety_formula_full's third result;
+	// consumed by seed_since_aux_bits() (make_interpreter and reset()).
+	std::vector<std::string> since_aux_anchor_;
+
 	// Open-stream handlers (declared via declare_open). Iteration order
 	// matches insertion order via std::vector<std::string> open_streams_order_;
 	// std::map gives us name-keyed lookup but loses order, so we keep a
@@ -434,6 +453,13 @@ private:
 	/// @param pin Optional caller-held map whose nodes must survive the
 	/// sweep (collect_live_refs cannot see locals).
 	void maybe_gc(const assignment<node>* pin = nullptr);
+
+	/// Shared memory pre-population for auxiliary bv state bits (the Mealy
+	/// one-hot bits and the LA-N3 inner-S anchors): for each (name → bit)
+	/// entry whose `name[t-1]` lookback occurs in `ubt_ctn`, emplace
+	/// memory[name[t = formula_time_point - 1]] := bv-{bit}. No-op when
+	/// `formula_time_point` is 0 (no lookback, nothing to seed).
+	void seed_aux_lookback_bits(const std::map<std::string, int>& bits);
 
 	/// @brief Everything update() needs to commit, computed without
 	/// mutating the interpreter (PW-4 / PW-N9 / IN-M7).
