@@ -1,0 +1,3 @@
+g[n](x):tau := g[n-1](x)'.
+g[0](x):tau := 1.
+G(o1[t] = g(o1[t]):tau fallback 1).

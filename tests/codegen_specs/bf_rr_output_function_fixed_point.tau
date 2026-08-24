@@ -1,0 +1,3 @@
+f[n](x):tau := f[n-1](x) & x.
+f[0](x):tau := 1.
+G(o1[t] = f(o1[t]):tau).
