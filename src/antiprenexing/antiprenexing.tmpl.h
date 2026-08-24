@@ -1901,18 +1901,29 @@ using tau = tree<node>;
 				// falls through to the blasting attempt and the
 				// excluded.insert() below, which is the path an
 				// unsolvable scope already takes.
+				// Initialized: under non-eager placement the assigning
+				// call below is short-circuited away, yet the blasting
+				// gate reads bv_reason unconditionally.
+				bv_unsolvable_reason bv_reason = bv_unsolvable_reason::ok;
 				if (solver_placement == solver_site::eager
-					&& is_bv_solvable_formula<node>(n)) {
+					&& is_bv_solvable_formula<node>(n, bv_reason)) {
 					// Only commit to T/F on a definite answer: cvc5
 					// returning unknown, or translation failing, means
 					// we cannot decide, not that the formula is false.
 					const trefs& fv = get_free_vars<node>(n);
 					if (fv.empty()) {
-						std::optional<bv_sat_status> status =
-							bv_formula_sat_status<node>(n);
-						if (status == bv_sat_status::sat) return tau::_T();
-						if (status == bv_sat_status::unsat) return tau::_F();
-						DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
+						// Same residue screen as the open branch below: `n`
+						// may already carry a blasting-introduced quantifier
+						// alternation from a prior pass, even though this
+						// call adds no new binder itself -- screening avoids
+						// handing cvc5 a closed query it cannot terminate on.
+						if (!has_blasting_residue<node>(n)) {
+							std::optional<bv_sat_status> status =
+								bv_formula_sat_status<node>(n);
+							if (status == bv_sat_status::sat) return tau::_T();
+							if (status == bv_sat_status::unsat) return tau::_F();
+							DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
+						}
 					} else if (!has_blasting_residue<node>(n)) {
 						// The residue screen is what keeps this branch
 						// from hanging the process. Closing the free
@@ -2001,8 +2012,16 @@ using tau = tree<node>;
 							== bv_sat_status::unsat) return tau::_F();
 					}
 				}
+				// Blasting can only make progress on a scope
+				// is_bv_solvable_formula rejected for a reason it can
+				// actually resolve (embedded arithmetic/comparisons it
+				// rewrites). A variable typed outside the bv family has
+				// no arithmetic on it to rewrite, so blasting cannot
+				// close that gap; leave it unresolved for the outer
+				// machinery instead, like every other give-up path here.
 				if (bv_blasting
-					&& blast_placement == blast_site::per_leaf)
+					&& blast_placement == blast_site::per_leaf
+					&& bv_reason != bv_unsolvable_reason::non_bv_variable)
 					if (auto blasted = bv_predicate_blasting<node>(n);
 						blasted && blasted != n)
 						return blasted;

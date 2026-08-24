@@ -264,6 +264,20 @@ template <NodeType node>
 bool is_bv_formula_sat(tref form);
 
 /**
+ * @brief Why `is_bv_solvable_formula` declined a formula, or `ok` if it
+ * didn't. Lets callers that can act differently on different rejections
+ * (see the reason-aware overload below) tell them apart instead of getting
+ * a single collapsed `false`.
+ */
+enum class bv_unsolvable_reason {
+	ok,                 // solvable (or n/a: the bool-only overload doesn't ask)
+	has_unresolved_ref,  // formula still contains an unresolved wff_ref/bf_ref
+	non_bv_variable,     // a variable's ba_type is outside the bv family
+	missing_bitwidth,    // bv-typed variable with no explicit bitwidth subtype
+	no_bv_content,        // solvable checks all pass vacuously, but no bv content at all
+};
+
+/**
  * @brief Checks that the formula can be decided by the bitvector solver:
  * every variable must have an explicitly sized bitvector type. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
@@ -275,8 +289,14 @@ bool is_bv_formula_sat(tref form);
  * matters.
  *
  * @param form The formula to check
+ * @param reason Set to why the formula was rejected (`ok` if it wasn't).
  * @return true if all variables are explicitly sized bitvectors
  */
+template <NodeType node>
+bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason);
+
+/** @copydoc is_bv_solvable_formula(tref,bv_unsolvable_reason&)
+ * Adapter for callers that only need the yes/no answer. */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form);
 

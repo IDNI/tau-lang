@@ -346,10 +346,11 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
  * @return true if the formula is within the translator's reach
  */
 template <NodeType node>
-bool is_bv_solvable_formula(tref form) {
+bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	reason = bv_unsolvable_reason::ok;
 	bool solvable = true;
 	// A formula with no bv content at all satisfied every rejection below
 	// vacuously and was declared solvable, so a plain constant such as `1`
@@ -382,21 +383,36 @@ bool is_bv_solvable_formula(tref form) {
 		// over io_vars, adding io_var to this list turned 1.4s and all-pass
 		// into a >1500s timeout with a wrong answer, because every scope then
 		// missed the solver shortcut and went to blasting instead.
-		if (is<node>(n, tau::ref))
+		if (is<node>(n, tau::ref)) {
+			reason = bv_unsolvable_reason::has_unresolved_ref;
 			return solvable = false;
+		}
 		if (is_bv_type_family<node>(tau::get(n).get_ba_type()))
 			has_bv = true;
 		if (is<node>(n, tau::variable)) {
 			size_t t = tau::get(n).get_ba_type();
-			if (!is_bv_type_family<node>(t)) return solvable = false;
-			// the solver requires an explicit bitwidth
-			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype))
+			if (!is_bv_type_family<node>(t)) {
+				reason = bv_unsolvable_reason::non_bv_variable;
 				return solvable = false;
+			}
+			// the solver requires an explicit bitwidth
+			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype)) {
+				reason = bv_unsolvable_reason::missing_bitwidth;
+				return solvable = false;
+			}
 		}
 		return solvable;
 	};
 	pre_order<node>(form).search_unique(check);
+	if (solvable && !has_bv) reason = bv_unsolvable_reason::no_bv_content;
 	return solvable && has_bv;
+}
+
+/** @copydoc is_bv_solvable_formula(tref,bv_unsolvable_reason&) */
+template <NodeType node>
+bool is_bv_solvable_formula(tref form) {
+	bv_unsolvable_reason reason;
+	return is_bv_solvable_formula<node>(form, reason);
 }
 
 /** @copydoc has_foreign_ba_constant */

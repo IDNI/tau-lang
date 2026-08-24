@@ -1287,6 +1287,37 @@ static tref ngteq_predicate(tref atomic) {
  * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
  * @endcode
  */
+/**
+ * @brief Does @p atomic contain a variable outside the bv family, or a
+ * bv-typed variable with no explicit bitwidth?
+ *
+ * Blasting only rewrites arithmetic/comparisons over bv-typed operands; a
+ * variable left outside that family (e.g. one type inference never gave a
+ * bv type, left at ba_type 0) is nothing blasting can resolve, and the
+ * blasting machinery assumes every variable it walks is bv-typed with a
+ * known bitwidth. Used to decline blasting such an atom cleanly (no
+ * change) instead.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic comparison to check
+ * @return true if a disqualifying variable is present
+ */
+template<NodeType node>
+static bool has_non_bv_operand(tref atomic) {
+	using tau = tree<node>;
+	bool bad = false;
+	auto check = [&](tref n) {
+		if (!is<node, tau::variable>(n)) return true;
+		size_t t = tau::get(n).get_ba_type();
+		if (!is_bv_type_family<node>(t)
+			|| get_bv_type_bitwidth<node>(n) == 0)
+			return bad = true, false;
+		return true;
+	};
+	pre_order<node>(atomic).search_unique(check);
+	return bad;
+}
+
 template<NodeType node>
 static tref wff_predicate_blasting(tref term) {
 	using tau = tree<node>;
@@ -1298,6 +1329,10 @@ static tref wff_predicate_blasting(tref term) {
 		auto nt = tau::get(t).get_type();
 
 		auto blast = [&](tref atomic, const auto& blaster) -> tref {
+				// Decline cleanly (no change to this atom) rather than
+				// hand a mixed-type atom to machinery that assumes every
+				// operand is bv-typed -- see has_non_bv_operand.
+				if (has_non_bv_operand<node>(atomic)) return t;
 				auto blasted = blaster(atomic);
 				if (!blasted) return error = true, t;
 				// The atomic being replaced sits under a wff node and
