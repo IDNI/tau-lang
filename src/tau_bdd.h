@@ -128,6 +128,16 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 
 	/** @brief Clear all memoisation caches. */
 	static void clear_caches();
+
+	// The memo tables are keyed by BDD refs alone, not by order, so a
+	// cached entry is only valid under the order it was computed with.
+	// Every public entry point calls sync_order_cache() first, which
+	// clears all five tables when @p o differs from last_order.
+	static order last_order;      ///< @brief Order the memo caches were last populated under.
+	static bool  has_last_order;  ///< @brief Whether `last_order` holds a valid previous order.
+
+	/** @brief Clear all memoisation caches if @p o differs from the order last seen at a public entry point. */
+	static void sync_order_cache(const order& o);
 #endif
 
 	/** @brief Canonicalise the pair @p x, @p y so @p x ≤ @p y. */
@@ -193,23 +203,34 @@ private:
 		x.inv = false, y.inv = false;
 		return x < y ? true : x == y ? s : false;
 	};
+	// Memoised worker for bdd_and_many(refs, const order&): always
+	// memoizes the recursion within one top-level call, same pattern as
+	// bdd_and/bdd_ite/bdd_ex/bdd_quant's workers above.
+	static ref bdd_and_many(refs v, const order& o,
+		std::unordered_map<refs, ref>& memo);
 	static size_t bdd_and_many_iter(const refs& v, refs& h, refs& l, ref& res,
-		tref& m, const order& o);
+		tref& m, const order& o, std::unordered_map<refs, ref>& memo);
 	static void am_sort(refs& b);
 	static bool am_simplify(refs& v, const std::unordered_map<refs, ref>& memo);
 	static bool subset(const refs& small, const refs& big);
 	static ref abs(ref x);
-#ifdef TAU_CACHE
+	// Memoised recursive workers, independent of TAU_CACHE: the public
+	// entry points thread through a static map when TAU_CACHE is on, or
+	// a fresh local one otherwise.
+	static ref bdd_and(ref x, ref y, const order& o,
+		std::unordered_map<std::array<ref, 2>, ref>& memo);
+	static ref bdd_ite(ref f, ref g, ref h, const order& o,
+		std::unordered_map<std::array<ref, 3>, ref>& memo);
 	static ref bdd_ex(ref x, const trefs& v, size_t i, const order& o, auto& memo);
 	static ref bdd_quant(ref x, const quants& v, size_t i, const order& o, auto& memo);
-#else
-	static ref bdd_ex(ref x, const trefs& v, size_t i, const order& o);
-	static ref bdd_quant(ref x, const quants& v, size_t i, const order& o);
-#endif
 	static ref bdd_compose_impl(ref x, tref xi, ref g, const order& o,
 		std::unordered_map<ref, ref>& memo);
 	static ref bdd_compose_impl(ref x, const subs_t& subs, size_t i,
 		const order& o, std::unordered_map<ref, ref>& memo);
+	// Memoised worker for to_tau_term(ref, size_t): shared BDD nodes are
+	// rebuilt once per top-level call instead of once per path.
+	static tref to_tau_term(ref x, size_t term_type,
+		std::unordered_map<ref, tref>& memo);
 
 };
 
