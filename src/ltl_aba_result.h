@@ -24,26 +24,26 @@
 namespace idni::tau_lang {
 
 /** @brief One transition of a strategy automaton as Spot's HOA spells it. */
-struct HoaEdge {
+struct hoa_edge {
 	std::string guard_label;  // Boolean formula over AP indices, e.g. "0&!1"
 	int dst = 0;
 	bool accepting = false;   // true if this edge carries an acceptance mark
 };
 
 /** @brief A strategy automaton parsed out of Spot's HOA output. */
-struct HoaAutomaton {
+struct hoa_automaton {
 	int num_states = 0;
 	int initial_state = 0;
 	std::vector<std::string> aps;       // atomic proposition names
-	std::vector<std::vector<HoaEdge>> edges; // edges[src] = outgoing edges
+	std::vector<std::vector<hoa_edge>> edges; // edges[src] = outgoing edges
 	std::vector<bool> state_accepting;  // true if state has acceptance mark
 };
 
-HoaAutomaton parse_hoa(const std::string& hoa_text);
+hoa_automaton parse_hoa(const std::string& hoa_text);
 
 /** @brief Defined in ltl_aba_normalization.tmpl.h; incomplete is enough here. */
 template <NodeType node>
-struct LtlAbaSolution;
+struct ltl_aba_solution;
 
 /**
  * @brief A BA's answer to try_propositional_synthesis.
@@ -55,7 +55,7 @@ struct LtlAbaSolution;
  */
 template <NodeType node>
 using propositional_synthesis =
-	std::optional<std::optional<LtlAbaSolution<node>>>;
+	std::optional<std::optional<ltl_aba_solution<node>>>;
 
 /** @brief The formula is not this BA's; core falls through to the ABA oracle. */
 template <NodeType node>
@@ -65,12 +65,12 @@ propositional_synthesis<node> synthesis_declined() { return std::nullopt; }
 template <NodeType node>
 propositional_synthesis<node> synthesis_unrealizable() {
 	return propositional_synthesis<node>{
-		std::optional<LtlAbaSolution<node>>{}};
+		std::optional<ltl_aba_solution<node>>{}};
 }
 
 /** @brief The formula is this BA's and @p sol is a strategy for it. */
 template <NodeType node>
-propositional_synthesis<node> synthesis_solved(const LtlAbaSolution<node>& sol) {
+propositional_synthesis<node> synthesis_solved(const ltl_aba_solution<node>& sol) {
 	return propositional_synthesis<node>{sol};
 }
 

@@ -18,7 +18,7 @@
 
 namespace idni::tau_lang::algpick {
 
-enum class Algorithm { A, B, C, D };
+enum class algorithm { A, B, C, D };
 
 // Estimated skeleton size, in symbols.  Tight-ish upper bound from the
 // design-doc formulas; good enough to order-of-magnitude compare.
@@ -55,25 +55,25 @@ inline uint64_t estimate_size_D(uint64_t T1, uint64_t T2, uint64_t T3,
 //   cannot observe the environment's data type; D's direct parity-game product
 //   currently models only output D_i choices.  When has_input_vars is true,
 //   both are excluded from consideration.
-inline Algorithm pick(uint64_t T1, uint64_t T2, uint64_t T3,
+inline algorithm pick(uint64_t T1, uint64_t T2, uint64_t T3,
                       uint64_t K, uint64_t Q, uint64_t phi,
                       bool has_input_vars = false)
 {
 	// Start with B as the baseline (always sound).
 	uint64_t sB = estimate_size_B(T1, T2, T3, K, phi);
-	uint64_t best = sB; Algorithm a = Algorithm::B;
+	uint64_t best = sB; algorithm a = algorithm::B;
 
 	// A is only sound for output-only formulas.
 	if (!has_input_vars) {
 		uint64_t sA = estimate_size_A(T3, phi);
-		if (sA < best) { best = sA; a = Algorithm::A; }
+		if (sA < best) { best = sA; a = algorithm::A; }
 	}
 
 	uint64_t sC = estimate_size_C(T1, K, phi);
-	if (sC < best) { best = sC; a = Algorithm::C; }
+	if (sC < best) { best = sC; a = algorithm::C; }
 	if (!has_input_vars) {
 		uint64_t sD = estimate_size_D(T1, T2, T3, Q);
-		if (sD < best) { best = sD; a = Algorithm::D; }
+		if (sD < best) { best = sD; a = algorithm::D; }
 	}
 	return a;
 }

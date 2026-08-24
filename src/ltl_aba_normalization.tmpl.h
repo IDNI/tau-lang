@@ -102,41 +102,63 @@ tref guard_to_aba(
 
 // ── ABA feasibility checks ───────────────────────────────────────────────────
 //
-// Two distinct checks are used at different points in the pipeline:
-//
-// 1. aba_synthesis_feasible (used in add_consistency_constraints):
-//    Synthesis-feasibility — can the system ALWAYS satisfy this constraint
-//    regardless of env choices?  Detected by wrapping as G(fm) and running
-//    the safety synthesis pipeline.  Used to add G(!p) / G(!(pi&&pj)) skeleton
-//    constraints that prune ltlsynt-infeasible atoms/pairs before ltlsynt runs.
-//
-// 2. aba_existential_feasible (used in guard_is_aba_feasible / oracle):
-//    Existential satisfiability — does there EXIST any (i,o) satisfying this
-//    guard?  After the consistency constraints have been added, ltlsynt only
-//    produces guards built from individually-feasible and pairwise-compatible
-//    atoms, so existential satisfiability is sufficient for the oracle check.
-//    Crucially, input atoms in a guard represent conditions the env satisfies
-//    when that edge fires, so the guard is evaluated GIVEN those inputs hold —
-//    using synthesis here would give false infeasibility for conditional guards.
+// aba_synthesis_feasible (before ltlsynt) quantifies inputs universally,
+// the rest existentially, since the env picks inputs adversarially.
+// aba_existential_feasible (the oracle) quantifies everything existentially,
+// since a guard's own inputs already hold when it fires.
 
+// ── Mechanism 1(a) shadow crosscheck (ocLTL runtime-alignment design) ───────
+//
+// phi_delta(sigma,rho,D) decides whether some tau EXACTLY EQUALS the given
+// sigma/rho (Def. 3's "P_σ(m,x)"), so phi_delta_direct(allfalse,allfalse,D=1)
+// disagrees with the solver whenever an atom is a genuine constraint (it
+// forces a minterm to zero, contradicting the independent all-false type).
+// Wired SHADOW-ONLY: the solver's answer stays authoritative; this only
+// measures the agreement rate via ocltl_swap_stats/ocltl_swap_crosscheck.
+struct ocltl_swap_counters {
+	std::atomic<size_t> total_calls{0}; // aba_existential_feasible's compute() ran (always counted, cheap)
+	std::atomic<size_t> eligible{0};    // fm matched match_ocltl_swap_shape (crosscheck-gated)
+	std::atomic<size_t> ineligible{0};  // fm did not match (shape or BA gate; crosscheck-gated)
+	std::atomic<size_t> agree{0};       // closed form == solver, among eligible
+	std::atomic<size_t> disagree{0};    // closed form != solver, among eligible
+};
+
+inline ocltl_swap_counters& ocltl_swap_stats() {
+	static ocltl_swap_counters c;
+	return c;
+}
+
+// Env-gated (TAU_PHI_DELTA_CROSSCHECK=1): on a shape match, compares the
+// closed form against the solver's result and logs any disagreement (LOG
+// channel, never stdout, see AGENTS.md) -- never changes the returned value.
 template <NodeType node>
-static bool aba_synthesis_feasible(tref fm) {
-	using tau = tree<node>;
-	if (tau::get(fm).equals_T()) return true;
-	if (tau::get(fm).equals_F()) return false;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	// Wrap as G(fm); G alone (wff_always) is not a full-LTL operator so
-	// is_tau_formula_sat routes through the safety pipeline, not back here.
-	tref g_fm = tau::build_wff_always(fm);
-	bool result = is_tau_formula_sat<node>(g_fm, 0, false);
-#ifdef TAU_CACHE
-	cache.emplace(fm, result);
-#endif // TAU_CACHE
-	return result;
+static void ocltl_swap_crosscheck(tref fm, bool solver_result) {
+	static const bool enabled = [] {
+		const char* v = std::getenv("TAU_PHI_DELTA_CROSSCHECK");
+		return v && *v && v[0] != '0';
+	}();
+	if (!enabled) return;
+	auto match = match_ocltl_swap_shape<node>(fm);
+	if (!match) {
+		ocltl_swap_stats().ineligible.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
+	ocltl_swap_stats().eligible.fetch_add(1, std::memory_order_relaxed);
+	size_t k_sigma = match->dims.d_m + match->dims.d_x;
+	std::vector<bool> sigma(size_t{1} << k_sigma, false);
+	std::vector<bool> rho(size_t{1} << match->dims.d_y, false);
+	bool closed_form = ocltl_phi_delta_direct(
+		match->dims, match->atoms, sigma, rho, match->D);
+	if (closed_form == solver_result) {
+		ocltl_swap_stats().agree.fetch_add(1, std::memory_order_relaxed);
+	} else {
+		ocltl_swap_stats().disagree.fetch_add(1, std::memory_order_relaxed);
+		LOG_ERROR << "[ocltl_phi_delta swap] DISAGREEMENT: solver="
+			<< solver_result << " closed_form=" << closed_form
+			<< " k_sigma=" << k_sigma << " k_rho=" << match->dims.d_y
+			<< " |atoms|=" << match->atoms.size() << " D=" << match->D
+			<< " fm=" << LOG_FM(fm);
+	}
 }
 
 template <NodeType node>
@@ -177,7 +199,57 @@ static bool aba_existential_feasible(tref fm) {
 				tree<node>::get(v).get_ba_type())) return true;
 		return is_non_temp_nso_satisfiable<node>(fm);
 	};
+	ocltl_swap_stats().total_calls.fetch_add(1, std::memory_order_relaxed);
 	bool result = compute();
+	ocltl_swap_crosscheck<node>(fm, result); // shadow-only, see the note above
+#ifdef TAU_CACHE
+	cache.emplace(fm, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+// Per-step feasibility under an adversarial input: each free stream/time
+// instance is quantified in chronological order (earliest shift outermost),
+// input instances universally, everything else existentially -- a later
+// instance may depend on an earlier one, never the reverse.
+template <NodeType node>
+static bool aba_synthesis_feasible(tref fm) {
+	using tau = tree<node>;
+	if (tau::get(fm).equals_T()) return true;
+	if (tau::get(fm).equals_F()) return false;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	auto is_input = [](tref v) {
+		return tau::get(v).child_is(tau::io_var) && tau::get(v)[0].is_input_variable();
+	};
+	// get_io_var_shift returns the lookback magnitude (t-k -> k, t -> 0),
+	// so a larger shift means an earlier point in time.
+	auto shift = [](tref v) {
+		return tau::get(v).child_is(tau::io_var)
+			? get_io_var_shift<node>(v) : std::numeric_limits<int_t>::max();
+	};
+	trefs vars = tau::get(fm).get_free_vars();
+	std::sort(vars.begin(), vars.end(), [&](tref a, tref b) {
+		if (shift(a) != shift(b)) return shift(a) > shift(b);
+		if (is_input(a) != is_input(b)) return is_input(a);
+		return get_var_name<node>(a) < get_var_name<node>(b);
+	});
+	tref q_fm = fm;
+	for (auto it = vars.rbegin(); it != vars.rend(); ++it)
+		q_fm = is_input(*it) ? tau::build_wff_all(*it, q_fm, false)
+		                      : tau::build_wff_ex(*it, q_fm, false);
+	// q_fm is closed by construction, so a solving BA can decide it directly
+	// through its own quantifier support instead of DNF/Shannon case-split.
+	// A nullopt (cvc5 unknown or translation failure) is not a "no": fall
+	// through to the general solver rather than reading it as infeasible.
+	bool result;
+	if (pack_can_solve<node>(q_fm)) {
+		if (auto sat = pack_sat_status<node>(q_fm)) result = *sat;
+		else result = is_non_temp_nso_satisfiable<node>(q_fm);
+	} else result = is_non_temp_nso_satisfiable<node>(q_fm);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -186,15 +258,16 @@ static bool aba_existential_feasible(tref fm) {
 
 // Unified feasibility dispatch (code_restruct_suggestion #6).
 //
-// Picks between existential (∃(i,o). fm) and synthesis (∀i.∃o. fm) feasibility.
-// The pattern previously duplicated at call sites is now centralized here:
+// Picks between existential (∃(i,o). fm) and adversarial-input (∀i.∃o. fm)
+// feasibility. The pattern previously duplicated at call sites is now
+// centralized here:
 //
 //   - Pure-input formulas → EXISTENTIAL: pure-input constraints are env
 //     assumptions, not system obligations; ∃i captures env freedom.
-//   - Non-aba omcat output-only formulas → EXISTENTIAL: system sets outputs
-//     directly; such conjunctions are brittle under safety synthesis.
-//   - Input-bearing or non-omcat formulas → SYNTHESIS: env picks inputs
-//     adversarially; system needs ∀i.∃o guarantees.
+//   - Non-aba omcat output-only formulas → EXISTENTIAL: no input to be
+//     adversarial about.
+//   - Input-bearing or non-omcat formulas → aba_synthesis_feasible: env
+//     picks inputs adversarially; system needs ∀i.∃o guarantees.
 //
 // Callers still compute `pure_input` and `has_input` themselves (each has a
 // different fast path: single-atom uses is_pure_input_atom; pair uses both),
@@ -205,8 +278,6 @@ static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input) {
 	size_t ti = find_ba_type<node>(fm);
 	if (pack_type_is_non_aba_omcat<node>(ti) && !has_input)
 		return aba_existential_feasible<node>(fm);
-	// An algebra that can always satisfy its own outputs needs no safety
-	// fixpoint when nothing constrains those outputs adversarially.
 	if (pack_type_output_always_satisfiable<node>(ti) && !has_input)
 		return aba_existential_feasible<node>(fm);
 	return aba_synthesis_feasible<node>(fm);
@@ -228,8 +299,8 @@ static bool guard_is_aba_feasible(
 	using tau = tree<node>;
 
 	// Parse guard label into (atom_fm, negated, is_pure_input) tuples.
-	struct GuardLit { tref atom; bool neg; bool pure_input; };
-	std::vector<GuardLit> lits;
+	struct guard_lit { tref atom; bool neg; bool pure_input; };
+	std::vector<guard_lit> lits;
 	{
 		std::string s = guard_label;
 		size_t pos = 0;
@@ -323,6 +394,34 @@ static bool atom_has_lookback(tref atom) {
 	return result;
 }
 
+// True if `atom` is a ground equality (bf_eq) over exactly one io_var: the
+// shape the pairwise consistency fast path can decide without a solver
+// call. Positional atoms (no uniform shift) are excluded.
+template <NodeType node>
+static bool atom_is_ground_single_stream_eq(tref atom) {
+	using tau = tree<node>;
+	const auto& t = tau::get(atom);
+	if (!t.has_child() || t[0].value.nt != tau::bf_eq) return false;
+	if (tau::get(atom).select_top(is_child<node, tau::io_var>).size() != 1)
+		return false;
+	return atom_uniform_shift<node>(atom).has_value();
+}
+
+// Two ground single-stream equalities over the same io_var/shift agree iff
+// they carry the same constant; distinct constants are infeasible (forbid),
+// the same constant is trivially co-satisfiable. Returns false (fall
+// through to the solver) whenever the shape doesn't provably match.
+template <NodeType node>
+static bool ground_eq_pair_syntactically_infeasible(tref a, tref b) {
+	using tau = tree<node>;
+	if (!atom_is_ground_single_stream_eq<node>(a)
+	    || !atom_is_ground_single_stream_eq<node>(b))
+		return false;
+	if (atom_io_var_names<node>(a) != atom_io_var_names<node>(b)) return false;
+	if (*atom_uniform_shift<node>(a) != *atom_uniform_shift<node>(b)) return false;
+	return !tau::subtree_equals(a, b);
+}
+
 // ── ABA consistency constraints ──────────────────────────────────────────────
 //
 // For each atom and each pair of atoms, check ABA feasibility.  Append
@@ -363,61 +462,25 @@ static bool atom_has_lookback(tref atom) {
 // Emission is conservative: we emit only if the k-subset is NOT already
 // subsumed by a shorter forbid already in out_constraints.  This keeps the
 // constraint set minimal.
+
+// Exhaustive DPLL walk over positive subsets of size >= 3: cost scales with
+// the number of FEASIBLE subsets visited, not just infeasible ones. Fallback
+// for groups too large for the mus enumeration's explored bitset.
 template <NodeType node>
-static void extend_consistency_positive_k_ary(
+static void extend_consistency_positive_k_ary_walk(
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::string& skeleton,
-    std::vector<std::string>* out_constraints)
+    std::vector<std::string>* out_constraints,
+    std::vector<std::vector<int>>& existing_forbid_sets,
+    const std::function<bool(const std::vector<int>&)>& is_subsumed)
 {
 	using tau = tree<node>;
 	const int n = static_cast<int>(atoms.size());
-	if (n < 3) return;  // pairwise already handled by caller
-
-	// Collect existing forbid patterns (as sets of atom indices) so we can
-	// skip subsumed k-subsets.
-	std::vector<std::vector<int>> existing_forbid_sets;
-	if (out_constraints) {
-		for (const auto& c : *out_constraints) {
-			// Parse "G(!(name1 && name2 && ...))" into a set of indices.
-			std::vector<int> idxs;
-			for (int i = 0; i < n; ++i) {
-				if (c.find(atoms[i].second) != std::string::npos) idxs.push_back(i);
-			}
-			if (idxs.size() >= 2) existing_forbid_sets.push_back(std::move(idxs));
-		}
-	}
-	auto is_subsumed = [&](const std::vector<int>& cand) {
-		for (const auto& f : existing_forbid_sets) {
-			// cand is subsumed iff f ⊆ cand.
-			if (f.size() > cand.size()) continue;
-			bool all_in = true;
-			for (int fi : f) {
-				bool found = false;
-				for (int ci : cand) if (ci == fi) { found = true; break; }
-				if (!found) { all_in = false; break; }
-			}
-			if (all_in) return true;
-		}
-		return false;
-	};
-
-	// DPLL walk over positive subsets of size ≥ 3.
 	std::function<void(int, tref, std::vector<int>&)> walk =
 	    [&](int idx, tref prefix_body, std::vector<int>& sel) {
 		const int size = static_cast<int>(sel.size());
 		if (size >= 3) {
 			if (is_subsumed(sel)) return;
-			// Skip if ANY atom is pure-output-lookback: the safety pipeline's
-			// t=0 convention treats uninitialized lookback values as F, which
-			// makes lookback atoms spuriously infeasible under G-wrap.  This
-			// matches the pairwise check's skip condition.
-			bool any_pure_out_lb = false;
-			for (int i : sel) {
-				bool is_mixed = atom_has_any_input<node>(atoms[i].first);
-				bool pure_out_lb = atom_has_lookback<node>(atoms[i].first) && !is_mixed;
-				if (pure_out_lb) { any_pure_out_lb = true; break; }
-			}
-			if (any_pure_out_lb) return;
 			if (!aba_synthesis_feasible<node>(prefix_body)) {
 				std::string pat;
 				for (int i : sel) {
@@ -446,12 +509,265 @@ static void extend_consistency_positive_k_ary(
 	walk(0, tau::_T(), sel);
 }
 
+// MARCO-style enumeration of minimal infeasible k-subsets (k>=3): cost
+// scales with the number of infeasible subsets found (grows to a maximal
+// feasible witness instead of exhaustive descent). Requires n <= 22.
+template <NodeType node>
+static void extend_consistency_positive_k_ary_mus(
+    const std::vector<std::pair<tref, std::string>>& atoms,
+    std::string& skeleton,
+    std::vector<std::string>* out_constraints,
+    std::vector<std::vector<int>>& existing_forbid_sets,
+    const std::function<bool(const std::vector<int>&)>& is_subsumed)
+{
+	using tau = tree<node>;
+	const int n = static_cast<int>(atoms.size());
+	const uint32_t universe = (1u << n) - 1;
+
+	auto build_conj = [&](uint32_t mask) {
+		tref body = tau::_T();
+		for (int i = 0; i < n; ++i)
+			if (mask & (1u << i)) body = tau::build_wff_and(body, atoms[i].first);
+		return body;
+	};
+	auto for_each_submask = [](uint32_t mask, auto&& f) {
+		uint32_t sub = mask;
+		while (true) {
+			f(sub);
+			if (sub == 0) break;
+			sub = (sub - 1) & mask;
+		}
+	};
+
+	std::vector<bool> explored(std::size_t(1) << n, false);
+	std::vector<uint32_t> mus_masks;
+
+	auto process_seed = [&](uint32_t seed) {
+		tref conj = build_conj(seed);
+		if (aba_synthesis_feasible<node>(conj)) {
+			// Grow to a maximal feasible set; every subset of it is feasible too.
+			uint32_t max_set = seed;
+			tref max_conj = conj;
+			for (int i = 0; i < n; ++i) {
+				if (max_set & (1u << i)) continue;
+				tref grown = tau::build_wff_and(max_conj, atoms[i].first);
+				if (aba_synthesis_feasible<node>(grown)) {
+					max_set |= (1u << i);
+					max_conj = grown;
+				}
+			}
+			for_each_submask(max_set, [&](uint32_t s) { explored[s] = true; });
+		} else {
+			// Shrink by deletion, never below size 3 (the oracle floor).
+			uint32_t cur = seed;
+			for (int i = 0; i < n; ++i) {
+				if (!(cur & (1u << i))) continue;
+				if (std::popcount(cur) <= 3) break;
+				uint32_t candidate = cur & ~(1u << i);
+				if (!aba_synthesis_feasible<node>(build_conj(candidate)))
+					cur = candidate;
+			}
+			uint32_t complement = universe & ~cur;
+			for_each_submask(complement, [&](uint32_t s) { explored[cur | s] = true; });
+			mus_masks.push_back(cur);
+		}
+	};
+
+	for (int k = n; k >= 3; --k) {
+		uint32_t mask = (1u << k) - 1;
+		const uint32_t last = mask << (n - k);
+		while (true) {
+			if (!explored[mask]) process_seed(mask);
+			if (mask == last) break;
+			uint32_t c = mask & (~mask + 1u);
+			uint32_t r = mask + c;
+			mask = (((r ^ mask) >> 2) / c) | r;
+		}
+	}
+
+	// Sorting by the walk's own emission-order key (atom 0 most significant)
+	// keeps every subset ahead of its supersets, so is_subsumed correctly
+	// drops any mask here that turns out to be a superset of an earlier one.
+	auto walk_order_key = [&](uint32_t mask) {
+		uint32_t key = 0;
+		for (int i = 0; i < n; ++i)
+			if (mask & (1u << i)) key |= (1u << (n - 1 - i));
+		return key;
+	};
+	std::sort(mus_masks.begin(), mus_masks.end(),
+	    [&](uint32_t a, uint32_t b) { return walk_order_key(a) < walk_order_key(b); });
+	for (uint32_t m : mus_masks) {
+		std::vector<int> sel;
+		for (int i = 0; i < n; ++i) if (m & (1u << i)) sel.push_back(i);
+		if (is_subsumed(sel)) continue;
+		std::string pat;
+		for (int i : sel) {
+			if (!pat.empty()) pat += " && ";
+			pat += atoms[i].second;
+		}
+		std::string c = "G(!(" + pat + "))";
+		skeleton += " && " + c;
+		if (out_constraints) {
+			out_constraints->push_back(c);
+			existing_forbid_sets.push_back(sel);
+		}
+	}
+}
+
+template <NodeType node>
+static void extend_consistency_positive_k_ary(
+    const std::vector<std::pair<tref, std::string>>& group,
+    std::string& skeleton,
+    std::vector<std::string>* out_constraints)
+{
+	using tau = tree<node>;
+	const std::vector<std::pair<tref, std::string>>& atoms = group;
+	const int n = static_cast<int>(atoms.size());
+	if (n < 3) return;  // pairwise already handled by caller
+
+	// Feasibility is downward-closed, so a feasible whole group has no
+	// infeasible subset and the enumeration below would forbid nothing.
+	{
+		tref all = tau::_T();
+		for (const auto& a : atoms)
+			all = tau::build_wff_and(all, a.first);
+		if (aba_synthesis_feasible<node>(all)) return;
+	}
+
+	// Collect existing forbid patterns (as sets of atom indices) so we can
+	// skip subsumed k-subsets.
+	std::vector<std::vector<int>> existing_forbid_sets;
+	if (out_constraints) {
+		for (const auto& c : *out_constraints) {
+			// Parse "G(!(name1 && name2 && ...))" into a set of indices.
+			std::vector<int> idxs;
+			for (int i = 0; i < n; ++i) {
+				if (c.find(atoms[i].second) != std::string::npos) idxs.push_back(i);
+			}
+			if (idxs.size() >= 2) existing_forbid_sets.push_back(std::move(idxs));
+		}
+	}
+	std::function<bool(const std::vector<int>&)> is_subsumed =
+	    [&](const std::vector<int>& cand) {
+		for (const auto& f : existing_forbid_sets) {
+			// cand is subsumed iff f ⊆ cand.
+			if (f.size() > cand.size()) continue;
+			bool all_in = true;
+			for (int fi : f) {
+				bool found = false;
+				for (int ci : cand) if (ci == fi) { found = true; break; }
+				if (!found) { all_in = false; break; }
+			}
+			if (all_in) return true;
+		}
+		return false;
+	};
+
+	// The mus enumeration's explored bitset is 2^n entries, unallocatable
+	// much past n=22, so groups above that bound fall back to the walk.
+	const bool use_walk = n > 22;
+	if (use_walk)
+		extend_consistency_positive_k_ary_walk<node>(
+		    atoms, skeleton, out_constraints, existing_forbid_sets, is_subsumed);
+	else
+		extend_consistency_positive_k_ary_mus<node>(
+		    atoms, skeleton, out_constraints, existing_forbid_sets, is_subsumed);
+}
+
+// Ties shifted instances of one signal together (group_shift_families).
+// lo is aligned to hi's step; pp/pn/np/nn = SAT(lo'&hi/lo'&!hi/!lo'&hi/!lo'&!hi)
+// select: pp&&nn -> equivalent, pn&&np -> complementary, pp&&np&&nn -> lo=>hi,
+// pp&&pn&&nn -> hi=>lo, pn&&np&&nn -> exclusion, else -> none.
+// Input-only pairs go to input_assumptions; everything else to `skeleton`.
+template <NodeType node>
+static void add_shift_chain_constraints(
+    const std::vector<std::pair<tref, std::string>>& atoms,
+    std::string& skeleton,
+    std::string& input_assumptions,
+    std::vector<std::string>* out_constraints = nullptr)
+{
+	using tau = tree<node>;
+	int solver_calls = 0, emitted = 0;
+
+	auto families = group_shift_families<node>(atoms);
+	for (auto& [key, idxs] : families) {
+		for (size_t p = 0; p < idxs.size(); ++p) {
+			for (size_t q = p + 1; q < idxs.size(); ++q) {
+				size_t ia = idxs[p], ib = idxs[q];
+				tref a_fm = atoms[ia].first, b_fm = atoms[ib].first;
+				int_t sa = *atom_uniform_shift<node>(a_fm);
+				int_t sb = *atom_uniform_shift<node>(b_fm);
+				if (sa == sb) continue; // same reference frame -- not a chain pair
+
+				bool a_is_lo = sa < sb;
+				tref lo = a_is_lo ? a_fm : b_fm;
+				tref hi = a_is_lo ? b_fm : a_fm;
+				const std::string& lo_prop = a_is_lo ? atoms[ia].second : atoms[ib].second;
+				const std::string& hi_prop = a_is_lo ? atoms[ib].second : atoms[ia].second;
+				int_t delta = a_is_lo ? sb - sa : sa - sb;
+
+				// Align lo to hi's reference step by substituting each of lo's
+				// io_vars with hi's identically-named io_var subtree (the family
+				// key guarantees the same name set) rather than rebuilding an
+				// offset from scratch, so the aligned tree matches hi's own
+				// io_var representation exactly.
+				auto lo_io_vars = tau::get(lo).select_top(is_child<node, tau::io_var>);
+				auto hi_io_vars = tau::get(hi).select_top(is_child<node, tau::io_var>);
+				subtree_map<node, tref> align;
+				for (tref lv : lo_io_vars) {
+					const std::string& name = get_var_name<node>(lv);
+					for (tref hv : hi_io_vars)
+						if (get_var_name<node>(hv) == name) { align[lv] = hv; break; }
+				}
+				tref lo_aligned = rewriter::replace<node>(lo, align);
+				tref not_lo = tau::build_wff_neg(lo_aligned);
+				tref not_hi = tau::build_wff_neg(hi);
+
+				bool pp = aba_existential_feasible<node>(tau::build_wff_and(lo_aligned, hi));
+				bool pn = aba_existential_feasible<node>(tau::build_wff_and(lo_aligned, not_hi));
+				bool np = aba_existential_feasible<node>(tau::build_wff_and(not_lo, hi));
+				bool nn = aba_existential_feasible<node>(tau::build_wff_and(not_lo, not_hi));
+				solver_calls += 4;
+
+				std::string x_lo = lo_prop;
+				for (int_t k = 0; k < delta; ++k) x_lo = "X(" + x_lo + ")";
+
+				std::string constraint;
+				if (pp && nn && !pn && !np)
+					constraint = "G(" + x_lo + " <-> " + hi_prop + ")";
+				else if (!pp && !nn && pn && np)
+					constraint = "G(" + x_lo + " <-> !" + hi_prop + ")";
+				else if (pp && np && nn && !pn)
+					constraint = "G(" + x_lo + " -> " + hi_prop + ")";
+				else if (pp && pn && nn && !np)
+					constraint = "G(" + hi_prop + " -> " + x_lo + ")";
+				else if (!pp && pn && np && nn)
+					constraint = "G(" + x_lo + " -> !" + hi_prop + ")";
+				else
+					continue; // e.g. all four satisfiable -- instances stay independent
+
+				if (is_pure_input_atom<node>(lo) && is_pure_input_atom<node>(hi)) {
+					if (!input_assumptions.empty()) input_assumptions += " && ";
+					input_assumptions += constraint;
+				} else {
+					skeleton += " && " + constraint;
+				}
+				if (out_constraints) out_constraints->push_back(constraint);
+				++emitted;
+			}
+		}
+	}
+	LOG_DEBUG << "[ltl_aba] shift-chain constraints: " << emitted
+	          << " emitted, " << solver_calls << " solver call(s)";
+}
+
 template <NodeType node>
 static void add_consistency_constraints(
     const std::vector<std::pair<tref, std::string>>& atoms,
     std::string& skeleton,
     std::vector<std::string>* out_constraints = nullptr,
-    bool polarity_complete = false)
+    bool polarity_complete = false,
+    std::string seed_input_assumptions = "")
 {
 	using tau = tree<node>;
 
@@ -462,30 +778,21 @@ static void add_consistency_constraints(
 	// Input-only infeasibility constraints are env assumptions, not requirements.
 	// Collect them separately and wrap the skeleton with (assumptions) -> (...)
 	// so ltlsynt treats them as environment guarantees, not system obligations.
-	std::string input_assumptions;
+	// Seeded from the caller's own input-only constraints (e.g. shift-chain)
+	// so the whole set is combined behind a single implication wrap below.
+	std::string input_assumptions = std::move(seed_input_assumptions);
+	int fast_path_pairs = 0;
 
 	for (size_t i = 0; i < atoms.size(); ++i) {
 		if (!is_pure_input_atom<node>(atoms[i].first)) {
-			// Skip individual check for atoms with lookback shifts: the safety
-			// synthesis pipeline treats initial lookback values as 0, which
-			// makes lookback atoms appear unconditionally infeasible even though
-			// they become true through temporal feedback.
-			{
-				// Skip feasibility only for pure-output lookback atoms: the safety
-				// pipeline's t=0 convention makes them appear infeasible.
-				// Mixed atoms (containing input vars) must use synthesis (∀i.∃o).
-				bool is_mixed = atom_has_any_input<node>(atoms[i].first);
-				bool pure_out_lookback = atom_has_lookback<node>(atoms[i].first)
-				    && !is_mixed;
-				bool pure_input = is_pure_input_atom<node>(atoms[i].first);
-				bool feasible = pure_out_lookback
-				    || aba_feasible_dispatch<node>(atoms[i].first,
-				                                   pure_input, is_mixed);
-				if (!feasible) {
-					std::string c = "G(!" + atoms[i].second + ")";
-					skeleton += " && " + c;
-					if (out_constraints) out_constraints->push_back(c);
-				}
+			bool is_mixed = atom_has_any_input<node>(atoms[i].first);
+			bool pure_input = is_pure_input_atom<node>(atoms[i].first);
+			bool feasible = aba_feasible_dispatch<node>(atoms[i].first,
+			                                            pure_input, is_mixed);
+			if (!feasible) {
+				std::string c = "G(!" + atoms[i].second + ")";
+				skeleton += " && " + c;
+				if (out_constraints) out_constraints->push_back(c);
 			}
 		}
 		for (size_t j = i + 1; j < atoms.size(); ++j) {
@@ -493,24 +800,23 @@ static void add_consistency_constraints(
 			// jointly feasible by design (independent variables, independent solvers).
 			if (find_ba_type<node>(atoms[i].first) != find_ba_type<node>(atoms[j].first))
 				continue;
-			// Skip pairs where either atom is a pure-output lookback: the safety
-			// pipeline's t=0 convention makes such pairs appear infeasible.
-			// Input-containing lookback atoms (e.g. o1=i1[t-1]) must be checked —
-			// the env can block them by choosing past inputs adversarially.
-			bool i_pure_out_lb = atom_has_lookback<node>(atoms[i].first)
-			    && !atom_has_any_input<node>(atoms[i].first);
-			bool j_pure_out_lb = atom_has_lookback<node>(atoms[j].first)
-			    && !atom_has_any_input<node>(atoms[j].first);
-			if (i_pure_out_lb || j_pure_out_lb)
-				continue;
-			tref conj = tau::build_wff_and(atoms[i].first, atoms[j].first);
-			bool pure_input =
-			    is_pure_input_atom<node>(atoms[i].first) ||
-			    is_pure_input_atom<node>(atoms[j].first);
-			bool has_input = atom_has_any_input<node>(atoms[i].first)
-			              || atom_has_any_input<node>(atoms[j].first);
-			bool infeasible =
-			    !aba_feasible_dispatch<node>(conj, pure_input, has_input);
+			// Syntactic fast path (ground_eq_pair_syntactically_infeasible):
+			// two distinct ground equalities over the same stream/shift are
+			// provably infeasible without a solver call.
+			bool infeasible;
+			if (ground_eq_pair_syntactically_infeasible<node>(
+			        atoms[i].first, atoms[j].first)) {
+				infeasible = true;
+				++fast_path_pairs;
+			} else {
+				tref conj = tau::build_wff_and(atoms[i].first, atoms[j].first);
+				bool pure_input =
+				    is_pure_input_atom<node>(atoms[i].first) ||
+				    is_pure_input_atom<node>(atoms[j].first);
+				bool has_input = atom_has_any_input<node>(atoms[i].first)
+				              || atom_has_any_input<node>(atoms[j].first);
+				infeasible = !aba_feasible_dispatch<node>(conj, pure_input, has_input);
+			}
 			if (infeasible) {
 				bool both_pure_input = is_pure_input_atom<node>(atoms[i].first)
 				                    && is_pure_input_atom<node>(atoms[j].first);
@@ -542,17 +848,11 @@ static void add_consistency_constraints(
 		if (alg_b_mode || polarity_complete) {
 			for (size_t i = 0; i < atoms.size(); ++i) {
 				if (is_pure_input_atom<node>(atoms[i].first)) continue;
-				bool i_pure_out_lb = atom_has_lookback<node>(atoms[i].first)
-				                  && !atom_has_any_input<node>(atoms[i].first);
-				if (i_pure_out_lb) continue;
 				tref neg_i = tau::build_wff_neg(atoms[i].first);
 				for (size_t j = i + 1; j < atoms.size(); ++j) {
 					if (is_pure_input_atom<node>(atoms[j].first)) continue;
 					if (find_ba_type<node>(atoms[i].first)
 					    != find_ba_type<node>(atoms[j].first)) continue;
-					bool j_pure_out_lb = atom_has_lookback<node>(atoms[j].first)
-					                  && !atom_has_any_input<node>(atoms[j].first);
-					if (j_pure_out_lb) continue;
 					tref neg_j = tau::build_wff_neg(atoms[j].first);
 					const auto& ni = atoms[i].second;
 					const auto& nj = atoms[j].second;
@@ -631,6 +931,237 @@ static void add_consistency_constraints(
 				extend_consistency_positive_k_ary<node>(grp, skeleton, out_constraints);
 		}
 	}
+	LOG_DEBUG << "[ltl_aba] pairwise consistency: " << fast_path_pairs
+	          << " pair(s) decided by the ground-equality fast path (no solver call)";
+}
+
+// ── step-counter encoding of positional atoms (max-position hoisting) ──
+// A binary step counter guards each hoisted conjunct C (collect_hoist_
+// conjuncts) at its own max position k_max: io_var x[j] in C becomes x[t]
+// (j==k_max) or x[t-(k_max-j)], reparsed as C', guarded by
+// G(minterm(k_max) -> C').
+// A relativized atom identical to an existing one merges into it (one prop
+// per formula); atoms from different conjuncts that coincidentally match
+// text stay separate, one prop per position, since pairwise mutual-
+// exclusion forbids rely on that.
+// Returns the extra skeleton conjuncts; output_props gains the counter bits.
+template <NodeType node>
+static std::string apply_step_counter_encoding(
+    const std::vector<tref>& hoist_conjuncts,
+    std::vector<std::pair<tref, std::string>>& atoms,
+    std::vector<std::string>& input_props,
+    std::vector<std::string>& output_props,
+    int_t& out_max_pos)
+{
+	using tau = tree<node>;
+
+	if (hoist_conjuncts.empty()) return "";
+
+	// Per-conjunct k_max (its own maximum position), and the global maximum
+	// across every hoisted conjunct, which sizes the counter.
+	std::vector<int_t> k_max(hoist_conjuncts.size(), -1);
+	int_t max_pos = -1;
+	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
+		for (auto& [a, name] : atoms)
+			if (atom_is_positional<node>(a) && contains<node>(hoist_conjuncts[c], a))
+				k_max[c] = std::max(k_max[c], atom_max_position<node>(a));
+		max_pos = std::max(max_pos, k_max[c]);
+	}
+	out_max_pos = max_pos;
+
+	const int_t clamp = max_pos + 1; // parked state, held forever past the trace
+	int w = 1;
+	while ((int_t(1) << w) < clamp + 1) ++w;
+
+	std::vector<std::string> bits(w);
+	for (int b = 0; b < w; ++b)
+		bits[b] = "o__ltl_ctr" + std::to_string(b) + "__";
+	for (auto& b : bits) output_props.push_back(b);
+
+	auto minterm = [&](int_t value) {
+		std::string body;
+		for (int b = 0; b < w; ++b) {
+			if (!body.empty()) body += " & ";
+			body += ((value >> b) & 1) ? bits[b] : ("!" + bits[b]);
+		}
+		return body;
+	};
+
+	std::string extra;
+	// Initial condition: counter = 0 at t=0 (bare, un-G'd -- the S/T init convention).
+	extra += " & " + minterm(0);
+
+	// Ripple-carry +1, frozen once the counter reaches `clamp`.
+	std::string is_clamped = minterm(clamp);
+	for (int b = 0; b < w; ++b) {
+		std::string carry = "1";
+		for (int k = 0; k < b; ++k) carry += " & " + bits[k];
+		std::string incr_bit = "(" + bits[b] + " ^ (" + carry + "))";
+		std::string next_bit = "((" + is_clamped + " & " + bits[b] + ") | "
+		                        "(!(" + is_clamped + ") & " + incr_bit + "))";
+		extra += " & G(X(" + bits[b] + ") <-> " + next_bit + ")";
+	}
+
+	// Snapshot of the original positional atoms, taken before any mutation.
+	// An atom shared by more than one hoisted conjunct is the same
+	// underlying fact and resolves to one shared prop across all of them.
+	std::vector<tref> orig_pos_atoms;
+	for (auto& [a, name] : atoms)
+		if (atom_is_positional<node>(a)) orig_pos_atoms.push_back(a);
+	std::vector<std::string> orig_prop(orig_pos_atoms.size());
+	std::vector<bool> orig_done(orig_pos_atoms.size(), false);
+
+	// Marks atoms[i] as hoist-derived (added by some conjunct's rewrite);
+	// never a merge target for a different original atom's rewrite.
+	std::vector<bool> hoist_derived(atoms.size(), false);
+	for (size_t i = 0; i < atoms.size(); ++i)
+		if (atom_is_positional<node>(atoms[i].first)) hoist_derived[i] = true;
+
+	// Fresh prop names come from a monotonic counter, not atoms.size(): a
+	// later conjunct's addition could land at a size vacated by an earlier
+	// drop and repeat a name.
+	size_t next_prop_idx = atoms.size();
+
+	// Rewrites name[j] to name[t] (j==km) or name[t-(km-j)] textually, over
+	// every positional io_var found directly on `n` (not via `atoms`, which
+	// may already have dropped it for an earlier conjunct).
+	auto relativize_text = [&](tref n, int_t km) {
+		std::string txt = tau::get(n).to_str();
+		for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>)) {
+			if (!is_io_initial<node>(v)) continue;
+			const std::string& vname = get_var_name<node>(v);
+			int_t j = get_io_time_point<node>(v);
+			std::string from = vname + "[" + std::to_string(j) + "]";
+			std::string to = (j == km) ? (vname + "[t]")
+			    : (vname + "[t-" + std::to_string(km - j) + "]");
+			size_t at = 0;
+			while ((at = txt.find(from, at)) != std::string::npos) {
+				txt.replace(at, from.size(), to);
+				at += to.size();
+			}
+		}
+		typename tau::get_options opts;
+		opts.parse.start = tau::wff;
+		return tau::get(txt, std::move(opts));
+	};
+
+	auto drop_prop = [](std::vector<std::string>& props, const std::string& name) {
+		auto it = std::find(props.begin(), props.end(), name);
+		if (it != props.end()) props.erase(it);
+	};
+
+	// Renders C's Boolean shape into skeleton text, matching each atom leaf
+	// against `orig_pos_atoms` at its ORIGINAL, pre-rewrite level -- not via
+	// find_prop's relativized-text lookup, which can't disambiguate atoms
+	// the "stay separate" rule deliberately keeps distinct despite identical
+	// text.
+	std::function<std::string(tref)> build_guard_skel = [&](tref n) -> std::string {
+		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi)
+			if (tau::subtree_equals(orig_pos_atoms[oi], n)) return orig_prop[oi];
+		const auto& t = tau::get(n);
+		if (!t.has_child()) return "t";
+		auto nt = t[0].value.nt;
+		const auto& inner = t[0];
+		switch (nt) {
+		case tau::wff_t: return "1";
+		case tau::wff_f: return "0";
+		case tau::wff_neg:
+			return "!" + build_guard_skel(inner.first());
+		case tau::wff_and:
+			return "(" + build_guard_skel(inner.first())
+			     + " & " + build_guard_skel(inner.second()) + ")";
+		case tau::wff_or:
+			return "(" + build_guard_skel(inner.first())
+			     + " | " + build_guard_skel(inner.second()) + ")";
+		case tau::wff_xor:
+			return "(" + build_guard_skel(inner.first())
+			     + " ^ " + build_guard_skel(inner.second()) + ")";
+		case tau::wff_imply:
+			return "(" + build_guard_skel(inner.first())
+			     + " -> " + build_guard_skel(inner.second()) + ")";
+		case tau::wff_equiv:
+			return "(" + build_guard_skel(inner.first())
+			     + " <-> " + build_guard_skel(inner.second()) + ")";
+		case tau::wff_rimply:
+			return "(" + build_guard_skel(inner.second())
+			     + " -> " + build_guard_skel(inner.first()) + ")";
+		case tau::wff_conditional:
+			return "((" + build_guard_skel(inner.first())
+			     + " -> " + build_guard_skel(inner.second())
+			     + ") & (!" + build_guard_skel(inner.first())
+			     + " -> " + build_guard_skel(inner.third()) + "))";
+		default:
+			// Scope validation (collect_hoist_conjuncts) guarantees every
+			// leaf reachable here is one of C's own positional atoms,
+			// matched above; unreached in practice.
+			return "1";
+		}
+	};
+
+	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
+		tref C = hoist_conjuncts[c];
+		int_t km = k_max[c];
+
+		// Resolve each of C's own original positional atoms to a prop:
+		// reuse a shared atom's prop already resolved by an earlier
+		// conjunct, merge into a naturally-occurring atom, or add fresh.
+		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
+			tref a_orig = orig_pos_atoms[oi];
+			if (!contains<node>(C, a_orig)) continue;
+			if (orig_done[oi]) continue; // already resolved via a shared conjunct
+
+			tref rel = relativize_text(a_orig, km);
+			assert(rel != nullptr
+				&& "apply_step_counter_encoding: atom relativization failed");
+
+			size_t existing = atoms.size();
+			for (size_t k = 0; k < atoms.size(); ++k) {
+				if (hoist_derived[k]) continue;
+				if (tau::subtree_equals(atoms[k].first, rel)) { existing = k; break; }
+			}
+			std::string pname;
+			if (existing != atoms.size()) {
+				pname = atoms[existing].second;
+			} else {
+				pname = "p" + std::to_string(next_prop_idx++);
+				atoms.emplace_back(rel, pname);
+				hoist_derived.push_back(true);
+				bool pure_input = is_pure_input_atom<node>(rel);
+				if (pure_input) input_props.push_back(pname);
+				else output_props.push_back(pname);
+				// A fresh OUTPUT prop is pinned false outside its own step
+				// (nothing else references it, and the generic guard alone
+				// wouldn't stop it holding on the trailing silent self-loop).
+				// An input prop is never pinned this way: its truth is the
+				// environment's choice, tying it to the counter would
+				// over-constrain.
+				if (!pure_input)
+					extra += " & G(" + minterm(km) + " | !" + pname + ")";
+			}
+			orig_prop[oi] = pname;
+			orig_done[oi] = true;
+		}
+
+		// Drop C's own original positional atoms still present in `atoms`
+		// (a shared one may already be gone, dropped while resolving an
+		// earlier conjunct that also referenced it): their occurrence site
+		// then resolves to "1" when the outer skeleton walk revisits it.
+		for (size_t i = 0; i < atoms.size(); ) {
+			if (atom_is_positional<node>(atoms[i].first)
+			    && contains<node>(C, atoms[i].first)) {
+				drop_prop(input_props, atoms[i].second);
+				drop_prop(output_props, atoms[i].second);
+				atoms.erase(atoms.begin() + (long)i);
+				hoist_derived.erase(hoist_derived.begin() + (long)i);
+			} else ++i;
+		}
+
+		// Guard the whole conjunct (its Boolean shape, atoms substituted
+		// with their resolved props) at k_max.
+		extra += " & G((" + minterm(km) + ") -> " + build_guard_skel(C) + ")";
+	}
+
+	return extra;
 }
 
 // ── Internal: solve LTL(ABA) problem ─────────────────────────────────────────
@@ -644,12 +1175,18 @@ static void add_consistency_constraints(
 // The caller must perform the ABA oracle check if desired.
 
 template <NodeType node>
-struct LtlAbaSolution {
+struct ltl_aba_solution {
 	std::vector<std::pair<tref, std::string>> atoms;
 	std::vector<std::string> input_props;
 	std::vector<std::string> output_props;
 	std::string skeleton;         // skeleton sent to ltlsynt
-	HoaAutomaton aut;
+	std::vector<std::string> shift_chain_constraints;
+	std::vector<std::string> consistency_constraints;
+	hoa_automaton aut;
+	// Set only when apply_step_counter_encoding rewrote positional atoms
+	// away (atom_is_positional can no longer find them); -1 means
+	// build_program_desc derives highest_initial_pos from `atoms` as usual.
+	int_t counter_highest_initial_pos = -1;
 };
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────

@@ -35,7 +35,7 @@ namespace idni::tau_lang::alg_d {
 
 // ── Synthesis game (from ltlsynt --print-game-hoa) ───────────────────────
 
-struct SynthGame {
+struct synth_game {
 	int num_states = 0;
 	int init       = 0;
 	// player[q]: 0 = env (uncontrollable), 1 = sys (controller)
@@ -132,8 +132,8 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
 
 // ── HOA synthesis game parser ─────────────────────────────────────────────
 
-inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
-	SynthGame g;
+inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
+	synth_game g;
 
 	// A decomposed specification prints one game per part. Parsing only the
 	// first would drop the other parts' constraints, and their output APs
@@ -285,7 +285,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 
 // ── Call ltlsynt and get parity game ──────────────────────────────────────
 
-inline SynthGame call_ltlsynt_game(
+inline synth_game call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs)
@@ -306,7 +306,7 @@ inline SynthGame call_ltlsynt_game(
 			return h;
 		}
 	};
-	static std::unordered_map<game_cache_key, SynthGame, game_cache_hash> cache;
+	static std::unordered_map<game_cache_key, synth_game, game_cache_hash> cache;
 	game_cache_key key{phi_prop, ins, outs};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 
@@ -378,7 +378,7 @@ inline SynthGame call_ltlsynt_game(
 // For trans-based acceptance: insert intermediate "color" state per edge.
 // State i in intermediate layer: (q * T1_size + rho) + offset.
 
-struct ProductGame {
+struct product_game {
 	int  n_states = 0;
 	int  init     = 0;
 	std::vector<int> player;
@@ -396,7 +396,7 @@ inline int d_index_from_ap_name(const std::string& ap) {
 	return idx;
 }
 
-inline int d_pattern_from_assignment(const SynthGame& G, int assignment, int K) {
+inline int d_pattern_from_assignment(const synth_game& G, int assignment, int K) {
 	int pat = 0;
 	for (int ap = 0; ap < (int)G.aps.size(); ++ap) {
 		if (ap >= (int)G.controllable.size() || !G.controllable[ap]) continue;
@@ -411,7 +411,7 @@ inline int d_pattern_from_assignment(const SynthGame& G, int assignment, int K) 
 // game does not mention is unconstrained by the formula, so its D-bit still
 // ranges over both values instead of silently reading as false — otherwise half
 // the system's moves disappear and a realizable spec can report UNREALIZABLE.
-inline std::vector<std::pair<int,int>> sys_choices(const SynthGame& G, int K) {
+inline std::vector<std::pair<int,int>> sys_choices(const synth_game& G, int K) {
 	const int n_aps = (int)G.aps.size();
 	std::vector<int> ap_of_d(K, -1);
 	std::vector<int> other_aps;
@@ -437,10 +437,10 @@ inline std::vector<std::pair<int,int>> sys_choices(const SynthGame& G, int K) {
 	return out;
 }
 
-inline ProductGame build_product_game(
-	const SynthGame& G,
+inline product_game build_product_game(
+	const synth_game& G,
 	int T1_size,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,   // D-bitmask per T3 type
 	int K)                             // number of D propositions
 {
@@ -472,12 +472,12 @@ inline ProductGame build_product_game(
 
 	// Count intermediate states: one per (q, rho, trans_idx) with edge priority
 	// Intermediate state id = base + offset
-	struct EdgeStub {
+	struct edge_stub {
 		int q, rho, trans_idx, next_q, next_rho;
 		int priority;
 		int player; // pass-through to next_q's player (doesn't matter, single succ)
 	};
-	std::vector<EdgeStub> stubs;
+	std::vector<edge_stub> stubs;
 	// Map (q, rho, trans_idx) → stub_id
 	std::map<std::tuple<int,int,int>, int> stub_map;
 
@@ -521,7 +521,7 @@ inline ProductGame build_product_game(
 		}
 	}
 
-	ProductGame pg;
+	product_game pg;
 	pg.n_states = base_n + (int)stubs.size();
 	pg.init = G.init * T1_size + 0; // initial memory = T1 type 0 (below all constants)
 	pg.player.assign(pg.n_states, 0);
@@ -750,7 +750,7 @@ static std::pair<StateSet,StateSet> solve(
 } // namespace zielonka_impl
 
 // Returns the set of states where player 1 (sys) wins.
-inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
+inline std::set<int> zielonka_win_player1(const product_game& pg) {
 	std::set<int> V;
 	for (int s = 0; s < pg.n_states; ++s) V.insert(s);
 	auto [W0, W1] = zielonka_impl::solve(V, pg.n_states, pg.player, pg.priority, pg.succs);
@@ -768,7 +768,7 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 inline bool solve_algorithm_d(
 	const std::string& phi_star,
 	int T1_size,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,
 	int K)
 {
@@ -779,11 +779,11 @@ inline bool solve_algorithm_d(
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 
 	// Get synthesis parity game for φ*(D_i)
-	SynthGame G = call_ltlsynt_game(phi_star, {}, D_outs);
+	synth_game G = call_ltlsynt_game(phi_star, {}, D_outs);
 	if (G.num_states == 0) return false;
 
 	// Build product game (G × T_1)
-	ProductGame pg = build_product_game(G, T1_size, T3, type_A, K);
+	product_game pg = build_product_game(G, T1_size, T3, type_A, K);
 	if (pg.n_states == 0) return false;
 
 	// Solve parity game with Zielonka
@@ -800,24 +800,24 @@ inline bool solve_algorithm_d(
 
 // ── Extended Algorithm D: returns winning region for semantic PWR ──────────
 
-struct AlgDResult {
+struct alg_d_result {
 	bool realizable = false;
 	std::set<int> winning_region;     // W1 state indices in product game
-	ProductGame product_game;
-	SynthGame synth_game;
+	product_game prod_game;
+	synth_game game;
 	int T1_size = 0;
 	int K = 0;                        // number of D propositions
 	int init_rho = -1;                // winning initial ρ₀ (-1 if unrealizable)
 };
 
-inline AlgDResult solve_algorithm_d_full(
+inline alg_d_result solve_algorithm_d_full(
 	const std::string& phi_star,
 	int T1_size,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,
 	int K)
 {
-	AlgDResult result;
+	alg_d_result result;
 	result.T1_size = T1_size;
 	result.K = K;
 
@@ -826,17 +826,17 @@ inline AlgDResult solve_algorithm_d_full(
 	std::vector<std::string> D_outs;
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 
-	result.synth_game = call_ltlsynt_game(phi_star, {}, D_outs);
-	if (result.synth_game.num_states == 0) return result;
+	result.game = call_ltlsynt_game(phi_star, {}, D_outs);
+	if (result.game.num_states == 0) return result;
 
-	result.product_game = build_product_game(
-		result.synth_game, T1_size, T3, type_A, K);
-	if (result.product_game.n_states == 0) return result;
+	result.prod_game = build_product_game(
+		result.game, T1_size, T3, type_A, K);
+	if (result.prod_game.n_states == 0) return result;
 
-	result.winning_region = zielonka_win_player1(result.product_game);
+	result.winning_region = zielonka_win_player1(result.prod_game);
 
 	for (int rho0 = 0; rho0 < T1_size; ++rho0) {
-		int s0 = result.synth_game.init * T1_size + rho0;
+		int s0 = result.game.init * T1_size + rho0;
 		if (result.winning_region.count(s0)) {
 			result.realizable = true;
 			result.init_rho = rho0;

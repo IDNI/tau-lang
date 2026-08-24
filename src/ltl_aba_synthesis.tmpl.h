@@ -279,8 +279,8 @@ inline std::pair<bool, std::string> call_ltlsynt(
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
 
-inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
-	HoaAutomaton aut;
+inline hoa_automaton parse_hoa(const std::string& hoa_text) {
+	hoa_automaton aut;
 	std::istringstream ss(hoa_text);
 	std::string line;
 
@@ -334,7 +334,7 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 		int dst;
 		if (!(tl >> dst)) continue;
 
-		HoaEdge e;
+		hoa_edge e;
 		e.guard_label = guard;
 		e.dst = dst;
 		// Edge acceptance mark
@@ -371,8 +371,8 @@ inline std::string call_ltl2tgba_dpa(const std::string& ltl_formula) {
 	return out;
 }
 
-inline DpaAutomaton parse_dpa_hoa(const std::string& hoa_text) {
-	DpaAutomaton dpa;
+inline dpa_automaton parse_dpa_hoa(const std::string& hoa_text) {
+	dpa_automaton dpa;
 	std::istringstream ss(hoa_text);
 	std::string line;
 	bool in_body = false;
@@ -432,7 +432,7 @@ inline DpaAutomaton parse_dpa_hoa(const std::string& hoa_text) {
 		int dst;
 		if (!(tl >> dst)) continue;
 
-		DpaEdge e;
+		dpa_edge e;
 		e.guard_label = guard;
 		e.dst = dst;
 		// Look for acceptance mark {N}

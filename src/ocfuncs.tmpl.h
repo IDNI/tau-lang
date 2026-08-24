@@ -15,15 +15,15 @@ namespace idni::tau_lang {
 
 // ── Step 1: Mode and support checking ────────────────────────────────────────
 
-inline bool ocfuncs_check_modes(const std::vector<FuncDecl>& decls,
-		OCFuncsContext& ctx) {
+inline bool ocfuncs_check_modes(const std::vector<func_decl>& decls,
+		ocfuncs_context& ctx) {
 	ctx.declarations = decls;
 	for (const auto& d : decls) {
 		if (d.name.empty()) return false;
 		if (d.arg_sorts.empty()) return false;
 		if (d.result_sort.empty()) return false;
 
-		if (d.mode == FuncMode::STATIC) {
+		if (d.mode == func_mode::STATIC) {
 			// Static functions require a finite support certificate.
 			// For now, accept all declared static functions and require
 			// the user to provide support bounds via constraints.
@@ -31,9 +31,9 @@ inline bool ocfuncs_check_modes(const std::vector<FuncDecl>& decls,
 					ctx.support_bounds.end()) {
 				// Initialize with empty support bound — will be
 				// populated during analysis or by user declaration.
-				ctx.support_bounds[d.name] = SupportBound{d.name, {}};
+				ctx.support_bounds[d.name] = support_bound{d.name, {}};
 			}
-			ctx.static_states[d.name] = StaticProfileState{d.name, {}};
+			ctx.static_states[d.name] = static_profile_state{d.name, {}};
 		}
 	}
 	return true;
@@ -42,10 +42,10 @@ inline bool ocfuncs_check_modes(const std::vector<FuncDecl>& decls,
 // ── Step 2: Window purification ──────────────────────────────────────────────
 
 template <NodeType node>
-TermClosure ocfuncs_purify_window(tref window_fm,
-		const std::vector<FuncDecl>& decls) {
+term_closure ocfuncs_purify_window(tref window_fm,
+		const std::vector<func_decl>& decls) {
 	using tau = tree<node>;
-	TermClosure closure;
+	term_closure closure;
 
 	std::set<std::string> func_names;
 	for (const auto& d : decls) func_names.insert(d.name);
@@ -98,15 +98,15 @@ TermClosure ocfuncs_purify_window(tref window_fm,
 // ── Step 3: Local legal profiles ─────────────────────────────────────────────
 
 template <NodeType node>
-std::vector<GraphProfile> ocfuncs_enumerate_profiles(
-		const TermClosure& closure,
-		const OCFuncsContext& ctx) {
-	std::vector<GraphProfile> profiles;
+std::vector<graph_profile> ocfuncs_enumerate_profiles(
+		const term_closure& closure,
+		const ocfuncs_context& ctx) {
+	std::vector<graph_profile> profiles;
 
 	// Build graph edges from purified function applications
-	std::vector<GraphEdge> edges;
+	std::vector<graph_edge> edges;
 	for (const auto& [key, pvar] : closure.purified_vars) {
-		GraphEdge edge;
+		graph_edge edge;
 		// Parse function name from key
 		auto paren = key.find('(');
 		if (paren == std::string::npos) continue;
@@ -117,7 +117,7 @@ std::vector<GraphProfile> ocfuncs_enumerate_profiles(
 		edge.is_static = false;
 		for (const auto& d : ctx.declarations) {
 			if (d.name == edge.func_name
-					&& d.mode == FuncMode::STATIC) {
+					&& d.mode == func_mode::STATIC) {
 				edge.is_static = true;
 				break;
 			}
@@ -139,7 +139,7 @@ std::vector<GraphProfile> ocfuncs_enumerate_profiles(
 	// joint provider; for v1 we create one profile per consistent
 	// assignment)
 	if (!edges.empty()) {
-		GraphProfile p;
+		graph_profile p;
 		p.type_id = 0;
 		p.edges = edges;
 		profiles.push_back(p);
@@ -151,12 +151,12 @@ std::vector<GraphProfile> ocfuncs_enumerate_profiles(
 // ── Step 4: Static profile alphabet ──────────────────────────────────────────
 
 inline std::vector<std::string> ocfuncs_encode_static_profiles(
-		const OCFuncsContext& ctx) {
+		const ocfuncs_context& ctx) {
 	std::vector<std::string> props;
 
 	for (const auto& [fname, state] : ctx.static_states) {
 		// Find the declaration
-		const FuncDecl* decl = nullptr;
+		const func_decl* decl = nullptr;
 		for (const auto& d : ctx.declarations) {
 			if (d.name == fname) { decl = &d; break; }
 		}
@@ -185,7 +185,7 @@ inline std::vector<std::string> ocfuncs_encode_static_profiles(
 // ── Step 5: Quantifier elimination ───────────────────────────────────────────
 
 template <NodeType node>
-tref ocfuncs_eliminate_quantifiers(tref fm, const OCFuncsContext& /* ctx */) {
+tref ocfuncs_eliminate_quantifiers(tref fm, const ocfuncs_context& /* ctx */) {
 	// For v1, quantifier elimination delegates to the existing QE pipeline.
 	// The OCFuncs-specific extension is that parent/extension relations
 	// must account for function-result variables.
@@ -196,14 +196,14 @@ tref ocfuncs_eliminate_quantifiers(tref fm, const OCFuncsContext& /* ctx */) {
 // ── Step 6: Temporal LTL generation ──────────────────────────────────────────
 
 template <NodeType node>
-tref ocfuncs_generate_ltl(tref fm, const OCFuncsContext& ctx) {
+tref ocfuncs_generate_ltl(tref fm, const ocfuncs_context& ctx) {
 	// Replace function applications with their purified variables
 	// and add congruence + static consistency constraints.
 
 	// For each window, walk the formula and replace bf_func_app nodes
 	// with the corresponding purified variable.
-	struct FuncReplacer {
-		const OCFuncsContext& ctx;
+	struct func_replacer {
+		const ocfuncs_context& ctx;
 		std::vector<tref> constraints;
 
 		tref visit(tref n) {
@@ -234,7 +234,7 @@ tref ocfuncs_generate_ltl(tref fm, const OCFuncsContext& ctx) {
 		}
 	};
 
-	FuncReplacer replacer{ctx, {}};
+	func_replacer replacer{ctx, {}};
 	tref result = replacer.visit(fm);
 
 	// Add static consistency constraints:
@@ -262,8 +262,8 @@ tref ocfuncs_generate_ltl(tref fm, const OCFuncsContext& ctx) {
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 template <NodeType node>
-tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls) {
-	OCFuncsContext ctx;
+tref ocfuncs_compile(tref fm, const std::vector<func_decl>& decls) {
+	ocfuncs_context ctx;
 
 	// Step 1: Mode and support checking
 	if (!ocfuncs_check_modes(decls, ctx)) {
@@ -271,7 +271,7 @@ tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls) {
 	}
 
 	// Step 2: Window purification
-	TermClosure closure = ocfuncs_purify_window<node>(fm, decls);
+	term_closure closure = ocfuncs_purify_window<node>(fm, decls);
 
 	// Step 3: Local legal profiles
 	auto profiles = ocfuncs_enumerate_profiles<node>(closure, ctx);
@@ -290,9 +290,9 @@ tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls) {
 // ── Function declaration extraction ──────────────────────────────────────────
 
 template <NodeType node>
-FuncDecl extract_func_decl(tref decl_node) {
+func_decl extract_func_decl(tref decl_node) {
 	using tau = tree<node>;
-	FuncDecl decl;
+	func_decl decl;
 
 	const auto& t = tau::get(decl_node);
 	if (!t.has_child()) return decl;
@@ -304,9 +304,9 @@ FuncDecl extract_func_decl(tref decl_node) {
 	for (size_t i = 0; i < root.children_size(); ++i) {
 		auto& child = tau::get(root.child(i));
 		if (child.is(tau::func_dynamic)) {
-			decl.mode = FuncMode::DYNAMIC;
+			decl.mode = func_mode::DYNAMIC;
 		} else if (child.is(tau::func_static)) {
-			decl.mode = FuncMode::STATIC;
+			decl.mode = func_mode::STATIC;
 		} else if (child.is(tau::func_sym)) {
 			decl.name = child.to_str();
 		} else if (child.is(tau::func_sort_list)) {
@@ -346,7 +346,7 @@ static size_t resolve_sort_name_to_id(const std::string& sort_name) {
 }
 
 template <NodeType node>
-void resolve_func_decl_types(FuncDecl& decl) {
+void resolve_func_decl_types(func_decl& decl) {
 	decl.arg_type_ids.clear();
 	decl.arg_type_ids.reserve(decl.arg_sorts.size());
 	for (const auto& sort_name : decl.arg_sorts)
@@ -355,7 +355,7 @@ void resolve_func_decl_types(FuncDecl& decl) {
 }
 
 template <NodeType node>
-void resolve_func_decl_types(std::vector<FuncDecl>& decls) {
+void resolve_func_decl_types(std::vector<func_decl>& decls) {
 	for (auto& d : decls)
 		resolve_func_decl_types<node>(d);
 }

@@ -12,7 +12,7 @@
 // later ones when in conflict.
 //
 // USAGE:
-//   PreferenceOrder po;
+//   preference_order po;
 //   po.entries.push_back({"o1", "0"});  // prefer o1 = 0 always
 //   po.entries.push_back({"o2", "1"});  // prefer o2 = 1 always
 //   tref strengthened = apply_preferences<node_t>(spec, po);
@@ -29,13 +29,13 @@
 
 namespace idni::tau_lang {
 
-struct PreferenceEntry {
+struct preference_entry {
 	std::string var_name;        // output stream variable name (e.g. "o1")
 	std::string preferred_value; // value literal in tau syntax (e.g. "0", "1", "<:5>")
 };
 
-struct PreferenceOrder {
-	std::vector<PreferenceEntry> entries;
+struct preference_order {
+	std::vector<preference_entry> entries;
 };
 
 // Strengthen `spec` with tie-breaker clauses derived from `po`. Returns the
@@ -46,7 +46,7 @@ struct PreferenceOrder {
 // realisability of the spec-so-far ∧ this-preference. Failing preferences
 // are silently dropped (logged at DEBUG level).
 template <NodeType node>
-tref apply_preferences(tref spec, const PreferenceOrder& po) {
+tref apply_preferences(tref spec, const preference_order& po) {
 	using tau = tree<node>;
 	if (po.entries.empty()) return spec;
 

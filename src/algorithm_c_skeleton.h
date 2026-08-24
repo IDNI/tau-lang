@@ -28,7 +28,7 @@ inline std::string A_name(int rho, uint32_t J) {
 inline std::string R_name(int rho) { return "R_" + std::to_string(rho); }
 inline std::string D_name(int i)   { return "D_" + std::to_string(i); }
 
-struct SkeletonBundle {
+struct skeleton_bundle {
 	std::string formula;             // the skeleton itself (Spot syntax)
 	std::vector<std::string> ins;    // env-controlled propositions
 	std::vector<std::string> outs;   // system-controlled propositions
@@ -42,12 +42,12 @@ struct SkeletonBundle {
 //
 // Returns the complete skeleton plus the input/output proposition lists
 // for ltlsynt's --ins / --outs arguments.
-inline SkeletonBundle build_algorithm_c_skeleton(
+inline skeleton_bundle build_algorithm_c_skeleton(
     int T1_size,
     int K,
     const std::string& phi_star_ltl)
 {
-	SkeletonBundle b;
+	skeleton_bundle b;
 	const uint32_t total_J = (K >= 31) ? 0 : (1u << K);  // 0 treated as "all"
 
 	// Enumerate A_{ρ,J} (env inputs) and R_ρ, D_i (system outputs).

@@ -21,6 +21,8 @@
 
 #include "normalizer.h"
 #include "ltl_aba_result.h"
+#include "ocltl_phi_delta.h"
+#include "boolean_algebras/nso_ba.h"
 #include <optional>
 #include <string>
 #include <tuple>
@@ -60,7 +62,7 @@ std::string ltl_skeleton(tref fm,
 // Each S/T subformula is replaced by a fresh propositional state variable
 // in the skeleton.  The DFA transition + initial condition are encoded as
 // LTL constraints (G, X, propositional) that ltlsynt handles natively.
-struct PastTemporalTester {
+struct past_temporal_tester {
 	std::string state_var;
 	bool        initial_value;
 	std::string transition;
@@ -70,7 +72,7 @@ struct PastTemporalTester {
 // Build skeleton with temporal testers.  Returns {skeleton, testers}.
 // Caller must call append_tester_constraints() and add state vars to outputs.
 template <NodeType node>
-std::pair<std::string, std::vector<PastTemporalTester>>
+std::pair<std::string, std::vector<past_temporal_tester>>
 ltl_skeleton_with_testers(
     tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms);
@@ -78,7 +80,7 @@ ltl_skeleton_with_testers(
 // Append DFA tester constraints to the skeleton string.
 void append_tester_constraints(
     std::string& skeleton,
-    const std::vector<PastTemporalTester>& testers);
+    const std::vector<past_temporal_tester>& testers);
 
 // ── Input / output classification ────────────────────────────────────────────
 
@@ -103,28 +105,28 @@ std::pair<bool, std::string> call_ltlsynt(
 // A DPA edge carries a single parity color (0..num_colors-1).
 // color == -1 means the edge has no acceptance mark in the HOA; in min-even
 // parity this is treated as "worst priority" (never contributes to acceptance).
-struct DpaEdge {
+struct dpa_edge {
     std::string guard_label;
     int dst    = 0;
     int color  = -1;  // parity color; -1 = unmarked
 };
 
 // Deterministic Parity Automaton parsed from Spot's HOA output.
-struct DpaAutomaton {
+struct dpa_automaton {
     int num_states    = 0;
     int initial_state = 0;
     int num_colors    = 0;  // total number of colors in the parity condition
     bool min_even     = true; // true = min-even parity (Spot default for -D)
     std::vector<std::string>            aps;   // atomic proposition names
-    std::vector<std::vector<DpaEdge>>   edges; // edges[src] = outgoing edges
+    std::vector<std::vector<dpa_edge>>   edges; // edges[src] = outgoing edges
 };
 
 // Call ltl2tgba with parity='min even' -D --complete on the given LTL formula.
 // Returns the raw HOA text, or empty string on error.
 std::string call_ltl2tgba_dpa(const std::string& ltl_formula);
 
-// Parse the HOA output of ltl2tgba (with parity acceptance) into a DpaAutomaton.
-DpaAutomaton parse_dpa_hoa(const std::string& hoa_text);
+// Parse the HOA output of ltl2tgba (with parity acceptance) into a dpa_automaton.
+dpa_automaton parse_dpa_hoa(const std::string& hoa_text);
 
 // ── ABA oracle ────────────────────────────────────────────────────────────────
 
@@ -144,7 +146,7 @@ tref guard_to_aba(const std::string& guard_label,
 // The result is a pure LTL formula over I ∪ O ∪ W (witnesses).
 
 // State subformula context for CTL* reduction
-struct CtlStarWitness {
+struct ctl_star_witness {
     tref original;       // the E χ subformula
     std::string name;    // fresh witness output name, e.g. "w_0"
     tref path_formula;   // the inner path formula χ
@@ -154,13 +156,13 @@ struct CtlStarWitness {
 // synthesis problem. Returns the reduced formula (pure LTL) and the set of
 // witness variables that must be added to the output set.
 template <NodeType node>
-struct CtlStarReduction {
+struct ctl_star_reduction {
     tref ltl_formula;                    // reduced LTL formula
     std::vector<std::string> witnesses;  // witness output variable names
 };
 
 template <NodeType node>
-CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm);
+ctl_star_reduction<node> reduce_ctl_star_to_ltl(tref fm);
 
 // Check if a formula contains CTL* path quantifiers (A or E)
 template <NodeType node>
@@ -197,7 +199,7 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 //
 // Forward-declared here; the full struct definition lives in
 // `ltl_aba_normalization.tmpl.h` (per upstream PR #90 god-file split).
-// Forward-decl is enough for `std::optional<LtlAbaSolution<node>>` in the
+// Forward-decl is enough for `std::optional<ltl_aba_solution<node>>` in the
 // signature below — the type only needs to be complete at instantiation
 // sites (interpreter.impl.h, cpp_codegen.tmpl.h), which include the tmpl
 // chain that defines it.
@@ -217,7 +219,7 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 template <NodeType node>
 tref ltl_to_safety_formula(tref fm);
 
-// Variant that ALSO returns the LtlAbaSolution<node> (the strategy automaton +
+// Variant that ALSO returns the ltl_aba_solution<node> (the strategy automaton +
 // atoms map) when one was synthesised. The interpreter caches it so that
 // downstream code can introspect the Mealy state at runtime, visualise the
 // strategy, extract boundary traces, etc. — the strategy's information is
@@ -230,7 +232,7 @@ tref ltl_to_safety_formula(tref fm);
 // On the multi-state encoding path, the caller can read sol.aut.num_states,
 // sol.aut.edges, sol.atoms etc. without re-running synthesis.
 template <NodeType node>
-std::tuple<tref, std::optional<LtlAbaSolution<node>>>
+std::tuple<tref, std::optional<ltl_aba_solution<node>>>
 ltl_to_safety_formula_full(tref fm);
 
 } // namespace idni::tau_lang
