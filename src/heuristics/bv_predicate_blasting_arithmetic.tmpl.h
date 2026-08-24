@@ -22,14 +22,24 @@ namespace idni::tau_lang {
 
 //
 //
-// bvadd computes the addition of two bitvectors by unrolling the classic
-// carry-propagation recurrence
+// bvadd computes the addition of two bitvectors with a textbook per-bit
+// ripple-carry adder: a single fresh bv[N] carry variable C, plus two
+// families of constraints, all built directly (no per-bit recurrence
+// relation calls):
 //
-//	(a, b) -> (a ^ b, (a & b) << 1)
+//	- carry-in is zero:            bit(C, 0) = 0
+//	- sum bit i, for i in [0, N):  bit(s,i) ^ bit(a,i) ^ bit(b,i) ^ bit(C,i) = 0
+//	- carry-out i+1, for i in [0, N-1):
+//	      bit(C,i+1) = maj(bit(a,i), bit(b,i), bit(C,i))
+//	  where maj(x,y,z) = (x&y) | (x&z) | (y&z), expressed as an
+//	  equivalence of zero-tests since it relates two different bit
+//	  positions (i and i+1) -- see bvshl_by_one_rule for the same idiom.
+//	  The sum-bit equation instead relates four terms at the SAME
+//	  position i, so it is a plain term equation (no equivalence needed).
 //
-// bitwidth times. Each step shifts the pending carry one position to the
-// left, so after bitwidth steps the carry is provably zero and the sum
-// equals the accumulated xor term.
+// N constraints have no carry-out to define (i = N-1), so mod-2^N
+// wraparound is automatic: the final carry simply never appears in a
+// constraint.
 //
 //
 
@@ -40,33 +50,60 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 	auto bitwidth = get_bv_type_bitwidth<node>(augend);
 	if (bitwidth == 0) return nullptr;
 
-	tref a = augend, b = addend;
-	tref body = nullptr;
+	auto carry = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_carry = tau::get(tau::bf, carry);
+	aux.push_back(carry);
+
+	tref body = tau::build_bf_eq_0(bit<node>(bf_carry, 0));
 	for (size_t i = 0; i < bitwidth; ++i) {
-		auto carry = tau::build_variable(bv_type_id<node>(bitwidth));
-		auto bf_carry = tau::get(tau::bf, carry);
-		aux.push_back(carry);
-		// carry = (a & b) << 1
-		auto constraint = bvshl_by_one<node>(
-			tau::build_bf_and(a, b), bf_carry);
-		if (!constraint) return nullptr;
-		body = body ? tau::build_wff_and(body, constraint) : constraint;
-		a = tau::build_bf_xor(a, b);
-		b = bf_carry;
+		auto sum_eq = tau::build_bf_eq_0(tau::build_bf_xor(
+			tau::build_bf_xor(bit<node>(sum, (int_t)i), bit<node>(augend, (int_t)i)),
+			tau::build_bf_xor(bit<node>(addend, (int_t)i), bit<node>(bf_carry, (int_t)i))));
+		body = tau::build_wff_and(body, sum_eq);
+		if (i + 1 == bitwidth) continue;
+		auto maj = tau::build_bf_or(tau::build_bf_or(
+				tau::build_bf_and(bit<node>(augend, (int_t)i), bit<node>(addend, (int_t)i)),
+				tau::build_bf_and(bit<node>(augend, (int_t)i), bit<node>(bf_carry, (int_t)i))),
+			tau::build_bf_and(bit<node>(addend, (int_t)i), bit<node>(bf_carry, (int_t)i)));
+		body = tau::build_wff_and(body, tau::build_wff_equiv(
+			tau::build_bf_eq_0(bit<node>(bf_carry, (int_t)(i + 1))),
+			tau::build_bf_eq_0(maj)));
 	}
-	// after bitwidth steps the pending carry is zero, so sum = a
-	return tau::build_wff_and(body, tau::build_bf_eq(a, sum));
+	return body;
 }
 
 //
 //
-// bvsub computes the subtraction of two bitvectors by unrolling the borrow
-// recurrence
+// bvsub computes the subtraction of two bitvectors with the mirror-image
+// ripple-borrow subtractor: a single fresh bv[N] borrow variable B, with
 //
-//	(a, b) -> (a ^ b, (a' & b) << 1)
+//	- borrow-in is zero:            bit(B, 0) = 0
+//	- diff bit i, for i in [0, N):  bit(d,i) ^ bit(a,i) ^ bit(b,i) ^ bit(B,i) = 0
+//	- borrow-out i+1, for i in [0, N-1):
+//	      bit(B,i+1) = (~a_i & b_i) | (~a_i & B_i) | (b_i & B_i)
+//	  the standard full-subtractor borrow-generate term, again related to
+//	  bit(B,i+1) by zero-test equivalence (cross-position). bit() yields
+//	  the MASKED value a & 2^i, so ~a_i is formed by negating that masked
+//	  term and re-masking: (~bit(a,i)) & 2^i -- this keeps ~a_i in the
+//	  same "masked at position i" representation as every other operand,
+//	  so it combines with them via plain bf & / | like any other bit(x,i).
 //
-// bitwidth times: after bitwidth steps the pending borrow is provably zero
-// and the difference equals the accumulated xor term.
+// Hand-verified by exhaustive 1-bit enumeration of the full subtractor
+// (a, b, borrow-in) -> (diff, borrow-out), diff = a^b^Bin:
+//
+//	a b Bin | diff Bout | (~a&b)|(~a&Bin)|(b&Bin)
+//	0 0  0  |  0    0   |  0
+//	0 0  1  |  1    1   |  1
+//	0 1  0  |  1    1   |  1
+//	0 1  1  |  0    1   |  1
+//	1 0  0  |  1    0   |  0
+//	1 0  1  |  0    0   |  0
+//	1 1  0  |  0    0   |  0
+//	1 1  1  |  1    1   |  1
+//
+// Bout matches the formula in all 8 rows, so the recurrence is correct.
+// As with bvadd, N constraints have no borrow-out to define (i = N-1),
+// so mod-2^N wraparound is automatic.
 //
 //
 
@@ -77,22 +114,29 @@ tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
 	if (bitwidth == 0) return nullptr;
 
-	tref a = minuend, b = subtrahend;
-	tref body = nullptr;
+	auto borrow = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_borrow = tau::get(tau::bf, borrow);
+	aux.push_back(borrow);
+
+	tref body = tau::build_bf_eq_0(bit<node>(bf_borrow, 0));
 	for (size_t i = 0; i < bitwidth; ++i) {
-		auto borrow = tau::build_variable(bv_type_id<node>(bitwidth));
-		auto bf_borrow = tau::get(tau::bf, borrow);
-		aux.push_back(borrow);
-		// borrow = (a' & b) << 1
-		auto constraint = bvshl_by_one<node>(
-			tau::build_bf_and(tau::build_bf_neg(a), b), bf_borrow);
-		if (!constraint) return nullptr;
-		body = body ? tau::build_wff_and(body, constraint) : constraint;
-		a = tau::build_bf_xor(a, b);
-		b = bf_borrow;
+		auto diff_eq = tau::build_bf_eq_0(tau::build_bf_xor(
+			tau::build_bf_xor(bit<node>(difference, (int_t)i), bit<node>(minuend, (int_t)i)),
+			tau::build_bf_xor(bit<node>(subtrahend, (int_t)i), bit<node>(bf_borrow, (int_t)i))));
+		body = tau::build_wff_and(body, diff_eq);
+		if (i + 1 == bitwidth) continue;
+		auto mask_i = bit_mask_cte<node>(i, bitwidth);
+		auto not_a_i = tau::build_bf_and(
+			tau::build_bf_neg(bit<node>(minuend, (int_t)i)), mask_i);
+		auto borrow_gen = tau::build_bf_or(tau::build_bf_or(
+				tau::build_bf_and(not_a_i, bit<node>(subtrahend, (int_t)i)),
+				tau::build_bf_and(not_a_i, bit<node>(bf_borrow, (int_t)i))),
+			tau::build_bf_and(bit<node>(subtrahend, (int_t)i), bit<node>(bf_borrow, (int_t)i)));
+		body = tau::build_wff_and(body, tau::build_wff_equiv(
+			tau::build_bf_eq_0(bit<node>(bf_borrow, (int_t)(i + 1))),
+			tau::build_bf_eq_0(borrow_gen)));
 	}
-	// after bitwidth steps the pending borrow is zero, so difference = a
-	return tau::build_wff_and(body, tau::build_bf_eq(a, difference));
+	return body;
 }
 
 //
