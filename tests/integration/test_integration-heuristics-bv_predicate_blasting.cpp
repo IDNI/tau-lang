@@ -1075,6 +1075,93 @@ TEST_SUITE("more complex formulas") {
 }
 
 //
+// Nested arithmetic operands: atomic_blasting's `lookup` closure resolves
+// already-blasted operands through the `changes` map, but operands arrive
+// bf-wrapped while `changes` is keyed by the unwrapped operator node, so a
+// naive lookup always misses and the un-blasted subtree leaks into the next
+// operation's carry circuit. These cases exercise operators nested inside
+// other operators, which is exactly when a fresh variable from an inner
+// blast must be looked up by an outer one.
+//
+TEST_SUITE("nested arithmetic operands") {
+
+	// (a + b) + c = const: add nested in add.
+	TEST_CASE("nested add in add: (1+2)+3 = 6") {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a = { 1 }:bv[4] && b = { 2 }:bv[4] && c = { 3 }:bv[4]"
+			" && (a + b) + c = { 6 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("nested add in add: (1+2)+3 != 7") {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a = { 1 }:bv[4] && b = { 2 }:bv[4] && c = { 3 }:bv[4]"
+			" && (a + b) + c = { 7 }:bv[4])") == "F");
+	}
+
+	// a + (b >> 1) = const: shift nested in add.
+	TEST_CASE("shift nested in add: 3 + (8>>1) = 7") {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 3 }:bv[4] && b = { 8 }:bv[4]"
+			" && a + (b >> { 1 }:bv[4]) = { 7 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("shift nested in add: 3 + (8>>1) != 8") {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 3 }:bv[4] && b = { 8 }:bv[4]"
+			" && a + (b >> { 1 }:bv[4]) = { 8 }:bv[4])") == "F");
+	}
+
+	// (a - b) << 2 = const: sub nested in shift.
+	TEST_CASE("sub nested in shift: (5-2)<<2 = 12") {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && (a - b) << { 2 }:bv[4] = { 12 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("sub nested in shift: (5-2)<<2 != 13") {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && (a - b) << { 2 }:bv[4] = { 13 }:bv[4])") == "F");
+	}
+
+	// ((a-b)>>3) + ((a-b)<<4) = c: the shape from the real failing rule, with
+	// the shared subterm (a-b) blasted once and looked up twice.
+	TEST_CASE("shared nested sub under shr and shl: ((5-2)>>3)+((5-2)<<4) = 0") {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && ((a - b) >> { 3 }:bv[4]) + ((a - b) << { 4 }:bv[4]) = c"
+			" && c = { 0 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("shared nested sub under shr and shl: ((5-2)>>3)+((5-2)<<4) != 1") {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && ((a - b) >> { 3 }:bv[4]) + ((a - b) << { 4 }:bv[4]) = c"
+			" && c = { 1 }:bv[4])") == "F");
+	}
+
+	// Direct idempotence check: blasting nested arithmetic must remove every
+	// arithmetic operator, not just the outermost one, so a re-entrant blast
+	// pass over the result is a no-op (see antiprenexing.tmpl.h resolve loop).
+	TEST_CASE("nested arithmetic: blasting leaves no arithmetic operators behind") {
+		tref blasted = blast_formula(
+			"ex a ex b ex c (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && ((a - b) >> { 3 }:bv[4]) + ((a - b) << { 4 }:bv[4]) = c"
+			" && c = { 0 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		auto has_arithmetic = [](tref n) {
+			switch (tau::get(n).get_type()) {
+				case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+				case tau::bf_div: case tau::bf_mod: case tau::bf_shl:
+				case tau::bf_shr: case tau::bf_cast: return true;
+				default: return false;
+			}
+		};
+		CHECK( !tau::get(blasted).find_top(has_arithmetic) );
+	}
+}
+
+//
 // REVIEW (nested casting): temporary suite added while reviewing whether the
 // blasting path supports nested casts. See private/review-casting.md.
 //

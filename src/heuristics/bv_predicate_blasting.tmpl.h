@@ -188,10 +188,12 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 	// Operands may have been replaced by fresh variables already (post-order
 	// traversal blasts inner operations first), so resolve them through the
-	// changes map, defaulting to the original subtree.
+	// changes map, defaulting to the original subtree. changes is keyed by
+	// the unwrapped operator node, but operands arrive bf-wrapped, so trim
+	// before the lookup and re-wrap a hit for consumers expecting bf terms.
 	auto lookup = [&changes](tref c) -> tref {
-		auto it = changes.find(c);
-		return it != changes.end() ? it->second : c;
+		auto it = changes.find(tau::trim(c));
+		return it != changes.end() ? tau::get(tau::bf, it->second) : c;
 	};
 
 	// Conjoin a new constraint into the accumulated predicate; a nullptr
