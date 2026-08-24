@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Round-trip test: emit C++ program from a known HoaAutomaton, write it to
+// Round-trip test: emit C++ program from a known hoa_automaton, write it to
 // a temp file, compile it with g++ -O3 -flto, link + run a tiny driver,
 // and check runtime behavior matches the synthesized strategy.
 
@@ -17,14 +17,14 @@ using namespace idni::tau_lang;
 
 namespace {
 
-HoaAutomaton echo_spec() {
-	HoaAutomaton a;
+hoa_automaton echo_spec() {
+	hoa_automaton a;
 	a.num_states = 1;
 	a.initial_state = 0;
 	a.aps = {"in_sig", "out_sig"};
 	a.edges.resize(1);
-	a.edges[0].push_back(HoaEdge{"0&1",   0, false});
-	a.edges[0].push_back(HoaEdge{"!0&!1", 0, false});
+	a.edges[0].push_back(hoa_edge{"0&1",   0, false});
+	a.edges[0].push_back(hoa_edge{"!0&!1", 0, false});
 	a.state_accepting = {false};
 	return a;
 }
@@ -48,14 +48,14 @@ bool compile_and_run_echo(const std::string& header_src) {
 		    "#include \"_tau_codegen_test_ctrl.h\"\n"
 		    "#include <cstdio>\n"
 		    "int main() {\n"
-		    "  EchoCtrl c;\n"
-		    "  EchoCtrl::Inputs in;\n"
-		    "  in.i_in_sig = true;\n"
+		    "  echo_ctrl c;\n"
+		    "  echo_ctrl::inputs in;\n"
+		    "  in.in_sig = true;\n"
 		    "  auto o1 = c.step(in);\n"
-		    "  if (!o1.ok || !o1.o_out_sig) { std::printf(\"FAIL1\\n\"); return 1; }\n"
-		    "  in.i_in_sig = false;\n"
+		    "  if (!o1.ok || !o1.out_sig) { std::printf(\"FAIL1\\n\"); return 1; }\n"
+		    "  in.in_sig = false;\n"
 		    "  auto o2 = c.step(in);\n"
-		    "  if (!o2.ok || o2.o_out_sig)  { std::printf(\"FAIL2\\n\"); return 2; }\n"
+		    "  if (!o2.ok || o2.out_sig)  { std::printf(\"FAIL2\\n\"); return 2; }\n"
 		    "  std::printf(\"OK\\n\");\n"
 		    "  return 0;\n"
 		    "}\n";
@@ -81,8 +81,11 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 
 	TEST_CASE("echo spec: emit → g++ -O3 → run passes") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_ctrl");
+		REQUIRE_FALSE(d.needs_tau_link);
 		std::ostringstream os;
-		emit_cpp_program_prop(echo_spec(), {"in_sig"}, {"out_sig"}, os, "EchoCtrl");
+		emit_program(d, os);
 		CHECK(compile_and_run_echo(os.str()));
 	}
 }

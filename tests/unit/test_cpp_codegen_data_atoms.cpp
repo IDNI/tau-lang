@@ -2,19 +2,24 @@
 
 // Tests for #60: data-atom witness emission in the tau→C++ codegen.
 //
-// When a spec contains qlt (DLO) output atoms, emit_cpp_program<node_t> should:
-//   - Emit `double varname` in Outputs instead of `bool o_pN`
-//   - Embed a concrete witness value (computed via qlt_dlo_qe at codegen time)
-//   - Produce a class that compiles and satisfies the spec at runtime
+// When a spec contains qlt (DLO) output atoms, build_program_desc<node_t> +
+// emit_program should:
+//   - Emit `tref varname` in outputs instead of `bool o_pN`
+//   - Embed an exact-rational witness factory expression (qlt_rational(p,q)
+//     via the BA's own ba_constants pool), not a rounded double
+//   - Set needs_tau_link=true, since the factory expression links tau
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
+#include "tau_compile.h"
 
 #include <cstdio>
 #include <cstdlib>
-#include <fstream>
+#include <filesystem>
+#include <optional>
+#include <regex>
 #include <sstream>
 #include <string>
 
@@ -24,7 +29,7 @@ namespace {
 
 // Parse and synthesize a formula, returning the solution.
 // Returns nullopt if UNREALIZABLE or parse failure.
-static std::optional<LtlAbaSolution<node_t>> synth(const std::string& spec) {
+static std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
 	tref fm = api<node_t>::get_formula(spec);
 	if (!fm) return std::nullopt;
 	return solve_ltl_aba<node_t>(fm);
@@ -35,146 +40,205 @@ static bool has(const std::string& s, const std::string& pat) {
 	return s.find(pat) != std::string::npos;
 }
 
-// Compile a generated header to a temp executable and return its stdout line.
-// Returns "" on compilation or runtime failure.
-static std::string compile_and_run(
-    const std::string& header_src,
-    const std::string& main_src)
-{
-	const char* hdr  = "/tmp/_tau_cg_da_test.h";
-	const char* main_f = "/tmp/_tau_cg_da_main.cpp";
-	const char* exe  = "/tmp/_tau_cg_da_exe";
-	{
-		std::ofstream f(hdr);  f << header_src;
-	}
-	{
-		std::ofstream f(main_f); f << main_src;
-	}
-	std::string cmd = std::string("g++ -O2 -std=c++17 -I/tmp -o ") + exe
-	                + " " + main_f + " 2>&1";
-	if (::system(cmd.c_str()) != 0) return "";
-	std::string run_cmd = std::string(exe) + " > /tmp/_tau_cg_da_out 2>&1";
-	if (::system(run_cmd.c_str()) != 0) return "";
-	std::ifstream out("/tmp/_tau_cg_da_out");
-	std::string line; std::getline(out, line);
-	return line;
+// Extract the (p, q) integer components of the LAST `qlt_rational(p, q)`
+// factory expression in the emitted text -- exact arithmetic on these is
+// what the tests below use to check the witness against its interval,
+// instead of trusting a rounded floating-point value. Earlier occurrences
+// belong to program_desc::atoms' ground-constant rendering (emitted ahead
+// of step()); the witness's own is emitted inside step().
+static bool extract_qlt_rational(const std::string& s, long long& p, long long& q) {
+	static const std::string tag = "qlt_rational(";
+	auto pos = s.rfind(tag);
+	if (pos == std::string::npos) return false;
+	pos += tag.size();
+	auto comma = s.find(',', pos);
+	if (comma == std::string::npos) return false;
+	auto close = s.find(')', comma);
+	if (close == std::string::npos) return false;
+	try {
+		p = std::stoll(s.substr(pos, comma - pos));
+		q = std::stoll(s.substr(comma + 1, close - comma - 1));
+	} catch (...) { return false; }
+	return q != 0;
 }
 
-static bool has_gpp() {
-	return ::system("g++ --version >/dev/null 2>&1") == 0;
+// Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
+static bool run_sdk_link_test() {
+	const char* v = std::getenv("TAU_CODEGEN_RUN_SDK_LINK_TEST");
+	return v && *v && std::string(v) != "0";
+}
+
+// Run `cmd`, return its combined stdout+stderr.
+static std::string run_capture(const std::string& cmd) {
+	std::string out;
+	FILE* p = popen((cmd + " 2>&1").c_str(), "r");
+	if (!p) return out;
+	char buf[256];
+	while (std::fgets(buf, sizeof(buf), p)) out += buf;
+	pclose(p);
+	return out;
+}
+
+// Extract (p, q) from the running artifact's printed "{ p/q }" qlt witness.
+static bool extract_printed_qlt(const std::string& s, long long& p, long long& q) {
+	std::smatch m;
+	if (!std::regex_search(s, m, std::regex(R"(\{\s*(-?\d+)/(\d+)\s*\})")))
+		return false;
+	p = std::stoll(m[1]); q = std::stoll(m[2]);
+	return q != 0;
 }
 
 } // namespace
 
 TEST_SUITE("cpp_codegen_data_atoms") {
 
-	// ── Structural tests (no compile) ──
-
-	TEST_CASE("G(o1:qlt > 1/2): emits double o1 in Outputs") {
+	TEST_CASE("G(o1:qlt > 1/2): emits tref o1 with an exact-rational factory expression") {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os);
+		emit_program(*d, os);
 		std::string s = os.str();
-		// Must have double output field, not bool o_p0
-		CHECK(has(s, "double o1"));
+		// Must have a tref output field, not bool o_p0.
+		CHECK(has(s, "tref o1"));
 		CHECK_FALSE(has(s, "bool o_p0"));
 		CHECK_FALSE(has(s, "bool o_p"));
-		// Must have a witness literal > 0.5 embedded
-		// The witness is 1/2 + 1 = 1.5 (or midpoint if bounded above)
+		CHECK_FALSE(has(s, "double o1"));
+		// The factory expression is baked in, and the assignment reads it back.
+		CHECK(has(s, "qlt_rational("));
+		CHECK(has(s, "ba_constants<"));
+		CHECK(has(s, "ba_descriptor<"));
 		CHECK(has(s, "o.o1 ="));
-		// State machine structure still present
-		CHECK(has(s, "enum class State"));
-		CHECK(has(s, "Outputs step("));
+		// State machine structure still present.
+		CHECK(has(s, "outputs step("));
+
+		long long p = 0, q = 0;
+		REQUIRE(extract_qlt_rational(s, p, q));
+		CHECK(q > 0);
+		CHECK(p * 2 > q);  // p/q > 1/2
 	}
 
-	TEST_CASE("G(o1:qlt > 1/4): emits double witness > 0.25") {
+	TEST_CASE("G(o1:qlt > 1/4): exact-rational witness satisfies > 1/4") {
 		auto sol = synth("G(o1[t]:qlt > {1/4}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os);
+		emit_program(*d, os);
 		std::string s = os.str();
-		CHECK(has(s, "double o1"));
-		// There should be a double assignment to o.o1
+		CHECK(has(s, "tref o1"));
 		CHECK(has(s, "o.o1 ="));
+
+		long long p = 0, q = 0;
+		REQUIRE(extract_qlt_rational(s, p, q));
+		CHECK(q > 0);
+		CHECK(p * 4 > q);  // p/q > 1/4
 	}
 
-	TEST_CASE("G(o1:bv = i1:bv): propositional path unchanged") {
+	// A two-var data atom's value depends on the step's input, so o1 routes
+	// as a witness-template field (solved at runtime by
+	// table_step_provider) and the edge records the atom's prop; only the
+	// standalone baked step() emitter, which cannot solve, refuses.
+	TEST_CASE("G(o1:bv = i1:bv): output routes as a witness template; the "
+	          "standalone emitter refuses") {
 		auto sol = synth("G(o1[t]:bv = i1[t]:bv)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
+		REQUIRE(d->atoms.size() == 1);
+		CHECK(d->needs_tau_link);
+		bool tmpl_field = false;
+		for (auto& f : d->outputs)
+			if (f.kind == field_kind::witness_template && f.prop == "o1")
+				tmpl_field = true;
+		CHECK(tmpl_field);
+		bool tmpl_edge = false;
+		for (auto& es : d->edges) for (auto& e : es)
+			if (!e.witness_template_props.empty()) tmpl_edge = true;
+		CHECK(tmpl_edge);
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os);
-		std::string s = os.str();
-		// Propositional: no double fields
-		CHECK_FALSE(has(s, "double "));
-		CHECK(has(s, "bool "));
+		CHECK_THROWS_AS(emit_program(*d, os), std::runtime_error);
 	}
 
-	TEST_CASE("G(o1:qlt > 1/3 && o1:qlt < 2/3): bounded witness in interval") {
-		// Two atoms p0=(o1>1/3) and p1=(o1<2/3); witness should be midpoint ~0.5
+	TEST_CASE("G(o1:qlt > 1/3 && o1:qlt < 2/3): exact-rational witness stays in (1/3, 2/3)") {
 		auto sol = synth("G(o1[t]:qlt > {1/3}:qlt && o1[t]:qlt < {2/3}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os);
+		emit_program(*d, os);
 		std::string s = os.str();
-		CHECK(has(s, "double o1"));
+		CHECK(has(s, "tref o1"));
 		CHECK(has(s, "o.o1 ="));
-		// The witness should be somewhere between 1/3 and 2/3 ≈ 0.5
-		// We can't check the numeric value precisely here without parsing,
-		// but we verify the structure.
 		CHECK(has(s, "ok = true"));
+
+		long long p = 0, q = 0;
+		REQUIRE(extract_qlt_rational(s, p, q));
+		CHECK(q > 0);
+		CHECK(p * 3 > q);      // p/q > 1/3
+		CHECK(p * 3 < q * 2);  // p/q < 2/3
 	}
 
-	// ── Round-trip tests (requires g++) ──
+	// Cheap structural checks; the compile+build+run coverage is the opt-in SDK-link test below.
 
-	TEST_CASE("G(o1:qlt > 1/2): compiled program produces witness > 0.5") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+	TEST_CASE("G(o1:qlt > 1/2): exact-rational witness satisfies > 1/2 (structural)") {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "witness_gt");
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os, "WitnessGT");
-		std::string hdr = os.str();
+		emit_program(*d, os);
+		std::string s = os.str();
 
-		std::string main_src =
-		    "#include \"_tau_cg_da_test.h\"\n"
-		    "#include <cstdio>\n"
-		    "int main() {\n"
-		    "  WitnessGT c;\n"
-		    "  WitnessGT::Inputs in;\n"
-		    "  auto o = c.step(in);\n"
-		    "  if (!o.ok) { std::printf(\"FAIL_OK\\n\"); return 1; }\n"
-		    "  if (o.o1 > 0.5) std::printf(\"PASS\\n\");\n"
-		    "  else std::printf(\"FAIL_WITNESS %.17g\\n\", o.o1);\n"
-		    "  return 0;\n"
-		    "}\n";
-
-		auto result = compile_and_run(hdr, main_src);
-		CHECK(result == "PASS");
+		long long p = 0, q = 0;
+		REQUIRE(extract_qlt_rational(s, p, q));
+		CHECK(q > 0);
+		CHECK(p * 2 > q);  // p/q > 1/2
 	}
 
-	TEST_CASE("G(o1:qlt > 1/4 && o1:qlt < 3/4): witness in (0.25, 0.75)") {
-		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+	TEST_CASE("G(o1:qlt > 1/4 && o1:qlt < 3/4): exact-rational witness stays in (1/4, 3/4) (structural)") {
 		auto sol = synth("G(o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {3/4}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "bounded_witness");
+		REQUIRE(d.has_value());
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os, "BoundedWitness");
-		std::string hdr = os.str();
+		emit_program(*d, os);
+		std::string s = os.str();
 
-		std::string main_src =
-		    "#include \"_tau_cg_da_test.h\"\n"
-		    "#include <cstdio>\n"
-		    "int main() {\n"
-		    "  BoundedWitness c;\n"
-		    "  BoundedWitness::Inputs in;\n"
-		    "  auto o = c.step(in);\n"
-		    "  if (!o.ok) { std::printf(\"FAIL_OK\\n\"); return 1; }\n"
-		    "  if (o.o1 > 0.25 && o.o1 < 0.75) std::printf(\"PASS\\n\");\n"
-		    "  else std::printf(\"FAIL_WITNESS %.17g\\n\", o.o1);\n"
-		    "  return 0;\n"
-		    "}\n";
+		long long p = 0, q = 0;
+		REQUIRE(extract_qlt_rational(s, p, q));
+		CHECK(q > 0);
+		CHECK(p * 4 > q);      // p/q > 1/4
+		CHECK(p * 4 < q * 3);  // p/q < 3/4
+	}
 
-		auto result = compile_and_run(hdr, main_src);
-		CHECK(result == "PASS");
+	TEST_CASE("G(o1:qlt > 1/2): compile_spec builds and runs, printed witness satisfies the bound") {
+		if (!run_sdk_link_test()) {
+			MESSAGE("TAU_CODEGEN_RUN_SDK_LINK_TEST not set; skipping the "
+				"compile+build+run coverage (structural tests above cover "
+				"the emitted text on every run)");
+			return;
+		}
+		namespace fs = std::filesystem;
+		fs::path bdir = fs::temp_directory_path() / "test_cpp_codegen_sdk_link.build";
+		std::error_code ec;
+		fs::remove_all(bdir, ec);
+
+		auto res = compile_spec<node_t>("G(o1[t]:qlt > {1/2}:qlt)", "", bdir.string());
+		REQUIRE_MESSAGE(res.ok(), res.error);
+
+		std::string out = run_capture(res.exe_path);
+		CHECK(has(out, "OK"));
+
+		long long p = 0, q = 0;
+		REQUIRE(extract_printed_qlt(out, p, q));
+		CHECK(q > 0);
+		CHECK(p * 2 > q);  // p/q > 1/2
+
+		fs::remove_all(bdir, ec);
 	}
 }
 
