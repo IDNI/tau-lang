@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -17,6 +18,7 @@
 #	include "tau.h"
 #endif // DEBUG
 #include "repl_evaluator.h"
+#include "tau_compile.h"
 #include "utility/cli.h"
 
 using namespace std;
@@ -67,6 +69,17 @@ cli::options tau_options() {
 	return opts;
 }
 
+cli::commands tau_commands() {
+	cli::commands cs;
+	cli::command compile("compile",
+		"compiles a Tau spec file into a standalone executable");
+	compile.add_option(cli::option("output", 'o', "")
+		.set_description("output executable path (default: spec "
+			"file path without extension)"));
+	cs[compile.name()] = compile;
+	return cs;
+}
+
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
 int run_tau_spec(string spec_file, cli::options& opts) {
@@ -95,31 +108,11 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	auto maybe_i = tau_api::get_interpreter(m.part(), src);
 	if (!maybe_i) return result(1);
 	auto& i = maybe_i.value();
-	while (true) {
-		auto maybe_outputs = tau_api::step(m.part(), i);
-		if (!maybe_outputs) {
-			if (opts["quit"].get<bool>()) {
-				TAU_LOG_INFO << "No more inputs provided."
-					<< " Terminating.";
-				break;
-			}
-			TAU_LOG_INFO << "No input provided."
-				<< " q or quit to terminate."
-				<< " Press ENTER to continue.";
-			std::string line;
-			term::enable_getline_mode();
-			t.pause();
-			std::getline(std::cin, line);
-			t.unpause();
-			term::disable_getline_mode();
-			// On closed/exhausted stdin, getline never sets line to "q"/
-			// "quit" and keeps returning immediately, spinning this loop
-			// forever; stop the same way repl_evaluator::run_cmd does.
-			if (std::cin.eof() || std::cin.fail()) { std::cin.clear(); break; }
-			if (line == "q" || line == "quit") break;
-		}
-	}
-	return result(0);
+	bool quit_on_idle = opts["quit"].get<bool>();
+	bool run_ok = tau_api::run(m.part(), i, quit_on_idle);
+	if (quit_on_idle) TAU_LOG_INFO << "No more inputs provided."
+		<< " Terminating.";
+	return result(run_ok ? 0 : 1);
 }
 
 void welcome() {
@@ -139,10 +132,41 @@ int main(int argc, char** argv) {
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
 
-	cli cl("tau", args, {}, "", tau_options());
+	cli cl("tau", args, tau_commands(), "", tau_options());
 	cl.set_help_header("Usage: tau [ <specification file> ]");
 
 	if (cl.process_args() != 0) return cl.status();
+	auto cmd = cl.get_processed_command();
+
+	if (cmd.ok() && cmd.name() == "compile") {
+		auto files = cl.get_files();
+		if (files.empty())
+			return error("Usage: tau compile <spec.tau> [-o out_exe]");
+		std::string spec_file = files.front();
+		std::string out_exe = cmd.get<std::string>("output");
+		if (out_exe.empty()) {
+			std::filesystem::path p(spec_file);
+			out_exe = (p.parent_path() / p.stem()).string();
+		}
+
+		std::string src;
+		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
+		if (!ifs) return error("Cannot open file: " + spec_file);
+		auto l = ifs.tellg();
+		src.resize(l); ifs.seekg(0); ifs.read(&src[0], l);
+		if (src.empty()) return error("Spec file is empty: " + spec_file);
+
+		std::string build_dir = spec_file + ".build";
+		TAU_LOG_INFO << "tau compile: " << spec_file;
+		auto res = compile_spec<node_t>(src, out_exe, build_dir);
+		if (!res.ok()) {
+			TAU_LOG_ERROR << "compile failed: " << res.error;
+			return 1;
+		}
+		TAU_LOG_INFO << "compiled: " << res.exe_path;
+		return 0;
+	}
+
 	auto opts  = cl.get_processed_options();
 	auto files = cl.get_files();
 

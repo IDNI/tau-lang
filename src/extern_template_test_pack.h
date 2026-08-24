@@ -6,11 +6,10 @@
 // local instantiation — the linker resolves the symbol against
 // libTAU.a's pre-instantiated copy.
 //
-// Production builds (main.cpp, tau_codegen_cli.cpp) use the same full
-// pack and could benefit from the same extern declarations, but they
-// aren't force-included here so per-TU instantiation continues to
-// work identically to before — preserving build invariants for the
-// CLI binaries.
+// Production builds (main.cpp) use the same full pack and could benefit
+// from the same extern declarations, but they aren't force-included
+// here so per-TU instantiation continues to work identically to before —
+// preserving build invariants for the CLI binary.
 //
 // Recipe: mirror the list at the top of src/instantiate_test_pack.cpp.
 

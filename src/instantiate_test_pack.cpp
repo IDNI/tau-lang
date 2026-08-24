@@ -1,9 +1,9 @@
 // Explicit template instantiations for the BA pack used by every
-// test binary and by the production CLI binaries.
+// test binary and by the production CLI binary.
 //
 // The dominant node pack is the configured one, tau_pack::node_t (also
 // bas_pack in tests/test_tau_helpers.h, used by 40+ unit tests AND by
-// src/main.cpp / src/tau_codegen_cli.cpp).
+// src/main.cpp).
 //
 // Without explicit instantiations, every consumer TU re-instantiates
 // the heaviest pipeline templates (is_ltl_aba_realizable,
