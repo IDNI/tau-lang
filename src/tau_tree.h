@@ -1132,6 +1132,10 @@ bool is_input_var(tref n);
 template <NodeType node>
 bool is_output_var(tref n);
 
+/** @brief Classify an io_var's direction: 0 unknown, 1 input, 2 output. */
+template <NodeType node>
+size_t io_var_direction(tref n);
+
 /** @brief Return `true` if @p n is a formula variable or capture variable. */
 template <NodeType node>
 bool is_var_or_capture(tref n);

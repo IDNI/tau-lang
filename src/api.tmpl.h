@@ -619,6 +619,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	if (!applied) return {};
 	tref normalized = normalizer<node>(applied);
 	if (!normalized) return {};
+	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
 	if (has_free_vars<node>(normalized)) return {};
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
@@ -650,6 +651,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	if (!applied) return {};
 	tref normalized = normalizer<node>(applied);
 	if (!normalized) return {};
+	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
 	if (has_free_vars<node>(normalized)) return {};
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;

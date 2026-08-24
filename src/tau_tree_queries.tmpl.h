@@ -107,6 +107,20 @@ bool is_output_var(tref n) {
 	return tree<node>::get(n).is_output_variable();
 }
 
+// 0 (not io_var/unresolved), 1 (input) or 2 (output): tag if resolved, else name prefix.
+template <NodeType node>
+size_t io_var_direction(tref n) {
+	const auto& t = tree<node>::get(n);
+	if (!t.is(node::type::io_var)) return 0;
+	size_t dir = t.value.data;
+	if (dir == 1 || dir == 2) return dir;
+	const std::string& nm = get_var_name<node>(n);
+	if (nm.empty()) return 0;
+	if (nm[0] == 'i' || nm == "this") return 1;
+	if (nm[0] == 'o' || nm == "u")    return 2;
+	return 0;
+}
+
 template <NodeType node>
 bool is_var_or_capture(tref n) {
 	return tree<node>::get(n).is(node::type::variable)
