@@ -287,7 +287,10 @@ bool api<node>::contains(tref expression, typename node::type nt) {
 		if (tau::get(n).get_type() == nt) return found = true, false;
 		return true;
 	};
-	pre_order<node>(expression).search(searcher);
+	// searcher's answer depends only on a node's own type, so it gives the
+	// same result for every occurrence of a shared subtree -- search_unique
+	// is sound here and avoids revisiting shared subtrees.
+	pre_order<node>(expression).search_unique(searcher);
 	return found;
 }
 

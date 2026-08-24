@@ -2,6 +2,8 @@
 
 //#include <cvc5/cvc5.h>
 
+#include <functional>
+
 #include "tau_tree.h"
 #include "definitions.h"
 
@@ -163,14 +165,39 @@ std::optional<rr<node>> get_nso_rr(tref r) {
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	using tau = tree<node>;
-	auto add_leave = [&branch, &leaves](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(branch)) return true;
-		if (t.child_is(branch)) return true;
-		LOG_TRACE << "adding leaf: " << LOG_FM(n);
-		return leaves.push_back(n), false;
+	if (!n) return;
+
+	// Which leaves a subtree flattens to along the and/or spine depends
+	// only on that subtree and `branch`, so memoizing per (tref, branch)
+	// is sound and preserves multiplicity: a syntactic duplicate (e.g.
+	// `A && A`) still contributes two spliced-in copies of A's leaves.
+	//
+	// Local to this call, not a persistent tau::create_cache: its value
+	// type (a container of trefs) isn't introspected by the gc's
+	// for_each_tref_in, so a cache surviving past a gc sweep could hold
+	// dangling trefs. Scoping it to one call avoids that.
+	using cache_t = subtree_unordered_map<node, std::unordered_map<size_t, trefs>>;
+	cache_t cache;
+
+	std::function<const trefs&(tref)> flatten =
+		[&](tref m) -> const trefs& {
+		auto& per_branch = cache[m];
+		if (auto it = per_branch.find((size_t) branch);
+			it != per_branch.end())
+			return it->second;
+		const auto& t = tau::get(m);
+		trefs result;
+		if (t.is(branch) || t.child_is(branch)) {
+			for (tref c : t.children())
+				for (tref l : flatten(c)) result.push_back(l);
+		} else {
+			LOG_TRACE << "adding leaf: " << LOG_FM(m);
+			result.push_back(m);
+		}
+		return per_branch.emplace((size_t) branch,
+			std::move(result)).first->second;
 	};
-	pre_order<node>(n).visit(add_leave);
+	for (tref l : flatten(n)) leaves.push_back(l);
 }
 
 template <NodeType node>
@@ -567,65 +594,63 @@ const trefs& get_free_vars(tref n) {
 		return it->second;
 
 	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
-	// Scope-aware collection: each binder opens a scope; on leaving it,
-	// the bound variable is subtracted from that scope only and the rest
-	// is merged outward. A flat set would erase free occurrences of the
-	// same variable collected from sibling subtrees (B6). Offset
-	// variables inside io_vars (x[t], x[t-1]) are not free occurrences;
-	// they are excluded by not descending into variable nodes
+	// DAG-aware, scope-correct free-variable collection, memoized per
+	// node: a binder subtracts its own bound variable before merging
+	// into an outer scope, so a (sub)tree's free-var set is intrinsic to
+	// it and safe to memoize -- unlike a naive node-identity dedup (e.g.
+	// search_unique), which would still need to merge a memoized
+	// subtree's contribution into every scope reaching it.
+	//
+	// Offset variables inside io_vars (x[t], x[t-1]) are not free
+	// occurrences; excluded by not descending into variable nodes at all.
 	auto is_binder = [](const tau& t) {
 		return t.is(tau::wff_all) || t.is(tau::wff_ex) ||
 			t.is(tau::bf_fall) || t.is(tau::bf_fex);
 	};
-	std::vector<subtree_set<node>> scopes;
-	scopes.emplace_back();
-	// Depth of nested variable nodes: variables inside another variable
-	// (io_var offsets, shifts) are not free occurrences
-	size_t var_depth = 0;
-	auto visit = [&](tref m) -> bool {
+	subtree_unordered_map<node, subtree_set<node>> memo;
+	std::function<const subtree_set<node>&(tref)> walk =
+		[&](tref m) -> const subtree_set<node>& {
+		if (auto it = memo.find(m); it != memo.end()) return it->second;
 		const auto& t = tau::get(m);
-		if (is_binder(t)) scopes.emplace_back();
-		else if (is_var_or_capture<node>(m)) {
-			if (var_depth == 0) {
-				DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
-				scopes.back().insert(m);
+		subtree_set<node> result;
+		if (is_binder(t)) {
+			// Fresh scope: only this binder's own subtree feeds it,
+			// mirroring the original push-scope-then-pop-and-merge.
+			for (tref c : t.children())
+				for (tref v : walk(c)) result.insert(v);
+			if (tref var = t.find_top(
+				(bool(*)(tref)) is_var_or_capture<node>); var)
+			{
+				if (auto it2 = result.find(var); it2 != result.end()) {
+					DBG(LOG_TRACE << "removing quantified var: "
+									<< LOG_FM(var);)
+					result.erase(it2);
+				}
 			}
-			++var_depth;
-		} else if (t.is(tau::BDD_ID) && var_depth == 0) {
-			// Keys in U were stored without right siblings (via trim/get_typed),
-			// so trim before constructing the lookup key.
-			const tref trimmed = tau::trim_right_sibling(m);
-			const auto& bdd_u = tau_term_bdd_handle<node>::U;
-			if (auto jt = bdd_u.find(tau::get(tau::bf, trimmed));
-				jt != bdd_u.end())
-				for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(
-					jt->second.get().b))
-					scopes.back().insert(v);
-		}
-		return true;
-	};
-	auto visit_subtree = [](tref) -> bool { return true; };
-	auto up = [&](tref m) {
-		const auto& t = tau::get(m);
-		if (is_var_or_capture<node>(m)) { --var_depth; return; }
-		if (!is_binder(t)) return;
-		subtree_set<node> inner = std::move(scopes.back());
-		scopes.pop_back();
-		if (tref var = t.find_top(
-			(bool(*)(tref)) is_var_or_capture<node>); var)
-		{
-			if (auto it = inner.find(var); it != inner.end()) {
-				DBG(LOG_TRACE << "removing quantified var: "
-								<< LOG_FM(var);)
-				inner.erase(it);
+		} else if (is_var_or_capture<node>(m)) {
+			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
+			result.insert(m);
+			// Deliberately not descending into m's children.
+		} else {
+			if (t.is(tau::BDD_ID)) {
+				// Keys in U were stored without right siblings (via
+				// trim/get_typed), so trim before constructing the
+				// lookup key.
+				const tref trimmed = tau::trim_right_sibling(m);
+				const auto& bdd_u = tau_term_bdd_handle<node>::U;
+				if (auto jt = bdd_u.find(tau::get(tau::bf, trimmed));
+					jt != bdd_u.end())
+					for (tref v :
+						tau_term_bdd_handle<node>::get_free_tau_vars(
+							jt->second.get().b))
+						result.insert(v);
 			}
+			for (tref c : t.children())
+				for (tref v : walk(c)) result.insert(v);
 		}
-		scopes.back().merge(inner);
+		return memo.emplace(m, std::move(result)).first->second;
 	};
-	pre_order<node>(n).search(visit, visit_subtree, up);
-	DBG(assert(scopes.size() == 1);)
-	DBG(assert(var_depth == 0);)
-	subtree_set<node>& free_vars = scopes.back();
+	const subtree_set<node>& free_vars = walk(n);
 	trefs fv(free_vars.size());
 	size_t i = 0;
 	for (tref v : free_vars) fv[i++] = tau::trim_right_sibling(v);

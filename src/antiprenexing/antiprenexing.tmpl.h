@@ -342,7 +342,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				note_type(t);
 				return false;
 			};
-			pre_order<node>(f).visit(type_scan);
+			// Pure structural scan (get_ba_type only), so a shared subtree
+			// contributes the same note_type/homogeneous result every time
+			// it's reached -- visit_unique is sound and avoids re-walking
+			// it once per path on a blasted DAG.
+			pre_order<node>(f).visit_unique(type_scan);
 			// Decline rather than build a mixed-type bf_or: a matrix
 			// mixing e.g. sbf and tau atoms would otherwise be combined
 			// by build_bf_or under whichever type happened to come first.

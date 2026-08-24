@@ -191,6 +191,25 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv>& vars, subtree_map<node, bv>& free_vars);
 
 /**
+ * @brief bv_eval_node's memo: tref -> (context id -> already-translated
+ * term). See the memo-taking overload's doc for what a context id
+ * identifies.
+ */
+template <NodeType node>
+using bv_eval_memo = subtree_unordered_map<node, std::unordered_map<size_t, bv>>;
+
+/**
+ * @brief Memoised worker behind the overload above; caches tref -> term
+ * keyed by (tref, ctx). @p ctx identifies the enclosing wff_all/wff_ex
+ * instance (0 at top level, else a fresh value from @p ctx_counter minted
+ * per quantifier entry) so memo entries don't leak across quantifier scopes.
+ */
+template <NodeType node>
+std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
+	subtree_map<node, bv>& vars, subtree_map<node, bv>& free_vars,
+	bv_eval_memo<node>& memo, size_t& ctx_counter, size_t ctx);
+
+/**
  * @brief Evaluate a `tref` BV formula node; wrapper overload of the traverser version.
  * @param form Root formula node.
  * @param vars Bound variable assignments.
