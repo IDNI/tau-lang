@@ -1,6 +1,8 @@
 # populates TAU_GIT_DESCRIBED, TAU_GIT_BRANCH and TAU_GIT_COMMIT_HASH variables
 # and creates TAU_GIT_DEFINITIONS list
 
+# Skip outside a git checkout (a tau-compiled spec's emitted project has none).
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
 execute_process(
 	COMMAND git describe --tags --always
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -19,6 +21,7 @@ execute_process(
 	OUTPUT_VARIABLE TAU_GIT_COMMIT_HASH
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+endif()
 
 set(TAU_GIT_DEFINITIONS
 	"TAU_GIT_DESCRIBED=\"${TAU_GIT_DESCRIBED}\""

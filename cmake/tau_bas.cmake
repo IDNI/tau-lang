@@ -198,12 +198,23 @@ function(tau_generate_pack_header)
 		"Directory containing the generated tau_pack.h")
 	set(TAU_PACK_HEADER "${TAU_PACK_INCLUDE_DIR}/tau_pack.h")
 
+	# SDK root baked into tau_pack.h for `tau compile`; a caller may set this first.
+	if(NOT DEFINED TAU_SDK_ROOT_PATH OR TAU_SDK_ROOT_PATH STREQUAL "")
+		set(TAU_SDK_ROOT_PATH "${PROJECT_SOURCE_DIR}")
+	endif()
+	set(TAU_SDK_ROOT_PATH "${TAU_SDK_ROOT_PATH}" PARENT_SCOPE)
+
+	# Filled in for real by tau_finalize_pack_compile_definitions() once
+	# tauparser exists; empty here just keeps this first write well-formed.
+	set(TAU_RESOLVED_COMPILE_DEFINITIONS "")
+
 	file(MAKE_DIRECTORY "${TAU_PACK_INCLUDE_DIR}")
 
 	set(TAU_PACK_INCLUDES "")
 	foreach(_h ${TAU_BA_HEADERS})
 		string(APPEND TAU_PACK_INCLUDES "#include \"${_h}\"\n")
 	endforeach()
+	set(TAU_PACK_INCLUDES "${TAU_PACK_INCLUDES}" PARENT_SCOPE)
 
 	set(TAU_PACK_BA_DEFINES "")
 	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
@@ -217,12 +228,25 @@ function(tau_generate_pack_header)
 		string(APPEND TAU_PACK_BA_DEFINES
 			"#define TAU_PACK_HAS_BA_${_id_upper} 1\n")
 	endforeach()
+	set(TAU_PACK_BA_DEFINES "${TAU_PACK_BA_DEFINES}" PARENT_SCOPE)
 
 	if(TAU_PACK_HAS_TAU)
 		set(TAU_PACK_HAS_TAU_CPP "true")
 	else()
 		set(TAU_PACK_HAS_TAU_CPP "false")
 	endif()
+	set(TAU_PACK_HAS_TAU_CPP "${TAU_PACK_HAS_TAU_CPP}" PARENT_SCOPE)
+
+	# libTAU.a pre-instantiates the artifact pack only when TAU_ARTIFACT_PREINST
+	# is on; an SDK built without it emits today's artifact.
+	if(TAU_ARTIFACT_PREINST)
+		set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
+			"#define TAU_CODEGEN_ARTIFACT_PREINST 1")
+	else()
+		set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE "")
+	endif()
+	set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
+		"${TAU_CODEGEN_ARTIFACT_PREINST_DEFINE}" PARENT_SCOPE)
 
 	# The carrier order reaches the fold as one macro rather than through
 	# tau_pack.h: ba_pack_traits.h cannot include the generated header, which
@@ -252,6 +276,46 @@ function(tau_generate_pack_header)
 		@ONLY)
 
 	add_custom_target(tau_pack_header ALL DEPENDS "${TAU_PACK_HEADER}")
+endfunction()
+
+#
+# Re-writes tau_pack.h once tauparser exists (called after its add_subdirectory,
+# which tau_generate_pack_header() precedes), filling in the compile
+# definitions actually resolved active on this build: the TAU_DEFINITIONS
+# target_compile_definitions_if() would have applied, plus whatever tauparser
+# requires of its consumers (e.g. TAU_PARSER_MEASURE* once TAU_PARSER_BUILD_TGF
+# forces it on). A `tau compile` artifact links libTAU.a/libtauparser.a as
+# prebuilt archives, so its own TU needs the same toggles or a header-only
+# template's layout drifts from the one those archives were compiled against.
+#
+function(tau_finalize_pack_compile_definitions)
+	set(_resolved "")
+	foreach(_def IN LISTS TAU_DEFINITIONS)
+		if(${_def})
+			list(APPEND _resolved "${_def}")
+		endif()
+	endforeach()
+	if(TARGET tauparser)
+		get_target_property(_parser_defs tauparser INTERFACE_COMPILE_DEFINITIONS)
+		if(_parser_defs)
+			foreach(_pd IN LISTS _parser_defs)
+				# only a valueless toggle can change a header-only template's
+				# layout; a NAME=VALUE define (tauparser's own git identifiers)
+				# is data, not structure, and isn't safe to bake into a C string.
+				if(NOT _pd MATCHES "=")
+					list(APPEND _resolved "${_pd}")
+				endif()
+			endforeach()
+		endif()
+	endif()
+	if(_resolved)
+		list(REMOVE_DUPLICATES _resolved)
+	endif()
+	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}")
+	configure_file(
+		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
+		"${TAU_PACK_INCLUDE_DIR}/tau_pack.h"
+		@ONLY)
 endfunction()
 
 #
