@@ -440,13 +440,14 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
 		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0.
-		// Which side an atom's variable prints on is decided by
-		// simplify_using_equality_term_comp's tau::subtree_less fallback for
-		// two plain variables, a content-hash tie-break that is not a
-		// guaranteed canonical order (see tau_bdd.tmpl.h for the analogous
-		// issue), so accept either orientation for the "z = x" atom.
-		CHECK((tau::get(res).to_str() == "x = 0 || x = y || z = x"
-			|| tau::get(res).to_str() == "x = 0 || x = y || x = z"));
+		// Disjunct order is wff_or commutativity, and each equality's own
+		// operand orientation is a content-hash tie-break too (both sides
+		// are plain variables, so term_comp falls through to
+		// tau::subtree_less) -- matches_wff_mod_and_or absorbs both
+		// (.local/build-emscripten.md §4i). An equality between operands
+		// of different term_comp categories (e.g. an io variable against a
+		// plain one) would still have to match exactly.
+		CHECK(matches_wff_mod_and_or(res, "x = 0 || x = y || x = z"));
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {
@@ -477,17 +478,43 @@ TEST_SUITE("simplify_using_equality") {
 		const char* s = "o1[t] = i1[t] && o2[t] = o1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau");
+		// Operand orientation within each equality (output left, input
+		// right) is decided by term_comp's documented input/output
+		// priority, never reaching the subtree_less tie-break, so it is
+		// exact and hash-policy-independent here -- assert both conjuncts'
+		// strings precisely. Which conjunct comes first is AND
+		// commutativity, decided by a content hash, so that part is
+		// checked order-insensitively.
+		trefs conjs = get_cnf_wff_clauses<node_t>(res);
+		strings got;
+		for (tref c : conjs) got.push_back(tau::get(c).to_str());
+		std::ranges::sort(got);
+		strings expected = {
+			"o1[t]:tau = i1[t]:tau", "o2[t]:tau = i1[t]:tau" };
+		std::ranges::sort(expected);
+		CHECK(got == expected);
 	}
 
 	TEST_CASE("io_output_var_replaced_when_equality_added_later") {
 		// Same as above but the equalities are in reversed order: o2=o1 comes
-		// first, then o1=i1 is added to the UF. o1 in the first conjunct is
-		// substituted with i2's representative (o2 < o1 by subtree_less).
+		// first, then o1=i1 is added to the UF. One of the two output
+		// variables becomes the union-find representative and the other is
+		// substituted with it.
+		//
+		// o1 and o2 are the same term_comp category, so which one wins is
+		// decided by tau::subtree_less -- a content hash, not a canonical
+		// order (.local/build-emscripten.md §4i). Both outcomes below state
+		// the same closure (o1 = o2 and representative = i1) and they are
+		// the complete set of two, one per representative, rather than a
+		// list of orders someone observed: `default` and `fnv1a` pick o2,
+		// `wyhash` picks o1. The cross-category orientation this suite
+		// checks elsewhere stays asserted exactly.
 		const char* s = "o2[t] = o1[t] && o1[t] = i1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau");
+		const std::string got = tau::get(res).to_str();
+		CHECK((got == "o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau"
+			|| got == "o2[t]:tau = o1[t]:tau && o1[t]:tau = i1[t]:tau"));
 	}
 
 	TEST_CASE("io_input_var_not_substituted_despite_being_in_uf") {

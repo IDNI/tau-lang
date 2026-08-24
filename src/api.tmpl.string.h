@@ -66,8 +66,26 @@ std::optional<std::string> api<node>::apply_defs(
 		}
 		tdefs.insert(d);
 	}
-	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a)
+	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a) {
+		// get_spec_or_term() parses a bare formula as a one-line spec
+		// (spec(main(wff(...)))); get_nso_rr()'s no-ref branch keeps
+		// that shape rather than unwrapping it the way its ref branch
+		// does (via tau_lang::get_nso_rr's main -> wff/bf navigation),
+		// so content round-trips through nso_rr_apply but the shape
+		// stays spec-wrapped. Only to_str() sees the difference: a
+		// spec-shaped tree renders with the trailing '.' every other
+		// string overload's result lacks. Unwrap here, at the point
+		// content becomes a string, so the tref-level overloads --
+		// which other callers (e.g. get_interpreter) rely on staying
+		// spec-shaped -- are untouched.
+		using tt = typename tau::traverser;
+		if (tau::get(a).is(tau::spec)) {
+			tref main = tt(a) | tau::main | tau::wff | tt::ref;
+			if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
+			if (main) a = main;
+		}
 		return to_str(a);
+	}
 	return {};
 }
 
@@ -113,9 +131,8 @@ std::optional<std::string> api<node>::substitute(
 template <NodeType node>
 std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
-	if (tref a = apply_all_defs(get_spec_or_term(expr)); a)
-		if (tref b = tau_lang::boole_normal_form<node>(a); b)
-			return to_str(b);
+	if (tref b = boole_normal_form(get_formula_or_term(expr)); b)
+		return to_str(b);
 	return {};
 }
 
@@ -202,17 +219,17 @@ std::optional<std::string> api<node>::eliminate_quantifiers(
 
 template <NodeType node>
 bool api<node>::realizable(const std::string& expr) {
-	return realizable(get_spec_or_term(expr));
+	return realizable(get_formula_or_term(expr));
 }
 
 template <NodeType node>
 bool api<node>::unrealizable(const std::string& expr) {
-	return unrealizable(get_spec_or_term(expr));
+	return unrealizable(get_formula_or_term(expr));
 }
 
 template <NodeType node>
 bool api<node>::sat(const std::string& expr) {
-	return sat(get_spec_or_term(expr));
+	return sat(get_formula_or_term(expr));
 }
 
 template <NodeType node>
@@ -222,29 +239,56 @@ bool api<node>::unsat(const std::string& expr) {
 
 template <NodeType node>
 bool api<node>::valid(const std::string& expr) {
-	return valid(get_spec_or_term(expr));
+	return valid(get_formula_or_term(expr));
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(const std::string& expr) {
-	return valid_spec(get_spec_or_term(expr));
+	return valid_spec(get_formula_or_term(expr));
 }
 
 
 // Solving
 // ------------------------------------------------------------
 
+// Render a solved variable's value the way the REPL does
+// (print_solver_cmd_solution, repl_evaluator.tmpl.h): a compound BA constant
+// already stringifies with its own type-tagged form (tau_tree_printers.tmpl.h's
+// `ba_constant` case), so it goes through the generic printer unchanged; the
+// atomic bf_t/bf_f nodes carry no BA type of their own, so serialize_constant
+// recovers the declared type's own literal instead of the generic "0"/"1".
+// fallback_type mirrors the REPL, resolving the variable's own type first and
+// falling back to the formula's type only for untyped variables.
+template <NodeType node>
+std::map<std::string, std::string> serialize_solution(
+	const solution<node>& sol, size_t fallback_type)
+{
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	std::map<std::string, std::string> s;
+	for (auto& [var, val] : sol) {
+		if (tt(val) | tau::ba_constant) {
+			s.emplace(tau::get(var).to_str(), tau::get(val).to_str());
+			continue;
+		}
+		size_t t = find_ba_type<node>(var);
+		if (t == 0) t = fallback_type;
+		std::stringstream ss;
+		s.emplace(tau::get(var).to_str(), serialize_constant<node>(ss, val, t)
+			? ss.str() : tau::get(val).to_str());
+	}
+	return s;
+}
+
 template <NodeType node>
 std::optional<std::map<std::string, std::string>> api<node>::solve(
 	const std::string& formula,
 	solver_mode mode)
 {
-	if (auto solution = solve(get_formula(formula), mode); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
+	tref fm = get_formula(formula);
+	if (auto solution = solve(fm, mode); solution)
+		return serialize_solution<node>(solution.value(),
+			find_ba_type_or_default<node>(fm));
 	return {};
 }
 
@@ -252,12 +296,10 @@ template <NodeType node>
 std::optional<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	if (auto solution = lgrs(get_formula(equation)); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
+	tref eq = get_formula(equation);
+	if (auto solution = lgrs(eq); solution)
+		return serialize_solution<node>(solution.value(),
+			find_ba_type_or_default<node>(eq));
 	return {};
 }
 

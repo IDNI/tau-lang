@@ -33,6 +33,13 @@
 			"toolchainFile": "${sourceDir}/external/parser/cmake/mingw-w64-x86_64.cmake"
 		},
 		{
+			"name": "_toolchain-emscripten",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EMSCRIPTEN": "ON"
+			}
+		},
+		{
 			"name": "_build_dir-release",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release"
@@ -61,6 +68,36 @@
 			"name": "_build_dir-relwithdebinfo",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/relwithdebinfo"
+		},
+		{
+			"name": "_build_dir-emscripten",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/emscripten"
+		},
+		{
+			"name": "_build_dir-debug-emscripten",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-emscripten"
+		},
+		{
+			"name": "_build_dir-emscripten-tests",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/emscripten-tests"
+		},
+		{
+			"name": "_build_dir-debug-emscripten-tests",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-emscripten-tests"
+		},
+		{
+			"name": "_build_dir-emscripten-pthread",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/emscripten-pthread"
+		},
+		{
+			"name": "_build_dir-debug-emscripten-pthread",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-emscripten-pthread"
 		},
 		{
 			"name": "_build_dir-coverage",
@@ -117,6 +154,20 @@
 			}
 		},
 		{
+			"name": "_build-binding-js",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "ON"
+			}
+		},
+		{
+			"name": "_build-repl-wasm",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_WASM": "ON"
+			}
+		},
+		{
 			"name": "_build-all",
 			"hidden": true,
 			"cacheVariables": {
@@ -153,10 +204,26 @@
 			}
 		},
 		{
+			"name": "_build-wasm-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_UNIT_TESTS": "ON",
+				"TAU_BUILD_INTEGRATION": "ON",
+				"TAU_BUILD_API_TESTS": "ON"
+			}
+		},
+		{
 			"name": "_build-measure",
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_MEASURE": "ON"
+			}
+		},
+		{
+			"name": "_bas-wasm",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BAS": "sbf,tau,qint,qlt"
 			}
 		},
 		{
@@ -330,6 +397,72 @@
 				"_build_dir-debug-mingw",
 				"_generator-make",
 				"_toolchain-mingw",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "emscripten",
+			"inherits": [
+				"_build_dir-emscripten",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-binding-js",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-emscripten",
+			"inherits": [
+				"_build_dir-debug-emscripten",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-binding-js",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "emscripten-tests",
+			"inherits": [
+				"_build_dir-emscripten-tests",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-wasm-tests",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-emscripten-tests",
+			"inherits": [
+				"_build_dir-debug-emscripten-tests",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-wasm-tests",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "emscripten-pthread",
+			"inherits": [
+				"_build_dir-emscripten-pthread",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-repl-wasm",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-emscripten-pthread",
+			"inherits": [
+				"_build_dir-debug-emscripten-pthread",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-repl-wasm",
 				"_build-type-debug"
 			]
 		},
@@ -700,6 +833,30 @@
 			"configurePreset": "debug-mingw"
 		},
 		{
+			"name": "emscripten",
+			"configurePreset": "emscripten"
+		},
+		{
+			"name": "debug-emscripten",
+			"configurePreset": "debug-emscripten"
+		},
+		{
+			"name": "emscripten-tests",
+			"configurePreset": "emscripten-tests"
+		},
+		{
+			"name": "debug-emscripten-tests",
+			"configurePreset": "debug-emscripten-tests"
+		},
+		{
+			"name": "emscripten-pthread",
+			"configurePreset": "emscripten-pthread"
+		},
+		{
+			"name": "debug-emscripten-pthread",
+			"configurePreset": "debug-emscripten-pthread"
+		},
+		{
 			"name": "relwithdebinfo",
 			"configurePreset": "relwithdebinfo"
 		},
@@ -816,6 +973,14 @@
 		{
 			"name": "release-api-tests",
 			"configurePreset": "release-api-tests"
+		},
+		{
+			"name": "emscripten-tests",
+			"configurePreset": "emscripten-tests"
+		},
+		{
+			"name": "debug-emscripten-tests",
+			"configurePreset": "debug-emscripten-tests"
 		},
 		{
 			"name": "release-all",

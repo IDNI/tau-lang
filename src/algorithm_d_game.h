@@ -23,7 +23,9 @@
 #include <cassert>
 #include <cctype>
 #include <cstdio>
+#ifndef __EMSCRIPTEN__
 #include <sys/wait.h>
+#endif // __EMSCRIPTEN__
 #include <map>
 #include <set>
 #include <sstream>
@@ -310,6 +312,7 @@ inline synth_game call_ltlsynt_game(
 	game_cache_key key{phi_prop, ins, outs};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 
+#ifndef __EMSCRIPTEN__
 	// Shell-escape
 	std::string esc;
 	for (char c : phi_prop) {
@@ -364,6 +367,9 @@ inline synth_game call_ltlsynt_game(
 	auto result = parse_synth_game_hoa(hoa);
 	cache[key] = result;
 	return result;
+#else
+	return {}; // no process model under wasm; same as ltlsynt-not-found
+#endif // __EMSCRIPTEN__
 }
 
 // ── Product game (game × T_1) ─────────────────────────────────────────────

@@ -23,15 +23,19 @@
 #include <optional>
 #include <sstream>
 #include <stdexcept>
-#include <thread>
 #include <vector>
-#include <sys/wait.h>
 #include <unistd.h>
-#include <spawn.h>
-#include <signal.h>
 #include <fcntl.h>
 
+#ifndef __EMSCRIPTEN__
+// posix_spawn is declared but not implemented under Emscripten; wasm has no process model.
+#include <thread>
+#include <sys/wait.h>
+#include <spawn.h>
+#include <signal.h>
+
 extern char **environ;
+#endif // __EMSCRIPTEN__
 
 // Split into logical sub-files for readability.
 // Include order matches the original code order.

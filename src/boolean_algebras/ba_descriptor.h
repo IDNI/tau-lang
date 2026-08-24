@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "splitter_types.h"
+#include "utility/tree_types.h"
 
 namespace idni::tau_lang {
 
@@ -67,9 +68,6 @@ constexpr bool ba_name_eq(const char* a, const char* b) {
  * against the line naming it. Optional capabilities (own solver, arithmetic,
  * quantifier elimination, hosting the Boolean carrier, ...) are deliberately
  * absent here and are probed where they are used.
- *
- * `tref` is spelled out as `const intptr_t*` to keep this header free of the
- * parser tree includes.
  */
 template <typename BA, typename Node>
 concept ba_descriptor_complete =
@@ -95,17 +93,17 @@ concept ba_descriptor_complete =
  && requires { { ba_descriptor<BA, Node>::non_aba_omcat }
                    -> std::convertible_to<bool>;                     }
 	// type system
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         { ba_descriptor<BA, Node>::matches_type(t) }
             -> std::convertible_to<bool>;                            }
  && requires { ba_descriptor<BA, Node>::type_tree();                 }
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         { ba_descriptor<BA, Node>::owns_type(t) }
             -> std::convertible_to<bool>;                            }
  && requires(size_t n) {
         { ba_descriptor<BA, Node>::owns_type(n) }
             -> std::convertible_to<bool>;                            }
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         ba_descriptor<BA, Node>::type_param(t);                      }
  && requires(unsigned short s) {
         { ba_descriptor<BA, Node>::type_id_for(s) }
@@ -129,10 +127,10 @@ concept ba_descriptor_complete =
         { ba_descriptor<BA, Node>::is_closed(x) }
             -> std::convertible_to<bool>;                            }
 	// literals
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         { ba_descriptor<BA, Node>::literal_one(t) }
             -> std::convertible_to<std::string>;                     }
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         { ba_descriptor<BA, Node>::literal_zero(t) }
             -> std::convertible_to<std::string>;                     }
 	// normalization and splitting
@@ -140,20 +138,20 @@ concept ba_descriptor_complete =
         ba_descriptor<BA, Node>::normalize(x);                       }
  && requires(const BA& x, splitter_type st) {
         ba_descriptor<BA, Node>::splitter(x, st);                    }
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         ba_descriptor<BA, Node>::splitter_one(t);                    }
 	// tree/value bridge
  && requires(const BA& x) {
         ba_descriptor<BA, Node>::unpack(x);                          }
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         ba_descriptor<BA, Node>::pack(t);                            }
 	// symbol and term simplification
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         ba_descriptor<BA, Node>::simplify_symbol(t);                 }
- && requires(const intptr_t* t) {
+ && requires(tref t) {
         ba_descriptor<BA, Node>::simplify_term(t);                   }
 	// parsing
- && requires(const std::string& src, const intptr_t* t) {
+ && requires(const std::string& src, tref t) {
         ba_descriptor<BA, Node>::parse(src, t);                      };
 
 /** @internal @brief Fold of `ba_descriptor_complete` over the pack. */

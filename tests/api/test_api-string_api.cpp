@@ -18,6 +18,116 @@ TEST_SUITE("Tau API - string") {
 			CHECK(tau_api::is_formula(formula));
 		}
 	}
+
+	// apply_defs()/apply_all_defs() parse via get_spec_or_term(), which
+	// tries get_spec() first; a bare formula like "x = 0" parses fine as
+	// a one-line spec (spec(main(wff(...)))). Because that tree contains
+	// no `ref`, api<node>::get_nso_rr's no-ref branch kept the whole
+	// spec-shaped tree as nso_rr.main instead of unwrapping it the way
+	// its ref branch does (via tau_lang::get_nso_rr's main -> wff/bf
+	// navigation), so nso_rr_apply carried the spec shape through and
+	// to_str() rendered it with spec grammar's trailing '.' -- unlike
+	// every neighbouring string overload (substitute, dnf, cnf, nnf, ...)
+	// which route through get_formula_or_term() and never carry the
+	// artifact. Fixed by unwrapping the spec shape in the string overload
+	// itself, right before to_str(); apply_def/apply_all_defs share the
+	// same underlying apply_defs(defs, string) so both are covered.
+	TEST_CASE_FIXTURE(api_fixture, "apply_defs/apply_all_defs on a bare formula") {
+		auto all = tau_api::apply_all_defs("x = 0");
+		REQUIRE(all.has_value());
+		CHECK(all.value() == "x = 0");
+
+		auto some = tau_api::apply_defs(std::set<std::string>{}, "x = 0");
+		REQUIRE(some.has_value());
+		CHECK(some.value() == "x = 0");
+	}
+
+	// Input that genuinely carries a spec's own inline definitions must
+	// still round-trip correctly: it reaches api<node>::get_nso_rr's ref
+	// branch (a `ref` to apply_all_defs_f is present), which already
+	// unwraps to the bare main formula via tau_lang::get_nso_rr, so this
+	// path was correct both before and after the fix above -- pinned here
+	// so the string-overload change above cannot regress it. Mirrors the
+	// tref-level "apply_all_defs" case in test_api-tref_api.cpp, whose
+	// spec (apply_all_defs_f(x) := x'.\napply_all_defs_f(z) = 0.) already
+	// established z' = 0 as the correct unwrapped result.
+	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs on a spec with real definitions") {
+		auto applied = tau_api::apply_all_defs(
+			"str_apply_all_defs_f(x) := x'.\n"
+			"str_apply_all_defs_f(z) = 0.");
+		REQUIRE(applied.has_value());
+		CHECK(applied.value() == "z' = 0");
+	}
+
+	// AP-9: sat/realizable/unrealizable/valid/valid_spec routed a string
+	// through get_spec_or_term(), wrapping it in a `spec` node. The
+	// tref-level sat()/realizable() gate on is_formula() (a bare wff), so
+	// every well-formed formula silently reported unsat/unrealizable
+	// regardless of content; valid()/valid_spec() have no such gate, so
+	// instead the whole-query BA fast path fed the still-`spec`-wrapped
+	// tree to build_wff_neg(), which asserts on a bare wff and aborted.
+	// Fixed by routing through get_formula_or_term(), like the
+	// neighbouring string overloads (substitute, dnf, cnf, nnf, ...).
+	TEST_CASE_FIXTURE(api_fixture, "sat/unsat/realizable/unrealizable/valid on well-formed input") {
+		CHECK(tau_api::sat("x = 0"));
+		CHECK(tau_api::realizable("x = 0"));
+		CHECK(!tau_api::unsat("x = 0"));
+		CHECK(!tau_api::unrealizable("x = 0"));
+
+		// a genuine contradiction
+		CHECK(!tau_api::sat("x = 0 && x != 0"));
+		CHECK(tau_api::unsat("x = 0 && x != 0"));
+		CHECK(!tau_api::realizable("x = 0 && x != 0"));
+		CHECK(tau_api::unrealizable("x = 0 && x != 0"));
+
+		// a tautology
+		CHECK(tau_api::valid("x = x"));
+		CHECK(tau_api::valid_spec("x = x"));
+		CHECK(!tau_api::valid("x = 0"));
+		CHECK(!tau_api::valid_spec("x = 0"));
+	}
+
+	// boole_normal_form(const string&) routed through
+	// get_spec_or_term(), so a one-line formula parsed as a spec node
+	// (spec(main(wff(...)))) rather than a bare wff; that wrapped tree
+	// reached tau_lang::boole_normal_form() -> syntactic_formula_simplification()
+	// -> syntactic_path_simplification_dnf::on() -> build_wff_neg(), whose
+	// assertion requires a bare wff and aborted the process for ordinary
+	// well-formed input. Fixed by routing through get_formula_or_term(),
+	// like dnf/cnf/nnf.
+	// Only asserting a value here already proves the abort is gone (an
+	// abort would take the whole test binary down), but pin the content
+	// too, not merely that a value came back.
+	TEST_CASE_FIXTURE(api_fixture, "boole_normal_form on well-formed input") {
+		auto bnf = tau_api::boole_normal_form("x = 0 && y = 1");
+		REQUIRE(bnf.has_value());
+		CHECK(bnf.value() == "x = 0 && y' = 0");
+	}
+
+
+	// §4e item 8: api<node>::solve(const string&) rendered every solved
+	// value with the generic bf-constant spelling ("0"/"1"), unlike the
+	// REPL's solve/lgrs commands (print_solver_cmd_solution ->
+	// serialize_constant), which use the declared type's own literal
+	// (tau's is "F"/"T"). Pin the actual formatted text here so a
+	// regression to "0"/"1" fails loudly -- the malformed-input tests
+	// above never exercised this positive case.
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs render the declared type's own literal") {
+		auto zero = tau_api::solve("x = 0", solver_mode::general);
+		REQUIRE(zero.has_value());
+		CHECK(zero.value() == std::map<std::string, std::string>{
+			{ "x", "F" } });
+
+		auto nonzero = tau_api::solve("x != 0", solver_mode::general);
+		REQUIRE(nonzero.has_value());
+		CHECK(nonzero.value() == std::map<std::string, std::string>{
+			{ "x", "T" } });
+
+		auto lg = tau_api::lgrs("x = 0");
+		REQUIRE(lg.has_value());
+		CHECK(lg.value() == std::map<std::string, std::string>{
+			{ "x", "F" } });
+	}
 }
 
 // AP-8: only get_interpreter (below) had negative/malformed-input tests;

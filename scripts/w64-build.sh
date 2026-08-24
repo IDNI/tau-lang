@@ -1,11 +1,5 @@
 #!/bin/bash
 
-BUILD_TYPE="${1:-Release}"
-
-if [ "$1" == "$BUILD_TYPE" ]; then
-	shift
-fi
-
-./dev build "${BUILD_TYPE}" \
+./dev build \
 	-DCMAKE_TOOLCHAIN_FILE=external/parser/cmake/mingw-w64-x86_64.cmake \
 	"$@"

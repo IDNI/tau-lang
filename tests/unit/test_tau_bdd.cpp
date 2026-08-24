@@ -202,15 +202,12 @@ TEST_SUITE("BDD and many") {
 		bdd::refs bdds = {x,y,z};
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
-		auto result = tau::get(ct).to_str();
-		// expected[0] is the canonical form (see matches_to_any_of); the
-		// rest are orders earlier packs produced -- conjunct order follows
-		// the ba_type pool indices (D8).
-		CHECK((result == "xyefcdba"
-			|| result == "xycdabfe" || result == "xycdabef"
-			|| result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab"
-			|| result == "xycdfeba" ));
+		// The 8 single-letter conjuncts print with no delimiter at all
+		// (bare bf_and juxtaposition), in an order that follows the
+		// ba_type pool indices (D8) rather than anything canonical, so
+		// compare the tree modulo bf_and commutativity instead of the
+		// printed string.
+		CHECK(matches_bf_mod_and_or(ct, "xyefcdba"));
 	}
 
 	TEST_CASE("2") {

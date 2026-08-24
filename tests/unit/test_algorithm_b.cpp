@@ -156,7 +156,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 		CHECK(alg_b_realizable("G (o1[t]:qlt < {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-B-12] GF(o1 > {0}) REALIZABLE: liveness regression") {
+	TEST_CASE("[ALG-B-12] GF(o1 > {0}) REALIZABLE: liveness regression" * doctest::skip(!ltlsynt_available())) {
 		CHECK(alg_b_realizable("G F (o1[t]:qlt > {0}:qlt)."));
 	}
 

@@ -368,13 +368,22 @@ tref simplify_using_equality(tref fm) {
 			n = syntactic_atomic_formula_simplification<node>(n);
 			n = simplify_using_equality_direct_atm<node>(n);
 			tref s = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
+			// Union-find substitution rewrites operands in place, so the
+			// left/right slot each keeps is whatever direct_atm decided
+			// for the PRE-substitution operands above -- stale once a
+			// substituted operand's term_comp category differs from what
+			// it replaced (e.g. an output variable's slot now holding its
+			// input-variable representative). Re-orient against the
+			// operands actually present in s.
+			s = simplify_using_equality_direct_atm<node>(s);
 			if (!is_child<node>(s, tau::bf_eq)) return s;
 			if (simplify_using_equality_add_equality<node>(uf_stack.back(), s)) return s;
 			else return _F<node>();
 		} else if (is_atomic_fm<node>(n)) {
 			n = syntactic_atomic_formula_simplification<node>(n);
 			n = simplify_using_equality_direct_atm<node>(n);
-			return simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
+			n = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
+			return simplify_using_equality_direct_atm<node>(n);
 		} else if (cn.is(tau::wff_and)) {
 			if (mark.contains(n)) return n;
 			trefs conjs = get_cnf_wff_clauses<node>(n);

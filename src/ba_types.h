@@ -248,6 +248,10 @@ size_t find_ba_type (tref term);
 template <NodeType node>
 tref find_ba_type_tree (tref term);
 
+/** @brief find_ba_type(term), falling back to the configured pack's default BA type when unresolved. */
+template <NodeType node>
+size_t find_ba_type_or_default (tref term);
+
 /** @brief Print the type name for @p ba_type_id to @p os. */
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);

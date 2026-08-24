@@ -98,6 +98,12 @@ std::pair<bool, std::string> call_ltlsynt(
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props);
 
+// Whether this build can actually invoke ltlsynt: always false under
+// Emscripten (no process model to spawn it with), a real PATH probe
+// otherwise. Reuses call_ltlsynt's own spawn/not-found detection, so the
+// two can never disagree about whether ltlsynt is reachable.
+bool ltlsynt_available();
+
 // The HOA automaton and parse_hoa live in ltl_aba_result.h.
 
 // ── DPA (Deterministic Parity Automaton) — Algorithm D Phase 1 ───────────────

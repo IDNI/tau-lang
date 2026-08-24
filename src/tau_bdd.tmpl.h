@@ -1093,42 +1093,42 @@ const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 /** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto& n) const {
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	idni::hash_combine(seed, idni::hash_lcrs_tref<T>()(n.v), n.inv_v,
 		n.inv_h, n.inv_l);
-	return seed;
+	return static_cast<size_t>(seed);
 }
 
 /** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	idni::hash_combine(seed, idni::hash_tref<T>()(r.b), r.inv);
-	return seed;
+	return static_cast<size_t>(seed);
 }
 
 /** @internal @copydoc std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto& a) const {
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	idni::hash_combine(seed, a[0], a[1]);
-	return seed;
+	return static_cast<size_t>(seed);
 }
 
 /** @internal @copydoc std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto& a) const {
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	idni::hash_combine(seed, a[0], a[1], a[2]);
-	return seed;
+	return static_cast<size_t>(seed);
 }
 
 /** @internal @copydoc std::hash<idni::tau_lang::term_handle<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::term_handle<T>>::operator()(auto& th) const {
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	idni::hash_combine(seed, idni::hash_htree<T>()(th.h), th.inv);
-	return seed;
+	return static_cast<size_t>(seed);
 }
 
 #endif //TAU_TAU_BDD_TMPL_H

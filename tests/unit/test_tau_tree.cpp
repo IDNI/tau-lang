@@ -52,6 +52,18 @@ TEST_SUITE("node::extension") {
 		CHECK(back.data == n.data);
 		CHECK(back.ba_type == 0);
 	}
+
+	// nt_bits is 9, so an id >= 256 needs its top bit packed correctly.
+	TEST_CASE("round-trips an nt id >= 256") {
+		REQUIRE(static_cast<size_t>(tau::shift) >= 256);
+		node_t n(tau::shift, 7, false, 0, 0);
+		auto raw = n.extension();
+		node_t back = node_t::extension(raw);
+		CHECK(back.nt == n.nt);
+		CHECK(back.term == n.term);
+		CHECK(back.ext == n.ext);
+		CHECK(back.data == n.data);
+	}
 }
 
 // ── get_var_name/get_var_name_sid null-node safety (TT-17) ──────────────────

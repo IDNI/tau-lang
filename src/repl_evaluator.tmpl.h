@@ -682,14 +682,6 @@ solver_mode get_solver_cmd_mode(tref n) {
 }
 
 template <NodeType node>
-size_t get_solver_cmd_type(tref n) {
-	size_t type = find_ba_type<node>(n);
-	return type > 0 ? type
-		: get_ba_type_id<node>(
-			node::ba::default_type());
-}
-
-template <NodeType node>
 void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 		size_t type_id)
 {
@@ -773,7 +765,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	print_solver_cmd_solution<node>(solution,
-		get_solver_cmd_type<node>(value));
+		find_ba_type_or_default<node>(value));
 }
 
 template <typename... BAs>
@@ -791,7 +783,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
 	print_solver_cmd_solution<node>(solution,
-		get_solver_cmd_type<node>(value));
+		find_ba_type_or_default<node>(value));
 }
 
 template <typename... BAs>

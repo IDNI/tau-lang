@@ -118,26 +118,37 @@ struct node {
 	using constant_with_type = std::pair<constant, tref>;
 	using ba = tau_lang::base_ba_dispatcher<BAs...>; ///< BA dispatcher alias.
 
-	using T = size_t;
+	// Pinned to 64 bits rather than following size_t: on wasm32 size_t is
+	// 32 bits, which would shrink data_bits well below int_t's 32-bit
+	// range and corrupt any negative value stored in `data`. Fixing T
+	// keeps `data`'s width, and therefore the sign/range semantics of
+	// every stored integer, the same on every target.
+	using T = uint64_t;
 
 	// bit sizes
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
-	static constexpr size_t data_bits = bits - nt_bits - 1;
+	// Two 1-bit fields (term and ext) share the word with nt and data, so
+	// both must be accounted for here, not just one.
+	static constexpr size_t data_bits = bits - nt_bits - 2;
 
 	// masks and shifts
-	static constexpr size_t nt_mask = (size_t(1) << nt_bits) - size_t(1);
-	static constexpr size_t data_mask = (size_t(1) << data_bits) - size_t(1);
+	// Built from T, not size_t: on wasm32 size_t is 32 bits, so shifting
+	// it by data_bits (53) would be undefined behavior.
+	static constexpr T nt_mask = (T(1) << nt_bits) - T(1);
+	static constexpr T data_mask = (T(1) << data_bits) - T(1);
 	static constexpr size_t ext_shift = data_bits;
 	static constexpr size_t term_shift = ext_shift + 1;
 	static constexpr size_t nt_shift = term_shift + 1;
+	static_assert(nt_shift + nt_bits == bits,
+		"nt/term/ext/data must exactly fill the word");
 
 	const T nt   : nt_bits   = 0; ///< Nonterminal id.
 	const T term : 1         = 0; ///< 1 = is term (bf), 0 = is formula (wff).
 	const T ext  : 1         = 0; ///< 1 = data stored in child (not yet used).
 	const T data : data_bits = 0; ///< Inline data (meaning depends on `nt`).
 	const unsigned short ba_type; ///< Boolean-algebra type id.
-	const size_t hash;            ///< Pre-computed hash for fast equality checks.
+	const uint64_t hash;          ///< Pre-computed hash for fast equality checks.
 
 	/**
 	 * @brief Generic constructor.
@@ -147,7 +158,7 @@ struct node {
 	 * @param ba_type BA type id.
 	 * @param ext Extension flag (unused, always 0).
 	 */
-	constexpr node(size_t nt = 0, size_t data = 0, size_t is_term = 0,
+	constexpr node(size_t nt = 0, T data = 0, size_t is_term = 0,
 			size_t ba_type = 0, size_t ext = 0) noexcept;
 
 	/** @brief Return a copy of this node with the nonterminal changed to @p new_nt. */
@@ -155,10 +166,10 @@ struct node {
 	/** @brief Return a copy with the BA type id changed to @p new_ba. */
 	node ba_retype(size_t new_ba) const;
 	/** @brief Return a copy with the inline data changed to @p new_data. */
-	node replace_data(size_t new_data) const;
+	node replace_data(T new_data) const;
 
 	/** @brief Construct a BA-constant node with value index @p v and type @p ba_tid. */
-	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
+	static constexpr node_t ba_constant(T v, size_t ba_tid = 0);
 
 	/** @brief Construct a BA-typed terminal node of type @p nt with BA type @p ba_tid. */
 	static constexpr node_t ba_typed(type nt, size_t ba_tid = 0);
@@ -200,7 +211,7 @@ struct node {
 	constexpr auto     operator!= (const node& that) const;
 
 	/** @brief Return the pre-computed hash value for this node. */
-	constexpr size_t hashit() const;
+	constexpr uint64_t hashit() const;
 };
 
 /// @brief Placeholder for parser nonterminal grouping.

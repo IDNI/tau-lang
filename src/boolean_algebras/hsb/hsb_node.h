@@ -41,10 +41,10 @@ struct hsb_node {
 // Construct an hsb_node with precomputed hash.
 inline hsb_node make_hsb_node(hsb_parser::nonterminal nt,
                                size_t data = 0) noexcept {
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	idni::hash_combine(seed, static_cast<size_t>(nt));
 	idni::hash_combine(seed, data);
-	return hsb_node{ nt, data, seed };
+	return hsb_node{ nt, data, static_cast<size_t>(seed) };
 }
 
 using hsb_tree = idni::lcrs_tree<hsb_node>;
