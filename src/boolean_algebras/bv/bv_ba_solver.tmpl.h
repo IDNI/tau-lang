@@ -284,8 +284,11 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 
 /**
  * @brief Checks that the formula can be decided by the bitvector solver:
- * every variable must have an explicitly sized bitvector type. Mixed-type
- * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
+ * every variable must have an explicitly sized bitvector type, and at least
+ * one bv-typed variable or ba_constant must actually be present. Mixed-type
+ * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5,
+ * and a formula with no bv content at all (e.g. an already-resolved
+ * T/F literal) is not this solver's to claim.
  *
  * Also rejects formulas carrying a non-bv-typed ba_constant (e.g. a `qlt`
  * constant like `{1/3}:qlt`): such a constant can appear in an otherwise
@@ -293,9 +296,18 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
  * concrete value (e.g. during interpretation), so checking only `variable`
  * nodes is not enough to catch the mixed-type case.
  *
+ * A `variable` node is treated as an opaque leaf: its children are not
+ * descended into. An io_var (`o1[t]`, `i1[t-3]`) is itself a `variable`
+ * node whose children carry the time offset/shift bookkeeping, including
+ * an inner, untyped `variable` node for the bare time symbol `t` -- that
+ * bookkeeping is not a data variable and bv_eval_node never looks past the
+ * outer variable's own type when translating it, so inspecting it here
+ * would reject bv-only formulas over their own opaque type mismatch.
+ *
  * @tparam node Node type
  * @param form The formula to check
  * @return true if all variables/constants are (explicitly sized) bitvectors
+ * and at least one bv-typed variable/constant was seen
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form) {
@@ -307,6 +319,7 @@ bool is_bv_solvable_formula(tref form) {
 		return false;
 
 	bool solvable = true;
+	bool has_bv_content = false;
 	auto check = [&](tref n) {
 		if (is<node>(n, tau::variable)) {
 			size_t t = tau::get(n).get_ba_type();
@@ -314,16 +327,67 @@ bool is_bv_solvable_formula(tref form) {
 			// the solver requires an explicit bitwidth
 			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype))
 				return solvable = false;
+			has_bv_content = true;
 		} else if (is<node>(n, tau::ba_constant)) {
 			size_t t = tau::get(n).get_ba_type();
 			if (t != 0 && !is_bv_type_family<node>(t))
 				return solvable = false;
+			if (t != 0) has_bv_content = true;
 		}
 		return solvable;
 	};
-	pre_order<node>(form).search_unique(check);
-	return solvable;
+	// Do not descend into a variable node's own children: its offset/shift
+	// bookkeeping (e.g. the untyped `t` inside an io_var) is not data.
+	auto skip_variable_children = [](tref, tref parent = nullptr) {
+		return !(parent && is<node>(parent, tau::variable));
+	};
+	auto up = [](tref) {};
+	pre_order<node>(form).search_unique(check, skip_variable_children, up);
+	return solvable && has_bv_content;
 }
+
+namespace detail {
+
+/**
+ * @brief Reusable cvc5::Solver for the bv satisfiability/solve path
+ * (bv_formula_sat_status, solve_bv). Constructing a cvc5::Solver is
+ * expensive -- finishInit sets up TheoryArith etc. from scratch every time
+ * -- while resetAssertions() only clears the assertion stack and keeps the
+ * once-configured options/logic (SMT-LIB reset-assertions semantics), so
+ * one process-wide instance can serve every independent query. Solvers are
+ * single-use per query here (no push/pop), matching how each call site
+ * already treats its solver as scoped to one formula.
+ *
+ * Single-threaded only, like every other user of cvc5_term_manager in this
+ * codebase; must not be shared across threads.
+ */
+class bv_solver_holder {
+	std::optional<cvc5::Solver> solver;
+public:
+	/** @brief Return a solver ready for a new, independent query. */
+	cvc5::Solver& get() {
+		if (solver) {
+			try { solver->resetAssertions(); return *solver; }
+			catch (...) { solver.reset(); } // fall through and rebuild
+		}
+		solver.emplace(cvc5_term_manager);
+		config_cvc5_solver(*solver);
+		return *solver;
+	}
+	/**
+	 * @brief Drop the solver so the next get() rebuilds it from scratch.
+	 * Call after a query throws: cvc5's post-exception solver state is
+	 * unspecified, so the shared instance must not be reused as-is.
+	 */
+	void invalidate() { solver.reset(); }
+};
+
+inline bv_solver_holder& shared_bv_solver() {
+	static bv_solver_holder holder;
+	return holder;
+}
+
+} // namespace detail
 
 template <NodeType node>
 std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
@@ -331,9 +395,6 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tt = tau::traverser;
 
 	subtree_map<node, bv> vars, free_vars;
-	cvc5::Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
-
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
@@ -341,14 +402,20 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 		return std::nullopt;
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
-	solver.assertFormula(expr.value());
-	auto result = solver.checkSat();
-	if (result.isSat()) return bv_sat_status::sat;
-	if (result.isUnknown()) {
-		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
-		return bv_sat_status::unknown;
+	auto& solver = detail::shared_bv_solver().get();
+	try {
+		solver.assertFormula(expr.value());
+		auto result = solver.checkSat();
+		if (result.isSat()) return bv_sat_status::sat;
+		if (result.isUnknown()) {
+			LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+			return bv_sat_status::unknown;
+		}
+		return bv_sat_status::unsat;
+	} catch (...) {
+		detail::shared_bv_solver().invalidate();
+		throw;
 	}
-	return bv_sat_status::unsat;
 }
 
 template <NodeType node>
@@ -377,9 +444,6 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	using tt = tau::traverser;
 
 	subtree_map<node, bv> vars, free_vars;
-	cvc5::Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
-
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
@@ -388,31 +452,37 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 
-	solver.assertFormula(expr.value());
-	LOG_DEBUG << "Solving bitvector formula: " << expr.value();
-	auto result = solver.checkSat();
-	// extract the model and return the solution if sat
-	if (result.isSat()) {
-		LOG_DEBUG << "Bitvector system is sat.";
-		solution<node> s;
-		for (const auto& [tau_var, bv_var] : free_vars) {
-			bv cte = solver.getValue(bv_var);
-			s.emplace(tau::get(tau::bf, tau_var),
-				tau::get(tau::bf, tau::get_ba_constant(cte,
-					bv_type<node>(cte.getSort().getBitVectorSize()))));
+	auto& solver = detail::shared_bv_solver().get();
+	try {
+		solver.assertFormula(expr.value());
+		LOG_DEBUG << "Solving bitvector formula: " << expr.value();
+		auto result = solver.checkSat();
+		// extract the model and return the solution if sat
+		if (result.isSat()) {
+			LOG_DEBUG << "Bitvector system is sat.";
+			solution<node> s;
+			for (const auto& [tau_var, bv_var] : free_vars) {
+				bv cte = solver.getValue(bv_var);
+				s.emplace(tau::get(tau::bf, tau_var),
+					tau::get(tau::bf, tau::get_ba_constant(cte,
+						bv_type<node>(cte.getSort().getBitVectorSize()))));
+			}
+			return s;
 		}
-		return s;
+		// Callers of this overload (solve_bv(trefs) -> solver.tmpl.h) already
+		// treat "no solution" uniformly as "skip this clause" regardless of
+		// the reason, which is sound for unknown as well as unsat (neither
+		// asserts a definite truth value), so nullopt is returned for both;
+		// only the diagnostic differs.
+		if (result.isUnknown())
+			LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+		else
+			LOG_DEBUG << "Bitvector system is unsat.";
+		return {};
+	} catch (...) {
+		detail::shared_bv_solver().invalidate();
+		throw;
 	}
-	// Callers of this overload (solve_bv(trefs) -> solver.tmpl.h) already
-	// treat "no solution" uniformly as "skip this clause" regardless of
-	// the reason, which is sound for unknown as well as unsat (neither
-	// asserts a definite truth value), so nullopt is returned for both;
-	// only the diagnostic differs.
-	if (result.isUnknown())
-		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
-	else
-		LOG_DEBUG << "Bitvector system is unsat.";
-	return {};
 }
 
 template<NodeType node>
