@@ -76,7 +76,7 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 	}
 
 	TEST_CASE("[ALG-D-08] D-pattern extraction uses AP names, not AP order") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.aps = {"r_0", "d_1", "d_0"};
 		g.controllable = {true, true, true};
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b110, 2) == 0b11);
@@ -85,7 +85,7 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 	}
 
 	TEST_CASE("[ALG-D-09] D-pattern extraction ignores non-D controllable APs") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.aps = {"acc", "d_0", "grant"};
 		g.controllable = {true, true, true};
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b111, 1) == 0b1);
@@ -97,7 +97,7 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 		CHECK(alg_d::d_index_from_ap_name("d_10") == 10);
 		CHECK(alg_d::d_index_from_ap_name("q_10") == -1);
 		CHECK(alg_d::d_index_from_ap_name("d_x") == -1);
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.aps = {"d_10", "d_2", "d_0"};
 		g.controllable = {true, true, true};
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b111, 11)
@@ -129,7 +129,7 @@ State: 1
 [t] 1
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		CHECK(g.num_states == 2);
 		CHECK(g.init == 0);
 		REQUIRE(g.aps.size() == 2u);
@@ -171,7 +171,7 @@ State: 0 {0}
 [t] 0 {0}
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 1u);
 		CHECK(g.state_priority[0] == 1);
 		REQUIRE(g.edge_priority.size() == 1u);
@@ -191,7 +191,7 @@ State: 0 {0}
 [t] 0 {0}
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 1u);
 		CHECK(g.state_priority[0] == 0);
 		REQUIRE(g.edge_priority.size() == 1u);
@@ -211,7 +211,7 @@ State: 0 {2}
 State: 1
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 2u);
 		CHECK(g.state_priority[0] == 2);
 		CHECK(g.state_priority[1] == 0);
@@ -227,7 +227,7 @@ controllable-AP: 0 2
 State: 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.controllable.size() == 3u);
 		CHECK(g.controllable[0]);
 		CHECK_FALSE(g.controllable[1]);
@@ -244,7 +244,7 @@ properties: trans-acc
 State: 0
 --END--
 )";
-		alg_d::SynthGame g1 = alg_d::parse_synth_game_hoa(hoa_trans);
+		alg_d::synth_game g1 = alg_d::parse_synth_game_hoa(hoa_trans);
 		CHECK(g1.trans_acc);
 
 		std::string hoa_no_trans = R"(HOA: v1
@@ -255,7 +255,7 @@ AP: 1 "p0"
 State: 0
 --END--
 )";
-		alg_d::SynthGame g2 = alg_d::parse_synth_game_hoa(hoa_no_trans);
+		alg_d::synth_game g2 = alg_d::parse_synth_game_hoa(hoa_no_trans);
 		CHECK_FALSE(g2.trans_acc);
 	}
 
@@ -268,7 +268,7 @@ AP: 1 "my_ap"
 State: 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.aps.size() == 1u);
 		CHECK(g.aps[0] == "my_ap");
 	}
@@ -286,7 +286,7 @@ not a transition line
 [1] 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.trans.size() == 2u);
 		REQUIRE(g.trans[0].size() == 2u);
 		CHECK(std::get<0>(g.trans[0][0]) == "0");
@@ -303,7 +303,7 @@ TEST_SUITE("[Algorithm D Phase 1: DPA extraction]") {
 	TEST_CASE("[ALG-D-11] G(F(p0)) produces a non-empty DPA") {
 		std::string hoa = call_ltl2tgba_dpa("G(F(p0))");
 		REQUIRE(!hoa.empty());
-		DpaAutomaton dpa = parse_dpa_hoa(hoa);
+		dpa_automaton dpa = parse_dpa_hoa(hoa);
 		CHECK(dpa.num_states >= 1);
 		CHECK(dpa.aps.size() == 1u);
 	}
@@ -311,7 +311,7 @@ TEST_SUITE("[Algorithm D Phase 1: DPA extraction]") {
 	TEST_CASE("[ALG-D-12] DPA for G(F(p0)) is deterministic") {
 		std::string hoa = call_ltl2tgba_dpa("G(F(p0))");
 		REQUIRE(!hoa.empty());
-		DpaAutomaton dpa = parse_dpa_hoa(hoa);
+		dpa_automaton dpa = parse_dpa_hoa(hoa);
 		REQUIRE(dpa.num_states >= 1);
 		int aps = (int)dpa.aps.size();
 		int expected = 1 << aps;
@@ -327,7 +327,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 	TEST_CASE("[ALG-D-20] Zielonka on trivial 2-state game: sys always wins") {
 		// Simple game: state 0 (player 0=env), state 1 (player 1=sys)
 		// Env unconditional → sys. Sys self-loops. All priority 1 (odd → sys wins).
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 2;
 		pg.init      = 0;
 		pg.player    = {0, 1};
@@ -340,7 +340,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 
 	TEST_CASE("[ALG-D-21] Zielonka: env wins if stuck sys") {
 		// State 0 (sys/player 1), priority 0 (even = env wins), no successors
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 1;
 		pg.init      = 0;
 		pg.player    = {1};
@@ -355,7 +355,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		// State 0 (sys/player 1), priority 1 (odd = sys-favoring), no
 		// successors.  A stuck player loses immediately regardless of
 		// priority, so sys must NOT win via its own priority parity.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 1;
 		pg.init      = 0;
 		pg.player    = {1};
@@ -369,7 +369,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 	          "is still lost by env") {
 		// State 0 (env/player 0), priority 0 (even = env-favoring), no
 		// successors.  Env is stuck, so sys wins despite the priority.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 1;
 		pg.init      = 0;
 		pg.player    = {0};
@@ -384,7 +384,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		// 0 (env) → 1 (sys) → 2 (sys, stuck).  All priorities odd
 		// (sys-favoring), but play is forced into the dead end where sys
 		// is stuck, so env wins the whole chain.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 3;
 		pg.init      = 0;
 		pg.player    = {0, 1, 1};

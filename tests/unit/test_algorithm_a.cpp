@@ -24,12 +24,12 @@ TEST_SUITE("enumerate_qlt_T3") {
 
 	TEST_CASE("one constant: strictly more than 13 3-types") {
 		// With one constant c_0, T_1 has 3 elements; more triples are admissible.
-		auto T3 = enumerate_qlt_T3({Rat(0, 1)});
+		auto T3 = enumerate_qlt_T3({rational(0, 1)});
 		CHECK(T3.size() > 13u);
 	}
 
 	TEST_CASE("pos fields in bounds: all positions in [0, 2k]") {
-		std::vector<Rat> consts = {Rat(0, 1), Rat(1, 1)};  // k=2 constants
+		std::vector<rational> consts = {rational(0, 1), rational(1, 1)};  // k=2 constants
 		auto T3 = enumerate_qlt_T3(consts);
 		int k = 2, max_pos = 2 * k;  // 2*k+1 1-types → positions 0..4
 		for (const auto& t : T3) {
@@ -41,16 +41,16 @@ TEST_SUITE("enumerate_qlt_T3") {
 
 	TEST_CASE("rel3_consistent: transitivity spot-checks") {
 		// Forced chains
-		CHECK( rel3_consistent(Rel::LT, Rel::LT, Rel::LT));
-		CHECK(!rel3_consistent(Rel::LT, Rel::LT, Rel::EQ));
-		CHECK(!rel3_consistent(Rel::LT, Rel::LT, Rel::GT));
-		CHECK( rel3_consistent(Rel::GT, Rel::GT, Rel::GT));
-		CHECK(!rel3_consistent(Rel::GT, Rel::GT, Rel::LT));
+		CHECK( rel3_consistent(relation::LT, relation::LT, relation::LT));
+		CHECK(!rel3_consistent(relation::LT, relation::LT, relation::EQ));
+		CHECK(!rel3_consistent(relation::LT, relation::LT, relation::GT));
+		CHECK( rel3_consistent(relation::GT, relation::GT, relation::GT));
+		CHECK(!rel3_consistent(relation::GT, relation::GT, relation::LT));
 		// Ambiguous cases: any r_my consistent
-		CHECK( rel3_consistent(Rel::LT, Rel::GT, Rel::LT));
-		CHECK( rel3_consistent(Rel::LT, Rel::GT, Rel::EQ));
-		CHECK( rel3_consistent(Rel::LT, Rel::GT, Rel::GT));
-		CHECK( rel3_consistent(Rel::GT, Rel::LT, Rel::LT));
+		CHECK( rel3_consistent(relation::LT, relation::GT, relation::LT));
+		CHECK( rel3_consistent(relation::LT, relation::GT, relation::EQ));
+		CHECK( rel3_consistent(relation::LT, relation::GT, relation::GT));
+		CHECK( rel3_consistent(relation::GT, relation::LT, relation::LT));
 	}
 }
 

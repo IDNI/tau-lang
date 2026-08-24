@@ -90,4 +90,23 @@ TEST_SUITE("interpreter") {
 		REQUIRE(maybe_outputs.has_value());
 		CHECK(maybe_outputs.value().at({ "o", 1 }) == "T");
 	}
+
+	TEST_CASE("a bare-reparsed output var (no ctx-aware resolve_io_vars "
+		  "pass) still registers and writes correctly")
+	{
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", tau_type_id<node_t>(), o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("G(o[t]:tau = {T.}:tau)", opts);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		auto vals = o->get_values();
+		REQUIRE(vals.size() == 3);
+		for (auto& v : vals) CHECK(matches_to_any_of(v, strings{ "T" }));
+	}
 }

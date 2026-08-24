@@ -20,7 +20,7 @@ TEST_SUITE("mealy_extract") {
 		std::map<std::pair<int,int>, int> witness = { {{0, 0}, 7} };
 		auto successor = [](int, int) { return 0; };
 
-		Mealy m = extract_mealy(winning, 0, witness, 1, successor);
+		machine m = extract_mealy(winning, 0, witness, 1, successor);
 
 		CHECK(m.num_states == 1);
 		CHECK(m.initial_state == 0);
@@ -46,14 +46,14 @@ TEST_SUITE("mealy_extract") {
 			return 5;
 		};
 
-		Mealy m = extract_mealy(winning, 0, witness, 1, successor);
+		machine m = extract_mealy(winning, 0, witness, 1, successor);
 
 		CHECK(m.num_states == 3);
 		REQUIRE(m.edges.size() == 3);
-		auto find_edge = [&](int from) -> const Edge& {
+		auto find_edge = [&](int from) -> const mealy_edge& {
 			for (auto& e : m.edges) if (e.from_state == from) return e;
 			FAIL("no edge found for from_state");
-			static Edge dummy{};
+			static mealy_edge dummy{};
 			return dummy;
 		};
 		// vertex 5 -> state 0, successor vertex 2 -> state 1
@@ -73,7 +73,7 @@ TEST_SUITE("mealy_extract") {
 		std::map<std::pair<int,int>, int> witness = { {{0, 0}, 42} };
 		auto successor = [](int, int) { return 0; };
 
-		Mealy m = extract_mealy(winning, 0, witness, /*num_T2=*/2, successor);
+		machine m = extract_mealy(winning, 0, witness, /*num_T2=*/2, successor);
 
 		REQUIRE(m.edges.size() == 1);
 		CHECK(m.edges[0].input_sigma == 0);
@@ -91,7 +91,7 @@ TEST_SUITE("mealy_extract") {
 			return 0;
 		};
 
-		Mealy m = extract_mealy(winning, 0, witness, 1, successor);
+		machine m = extract_mealy(winning, 0, witness, 1, successor);
 
 		REQUIRE(m.edges.size() == 1);
 		CHECK(m.edges[0].from_state == 1); // vertex 1 -> state 1
@@ -103,7 +103,7 @@ TEST_SUITE("mealy_extract") {
 		std::map<std::pair<int,int>, int> witness;
 		auto successor = [](int, int) { return 0; };
 
-		Mealy m = extract_mealy(winning, 0, witness, 3, successor);
+		machine m = extract_mealy(winning, 0, witness, 3, successor);
 
 		CHECK(m.num_states == 0);
 		CHECK(m.edges.empty());
@@ -114,7 +114,7 @@ TEST_SUITE("mealy_extract") {
 		std::map<std::pair<int,int>, int> witness;
 		auto successor = [](int, int) { return 0; };
 
-		Mealy m = extract_mealy(winning, /*initial_state=*/2, witness, 1, successor);
+		machine m = extract_mealy(winning, /*initial_state=*/2, witness, 1, successor);
 
 		CHECK(m.initial_state == 2);
 	}

@@ -45,7 +45,7 @@ using std::uint64_t;
 
 // ── formula pair (tau syntax + Spot syntax) ────────────────────────────────────
 
-struct Formula {
+struct formula {
 	string tau; // tau-lang spec string (needs trailing "." to be a full spec)
 	string spot; // Spot/ltlsynt LTL string
 };
@@ -61,7 +61,7 @@ struct Formula {
 // that is semantic-by-design, not a bug in either tool.  Keeping the
 // untyped form so the test continues to exercise tau's atomless BA
 // pipeline across random LTL shapes.
-static const Formula ATOMS[] = {
+static const formula ATOMS[] = {
 	{"(o1[t] = 1)", "o1"},
 	{"(o1[t] = 0)", "(!o1)"},
 	{"(i1[t] = 1)", "i1"},
@@ -71,7 +71,7 @@ static constexpr int N_ATOMS = 4;
 
 // Recursive random formula generator.
 // depth 0 → atom; higher depth → operator applied to sub-formulas.
-static Formula make_formula(mt19937& rng, int depth) {
+static formula make_formula(mt19937& rng, int depth) {
 	// Force atom at depth 0 or with 1/3 probability at shallow depths
 	if (depth == 0 || (depth <= 2 && rng() % 3 == 0))
 		return ATOMS[rng() % N_ATOMS];
