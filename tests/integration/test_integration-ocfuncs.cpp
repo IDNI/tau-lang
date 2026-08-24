@@ -99,37 +99,37 @@ TEST_SUITE("OCFuncs parsing - function application") {
 // 2. FUNCTION DECLARATION DATA STRUCTURES
 // ═════════════════════════════════════════════════════════════════════════════
 
-TEST_SUITE("OCFuncs - FuncDecl") {
+TEST_SUITE("OCFuncs - func_decl") {
 	TEST_CASE("func_decl_dynamic") {
-		FuncDecl d;
+		func_decl d;
 		d.name = "f";
-		d.mode = FuncMode::DYNAMIC;
+		d.mode = func_mode::DYNAMIC;
 		d.arg_sorts = {"Bool"};
 		d.result_sort = "Bool";
 		CHECK(d.arity() == 1);
-		CHECK(d.mode == FuncMode::DYNAMIC);
+		CHECK(d.mode == func_mode::DYNAMIC);
 	}
 	TEST_CASE("func_decl_static") {
-		FuncDecl d;
+		func_decl d;
 		d.name = "g";
-		d.mode = FuncMode::STATIC;
+		d.mode = func_mode::STATIC;
 		d.arg_sorts = {"Bool", "Bool"};
 		d.result_sort = "Bool";
 		CHECK(d.arity() == 2);
-		CHECK(d.mode == FuncMode::STATIC);
+		CHECK(d.mode == func_mode::STATIC);
 	}
 	TEST_CASE("func_decl_ternary") {
-		FuncDecl d;
+		func_decl d;
 		d.name = "h";
-		d.mode = FuncMode::DYNAMIC;
+		d.mode = func_mode::DYNAMIC;
 		d.arg_sorts = {"Bool", "Bool", "Bool"};
 		d.result_sort = "Bool";
 		CHECK(d.arity() == 3);
 	}
 	TEST_CASE("func_decl_heterogeneous_sorts") {
-		FuncDecl d;
+		func_decl d;
 		d.name = "f";
-		d.mode = FuncMode::DYNAMIC;
+		d.mode = func_mode::DYNAMIC;
 		d.arg_sorts = {"Bool", "Int"};
 		d.result_sort = "Real";
 		CHECK(d.arity() == 2);
@@ -138,9 +138,9 @@ TEST_SUITE("OCFuncs - FuncDecl") {
 		CHECK(d.result_sort == "Real");
 	}
 	TEST_CASE("func_decl_names") {
-		FuncDecl d;
+		func_decl d;
 		d.name = "myFunc";
-		d.mode = FuncMode::STATIC;
+		d.mode = func_mode::STATIC;
 		d.arg_sorts = {"A"};
 		d.result_sort = "B";
 		CHECK(d.name == "myFunc");
@@ -153,80 +153,80 @@ TEST_SUITE("OCFuncs - FuncDecl") {
 
 TEST_SUITE("OCFuncs - Step 1: mode checking") {
 	TEST_CASE("check_valid_dynamic") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"f", FuncMode::DYNAMIC, {"Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"f", func_mode::DYNAMIC, {"Bool"}, "Bool"}
 		};
 		CHECK(ocfuncs_check_modes(decls, ctx));
 	}
 	TEST_CASE("check_valid_static") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"g", FuncMode::STATIC, {"Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"g", func_mode::STATIC, {"Bool"}, "Bool"}
 		};
 		CHECK(ocfuncs_check_modes(decls, ctx));
 	}
 	TEST_CASE("check_valid_mixed") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"f", FuncMode::DYNAMIC, {"Bool"}, "Bool"},
-			{"g", FuncMode::STATIC, {"Bool", "Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"f", func_mode::DYNAMIC, {"Bool"}, "Bool"},
+			{"g", func_mode::STATIC, {"Bool", "Bool"}, "Bool"}
 		};
 		CHECK(ocfuncs_check_modes(decls, ctx));
 		CHECK(ctx.declarations.size() == 2);
 	}
 	TEST_CASE("check_empty_name_rejected") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"", FuncMode::DYNAMIC, {"Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"", func_mode::DYNAMIC, {"Bool"}, "Bool"}
 		};
 		CHECK(!ocfuncs_check_modes(decls, ctx));
 	}
 	TEST_CASE("check_empty_args_rejected") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"f", FuncMode::DYNAMIC, {}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"f", func_mode::DYNAMIC, {}, "Bool"}
 		};
 		CHECK(!ocfuncs_check_modes(decls, ctx));
 	}
 	TEST_CASE("check_empty_result_rejected") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"f", FuncMode::DYNAMIC, {"Bool"}, ""}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"f", func_mode::DYNAMIC, {"Bool"}, ""}
 		};
 		CHECK(!ocfuncs_check_modes(decls, ctx));
 	}
 	TEST_CASE("check_static_creates_support_bound") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"g", FuncMode::STATIC, {"Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"g", func_mode::STATIC, {"Bool"}, "Bool"}
 		};
 		ocfuncs_check_modes(decls, ctx);
 		CHECK(ctx.support_bounds.count("g") > 0);
 	}
 	TEST_CASE("check_static_creates_state") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"g", FuncMode::STATIC, {"Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"g", func_mode::STATIC, {"Bool"}, "Bool"}
 		};
 		ocfuncs_check_modes(decls, ctx);
 		CHECK(ctx.static_states.count("g") > 0);
 	}
 	TEST_CASE("check_dynamic_no_support") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls = {
-			{"f", FuncMode::DYNAMIC, {"Bool"}, "Bool"}
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls = {
+			{"f", func_mode::DYNAMIC, {"Bool"}, "Bool"}
 		};
 		ocfuncs_check_modes(decls, ctx);
 		CHECK(ctx.support_bounds.count("f") == 0);
 	}
 	TEST_CASE("check_many_funcs") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls;
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls;
 		for (int i = 0; i < 10; ++i) {
 			decls.push_back({
 				"f" + std::to_string(i),
-				(i % 2 == 0) ? FuncMode::DYNAMIC : FuncMode::STATIC,
+				(i % 2 == 0) ? func_mode::DYNAMIC : func_mode::STATIC,
 				{"Bool"},
 				"Bool"
 			});
@@ -242,29 +242,29 @@ TEST_SUITE("OCFuncs - Step 1: mode checking") {
 
 TEST_SUITE("OCFuncs - Step 4: static profile encoding") {
 	TEST_CASE("encode_empty") {
-		OCFuncsContext ctx;
+		ocfuncs_context ctx;
 		auto props = ocfuncs_encode_static_profiles(ctx);
 		CHECK(props.empty());
 	}
 	TEST_CASE("encode_single_static_with_support") {
-		OCFuncsContext ctx;
-		ctx.declarations = {{"g", FuncMode::STATIC, {"Bool"}, "Bool"}};
+		ocfuncs_context ctx;
+		ctx.declarations = {{"g", func_mode::STATIC, {"Bool"}, "Bool"}};
 		ctx.static_states["g"] = {"g", {}};
 		ctx.support_bounds["g"] = {"g", {{"0"}, {"1"}}};
 		auto props = ocfuncs_encode_static_profiles(ctx);
 		CHECK(props.size() == 4); // 2 tuples * 2 props each (bound + val)
 	}
 	TEST_CASE("encode_no_static_funcs") {
-		OCFuncsContext ctx;
-		ctx.declarations = {{"f", FuncMode::DYNAMIC, {"Bool"}, "Bool"}};
+		ocfuncs_context ctx;
+		ctx.declarations = {{"f", func_mode::DYNAMIC, {"Bool"}, "Bool"}};
 		auto props = ocfuncs_encode_static_profiles(ctx);
 		CHECK(props.empty());
 	}
 	TEST_CASE("encode_multiple_static") {
-		OCFuncsContext ctx;
+		ocfuncs_context ctx;
 		ctx.declarations = {
-			{"g1", FuncMode::STATIC, {"Bool"}, "Bool"},
-			{"g2", FuncMode::STATIC, {"Bool"}, "Bool"}
+			{"g1", func_mode::STATIC, {"Bool"}, "Bool"},
+			{"g2", func_mode::STATIC, {"Bool"}, "Bool"}
 		};
 		ctx.static_states["g1"] = {"g1", {}};
 		ctx.static_states["g2"] = {"g2", {}};
@@ -281,7 +281,7 @@ TEST_SUITE("OCFuncs - Step 4: static profile encoding") {
 
 TEST_SUITE("OCFuncs - graph structures") {
 	TEST_CASE("graph_edge_dynamic") {
-		GraphEdge e;
+		graph_edge e;
 		e.func_name = "f";
 		e.args = {"x"};
 		e.result_var = "v_f_x";
@@ -289,7 +289,7 @@ TEST_SUITE("OCFuncs - graph structures") {
 		CHECK(!e.is_static);
 	}
 	TEST_CASE("graph_edge_static") {
-		GraphEdge e;
+		graph_edge e;
 		e.func_name = "g";
 		e.args = {"x", "y"};
 		e.result_var = "v_g_x_y";
@@ -297,18 +297,18 @@ TEST_SUITE("OCFuncs - graph structures") {
 		CHECK(e.is_static);
 	}
 	TEST_CASE("graph_profile_empty") {
-		GraphProfile p;
+		graph_profile p;
 		p.type_id = 0;
 		CHECK(p.edges.empty());
 	}
 	TEST_CASE("graph_profile_single_edge") {
-		GraphProfile p;
+		graph_profile p;
 		p.type_id = 0;
 		p.edges.push_back({"f", {"x"}, "v_f_x", false});
 		CHECK(p.edges.size() == 1);
 	}
 	TEST_CASE("graph_profile_multiple_edges") {
-		GraphProfile p;
+		graph_profile p;
 		p.type_id = 0;
 		p.edges.push_back({"f", {"x"}, "v_f_x", false});
 		p.edges.push_back({"g", {"y", "z"}, "v_g_y_z", true});
@@ -322,23 +322,23 @@ TEST_SUITE("OCFuncs - graph structures") {
 
 TEST_SUITE("OCFuncs - term closure") {
 	TEST_CASE("term_closure_empty") {
-		TermClosure tc;
+		term_closure tc;
 		CHECK(tc.variables.empty());
 		CHECK(tc.func_apps.empty());
 		CHECK(tc.purified_vars.empty());
 	}
 	TEST_CASE("term_closure_with_variables") {
-		TermClosure tc;
+		term_closure tc;
 		tc.variables = {"x", "y", "z"};
 		CHECK(tc.variables.size() == 3);
 	}
 	TEST_CASE("term_closure_with_func_apps") {
-		TermClosure tc;
+		term_closure tc;
 		tc.func_apps = {{"f", {"x"}}, {"g", {"y", "z"}}};
 		CHECK(tc.func_apps.size() == 2);
 	}
 	TEST_CASE("term_closure_purification") {
-		TermClosure tc;
+		term_closure tc;
 		tc.purified_vars["f(x)"] = "v_f_x";
 		tc.purified_vars["g(y,z)"] = "v_g_y_z";
 		CHECK(tc.purified_vars.size() == 2);
@@ -352,18 +352,18 @@ TEST_SUITE("OCFuncs - term closure") {
 
 TEST_SUITE("OCFuncs - support bounds") {
 	TEST_CASE("support_bound_empty") {
-		SupportBound sb;
+		support_bound sb;
 		sb.func_name = "f";
 		CHECK(sb.tuples.empty());
 	}
 	TEST_CASE("support_bound_single") {
-		SupportBound sb;
+		support_bound sb;
 		sb.func_name = "f";
 		sb.tuples = {{"0"}};
 		CHECK(sb.tuples.size() == 1);
 	}
 	TEST_CASE("support_bound_multiple") {
-		SupportBound sb;
+		support_bound sb;
 		sb.func_name = "g";
 		sb.tuples = {{"0", "0"}, {"0", "1"}, {"1", "0"}, {"1", "1"}};
 		CHECK(sb.tuples.size() == 4);
@@ -376,18 +376,18 @@ TEST_SUITE("OCFuncs - support bounds") {
 
 TEST_SUITE("OCFuncs - static profile state") {
 	TEST_CASE("static_state_empty") {
-		StaticProfileState s;
+		static_profile_state s;
 		s.func_name = "g";
 		CHECK(s.bindings.empty());
 	}
 	TEST_CASE("static_state_single_binding") {
-		StaticProfileState s;
+		static_profile_state s;
 		s.func_name = "g";
 		s.bindings["0"] = "1";
 		CHECK(s.bindings.size() == 1);
 	}
 	TEST_CASE("static_state_multiple_bindings") {
-		StaticProfileState s;
+		static_profile_state s;
 		s.func_name = "g";
 		s.bindings["0"] = "1";
 		s.bindings["1"] = "0";
@@ -401,12 +401,12 @@ TEST_SUITE("OCFuncs - static profile state") {
 
 TEST_SUITE("OCFuncs stress - 200 declarations") {
 	TEST_CASE("stress_many_dynamic_funcs") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls;
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls;
 		for (int i = 0; i < 50; ++i) {
 			decls.push_back({
 				"dyn_" + std::to_string(i),
-				FuncMode::DYNAMIC,
+				func_mode::DYNAMIC,
 				{"Bool"},
 				"Bool"
 			});
@@ -415,12 +415,12 @@ TEST_SUITE("OCFuncs stress - 200 declarations") {
 		CHECK(ctx.declarations.size() == 50);
 	}
 	TEST_CASE("stress_many_static_funcs") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls;
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls;
 		for (int i = 0; i < 50; ++i) {
 			decls.push_back({
 				"stat_" + std::to_string(i),
-				FuncMode::STATIC,
+				func_mode::STATIC,
 				{"Bool"},
 				"Bool"
 			});
@@ -429,12 +429,12 @@ TEST_SUITE("OCFuncs stress - 200 declarations") {
 		CHECK(ctx.static_states.size() == 50);
 	}
 	TEST_CASE("stress_mixed_funcs") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls;
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls;
 		for (int i = 0; i < 100; ++i) {
 			decls.push_back({
 				"mix_" + std::to_string(i),
-				(i % 2 == 0) ? FuncMode::DYNAMIC : FuncMode::STATIC,
+				(i % 2 == 0) ? func_mode::DYNAMIC : func_mode::STATIC,
 				{"Bool"},
 				"Bool"
 			});
@@ -444,13 +444,13 @@ TEST_SUITE("OCFuncs stress - 200 declarations") {
 		CHECK(ctx.static_states.size() == 50);
 	}
 	TEST_CASE("stress_varying_arity") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls;
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls;
 		for (int i = 1; i <= 20; ++i) {
 			std::vector<std::string> args(i, "Bool");
 			decls.push_back({
 				"ary_" + std::to_string(i),
-				FuncMode::DYNAMIC,
+				func_mode::DYNAMIC,
 				args,
 				"Bool"
 			});
@@ -461,13 +461,13 @@ TEST_SUITE("OCFuncs stress - 200 declarations") {
 		}
 	}
 	TEST_CASE("stress_varying_sorts") {
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> decls;
+		ocfuncs_context ctx;
+		std::vector<func_decl> decls;
 		const char* sorts[] = {"Bool", "Int", "Real", "Nat", "String"};
 		for (int i = 0; i < 20; ++i) {
 			decls.push_back({
 				"sort_" + std::to_string(i),
-				FuncMode::DYNAMIC,
+				func_mode::DYNAMIC,
 				{sorts[i % 5], sorts[(i + 1) % 5]},
 				sorts[(i + 2) % 5]
 			});

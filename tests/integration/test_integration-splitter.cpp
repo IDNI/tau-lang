@@ -320,8 +320,49 @@ TEST_SUITE("Tau_splitter_uniter_const") {
 		auto [fm, s] = get_nso_rr_tau_splitter(src, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// The minted uconst's exact numeral depends on how many other
+		// "split"-family constants earlier test cases in this same process
+		// already minted (get_new_uninterpreted_constant's numbering is a
+		// process-wide floor, normalizer.tmpl.h) -- pin the shape, not the
+		// number.
 		auto s_str = tau::get(s).to_str();
-		CHECK(s_str == "<:split1> = 0 && <:split2> != 0");
+		CHECK(s_str.starts_with("<:split1> = 0 && <:split"));
+		CHECK(s_str.ends_with("> != 0"));
+		trefs names = tau::get(s).select_top(is<node_t, tau::uconst_name>);
+		REQUIRE(names.size() == 2);
+		CHECK(tau::get(names[0]).get_string() == ":split1");
+		CHECK(tau::get(names[1]).get_string() != ":split1");
+	}
+
+	// Regression: the temporal single-clause bad-splitter fallback
+	// (splitter.tmpl.h ~:429-439, documented at solver.tmpl.h's
+	// atomless_bad_splitter wrapper) finds `aw` -- the always-clause to
+	// conjunct a fresh uconst into -- by scanning the *whole* fm, but mints
+	// the fresh name by scanning only aw's own inner body. Before
+	// d367bbcd's process-wide per-family floor, that scan-vs-result mismatch
+	// could re-mint a ":split*" name already bound in a different,
+	// untouched conjunct of the very same fm -- degenerate (the "splitter"
+	// binds a name that already means something elsewhere in the result).
+	// st = bad forces nso_tau_splitter to report "bad" for every spec
+	// unconditionally, so this always falls through to that fallback.
+	TEST_CASE("bad splitter after a temporal clause stays fresh "
+		"w.r.t. the whole formula")
+	{
+		bdd_init<Bool>();
+		// The only wff_always node is the G-clause, so `aw` is
+		// unambiguous; its inner body ("o1[t] = 0") has no uconst, while
+		// the untouched F-clause right next to it already binds <:split1>.
+		const char *src = "(F <:split1> = 0) && (G o1[t] = 0).";
+		auto [fm, s] = get_nso_rr_tau_splitter(src, splitter_type::bad, true);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		// No uconst name is bound at more than one position in the result:
+		// the freshly minted name must differ from the pre-existing
+		// <:split1>, wherever in fm it scanned from.
+		trefs names = tau::get(s).select_top(is<node_t, tau::uconst_name>);
+		std::set<std::string> unique_names;
+		for (tref n : names) unique_names.insert(tau::get(n).get_string());
+		CHECK(names.size() == unique_names.size());
 	}
 }
 

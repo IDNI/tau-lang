@@ -291,6 +291,10 @@ void check_rendering() {
 	}
 
 	if constexpr (requires { requires desc::can_host_bool; }) {
+		// a carrier must offer value_constant, the capability core's flag
+		// output path resolves through
+		CHECK(ba_has_value_constant<node_t, BA>);
+
 		// the carrier's own type, which need not be type_tree()
 		tref carrier = type;
 		if constexpr (requires { desc::bool_carrier_type(); })

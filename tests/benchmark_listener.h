@@ -13,10 +13,10 @@
 #include <string>
 #include <vector>
 
-struct BenchmarkListener : public doctest::IReporter {
+struct benchmark_listener : public doctest::IReporter {
 
 	// Per-test result with timing
-	struct TestTiming {
+	struct test_timing {
 		std::string suite;
 		std::string name;
 		double ms;
@@ -24,13 +24,13 @@ struct BenchmarkListener : public doctest::IReporter {
 	};
 
 	std::chrono::high_resolution_clock::time_point test_start_;
-	std::vector<TestTiming> results_;
+	std::vector<test_timing> results_;
 	std::string current_suite_;
 	std::string current_name_;
 	std::string output_file_;
 	const doctest::ContextOptions& opt_;
 
-	BenchmarkListener(const doctest::ContextOptions& in)
+	benchmark_listener(const doctest::ContextOptions& in)
 		: opt_(in) {
 		// Output file: TAU_BENCHMARK_FILE env var, or default name
 		const char* env = std::getenv("TAU_BENCHMARK_FILE");
@@ -116,6 +116,6 @@ private:
 	}
 };
 
-REGISTER_LISTENER("benchmark", 1, BenchmarkListener);
+REGISTER_LISTENER("benchmark", 1, benchmark_listener);
 
 #endif // __IDNI__TAU__BENCHMARK_LISTENER_H__
