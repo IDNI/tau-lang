@@ -452,6 +452,11 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 }
 
 template <NodeType node>
+bool api<node>::run(interpreter<node>& i, bool quit_on_idle) {
+	return i.run_loop(0, quit_on_idle);
+}
+
+template <NodeType node>
 std::optional<std::string> api<node>::simplify(const std::string& expr,
 	bool use_defaults)
 {

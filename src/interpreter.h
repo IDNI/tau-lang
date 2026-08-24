@@ -17,6 +17,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -31,6 +32,35 @@ using system = std::map<size_t, tref>;
 
 template <NodeType node>
 struct api;
+
+/**
+ * @brief Pluggable source of the solution `interpreter::step` commits each step.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+struct step_provider {
+	virtual ~step_provider() = default;
+
+	/**
+	 * @brief Produce the (unfiltered) solution for the current step.
+	 * @param step_spec Spec parts to satisfy this step.
+	 * @param memory Committed memory so far this step (inputs already merged in).
+	 * @param time_point Current execution time point.
+	 * @param formula_time_point Time point the running formula is phrased at.
+	 * @return The solution, or `std::nullopt` if no part of @p step_spec is solvable.
+	 */
+	virtual std::optional<solution<node>> produce(
+		const trefs& step_spec, const assignment<node>& memory,
+		size_t time_point, size_t formula_time_point) = 0;
+
+	/// @brief True to skip the appear_within_lookback input filter in step().
+	virtual bool skip_lookback_filter() const { return false; }
+};
+
+/// @brief Default step_provider: re-runs the general solver every step. Full
+/// definition in interpreter.tmpl.h; forward-declared for make_interpreter's use.
+template <NodeType node>
+struct solve_step_provider;
 
 /**
  * @brief Step-by-step interpreter for a normalized Tau specification.
@@ -64,6 +94,25 @@ struct interpreter {
 	 */
 	static std::optional<interpreter> make_interpreter(tref spec,
 		const io_context<node>& ctx);
+
+	/**
+	 * @brief Build a table-driven interpreter with no spec-derived state.
+	 *
+	 * Bypasses `make_interpreter`'s normalizer/safety-encoding/partitioning
+	 * pipeline: constructs directly with empty spec-side state and takes
+	 * @p lookback / @p highest_initial_pos as given (they would otherwise be
+	 * derived from `ubt_ctn`, which is empty here). No caller yet.
+	 * @param ctx I/O context; also the source of the input/output streams.
+	 * @param provider Solution source `step()` will consult each step.
+	 * @param lookback Baked lookback (max relative shift across the table's atoms).
+	 * @param highest_initial_pos Baked highest initial position.
+	 * @return Initialized interpreter, or `std::nullopt` if a stream in @p ctx
+	 *         could not be opened.
+	 */
+	static std::optional<interpreter> make_table_interpreter(
+		const io_context<node>& ctx,
+		std::shared_ptr<step_provider<node>> provider,
+		int_t lookback, int_t highest_initial_pos = 0);
 
 	/**
 	 * @brief Execute one time step without providing explicit input values.
@@ -101,6 +150,36 @@ struct interpreter {
 	 * @param update Normalized update formula.
 	 */
 	void update(tref update);
+
+	/**
+	 * @brief The interactive stepping loop run() drives after construction.
+	 *
+	 * Steps until the spec is exhausted, input ends, the user quits, or
+	 * @p steps steps have executed (0 = unlimited); applies `u`-stream
+	 * pointwise revisions between steps. Public so a table-mode caller
+	 * (make_table_interpreter) reuses the same prompting/reading/writing.
+	 *
+	 * A step producing no output (an input stream was asked for and given
+	 * an empty line) always ends the loop immediately, for every caller,
+	 * regardless of @p steps or @p quit_on_idle.
+	 *
+	 * When @p steps == 0 and a step needed no input (auto_continue is
+	 * false), the loop is idle: with @p quit_on_idle false (the default)
+	 * it logs a prompt and waits on stdin for ENTER (continue) or q/quit
+	 * (stop), invoking @p idle_hook(true) before and @p idle_hook(false)
+	 * after the wait so a caller (e.g. a measuring wrapper) can pause and
+	 * resume its own timing around the human wait; with @p quit_on_idle
+	 * true it stops immediately instead of prompting.
+	 *
+	 * @param quit_on_idle Stop instead of prompting when idle (steps == 0
+	 *   and no input was needed this step).
+	 * @param idle_hook Optional callback invoked with true when the loop
+	 *   starts waiting on stdin and with false when the wait ends.
+	 * @return false if a step's output failed to write (error already
+	 *   logged); true otherwise, including a clean user/input-driven stop.
+	 */
+	bool run_loop(const size_t steps = 0, bool quit_on_idle = false,
+		const std::function<void(bool)>& idle_hook = {});
 
 	// ── Inspection / introspection (added for tau-neuro runtime) ─────────
 
@@ -197,7 +276,7 @@ struct interpreter {
 	// ltlsynt at synthesis time (Approach A3). The HOA is already
 	// deterministic-strategy by construction. Returns an empty automaton
 	// (num_states == 0) when no Mealy was synthesised.
-	HoaAutomaton determinise() const;
+	hoa_automaton determinise() const;
 
 	// Extract up to `n` "boundary" traces — simple paths from the initial
 	// Mealy state, sorted by length (longest first). For first iteration
@@ -229,7 +308,7 @@ struct interpreter {
 	// ── Oracle-resolved output streams (declare_open) ────────────────────
 	//
 	//
-	// An OracleHandler is invoked at runtime when step() encounters an
+	// An oracle_handler is invoked at runtime when step() encounters an
 	// open output stream. It receives a serialized tau data formula F
 	// characterizing the admissible values for that stream at the
 	// current state, and must return a satisfying assignment serialized
@@ -239,7 +318,7 @@ struct interpreter {
 	// F is guaranteed satisfiable by W-invariance (the engine only
 	// dispatches from a winning sys-state in the parity game's winning
 	// region). The handler need not check satisfiability of F itself.
-	using OracleHandler = std::function<std::string(const std::string& formula)>;
+	using oracle_handler = std::function<std::string(const std::string& formula)>;
 
 	// Declare `stream_name` as an open output stream filled by `handler`.
 	// Subsequent step() calls dispatch to `handler` when the value of this
@@ -247,7 +326,7 @@ struct interpreter {
 	// same stream. Throws if `stream_name` is not an output stream of the
 	// current spec, or if called from inside a handler invocation
 	// (re-entrance violation).
-	void declare_open(const std::string& stream_name, OracleHandler handler);
+	void declare_open(const std::string& stream_name, oracle_handler handler);
 
 	// Remove a prior declaration for `stream_name`. Subsequent step()
 	// calls use the committed strategy for this stream. No-op if the
@@ -289,16 +368,16 @@ struct interpreter {
 	//     `o__ltl_ms<i>__` in `memory` (per `encode_mealy_as_safety`),
 	//   - emit DOT visualisations, extract boundary traces, etc. — without
 	//     re-running synthesis.
-	std::optional<LtlAbaSolution<node>> cached_solution;
+	std::optional<ltl_aba_solution<node>> cached_solution;
 
 	// Open-stream handlers (declared via declare_open). Iteration order
 	// matches insertion order via std::vector<std::string> open_streams_order_;
 	// std::map gives us name-keyed lookup but loses order, so we keep a
 	// parallel vector for declaration order (per design doc §4.5).
-	std::map<std::string, OracleHandler> open_handlers_;
+	std::map<std::string, oracle_handler> open_handlers_;
 	std::vector<std::string> open_streams_order_;
 
-	// Re-entrance guard: set true while inside an OracleHandler invocation;
+	// Re-entrance guard: set true while inside an oracle_handler invocation;
 	// mutating methods (step, update, declare_open, ...) check and refuse.
 	bool in_oracle_handler_ = false;
 
@@ -313,6 +392,9 @@ private:
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 	int_t announced_step_ = -1;
+
+	/// Solution source step() consults; set by make_interpreter/make_table_interpreter.
+	std::shared_ptr<step_provider<node>> provider_;
 
 	/// Adaptive tree-node gc trigger: a sweep fires when bintree<node>::M()
 	/// has both crossed the gc_min_size floor AND grown by at least
@@ -359,9 +441,6 @@ private:
 	/// @brief Build the input variable assignments required for step @p t.
 	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
 
-	/// @brief Update formula @p f to reflect time point @p t.
-	tref update_to_time_point(tref f, const int_t t);
-
 	/// @brief Return `true` if all memory accesses in @p io_vars are valid.
 	bool is_memory_access_valid(const auto& io_vars) const;
 
@@ -378,9 +457,6 @@ private:
 
 	/// @brief Apply the pointwise revision algorithm to produce an updated specification.
 	tref pointwise_revision(tref spec, tref update, const int_t start_time);
-
-	/// @brief Find the maximal update-stream solution for @p spec.
-	std::optional<assignment<node>> solution_with_max_update(tref spec);
 
 	/// @brief Return `true` if @p var is excluded from output.
 	static bool is_excluded_output(tref var);
@@ -409,6 +485,31 @@ private:
  */
 template <NodeType node>
 tref unpack_tau_constant(tref constant);
+
+/**
+ * @brief Update formula @p f to reflect time point @p t.
+ *
+ * Free function (no interpreter state read): shared by `interpreter::step`
+ * and any `step_provider` that needs to phrase a spec part at a time point.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+tref update_to_time_point(tref f, const int_t t);
+
+// Ground @p atom_ref at @p formula_time_point against @p memory (update_to_time_point + rewriter::replace + normalize_non_temp) and return its truth; a step_provider's guard-evaluation counterpart to update_to_time_point.
+template <NodeType node>
+bool evaluate_atom(tref atom_ref, const assignment<node>& memory,
+	size_t formula_time_point);
+
+/**
+ * @brief Find the maximal update-stream solution for @p spec.
+ *
+ * Free function: the only interpreter state it reads is the current
+ * @p time_point, passed explicitly so a `step_provider` can call it too.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+std::optional<assignment<node>> solution_with_max_update(tref spec, size_t time_point);
 
 /**
  * @brief Run a Tau specification for at most @p steps time steps.

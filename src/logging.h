@@ -410,7 +410,14 @@ struct logging {
 			}
 			os << ss.str() << rec[expressions::smessage];
 		};
-		add_console_log(std::cout, keywords::format = formatter);
+		// Warnings and errors are diagnostics, not program output: route
+		// them to stderr so a failure is visible even when stdout is
+		// captured/redirected, and so the process's observable output
+		// stream stays clean.
+		add_console_log(std::cout, keywords::format = formatter,
+			keywords::filter = severity < trivial::warning);
+		add_console_log(std::cerr, keywords::format = formatter,
+			keywords::filter = severity >= trivial::warning);
  	}
 
 	using channel_logger_type =
