@@ -1,5 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <cstdlib>
+#include <functional>
+#include <iostream>
+#include <map>
+#include <mutex>
+#include <optional>
+
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "normalizer_uf_arithmetic.h"
@@ -64,6 +71,9 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 		auto arith_skip = make_arithmetic_skip_uf<node>(form);
 		form = anti_prenex_block<node>(form, arith_skip);
 		form = resolve_quantifiers<node>(form);
+		// Already a truth literal: nothing left for the pack to solve.
+		if (tau::get(form).equals_T() || tau::get(form).equals_F())
+			return form;
 		if (get_free_vars<node>(form).empty()
 			&& pack_can_solve<node>(form))
 		{
@@ -177,8 +187,20 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 		std::string id = tmp.substr(prefix.size());
 		if (is_number(id)) ids.insert(std::stoi(id));
 	}
-	std::string id = std::to_string(*ids.rbegin() + 1);
-	tref uninter_const = tau::build_bf_uconst("", name + id, type);
+	// Process-wide floor per name family, combined with the per-fm scan
+	// above: two calls minting from different formulas can never land on
+	// the same numeral.
+	static std::mutex mtx;
+	static std::map<std::string, size_t> next_by_family;
+	size_t local_next = static_cast<size_t>(*ids.rbegin()) + 1;
+	size_t id_num;
+	{
+		std::lock_guard<std::mutex> lock(mtx);
+		size_t& global_next = next_by_family[name];
+		id_num = std::max(global_next, local_next);
+		global_next = id_num + 1;
+	}
+	tref uninter_const = tau::build_bf_uconst("", name + std::to_string(id_num), type);
 	return uninter_const;
 }
 
@@ -288,6 +310,51 @@ bool has_no_boolean_combs_of_models(tref n) {
 	return true;
 }
 
+// Shape-gated shortcut for is_non_temp_nso_satisfiable: a conjunction of
+// comparisons each equating/dis-equating one free `capture` variable to its
+// algebra's own zero. Existential closure distributes over such a
+// conjunction, so it is unsatisfiable only if some capture carries both
+// `=0` and `!=0`; any other shape returns nullopt (bail to the general path).
+template <NodeType node>
+std::optional<bool> lean_capture_conjunction_sat(tref n) {
+	using tau = tree<node>;
+	subtree_map<node, std::pair<bool, bool>> seen; // var -> (saw =0, saw !=0)
+
+	std::function<bool(tref)> walk = [&](tref f) -> bool {
+		const auto& t = tau::get(f);
+		if (t.equals_T()) return true;
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.nt;
+		if (nt == tau::wff_and)
+			return walk(t[0].first()) && walk(t[0].second());
+		if (nt != tau::bf_eq && nt != tau::bf_neq) return false;
+		trefs fv = get_free_vars<node>(f);
+		if (fv.size() != 1 || !tau::get(fv[0]).is(tau::capture)) return false;
+		tref var = fv[0];
+		tref lhs = t[0].first(), rhs = t[0].second();
+		bool var_is_lhs = tau::subtree_equals(lhs, var);
+		bool var_is_rhs = tau::subtree_equals(rhs, var);
+		if (var_is_lhs == var_is_rhs) return false; // not a bare-var compare
+		tref other = var_is_lhs ? rhs : lhs;
+		if (!tau::subtree_equals(other, tau::_0(find_ba_type<node>(f))))
+			return false;
+		auto& [eq, neq] = seen[var];
+		(nt == tau::bf_eq ? eq : neq) = true;
+		return true;
+	};
+	if (!walk(n)) return std::nullopt;
+	for (auto& [var, flags] : seen)
+		if (flags.first && flags.second) return false; // x=0 and x!=0
+	return true;
+}
+
+// Cached getenv("TAU_LEAN_DECIDE_CROSSCHECK") -- read once per process; see
+// lean_capture_conjunction_sat's caller for what it gates.
+inline bool lean_decide_crosscheck_enabled() {
+	static const bool on = std::getenv("TAU_LEAN_DECIDE_CROSSCHECK") != nullptr;
+	return on;
+}
+
 /** @internal @copydoc is_non_temp_nso_satisfiable @endinternal */
 template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n) {
@@ -298,6 +365,10 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
 	DBG(assert(!fm.find_top(is<node, tau::wff_F>));)
+
+	auto lean = lean_capture_conjunction_sat<node>(n);
+	if (lean && !lean_decide_crosscheck_enabled()) return *lean;
+
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
@@ -311,7 +382,14 @@ bool is_non_temp_nso_satisfiable(tref n) {
 		|| t.find_top(is<node, tau::constraint>)
 		|| t.find_top(is_quantifier<node>)));)
 
-	return t.equals_T();
+	bool full = t.equals_T();
+	if (lean && *lean != full) {
+		std::cerr << "[TAU_LEAN_DECIDE_CROSSCHECK] disagreement: lean="
+			<< *lean << " full=" << full << " formula=" << fm.to_str()
+			<< "\n";
+		std::abort();
+	}
+	return full;
 }
 
 /**
@@ -1227,6 +1305,21 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 
 	if (!is_well_founded<node>(nso_rr)) return nullptr;
+
+	// `nt` (the call site's type) must match every rule's pattern/body type,
+	// or no rule could ever structurally match and the loop would spin
+	// silently until MAX_FP_STEPS -- fail fast with a diagnostic instead.
+	for (const auto& r : nso_rr.rec_relations) {
+		auto pt = tau::get(r.first->get()).get_type();
+		auto bt = tau::get(r.second->get()).get_type();
+		if (pt != nt || bt != nt) {
+			LOG_ERROR << "Recurrence relation type mismatch: rule "
+				<< LOG_FM(r.first->get()) << " := "
+				<< LOG_FM(r.second->get())
+				<< " does not match the call site's type";
+			return nullptr;
+		}
+	}
 
 	trefs previous;
 	tref current;

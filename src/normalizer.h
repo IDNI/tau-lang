@@ -123,8 +123,8 @@ tref normalize_non_temp(tref fm);
  * @brief Build a fresh uninterpreted constant of the given BA type not present in `fm`.
  *
  * Scans all `uconst_name` nodes in `fm` whose name starts with `name` and
- * returns a new BF node `name<i>` where `i` is one past the largest existing
- * suffix index (starting from 1).
+ * combines the largest existing suffix index there with a process-wide
+ * per-family counter, returning `name<i>` one past whichever is larger.
  * @tparam node Tree node type.
  * @param fm Formula to inspect for existing uninterpreted constants.
  * @param name Base name prefix for the new constant.
