@@ -265,6 +265,30 @@ bool pack_type_has_arith_ops(const intptr_t* type) {
 	return pack_type_has_arith_ops_impl<Node>(type);
 }
 
+/**
+ * @brief `true` when the BA owning type id @p ba_type declares atomless.
+ *
+ * Gates the atomless-only inequality-system shortcut in `solve_inequality_
+ * system` (solver.tmpl.h): `atomless` is a mandatory descriptor member, so an
+ * owner that answers at all always has an opinion -- the empty case (no owner)
+ * is the ordinary "ask about a type nothing in the pack owns" outcome.
+ */
+template <typename Node>
+bool pack_type_is_atomless(size_t ba_type) {
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_descriptor_v<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::atomless
+					&& ba_descriptor<BA, Node>::owns_type(ba_type))
+						out = true;
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
 
 /** @brief `true` when @p BA's descriptor builds a canonical zero constant. */
 template <typename Node, typename BA>
@@ -589,6 +613,133 @@ std::optional<std::string> pack_codegen_witness(size_t ba_type_id, tref var,
 						::codegen_witness(var, conj);
 			return std::nullopt;
 		});
+}
+
+/**
+ * @brief `true` when the BA owning @p ba_type_id declares a codegen witness.
+ *
+ * A capability-existence probe, the same shape as @c pack_type_is_non_aba_omcat:
+ * codegen consumers that must decide *ahead of calling* @c pack_codegen_witness
+ * whether an owner can answer at all (rather than discovering it per-edge as a
+ * `nullopt`) ask this instead of naming the BA that happens to implement it.
+ */
+template <typename Node>
+bool pack_type_has_codegen_witness(size_t ba_type_id) {
+	if (!ba_type_id) return false;
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_codegen_witness<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type_id))
+					out = true;
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/** @brief `true` when @p BA spells a self-contained expression for one of its own constants. */
+template <typename Node, typename BA>
+concept ba_has_codegen_constant_expr = ba_has_descriptor_v<Node, BA>
+	&& requires(tref cst) {
+		ba_descriptor<BA, Node>::codegen_constant_expr(cst);
+	};
+
+/** @brief A self-contained C++ expression of type `tref` rebuilding the already-trimmed constant @p cst, from the BA owning @p ba_type_id; `nullopt` means no owner contributes one (a build-time error, never a lossy re-parsed fallback). */
+template <typename Node>
+std::optional<std::string> pack_codegen_constant_expr(size_t ba_type_id, tref cst) {
+	return pack_first_owner<Node>([&]<typename BA>()
+		-> std::optional<std::string> {
+			if constexpr (ba_has_codegen_constant_expr<Node, BA>)
+				if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
+					return ba_descriptor<BA, Node>
+						::codegen_constant_expr(cst);
+			return std::nullopt;
+		});
+}
+
+/** @brief `true` when the BA owning @p ba_type_id declares @c codegen_constant_expr -- same shape as @c pack_type_has_codegen_witness. */
+template <typename Node>
+bool pack_type_has_codegen_constant_expr(size_t ba_type_id) {
+	if (!ba_type_id) return false;
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_codegen_constant_expr<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type_id))
+					out = true;
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/** @brief `true` when @p BA's family is parameterized (declares @c type_tree_for). */
+template <typename Node, typename BA>
+concept ba_has_type_tree_for = ba_has_descriptor_v<Node, BA>
+	&& requires(unsigned short param) {
+		ba_descriptor<BA, Node>::type_tree_for(param);
+	};
+
+/**
+ * @brief The type tree of the pack BA named @p family: its default tree, or
+ *        `type_tree_for(*param)` when @p param names a parameterized
+ *        instance. nullptr when no pack member answers to the name.
+ *
+ * An emitted artifact's main resolves its baked ba-type table through this,
+ * so a reduced pack works as long as it contains the families the spec uses.
+ */
+template <typename Node>
+tref pack_type_tree(const std::string& family,
+	std::optional<unsigned short> param = std::nullopt)
+{
+	tref out = nullptr;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_descriptor_v<Node, BA>) {
+				if (out || family != ba_descriptor<BA, Node>::type_name)
+					return;
+				if constexpr (ba_has_type_tree_for<Node, BA>) {
+					out = param
+						? ba_descriptor<BA, Node>::type_tree_for(*param)
+						: ba_descriptor<BA, Node>::type_tree();
+				} else out = ba_descriptor<BA, Node>::type_tree();
+			}
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/**
+ * @brief The pack family name and parameter of @p type_tree, from its owner.
+ *
+ * The inverse of @c pack_type_tree, used at emission time to spell a
+ * registry entry the artifact can replay. nullopt when no pack member owns
+ * the tree (a reserved core type, or a syntactic type no BA answers to).
+ */
+template <typename Node>
+std::optional<std::pair<std::string, std::optional<unsigned short>>>
+pack_type_family_param(tref type_tree) {
+	std::optional<std::pair<std::string, std::optional<unsigned short>>> out;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_descriptor_v<Node, BA>) {
+				if (out || !ba_descriptor<BA, Node>::owns_type(type_tree))
+					return;
+				std::optional<unsigned short> param;
+				if constexpr (ba_has_type_tree_for<Node, BA>)
+					param = ba_descriptor<BA, Node>::type_param(type_tree);
+				out = {{ba_descriptor<BA, Node>::type_name, param}};
+			}
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
 }
 
 /**

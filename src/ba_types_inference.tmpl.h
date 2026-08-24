@@ -962,7 +962,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					auto canonized_io_var = canonize<node>(io_var);
 					for (auto c : io_def.get_children()) {
 						if (tau::get(c).is(tau::typed)) {
-							auto type_id = get_ba_type_id<node>(c);
+							auto type_id = pack_default_ba_type<node>(
+								get_ba_type_id<node>(c));
 							resolver.insert(canonized_io_var);
 							if (auto assigned = resolver.assign(canonized_io_var, type_id);
 									std::holds_alternative<inference_error>(assigned)) {
@@ -1224,6 +1225,24 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				auto merged_type = merge<node>(resolver, typeables_map);
 				if(std::holds_alternative<inference_error>(merged_type)) {
 					error = std::get<inference_error>(merged_type); break;
+				}
+				// Default only once the whole atomic expression is merged, never per operand.
+				if (size_t resolved = std::get<size_t>(merged_type),
+						defaulted = pack_default_ba_type<node>(resolved);
+						defaulted != resolved) {
+					trefs mergeables;
+					for (auto& [_, typeables] : typeables_map)
+						for (auto& [t, __] : typeables)
+							mergeables.push_back(t);
+					for (tref t : mergeables) {
+						auto assigned = resolver.assign(t, defaulted);
+						if (std::holds_alternative<inference_error>(assigned)) {
+							error = std::get<inference_error>(assigned);
+							break;
+						}
+						merged_type = std::get<size_t>(assigned);
+					}
+					if (error) break;
 				}
 				// Take type definition due to function symbols into account
 				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,

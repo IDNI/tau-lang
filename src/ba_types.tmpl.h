@@ -162,6 +162,11 @@ size_t ba_types<node>::id(tref ba_type) {
 		type_trees().push_back(tau::geth(ba_type)), type_trees().size() - 1;
 }
 
+template<NodeType node>
+size_t ba_types<node>::count() {
+	return type_trees().size();
+}
+
 // A ba_type_id past the end of type_trees() means the id was corrupted
 // somewhere upstream; silently clamping it to 0 (untyped) in release --
 // while asserting in debug -- masked that corruption as a valid type,
@@ -442,6 +447,26 @@ bool pack_owns_ba_type(size_t ba_type_id) {
 	if (is_reserved_ba_type<node>(ba_type_id)) return true;
 	return pack_owns_ba_type_name<node>(
 		tau::get(ba_types<node>::type_tree(ba_type_id))[0].get_string());
+}
+
+template <NodeType node>
+size_t pack_default_ba_type(size_t type_id) {
+	tref type_tree = ba_types<node>::type_tree(type_id);
+	size_t result = type_id;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename node::bas_tuple>;
+			if constexpr (ba_has_descriptor_v<node, BA>) {
+				if (ba_descriptor<BA, node>::matches_type(type_tree))
+					if (auto param = ba_descriptor<BA, node>::type_param(
+							type_tree))
+						result = ba_descriptor<BA, node>::type_id_for(
+							*param);
+			}
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename node::bas_tuple>>{});
+	return result;
 }
 
 template <NodeType node>
