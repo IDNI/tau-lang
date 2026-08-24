@@ -65,8 +65,15 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 
 	static ba_t normalize(const ba_t& x) { return normalize_tau(x); }
 
+	// tau_splitter's documented precondition is a normalized formula;
+	// establish it here, once, for every caller, the same way
+	// tau_ba.tmpl.h's own free splitter() does. Routed through
+	// normalize_for_splitter (memoized) rather than a raw normalizer()
+	// call, since this is the solver's per-candidate hot path
+	// (atomless_choose_value's ladder).
 	static ba_t splitter(const ba_t& x, splitter_type st) {
-		return ba_t(tau_splitter<ba_t, BaseBAs...>(unpack(x), st));
+		return ba_t(tau_splitter<ba_t, BaseBAs...>(
+			normalize_for_splitter(x.nso_rr), st));
 	}
 
 	static tref splitter_one(tref) {
