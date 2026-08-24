@@ -1161,6 +1161,516 @@ TEST_SUITE("nested arithmetic operands") {
 	}
 }
 
+// Counts wff_ex nodes anywhere in n. Used to check that quantify_aux_vars
+// (bv_predicate_blasting.tmpl.h) actually eliminates its freshly-introduced
+// auxiliary quantifiers via push_ex_block_into_clause's fold + BDD
+// elimination, instead of leaving them stuck.
+static size_t count_wff_ex(tref n) {
+	size_t c = 0;
+	auto counter = [&](tref m) {
+		if (is<node_t, tau::wff_ex>(m)) ++c;
+		return true;
+	};
+	pre_order<node_t>(n).visit(counter);
+	return c;
+}
+
+TEST_SUITE("aux var elimination") {
+
+	// = and != atoms have no comparator recurrence (no "applied" part): the
+	// blasted body is a pure conjunction of bf_eq carry/definition
+	// constraints, so the fold should remove every auxiliary quantifier.
+
+	TEST_CASE("nested arithmetic under =, bv[4]: sat (2+3)+1 = 6") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] = { 6 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction for pure =/!= bodies; the 2 remaining wff_ex
+		// are the formula's own outer "ex a ex b" (renamed), not stuck
+		// aux vars.
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] = { 6 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("nested arithmetic under =, bv[4]: unsat (2+3)+1 != 7 as an =") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] = { 7 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed), never touched by blasting.
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] = { 7 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("nested arithmetic under !=, bv[4]: sat (2+3)+1 = 6, 6 != 7") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] != { 7 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed), never touched by blasting.
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] != { 7 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("nested arithmetic under !=, bv[4]: unsat (2+3)+1 = 6, not != 6") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] != { 6 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed), never touched by blasting.
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4]"
+			" && (a + b) + { 1 }:bv[4] != { 6 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("nested arithmetic under =, bv[8]: sat (20+30)+5 = 55") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] = { 55 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed).
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] = { 55 }:bv[8])") == "T");
+	}
+
+	TEST_CASE("nested arithmetic under =, bv[8]: unsat (20+30)+5 != 56 as an =") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] = { 56 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed).
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] = { 56 }:bv[8])") == "F");
+	}
+
+	TEST_CASE("nested arithmetic under !=, bv[8]: sat (20+30)+5 = 55, 55 != 56") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] != { 56 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed).
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] != { 56 }:bv[8])") == "T");
+	}
+
+	TEST_CASE("nested arithmetic under !=, bv[8]: unsat (20+30)+5 = 55, not != 55") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] != { 55 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 2 remaining wff_ex are the formula's own
+		// outer "ex a ex b" (renamed).
+		CHECK(count_wff_ex(blasted) == 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8]"
+			" && (a + b) + { 5 }:bv[8] != { 55 }:bv[8])") == "F");
+	}
+
+	// Comparisons (lt/gt-family) carry a comparator recurrence ("applied")
+	// referencing the arithmetic result var, so a small residual quantifier
+	// (the linking variable) may legitimately survive; what must not happen
+	// is a residual proportional to the bitwidth (one per carry).
+
+	TEST_CASE("a+b >= c, bv[4]: sat 2+3 >= 5") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b >= { 5 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b >= { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("a+b >= c, bv[4]: unsat 2+3 >= 6") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b >= { 6 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b >= { 6 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("a+b < c, bv[4]: sat 2+3 < 6") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b < { 6 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b < { 6 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("a+b < c, bv[4]: unsat 2+3 < 5") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b < { 5 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b < { 5 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("a+b !<= c, bv[4]: sat 2+3 !<= 4") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b !<= { 4 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b !<= { 4 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("a+b !<= c, bv[4]: unsat 2+3 !<= 5") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b !<= { 5 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 2 }:bv[4] && b = { 3 }:bv[4] && a + b !<= { 5 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("a+b >= c, bv[8]: sat 20+30 >= 50") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b >= { 50 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; a small residual (outer quantifiers +
+		// comparator linking var) is expected.
+		CHECK(count_wff_ex(blasted) <= 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b >= { 50 }:bv[8])") == "T");
+	}
+
+	TEST_CASE("a+b >= c, bv[8]: unsat 20+30 >= 51") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b >= { 51 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; a small residual (outer quantifiers +
+		// comparator linking var) is expected.
+		CHECK(count_wff_ex(blasted) <= 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b >= { 51 }:bv[8])") == "F");
+	}
+
+	TEST_CASE("a+b < c, bv[8]: sat 20+30 < 51") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b < { 51 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; a small residual (outer quantifiers +
+		// comparator linking var) is expected.
+		CHECK(count_wff_ex(blasted) <= 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b < { 51 }:bv[8])") == "T");
+	}
+
+	TEST_CASE("a+b < c, bv[8]: unsat 20+30 < 50") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b < { 50 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; a small residual (outer quantifiers +
+		// comparator linking var) is expected.
+		CHECK(count_wff_ex(blasted) <= 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b < { 50 }:bv[8])") == "F");
+	}
+
+	TEST_CASE("a+b !<= c, bv[8]: sat 20+30 !<= 49") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b !<= { 49 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; a small residual (outer quantifiers +
+		// comparator linking var) is expected.
+		CHECK(count_wff_ex(blasted) <= 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b !<= { 49 }:bv[8])") == "T");
+	}
+
+	TEST_CASE("a+b !<= c, bv[8]: unsat 20+30 !<= 50") {
+		tref blasted = blast_formula(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b !<= { 50 }:bv[8])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; a small residual (outer quantifiers +
+		// comparator linking var) is expected.
+		CHECK(count_wff_ex(blasted) <= 2);
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 20 }:bv[8] && b = { 30 }:bv[8] && a + b !<= { 50 }:bv[8])") == "F");
+	}
+
+	// Two linking variables: both operands of the comparison carry their own
+	// embedded addition, so the residual (post-fold, pre-normalization) has
+	// two result variables shared with the comparator instead of one.
+
+	TEST_CASE("a+b >= c+d, bv[4]: sat 1+2 >= 1+1 (3 >= 2)") {
+		tref blasted = blast_formula(
+			"ex a ex b ex c ex d (a = { 1 }:bv[4] && b = { 2 }:bv[4]"
+			" && c = { 1 }:bv[4] && d = { 1 }:bv[4] && a + b >= c + d)");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b ex c ex d (a = { 1 }:bv[4] && b = { 2 }:bv[4]"
+			" && c = { 1 }:bv[4] && d = { 1 }:bv[4] && a + b >= c + d)") == "T");
+	}
+
+	TEST_CASE("a+b >= c+d, bv[4]: unsat 1+2 >= 3+2 (3 >= 5)") {
+		tref blasted = blast_formula(
+			"ex a ex b ex c ex d (a = { 1 }:bv[4] && b = { 2 }:bv[4]"
+			" && c = { 3 }:bv[4] && d = { 2 }:bv[4] && a + b >= c + d)");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) resolves the
+		// arithmetic aux vars; the residual is the formula's own 4 outer
+		// quantifiers (a,b,c,d, renamed) plus at most a small
+		// comparator-linking one, not one per carry.
+		CHECK(count_wff_ex(blasted) <= 5);
+		CHECK(blast_normalize(
+			"ex a ex b ex c ex d (a = { 1 }:bv[4] && b = { 2 }:bv[4]"
+			" && c = { 3 }:bv[4] && d = { 2 }:bv[4] && a + b >= c + d)") == "F");
+	}
+
+	// Coarse size/time guard: must complete within the test timeout and be
+	// correct.
+
+	// Width ladder. Only bv[16] add stays under the test timeout end to
+	// end; wider/other shapes are shelved below, each for one of two
+	// distinct reasons:
+	//  - add/>= at bv[32] and up: blast_formula() itself is fast; the wall
+	//    is in normalizer<node_t>()/cvc5's own solving, not in
+	//    quantify_aux_vars.
+	//  - the nested (bvsub -> shr/shl -> bvadd) shape: the wall is inside
+	//    quantify_aux_vars' own BDD fold (bdd_and_many/bdd_ex over a
+	//    `running` BDD that stays large throughout), structurally
+	//    guaranteed to terminate (bounded by ranked.size() ==
+	//    conjuncts.size()).
+	// Both are the same "normalization blowup" class as stress
+	// template-5 (test_integration-bv_stress_check.cpp), not new bugs.
+	TEST_CASE("a+b=c, bv[16]: sat 1000+2000=3000") {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 1000 }:bv[16] && b = { 2000 }:bv[16]"
+			" && a + b = { 3000 }:bv[16])") == "T");
+	}
+	// Normalizer/cvc5 wall (see the width-ladder note above).
+	TEST_CASE("a+b >= c, bv[16]: sat 1000+2000 >= 3000" * doctest::skip()) {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 1000 }:bv[16] && b = { 2000 }:bv[16]"
+			" && a + b >= { 3000 }:bv[16])") == "T");
+	}
+	// Normalizer/cvc5 wall (see the width-ladder note above).
+	TEST_CASE("a+b=c, bv[32]: sat 100000+200000=300000" * doctest::skip()) {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 100000 }:bv[32] && b = { 200000 }:bv[32]"
+			" && a + b = { 300000 }:bv[32])") == "T");
+	}
+	// Normalizer/cvc5 wall (see the width-ladder note above).
+	TEST_CASE("a+b=c, bv[64]: sat 1000000000+2000000000=3000000000" * doctest::skip()) {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 1000000000 }:bv[64] && b = { 2000000000 }:bv[64]"
+			" && a + b = { 3000000000 }:bv[64])") == "T");
+	}
+	// Blasting-side wall, inside quantify_aux_vars' own BDD fold (see the
+	// width-ladder note above).
+	TEST_CASE("nested ((a-b)>>3)+((a-b)<<4)=c, bv[16]" * doctest::skip()) {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a = { 500 }:bv[16] && b = { 200 }:bv[16]"
+			" && ((a - b) >> { 3 }:bv[16]) + ((a - b) << { 4 }:bv[16]) = c)") == "T");
+	}
+	// Same blasting-side wall as the bv[16] nested case above, at a larger
+	// width.
+	TEST_CASE("nested ((a-b)>>3)+((a-b)<<4)=c, bv[64]" * doctest::skip()) {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a = { 500000 }:bv[64] && b = { 200000 }:bv[64]"
+			" && ((a - b) >> { 3 }:bv[64]) + ((a - b) << { 4 }:bv[64]) = c)") == "T");
+	}
+	// Normalizer/cvc5 wall (see the width-ladder note above).
+	TEST_CASE("a+b>=c, bv[64]: sat 1000000000+2000000000>=2999999999" * doctest::skip()) {
+		CHECK(blast_normalize(
+			"ex a ex b (a = { 1000000000 }:bv[64] && b = { 2000000000 }:bv[64]"
+			" && a + b >= { 2999999999 }:bv[64])") == "T");
+	}
+
+	// -- Atomic-BA soundness edge (bv is atomic, not atomless; TABA
+	// Corollary 2.3 is proven for atomless BAs) --------------------------
+	//
+	// The fold identity `f1=0 && f2=0 == (f1|f2)=0` (used to remove the
+	// existential over the auxiliary carry/definition variables) is
+	// unconditionally sound as a term-level rewrite: it does not depend on
+	// atomlessness. The cases below specifically probe formulas mixing
+	// equations with disequations (!=) over blasted arithmetic's quantified
+	// helper variables, at small enough bitwidths (bv[2], bv[4]) that the
+	// expected verdict can be hand-checked by brute-force enumeration over
+	// every value, independent of the blasting/elimination machinery.
+
+	// x + 1 != 3 alone, bv[2] (values mod 4: 0,1,2,3).
+	TEST_CASE("bv[2] arithmetic under != alone: sat, x=1: 1+1=2, 2 != 3") {
+		// Enumeration: x=1 => x+1 = 2 (mod 4). 2 != 3 holds. Sat.
+		tref blasted = blast_formula(
+			"ex x (x = { 1 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 1 remaining wff_ex is the formula's own
+		// outer "ex x" (renamed), never touched by blasting.
+		CHECK(count_wff_ex(blasted) == 1);
+		CHECK(blast_normalize(
+			"ex x (x = { 1 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bv[2] arithmetic under != alone: unsat, x=2: 2+1=3, not(3 != 3)") {
+		// Enumeration: x=2 => x+1 = 3 (mod 4). 3 != 3 is false. Unsat.
+		tref blasted = blast_formula(
+			"ex x (x = { 2 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2])");
+		REQUIRE(blasted != nullptr);
+		// Bit-level BDD elimination (quantify_aux_vars) fully resolves the
+		// aux-var conjunction; the 1 remaining wff_ex is the formula's own
+		// outer "ex x" (renamed), never touched by blasting.
+		CHECK(count_wff_ex(blasted) == 1);
+		CHECK(blast_normalize(
+			"ex x (x = { 2 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2])") == "F");
+	}
+
+	// Mixed equation + disequation over the same blasted arithmetic, bv[2].
+	// x + 1 = 2 has the unique solution x=1 (mod 4, addition is a bijection
+	// in x for a fixed addend: checking all four values, 0+1=1, 1+1=2,
+	// 2+1=3, 3+1=0 -- only x=1 gives 2).
+	TEST_CASE("bv[2] mixed = and !=: sat, unique x=1, and 1 != 0") {
+		// Enumeration: the only x with x+1=2 is x=1; 1 != 0 holds. Sat.
+		tref blasted = blast_formula(
+			"ex x (x + { 1 }:bv[2] = { 2 }:bv[2] && x != { 0 }:bv[2])");
+		REQUIRE(blasted != nullptr);
+		CHECK(blast_normalize(
+			"ex x (x + { 1 }:bv[2] = { 2 }:bv[2] && x != { 0 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bv[2] mixed = and !=: unsat, unique x=1, but not(1 != 1)") {
+		// Enumeration: the only x with x+1=2 is x=1; 1 != 1 is false. Unsat.
+		tref blasted = blast_formula(
+			"ex x (x + { 1 }:bv[2] = { 2 }:bv[2] && x != { 1 }:bv[2])");
+		REQUIRE(blasted != nullptr);
+		CHECK(blast_normalize(
+			"ex x (x + { 1 }:bv[2] = { 2 }:bv[2] && x != { 1 }:bv[2])") == "F");
+	}
+
+	// Same mixed shape at bv[4] (values mod 16). x + 1 = 5 has the unique
+	// solution x=4 (addition mod 16 is a bijection in x for fixed addend).
+	TEST_CASE("bv[4] mixed = and !=: sat, unique x=4, and 4 != 0") {
+		// Enumeration: the only x with x+1=5 (mod 16) is x=4; 4 != 0 holds. Sat.
+		tref blasted = blast_formula(
+			"ex x (x + { 1 }:bv[4] = { 5 }:bv[4] && x != { 0 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		CHECK(blast_normalize(
+			"ex x (x + { 1 }:bv[4] = { 5 }:bv[4] && x != { 0 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bv[4] mixed = and !=: unsat, unique x=4, but not(4 != 4)") {
+		// Enumeration: the only x with x+1=5 (mod 16) is x=4; 4 != 4 is false. Unsat.
+		tref blasted = blast_formula(
+			"ex x (x + { 1 }:bv[4] = { 5 }:bv[4] && x != { 4 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		CHECK(blast_normalize(
+			"ex x (x + { 1 }:bv[4] = { 5 }:bv[4] && x != { 4 }:bv[4])") == "F");
+	}
+
+	// The != involves the arithmetic result feeding a comparison too:
+	// x forced to a concrete value, then both a != and a >= on the same
+	// blasted sum. bv[2], values mod 4.
+	TEST_CASE("bv[2] != feeding a comparison on the same sum: sat, x=0: 0+1=1, 1!=3, 1>=1") {
+		// Enumeration: x=0 => sum = 1. 1 != 3 holds; 1 >= 1 holds. Sat.
+		tref blasted = blast_formula(
+			"ex x (x = { 0 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2]"
+			" && x + { 1 }:bv[2] >= { 1 }:bv[2])");
+		REQUIRE(blasted != nullptr);
+		CHECK(blast_normalize(
+			"ex x (x = { 0 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2]"
+			" && x + { 1 }:bv[2] >= { 1 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bv[2] != feeding a comparison on the same sum: unsat, x=2: 2+1=3, not(3!=3)") {
+		// Enumeration: x=2 => sum = 3. 3 != 3 is false, so the conjunction
+		// fails regardless of the >= conjunct. Unsat.
+		tref blasted = blast_formula(
+			"ex x (x = { 2 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2]"
+			" && x + { 1 }:bv[2] >= { 1 }:bv[2])");
+		REQUIRE(blasted != nullptr);
+		CHECK(blast_normalize(
+			"ex x (x = { 2 }:bv[2] && x + { 1 }:bv[2] != { 3 }:bv[2]"
+			" && x + { 1 }:bv[2] >= { 1 }:bv[2])") == "F");
+	}
+
+	// Guards: quantify_aux_vars's real mixed eq(-carry-definition)+neq(-atom)
+	// shape resolves through push_ex_block_into_clause's fold without the
+	// aux vars getting stuck or the answer flipping. bv[2]: a+b is a single
+	// value and c ranges freely, so some c differs from it. Sat.
+	TEST_CASE("mixed eq+neq aux-var shape, bv[2]: ex a ex b ex c (a+b != c) is sat") {
+		CHECK(blast_normalize(
+			"ex a ex b ex c (a:bv[2] + b:bv[2] != c:bv[2])") == "T");
+	}
+
+	// Guards the atomless-only Corollary 2.3 fold from ever being applied to
+	// a bv (atomic, not atomless) domain with multiple disequations: bv[2]
+	// has only 4 values, so x cannot differ from all of them at once. If the
+	// fold were (wrongly) treating bv content as atomless here, this would
+	// be misjudged T; the existing BA-type/skip gates must keep it F.
+	TEST_CASE("pigeonhole canary, bv[2]: x != 0,1,2,3 all at once is unsat") {
+		CHECK(blast_normalize(
+			"ex x (x != { 0 }:bv[2] && x != { 1 }:bv[2]"
+			" && x != { 2 }:bv[2] && x != { 3 }:bv[2])") == "F");
+	}
+}
+
 //
 // REVIEW (nested casting): temporary suite added while reviewing whether the
 // blasting path supports nested casts. See private/review-casting.md.
