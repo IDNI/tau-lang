@@ -8,6 +8,7 @@ set(TAU_BA_TESTS
 	tests/test_integration-solver-qlt.cpp
 	tests/test_omcat_types.cpp
 	tests/test_qlt.cpp
+	tests/test_qlt_codegen.cpp
 	tests/test_qlt_grammar.cpp
 	tests/test_qlt_oracle.cpp
 	tests/test_semantic_pwr.cpp

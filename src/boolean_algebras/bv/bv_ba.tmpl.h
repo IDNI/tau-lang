@@ -16,7 +16,10 @@ size_t get_bv_size(const tref t) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto subtype = tt(t) | tau::subtype | tt::ref;
-	DBG(assert(subtype && "bv type must have explicit bitwidth");)
+	if (!subtype) {
+		LOG_ERROR << "get_bv_size: bv type has no explicit bitwidth\n";
+		throw std::logic_error("get_bv_size: bv type has no explicit bitwidth");
+	}
 	return tau::get(subtype)[0].get_num();
 }
 

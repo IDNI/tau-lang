@@ -52,7 +52,9 @@ size_t get_bv_width(tref t) {
 
 	DBG(assert(is_bv_type_family<node>(t)));
 	size_t num = tt(t) | tau::subtype | tau::num | tt::num;
-	assert(num && "bv type must have explicit bitwidth");
+	DBG(assert(num && "bv type must have explicit bitwidth");)
+	if (!num) throw std::logic_error(
+		"get_bv_width: bv type has no explicit bitwidth");
 	return num;
 }
 

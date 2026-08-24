@@ -59,16 +59,16 @@ bool atom_has_any_input(tref atom);
 // Restricted to: all atoms qlt-type, single output var, lookback ≤ 1.
 
 // Role of an io_var in the (m=memory, x=input, y=output) T_3 triple.
-enum class T3VarRole { M, X, Y };
+enum class t3_var_role { M, X, Y };
 
 template <NodeType node>
-static std::optional<T3VarRole> t3_role_of(tref io_var) {
+static std::optional<t3_var_role> t3_role_of(tref io_var) {
 	const std::string& nm = get_var_name<node>(io_var);
 	if (nm.empty()) return std::nullopt;
 	int_t shift = get_io_var_shift<node>(io_var);
-	if (nm[0] == 'o' && shift == 0) return T3VarRole::Y;
-	if (nm[0] == 'i' && shift == 0) return T3VarRole::X;
-	if (nm[0] == 'o' && shift == 1) return T3VarRole::M;
+	if (nm[0] == 'o' && shift == 0) return t3_var_role::Y;
+	if (nm[0] == 'i' && shift == 0) return t3_var_role::X;
+	if (nm[0] == 'o' && shift == 1) return t3_var_role::M;
 	return std::nullopt;
 }
 
@@ -106,8 +106,8 @@ static bool is_algorithm_a_applicable(
 template <NodeType node>
 static std::optional<bool> qlt_atom_holds_in_type3(
 	tref atom,
-	const omcat::QltType3& T3,
-	const std::vector<omcat::Rat>& constants)
+	const omcat::qlt_type3& T3,
+	const std::vector<omcat::rational>& constants)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(atom);
@@ -130,17 +130,17 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 	tref rhs_io = tau::get(rhs).find_top([](tref n) {
 		return is_child<node>(n, tau::io_var); });
 
-	auto flip_rel = [](omcat::Rel r) {
-		return r == omcat::Rel::LT ? omcat::Rel::GT :
-		       r == omcat::Rel::GT ? omcat::Rel::LT : omcat::Rel::EQ;
+	auto flip_rel = [](omcat::relation r) {
+		return r == omcat::relation::LT ? omcat::relation::GT :
+		       r == omcat::relation::GT ? omcat::relation::LT : omcat::relation::EQ;
 	};
-	auto rel_holds = [&](omcat::Rel rel, size_t nt) -> bool {
-		if (nt == tau::bf_lt)   return rel == omcat::Rel::LT;
-		if (nt == tau::bf_lteq) return rel != omcat::Rel::GT;
-		if (nt == tau::bf_gt)   return rel == omcat::Rel::GT;
-		if (nt == tau::bf_gteq) return rel != omcat::Rel::LT;
-		if (nt == tau::bf_eq)   return rel == omcat::Rel::EQ;
-		if (nt == tau::bf_neq)  return rel != omcat::Rel::EQ;
+	auto rel_holds = [&](omcat::relation rel, size_t nt) -> bool {
+		if (nt == tau::bf_lt)   return rel == omcat::relation::LT;
+		if (nt == tau::bf_lteq) return rel != omcat::relation::GT;
+		if (nt == tau::bf_gt)   return rel == omcat::relation::GT;
+		if (nt == tau::bf_gteq) return rel != omcat::relation::LT;
+		if (nt == tau::bf_eq)   return rel == omcat::relation::EQ;
+		if (nt == tau::bf_neq)  return rel != omcat::relation::EQ;
 		return false;
 	};
 
@@ -148,9 +148,9 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 		auto rl = t3_role_of<node>(lhs_io);
 		auto rr = t3_role_of<node>(rhs_io);
 		if (!rl || !rr) return std::nullopt;
-		omcat::Rel rel;
+		omcat::relation rel;
 		auto p = std::make_pair(*rl, *rr);
-		using R = T3VarRole;
+		using R = t3_var_role;
 		if      (p == std::make_pair(R::M, R::X)) rel = T3.rel_mx;
 		else if (p == std::make_pair(R::X, R::M)) rel = flip_rel(T3.rel_mx);
 		else if (p == std::make_pair(R::M, R::Y)) rel = T3.rel_my;
@@ -167,9 +167,9 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 		bool io_is_lhs = (lhs_io != nullptr);
 		auto role = t3_role_of<node>(io_var);
 		if (!role) return std::nullopt;
-		omcat::QltType1 t1;
-		if      (*role == T3VarRole::M) t1 = T3.restrict_m();
-		else if (*role == T3VarRole::X) t1 = T3.restrict_x();
+		omcat::qlt_type1 t1;
+		if      (*role == t3_var_role::M) t1 = T3.restrict_m();
+		else if (*role == t3_var_role::X) t1 = T3.restrict_x();
 		else                            t1 = T3.restrict_y();
 		auto cs = omcat::collect_qlt_constants<node>(const_side);
 		if (cs.size() != 1) return std::nullopt;
@@ -204,7 +204,7 @@ template <NodeType node>
 static std::optional<bool> eval_pure_output_atom_at(
 	tref atom,
 	const std::map<std::string, int>& var_pos,
-	const std::vector<omcat::Rat>& constants)
+	const std::vector<omcat::rational>& constants)
 {
 	using tau = tree<node>;
 	if (atom_has_any_input<node>(atom)) return std::nullopt;
@@ -233,13 +233,13 @@ static std::optional<bool> eval_pure_output_atom_at(
 		return it->second;
 	};
 
-	auto rel_holds = [&](omcat::Rel rel, size_t o) -> bool {
-		if (o == tau::bf_lt)   return rel == omcat::Rel::LT;
-		if (o == tau::bf_lteq) return rel != omcat::Rel::GT;
-		if (o == tau::bf_gt)   return rel == omcat::Rel::GT;
-		if (o == tau::bf_gteq) return rel != omcat::Rel::LT;
-		if (o == tau::bf_eq)   return rel == omcat::Rel::EQ;
-		if (o == tau::bf_neq)  return rel != omcat::Rel::EQ;
+	auto rel_holds = [&](omcat::relation rel, size_t o) -> bool {
+		if (o == tau::bf_lt)   return rel == omcat::relation::LT;
+		if (o == tau::bf_lteq) return rel != omcat::relation::GT;
+		if (o == tau::bf_gt)   return rel == omcat::relation::GT;
+		if (o == tau::bf_gteq) return rel != omcat::relation::LT;
+		if (o == tau::bf_eq)   return rel == omcat::relation::EQ;
+		if (o == tau::bf_neq)  return rel != omcat::relation::EQ;
 		return false;
 	};
 
@@ -247,17 +247,17 @@ static std::optional<bool> eval_pure_output_atom_at(
 		auto p1 = lookup(lhs_io);
 		auto p2 = lookup(rhs_io);
 		if (!p1 || !p2) return std::nullopt;
-		omcat::QltType1 t1a{*p1, constants};
-		omcat::QltType1 t1b{*p2, constants};
-		omcat::Rel rel;
+		omcat::qlt_type1 t1a{*p1, constants};
+		omcat::qlt_type1 t1b{*p2, constants};
+		omcat::relation rel;
 		if (*p1 == *p2) {
 			// Same T₁ position: constant strategy picks same value → EQ.
-			rel = omcat::Rel::EQ;
+			rel = omcat::relation::EQ;
 		} else {
-			omcat::Rat va = t1a.realize();
-			omcat::Rat vb = t1b.realize();
+			omcat::rational va = t1a.realize();
+			omcat::rational vb = t1b.realize();
 			int c = omcat::cmp(va, vb);
-			rel = c < 0 ? omcat::Rel::LT : (c == 0 ? omcat::Rel::EQ : omcat::Rel::GT);
+			rel = c < 0 ? omcat::relation::LT : (c == 0 ? omcat::relation::EQ : omcat::relation::GT);
 		}
 		return rel_holds(rel, op);
 	}
@@ -266,13 +266,13 @@ static std::optional<bool> eval_pure_output_atom_at(
 		bool io_is_lhs = (lhs_io != nullptr);
 		auto p = lookup(io);
 		if (!p) return std::nullopt;
-		omcat::QltType1 t1{*p, constants};
+		omcat::qlt_type1 t1{*p, constants};
 		auto cs = omcat::collect_qlt_constants<node>(io_is_lhs ? rhs : lhs);
 		// Range constant handling: {[a,b]} collects two endpoints.
 		// Interpret `io_var = {[a,b]}` as closed-interval membership,
 		// `!=` as non-membership.
 		if (cs.size() == 2 && (op == tau::bf_eq || op == tau::bf_neq)) {
-			omcat::Rat a = cs[0], b = cs[1];
+			omcat::rational a = cs[0], b = cs[1];
 			if (omcat::cmp(a, b) > 0) std::swap(a, b);
 			int ja = -1, jb = -1;
 			for (int k = 0; k < (int)constants.size(); ++k) {
@@ -417,7 +417,7 @@ static bool constant_output_realizable(
 }
 
 template <NodeType node>
-static std::optional<LtlAbaSolution<node>>
+static std::optional<ltl_aba_solution<node>>
 solve_ltl_aba_algorithm_a(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -478,7 +478,7 @@ solve_ltl_aba_algorithm_a(
 	auto [realizable, hoa_text] = call_ltlsynt(bundle.formula, input_props, output_props);
 	if (!realizable) return std::nullopt;
 
-	LtlAbaSolution<node> sol;
+	ltl_aba_solution<node> sol;
 	// Populate sol.atoms with the d_i propositions phi_star uses, so
 	// downstream consumers (the codegen witness emitter in
 	// cpp_codegen.tmpl.h, the safety-formula extractor in
@@ -508,7 +508,7 @@ solve_ltl_aba_algorithm_a(
 // contains input-variable atoms (the system observes x's type via P-bits and can
 // then pick the correct output type ρ).
 template <NodeType node>
-static std::optional<LtlAbaSolution<node>>
+static std::optional<ltl_aba_solution<node>>
 solve_ltl_aba_algorithm_b(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -577,7 +577,7 @@ solve_ltl_aba_algorithm_b(
 	auto [realizable, hoa_text] = call_ltlsynt(bundle.formula, bundle.ins, bundle.outs);
 	if (!realizable) return std::nullopt;
 
-	LtlAbaSolution<node> sol;
+	ltl_aba_solution<node> sol;
 	sol.aut = parse_hoa(hoa_text);
 	return sol;
 }
@@ -593,7 +593,7 @@ template <NodeType node>
 static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
 {
-	LtlAbaSolution<node> sol;
+	ltl_aba_solution<node> sol;
 	sol.atoms = atoms;
 
 	const bool alg_d_mode = [] {
@@ -771,7 +771,7 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 			// Algorithm B's large P_σ-encoded formula would make
 			// ltlsynt time out on.
 			if (constant_output_realizable<node>(fm, sol.atoms)) {
-				LtlAbaSolution<node> trivial;
+				ltl_aba_solution<node> trivial;
 				trivial.atoms = sol.atoms;
 				// num_states = 0 signals trivially realizable.
 				return synthesis_solved(trivial);

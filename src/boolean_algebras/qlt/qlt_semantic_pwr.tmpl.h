@@ -44,9 +44,9 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref build_win_formula(
-	const alg_d::AlgDResult& result,
+	const alg_d::alg_d_result& result,
 	const std::vector<std::pair<tref, std::string>>& atoms,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A)
 {
 	const int K = result.K;
@@ -55,7 +55,7 @@ tref build_win_formula(
 	// Only base product-game states encode valid (q, ρ) pairs.
 	// Stub states (for transition-based edge acceptance) have indices
 	// >= base_n and must be skipped.
-	const int base_n = result.synth_game.num_states * T1_size;
+	const int base_n = result.game.num_states * T1_size;
 
 	std::set<int> winning_rhos;
 	for (int s : result.winning_region) {
@@ -99,14 +99,14 @@ tref build_win_formula(
 
 template <NodeType node>
 tref build_win0_formula(
-	const alg_d::AlgDResult& result,
+	const alg_d::alg_d_result& result,
 	const std::vector<std::pair<tref, std::string>>& atoms,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A)
 {
 	const int K = result.K;
 	const int T1_size = result.T1_size;
-	const int q_init = result.synth_game.init;
+	const int q_init = result.game.init;
 
 	// Collect initial ρ₀ values where (q_init, ρ₀) ∈ W.
 	// Initial states are always base states (index < base_n).
