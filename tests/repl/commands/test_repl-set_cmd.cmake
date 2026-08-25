@@ -57,6 +57,8 @@ add_repl_test(set_cmd-maxsubsets
 	"set maxsubsets 7. get maxsubsets" "maxsubsets: *7")
 add_repl_test(set_cmd-cachebound
 	"set cachebound 99. get cachebound" "cachebound: *99")
+add_repl_test(set_cmd-maxcoverproducts
+	"set maxcoverproducts 17. get maxcoverproducts" "maxcoverproducts: *17")
 # The two pre-existing numeric options now accept 0 as "unlimited" (they
 # rejected 0 before this change, so no meaning was lost).
 add_repl_test(set_cmd-maxsplits_zero_unlimited

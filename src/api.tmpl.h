@@ -166,6 +166,11 @@ void api<node>::set_cache_bound(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_max_cover_products(size_t n) {
+	max_cover_products = n;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	pwr_semantic_fallback = on;
 }

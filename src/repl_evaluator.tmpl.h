@@ -1010,6 +1010,7 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "maxsubsets"
 		|| x == "maxconsistencysubsets") return consistency_subsets_opt;
 	if (x == "cachebound")               return cache_bound_opt;
+	if (x == "maxcoverproducts")         return cover_products_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1111,7 +1112,9 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ consistency_subsets_opt, [climit]() {
 		std::cout << "maxsubsets:          " << climit(max_consistency_subsets) << "\n"; } },
 	{ cache_bound_opt, [climit]() {
-		std::cout << "cachebound:          " << climit(cache_bound) << "\n"; } }
+		std::cout << "cachebound:          " << climit(cache_bound) << "\n"; } },
+	{ cover_products_opt, [climit]() {
+		std::cout << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1251,7 +1254,9 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ consistency_subsets_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_consistency_subsets(*n); } },
 	{ cache_bound_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_cache_bound(*n); } } };
+		api<node>::set_cache_bound(*n); } },
+	{ cover_products_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_cover_products(*n); } } };
 	setters[o]();
 }
 
@@ -1306,6 +1311,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case revision_alts_opt:
 	case consistency_subsets_opt:
 	case cache_bound_opt:
+	case cover_products_opt:
 		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
 			"`set <option> <n>`\n", error = true;
 		return;
@@ -1587,7 +1593,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  specsizewarn           updated-spec size warning (chars)    off\n"
 		"  revisionalts           revision alternatives kept per part  unlimited\n"
 		"  maxsubsets             k-ary consistency subset checks      4096\n"
-		"  cachebound             string-keyed synthesis cache bound   4096\n";
+		"  cachebound             string-keyed synthesis cache bound   4096\n"
+		"  maxcoverproducts       oracle mixed-type coverage products  256\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options +
 		"  severity               severity                             error/info/debug/trace\n"

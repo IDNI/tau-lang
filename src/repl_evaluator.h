@@ -80,7 +80,7 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
 	spec_size_warn_opt, revision_alts_opt, consistency_subsets_opt,
-	cache_bound_opt };
+	cache_bound_opt, cover_products_opt };
 
 // Logic fragment: determines which operators are available
 enum logic_fragment { fragment_ltl, fragment_ctl_star };

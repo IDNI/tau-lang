@@ -158,6 +158,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"
 	"max_consistency_subsets|max-consistency-subsets|k|9|maxsubsets|9"
 	"cache_bound|cache-bound|C|123|cachebound|123"
+	"max_cover_products|max-cover-products|n|9|maxcoverproducts|9"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

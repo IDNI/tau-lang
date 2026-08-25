@@ -42,6 +42,14 @@ namespace idni::tau_lang {
 // REPL `set maxsubsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
 inline size_t max_consistency_subsets = 4096;
 
+// §13 / Batch O8: cap on the literal products the ABA oracle's exact
+// mixed-type coverage check may expand `I_k ∧ ⋀_j ¬I_j` into. Beyond the
+// cap the check keeps the (weaker, syntactic-subset) pre-O8 verdict for
+// that product and logs — a possible false UNREALIZABLE, never a false
+// REALIZABLE. Runtime parameter by policy (`--max-cover-products`, REPL
+// `set maxcoverproducts`, `api::set_max_cover_products`); 0 = unlimited.
+inline size_t max_cover_products = 256;
+
 // ── Detection ────────────────────────────────────────────────────────────────
 
 // True iff the formula contains any full-LTL operator: wff_F, wff_U, wff_R,

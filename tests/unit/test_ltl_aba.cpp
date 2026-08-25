@@ -4108,6 +4108,98 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
 	}
 
+	// ── §13 / Batch O8: exact mixed-type coverage ─────────────────────────
+	//
+	// The single-type semantic COVER check cannot span independent BA
+	// types, so mixed-type guards used to stop at the syntactic subset
+	// test — a false UNREALIZABLE whenever the feasible input classes only
+	// JOINTLY cover an infeasible product's class.  The exact check
+	// expands I_k ∧ ⋀_j ¬I_j into literal products (capped by the runtime
+	// parameter max_cover_products) and calls I_k covered iff every
+	// product has some BA type's sub-conjunction infeasible.
+	// Fixture: p0 = (i1:qlt = 1/4), p1 = (i2:sbf = X) — inputs of two
+	// different types — and the jointly-infeasible qlt output pair
+	// p2 = (o1 < 0), p3 = (o1 > 1).
+	static std::pair<std::vector<std::pair<tref, std::string>>,
+	                 std::vector<std::string>>
+	mixed_two_type_fixture() {
+		tref fm = wff("(i1[t]:qlt = {1/4}:qlt) && (i2[t]:sbf = {X}:sbf)"
+		              " && (o1[t]:qlt < {0}:qlt) && (o1[t]:qlt > {1}:qlt)");
+		auto atoms = extract_data_atoms<node_t>(fm);
+		std::vector<std::string> aps;
+		for (auto& [f, name] : atoms) aps.push_back(name);
+		return {atoms, aps};
+	}
+
+	TEST_CASE("[GF-30] mixed fixture atoms behave as assumed") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK(is_pure_input_atom<node_t>(atoms[0].first));
+		CHECK(is_pure_input_atom<node_t>(atoms[1].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[2].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[3].first));
+		// Different BA types are independent variables: p0 ∧ p1 is
+		// feasible, the qlt output pair is not.
+		CHECK(guard_is_aba_feasible<node_t>("0&1", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
+	}
+
+	// The plan's flip fixture: the input-unconstrained product 2&3 is
+	// infeasible, and the two feasible products' input classes p1 / ¬p1
+	// JOINTLY cover every input valuation.  The syntactic subset test
+	// cannot see that ({p1} ⊄ ∅), so this edge was refused pre-O8; the
+	// exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
+	TEST_CASE("[GF-31] jointly-covering mixed-type classes accept the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK(guard_is_aba_feasible<node_t>("2&3 | 1&!2 | !1&!2", aps, atoms));
+	}
+
+	// Exactness in the other direction: with only the p1 class feasible,
+	// the input valuation (p0, ¬p1) still reaches only the infeasible
+	// product — the expansion finds the feasible product p0 ∧ ¬p1 (each
+	// type's sub-conjunction feasible) and the edge stays refused.
+	TEST_CASE("[GF-32] an uncovered mixed-type class still rejects the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | 1&!2", aps, atoms));
+	}
+
+	// Mixed-type version of GF-14: complementary sbf literals under a
+	// shared qlt input literal.  I_k = {p0}; the feasible classes
+	// {p0, p1} and {p0, ¬p1} jointly cover it — every expansion product
+	// carries either ¬p0 (qlt-infeasible with p0) or p1 ∧ ¬p1
+	// (sbf-infeasible), so the edge is accepted.
+	TEST_CASE("[GF-33] complementary mixed literals jointly cover a shared class") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK(guard_is_aba_feasible<node_t>(
+			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
+	}
+
+	// The expansion cap: negating GF-33's two-literal class {p0, p1}
+	// doubles the product count, so max_cover_products = 1 blows the cap
+	// and the pre-O8 syntactic verdict stands (refused, logged) — sound,
+	// at worst incomplete.  Restoring the default restores the exact
+	// answer.  (GF-31's single-literal classes never grow the expansion
+	// past one product, so that guard stays exact under any cap ≥ 1.)
+	TEST_CASE("[GF-34] the max_cover_products cap degrades to the syntactic verdict") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		const size_t saved = max_cover_products;
+		max_cover_products = 1;
+		CHECK_FALSE(guard_is_aba_feasible<node_t>(
+			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
+		max_cover_products = saved;
+		CHECK(guard_is_aba_feasible<node_t>(
+			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
+	}
+
 	// ── LA-13 / LA-N6: `!` before a group or constant; absurd AP index ──
 	//
 	// `parse_atom` accepted `!` only in front of digits: `!(...)` returned

@@ -621,6 +621,87 @@ static bool guard_is_aba_feasible(
 				tau::build_wff_neg(feasible_inputs_disj));
 			covered = !aba_existential_feasible<node>(uncovered);
 		}
+		if (!covered && !single_type) {
+			// §13 / Batch O8: exact coverage for MIXED-type guards.
+			// The single-type semantic check above cannot run (one
+			// existential query cannot span independent BA types),
+			// so the syntactic subset test used to be the last
+			// word — a false UNREALIZABLE whenever the feasible
+			// input classes only jointly cover I_k.  Expand
+			// I_k ∧ ⋀_{j feasible} ¬I_j into products of literals
+			// (¬I_j = ∨_{l ∈ I_j} ¬l distributed); a product is
+			// feasible iff each BA type's sub-conjunction is
+			// (independent variables), and I_k is COVERED iff no
+			// product is feasible.  The expansion is capped by the
+			// runtime parameter max_cover_products; beyond it the
+			// pre-O8 syntactic verdict stands (logged) — sound, at
+			// worst incomplete.
+			auto negate_lit = [&](tref l) -> tref {
+				const auto& lt = tau::get(l);
+				if (lt.has_child()
+					&& lt[0].value.nt == tau::wff_neg)
+					return lt[0].first();
+				return tau::build_wff_neg(l);
+			};
+			std::vector<trefs> products{ pk.input_lits };
+			bool blown = false;
+			for (auto& pj : live) {
+				if (!pj.feasible) continue;
+				// A feasible product with no input literals
+				// covers everything and already returned above.
+				std::vector<trefs> next;
+				for (auto& prod : products) {
+					for (tref l : pj.input_lits) {
+						if (max_cover_products
+							&& next.size() >=
+							max_cover_products) {
+							blown = true;
+							break;
+						}
+						trefs np = prod;
+						np.push_back(negate_lit(l));
+						next.push_back(std::move(np));
+					}
+					if (blown) break;
+				}
+				if (blown) break;
+				products = std::move(next);
+			}
+			if (blown) {
+				LOG_WARNING << "[ltl_aba] mixed-type coverage "
+					"expansion exceeded "
+					<< max_cover_products
+					<< " products (--max-cover-products / "
+					"`set maxcoverproducts`, 0 = "
+					"unlimited); keeping the syntactic "
+					"verdict for this input class -- the "
+					"edge may be refused although it is "
+					"coverable (false UNREALIZABLE at "
+					"worst)\n";
+			} else {
+				bool some_feasible = false;
+				for (auto& prod : products) {
+					std::vector<GuardLit> lits;
+					lits.reserve(prod.size());
+					for (tref l : prod) {
+						tref atom = l;
+						const auto& lt = tau::get(l);
+						if (lt.has_child()
+							&& lt[0].value.nt ==
+								tau::wff_neg)
+							atom = lt[0].first();
+						lits.push_back({l, atom, true});
+					}
+					if (conj_feasible(lits,
+						[](const GuardLit&) {
+							return true; })) {
+						some_feasible = true;
+						break;
+					}
+				}
+				covered = !some_feasible;
+			}
+		}
 		if (!covered) return false;
 	}
 	return true;

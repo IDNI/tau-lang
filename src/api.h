@@ -280,6 +280,12 @@ struct api {
 	 */
 	static void set_cache_bound(size_t n);
 	/**
+	 * @brief Cap the ABA oracle's mixed-type coverage expansion (§13);
+	 * beyond it the weaker syntactic verdict stands, logged. Default
+	 * 256; 0 = unlimited.
+	 */
+	static void set_max_cover_products(size_t n);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */

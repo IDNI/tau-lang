@@ -22,7 +22,8 @@ add_repl_test(get_cmd-lists_specsizewarn_off "get" "specsizewarn: *off")
 # --- bare `get` prints every limit option (covers the limit_printers map) ----
 foreach(opt maxsplits maxrounds fixpointsteps flagsteps blastdepth squeezecap
 		simplifyrounds defpasses enumsteps rewriterounds gcminsize
-		gcgrowth specsizewarn revisionalts maxsubsets cachebound)
+		gcgrowth specsizewarn revisionalts maxsubsets cachebound
+		maxcoverproducts)
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
 endforeach()
 
@@ -36,6 +37,13 @@ add_repl_test(get_cmd-cachebound_default_finite "get cachebound"
 	"cachebound: *4096")
 add_repl_test(get_cmd-cachebound_zero_is_unlimited
 	"set cachebound 0. get cachebound" "cachebound: *unlimited")
+# §13 / Batch O8: the oracle's mixed-type coverage expansion cap ships
+# FINITE (256); 0 opts into unlimited.
+add_repl_test(get_cmd-maxcoverproducts_default_finite "get maxcoverproducts"
+	"maxcoverproducts: *256")
+add_repl_test(get_cmd-maxcoverproducts_zero_is_unlimited
+	"set maxcoverproducts 0. get maxcoverproducts"
+	"maxcoverproducts: *unlimited")
 
 # gcminsize round trip through `get` (only a `set` test existed).
 add_repl_test(get_cmd-gcminsize "set gcminsize 512. get gcminsize"
