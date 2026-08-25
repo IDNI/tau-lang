@@ -13,26 +13,17 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
-	LOG_TRACE << "-- get(constant, type_id): "
-		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
-	// LOG_TRACE << dump_to_str();
-	// TODO optimize
-	const auto p = std::make_pair(constant, type_id);
-	for (size_t i = 0; i < C.size(); ++i) if (C[i] == p) {
-		LOG_TRACE << "-- returning already pooled: "
-					<< i+1 << " " << LOG_FM(T[i]->get());
-		return T[i]->get();
-	}
-	C.emplace_back(std::move(p));
+	// No tracing here: this runs for every constant the bv evaluation
+	// hooks fold during a step, and the pool lookup is index-backed.
+	auto p = std::make_pair(constant, type_id);
+	if (auto it = index_.find(p); it != index_.end())
+		return T[it->second]->get();
+	C.emplace_back(p);
 	size_t constant_id = C.size();
+	index_.emplace(std::move(p), constant_id - 1);
 	node n = node::ba_constant(constant_id, type_id);
 	tref r = tree<node>::get(n);
 	T.push_back(tree<node>::geth(r));
-	// LOG_TRACE << "node constant: " << n;
-	// LOG_TRACE << dump_to_str();
-	// const auto& t = tree<node>::get(r);
-	// LOG_TRACE << "node from tree:    " << t.value;
-	LOG_TRACE << "-- returning pooled constant: " << LOG_FM(r);
 	return r;
 }
 
@@ -72,6 +63,7 @@ template <NodeType node>
 void ba_constants<node>::cleanup() {
 	C.clear(); C.shrink_to_fit();
 	T.clear(); T.shrink_to_fit();
+	index_.clear();
 }
 
 } // namespace idni::tau_lang

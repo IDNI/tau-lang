@@ -89,6 +89,19 @@ private:
 	inline static std::vector<std::pair<constant, size_t>> C;  // pool of constants
 	// pool of constant tree nodes with type info
 	inline static htrefs T;
+	// O(1) lookup index: (constant, type_id) -> position in C. C stays
+	// the id-ordered store (get(constant_id) reads it); this map only
+	// accelerates get(constant, type_id), which used to scan C linearly
+	// with full BA equality per entry on the step() hot path.
+	struct pooled_key_hash {
+		size_t operator()(const std::pair<constant, size_t>& p) const {
+			size_t seed = std::hash<constant>{}(p.first);
+			hash_combine(seed, p.second);
+			return seed;
+		}
+	};
+	inline static std::unordered_map<std::pair<constant, size_t>, size_t,
+		pooled_key_hash> index_;
 };
 
 } // namespace idni::tau_lang
