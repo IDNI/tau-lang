@@ -42,10 +42,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	tref func2 = tau::get(atomic_fm)[0].second();
 	// Make sure that it works only on Boolean parts by using replace_if
 	tref func1_v_0 = rewriter::replace_if<node>(func1, var,
-		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func1_v_0 = tt(func1_v_0) | bf_reduce_canonical<node>() | tt::ref;
 	tref func1_v_1 = rewriter::replace_if<node>(func1, var,
-		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func1_v_1 = tt(func1_v_1) | bf_reduce_canonical<node>() | tt::ref;
 	// Is func syntactically identically 0
 	if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
@@ -61,10 +61,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
 	// Simplify func2
 	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
-		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
 	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
-		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func2_v_1 = tt(func2_v_1) | bf_reduce_canonical<node>() | tt::ref;
 	// Is func syntactically identically 0
 	if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
