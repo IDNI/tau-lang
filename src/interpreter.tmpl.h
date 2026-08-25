@@ -415,15 +415,18 @@ post_normalization:
 					// structure for sv_j[t-1] (shift=1) from it.
 					tref sv_tmpl = build_state_bit_eq<node>(
 						sv_names[j], -1, false);
-					trefs sv_io  = tau::get(sv_tmpl)
-						.select_top(is_child<node, tau::io_var>);
-					if (sv_io.empty()) continue;
-					// transform_io_var(ms_j[t-1], formula_time_point)
-					// → ms_j[t = formula_time_point - 1]  (= ms_j[t=0])
-					// This is the exact key update_to_time_point produces
-					// for the lookback var when processing the G body.
-					tref mem_key = transform_io_var<node>(
-						sv_io[0], i.formula_time_point);
+					trefs sv_bf  = tau::get(sv_tmpl)
+						.select_top(is_child<node, tau::variable>);
+					if (sv_bf.empty()) continue;
+					// bf(ms_j[t = formula_time_point - 1]), i.e. the
+					// bf node update_to_time_point leaves wrapping the
+					// lookback var when processing the G body — key at
+					// bf altitude so the bf-wrapped value below replaces
+					// a bf node wholesale, not the variable underneath it.
+					tref transformed_var = transform_io_var<node>(
+						tau::trim(sv_bf[0]), i.formula_time_point);
+					tref mem_key = tau::get(
+						tau::get(sv_bf[0]).value, transformed_var);
 					tref mem_val = (j == init_s) ? one_val : zero_val;
 					i.memory.emplace(mem_key, mem_val);
 				}
