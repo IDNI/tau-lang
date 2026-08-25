@@ -701,10 +701,14 @@ State: 1
 		CHECK(W1.empty());
 	}
 
-	// The symmetric shape keeps its documented asymmetry: an ENV state that
-	// could move into an env dead end is still NOT awarded to sys (the env
-	// over-approximation refusal), but the env dead end itself is.
-	TEST_CASE("[ALG-D-50] AL-R1: env edges into env dead ends are pruned, attractor still refused") {
+	// Batch O7 (textbook dead-end semantics): the env dead end 1 is
+	// awarded to sys together with sys's attractor of it — which does NOT
+	// include state 0, because env there has the live alternative 2 (the
+	// ∀-rule only pulls in an opponent state ALL of whose successors are
+	// in the set).  The §14 plan predicted this expectation would flip;
+	// hand-computing the textbook rule shows it stands: env avoids its
+	// dead end by choice, not by a refused attractor.
+	TEST_CASE("[ALG-D-50] textbook: an env dead end is sys-won; an env state with an alternative is not") {
 		alg_d::ProductGame pg;
 		pg.n_states = 3;
 		pg.init     = 0;
@@ -714,12 +718,13 @@ State: 1
 		auto W1 = alg_d::zielonka_win_player1(pg);
 		CHECK(W1.count(1));      // env cannot move: lost for env
 		CHECK(!W1.count(2));     // even self-loop: env wins
-		CHECK(!W1.count(0));     // env avoids its dead end; attractor not awarded
+		CHECK(!W1.count(0));     // env takes the live alternative 2
 	}
 
-	// Pruning must not remove the live alternative: [ALG-D-47] with an
-	// extra sys edge from the dead end's sibling stays REALIZABLE.
-	TEST_CASE("[ALG-D-51] AL-R1: pruning keeps live alternatives") {
+	// The dead-end treatment must not swallow the live alternative:
+	// [ALG-D-47] with an extra sys edge from the dead end's sibling stays
+	// REALIZABLE.
+	TEST_CASE("[ALG-D-51] dead-end handling keeps live alternatives") {
 		alg_d::ProductGame pg;
 		pg.n_states = 4;
 		pg.init     = 0;
@@ -907,7 +912,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 
 	// AL-R1 through the product game: sys state 0 has two edges under the
 	// same feasible D-pattern — one into sys state 1, whose only edge needs
-	// an infeasible pattern (a dead end after pruning), and one into env
+	// an infeasible pattern (a dead end), and one into env
 	// state 2 whose even self-loop env wins.  Both options lose.
 	TEST_CASE("[ALG-D-56c] AL-R1: dead-end edge plus env-won edge is UNREALIZABLE") {
 		alg_d::SynthGame g;
@@ -982,16 +987,16 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// over-approximation / refused opponent attractor, Batch O7).  With
 	// the convention fixed, the system's only strategy edge ([d_0 & d_1]
 	// in the ltlsynt-solved game) is data-infeasible from ρ₀ = {0}, so
-	// the SYS state is a dead end and correctly marked lost — but the
-	// ENV-owned initial state keeps its trivial move into that dead end
-	// and stays counted as sys-winning, because the opponent is not
-	// awarded the attractor of dead ends.  Batch O7 (precise env edges +
-	// textbook dead-end semantics) must un-skip this.  The convention
-	// itself — one fixed initial state — is proven without the env
-	// mediation by [ALG-D-74] below.
+	// the SYS state is a dead end and correctly marked lost — and since
+	// Batch O7 the sys dead end is awarded to env TOGETHER WITH env's
+	// attractor (textbook), so the loss propagates through the env-owned
+	// initial state whose only move leads there, and the end-to-end flip
+	// finally shows.  (O7 also passes --polarity=no to ltlsynt so the
+	// game is the genuine arena, not the polarity-reduced strategy.)  The
+	// convention itself — one fixed initial state — is proven without the
+	// env mediation by [ALG-D-74] below.
 	TEST_CASE("[ALG-D-71] phantom initial memory cannot win end-to-end: "
-	          "G(o1[t-1]>0) && F(o1>1) UNREALIZABLE"
-	          * doctest::skip()) {
+	          "G(o1[t-1]>0) && F(o1>1) UNREALIZABLE") {
 		CHECK_FALSE(alg_d_realizable(
 			"(G (o1[t-1]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
 	}

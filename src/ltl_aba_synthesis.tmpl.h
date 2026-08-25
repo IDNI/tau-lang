@@ -498,8 +498,21 @@ inline const SynthGame& call_ltlsynt_game(
 		return empty_game;  // transient — don't cache
 	}
 
+	// §14 / Batch O7: --polarity=no.  ltlsynt's polarity optimization
+	// substitutes output APs of constant polarity with their favorable
+	// value BEFORE building the game, so `--print-game-hoa` for
+	// `d_0 U d_1` came back as a 2-state acceptance-"all" machine whose
+	// single sys edge is `[0&1]` — the propositional strategy, with every
+	// alternative discarded.  Algorithm D re-solves the game under DATA
+	// feasibility, where a discarded alternative (set d_1 alone) may be
+	// the only feasible one; the reduced machine then reads as a sys dead
+	// end and textbook dead-end semantics flips a realizable spec
+	// (ALG-D-28).  With --polarity=no ltlsynt emits the genuine arena
+	// (all sys alternatives, real acceptance), which is what a re-solver
+	// needs.
 	std::vector<std::string> argv = {
-	    "ltlsynt", "-F", tmpfile_path, "--print-game-hoa"};
+	    "ltlsynt", "-F", tmpfile_path, "--print-game-hoa",
+	    "--polarity=no"};
 	if (!ins.empty())  argv.push_back("--ins="  + csv(ins));
 	if (!outs.empty()) argv.push_back("--outs=" + csv(outs));
 

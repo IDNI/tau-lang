@@ -589,6 +589,27 @@ inline ProductGame build_product_game(
 			feasible[pm][py][type_A[t]] = true;
 	}
 
+	// §14 / Batch O7: precise environment edges.  An env edge used to be
+	// added whenever its guard was satisfiable by ANY propositional
+	// assignment — no feasibility filter — so the product game let the
+	// environment "move" into states the real environment cannot reach
+	// (the guard's D-content is data, and data feasibility from ρ is the
+	// same fact regardless of which player owns the state).  Those phantom
+	// moves are why textbook dead-end semantics used to flip ALG-D-28 and
+	// why the opponent attractor was refused in zielonka_win_player1.
+	// Filter: an env edge from (q, ρ) exists iff its guard admits an
+	// assignment whose D-pattern is feasible from ρ to SOME ρ' (the memory
+	// still updates on sys moves only, so the env target keeps ρ).
+	auto env_edge_reachable = [&](int rho, const std::string& guard) {
+		for (int a = 0; a < (1 << n_aps); ++a) {
+			if (!eval_guard(guard, a, n_aps)) continue;
+			int D_pat = d_pattern_from_assignment(G, a, K);
+			for (int rp = 0; rp < T1_size; ++rp)
+				if (feasible[rho][rp][D_pat]) return true;
+		}
+		return false;
+	};
+
 	// Base layer: G.num_states * T1_size states
 	// Intermediate layer for trans-based acceptance: one extra state per edge
 	// Layer 0: base (q, rho) with state priority
@@ -627,13 +648,10 @@ inline ProductGame build_product_game(
 					// satisfying assignment instead of
 					// re-testing the key 2^n_aps times.
 					if (G.player[q] != 1) {
-						bool reachable = false;
-						for (int a = 0;
-							a < (1 << n_aps)
-							&& !reachable; ++a)
-							reachable = eval_guard(
-								guard, a, n_aps);
-						if (!reachable) continue;
+						// §14: same feasibility filter as
+						// the transition site below.
+						if (!env_edge_reachable(rho,
+							guard)) continue;
 						auto key = std::make_tuple(
 							q * T1_size + rho, j,
 							rho);
@@ -742,16 +760,18 @@ inline ProductGame build_product_game(
 					}
 				}
 			} else {
-				// Env (player 0): rho unchanged.  Env observes (but
-				// does not control) output APs, so a transition is
-				// reachable if its guard is satisfiable under ANY
-				// AP assignment.
+				// Env (player 0): rho unchanged (memory updates on
+				// sys moves).  Env observes (but does not control)
+				// output APs; §14 filters its edges by the same T3
+				// feasibility the sys edges use, since a guard's
+				// data content is player-independent.
 				for (int j = 0; j < (int)G.trans[q].size(); ++j) {
 					const auto& [guard, nq, ec] = G.trans[q][j];
-					bool reachable = false;
-					for (int a = 0; a < (1 << n_aps) && !reachable; ++a)
-						reachable = eval_guard(guard, a, n_aps);
-					if (!reachable) continue;
+					// §14: only edges whose D-content is
+					// feasible from rho exist for the real
+					// environment.
+					if (!env_edge_reachable(rho, guard))
+						continue;
 					int ep = G.edge_priority[q][j];
 					int dest = nq * T1_size + rho;
 					if (ep >= 0) {
@@ -840,13 +860,13 @@ static std::pair<StateSet,StateSet> solve(
 		for (int v : succs[u])
 			if (V.count(v)) succs_V[u].push_back(v);
 
-	// NOTE on dead ends (LG-32): they are corrected ONCE, after the recursion,
-	// in `zielonka_win_player1` — deliberately NOT here.  Inside the recursion
-	// "no successor in V" is not the same statement as "cannot move": the
-	// sub-games Zielonka builds are traps for one player only, so the OTHER
-	// player may still have moves that leave V, and declaring it stuck would
-	// be wrong.  Only a state that is successor-less in the FULL game truly
-	// cannot move.
+	// NOTE on dead ends (LG-32 / Batch O7): they are decided ONCE, BEFORE
+	// this recursion, in `zielonka_win_player1`'s textbook preprocessing —
+	// deliberately NOT here.  Inside the recursion "no successor in V" is
+	// not the same statement as "cannot move": the sub-games Zielonka
+	// builds are traps for one player only, so the OTHER player may still
+	// have moves that leave V, and declaring it stuck would be wrong.  The
+	// game handed to the top-level solve call has no dead ends at all.
 
 	int c_max = -1;
 	for (int u : V) c_max = std::max(c_max, pri[u]);
@@ -893,93 +913,98 @@ static std::pair<StateSet,StateSet> solve(
 } // namespace zielonka_impl
 
 // Returns the set of states where player 1 (sys) wins.
+//
+// LG-32 / AL-R1 / §14 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
+// semantics say the player who cannot move LOSES the finite play, while
+// `solve` scores every state by its priority's parity — so dead ends are
+// decided here, BEFORE the parity recursion, the standard way:
+//
+//   repeat until the subgame has no dead ends:
+//     a dead end is lost for its owner; award it to the opponent TOGETHER
+//     WITH the opponent's attractor of it, and remove that attractor from
+//     the subgame (removal can create new dead ends, hence the loop);
+//   then run Zielonka on the residual subgame, which has none.
+//
+// Every state the attractors removed carries exactly one of two facts: the
+// winner can force the play into the dead-end set (∃-rule), or the loser
+// cannot avoid it (∀-rule).  A state remaining in the residual keeps at
+// least one in-subgame successor by the same rules, so `solve`'s internal
+// restriction to V creates no fresh dead ends.
+//
+// History: this replaces the prune-own-suicidal-edges + one-shot-override
+// patch, which deliberately REFUSED the opponent attractor because
+// `build_product_game`'s environment edges were over-approximated (any
+// satisfiable guard, no data feasibility) — a phantom env move could then
+// "force" sys into a dead end no real environment can reach, flipping the
+// realizable ALG-D-28.  §14 made the env edges precise (the same T3
+// feasibility filter the sys edges use), so the refusal's reason is gone
+// and the textbook rule is exactly right.
 inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 	std::set<int> V;
 	for (int s = 0; s < pg.n_states; ++s) V.insert(s);
 
-	// LG-32: dead ends.  Parity-game semantics say the player who cannot move
-	// LOSES the finite play, but `solve` scores every state by its priority's
-	// parity, so a successor-less sys state with an ODD priority was counted a
-	// sys WIN.  `build_product_game` produces exactly such states: a sys state
-	// (q, rho) gets no successor at all when the T3 feasibility table admits
-	// no D-pattern from rho.
-	//
-	// The correction is applied as an OVERRIDE on the solver's answer, over
-	// two facts that are true unconditionally and locally:
-	//
-	//   1. a state with no successor in the FULL game cannot move, so it is
-	//      lost for its owner;
-	//   2. a state whose owner is that same player and ALL of whose full-game
-	//      successors are already lost for that player is lost too.
-	//
-	// Both are read off `pg.succs` directly, so neither depends on which
-	// sub-game Zielonka happens to be looking at.  An earlier attempt put the
-	// test inside `solve` instead, where "no successor in V" is NOT the same
-	// statement as "cannot move" (a Zielonka sub-game is a trap for one player
-	// only), and it short-circuited the parity recursion.
-	//
-	// AL-R1 (2026-08-18 review): the one-shot override alone UNDER-corrects.
-	// `solve` scores a sys dead end with an odd priority as a sys win, so a
-	// sys predecessor that chooses between that dead end and a genuinely
-	// env-won successor is handed to sys by the recursion, and erasing the
-	// dead end afterwards leaves the predecessor in W1 (false REALIZABLE).
-	// Fix: before solving, delete each owner's edges INTO its own lost set —
-	// a player never voluntarily moves into a state it has already lost —
-	// re-run the closure on the pruned graph to a fixpoint, and solve the
-	// pruned game.  The override below then only has the dead ends
-	// themselves left to correct.  Symmetrically env edges into env-lost
-	// states are pruned, so env is never credited with a suicidal move.
-	//
-	// What is deliberately NOT done: the OPPONENT's attractor of the dead-end
-	// set is not awarded to the opponent, even though that is the textbook
-	// treatment.  `build_product_game`'s env transitions ignore the T3
-	// feasibility filter entirely — an env edge is added whenever its guard is
-	// satisfiable by ANY assignment — so env's ability to "force" the play into
-	// a state where sys has no feasible D-pattern is an artifact of that
-	// over-approximation, not a real environment move.  Leaning on it turns the
-	// realizable `G(o1>0) U (o1<0)` into UNREALIZABLE (ALG-D-28).  Fixing the
-	// env-move modelling is its own piece of work; until then the rule is
-	// applied only where it cannot be wrong.
-	std::vector<std::vector<int>> succs = pg.succs;
-	auto closure_of_dead_ends = [&](int stuck_player) {
-		std::set<int> lost;
-		for (int u = 0; u < pg.n_states; ++u)
-			if (succs[u].empty() && pg.player[u] == stuck_player)
-				lost.insert(u);
-		if (lost.empty()) return lost;
+	// Attractor of `target` for player `p` within the CURRENT V.
+	auto attractor = [&](int p, std::set<int> target) {
 		for (bool changed = true; changed; ) {
 			changed = false;
-			for (int u = 0; u < pg.n_states; ++u) {
-				if (lost.count(u)) continue;
-				if (pg.player[u] != stuck_player) continue;
-				if (succs[u].empty()) continue;   // already seeded
-				bool all_lost = true;
-				for (int v : succs[u])
-					if (!lost.count(v)) { all_lost = false; break; }
-				if (all_lost) { lost.insert(u); changed = true; }
+			for (int u : V) {
+				if (target.count(u)) continue;
+				bool add = false;
+				if (pg.player[u] == p) {
+					for (int v : pg.succs[u])
+						if (V.count(v)
+							&& target.count(v)) {
+							add = true;
+							break;
+						}
+				} else {
+					bool any = false, all = true;
+					for (int v : pg.succs[u]) {
+						if (!V.count(v)) continue;
+						any = true;
+						if (!target.count(v)) {
+							all = false;
+							break;
+						}
+					}
+					add = any && all;
+				}
+				if (add) {
+					target.insert(u);
+					changed = true;
+				}
 			}
 		}
-		return lost;
+		return target;
 	};
-	std::set<int> sys_lost, env_lost;
+
+	std::set<int> W1acc;   // sys wins (env dead ends + sys attractor)
 	for (;;) {
-		sys_lost = closure_of_dead_ends(1);
-		env_lost = closure_of_dead_ends(0);
-		bool pruned = false;
-		for (int u = 0; u < pg.n_states; ++u) {
-			const std::set<int>& own_lost = pg.player[u] == 1 ? sys_lost : env_lost;
-			if (own_lost.count(u)) continue;   // keep lost states as they are
-			auto& out = succs[u];
-			auto keep = std::remove_if(out.begin(), out.end(),
-				[&](int v) { return own_lost.count(v) != 0; });
-			if (keep != out.end()) { out.erase(keep, out.end()); pruned = true; }
+		std::set<int> d_sys, d_env;
+		for (int u : V) {
+			bool any = false;
+			for (int v : pg.succs[u])
+				if (V.count(v)) { any = true; break; }
+			if (!any)
+				(pg.player[u] == 1 ? d_sys : d_env).insert(u);
 		}
-		if (!pruned) break;
+		if (d_sys.empty() && d_env.empty()) break;
+		if (!d_sys.empty()) {
+			// Sys stuck: env wins the attractor.  (Not accumulated:
+			// only W1 is returned.)
+			for (int u : attractor(0, d_sys)) V.erase(u);
+			continue;   // removal may create new dead ends
+		}
+		for (int u : attractor(1, d_env)) {
+			W1acc.insert(u);
+			V.erase(u);
+		}
 	}
 
-	auto [W0, W1] = zielonka_impl::solve(V, pg.n_states, pg.player, pg.priority, succs);
-	for (int u : sys_lost) W1.erase(u);    // sys cannot move there
-	for (int u : env_lost) W1.insert(u);   // env cannot move there
+	auto [W0, W1] = zielonka_impl::solve(V, pg.n_states, pg.player,
+		pg.priority, pg.succs);
+	(void) W0;
+	W1.insert(W1acc.begin(), W1acc.end());
 	return W1;
 }
 
