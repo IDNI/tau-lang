@@ -219,7 +219,8 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 		T3.push_back(t3);
 		type_A.push_back(1); // D_0 is true in this type
 
-		auto result = alg_d::solve_algorithm_d_full(phi_star, T1_size, T3, type_A, K);
+		auto result = alg_d::solve_algorithm_d_full(phi_star, T1_size,
+			T3, type_A, K, /*init_rho=*/0);
 
 		if (result.realizable) {
 			CHECK(!result.winning_region.empty());
@@ -231,7 +232,8 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 	}
 
 	TEST_CASE("[SPWR-A-02] solve_algorithm_d_full empty input returns unrealizable") {
-		auto result = alg_d::solve_algorithm_d_full("", 0, {}, {}, 0);
+		auto result = alg_d::solve_algorithm_d_full("", 0, {}, {}, 0,
+			/*init_rho=*/0);
 		CHECK_FALSE(result.realizable);
 		CHECK(result.winning_region.empty());
 		CHECK(result.init_rho == -1);
@@ -424,6 +426,9 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		result.synth_game.init = 0;
 		result.K = 1;
 		result.winning_region = {0, 3};
+		// LG-12: Win₀ reads the FIXED initial memory from init_rho now
+		// (the solver sets it; hand-built results must set it too).
+		result.init_rho = 0;
 
 		std::vector<omcat::QltType3> T3;
 		omcat::QltType3 t3_0;

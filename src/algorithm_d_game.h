@@ -531,12 +531,49 @@ inline int d_pattern_from_assignment(const SynthGame& G, int assignment, int K) 
 	return pat;
 }
 
+// ── LG-12 / AL-N4: the t = 0 initial-memory convention ───────────────────
+//
+// At t = 0 the memory ρ ("1-type of the previous output") has no referent:
+// no output has ever been emitted.  The convention here is (F), FIXED:
+//
+//     ρ₀ = qlt_type_of(0, constants)
+//
+// because it is the 1-type of the previous output the INTERPRETER actually
+// supplies at its first enforced step: steps before `formula_time_point`
+// are auto-continued with defaulted outputs (zero), so a lookback atom
+// `o[t-1] ⋈ …` there is evaluated against the constant 0.  Fixing ρ₀ to the
+// same type makes the Algorithm-D verdict and the execution agree.
+//
+// The two rejected alternatives, for the record: ∃ρ₀ ("the system chooses
+// its initial memory") is unsound — ρ is not a free bookkeeping state like
+// a Mealy initial state but the type of an actual prior output, so choosing
+// it asserts a phantom value (starkest for a point type {c_j}) that no
+// first move can implement, and the interpreter then fails at its first
+// enforced step; ∀ρ₀ is needlessly incomplete — it pessimises against
+// initial memories that can never occur.
+//
+// This is one of the three t = 0 conventions in the codebase; the other two
+// are the safety pipeline's "initial lookback values are 0" (see
+// `atom_has_lookback` in ltl_aba_normalization.tmpl.h) and the LA-N3
+// inner-S auxiliary anchor `S(-1) = false` (see `compile_since_trigger_rec`
+// there, and `seed_since_aux_bits` in interpreter.tmpl.h).  All three say
+// the same thing: history before the first enforced step is the defaulted
+// zero stream.
+//
+// `sorted_constants` must be the sorted, deduplicated constants list the
+// T1/T3 positions were enumerated from (collect_qlt_constants returns it in
+// exactly that form).
+inline int initial_memory(const std::vector<omcat::Rat>& sorted_constants) {
+	return omcat::qlt_type_of(omcat::Rat(0, 1), sorted_constants);
+}
+
 inline ProductGame build_product_game(
 	const SynthGame& G,
 	int T1_size,
 	const std::vector<omcat::QltType3>& T3,
 	const std::vector<int>& type_A,   // D-bitmask per T3 type
-	int K)                             // number of D propositions
+	int K,                             // number of D propositions
+	int init_rho)                      // initial memory, from initial_memory()
 {
 	const int n_aps = (int)G.aps.size();
 
@@ -634,7 +671,13 @@ inline ProductGame build_product_game(
 
 	ProductGame pg;
 	pg.n_states = base_n + (int)stubs.size();
-	pg.init = G.init * T1_size + 0; // initial memory = T1 type 0 (below all constants)
+	// LG-12: the initial memory is the caller-supplied fixed convention
+	// (see initial_memory above) — not position 0, not a solver choice.
+	// Out of range is a caller bug (assert); in Release the bad index is
+	// left as-is, which downstream membership tests read as UNREALIZABLE —
+	// fail-safe, unlike a silent clamp back to the old position-0 phantom.
+	assert(0 <= init_rho && init_rho < T1_size);
+	pg.init = G.init * T1_size + init_rho;
 	pg.player.assign(pg.n_states, 0);
 	pg.priority.assign(pg.n_states, 0);
 	pg.succs.resize(pg.n_states);
@@ -952,12 +995,16 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 // T3: enumerated 3-types.
 // type_A: D_pattern bitmask for each T3 type.
 // K: number of D propositions.
+// init_rho: the fixed initial memory type — pass initial_memory(constants)
+//   (LG-12: the ∃ρ₀ loop this replaces let the system win by asserting a
+//   phantom previous output; see the convention block at initial_memory).
 inline bool solve_algorithm_d(
 	const std::string& phi_star,
 	int T1_size,
 	const std::vector<omcat::QltType3>& T3,
 	const std::vector<int>& type_A,
-	int K)
+	int K,
+	int init_rho)
 {
 	if (phi_star.empty() || T1_size <= 0) return false;
 
@@ -970,19 +1017,15 @@ inline bool solve_algorithm_d(
 	if (G.num_states == 0) return false;
 
 	// Build product game (G × T_1)
-	ProductGame pg = build_product_game(G, T1_size, T3, type_A, K);
+	ProductGame pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
 	if (pg.n_states == 0) return false;
 
 	// Solve parity game with Zielonka
 	auto W1 = zielonka_win_player1(pg);
 
-	// REALIZABLE iff ∃ initial T_1 memory type ρ_0 such that player 1 wins
-	// from (G.init, ρ_0).  Since sys chooses its initial memory, take ∃.
-	for (int rho0 = 0; rho0 < T1_size; ++rho0) {
-		int s0 = G.init * T1_size + rho0;
-		if (W1.count(s0)) return true;
-	}
-	return false;
+	// REALIZABLE iff player 1 wins from the ONE initial state
+	// (G.init, init_rho) — convention (F), see initial_memory.
+	return W1.count(pg.init) != 0;
 }
 
 // ── Extended Algorithm D: returns winning region for semantic PWR ──────────
@@ -994,16 +1037,22 @@ struct AlgDResult {
 	SynthGame synth_game;
 	int T1_size = 0;
 	int K = 0;                        // number of D propositions
-	int init_rho = -1;                // winning initial ρ₀ (-1 if unrealizable)
+	// The FIXED initial memory type (LG-12 convention (F), equal to the
+	// initial_memory() argument) when realizable; -1 if unrealizable.
+	// Consistent with product_game.init by construction:
+	// product_game.init == synth_game.init * T1_size + init_rho.
+	int init_rho = -1;
 };
 
 // PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
+// init_rho: the fixed initial memory type — pass initial_memory(constants).
 inline AlgDResult solve_algorithm_d_full(
 	const std::string& phi_star,
 	int T1_size,
 	const std::vector<omcat::QltType3>& T3,
 	const std::vector<int>& type_A,
-	int K)
+	int K,
+	int init_rho)
 {
 	AlgDResult result;
 	result.T1_size = T1_size;
@@ -1018,18 +1067,16 @@ inline AlgDResult solve_algorithm_d_full(
 	if (result.synth_game.num_states == 0) return result;
 
 	result.product_game = build_product_game(
-		result.synth_game, T1_size, T3, type_A, K);
+		result.synth_game, T1_size, T3, type_A, K, init_rho);
 	if (result.product_game.n_states == 0) return result;
 
 	result.winning_region = zielonka_win_player1(result.product_game);
 
-	for (int rho0 = 0; rho0 < T1_size; ++rho0) {
-		int s0 = result.synth_game.init * T1_size + rho0;
-		if (result.winning_region.count(s0)) {
-			result.realizable = true;
-			result.init_rho = rho0;
-			break;
-		}
+	// LG-12: one initial state — (synth_game.init, init_rho) — not ∃ρ₀.
+	// init_rho stays -1 when unrealizable (pinned by SPWR-A-02).
+	if (result.winning_region.count(result.product_game.init)) {
+		result.realizable = true;
+		result.init_rho = init_rho;
 	}
 	return result;
 }

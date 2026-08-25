@@ -845,7 +845,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // pattern 1 (d_0 = true) feasible
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1);
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
 		int base_n = g.num_states * T1_size;
 		CHECK(pg.n_states > base_n);
 		// The sys base state (0,rho=0) = index 0 must reach a stub with the
@@ -875,7 +875,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // D-pattern 1 feasible at (rho=0,rho'=0)
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1);
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
 		auto W1 = alg_d::zielonka_win_player1(pg);
 		CHECK(W1.count(0));
 	}
@@ -898,7 +898,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {0}; // only pattern 0 feasible — guard needs 1
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1);
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/1, /*init_rho=*/0);
 		// Base sys state must have no successors (dead end).
 		CHECK(pg.succs[0].empty());
 		auto W1 = alg_d::zielonka_win_player1(pg);
@@ -930,7 +930,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1};         // only pattern 1 feasible
 
-		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/2);
+		auto pg = alg_d::build_product_game(g, T1_size, T3, type_A, /*K=*/2, /*init_rho=*/0);
 		REQUIRE(pg.n_states >= 3);
 		CHECK(pg.succs[1].empty());            // sys dead end
 		CHECK(pg.succs[0].size() == 2);
@@ -941,6 +941,145 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 	}
 
 } // TEST_SUITE("[Algorithm D: product game construction]")
+
+
+// ── LG-12 / AL-N4: one initial-memory convention, (F) ρ₀ = type_of(0) ────────
+//
+// At t = 0 the memory ρ ("1-type of the previous output") has no referent.
+// The convention is (F): ρ₀ = qlt_type_of(0, constants) — the 1-type of the
+// interpreter's defaulted previous output (steps before the first enforced
+// one emit 0), so verdict and execution agree.  The old code disagreed with
+// itself: build_product_game pinned ρ₀ = position 0, both verdict loops took
+// ∃ρ₀ (the system "won" by asserting a phantom previous output), and
+// semantic_pwr's Win₀ took the union over all winning ρ₀.
+
+TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
+
+	TEST_CASE("[ALG-D-70] initial_memory is qlt_type_of(0, constants)") {
+		using omcat::Rat;
+		// No constants: single interval (-inf, +inf) = position 0.
+		CHECK(alg_d::initial_memory({}) == 0);
+		// 0 is a named constant: the POINT type {0} = position 1.
+		CHECK(alg_d::initial_memory({Rat(0, 1)}) == 1);
+		// 0 below every constant: the interval (-inf, c_0) = position 0.
+		CHECK(alg_d::initial_memory({Rat(1, 2)}) == 0);
+		// 0 strictly between constants: interval (c_0, c_1) = position 2.
+		CHECK(alg_d::initial_memory({Rat(-1, 1), Rat(1, 1)}) == 2);
+		// 0 above every constant: interval (c_{k-1}, +inf) = position 2k.
+		CHECK(alg_d::initial_memory({Rat(-1, 1)}) == 2);
+	}
+
+	// The end-to-end reproducer for the unsound (E) reading.  The F
+	// conjunct routes the spec through the LTL(ABA) pipeline (a G-only
+	// spec takes the safety pipeline and never reaches this gate); the G
+	// conjunct forces the LOOKBACK atom o1[t-1] > 0 at every step,
+	// including t = 0, where the previous output is the interpreter's
+	// defaulted 0.  Under the fixed ρ₀ = type_of(0) = {0} the correct
+	// verdict is UNREALIZABLE (the run's first enforced step already
+	// fails at execution).
+	//
+	// skip(): still blocked by §14 (the product game's environment
+	// over-approximation / refused opponent attractor, Batch O7).  With
+	// the convention fixed, the system's only strategy edge ([d_0 & d_1]
+	// in the ltlsynt-solved game) is data-infeasible from ρ₀ = {0}, so
+	// the SYS state is a dead end and correctly marked lost — but the
+	// ENV-owned initial state keeps its trivial move into that dead end
+	// and stays counted as sys-winning, because the opponent is not
+	// awarded the attractor of dead ends.  Batch O7 (precise env edges +
+	// textbook dead-end semantics) must un-skip this.  The convention
+	// itself — one fixed initial state — is proven without the env
+	// mediation by [ALG-D-74] below.
+	TEST_CASE("[ALG-D-71] phantom initial memory cannot win end-to-end: "
+	          "G(o1[t-1]>0) && F(o1>1) UNREALIZABLE"
+	          * doctest::skip()) {
+		CHECK_FALSE(alg_d_realizable(
+			"(G (o1[t-1]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
+	}
+
+	// The convention flip, one level below the env mediation: a hand-built
+	// game whose SYS-owned initial state has a single self-loop needing
+	// pattern d_0 ("m > 0"), feasible only from memory type 2 = (0, +inf)
+	// sustaining itself.  The retired ∃ρ₀ loop answered REALIZABLE for
+	// this game unconditionally (ρ₀ = 2 wins); under the fixed convention
+	// the verdict depends on the ONE initial memory: lost from
+	// type_of(0) = {0} (position 1, the dead end), won from position 2.
+	TEST_CASE("[ALG-D-74] fixed rho0 decides: dead end from {0}, "
+	          "win from (0,+inf)") {
+		alg_d::SynthGame g;
+		g.num_states = 1;
+		g.init = 0;
+		g.player = {1};                        // sys-owned init
+		g.aps = {"d_0"};
+		g.controllable = {true};
+		g.state_color = {-1};
+		g.state_priority = {1};                // trivial acceptance: all odd
+		g.trans.resize(1);
+		g.trans[0].emplace_back("0", 0, -1);   // needs d_0
+		g.edge_priority = {{-1}};
+
+		// Constants conceptually {0}: positions 0 = (-inf,0), 1 = {0},
+		// 2 = (0,+inf).  d_0 = "previous output > 0" is realisable only
+		// from m-position 2, staying there (y stays > 0).
+		const int T1_size = 3;
+		std::vector<omcat::QltType3> T3(1);
+		T3[0].pos_m = 2; T3[0].pos_y = 2;
+		std::vector<int> type_A = {1};
+
+		// From ρ₀ = type_of(0) = 1 (the point {0}) the only strategy
+		// edge is infeasible: the init state is a sys dead end — lost.
+		auto pg1 = alg_d::build_product_game(g, T1_size, T3, type_A,
+			/*K=*/1, /*init_rho=*/1);
+		CHECK(pg1.init == g.init * T1_size + 1);
+		auto W1 = alg_d::zielonka_win_player1(pg1);
+		CHECK_FALSE(W1.count(pg1.init));
+
+		// From ρ₀ = 2 the self-loop is feasible and all-odd: won.  The
+		// retired ∃ρ₀ loop reported this game realizable regardless of
+		// the initial memory, which is the unsound (E) reading.
+		auto pg2 = alg_d::build_product_game(g, T1_size, T3, type_A,
+			/*K=*/1, /*init_rho=*/2);
+		CHECK(pg2.init == g.init * T1_size + 2);
+		auto W2 = alg_d::zielonka_win_player1(pg2);
+		CHECK(W2.count(pg2.init) == 1);
+	}
+
+	// Guard in the other direction: the same shape winnable from
+	// ρ₀ = type_of(0) stays REALIZABLE (>= admits the defaulted 0 itself).
+	TEST_CASE("[ALG-D-72] G(o1[t-1]>=0) && F(o1>1) stays REALIZABLE "
+	          "from type_of(0)") {
+		CHECK(alg_d_realizable(
+			"(G (o1[t-1]:qlt >= {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
+	}
+
+	// The three former disagreement sites refer to the same state now:
+	// product_game.init, the verdict membership test, and the init_rho
+	// handed to semantic PWR.
+	TEST_CASE("[ALG-D-73] pg.init, verdict and init_rho are one state") {
+		// Skip when ltlsynt is not on PATH (same guard as ALG-D-48).
+		auto small = alg_d::call_ltlsynt_game("d_0", {}, {"d_0"});
+		if (small.num_states == 0) return;
+
+		using omcat::Rat;
+		const std::vector<Rat> constants = {Rat(0, 1)};
+		auto T3 = omcat::enumerate_qlt_T3(constants);
+		const int T1_size = 3;
+		// d_0 = "current output > 0": true exactly in the types whose
+		// y-component is the interval (0, +inf) = position 2.
+		std::vector<int> type_A(T3.size(), 0);
+		for (size_t t = 0; t < T3.size(); ++t)
+			if (T3[t].pos_y == 2) type_A[t] = 1;
+
+		const int rho0 = alg_d::initial_memory(constants);
+		auto r = alg_d::solve_algorithm_d_full(
+			"G(d_0)", T1_size, T3, type_A, 1, rho0);
+		REQUIRE(r.realizable);
+		CHECK(r.init_rho == rho0);
+		CHECK(r.product_game.init
+			== r.synth_game.init * T1_size + rho0);
+		CHECK(r.winning_region.count(r.product_game.init) == 1);
+	}
+
+} // TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]")
 
 
 TEST_SUITE("Cleanup") {

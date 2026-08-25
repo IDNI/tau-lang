@@ -632,6 +632,12 @@ static bool guard_is_aba_feasible(
 // synthesis pipeline for individual feasibility — the safety pipeline's
 // initial-value convention makes lookback atoms appear unconditionally
 // infeasible from t=0, which is incorrect in the LTL context.
+//
+// That "initial lookback values are 0" convention is one of the three t=0
+// conventions in the codebase; the authoritative statement of all three
+// (this one, Algorithm D's initial memory ρ₀ = type_of(0), and the LA-N3
+// inner-S auxiliary anchor S(-1) = false) lives at `alg_d::initial_memory`
+// in algorithm_d_game.h.
 template <NodeType node>
 static bool atom_has_lookback(tref atom) {
 	using tau = tree<node>;

@@ -670,7 +670,11 @@ solve_ltl_aba(tref fm)
 			LOG_DEBUG << "[ltl_aba:algD] T3=" << T3.size() << " T1=" << T1_size
 			          << " K=" << K << " phi_star=" << phi_star;
 
-			bool realizable = alg_d::solve_algorithm_d(phi_star, T1_size, T3, type_A, K);
+			// LG-12: fixed initial memory ρ₀ = type_of(0) — the
+			// interpreter's own lookback-at-t=0 convention.
+			bool realizable = alg_d::solve_algorithm_d(phi_star,
+				T1_size, T3, type_A, K,
+				alg_d::initial_memory(constants));
 			LOG_DEBUG << "[ltl_aba:algD] result=" << (realizable ? "REALIZABLE" : "UNREALIZABLE");
 
 			if (!realizable) return std::nullopt;

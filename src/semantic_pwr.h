@@ -95,8 +95,13 @@ tref build_win_formula(
 // ---------------------------------------------------------------------------
 // Build the Win_0 formula (initial state entry condition).
 //
-// Win_0 = ∨ over all ρ₀ such that (q_init, ρ₀) ∈ W of the data-atom
-// condition for ρ₀.
+// Win_0 = the data-atom condition of the patterns reachable from THE fixed
+// initial memory ρ₀ = result.init_rho, provided (q_init, ρ₀) ∈ W.
+//
+// LG-12: this used to take the union over ALL winning ρ₀ — the ∃ρ₀ reading
+// whose phantom initial memories the fixed convention (F) retired (see
+// alg_d::initial_memory).  result.init_rho is -1 when unrealizable (or on a
+// hand-built result that never ran the solver), which yields nullptr here.
 // ---------------------------------------------------------------------------
 
 template <NodeType node>
@@ -109,20 +114,15 @@ tref build_win0_formula(
 	const int K = result.K;
 	const int T1_size = result.T1_size;
 	const int q_init = result.synth_game.init;
+	const int rho0 = result.init_rho;
+	if (rho0 < 0 || rho0 >= T1_size) return nullptr;
+	if (!result.winning_region.count(q_init * T1_size + rho0))
+		return nullptr;
 
-	// Collect initial ρ₀ values where (q_init, ρ₀) ∈ W.
-	// Initial states are always base states (index < base_n).
-	std::set<int> init_rhos;
-	for (int rho0 = 0; rho0 < T1_size; ++rho0) {
-		int s0 = q_init * T1_size + rho0;
-		if (result.winning_region.count(s0))
-			init_rhos.insert(rho0);
-	}
-
-	// Collect D-patterns reachable from initial winning ρ₀ values.
+	// Collect D-patterns reachable from the fixed initial ρ₀.
 	std::set<int> init_patterns;
 	for (int t = 0; t < (int)T3.size(); ++t) {
-		if (init_rhos.count(T3[t].pos_m))
+		if (T3[t].pos_m == rho0)
 			init_patterns.insert(type_A[t]);
 	}
 
@@ -229,9 +229,11 @@ tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
 	LOG_DEBUG << "[semantic_pwr] trying optimal mode: K=" << K
 	          << " T1=" << T1_size << " phi_star=" << phi_star;
 
-	// Run Algorithm D (full) to get winning region.
+	// Run Algorithm D (full) to get winning region.  LG-12: fixed initial
+	// memory ρ₀ = type_of(0), the interpreter's lookback-at-t=0 convention.
 	auto alg_result = alg_d::solve_algorithm_d_full(
-		phi_star, T1_size, T3, type_A, K);
+		phi_star, T1_size, T3, type_A, K,
+		alg_d::initial_memory(constants));
 
 	if (!alg_result.realizable) {
 		LOG_DEBUG << "[semantic_pwr] unrealizable via Algorithm D";
