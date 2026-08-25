@@ -1712,6 +1712,11 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 	update = normalizer<node>(update);
 	// If the update is T, nothing changes
 	if (tau::get(update).equals_T()) return to_htrefs(alts);
+	// PW-R6: one satisfiability memo per factored revision — the clause,
+	// sometimes-conjunction and gate checks repeat identical hash-consed
+	// (formula, start_time) queries, each a subprocess on temporal
+	// content (see pointwise_revision.h for the delegated-path twin).
+	pwr_sat_memo memo;
 	for (tref clause : expression_paths<node>(update)) {
 		tref upd_always = tau::get(clause).find_top(
 			is_child<node, tau::wff_always>);
@@ -1721,7 +1726,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
 		LOG_TRACE << "pwr/clause: " << LOG_FM(clause) << "\n";
-		if (!is_tau_formula_sat<node>(clause, start_time))
+		if (!pwr_memo_sat<node>(clause, start_time, &memo))
 			continue;
 
 		// An update already implied by the running spec is a no-op;
@@ -1765,7 +1770,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			if (sts.empty()) return base;
 			tref with = build_wff_and<node>(base,
 				build_wff_and<node>(sts));
-			return is_tau_formula_sat<node>(with, start_time)
+			return pwr_memo_sat<node>(with, start_time, &memo)
 				? with : base;
 		};
 
@@ -1836,7 +1841,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				build_wff_and<node>(upd_sometime));
 			LOG_TRACE << "pwr/gate: " << LOG_FM(gate) << "\n";
 			const bool plain_ok =
-				is_tau_formula_sat<node>(gate, start_time);
+				pwr_memo_sat<node>(gate, start_time, &memo);
 			if (!plain_ok && !upd_always) {
 				// Without an always part in the update there
 				// is no weaker always to fall back on; the

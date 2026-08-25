@@ -84,6 +84,51 @@ TEST_SUITE("bounded_cache — correctness") {
 		}
 	}
 
+	// TT2-13 / LG-27: the runtime-bound mode used by the string-keyed
+	// synthesis caches (`call_ltlsynt_game` with `&cache_bound`). The
+	// pointee is read on every insert, so `set cachebound N` takes
+	// effect on a live cache.
+	TEST_CASE("runtime bound: pointee read on every insert") {
+		std::size_t bound = 4;
+		bounded_cache<int, int> bc{&bound};
+
+		for (int i = 0; i < 10; ++i) bc.emplace(i, compute(i));
+		CHECK(bc.size() == 4);
+		CHECK(bc.evictions() == 6);
+		// FIFO: the latest 4 survive.
+		for (int i = 6; i < 10; ++i) REQUIRE(bc.contains(i));
+
+		// Loosening the bound takes effect immediately.
+		bound = 8;
+		for (int i = 10; i < 14; ++i) bc.emplace(i, compute(i));
+		CHECK(bc.size() == 8);
+
+		// Tightening evicts down on the next insert (not before).
+		bound = 2;
+		CHECK(bc.size() == 8);
+		bc.emplace(100, compute(100));
+		CHECK(bc.size() == 2);
+		CHECK(bc.contains(100));
+	}
+
+	TEST_CASE("runtime bound: 0 is unbounded but keeps FIFO order") {
+		std::size_t bound = 0;
+		bounded_cache<int, int> bc{&bound};
+
+		for (int i = 0; i < 100; ++i) bc.emplace(i, compute(i));
+		CHECK(bc.size() == 100);
+		CHECK(bc.evictions() == 0);
+
+		// A later non-zero bound still knows the insertion order:
+		// the next insert evicts the OLDEST entries first.
+		bound = 50;
+		bc.emplace(1000, compute(1000));
+		CHECK(bc.size() == 50);
+		for (int i = 0; i < 51; ++i) CHECK(!bc.contains(i));
+		REQUIRE(bc.contains(1000));
+		CHECK(bc.contains(99));
+	}
+
 	TEST_CASE("erase shrinks both map and queue") {
 		bounded_cache<int, int, std::less<int>, 16> bc;
 		for (int i = 0; i < 16; ++i) bc.emplace(i, compute(i));

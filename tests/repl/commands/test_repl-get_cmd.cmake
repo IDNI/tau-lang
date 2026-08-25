@@ -22,9 +22,20 @@ add_repl_test(get_cmd-lists_specsizewarn_off "get" "specsizewarn: *off")
 # --- bare `get` prints every limit option (covers the limit_printers map) ----
 foreach(opt maxsplits maxrounds fixpointsteps flagsteps blastdepth squeezecap
 		simplifyrounds defpasses enumsteps rewriterounds gcminsize
-		gcgrowth specsizewarn revisionalts)
+		gcgrowth specsizewarn revisionalts maxsubsets cachebound)
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
 endforeach()
+
+# LT-17 / LG-27: the two Batch-O3 caps ship FINITE (4096); 0 opts back into
+# unlimited/unbounded, same shape as the SO-1 temporal caps above.
+add_repl_test(get_cmd-maxsubsets_default_finite "get maxsubsets"
+	"maxsubsets: *4096")
+add_repl_test(get_cmd-maxsubsets_zero_is_unlimited
+	"set maxsubsets 0. get maxsubsets" "maxsubsets: *unlimited")
+add_repl_test(get_cmd-cachebound_default_finite "get cachebound"
+	"cachebound: *4096")
+add_repl_test(get_cmd-cachebound_zero_is_unlimited
+	"set cachebound 0. get cachebound" "cachebound: *unlimited")
 
 # gcminsize round trip through `get` (only a `set` test existed).
 add_repl_test(get_cmd-gcminsize "set gcminsize 512. get gcminsize"

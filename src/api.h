@@ -268,6 +268,18 @@ struct api {
 	 */
 	static void set_max_revision_alts(size_t n);
 	/**
+	 * @brief Cap the ∀∃-synthesis checks the k-ary consistency-subset
+	 * walk may spend per atom group (LT-17); on the cap the remaining
+	 * subsets are skipped with a warning (sound, at worst a false
+	 * UNREALIZABLE). Default 4096; 0 = unlimited.
+	 */
+	static void set_max_consistency_subsets(size_t n);
+	/**
+	 * @brief Bound the string-keyed synthesis caches (FIFO eviction,
+	 * LG-27); default 4096 entries, 0 = unbounded.
+	 */
+	static void set_cache_bound(size_t n);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */

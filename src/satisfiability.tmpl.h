@@ -1625,7 +1625,9 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 }
 
 template <NodeType node>
-bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
+bool is_tau_formula_sat_core(tref fm, const int_t start_time,
+	const bool output)
+{
 	using tau = tree<node>;
 	LOG_DEBUG << "Start is_tau_formula_sat: " << LOG_FM(fm);
 	// Merge top-level (G A) && (G B) → G(A && B) up-front.  Direct
@@ -1674,6 +1676,35 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	}
 	LOG_DEBUG << "End is_tau_formula_sat: false";
 	return false;
+}
+
+// PW-R6: the cross-revision result cache ("B12"). Any U/R/W/S/T content
+// routes a satisfiability query through the full LTL(ABA) pipeline — one
+// ltlsynt subprocess per call — and the pointwise revision asks the same
+// (formula, start_time) queries again on every later update. Memoise the
+// verdict under TAU_CACHE, keyed like `transform_to_execution`'s cache and
+// invalidated by the tree GC like every other create_cache table. The
+// `output` flag only adds logging/exports on top of the same verdict, so it
+// is not part of the key — but an output=true call still runs the full
+// computation for its side effects (and stores the verdict for others).
+// Pinned trap (BA1-17): never a shared cvc5 solver or ltlsynt session
+// across calls — the RESULT cache is the only safe port.
+template <NodeType node>
+bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
+#ifdef TAU_CACHE
+	using cache_t = std::map<std::pair<tref, int_t>, bool,
+				subtree_pair_less<node, int_t>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (!output)
+		if (auto it = cache.find(std::make_pair(fm, start_time));
+			it != cache.end()) return it->second;
+	const bool result =
+		is_tau_formula_sat_core<node>(fm, start_time, output);
+	cache.emplace(std::make_pair(fm, start_time), result);
+	return result;
+#else
+	return is_tau_formula_sat_core<node>(fm, start_time, output);
+#endif // TAU_CACHE
 }
 
 // Check for temporal formulas if f1 implies f2

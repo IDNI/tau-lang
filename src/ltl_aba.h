@@ -20,6 +20,7 @@
 #define __IDNI__TAU__LTL_ABA_H__
 
 #include "normalizer.h"
+#include "bounded_cache.h"
 #include "boolean_algebras/nlang_ba.h"
 #include <optional>
 #include <stdexcept>
@@ -28,6 +29,18 @@
 #include <vector>
 
 namespace idni::tau_lang {
+
+// LT-17: cap on the number of ∀∃-synthesis feasibility checks the k-ary
+// positive-subset walk (`extend_consistency_positive_k_ary`) may spend per
+// atom group. The walk is Θ(2^n) when the atoms are mostly jointly feasible
+// (nothing to prune), and each check is a full safety-synthesis fixpoint.
+// Skipping the remaining subsets is sound: a strategy edge whose guard uses
+// a jointly-infeasible combination is still caught by the per-edge oracle,
+// so a fired cap can only cost completeness (a false UNREALIZABLE when
+// ltlsynt happened to pick such an edge — D3 = skip + log), never a false
+// REALIZABLE. Runtime parameter by policy (`--max-consistency-subsets`,
+// REPL `set maxsubsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
+inline size_t max_consistency_subsets = 4096;
 
 // ── Detection ────────────────────────────────────────────────────────────────
 

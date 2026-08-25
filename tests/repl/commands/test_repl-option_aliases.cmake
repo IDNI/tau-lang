@@ -105,6 +105,8 @@ add_repl_test(option_alias-blockmaxsplits
 	"get blockmaxsplits"      "maxsplits:")
 add_repl_test(option_alias-blockmaxrounds
 	"get blockmaxrounds"      "maxrounds:")
+add_repl_test(option_alias-maxconsistencysubsets
+	"get maxconsistencysubsets" "maxsubsets:")
 
 # Numeric options take a count, not a flag: enable/disable/toggle must refuse.
 add_repl_test_fail(option_numeric-enable_refused

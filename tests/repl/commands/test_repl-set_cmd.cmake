@@ -53,6 +53,10 @@ add_repl_test(set_cmd-specsizewarn
 	"set specsizewarn 4096. get specsizewarn" "specsizewarn: *4096")
 add_repl_test(set_cmd-revisionalts
 	"set revisionalts 3. get revisionalts" "revisionalts: *3")
+add_repl_test(set_cmd-maxsubsets
+	"set maxsubsets 7. get maxsubsets" "maxsubsets: *7")
+add_repl_test(set_cmd-cachebound
+	"set cachebound 99. get cachebound" "cachebound: *99")
 # The two pre-existing numeric options now accept 0 as "unlimited" (they
 # rejected 0 before this change, so no meaning was lost).
 add_repl_test(set_cmd-maxsplits_zero_unlimited

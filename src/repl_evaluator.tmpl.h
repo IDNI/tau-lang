@@ -985,6 +985,9 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "specsizewarn")             return spec_size_warn_opt;
 	if (x == "revisionalts"
 		|| x == "maxrevisionalts")   return revision_alts_opt;
+	if (x == "maxsubsets"
+		|| x == "maxconsistencysubsets") return consistency_subsets_opt;
+	if (x == "cachebound")               return cache_bound_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1082,7 +1085,11 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "specsizewarn:        "
 			<< (v ? std::to_string(v) : "off") << "\n"; } },
 	{ revision_alts_opt, [climit]() {
-		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } }
+		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } },
+	{ consistency_subsets_opt, [climit]() {
+		std::cout << "maxsubsets:          " << climit(max_consistency_subsets) << "\n"; } },
+	{ cache_bound_opt, [climit]() {
+		std::cout << "cachebound:          " << climit(cache_bound) << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1218,7 +1225,11 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ spec_size_warn_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_spec_size_warn(*n); } },
 	{ revision_alts_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_max_revision_alts(*n); } } };
+		api<node>::set_max_revision_alts(*n); } },
+	{ consistency_subsets_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_consistency_subsets(*n); } },
+	{ cache_bound_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_cache_bound(*n); } } };
 	setters[o]();
 }
 
@@ -1271,6 +1282,8 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case gc_growth_opt:
 	case spec_size_warn_opt:
 	case revision_alts_opt:
+	case consistency_subsets_opt:
+	case cache_bound_opt:
 		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
 			"`set <option> <n>`\n", error = true;
 		return;
@@ -1550,7 +1563,9 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  gcminsize              gc trigger floor (tree nodes)        256\n"
 		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
 		"  specsizewarn           updated-spec size warning (chars)    off\n"
-		"  revisionalts           revision alternatives kept per part  unlimited\n";
+		"  revisionalts           revision alternatives kept per part  unlimited\n"
+		"  maxsubsets             k-ary consistency subset checks      4096\n"
+		"  cachebound             string-keyed synthesis cache bound   4096\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options +
 		"  severity               severity                             error/info/debug/trace\n"

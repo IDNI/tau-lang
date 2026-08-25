@@ -464,29 +464,28 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 
 namespace alg_d {
 
-inline SynthGame call_ltlsynt_game(
+inline const SynthGame& call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs)
 {
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
-	struct game_cache_key {
-		std::string formula;
-		std::vector<std::string> ins, outs;
-		bool operator==(const game_cache_key& o) const {
-			return formula == o.formula && ins == o.ins && outs == o.outs;
-		}
+	// TT2-13 / LG-27: a bounded_cache in runtime-bound mode (`set
+	// cachebound`, 0 = unbounded, FIFO eviction) instead of the previous
+	// unbounded unordered_map of full SynthGame copies — this cache holds
+	// no trefs, so the tree GC never pruned it and the bound is its only
+	// control. The returned reference is valid until a later call inserts
+	// (and possibly evicts); callers copy on assignment.
+	auto csv = [](const std::vector<std::string>& v) {
+		std::string r;
+		for (size_t i = 0; i < v.size(); ++i) { if (i) r += ","; r += v[i]; }
+		return r;
 	};
-	struct game_cache_hash {
-		size_t operator()(const game_cache_key& k) const {
-			size_t h = std::hash<std::string>{}(k.formula);
-			for (auto& s : k.ins)  h ^= std::hash<std::string>{}(s) + 0x9e3779b9 + (h << 6) + (h >> 2);
-			for (auto& s : k.outs) h ^= std::hash<std::string>{}(s) + 0x517cc1b7 + (h << 6) + (h >> 2);
-			return h;
-		}
-	};
-	static std::unordered_map<game_cache_key, SynthGame, game_cache_hash> cache;
-	game_cache_key key{phi_prop, ins, outs};
+	static bounded_cache<std::string, SynthGame> cache{&cache_bound};
+	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
+	// name, so the concatenation is injective.
+	const std::string key =
+		phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 
 	// Configurable timeout (same env var as call_ltlsynt).
@@ -495,16 +494,12 @@ inline SynthGame call_ltlsynt_game(
 	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
 	if (tmpfile_path.empty()) {
 		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		return {};  // transient — don't cache
+		static const SynthGame empty_game{};
+		return empty_game;  // transient — don't cache
 	}
 
 	std::vector<std::string> argv = {
 	    "ltlsynt", "-F", tmpfile_path, "--print-game-hoa"};
-	auto csv = [](const std::vector<std::string>& v) {
-		std::string r;
-		for (size_t i = 0; i < v.size(); ++i) { if (i) r += ","; r += v[i]; }
-		return r;
-	};
 	if (!ins.empty())  argv.push_back("--ins="  + csv(ins));
 	if (!outs.empty()) argv.push_back("--outs=" + csv(outs));
 
@@ -534,9 +529,12 @@ inline SynthGame call_ltlsynt_game(
 	case spot_exit_kind::ok:
 		break;
 	}
-	auto result = parse_synth_game_hoa(hoa);
-	cache[key] = result;
-	return result;
+	// Insert-then-return-reference: the freshly inserted entry is the
+	// newest in FIFO order, so an eviction triggered by this insert can
+	// only remove OLDER entries (bound >= 1) — the reference is safe.
+	auto [it, inserted] = cache.emplace(key, parse_synth_game_hoa(hoa));
+	(void) inserted;  // the find above missed, so this always inserts
+	return it->second;
 }
 
 } // namespace alg_d

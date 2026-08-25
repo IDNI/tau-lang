@@ -115,6 +115,16 @@ cli::options tau_options() {
 	opts["max-rewrite-rounds"] = cli::option("max-rewrite-rounds", 'R', "0")
 		.set_description("cap rewrite-to-fixpoint rounds "
 			"(0 = unlimited)");
+	// The k-ary walk cap ships FINITE: the walk is 2^n synthesis checks
+	// on mostly-feasible atoms; a fired cap is sound (false UNREALIZABLE
+	// at worst, warned loudly), an uncapped walk is a hang.
+	opts["max-consistency-subsets"] =
+		cli::option("max-consistency-subsets", 'k', "4096")
+		.set_description("cap k-ary consistency subset checks per atom "
+			"group (default 4096; 0 = unlimited)");
+	opts["cache-bound"] = cli::option("cache-bound", 'C', "4096")
+		.set_description("bound the string-keyed synthesis caches, "
+			"FIFO eviction (default 4096; 0 = unbounded)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
 		.set_description("tree-node count floor before gc may trigger");
 	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
@@ -250,6 +260,8 @@ int main(int argc, char** argv) {
 	tau_api::set_max_def_passes(optnum("max-def-passes"));
 	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
 	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
+	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
+	tau_api::set_cache_bound(optnum("cache-bound"));
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));

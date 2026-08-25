@@ -156,6 +156,16 @@ void api<node>::set_max_revision_alts(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_max_consistency_subsets(size_t n) {
+	max_consistency_subsets = n;
+}
+
+template <NodeType node>
+void api<node>::set_cache_bound(size_t n) {
+	cache_bound = n;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	pwr_semantic_fallback = on;
 }

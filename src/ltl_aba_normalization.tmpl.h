@@ -760,9 +760,20 @@ static void extend_consistency_positive_k_ary(
 		return false;
 	};
 
+	// LT-17: the walk performs Θ(2^n) synthesis checks when the atoms are
+	// mostly jointly feasible (supersets of an infeasible set are pruned,
+	// but feasible sets prune nothing). Cap the checks at the runtime
+	// parameter `max_consistency_subsets` (0 = unlimited) and skip the
+	// rest: sound (the per-edge oracle still catches any jointly
+	// infeasible guard), at worst incomplete (a false UNREALIZABLE if
+	// ltlsynt picks such an edge — D3 = skip + log, never throw).
+	size_t checks_spent = 0;
+	bool cap_fired = false;
+
 	// DPLL walk over positive subsets of size ≥ 3.
 	std::function<void(int, tref, std::vector<int>&)> walk =
 	    [&](int idx, tref prefix_body, std::vector<int>& sel) {
+		if (cap_fired) return;
 		const int size = static_cast<int>(sel.size());
 		if (size >= 3) {
 			if (is_subsumed(sel)) return;
@@ -777,6 +788,21 @@ static void extend_consistency_positive_k_ary(
 				if (pure_out_lb) { any_pure_out_lb = true; break; }
 			}
 			if (any_pure_out_lb) return;
+			if (max_consistency_subsets
+				&& checks_spent >= max_consistency_subsets) {
+				cap_fired = true;
+				LOG_WARNING << "[ltl_aba] k-ary consistency "
+					"walk capped after "
+					<< checks_spent << " subset checks "
+					"(--max-consistency-subsets / `set "
+					"maxsubsets`, 0 = unlimited); "
+					"remaining subsets skipped -- the "
+					"verdict stays sound (the oracle "
+					"checks every strategy edge) but may "
+					"be a false UNREALIZABLE\n";
+				return;
+			}
+			++checks_spent;
 			if (!aba_synthesis_feasible<node>(prefix_body)) {
 				std::string pat;
 				for (int i : sel) {

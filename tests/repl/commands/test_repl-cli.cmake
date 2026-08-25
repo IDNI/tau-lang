@@ -156,6 +156,8 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_rewrite_rounds|max-rewrite-rounds|R|21|rewriterounds|21"
 	"gc_min_size|gc-min-size|G|512|gcminsize|512"
 	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"
+	"max_consistency_subsets|max-consistency-subsets|k|9|maxsubsets|9"
+	"cache_bound|cache-bound|C|123|cachebound|123"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

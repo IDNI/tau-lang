@@ -886,3 +886,122 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 		CHECK(is_realizable(result));
 	}
 }
+
+// ============================================================================
+// PWR-R6: per-revision satisfiability memo (+ the cross-revision TAU_CACHE
+// result cache inside is_tau_formula_sat).
+//
+// Every is_tau_formula_sat query with U/R/W/S/T content is one ltlsynt
+// subprocess (call_ltlsynt has no cache), and one revision repeats identical
+// hash-consed (formula, start_time) queries: Step 1's spec ∧ update, Step 2's
+// clause ∧ update on a single-clause spec and revise()'s early-exit
+// conjunction are the same tref. The memo answers repeats once per revision
+// in every build; under TAU_CACHE (Release) the global result cache also
+// answers repeats across revisions.
+//
+// Counted through a stub `ltlsynt` prepended to PATH that appends one line
+// per invocation to a file, then execs the real binary — behavior is
+// unchanged, only observed.
+// ============================================================================
+
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <sys/stat.h>
+#include <unistd.h>
+
+namespace {
+
+int count_lines(const std::string& path) {
+	std::ifstream in(path);
+	int n = 0;
+	std::string line;
+	while (std::getline(in, line)) ++n;
+	return n;
+}
+
+} // namespace
+
+TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
+
+	TEST_CASE("[PWR-R6-01] one U-revision spawns each distinct query "
+			"once; a repeated revision spawns none under "
+			"TAU_CACHE") {
+		// Skip when ltlsynt is not on PATH (same guard as the other
+		// ltlsynt-driven suites).
+		if (std::system("command -v ltlsynt > /dev/null 2>&1") != 0)
+			return;
+		// Resolve the real binary before PATH is changed.
+		std::string real;
+		{
+			FILE* p = popen("command -v ltlsynt", "r");
+			REQUIRE(p != nullptr);
+			char buf[4096];
+			if (fgets(buf, sizeof(buf), p)) real = buf;
+			pclose(p);
+			while (!real.empty() && (real.back() == '\n'
+				|| real.back() == '\r')) real.pop_back();
+		}
+		REQUIRE(!real.empty());
+
+		char tmpl[] = "/tmp/tau_pwr_r6_XXXXXX";
+		char* dir = mkdtemp(tmpl);
+		REQUIRE(dir != nullptr);
+		const std::string stub  = std::string(dir) + "/ltlsynt";
+		const std::string count = std::string(dir) + "/count";
+		{
+			std::ofstream s(stub);
+			s << "#!/bin/sh\n"
+			     "echo x >> \"$TAU_TEST_LTLSYNT_COUNT\"\n"
+			     "exec \"$TAU_TEST_LTLSYNT_REAL\" \"$@\"\n";
+		}
+		chmod(stub.c_str(), 0755);
+
+		const char* old_path = std::getenv("PATH");
+		REQUIRE(old_path != nullptr);
+		const std::string saved_path = old_path;
+		setenv("TAU_TEST_LTLSYNT_COUNT", count.c_str(), 1);
+		setenv("TAU_TEST_LTLSYNT_REAL", real.c_str(), 1);
+		setenv("PATH",
+			(std::string(dir) + ":" + saved_path).c_str(), 1);
+
+		// s ∧ u is UNSAT at every discharge combination (invariants
+		// o1=0 vs o1=1 conflict, commitments force o1 both ways), so
+		// the revision runs the full recursion instead of returning
+		// at the Step 1 vacuity check.
+		tref s = spec("(o1[t] = 0) U ((o1[t] = 0) && (o2[t] = 1)).");
+		tref u = spec("(o1[t] = 1) U ((o1[t] = 1) && (o2[t] = 0)).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+
+		std::ofstream(count, std::ios::trunc).flush();
+		tref r1 = pointwise_revision_temporal<node_t>(s, u, 0);
+		const int n1 = count_lines(count);
+
+		std::ofstream(count, std::ios::trunc).flush();
+		tref r2 = pointwise_revision_temporal<node_t>(s, u, 0);
+		const int n2 = count_lines(count);
+
+		setenv("PATH", saved_path.c_str(), 1);
+		unsetenv("TAU_TEST_LTLSYNT_COUNT");
+		unsetenv("TAU_TEST_LTLSYNT_REAL");
+
+		REQUIRE(r1 != nullptr);
+		CHECK(r2 == r1);
+
+		// The revision makes 6 temporal queries of which 2 are
+		// hash-consed repeats (Step 2's clause ∧ update and the
+		// outer revise() early exit); the memo answers those, so at
+		// most 4 subprocesses run. Without the memo this was 6.
+		CHECK(n1 >= 1);
+		CHECK(n1 <= 4);
+#ifdef TAU_CACHE
+		// Cross-revision result cache: the identical revision answers
+		// every query from the cache — zero subprocesses.
+		CHECK(n2 == 0);
+#else
+		// No global cache in this build: the repeat costs the same.
+		CHECK(n2 == n1);
+#endif // TAU_CACHE
+	}
+}
