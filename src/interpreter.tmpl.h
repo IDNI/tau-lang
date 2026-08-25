@@ -1073,15 +1073,29 @@ void interpreter<node>::update(tref update) {
 					// product of both parts' alternatives
 					// in lexicographic preference order --
 					// (⋁A)∧(⋁B) with the stronger pairs
-					// tried first.
+					// tried first. Structural duplicates
+					// are dropped keeping the earliest
+					// (strongest) position -- hash-consing
+					// makes the built conjunction tref the
+					// structural identity -- matching the
+					// dedup pointwise_revision already
+					// applies to its own result.
 					htrefs merged;
+					std::unordered_set<tref> seen;
 					merged.reserve(current_spec[i].first.size()
 						* current_spec[j].first.size());
 					for (const htref& a : current_spec[i].first)
-						for (const htref& b : current_spec[j].first)
-							merged.push_back(tree<node>::geth(
-								tau::build_wff_and(
-									a->get(), b->get())));
+						for (const htref& b : current_spec[j].first) {
+							// a∧a ≡ a: keep the pair flat
+							tref m = a->get() == b->get()
+								? a->get()
+								: tau::build_wff_and(
+									a->get(),
+									b->get());
+							if (seen.insert(m).second)
+								merged.push_back(
+									tree<node>::geth(m));
+						}
 					current_spec[i].first = std::move(merged);
 					part_merged[i] = true;
 					current_spec.erase(current_spec.begin()+j);
