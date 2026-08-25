@@ -84,10 +84,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
-# take TAU_SHARED_PREFIX from env and args
-include(tau-shared-prefix)
-# take TAU_BUILD_JOBS from env and args
-include(tau-build-jobs)
+# resolve TAU_SHARED_PREFIX and TAU_BUILD_JOBS from -D/env/auto into
+# TAU_SHARED_PREFIX_RESOLVED / TAU_BUILD_JOBS_RESOLVED (consumers below must
+# read the _RESOLVED name, not the bare cache variable -- see
+# external/parser/cmake/tau-resolve.cmake). Already include()d once above
+# (before project()) when TAU_BUILD_EMSCRIPTEN is ON, via use-emscripten.cmake;
+# the include_guard makes this a no-op in that case, and both paths set the
+# same directory-scope variables, so ordering relative to project() doesn't
+# matter here.
+include(tau-resolve)
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
@@ -298,7 +303,13 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_API_TESTS: ${TAU_BUILD_API_TESTS}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
+# TAU_BUILD_JOBS_REASON is only set when TAU_BUILD_JOBS_RESOLVED came from
+# auto-detection (see tau-resolve.cmake); empty otherwise (explicit -D/env).
+if(TAU_BUILD_JOBS_REASON)
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED} (${TAU_BUILD_JOBS_REASON})")
+else()
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED}")
+endif()
 message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_RPM_PACKAGE: ${TAU_RPM_PACKAGE}")
 message(STATUS "TAU_DEB_PACKAGE: ${TAU_DEB_PACKAGE}")
@@ -309,7 +320,7 @@ message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
 message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
 message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
-message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
 
@@ -319,7 +330,7 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}")
 
-set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX}" CACHE PATH "Install prefix" FORCE)
+set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX_RESOLVED}" CACHE PATH "Install prefix" FORCE)
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "CMAKE_INSTALL_BINDIR: ${CMAKE_INSTALL_BINDIR}")
 message(STATUS "CMAKE_INSTALL_LIBDIR: ${CMAKE_INSTALL_LIBDIR}")
@@ -346,9 +357,9 @@ message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 #
 if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	set(DEP_CVC5_ARGS
-		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX})
-	set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
+		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}
+		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED})
+	set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX_RESOLVED}/cvc5)
 	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		list(APPEND DEP_CVC5_ARGS --w64)
@@ -395,10 +406,10 @@ endif()
 # Add Boost log library
 #
 set(DEP_BOOST_ARGS
-	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}
+	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}
+	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}
 	-DTAU_BUILD_PIC=${TAU_BUILD_PIC})
-set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX}/boost)
+set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX_RESOLVED}/boost)
 set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	list(APPEND DEP_BOOST_ARGS --w64)
@@ -473,12 +484,12 @@ if(TAU_BUILD_BROWSER_TESTS)
 	# use-emscripten.cmake for where TAU_SHARED_PREFIX/emsdk comes from);
 	# putting its bin/ first on PATH means neither script below needs a
 	# system node install.
-	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX}/emsdk/node/*/bin")
+	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node/*/bin")
 	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
 	if(_tau_emsdk_node_bin_count EQUAL 0)
 		message(FATAL_ERROR
 			"TAU_BUILD_BROWSER_TESTS=ON needs emsdk's bundled node, not found "
-			"under ${TAU_SHARED_PREFIX}/emsdk/node. Run './dev dep-emsdk.sh' "
+			"under ${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node. Run './dev dep-emsdk.sh' "
 			"first (the Emscripten toolchain itself already requires it).")
 	endif()
 	list(GET _tau_emsdk_node_bin 0 _tau_emsdk_node_bin)
@@ -673,7 +684,7 @@ set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")
-set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX}/packages")
+set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX_RESOLVED}/packages")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")

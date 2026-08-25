@@ -36,8 +36,8 @@ else()
 		-DTAU_PARSER_BUILD_DOC=OFF
 		-DTAU_PARSER_DONT_USE_FTXUI=ON
 		-DTAU_PARSER_INSTALL=OFF
-		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}
-		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS})
+		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}
+		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED})
 	# Reuse whatever compiler launcher (ccache, ...) the outer configure
 	# already wired in, rather than forcing a choice of our own.
 	if(CMAKE_C_COMPILER_LAUNCHER)
@@ -51,8 +51,8 @@ else()
 
 	set(TAU_HOST_TGF_BUILD_COMMAND
 		${CMAKE_COMMAND} --build "${TAU_HOST_TOOLS_BINARY_DIR}" --target tgf)
-	if(TAU_BUILD_JOBS MATCHES "^[1-9][0-9]*$")
-		list(APPEND TAU_HOST_TGF_BUILD_COMMAND --parallel ${TAU_BUILD_JOBS})
+	if(TAU_BUILD_JOBS_RESOLVED MATCHES "^[1-9][0-9]*$")
+		list(APPEND TAU_HOST_TGF_BUILD_COMMAND --parallel ${TAU_BUILD_JOBS_RESOLVED})
 	endif()
 
 	# The parent configure's CC/CXX/*FLAGS, if any, belong to the cross

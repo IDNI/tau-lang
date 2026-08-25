@@ -26,9 +26,9 @@
 #  define TAU_CODEGEN_BA_LINK_LIBS "@TAU_BA_LINK_LIBS@"
 #endif
 
-// Install prefix of the Boost/cvc5 builds this build linked (TAU_SHARED_PREFIX), likewise.
+// Install prefix of the Boost/cvc5 builds this build linked (TAU_SHARED_PREFIX_RESOLVED), likewise.
 #ifndef TAU_CODEGEN_SHARED_PREFIX
-#  define TAU_CODEGEN_SHARED_PREFIX "@TAU_SHARED_PREFIX@"
+#  define TAU_CODEGEN_SHARED_PREFIX "@TAU_SHARED_PREFIX_RESOLVED@"
 #endif
 
 // Compile definitions resolved active on this build (e.g. TAU_PARSER_MEASURE*),
