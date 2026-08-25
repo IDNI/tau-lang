@@ -28,3 +28,12 @@ add_test(NAME "test_codegen_cli-non_executable_exit_5"
 set_tests_properties("test_codegen_cli-non_executable_exit_5" PROPERTIES
 	PASS_REGULAR_EXPRESSION "not executable(.*\n)*.*EXIT=5"
 	FAIL_REGULAR_EXPRESSION "class TauProgram")
+
+# LA-10: a spec decided by the constant-output fast path now emits a program
+# with the synthesised constant embedded (it used to be exit 5, REALIZABLE
+# but not executable).
+add_test(NAME "test_codegen_cli-constant_output_emits"
+	COMMAND bash -c "echo '(i1[t]:qlt = {0}:qlt) U (o1[t]:qlt = {1}:qlt)' | $<TARGET_FILE:tau_codegen> -; echo EXIT=$?")
+set_tests_properties("test_codegen_cli-constant_output_emits" PROPERTIES
+	PASS_REGULAR_EXPRESSION "synthesised constant"
+	FAIL_REGULAR_EXPRESSION "not executable|UNREALIZABLE|UNKNOWN")

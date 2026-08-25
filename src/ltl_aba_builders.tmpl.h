@@ -284,7 +284,11 @@ static std::optional<bool> eval_pure_output_atom_at(
 // constant output choice. This fast-path avoids the expensive Algorithm B
 // ltlsynt call for formulas with trivially-satisfiable U/W/R right-sides.
 template <NodeType node>
-static bool constant_output_realizable(
+// LA-10: on success, returns the WINNING assignment (output stream name →
+// T1 position of its constant value) instead of a bare true — the caller
+// materialises it as `always(⋀ o_k = c_k)` so the strategy survives into
+// execution and codegen instead of being discarded.
+static std::optional<std::map<std::string, int>> constant_output_realizable(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
 {
@@ -297,20 +301,20 @@ static bool constant_output_realizable(
 			if (!nm.empty() && nm[0] == 'o') out_names.insert(nm);
 		}
 	}
-	if (out_names.empty()) return false;
+	if (out_names.empty()) return std::nullopt;
 
 	auto constants = omcat::collect_qlt_constants<node>(fm);
 	int T1_size = 2 * (int)constants.size() + 1;
-	if (T1_size <= 0) return false;
+	if (T1_size <= 0) return std::nullopt;
 
 	std::vector<std::string> out_vec(out_names.begin(), out_names.end());
 	int n_out = (int)out_vec.size();
 	unsigned long long total_u = 1;
 	const unsigned long long CAP = 100ULL;
 	for (int i = 0; i < n_out; ++i) {
-		if (total_u > CAP) return false;
+		if (total_u > CAP) return std::nullopt;
 		total_u *= (unsigned long long)T1_size;
-		if (total_u > CAP) return false;
+		if (total_u > CAP) return std::nullopt;
 	}
 	long long total = (long long)total_u;
 
@@ -372,10 +376,10 @@ static bool constant_output_realizable(
 		if (rc == 0 && out == "1") {
 			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
 			          << "(combo=" << combo << ")";
-			return true;
+			return var_pos;
 		}
 	}
-	return false;
+	return std::nullopt;
 }
 
 // LS-12: shared between solve_ltl_aba_algorithm_a and semantic_pwr_optimal
@@ -819,15 +823,75 @@ solve_ltl_aba(tref fm)
 				// Catches trivially-satisfiable U/W/R right-sides that
 				// Algorithm B's large P_σ-encoded formula would make
 				// ltlsynt time out on.
-				if (constant_output_realizable<node>(fm, sol.atoms)) {
+				if (auto win = constant_output_realizable<node>(
+					fm, sol.atoms); win) {
+					// LA-10: materialise the winning constant
+					// combination as `always(⋀ o_k = c_k)` so the
+					// strategy survives into execution and codegen
+					// (it used to be discarded: executable=false,
+					// exit 5 / interpreter refusal).  Any
+					// representative of the winning 1-type works —
+					// atom truth only depends on the type — and
+					// QltType1::realize() picks one (the constant
+					// for a point type, the mediant / ±1 for an
+					// interval).
+					auto constants =
+						omcat::collect_qlt_constants<node>(fm);
 					LtlAbaSolution<node> trivial;
 					trivial.atoms = sol.atoms;
-					// num_states = 0 signals trivially realizable.
-					// The check proves that SOME fixed output
-					// combination works but does not record
-					// which, so there is nothing to encode
-					// for execution (LT-6).
-					trivial.executable = false;
+					// Classify props so the codegen data emitter
+					// puts the constant vars into Outputs (the
+					// shared classification loop below is only
+					// reached on the default path).
+					for (auto& [f, name] : trivial.atoms) {
+						if (is_pure_input_atom<node>(f))
+							trivial.input_props
+								.push_back(name);
+						else
+							trivial.output_props
+								.push_back(name);
+					}
+					tref conj = nullptr;
+					bool built_ok = true;
+					for (const auto& [var, pos] : *win) {
+						omcat::QltType1 t1;
+						t1.pos = pos;
+						t1.constants = constants;
+						omcat::Rat v = t1.realize();
+						std::string lit = std::to_string(v.p)
+							+ (v.q == 1 ? std::string()
+							   : "/" + std::to_string(v.q));
+						// Same text-parse route as parse_sv_eq:
+						// wff start symbol, io classification
+						// resolved by name.
+						std::string expr = var + "[t]:qlt = {"
+							+ lit + "}:qlt";
+						typename tree<node>::get_options opts;
+						opts.parse.start = tree<node>::wff;
+						tref eq = tree<node>::get(expr,
+							std::move(opts));
+						if (!eq) { built_ok = false; break; }
+						eq = resolve_io_vars<node>(
+							*definitions<node>::instance()
+								.get_io_context(), eq);
+						conj = conj
+							? tree<node>::build_wff_and(conj, eq)
+							: eq;
+						trivial.const_outputs.emplace_back(var, lit);
+					}
+					if (built_ok && conj) {
+						trivial.const_formula =
+							tree<node>::build_wff_always(conj);
+						trivial.executable = true;
+					} else {
+						// Fail-safe: keep the sound verdict but
+						// fall back to the pre-LA-10 refusal.
+						LOG_WARNING << "[ltl_aba] constant-output "
+							"witness could not be built; the "
+							"strategy stays non-executable\n";
+						trivial.const_outputs.clear();
+						trivial.executable = false;
+					}
 					return trivial;
 				}
 				// Has input vars: Algorithm B required for soundness.
@@ -1234,26 +1298,31 @@ ltl_to_safety_formula_full(tref fm) {
 
 	auto& sol = *maybe;
 
-	// LT-6: Algorithm B and the constant-output fast path decide
-	// realizability by routes whose strategy is not expressible over the
-	// user's data atoms.  Both used to be mapped to `{tau::_T(), sol}` under
-	// the comment "purely propositional: realizable but no data constraints
-	// to encode", which is wrong for them — realizability depended on a
-	// concrete output strategy (the P_σ / D-bit machinery, or a specific
-	// constant output combination) that `always T` does not encode.  The
-	// interpreter then ran `always T` and emitted default outputs that can
-	// violate the very spec that was reported REALIZABLE (an `F(o1={c})`
-	// component, for instance, is simply never enforced).
+	// LT-6: Algorithm B decides realizability by a route whose strategy is
+	// not expressible over the user's data atoms (the P_σ / D-bit
+	// machinery).  It used to be mapped to `{tau::_T(), sol}` under the
+	// comment "purely propositional: realizable but no data constraints to
+	// encode", which is wrong — realizability depended on a concrete output
+	// strategy that `always T` does not encode.  The interpreter then ran
+	// `always T` and emitted default outputs that can violate the very spec
+	// that was reported REALIZABLE.
 	//
 	// Refusing to execute is the honest answer; the realizability verdict
-	// from `is_ltl_aba_realizable` is unaffected.
+	// from `is_ltl_aba_realizable` is unaffected.  (LA-10: the
+	// constant-output fast path used to be refused here too; it now
+	// materialises its witness — see `const_formula` below.)
 	if (!sol.executable) {
 		LOG_ERROR << "[ltl_aba] specification is REALIZABLE but the "
 		             "synthesised strategy cannot be encoded as a safety "
-		             "formula (Algorithm B / constant-output fast path) — "
-		             "it is not executable\n";
+		             "formula (Algorithm B strategy over bookkeeping "
+		             "bits) — it is not executable\n";
 		return {nullptr, std::nullopt, {}};
 	}
+
+	// LA-10: constant-output strategy — the executable form is the
+	// materialised `always(⋀ o_k = c_k)` witness, not `always T`.
+	if (sol.const_formula)
+		return {sol.const_formula, std::move(sol), {}};
 
 	// Purely propositional: realizable but no data constraints to encode.
 	if (sol.atoms.empty()) return {tau::_T(), std::move(sol), {}};
@@ -1560,6 +1629,23 @@ static tref translate_ctl_star(tref fm,
 		// but no longer a universal context: w marks SOME state).
 		tref translated_inner = translate_ctl_star<node>(
 			inner, constraints, witnesses, true, false);
+		// IN-R6: rewrite every `sometimes` inside the witness
+		// constraint to its full-LTL twin `F`.  The two operators are
+		// the same eventuality (LS-3), but `sometimes` is not a
+		// full-LTL operator, so a constraint like
+		// `G(w=1 → sometimes χ)` would route the whole reduced
+		// formula into the safety pipeline, whose eventual-variable
+		// transform cannot handle sometimes-under-G — while as
+		// `G(w=1 → F χ)` the formula self-routes to ltlsynt, which
+		// handles it natively (the sat path already ends up there).
+		for (;;) {
+			tref st = tau::get(translated_inner).find_top(
+				is_child<node, tau::wff_sometimes>);
+			if (!st) break;
+			translated_inner = rewriter::replace<node>(
+				translated_inner, st,
+				build_wff_F<node>(tau::trim2(st)));
+		}
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
 		witnesses.push_back(wname);
@@ -1739,7 +1825,14 @@ CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm) {
 		result = tau::build_wff_and(result, constraint);
 	}
 
-	return CtlStarReduction<node>{result, witnesses};
+	// IN-R6: every witness is built over the default bv type (see the
+	// wff_E case in translate_ctl_star); record the type ids so the
+	// interpreter can register the streams without re-deriving them.
+	std::vector<size_t> witness_types(witnesses.size(),
+		get_ba_type_id<node>(bv_type<node>()));
+
+	return CtlStarReduction<node>{result, witnesses,
+		std::move(witness_types)};
 }
 
 // ── Semantic negation implementation ─────────────────────────────────────────

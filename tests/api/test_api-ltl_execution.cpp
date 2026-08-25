@@ -105,4 +105,28 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 		REQUIRE(v.size() == 3);
 		for (auto& x : v) CHECK(x == "T");
 	}
+
+	// IN-R6: an executed E reduction carries a witness output w_0. It is
+	// registered as an internal stream and force-routed through the LTL
+	// pipeline (its G(w → F χ) shape lies outside the safety pipeline's
+	// eventual-variable transform), so the spec executes — and the
+	// witness never appears among the user-visible outputs.
+	TEST_CASE("[IN-RT4-E] ctl_star E executes; the witness is not printed") {
+		auto maybe_i = tau_api::get_interpreter(
+			"E (sometimes (o1[t] = 1)).");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		bool saw_o1 = false;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> assigned;
+			auto outputs = tau_api::step(i, assigned,
+				/*interactive=*/false);
+			REQUIRE_MESSAGE(outputs.has_value(), "step " << step);
+			for (auto& [at, val] : *outputs) {
+				CHECK(at.name.rfind("w_", 0) != 0);
+				if (at.name == "o1") saw_o1 = true;
+			}
+		}
+		CHECK(saw_o1);
+	}
 }

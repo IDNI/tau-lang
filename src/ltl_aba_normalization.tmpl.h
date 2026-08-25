@@ -1041,15 +1041,24 @@ struct LtlAbaSolution {
 	// be re-expressed as a safety formula over the user's data atoms:
 	//
 	//   - Algorithm B: the strategy lives over the P_σ / R bits and the
-	//     returned solution carries no `atoms` at all;
-	//   - the constant-output fast path: `num_states == 0` records "some
-	//     fixed output combination works", not which one.
+	//     returned solution carries no `atoms` at all.
 	//
 	// The verdict is still sound — `is_ltl_aba_realizable` uses it as before
 	// — but `ltl_to_safety_formula_full` must refuse to execute such a
 	// solution instead of encoding it as `always T`, which silently drops
 	// every obligation the strategy was carrying (LT-6).
+	//
+	// LA-10: the constant-output fast path used to be a second
+	// non-executable route (`num_states == 0` recorded "some fixed output
+	// combination works" without saying which).  It now materialises its
+	// witness: `const_outputs` names each output stream with its constant
+	// rational value (as the literal text "p/q"), and `const_formula` is
+	// the executable `always(⋀_k o_k = c_k)` over the user's streams.
+	// Convention: `num_states == 0` with `executable == true` and a
+	// non-empty `const_outputs` means "constant strategy const_formula".
 	bool executable = true;
+	std::vector<std::pair<std::string, std::string>> const_outputs;
+	tref const_formula = nullptr;
 };
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────

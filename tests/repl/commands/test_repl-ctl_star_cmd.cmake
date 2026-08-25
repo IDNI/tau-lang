@@ -128,3 +128,12 @@ add_test(NAME "test_repl-ctl_star-run_A_always_executes"
 set_tests_properties("test_repl-ctl_star-run_A_always_executes" PROPERTIES
 	FAIL_REGULAR_EXPRESSION "unsat|Internal error"
 	PASS_REGULAR_EXPRESSION "o1\\[0\\] := T")
+
+# IN-R6: an executed E reduction registers its witness output internally and
+# routes through the LTL pipeline; the run executes and the witness stream is
+# never printed. (Needs a live ltlsynt on PATH like the other ltl run tests.)
+add_test(NAME "test_repl-ctl_star-run_E_executes"
+	COMMAND bash -c "printf 'fragment ctl_star.\\nrun E (sometimes (o1[t] = 1)).\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-ctl_star-run_E_executes" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := T"
+	FAIL_REGULAR_EXPRESSION "w_0\\[0\\] :=")

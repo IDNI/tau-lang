@@ -924,9 +924,12 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 		CHECK((refused || satisfied));
 	}
 
-	// Constant-output fast path: `constant_output_realizable` succeeds, so the
-	// solution comes back with num_states == 0 and no automaton at all.
-	TEST_CASE("[LT6-EXEC-02] constant-output spec does not execute as `always T`") {
+	// LA-10 correction of this case's original comment: this spec's atoms
+	// include the MIXED atom (i1=1/4 -> o1!=3/4), which the constant-output
+	// fast path cannot evaluate under a fixed output, so realizability is
+	// decided by Algorithm B — whose strategy over bookkeeping bits stays
+	// non-executable. The pin is unchanged: never `always T`.
+	TEST_CASE("[LT6-EXEC-02] Algorithm-B-decided spec does not execute as `always T`") {
 		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(
@@ -937,6 +940,21 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 		bool satisfied = false;
 		for (auto& v : vals) if (v == "1/2") satisfied = true;
 		CHECK((refused || satisfied));
+	}
+
+	// LA-10: when the constant-output fast path DOES decide realizability
+	// (pure-output atoms whose fixed values make the skeleton a tautology
+	// over the remaining input atoms), the winning combination is now
+	// materialised as `always(o = c)` and executes — it used to come back
+	// executable == false and be refused.
+	TEST_CASE("[LA10-EXEC-01] constant-output strategy executes with its constant") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"0", "0", "0", "0"};
+		auto vals = run_qlt_with_i1(
+		    "(i1[t]:qlt = {0}:qlt) U (o1[t]:qlt = {1}:qlt).",
+		    i1_vals, 4);
+		REQUIRE(!vals.empty());
+		for (auto& v : vals) CHECK(v == "1");
 	}
 
 } // TEST_SUITE "LTL correctness: strategy must survive into execution (LT-6)"

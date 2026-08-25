@@ -330,9 +330,20 @@ std::optional<interpreter<node>>
 	// clause containing non-equation") and reported a false "unsat".
 	// is_tau_formula_sat reduces first; so must execution.  The reducer
 	// throws ltl_synthesis_error for placements it cannot encode soundly
-	// (LA-N2); the api/REPL callers already catch it.  Residual: E's
-	// witness outputs w_<n> are not registered streams (IN-R6), so an E
-	// reduction that keeps a witness still cannot be executed.
+	// (LA-N2); the api/REPL callers already catch it.
+	//
+	// IN-R6: an E reduction introduces witness outputs w_<n>.  They are
+	// registered below as internal output streams (reserved prefix `w_`,
+	// excluded from printing via is_excluded_output) so classification
+	// passes over rebuilt nodes keep treating them as outputs.  A
+	// witness-carrying reduction is also FORCE-ROUTED through the LTL
+	// pipeline: its shape is `w=1 ∧ G(w=1 → sometimes χ)`, whose
+	// sometimes-under-G lies outside the safety pipeline's
+	// eventual-variable transform, while the sat path already sends the
+	// reduced formula to is_ltl_aba_realizable — routing execution the
+	// same way keeps verdict and execution in agreement.
+	bool witness_ltl_route = false;
+	io_context<node> ctx_with_witnesses;
 	if (has_ctl_star_operators<node>(spec)) {
 		auto reduction = reduce_ctl_star_to_ltl<node>(spec);
 		if (!reduction.ltl_formula) {
@@ -340,12 +351,37 @@ std::optional<interpreter<node>>
 			return {};
 		}
 		spec = reduction.ltl_formula;
+		if (!reduction.witnesses.empty()) {
+			witness_ltl_route = true;
+			ctx_with_witnesses = ctx;
+			auto& gctx = *definitions<node>::instance()
+				.get_io_context();
+			for (size_t i = 0; i < reduction.witnesses.size(); ++i) {
+				const auto& wname = reduction.witnesses[i];
+				const size_t wtype =
+					i < reduction.witness_types.size()
+					? reduction.witness_types[i]
+					: get_ba_type_id<node>(bv_type<node>());
+				ctx_with_witnesses.add_output(wname, wtype,
+					std::make_shared<
+						vector_output_stream>());
+				// The global context too: text-parse helpers
+				// (parse_sv_eq-style) resolve against it, and
+				// the w_ prefix falls outside the i/o name
+				// heuristic.
+				gctx.add_output(wname, wtype,
+					std::make_shared<
+						vector_output_stream>());
+			}
+		}
 		DBG(LOG_TRACE << "make_interpreter[ctl* reduced]: " << LOG_FM_DUMP(spec) << "\n";)
 	}
+	const io_context<node>& ctx_eff =
+		witness_ltl_route ? ctx_with_witnesses : ctx;
 	// Handle G(phi_A) && G(phi_B) with different BA types:
 	// the normalizer merges them into G(phi_A && phi_B) which breaks on mixed
 	// types.  Normalize each G formula independently then combine.
-	if (!has_ltl_operators<node>(spec)) {
+	if (!has_ltl_operators<node>(spec) && !witness_ltl_route) {
 		auto get_g_body = [](tref c) -> tref {
 			const auto& ct = tree<node>::get(c);
 			if (!ct.has_child()) return nullptr;
@@ -394,7 +430,7 @@ std::optional<interpreter<node>>
 	// Find a satisfiable unbound continuation from spec.
 	// Skip normalizer for LTL formulas — it converts wff_F → wff_sometimes,
 	// which would make has_ltl_operators return false and bypass ltl_to_safety_formula.
-	if (!has_ltl_operators<node>(spec))
+	if (!has_ltl_operators<node>(spec) && !witness_ltl_route)
 		spec = normalizer<node>(spec);
 post_normalization:
 	// Full LTL formulas (F/U/R/W) need a different execution strategy.
@@ -407,7 +443,7 @@ post_normalization:
 	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
 	std::optional<LtlAbaSolution<node>> ltl_sol;
 	std::vector<std::string> since_aux_anchor;
-	if (has_ltl_operators<node>(spec)) {
+	if (has_ltl_operators<node>(spec) || witness_ltl_route) {
 		auto [safety_spec, sol_opt, unanchored_aux] =
 			ltl_to_safety_formula_full<node>(spec);
 		if (!safety_spec) {
@@ -443,7 +479,7 @@ post_normalization:
 			spec_parts.emplace_back(htrefs{ spec_part }, out_rep);
 		assignment<node> memory;
 		auto i = interpreter{ ubt_ctn, spec_parts, output_partition,
-			memory, ctx };
+			memory, ctx_eff };
 
 		// Cache the LTL synthesis solution (if any) for downstream
 		// introspection of the Mealy strategy. Empty for pure-safety /
@@ -2560,6 +2596,12 @@ bool interpreter<node>::is_excluded_output(tref var) {
 	const std::string& io_name = get_var_name<node>(var);
 	if (io_name.size() > 9 && io_name.substr(0, 9) == "o__ltl_ms") return true;
 	if (io_name.size() > 8 && io_name.substr(0, 8) == "o__ltl_s") return true;
+	// IN-R6: CTL* witness outputs (w_<n>) are internal encoding
+	// artefacts like the aux state bits — solved every step, never
+	// printed. The prefix is reserved (user stream definitions named
+	// `w_...` are rejected at definition time).
+	if (io_name.size() > 2 && io_name[0] == 'w' && io_name[1] == '_')
+		return true;
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
 }

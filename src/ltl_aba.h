@@ -224,6 +224,10 @@ template <NodeType node>
 struct CtlStarReduction {
     tref ltl_formula;                    // reduced LTL formula
     std::vector<std::string> witnesses;  // witness output variable names
+    // IN-R6: BA type id per witness (index-aligned with `witnesses`);
+    // currently always the default bv type. The interpreter uses these to
+    // register each witness as an internal output stream.
+    std::vector<size_t> witness_types;
 };
 
 template <NodeType node>
@@ -293,16 +297,16 @@ struct LtlAbaSolution;
 // here so the contracts are visible without reading the template bodies.
 //
 // LtlAbaSolution conventions (every algorithm honours these):
-//   - `aut.num_states == 0` means "realizable with no strategy automaton":
-//     the constant-output fast path proves SOME fixed output works but does
-//     not record it (executable == false), and the pure-past compile-away
-//     returns no automaton either.  is_ltl_aba_realizable reports such a
-//     solution REALIZABLE without running the ABA oracle; parse_hoa never
-//     produces it (a strategy text with fewer than one state is refused).
+//   - `aut.num_states == 0` means "realizable with no strategy automaton";
+//     is_ltl_aba_realizable reports such a solution REALIZABLE without
+//     running the ABA oracle; parse_hoa never produces it (a strategy text
+//     with fewer than one state is refused).  LA-10: `num_states == 0`
+//     with `executable == true` and non-empty `const_outputs` means
+//     "constant strategy": `const_formula` is the executable
+//     `always(⋀ o_k = c_k)` and `const_outputs` lists (stream, "p/q").
 //   - `executable == false` marks a solution that cannot be compiled into a
-//     program over the user's streams (Algorithm B bookkeeping bits, the
-//     constant-output path); ltl_to_safety_formula_full and tau_codegen
-//     refuse it.
+//     program over the user's streams (Algorithm B bookkeeping bits);
+//     ltl_to_safety_formula_full and tau_codegen refuse it.
 //   - `atoms` carry the AP names the automaton uses (p_i on the default
 //     path, d_i on Algorithms A/D); the oracle and the safety encoding match
 //     by NAME, so a mismatch makes both vacuous (LT-8).

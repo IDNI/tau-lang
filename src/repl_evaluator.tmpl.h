@@ -862,6 +862,17 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid stream definition";
 		return;
 	}
+	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
+	// reduction registers internal output streams named w_<n>, so a user
+	// stream with that prefix would collide with them.
+	if (tref name_node = tau::get(def).first(); name_node) {
+		const std::string sname = tau::get(name_node).to_str();
+		if (sname.rfind("w_", 0) == 0) {
+			TAU_LOG_ERROR << "Stream name '" << sname
+				<< "' uses the reserved witness prefix `w_`\n";
+			return;
+		}
+	}
 	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
 	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
@@ -876,6 +887,17 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	if (!def) {
 		TAU_LOG_ERROR << "Invalid stream definition";
 		return;
+	}
+	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
+	// reduction registers internal output streams named w_<n>, so a user
+	// stream with that prefix would collide with them.
+	if (tref name_node = tau::get(def).first(); name_node) {
+		const std::string sname = tau::get(name_node).to_str();
+		if (sname.rfind("w_", 0) == 0) {
+			TAU_LOG_ERROR << "Stream name '" << sname
+				<< "' uses the reserved witness prefix `w_`\n";
+			return;
+		}
 	}
 	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;

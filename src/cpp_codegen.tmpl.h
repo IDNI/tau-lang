@@ -447,7 +447,28 @@ void emit_cpp_program_data(
 		out << "\t// automaton and no state to track.\n";
 		out << "\tOutputs step(const Inputs& in) noexcept {\n";
 		out << "\t\t(void)in;\n";
-		out << "\t\treturn Outputs{};\n";
+		if (!sol.const_outputs.empty()) {
+			// LA-10: the constant strategy's witness values are
+			// embedded, not defaulted -- Outputs{} zeros could
+			// violate the very spec that was proved REALIZABLE.
+			out << "\t\tOutputs o;\n";
+			for (const auto& [var, lit] : sol.const_outputs) {
+				double v = 0.0;
+				auto slash = lit.find('/');
+				try {
+					v = slash == std::string::npos
+					    ? std::stod(lit)
+					    : std::stod(lit.substr(0, slash))
+					      / std::stod(lit.substr(slash + 1));
+				} catch (...) { v = 0.0; }
+				out << "\t\to." << sanitize(var) << " = "
+				    << double_to_cpp(v) << ";  // = " << lit
+				    << " (synthesised constant)\n";
+			}
+			out << "\t\treturn o;\n";
+		} else {
+			out << "\t\treturn Outputs{};\n";
+		}
 		out << "\t}\n";
 		out << "};\n";
 		return;
