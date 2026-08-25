@@ -209,6 +209,16 @@ struct ba_types {
 	/** @brief Return the string name for @p ba_type_id. */
 	static std::string name(size_t ba_type_id);
 
+	/**
+	 * @brief Hash of `name(ba_type_id)`, computed once per registered type.
+	 *
+	 * On the `node::hashit` hot path: hashit used to build, copy and
+	 * re-hash the name string on every hash-cons probe; this returns a
+	 * cached integer instead. Derived from the name (not the
+	 * registration-order id), so it stays deterministic across runs.
+	 */
+	static size_t name_hash(size_t ba_type_id);
+
 	/** @brief Print the type name for @p ba_type to @p os. */
 	static std::ostream& print(std::ostream& os, size_t ba_type);
 
