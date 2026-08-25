@@ -175,6 +175,14 @@ private:
 	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
 	void maybe_gc();
 
+	/// Memo for update_to_time_point, valid for a single time point:
+	/// identical formulas (duplicate alternatives, repeated
+	/// get_ubt_ctn_at calls in one step) are rewritten once. Cleared when
+	/// t changes and before gc -- it is a pure cache whose raw trefs are
+	/// deliberately NOT walked by collect_live_refs.
+	std::unordered_map<tref, tref> tp_rewrite_memo_;
+	int_t tp_rewrite_memo_t_ = std::numeric_limits<int_t>::min();
+
 	/// @brief Partition @p spec by output stream representatives.
 	static std::vector<std::pair<htref, htref>>
 	create_spec_partition(tref spec, auto& output_partition);
