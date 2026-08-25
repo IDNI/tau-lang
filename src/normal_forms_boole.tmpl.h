@@ -413,10 +413,10 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	if (atm_type == tau::bf_eq || atm_type == tau::bf_neq) {
 	tref func = tau::trim2(norm_equation<node>(atm));
 	func = apply_xor_def<node>(func);
-	// We use is_boolean_operation to enable the procedure on non-boolean functions
-	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(find_ba_type<node>(var)), is_boolean_operation<node>);
+	// We use while_is_boolean_operation to enable the procedure on non-boolean functions
+	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func_v_0 = syntactic_path_simplification_dnf<node>::on(func_v_0);
-	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func_v_1 = syntactic_path_simplification_dnf<node>::on(func_v_1);
 	// Check identically zero
 	if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0()) {
