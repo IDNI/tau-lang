@@ -1063,6 +1063,7 @@ inline void emit_cpp_program_pwr(
 	out << "// The strategy is table-driven; call revise() to swap at runtime.\n\n";
 	out << "#pragma once\n";
 	out << "#include <cstdint>\n";
+	out << "#include <string>\n";
 	out << "#include <utility>\n";
 	out << "#include <vector>\n";
 	out << "#include <cassert>\n\n";
@@ -1103,6 +1104,10 @@ inline void emit_cpp_program_pwr(
 	out << "\t\tint num_states = 0;\n";
 	out << "\t\tint initial_state = 0;\n";
 	out << "\t\tstd::vector<std::vector<Edge>> edges;  // edges[src] = outgoing edges\n";
+	out << "\t\t// AP name order the guards are indexed by (CG-N5). Empty =\n";
+	out << "\t\t// caller vouches for the order; non-empty must equal\n";
+	out << "\t\t// program_aps() or revise() refuses the strategy.\n";
+	out << "\t\tstd::vector<std::string> aps;\n";
 	out << "\t};\n\n";
 
 	// --- Input/Output structs ---
@@ -1156,20 +1161,47 @@ inline void emit_cpp_program_pwr(
 	out << "\t\to.ok = false; return o;\n";
 	out << "\t}\n\n";
 
+	// --- program_aps() ---
+	out << "\t// The AP order this program's guards are indexed by, embedded\n";
+	out << "\t// at generation time (CG-N5).\n";
+	out << "\tstatic const std::vector<std::string>& program_aps() {\n";
+	out << "\t\tstatic const std::vector<std::string> aps = {";
+	for (size_t i = 0; i < aut.aps.size(); ++i) {
+		if (i) out << ", ";
+		out << "\"" << aut.aps[i] << "\"";
+	}
+	out << "};\n";
+	out << "\t\treturn aps;\n";
+	out << "\t}\n\n";
+
 	// --- revise() ---
-	out << "\t// Swap the strategy at runtime (PWR).  The state machine resets\n";
-	out << "\t// to the new initial state — matching the interpreter's behaviour\n";
-	out << "\t// where a revised spec restarts the unbound continuation.\n";
-	out << "\tvoid revise(Strategy new_strat) noexcept {\n";
-	out << "\t\tassert(new_strat.num_states > 0);\n";
-	out << "\t\tassert(new_strat.initial_state >= 0 && new_strat.initial_state < new_strat.num_states);\n";
-	out << "\t\tassert((int)new_strat.edges.size() == new_strat.num_states);\n";
-	out << "\t\tfor (auto& sv : new_strat.edges)\n";
-	out << "\t\t\tfor (auto& e : sv)\n";
-	out << "\t\t\t\tassert((int)e.guard.size() == " << aut.aps.size() << ");\n";
+	out << "\t// Swap the strategy at runtime (PWR).  CG-N5: validation is\n";
+	out << "\t// real code, not assert-only — a malformed Strategy is REFUSED\n";
+	out << "\t// (return false, running strategy and state untouched) even\n";
+	out << "\t// under -DNDEBUG, where the asserts compile out.  On success\n";
+	out << "\t// the state machine resets to the new initial state — matching\n";
+	out << "\t// the interpreter's behaviour where a revised spec restarts the\n";
+	out << "\t// unbound continuation.\n";
+	out << "\tbool revise(Strategy new_strat) noexcept {\n";
+	out << "\t\tbool valid = new_strat.num_states > 0\n";
+	out << "\t\t\t&& new_strat.initial_state >= 0\n";
+	out << "\t\t\t&& new_strat.initial_state < new_strat.num_states\n";
+	out << "\t\t\t&& (int)new_strat.edges.size() == new_strat.num_states\n";
+	out << "\t\t\t&& (new_strat.aps.empty()\n";
+	out << "\t\t\t    || new_strat.aps == program_aps());\n";
+	out << "\t\tif (valid)\n";
+	out << "\t\t\tfor (const auto& sv : new_strat.edges)\n";
+	out << "\t\t\t\tfor (const auto& e : sv)\n";
+	out << "\t\t\t\t\tvalid = valid\n";
+	out << "\t\t\t\t\t\t&& (int)e.guard.size() == " << aut.aps.size() << "\n";
+	out << "\t\t\t\t\t\t&& e.dst >= 0\n";
+	out << "\t\t\t\t\t\t&& e.dst < new_strat.num_states;\n";
+	out << "\t\tassert(valid && \"revise(): malformed Strategy refused\");\n";
+	out << "\t\tif (!valid) return false;\n";
 	out << "\t\tstrat_ = std::move(new_strat);\n";
 	out << "\t\tstate_ = strat_.initial_state;\n";
 	out << "\t\t++revision_count_;\n";
+	out << "\t\treturn true;\n";
 	out << "\t}\n\n";
 
 	// --- Accessors ---
@@ -1186,6 +1218,7 @@ inline void emit_cpp_program_pwr(
 	out << "\tvoid load_initial_strategy() {\n";
 	out << "\t\tstrat_.num_states = " << aut.num_states << ";\n";
 	out << "\t\tstrat_.initial_state = " << aut.initial_state << ";\n";
+	out << "\t\tstrat_.aps = program_aps();\n";
 	out << "\t\tstrat_.edges.resize(" << aut.num_states << ");\n";
 	int num_aps = (int)aut.aps.size();
 	for (int s = 0; s < aut.num_states; ++s) {
@@ -1261,7 +1294,15 @@ inline void emit_strategy_initializer(
 		}
 		out << "\t\t},\n";
 	}
-	out << "\t}\n";
+	out << "\t},\n";
+	// CG-N5: embed the AP order so the generated revise() can verify the
+	// initializer was built against the same program.
+	out << "\t{";
+	for (int k = 0; k < num_aps; ++k) {
+		if (k) out << ", ";
+		out << "\"" << aut.aps[k] << "\"";
+	}
+	out << "} // aps\n";
 	out << "}";
 }
 

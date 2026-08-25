@@ -65,21 +65,26 @@ void emit_cpp_program_prop(
 //     struct Inputs { bool i_...; };
 //     struct Outputs { bool o_...; bool ok; };
 //     struct Edge { std::vector<int8_t> guard; int dst; ... };
-//     struct Strategy { int num_states; int initial; vector<vector<Edge>>; ... };
+//     struct Strategy { int num_states; int initial; vector<vector<Edge>>;
+//                       vector<string> aps; ... };
 //     Outputs step(const Inputs& in);
-//     void revise(Strategy new_strategy);
+//     bool revise(Strategy new_strategy) noexcept;
+//     static const std::vector<std::string>& program_aps();
 //     int state() const;
 //     int revision_count() const;
 //   };
 //
-// The `revise()` method accepts a new Strategy, validates it, and swaps
-// the strategy table.  The state machine resets to the new initial state
-// (matching the interpreter's behaviour where a revised spec restarts
-// the unbound continuation from the current time point).
-// LG-21 CAVEAT: the generated validation is assert-based and disappears
-// under -DNDEBUG -- a malformed Strategy (out-of-range dst, wrong guard
-// sizes) is then UB. Build the generated code without -DNDEBUG, or add
-// your own checks before calling revise().
+// The `revise()` method accepts a new Strategy, validates it with REAL
+// runtime checks (CG-N5, closing the old LG-21 assert-only caveat: the
+// checks no longer disappear under -DNDEBUG) and swaps the strategy table.
+// A malformed Strategy -- num_states <= 0, initial_state or any edge dst
+// out of range, edges.size() != num_states, a guard of the wrong width, or
+// a non-empty `aps` list differing from the program's embedded AP order --
+// is refused: revise() returns false and the running strategy and state
+// are untouched.  On success the state machine resets to the new initial
+// state (matching the interpreter's behaviour where a revised spec
+// restarts the unbound continuation from the current time point) and
+// revise() returns true.  The asserts remain as Debug documentation.
 void emit_cpp_program_pwr(
     const HoaAutomaton& aut,
     const std::vector<std::string>& input_props,

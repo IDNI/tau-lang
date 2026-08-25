@@ -178,7 +178,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*generated, "class PwrSafety {"));
 		CHECK(has(*generated, "struct Edge"));
 		CHECK(has(*generated, "struct Strategy"));
-		CHECK(has(*generated, "void revise("));
+		CHECK(has(*generated, "bool revise("));
 		CHECK(has(*generated, "revision_count"));
 		CHECK(has(*generated, "load_initial_strategy"));
 	}
@@ -197,6 +197,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*init, "num_states"));
 		CHECK(has(*init, "initial_state"));
 		CHECK(has(*init, "edges"));
+		// CG-N5: the initializer embeds the program's AP order so the
+		// generated revise() can verify it.
+		CHECK(has(*init, "aps"));
 	}
 
 	TEST_CASE("PWR emitter handles input+output spec") {
@@ -216,9 +219,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		REQUIRE(gen1.has_value());
 		REQUIRE(gen2.has_value());
 		CHECK(has(*gen1, "class PwrSpec1 {"));
-		CHECK(has(*gen1, "void revise("));
+		CHECK(has(*gen1, "bool revise("));
 		CHECK(has(*gen2, "class PwrSpec2 {"));
-		CHECK(has(*gen2, "void revise("));
+		CHECK(has(*gen2, "bool revise("));
 	}
 
 	TEST_CASE("PWR table-driven class compiles and steps") {
@@ -295,7 +298,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 			     "  if (c.revision_count() != 0) { std::printf(\"FAIL rev0\\n\"); return 1; }\n"
 			     "  // Now revise with new strategy\n"
 			     "  PwrRevT::Strategy s2 = " << strat2 << ";\n"
-			     "  c.revise(std::move(s2));\n"
+			     "  if (!c.revise(std::move(s2))) { std::printf(\"FAIL revise_refused\\n\"); return 1; }\n"
 			     "  if (c.revision_count() != 1) { std::printf(\"FAIL rev1\\n\"); return 1; }\n"
 			     "  if (c.state() != c.strategy().initial_state) { std::printf(\"FAIL state\\n\"); return 1; }\n"
 			     "  auto o2 = c.step(in);\n"
@@ -327,16 +330,18 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 
 TEST_SUITE("cpp_codegen_pwr_ndebug") {
 
-	// CG-RT4 / CG-N5 (OPEN, hence skip): revise()'s validation is
+	// CG-RT4 / CG-N5 (FIXED, Batch O6): revise()'s validation used to be
 	// assert()-only; under -DNDEBUG (the flag customer release builds use,
-	// and which g++ -O2 alone does NOT define) those asserts compile out,
+	// and which g++ -O2 alone does NOT define) those asserts compiled out,
 	// so an invalid Strategy (initial_state out of range for num_states)
-	// causes OOB std::vector indexing (UB) on the next step() instead of
-	// being rejected. This test compiles WITH -DNDEBUG specifically to
-	// reproduce the customer-build configuration where CG-N5 manifests.
-	// Un-skip when revise() returns a real runtime verdict.
-	TEST_CASE("[CG-PWR-NDEBUG-01] revise() with an invalid Strategy under -DNDEBUG"
-	          * doctest::skip(true)) {
+	// caused OOB std::vector indexing (UB) on the next step() instead of
+	// being rejected. revise() is now `bool` with real runtime refusal;
+	// this test compiles WITH -DNDEBUG specifically to prove the checks
+	// survive the customer-build configuration: the invalid strategies
+	// (bad initial_state, out-of-range edge dst, mismatched aps) are all
+	// refused with the running strategy and state untouched, and a valid
+	// revision afterwards still succeeds.
+	TEST_CASE("[CG-PWR-NDEBUG-01] revise() with an invalid Strategy under -DNDEBUG") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrNdebug");
 		REQUIRE(gen1.has_value());
@@ -347,26 +352,44 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 		{ std::ofstream f(hdr); f << *gen1; }
 		{
 			std::ofstream f(main_f);
-			// initial_state=99 is out of range for a 1-state Strategy;
-			// edges has only 1 entry (matching num_states=1), so
-			// strat_.edges[99] is an OOB vector access on the next step().
 			f << "#include \"_tau_pwr_ndebug_test.h\"\n"
 			     "#include <cstdio>\n"
+			     "#include <vector>\n"
 			     "int main() {\n"
 			     "  PwrNdebug c;\n"
 			     "  PwrNdebug::Inputs in;\n"
+			     "  auto o0 = c.step(in);\n"
+			     "  if (!o0.ok) { std::printf(\"FAIL step0\\n\"); return 1; }\n"
+			     "  int state_before = c.state();\n"
+			     "  // initial_state=99 is out of range for a 1-state Strategy.\n"
 			     "  PwrNdebug::Strategy bad;\n"
 			     "  bad.num_states = 1;\n"
 			     "  bad.initial_state = 99;\n"
 			     "  bad.edges.resize(1);\n"
-			     "  c.revise(std::move(bad));\n"
-			     "  if (c.state() >= 0 && c.state() < c.strategy().num_states) {\n"
-			     "    std::printf(\"OK\\n\");\n"
-			     "  } else {\n"
-			     "    std::printf(\"ACCEPTED_INVALID_STATE %d\\n\", c.state());\n"
-			     "  }\n"
-			     "  auto o = c.step(in);\n"
-			     "  (void)o;\n"
+			     "  if (c.revise(std::move(bad))) { std::printf(\"ACCEPTED_INVALID\\n\"); return 1; }\n"
+			     "  if (c.revision_count() != 0) { std::printf(\"FAIL revcount\\n\"); return 1; }\n"
+			     "  if (c.state() != state_before) { std::printf(\"FAIL state_changed %d\\n\", c.state()); return 1; }\n"
+			     "  auto o1 = c.step(in);\n"
+			     "  if (!o1.ok) { std::printf(\"FAIL step_after_refusal\\n\"); return 1; }\n"
+			     "  // An out-of-range edge dst is refused too (the old asserts\n"
+			     "  // never even checked dst).\n"
+			     "  PwrNdebug::Strategy bad2;\n"
+			     "  bad2.num_states = 1;\n"
+			     "  bad2.initial_state = 0;\n"
+			     "  bad2.edges.resize(1);\n"
+			     "  bad2.edges[0].push_back({std::vector<int8_t>(PwrNdebug::program_aps().size(), 0), 7});\n"
+			     "  if (c.revise(std::move(bad2))) { std::printf(\"ACCEPTED_BAD_DST\\n\"); return 1; }\n"
+			     "  // A non-empty aps list differing from the program's is refused.\n"
+			     "  PwrNdebug::Strategy bad3 = c.strategy();\n"
+			     "  bad3.aps = {\"__not_this_programs_ap__\"};\n"
+			     "  if (c.revise(std::move(bad3))) { std::printf(\"ACCEPTED_BAD_APS\\n\"); return 1; }\n"
+			     "  // A valid revision afterwards still succeeds.\n"
+			     "  PwrNdebug::Strategy good = c.strategy();\n"
+			     "  if (!c.revise(std::move(good))) { std::printf(\"FAIL good_refused\\n\"); return 1; }\n"
+			     "  if (c.revision_count() != 1) { std::printf(\"FAIL revcount2\\n\"); return 1; }\n"
+			     "  auto o2 = c.step(in);\n"
+			     "  if (!o2.ok) { std::printf(\"FAIL step_after_good\\n\"); return 1; }\n"
+			     "  std::printf(\"OK\\n\");\n"
 			     "  return 0;\n"
 			     "}\n";
 		}
