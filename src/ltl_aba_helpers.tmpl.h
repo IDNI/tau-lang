@@ -158,121 +158,35 @@ static std::string find_prop(
 	return "";
 }
 
+// ── Propositional LTL skeleton (LT-16(c): ONE walker) ───────────────────────
+//
+// skeleton_str used to be a verbatim copy of skeleton_str_with_testers
+// minus the ppLTLTT tester emission, so a guard added to one walker could
+// silently miss the other (that is how IN-R3 happened).  It is now a thin
+// wrapper delegating to the tester-emitting walker with a scratch vector.
+// Every ltl_skeleton call site is gated on !has_past, so past content
+// reaching this entry keeps LT-12's loud refusal: the whole skeleton
+// becomes "0" rather than a partial formula ltlsynt would misread.
+
+template <NodeType node>
+static std::string skeleton_str_with_testers(
+    tref n,
+    const std::vector<std::pair<tref, std::string>>& atoms,
+    std::vector<PastTemporalTester>& testers);
+
 template <NodeType node>
 static std::string skeleton_str(
     tref n,
-    const std::vector<std::pair<tref, std::string>>& atoms);
-
-template <NodeType node>
-static std::string skeleton_wff(
-    tref n,
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	if (!t.has_child()) return "1"; // terminal → TRUE (LT-11: bare "t" is an AP to Spot)
-	auto nt = t[0].value.nt;
-	const auto& inner = t[0];
-
-	// Check if this is a data atom.
-	auto prop = find_prop<node>(n, atoms);
-	if (!prop.empty()) return prop;
-
-	switch (nt) {
-	case tau::wff_t: return "1";
-	case tau::wff_f: return "0";
-	case tau::wff_neg:
-		return "!" + skeleton_str<node>(inner.first(), atoms);
-	case tau::wff_and:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " & " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_or:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " | " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_xor:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " ^ " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_imply:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " -> " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_equiv:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " <-> " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_always:
-		// G (globally) is wff_always — handled by existing safety pipeline
-		// but we also emit it in the skeleton for ltlsynt.
-		return "G(" + skeleton_str<node>(inner.first(), atoms) + ")";
-	case tau::wff_sometimes:
-	case tau::wff_F:
-		return "F(" + skeleton_str<node>(inner.first(), atoms) + ")";
-	case tau::wff_U:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " U " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_R:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " R " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_W:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " W " + skeleton_str<node>(inner.second(), atoms) + ")";
-	case tau::wff_S:
-	case tau::wff_T:
-		// LT-12: past operators are not supported by ltlsynt; every
-		// ltl_skeleton call site is gated on !has_past, so this is
-		// unreachable. Fail loudly instead of emitting a formula
-		// ltlsynt would silently reject as UNREALIZABLE.
+	std::vector<PastTemporalTester> testers;
+	std::string s = skeleton_str_with_testers<node>(n, atoms, testers);
+	if (!testers.empty()) {
 		LOG_ERROR << "skeleton_str: past operator (S/T) reached the "
 			"non-tester LTL skeleton";
 		return "0";
-	case tau::wff_rimply:
-		return "(" + skeleton_str<node>(inner.second(), atoms)
-		     + " -> " + skeleton_str<node>(inner.first(), atoms) + ")";
-	case tau::wff_conditional:
-		// phi ? psi : chi = (phi -> psi) && (!phi -> chi)
-		return "((" + skeleton_str<node>(inner.first(), atoms)
-		     + " -> " + skeleton_str<node>(inner.second(), atoms)
-		     + ") & (!" + skeleton_str<node>(inner.first(), atoms)
-		     + " -> " + skeleton_str<node>(inner.third(), atoms) + "))";
-	case tau::wff_A:
-	case tau::wff_E:
-	case tau::wff_semantic_neg:
-		// LT-5: these used to fall into the default case below, which — for
-		// anything containing io_vars — returns the propositional constant
-		// "1".  A path quantifier or a semantic negation that survives
-		// `reduce_ctl_star_to_ltl` therefore vanished from the skeleton and
-		// the whole specification was decided as if it were TRUE.  Fail
-		// loudly instead: reaching here means the CTL* reduction did not
-		// handle the node, which is a defect, not a value.
-		throw ltl_synthesis_error(
-		    "CTL* node (A / E / semantic negation) survived the CTL* "
-		    "reduction and reached the propositional skeleton; it has no "
-		    "sound propositional encoding");
-	default: {
-		// Unknown node or ABA comparison without io_vars.
-		// If it has io_vars, it should have been extracted as a data atom.
-		if (has_io_var<node>(n)) {
-			auto p2 = find_prop<node>(n, atoms);
-			return p2.empty() ? "1" : p2;
-		}
-		// No io_var: evaluate statically — returns "1" (true) or "0" (false).
-		tref normalized = normalize_non_temp<node>(n);
-		if (tree<node>::get(normalized).equals_F()) return "0";
-		return "1";
 	}
-	}
-}
-
-template <NodeType node>
-static std::string skeleton_str(
-    tref n,
-    const std::vector<std::pair<tref, std::string>>& atoms)
-{
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	// wff wrapper
-	if (t.is(tau::wff)) return skeleton_wff<node>(n, atoms);
-	// bf/atom — treat as data prop
-	auto prop = find_prop<node>(n, atoms);
-	return prop.empty() ? "1" : prop; // LT-11
+	return s;
 }
 
 template <NodeType node>

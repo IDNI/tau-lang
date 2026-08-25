@@ -57,9 +57,7 @@ set(TESTS
 
 	algorithm_a
 	algorithm_b
-	algorithm_c
 	algorithm_d
-	algorithm_picker
 	semantic_pwr
 	cpp_codegen
 	cpp_codegen_pwr

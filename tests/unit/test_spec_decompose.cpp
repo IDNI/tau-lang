@@ -112,6 +112,25 @@ TEST_SUITE("Spec decomposition") {
 		CHECK(s.reactive  != nullptr);
 	}
 
+	TEST_CASE("[GR-RT4e] temporal compounds under a Boolean top node are "
+			"reactive, not transient (GR-N2)") {
+		// Each conjunct's TOP node is Boolean (or/neg/imply), so the old
+		// classifier fell through to the transient default and filed a
+		// temporal obligation as an initial-only constraint.
+		const char* specs[] = {
+			"(F (o1[t] = 1)) || (G (o1[t] = 0)).",
+			"!(G (o1[t] = 1)).",
+			"(G (o1[t] = 1)) -> (F (o2[t] = 1)).",
+		};
+		for (const char* src : specs) {
+			tref fm = parse(src);
+			REQUIRE_MESSAGE(fm, src);
+			auto s = decompose_spec<node_t>(fm);
+			CHECK_MESSAGE(s.reactive != nullptr, src);
+			CHECK_MESSAGE(s.transient == nullptr, src);
+		}
+	}
+
 	TEST_CASE("[GR-RT4d] two invariants join into one invariant conjunction") {
 		tref fm = parse("(G ((o1[t] = 1))) && (G ((o2[t] = 1))).");
 		REQUIRE(fm);

@@ -861,8 +861,9 @@ solve_ltl_aba(tref fm)
 						std::string lit = std::to_string(v.p)
 							+ (v.q == 1 ? std::string()
 							   : "/" + std::to_string(v.q));
-						// Same text-parse route as parse_sv_eq:
-						// wff start symbol, io classification
+						// Same text-parse route as
+						// build_bv_eq_aux: wff start
+						// symbol, io classification
 						// resolved by name.
 						std::string expr = var + "[t]:qlt = {"
 							+ lit + "}:qlt";
@@ -1082,30 +1083,9 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 // The synthesis chooses the initial state bits si[-1] freely; any valid
 // initialization satisfies the formula (since the strategy is realizable).
 
-template <NodeType node>
-static tref parse_sv_eq(const std::string& name, int shift, int value)
-{
-	using tau = tree<node>;
-	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
-	// Use the default BV bitwidth explicitly — bare ":bv" is rejected by
-	// the grammar since the merge that made bitwidths mandatory.
-	std::string bv_type_str = ":bv[" + std::to_string(default_bv_size) + "]";
-	std::string expr = name + "[" + t_str + "]" + bv_type_str + " = { "
-	                 + std::to_string(value) + " }";
-	// Use wff start symbol; keep all type inference defaults enabled so that
-	// bitvector constants ({0}, {1}) are properly resolved.
-	typename tau::get_options opts;
-	opts.parse.start = tau::wff;
-	tref fm = tau::get(expr, std::move(opts));
-	// The input/output bit of an io_var is set while parsing a *spec*, so a
-	// bare wff parse leaves these aux variables unclassified. Everything
-	// downstream (transform_io_var, existentially_quantify_output_streams)
-	// then treats them as neither input nor output. Resolve them here the
-	// same way get_nso_rr resolves a bare formula: the "o" name prefix marks
-	// them as the outputs they are.
-	return resolve_io_vars<node>(
-		*definitions<node>::instance().get_io_context(), fm);
-}
+// LT-16(a): parse_sv_eq was a verbatim duplicate of build_bv_eq_aux
+// (ltl_aba_normalization.tmpl.h, included before this header); the callers
+// below use the one builder directly.
 
 template <NodeType node>
 static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
@@ -1123,15 +1103,15 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 	// ── (a) One-hot constraint at the current step ────────────────────────
 	tref at_least = tau::_F();
 	for (int i = 0; i < k; ++i)
-		at_least = tau::build_wff_or(at_least, parse_sv_eq<node>(sv[i], 0, 1));
+		at_least = tau::build_wff_or(at_least, build_bv_eq_aux<node>(sv[i], 0, 1));
 
 	tref at_most = tau::_T();
 	for (int i = 0; i < k; ++i)
 		for (int j = i + 1; j < k; ++j)
 			at_most = tau::build_wff_and(at_most,
 			    tau::build_wff_neg(
-			        tau::build_wff_and(parse_sv_eq<node>(sv[i], 0, 1),
-			                          parse_sv_eq<node>(sv[j], 0, 1))));
+			        tau::build_wff_and(build_bv_eq_aux<node>(sv[i], 0, 1),
+			                          build_bv_eq_aux<node>(sv[j], 0, 1))));
 
 	tref one_hot = tau::build_wff_and(at_least, at_most);
 
@@ -1140,7 +1120,7 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 	//   si[t-1]=1  →  ∨_edges_from_s (guard_formula ∧ s_{dst}[t]=1)
 	tref trans = tau::_T();
 	for (int s = 0; s < k; ++s) {
-		tref prev_s = parse_sv_eq<node>(sv[s], -1, 1);
+		tref prev_s = build_bv_eq_aux<node>(sv[s], -1, 1);
 		tref edges_disj = tau::_F();
 		for (const auto& e : aut.edges[s]) {
 			if (e.dst < 0 || e.dst >= k) {
@@ -1150,7 +1130,7 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 			}
 			tref guard_fm = guard_to_aba<node>(
 			    e.guard_label, aut.aps, sol.atoms);
-			tref next_d = parse_sv_eq<node>(sv[e.dst], 0, 1);
+			tref next_d = build_bv_eq_aux<node>(sv[e.dst], 0, 1);
 			edges_disj = tau::build_wff_or(edges_disj,
 			    tau::build_wff_and(guard_fm, next_d));
 		}
@@ -1194,7 +1174,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 	if (init_s < 0 || init_s >= k) return {nullptr, nullptr};
 
 	// (1) sv[initial_state][0] = {1}
-	tref sv_tmpl = parse_sv_eq<node>(sv[init_s], 0, 1);
+	tref sv_tmpl = build_bv_eq_aux<node>(sv[init_s], 0, 1);
 	auto sv_io   = tau::get(sv_tmpl).select_top(is_child<node, tau::io_var>);
 	tref init_sv = fm_at_time_point<node>(sv_tmpl, sv_io, 0);
 
@@ -1205,7 +1185,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 		tref gfm   = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
 		auto gvars = tau::get(gfm).select_top(is_child<node, tau::io_var>);
 		tref g0    = fm_at_time_point<node>(gfm, gvars, 0);
-		tref sv_t  = parse_sv_eq<node>(sv[e.dst], 0, 1);
+		tref sv_t  = build_bv_eq_aux<node>(sv[e.dst], 0, 1);
 		auto sv_t_io = tau::get(sv_t).select_top(is_child<node, tau::io_var>);
 		tref sv1   = fm_at_time_point<node>(sv_t, sv_t_io, 1);
 		tref edge  = tau::build_wff_and(g0, sv1);

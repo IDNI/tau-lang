@@ -323,10 +323,11 @@ static std::optional<LtlAbaSolution<node>> solve_ltl_aba(tref fm);
 template <NodeType node>
 static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
 
-// Build the atom `<name>[t-<shift>] = <value>` over the Boolean type used
-// for the one-hot state bits.
+// Build the atom `<name>[t-<shift>] = <value>` over the default bv type
+// used for the one-hot state bits and the S/T auxiliaries. LT-16(a): one
+// builder — the former parse_sv_eq was a verbatim duplicate.
 template <NodeType node>
-static tref parse_sv_eq(const std::string& name, int shift, int value);
+static tref build_bv_eq_aux(const std::string& name, int shift, int value);
 
 // Multi-state Mealy strategy -> always(phi) with one-hot auxiliary state
 // bits o__ltl_ms<i>__ (see the block comment at the definition).

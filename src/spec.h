@@ -126,6 +126,17 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			append(s.reactive);
 			return;
 		}
+		// GR-N2: a compound conjunct with temporal content below a
+		// Boolean top node — `F(a) || G(b)`, `!G(a)`, `G(a) -> F(b)` —
+		// used to fall through to the transient default and be filed
+		// as an initial-only constraint. Any temporal operator
+		// anywhere inside makes it a temporal obligation: reactive.
+		// (Shared predicate: the same one gr1_detect and the two
+		// other classifiers use.)
+		if (!gr1_detect_internal::is_non_temporal<node>(fm)) {
+			append(s.reactive);
+			return;
+		}
 		// Otherwise — non-temporal at the top level.  Transient.
 		append(s.transient);
 	};

@@ -1072,18 +1072,6 @@ struct LtlAbaSolution {
 // After the pass the formula no longer contains wff_S or wff_T, so it can
 // be sent to ltlsynt.
 
-// Return true if the tree rooted at fm contains any wff_S or wff_T node.
-template <NodeType node>
-static bool has_since_trigger(tref fm) {
-	using tau = tree<node>;
-	return tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		auto nt = t[0].value.nt;
-		return nt == tree<node>::wff_S || nt == tree<node>::wff_T;
-	}) != nullptr;
-}
-
 // Build   name[t+shift]:bv = {value}   (shift ≤ 0: -1 → t-1, 0 → t).
 template <NodeType node>
 static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
@@ -1092,13 +1080,19 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
 	// Use the default BV bitwidth explicitly — bare ":bv" is rejected by
 	// the grammar since the merge that made bitwidths mandatory.
-	std::string bv_type_str = ":bv[" + std::to_string(default_bv_size) + "]";
+	// IN-M4: ONE width source — read it from the default bv type tree,
+	// the same chain seed_aux_lookback_bits uses. `default_bv_size` here
+	// was a second copy of the same fact; a change to the default bv
+	// width in one place would have silently desynchronised the seeded
+	// state-bit values from the atoms built over them.
+	std::string bv_type_str = ":bv["
+		+ std::to_string(get_bv_size<node>(bv_type<node>())) + "]";
 	std::string expr = name + "[" + t_str + "]" + bv_type_str + " = { "
 	                 + std::to_string(value) + " }";
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;
 	tref fm = tau::get(expr, std::move(opts));
-	// See parse_sv_eq in ltl_aba_builders.tmpl.h: a bare wff parse never sets
+	// A bare wff parse never sets
 	// the io_var input/output bit (that happens during spec parsing), leaving
 	// these aux variables classified as neither, which transform_io_var and
 	// existentially_quantify_output_streams both reject. Resolve them the way
@@ -1392,7 +1386,9 @@ static std::tuple<tref, tref, tref, std::vector<std::pair<tref,tref>>,
                   std::vector<std::string>>
 compile_since_trigger(tref fm) {
 	using tau = tree<node>;
-	if (!has_since_trigger<node>(fm))
+	// LT-16(b): has_since_trigger was a verbatim duplicate of
+	// has_past_operators (ltl_aba_helpers.tmpl.h); one predicate now.
+	if (!has_past_operators<node>(fm))
 		return {fm, tau::_T(), tau::_T(), {}, {}};
 
 	std::vector<std::pair<tref,tref>> aux_pairs;

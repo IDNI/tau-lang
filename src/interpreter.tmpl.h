@@ -366,7 +366,7 @@ std::optional<interpreter<node>>
 					std::make_shared<
 						vector_output_stream>());
 				// The global context too: text-parse helpers
-				// (parse_sv_eq-style) resolve against it, and
+				// (build_bv_eq_aux-style) resolve against it, and
 				// the w_ prefix falls outside the i/o name
 				// heuristic.
 				gctx.add_output(wname, wtype,
@@ -2109,7 +2109,20 @@ void interpreter<node>::seed_aux_lookback_bits(
 		}
 	for (const auto& [name, bit] : bits) {
 		auto it = lookback_occ.find(name);
-		if (it == lookback_occ.end()) continue;
+		if (it == lookback_occ.end()) {
+			// IN-M4: a bit with no shift-(-1) occurrence in the
+			// executable spec cannot be seeded — its t = -1 value
+			// will be the interpreter's default rather than the
+			// strategy's initial state. Today the Mealy encoding
+			// mentions every bit at shift -1, so this arm firing
+			// means that encoding changed; say so instead of
+			// silently skipping.
+			LOG_WARNING << "seed_aux_lookback_bits: no lookback "
+				"occurrence of state bit '" << name
+				<< "' in the executable spec; its initial "
+				"value stays at the interpreter default\n";
+			continue;
+		}
 		// transform_io_var(name[t-1], formula_time_point)
 		// → name[t = formula_time_point - 1]  (= name[t=0])
 		// This is the exact key update_to_time_point produces for the
@@ -2178,7 +2191,7 @@ int interpreter<node>::current_state() const {
 	// `memory` holds the full history; we look up time_point - 1 because
 	// time_point has already advanced past the last commit.
 	//
-	// `parse_sv_eq<node>(sv[i], 0, 1)` in encode_mealy_as_safety builds
+	// `build_bv_eq_aux<node>(sv[i], 0, 1)` in encode_mealy_as_safety builds
 	// the formula `o__ltl_ms<i>__[t] = bv1`. The committed value in
 	// `memory[o__ltl_ms<i>__[t]]` is therefore a bv constant; the active
 	// state has value bv1, inactive states have bv0.

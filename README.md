@@ -2417,7 +2417,7 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 | `src/algorithm_b_skeleton.h` | **Default path** | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
 | `src/algorithm_a_skeleton.h` | Available for pure-output formulas | Algorithm A: `build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star)`. Uses ⌈log₂\|T₁\|⌉ output R-bits for the memory type, no input propositions. Faster for pure-output formulas; bypassed when input variables appear. |
 | `src/algorithm_d_game.h` | Available for output-only formulas (`TAU_LTL_ALG=D`) | Algorithm D: direct parity-game construction. HOA guard evaluator (`eval_guard`); synthesis game parser (`parse_synth_game_hoa`); `build_product_game` (synthesis game × T₁, with T₃ feasibility pruning); `zielonka_win_player1` (recursive attractor + subgame solver, odd priority = system wins). |
-| `src/algorithm_c_skeleton.h` | Available | Algorithm C: oracle-assisted abstract game. `A_{ρ,J}` encoding — O(\|T_1\|·2^K) inputs, K+\|T_1\| outputs, independent of \|T_3\|. |
+| Algorithm C (deleted) | Not implemented | Oracle-assisted abstract game with `A_{ρ,J}` oracle propositions. Deleted 2026-08-25 (D2): Algorithm D provides the `T1`-product game without the formula blow-up, and C's oracle propositions had no executable strategy; the design write-up remains in `LTL_ABA_DESIGN.md`. |
 
 ## Type enumeration (ω-categorical theories)
 
