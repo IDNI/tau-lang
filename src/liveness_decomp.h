@@ -2,6 +2,10 @@
 
 // Opt-6: decomposition by liveness (prune-then-solve).
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // If φ = G(ψ_safe) ∧ ⋀_j GF(ψ_j), split into:
 //   - safety_part:    the G(ψ_safe) invariant — it restricts the arena
 //                     (prune types violating ψ_safe before solving liveness).
@@ -10,9 +14,11 @@
 //                     fixpoint in the pruned arena.
 //
 // Returns the structured decomposition for the direct-game pipeline.
-// Non-GR(1) formulas fall back to returning `overall = fm` and an empty
-// `liveness_parts` vector — the caller should then dispatch to general
-// LTL via the DPW product game (Algorithm D, Phase 1).
+// Non-GR(1) formulas (and a null/empty input) come back as a
+// default-constructed LivenessDecomp -- `is_gr1 == false`, null
+// `safety_part`, empty `liveness_parts` (GR-2: there is no `overall`
+// field; the caller keeps its own handle on the formula and dispatches to
+// the general parity-game path).
 
 #ifndef __IDNI__TAU__LIVENESS_DECOMP_H__
 #define __IDNI__TAU__LIVENESS_DECOMP_H__
@@ -65,6 +71,10 @@ inline LivenessDecomp<node> decompose_liveness(tref fm) {
 	std::vector<tref> conjs;
 	liveness_decomp_internal::gather_conjuncts<node>(fm, conjs);
 
+	// GR-R2: a childless top node yields no conjunct at all; that is not
+	// a solved GR(1) instance, it is no formula.
+	if (conjs.empty()) return {};
+
 	std::vector<tref> safety_bodies;
 	for (tref c : conjs) {
 		const auto& t = tau::get(c);
@@ -73,8 +83,14 @@ inline LivenessDecomp<node> decompose_liveness(tref fm) {
 		if (nt != tau::wff_always) { d.is_gr1 = false; return {}; }
 		tref body = t[0].first();
 		const auto& bt = tau::get(body);
-		if (bt.has_child() && bt[0].value.nt == tau::wff_F) {
-			// GF: record the inner body.
+		if (gr1_detect_internal::is_eventually_node<node>(body)) {
+			// GF: record the inner body. LG-8: only when it is
+			// non-temporal, matching is_gr1_fragment -- G(F(G p))
+			// is NOT GR(1) and must not be classified as such.
+			if (!gr1_detect_internal::is_non_temporal<node>(
+					bt[0].first())) {
+				d.is_gr1 = false; return {};
+			}
 			d.liveness_parts.push_back(bt[0].first());
 			continue;
 		}

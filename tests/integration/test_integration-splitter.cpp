@@ -331,3 +331,32 @@ TEST_SUITE("Cleanup") {
 		ba_constants<node_t>::cleanup();
 	}
 }
+// SO-15: the temporal branch of tau_splitter (has_temp_var true) and the
+// temporal gate of is_splitter had zero coverage -- every prior sample was
+// non-temporal.
+TEST_SUITE("Tau_splitter_temporal (SO-15)") {
+
+	// The two-arg is_splitter overload is non-temporal only (it asserts
+	// always-freedom); for temporal results the splitter property is
+	// checked directly: satisfiable and strictly below the original.
+	TEST_CASE("always-wrapped clause yields a temporal splitter") {
+		const char* sample = "always o1[t]x = 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample,
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s) );
+		CHECK( !are_tau_equivalent<node_t>(s, fm) );
+	}
+
+	TEST_CASE("always && sometimes clause yields a temporal splitter") {
+		const char* sample =
+			"(always o1[t]x = 0) && (sometimes o1[t] != 0).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample,
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s) );
+		CHECK( !are_tau_equivalent<node_t>(s, fm) );
+	}
+}

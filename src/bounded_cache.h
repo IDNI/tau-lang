@@ -2,6 +2,13 @@
 
 // bounded_cache — std::map with a configurable max-size bound.
 //
+// STATUS (TT2-13): adopted for the string-keyed synthesis cache in
+// `call_ltlsynt_game` (runtime-bound mode, bound = `cache_bound` below).
+// The create_cache adoption described below has not happened yet for the
+// tref-keyed caches; the unbounded-growth issue it targets remains open at
+// the normal_forms/satisfiability cache sites (their keys at least get GC
+// pruning, which the string-keyed caches never did).
+//
 // Drop-in replacement for `std::map<K, V, Cmp>` at every call site
 // where the existing tau-ltl convention is:
 //
@@ -69,6 +76,13 @@
 
 namespace idni::tau_lang {
 
+// LG-27: the runtime bound consulted by the string-keyed synthesis caches
+// (see `call_ltlsynt_game`). A cache constructed with `&cache_bound` reads
+// the current value on every insert, so `--cache-bound` / REPL `set
+// cachebound` / `api::set_cache_bound` take effect immediately. Runtime
+// parameter by policy; 0 = unbounded.
+inline std::size_t cache_bound = 4096;
+
 template <typename K, typename V,
           typename Cmp = std::less<K>,
           std::size_t Max = 0> // Max == 0 means unbounded — same as std::map
@@ -81,11 +95,26 @@ struct bounded_cache {
 	using const_iterator = typename map_t::const_iterator;
 	using key_compare = Cmp;
 
+	// TT2-13: two bounding modes. The compile-time `Max` template
+	// parameter is the original mode (kept for the existing unit tests
+	// and benchmark). Constructing with a pointer to a runtime bound
+	// switches to runtime mode: the pointee is read on every insert, so
+	// a `set cachebound N` tightens or loosens a live cache. In both
+	// modes a bound of 0 means unbounded; in runtime mode the FIFO
+	// queue is maintained even while the bound is 0, so a later
+	// non-zero bound still knows the insertion order.
+	bounded_cache() = default;
+	explicit bounded_cache(const std::size_t* runtime_bound)
+		: runtime_bound_(runtime_bound) {}
+
 	// --- queries ----------------------------------------------------
 
 	bool empty()       const noexcept { return map_.empty(); }
 	std::size_t size() const noexcept { return map_.size(); }
 	static constexpr std::size_t max_size() noexcept { return Max; }
+	std::size_t bound() const noexcept {
+		return runtime_bound_ ? *runtime_bound_ : Max;
+	}
 
 	iterator       find(const K& k)       { return map_.find(k); }
 	const_iterator find(const K& k) const { return map_.find(k); }
@@ -132,7 +161,7 @@ struct bounded_cache {
 		auto it = map_.find(k);
 		if (it == map_.end()) return 0;
 		// Drop from FIFO queue too if we track it.
-		if constexpr (Max != 0) {
+		if (tracked()) {
 			for (auto qit = order_.begin(); qit != order_.end(); ++qit) {
 				if (*qit == it) { order_.erase(qit); break; }
 			}
@@ -142,7 +171,7 @@ struct bounded_cache {
 	}
 
 	iterator erase(iterator it) {
-		if constexpr (Max != 0) {
+		if (tracked()) {
 			for (auto qit = order_.begin(); qit != order_.end(); ++qit) {
 				if (*qit == it) { order_.erase(qit); break; }
 			}
@@ -152,7 +181,7 @@ struct bounded_cache {
 
 	void clear() {
 		map_.clear();
-		if constexpr (Max != 0) order_.clear();
+		if (tracked()) order_.clear();
 	}
 
 	// --- introspection (used by the benchmark) ---------------------
@@ -160,10 +189,17 @@ struct bounded_cache {
 	std::size_t evictions() const noexcept { return evictions_; }
 
 private:
+	// Whether the FIFO queue is maintained at all: always in runtime
+	// mode (the bound can become non-zero later), only for Max != 0 in
+	// compile-time mode.
+	bool tracked() const noexcept { return Max != 0 || runtime_bound_; }
+
 	void on_insert(iterator it) {
-		if constexpr (Max == 0) return; // unbounded
+		if (!tracked()) return; // unbounded, compile-time mode
 		order_.push_back(it);
-		while (map_.size() > Max && !order_.empty()) {
+		const std::size_t b = bound();
+		if (b == 0) return; // unbounded right now; keep the queue
+		while (map_.size() > b && !order_.empty()) {
 			iterator victim = order_.front();
 			order_.pop_front();
 			map_.erase(victim);
@@ -177,6 +213,8 @@ private:
 	// across insert/erase (only the erased iterator is invalidated),
 	// so this is sound.
 	std::list<iterator> order_;
+
+	const std::size_t* runtime_bound_ = nullptr;
 
 	std::size_t evictions_ = 0;
 };

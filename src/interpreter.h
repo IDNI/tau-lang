@@ -46,14 +46,59 @@ struct interpreter {
 	friend struct api<node>;
 
 	/**
+	 * @brief Runtime size guard for updated specifications (I7).
+	 *
+	 * When nonzero, update() logs a WARNING whenever the stored
+	 * specification exceeds this many printed characters. 0 disables the
+	 * check. Set from the `--spec-size-warn` CLI option; a runtime
+	 * parameter by policy, never a header constant.
+	 */
+	static inline size_t spec_size_warn_threshold = 0;
+
+	/**
+	 * @brief Runtime cap on the revision alternatives kept per spec part.
+	 *
+	 * Every per-update cost of the factored pointwise revision (I1) is
+	 * proportional to the number of alternatives a part carries, and a
+	 * conflicting update can add one each time. When nonzero and a
+	 * revision produces more than this many alternatives, the first
+	 * `max_revision_alts - 1` (the strongest accumulated behavior) and
+	 * the last one (the newest update clause, the part's universally
+	 * executable anchor) are kept and the middle preference tiers are
+	 * dropped with a WARNING. 0 disables the cap. Set from the
+	 * `--max-revision-alts` CLI option; a runtime parameter by policy,
+	 * never a header constant.
+	 */
+	static inline size_t max_revision_alts = 0;
+
+	/**
+	 * @brief Adaptive tree-node gc trigger knobs.
+	 *
+	 * A sweep fires when bintree<node>::M() has both crossed the
+	 * gc_min_size floor AND grown by at least gc_growth_factor since the
+	 * last sweep. Set gc_growth_factor <= 0 to disable. Self-tunes across
+	 * workloads — fast-growing M triggers frequent sweeps at small peak;
+	 * slow-growing M sweeps rarely. Runtime parameters (defaults kept at
+	 * the tuned 256 / 1.5), public like the two limits above so the REPL
+	 * `get` printers can read them back: set via
+	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
+	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`.
+	 */
+	static inline size_t gc_min_size      = 256;
+	static inline double gc_growth_factor = 1.5;
+
+	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
-	 * @param ubt_ctn Unbounded continuation formulas.
-	 * @param original_spec Specification partition (formula, representative pairs).
+	 * @param ubt_ctn Per spec part, the ordered unbounded continuation
+	 *        formulas of its alternatives (parallel to @p original_spec).
+	 * @param original_spec Specification partition; per part an ordered
+	 *        list of alternative formulas plus its representative.
 	 * @param output_partition Union-find structure over output stream groups.
 	 * @param memory Current memory (variable-to-value map).
 	 * @param ctx I/O context for reading/writing streams.
 	 */
-	interpreter(htrefs& ubt_ctn, auto& original_spec, auto& output_partition,
+	interpreter(std::vector<htrefs>& ubt_ctn, auto& original_spec,
+		auto& output_partition,
 		assignment<node>& memory, const io_context<node>& ctx);
 
 	/**
@@ -75,6 +120,13 @@ struct interpreter {
 	 * @brief Execute one time step with the given input @p values.
 	 * @param values Input variable assignments for this step.
 	 * @return Pair (output assignment if successful, whether execution should continue).
+	 *
+	 * Lifetime of the returned map (IN-M1): its nodes are owned by the
+	 * tree store and kept alive by the interpreter until the SECOND
+	 * following step() call -- the sweep at the start of step N+1 pins
+	 * step N's map, the sweep at the start of step N+2 does not. A host
+	 * that needs a step's outputs for longer must serialize them (or copy
+	 * the trees into its own htref-held storage) before then.
 	 */
 	std::pair<std::optional<assignment<node>>, bool> step(
 						const assignment<node>& values);
@@ -85,11 +137,11 @@ struct interpreter {
 	// commit — F6-compliant: never mid-token). Equivalent to calling
 	// `step(values)` then `update(u)` in sequence.
 	//
-	// PWR mode is interpreter-internal; today only syntactic fast mode is
-	// wired (pwr-ltl.tex §3 algorithm via `pointwise_revision_temporal`).
-	// Semantic / Zielonka winning-region mode (pwr-ltl.tex §11 "optimal
-	// mode") is a deferred design — the machinery (algorithm_d_game.h,
-	// mealy_extract.h) exists but is not yet wired into PWR.
+	// PWR mode is interpreter-internal. LS-7: BOTH modes are wired at
+	// HEAD -- syntactic fast mode (pwr-ltl.tex §3 via
+	// `pointwise_revision_temporal`) with `semantic_pwr_optimal`
+	// (pwr-ltl.tex §11) invoked as its fallback inside
+	// pointwise_revision.h.
 	std::pair<std::optional<assignment<node>>, bool> step(
 						const assignment<node>& values,
 						std::optional<tref> u);
@@ -99,21 +151,62 @@ struct interpreter {
 	 *
 	 * Both the running spec and @p update must be normalized before calling.
 	 * @param update Normalized update formula.
+	 * @return true iff the update was accepted and committed; false leaves
+	 *         the interpreter exactly as it was (spec, streams, memory).
+	 *         The reason is logged.
 	 */
-	void update(tref update);
+	bool update(tref update);
 
 	// ── Inspection / introspection (added for tau-neuro runtime) ─────────
 
 	// Return the current running spec as a tau-syntax string. Reflects
 	// whatever the interpreter holds in `original_spec` after any PWR
 	// updates that have been applied — this is the "this[t]" view.
+	//
+	// IN-M2: a part with several revision alternatives is executed by
+	// step() as its FIRST solvable alternative, not as their disjunction.
+	// Once a step has run, this reports the alternatives that step chose;
+	// before the first step (or after an update, until the next step) it
+	// reports the disjunction, which over-approximates.
 	std::string current_spec() const;
 
+	// True once a pointwise-revision update has been committed after the
+	// Mealy strategy in `cached_solution` was synthesised (IN-N3): the
+	// automaton then no longer describes the running spec, and the
+	// strategy introspection below (visualise_mealy_dot, determinise,
+	// boundary_traces) reports nothing rather than a stale machine.
+	// The solution itself is kept because reset() still needs it to
+	// re-seed the aux state bits of the original spec parts.
+	bool strategy_stale() const { return cached_solution_stale_; }
+
 	// Reset the interpreter back to time t=0. Clears `memory`,
-	// `time_point`, `formula_time_point`; recomputes lookback. The spec
-	// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
-	// preserved — only the execution snapshot is reset.
+	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
+	// the multi-state Mealy initial-state bits (see
+	// seed_mealy_initial_state) and the inner-S auxiliary anchors (see
+	// seed_since_aux_bits). The spec (`original_spec`, `ubt_ctn`,
+	// `cached_solution`, IO streams) is preserved — only the execution
+	// snapshot is reset.
 	void reset();
+
+	// Pre-populate `memory` with the multi-state Mealy strategy's initial
+	// one-hot state-bit values ms_j[t = formula_time_point - 1], so the
+	// first non-auto-continued step sees correct lookback values. No-op
+	// unless `cached_solution` is a multi-state strategy and lookback is
+	// at least 1. Called by make_interpreter and by reset() (AP2-3: a
+	// reset() that only cleared `memory` lost this pre-population, so
+	// "back to t=0" was not the real t=0 state).
+	void seed_mealy_initial_state();
+
+	// LA-N3: pre-populate `memory` with bv-0 for every INNER (off-spine)
+	// S/T auxiliary `o__ltl_s<k>__` in `since_aux_anchor_`, at
+	// t = formula_time_point - 1 — the strong-past anchor S(-1) = false
+	// (equivalently T(-1) = true) that the compile-away pass cannot state
+	// in the formula without a cross-BA-type or negative-time shape (both
+	// revert-pinned; see compile_since_trigger_rec). Without it the first
+	// enforced step's `φ ∧ prev` arm lets the strategy claim a Since
+	// through phantom memory. Called by make_interpreter and by reset();
+	// no-op when the list is empty or lookback is 0.
+	void seed_since_aux_bits();
 
 	// Opaque identifier for the current Mealy state (or interpreter
 	// snapshot if the spec has no Mealy strategy). Two states with the
@@ -135,12 +228,16 @@ struct interpreter {
 	// non-null gate), but don't mutate any state. Returns true iff the
 	// resulting merged spec would be executable.
 	//
-	// Today this uses syntactic fast-mode PWR (`pointwise_revision_temporal`).
-	// Semantic mode is deferred upstream (see pwr-ltl.tex §11).
+	// Uses the same PWR pipeline as update(): syntactic fast mode with
+	// the semantic-optimal fallback (LS-7: both wired at HEAD).
 	//
 	// Non-const because the dry-run needs to copy the output_partition
 	// union-find structure, which lacks a usable copy constructor;
-	// implementation defers to the same machinery as `update()`.
+	// implementation defers to the same machinery as `update()` --
+	// literally: both call plan_update(), so can_extend(psi) is true
+	// exactly when update(psi) would commit (PW-N9 / IN-M7). The one
+	// side effect both share is that unknown console streams named by
+	// psi get registered in the io_context during stream collection.
 	bool can_extend(tref psi);
 
 	// Enumerate output assignments admissible at the current step without
@@ -160,6 +257,11 @@ struct interpreter {
 	// the admissibility set, then constrained-argmax over it. The returned
 	// assignments are over OUTPUT stream variables; auxiliary state bits
 	// (`o__ltl_ms*`, `o__ltl_s*`) are filtered via `is_excluded_output`.
+	//
+	// IN-M2: for a part with several revision alternatives the constraint
+	// is the FIRST alternative that is solvable under the current memory
+	// -- the one step() would execute -- not the disjunction of all of
+	// them (which admitted outputs step() never emits).
 	//
 	// Non-const because lazy initialization of step_spec via
 	// `calculate_initial_spec()` may be required.
@@ -229,16 +331,18 @@ struct interpreter {
 	// ── Oracle-resolved output streams (declare_open) ────────────────────
 	//
 	//
-	// An OracleHandler is invoked at runtime when step() encounters an
-	// open output stream. It receives a serialized tau data formula F
-	// characterizing the admissible values for that stream at the
-	// current state, and must return a satisfying assignment serialized
-	// as "var := value" (one per free variable in F). The engine
-	// validates the returned assignment against F and commits it.
+	// DESIGN CONTRACT (target semantics): an OracleHandler is invoked
+	// when step() encounters an open output stream; it receives a
+	// serialized tau data formula F characterizing the admissible values
+	// and returns a satisfying assignment ("var := value" per free
+	// variable), which the engine validates against F and commits. F is
+	// guaranteed satisfiable by W-invariance.
 	//
-	// F is guaranteed satisfiable by W-invariance (the engine only
-	// dispatches from a winning sys-state in the parity game's winning
-	// region). The handler need not check satisfiability of F itself.
+	// V1 STATUS (AP2-11): step() does NOT yet dispatch to handlers --
+	// open-stream resolution stays host-side (see the V1 scaffolding
+	// note in interpreter.tmpl.h step()); consequently the
+	// in_oracle_handler_ re-entrance guard cannot fire yet.
+	// declare_open DOES validate stream_name (throws on unknown).
 	using OracleHandler = std::function<std::string(const std::string& formula)>;
 
 	// Declare `stream_name` as an open output stream filled by `handler`.
@@ -270,9 +374,23 @@ struct interpreter {
 	 */
 	void collect_live_refs(std::unordered_set<tref>& keep) const;
 
-	htrefs ubt_ctn;
-	/// Partition of spec each with representative for set of output streams.
-	std::vector<std::pair<htref, htref>> original_spec;
+	// I1 (factored spec storage): each spec part holds an ORDERED list of
+	// alternative formulas, strongest first. Semantically the part is the
+	// disjunction of its alternatives; operationally step() tries them in
+	// order and the first solvable one wins, which implements the
+	// pointwise-revision preference "follow the accumulated spec when the
+	// current inputs allow it, else fall back to the newer update" without
+	// ever embedding the ¬∃outs.(S∧U) guard (and thus a second copy of the
+	// whole spec) into a stored formula. Stored size grows additively per
+	// update instead of doubling.
+	/// Per spec part, the executable continuations of its alternatives.
+	/// Parallel to `original_spec` (same size, same part order) -- the
+	/// multi-state Mealy initial-output part pushed by make_interpreter
+	/// has a representative-less entry in `original_spec` too (IN-N11).
+	std::vector<htrefs> ubt_ctn;
+	/// Partition of spec: per part the ordered alternative formulas with a
+	/// representative for its set of output streams.
+	std::vector<std::pair<htrefs, htref>> original_spec;
 	assignment<node> memory;
 	size_t time_point = 0;
 	input_streams<node>     inputs;
@@ -290,6 +408,14 @@ struct interpreter {
 	//   - emit DOT visualisations, extract boundary traces, etc. — without
 	//     re-running synthesis.
 	std::optional<LtlAbaSolution<node>> cached_solution;
+	bool cached_solution_stale_ = false;
+
+	// LA-N3: auxiliary output names (`o__ltl_s<k>__`) of the inner /
+	// off-spine S operators from the pure-past compile-away, whose t=0
+	// anchor is not expressible in the safety formula itself. Set by
+	// make_interpreter from ltl_to_safety_formula_full's third result;
+	// consumed by seed_since_aux_bits() (make_interpreter and reset()).
+	std::vector<std::string> since_aux_anchor_;
 
 	// Open-stream handlers (declared via declare_open). Iteration order
 	// matches insertion order via std::vector<std::string> open_streams_order_;
@@ -307,23 +433,73 @@ private:
 		return tau::subtree_less(s1, s2);
 	};
 	union_find_with_sets<decltype(stream_comp), node> output_partition;
-	trefs step_spec;
+	/// Per spec part, the alternatives' continuations at the current step.
+	std::vector<trefs> step_spec;
 	bool final_system = false;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 	int_t announced_step_ = -1;
 
-	/// Adaptive tree-node gc trigger: a sweep fires when bintree<node>::M()
-	/// has both crossed the gc_min_size floor AND grown by at least
-	/// gc_growth_factor since the last sweep. Set gc_growth_factor <= 0 to
-	/// disable. Self-tunes across workloads — fast-growing M triggers
-	/// frequent sweeps at small peak; slow-growing M sweeps rarely.
-	static constexpr size_t gc_min_size      = 256;
-	static constexpr double gc_growth_factor = 1.5;
 	size_t m_at_last_gc = 0;
+	/// The output map returned by the previous step(); pinned through the
+	/// next sweep so a host may still read it while feeding the next step
+	/// (IN-M1, see step()'s lifetime note).
+	assignment<node> last_outputs_;
+	/// Per part, the index (into the part's alternatives) step() executed
+	/// last; empty until the first step and after every update (IN-M2).
+	std::vector<size_t> chosen_alt_;
 	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
-	void maybe_gc();
+	/// @param pin Optional caller-held map whose nodes must survive the
+	/// sweep (collect_live_refs cannot see locals).
+	void maybe_gc(const assignment<node>* pin = nullptr);
+
+	/// Shared memory pre-population for auxiliary bv state bits (the Mealy
+	/// one-hot bits and the LA-N3 inner-S anchors): for each (name → bit)
+	/// entry whose `name[t-1]` lookback occurs in `ubt_ctn`, emplace
+	/// memory[name[t = formula_time_point - 1]] := bv-{bit}. No-op when
+	/// `formula_time_point` is 0 (no lookback, nothing to seed).
+	void seed_aux_lookback_bits(const std::map<std::string, int>& bits);
+
+	/// @brief Everything update() needs to commit, computed without
+	/// mutating the interpreter (PW-4 / PW-N9 / IN-M7).
+	struct update_plan {
+		std::vector<htrefs> ubt_ctn;
+		std::vector<std::pair<htrefs, htref>> spec;
+		union_find_with_sets<decltype(stream_comp), node> partition;
+		input_streams<node>  inputs;
+		output_streams<node> outputs;
+		std::string spec_str;
+		// The union-find's move constructor is explicit, so the members
+		// are direct-initialized here rather than brace-aggregated.
+		update_plan(std::vector<htrefs>&& c,
+			std::vector<std::pair<htrefs, htref>>&& s,
+			union_find_with_sets<decltype(stream_comp), node>&& p,
+			input_streams<node>&& i, output_streams<node>&& o,
+			std::string&& str)
+			: ubt_ctn(std::move(c)), spec(std::move(s)),
+			  partition(std::move(p)), inputs(std::move(i)),
+			  outputs(std::move(o)), spec_str(std::move(str)) {}
+	};
+	/// @brief Dry-run the pointwise revision of the running spec by
+	/// @p update: the first update clause that yields an entirely
+	/// executable revised spec (with its streams resolvable) wins.
+	/// @return The plan, or std::nullopt (reason logged) when no clause does.
+	std::optional<update_plan> plan_update(tref update);
+
+	/// @brief The index of the first alternative of part @p part whose
+	/// continuation is solvable at the current time point under the
+	/// current memory -- the one step() would execute (IN-M2).
+	std::optional<size_t> first_solvable_alternative(size_t part);
+	/// @brief The running spec as step() executes it: per part its chosen
+	/// alternative when known (@p use_memory picks by solvability under
+	/// the current memory, else the last step's choice), the
+	/// disjunction otherwise.
+	tref executed_spec_fm(bool use_memory);
+
+	/// @brief Drop dead and duplicate alternatives (keeping the earliest,
+	/// i.e. strongest, position) and apply the max_revision_alts cap.
+	static htrefs finalize_alternatives(const trefs& alts);
 
 	/// @brief Partition @p spec by output stream representatives.
 	static std::vector<std::pair<htref, htref>>
@@ -340,6 +516,13 @@ private:
 	/// @brief Rebuild the output stream map from @p current_outputs.
 	/// @return false if a stream could not be found (interpretation should stop).
 	bool rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
+	/// @brief Build the input stream map for @p current_inputs into @p dst
+	/// (the member map is untouched) -- update() validates before it swaps.
+	bool build_inputs(const subtree_map<node, size_t>& current_inputs,
+		input_streams<node>& dst);
+	/// @brief Build the output stream map for @p current_outputs into @p dst.
+	bool build_outputs(const subtree_map<node, size_t>& current_outputs,
+		output_streams<node>& dst);
 
 	/// @brief Collect all input stream variables from @p dnf into @p current_inputs.
 	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);
@@ -350,14 +533,18 @@ private:
 	/// @brief Return the set of output stream variables present in @p dnf.
 	subtree_map<node, size_t> collect_output_streams(tref dnf);
 
-	/// @brief Return the unbounded continuation formulas at time @p t.
-	trefs get_ubt_ctn_at(int_t t);
+	/// @brief Return the unbounded continuation formulas at time @p t,
+	/// per spec part in alternative order.
+	std::vector<trefs> get_ubt_ctn_at(int_t t);
 
 	/// @brief Compute and store the initial specification.
 	bool calculate_initial_spec();
 
 	/// @brief Build the input variable assignments required for step @p t.
 	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
+
+	/** @brief Return `true` if a tau-typed `this` input stream is registered. */
+	bool has_this_input_stream() const;
 
 	/// @brief Update formula @p f to reflect time point @p t.
 	tref update_to_time_point(tref f, const int_t t);
@@ -376,8 +563,22 @@ private:
 	/// @brief Find an executable specification clause from DNF.
 	static tref get_executable_spec(tref& clause, const size_t start_time = 0);
 
-	/// @brief Apply the pointwise revision algorithm to produce an updated specification.
-	tref pointwise_revision(tref spec, tref update, const int_t start_time);
+	/// @brief Recompute the executable continuations of a part's ordered
+	/// alternatives. Alternatives that are not executable are dropped from
+	/// @p alts (they could never fire in step()).
+	/// @return false when no alternative survives.
+	static bool compute_part_continuations(htrefs& alts, htrefs& ctns,
+		const size_t start_time);
+
+	/// @brief Apply the pointwise revision algorithm to a part's ordered
+	/// alternatives (I1). Conjoins @p update into every alternative; when
+	/// the plain conjunction is unsat, appends the update clause as a
+	/// last-resort alternative instead of embedding the guarded
+	/// ¬∃outs.(S∧U) disjunction into a stored formula.
+	/// @return The revised ordered alternatives, or `std::nullopt` when no
+	/// update clause yields a satisfiable revision.
+	std::optional<htrefs> pointwise_revision(const htrefs& alts,
+		tref update, const int_t start_time);
 
 	/// @brief Find the maximal update-stream solution for @p spec.
 	std::optional<assignment<node>> solution_with_max_update(tref spec);
@@ -411,6 +612,19 @@ template <NodeType node>
 tref unpack_tau_constant(tref constant);
 
 /**
+ * @brief Return `true` if @p fm contains a variable that must be quantified
+ * but appears free (io_var streams must be declared inputs/outputs;
+ * uninterpreted-constant names are allowed free).
+ *
+ * @tparam node Tree node type.
+ * @param fm Formula to check.
+ * @param silent Suppress the LOG_ERROR diagnostics naming the offenders.
+ * @return `true` if a disallowed free variable (or undeclared stream) exists.
+ */
+template <NodeType node>
+bool has_free_vars(tref fm, bool silent = false);
+
+/**
  * @brief Run a Tau specification for at most @p steps time steps.
  *
  * Builds an interpreter, then calls `step()` repeatedly until the spec is
@@ -429,4 +643,4 @@ std::optional<interpreter<node>> run(tref form,
 
 #include "interpreter.tmpl.h"
 
-# endif //__IDNI__TAU__INTERPRETER_H__
+#endif //__IDNI__TAU__INTERPRETER_H__

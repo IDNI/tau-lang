@@ -17,6 +17,25 @@ namespace idni::tau_lang {
 
 inline static bool use_debug_output_in_sat = false;
 
+/// Cap on the fixpoint searches in `find_fixpoint_phi`/`find_fixpoint_chi`;
+/// 0 = unlimited. A runtime parameter by policy, never a header constant —
+/// set via `--max-fixpoint-steps` or REPL `fixpointsteps`, or
+/// `api::set_max_fixpoint_steps`. SO-1 caveat: these searches have no
+/// convergence guarantee, so an unlimited run on a non-converging spec does
+/// not terminate. The shipped default is therefore FINITE (500, the value the
+/// pre-parameter constant had): a give-up is wrong-but-loud where an
+/// unlimited run hangs `sat`/`run`/pointwise revision. Pass 0 to opt into
+/// unlimited. The CLI default in main.cpp must agree with this value.
+inline size_t max_fixpoint_steps = 500;
+
+/// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
+/// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps` — and a
+/// bounded give-up here reports unsatisfiable, which is wrong but bounded and
+/// loud. Shipped default 500 (finite, see above); set via
+/// `--max-flag-search-steps`, REPL `flagsteps`, or
+/// `api::set_max_flag_search_steps`.
+inline size_t max_flag_search_steps = 500;
+
 /**
  * @internal
  * @brief Print a diagnostic message describing a fixpoint computation's
@@ -45,13 +64,6 @@ inline void print_fixpoint_info(const std::string& message,
 	if (!use_debug_output_in_sat)
 		LOG_INFO << "\n" << message << "\n" << result << "\n\n";
 	else std::cerr << message << "\n" << result << "\n";
-}
-
-template <NodeType node>
-bool has_stream_flag(const tref& fm) {
-	using tau = tree<node>;
-	return tau::get(fm).find_top(is<node, tau::wff_sometimes>)
-		|| tau::get(fm).find_top(is<node, tau::constraint>);
 }
 
 /**
@@ -119,11 +131,27 @@ tref transform_io_var(tref io_var, int_t time_point) {
 	if (is_io_initial<node>(io_var)) return io_var;
 	int_t shift = get_io_var_shift<node>(io_var);
 	size_t type = tau::get(io_var).get_ba_type();
+	// The input/output data bit is assigned while parsing a *spec*; it is not
+	// derived from the `i`/`o` name prefix. So an io_var that reached here
+	// without going through spec parsing is neither is_input_variable() nor
+	// is_output_variable(), and testing only the former and falling to an
+	// `else` silently rebuilt such a variable as an *output*:
+	// transform_io_var(i1[t-2], 5) returned i1[3] with is_output_variable()
+	// == true. Every production caller does work on spec-parsed trees, which
+	// is exactly why the unclassified case must be loud rather than defaulted
+	// -- it is otherwise a wrong answer nothing reports.
 	if (tau::get(io_var).is_input_variable())
 		return tau::trim(build_in_var_at_n<node>(
 			get_var_name_node<node>(io_var), time_point - shift, type));
-	else return tau::trim(build_out_var_at_n<node>(
+	if (tau::get(io_var).is_output_variable())
+		return tau::trim(build_out_var_at_n<node>(
 			get_var_name_node<node>(io_var), time_point - shift, type));
+	DBG(assert(false && "transform_io_var: io_var is neither input nor output");)
+	LOG_ERROR << "transform_io_var: " << LOG_FM(io_var) << " is classified"
+		" neither as input nor as output (the in/out bit comes from spec"
+		" parsing, not from the name prefix); returning it unchanged rather"
+		" than rebuilding it as an output variable.";
+	return io_var;
 }
 
 template <NodeType node>
@@ -134,7 +162,11 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_o_vars;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i) {
-		// Skip input streams
+		// Skip input streams. An io_var classified as neither (see
+		// transform_io_var) would be quantified existentially below as if it
+		// were an output; make that loud instead of defaulting silently.
+		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
+			|| tau::get(io_vars[i])[0].is_output_variable());)
 		if (tau::get(io_vars[i])[0].is_input_variable()) continue;
 		// Skip initial conditions
 		if (is_io_initial<node>(io_vars[i])) continue;
@@ -164,6 +196,10 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_i_vars;
 	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
+		// SO-10: fail loudly on an unclassified io_var, like the
+		// existential sibling does.
+		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
+			|| tau::get(io_vars[i])[0].is_output_variable());)
 		// Skip output streams
 		if (tau::get(io_vars[i])[0].is_output_variable()) continue;
 		// Skip initial conditions
@@ -235,8 +271,12 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	if (t | tau::ctn_lt)
 		return is_left  ? to_ba(condition < time_point)
 				: to_ba(time_point < condition);
-	// The above is exhaustive for possible children of constraint
-	assert(false); return nullptr;
+	// The above is exhaustive for the possible children of a constraint. A
+	// plain assert is a no-op under NDEBUG and the nullptr it then returns
+	// flows into build_bf_xor at the create_initial call site, so fail loudly
+	// in every configuration instead.
+	LOG_ERROR << "Unrecognized constraint kind in " << TAU_TO_STR(constraint);
+	throw std::logic_error("Unrecognized constraint kind");
 }
 
 /**
@@ -271,13 +311,24 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	auto t = ctn();
 	DBG(assert(!(t | tau::ctn_neq) && !(t | tau::ctn_eq));)
 
+	// Unlike calculate_ctn, which branches on whether the numeral is the left
+	// or the right operand, the tests below are deliberately side-agnostic.
+	// The initial phase is "up to and including the time point at which the
+	// flag stream has settled", and that point depends only on `condition`,
+	// not on the direction of the comparison: `c >= t` settles at t = c and
+	// `t >= c` settles at t = c as well (the flag is constant on either side
+	// of c), so both are covered by `condition >= time_point`; `c > t` and
+	// `t > c` likewise both settle one step later, hence the `+ 1`. The bound
+	// is intentionally an over-approximation -- an extra initial condition is
+	// harmless, a missing one is not.
 	if (t | tau::ctn_gteq) return condition >= time_point;
 	if (t | tau::ctn_gt)   return condition + 1 >= time_point;
 	if (t | tau::ctn_lteq) return condition + 1 >= time_point;
 	if (t | tau::ctn_lt)   return condition >= time_point;
 
-	// The above is exhaustive for possible children of constraints
-	assert(false); return {};
+	// The above is exhaustive for the possible children of a constraint.
+	LOG_ERROR << "Unrecognized constraint kind in "	<< TAU_TO_STR(constraint);
+	throw std::logic_error("Unrecognized constraint kind");
 }
 
 template <NodeType node>
@@ -299,7 +350,10 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
-	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point, 0);
+	// SO-9: same type as build_step_chi's placeholder -- each is only
+	// used as its own replace key, but the asymmetry invited bugs.
+	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point,
+		sbf_type_id<node>());
 	c_pholder = tau::build_bf_eq_0(c_pholder);
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
 	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
@@ -510,14 +564,13 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 		}
 		auto& v = io_vars.back();
 
-		for (auto it = free_io_vars.begin();
-			it != free_io_vars.end(); ++it)
-		{
-			if (tau::subtree_equals(*it, v)) {
+		// free_io_vars is a copy of get_free_vars' result, which is sorted
+		// by subtree_less, so locate v by binary search instead of scanning
+		// the whole vector per io_var.
+		if (auto it = std::lower_bound(free_io_vars.begin(),
+			free_io_vars.end(), v, tau::subtree_less);
+			it != free_io_vars.end() && tau::subtree_equals(*it, v))
 				free_io_vars.erase(it);
-				break;
-			}
-		}
 		uconst_ctns = tau::get(v).is_input_variable()
 			? tau::build_wff_all(v, uconst_ctns, false)
 			: tau::build_wff_ex( v, uconst_ctns, false);
@@ -598,16 +651,29 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(phi);
 
 	int_t lookback = get_max_shift<node>(io_vars);
-	// Limit iterations to guard against non-convergent formulas (e.g. bug #47).
-	// SO-1: this search has no convergence guarantee; cap the step count so
-	// a non-converging formula fails loudly instead of hanging forever.
-	// This is a safety net, not full error propagation: callers still
-	// receive a (non-fixpoint) result rather than a failure signal.
-	constexpr int_t max_fixpoint_steps = 1'000'000;
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
+	// SO-1: this search has no convergence guarantee; the global
+	// max_fixpoint_steps (0 = unlimited, the default) lets a caller cap the
+	// step count so a non-converging formula fails loudly instead of
+	// hanging forever. This is a safety net, not full error propagation:
+	// callers still receive a (non-fixpoint) result rather than a failure
+	// signal. Real specs settle in a handful of steps (the flag_boundary
+	// tests in tests/integration/test_integration-solver.cpp reach single
+	// digits), so any generous bound leaves a wide margin.
+	//
+	// Checking the implication on the RAW iterates is deliberate. A
+	// variant that normalized each iterate once (normalize_non_temp per
+	// step) and ran is_nso_impl on the normal forms -- hoping the
+	// positive-polarity block eliminations would be cache hits and equal
+	// normal forms would shortcut the query -- measured ~10% SLOWER on
+	// bv[64]x14 interpreter stress (22.0-22.9s vs 19.0-21.1s wall over
+	// repeated runs, 2026-08-17): the extra per-step normalization of the
+	// accumulated telescope costs more than it saves, buying only a ~21%
+	// peak-RSS reduction. Do not reintroduce it for wall-clock reasons.
 	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
-		if (step_num >= max_fixpoint_steps) {
+		if (max_fixpoint_steps
+			&& step_num >= (int_t)max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
 				<< " steps without reaching a fixpoint, giving up";
 			break;
@@ -680,12 +746,13 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	LOG_DEBUG << "Continuation at step " << step_num << ": "
 			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
 
-	// Limit iterations to guard against non-convergent formulas.
-	// SO-1: same unbounded-search concern as find_fixpoint_phi above.
-	constexpr int_t max_fixpoint_steps = 1'000'000;
+	// Find fix point once the lookback is greater the step_num
+	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
+	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
 	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
 	{
-		if (step_num >= max_fixpoint_steps) {
+		if (max_fixpoint_steps
+			&& step_num >= (int_t)max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_chi: exceeded " << max_fixpoint_steps
 				<< " steps without reaching a fixpoint, giving up";
 			break;
@@ -764,6 +831,25 @@ tref build_prev_flag_on_lookback(tref io_var_node,
 
 /**
  * @internal
+ * @brief The flag-stream numbering counter used by `transform_ctn_to_streams`.
+ *
+ * Held in one place, per node type, instead of as a function-local `static`
+ * inside `transform_ctn_to_streams`: callers reset it explicitly via that
+ * function's `reset_ctn_id` argument, and tests can inspect or reset it
+ * directly. Still process-global (and therefore still single-thread only, like
+ * the rest of this subsystem), but no longer hidden.
+ * @tparam node Tree node type.
+ * @return Reference to the counter for @p node.
+ * @endinternal
+ */
+template <NodeType node>
+size_t& ctn_flag_counter() {
+	static size_t ctn_id = 0;
+	return ctn_id;
+}
+
+/**
+ * @internal
  * @brief Replace every constant-time constraint (e.g. `t <= 3`) in @p fm
  * with a fresh Boolean flag output stream, plus the recurrence rules and
  * initial conditions needed for that flag to track the constraint over
@@ -803,7 +889,7 @@ tref build_prev_flag_on_lookback(tref io_var_node,
 template <NodeType node>
 tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	tref& flag_rules, const int_t lookback, const int_t start_time,
-	bool reset_ctn_id)
+	const bool reset_ctn_id)
 {
 	using tau = tree<node>;
 	auto to_eq_1 = [](tref n) {
@@ -820,12 +906,13 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	};
 	flag_initials = tau::_T();
 	subtree_map<node, tref> changes;
-	// transform constraints to their respective output streams and add required conditions
-	// We make the variable static so that we can transform different parts of the formula independently
-	static size_t ctn_id = 0;
-	if (reset_ctn_id) ctn_id = 0, reset_ctn_id = false;
-	auto ctns = tau::get(fm).select_top(is<node, tau::constraint>);
-	for (tref ctn : ctns) {
+	// The flag counter is owned by the caller (see ctn_flag_counter) so that
+	// different parts of one formula can be transformed independently without
+	// the numbering being shared, unsynchronised, across every formula and
+	// node type -- which is what a function-local static gave.
+	size_t& ctn_id = ctn_flag_counter<node>();
+	if (reset_ctn_id) ctn_id = 0;
+	for (tref ctn : tau::get(fm).select_top(is<node, tau::constraint>)) {
 		const auto& ct = tau::get(ctn);
 		std::string ctnvar = tau::get(
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
@@ -992,7 +1079,6 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	}
 	auto result = normalize_non_temp<node>(
 		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
-	// The following is std::cout because it should always be printed
 	print_fixpoint_info(
 		"Temporal normalization of G specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",
@@ -1011,7 +1097,11 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
 	tref guard = tau::_T();
 	for (tref io_var : io_vars) {
-		// Check if input stream variable
+		// Check if input stream variable. An io_var classified as neither (see
+		// transform_io_var) contributes no conjunct, so the guard silently
+		// comes out as `T`; make that loud instead.
+		DBG(assert(tau::get(io_var).is_input_variable()
+			|| tau::get(io_var).is_output_variable());)
 		if (tau::get(io_var).is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
 			size_t type = tau::get(io_var).get_ba_type();
@@ -1190,26 +1280,6 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 }
 
 template <NodeType node>
-tref add_st_ctn(tref st, const int_t timepoint, const int_t steps) {
-	using tau = tree<node>;
-	tref st_ctn = tau::_T();
-	trefs io_vars = tau::get(st).select_top(is_child<node, tau::io_var>);
-	for (int_t s = 0; s <= steps; ++s) {
-		subtree_map<node, tref> changes;
-		for (size_t i = 0; i < io_vars.size(); ++i) {
-			tref new_io_var =
-				transform_io_var<node>(io_vars[i], timepoint + s);
-			changes[io_vars[i]] = new_io_var;
-		}
-		if (s == steps) st_ctn = tau::build_wff_and(st_ctn,
-						tau::replace(st, changes));
-		else st_ctn = tau::build_wff_and(st_ctn,
-			tau::build_wff_neg(rewriter::replace<node>(st, changes)));
-	}
-	return st_ctn;
-}
-
-template <NodeType node>
 tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using tau = tree<node>;
@@ -1299,7 +1369,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	const int_t time_point = get_max_shift<node>(io_vars);
 
 	// There must not be a constant time constraint at this point
-	assert(!tau::get(aw).find_top(is<node, tau::constraint>));
+	DBG(assert(!tau::get(aw).find_top(is<node, tau::constraint>));)
 
 	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
 	// Shift flags in order to match lookback of always part
@@ -1385,7 +1455,36 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	}
 	// Here we know that the formula is satisfiable at some point
 	// Since the initial segment is already checked we continue from there
+	//
+	// SO-1: the "guaranteed to be sat at some point" argument below rests on
+	// the is_run_satisfiable check *above*, made before this loop starts
+	// conjoining !current_flag into `run` on every iteration -- so the
+	// property it depends on is not preserved and the search is not
+	// guaranteed to terminate. The global max_flag_search_steps (default
+	// 500; 0 = unlimited) bounds it: a give-up reports unsatisfiable,
+	// which is wrong but bounded and loud, where an unlimited run on such
+	// a spec hangs. Deciding this properly needs a
+	// tri-state (sat/unsat/unknown) result threaded through
+	// transform_to_execution.
+	const bool flag_search_bounded = max_flag_search_steps > 0;
+	const int_t flag_search_limit = flag_boundary + 1
+					+ (int_t)max_flag_search_steps;
 	for (int_t i = flag_boundary + 1; true; ++i) {
+		if (flag_search_bounded && i > flag_search_limit) {
+			LOG_ERROR << "to_unbounded_continuation: the eventual "
+				"variable flag could not be raised within "
+				<< max_flag_search_steps << " steps past the flag "
+				"boundary; giving up and reporting unsatisfiable. "
+				"This is a bounded failure, not a proof of "
+				"unsatisfiability.";
+			print_fixpoint_info("Temporal normalization of Tau "
+				"specification gave up after " +
+				std::to_string(steps) + " fixpoint steps and " +
+				std::to_string(max_flag_search_steps) +
+				" flag search steps, yielding the result: ",
+				TAU_TO_STR(tau::_F()), output);
+			return tau::_F();
+		}
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
 		run = tau::build_wff_and(run, current_aw);
 		auto current_flag
@@ -1477,6 +1576,12 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	}
 	auto aw_after_ev = tau::get(ev_t.first)
 				.find_top(is_child<node, tau::wff_always>);
+	// Both producers of ev_t above wrap their result in build_wff_always
+	// whenever they transformed anything (and the untransformed cases already
+	// returned), so this should not happen. If it ever does, returning the
+	// untransformed `fm` discards the eventual-variable transformation just
+	// computed -- assert rather than let that pass silently.
+	DBG(assert(aw_after_ev != nullptr);)
 	if (aw_after_ev == nullptr) {
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(fm, start_time),
@@ -1486,7 +1591,21 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	}
 	trefs st = tau::get(ev_t.first)
 				.select_top(is_child<node, tau::wff_sometimes>);
-	DBG(assert(st.size() < 2);)
+	// IN-N13: transform_to_eventual_variables folds every sometimes
+	// clause into one flag-carrying clause, so at most one may survive
+	// here. A second one (a nested `sometimes` leaking through, as the
+	// pre-IN-R1 A/E erasure produced) used to be a Debug-only assert and a
+	// silent "use the first, drop the rest" in Release. Refuse loudly in
+	// both builds: api::realizable/valid_spec/get_interpreter convert
+	// ltl_synthesis_error into a logged UNKNOWN.
+	if (st.size() >= 2) {
+		LOG_ERROR << "transform_to_execution: " << st.size()
+			<< " sometimes clauses survived the eventual-variable "
+			"transform; the formula cannot be decided by the "
+			"safety pipeline";
+		throw ltl_synthesis_error("nested or multiple `sometimes` "
+			"clauses survived the eventual-variable transform");
+	}
 
 	tref res;
 	if (!tau::get(aw_after_ev).equals_F() && !st.empty())
@@ -1506,7 +1625,9 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 }
 
 template <NodeType node>
-bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
+bool is_tau_formula_sat_core(tref fm, const int_t start_time,
+	const bool output)
+{
 	using tau = tree<node>;
 	LOG_DEBUG << "Start is_tau_formula_sat: " << LOG_FM(fm);
 	// Merge top-level (G A) && (G B) → G(A && B) up-front.  Direct
@@ -1538,30 +1659,12 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	if (has_ltl_operators<node>(fm)) {
 		return is_ltl_aba_realizable<node>(fm, start_time, output);
 	}
-	if (!has_no_boolean_combs_of_models<node>(fm)) {
-		// Check if the "boolean combination" is just G(...) && sometimes(...),
-		// which the safety pipeline handles via flag-based unrolling.
-		bool only_always_sometimes = true;
-		tau::get(fm).find_top([&](tref n) {
-			const auto& t = tau::get(n);
-			if (!t.has_child()) return false;
-			auto nt = t[0].value.nt;
-			if (nt == tau::wff_always || nt == tau::wff_sometimes)
-				return false;
-			if (nt == tau_parser::wff_F || nt == tau_parser::wff_U
-			    || nt == tau_parser::wff_R || nt == tau_parser::wff_W
-			    || nt == tau_parser::wff_S || nt == tau_parser::wff_T) {
-				only_always_sometimes = false;
-				return true;
-			}
-			return false;
-		});
-		if (!only_always_sometimes) {
-			return is_ltl_aba_realizable<node>(
-				fm, start_time, output);
-		}
-		// Fall through to the safety pipeline for always+sometimes.
-	}
+	// A "boolean combination of models" that reaches this point can only
+	// be G(...) && sometimes(...) shapes, which the safety pipeline
+	// handles via flag-based unrolling: any F/U/R/W/S/T content already
+	// returned through is_ltl_aba_realizable above (SO-5 deleted a scan
+	// re-testing exactly that operator set -- provably always true here).
+	// Fall through to the safety pipeline.
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : expression_paths<node>(normalized_fm)) {
@@ -1573,6 +1676,35 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	}
 	LOG_DEBUG << "End is_tau_formula_sat: false";
 	return false;
+}
+
+// PW-R6: the cross-revision result cache ("B12"). Any U/R/W/S/T content
+// routes a satisfiability query through the full LTL(ABA) pipeline — one
+// ltlsynt subprocess per call — and the pointwise revision asks the same
+// (formula, start_time) queries again on every later update. Memoise the
+// verdict under TAU_CACHE, keyed like `transform_to_execution`'s cache and
+// invalidated by the tree GC like every other create_cache table. The
+// `output` flag only adds logging/exports on top of the same verdict, so it
+// is not part of the key — but an output=true call still runs the full
+// computation for its side effects (and stores the verdict for others).
+// Pinned trap (BA1-17): never a shared cvc5 solver or ltlsynt session
+// across calls — the RESULT cache is the only safe port.
+template <NodeType node>
+bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
+#ifdef TAU_CACHE
+	using cache_t = std::map<std::pair<tref, int_t>, bool,
+				subtree_pair_less<node, int_t>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (!output)
+		if (auto it = cache.find(std::make_pair(fm, start_time));
+			it != cache.end()) return it->second;
+	const bool result =
+		is_tau_formula_sat_core<node>(fm, start_time, output);
+	cache.emplace(std::make_pair(fm, start_time), result);
+	return result;
+#else
+	return is_tau_formula_sat_core<node>(fm, start_time, output);
+#endif // TAU_CACHE
 }
 
 // Check for temporal formulas if f1 implies f2

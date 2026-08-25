@@ -16,7 +16,7 @@ struct qint_parser_instance : public idni::parser<char, char> {
 
 	qint_parser_instance() : idni::parser<char, char>(
 		qint_parser_data::grammar,
-		qint_parser_data::parser_options) {}
+		qint_parser_data::make_parser_options()) {}
 
 	size_t id(const std::basic_string<char>& name) {
 		return qint_parser_data::nts.get(name);

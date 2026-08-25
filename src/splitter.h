@@ -21,10 +21,7 @@ namespace idni::tau_lang {
 /**
  * @brief Identifies whether a conjunction or disjunction drives a split.
  */
-enum class split_sym {
-	conjunction, ///< Split along a conjunction.
-	disjunction  ///< Split along a disjunction.
-};
+// (SO-8: enum class split_sym deleted -- never referenced.)
 
 /**
  * @brief Return a "bad" splitter for @p fm.

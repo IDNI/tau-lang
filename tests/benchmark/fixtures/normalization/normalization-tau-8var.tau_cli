@@ -1,0 +1,13 @@
+n all v1:tau all v2:tau all v3:tau all v4:tau all v5:tau all v6:tau all v7:tau all v8:tau (v1 & v2) & (v3 & v4) = (v4 & v3) & (v2 & v1) && (v5 & v6) & (v7 & v8) = (v8 & v7) & (v6 & v5).
+n ex v1:tau ex v2:tau ex v3:tau ex v4:tau ex v5:tau ex v6:tau ex v7:tau ex v8:tau v1 < v2 && v2 < v3 && v3 < v4 && v4 != v1 && v5 < v6 && v6 < v7 && v7 < v8 && v8 != v5.
+n all v1:tau all v2:tau all v3:tau all v4:tau all v5:tau all v6:tau all v7:tau all v8:tau v1 & (v2 | v3) | v4 = (v1 & v2) | (v1 & v3) | v4 && v5 & (v6 | v7) | v8 = (v5 & v6) | (v5 & v7) | v8.
+n ex v1:tau ex v2:tau ex v3:tau ex v4:tau ex v5:tau ex v6:tau ex v7:tau ex v8:tau v1 != 0 && v2 = v1' && v3 = v2 & v1 && v3 = 0 && v4 = v1 | v2 && v4 != 0 && v5 != 0 && v6 = v5' && v7 = v6 & v5 && v7 = 0 && v8 = v5 | v6 && v8 != 0.
+n all v1:tau all v2:tau all v3:tau all v4:tau all v5:tau all v6:tau all v7:tau all v8:tau (v1 ^ v2) ^ v3 = v1 ^ (v2 ^ v3) && v1 | v4 = v4 | v1 && (v5 ^ v6) ^ v7 = v5 ^ (v6 ^ v7) && v5 | v8 = v8 | v5.
+n ex v1:tau ex v2:tau ex v3:tau ex v4:tau ex v5:tau ex v6:tau ex v7:tau ex v8:tau v1 != v2 && v2 = v1' && v3 = v1 | v2 && v4 = v3 & v1 && v4 <= v2 && v5 != v6 && v6 = v5' && v7 = v5 | v6 && v8 = v7 & v5 && v8 <= v6.
+n all v1:tau all v2:tau all v3:tau all v4:tau all v5:tau all v6:tau all v7:tau all v8:tau v1 | v2 >= v1 && v1 | v2 >= v2 && v3 & v4 <= v3 && v3 & v4 <= v4 && v5 | v6 >= v5 && v5 | v6 >= v6 && v7 & v8 <= v7 && v7 & v8 <= v8.
+n ex v1:tau ex v2:tau ex v3:tau ex v4:tau ex v5:tau ex v6:tau ex v7:tau ex v8:tau v1 != 0 && v2 = v1' && v2 != v1 && v3 = v2' && v4 = v3' && v4 = v2 && v5 != 0 && v6 = v5' && v6 != v5 && v7 = v6' && v8 = v7' && v8 = v6.
+n all v1:tau all v2:tau all v3:tau all v4:tau all v5:tau all v6:tau all v7:tau all v8:tau (v1 & v1) = v1 && (v2 | v2) = v2 && (v5 & v5) = v5 && (v6 | v6) = v6.
+n ex v1:tau ex v2:tau ex v3:tau ex v4:tau ex v5:tau ex v6:tau ex v7:tau ex v8:tau v1 != 0 && v2 = v1 | v3 && v3 = v1 & v2 && v4 = v2 ^ v3 && v4 != 0 && v5 != 0 && v6 = v5 | v7 && v7 = v5 & v6 && v8 = v6 ^ v7 && v8 != 0.
+n all v1:tau ex v2:tau all v3:tau ex v4:tau all v5:tau ex v6:tau all v7:tau ex v8:tau v2 = v1' && v4 = v3' && v6 = v5' && v8 = v7'.
+n ex v1:tau all v2:tau ex v3:tau all v4:tau ex v5:tau all v6:tau ex v7:tau all v8:tau v1 = 1 && v3 = v2 & v2 && v1 & v4 = v4 && v5 = 1 && v7 = v6 & v6 && v5 & v8 = v8.
+n all v1:tau ex v2:tau ex v3:tau all v4:tau all v5:tau ex v6:tau ex v7:tau all v8:tau v2 = v1' && v3 = v2' && v3 = v1 && v1 | v4 = v4 | v1 && v6 = v5' && v7 = v6' && v7 = v5 && v5 | v8 = v8 | v5.

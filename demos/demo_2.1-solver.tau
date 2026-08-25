@@ -1,0 +1,56 @@
+# The solver: satisfying assignments, splitters, and general solutions.
+#
+# See demos/README.md for how to run this script.
+
+# The solve command computes one satisfying assignment for the free variables of
+# a formula. Starting with the simplest cases:
+
+solve x = 0
+solve x = 0 && y = 0
+
+# Untyped variables live in the Tau Boolean algebra by default, which is why the
+# assignments above are reported as {F}:tau. Bringing in a constant of another
+# Boolean algebra fixes the type of the equation, and of its solution:
+
+solve {a}:sbf x = 0
+
+# Some systems have no solution that can be written with the constants at hand.
+# Here x must be neither 0 nor everything, so the solver introduces a splitter, a
+# fresh element strictly between the two:
+
+solve x != 0 && x' != 0
+
+# Splitters exist for the Tau Boolean algebra as well, so the same reasoning
+# applies when the constants are themselves Tau specifications:
+
+solve {ex a a = 0} x != 0 && {ex b b = 0} x != 0
+
+# A couple of larger systems, mixing Tau constants and several unknowns:
+
+solve {ex x x = 0} a ^ {ex y y = 0} b = 0
+solve a x ^ b y = 0
+
+# solve answers with a single assignment. When you want every solution rather
+# than one of them, use lgrs, which computes a least general reproductive
+# solution: an assignment parametrized by the variables themselves, whose
+# instances are exactly the solutions of the equation.
+
+# Compare the two on the same equation. solve picks one witness:
+
+solve {a}:sbf x = 0
+
+# while lgrs describes the whole solution set, here every x below a':
+
+lgrs {a}:sbf x = 0
+
+# When the only solution is a single element, the two agree:
+
+lgrs x:sbf | y:sbf = 0
+
+# Note that lgrs is defined for Boolean equations only, so an equation over a
+# bitvector type is rejected. Bitvectors are solved instead by the route shown
+# in demo_2.3-solver-bitvectors.tau:
+
+lgrs x:bv[16] + y:bv[16] = {0}:bv[16]
+
+quit

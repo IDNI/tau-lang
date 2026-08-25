@@ -103,10 +103,3 @@ template<NodeType node>
 tref apply_all_xor_def(tref fm) {
 	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
 }
-
-
-/** @internal @copydoc no_skip @endinternal */
-template <NodeType node>
-bool no_skip(tref) {
-	return false;
-}

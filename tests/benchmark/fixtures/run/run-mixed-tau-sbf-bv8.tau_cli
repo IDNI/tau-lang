@@ -1,0 +1,5 @@
+i1:tau := in file("tests/benchmark/fixtures/run/inputs/tau-16.in").
+i2:sbf := in file("tests/benchmark/fixtures/run/inputs/sbf-16.in").
+i3:bv[8] := in file("tests/benchmark/fixtures/run/inputs/bv8-16.in").
+run always (o1[t]:tau = i1[t]:tau && o2[t]:sbf = i2[t]:sbf && o3[t]:bv[8] = i3[t]:bv[8] + { 1 }:bv[8]).
+q

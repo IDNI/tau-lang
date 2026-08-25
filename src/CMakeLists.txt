@@ -5,6 +5,7 @@ set(TAU_HEADERS
 	../parser/tau_parser.generated.h
 	../parser/bitvector_parser.generated.h
 	../parser/nlang_parser.generated.h
+	boolean_algebras/cvc5/cvc5_options.h    # runtime cvc5 option-set and solver placement parameters
 	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
@@ -16,6 +17,7 @@ set(TAU_HEADERS
 	boolean_algebras/bv_ba.h
 	heuristics/bv_ba_simplification.h		# heuristic for simplifying boolean formulas with bitvectors
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
+	heuristics/blast_placement.h            # runtime placement parameters for blasting and the solver
 	heuristics/bv_predicate_blasting.h      # heuristic for predicate blasting bitvector formulas
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
@@ -222,12 +224,18 @@ target_include_directories(tau_codegen PUBLIC
 )
 add_dependencies(tau_codegen tau_header)
 
-# Kept out of the default build: it is a full-stack translation unit that no
-# test or other target needs (the cpp_codegen tests emit and compile code
-# in-process, they do not run this binary).  Build it on demand with
+# Kept out of the default build when tests are off: it is a full-stack
+# translation unit that no non-test target needs (the cpp_codegen tests emit
+# and compile code in-process, they do not run this binary). Build it on
+# demand with
 #   cmake --build <dir> --target tau_codegen
 # It is slated to be merged into the tau CLI as a compile/codegen subcommand.
-exclude(tau_codegen)
+# tests/repl/commands/test_repl-codegen_cli.cmake DOES run this binary
+# directly (CG-N6/CG-R1 exit-code coverage), so a *-tests build must include
+# it in the default target set.
+if(NOT TAU_BUILD_TESTS)
+	exclude(tau_codegen)
+endif()
 
 #
 # executable using shared library
@@ -244,7 +252,7 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
-	add_dependencies(${TAU_BUILD_SHARED_EXECUTABLE} tau_header)
+	add_dependencies(${TAU_EXE_SHARED_NAME} tau_header)
 	if(TAU_PARSER_HAS_FTXUI_DEP)
 		target_link_libraries(${TAU_EXE_SHARED_NAME}
 			ftxui::screen ftxui::dom ftxui::component)
@@ -256,16 +264,3 @@ endif(TAU_BUILD_SHARED_EXECUTABLE)
 # install
 #
 
-set(BUILD_TARGETS "")
-if(BUILD_SHARED_LIBRARY)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_SHARED_LIB_NAME})
-endif()
-if(BUILD_STATIC_LIBRARY)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_STATIC_LIB_NAME})
-endif()
-if(BUILD_EXECUTABLE)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_EXECUTABLE_NAME})
-endif()
-if(BUILD_SHARED_EXECUTABLE)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_EXE_SHARED_NAME})
-endif()

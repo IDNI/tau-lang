@@ -20,18 +20,42 @@
 #define __IDNI__TAU__LTL_ABA_H__
 
 #include "normalizer.h"
+#include "bounded_cache.h"
 #include "boolean_algebras/nlang_ba.h"
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
 
 namespace idni::tau_lang {
 
+// LT-17: cap on the number of ∀∃-synthesis feasibility checks the k-ary
+// positive-subset walk (`extend_consistency_positive_k_ary`) may spend per
+// atom group. The walk is Θ(2^n) when the atoms are mostly jointly feasible
+// (nothing to prune), and each check is a full safety-synthesis fixpoint.
+// Skipping the remaining subsets is sound: a strategy edge whose guard uses
+// a jointly-infeasible combination is still caught by the per-edge oracle,
+// so a fired cap can only cost completeness (a false UNREALIZABLE when
+// ltlsynt happened to pick such an edge — D3 = skip + log), never a false
+// REALIZABLE. Runtime parameter by policy (`--max-consistency-subsets`,
+// REPL `set maxsubsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
+inline size_t max_consistency_subsets = 4096;
+
+// §13 / Batch O8: cap on the literal products the ABA oracle's exact
+// mixed-type coverage check may expand `I_k ∧ ⋀_j ¬I_j` into. Beyond the
+// cap the check keeps the (weaker, syntactic-subset) pre-O8 verdict for
+// that product and logs — a possible false UNREALIZABLE, never a false
+// REALIZABLE. Runtime parameter by policy (`--max-cover-products`, REPL
+// `set maxcoverproducts`, `api::set_max_cover_products`); 0 = unlimited.
+inline size_t max_cover_products = 256;
+
 // ── Detection ────────────────────────────────────────────────────────────────
 
 // True iff the formula contains any full-LTL operator: wff_F, wff_U, wff_R,
-// wff_W.  wff_always (G) is already handled by the safety pipeline.
+// wff_W, and the past operators wff_S, wff_T (past formulas must route to
+// the LTL pipeline's temporal testers).  wff_always (G) is already handled
+// by the safety pipeline.
 template <NodeType node>
 bool has_ltl_operators(tref fm);
 
@@ -62,8 +86,14 @@ std::string ltl_skeleton(tref fm,
 // LTL constraints (G, X, propositional) that ltlsynt handles natively.
 struct PastTemporalTester {
 	std::string state_var;
+	/// Informational only (LT-15): always false ((φ S ψ)(−1) = false);
+	/// the encoding hard-codes !state_var at t=0. Kept for the
+	/// explain/debug output.
 	bool        initial_value;
 	std::string transition;
+	/// Informational only (LT-15): the negation is already inlined in the
+	/// expression returned by skeleton_str_with_testers; this flag merely
+	/// annotates the explain/debug output for T-testers.
 	bool        negate_output;
 };
 
@@ -82,15 +112,59 @@ void append_tester_constraints(
 
 // ── Input / output classification ────────────────────────────────────────────
 
-// True iff every io_var appearing in the atom is an INPUT variable
-// (by tau-lang convention: io_var name starts with 'i').
+// True iff every io_var appearing in the atom is an INPUT variable.
+// Primarily reads the resolved direction bit (data 1=input / 2=output);
+// only unresolved io_vars fall back to the name prefix ('o' = output).
+// Note the resolver additionally classifies `this` as input and `u` as
+// output (see tau_tree_extractors.tmpl.h); the prefix fallback here does
+// not replicate that.
 template <NodeType node>
 bool is_pure_input_atom(tref atom);
 
 // ── Spot interface ────────────────────────────────────────────────────────────
 
+// Raised when a Spot subprocess could not deliver a verdict (LT-7).  A failed
+// or killed ltlsynt is NOT an UNREALIZABLE answer, and reporting it as one
+// turns a slow-but-realizable specification into a silently wrong result.
+struct ltl_synthesis_error : std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
+// How to read a (exit_code, stdout) pair from a Spot subprocess.
+//
+//   ok         a verdict was produced (REALIZABLE / UNREALIZABLE).
+//   not_found  the binary is not on PATH — spawn_capture maps ENOENT to 127.
+//   failed     no verdict: the TAU_LTL_TIMEOUT_SEC watchdog killed the child
+//              (exit 128 + SIGTERM = 143), the spawn itself failed (-1), the
+//              tool reported a usage/internal error, or it exited non-zero
+//              with nothing on stdout.
+enum class spot_exit_kind { ok, not_found, failed };
+
+inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) {
+	if (exit_code == 127) return spot_exit_kind::not_found;
+	// Negative: spawn_capture could not create the pipe or the process.
+	// >= 128: killed by signal 128 + N — in particular 143 = SIGTERM, which
+	// is exactly what the timeout watchdog sends.
+	if (exit_code < 0 || exit_code >= 128) return spot_exit_kind::failed;
+	// ltlsynt exits 0 on REALIZABLE and 1 on UNREALIZABLE; every other code
+	// is a usage or internal error.
+	if (exit_code != 0 && exit_code != 1) return spot_exit_kind::failed;
+	// SY-R4: ltlsynt always prints a verdict line, so no output at all is
+	// no verdict -- whatever the exit code (a 0 with empty stdout used to be
+	// read as UNREALIZABLE by call_ltlsynt and as an empty game by
+	// call_ltlsynt_game).
+	if (out.empty()) return spot_exit_kind::failed;
+	return spot_exit_kind::ok;
+}
+
 // Invoke ltlsynt as a subprocess and return {realizable, hoa_strategy_text}.
 // hoa_strategy_text is non-empty only when realizable == true.
+//
+// Throws ltl_synthesis_error when the subprocess produced no verdict (see
+// classify_spot_exit) -- including when ltlsynt is not on PATH (IN-N1: the
+// old {false, ""} degradation made a missing Spot install print
+// "UNREALIZABLE (propositional)" for every specification). The api layer
+// converts the exception into a logged UNKNOWN verdict.
 std::pair<bool, std::string> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,
@@ -112,35 +186,14 @@ struct HoaAutomaton {
     std::vector<bool> state_accepting;  // true if state has acceptance mark
 };
 
+// Parses the HOA strategy text that follows ltlsynt's REALIZABLE line.
+// Throws ltl_synthesis_error on a malformed or truncated automaton (no
+// `States:` header, a non-positive or absurd state count, no `--BODY--`):
+// LA-8/SY-1 -- such text used to parse to the EMPTY automaton, which the
+// verdict layer read as trivially REALIZABLE with the ABA oracle skipped.
+// Parsing stops at `--END--`; out-of-range states and edges are still
+// dropped (LT-10).
 HoaAutomaton parse_hoa(const std::string& hoa_text);
-
-// ── DPA (Deterministic Parity Automaton) — Algorithm D Phase 1 ───────────────
-//
-// A DPA edge carries a single parity color (0..num_colors-1).
-// color == -1 means the edge has no acceptance mark in the HOA; in min-even
-// parity this is treated as "worst priority" (never contributes to acceptance).
-struct DpaEdge {
-    std::string guard_label;
-    int dst    = 0;
-    int color  = -1;  // parity color; -1 = unmarked
-};
-
-// Deterministic Parity Automaton parsed from Spot's HOA output.
-struct DpaAutomaton {
-    int num_states    = 0;
-    int initial_state = 0;
-    int num_colors    = 0;  // total number of colors in the parity condition
-    bool min_even     = true; // true = min-even parity (Spot default for -D)
-    std::vector<std::string>            aps;   // atomic proposition names
-    std::vector<std::vector<DpaEdge>>   edges; // edges[src] = outgoing edges
-};
-
-// Call ltl2tgba with parity='min even' -D --complete on the given LTL formula.
-// Returns the raw HOA text, or empty string on error.
-std::string call_ltl2tgba_dpa(const std::string& ltl_formula);
-
-// Parse the HOA output of ltl2tgba (with parity acceptance) into a DpaAutomaton.
-DpaAutomaton parse_dpa_hoa(const std::string& hoa_text);
 
 // ── ABA oracle ────────────────────────────────────────────────────────────────
 
@@ -168,11 +221,21 @@ struct CtlStarWitness {
 
 // Reduce a CTL* formula containing A/E quantifiers to an equivalent LTL
 // synthesis problem. Returns the reduced formula (pure LTL) and the set of
-// witness variables that must be added to the output set.
+// LT-23: the witness variables are SELF-CLASSIFYING -- they are built with
+// node::output_variable() (direction bit = output), so extract_data_atoms /
+// is_pure_input_atom already treat them as outputs and the only caller
+// (is_tau_formula_sat) rightly uses ltl_formula alone. Do NOT additionally
+// add `witnesses` to an output set; the vector is informational. Note the
+// names (`w_<n>`) have no `o` prefix, so classification rests entirely on
+// the direction bit.
 template <NodeType node>
 struct CtlStarReduction {
     tref ltl_formula;                    // reduced LTL formula
     std::vector<std::string> witnesses;  // witness output variable names
+    // IN-R6: BA type id per witness (index-aligned with `witnesses`);
+    // currently always the default bv type. The interpreter uses these to
+    // register each witness as an internal output stream.
+    std::vector<size_t> witness_types;
 };
 
 template <NodeType node>
@@ -184,8 +247,24 @@ bool has_ctl_star_operators(tref fm);
 
 // ── Semantic negation ─────────────────────────────────────────────────────────
 //
-// Semantic negation -φ means "φ is unrealizable by the system".
-// Implementation: swap input/output roles and check realizability of ¬φ.
+// Semantic negation -φ means "φ is unrealizable by the system", i.e. the
+// environment can force ¬φ.  Deciding it means swapping the input/output roles
+// for the subformula and checking realizability of ¬φ.
+//
+// THAT ROLE SWAP IS NOT IMPLEMENTED (LT-5).  `apply_semantic_negation` only
+// re-wraps its argument in a `wff_semantic_neg` node; the header used to claim
+// the swap happened "at the synthesis call site", but no such site exists.
+// The surviving node then reached `skeleton_wff`'s default case which, because
+// the subformula contains io_vars, emitted the propositional constant "1" — so
+// every non-constant `-φ` was silently decided REALIZABLE regardless of φ.
+//
+// Until the swap exists, a `wff_semantic_neg` that survives constant folding
+// is REJECTED with `ltl_synthesis_error` rather than answered wrongly.  The
+// hook-level folding of `-T` → F and `-F` → T is unaffected and keeps working.
+
+// True iff the formula contains a `wff_semantic_neg` node.
+template <NodeType node>
+bool has_semantic_negation(tref fm);
 
 template <NodeType node>
 tref apply_semantic_negation(tref fm);
@@ -220,6 +299,57 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 template <NodeType node>
 struct LtlAbaSolution;
 
+// ── Interpreter-facing helpers (LT-29) ───────────────────────────────────────
+//
+// Defined in ltl_aba_builders.tmpl.h / ltl_aba_normalization.tmpl.h; declared
+// here so the contracts are visible without reading the template bodies.
+//
+// LtlAbaSolution conventions (every algorithm honours these):
+//   - `aut.num_states == 0` means "realizable with no strategy automaton";
+//     is_ltl_aba_realizable reports such a solution REALIZABLE without
+//     running the ABA oracle; parse_hoa never produces it (a strategy text
+//     with fewer than one state is refused).  LA-10: `num_states == 0`
+//     with `executable == true` and non-empty `const_outputs` means
+//     "constant strategy": `const_formula` is the executable
+//     `always(⋀ o_k = c_k)` and `const_outputs` lists (stream, "p/q").
+//   - `executable == false` marks a solution that cannot be compiled into a
+//     program over the user's streams (Algorithm B bookkeeping bits);
+//     ltl_to_safety_formula_full and tau_codegen refuse it.
+//   - `atoms` carry the AP names the automaton uses (p_i on the default
+//     path, d_i on Algorithms A/D); the oracle and the safety encoding match
+//     by NAME, so a mismatch makes both vacuous (LT-8).
+
+// Run the whole LTL(ABA) pipeline on a (normalised) formula and return the
+// strategy solution, or nullopt when the formula is UNREALIZABLE.  Throws
+// ltl_synthesis_error when no verdict could be obtained.
+template <NodeType node>
+static std::optional<LtlAbaSolution<node>> solve_ltl_aba(tref fm);
+
+// Existential / synthesis feasibility dispatch for a data conjunction:
+// pure-input and pure-output omcat/nlang formulas use existential
+// satisfiability, everything else the safety-synthesis fixpoint.
+template <NodeType node>
+static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
+
+// Build the atom `<name>[t-<shift>] = <value>` over the default bv type
+// used for the one-hot state bits and the S/T auxiliaries. LT-16(a): one
+// builder — the former parse_sv_eq was a verbatim duplicate.
+template <NodeType node>
+static tref build_bv_eq_aux(const std::string& name, int shift, int value);
+
+// Multi-state Mealy strategy -> always(phi) with one-hot auxiliary state
+// bits o__ltl_ms<i>__ (see the block comment at the definition).
+template <NodeType node>
+static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol);
+
+// Initial-state conditions for the encoding above: {init bits, first-step
+// output constraint}; the second element is nullptr when the initial state
+// has no outgoing edge.
+template <NodeType node>
+static std::pair<tref,tref>
+encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
+                                const std::vector<std::string>& sv);
+
 // Convert a realizable LTL formula to a tau-lang safety formula (always(phi))
 // that the existing interpreter pipeline can execute.
 //
@@ -247,8 +377,14 @@ tref ltl_to_safety_formula(tref fm);
 //
 // On the multi-state encoding path, the caller can read sol.aut.num_states,
 // sol.aut.edges, sol.atoms etc. without re-running synthesis.
+//
+// The third element is the pure-past compile-away's list of UNANCHORED
+// auxiliary output names (`o__ltl_s<k>__` of every inner / off-spine S):
+// the interpreter must seed each to bv-0 at t = formula_time_point - 1
+// (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
+// other path (the ppLTLTT tester encoding anchors inside the skeleton).
 template <NodeType node>
-std::tuple<tref, std::optional<LtlAbaSolution<node>>>
+std::tuple<tref, std::optional<LtlAbaSolution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm);
 
 } // namespace idni::tau_lang

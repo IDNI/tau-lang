@@ -55,3 +55,14 @@ add_repl_test(sat_cmd-tc-triple_g_and_g_and_g_one_contradictory_pair "sat (G (o1
 add_repl_test(sat_cmd-tc-quadruple_g_with_non_g_conjunct "sat (G (o1[t] = 0)) && (G (o2[t] = 1)) && (G (o3[t] = 0)) && (G (o4[t] = 1))." ": T")
 # XOR: the C++ case now carries a real CHECK; the "no XOR support" note was stale.
 add_repl_test(sat_cmd-tc-g_xor_g_negated_arg_sat "sat (G (o1[t] = 0)) ^^ (G (o1[t] = 1))." ": T")
+
+# AP1-1: a definition set whose expansion oscillates (`f(x) := f(x)'`, the
+# same shape as the normalize_cmd regressions above) makes normalize_formula
+# return nullptr. `sat` used to hand that null straight to is_tau_formula_sat,
+# which dereferences it. The expected output is the verdict, not the
+# diagnostic: the "oscillates" message is printed *before* the crash point, so
+# matching on it would not tell a crash apart from a clean rejection, whereas
+# the ": F" line can only be reached after sat returns.
+# add_repl_test_fail is used because the diagnostic contains "Error".
+add_repl_test_fail(sat_cmd-oscillating_definition
+	"f(x) := f(x)'. sat f(1) = 0" ": F")

@@ -19,6 +19,13 @@
 
 namespace idni::tau_lang {
 
+// BA2-8 caveat: these compile-time traits are currently CONSUMED BY NOTHING
+// outside this header's own static_asserts, and their notion of "omcat"
+// (aba ∪ non-aba-omcat, so qint/sbf/tau count) is BROADER than the runtime
+// predicate live dispatch code actually uses -- is_omcat_type_family
+// (ba_types) is true only for qlt. hsb also has no is_aba specialization
+// yet. Reconcile the two notions before wiring these traits anywhere.
+
 // is_aba: atomless Boolean algebras
 template <typename T> struct is_aba : std::false_type {};
 template <> struct is_aba<qint>     : std::true_type {};

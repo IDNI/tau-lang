@@ -67,7 +67,20 @@ namespace idni::tau_lang {
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
-	print_benchmarks_opt, debug_opt };
+	print_benchmarks_opt, debug_opt,
+	// Numeric, unlike every option above: they take a count, not a flag, so
+	// enable/disable/toggle do not apply to them. Full names only -- the
+	// single-letter space is exhausted (see the RE-1 note at the name
+	// lookup: "b" is benchmarks and "B" is blasting). One per runtime
+	// limit; each sets the library global through its api setter, and `get`
+	// reads the global back, so the REPL and the CLI options stay two views
+	// of the same knob.
+	block_max_splits_opt, block_max_rounds_opt, fixpoint_steps_opt,
+	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
+	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
+	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
+	spec_size_warn_opt, revision_alts_opt, consistency_subsets_opt,
+	cache_bound_opt, cover_products_opt };
 
 // Logic fragment: determines which operators are available
 enum logic_fragment { fragment_ltl, fragment_ctl_star };
@@ -102,8 +115,12 @@ struct repl_evaluator {
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
 		bool blasting            = true;  ///< Enable bitvector predicate blasting.
-		bool repl_running 	 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
+		// The numeric limit options deliberately have no mirror fields
+		// here: `set` writes the library globals through the api setters
+		// and `get` reads the globals back, so a mirror could only fall
+		// out of sync (and the two that used to exist did, holding dead
+		// 512/1000 defaults the constructor never applied).
 #ifdef DEBUG
 		bool debug_repl          = true;
 		boost::log::trivial::severity_level
@@ -312,6 +329,9 @@ private:
 	tref get_wff(tref n) const;
 	/// @brief Extract any formula from @p arg or from history.
 	tref get_any(tref arg) const;
+	/// @brief Infer @p n's BA types so it can be matched against an
+	/// already inferred expression. Returns @p n if inference fails.
+	tref infer_for_match(tref n) const;
 
 	/// @brief Print benchmark measurements from @p m.
 	std::ostream& benchmarks(measuring& m) const;
@@ -320,8 +340,13 @@ private:
 
 	std::vector<history> H;
 	options opt{};
-	trefs rr_defs;
-	trefs io_defs;
+	// Held as htrefs, not raw trefs: interpreter::step() calls maybe_gc(),
+	// and bintree<node>::gc() destroys every node that is neither reachable
+	// from a live htref nor in the keep set collect_live_refs() builds --
+	// which never mentions the REPL. A `run` would otherwise free the
+	// definitions this session keeps reading afterwards.
+	htrefs rr_defs;
+	htrefs io_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 #ifdef TAU_PARSER_HAS_FTXUI

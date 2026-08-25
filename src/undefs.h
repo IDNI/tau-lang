@@ -4,11 +4,10 @@
 
 // logging.h
 
-#undef HOOK_LOGGING_ENABLED
-#undef PRETTY_PRINTER_LOGGING_ENABLED
-
+// (SW-22: HOOK_LOGGING_ENABLED / PRETTY_PRINTER_LOGGING_ENABLED exist only
+// as commented-out defines in logging.h, and the line macro is
+// TAU_LOG_LINE_VALUE; their no-op #undefs were dropped.)
 #undef LOG_CHANNEL_NAME
-#undef LOG_LINE_VALUE
 
 #undef LOG_ERROR
 #undef LOG_WARNING

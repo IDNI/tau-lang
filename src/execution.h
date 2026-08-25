@@ -92,6 +92,20 @@ struct repeat_each {
  * @tparam node Tree node type.
  * @tparam step_t Individual step type.
  */
+/// Round cap for `repeat_all` — a rewrite that neither settles nor cycles;
+/// 0 = unlimited (the default). A rewriting system given by user definitions
+/// need not terminate, and a non-terminating one typically *grows* the
+/// formula rather than revisiting an earlier state, so `repeat_all`'s
+/// `visited` cycle check never fires on it — only a bound set here stops it.
+/// Legitimate definition expansion needs few rounds: a round rewrites every
+/// match at once and applies the whole rule set, so a call chain of depth k
+/// collapses in O(k) rounds at worst. A namespace-level global (not a
+/// `repeat_all` member) because `repeat_all` is templated on the step type —
+/// a member would be one knob per instantiation. Set via
+/// `--max-rewrite-rounds`, REPL `rewriterounds`, or
+/// `api::set_max_rewrite_rounds`.
+inline size_t max_rewrite_rounds = 0;
+
 template <NodeType node, typename step_t>
 struct repeat_all {
 	/** @brief Construct with a `steps` sequence @p s. */
@@ -102,7 +116,9 @@ struct repeat_all {
 	/**
 	 * @brief Apply all steps, restarting until no step fires.
 	 * @param n Formula to rewrite.
-	 * @return Fixpoint formula.
+	 * @return Fixpoint formula, or `nullptr` if `max_rewrite_rounds` is
+	 *         set and neither a fixpoint nor a cycle was reached within
+	 *         that many rounds.
 	 */
 	tref operator()(tref n) const;
 
@@ -131,25 +147,11 @@ struct repeat_once {
 	steps<node, step_t> s; ///< Steps to apply.
 };
 
-/**
- * @brief Build a `steps` object from an initializer list of libraries.
- * @tparam node Tree node type.
- * @param libs Libraries to wrap.
- * @return `steps` object containing one `step<node>` per library.
- */
-template <NodeType node>
-steps<node, step<node>> to_steps(
-	const std::initializer_list<rewriter::library>& libs);
+// (RR-4: to_steps deleted -- zero callers.)
 
-/** @brief Compose two `repeat_each` objects into a `steps` sequence. */
-template <NodeType node, typename step_t>
-steps<repeat_each<node, step_t>, node> operator|(
-	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r);
-
-/** @brief Compose two `repeat_all` objects into a `steps` sequence. */
-template <NodeType node, typename step_t>
-steps<repeat_all<node, step_t>, node> operator|(
-	const repeat_all<node, step_t>& l, const repeat_all<node, step_t>& r);
+// (RR-1: the repeat_each|repeat_each and repeat_all|repeat_all compose
+// overloads were deleted -- their template arguments were swapped, so any
+// instantiation failed to compile, and nothing ever called them.)
 
 /** @brief Append a step to an existing `steps` sequence. */
 template <NodeType node, typename step_t>
@@ -171,10 +173,8 @@ template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n, const rewriter::library& l);
 
-/** @brief Apply a `steps` object to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n, const steps<step_t, node>& s);
+// (RR-1: the traverser|steps overload was deleted -- it took the swapped
+// steps<step_t, node> form no live steps object can match.)
 
 /** @brief Apply a `repeat_once` to a `tree<node>::traverser`. */
 template <NodeType node, typename step_t>

@@ -262,8 +262,8 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 			make_is_bit_one_call_from_index<node>(left, 0),
 			make_is_bit_zero_call_from_index<node>(right, 0));
 	rules.push_back(make_rule<node>(base_header, base_body));
-	// general case: bvgt[n](x, y) = ((bit[n-1](x) = 1) && (bit[n-1](y) = 0))
-	//		|| ((bit[n-1](x) = bit[n-1](y)) && bvgt[n-1](x, y));
+	// general case: bvgt[n](x, y) = ((bit[n](x) = 1) && (bit[n](y) = 0))
+	//		|| ((bit[n](x) = bit[n](y)) && bvgt[n-1](x, y));
 	auto n = tau::build_variable(untyped_type_id<node>());
 	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvgt_call_from_offset<node>(left, right, n);

@@ -26,14 +26,27 @@
 namespace idni::tau_lang {
 
 /** @brief Cached type id for bitvector-8 under node @p node. */
+// BA2-10: lazily-initialized functions, not static variable templates --
+// those gave one copy per TU with unordered pre-main dynamic initialization
+// that claimed BA registry ids in TU-link order, interleaving with lazy
+// registrations (bool, hsb, nat).
 template<NodeType node>
-static size_t bv8_type_id = ba_types<node>::id(bv_type<node>(8));
+inline size_t bv8_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(8));
+	return id;
+}
 /** @brief Cached type id for bitvector-16 under node @p node. */
 template<NodeType node>
-static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
+inline size_t bv16_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(16));
+	return id;
+}
 /** @brief Cached type id for bitvector-32 under node @p node. */
 template<NodeType node>
-static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
+inline size_t bv32_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(32));
+	return id;
+}
 
 /**
  * @brief Options controlling type inference behaviour.

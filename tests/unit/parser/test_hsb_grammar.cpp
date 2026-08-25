@@ -16,7 +16,7 @@ struct hsb_parser_instance : public idni::parser<char, char> {
 
 	hsb_parser_instance() : idni::parser<char, char>(
 		hsb_parser_data::grammar,
-		hsb_parser_data::parser_options) {}
+		hsb_parser_data::make_parser_options()) {}
 
 	size_t id(const std::basic_string<char>& name) {
 		return hsb_parser_data::nts.get(name);

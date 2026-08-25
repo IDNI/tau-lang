@@ -70,7 +70,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::fp_fallback
 			|| nt == tau::ref
 			|| nt == tau::bf_ref
-			|| nt == tau::ref
+			|| nt == tau::wff_ref
 			|| nt == tau::ref_args
 			|| nt == tau::ref_arg
 			|| nt == tau::offset;
@@ -327,12 +327,13 @@ std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
 //------------------------------------------------------------------------------
 // print
 
-// Find the smallest number n such that "bm" for all m > n does not occur
-// as a variable name
+// Return the largest n such that "bn" occurs as a variable name (0 when
+// none does); callers derive fresh names from id + 1 (TT2-17: the old
+// comment promised max+1 while the code returns max)
 template <NodeType node>
 int_t get_max_var_name_b_id(tref fm) {
 	// Find all occurrences of bn where n is some number in fm
-	// and return the maximal n + 1
+	// and return the maximal such n
 	using tau = tree<node>;
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
@@ -345,9 +346,13 @@ int_t get_max_var_name_b_id(tref fm) {
 			auto name = get_var_name<node>(n);
 			if (!name.empty() && name[0] == 'b') {
 				// Check if of form bn
-				if (is_number(name.substr(1)))
-					id = std::max(id, std::stoi(
-						name.substr(1)));
+				if (is_number(name.substr(1))) try {
+					id = std::max(id, static_cast<int_t>(
+						std::stoll(name.substr(1))));
+				} catch (const std::out_of_range&) {
+					// Variable name exceeds range; use max id
+					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1 (TT2-7)
+				}
 			}
 		}
 	};
@@ -733,7 +738,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		switch (pnt) {
 			case bf_and:
-				if (type_printed || isdigit(last_written_char)
+				if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
 					|| t.child_is(tau::ba_constant)) {
 					out(" ");
 				}

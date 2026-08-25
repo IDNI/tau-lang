@@ -55,11 +55,11 @@ inline const std::vector<std::string> symbol_names{
 	"disable_cmd", "__E_cli_command_178", "disable_sym", "toggle_cmd", "__E_cli_command_179", "toggle_sym", "def_list_cmd", "__E_cli_command_180", "def_sym", "__E___E_cli_command_180_181", 
 	"def_print_cmd", "__E_cli_command_182", "def_rr_cmd", "def_input_cmd", "def_output_cmd", "history_list_cmd", "__E_cli_command_183", "history_sym", "__E___E_cli_command_183_184", "history_print_cmd", 
 	"__E_cli_command_185", "history", "history_store_cmd", "__E_cli_command_186", "solve_option", "__E_solve_option_187", "solver_mode", "solver_mode_minimum", "__E_solver_mode_188", "solver_mode_maximum", 
-	"__E_solver_mode_189", "__E_file_name_190", "__E_option_name_191", "__E_option_value_192", "__E_fragment_name_193", "fragment_ltl", "fragment_ctl_star", "abs_history_sym", "rel_history_sym", "selection_sym", 
-	"execute_sym", "snf_sym", "examples_sym", "__E_help_arg_194", "__E___E_help_arg_194_195", "rel_history", "__E_history_196", "__E___E_history_196_197", "history_id", "abs_history", 
-	"__E_history_198", "unreachable", "BDD_ID", "stream_def", "fm_or_term", "__N_0", "__N_1", "__N_2", "__N_3", "__N_4", 
-	"__N_5", "__N_6", "__N_7", "__N_8", "__N_9", "__N_10", "__N_11", "__N_12", "__N_13", "__N_14", 
-	"__N_15", "__N_16", "__N_17", 
+	"__E_solver_mode_189", "__E_file_name_190", "__E_option_name_191", "__E_option_value_192", "__E_option_value_193", "__E_fragment_name_194", "fragment_ltl", "fragment_ctl_star", "abs_history_sym", "rel_history_sym", 
+	"selection_sym", "execute_sym", "snf_sym", "examples_sym", "__E_help_arg_195", "__E___E_help_arg_195_196", "rel_history", "__E_history_197", "__E___E_history_197_198", "history_id", 
+	"abs_history", "__E_history_199", "unreachable", "BDD_ID", "stream_def", "fm_or_term", "__N_0", "__N_1", "__N_2", "__N_3", 
+	"__N_4", "__N_5", "__N_6", "__N_7", "__N_8", "__N_9", "__N_10", "__N_11", "__N_12", "__N_13", 
+	"__N_14", "__N_15", "__N_16", "__N_17", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -186,11 +186,11 @@ struct tau_parser_nonterminals {
 		disable_cmd, __E_cli_command_178, disable_sym, toggle_cmd, __E_cli_command_179, toggle_sym, def_list_cmd, __E_cli_command_180, def_sym, __E___E_cli_command_180_181, 
 		def_print_cmd, __E_cli_command_182, def_rr_cmd, def_input_cmd, def_output_cmd, history_list_cmd, __E_cli_command_183, history_sym, __E___E_cli_command_183_184, history_print_cmd, 
 		__E_cli_command_185, history, history_store_cmd, __E_cli_command_186, solve_option, __E_solve_option_187, solver_mode, solver_mode_minimum, __E_solver_mode_188, solver_mode_maximum, 
-		__E_solver_mode_189, __E_file_name_190, __E_option_name_191, __E_option_value_192, __E_fragment_name_193, fragment_ltl, fragment_ctl_star, abs_history_sym, rel_history_sym, selection_sym, 
-		execute_sym, snf_sym, examples_sym, __E_help_arg_194, __E___E_help_arg_194_195, rel_history, __E_history_196, __E___E_history_196_197, history_id, abs_history, 
-		__E_history_198, unreachable, BDD_ID, stream_def, fm_or_term, __N_0, __N_1, __N_2, __N_3, __N_4, 
-		__N_5, __N_6, __N_7, __N_8, __N_9, __N_10, __N_11, __N_12, __N_13, __N_14, 
-		__N_15, __N_16, __N_17, 
+		__E_solver_mode_189, __E_file_name_190, __E_option_name_191, __E_option_value_192, __E_option_value_193, __E_fragment_name_194, fragment_ltl, fragment_ctl_star, abs_history_sym, rel_history_sym, 
+		selection_sym, execute_sym, snf_sym, examples_sym, __E_help_arg_195, __E___E_help_arg_195_196, rel_history, __E_history_197, __E___E_history_197_198, history_id, 
+		abs_history, __E_history_199, unreachable, BDD_ID, stream_def, fm_or_term, __N_0, __N_1, __N_2, __N_3, 
+		__N_4, __N_5, __N_6, __N_7, __N_8, __N_9, __N_10, __N_11, __N_12, __N_13, 
+		__N_14, __N_15, __N_16, __N_17, 
 	};
 };
 

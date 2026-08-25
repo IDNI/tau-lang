@@ -1,0 +1,13 @@
+n all a:tau all b:tau all c:tau all d:tau (a & b) & (c & d) = (d & c) & (b & a).
+n ex a:tau ex b:tau ex c:tau ex d:tau a < b && b < c && c < d && d != a.
+n all a:tau all b:tau all c:tau all d:tau a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:tau ex b:tau ex c:tau ex d:tau a != 0 && b = a' && c = b & a && c = 0 && d = a | b && d != 0.
+n all a:tau all b:tau all c:tau all d:tau (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:tau ex b:tau ex c:tau ex d:tau a != b && b = a' && c = a | b && d = c & a && d <= b.
+n all a:tau all b:tau all c:tau all d:tau a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:tau ex b:tau ex c:tau ex d:tau a != 0 && b = a' && b != a && c = b' && d = c' && d = b.
+n all a:tau all b:tau all c:tau all d:tau (a & a) = a && (b | b) = b.
+n ex a:tau ex b:tau ex c:tau ex d:tau a != 0 && b = a | c && c = a & b && d = b ^ c && d != 0.
+n all a:tau ex b:tau all c:tau ex d:tau b = a' && d = c'.
+n ex a:tau all b:tau ex c:tau all d:tau a = 1 && c = b & b && a & d = d.
+n all a:tau ex b:tau ex c:tau all d:tau b = a' && c = b' && c = a && a | d = d | a.

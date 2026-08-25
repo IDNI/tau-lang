@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	apply_rule
+	antiprenexing
 	base_ba_dispatcher
 	bv_ba_helpers
+	bv_ba_hooks
 	ba_constants
 	ba_types
 	ba_types_inference
@@ -14,6 +16,7 @@ set(TESTS
 	bv_ba-simplification
 	bv_ba-cast
 	cvc5
+	eliminability
 	execution
 	gc
 	hooks
@@ -28,6 +31,7 @@ set(TESTS
 	#pwr_deepseek_3
 	#pwr_deepseek_4
 	ltl_aba
+	parse_hoa
 	#ltl_adversarial
 	#ltl_adversarial2
 	ltl_benchmarks
@@ -53,9 +57,7 @@ set(TESTS
 
 	algorithm_a
 	algorithm_b
-	algorithm_c
 	algorithm_d
-	algorithm_picker
 	semantic_pwr
 	cpp_codegen
 	cpp_codegen_pwr
@@ -65,8 +67,8 @@ set(TESTS
 	gr1_detect
 	liveness_decomp
 	mealy_extract
+	leaf_clause
 	normal_forms
-	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
 	omcat_types

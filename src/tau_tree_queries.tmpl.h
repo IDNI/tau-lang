@@ -29,7 +29,11 @@ bool is(tref n, std::initializer_list<size_t> nts) {
 	return false;
 }
 
-// factory method for is predicate
+// factory method for is predicate.
+// WARNING (TT1-21): the returned closure captures the initializer_list BY
+// VALUE, which is a VIEW over the caller's temporary backing array -- valid
+// only within the creating full-expression. Do NOT store the result; for a
+// storable predicate build it from a std::vector instead.
 template <NodeType node>
 inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
 	return [nts](tref n) { return is<node>(n, nts); };
@@ -72,9 +76,14 @@ bool is_temporal_quantifier(tref n) {
 
 template <NodeType node>
 bool is_child_temporal_quantifier(tref n) {
-	return tree<node>::get(n).child_is(node::type::wff_always)
-		|| tree<node>::get(n).child_is(node::type::wff_sometimes);
-
+	// TT1-13: keep in sync with is_temporal_quantifier above -- the LTL
+	// and CTL* operators are temporal too. Consumers (e.g. normalize's
+	// temporal-block detection) rely on this to avoid applying
+	// quantifier elimination across a temporal operator; on paths where
+	// the LTL ops are already compiled away this is a no-op.
+	const auto& t = tree<node>::get(n);
+	if (!t.has_child()) return false;
+	return is_temporal_quantifier<node>(t.first());
 }
 
 template <NodeType node>
@@ -214,7 +223,6 @@ bool is_cli_cmd(tref n) {
 		tau::def_list_cmd,
 		tau::def_print_cmd,
 		tau::def_rr_cmd,
-		tau::def_list_cmd,
 		tau::def_input_cmd,
 		tau::def_output_cmd,
 		tau::history_print_cmd,
@@ -317,10 +325,7 @@ bool while_is_boolean_operation(tref n) {
 	return false;
 }
 
-/** @brief Return `true` if @p n is a quantified formula. */
-template <NodeType node>
-bool until_is_quantified(tref n) {
-	return is_quantifier<node>(n);
-}
+// (TT1-23: until_is_quantified deleted -- zero callers, zero tests.)
+
 
 } // namespace idni::tau_lang

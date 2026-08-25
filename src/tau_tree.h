@@ -158,8 +158,6 @@ struct node {
 	constexpr node(size_t nt = 0, size_t data = 0, size_t is_term = 0,
 			size_t ba_type = 0, size_t ext = 0) noexcept;
 
-	/** @brief Return a copy of this node with the nonterminal changed to @p new_nt. */
-	node retype(size_t new_nt) const;
 	/** @brief Return a copy with the BA type id changed to @p new_ba. */
 	node ba_retype(size_t new_ba) const;
 	/** @brief Return a copy with the inline data changed to @p new_data. */
@@ -184,13 +182,12 @@ struct node {
 	/** @brief Reinterpret the inline `data` field as `int_t`. */
 	int_t as_int() const;
 
-	/** @brief Return a null sentinel node. */
-	static constexpr node_t nnull();
-
-	/** @brief Construct an extension node from raw storage @p raw_value. */
-	static constexpr node_t extension(T raw_value);
-	/** @brief Return the raw storage value of an extension node. */
-	constexpr T extension() const noexcept;
+	// TT1-11: node::retype(new_nt), nnull() and the extension()
+	// pack/unpack pair were deleted: zero callers, and the extension
+	// packing could not round-trip -- data(54) + term(1) + ext(1) + nt(9)
+	// needs 65 bits in a 64-bit word, so any nt >= 256 lost its MSB.
+	// Recover from git if the `ext` child-storage design is ever built;
+	// it needs data_bits = bits - nt_bits - 2 first.
 
 	/** @brief Three-way comparison (by hash, then field-by-field). */
 	std::weak_ordering operator<=>(const node& that) const;
@@ -503,7 +500,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Return the free variables reachable from this node. */
 	const trefs& get_free_vars() const;
 
-	/** @brief Return a copy of @p term with all BA type annotations stripped. */
+	/** @brief Return a copy of @p term with its own BA type annotation and
+ * `typed` children removed. Shallow: descendants keep their types, and
+ * ba_constants keep theirs (their data is a typed pool index). */
 	static tref untype(tref term);
 
 	/** @brief Replace @p that with @p with in this subtree. */
@@ -511,52 +510,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Apply all substitutions in @p changes to this subtree. */
 	tref substitute(const auto& changes) const;
 
-	// -----------------------------------------------------------------------
-	// Predicate-based selection helpers
-	// -----------------------------------------------------------------------
-
-	/** @brief Select top-level nodes matching each of @p count predicates in @p queries. */
-	std::vector<trefs> select_top_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count) const;
-	/** @brief Select top-level nodes matching each predicate in the list. */
-	std::vector<trefs> select_top_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries) const;
-	/** @brief Select top-level nodes matching each predicate in the vector. */
-	std::vector<trefs> select_top_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries) const;
-	/** @brief Like `select_top_by_predicates` but stops at nodes satisfying @p until. */
-	std::vector<trefs> select_top_until_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count,
-		const auto& until) const;
-	/** @brief List variant of `select_top_until_by_predicates`. */
-	std::vector<trefs> select_top_until_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries,
-		const auto& until) const;
-	/** @brief Vector variant of `select_top_until_by_predicates`. */
-	std::vector<trefs> select_top_until_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries,
-		const auto& until) const;
-	/** @brief Select all nodes (any depth) matching each predicate. */
-	std::vector<trefs> select_all_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count) const;
-	/** @brief List variant of `select_all_by_predicates`. */
-	std::vector<trefs> select_all_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries) const;
-	/** @brief Vector variant of `select_all_by_predicates`. */
-	std::vector<trefs> select_all_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries) const;
-	/** @brief Like `select_all_by_predicates` but stops at nodes satisfying @p until. */
-	std::vector<trefs> select_all_until_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count,
-		const auto& until) const;
-	/** @brief List variant of `select_all_until_by_predicates`. */
-	std::vector<trefs> select_all_until_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries,
-		const auto& until) const;
-	/** @brief Vector variant of `select_all_until_by_predicates`. */
-	std::vector<trefs> select_all_until_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries,
-		const auto& until) const;
+	// TT1-22: the select_top/select_all[_until]_by_predicates family (12
+	// overloads plus or_predicate/select_by_predicates helpers) was
+	// deleted: zero callers and zero tests. Recover from git if a
+	// multi-predicate selection API is ever wanted.
 
 	// -----------------------------------------------------------------------
 	// From-parser API (tau_tree_from_parser.tmpl.h)
@@ -567,7 +524,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 */
 	struct get_options {
 		tau_parser::parse_options parse{};          ///< Underlying parser options.
-		std::map<std::string, tref> named_constants{}; ///< Pre-bound constant names.
 		bool infer_ba_types = true;                 ///< Run BA type inference.
 		bool use_default_types = true;              ///< Fall back to tau type for unknowns.
 		bool reget_with_hooks = true;               ///< Re-register nodes through hooks.
@@ -713,8 +669,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	// Builder API (tau_tree_builders.tmpl.h)
 	// -----------------------------------------------------------------------
 
-	/** @brief Apply rewriter builder @p b to nodes @p n. */
-	static tref apply_builder(const rewriter::builder& b, trefs n);
 
 	/** @brief Return the BA zero constant for type @p type_id. */
 	static tref _0(size_t type_id);
@@ -755,16 +709,25 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Build `always n`. */
 	static tref build_wff_always(tref n);
 	// CTL* path quantifiers
+	/** @brief Build CTL* `A n` — n holds on ALL paths. */
 	static tref build_wff_A(tref n);
+	/** @brief Build CTL* `E n` — n holds on SOME path. */
 	static tref build_wff_E(tref n);
-	// semantic negation (strategy-level)
+	/** @brief Build `-n` — strategy-level semantic negation (role swap
+	 * at the synthesis layer, not Boolean negation). */
 	static tref build_wff_semantic_neg(tref n);
 	// LTL(ABA) operators
+	/** @brief Build `F n` — finally/eventually. */
 	static tref build_wff_F(tref n);
+	/** @brief Build `l U r` — strong until (r must eventually hold). */
 	static tref build_wff_U(tref l, tref r);
+	/** @brief Build `l R r` — release (r holds up to and incl. first l). */
 	static tref build_wff_R(tref l, tref r);
+	/** @brief Build `l W r` — weak until (like U, but r may never hold). */
 	static tref build_wff_W(tref l, tref r);
+	/** @brief Build `l S r` — since (past: r held once, l ever since). */
 	static tref build_wff_S(tref l, tref r);
+	/** @brief Build `l T r` — trigger (past dual of S). */
 	static tref build_wff_T(tref l, tref r);
 	/** @brief Build `x ? y : z` conditional. */
 	static tref build_wff_conditional(tref x, tref y, tref z);
@@ -999,7 +962,9 @@ private:
 
 };
 
-/** @brief Return a copy of @p term with all BA type annotations stripped. */
+/** @brief Return a copy of @p term with its own BA type annotation and
+ * `typed` children removed. Shallow: descendants keep their types, and
+ * ba_constants keep theirs (their data is a typed pool index). */
 template <NodeType node>
 tref untype(tref term);
 
@@ -1114,11 +1079,15 @@ inline std::function<bool(tref)> is_child(size_t nt);
 template <NodeType node>
 bool is_child_quantifier(tref n);
 
-/** @brief Return `true` if @p n is a temporal quantifier (`always`, `sometimes`). */
+/** @brief Return `true` if @p n is a temporal operator: `always`,
+ * `sometimes`, the LTL operators F/U/R/W/S/T, or the CTL* nodes A/E and
+ * `wff_semantic_neg` (the last is not itself temporal but scopes a full
+ * temporal formula, so temporal-block detection must not descend into it). */
 template <NodeType node>
 bool is_temporal_quantifier(tref n);
 
-/** @brief Return `true` if the first child of @p n is a temporal quantifier (`always`, `sometimes`). */
+/** @brief Return `true` if the first child of @p n is a temporal operator
+ * (same set as is_temporal_quantifier). */
 template <NodeType node>
 bool is_child_temporal_quantifier(tref n);
 
@@ -1200,9 +1169,7 @@ bool while_is_boolean_operation(tref n);
 template <NodeType node>
 bool while_is_formula(tref n);
 
-/** @brief Return `true` if @p n is a quantified formula. */
-template <NodeType node>
-bool until_is_quantified(tref n);
+// (TT1-23: until_is_quantified deleted -- zero callers, zero tests.)
 
 /** @brief Return `true` if @p n is a non-boolean term. */
 template <NodeType node>
@@ -1266,6 +1233,39 @@ inline void sweep_interned_free_vars() {
 		else ++it;
 	}
 }
+
+/**
+ * @brief RAII guard for the process-global `tree<node>::use_hooks` flag.
+ *
+ * `use_hooks` is a static member, so a pass that disables construction hooks
+ * for the duration of a traversal has to restore it on *every* exit, including
+ * an exceptional one -- the bitvector paths do throw (see the
+ * `std::bad_variant_access` discussion in `bv_ba_solver.tmpl.h`), and leaving
+ * hooks disabled corrupts every tree built afterwards in the process. Assigning
+ * `true` unconditionally at the end is wrong for the same reason: it force-enables
+ * hooks for a caller that had deliberately disabled them.
+ *
+ * @par Example
+ * @code
+ * {
+ *     use_hooks_guard<node> g(false); // hooks off inside this scope
+ *     res = pre_order<node>(fm).apply(f, visit, up);
+ * }                                   // previous value restored here
+ * @endcode
+ */
+template <NodeType node>
+struct use_hooks_guard {
+	explicit use_hooks_guard(bool enable)
+		: previous_(tree<node>::use_hooks)
+	{
+		tree<node>::use_hooks = enable;
+	}
+	~use_hooks_guard() { tree<node>::use_hooks = previous_; }
+	use_hooks_guard(const use_hooks_guard&) = delete;
+	use_hooks_guard& operator=(const use_hooks_guard&) = delete;
+private:
+	bool previous_;
+};
 
 } // namespace idni::tau_lang
 

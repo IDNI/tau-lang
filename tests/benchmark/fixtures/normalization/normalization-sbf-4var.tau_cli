@@ -1,0 +1,13 @@
+n all a:sbf all b:sbf all c:sbf all d:sbf (a & b) & (c & d) = (d & c) & (b & a).
+n ex a:sbf ex b:sbf ex c:sbf ex d:sbf a < b && b < c && c < d && d != a.
+n all a:sbf all b:sbf all c:sbf all d:sbf a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:sbf ex b:sbf ex c:sbf ex d:sbf a != 0 && b = a' && c = b & a && c = 0 && d = a | b && d != 0.
+n all a:sbf all b:sbf all c:sbf all d:sbf (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:sbf ex b:sbf ex c:sbf ex d:sbf a != b && b = a' && c = a | b && d = c & a && d <= b.
+n all a:sbf all b:sbf all c:sbf all d:sbf a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:sbf ex b:sbf ex c:sbf ex d:sbf a != 0 && b = a' && b != a && c = b' && d = c' && d = b.
+n all a:sbf all b:sbf all c:sbf all d:sbf (a & a) = a && (b | b) = b.
+n ex a:sbf ex b:sbf ex c:sbf ex d:sbf a != 0 && b = a | c && c = a & b && d = b ^ c && d != 0.
+n all a:sbf ex b:sbf all c:sbf ex d:sbf b = a' && d = c'.
+n ex a:sbf all b:sbf ex c:sbf all d:sbf a = 1 && c = b & b && a & d = d.
+n all a:sbf ex b:sbf ex c:sbf all d:sbf b = a' && c = b' && c = a && a | d = d | a.

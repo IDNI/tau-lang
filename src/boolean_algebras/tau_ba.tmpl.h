@@ -91,18 +91,75 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
 	return *this + other;
 }
 
+/**
+ * @internal
+ * @brief Memoise a Tau-BA constant/valid test over the element's main tree.
+ *
+ * `is_zero`/`is_one` are what every layer above probes a Tau-BA leaf with --
+ * `nso_ba`'s `operator==(tree, bool)` routes through `node::ba::is_zero/is_one`,
+ * so each BDD node reduction over Tau-BA content asks the question at least
+ * once. Unlike every other BA in the pack, answering it here costs a full
+ * temporal decision procedure (`normalizer` re-normalizes and re-applies the
+ * recurrence relations, then `is_tau_formula_sat`/`is_tau_impl` unroll the spec
+ * to its unbounded continuation). Quantifier elimination over Tau-BA content
+ * asks it tens of thousands of times about a handful of distinct elements, so
+ * without memoisation a single elimination step runs for hours. Measured on a
+ * `run` over nested conditionals with `:tau` streams: 35843 `is_one` and 35892
+ * `is_zero` calls in the first two minutes over *three* distinct elements,
+ * driving 71735 `transform_to_execution` and 215590 `normalize` calls; the memo
+ * takes those to 11 and 26.
+ *
+ * This is a memo over an unchanged predicate, so no test pins it directly --
+ * the existing tau_ba suites cover the answers and the cost is not something a
+ * suite can assert without becoming a timing test.
+ *
+ * Deliberately NOT under `#ifdef TAU_CACHE`: this keeps the algorithm out of a
+ * pathological regime rather than shaving a constant factor, and Debug builds
+ * (where `TAU_CACHE` is off) run the same specs and the same tests.
+ *
+ * Registered through `tree<node>`'s GC-aware cache registry, so entries whose
+ * key does not survive a sweep are dropped. Keyed by the element's main tree,
+ * which is only a complete identity when the element carries no recurrence
+ * relations -- `rewriter::rules` is not a tref-shaped key, and `normalizer`
+ * folds those rules into the answer. Elements that carry them are therefore
+ * computed uncached (correct, just as slow as before).
+ * @endinternal
+ */
+template <typename... BAs>
+requires BAsPack<BAs...>
+static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
+	subtree_unordered_map<typename tau_ba<BAs...>::node, bool>& cache,
+	auto&& compute)
+{
+	using node = typename tau_ba<BAs...>::node;
+	if (!fm.nso_rr.rec_relations.empty())
+		return compute(normalizer<node>(fm.nso_rr));
+	tref key = fm.nso_rr.main->get();
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	// compute() before emplace: it can create new trees, and a rehash of
+	// `cache` must not happen with a half-built entry in it.
+	bool res = compute(normalizer<node>(fm.nso_rr));
+	return cache.insert_or_assign(key, res).first->second;
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_zero() const {
-	tref normalized = normalizer<node>(nso_rr);
-	return !is_tau_formula_sat<node>(normalized);
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	return cached_tau_ba_predicate(*this, cache, [](tref normalized) {
+		return !is_tau_formula_sat<node>(normalized);
+	});
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_one() const {
-	tref normalized = normalizer<node>(nso_rr);
-	return is_tau_impl<node>(tau::_T(), normalized);
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	return cached_tau_ba_predicate(*this, cache, [](tref normalized) {
+		return is_tau_impl<node>(tau::_T(), normalized);
+	});
 }
 
 template <typename... BAs>

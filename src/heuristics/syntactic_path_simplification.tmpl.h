@@ -67,7 +67,15 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
  * CHECK( tau::get(res).equals_F() );
  * @endcode
  * @endinternal
- */
+ PRECONDITION (HE-7): bound variables must be canonically renamed apart
+ * from free occurrences before calling (the normalizer's canonize pass
+ * guarantees this on every production path). The conjunct-assumption
+ * substitution below uses rewriter::replace over the WHOLE subtree with no
+ * quantifier-scope guard, so a sibling scope rebinding an assumption's
+ * variable name would have its bound occurrences wrongly replaced
+ * (`x = 0 && ex x (x != 0)` would collapse to F).
+ *
+ * */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_wff(tref root) {
 	using tau = tree<node>;
@@ -143,7 +151,15 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
  * CHECK( tau::get(res).equals_0() );
  * @endcode
  * @endinternal
- */
+ PRECONDITION (HE-7): bound variables must be canonically renamed apart
+ * from free occurrences before calling (the normalizer's canonize pass
+ * guarantees this on every production path). The conjunct-assumption
+ * substitution below uses rewriter::replace over the WHOLE subtree with no
+ * quantifier-scope guard, so a sibling scope rebinding an assumption's
+ * variable name would have its bound occurrences wrongly replaced
+ * (`x = 0 && ex x (x != 0)` would collapse to F).
+ *
+ * */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_bf(tref root) {
 	using tau = tree<node>;
@@ -211,11 +227,22 @@ tref syntactic_path_simplification_simplify_bf(tref root) {
 template <NodeType node>
 tref syntactic_path_simplification(tref fm) {
 	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	// fm is reassigned below, so the cache key must be captured before any
+	// mutation -- key is always the untouched argument.
+	const tref key = fm;
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	auto memo = [&](tref r) { return cache.emplace(key, r).first->second; };
+#else
+	auto memo = [](tref r) { return r; };
+#endif // TAU_CACHE
 	DBG(LOG_DEBUG << "Syntactic_path_simplification on " << LOG_FM(fm) << "\n";)
 	tref res = nullptr;
 	if (tau::get(fm).is_term()) {
 		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
-			return fm;
+			return memo(fm);
 		// Resolve contradictions
 		fm = push_negation_in<node, false>(fm);
 		fm = syntactic_path_simplification_simplify_bf<node>(fm);
@@ -225,7 +252,7 @@ tref syntactic_path_simplification(tref fm) {
 		res = push_negation_in<node, false>(tau::build_bf_neg(fm));
 	} else {
 		if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
-			return fm;
+			return memo(fm);
 		// Resolve contradictions
 		fm = normalize_atomic_formula_operators<node>(to_nnf<node>(fm));
 		fm = syntactic_path_simplification_simplify_wff<node>(fm);
@@ -235,20 +262,32 @@ tref syntactic_path_simplification(tref fm) {
 		res = to_nnf<node>(tau::build_wff_neg(fm));
 	}
 	DBG(LOG_DEBUG << "Syntactic_path_simplification result: " << LOG_FM(res) << "\n";)
-	return res;
+	return memo(res);
 }
 
 template <NodeType node>
 tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 	using tau = tree<node>;
+#ifdef TAU_CACHE
+	// -- measured 2026-08-15, same-window A/B on satisfiability2's
+	// mixed_lookback cases: medians 11.23/12.88 s with the cache vs
+	// 11.51/16.09 s without (>=2% better on both) -> kept; details in
+	// private/eliminability-measurements.md, "Caching pass (2026-08-15)"
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	auto memo = [&](tref r) { return cache.emplace(fm, r).first->second; };
+#else
+	auto memo = [](tref r) { return r; };
+#endif // TAU_CACHE
 	if (tau::get(fm).is_term()) {
 		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
-			return fm;
+			return memo(fm);
 		// Resolve contradictions
-		return syntactic_path_simplification_simplify_bf<node>(fm);
+		return memo(syntactic_path_simplification_simplify_bf<node>(fm));
 	} else {
 		// Resolve contradiction
-		return syntactic_path_simplification_simplify_wff<node>(fm);
+		return memo(syntactic_path_simplification_simplify_wff<node>(fm));
 	}
 }
 

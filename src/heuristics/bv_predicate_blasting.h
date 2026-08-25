@@ -17,29 +17,37 @@
 
 #include "tau_tree.h"
 #include "tau_bdd.h"
+// `bv_blasting` and the blasting/solver placement parameters. They belong
+// here, and used to be spelled out here, but live in their own dependency-free
+// header so tests/test_init.h can apply environment overrides without pulling
+// the whole tau tree into every test binary's main(). See there.
+#include "blast_placement.h"
 
 namespace idni::tau_lang {
 
 // Forward declarations needed by wff_predicate_blasting/quantify_aux_vars
 // (bv_predicate_blasting.tmpl.h) to anti-prenex/eliminate its own
 // freshly-introduced auxiliary bv-typed quantifiers. The full
-// declarations/definitions come from
-// normal_forms_transformations.h/normal_forms.tmpl.h; including those
-// headers directly here would create a header include cycle
-// (normal_forms_transformations.h includes this file). No default argument
+// declarations/definitions come from antiprenexing/antiprenexing.h and
+// antiprenexing/antiprenexing.tmpl.h. This file is included (via
+// normal_forms_transformations.h) before
+// antiprenexing.h in normal_forms.h, so these are forward-declared here
+// rather than including antiprenexing.h directly. No default argument
 // is given here, since a default cannot be redeclared and these call sites
-// always pass an explicit predicate.
+// always pass an explicit analysis.
+//
+// `eliminability` is only named through a reference in these signatures, so
+// its declaration suffices; the full definition (antiprenexing/eliminability.h)
+// is in scope by the time bv_predicate_blasting.tmpl.h's call sites are
+// instantiated, via normal_forms.h.
+template<NodeType node> struct eliminability;
+
 template<NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
+tref anti_prenex(tref formula, const eliminability<node>& el);
 
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
-	std::function<bool(tref)> skip);
-
-// NOT thread-safe: Controls whether bitvector blasting is enabled.
-// The tau library assumes single-threaded access.
-// Do not call set_blasting() concurrently from multiple threads.
-inline bool bv_blasting = true;
+	const eliminability<node>& el);
 
 /**
  * @brief Entry point for predicate blasting on bitvector formulas.

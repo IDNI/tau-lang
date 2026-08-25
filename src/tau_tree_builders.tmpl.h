@@ -9,13 +9,8 @@
 
 namespace idni::tau_lang {
 
-template <NodeType node>
-tref tree<node>::apply_builder(const rewriter::builder& b, trefs n) {
-	subtree_map<node, tref> changes;
-	trefs vars = (tt(b.first->get()) || capture).values();
-	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
-	return rewriter::replace<node>(b.second->get(), changes);
-}
+// (TT2-9: tree::apply_builder deleted -- zero callers.)
+
 
 template<NodeType node>
 tref canonize_quantifier_ids(tref fm) {
@@ -290,7 +285,7 @@ int_t find_biggest_quant_id(tref fm) {
 					id = std::max(id, static_cast<int_t>(std::stoll(name)));
 				} catch (const std::out_of_range&) {
 					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max();
+					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1 (TT2-7)
 				}
 				return false;
 			}
@@ -720,7 +715,6 @@ tref build_bf_neg(tref l) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr);)
-	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf));)
 	LOG_TRACE << "build_bf_neg";
 	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
@@ -841,13 +835,9 @@ tref build_bf_ba_constant(const typename node::constant& constant,
 		tau::get_ba_constant(constant, ba_type_id) }, right);
 }
 
-template <NodeType node>
-tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id) {
-	using tau = tree<node>;
+// (TT2-11: build_bv_ba_constant deleted -- zero callers, and it built a
+// bare bv node unlike every other constant builder.)
 
-	return tau::get(tau::bv, {
-		tau::get_ba_constant(constant, ba_type_id) });
-}
 
 template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id) {

@@ -156,3 +156,98 @@ TEST_SUITE("typed child stripping after inference") {
 		CHECK_FALSE( has_typed );
 	}
 }
+
+// ── untype / canonize on a typed ba_constant ────────────────────────────────
+//
+// A ba_constant's `data` field means different things depending on whether the
+// node is typed: for a typed constant it is an index into the BA constants
+// pool, for an untyped one it is a string id for the constant's source text.
+// node::hashit() picks which of the two to read from the node's ba_type.
+//
+// untype() used to clear the ba_type of every node it was given, ba_constants
+// included, leaving the pool index in place. That produced a node claiming to
+// be untyped while still holding a pool index, so hashing it looked the index
+// up in the string dictionary. Once the pool had grown past the dictionary
+// (reached by normalizing a handful of bitvector constants in one session) that
+// read went out of bounds: an assert in debug, a segfault in release, and a
+// silently wrong hash in between.
+TEST_SUITE("untype of a ba_constant") {
+
+	TEST_CASE("keeps the ba_type, so data stays a pool index") {
+		tref c = tau::get_ba_constant(Bool(true), bool_type());
+		REQUIRE( c != nullptr );
+		const size_t type = tau::get(c).get_ba_type();
+		const size_t id = tau::get(c).get_ba_constant_id();
+		REQUIRE( type != 0 );  // it really is typed
+		REQUIRE( id != 0 );
+
+		tref u = untype<node_t>(c);
+		REQUIRE( u != nullptr );
+		CHECK( tau::get(u).get_ba_type() == type );
+		CHECK( tau::get(u).get_ba_constant_id() == id );
+	}
+
+	// Hashing is where the inconsistent node was read, so exercise it. Two
+	// constants of the same type must hash apart, and untyping must not
+	// change a constant's hash.
+	TEST_CASE("hashing an untyped ba_constant stays in range") {
+		tref t = tau::get_ba_constant(Bool(true), bool_type());
+		tref f = tau::get_ba_constant(Bool(false), bool_type());
+		REQUIRE( t != nullptr );
+		REQUIRE( f != nullptr );
+		CHECK( tau::get(t).value.hashit()
+					!= tau::get(f).value.hashit() );
+		CHECK( tau::get(untype<node_t>(t)).value.hashit()
+					== tau::get(t).value.hashit() );
+		CHECK( tau::get(untype<node_t>(t)).value.hashit()
+					!= tau::get(untype<node_t>(f)).value.hashit() );
+	}
+
+	// canonize() is untype()'s caller inside inference; it must keep
+	// constants of the same value but different types apart.
+	TEST_CASE("canonize keeps a typed constant distinct from another type") {
+		tref c = tau::get_ba_constant(Bool(true), bool_type());
+		REQUIRE( c != nullptr );
+		CHECK( canonize<node_t>(c) == c );
+	}
+
+	// The fix must stay narrow: a typed *variable* is still untyped, since
+	// its data is a name and does not depend on the ba_type.
+	TEST_CASE("a typed variable is still untyped") {
+		tref parsed = parse_bf_no_infer("x:sbf");
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		tref v = find_first<tau::variable>(inferred);
+		REQUIRE( v != nullptr );
+		REQUIRE( tau::get(v).get_ba_type() != 0 );
+		CHECK( tau::get(untype<node_t>(v)).get_ba_type() == 0 );
+	}
+}
+
+TEST_SUITE("regression/typed rec-relation head with a wff body") {
+
+	// BA2-2: `p(x):sbf := x = 0.` is classified as a functional relation
+	// (its head is typed) but its body is a formula, which
+	// update_functional_rr rejects by returning nullptr. The rec_relation
+	// on_leave handler only looked for parse_error/inference_error and
+	// stored that nullptr as a child of the rec_relations node; the final
+	// update pass then dereferenced it. The rejection must surface as an
+	// inference failure (whole parse yields nullptr), never as a crash.
+	TEST_CASE("a typed head with a wff body is rejected without crashing") {
+		tref n = tau::get("p(x):sbf := x = 0. T.");
+		CHECK( n == nullptr );
+	}
+
+	// The neighbouring accepted shapes from the same sample table must
+	// keep parsing, so the rejection stays narrow.
+	TEST_CASE("a typed head with a bf body still parses") {
+		tref n = tau::get("p(x):sbf := x'. T.");
+		CHECK( n != nullptr );
+	}
+
+	TEST_CASE("an untyped head with a wff body still parses") {
+		tref n = tau::get("p(x:sbf) := x = 0. T.");
+		CHECK( n != nullptr );
+	}
+}

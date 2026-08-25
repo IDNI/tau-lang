@@ -50,6 +50,10 @@ template <NodeType node, typename step_t>
 tref repeat_each<node, step_t>::operator()(tref n) const {
 	auto nn = n;
 	for (auto& l: s.libraries) {
+		// RR-3: `visited` only catches cycles, not growth -- an
+		// ever-growing rewrite loops forever here. Test-only today
+		// (production uses repeat_all); give it the same runtime round
+		// cap as repeat_all when that parameter lands (issue #36).
 		std::unordered_set<tref> visited;
 		while (true) {
 			nn = l(nn);
@@ -78,18 +82,23 @@ tref repeat_all<node, step_t>::operator()(tref n) const {
 	// == nn) or, using visited, a longer oscillating cycle -- previously
 	// the sequence was applied twice per round (once here, once again via
 	// s(nn)) and visited was never used, so a period-2+ oscillating
-	// sequence looped forever. max_rounds additionally bounds an
-	// ever-growing rewrite (one that never repeats a prior state), which
-	// visited alone cannot detect.
-	constexpr size_t max_rounds = 1'000'000;
-	for (size_t round = 0; round < max_rounds; ++round) {
+	// sequence looped forever. max_rewrite_rounds (0 = unlimited)
+	// additionally bounds an ever-growing rewrite (one that never repeats
+	// a prior state), which visited alone cannot detect.
+	for (size_t round = 0;
+		!max_rewrite_rounds || round < max_rewrite_rounds; ++round) {
 		nn = s(nn);
 		if (visited.contains(nn)) return nn;
 		visited.insert(nn);
 	}
-	LOG_ERROR << "repeat_all: exceeded " << max_rounds
-		<< " rounds without reaching a fixpoint or cycle, giving up";
-	return nn;
+	// Returning the partially rewritten formula would hand the caller a
+	// half-expanded term indistinguishable from a real result; a rewrite
+	// that never settles has no result, so report the failure instead.
+	LOG_ERROR << "Rewriting did not reach a fixpoint after "
+		<< max_rewrite_rounds << " rounds (max-rewrite-rounds) and is "
+		"still growing; the definitions in use are most likely "
+		"non-terminating for this argument";
+	return nullptr;
 }
 
 // -----------------------------------------------------------------------------
@@ -114,42 +123,11 @@ tref repeat_once<node, step_t>::operator()(tref n) const {
 // -----------------------------------------------------------------------------
 // to_steps
 
-template <NodeType node>
-steps<node, step<node>> to_steps(
-	const std::initializer_list<rewriter::library>& libs)
-{
-	std::vector<step<node>> s;
-	for (auto& l : libs) {
-		// LOG_TRACE << "to_steps library " << l.size() << " rules";
-		// for (auto& r : l)
-		// 	LOG_TRACE << "to_steps rule: " << to_str<node>(r);
-		s.emplace_back(l);
-	}
-	return steps<node, step<node>>(std::move(s));
-}
+// (RR-4: to_steps deleted -- zero callers.)
+
 
 // -----------------------------------------------------------------------------
 // operator|
-
-template <NodeType node, typename step_t>
-steps<repeat_each<node, step_t>, node> operator|(
-	const repeat_each<node, step_t>& l,
-	const repeat_each<node, step_t>& r)
-{
-	auto s = steps<node, repeat_each<node, step_t>>(l);
-	s.libraries.push_back(r);
-	return s;
-}
-
-template <NodeType node, typename step_t>
-steps<repeat_all<node, step_t>, node> operator|(
-	const repeat_all<node, step_t>& l,
-	const repeat_all<node, step_t>& r)
-{
-	auto s = steps<repeat_all<node, step_t>, node>(l);
-	s.libraries.push_back(r);
-	return s;
-}
 
 template <NodeType node, typename step_t>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
@@ -184,15 +162,6 @@ typename tree<node>::traverser operator|(
 {
 	using tt = typename tree<node>::traverser;
 	return n | tt::f(step<node>(l));
-}
-
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const steps<step_t, node>& s)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(s);
 }
 
 template <NodeType node, typename step_t>

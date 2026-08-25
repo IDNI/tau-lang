@@ -652,3 +652,48 @@ TEST_SUITE("regression/disallow T and F as variables") {
 	}
 
 }
+
+TEST_SUITE("regression/oversized numeric literals") {
+
+	// TT1-1: the `digits` terminal was converted with a bare
+	// `std::stoul(ptr.get_terminals())`. Nothing on the parse path caught
+	// the `std::out_of_range` it throws for a literal above 2^64-1, so
+	// such an input terminated the process.
+	//
+	// This case is a regression guard, not a reproduction: the throw was
+	// never observed through this carrier. It pins the contract the fix
+	// establishes -- an out-of-range literal is a parse failure and never
+	// an exception escaping tree<node>::get().
+	TEST_CASE("a literal above 2^64-1 fails the parse instead of throwing") {
+		const char* sample =
+			"g[99999999999999999999999999](Y) := T."
+			"T.";
+		tref n = nullptr;
+		CHECK_NOTHROW( n = tau::get(sample) );
+		CHECK( n == nullptr );
+	}
+
+	// TT1-1: node::data is a 54-bit bitfield, so a literal in
+	// [2^54, 2^64) was accepted by stoul and then silently truncated by
+	// the node constructor. 2^54 truncates to 0, which is why this used to
+	// parse successfully -- as the *wrong* definition `g[0](Y) := T.`
+	TEST_CASE("a literal that does not fit node::data fails the parse") {
+		const char* sample =
+			"g[18014398509481984](Y) := T." // 2^54
+			"T.";
+		CHECK( tau::get(sample) == nullptr );
+	}
+
+	// ...while an ordinary literal must keep parsing.
+	//
+	// The exact boundary (2^54-1, the largest value node::data holds) is
+	// deliberately not asserted here: an offset that large is already
+	// rejected further down the spec machinery, independently of this
+	// range check, so it cannot distinguish the two behaviours.
+	TEST_CASE("an ordinary literal still parses") {
+		const char* sample =
+			"g[3](Y) := T."
+			"T.";
+		CHECK( tau::get(sample) != nullptr );
+	}
+}

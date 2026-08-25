@@ -845,7 +845,7 @@ void bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 	else if (n.h == F) m.clear(), m.emplace(n.v, B::one());
 	else if (!leaf(n.l))
 		get_one_zero(bdd_and(n.l, n.h), m),
-			m.empalce(n.v, get_elem(eval(n.l, m)));
+			m.emplace(n.v, get_elem(eval(n.l, m)));
 	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
 	else	get_one_zero(bdd_and(n.h, get_elem(n.l)), m),
 			m.emplace(n.v, compose(bdd_not(n.h), m));
@@ -1348,7 +1348,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			m.emplace(n.v, false);
 			if ((x = n.l) == F) return;
 		}
-		throw 0;
+		// BA1-23: reachable for x == F (the loop never runs); a bare
+		// `throw 0` was uncatchable as std::exception.
+		throw std::logic_error(
+			"bdd::get_one_zero called on F or malformed chain");
 	}
 
 	static bdd_ref compose(bdd_ref x, const std::map<int_t, bdd_ref>& m) {
@@ -1396,7 +1399,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			if ((x.first & e) == false) r.insert(x);
 			else {
 				r.emplace(x.first & p, x.second);
-				for (const Bool& y : x.second)
+				// BA1-22: iterate the split set s, not the
+				// clause's variable list (every int_t converted
+				// to Bool(true), a no-op AND).
+				for (const Bool& y : s)
 					r.emplace(x.first & y, x.second);
 			}
 		});

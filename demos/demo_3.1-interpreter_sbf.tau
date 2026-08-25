@@ -1,124 +1,105 @@
-# To run it you need to compile the project using release.sh (customized with
-# your settings if needed) and then execute the run.sh whithin the demo directory
-# as follows:
+# Executing specifications: streams over the sbf Boolean algebra.
 #
-# ./run.sh demo_3.1-interpreter_sbf.tau
-#
-# This demo should work under any *nix flavour due to the paths used for files.
-# To run it under windows you will need to change the paths to the files.
+# See demos/README.md for how to run this script.
 
-# This demo demonstrate the workings of the interpreter.
+# The run command, abbreviated r, executes a specification. It picks one program
+# out of the set of programs satisfying the specification and steps it: at each
+# time point, starting at 0, it reads a value for every input stream and then
+# writes a value to every output stream such that the specification stays
+# satisfied.
 
-# To run a tau program we need to define input and output variables.
-# If you attempt to run a program without defining the input and output variables,
-# the interpreter will throw an error.
+# Streams are declared before use, which is how their Boolean algebra and their
+# source or sink are chosen. An input stream reads from somewhere, an output
+# stream writes to somewhere:
 
-# The following program just echo the inputs to the outputs, but we have not
-# define inputs yet! So we would get an error.
+o1:sbf := out console.
 
-r i1[t] = o1[t]
+# Declaring a stream is optional. A stream variable that is never declared is
+# given the default type, tau, and the console, so a declaration is how you ask
+# for something else -- here, the sbf Boolean algebra rather than tau.
 
-# Let us define the inputs for variable i1 directly from the console (of type sbf)
-
-sbf i1 = console
-
-# However, we still need to define the output variable. If we try to run the above
-# program, we will still get an error.
-
-r i1[t] = o1[t]
-
-# Let us define the output variable as the console
-
-sbf o1 = console
-
-# In order to check the defined inputs and outputs, we can run the following command:
+# The definitions command lists the declarations in effect:
 
 defs
 
-# Now we can run the program:
+# The specification below has no input stream, so every step can be taken
+# without reading anything. Once the interpreter runs out of steps it must take,
+# it asks whether to continue: anything but q takes another step, and q ends the
+# run. Interactively that means pressing Enter; in a script it has to be a
+# non-empty line, because a blank one is skipped before the interpreter sees it,
+# so the demos below advance with a `# step` comment.
 
-r i1[t] = o1[t]
-0
-1
-0
-1
-0
+# This is the Fibonacci recurrence over the sbf Boolean algebra, with the first
+# two values pinned by initial conditions:
 
-# You would see the negations of you have seen previously in the console as that
-# is what we have defined as the output.
-#
-# Of course, we could also deal with more complex programs. The above examples are quite
-# simple but are provided to show the basic workings of the interpreter.
-# Let us consider the following example based on the Fibonacci sequence:
-
-r o1[t] = o1[t-1] + o1[t-2] && o1[0] = 1 && o1[1] = 1
-n
-n
-n
-n
-n
-n
+r o1[t] = o1[t-1] ^ o1[t-2] && o1[0] = 1 && o1[1] = 1
+# step
+# step
 q
 
-
-# We can also execute specifications involving inequalities:
+# A specification need not determine its outputs uniquely. Here the output has to
+# be neither empty nor everything, and the interpreter picks a witness:
 
 r o1[t] != 0 && o1[t] != 1
-n
-n
-n
-n
-n
-n
+# step
+# step
 q
 
-
-# and also include uninterpreted constants:
+# Uninterpreted constants are allowed. They are existentially quantified from
+# outside the specification, so before execution begins the interpreter assigns
+# each one a value and reports the choice it made:
 
 r o1[t] = <:a>
-n
-n
-n
-n
-n
-n
+# step
+# step
 q
 
+# Specifications may also use the function definitions of demo_1.3:
 
-# or use functions:
-
-f(x) := {a}:sbf x + {b}:sbf x'
-g(x) := {c}:sbf x + {d}:sbf x'
-r o1[t] = f(o1[t-1]) + g(o1[t-2])
-n
-n
-n
+f(x) := {a}:sbf x ^ {b}:sbf x'
+g(x) := {c}:sbf x ^ {d}:sbf x'
+r o1[t] = f(o1[t-1]) ^ g(o1[t-2])
+# step
+# step
 q
 
+# Note that the steps requested above are taken after the initial conditions have
+# been established.
 
-# Note that the 3 steps we are requesting are performed after the initial
-# conditions are set.
+# A stream can be attached to a file rather than the console. An input file holds
+# one value per line, and the run stops asking for input once the file is
+# exhausted -- so this program, which complements its input, runs the whole file
+# through without pausing:
 
-# Of course, we could define inputs for variable from a file (of type sbf)
-
-sbf i2 = ifile("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in")
+i2:sbf := in file("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in").
 r i2[t]' = o1[t]
-
-# We could also define the output as a file, and run a similar program again.
-# In order to check the result, you could run the following command, in another console:
-
-# cat /tmp/output_file1
-
-sbf o2 = ofile("/tmp/output_file1")
-r i1[t]' = o2[t]
-0
-1
-0
-1
-0
-
-# In the future we would provide more complex examples, but we
-# guess you have a taste of how the interpreter works, at least in simple cases.
-#
-
 q
+
+# Output streams work the same way. The run below reads the same file and writes
+# to another one instead of to the console, so check the result with
+# `cat /tmp/tau_demo_3.1.out` afterwards.
+
+# Note that a file stream is read once and is not rewound, so the run above has
+# already consumed i2. Reading the file again needs a fresh stream:
+
+i3:sbf := in file("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in").
+o2:sbf := out file("/tmp/tau_demo_3.1.out").
+r i3[t] = o2[t]
+q
+
+# Finally, an input stream can read from the console, in which case the
+# interpreter prompts for each value with the stream name, the time point and the
+# expected type. Note that a value for an sbf stream is written on its own, with
+# no trailing period -- the period is only used for tau streams, whose values are
+# whole specifications, as demo_3.2 shows.
+
+# Bear in mind that a specification asserted at every time point never stops
+# needing input, so it would consume the rest of this script. The one below is
+# constrained only at time point 0, which lets the run finish:
+
+i1:sbf := in console.
+r o1[0] = i1[0]
+1
+q
+
+quit

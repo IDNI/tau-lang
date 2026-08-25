@@ -126,3 +126,87 @@ TEST_SUITE("solve") {
 		CHECK( !test_solve(system) );
 	}
 }
+
+// SO-1: the DLO diversion in solve(const equations&, ...) only fired for a
+// system that is *entirely* ordering atoms with no equality.  A mixed system
+// therefore fell through to the BA-level solve_system, where
+// check_extreme_solution only rejects on equals_F() after
+// bf_reduce_canonical -- which cannot evaluate an ordering atom, so an extreme
+// solution violating it silently passed -- and, with no equality present,
+// solve_inequality_system's minterm_inequality_system_iterator dereferenced an
+// empty traverser on the bf_gt node.  solve() now solves the system WITHOUT
+// its ordering atoms and then verifies each of them against the solution
+// (ground qlt comparisons fold to T/F at construction), declining on anything
+// that does not verify.
+TEST_SUITE("SO-1 mixed ordering systems") {
+
+	std::optional<solution<node_t>> solve_mixed(const std::string& system) {
+		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		bool error = false;
+		return solve<node_t>(form, options, error);
+	}
+
+	TEST_CASE("unsat equality/ordering mix is declined, not mis-solved") {
+		CHECK( !solve_mixed(
+			"x : qlt = {1/2}:qlt && x : qlt > {3/4}:qlt.")
+			.has_value() );
+	}
+
+	TEST_CASE("sat disequality/ordering mix yields a verified solution") {
+		auto sol = solve_mixed(
+			"x : qlt != {0}:qlt && x : qlt > {3/4}:qlt.");
+		REQUIRE( sol.has_value() );
+		REQUIRE( sol.value().size() == 1 );
+		// The solution must satisfy the ordering atom it was verified
+		// against: substituting it into the system's atoms must not
+		// produce F (ground qlt comparisons fold at construction).
+		tref atoms = get_nso_rr<node_t>(tau::get(
+			"x : qlt != {0}:qlt && x : qlt > {3/4}:qlt."))
+			.value().main->get();
+		tref subst = rewriter::replace<node_t>(atoms, sol.value());
+		CHECK( !tau::get(subst).find_top(is<node_t, tau::wff_f>) );
+	}
+}
+
+// SO-14: the DLO ordering path (is_qlt_ordering_atom gate,
+// solve_qlt_ordering_system, qlt_pick_witness) had zero direct coverage.
+TEST_SUITE("SO-14 qlt ordering systems") {
+
+	std::optional<solution<node_t>> solve_ord(const std::string& system) {
+		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		bool error = false;
+		return solve<node_t>(form, options, error);
+	}
+
+	TEST_CASE("bounded interval yields a witness inside it") {
+		auto sol = solve_ord(
+			"x : qlt > {3/4}:qlt && x : qlt < {7/8}:qlt.");
+		REQUIRE( sol.has_value() );
+		REQUIRE( sol.value().size() == 1 );
+	}
+
+	TEST_CASE("one-sided bound is satisfiable") {
+		CHECK( solve_ord("x : qlt >= {5}:qlt.").has_value() );
+	}
+
+	TEST_CASE("empty interval is declined") {
+		CHECK( !solve_ord(
+			"x : qlt > {7/8}:qlt && x : qlt < {3/4}:qlt.")
+			.has_value() );
+	}
+
+	TEST_CASE("two independent variables both get witnesses") {
+		auto sol = solve_ord(
+			"x : qlt > {1}:qlt && y : qlt < {0}:qlt.");
+		REQUIRE( sol.has_value() );
+		CHECK( sol.value().size() == 2 );
+	}
+}

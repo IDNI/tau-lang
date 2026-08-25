@@ -33,12 +33,13 @@
  * @note Implementation details are provided in "bv_ba.tmpl.h".
  */
 
-#ifndef __IDNI__TAU__CVC5_H__
-#define __IDNI__TAU__CVC5_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__
 
 #include <cvc5/cvc5.h>
 
 #include "boolean_algebras/cvc5/cvc5.h"
+#include "boolean_algebras/cvc5/cvc5_options.h"
 #include "tau_tree.h"
 #include "splitter_types.h"
 
@@ -69,17 +70,104 @@ size_t get_bv_size(const tref t);
 /**
  * @brief Configures the given cvc5 solver instance for bit-vector logic.
  *
- * Sets the solver options to produce models and configures the logic to "BV" (Bit-Vector).
- * This function prepares the solver for solving bit-vector problems.
+ * Applies the option set selected by `cvc5_options`
+ * (boolean_algebras/cvc5/cvc5_options.h -- the considered sets, the measured
+ * matrix and the selection rationale live there), then the base
+ * configuration: model production, no proofs, logic "BV". Options must be
+ * set before `setLogic`, which is where cvc5 resolves its module defaults.
  *
  * @param solver Reference to a cvc5::Solver instance to be configured.
+ * @param decision_only The caller will only read the checkSat verdict --
+ * never a model (`getValue`) and never a `simplify` result. This admits
+ * satisfiability-preserving-only preprocessing (see
+ * `cvc5_option_set::decision_no_models`); passing it from a call site that
+ * later extracts a model throws in cvc5, and from a `simplify` site would
+ * silently corrupt the rewritten term, so it defaults to false.
  */
-inline void config_cvc5_solver(cvc5::Solver& solver) {
-	// configure the solver
-	solver.setOption("produce-models", "true");
+inline void config_cvc5_solver(cvc5::Solver& solver, bool decision_only = false) {
+	switch (cvc5_options) {
+	case cvc5_option_set::baseline: break;
+	case cvc5_option_set::decision_no_models: break; // handled below
+	case cvc5_option_set::miniscope_agg:
+		solver.setOption("miniscope-quant", "agg"); break;
+	case cvc5_option_set::ext_rewrite_quant:
+		solver.setOption("ext-rewrite-quant", "true"); break;
+	case cvc5_option_set::pre_skolem_agg:
+		solver.setOption("pre-skolem-quant", "agg"); break;
+	case cvc5_option_set::sygus_inst:
+		// sygus-inst refuses incremental solving (cvc5's API default);
+		// single-checkSat usage makes non-incremental safe, see below
+		solver.setOption("incremental", "false");
+		solver.setOption("sygus-inst", "true"); break;
+	case cvc5_option_set::mbqi:
+		solver.setOption("mbqi", "true"); break;
+	case cvc5_option_set::enum_inst:
+		solver.setOption("enum-inst", "true"); break;
+	case cvc5_option_set::cegqi_bv_ineq_keep:
+		solver.setOption("cegqi-bv-ineq", "keep"); break;
+	case cvc5_option_set::non_incremental:
+		// every solver instance here performs exactly ONE checkSat and
+		// no push/pop, so cvc5's incremental API default buys nothing
+		solver.setOption("incremental", "false"); break;
+	case cvc5_option_set::ext_rewrite_no_models:
+		solver.setOption("incremental", "false");
+		solver.setOption("ext-rewrite-quant", "true"); break;
+	case cvc5_option_set::combined_best:
+		solver.setOption("incremental", "false");
+		solver.setOption("ext-rewrite-quant", "true");
+		solver.setOption("cegqi-bv-ineq", "keep"); break;
+	}
+	const bool drop_models = decision_only
+		&& (cvc5_options == cvc5_option_set::decision_no_models
+		|| cvc5_options == cvc5_option_set::ext_rewrite_no_models
+		|| cvc5_options == cvc5_option_set::combined_best);
+	solver.setOption("produce-models", drop_models ? "false" : "true");
+	// NOTE: unconstrained-simp looked like the natural companion here but
+	// cvc5 rejects it outright in any logic admitting quantifiers ("Cannot
+	// use unconstrained simplification in this logic"), and the
+	// decision-only path is exactly the quantified one -- so the no-models
+	// sets reduce to dropping models and incrementality.
+	if (drop_models) solver.setOption("incremental", "false");
 	solver.setOption("produce-proofs", "false");
 	//solver.setOption("incremental", "true");
 	solver.setLogic("BV");
+}
+
+/**
+ * @brief Let counterexample-guided instantiation consider outer quantifiers.
+ *
+ * By default cvc5 only instantiates the *innermost* quantified subformula
+ * (`cegqi-innermost`), which collapses on interleaved `all`/`ex` over
+ * bitvectors: a 4-level alternating chain with a disjunctive body over
+ * `bv[8]` takes ~14s, and the `bv[16]`, `bv[32]`, `bv[64]` and 6-level
+ * variants do not finish at all. Turning it off decides every one of them
+ * in 13-194ms.
+ *
+ * The cost is confined and small: quantified multiplication is unchanged
+ * (1/4/16ms at `bv[8]`/`bv[16]`/`bv[32]`) and quantified division is the
+ * worst case at roughly 1.8x (25ms to 44ms at `bv[16]`, 133ms to 237ms at
+ * `bv[32]`) -- which is why `bv_formula_sat_status` applies this whenever
+ * the quantification actually alternates, rather than trying to also
+ * exclude arithmetic.
+ *
+ * @note `cegqi-nested-qe` looks like the option for this and is what cvc5's
+ * own command line derives a fast configuration from, but it does nothing
+ * on its own through the C++ API: setting it leaves the search unchanged
+ * (~13s) because the CLI's speedup actually comes from the `pre-skolem-quant`
+ * / `prenex-quant-user` defaults cvc5 derives *from* it, and deriving those
+ * by hand still only reaches ~200ms and does not scale past `bv[8]`.
+ *
+ * @warning Do not pair quantifier-strategy changes with a resource limit
+ * (`rlimit`/`rlimit-per`). A truncated instantiation search can report a
+ * plain `sat` instead of `unknown`: `--cegqi-nested-qe --rlimit-per=2000`
+ * calls the 4-level `bv[16]` chain **sat** when it is unsat (reproducible;
+ * two unbounded strategies agree on unsat). Callers treat a definite answer
+ * as truth, so a bounded run here would silently corrupt results.
+ *
+ * @param solver Reference to a cvc5::Solver instance to be reconfigured.
+ */
+inline void config_cvc5_solver_alternating_quantifiers(cvc5::Solver& solver) {
+	solver.setOption("cegqi-innermost", "false");
 }
 
 /**
@@ -161,11 +249,66 @@ bool is_bv_formula_sat(tref form);
  * every variable must have an explicitly sized bitvector type. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
  *
+ * @note Also rejects `ref` nodes, formulas whose variables lack an explicit
+ * bitwidth, and formulas carrying a non-bv-typed ba_constant (e.g. a `qlt`
+ * constant like `{1/3}:qlt`): such a constant can appear in an otherwise
+ * bv-only clause once its variable has already been substituted by a
+ * concrete value (e.g. during interpretation), so checking only `variable`
+ * nodes is not enough to catch the mixed-type case.
+ *
  * @param form The formula to check
  * @return true if all variables are explicitly sized bitvectors
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form);
+
+/**
+ * @brief Does @p form carry a constant (or typed `T`/`F`) of a Boolean algebra
+ * other than the bitvector family?
+ *
+ * Such content is invisible to `bv_eval_node`, so no bv scope sharing a
+ * formula with it can be decided by cvc5 -- callers use this to tell "the
+ * solver owns this bv content" apart from "nothing here will ever decide it".
+ * Untyped `T`/`F` carries no algebra of its own and does not count.
+ *
+ * @param form The formula to scan
+ * @return true if a foreign-algebra constant occurs in @p form
+ */
+template <NodeType node>
+bool has_foreign_ba_constant(tref form);
+
+/**
+ * @brief Does @p form contain the residue of a blasted bitvector predicate?
+ *
+ * `bit` (bv_predicate_blasting_logic.tmpl.h) extracts bit @e i of an operand as
+ * `operand & bit_mask_cte(i)`, a conjunction with a bitvector constant having
+ * exactly one bit set. Every blasted comparison and every blasted arithmetic
+ * constraint is built out of those bit extractions, so a one-hot masking
+ * conjunction is what blasting leaves behind and nothing else in the pipeline
+ * produces in bulk.
+ *
+ * `resolve_quantifiers` uses this to keep its "ask the solver before blasting"
+ * rule true across passes: it queries cvc5 for a bv scope because cvc5 handles
+ * bitvector arithmetic natively, but `eliminate_bv_and_quantifiers` runs
+ * `resolve_quantifiers` three times and is itself re-entered from the
+ * interpreter's fixpoint loops, so a later pass can meet a scope an earlier one
+ * already blasted. Only its *open*-scope branch screens on this, because only
+ * that branch synthesises the universal block which -- wrapped around the
+ * auxiliary quantifiers blasting introduced -- gives cvc5's
+ * counterexample-guided instantiation the alternation it does not terminate on.
+ * See that branch for the measurements and the reproducing spec.
+ *
+ * A hand-written `x & { 1 }:bv[N]` matches too. That costs nothing beyond the
+ * solver shortcut for that one open scope -- blasting, the same fallback taken
+ * for any scope the solver cannot own, still applies, and by the caller's own
+ * reasoning blasting "neither closes a formula nor makes this check succeed
+ * later", so no scope that cvc5 would have decided is lost.
+ *
+ * @param form The formula to scan
+ * @return true if a one-hot bitvector masking conjunction occurs in @p form
+ */
+template <NodeType node>
+bool has_blasting_residue(tref form);
 
 /**
  * @brief Checks whether a given bit-vector formula is valid.
@@ -191,19 +334,7 @@ bool is_bv_formula_valid(tref form);
 template <NodeType node>
 bool is_bv_formula_unsat(tref form);
 
-/**
- * @brief Solves a Boolean algebra problem over bit-vectors using the provided CVC5 solver.
- *
- * This function attempts to find a solution for the given Boolean formula represented by `form`.
- * It utilizes the specified CVC5 solver instance to perform the computation.
- *
- * @param form The Boolean formula to be solved, represented as a `tref`.
- * @param solver Reference to a CVC5 solver instance used for solving the formula.
- * @return An optional solution of type `solution<node>`. If a solution exists, it is returned;
- *         otherwise, `std::nullopt` is returned.
- */
-template <NodeType node>
-std::optional<solution<node>> solve_bv(tref form, cvc5::Solver& solver);
+// (BA1-16: never-defined solve_bv(tref, cvc5::Solver&) declaration removed.)
 
 /**
  * @brief Solves a boolean algebra problem over bit-vectors.
@@ -257,13 +388,45 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
+// (BA1-16: four never-defined declarations removed: solve_bv(tref,Solver&),
+// canonize_associative_commutative_symbol, is_associative_and_commutative,
+// get_inv_sym.)
 
-/** @brief Normalise a BV term via cvc5's simplifier. */
+/** @brief Normalise a BV term via cvc5's simplifier.
+ *
+ * One long-lived solver plus a result cache: constructing a solver per
+ * call pays full engine initialization (theory stack + statistics
+ * registry) on its first simplify -- sampled as the dominant cost of a
+ * bv[64] interpreter step once the spec grows past a few thousand printed
+ * chars, since the constant-folding term hooks route every rebuilt bv
+ * operation through here. simplify() adds no assertions, so solver reuse
+ * is state-safe, and it is deterministic for a fixed option set (options
+ * are fixed before the first query, see cvc5_options.h), so the cache is
+ * sound. The solver is deliberately leaked: a static Solver object could
+ * destruct after the global cvc5_term_manager it references (see at_exit
+ * in main.cpp for the cleanup-order minefield).
+ *
+ * NOTE (BA1-17): an earlier attempt at a plain static Solver here (owned,
+ * not leaked) SIGSEGVed Release LTL execution mid-run (test_ltl_correctness
+ * LT2-EXEC-03, test_ltl_qlt_bv); the deliberate leak above avoids the
+ * destruction-order interaction. Do not convert it back to an owned
+ * static object. */
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
-	cvc5::Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
+#ifdef TAU_CACHE
+	static std::unordered_map<cvc5::Term, cvc5::Term> cache;
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	static cvc5::Solver* solver = [] {
+		auto* s = new cvc5::Solver(cvc5_term_manager);
+		config_cvc5_solver(*s);
+		return s;
+	}();
 	// Use general simplification procedure
-	return solver.simplify(fm);
+	cvc5::Term res = solver->simplify(fm);
+#ifdef TAU_CACHE
+	cache.emplace(fm, res);
+#endif // TAU_CACHE
+	return res;
 }
 
 /** @brief Return `true` if @p fm is the all-zeros bitvector constant. */
@@ -320,17 +483,9 @@ template<NodeType node> tref simplify_bv_symbol(tref symbol);
 /** @brief Apply all BV term-level simplifications to @p term. */
 template<NodeType node> tref simplify_bv_term(tref term);
 
-/** @brief Canonise an associative/commutative symbol node, excluding @p excluded nodes. */
-template <typename ...BAs> requires BAsPack<BAs...>
-tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
-
-/** @brief Return `true` if @p symbol is an associative and commutative BV operator. */
-template <typename ...BAs> requires BAsPack<BAs...>
-bool is_associative_and_commutative(size_t symbol);
-
-/** @brief Return the inverse symbol id (e.g. nand → and) for @p symbol. */
-template <typename ...BAs> requires BAsPack<BAs...>
-size_t get_inv_sym(size_t symbol);
+// (BA1-16: three never-defined declarations removed here:
+// canonize_associative_commutative_symbol, is_associative_and_commutative,
+// get_inv_sym.)
 
 
 // -----------------------------------------------------------------------------
@@ -346,4 +501,4 @@ size_t get_inv_sym(size_t symbol);
 #include "boolean_algebras/bv_ba_solver.tmpl.h"
 #include "boolean_algebras/bv_ba_helpers.tmpl.h"
 
-#endif // __IDNI__TAU__CVC5_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__

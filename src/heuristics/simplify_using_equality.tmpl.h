@@ -413,7 +413,26 @@ tref simplify_using_equality(tref fm) {
 	auto visit = [](tref n) {
 		if (is_quantifier<node>(n)) return false;
 		if (is_temporal_quantifier<node>(n)) return false;
-		return is_formula<node>(n);
+		if (!is_formula<node>(n)) return false;
+		// `f` models three shapes: a conjunction, whose conjuncts are
+		// facts of the current scope; a disjunction, which opens a new
+		// scope; and an atomic formula. A sub-formula of anything else
+		// is not a fact of the enclosing scope, so descending into one
+		// would register its equalities in the wrong scope -- an
+		// implication's antecedent would become an assertion, silently
+		// rewriting and dropping the sibling conjuncts (issue #69).
+		// `to_nnf` above is what normally rules these out; declining
+		// here keeps a gap in it costing precision, not soundness.
+		if (is<node>(n, tau::wff) && tau::get(n).has_child())
+			switch (tau::get(n)[0].value.nt) {
+			case tau::wff_imply:
+			case tau::wff_rimply:
+			case tau::wff_equiv:
+			case tau::wff_xor:
+			case tau::wff_conditional: return false;
+			default: break;
+			}
+		return true;
 	};
 	fm = pre_order<node>(fm).apply(f, visit, up);
 	DBG(LOG_DEBUG << "simplify_using_equality result: " << LOG_FM(fm) << "\n";)

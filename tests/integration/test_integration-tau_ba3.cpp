@@ -51,9 +51,11 @@ TEST_SUITE("allowing unresolved rr's in normalization") {
 
 	TEST_CASE("ex x f[0](x) && x != 0.") {
 		const char* sample = "ex x f[0](x) && x != 0.";
+		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( normalize_and_check(sample, strings{
-			"ex b1 b1 != 0 && f[0](b1)",
 			"ex b1 f[0](b1) && b1 != 0",
+			"ex b1 b1 != 0 && f[0](b1)",
 		}) );
 	}
 }

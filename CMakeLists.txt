@@ -15,6 +15,13 @@ endif()
 
 option(TAU_USE_CCACHE              "Use ccache when building"              ON)
 if(TAU_USE_CCACHE)
+	# include(<module>), not include(<file>): an argument carrying the .cmake
+	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
+	# is never looked up on CMAKE_MODULE_PATH, which is where use-ccache.cmake
+	# actually lives (external/parser/cmake). With the extension this failed
+	# with "include could not find requested file: use-ccache.cmake" on every
+	# reconfigure whenever TAU_USE_CCACHE was ON -- latent until something
+	# forced a regenerate, e.g. adding a test target.
 	include(use-ccache)
 endif()
 
@@ -59,11 +66,6 @@ option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
-
-# Load local cmake settings
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-endif()
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 if (TAU_BUILD_JOBS STREQUAL "")
@@ -134,6 +136,11 @@ if(TAU_BUILD_REPL_TESTS)
 	set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
+# SW-20: the benchmark tests run the executable through valgrind.
+if(TAU_BUILD_BENCHMARK)
+	set(TAU_BUILD_EXECUTABLE ON)
+endif()
+
 if(TAU_BUILD_BINDING_PYTHON)
 	set(TAU_BUILD_STATIC_LIBRARY ON)
 	set(TAU_BUILD_PIC ON)
@@ -151,7 +158,7 @@ if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 		set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
-if(TAU_WINDOW_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
+if(TAU_WINDOWS_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
 	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
 endif()
 
@@ -181,8 +188,10 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
 	set(TAU_BUILD_UNIT_TESTS ON)
 	set(TAU_BUILD_INTEGRATION ON)
-	set(TAU_BUILD_API_TESTS OFF)
-	set(TAU_BUILD_REPL_TESTS OFF)
+	set(TAU_BUILD_API_TESTS ON)
+	# repl tests drive the `tau` executable, so it has to be built too
+	set(TAU_BUILD_REPL_TESTS ON)
+	set(TAU_BUILD_EXECUTABLE ON)
 	set(TAU_BUILD_BENCHMARK OFF)
 endif()
 
@@ -332,6 +341,7 @@ if(TAU_BUILD_BOOST)
 	execute_process(
 		COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY # SW-12: fail here, not at find_package
 	)
 endif()
 
@@ -374,9 +384,13 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
+	# Keep this list in sync with scripts/regen.sh — every parser/*.tgf
+	# with a checked-in *_parser.generated.h must appear in both.
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/sbf.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/bitvector.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/qint.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/qlt.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/hsb.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/nlang.tgf")
 endif()
@@ -424,7 +438,8 @@ add_subdirectory("src")
 # Testing
 #
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
- OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS)
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS
+ OR TAU_BUILD_BENCHMARK)
 	message(STATUS "Building tests")
 	include(CTest)
 	add_subdirectory(tests)

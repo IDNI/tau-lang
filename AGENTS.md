@@ -17,20 +17,22 @@ to `build/<preset>` (e.g. `build/debug`, `build/release`).
 ```bash
 ./dev preset <PRESET> [run] [<CMAKE_OPTIONS>]
 
-./dev preset debug                     # Debug build → build/debug/
-./dev preset release                   # Release build → build/release/
-./dev preset debug-tests               # Debug build with all tests
+./dev preset devel                     # Fast optimized build → build/devel/  (use for quick checks)
+./dev preset devel-tests               # Fast optimized build with all tests
+./dev preset release                   # Release build → build/release/      (use for full verification)
 ./dev preset release-tests             # Release build with all tests
-./dev preset debug-tau                 # Debug build of the tau CLI
+./dev preset devel-tau                 # Fast optimized build of the tau CLI
 ./dev preset release-tau               # Release build of the tau CLI
 ./dev preset relwithdebinfo            # → build/relwithdebinfo/
-./dev preset debug-clang               # Clang build → build/debug-clang/
-./dev preset debug-asan                # Debug + AddressSanitizer
 ./dev clean [all]                      # Remove build dirs (all: also build/ preset trees)
 ./dev regen                            # Regenerate parsers from .tgf grammar files
 ```
 
-Other presets: `{debug,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau,all}`,
+Debug (`-O0`) presets (`debug`, `debug-tests`, `debug-clang`, `debug-asan`, …)
+exist but are ONLY for gdb debugging sessions — never use them for building,
+verification, or test runs.
+
+Other presets: `{devel,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau,all}`,
 `coverage`, `release-packages-{deb,rpm}`, `release-mingw*`. Default preset is
 `release` if omitted.
 
@@ -54,19 +56,19 @@ Key CMake options (forwarded from anywhere on the command line):
 ## Running Tests
 
 ```bash
-./dev preset debug-tests run           # Build + run all tests in build/debug/
-./dev preset release-tests run         # Build + run all tests in build/release/
+./dev preset devel-tests               # Fast check: build tests in build/devel/ (run single tests while iterating)
+./dev preset release-tests run         # Full verification: build + run all tests in build/release/
 
 # Run tests matching a pattern (test presets work from the project root)
-ctest --preset debug-tests -R <pattern> --output-on-failure
+ctest --preset devel-tests -R <pattern> --output-on-failure
 ctest --preset release-tests -R <pattern> --output-on-failure
 
 # Compile and run a single test by name (auto-selects test type)
 ./dev test <TEST_NAME>
 
-# Run a single compiled debug test binary directly
-./build/debug/tests/unit/test_bool
-./build/debug/tests/integration/test_integration-satisfiability1
+# Run a single compiled devel test binary directly
+./build/devel/tests/unit/test_bool
+./build/devel/tests/integration/test_integration-satisfiability1
 
 # Run a single compiled release test binary directly
 ./build/release/tests/unit/test_bool
@@ -75,8 +77,12 @@ ctest --preset release-tests -R <pattern> --output-on-failure
 
 Tests use the **doctest** framework (`src/doctest.h`). Test organization uses `TEST_SUITE` / `TEST_CASE` macros. Test helper headers live in `tests/` (e.g., `test_helpers.h`, `test_tau_helpers.h`, `test_integration-satisfiability_helper.h`).
 
-Always follow those guidelines using `./dev` and `ctest` run tests.
-Always run tests in debug. Always run tests in release before pushing.
+Always follow those guidelines using `./dev` and `ctest` to run tests.
+Workflow: `devel` is only for a quick build check and for iterating during
+development (single tests). When the work is finished, run the FULL test
+suite once in `release` before committing — do not run the full suite in
+devel first. Never use debug (`-O0`) builds or test runs for verification;
+debug exists only for gdb.
 
 ## Architecture
 

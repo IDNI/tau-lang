@@ -113,8 +113,12 @@ struct hsb_halfspace {
 /// Index 0 is reserved (hsb_node uses data = 0 as the "no data" sentinel):
 /// real halfspaces are 1-indexed; slot 0 holds an inert dummy entry.
 struct hsb_halfspace_pool {
-	/// Insert h (after normalizing) and return its pool index (never 0).
-	/// Returns an existing index if an equal normalized halfspace is found.
+	/// Insert h AS-IS and return its pool index; an existing index is
+	/// returned only for a structurally equal halfspace. NOTE (BA1-19):
+	/// no normalization happens here -- normalize_all_leaves runs later,
+	/// so scalar multiples of one constraint (x[0]<0 vs 2x[0]<0) intern
+	/// separately and the pool-index complement shortcuts miss them
+	/// (semantics stay correct via the LRA fallback; trees just grow).
 	static size_t insert(const hsb_halfspace& h);
 
 	/// Retrieve a halfspace by pool index.

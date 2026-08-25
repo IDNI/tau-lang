@@ -1,32 +1,42 @@
 #!/bin/bash
+# Regenerate one parser/<name>_parser.generated.h from parser/<name>.tgf.
+# Every failure path below exits non-zero: a silent "Generation done" over a
+# missing generator is how stale generated parsers used to ship unnoticed.
 
 TGF_FILE=$1
 
 if [[ -z "$TGF_FILE" ]]; then
-	echo "provide an existing TGF file path"
+	echo "provide an existing TGF file path" >&2
+	exit 1
+fi
+
+if [[ ! -f "$TGF_FILE" ]]; then
+	echo "ERROR: no such TGF file: $TGF_FILE" >&2
 	exit 1
 fi
 
 TGF_DIR="./external/parser"
 TGF="$TGF_DIR/build/release/tgf"
 
-if [[ ! -f "$TGF" ]]; then
+if [[ ! -x "$TGF" ]]; then
 	echo "tgf tool not built. Building..."
-	D=`pwd`
-	cd "$TGF_DIR" || exit 1
-	./dev preset release-tgf
-	cd "$D" || exit 1
+	if ! (cd "$TGF_DIR" && ./dev preset release-tgf); then
+		echo "ERROR: failed to build the tgf generator in $TGF_DIR;" \
+			"parsers were NOT regenerated" >&2
+		exit 1
+	fi
 fi
 
-if [[ ! -f "$TGF" ]]; then
-	echo "tgf tool missing after build: $TGF" >&2
+if [[ ! -x "$TGF" ]]; then
+	echo "ERROR: tgf generator missing at $TGF after the build attempt;" \
+		"parsers were NOT regenerated" >&2
 	exit 1
 fi
 
 echo "Generating parser from $TGF_FILE ..."
 # --header-only false: table goes to a shared TU, never inline in the header
-if ! $TGF "$TGF_FILE" gen --header-only false; then
-	echo "Generation FAILED for $TGF_FILE" >&2
+if ! "$TGF" "$TGF_FILE" gen --header-only false; then
+	echo "ERROR: tgf failed to generate a parser from $TGF_FILE" >&2
 	exit 1
 fi
 echo "Generation done"

@@ -21,6 +21,15 @@
 
 namespace idni::tau_lang {
 
+/// Enable the semantic ("optimal mode", pwr-ltl.tex §11) fallback of the
+/// temporal pointwise revision: when the syntactic revision drops a spec
+/// clause, re-derive it from Algorithm D's winning region. OFF by default
+/// (PW-N4): that route reaches the parity-game solver whose dead-end
+/// override is known to under-correct (AL-R1), so a wrong winning region
+/// would silently shape the revised spec. A runtime parameter by policy --
+/// `--pwr-semantic` on the CLI, `api::set_pwr_semantic_fallback`.
+inline bool pwr_semantic_fallback = false;
+
 // ---------------------------------------------------------------------------
 // Build the Win formula from a winning region.
 //
@@ -86,8 +95,13 @@ tref build_win_formula(
 // ---------------------------------------------------------------------------
 // Build the Win_0 formula (initial state entry condition).
 //
-// Win_0 = ∨ over all ρ₀ such that (q_init, ρ₀) ∈ W of the data-atom
-// condition for ρ₀.
+// Win_0 = the data-atom condition of the patterns reachable from THE fixed
+// initial memory ρ₀ = result.init_rho, provided (q_init, ρ₀) ∈ W.
+//
+// LG-12: this used to take the union over ALL winning ρ₀ — the ∃ρ₀ reading
+// whose phantom initial memories the fixed convention (F) retired (see
+// alg_d::initial_memory).  result.init_rho is -1 when unrealizable (or on a
+// hand-built result that never ran the solver), which yields nullptr here.
 // ---------------------------------------------------------------------------
 
 template <NodeType node>
@@ -100,20 +114,15 @@ tref build_win0_formula(
 	const int K = result.K;
 	const int T1_size = result.T1_size;
 	const int q_init = result.synth_game.init;
+	const int rho0 = result.init_rho;
+	if (rho0 < 0 || rho0 >= T1_size) return nullptr;
+	if (!result.winning_region.count(q_init * T1_size + rho0))
+		return nullptr;
 
-	// Collect initial ρ₀ values where (q_init, ρ₀) ∈ W.
-	// Initial states are always base states (index < base_n).
-	std::set<int> init_rhos;
-	for (int rho0 = 0; rho0 < T1_size; ++rho0) {
-		int s0 = q_init * T1_size + rho0;
-		if (result.winning_region.count(s0))
-			init_rhos.insert(rho0);
-	}
-
-	// Collect D-patterns reachable from initial winning ρ₀ values.
+	// Collect D-patterns reachable from the fixed initial ρ₀.
 	std::set<int> init_patterns;
 	for (int t = 0; t < (int)T3.size(); ++t) {
-		if (init_rhos.count(T3[t].pos_m))
+		if (T3[t].pos_m == rho0)
 			init_patterns.insert(type_A[t]);
 	}
 
@@ -167,52 +176,64 @@ tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
 	if (has_input) return nullptr;
 	if (!is_algorithm_a_applicable<node>(atoms)) return nullptr;
 
+	// LS-2: the encoding below is Algorithm A's T_3 encoding, but it used to
+	// run WITHOUT either of the two soundness guards `solve_ltl_aba` applies
+	// to that same encoding.  Both matter here for the same reasons:
+	//
+	//   * an atom no T_3 type can classify (a `{top}:qlt` / `{bot}:qlt`
+	//     constant) gives `qlt_atom_holds_in_type3 == nullopt` for every
+	//     type, and the `h != false` test below maps nullopt to "the atom
+	//     holds" — so the atom is silently asserted rather than left out;
+	//   * two or more distinct output variables share the single Y slot, so
+	//     `o1 < c && o2 > c` collapses to a constraint on one witness.
+	//
+	// Either way `type_A` and the winning region are garbage, and the final
+	// `is_tau_formula_sat(theta)` does not catch it: that only checks that θ
+	// is realizable, not that G(Win) encodes the real winning region.  Fall
+	// back to fast mode instead.
+	if (!alg_a_can_classify<node>(clause_and_update, atoms)) {
+		LOG_DEBUG << "[semantic_pwr] atom outside T_3 (top/bot qlt "
+		             "constant?) — optimal mode not applicable";
+		return nullptr;
+	}
+	if (size_t n_out = count_distinct_output_vars<node>(atoms); n_out > 1) {
+		LOG_DEBUG << "[semantic_pwr] " << n_out << " output variables — "
+		             "Algorithm A's single Y/M slot would conflate them; "
+		             "optimal mode not applicable";
+		return nullptr;
+	}
+
 	// Collect qlt constants and enumerate T3 types.
 	auto constants = omcat::collect_qlt_constants<node>(clause_and_update);
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int K = (int)atoms.size();
 	int T1_size = 2 * (int)constants.size() + 1;
-	if (T1_size <= 0 || K <= 0 || K > 20) return nullptr;
-
-	// Compute D-bitmask for each T3 type.
-	std::vector<int> type_A(T3.size(), 0);
-	for (int i = 0; i < K; ++i) {
-		for (int t = 0; t < (int)T3.size(); ++t) {
-			auto h = qlt_atom_holds_in_type3<node>(
-				atoms[i].first, T3[t], constants);
-			if (h != false) type_A[t] |= (1 << i);
-		}
+	// LS-11: named cap + a log line when it trips (the silent gate hid
+	// why optimal mode never ran for >= 21 atoms). Promote to a runtime
+	// parameter when that mechanism lands (same family as issue #36).
+	constexpr int semantic_pwr_max_atoms = 20;
+	if (T1_size <= 0 || K <= 0 || K > semantic_pwr_max_atoms) {
+		if (K > semantic_pwr_max_atoms)
+			TAU_LOG_DEBUG << "[semantic_pwr] optimal mode skipped: "
+				<< K << " atoms exceed the cap ("
+				<< semantic_pwr_max_atoms << ")";
+		return nullptr;
 	}
 
-	// Build propositional skeleton φ*(D_i).
-	std::string phi_star = ltl_skeleton<node>(clause_and_update, atoms);
-	for (int i = K; i-- > 0; ) {
-		std::string fp = "p" + std::to_string(i);
-		std::string td = "d_" + std::to_string(i);
-		size_t pos = 0;
-		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-			size_t end = pos + fp.size();
-			bool l_ok = pos == 0
-				|| (!std::isalnum((unsigned char)phi_star[pos-1])
-				    && phi_star[pos-1] != '_');
-			bool r_ok = end >= phi_star.size()
-				|| (!std::isalnum((unsigned char)phi_star[end])
-				    && phi_star[end] != '_');
-			if (l_ok && r_ok) {
-				phi_star.replace(pos, fp.size(), td);
-				pos += td.size();
-			} else {
-				pos = end;
-			}
-		}
-	}
+	// Compute D-bitmask for each T3 type and build the propositional
+	// skeleton φ*(D_i) (LS-12: shared helpers in ltl_aba_builders.tmpl.h).
+	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
+	std::string phi_star = rename_skeleton_props_to_d(
+		ltl_skeleton<node>(clause_and_update, atoms), K);
 
 	LOG_DEBUG << "[semantic_pwr] trying optimal mode: K=" << K
 	          << " T1=" << T1_size << " phi_star=" << phi_star;
 
-	// Run Algorithm D (full) to get winning region.
+	// Run Algorithm D (full) to get winning region.  LG-12: fixed initial
+	// memory ρ₀ = type_of(0), the interpreter's lookback-at-t=0 convention.
 	auto alg_result = alg_d::solve_algorithm_d_full(
-		phi_star, T1_size, T3, type_A, K);
+		phi_star, T1_size, T3, type_A, K,
+		alg_d::initial_memory(constants));
 
 	if (!alg_result.realizable) {
 		LOG_DEBUG << "[semantic_pwr] unrealizable via Algorithm D";

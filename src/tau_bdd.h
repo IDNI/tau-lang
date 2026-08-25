@@ -164,8 +164,10 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/** @brief NOT of @p x (flips the output inverter). */
 	static ref bdd_not(ref x);
 
-	/** @brief Existentially quantify variables @p v from @p x under @p o. */
-	static ref bdd_ex(ref x, trefs& v, const order& o);
+	/** @brief Existentially quantify variables @p v from @p x under @p o.
+	 *  @p v is taken by value: the implementation sorts it, and callers
+	 *  (including tau_term_bdd_handle::bdd_ex) hold it by const reference. */
+	static ref bdd_ex(ref x, trefs v, const order& o);
 	/** @brief Universally quantify variables @p v from @p x under @p o. */
 	static ref bdd_all(ref x, trefs v, const order& o);
 	/** @brief Apply a sequence of mixed quantifiers @p v to @p x under @p o. */
@@ -246,9 +248,13 @@ struct tau_term_bdd_handle {
 
 	/** @brief Build a BDD handle from Tau formula @p term using variable order @p o. */
 	static term_handle build(tref term, const order& o);
-	/** @brief Convert a handle back to a Tau tree node with type @p term_type; result cached in @p U. */
+	/** @brief Convert a handle back to a Tau tree node with type @p term_type.
+	 * Each call mints a fresh BDD_ID node and registers the tau-node → handle
+	 * mapping in @p U for later lookup; nothing is deduplicated (converting
+	 * the same handle twice yields two distinct tau nodes). */
 	static tref convert_to_tau_node(term_handle handle, size_t term_type);
-	/** @brief Build a Tau node from @p term using @p o; result cached in @p U. */
+	/** @brief Build a Tau node from @p term using @p o; registers the mapping
+	 * in @p U (see the handle overload -- no deduplication). */
 	static tref convert_to_tau_node(tref term, const order& o);
 	/** @brief Retrieve the BDD handle for an existing Tau BDD node @p tau_node. */
 	static term_handle convert_to_handle(tref tau_node);

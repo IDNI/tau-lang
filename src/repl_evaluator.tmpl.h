@@ -7,8 +7,6 @@
 
 namespace idni::tau_lang {
 
-using namespace cvc5;
-
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
 							term::color::BRIGHT)
@@ -148,6 +146,27 @@ tref repl_evaluator<BAs...>::get_wff(tref n) const {
 	return get_(tau::wff, n, false);
 }
 
+// Puts an expression into the type-annotated form that substitution matching
+// compares against.
+//
+// Matching is sensitive to the resolved BA type id on each node. A history
+// entry produced by dnf/cnf/normalize has already been through inference and
+// carries those ids, whereas an expression parsed straight off the command line
+// carries none, so the two never match even when they print identically. Both
+// sides therefore have to be inferred before they are compared.
+//
+// Inference is idempotent on an already inferred tree, so this is safe to apply
+// to every argument. An expression inference rejects is returned unchanged
+// rather than turned into an error, which keeps this from failing substitutions
+// that used to work.
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
+	if (!n) return n;
+	tref inferred = tau_api::infer(n);
+	return inferred ? inferred : n;
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_any(tref arg) const {
@@ -162,8 +181,8 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
 	spec.add(arg);
-	for (tref d : rr_defs) spec.add(d);
-	for (tref d : io_defs) spec.add(d);
+	for (const htref& d : rr_defs) spec.add(d->get());
+	for (const htref& d : io_defs) spec.add(d->get());
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr) {
 		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
@@ -342,6 +361,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
+		in = infer_for_match(in), thiz = infer_for_match(thiz),
+			with = infer_for_match(with);
 		// strip bf of variables so we match also quantifiers
 		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
 			thiz = tau::trim(thiz),	with = tau::trim(with);
@@ -362,6 +383,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
+	in = infer_for_match(in), thiz = infer_for_match(thiz),
+		with = infer_for_match(with);
 	// strip bf of variables so we match also quantifiers
 	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
 		thiz = tau::trim(thiz),	with = tau::trim(with);
@@ -393,6 +416,7 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
+	if (reject_ctl_star_if_disabled(value)) return nullptr;
 	measuring m;
 	tref r;
 	switch (type) {
@@ -408,7 +432,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
+	if (auto value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::eliminate_quantifiers(m, value);
 	return benchmarks(m), r;
 }
@@ -458,12 +483,24 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		value = get_any(fc | tt::ref);
 
 	if (value) {
+		if (reject_ctl_star_if_disabled(value)) return;
 		DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
-		// tau_spec path resolves io_vars for LTL and safety formulas.
+		// Build a tau_spec from the formula and REPL-defined io/rr defs,
+		// mirroring get_applied(). This uses the tau_spec path which correctly
+		// handles io_var resolution for LTL and safety formulas.
 		tau_spec<node> spec;
 		spec.add(value);
-		for (tref d : rr_defs) spec.add(d);
-		for (tref d : io_defs) spec.add(d);
+		// IN-N5: definition bodies are conjoined into the spec; gate them
+		// like the main formula, or A/E smuggled through a def bypass the
+		// fragment check.
+		for (const htref& d : rr_defs) {
+			if (reject_ctl_star_if_disabled(d->get())) return;
+			spec.add(d->get());
+		}
+		for (const htref& d : io_defs) {
+			if (reject_ctl_star_if_disabled(d->get())) return;
+			spec.add(d->get());
+		}
 
 		auto maybe_i = tau_api::get_interpreter(m.part(), spec);
 		if (!maybe_i) return;
@@ -506,11 +543,23 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 
 	tref value = get_any(n[1].get());
 	if (!value) return;
+	// IN-N5: `ltl` was the one formula command with no fragment gate.
+	if (reject_ctl_star_if_disabled(value)) return;
 
 	t.start();
 	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
 
-	ltl_explain<node>(value, std::cout);
+	// IN-R4: the synthesis backend reports "no verdict" by throwing;
+	// nothing above this frame catches it, so a slow or missing ltlsynt
+	// (or a refused CTL* placement) used to terminate the REPL.
+	try {
+		ltl_explain<node>(value, std::cout);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, timed "
+			"out or refused the formula (" << e.what()
+			<< "); realizability could not be decided";
+		error = true;
+	}
 	benchmarks(m, t);
 }
 
@@ -533,7 +582,22 @@ void repl_evaluator<BAs...>::continue_running(
 		// time_point advances iff a step produced output; api::step returns
 		// nullopt both when it needs input and when auto_continue is false.
 		const size_t tp_before = running->interp.time_point;
-		auto maybe_outputs = tau_api::step(step_m, running->interp);
+		// IN-R4: a mid-run pointwise-revision update can reach ltlsynt
+		// (through update() -> pointwise_revision), whose failures are
+		// thrown; end the session with a diagnostic instead of the
+		// process.
+		decltype(tau_api::step(step_m, running->interp)) maybe_outputs;
+		try {
+			maybe_outputs = tau_api::step(step_m, running->interp);
+		} catch (const ltl_synthesis_error& e) {
+			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, "
+				"timed out or refused the formula during this step ("
+				<< e.what() << "); ending the run";
+			running->m.parts.pop_back();
+			running.reset();
+			error = true;
+			return;
+		}
 		// copy this step's timing before dropping the node (step_m is a
 		// reference into m.parts that pop_back() invalidates)
 		measuring step_m_copy = step_m;
@@ -672,7 +736,9 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	// bf_t/bf_f carry no BA type; serialize_constant renders them as the
-	// type's one/zero. type_id is the fallback for untyped variables.
+	// type's one/zero (see the ba_constant case in tau_tree_printers). This
+	// also covers the general ba_constant case, unlike a narrower dedicated
+	// bf_t/bf_f branch; type_id is the fallback for untyped variables.
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	std::cout << "solution: {\n";
@@ -686,8 +752,8 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 		std::stringstream ss;
 		if (!serialize_constant<node>(ss, value, t))
 			print_binding<node>(std::cout, var, value);
-		else std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< ss.str() << "}" << ba_types<node>::name(t) << "\n";
+		else std::cout << "\t" << tau::get(var).to_str() << " := { "
+			<< ss.str() << " }" << ba_types<node>::name(t) << "\n";
 	}
 	std::cout << "}\n";
 }
@@ -739,15 +805,16 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	auto check = get_type_and_arg(arg);
-	if (!check) return;
-	auto [_, value] = check.value();
+	tref value = get_any(arg);
+	if (!value) return;
 	measuring m;
 	auto solution = tau_api::solve(m, value,
 		get_solver_cmd_mode<node>(n.value()));
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 
+	// the printer needs the BA type of the solution, not the grammar
+	// nonterminal of the argument that get_type_and_arg also returns
 	print_solver_cmd_solution<node>(solution,
 		get_solver_cmd_type<node>(value));
 }
@@ -758,14 +825,15 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	auto check = get_type_and_arg(arg);
-	if (!check) return;
-	auto [_, value] = check.value();
+	tref value = get_any(arg);
+	if (!value) return;
 	measuring m;
 	auto solution = tau_api::lgrs(m, value);
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
+	// same as solve_cmd: the printer takes a BA type id, not the grammar
+	// nonterminal that get_type_and_arg also returns
 	print_solver_cmd_solution<node>(solution,
 		get_solver_cmd_type<node>(value));
 }
@@ -775,7 +843,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
+	if (tref value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::valid(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }
@@ -785,7 +854,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
+	if (tref value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::sat(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }
@@ -795,7 +865,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
+	if (tref value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::unsat(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }
@@ -823,12 +894,27 @@ tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	tref rr = n | tt::first | tt::ref;
-	rr_defs.push_back(rr);
+	// grammar: rec_relation => ref ":=" (capture | ref | wff | bf)
+	tref def = n | tt::first | tt::ref;
+	const auto& t = tau::get(def);
+	// Reject a definition that can never be used before it is stored, so
+	// that using it hangs the unfolding (issue 20) and so that it does not
+	// invalidate every later command by sitting in the definition list.
+	if (tref ref = get_unbindable_relative_offset<node>(
+		t[0].get(), t[1].get()); ref)
+	{
+		TAU_LOG_ERROR << "Definition " << tau::get(def).to_str()
+			<< " cannot use the relative offset of "
+			<< tau::get(ref).to_str() << ": its head declares no "
+			"offset to bind it. Give the head an offset, as in "
+			"f[n](x), or use a fixed offset";
+		return;
+	}
+	rr_defs.push_back(tau::geth(def));
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tree<node>::get(rr_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
 	// Register definition head early so type inference recognizes it
-	tt rrt(rr);
+	tt rrt(def);
 	htref head = rrt | tt::first | tt::handle;
 	htref body = rrt | tt::second | tt::handle;
 	if (head) definitions<node>::instance().add(head, body);
@@ -842,12 +928,12 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	else std::cout << "Definitions:\n";
 	for (size_t i = 0; i < rr_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< tau::get(rr_defs[i]).to_str() << "\n";
+			<< tau::get(rr_defs[i]->get()).to_str() << "\n";
 	if (io_defs.empty()) std::cout << "Streams: empty\n";
 	else std::cout << "Streams:\n";
 	for (size_t i = 0; i < io_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< tau::get(io_defs[i]).to_str() << "\n";
+			<< tau::get(io_defs[i]->get()).to_str() << "\n";
 	std::cout << *defs.get_io_context();
 }
 
@@ -858,7 +944,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (!num) return;
 	auto i = num | tt::num;
 	if (i && i <= rr_defs.size()) {
-		std::cout << tau::get(rr_defs[i-1]).to_str() << "\n";
+		std::cout << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -868,17 +954,53 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
-	io_defs.push_back(n | tt::first | tt::ref);
+	tref def = n | tt::first | tt::ref;
+	// tree<node>::geth() asserts on a null tref, and the read sites
+	// below would dereference it anyway.
+	if (!def) {
+		TAU_LOG_ERROR << "Invalid stream definition";
+		return;
+	}
+	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
+	// reduction registers internal output streams named w_<n>, so a user
+	// stream with that prefix would collide with them.
+	if (tref name_node = tau::get(def).first(); name_node) {
+		const std::string sname = tau::get(name_node).to_str();
+		if (sname.rfind("w_", 0) == 0) {
+			TAU_LOG_ERROR << "Stream name '" << sname
+				<< "' uses the reserved witness prefix `w_`\n";
+			return;
+		}
+	}
+	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
-	io_defs.push_back(n | tt::first | tt::ref);
+	tref def = n | tt::first | tt::ref;
+	// tree<node>::geth() asserts on a null tref, and the read sites
+	// below would dereference it anyway.
+	if (!def) {
+		TAU_LOG_ERROR << "Invalid stream definition";
+		return;
+	}
+	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
+	// reduction registers internal output streams named w_<n>, so a user
+	// stream with that prefix would collide with them.
+	if (tref name_node = tau::get(def).first(); name_node) {
+		const std::string sname = tau::get(name_node).to_str();
+		if (sname.rfind("w_", 0) == 0) {
+			TAU_LOG_ERROR << "Stream name '" << sname
+				<< "' uses the reserved witness prefix `w_`\n";
+			return;
+		}
+	}
+	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -941,10 +1063,51 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
 		|| x == "indent")            return indenting_opt;
-	if (x == "B" || x == "benchmarks"
+	// RE-1: this arm used to claim "B" as well, but blasting_opt above
+	// already matches it, so the benchmarks short option was unreachable
+	// and `get B` silently meant blasting. Benchmarks gets the still-free
+	// lowercase "b" instead, which leaves blasting's "B" alone.
+	if (x == "b" || x == "benchmarks"
 		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
+	// Full names only: every single letter that would fit is taken (see
+	// RE-1 above). These two are numeric options, not flags.
+	//
+	// No underscore in the spelling: the grammar has
+	// `option_name => alnum+` (parser/tau.tgf:231), so `block_max_splits`
+	// does not even parse as an option name. Every existing option is a
+	// single alnum word for the same reason (`charvar`, `benchmarks`).
+	if (x == "maxsplits"
+		|| x == "blockmaxsplits")    return block_max_splits_opt;
+	if (x == "maxrounds"
+		|| x == "blockmaxrounds")    return block_max_rounds_opt;
+	if (x == "fixpointsteps"
+		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
+	if (x == "flagsteps"
+		|| x == "maxflagsearchsteps") return flag_search_steps_opt;
+	if (x == "blastdepth"
+		|| x == "maxblastreentrydepth") return blast_depth_opt;
+	if (x == "squeezecap"
+		|| x == "blocksqueezecap")   return squeeze_cap_opt;
+	if (x == "simplifyrounds"
+		|| x == "maxsimplifyrounds") return simplify_rounds_opt;
+	if (x == "defpasses"
+		|| x == "maxdefpasses")      return def_passes_opt;
+	if (x == "enumsteps"
+		|| x == "maxenumsteps")      return enum_steps_opt;
+	if (x == "rewriterounds"
+		|| x == "maxrewriterounds")  return rewrite_rounds_opt;
+	if (x == "gcminsize")                return gc_min_size_opt;
+	if (x == "gcgrowth"
+		|| x == "gcgrowthfactor")    return gc_growth_opt;
+	if (x == "specsizewarn")             return spec_size_warn_opt;
+	if (x == "revisionalts"
+		|| x == "maxrevisionalts")   return revision_alts_opt;
+	if (x == "maxsubsets"
+		|| x == "maxconsistencysubsets") return consistency_subsets_opt;
+	if (x == "cachebound")               return cache_bound_opt;
+	if (x == "maxcoverproducts")         return cover_products_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1004,10 +1167,60 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ print_benchmarks_opt, [this]() {
 		std::cout << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } }
 	};
+	// Read from the library globals, not from `opt`: they are what the
+	// algorithm actually consults, and a caller using the api setters
+	// directly would otherwise be misreported here. Both "unlimited"
+	// representations print alike: 0 for the caps and SIZE_MAX for the
+	// two decrementing block budgets.
+	auto climit = [](size_t v) -> std::string {
+		return v == 0 || v == std::numeric_limits<size_t>::max()
+			? "unlimited" : std::to_string(v); };
+	std::map<repl_option, std::function<void()>> limit_printers = {
+	{ block_max_splits_opt, [climit]() {
+		std::cout << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
+	{ block_max_rounds_opt, [climit]() {
+		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ fixpoint_steps_opt, [climit]() {
+		std::cout << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
+	{ flag_search_steps_opt, [climit]() {
+		std::cout << "flagsteps:           " << climit(max_flag_search_steps) << "\n"; } },
+	{ blast_depth_opt, [climit]() {
+		std::cout << "blastdepth:          " << climit(max_blast_reentry_depth) << "\n"; } },
+	{ squeeze_cap_opt, [climit]() {
+		std::cout << "squeezecap:          " << climit(block_squeeze_cap) << "\n"; } },
+	{ simplify_rounds_opt, [climit]() {
+		std::cout << "simplifyrounds:      " << climit(max_simplify_rounds) << "\n"; } },
+	{ def_passes_opt, [climit]() {
+		std::cout << "defpasses:           " << climit(max_def_passes) << "\n"; } },
+	{ enum_steps_opt, [climit]() {
+		std::cout << "enumsteps:           " << climit(max_enum_steps) << "\n"; } },
+	{ rewrite_rounds_opt, [climit]() {
+		std::cout << "rewriterounds:       " << climit(max_rewrite_rounds) << "\n"; } },
+	{ gc_min_size_opt, []() {
+		std::cout << "gcminsize:           " << interpreter<node>::gc_min_size << "\n"; } },
+	{ gc_growth_opt, []() {
+		std::cout << "gcgrowth:            " << interpreter<node>::gc_growth_factor << "\n"; } },
+	{ spec_size_warn_opt, []() {
+		const size_t v = interpreter<node>::spec_size_warn_threshold;
+		std::cout << "specsizewarn:        "
+			<< (v ? std::to_string(v) : "off") << "\n"; } },
+	{ revision_alts_opt, [climit]() {
+		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } },
+	{ consistency_subsets_opt, [climit]() {
+		std::cout << "maxsubsets:          " << climit(max_consistency_subsets) << "\n"; } },
+	{ cache_bound_opt, [climit]() {
+		std::cout << "cachebound:          " << climit(cache_bound) << "\n"; } },
+	{ cover_products_opt, [climit]() {
+		std::cout << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } }
+	};
+	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
 #ifndef DEBUG
+	// RE-2: answering a query about an option this build does not carry is
+	// not an error condition, it is the answer. Reported at info level so a
+	// plain `get debug` no longer prints "(Error)" in a release build.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available in release build\n";
+		TAU_LOG_INFO << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -1031,11 +1244,42 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	using namespace boost::log;
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
+	// RE-2: a warning, not an error -- the command was understood, it just
+	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_WARNING << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
+	// A count. Zero is accepted and means "unlimited" (specsizewarn: off)
+	// by the unified limit-option convention -- the api setters translate
+	// it to each knob's internal representation.
+	auto str2count = [&v](void) -> std::optional<size_t> {
+		size_t n = 0;
+		if (v.empty()) { TAU_LOG_ERROR << "Invalid value\n"; return {}; }
+		for (char c : v) {
+			if (c < '0' || c > '9') {
+				TAU_LOG_ERROR << "Invalid value: expected a "
+					"count\n";
+				return {};
+			}
+			n = n * 10 + static_cast<size_t>(c - '0');
+		}
+		return n;
+	};
+	// A decimal number (gcgrowth); the grammar admits digits and '.'.
+	auto str2double = [&v](void) -> std::optional<double> {
+		try {
+			size_t pos = 0;
+			double d = std::stod(v, &pos);
+			if (pos != v.size())
+				throw std::invalid_argument(v);
+			return d;
+		} catch (const std::exception&) {
+			TAU_LOG_ERROR << "Invalid value: expected a number\n";
+			return {};
+		}
+	};
 	auto update_bool_value = [&v](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
 			|| v == "y" || v == "yes") opt = true;
@@ -1073,7 +1317,43 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		if (!sev.has_value()) return;
 		opt.severity = sev.value();
 		logging::set_filter(opt.severity);
-	} } };
+	} },
+	// Every numeric option funnels through its api setter, the same
+	// surface the CLI options use, so the two stay in lockstep.
+	{ block_max_splits_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_block_max_splits(*n); } },
+	{ block_max_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_block_max_rounds(*n); } },
+	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_fixpoint_steps(*n); } },
+	{ flag_search_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_flag_search_steps(*n); } },
+	{ blast_depth_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_blast_reentry_depth(*n); } },
+	{ squeeze_cap_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_block_squeeze_cap(*n); } },
+	{ simplify_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_simplify_rounds(*n); } },
+	{ def_passes_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_def_passes(*n); } },
+	{ enum_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_enum_steps(*n); } },
+	{ rewrite_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_rewrite_rounds(*n); } },
+	{ gc_min_size_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_gc_min_size(*n); } },
+	{ gc_growth_opt, [&]() { if (auto d = str2double(); d)
+		api<node>::set_gc_growth_factor(*d); } },
+	{ spec_size_warn_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_spec_size_warn(*n); } },
+	{ revision_alts_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_revision_alts(*n); } },
+	{ consistency_subsets_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_consistency_subsets(*n); } },
+	{ cache_bound_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_cache_bound(*n); } },
+	{ cover_products_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_cover_products(*n); } } };
 	setters[o]();
 }
 
@@ -1094,8 +1374,10 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 {
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
+	// RE-2: a warning, not an error -- the command was understood, it just
+	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_WARNING << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -1110,6 +1392,26 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
 	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
+	case block_max_splits_opt:
+	case block_max_rounds_opt:
+	case fixpoint_steps_opt:
+	case flag_search_steps_opt:
+	case blast_depth_opt:
+	case squeeze_cap_opt:
+	case simplify_rounds_opt:
+	case def_passes_opt:
+	case enum_steps_opt:
+	case rewrite_rounds_opt:
+	case gc_min_size_opt:
+	case gc_growth_opt:
+	case spec_size_warn_opt:
+	case revision_alts_opt:
+	case consistency_subsets_opt:
+	case cache_bound_opt:
+	case cover_products_opt:
+		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
+			"`set <option> <n>`\n", error = true;
+		return;
 	default: TAU_LOG_ERROR << "Invalid option\n", error = true; return;
 	}
 }
@@ -1252,8 +1554,6 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 {
 	TC.set(opt.colors);
 	logging::set_filter(opt.severity);
-	// Controls how fixpoint information in satisfiability.h should be printed
-	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
 	// Propagate the CLI-provided charvar/blasting values to the api's
@@ -1325,7 +1625,14 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		return 0;
 	}
 	error = false;
-	auto tau_spec = tt(make_cli(src));
+	tref cli = make_cli(src);
+	// Pin the parsed command line for the whole evaluation: a `run` among
+	// its commands steps the interpreter, which calls maybe_gc(), and the
+	// commands still queued behind it live in this very tree. A line that
+	// failed to parse has no tree and needs no pin -- tree<node>::geth()
+	// asserts on a null tref, unlike bintree's.
+	htref cli_pin = cli ? tau::geth(cli) : htref{};
+	auto tau_spec = tt(cli);
 	int quit = 0;
 	if (tau_spec) {
 		auto commands = tau_spec || tau::cli_command;
@@ -1358,15 +1665,41 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	static const std::string bool_options =
 		"  <option>               <description>                        <value>\n"
 #ifdef DEBUG
-		"  debug-repl             show REPL commands             on/off\n"
+		"  debug-repl             show REPL commands                   on/off\n"
 #endif // DEBUG
 		"  status                 show status                          on/off\n"
 		"  colors                 use term colors                      on/off\n"
 		"  highlighting           syntax highlighting of Tau formulas  on/off\n"
-		"  indenting              indenting of Tau formulas            on/off\n";
+		"  indenting              indenting of Tau formulas            on/off\n"
+		"  charvar (V)            character-variable notation          on/off\n"
+		"  blasting (B)           bitvector predicate blasting         on/off\n"
+		"  benchmarks (b)         print timing benchmarks              on/off\n";
+	static const std::string numeric_options =
+		"and the numeric limit options, set with `set <option> <n>` "
+		"(0 = unlimited;\nspecsizewarn: 0 = off; gcgrowth <= 0 disables "
+		"gc; each mirrors the CLI option\nof the same meaning):\n"
+		"  <option>               <description>                        <default>\n"
+		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
+		"  maxrounds              anti-prenex driver rounds            unlimited\n"
+		"  fixpointsteps          temporal-normalization fixpoint steps unlimited\n"
+		"  flagsteps              eventual-flag search steps           unlimited\n"
+		"  blastdepth             blast-block re-entry nesting         unlimited\n"
+		"  squeezecap             block-squeeze operand-set size cap   unlimited\n"
+		"  simplifyrounds         bitvector simplification rounds      unlimited\n"
+		"  defpasses              definition-expansion passes          unlimited\n"
+		"  enumsteps              recurrence enumeration steps         unlimited\n"
+		"  rewriterounds          rewrite-to-fixpoint rounds           unlimited\n"
+		"  gcminsize              gc trigger floor (tree nodes)        256\n"
+		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
+		"  specsizewarn           updated-spec size warning (chars)    off\n"
+		"  revisionalts           revision alternatives kept per part  unlimited\n"
+		"  maxsubsets             k-ary consistency subset checks      4096\n"
+		"  cachebound             string-keyed synthesis cache bound   4096\n"
+		"  maxcoverproducts       oracle mixed-type coverage products  256\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options +
-		"  severity               severity                             error/info/debug/trace\n";
+		"  severity               severity                             error/info/debug/trace\n"
+		+ numeric_options;
 	static const std::string bool_available_options = std::string{} +
 		"Available options and values:\n" + bool_options;
 	switch (nt) {

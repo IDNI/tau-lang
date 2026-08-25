@@ -17,6 +17,9 @@
 #include <numeric>
 
 #include "normal_forms_transformations.h"
+// Anti-prenexing declarations must precede normal_forms.tmpl.h, since the
+// latter's definitions use them.
+#include "antiprenexing/antiprenexing.h"
 
 namespace idni::tau_lang {
 
@@ -27,11 +30,7 @@ template <NodeType node>
 struct bf_reduce_canonical;
 
 template <NodeType node>
-class syntactic_path_simplification_dnf;
-
-template <NodeType node>
-tref syntactic_formula_simplification(tref formula,
-	std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
+tref syntactic_formula_simplification(tref formula);
 
 template <NodeType node, bool is_wff = true>
 tref push_negation_one_in(tref fm);
@@ -79,8 +78,21 @@ auto lex_var_comp = [](tref x, tref y) {
  * @brief Predicate that classifies a wff node as a BDD variable.
  *
  * In BDD-based DNF/CNF reductions of well-formed formulas the following node
- * types are treated as atomic BDD variables: `bf_eq`, `wff_ref`, `wff_ex`,
- * `wff_sometimes`, `wff_always`, `wff_all`, and `constraint`.
+ * types are treated as atomic BDD variables: `bf_eq`, the ordering comparisons
+ * (`bf_lt`, `bf_lteq`, `bf_gt`, `bf_gteq` and their negated `n` variants),
+ * `wff_ref`, `wff_ex`, `wff_sometimes`, `wff_always`, `wff_all`, and
+ * `constraint`.
+ *
+ * The classification has to cover *every* atom kind that can reach `reduce`,
+ * not just the ones it can reason about. An atom missing from this set matches
+ * no branch of `clause_to_vector`, which then simply descends past it: the atom
+ * never enters the clause's path vector and `build_reduced_formula` rebuilds
+ * the clause without it (`x < y && s = 0` came back as `s = 0`). When such an
+ * atom is the only one in the formula the variable set comes out empty and
+ * `reduce` answers `F` for a satisfiable formula. Ordering comparisons reach
+ * `reduce` unexpanded whenever the BA does not expand them at construction
+ * time -- bitvectors and qlt keep them raw (see `hooks_tau.tmpl.h`) -- so they
+ * are listed here and treated as opaque, exactly as `constraint` already is.
  * @tparam node Tree node type.
  * @todo Extend for the full grammar.
  */
@@ -88,8 +100,20 @@ template <NodeType node>
 inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	DBG(assert(!t.is(tau::bf_neq));)
+	// `n` is a wff wrapper, so the invariant to check is on its child: the
+	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal.
+	// Asserting `t.is(bf_neq)` instead would be vacuously true and check
+	// nothing.
+	DBG(assert(!t.child_is(tau::bf_neq));)
 	return t.child_is(tau::bf_eq)
+		|| t.child_is(tau::bf_lt)
+		|| t.child_is(tau::bf_nlt)
+		|| t.child_is(tau::bf_lteq)
+		|| t.child_is(tau::bf_nlteq)
+		|| t.child_is(tau::bf_gt)
+		|| t.child_is(tau::bf_ngt)
+		|| t.child_is(tau::bf_gteq)
+		|| t.child_is(tau::bf_ngteq)
 		|| t.child_is(tau::wff_ref)
 		|| t.child_is(tau::wff_ex)
 		|| t.child_is(tau::wff_sometimes)
@@ -97,6 +121,30 @@ inline auto is_wff_bdd_var = [](tref n) {
 		|| t.child_is(tau::wff_all)
 		|| t.child_is(tau::constraint);
 };
+
+/**
+ * @internal
+ * @brief The atomic formula kinds `boole_normal_form` treats as BDD variables:
+ * `bf_eq`, `bf_lt` and `bf_lteq`.
+ *
+ * Kept as one predicate so the filter that selects them and the two consumers
+ * that assert on them cannot drift apart -- they did, and a bitvector
+ * comparison (which the construction hooks do not expand) aborted Debug builds
+ * while Release decomposed it correctly.
+ * @tparam node Tree node type.
+ * @endinternal
+ */
+template <NodeType node>
+bool is_atomic_bdd_var(tref n) {
+	using tau = tree<node>;
+	if (!tau::get(n).is(tau::wff)) return false;
+	switch (tau::get(n)[0].value.nt) {
+		case tau::bf_eq:
+		case tau::bf_lt:
+		case tau::bf_lteq: return true;
+		default: return false;
+	}
+}
 
 /**
  * @brief Predicate that classifies a bf node as a BDD variable.
@@ -436,32 +484,6 @@ template <NodeType node>
 tref term_boole_normal_form(tref formula);
 
 /**
- * @brief Apply the anti-prenex transformation to a formula.
- *
- * Drives the full anti-prenex procedure: converts to NNF, identifies
- * quantifier blocks, and calls `anti_prenex_block` to push quantifiers into
- * the formula structure as deeply as possible.
- * @tparam node Tree node type.
- * @param formula Formula to anti-prenex.
- * @return Formula with quantifiers pushed in as far as possible.
- *
- * @par Example
- * @code{.cpp}
- * // The inner "ex o2[1],o1[1] o1[1]o2[1]=0" is always satisfiable (pick
- * // o1[1]=o2[1]=0), so the whole formula reduces to a tautology once the
- * // quantifier is pushed in and resolved (see
- * // tests/integration/test_integration-wff_normalization.cpp:131-136).
- * tref fm = get_nso_rr(
- *     "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && "
- *     "(ex o2[1], o1[1] o1[1]o2[1] = 0).").value().main->get();
- * tref res = anti_prenex<node_t>(fm);
- * CHECK( tau::get(res).equals_T() );
- * @endcode
- */
-template <NodeType node>
-tref anti_prenex(tref formula);
-
-/**
  * @brief Convert a formula to Algebraic Normal Form (ANF) for a given type.
  *
  * The ANF is the XOR-AND normal form where each variable appears at most once
@@ -471,9 +493,9 @@ tref anti_prenex(tref formula);
  * @param n Formula to convert.
  * @return Formula in ANF.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body prints
- * "Not implemented yet." and returns @p n unchanged. No worked example is
- * given here since the function is currently the identity.
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body logs an
+ * error on the "normal_forms" channel and returns @p n unchanged. No worked
+ * example is given here since the function is currently the identity.
  */
 template <NodeType node, size_t type>
 tref anf(tref n);
@@ -487,9 +509,9 @@ tref anf(tref n);
  * @param n Formula to convert.
  * @return Formula in PNF.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body prints
- * "Not implemented yet." and returns @p n unchanged. No worked example is
- * given here since the function is currently the identity.
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body logs an
+ * error on the "normal_forms" channel and returns @p n unchanged. No worked
+ * example is given here since the function is currently the identity.
  */
 template <NodeType node>
 tref pnf(tref n);
@@ -500,9 +522,23 @@ tref pnf(tref n);
 // of the heuristics themselves and also they could need definitions from the
 // header (as is the case in 'heuristics/bv_ba_simplification.h'). Also, they
 // need to be included before the definitions as they can be used in there.
+#include "antiprenexing/eliminability.h"
+#include "antiprenexing/leaf_clause.h"
+#include "antiprenexing/block_atom_profile.h"
+#include "antiprenexing/block_squeeze.h"
+#include "antiprenexing/boole_atom_analysis.h"
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"
 #include "heuristics/trivial_skolem.h"
 #include "normal_forms.tmpl.h"
+// Must stay after normal_forms.tmpl.h, deliberately breaking the usual
+// .h-includes-its-own-.tmpl.h idiom: the anti-prenexing definitions call
+// back into normal_forms.tmpl.h's internal helpers (to_nnf,
+// normalize_atomic_formula_operators, term_boole_decomposition,
+// squeeze_absorb, atm_formula_order_for_quant_elim), four of which have no
+// header declarations at all. Moving this line earlier breaks the build.
+#include "antiprenexing/eliminability.tmpl.h"
+#include "antiprenexing/leaf_clause.tmpl.h"
+#include "antiprenexing/antiprenexing.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__

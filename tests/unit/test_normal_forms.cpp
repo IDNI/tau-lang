@@ -225,6 +225,19 @@ TEST_SUITE("normal forms: onf") {
 		// a genuine onf transformation replaces the bare equation
 		CHECK(tau::get(result_rhs).to_str() != tau::get(fm_rhs).to_str());
 	}
+
+	// NF-5: onf_wff::operator() rewrote the body returned by
+	// get_inner_quantified_wff and returned *only* that body, dropping the
+	// binder and everything above it -- so `onf` on a quantified formula
+	// silently returned a formula with a different meaning.  The existing
+	// tests were all quantifier-free, so the branch was uncovered.
+	TEST_CASE("onf keeps the quantifier prefix") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = get_nso_rr("ex y (x = y).").value().main->get();
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		tref result = onf<node_t>(fm, x);
+		CHECK( tau::get(result).find_top(is<node_t, tau::wff_ex>) != nullptr );
+	}
 }
 
 TEST_SUITE("GetNewUninterpretedConstant") {
@@ -485,229 +498,6 @@ TEST_SUITE("GetFreeVars") {
 	}
 }
 
-TEST_SUITE("TreatExQuantifiedClause") {
-	TEST_CASE("surviving inner quantifier blocks elimination (B5)") {
-		// The inner ex y survived elimination; its equations are not
-		// top-level conjuncts of the outer clause, so the eliminator
-		// must keep the whole quantified clause instead of squeezing
-		// them and silently dropping the inner binder (leaking y free)
-		const char* sample =
-			"ex x (xw = 0 && (ex y (xy = 0 && f(y) != 0))).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
-		CHECK( !quant_eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
-	}
-
-	TEST_CASE("plain clause still eliminated (B5 control)") {
-		const char* sample = "ex x (xw = 0 && xz != 0).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		bool quant_eliminated = true;
-		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
-		CHECK( quant_eliminated );
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
-		CHECK( res != fm );
-	}
-}
-
-TEST_SUITE("AntiPrenexBlock") {
-	// Helper: peel the leading ex-quantifier prefix into a block,
-	// innermost variable gets the lowest order index
-	static std::tuple<tref, trefs, term_handle<node_t>::order> peel_block(
-		tref fm)
-	{
-		trefs block;
-		term_handle<node_t>::order order;
-		while (tau::get(fm)[0].is(tau::wff_ex)) {
-			block.push_back(tau::get(fm)[0].first());
-			fm = tau::get(fm)[0].second();
-		}
-		for (size_t i = 0; i < block.size(); ++i)
-			order.emplace(block[i], block.size() - 1 - i);
-		return {fm, block, order};
-	}
-
-	// Helper: run anti_prenex_block on a parsed "ex ... (...)" sample
-	static std::pair<tref, size_t> run_apb(const char* sample) {
-		tref fm = get_nso_rr(sample).value().main->get();
-		auto [body, block, order] = peel_block(fm);
-		subtree_unordered_set<node_t> used_atms;
-		subtree_unordered_map<node_t, int_t> quant_pattern;
-		for (size_t i = 0; i < block.size(); ++i)
-			quant_pattern.emplace(block[i], i + 1);
-		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order, is_tref_bv_type_family<node_t>);
-		return {res, used_atms.size()};
-	}
-
-	TEST_CASE("disjunction push (B11)") {
-		// The disjunction-case recursions must compile and push the
-		// block into each disjunct independently
-		auto [res, used] = run_apb("ex x (xy = 0 || xw = 0).");
-		CHECK( matches_to_str_to_any_of(res, {
-			"(ex b1 b1 y = 0) || (ex b1 b1 w = 0)",
-			"(ex b1 b1 w = 0) || (ex b1 b1 y = 0)",
-		}) );
-		CHECK( used == 0 );
-	}
-
-	TEST_CASE("decomposition keeps independent conjuncts (B12/B13)") {
-		// z = 0 must survive (B13) and the negative branch must be
-		// built from formula[atm:=F], so the remaining equation gets
-		// resolved by the clause eliminator (B12): for atm = xw = 0
-		// the branch ex x (xw != 0 && xy = 0) resolves to wy' != 0
-		auto [res, used] = run_apb("ex x (z = 0 && (xy = 0 || xw = 0)).");
-		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && ((ex b1 b1 w = 0) || !wy' = 0)",
-			"z = 0 && ((ex b1 b1 w = 0) || !y'w = 0)",
-			"z = 0 && ((ex b1 b1 y = 0) || !yw' = 0)",
-			"z = 0 && ((ex b1 b1 y = 0) || !w'y = 0)",
-		}) );
-		CHECK( used == 0 );
-	}
-
-	TEST_CASE("no decomposable atoms keeps block (B14)") {
-		// The dependent part contains only != atoms, which the
-		// decomposition cannot use: the block must be kept on the
-		// dependent part (instead of dereferencing end())
-		auto [res, used] = run_apb("ex x (z = 0 && (xy != 0 || xw != 0)).");
-		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && (ex b1 b1 y != 0 || b1 w != 0)",
-			"z = 0 && (ex b1 b1 w != 0 || b1 y != 0)",
-		}) );
-		CHECK( used == 0 );
-	}
-
-	TEST_CASE("T branch shortcut restores used_atms (B15)") {
-		// The positive decomposition branch resolves to T (the clause
-		// ex x (atm && xk = 0) is satisfiable by x := 0), triggering
-		// the early return, which must leave used_atms balanced
-		auto [res, used] = run_apb(
-			"ex x (z = 0 && (xy = 0 || xw = 0) && xk = 0).");
-		CHECK( tau::get(res).to_str() == "z = 0" );
-		CHECK( used == 0 );
-	}
-
-	TEST_CASE("fallback: plain bf_neq atom re-wraps block (B16)") {
-		// body is a single bf_neq atom (neither wff_or nor wff_and at
-		// the top level): the catch-all fallback re-wraps the quantifier
-		// block around the atom and returns it unchanged
-		auto [res, used] = run_apb("ex x (xy != 0).");
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
-		CHECK( used == 0 );
-	}
-}
-
-TEST_SUITE("AntiPrenexBlock0Arg") {
-	// Tests for the zero-arg anti_prenex_block (the full pipeline:
-	// NNF+simplify → subs_elim → normalize_atomic → process_block post-order).
-
-	static tref run_apb0(const char* sample) {
-		return anti_prenex_block<node_t>(
-			get_nso_rr(sample).value().main->get());
-	}
-
-	TEST_CASE("quantifier-free formula is returned unchanged") {
-		// Short-circuit: no quantifiers → original tref returned as-is.
-		tref fm = get_nso_rr("xy = 0 && wz = 0.").value().main->get();
-		CHECK( anti_prenex_block<node_t>(fm) == fm );
-	}
-
-	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
-		// Step 2 (subs_elim): ex x (x=w && xy=0) → (xy=0)[x:=w] = wy=0
-		tref res = run_apb0("ex x (xy = 0 && x = w).");
-		CHECK( matches_to_str_to_any_of(res, {"wy = 0", "yw = 0"}) );
-	}
-
-	TEST_CASE("subs_elim: ex x (x=w) → T") {
-		// ex x (x=w): body after subs_elim is empty (T), since the only
-		// conjunct was the substitution witness x=w itself.
-		tref res = run_apb0("ex x (x = w).");
-		CHECK( tau::get(res)[0].is(tau::wff_t) );
-	}
-
-	TEST_CASE("all-block dualization: all x (x=0 || x!=0) → T") {
-		// ∀x. (x=0 ∨ x≠0): law of excluded middle in BA → T.
-		tref res = run_apb0("all x (x = 0 || x != 0).");
-		CHECK( tau::get(res)[0].is(tau::wff_t) );
-	}
-
-	TEST_CASE("all-block dualization: all x (xy!=0) → F") {
-		// ∀x. xy≠0: pick x=0 → 0·y=0=0, contradiction → F.
-		tref res = run_apb0("all x xy != 0.");
-		CHECK( tau::get(res)[0].is(tau::wff_f) );
-	}
-
-	TEST_CASE("ex block conjunction decomposition") {
-		// ∃x. (xy=0 ∧ wz=0): wz=0 is independent of x → factor out;
-		// ∃x. xy=0 → T (pick x=0).  Result: T ∧ wz=0 = wz=0.
-		tref res = run_apb0("ex x (xy = 0 && wz = 0).");
-		CHECK( matches_to_str_to_any_of(res, {"wz = 0", "zw = 0"}) );
-	}
-
-	TEST_CASE("trivial_skolem wiring: ex x (x=w || z=0) resolves via the block hook") {
-		// x's only occurrence is `x=w`, reachable under wff_or. subs_elim
-		// (Step 2) bails on any wff_or in scope, so only the trivial_skolem
-		// wiring in process_quantifier_block can remove x here.
-		// ex x.(x=w || z=0) is a tautology (x:=w always witnesses the left
-		// disjunct), so it folds all the way to T.
-		tref res = run_apb0("ex x (x = w || z = 0).");
-		CHECK( tau::get(res)[0].is(tau::wff_t) );
-	}
-
-	TEST_CASE("trivial_skolem wiring: mixed block falls back safely when not fully eliminable") {
-		// x occurs once, in `x=c` under an or; y occurs twice (yz=0 and
-		// yw=0), so trivial_skolem_ex keeps y (occurrence count != 1).
-		// Since not every block variable is eliminated, the wiring in
-		// process_quantifier_block discards trivial_skolem_ex's result
-		// (it only adopts full-block eliminations) and falls through to
-		// the existing Boole-decomposition pipeline, which must still
-		// resolve the whole block correctly on its own.
-		tref res = run_apb0("ex x ex y ((x = c || z = 0) && (yz = 0 || yw = 0)).");
-		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
-	}
-}
-
-TEST_SUITE("QuantBlockPush") {
-	TEST_CASE("1") {
-		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		trefs quant_block;
-		quant_block.push_back(tau::get(fm)[0].first());
-		fm = tau::get(fm)[0].second();
-		quant_block.push_back(tau::get(fm)[0].first());
-		fm = tau::get(fm)[0].second();
-		term_handle<node_t>::order order;
-		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
-		// tau::get(res).print(std::cout << "res: ") << "\n";
-		CHECK(tau::get(res).to_str() == "(ex b2, b1 b2 b1|b1 b2 = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2|b1) = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2^b1) = 0)");
-	}
-	TEST_CASE("2") {
-		const char* sample = "all u ex v (u<v && v<x).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		fm = unequal_to_not_equal<node_t>(fm);
-		trefs quant_block;
-		term_handle<node_t>::order order;
-		tref uvar = tau::trim2(fm);
-		order.emplace(uvar, 1);
-		fm = tau::get(fm)[0].second();
-		quant_block.push_back(tau::trim2(fm));
-		order.emplace(tau::trim2(fm), 0);
-		fm = tau::get(fm)[0].second();
-		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
-		// tau::get(res).print(std::cout << "ex: ") << "\n";
-		res = tau::build_wff_all(uvar, res, false);
-		res = push_quantifiers_in<node_t>(res);
-		// tau::get(res).print(std::cout << "all: ") << "\n";
-		res = resolve_quantifiers2<node_t>(res, order);
-		// tau::get(res).print(std::cout << "res: ") << "\n";
-		CHECK(tau::get(res).equals_F());
-	}
-}
-
-
-
 TEST_SUITE("ToNNF") {
 	TEST_CASE("double negation bf") {
 		// !!(a = 0) → a = 0 (push double negation in)
@@ -724,6 +514,87 @@ TEST_SUITE("ToNNF") {
 		// No wff_and at top, the result is a disjunction of negated atoms
 		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_and>) );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+	}
+
+	// Negation normal form is `&&`, `||` and negated atoms and nothing
+	// else. The sugar connectives never survive `tau::get` -- the
+	// construction hooks rewrite them away, which is why they have to be
+	// built with hooks off here. That is not a contrivance: a Tau-BA
+	// constant is parsed exactly that way (`tau_spec` sets
+	// `reget_with_hooks = false`) and, unlike every other parsed formula,
+	// never goes through `api::simplify`, whose `reget` is what desugars
+	// them. to_nnf leaving them in place made every consumer of its output
+	// read the tree wrong; simplify_using_equality took an implication's
+	// antecedent for an asserted fact (issue #69).
+
+	// Builds `wff(sym(args...))` without the hooks that would desugar it.
+	static auto raw_sugar = [](typename node_t::type sym,
+		const trefs& args)
+	{
+		use_hooks_guard<node_t> hooks_off(false);
+		return tau::get(tau::wff, tau::get(sym, args));
+	};
+
+	TEST_CASE("sugar: a = 0 -> b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_imply, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_imply>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+	}
+
+	TEST_CASE("sugar: !(a = 0 -> b = 0)") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_neg,
+			{ raw_sugar(tau::wff_imply, { a, b }) });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_imply>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+		// !(a=0 -> b=0) is a=0 && b!=0
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_and>) );
+	}
+
+	TEST_CASE("sugar: a = 0 <- b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_rimply, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_rimply>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_rimply>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+	}
+
+	TEST_CASE("sugar: a = 0 <-> b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_equiv, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_equiv>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_equiv>) );
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+	}
+
+	TEST_CASE("sugar: a = 0 ^^ b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_xor, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_xor>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_xor>) );
+	}
+
+	TEST_CASE("sugar: a = 0 ? b = 0 : c = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref c = get_nso_rr("c = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_conditional, { a, b, c });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_conditional>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_conditional>) );
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
 	}
 }
 
@@ -780,6 +651,74 @@ TEST_SUITE("ReduceWff") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = reduce<node_t>(fm);
 		CHECK( tau::get(res).equals_T() );
+	}
+
+	// NF-1. The construction hooks leave a bv comparison as a raw `bf_lt`
+	// atom (they only expand comparisons for plain BAs), so `reduce`'s
+	// BDD-variable classifier has to treat it as an opaque atom.  When it did
+	// not, clause_to_vector matched no branch for the atom and just descended
+	// past it: the atom was left out of the path vector and
+	// build_reduced_formula rebuilt the clause without it.  With the
+	// comparison as the *only* atom the variable set came out empty and
+	// reduce answered F for a perfectly satisfiable formula.
+	TEST_CASE("bv comparison as the only atom is not reduced to F") {
+		const char* sample = "x:bv[8] < y:bv[8].";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::bf_lt>) );
+		tref res = reduce<node_t>(fm);
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>) );
+	}
+
+	TEST_CASE("bv comparison is not dropped from a conjunction") {
+		const char* sample = "x:bv[8] < y:bv[8] && z:bv[8] = 0.";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
+	}
+
+	// A negated comparison does not reach the BDD-variable selection as a
+	// `wff_neg` wrapper: `dnf_cnf_to_reduced` runs `push_negation_in` first,
+	// and that rewrites `!(a < b)` into the `bf_nlt` atom
+	// (normal_forms_nnf.tmpl.h). So the negated comparison kinds have to be
+	// classified as BDD variables in their own right -- classifying only
+	// `bf_lt`/`bf_lteq` would still drop these.
+	TEST_CASE("negated bv comparison as the only atom is not reduced to F") {
+		const char* sample = "!(x:bv[8] < y:bv[8]).";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( (tau::get(res).find_top(is<node_t, tau::bf_nlt>)
+			|| tau::get(res).find_top(is<node_t, tau::bf_lt>)) );
+	}
+
+	TEST_CASE("negated bv comparison is not dropped from a conjunction") {
+		const char* sample = "!(x:bv[8] < y:bv[8]) && z:bv[8] = 0.";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
+		CHECK( (tau::get(res).find_top(is<node_t, tau::bf_nlt>)
+			|| tau::get(res).find_top(is<node_t, tau::bf_lt>)) );
+	}
+
+	TEST_CASE("bv <= comparison is not dropped from a conjunction") {
+		const char* sample = "x:bv[8] <= y:bv[8] && z:bv[8] = 0.";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lteq>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
 	}
 }
 
@@ -855,22 +794,194 @@ TEST_SUITE("SyntacticFormulaSimplification") {
 	}
 }
 
-TEST_SUITE("PushUniversalQuantifierOneOr") {
-	TEST_CASE("mixed-variable disjunction: x-free clause factored out") {
-		// all x (x = 0 || z = 0):
-		//   x = 0 contains the bound variable x → kept under ∀x
-		//   z = 0 is x-free                     → pulled out as a disjunct
-		// Exercises the wff_or branch where both q_fm and no_q_fm are
-		// non-empty (the partial-removal path that was never exercised).
-		// Result: (all x (x=0 || _F())) || (_F() || z=0)
-		const char* sample = "all x (x = 0 || z = 0).";
-		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = push_universal_quantifier_one<node_t>(fm);
-		// The formula must have changed (quantifier was restructured)
-		CHECK( tau::get(res) != tau::get(fm) );
-		// The quantifier must survive (x-dependent clause kept under ∀x)
+// TC-4: simplify_temporal_clause's `return std::nullopt` at
+// normalizer.tmpl.h:777 is the only way a temporal clause is dropped, and it
+// had no test -- the existing coverage exercises the implied-always path only.
+TEST_SUITE("SimplifyTemporalClauseUnsat") {
+
+	TEST_CASE("an unsatisfiable always/sometimes pair drops the clause") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref q = get_nso_rr("x != 0.").value().main->get();
+		// always x = 0 && sometimes x != 0: the pair is unsatisfiable, so
+		// the whole clause is dropped.
+		tref clause = tau::build_wff_and(tau::build_wff_always(p),
+			tau::build_wff_sometimes(q));
+		CHECK( !simplify_temporal_clause<node_t>(clause).has_value() );
+	}
+
+	TEST_CASE("a satisfiable always/sometimes pair keeps the clause") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref q = get_nso_rr("y = 0.").value().main->get();
+		tref clause = tau::build_wff_and(tau::build_wff_always(p),
+			tau::build_wff_sometimes(q));
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		CHECK( *res != nullptr );
+	}
+
+	// A sometimes part implied by an always part is replaced by T rather than
+	// dropping the clause (normalizer.tmpl.h:781-782).
+	TEST_CASE("a sometimes part implied by an always part is eliminated") {
+		tref strong = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		tref weak = get_nso_rr("x = 0.").value().main->get();
+		tref clause = tau::build_wff_and(tau::build_wff_always(strong),
+			tau::build_wff_sometimes(weak));
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		// The sometimes part is gone; only the always part is left.
+		CHECK( !tau::get(*res).find_top(is<node_t, tau::wff_sometimes>) );
+	}
+
+	// The single-part short-circuit at normalizer.tmpl.h:747-749.
+	TEST_CASE("a clause with a single temporal part is returned as is") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref only_aw = tau::build_wff_always(p);
+		auto r1 = simplify_temporal_clause<node_t>(only_aw);
+		REQUIRE( r1.has_value() );
+		CHECK( *r1 == only_aw );
+		tref only_st = tau::build_wff_sometimes(p);
+		auto r2 = simplify_temporal_clause<node_t>(only_st);
+		REQUIRE( r2.has_value() );
+		CHECK( *r2 == only_st );
+	}
+}
+
+// NZ-1 regression. normalize_non_temp can legitimately return a formula that is
+// neither T nor F: a closed bv scope the solver cannot settle (here bv
+// arithmetic plus an unresolved wff_ref, which is_bv_solvable_formula accepts
+// because it inspects only variable nodes, and which cvc5 then fails to
+// translate) comes back with its quantifier intact. All three predicates below
+// asserted that could not happen, so each aborted a Debug build on this input.
+// They now fall back to their negative answer and log it.
+TEST_SUITE("UndecidableNormalizationFallback") {
+
+	static tref undecidable() {
+		return get_nso_rr("ex x (x:bv[8] * y:bv[8] = { 1 }:bv[8]"
+			" && q(x)).").value().main->get();
+	}
+
+	TEST_CASE("normalize_non_temp leaves it quantified") {
+		tref res = normalize_non_temp<node_t>(undecidable());
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).equals_T() );
+		CHECK( !tau::get(res).equals_F() );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
-		// A top-level disjunction must appear (x-free clause factored out)
-		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) != nullptr );
+	}
+
+	TEST_CASE("is_nso_impl answers false instead of aborting") {
+		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()) );
+	}
+
+	TEST_CASE("is_non_temp_nso_unsat answers false instead of aborting") {
+		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()) );
+	}
+
+	TEST_CASE("is_non_temp_nso_satisfiable answers false instead of aborting") {
+		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()) );
+	}
+
+	TEST_CASE("are_nso_equivalent answers false instead of aborting") {
+		CHECK( !are_nso_equivalent<node_t>(tau::_T(), undecidable()) );
+	}
+
+	// Control: a decidable formula still gets a real answer.
+	TEST_CASE("decidable formulas are unaffected") {
+		tref taut = get_nso_rr("x = 0 || x != 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(tau::_T(), taut) );
+		CHECK( !is_non_temp_nso_unsat<node_t>(taut) );
+		CHECK( is_non_temp_nso_satisfiable<node_t>(taut) );
+	}
+}
+
+// NF-6 / AP-16. squeeze_absorb disables the process-global tree<node>::use_hooks
+// for the duration of its traversal and used to re-enable it by assigning
+// `true` unconditionally at the end. Two ways that goes wrong: an exception
+// thrown out of the traversal (this subsystem's bv paths do throw) skips the
+// re-enable and leaves hooks disabled for the rest of the process, and a caller
+// that had deliberately disabled them gets them force-enabled on return.
+TEST_SUITE("UseHooksGuard") {
+
+	TEST_CASE("restores the previous value on scope exit") {
+		const bool before = tau::use_hooks;
+		{
+			use_hooks_guard<node_t> g(false);
+			CHECK( tau::use_hooks == false );
+		}
+		CHECK( tau::use_hooks == before );
+	}
+
+	TEST_CASE("restores a false previous value, not `true`") {
+		// The old code's second failure mode: it did not save, it assigned.
+		tau::use_hooks = false;
+		{
+			use_hooks_guard<node_t> g(false);
+			CHECK( tau::use_hooks == false );
+		}
+		CHECK( tau::use_hooks == false );
+		tau::use_hooks = true;
+	}
+
+	TEST_CASE("restores on an exception thrown through the scope") {
+		const bool before = tau::use_hooks;
+		try {
+			use_hooks_guard<node_t> g(false);
+			throw std::runtime_error("unwind");
+		} catch (const std::runtime_error&) {}
+		CHECK( tau::use_hooks == before );
+	}
+
+	TEST_CASE("squeeze_absorb leaves hooks as it found them") {
+		const bool before = tau::use_hooks;
+		tref fm = get_nso_rr("x y = 0 && x z != 0.").value().main->get();
+		tref var = tau::get(fm).find_top(is<node_t, tau::variable>);
+		REQUIRE( var != nullptr );
+		squeeze_absorb<node_t>(fm, var);
+		CHECK( tau::use_hooks == before );
+	}
+}
+
+TEST_SUITE("atm_formula_order_for_quant_elim stability") {
+
+	// Pivot selection must not depend on parser nonterminal numbering:
+	// a `./dev regen` with a newer pinned generator renumbers the
+	// nonterminals, and the comparator's old subtree_less tie-breaks
+	// flipped with them — the 8f1a74c1 regeneration re-rolled the
+	// Boole-decomposition pivot order this way and with it the
+	// decomposition cost (bisected 2026-08-18/19, GitHub #70 family).
+	// Ties must therefore break on PRINTED form: surface syntax is the
+	// one ordering a regeneration cannot change.
+	TEST_CASE("ties break on printed form, not grammar numbering") {
+		// All four equations tie on every semantic key: the same
+		// quantified variable x (same max/min priority), none an
+		// equational assignment, one extra unquantified variable each.
+		tref fm = get_nso_rr(
+			"ex x (x d = 0 && x b = 0 && x c = 0 && x a = 0).")
+				.value().main->get();
+		// The comparator receives wff-level atoms (wff{bf_eq ...}),
+		// exactly what anti_prenex_block's candidate scan collects.
+		trefs atms = tau::get(fm).select_top(
+			[](tref n) {
+				const auto& t = tau::get(n);
+				return t.is(tau::wff) && t.child_is(tau::bf_eq);
+			});
+		REQUIRE( atms.size() == 4 );
+		// x's binder node is interned identically to its occurrences.
+		tref x = tau::get(fm).find_top(is<node_t, tau::variable>);
+		REQUIRE( x != nullptr );
+		subtree_unordered_map<node_t, int_t> qp;
+		qp.emplace(x, 1);
+		auto comp = atm_formula_order_for_quant_elim<node_t>(qp);
+		// Spec: among fully tied candidates the minimum is the one with
+		// the lexicographically smallest printed form.
+		std::vector<std::string> strs;
+		for (tref a : atms) strs.push_back(tau::get(a).to_str());
+		const std::string smallest =
+			*std::min_element(strs.begin(), strs.end());
+		tref m = *std::min_element(atms.begin(), atms.end(), comp);
+		CHECK( tau::get(m).to_str() == smallest );
+		// Strict-weak-order sanity: irreflexive and asymmetric.
+		for (tref p : atms) CHECK( !comp(p, p) );
+		for (tref p : atms) for (tref q : atms)
+			if (comp(p, q)) CHECK( !comp(q, p) );
 	}
 }

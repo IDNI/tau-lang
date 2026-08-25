@@ -9,8 +9,8 @@
 // Usage: `tau_codegen spec.tau -o program.h`;
 // then links the resulting header in their C++ project.  The generated
 // program is pure-switch-case for propositional specs; for specs with
-// data atoms (qlt, bv, etc.) it emits runtime solver call stubs linked
-// against libtau at build time.
+// data atoms (qlt, bv, etc.) it embeds compile-time witness literals --
+// the generated header depends only on <cstdint>, not libtau.
 
 #ifdef DEBUG
 #include "boolean_algebras/bv_ba.h"
@@ -32,6 +32,7 @@
 #endif
 
 #include <cstring>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -57,7 +58,24 @@ static void usage() {
 	    "        oracle-resolved at runtime (per declare_open_design.md §14).\n"
 	    "        V1: registration API only; per-step dispatch is V2.\n"
 	    "\n"
-	    "The generated header compiles with: g++ -O3 -flto -std=c++17\n";
+	    "The generated header compiles with: g++ -O3 -flto -std=c++17\n"
+	    "\n"
+	    "Exit codes: 0 program emitted; 1 input/output error; 2 usage;\n"
+	    "            3 UNREALIZABLE; 4 UNKNOWN (backend gave no verdict);\n"
+	    "            5 REALIZABLE but not compilable over the streams.\n";
+}
+
+// CG-N7: --class and --open names are interpolated into generated C++
+// (class name, struct fields, string literals); anything that is not an
+// identifier produces an invalid or mis-quoted program.
+static bool is_cpp_identifier(const std::string& s) {
+	if (s.empty()) return false;
+	auto ok_first = [](unsigned char c) { return std::isalpha(c) || c == '_'; };
+	auto ok_rest  = [](unsigned char c) { return std::isalnum(c) || c == '_'; };
+	if (!ok_first(s[0])) return false;
+	for (size_t i = 1; i < s.size(); ++i)
+		if (!ok_rest(s[i])) return false;
+	return true;
 }
 
 int main(int argc, char** argv) {
@@ -65,6 +83,7 @@ int main(int argc, char** argv) {
 	std::string out_path;
 	std::string class_name = "TauProgram";
 	std::vector<std::string> open_streams;
+	bool seen_spec = false;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string a = argv[i];
@@ -93,12 +112,37 @@ int main(int argc, char** argv) {
 				start = (comma == std::string::npos)
 					? list.size() : comma + 1;
 			}
+			// CG-R6: an --open list that names nothing silently
+			// produced the non-open program.
+			if (open_streams.empty()) {
+				std::cerr << "--open: no stream names given\n";
+				usage(); return 2;
+			}
 		} else if (a.size() && a[0] == '-' && a != "-") {
 			std::cerr << "unknown option: " << a << "\n"; usage(); return 2;
+		} else if (seen_spec) {
+			// CG-R6: a second positional used to replace the first
+			// silently.
+			std::cerr << "more than one spec file given: " << spec_path
+			          << " and " << a << "\n";
+			usage(); return 2;
 		} else {
 			spec_path = a;
+			seen_spec = true;
 		}
 	}
+
+	if (!is_cpp_identifier(class_name)) {
+		std::cerr << "--class: '" << class_name
+		          << "' is not a C++ identifier\n";
+		return 2;
+	}
+	for (const auto& s : open_streams)
+		if (!is_cpp_identifier(s)) {
+			std::cerr << "--open: '" << s
+			          << "' is not a stream identifier\n";
+			return 2;
+		}
 
 	std::string src;
 	if (spec_path == "-") {
@@ -107,6 +151,14 @@ int main(int argc, char** argv) {
 		std::ifstream ifs(spec_path);
 		if (!ifs) { std::cerr << "cannot open " << spec_path << "\n"; return 1; }
 		std::ostringstream oss; oss << ifs.rdbuf(); src = oss.str();
+	}
+	// CG-R7: the formula parser rejects trailing whitespace, so a spec piped
+	// through stdin (`echo 'G(o1[t] = 1)' | tau_codegen -`) failed to parse
+	// while the same text read from a file succeeded. Trim both ends.
+	{
+		auto b = src.find_first_not_of(" \t\r\n");
+		auto e = src.find_last_not_of(" \t\r\n");
+		src = b == std::string::npos ? "" : src.substr(b, e - b + 1);
 	}
 	if (src.empty()) { std::cerr << "empty input\n"; return 1; }
 
@@ -122,10 +174,33 @@ int main(int argc, char** argv) {
 	// Drive the LTL(ABA) synthesis pipeline.  solve_ltl_aba returns
 	// std::nullopt on propositional unrealizability; on success we receive
 	// the HoaAutomaton strategy.
-	auto sol = solve_ltl_aba<node_t>(fm);
+	//
+	// CG-N6: the backend reports "no verdict" (timeout, missing Spot,
+	// malformed strategy, refused CTL* placement) by throwing; without a
+	// handler the process died with an unhandled exception. Exit 4 =
+	// UNKNOWN, distinct from 3 = UNREALIZABLE.
+	std::optional<LtlAbaSolution<node_t>> sol;
+	try {
+		sol = solve_ltl_aba<node_t>(fm);
+	} catch (const ltl_synthesis_error& e) {
+		std::cerr << "UNKNOWN: synthesis failed (" << e.what() << ")\n";
+		return 4;
+	}
 	if (!sol) {
 		std::cerr << "spec is UNREALIZABLE\n";
 		return 3;
+	}
+	// CG-R1: Algorithm B's strategy ranges over bookkeeping bits (P_sigma /
+	// D) and the constant-output fast path carries no automaton at all;
+	// neither can be compiled into a program over the user's streams. The
+	// interpreter refuses these (ltl_to_safety_formula_full); so must the
+	// code generator, instead of emitting a wrong-but-compiling program.
+	if (!sol->executable) {
+		std::cerr << "spec is REALIZABLE but its strategy is not "
+			"executable: it cannot be compiled into a program over "
+			"the declared streams (Algorithm B / constant-output "
+			"fast path)\n";
+		return 5;
 	}
 
 	std::ostringstream ss;
@@ -141,6 +216,9 @@ int main(int argc, char** argv) {
 		std::ofstream ofs(out_path);
 		if (!ofs) { std::cerr << "cannot write " << out_path << "\n"; return 1; }
 		ofs << ss.str();
+		// CG-N12: a failed write (full disk, closed pipe) exited 0.
+		ofs.flush();
+		if (!ofs) { std::cerr << "write failed: " << out_path << "\n"; return 1; }
 	}
 	std::cerr << "[tau_codegen] emitted " << class_name << " ("
 	          << sol->aut.num_states << " states, "

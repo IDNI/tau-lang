@@ -12,12 +12,6 @@ namespace idni::tau_lang {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-node<BAs...> node<BAs...>::retype(size_t new_nt) const {
-	return node(new_nt, data, term, ba_type, ext);
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
 	return node(nt, data, term, new_ba, ext);
 }
@@ -64,10 +58,12 @@ constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 // Deliberately narrower than tree<node>::is_term_nt (see tau_tree.tmpl.h):
 // this variant only sets the node's `term` bit at construction time for the
 // core bf/io_var nonterminals, excluding the extended bf arithmetic/functional
-// operators and capture. Those are typed later in the pipeline, and the
-// DBG-only "all term nodes are typed" invariant in
-// tree<node>::get(const parser::tree&, get_options&) (tau_tree_from_parser.tmpl.h)
-// relies on this narrower set to avoid false positives on not-yet-typed nodes.
+// operators and capture. NOTE (TT1-18): the DBG "all term nodes are typed"
+// invariant in tree<node>::get(const parser::tree&, get_options&)
+// (tau_tree_from_parser.tmpl.h) does NOT use this function -- unqualified
+// lookup there resolves to the wide member tree::is_term_nt, and that is
+// load-bearing: this narrower set flags atoms (e.g. qlt ordering operands)
+// that are legitimately still untyped at that stage.
 inline bool is_term_nt(size_t nt) {
 	switch (nt) {
 		case tau_parser::bf:
@@ -121,35 +117,10 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 int_t node<BAs...>::as_int() const { return static_cast<int_t>(data); }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::nnull() { return node(); }
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
-	// ba_type is not encoded in raw_value (see extension() below), so it
-	// cannot be recovered here and is reset to 0.
-	return node(
-		(raw_value >> node::nt_shift) & node::nt_mask,
-		raw_value & node::data_mask,
-		(raw_value >> node::term_shift) & 1u,
-		0,
-		(raw_value >> node::ext_shift) & 1u
-	);
-}
+// (TT1-11: nnull() and the extension() pack/unpack pair deleted -- zero
+// callers, and the packing lost nt's MSB; see the note in tau_tree.h.)
 
 #define NODE_CAST(x) static_cast<node<BAs...>::T>(x)
-template <typename... BAs>
-requires BAsPack<BAs...>
-constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
-	T result = 0;
-	result |= (NODE_CAST(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
-	result |= (NODE_CAST(term) & 1u) << node::term_shift ;
-	result |= (NODE_CAST(ext) & 1u) << node::ext_shift;
-	result |= NODE_CAST(data) & node::data_mask;
-	return result;
-}
 
 template <typename... BAs>
 requires BAsPack<BAs...>

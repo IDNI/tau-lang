@@ -1,0 +1,5 @@
+i1:bv[8] := in file("tests/benchmark/fixtures/run/inputs/bv8-16.in").
+i2:bv[16] := in file("tests/benchmark/fixtures/run/inputs/bv16-16.in").
+i3:bv[32] := in file("tests/benchmark/fixtures/run/inputs/bv32-16.in").
+run always (o1[t]:bv[8] = i1[t]:bv[8] + { 1 }:bv[8] && o2[t]:bv[16] = i2[t]:bv[16] + { 1 }:bv[16] && o3[t]:bv[32] = i3[t]:bv[32] + { 1 }:bv[32]).
+q

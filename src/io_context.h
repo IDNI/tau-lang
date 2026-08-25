@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 /**
  * @file io_context.h
@@ -147,6 +147,10 @@ struct repl_pending_input_stream : public serialized_constant_input_stream {
 	size_t awaiting_time_point() const { return awaiting_time_point_; }
 private:
 	std::optional<std::string> pending_value;
+	// Value already handed out for `delivered_time_point_`, kept so that a
+	// step re-entered for another stream's value reads the same input again.
+	std::optional<std::string> delivered_value;
+	size_t delivered_time_point_ = 0;
 	bool awaiting_ = false;
 	size_t awaiting_time_point_ = 0;
 };
@@ -218,7 +222,9 @@ struct vector_input_stream : public serialized_constant_input_stream {
 	vector_input_stream(std::shared_ptr<std::vector<std::string>> values,
 		std::shared_ptr<size_t> current);
 	virtual ~vector_input_stream() = default;
-	/** @brief Rebuild by resetting the cursor to the beginning. */
+	/** @brief Rebuild SHARING values and cursor -- the copy CONTINUES
+	 * where this stream left off (AP2-12: it does not rewind, despite the
+	 * base contract; tests pin this sharing behavior). */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
 	/** @brief Return the next value, or `std::nullopt` when exhausted. */
 	virtual std::optional<std::string> get() override;
@@ -240,7 +246,8 @@ struct vector_output_stream : public serialized_constant_output_stream {
 	/** @brief Construct sharing @p values as the backing store. */
 	vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values);
 	virtual ~vector_output_stream() = default;
-	/** @brief Rebuild by resetting the read cursor. */
+	/** @brief Rebuild SHARING the backing values (not empty, unlike the
+	 * base contract) with the read cursor reset (AP2-12). */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	/** @brief Append @p value to the backing store. */
 	virtual bool put(const std::string& value) override;
@@ -290,10 +297,6 @@ struct io_context {
 	tref add_input_console(const std::string& name, size_t type_id);
 	/** @brief Register a prompting console output stream for @p name with @p type_id. */
 	tref add_output_console(const std::string& name, size_t type_id);
-	/** @brief Register a non-prompting console input stream for @p name with @p type_id. */
-	tref add_input_console_no_prompt(const std::string& name, size_t type_id);
-	/** @brief Register a non-prompting console output stream for @p name with @p type_id. */
-	tref add_output_console_no_prompt(const std::string& name, size_t type_id);
 	/** @brief Register a file input stream reading from @p filename for @p name with @p type_id. */
 	tref add_input_file(const std::string& name, size_t type_id, const std::string& filename);
 	/** @brief Register a file output stream writing to @p filename for @p name with @p type_id. */

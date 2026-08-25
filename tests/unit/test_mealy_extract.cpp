@@ -118,4 +118,23 @@ TEST_SUITE("mealy_extract") {
 
 		CHECK(m.initial_state == 2);
 	}
+
+	// GR-RT7: a duplicated winning vertex is counted twice by num_states
+	// (the dense remap keeps the LAST position) and its edges are emitted
+	// once per copy.  Pinned as current behaviour: callers pass a set-derived
+	// vector, so this is unreachable today; change the expectation if the
+	// extractor is ever made to de-duplicate.
+	TEST_CASE("[GR-RT7] duplicate winning vertex inflates num_states (pinned)") {
+		std::vector<int> winning = {3, 3};
+		std::map<std::pair<int,int>, int> witness = { {{3, 0}, 1} };
+		auto successor = [](int, int) { return 3; };
+		Mealy m = extract_mealy(winning, 0, witness, 1, successor);
+		CHECK(m.num_states == 2);
+		CHECK(m.edges.size() == 2);
+		for (const auto& e : m.edges) {
+			CHECK(e.from_state == 1);
+			CHECK(e.to_state == 1);
+		}
+	}
+
 }

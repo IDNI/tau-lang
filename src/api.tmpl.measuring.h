@@ -10,7 +10,7 @@ namespace idni::tau_lang {
 inline measuring& measuring::part() { return parts.emplace_back(), parts.back(); }
 
 inline std::ostream& measuring::operator()(std::ostream& os, size_t level) const {
-	if (print_json) return to_json(os) << "\n";
+	if (print_json) return to_json(os, level) << "\n";
 	auto indent = std::string(level, '\t');
 	os << indent << name << ": " << ms << " ms\n";
 	if (!parts.empty()) {
@@ -279,10 +279,10 @@ MT(std::vector<stream_at>, get_inputs_for_step, (interpreter<node>& i), (i))
 template <NodeType node>
 std::optional<std::map<stream_at, std::string>>
 api<node>::step(measuring& m, interpreter<node>& i,
-	std::map<stream_at, std::string> inputs)
+	std::map<stream_at, std::string> inputs, bool interactive)
 {
 	api_measure am("step", m);
-	return step(i, std::move(inputs));
+	return step(i, std::move(inputs), interactive);
 }
 
 template <NodeType node>

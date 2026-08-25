@@ -10,15 +10,6 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
-/// Convert a subtree_map<node,tref> to a map<string,string> by
-/// serializing every key and value with to_str().  Null entries are skipped.
-template <NodeType node>
-std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
-	std::map<std::string, std::string> sm;
-	for (auto [k, v] : m) if (k && v) sm[to_str(k)] = to_str(v);
-	return sm;
-}
-
 // ------------------------------------------------------------
 // String API — convenience wrappers that accept/return std::string
 // ------------------------------------------------------------
@@ -113,9 +104,10 @@ std::optional<std::string> api<node>::substitute(
 template <NodeType node>
 std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
-	if (tref a = apply_all_defs(get_spec_or_term(expr)); a)
-		if (tref b = tau_lang::boole_normal_form<node>(a); b)
-			return to_str(b);
+	// AP1-17: delegate to the tref overload (it runs simplify first);
+	// the inlined copy skipped it and could diverge on canonization.
+	if (tref b = boole_normal_form(get_formula_or_term(expr)); b)
+		return to_str(b);
 	return {};
 }
 
@@ -191,12 +183,10 @@ template <NodeType node>
 std::optional<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
-	// Pipeline: parse → apply all defs → anti-prenex → resolve quantifiers
+	// AP1-17: delegate to the tref overload (see boole_normal_form).
 	if (tref e = get_formula(expr); e)
-		if (tref a = apply_all_defs(e); a)
-			if (tref r = resolve_quantifiers<node>(
-				tau_lang::anti_prenex<node>(a)); r)
-					return to_str(r);
+		if (tref r = eliminate_quantifiers(e); r)
+			return to_str(r);
 	return {};
 }
 
@@ -217,7 +207,9 @@ bool api<node>::sat(const std::string& expr) {
 
 template <NodeType node>
 bool api<node>::unsat(const std::string& expr) {
-	return !sat(expr);
+	// AP1-11: route through the tref overload so unparseable input is
+	// invalid (false), not "unsatisfiable".
+	return unsat(get_spec_or_term(expr));
 }
 
 template <NodeType node>
@@ -398,6 +390,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Run update if update stream is present and unequal to 0
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
+	else warn_if_update_dropped<node>(i, output.value());
 
 	if (interactive && !auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
@@ -411,7 +404,9 @@ template <NodeType node>
 std::optional<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i)
 {
-	using tau = tree<node>;
+	// tau is only consulted by DBG tracing since AP1-12 switched the
+	// output serialization to serialize_constant.
+	using tau [[maybe_unused]] = tree<node>;
 
 	if (!i.calculate_initial_spec()) return {};
 
@@ -429,19 +424,29 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		return {};
 	}
 
-	// Build outputs for the step
+	// Build outputs for the step. AP1-12: serialize via
+	// serialize_constant like the with-inputs overload -- raw to_str()
+	// skipped the bf_t/bf_f-to-BA-element mapping and the no-element
+	// failure check, so the two overloads printed different values for
+	// the same step.
 	std::map<stream_at, std::string> outputs;
 	for (const auto& [out, val] : output.value()) {
 		DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
-		outputs[{ get_var_name<node>(out), i.time_point }] =
-							tau::get(val).to_str();
+		std::stringstream ss;
+		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
+			TAU_LOG_ERROR << "No Boolean algebra element assigned "
+				"to output '" << TAU_TO_STR(out) << "'";
+			return {};
+		}
+		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
 
 	// Run update if update stream is present and unequal to 0
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
+	else warn_if_update_dropped<node>(i, output.value());
 
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";

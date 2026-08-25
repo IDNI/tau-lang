@@ -245,17 +245,9 @@ TEST_SUITE("type_scoped_resolver free functions") {
 		CHECK(std::holds_alternative<inference_error>(result));
 	}
 
-	// TY-4 (still present at HEAD): the initializer_list overload of
-	// open_same_type() computes `inferred_type` by folding default_type
-	// with every provided type via unify() -- exactly like the map overload
-	// tested above -- but then stores `scoped[t] = default_type` (not
-	// inferred_type) and calls resolver.open(scoped) directly, and finally
-	// `return default_type` (not inferred_type). So both the returned type
-	// and every node's stored type end up being the original default_type
-	// even when a strictly more specific compatible type was inferred.
-	// This test documents CURRENT (buggy) behavior; it intentionally does
-	// NOT modify src/type_scoped_resolver.tmpl.h to fix it.
-	TEST_CASE("free open_same_type (initializer_list variant): TY-4 bug -- stores/returns default_type instead of the inferred type") {
+	// TY-4 / LS-4 (FIXED): the initializer_list overload now stores and
+	// returns the unified inferred type, matching the map overload.
+	TEST_CASE("free open_same_type (initializer_list variant): stores/returns the inferred type (TY-4 fixed)") {
 		type_scoped_resolver<node_t> r;
 		tref a = tau::get("T", parse_opts_wff_no_infer);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
@@ -264,11 +256,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 		auto result = open_same_type<node_t>(r,
 			{ subtree_map<node_t, size_t>{ { a, bool_tid } } }, untyped_tid);
 		REQUIRE(!std::holds_alternative<inference_error>(result));
-		// Buggy: the correctly-inferred type here is bool_tid, but the
-		// function returns the original default_type (untyped) instead.
-		CHECK(std::get<size_t>(result) == untyped_tid);
-		// Buggy: `a` ends up typed as untyped in the resolver, not bool.
-		CHECK(r.type_id_of(a) == untyped_tid);
+		CHECK(std::get<size_t>(result) == bool_tid);
+		CHECK(r.type_id_of(a) == bool_tid);
 	}
 
 	TEST_CASE("free merge (initializer_list variant): merges nodes, ignoring the map's type values") {

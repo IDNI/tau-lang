@@ -1,8 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <cctype> // BA1-6: isalpha/isalnum used below
 #include "qlt.h"
 
 namespace idni::tau_lang {
+
+// BA1-4: pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
+__extension__ typedef __int128 int128_t_;
 
 // --- internal helper ---
 
@@ -42,13 +46,22 @@ bool qlt_rational::operator<(const qlt_rational& o) const {
 	if (neg_inf) return !o.neg_inf;
 	if (o.pos_inf) return !pos_inf;
 	if (pos_inf || o.neg_inf) return false;
-	return p * o.q < o.p * q;
+	// BA1-4: cross-multiplication overflows long long for parse-reachable
+	// magnitudes (~9.2e18); widen to __int128.
+	return (int128_t_) p * o.q < (int128_t_) o.p * q;
 }
 
 qlt_rational qlt_rational::midpoint(const qlt_rational& o) const {
-	long long num = p * o.q + o.p * q;
-	long long den = 2 * q * o.q;
-	return qlt_rational(num, den);
+	// BA1-4: compute wide, then reduce by gcd before narrowing -- the
+	// unreduced cross products overflow long long for large operands.
+	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
+	int128_t_ den = (int128_t_) 2 * q * o.q;
+	int128_t_ a = num < 0 ? -num : num, b = den < 0 ? -den : den;
+	while (b) { int128_t_ t = a % b; a = b; b = t; }
+	if (a > 1) num /= a, den /= a;
+	// A gcd-irreducible result outside long long keeps the historical
+	// truncation (extreme parse-level literals only).
+	return qlt_rational((long long) num, (long long) den);
 }
 
 qlt_rational qlt_rational::operator+(const qlt_rational& o) const {
@@ -158,18 +171,41 @@ bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
 	return true;
 }
 
+// --- semantic endpoint comparison ---
+
+// `qlt_rational::operator<` is a canonical total order used for sorting,
+// hashing and canonical forms: it places named constants after +inf.  That is
+// NOT the order of Q.  A named constant denotes an unknown rational, so the
+// only decidable facts about it are that it lies strictly between -inf and
+// +inf and that it equals itself; its position relative to a specific
+// rational, or to a differently-named constant, is unknown.
+//
+// Reading the canonical order as semantic is what made `{c} & ~{c}` come out
+// as `(c, +inf)`: `qlt_hi_min({c,CLOSED}, {+inf,OPEN})` answered `+inf`
+// because `c < +inf` is false canonically.
+std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b)
+{
+	if (a == b) return std::partial_ordering::equivalent;
+	if (a.is_sym()) {
+		if (b.is_neg_inf()) return std::partial_ordering::greater;
+		if (b.is_pos_inf()) return std::partial_ordering::less;
+		// vs a specific rational or another named constant
+		return std::partial_ordering::unordered;
+	}
+	if (b.is_sym()) {
+		if (a.is_neg_inf()) return std::partial_ordering::less;
+		if (a.is_pos_inf()) return std::partial_ordering::greater;
+		return std::partial_ordering::unordered;
+	}
+	// Both non-symbolic: the canonical order is the semantic one.
+	return a < b ? std::partial_ordering::less
+		     : std::partial_ordering::greater;
+}
+
 // --- interval helpers ---
 
-// Compare: lo1 endpoint < lo2 endpoint (for sorting)
-bool qlt_lo_less(const qlt_piece& a, const qlt_piece& b) {
-	if (a.lo.val != b.lo.val) return a.lo.val < b.lo.val;
-	// -inf [closed/-inf open: treat equal; for finite: CLOSED < OPEN
-	if (a.lo.val.is_neg_inf()) return false;
-	return (int)a.lo.bound < (int)b.lo.bound; // OPEN(0) < CLOSED(1)? No: closed is lower
-	// Actually for a lower endpoint: CLOSED means includes the point (lower),
-	// OPEN means excludes it (so the interval starts just after).
-	// For sorting: CLOSED endpoint at x is to the "left" of OPEN endpoint at x.
-}
+// (BA1-3: qlt_lo_less deleted -- zero callers, and its tie-break was
+// inverted relative to its own comment and to normalise's live comparator.)
 
 // Does piece p contain point val (for overlap testing)?
 // Pieces are intervals, so we check lo <= x < hi (or lo < x <= hi, etc.)
@@ -195,25 +231,38 @@ bool qlt_below_hi(const qlt_endpoint& hi, const qlt_rational& x) {
 }
 
 // Compare two endpoints as upper bounds: which is smaller?
-// Returns true if a.val < b.val, or same val but a is "tighter" (open < closed at same point)
+// Returns true if a is semantically below b, or they sit at the same value but
+// a is "tighter" (open < closed at the same point).  An undecidable comparison
+// (symbolic endpoint) is not "less".
 bool qlt_hi_less(const qlt_endpoint& a, const qlt_endpoint& b) {
-	if (a.val != b.val) return a.val < b.val;
+	auto c = qlt_sem_cmp(a.val, b.val);
+	if (c == std::partial_ordering::less)    return true;
+	if (c == std::partial_ordering::greater) return false;
+	if (c == std::partial_ordering::unordered) return false; // unknown
 	// same val: OPEN upper < CLOSED upper (open endpoint excludes the point, so it's "lower")
 	if (a.val.is_pos_inf()) return false;
 	return (int)a.bound < (int)b.bound; // OPEN(0) < CLOSED(1)
 }
 
-// The lower endpoint that is further right (for intersection lower)
-qlt_endpoint qlt_lo_max(const qlt_endpoint& a, const qlt_endpoint& b) {
-	if (a.val != b.val) return (a.val < b.val) ? b : a;
+// The lower endpoint that is further right (for intersection lower).
+// `nullopt` when the two values are not semantically comparable.
+std::optional<qlt_endpoint> qlt_lo_max(const qlt_endpoint& a, const qlt_endpoint& b) {
+	auto c = qlt_sem_cmp(a.val, b.val);
+	if (c == std::partial_ordering::unordered) return std::nullopt;
+	if (c == std::partial_ordering::less)      return b;
+	if (c == std::partial_ordering::greater)   return a;
 	if (a.val.is_neg_inf()) return a;
 	// same value: OPEN is more restrictive (excludes the point)
 	return (a.bound == qlt_bound::OPEN) ? a : b;
 }
 
-// The upper endpoint that is further left (for intersection upper)
-qlt_endpoint qlt_hi_min(const qlt_endpoint& a, const qlt_endpoint& b) {
-	if (a.val != b.val) return (a.val < b.val) ? a : b;
+// The upper endpoint that is further left (for intersection upper).
+// `nullopt` when the two values are not semantically comparable.
+std::optional<qlt_endpoint> qlt_hi_min(const qlt_endpoint& a, const qlt_endpoint& b) {
+	auto c = qlt_sem_cmp(a.val, b.val);
+	if (c == std::partial_ordering::unordered) return std::nullopt;
+	if (c == std::partial_ordering::less)      return a;
+	if (c == std::partial_ordering::greater)   return b;
 	if (a.val.is_pos_inf()) return a;
 	// same value: OPEN is more restrictive
 	return (a.bound == qlt_bound::OPEN) ? a : b;
@@ -226,16 +275,18 @@ qlt_endpoint qlt_hi_max(const qlt_endpoint& a, const qlt_endpoint& b) {
 }
 
 // Is interval empty? (lo >= hi in the sense that lo endpoint >= hi endpoint)
-// For symbolic endpoints the ordering is unknown, so assume non-empty (conservative).
+// When the two endpoints are not comparable (symbolic) the emptiness is
+// unknown, and the piece is kept: this algebra over-approximates undecidable
+// cases, because dropping a piece would turn a satisfiable constraint such as
+// `x = {c} && 0 <= x <= 1` into a wrong UNSAT.
 bool qlt_piece_empty(const qlt_piece& p) {
-	if (p.lo.val.is_sym() || p.hi.val.is_sym()) {
-		// [c, c] with same sym name is a valid singleton; anything else is kept
-		if (p.lo.val == p.hi.val)
-			return !(p.lo.bound == qlt_bound::CLOSED && p.hi.bound == qlt_bound::CLOSED);
-		return false; // different symbolic endpoints: assume non-empty
-	}
-	if (p.lo.val > p.hi.val) return true;
-	if (p.lo.val == p.hi.val) {
+	auto c = qlt_sem_cmp(p.lo.val, p.hi.val);
+	if (c == std::partial_ordering::greater)   return true;
+	if (c == std::partial_ordering::unordered) return false; // assume non-empty
+	if (c == std::partial_ordering::equivalent) {
+		// [c, c] with the same name is a valid singleton, as is [x, x];
+		// an open bound at either end makes it empty, and ±inf is never
+		// a member of the interval.
 		if (p.lo.val.is_pos_inf() || p.lo.val.is_neg_inf()) return true;
 		return !(p.lo.bound == qlt_bound::CLOSED && p.hi.bound == qlt_bound::CLOSED);
 	}
@@ -243,13 +294,15 @@ bool qlt_piece_empty(const qlt_piece& p) {
 }
 
 // Do two intervals overlap (share at least one point)?
-// If any endpoint is a named constant, conservatively return false (ordering unknown).
+// An undecidable endpoint comparison is not an overlap: `normalise` only
+// merges pieces it can merge exactly, and leaving two pieces unmerged keeps
+// the union exact (only the canonical form is lost).
 bool qlt_pieces_overlap(const qlt_piece& a, const qlt_piece& b) {
-	if (a.lo.val.is_sym() || a.hi.val.is_sym() ||
-	    b.lo.val.is_sym() || b.hi.val.is_sym()) return false;
 	auto hi_above_lo = [](const qlt_endpoint& hi, const qlt_endpoint& lo) -> bool {
-		if (hi.val < lo.val) return false;
-		if (hi.val > lo.val) return true;
+		auto c = qlt_sem_cmp(hi.val, lo.val);
+		if (c == std::partial_ordering::less)      return false;
+		if (c == std::partial_ordering::greater)   return true;
+		if (c == std::partial_ordering::unordered) return false;
 		if (hi.val.is_pos_inf() || hi.val.is_neg_inf()) return false;
 		return hi.bound == qlt_bound::CLOSED && lo.bound == qlt_bound::CLOSED;
 	};
@@ -257,10 +310,9 @@ bool qlt_pieces_overlap(const qlt_piece& a, const qlt_piece& b) {
 }
 
 // Are two intervals "adjacent" (touching but not overlapping)?
-// If any endpoint is symbolic, conservatively return false.
+// Two pieces touching at the *same* named constant are adjacent -- that is
+// what makes `{c} | ~{c}` collapse to top.
 bool qlt_pieces_adjacent(const qlt_piece& a, const qlt_piece& b) {
-	if (a.lo.val.is_sym() || a.hi.val.is_sym() ||
-	    b.lo.val.is_sym() || b.hi.val.is_sym()) return false;
 	if (a.hi.val != b.lo.val) return false;
 	if (a.hi.val.is_pos_inf() || a.hi.val.is_neg_inf()) return false;
 	return (a.hi.bound == qlt_bound::OPEN && b.lo.bound == qlt_bound::CLOSED)
@@ -268,12 +320,24 @@ bool qlt_pieces_adjacent(const qlt_piece& a, const qlt_piece& b) {
 		|| (a.hi.bound == qlt_bound::CLOSED && b.lo.bound == qlt_bound::CLOSED);
 }
 
-// Merge two overlapping or adjacent intervals
+// May the two pieces be merged into one?  Overlapping or adjacent is not
+// enough: the merged piece takes min(lo) and max(hi), so both of those have to
+// be decidable too.  `(-inf,0)` and `(-inf,c)` do overlap, but their union is
+// `(-inf, max(0,c))`, which is not representable -- merging them would silently
+// drop one of the two upper bounds.
+bool qlt_pieces_mergeable(const qlt_piece& a, const qlt_piece& b) {
+	if (!qlt_pieces_overlap(a, b) && !qlt_pieces_adjacent(a, b)) return false;
+	return qlt_sem_cmp(a.lo.val, b.lo.val) != std::partial_ordering::unordered
+		&& qlt_sem_cmp(a.hi.val, b.hi.val) != std::partial_ordering::unordered;
+}
+
+// Merge two mergeable (see qlt_pieces_mergeable) intervals
 qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b) {
 	// lower bound = min(a.lo, b.lo)
 	qlt_endpoint lo, hi;
-	if (a.lo.val < b.lo.val) lo = a.lo;
-	else if (b.lo.val < a.lo.val) lo = b.lo;
+	auto c = qlt_sem_cmp(a.lo.val, b.lo.val);
+	if (c == std::partial_ordering::less) lo = a.lo;
+	else if (c == std::partial_ordering::greater) lo = b.lo;
 	else {
 		// same val: CLOSED is more inclusive
 		lo.val = a.lo.val;
@@ -283,6 +347,57 @@ qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b) {
 	// upper bound = max(a.hi, b.hi)
 	hi = qlt_hi_max(a.hi, b.hi);
 	return qlt_piece{lo, hi};
+}
+
+// Intersection of two pieces; nullopt when the result is empty.
+//
+// When every endpoint comparison is decidable this is exact: [max(lo), min(hi)].
+// When it is not -- a named constant against a specific rational, or two
+// different names -- there is no representable exact answer, and the three
+// available choices are not equal:
+//   * inventing a mixed endpoint pair (the old behaviour: `{c} & [0,1]` =
+//     `[c,1]`) yields a set that is a subset of neither operand: always wrong;
+//   * dropping the piece under-approximates, which would make
+//     `x = {c} && 0 <= x <= 1` report UNSAT even though it holds for
+//     c in [0,1] -- a silently wrong verdict;
+//   * keeping one whole operand over-approximates (A & B is a subset of A), the
+//     same conservative direction `qlt_piece_empty` already takes for symbolic
+//     endpoints.
+// We take the third.  The operand kept is the symbolic one -- it is the more
+// specific description of the two, so `{c} & [0,1]` = `{c}`, the correct
+// over-approximation of "{c} if c in [0,1], else bot".  If both are symbolic
+// we keep the canonically smaller piece so that `&` stays commutative.
+// Nothing decidable is lost by this: `({c} & [0,1]) & ~{c}` still collapses to
+// bot through the exact equal-name path.
+//
+// Caveat -- this is a policy, not one-sided soundness.  Over-approximation is
+// not closed under complement: `operator~` is exact, so negating an
+// over-approximated set under-approximates.  `~({c} & [0,1])` computes as
+// `~{c}` = `(-inf,c) | (c,+inf)`, whereas the true complement is all of Q when
+// c is outside [0,1]; conjoining `x = {c}` with it then yields bot, a wrong
+// UNSAT reached through this very convention.  The trade-off is deliberate:
+// every choice here is wrong for some model, and this one at least keeps `&`
+// exact wherever the comparison is decidable and never returns an endpoint
+// pair that was not already present in an operand.  Sound treatment of
+// undecidable comparisons needs case splits (or a constraint store), which
+// this representation cannot express.
+std::optional<qlt_piece> qlt_piece_intersect(const qlt_piece& a, const qlt_piece& b)
+{
+	auto lo = qlt_lo_max(a.lo, b.lo);
+	auto hi = qlt_hi_min(a.hi, b.hi);
+	if (lo && hi) {
+		qlt_piece p{*lo, *hi};
+		if (qlt_piece_empty(p)) return std::nullopt;
+		return p;
+	}
+	const bool a_sym = a.lo.val.is_sym() || a.hi.val.is_sym();
+	const bool b_sym = b.lo.val.is_sym() || b.hi.val.is_sym();
+	// An undecidable comparison always involves a symbolic endpoint, so at
+	// least one of the two flags is set here.
+	if (a_sym && !b_sym) return a;
+	if (b_sym && !a_sym) return b;
+	if (a.lo.val != b.lo.val) return (a.lo.val < b.lo.val) ? a : b;
+	return (a.hi.val < b.hi.val) ? a : b;
 }
 
 // --- qlt ---
@@ -330,19 +445,19 @@ qlt qlt::operator|(const qlt& o) const {
 }
 
 qlt qlt::operator&(const qlt& o) const {
+	// Pairwise rather than the usual sorted merge-sweep: the sweep advances
+	// by comparing upper endpoints, and with symbolic endpoints that
+	// comparison can be undecidable, so it would skip pairs and silently
+	// drop pieces (`({c} | {d}) & [0,1]` would lose `{d}`).  Both operands
+	// hold a handful of pieces, so the quadratic pass costs nothing, and
+	// `normalise` restores sortedness and merges what is mergeable.
 	std::vector<qlt_piece> result;
-	size_t i = 0, j = 0;
-	while (i < pieces.size() && j < o.pieces.size()) {
-		auto lo = qlt_lo_max(pieces[i].lo, o.pieces[j].lo);
-		auto hi = qlt_hi_min(pieces[i].hi, o.pieces[j].hi);
-		qlt_piece p{lo, hi};
-		if (!qlt_piece_empty(p)) result.push_back(p);
-		// advance piece that ends first
-		if (qlt_hi_less(pieces[i].hi, o.pieces[j].hi)) ++i;
-		else if (qlt_hi_less(o.pieces[j].hi, pieces[i].hi)) ++j;
-		else { ++i; ++j; }
-	}
-	return qlt{std::move(result)};
+	result.reserve(pieces.size() * o.pieces.size());
+	for (const auto& p : pieces)
+		for (const auto& q : o.pieces)
+			if (auto r = qlt_piece_intersect(p, q); r)
+				result.push_back(*r);
+	return normalise(std::move(result));
 }
 
 qlt qlt::operator~() const {
@@ -399,17 +514,27 @@ qlt qlt::normalise(std::vector<qlt_piece> ps) {
 	// remove empty pieces
 	ps.erase(std::remove_if(ps.begin(), ps.end(), qlt_piece_empty), ps.end());
 	if (ps.empty()) return {};
-	// sort by lower bound
+	// Sort by lower bound, in the canonical order.  The upper bound is a
+	// tie-break rather than an afterthought: it makes the order total, so
+	// structurally identical pieces always end up adjacent and get merged
+	// below even when several pieces share a lower endpoint.
 	std::sort(ps.begin(), ps.end(), [](const qlt_piece& a, const qlt_piece& b) {
 		if (a.lo.val != b.lo.val) return a.lo.val < b.lo.val;
 		// CLOSED lower bound comes first (further left)
-		return (int)a.lo.bound > (int)b.lo.bound; // CLOSED=1 > OPEN=0
+		if (a.lo.bound != b.lo.bound)
+			return (int)a.lo.bound > (int)b.lo.bound; // CLOSED=1 > OPEN=0
+		if (a.hi.val != b.hi.val) return a.hi.val < b.hi.val;
+		// OPEN upper bound comes first (further left)
+		return (int)a.hi.bound < (int)b.hi.bound;
 	});
 	std::vector<qlt_piece> norm;
 	norm.push_back(ps[0]);
 	for (size_t k = 1; k < ps.size(); ++k) {
 		auto& last = norm.back();
-		if (qlt_pieces_overlap(last, ps[k]) || qlt_pieces_adjacent(last, ps[k])) {
+		// Structurally identical pieces always merge (that is what makes
+		// `{c} | {c}` idempotent); beyond that only pieces whose union is
+		// representable do -- see qlt_pieces_mergeable.
+		if (last == ps[k] || qlt_pieces_mergeable(last, ps[k])) {
 			last = qlt_merge(last, ps[k]);
 		} else {
 			norm.push_back(ps[k]);

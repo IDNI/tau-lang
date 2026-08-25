@@ -3914,6 +3914,570 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 } // TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]")
 
 
+// ── LT-3 / LT-4: the ABA oracle's guard feasibility check ────────────────────
+//
+// `guard_is_aba_feasible` is the oracle that decides whether a strategy edge
+// emitted by ltlsynt is realisable in the data domain.  Spot prints edge
+// labels as sums of products (`[0&1 | !0&!1]`), and the two defects below sit
+// on exactly that shape:
+//
+//   LT-3  the hand lexer stopped at the first `|` or `(`, so a disjunctive
+//         guard was truncated to its first product (false UNREALIZABLE) and a
+//         parenthesised guard produced NO literals at all, which the code then
+//         read as "vacuously feasible" (soundness hole).
+//   LT-4  `aba_existential_feasible`'s qlt fast path checked each free
+//         variable independently with `qlt_dlo_qe`, so a transitivity chain
+//         over three variables passed even though it is jointly UNSAT.
+//
+// Both are checked directly on the internal entry points: they are only ever
+// reached from a live ltlsynt strategy, which no test can shape on demand.
+
+TEST_SUITE("[LT-3] ABA oracle guard parsing") {
+
+	// atoms p0 = (o1 = 1/4), p1 = (o1 = 3/4) over qlt — mutually exclusive,
+	// each individually feasible.  aps mirrors the atom names, as parse_hoa
+	// would produce them.
+	static std::pair<std::vector<std::pair<tref, std::string>>,
+	                 std::vector<std::string>>
+	two_exclusive_qlt_atoms() {
+		tref fm = wff("(o1[t]:qlt = {1/4}:qlt) && (o1[t]:qlt = {3/4}:qlt)");
+		auto atoms = extract_data_atoms<node_t>(fm);
+		std::vector<std::string> aps;
+		for (auto& [f, name] : atoms) aps.push_back(name);
+		return {atoms, aps};
+	}
+
+	// Sanity: the two atoms are individually feasible and jointly infeasible.
+	TEST_CASE("[GF-00] fixture atoms behave as assumed") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		REQUIRE(atoms.size() == 2);
+		CHECK(guard_is_aba_feasible<node_t>("0", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("1", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1", aps, atoms));
+	}
+
+	// A sum of products is feasible iff SOME product is.  The old lexer kept
+	// only `0&1` (infeasible) and reported the whole edge infeasible, which
+	// the oracle loop turns into a spurious UNREALIZABLE verdict.
+	TEST_CASE("[GF-01] disjunctive guard accepted when a later product is feasible") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		REQUIRE(atoms.size() == 2);
+		CHECK(guard_is_aba_feasible<node_t>("0&1 | 0", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&1 | !0&!1", aps, atoms));
+	}
+
+	// ... and infeasible when EVERY product is.
+	TEST_CASE("[GF-02] disjunctive guard rejected when every product is infeasible") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		REQUIRE(atoms.size() == 2);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1 | 1&0", aps, atoms));
+	}
+
+	// A leading '(' made the old lexer emit an EMPTY literal list, which the
+	// per-type check then read as the empty conjunction `T` — every
+	// parenthesised guard was declared feasible unchecked.
+	TEST_CASE("[GF-03] parenthesised guard is not vacuously accepted") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		REQUIRE(atoms.size() == 2);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("(0&1)", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("(0)&(1)", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("(0|1)", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("(0|1)&0", aps, atoms));
+	}
+
+	// Constant labels keep their meaning: `t` fires unconditionally, `f`
+	// never fires (a dead edge is not an infeasibility).
+	TEST_CASE("[GF-04] constant guard labels") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		CHECK(guard_is_aba_feasible<node_t>("t", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("f", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("", aps, atoms));
+	}
+
+	// APs that are not user atoms (Algorithm A's R-bits, Algorithm B's
+	// P-bits, the ppLTLTT tester state vars) carry no data meaning and must
+	// keep dropping out — regression guard for QE-03/QE-09/QE-15.
+	TEST_CASE("[GF-05] bookkeeping APs still drop out") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		aps.push_back("r_0");   // index 2: no matching atom
+		CHECK(guard_is_aba_feasible<node_t>("0&2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&!2", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1&2", aps, atoms));
+	}
+
+	// ── LA-R1 / LA-R2 / LA-N5 / LA-RT1: per-input-class semantics ─────────
+	//
+	// A strategy edge fires under EVERY input class its label admits; the
+	// system only gets to pick the output part.  So "some product feasible"
+	// is the wrong acceptance rule as soon as the products carry different
+	// pure-input literals: the environment can choose the input class whose
+	// only product has an infeasible output part.  The sound rule is
+	//   for every input-feasible class, some product of that class (or one
+	//   whose input part is weaker) has a feasible output part;
+	//   input-dead classes fire vacuously.
+	// Fixture (review probe 5): p0 = (i1 = 1/4), p1 = (i1 = 3/4) — mutually
+	// exclusive pure-input — and the pure-output pair p2 = (o1 < 0),
+	// p3 = (o1 > 1), individually feasible and jointly infeasible, so `2&3`
+	// is the infeasible output part and `!2` a feasible one.  (A single
+	// self-contradictory atom such as `o1 < o1` folds to F at parse time.)
+	static std::pair<std::vector<std::pair<tref, std::string>>,
+	                 std::vector<std::string>>
+	two_inputs_one_dead_output() {
+		tref fm = wff("(i1[t]:qlt = {1/4}:qlt) && (i1[t]:qlt = {3/4}:qlt)"
+		              " && (o1[t]:qlt < {0}:qlt) && (o1[t]:qlt > {1}:qlt)");
+		auto atoms = extract_data_atoms<node_t>(fm);
+		std::vector<std::string> aps;
+		for (auto& [f, name] : atoms) aps.push_back(name);
+		return {atoms, aps};
+	}
+
+	TEST_CASE("[GF-10] probe-5 fixture atoms behave as assumed") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK(is_pure_input_atom<node_t>(atoms[0].first));
+		CHECK(is_pure_input_atom<node_t>(atoms[1].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[2].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[3].first));
+		CHECK(guard_is_aba_feasible<node_t>("0", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("1", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!2", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3", aps, atoms));
+	}
+
+	// LA-R2: the edge fires under input class p0 (only product 0&2&3,
+	// output part infeasible) AND under class p1 (product 1, fine).  The
+	// old "some product feasible" rule accepted it; under inputs p0 the
+	// system has no satisfying output.
+	TEST_CASE("[GF-11] LA-R2: a live input class with only an infeasible product rejects the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | 1", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("1 | 0&2&3", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0 | 1&2&3", aps, atoms));
+		// Both classes served by a feasible product: accepted.
+		CHECK(guard_is_aba_feasible<node_t>("0&!2 | 1", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&2 | 1&3", aps, atoms));
+	}
+
+	// LA-R1: a dead input class (p0&p1 is input-contradictory) must skip
+	// only ITS product, not accept the whole edge; the remaining
+	// unconstrained-input product `2&3` is the only one that can fire and
+	// it is infeasible.
+	TEST_CASE("[GF-12] LA-R1: a dead product is skipped, not used to accept the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&1&2 | 2&3", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3 | 0&1&2", aps, atoms));
+		// Every product input-dead: the edge can never fire → vacuous.
+		CHECK(guard_is_aba_feasible<node_t>("0&1&2&3", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&1&2&3 | 1&0&!2", aps, atoms));
+	}
+
+	// A product with a WEAKER input part covers the stronger class: under
+	// inputs p0 the system may take the input-unconstrained product `!2`.
+	TEST_CASE("[GF-13] a feasible product with weaker inputs covers a stronger class") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK(guard_is_aba_feasible<node_t>("0&2&3 | !2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&2&3 | 0&!2", aps, atoms));
+		// ... but a STRONGER input part does not cover the weaker class.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3 | 0&!2", aps, atoms));
+	}
+
+	// Negated input literals split the classes semantically: `!0` and `0`
+	// are complementary, so `0&2&3 | !0&!2` is rejected (inputs p0 only
+	// admit the infeasible product) while `!0&2&3 | 0&!2 | !0&!2` is
+	// accepted (every input class reaches a feasible product).
+	TEST_CASE("[GF-14] complementary input literals form disjoint classes") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_inputs_one_dead_output();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | !0&!2", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
+	}
+
+	// ── §13 / Batch O8: exact mixed-type coverage ─────────────────────────
+	//
+	// The single-type semantic COVER check cannot span independent BA
+	// types, so mixed-type guards used to stop at the syntactic subset
+	// test — a false UNREALIZABLE whenever the feasible input classes only
+	// JOINTLY cover an infeasible product's class.  The exact check
+	// expands I_k ∧ ⋀_j ¬I_j into literal products (capped by the runtime
+	// parameter max_cover_products) and calls I_k covered iff every
+	// product has some BA type's sub-conjunction infeasible.
+	// Fixture: p0 = (i1:qlt = 1/4), p1 = (i2:sbf = X) — inputs of two
+	// different types — and the jointly-infeasible qlt output pair
+	// p2 = (o1 < 0), p3 = (o1 > 1).
+	static std::pair<std::vector<std::pair<tref, std::string>>,
+	                 std::vector<std::string>>
+	mixed_two_type_fixture() {
+		tref fm = wff("(i1[t]:qlt = {1/4}:qlt) && (i2[t]:sbf = {X}:sbf)"
+		              " && (o1[t]:qlt < {0}:qlt) && (o1[t]:qlt > {1}:qlt)");
+		auto atoms = extract_data_atoms<node_t>(fm);
+		std::vector<std::string> aps;
+		for (auto& [f, name] : atoms) aps.push_back(name);
+		return {atoms, aps};
+	}
+
+	TEST_CASE("[GF-30] mixed fixture atoms behave as assumed") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK(is_pure_input_atom<node_t>(atoms[0].first));
+		CHECK(is_pure_input_atom<node_t>(atoms[1].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[2].first));
+		CHECK_FALSE(is_pure_input_atom<node_t>(atoms[3].first));
+		// Different BA types are independent variables: p0 ∧ p1 is
+		// feasible, the qlt output pair is not.
+		CHECK(guard_is_aba_feasible<node_t>("0&1", aps, atoms));
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("2&3", aps, atoms));
+	}
+
+	// The plan's flip fixture: the input-unconstrained product 2&3 is
+	// infeasible, and the two feasible products' input classes p1 / ¬p1
+	// JOINTLY cover every input valuation.  The syntactic subset test
+	// cannot see that ({p1} ⊄ ∅), so this edge was refused pre-O8; the
+	// exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
+	TEST_CASE("[GF-31] jointly-covering mixed-type classes accept the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK(guard_is_aba_feasible<node_t>("2&3 | 1&!2 | !1&!2", aps, atoms));
+	}
+
+	// Exactness in the other direction: with only the p1 class feasible,
+	// the input valuation (p0, ¬p1) still reaches only the infeasible
+	// product — the expansion finds the feasible product p0 ∧ ¬p1 (each
+	// type's sub-conjunction feasible) and the edge stays refused.
+	TEST_CASE("[GF-32] an uncovered mixed-type class still rejects the edge") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("0&2&3 | 1&!2", aps, atoms));
+	}
+
+	// Mixed-type version of GF-14: complementary sbf literals under a
+	// shared qlt input literal.  I_k = {p0}; the feasible classes
+	// {p0, p1} and {p0, ¬p1} jointly cover it — every expansion product
+	// carries either ¬p0 (qlt-infeasible with p0) or p1 ∧ ¬p1
+	// (sbf-infeasible), so the edge is accepted.
+	TEST_CASE("[GF-33] complementary mixed literals jointly cover a shared class") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		CHECK(guard_is_aba_feasible<node_t>(
+			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
+	}
+
+	// The expansion cap: negating GF-33's two-literal class {p0, p1}
+	// doubles the product count, so max_cover_products = 1 blows the cap
+	// and the pre-O8 syntactic verdict stands (refused, logged) — sound,
+	// at worst incomplete.  Restoring the default restores the exact
+	// answer.  (GF-31's single-literal classes never grow the expansion
+	// past one product, so that guard stays exact under any cap ≥ 1.)
+	TEST_CASE("[GF-34] the max_cover_products cap degrades to the syntactic verdict") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = mixed_two_type_fixture();
+		REQUIRE(atoms.size() == 4);
+		const size_t saved = max_cover_products;
+		max_cover_products = 1;
+		CHECK_FALSE(guard_is_aba_feasible<node_t>(
+			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
+		max_cover_products = saved;
+		CHECK(guard_is_aba_feasible<node_t>(
+			"0&2&3 | 0&1&!2 | 0&!1&!2", aps, atoms));
+	}
+
+	// ── LA-13 / LA-N6: `!` before a group or constant; absurd AP index ──
+	//
+	// `parse_atom` accepted `!` only in front of digits: `!(...)` returned
+	// F WITHOUT consuming the group (the oracle then read the edge as dead
+	// and execution dropped it) and `!f` read as F instead of T.  Spot
+	// negates atoms only, so this was latent -- but the parser is shared
+	// by the oracle and execution, and hand-fed HOA reaches it.
+	TEST_CASE("[GF-20] LA-13: !(group) is negated structurally, not read as F") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		REQUIRE(atoms.size() == 2);
+		// ¬(p0 ∧ ¬p0) ≡ ⊤: must not collapse to F.
+		tref r = guard_to_aba<node_t>("!(0&!0)", aps, atoms);
+		REQUIRE(r != nullptr);
+		CHECK_FALSE(tau::get(r).equals_F());
+		// ¬(p0 ∨ p1) is feasible (o1 = 1/2 satisfies neither atom) ...
+		CHECK(guard_is_aba_feasible<node_t>("!(0|1)", aps, atoms));
+		// ... and ¬(p0 ∨ p1) ∧ p0 is not.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("!(0|1)&0", aps, atoms));
+		// The group is CONSUMED: what follows it still parses.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("!(1)&0&1", aps, atoms));
+	}
+
+	TEST_CASE("[GF-21] LA-13: !t is F and !f is T") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		CHECK(tau::get(guard_to_aba<node_t>("!t", aps, atoms)).equals_F());
+		CHECK(tau::get(guard_to_aba<node_t>("!f", aps, atoms)).equals_T());
+		// `!f` is an unconditional edge, `!t` a dead one; both "feasible".
+		CHECK(guard_is_aba_feasible<node_t>("!f", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!t", aps, atoms));
+		// Combined with a real atom the constants keep their meaning.
+		CHECK_FALSE(guard_is_aba_feasible<node_t>("!t|0&1", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("!f&0", aps, atoms));
+	}
+
+	// LA-N6: std::stoi threw out of the oracle on a ≥10-digit AP index.
+	TEST_CASE("[GF-22] LA-N6: an absurd AP index is a bookkeeping AP, not an exception") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		CHECK_NOTHROW(guard_to_aba<node_t>("99999999999", aps, atoms));
+		CHECK(tau::get(guard_to_aba<node_t>("99999999999", aps, atoms)).equals_T());
+		CHECK_NOTHROW(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
+		CHECK(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
+	}
+
+} // TEST_SUITE("[LT-3] ABA oracle guard parsing")
+
+
+TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
+
+	// o1 < o2 ∧ o2 < o3 ∧ ¬(o1 < o3) is UNSAT by transitivity, but every
+	// SINGLE variable elimination leaves a non-empty residual: `qlt_dlo_qe`'s
+	// symbolic bounds only detect a contradiction when the SAME subtree is
+	// both a lower and an upper bound of the eliminated variable.  Treating
+	// "all variables individually non-empty" as joint satisfiability lets the
+	// oracle pass an infeasible strategy edge → false REALIZABLE.
+	//
+	// Falling back to `is_non_temp_nso_satisfiable` is NOT enough: that path
+	// answers "satisfiable" for this chain too (confirmed by the first GREEN
+	// attempt, which only capped the fast path).  The fix therefore carries a
+	// dense linear-order cycle check of its own.
+	TEST_CASE("[QJ-01] three-variable transitivity chain is infeasible") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& !(o1[t]:qlt < o3[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+	}
+
+	// The consistent chain must stay feasible — the guard must not turn into
+	// a blanket rejection of ≥3-variable qlt guards.
+	TEST_CASE("[QJ-02] consistent three-variable chain stays feasible") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& (o1[t]:qlt < o3[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK(aba_existential_feasible<node_t>(fm));
+	}
+
+	// Two-variable guards keep using the qlt fast path and keep their answers.
+	TEST_CASE("[QJ-03] two-variable guards unchanged") {
+		bdd_init<Bool>();
+		tref ok = spec("(o1[t]:qlt < o2[t]:qlt).");
+		REQUIRE(ok != nullptr);
+		CHECK(aba_existential_feasible<node_t>(ok));
+		tref bad = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o1[t]:qlt).");
+		REQUIRE(bad != nullptr);
+		CHECK_FALSE(aba_existential_feasible<node_t>(bad));
+	}
+
+	// Longer chain: the cycle only closes after three transitive steps.
+	TEST_CASE("[QJ-04] four-variable transitivity chain is infeasible") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& (o3[t]:qlt < o4[t]:qlt) "
+		               "&& !(o1[t]:qlt < o4[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+	}
+
+	// The joint check must only ever fire on a CONJUNCTION.  A disjunction
+	// whose first arm is the infeasible chain is still feasible through the
+	// second arm; treating the disjuncts as conjuncts would turn this into a
+	// spurious UNREALIZABLE — the failure direction that matters most.
+	TEST_CASE("[QJ-05] a disjunction is not read as a conjunction") {
+		bdd_init<Bool>();
+		tref fm = spec("((o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& !(o1[t]:qlt < o3[t]:qlt)) "
+		               "|| (o1[t]:qlt < o2[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK(aba_existential_feasible<node_t>(fm));
+	}
+
+	// Localiser for the joint check itself, so a future failure separates
+	// "the cycle check did not fire" from "something downstream overrode it".
+	// The MESSAGE lines print the parsed shape and the resolved BA type.
+	//
+	// Two separate defects were found through this case:
+	//   * `A && B && C` is ONE n-ary wff_and node, so reading only
+	//     first()/second() dropped the conjunct that closes the cycle;
+	//   * term identity has to be STRUCTURAL — keying the order graph by raw
+	//     tref turned the three chain variables into six disconnected nodes.
+	// Note that the printed form `!o1[t]:qlt < o3[t]:qlt` is a printer
+	// round-trip wart, not a bf-level complement: bf_neg prints postfix (`o1'`),
+	// so a leading `!` is always wff_neg.
+	TEST_CASE("[QJ-07] the order-cycle check fires on the chain directly") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& !(o1[t]:qlt < o3[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		size_t ti = find_ba_type<node_t>(fm);
+		CHECK(ti != 0);
+		CHECK(is_omcat_type_family<node_t>(ti));
+		CHECK(qlt_order_conj_unsat<node_t>(fm));
+	}
+
+	TEST_CASE("[QJ-08] ... and stays silent on the consistent chain") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& (o1[t]:qlt < o3[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(qlt_order_conj_unsat<node_t>(fm));
+	}
+
+	// (There is no QJ-09: the case that would have carried it was folded into
+	// QJ-12, which pins the same property on the shape the oracle builds.)
+
+	// Guarding the unsound direction: the closing literal must genuinely
+	// involve the SAME terms.  `o4 >= o1` looks like the chain's closer but
+	// names a different variable, so the graph must stay acyclic and the
+	// guard must stay feasible — a check that over-matched terms would turn
+	// this into a spurious UNREALIZABLE.
+	TEST_CASE("[QJ-10] distinct terms are not conflated") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& (o4[t]:qlt >= o1[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(qlt_order_conj_unsat<node_t>(fm));
+		CHECK(aba_existential_feasible<node_t>(fm));
+	}
+
+	// The `>=` spelling of the closing literal must be ingested too — it is
+	// the unambiguous surface form of `!(o1 < o3)`.
+	TEST_CASE("[QJ-11] the >= spelling of the chain is infeasible") {
+		bdd_init<Bool>();
+		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		               "&& (o1[t]:qlt >= o3[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK(qlt_order_conj_unsat<node_t>(fm));
+		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+	}
+
+	// The oracle never sees a parsed spec — `guard_is_aba_feasible` builds its
+	// products with build_wff_and over build_wff_neg literals.  This is that
+	// exact shape, so the check is pinned on the tree the live caller
+	// constructs rather than on whatever the parser happens to produce.
+	TEST_CASE("[QJ-12] the chain in the shape the oracle actually builds") {
+		bdd_init<Bool>();
+		tref lt12 = wff("o1[t]:qlt < o2[t]:qlt");
+		tref lt23 = wff("o2[t]:qlt < o3[t]:qlt");
+		tref lt13 = wff("o1[t]:qlt < o3[t]:qlt");
+		REQUIRE(lt12 != nullptr);
+		REQUIRE(lt23 != nullptr);
+		REQUIRE(lt13 != nullptr);
+		tref fm = build_wff_and<node_t>(
+		    build_wff_and<node_t>(lt12, lt23),
+		    build_wff_neg<node_t>(lt13));
+		REQUIRE(fm != nullptr);
+		CHECK(qlt_order_conj_unsat<node_t>(fm));
+		CHECK_FALSE(aba_existential_feasible<node_t>(fm));
+	}
+
+	// Non-strict edges alone are consistent: o1 <= o2 <= o1 just means
+	// o1 = o2.  Only a cycle carrying a STRICT edge is a contradiction.
+	TEST_CASE("[QJ-06] a non-strict cycle is not a contradiction") {
+		bdd_init<Bool>();
+		tref fm = spec("!(o1[t]:qlt > o2[t]:qlt) && !(o2[t]:qlt > o1[t]:qlt).");
+		REQUIRE(fm != nullptr);
+		CHECK(aba_existential_feasible<node_t>(fm));
+	}
+
+} // TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable")
+
+
+TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
+
+	// `call_ltlsynt` special-cased only exit 127 (binary not on PATH).  Every
+	// other failure — in particular exit 143, which is 128 + SIGTERM, exactly
+	// what the TAU_LTL_TIMEOUT_SEC watchdog sends — fell into the
+	// `out.empty()` branch and returned {false, ""}, which every caller reads
+	// as a definitive UNREALIZABLE.  A slow-but-realizable specification thus
+	// got a WRONG ANSWER with only a LOG_DEBUG trace behind it.
+	//
+	// A timeout cannot be forced on demand without making ltlsynt misbehave,
+	// so the decision itself is pinned here as a table over the classifier
+	// `call_ltlsynt` consults.
+
+	TEST_CASE("[LX-01] a real verdict is `ok`") {
+		CHECK(classify_spot_exit(0, "REALIZABLE\nHOA: v1\n")
+		      == spot_exit_kind::ok);
+		CHECK(classify_spot_exit(1, "UNREALIZABLE\n")
+		      == spot_exit_kind::ok);
+	}
+
+	TEST_CASE("[LX-02] the watchdog kill is a failure, not UNREALIZABLE") {
+		// 128 + SIGTERM(15) = 143.
+		CHECK(classify_spot_exit(143, "") == spot_exit_kind::failed);
+		// A partially-written strategy is still no verdict.
+		CHECK(classify_spot_exit(143, "REALIZABLE\nHOA: v1")
+		      == spot_exit_kind::failed);
+		// Any other signal death, e.g. SIGSEGV(11) → 139.
+		CHECK(classify_spot_exit(139, "") == spot_exit_kind::failed);
+	}
+
+	TEST_CASE("[LX-03] usage / internal errors are failures") {
+		CHECK(classify_spot_exit(2, "") == spot_exit_kind::failed);
+		CHECK(classify_spot_exit(2, "ltlsynt: unrecognized option")
+		      == spot_exit_kind::failed);
+		// Non-zero with nothing on stdout carries no verdict either.
+		CHECK(classify_spot_exit(1, "") == spot_exit_kind::failed);
+	}
+
+	TEST_CASE("[LX-04] a failed spawn is a failure") {
+		CHECK(classify_spot_exit(-1, "") == spot_exit_kind::failed);
+	}
+
+	// The API boundary (api<node>::realizable / valid_spec / get_interpreter)
+	// converts this into a logged UNKNOWN verdict instead of letting it
+	// terminate the process.  That handler cannot be driven deterministically
+	// from a test — it needs ltlsynt to hang or misbehave on demand — so what
+	// is pinned here is the contract the handler depends on: the exception is
+	// catchable as a std::runtime_error and carries the failure text.  If
+	// someone re-bases it on something else, the catch clauses silently stop
+	// matching and a slow spec goes back to terminating the session.
+	TEST_CASE("[LX-06] ltl_synthesis_error is catchable at the API boundary") {
+		bool caught = false;
+		std::string what;
+		try {
+			throw ltl_synthesis_error("ltlsynt produced no verdict (exit 143)");
+		} catch (const std::runtime_error& e) {
+			caught = true;
+			what = e.what();
+		} catch (...) {}
+		CHECK(caught);
+		CHECK(what.find("exit 143") != std::string::npos);
+	}
+
+	TEST_CASE("[LX-05] a missing binary keeps its own classification") {
+		// Kept distinct so ltlsynt-less environments degrade (log + false)
+		// instead of aborting, which is what the existing skip patterns in
+		// the PWR and Algorithm-D suites rely on.
+		CHECK(classify_spot_exit(127, "") == spot_exit_kind::not_found);
+	}
+
+}
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

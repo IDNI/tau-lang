@@ -275,6 +275,7 @@ tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls) {
 
 	// Step 3: Local legal profiles
 	auto profiles = ocfuncs_enumerate_profiles<node>(closure, ctx);
+	(void) profiles;
 
 	// Step 4: Static profile alphabet
 	auto static_props = ocfuncs_encode_static_profiles(ctx);
@@ -282,9 +283,27 @@ tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls) {
 
 	// Step 5: Quantifier elimination
 	tref qe_fm = ocfuncs_eliminate_quantifiers<node>(fm, ctx);
+	(void) qe_fm;
 
-	// Step 6: Temporal LTL generation
-	return ocfuncs_generate_ltl<node>(qe_fm, ctx);
+	// LG-22: Steps 3, 5 and 6 are V1 STUBS — enumerate_profiles emits one
+	// hardcoded profile, eliminate_quantifiers is a pass-through, and
+	// generate_ltl returns bf_func_app nodes unchanged with an empty
+	// "static consistency constraints" loop body.  Running them and returning
+	// the result hands the caller its own input back while the header
+	// advertises "a propositional LTL formula suitable for synthesis" — silent
+	// wrongness for anyone who wires this up.
+	//
+	// Refuse until the steps are real.  The steps above still run so they stay
+	// instantiated and their behaviour stays observable to the tests.
+	// TAU_LOG_ERROR, not LOG_ERROR: `src/tau.h` (the single-header form used by
+	// the Release test pack) #undefs every short LOG_* macro at its end, and
+	// logging.h is include-guarded so re-including cannot bring them back.
+	// Only the TAU_LOG_* spellings survive there — the same reason api.tmpl.h
+	// uses them.
+	TAU_LOG_ERROR << "[ocfuncs] ocfuncs_compile is not implemented: Steps 3, "
+	                 "5 and 6 are V1 stubs, so the returned formula would be "
+	                 "the input essentially unchanged\n";
+	return nullptr;
 }
 
 // ── Function declaration extraction ──────────────────────────────────────────
@@ -332,15 +351,23 @@ FuncDecl extract_func_decl(tref decl_node) {
 // Iterates registered types using the public get_ba_type_name API.
 template <NodeType node>
 static size_t resolve_sort_name_to_id(const std::string& sort_name) {
-	// Type IDs start at 1; 0 = untyped.
-	// Iterate registered types — the pool is small (< 64 types).
-	// get_ba_type_name(id) returns ":untyped" for id=0 and falls back to
-	// type 0's name for out-of-range IDs, so we stop when we see that.
-	const std::string untyped = get_ba_type_name<node>(0);
-	for (size_t i = 1; i < 64; ++i) {
+	// Type IDs start at 1; 0 = untyped, and 0 is also the "not found" answer.
+	//
+	// LG-22: this used to scan ids 1..63 assuming `get_ba_type_name` returns
+	// type 0's name past the end of the registry.  It does not — `ba_types::
+	// name` THROWS `invalid ba_type_id` there — so the very first call threw
+	// (this function had no test and no production caller, so it had never
+	// been instantiated, let alone run).  Ask the registry for its size.
+	//
+	// Registered names also carry a leading ':' (":sbf", ":qlt", …), so a
+	// declaration written `f : sbf -> sbf` would never have matched even
+	// without the throw.  Accept the sort name with or without the colon.
+	const size_t n = get_ba_type_count<node>();
+	const std::string colon_name =
+		(sort_name.empty() || sort_name[0] == ':') ? sort_name : ":" + sort_name;
+	for (size_t i = 1; i < n; ++i) {
 		std::string name = get_ba_type_name<node>(i);
-		if (name == untyped) break; // past end of registered types
-		if (name == sort_name) return i;
+		if (name == sort_name || name == colon_name) return i;
 	}
 	return 0;
 }
@@ -374,22 +401,44 @@ tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls,
 // ── Detection ────────────────────────────────────────────────────────────────
 
 template <NodeType node>
-bool has_func_applications(tref fm) {
+bool has_func_applications(tref fm, const std::vector<FuncDecl>& decls) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		return t[0].value.nt == tau::bf_func_app;
-	}) != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(fm, result);
-#endif // TAU_CACHE
-	return result;
+
+	// LG-22.  This used to look for a node whose first child is a
+	// `bf_func_app`, and answered false for EVERY input — including a formula
+	// that is nothing but a function application.  It had no test and no
+	// production caller, so nothing noticed.
+	//
+	// The reason is that `bf_func_app` does not appear in a parsed formula at
+	// all.  `g(o1[t]) = 1` parses as
+	//
+	//     bf_eq > [ bf > bf_ref > ref > { sym "g", ref_args > ref_arg > … },
+	//               bf > bf_t ]
+	//
+	// which is exactly the shape of a recursive-relation reference: at parse
+	// time a function application and an rr reference are indistinguishable.
+	// "Does this formula apply a function?" is therefore only answerable
+	// RELATIVE TO the declarations, which is why they are a parameter now.
+	if (decls.empty()) return false;
+
+	// A `sym` node carries its name as an INTERNED ID in `value.data`, not as
+	// text in a child — see `get_function_signature` in ba_types_inference,
+	// which reads a ref's symbol as `ref_head[0].value.data`.  Build the same
+	// id for each declared name and compare ids; reading the name back out as
+	// a string would be both slower and shape-dependent.
+	std::set<size_t> sym_ids;
+	for (const auto& d : decls)
+		sym_ids.insert(tau::get(build_sym<node>(d.name)).value.data);
+
+	// `select_all(is<node, tau::ref>)` is the idiom the recursive-relation
+	// machinery already uses to walk refs (normalizer.tmpl.h:1309).
+	//
+	// No memoisation: the answer depends on `decls` as well as on `fm`, so a
+	// formula-keyed cache would return a stale verdict for a different
+	// declaration set.  There is no hot path to protect.
+	for (tref r : tau::get(fm).select_all(is<node, tau::ref>))
+		if (sym_ids.count(tau::get(r)[0].value.data)) return true;
+	return false;
 }
 
 } // namespace idni::tau_lang

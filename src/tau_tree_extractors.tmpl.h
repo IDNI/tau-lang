@@ -26,12 +26,31 @@ rr_sig get_rr_sig(tref n) {
 
 template <NodeType node>
 tref resolve_io_vars(io_context<node>& ctx, tref fm) {
+	// Classification (TT2-21, public contract): a stream registered in
+	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
+	// first char 'i' or the name "this" -> input; first char 'o' or the
+	// name "u" -> output; anything else stays unresolved.
 	LOG_TRACE << "resolve_io_vars - fm: " << LOG_FM_DUMP(fm);
 	using tau = tree<node>;
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::io_var)) {
-			tref var = canonize<node>(n);
+			// EX-1: this used to be canonize<node>(n), but canonize
+			// expects the enclosing `variable` node -- it selects an
+			// io_var CHILD (tt(x) | tau::io_var | tau::var_name).
+			// Handed the io_var itself it matched nothing and returned
+			// its argument unchanged, offset subtree and all, so the
+			// key could never equal what add_input_console/
+			// add_output_console register
+			// (build_canonized_io_var == variable(io_var(var_name))).
+			// Both context lookups below were therefore dead, and
+			// classification always fell through to the name heuristic.
+			// Build the key the registrars' way instead.
+			tref var_name = get_var_name_node<node>(n);
+			tref var = var_name
+				? tau::get(tau::variable,
+					tau::get(tau::io_var, { var_name }))
+				: canonize<node>(n);
 			if (auto it = ctx.inputs.find(var); it != ctx.inputs.end())
 				return t.replace_value(
 					t.value.replace_data(1));
@@ -672,28 +691,12 @@ trefs get_free_vars_appearance_order(tref expression) {
 	return free_vars;
 }
 
-// Collects all free appearances of variables that are in bound representation
-// This can happen for example in subformulas
-template <NodeType node>
-trefs get_free_bound_vars(tref expression) {
-	using tau = tree<node>;
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
-		return true;
-	};
-	const trefs& free_vars = get_free_vars<node>(expression);
-	trefs bound_vars;
-	for (tref fv : free_vars) {
-		const tau& fv_t = tau::get(fv);
-		if (fv_t[0].is(tau::var_name) && is_number(fv_t[0].get_string()))
-			bound_vars.push_back(fv);
-	}
-	return bound_vars;
-}
+// (TT2-10: get_free_bound_vars deleted -- zero callers, zero tests.)
 
-// A formula has a temporal variable if either it contains an io_var with a variable or capture
-// or it contains a flag
+
+// A formula "has a temporal variable" if it contains ANY io_var (including
+// constant positions -- TT2-18: the old comment claimed variable/capture
+// positions only) or, when no io_var exists, a constraint flag.
 template <NodeType node>
 bool has_temp_var(tref fm) {
 	using tau = tree<node>;
@@ -712,8 +715,10 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
-		// Special case if the ba_constant is not converted to constant yet
-		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
+		// Skip a ba_constant not converted to a constant yet -- aborting
+		// the whole scan here (TT2-6) let an open tau constant hide
+		// behind an earlier unparsed one.
+		if (tau::get(ba_const).get_ba_constant_id() == 0) continue;
 		if (!node::ba::is_closed(tt(ba_const) | tt::ba_constant)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 							<< TAU_TO_STR(ba_const);

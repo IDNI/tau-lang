@@ -2,6 +2,10 @@
 
 // Static classifier for the GR(1) fragment (Opt-3).
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // A formula is in the GR(1) fragment (here, "simple GR(1)") when it is a
 // conjunction of:
 //   - zero or more G(φ_safe)     — safety invariants
@@ -23,18 +27,41 @@ namespace idni::tau_lang {
 
 namespace gr1_detect_internal {
 
+// The one temporal-operator predicate shared by the three classifiers
+// (gr1_detect, liveness_decomp, spec.h).  GR-R1/GR-4: the CTL* quantifiers
+// A/E and the semantic negation `-phi` are temporal in every sense that
+// matters here (they nest a path formula), so G(A phi) is NOT a safety
+// invariant; GR-3: `sometimes` is the normalizer's canonical spelling of F.
+template <NodeType node>
+inline bool is_temporal_operator_node(tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	if (!t.has_child()) return false;
+	auto nt = t[0].value.nt;
+	return nt == tau::wff_always  || nt == tau::wff_sometimes
+	    || nt == tau::wff_F       || nt == tau::wff_U
+	    || nt == tau::wff_R       || nt == tau::wff_W
+	    || nt == tau::wff_S       || nt == tau::wff_T
+	    || nt == tau::wff_A       || nt == tau::wff_E
+	    || nt == tau::wff_semantic_neg;
+}
+
+// True iff `n` is F in either spelling (GR-3).
+template <NodeType node>
+inline bool is_eventually_node(tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	if (!t.has_child()) return false;
+	auto nt = t[0].value.nt;
+	return nt == tau::wff_F || nt == tau::wff_sometimes;
+}
+
 template <NodeType node>
 inline bool is_non_temporal(tref fm) {
 	using tau = tree<node>;
 	if (!fm) return true;
 	return tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		auto nt = t[0].value.nt;
-		return nt == tau::wff_always  || nt == tau::wff_sometimes
-		    || nt == tau::wff_F       || nt == tau::wff_U
-		    || nt == tau::wff_R       || nt == tau::wff_W
-		    || nt == tau::wff_S       || nt == tau::wff_T;
+		return is_temporal_operator_node<node>(n);
 	}) == nullptr;
 }
 
@@ -53,8 +80,7 @@ inline Gr1Conjunct classify_conjunct(tref fm) {
 		// If φ is F(ψ) with non-temporal ψ ⇒ Liveness (GF).
 		const auto& inner = t[0][0];
 		if (!inner.has_child()) return Gr1Conjunct::Other;
-		auto inner_nt = inner[0].value.nt;
-		if (inner_nt == tau::wff_F) {
+		if (is_eventually_node<node>(t[0].first())) {
 			const auto& ff = inner[0][0];
 			if (is_non_temporal<node>(ff.get()))
 				return Gr1Conjunct::Liveness;

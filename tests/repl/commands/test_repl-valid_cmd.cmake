@@ -58,3 +58,9 @@ add_repl_test(valid_cmd-hooks_wff_conditional-04_non_degenerate_ne_y "valid ((z 
 
 add_repl_test(valid_cmd-hooks_wff_lt_lteq-01_lt_expansion            "valid (x < y) <-> ((x & y') = 0 && x != y)"          ": T")
 add_repl_test(valid_cmd-hooks_wff_lt_lteq-02_lteq_expansion          "valid (x <= y) <-> ((x & y') = 0)"                   ": T")
+
+# AP1-1: the same null normalize_formula result, reached through valid_spec's
+# is_tau_impl call instead of is_tau_formula_sat. As above, the verdict line is
+# the crash-distinguishing match.
+add_repl_test_fail(valid_cmd-oscillating_definition
+	"f(x) := f(x)'. valid f(1) = 0" ": F")

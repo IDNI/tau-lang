@@ -1769,8 +1769,13 @@ TEST_SUITE("bvshl bugs") {
 }
 
 //
-// REVIEW (nested casting): temporary suite added while reviewing whether the
-// blasting path supports nested casts. See private/review-casting.md.
+// Nested casts: a cast whose operand is itself a cast. `atomic_blasting`'s
+// bf_cast arm substitutes a same-width cast away and otherwise introduces a
+// fresh variable constrained by `bvcast`, so a nested cast is resolved one
+// level per post-order step, and the widths must compose (truncate-then-widen
+// loses the high bits for good). See "arithmetic under a cast" below for the
+// companion case where the cast operand holds arithmetic rather than another
+// cast.
 //
 TEST_SUITE("bvcast nested") {
 
@@ -1845,7 +1850,210 @@ TEST_SUITE("more complex formulas") {
 	TEST_CASE("complex formula 6") {
 		CHECK(blast_normalize("ex x:bv[4] (x << { 1 }:bv[4] = { 1 }:bv[4])") == "F");
 	}
+}
 
+// Regression: resolve_quantifiers must not hand an already-blasted open bv
+// scope to cvc5. eliminate_bv_and_quantifiers runs resolve_quantifiers three
+// times and the interpreter re-enters it from its fixpoint loops, so a later
+// pass meets scopes an earlier one blasted. Closing such a scope's free
+// variables wraps blasting's auxiliary quantifiers in a universal block, and
+// cvc5's counterexample-guided instantiation does not terminate on the result:
+// checkSat never returns, with no time or resource bound to stop it, so the
+// whole process hangs. `has_blasting_residue` is what keeps that query from
+// being issued.
+TEST_SUITE("blasted scopes stay off the solver path") {
+
+	// The one-hot masking conjunction `bit` leaves behind is the marker.
+	TEST_CASE("blasting output is recognised as residue") {
+		tref blasted = blast_formula(
+			"ex x (x:bv[4] + y:bv[4] = { 1 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		CHECK( has_blasting_residue<node_t>(blasted) );
+	}
+
+	// A formula the solver owns natively must keep its shortcut: bv
+	// arithmetic carries no bit masks, so the screen leaves it alone.
+	TEST_CASE("unblasted bv arithmetic is not residue") {
+		tref plain = parse_wff("ex x (x:bv[4] + y:bv[4] = { 1 }:bv[4])");
+		REQUIRE(plain != nullptr);
+		CHECK( !has_blasting_residue<node_t>(plain) );
+	}
+
+	// Guards the screen against matching everything: a hand-written mask is
+	// residue by this test's own definition, but ordinary bitwise content
+	// over whole bitvectors is not.
+	TEST_CASE("non-masking bitwise bv content is not residue") {
+		tref plain = parse_wff("ex x (x:bv[4] & y:bv[4] = z:bv[4])");
+		REQUIRE(plain != nullptr);
+		CHECK( !has_blasting_residue<node_t>(plain) );
+	}
+
+}
+
+//
+// HE-16: single atoms with more than one arithmetic operator. Every other
+// suite in this file writes chains through named intermediate variables
+// (`x / 3 = q && x % 3 = r`), so the nested-operand path -- where HE-3's
+// `changes` lookup and HE-4's per-operation result type live -- was never
+// exercised. The verdict alone is not enough: `blast_block` re-enters
+// blasting once per nesting level, so an incomplete first pass is masked.
+// Each case therefore also asserts that the *direct* blasting output holds
+// no residual arithmetic.
+//
+static bool blasted_holds_arithmetic(const std::string& sample) {
+	auto blasted = blast_formula(sample);
+	REQUIRE(blasted != nullptr);
+	auto is_arithmetic = [](tref n) {
+		switch (tau::get(n).get_type()) {
+			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+			case tau::bf_div: case tau::bf_mod: case tau::bf_cast:
+				return true;
+			default: return false;
+		}
+	};
+	tref found = tau::get(blasted).find_top(is_arithmetic);
+	if (found) std::cout << "residual arithmetic in blasted output: "
+		<< tau::get(found).to_str() << "\n";
+	return found != nullptr;
+}
+
+TEST_SUITE("chained arithmetic in a single atom") {
+
+	// Three distinct variables: the shape the nested-operand path was built
+	// for, and the one no constant folding can flatten.
+	TEST_CASE("add chain: ex x ex y ex z (x + y + z = 7)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ex y:bv[4] ex z:bv[4] (x + y + z = { 7 }:bv[4])")
+				== "T");
+	}
+
+	TEST_CASE("three-variable add chain is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] ex y:bv[4] ex z:bv[4] (x + y + z = { 7 }:bv[4])")
+				== false);
+	}
+
+	// no single sum works for every assignment
+	TEST_CASE("add chain: all x all y all z (x + y + z = 7)") {
+		CHECK(blast_normalize(
+			"all x:bv[4] all y:bv[4] all z:bv[4] (x + y + z = { 7 }:bv[4])")
+				== "F");
+	}
+
+	// `x + { 1 } + { 2 }` is not a chain: the parser's hooks fold the two
+	// constants into `{ 3 }` before blasting ever sees the atom. `x + x + c`
+	// cannot be folded, so it keeps both bf_add nodes.
+	// x + x + 2 = 8 holds for x = 3 and x = 11.
+	TEST_CASE("add chain: ex x (x + x + 2 = 8)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] (x + x + { 2 }:bv[4] = { 8 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("add chain is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] (x + x + { 2 }:bv[4] = { 8 }:bv[4])")
+				== false);
+	}
+
+	// 2x is even, so 2x + 2 is even and can never be 7.
+	TEST_CASE("add chain: ex x (x + x + 2 = 7)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] (x + x + { 2 }:bv[4] = { 7 }:bv[4])") == "F");
+	}
+
+	// x - 1 - 2 = 5 has the unique 4-bit solution x = 8.
+	TEST_CASE("sub chain: ex x (x - 1 - 2 = 5)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] (x - { 1 }:bv[4] - { 2 }:bv[4] = { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("sub chain is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] (x - { 1 }:bv[4] - { 2 }:bv[4] = { 5 }:bv[4])")
+				== false);
+	}
+
+	// (x + 1) * 2 = 6 holds for x + 1 in {3, 11}, i.e. x in {2, 10}.
+	TEST_CASE("add then mul: ex x ((x + 1) * 2 = 6)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) * { 2 }:bv[4] = { 6 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("add then mul is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) * { 2 }:bv[4] = { 6 }:bv[4])")
+				== false);
+	}
+
+	// (x + 1) << 1 = 6 holds for x + 1 = 3 (mod 8), i.e. x in {2, 10}.
+	TEST_CASE("add then shift: ex x ((x + 1) << 1 = 6)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) << { 1 }:bv[4] = { 6 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("add then shift is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) << { 1 }:bv[4] = { 6 }:bv[4])")
+				== false);
+	}
+
+	// bf_div and bf_mod share `get_arguments` with the shifts but have their
+	// own `atomic_blasting` arm, and nothing exercised it with a nested
+	// operand. (x + 1) / 2 = 2 holds for x + 1 in {4, 5}, i.e. x in {3, 4}.
+	TEST_CASE("add then div: ex x ((x + 1) / 2 = 2)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) / { 2 }:bv[4] = { 2 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("add then div is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) / { 2 }:bv[4] = { 2 }:bv[4])")
+				== false);
+	}
+
+	// (x + 1) % 3 = 1 holds for x + 1 in {1, 4, 7, 10, 13}.
+	TEST_CASE("add then mod: ex x ((x + 1) % 3 = 1)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) % { 3 }:bv[4] = { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("add then mod is fully blasted in one pass") {
+		CHECK(blasted_holds_arithmetic(
+			"ex x:bv[4] ((x + { 1 }:bv[4]) % { 3 }:bv[4] = { 1 }:bv[4])")
+				== false);
+	}
+}
+
+//
+// HE-4: arithmetic *inside* a cast operand. The fresh result variable for the
+// inner operation used to be built with the atomic's top-level BA type (the
+// cast's target width), so the inner constraint mixed two widths.
+//
+TEST_SUITE("arithmetic under a cast") {
+
+	// 8-bit addition, then truncation to 4 bits: x = 1 gives (1 + 1) = 2.
+	TEST_CASE("narrowing cast over an add: ex x:bv[8] ((bv[4]) (x + 1) = 2)") {
+		CHECK(blast_normalize(
+			"ex x:bv[8] ((bv[4]) (x + { 1 }:bv[8]) = { 2 }:bv[4])") == "T");
+	}
+
+	// x = 17 also works (18 mod 16 = 2), but not every x does.
+	TEST_CASE("narrowing cast over an add: all x:bv[8] ((bv[4]) (x + 1) = 2)") {
+		CHECK(blast_normalize(
+			"all x:bv[8] ((bv[4]) (x + { 1 }:bv[8]) = { 2 }:bv[4])") == "F");
+	}
+
+	// 4-bit addition, then zero-extension to 8 bits: x = 1 gives 2.
+	TEST_CASE("widening cast over an add: ex x:bv[4] ((bv[8]) (x + 1) = 2)") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ((bv[8]) (x + { 1 }:bv[4]) = { 2 }:bv[8])") == "T");
+	}
+
+	// the 4-bit addition wraps, so the zero-extended result never exceeds 15.
+	TEST_CASE("widening cast cannot reach a value above the source range") {
+		CHECK(blast_normalize(
+			"ex x:bv[4] ((bv[8]) (x + { 1 }:bv[4]) = { 200 }:bv[8])") == "F");
+	}
 }
 
 TEST_SUITE("cleanup") {

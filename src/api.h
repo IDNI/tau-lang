@@ -18,7 +18,8 @@
  */
 
 // TODO (LOW) add non string api for execution?
-// TODO (HIGH) tests
+// TODO (HIGH) tests for the htref surface (the tref/string surfaces are
+//             covered by tests/api)
 // TODO (HIGH) error handling
 // TODO (HIGH) decide which parsing get_* methods or other methods will go private if any
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
@@ -26,6 +27,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
+#include "heuristics/bv_simplify_options.h"
 #include "interpreter.h"
 #include "utility/measure.h"
 
@@ -140,6 +142,154 @@ struct api {
 	static void set_charvar(bool state);
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
+	/**
+	 * @brief Select where predicate blasting may run (see `blast_site`).
+	 *
+	 * 0 = `per_leaf` (default, today's behaviour), 1 = `per_block`,
+	 * 2 = `per_formula`. An out-of-range value clamps to the default.
+	 */
+	static void set_blast_placement(int site);
+	/**
+	 * @brief Select what happens to a blasted formula (see `blast_mode`).
+	 *
+	 * 0 = `anti_prenex_result` (default, today's behaviour: re-enter
+	 * `anti_prenex` on the blasted formula), 1 = `defer` (rewrite only and
+	 * leave the introduced quantifiers to the next resolve pass). An
+	 * out-of-range value clamps to the default.
+	 */
+	static void set_blast_method(int mode);
+	/**
+	 * @brief Select where the cvc5 solver may be queried (see `solver_site`).
+	 *
+	 * 0 = `eager` (default, today's behaviour), 1 = `per_closed_block`,
+	 * 2 = `per_formula`. An out-of-range value clamps to the default. The
+	 * final closed-formula check of `eliminate_bv_and_quantifiers` runs
+	 * under every setting -- it is the "final" site the other two rely on.
+	 */
+	static void set_solver_placement(int site);
+	/**
+	 * @brief Select the cvc5 option set (see `cvc5_option_set`).
+	 *
+	 * Values follow the `cvc5_option_set` enumerators; an out-of-range
+	 * value clamps to the default. Must be set before the first solver
+	 * query: `bv_formula_sat_status` memoizes verdicts keyed on the
+	 * formula alone, so a mid-process flip would serve answers computed
+	 * under the previous option set.
+	 */
+	static void set_cvc5_options(int set);
+	/**
+	 * @brief Set the per-block Boole-decomposition split budget.
+	 *
+	 * Bounds the Shannon splits ONE block elimination may charge, across its
+	 * whole recursion rather than along one path. Exhausting it costs
+	 * precision, not soundness: the elimination takes its graceful re-wrap
+	 * path and leaves the quantifier in place. 0 = unlimited (the default).
+	 */
+	static void set_block_max_splits(size_t n);
+	/**
+	 * @brief Set the anti-prenex driver's maximum round count.
+	 *
+	 * Bounds how many times the driver re-collects innermost blocks before
+	 * giving up and returning the formula unprocessed, with a log line.
+	 * 0 = unlimited (the default); convergence is normally reached in well
+	 * under 20 rounds.
+	 */
+	static void set_block_max_rounds(size_t n);
+	/**
+	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
+	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
+	 */
+	static void set_max_blast_reentry_depth(size_t n);
+	/**
+	 * @brief Operand-set size above which block squeezing declines and the
+	 * general Boole decomposition runs instead; 0 = unlimited (default:
+	 * always squeeze).
+	 */
+	static void set_block_squeeze_cap(size_t n);
+	/**
+	 * @brief Cap the temporal-normalization fixpoint searches
+	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); 0 = unlimited (default).
+	 *
+	 * On overrun the search gives up with a log line and returns the
+	 * current (non-fixpoint) iterate.
+	 */
+	static void set_max_fixpoint_steps(size_t n);
+	/**
+	 * @brief Cap the eventual-flag search past the flag boundary in
+	 * `to_unbounded_continuation`; 0 = unlimited (default).
+	 *
+	 * A bounded give-up reports unsatisfiable — wrong but bounded and
+	 * loud (SO-1).
+	 */
+	static void set_max_flag_search_steps(size_t n);
+	/**
+	 * @brief Cap definition-expansion passes in
+	 * `expand_defs_until_settled`; 0 = unlimited (default). On overrun the
+	 * expansion reports failure (`nullptr`) with a log line.
+	 */
+	static void set_max_def_passes(size_t n);
+	/**
+	 * @brief Cap recurrence-relation enumeration steps in
+	 * `calculate_fixed_point`; 0 = unlimited (default). A bounded give-up
+	 * is a bound on the search, not a proof that no fixed point exists.
+	 */
+	static void set_max_enum_steps(size_t n);
+	/**
+	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
+	 * (default). Oscillation is detected regardless; this bounds only
+	 * ever-growing rewrites.
+	 */
+	static void set_max_rewrite_rounds(size_t n);
+	/**
+	 * @brief Cap `bv_ba_custom_simplification` rewrite rounds; 0 =
+	 * unlimited (default). Oscillation is detected regardless.
+	 */
+	static void set_max_simplify_rounds(size_t n);
+	/**
+	 * @brief Tree-node count floor before the interpreter's gc may
+	 * trigger. Default 256 (kept — a tuned value, not a cap).
+	 */
+	static void set_gc_min_size(size_t n);
+	/**
+	 * @brief Growth factor of the interpreter's adaptive gc trigger; a
+	 * sweep fires when the node count grew by this factor since the last
+	 * sweep. Default 1.5 (kept); <= 0 disables gc.
+	 */
+	static void set_gc_growth_factor(double f);
+	/**
+	 * @brief Warn when an updated specification exceeds this many printed
+	 * characters (the I7 size guard); 0 = off (default).
+	 */
+	static void set_spec_size_warn(size_t n);
+	/**
+	 * @brief Cap the revision alternatives kept per specification part,
+	 * dropping middle preference tiers with a warning; 0 = unlimited
+	 * (default).
+	 */
+	static void set_max_revision_alts(size_t n);
+	/**
+	 * @brief Cap the ∀∃-synthesis checks the k-ary consistency-subset
+	 * walk may spend per atom group (LT-17); on the cap the remaining
+	 * subsets are skipped with a warning (sound, at worst a false
+	 * UNREALIZABLE). Default 4096; 0 = unlimited.
+	 */
+	static void set_max_consistency_subsets(size_t n);
+	/**
+	 * @brief Bound the string-keyed synthesis caches (FIFO eviction,
+	 * LG-27); default 4096 entries, 0 = unbounded.
+	 */
+	static void set_cache_bound(size_t n);
+	/**
+	 * @brief Cap the ABA oracle's mixed-type coverage expansion (§13);
+	 * beyond it the weaker syntactic verdict stands, logged. Default
+	 * 256; 0 = unlimited.
+	 */
+	static void set_max_cover_products(size_t n);
+	/**
+	 * @brief Enable the semantic (winning-region) fallback of the temporal
+	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
+	 */
+	static void set_pwr_semantic_fallback(bool on);
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
@@ -224,8 +374,9 @@ struct api {
 	/// Register a definition from pre-parsed head and body tree nodes.
 	/// Both are converted to htref internally and added to the global
 	/// definitions store.
-	/// @return The definition index (>0) on success, or 0 if either
-	///         argument is nullptr.
+	/// @return The 1-based definition id (>0) on success, or 0 if either
+	///         argument is nullptr (AP1-6: ids are 1-based precisely so
+	///         the first definition is distinguishable from failure).
 	static size_t add_definition(tref head, tref body);
 
 	// -----------------------------------------------------------------------
@@ -823,7 +974,9 @@ struct api {
 	static std::vector<stream_at> get_inputs_for_step(measuring& m, interpreter<node>& i);
 	/** @brief Advance interpreter one step with inputs and record timing. */
 	static std::optional<std::map<stream_at, std::string>> step(
-		measuring& m, interpreter<node>& i, std::map<stream_at, std::string> inputs);
+		measuring& m, interpreter<node>& i,
+		std::map<stream_at, std::string> inputs,
+		bool interactive = true);
 	/** @brief Advance interpreter one step and record timing. */
 	static std::optional<std::map<stream_at, std::string>> step(measuring& m, interpreter<node>& i);
 
