@@ -263,7 +263,9 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto is_var = [](tref n) {
-		return tau::get(n).child_is(tau::variable);
+		return tau::get(n).child_is(tau::variable)
+			|| tau::get(n).child_is(tau::bf_fall)
+			|| tau::get(n).child_is(tau::bf_fex);
 	};
 	auto vars = t.select_top(is_var);
 	std::sort(vars.begin(), vars.end(), lex_var_comp<node>);
