@@ -723,6 +723,7 @@ TEST_SUITE("get_var_name_node unwrapping") {
 		CHECK(get_var_name<node_t>(vn) == "x");
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("a ba_constant is returned as-is, not descended into") {
 		// A bv literal is used rather than a :tau one: a :tau
 		// ba_constant only survives parsing when a :tau variable
@@ -733,6 +734,7 @@ TEST_SUITE("get_var_name_node unwrapping") {
 		REQUIRE(cte != nullptr);
 		CHECK(get_var_name_node<node_t>(cte) == cte);
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("unwraps bf -> variable -> var_name") {
 		tref v = build_bf_variable<node_t>("x", tau_type_id<node_t>());
