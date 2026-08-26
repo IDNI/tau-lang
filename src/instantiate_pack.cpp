@@ -1,5 +1,6 @@
 // Explicit template instantiations for the BA pack used by every
-// test binary and by the production CLI binary.
+// test binary and by the production CLI binary, and -- through
+// pack_core.def -- by an emitted `tau compile` artifact's main.cpp too.
 //
 // The dominant node pack is the configured one, tau_pack::node_t (also
 // bas_pack in tests/test_tau_helpers.h, used by 40+ unit tests AND by
@@ -12,12 +13,15 @@
 //
 // With the matching `extern template` declarations in
 // src/extern_template_test_pack.h (force-included into every test
-// TU by tests/CMakeLists.txt's `add()`), the linker resolves these
-// symbols against libTAU.a's pre-instantiated copy.
+// TU by tests/CMakeLists.txt's `add()`) and src/artifact_pack_extern.h
+// (included by an emitted artifact's main.cpp), the linker resolves
+// these symbols against libTAU.a's pre-instantiated copy.
 //
-// Recipe to add a function: append `template <ret> fn<test_node_t>(...);`
-// to the list below and mirror it with `extern template ...` in the
-// header.
+// Recipe to add a function shared with the artifact pack: append it to
+// pack_core.def and mirror it in both extern_template_test_pack.h and
+// artifact_pack_extern.h. Recipe to add a test-only function: append
+// `template <ret> fn<test_node_t>(...);` below and mirror it with
+// `extern template ...` in extern_template_test_pack.h.
 
 #include "tau.h"
 #include "tau_pack.h"
@@ -27,14 +31,18 @@ namespace idni::tau_lang {
 // The configured pack; mirrored by tests/test_tau_helpers.h's bas_pack.
 using test_node_t = tau_pack::node_t;
 
-// Top-level synthesis entries.
-template bool is_ltl_aba_realizable<test_node_t>(tref, int_t, bool);
-template bool is_tau_formula_sat   <test_node_t>(tref, int_t, bool);
-template bool has_ltl_operators    <test_node_t>(tref);
+#define TAU_PACK_FN(ret, name, args) \
+	template ret name<test_node_t> args;
+#define TAU_PACK_CLASS(name) \
+	template struct name<test_node_t>;
+#define TAU_PACK_TAU_BA() \
+	template struct tau_ba<TAU_PACK_BASE_BAS>;
 
-template struct tree    <test_node_t>;
-template struct get_hook<test_node_t>;
-template struct tau_ba  <TAU_PACK_BASE_BAS>;
+#include "pack_core.def"
+
+#undef TAU_PACK_FN
+#undef TAU_PACK_CLASS
+#undef TAU_PACK_TAU_BA
 
 // The pack-agnostic fixture of tests/test_bool_only_helpers.h; Bool is
 // described in every pack, so this needs no guard.

@@ -1,4 +1,5 @@
-// One list of the artifact pack's template instantiations, included by both
+// The artifact-only remainder of the pack's template instantiations --
+// on top of the shared list in pack_core.def -- included by both
 // instantiate_artifact_pack.cpp (explicit instantiation definitions, built
 // into libTAU.a) and artifact_pack_extern.h (matching extern template
 // declarations, included by an emitted artifact's main.cpp) so the two
@@ -7,8 +8,7 @@
 // Define before including:
 //   TAU_ARTIFACT_PACK_FN(ret, name, args)  - a free function template
 //   TAU_ARTIFACT_PACK_CLASS(name)          - a single-node class template
-//   TAU_ARTIFACT_PACK_TAU_BA()             - tau_ba<TAU_PACK_BASE_BAS>
-// All three are undefined by the includer after this file.
+// Undefined by the includer after this file.
 
 TAU_ARTIFACT_PACK_FN(tref, build_bf_eq, (tref, tref))
 TAU_ARTIFACT_PACK_FN(tref, build_var_name, (const std::string&))
@@ -23,12 +23,3 @@ TAU_ARTIFACT_PACK_FN(tref, nat_type, ())
 TAU_ARTIFACT_PACK_CLASS(table_step_provider)
 TAU_ARTIFACT_PACK_CLASS(interpreter)
 TAU_ARTIFACT_PACK_CLASS(io_context)
-
-TAU_ARTIFACT_PACK_FN(bool, is_ltl_aba_realizable, (tref, int_t, bool))
-TAU_ARTIFACT_PACK_FN(bool, is_tau_formula_sat, (tref, int_t, bool))
-TAU_ARTIFACT_PACK_FN(bool, has_ltl_operators, (tref))
-
-TAU_ARTIFACT_PACK_CLASS(tree)
-TAU_ARTIFACT_PACK_CLASS(get_hook)
-
-TAU_ARTIFACT_PACK_TAU_BA()

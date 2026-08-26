@@ -1,0 +1,20 @@
+// The tau_pack::node_t template instantiations every full-pack consumer
+// needs -- both the test suite and an emitted artifact's main.cpp -- kept in
+// one list so instantiate_pack.cpp's definitions and each consumer's extern
+// template declarations cannot drift apart into an undefined-symbol link
+// error.
+//
+// Define before including:
+//   TAU_PACK_FN(ret, name, args)  - a free function template
+//   TAU_PACK_CLASS(name)          - a single-node class template
+//   TAU_PACK_TAU_BA()             - tau_ba<TAU_PACK_BASE_BAS>
+// All three are undefined by the includer after this file.
+
+TAU_PACK_FN(bool, is_ltl_aba_realizable, (tref, int_t, bool))
+TAU_PACK_FN(bool, is_tau_formula_sat, (tref, int_t, bool))
+TAU_PACK_FN(bool, has_ltl_operators, (tref))
+
+TAU_PACK_CLASS(tree)
+TAU_PACK_CLASS(get_hook)
+
+TAU_PACK_TAU_BA()

@@ -61,7 +61,7 @@ set(TAU_SOURCES
 	${TAU_GENERATED_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
 	${TAU_PACK_CORE_SOURCES}
-	instantiate_test_pack.cpp
+	instantiate_pack.cpp
 )
 
 
@@ -150,14 +150,9 @@ endif()
 # `tau compile` links this library as the emitted artifact's tau_prebuilt, so
 # only here -- not the object or shared libraries -- pre-instantiates the
 # artifact pack templates (src/artifact_pack.def) the artifact's main.cpp
-# extern-declares, when TAU_ARTIFACT_PREINST is on. -O3 regardless of build
-# type: an artifact from a devel or debug SDK must still run an optimized
-# solve/normalize pipeline; DEBUG/NDEBUG is left untouched so this TU still
-# matches the emitting build's ABI.
+# extern-declares, when TAU_ARTIFACT_PREINST is on.
 if(TAU_ARTIFACT_PREINST)
 	target_sources(${TAU_STATIC_LIB_NAME} PRIVATE instantiate_artifact_pack.cpp)
-	set_source_files_properties(instantiate_artifact_pack.cpp
-		PROPERTIES COMPILE_OPTIONS "-O3")
 endif()
 
 #

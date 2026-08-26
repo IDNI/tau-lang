@@ -1,4 +1,4 @@
-// Extern-template declarations matching src/instantiate_test_pack.cpp.
+// Extern-template declarations matching src/instantiate_pack.cpp.
 //
 // Force-included into every test TU by tests/CMakeLists.txt's `add()`
 // function (via `-include` in target_compile_options).  When a test TU
@@ -11,7 +11,9 @@
 // here so per-TU instantiation continues to work identically to before —
 // preserving build invariants for the CLI binary.
 //
-// Recipe: mirror the list at the top of src/instantiate_test_pack.cpp.
+// Recipe: mirror the list at the top of src/instantiate_pack.cpp; the six
+// entities shared with an emitted artifact's main.cpp live in
+// pack_core.def instead (see artifact_pack_extern.h for its other user).
 
 #ifndef __IDNI__TAU__EXTERN_TEMPLATE_TEST_PACK_H__
 #define __IDNI__TAU__EXTERN_TEMPLATE_TEST_PACK_H__
@@ -26,14 +28,20 @@ namespace idni::tau_lang {
 
 using test_node_t = tau_pack::node_t;
 
-extern template bool is_ltl_aba_realizable<test_node_t>(tref, int_t, bool);
-extern template bool is_tau_formula_sat   <test_node_t>(tref, int_t, bool);
-extern template bool has_ltl_operators    <test_node_t>(tref);
-extern template struct tree    <test_node_t>;
-extern template struct get_hook<test_node_t>;
-extern template struct tau_ba  <TAU_PACK_BASE_BAS>;
+#define TAU_PACK_FN(ret, name, args) \
+	extern template ret name<test_node_t> args;
+#define TAU_PACK_CLASS(name) \
+	extern template struct name<test_node_t>;
+#define TAU_PACK_TAU_BA() \
+	extern template struct tau_ba<TAU_PACK_BASE_BAS>;
 
-// Mirrors src/instantiate_test_pack.cpp, guards included.
+#include "pack_core.def"
+
+#undef TAU_PACK_FN
+#undef TAU_PACK_CLASS
+#undef TAU_PACK_TAU_BA
+
+// Mirrors src/instantiate_pack.cpp, guards included.
 using bool_node_t = node<Bool>;
 
 extern template struct tree    <bool_node_t>;
