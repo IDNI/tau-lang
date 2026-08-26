@@ -354,7 +354,7 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 	// SO-9: same type as build_step_chi's placeholder -- each is only
 	// used as its own replace key, but the asymmetry invited bugs.
 	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point,
-		sbf_type_id<node>());
+		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
 	c_pholder = tau::build_bf_eq_0(c_pholder);
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
 	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),

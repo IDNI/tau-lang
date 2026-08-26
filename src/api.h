@@ -163,7 +163,7 @@ struct api {
 	 *
 	 * 0 = `eager` (default, today's behaviour), 1 = `per_closed_block`,
 	 * 2 = `per_formula`. An out-of-range value clamps to the default. The
-	 * final closed-formula check of `eliminate_bv_and_quantifiers` runs
+	 * final closed-formula check of `eliminate_arithmetic_and_quantifiers` runs
 	 * under every setting -- it is the "final" site the other two rely on.
 	 */
 	static void set_solver_placement(int site);

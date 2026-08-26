@@ -1223,7 +1223,7 @@ tref normalize_with_temp_simp(tref fm) {
 		{
 			subtree_map<node, tref> changes;
 			for (tref b : blocks) {
-				tref r = eliminate_bv_and_quantifiers<node>(b);
+				tref r = eliminate_arithmetic_and_quantifiers<node>(b);
 				if (!r || r == b || tau::get(r).find_top(
 					is_quantifier<node>))
 				{
@@ -1236,7 +1236,7 @@ tref normalize_with_temp_simp(tref fm) {
 					// default) never reaches it. Its negation
 					// is the ∃ form; eliminate that and negate
 					// back.
-					tref nb = eliminate_bv_and_quantifiers<
+					tref nb = eliminate_arithmetic_and_quantifiers<
 						node>(tau::build_wff_neg(b));
 					if (nb && !tau::get(nb).find_top(
 						is_quantifier<node>))
