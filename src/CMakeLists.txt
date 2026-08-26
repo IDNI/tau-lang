@@ -98,6 +98,11 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 )
 add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
 
+# Nothing links this object library; leaving it in the default build just
+# recompiles TAU_SOURCES for no consumer. Build on demand with
+# `cmake --build <dir> --target TAUo`.
+exclude(${TAU_OBJECT_LIB_NAME})
+
 #
 # static library
 #
