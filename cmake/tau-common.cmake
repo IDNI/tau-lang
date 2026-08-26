@@ -31,9 +31,20 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
+# LTO only pays off when something LTO-links it; test targets are all -fno-lto
+if (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
+	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
+	set(TAU_LTO_COMPILE ";-flto=auto;-ffat-lto-objects")
+	set(TAU_LTO_LINK "-flto=auto")
+else()
+	set(TAU_LTO_COMPILE "")
+	set(TAU_LTO_LINK "")
+	message(STATUS "LTO off: nothing links with LTO here (tests are -fno-lto)")
+endif()
+
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
-set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG;-flto=auto")
-set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-flto=auto;-g")
+set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE}")
+set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE};-g")
 # Coverage mirrors Debug semantics; --coverage itself is added in CMakeLists.txt.
 # Without -DDEBUG (and with no -DNDEBUG) asserts stay live while bdd_handle::b is
 # private, which does not compile -- see bdd_handle.h.
@@ -47,11 +58,10 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(TAU_LINK_OPTIONS "")
 elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	set(COMPILE_OPTIONS "${TAU_RELWITHDEBINFO_OPTIONS}")
-	set(TAU_LINK_OPTIONS "-flto=auto")
-
+	set(TAU_LINK_OPTIONS "${TAU_LTO_LINK}")
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(COMPILE_OPTIONS "${TAU_RELEASE_OPTIONS}")
-	set(TAU_LINK_OPTIONS "-flto=auto")
+	set(TAU_LINK_OPTIONS "${TAU_LTO_LINK}")
 endif()
 
 message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
