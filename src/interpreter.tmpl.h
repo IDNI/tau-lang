@@ -346,7 +346,7 @@ std::optional<interpreter<node>>
 				const size_t wtype =
 					i < reduction.witness_types.size()
 					? reduction.witness_types[i]
-					: get_ba_type_id<node>(bv_type<node>());
+					: get_ba_type_id<node>(pack_bool_carrier_type<node>());
 				ctx_with_witnesses.add_output(wname, wtype,
 					std::make_shared<
 						vector_output_stream>());
