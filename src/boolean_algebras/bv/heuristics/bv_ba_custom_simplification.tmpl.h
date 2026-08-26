@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "bv_simplify_options.h"
+#include "heuristics/bv_simplify_options.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_simplification"

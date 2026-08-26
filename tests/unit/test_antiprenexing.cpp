@@ -1677,7 +1677,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	}
 
 	// The solver-ownership demotion: `process_quantifier_block`'s local
-	// `ctx_bv_is_solver_owned` (NOT `analysis_context::bv_is_solver_owned`
+	// `ctx_arith_is_solver_owned` (NOT `analysis_context::arith_is_solver_owned`
 	// -- `atom_arith_verdict` no longer branches on that at all, per the
 	// pure-BA-bv directive's comment) is recomputed once, at `anti_prenex`
 	// entry, as `!has_foreign_ba_constant(formula)`. A `:tau` BA constant
@@ -1703,7 +1703,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 			"&& y:bool = { true }:bool.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		// Non-vacuity: the formula really does carry a foreign BA
-		// constant, so ctx_bv_is_solver_owned really is false here.
+		// constant, so ctx_arith_is_solver_owned really is false here.
 		REQUIRE( has_foreign_ba_constant<node_t>(fm) );
 		tref res = anti_prenex<node_t>(fm);
 		REQUIRE( res != nullptr );
@@ -1759,7 +1759,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 		REQUIRE( parsed.has_value() );
 		tref fm = parsed.value().main->get();
 		analysis_context<node_t> ctx;
-		ctx.bv_is_solver_owned = true;
+		ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		tref res = anti_prenex<node_t>(fm, el);
 		REQUIRE( res != nullptr );

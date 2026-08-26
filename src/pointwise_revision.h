@@ -19,6 +19,18 @@
 
 namespace idni::tau_lang {
 
+/// Enable the semantic ("optimal mode", pwr-ltl.tex Sec.11) fallback of the
+/// temporal pointwise revision below: when the syntactic revision drops a
+/// spec clause, re-derive it from Algorithm D's winning region
+/// (`pack_semantic_pwr_optimal`). OFF by default (PW-N4): that route reaches
+/// the parity-game solver whose dead-end override is known to under-correct
+/// (AL-R1), so a wrong winning region would silently shape the revised spec.
+/// A runtime parameter by policy -- `--pwr-semantic` on the CLI,
+/// `api::set_pwr_semantic_fallback`. Lives here, not in the qlt plugin that
+/// implements the fallback itself: this file is its only reader, and core
+/// must not depend on a plugin-owned global.
+inline bool pwr_semantic_fallback = false;
+
 // ---------------------------------------------------------------------------
 // AST classification helpers
 // ---------------------------------------------------------------------------

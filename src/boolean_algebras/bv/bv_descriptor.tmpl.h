@@ -153,6 +153,37 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_preprocessing(bool enabled) { bv_blasting = enabled; }
 
 	/**
+	 * @brief `true` when @p form still carries a one-hot bit-mask conjunction
+	 * left over from an earlier predicate-blasting pass.
+	 *
+	 * @see idni::tau_lang::has_blasting_residue for what the screen looks for
+	 * and why closing an already-blasted scope's free variables must avoid
+	 * cvc5's non-terminating alternation on it.
+	 */
+	static bool has_preprocessing_residue(tref form) {
+		return idni::tau_lang::has_blasting_residue<node_t>(form);
+	}
+
+	/**
+	 * @brief `true` when @p term's own arithmetic operator has the constant
+	 * argument predicate blasting needs.
+	 *
+	 * Only `*`, `/`, `%`, `<<` and `>>` are constrained -- each blasts only
+	 * with a constant second (`*`: either) argument (bv_predicate_blasting.
+	 * tmpl.h). `+`, `-` and a cast blast unconditionally, so anything else
+	 * answers `true`.
+	 */
+	static bool term_is_blasteable(tref term) {
+		const auto& t = tau::get(term);
+		if (t.is(tau::bf_mul))
+			return get_bvmul_arguments<node_t>(term).second != nullptr;
+		if (t.is(tau::bf_shl) || t.is(tau::bf_shr)
+			|| t.is(tau::bf_div) || t.is(tau::bf_mod))
+			return get_arguments<node_t>(term).second != nullptr;
+		return true;
+	}
+
+	/**
 	 * @brief `true` when @p src is a truncated bv literal, not a bad one.
 	 *
 	 * Distinct from `parse` failing, which cannot tell the two apart; the REPL

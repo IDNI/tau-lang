@@ -185,6 +185,36 @@ bool pack_can_solve(Form form) {
 	return out;
 }
 
+/** @brief `true` when @p BA's descriptor flags re-decomposable preprocessing residue. */
+template <typename Node, typename BA, typename Form>
+concept ba_flags_preprocessing_residue = ba_has_descriptor_v<Node, BA>
+	&& requires(Form f) {
+		ba_descriptor<BA, Node>::has_preprocessing_residue(f);
+	};
+
+/**
+ * @brief `true` when some BA in the pack flags @p form as still carrying its
+ * own preprocessing residue.
+ *
+ * Preprocessing (@ref pack_preprocess) can rewrite a formula into a shape
+ * that closing its free variables would make expensive to decide again (bv's
+ * predicate blasting is the motivating case: closing an already-blasted
+ * scope's free variables wraps the auxiliary bit quantifiers it introduced in
+ * a universal block, which defeats the solver's usual instantiation strategy
+ * and can hang it outright). A BA whose preprocessing has no such trap simply
+ * declares nothing, so the fold answers `false` for it -- same "absent means
+ * ordinary" convention as every other optional capability here.
+ */
+template <typename Node, typename Form>
+bool pack_has_preprocessing_residue(Form form) {
+	bool out = false;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_flags_preprocessing_residue<Node, BA, Form>)
+			if (!out) out = ba_descriptor<BA, Node>::has_preprocessing_residue(form);
+	});
+	return out;
+}
+
 /**
  * @brief Definite satisfiability of @p form, or nullopt when undecided.
  *
@@ -289,6 +319,40 @@ bool pack_type_has_arith_ops(size_t ba_type) {
 template <typename Node>
 bool pack_type_has_arith_ops(tref type) {
 	return pack_type_has_arith_ops_impl<Node>(type);
+}
+
+/** @brief `true` when @p BA's descriptor classifies an arithmetic term's blastability. */
+template <typename Node, typename BA>
+concept ba_classifies_blasting = ba_has_descriptor_v<Node, BA>
+	&& requires(tref t) { ba_descriptor<BA, Node>::term_is_blasteable(t); };
+
+/**
+ * @brief `true` when the BA owning type id @p ba_type can predicate-blast
+ * @p term.
+ *
+ * A term with an arithmetic operator (`+`, `-`, `*`, `/`, `%`, a shift, a
+ * cast) is not automatically blasteable: an operator like `*` needs a
+ * constant argument to turn into a per-bit predicate. This asks the term's
+ * *owning* BA -- the one `pack_preprocess` would actually route it to --
+ * whether it can, for a BA that declares `arith_ops` and offers the
+ * classification; a BA with none of either simply cannot blast anything, so
+ * this answers `false`. @p ba_type is taken separately from @p term (rather
+ * than read off it internally) so this header need not depend on `tree<Node>`
+ * -- the caller already has it from classifying the same term.
+ */
+template <typename Node>
+bool pack_term_is_blasteable(size_t ba_type, tref term) {
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_classifies_blasting<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type))
+					out = ba_descriptor<BA, Node>::term_is_blasteable(term);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
 }
 
 

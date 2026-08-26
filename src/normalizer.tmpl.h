@@ -196,7 +196,7 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 	// needs those rewired to the verdicts first (the plan's own Task 9
 	// step 2), not merely one call deleted.
 	{
-		analysis_context<node> ctx1;          // bv_is_solver_owned = true
+		analysis_context<node> ctx1;          // arith_is_solver_owned = true
 		const eliminability<node> el1 = analyse_formula<node>(form, ctx1);
 		form = anti_prenex<node>(form, el1);
 	}
@@ -251,7 +251,7 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 		// and the atom counts in a mixed formula are the spec's own, not
 		// blasting's per-bit residue.
 		analysis_context<node> ctx2;
-		ctx2.bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
+		ctx2.arith_is_solver_owned = !has_foreign_arith_constant<node>(form);
 		const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
 		form = anti_prenex<node>(form, el2);
 		form = resolve_quantifiers<node>(form);

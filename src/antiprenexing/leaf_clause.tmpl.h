@@ -1,5 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+// `solver_placement`/`solver_site` and the blasting-placement knobs
+// (`bv_blasting`, `blast_placement`, `blast_site`, `blast_method`,
+// `blast_mode`): a dependency-free core header, not a BA plugin -- see its
+// own file comment.
+#include "heuristics/blast_placement.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "leaf_clause"
 
@@ -384,7 +390,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// rather than by a bare type test: `blasteable` is exactly "bv-typed
 	// and cvc5 can be expected to translate this formula", which is the
 	// question this branch needs answered. Gating on the verdict rather than
-	// on `is_bv_type_family` alone is what keeps a formula carrying a foreign
+	// on `pack_type_has_arith_ops` alone is what keeps a formula carrying a foreign
 	// BA constant out of a solver that cannot represent it.
 	//
 	// Currently unreachable through the block driver, which diverts a
@@ -392,7 +398,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// becomes live when the legacy path is rewired through this module.
 	for (tref v : still_live) {
 		if (elim.verdict_of(v) != elim_verdict::blasteable) continue;
-		if (!is_bv_type_family<node>(tau::get(v).get_ba_type())) continue;
+		if (!pack_type_has_arith_ops<node>(tau::get(v).get_ba_type())) continue;
 		const trefs& free_vars = get_free_vars<node>(scoped);
 		// Gated on `eager`, and the blasting attempt below on
 		// `per_leaf`, for consistency with the other leaf-level sites --
@@ -404,17 +410,18 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		if (solver_placement == solver_site::eager
 			&& (free_vars.empty() || (free_vars.size() == 1
 			&& tau::get(free_vars[0]) == tau::get(v)))
-			&& is_bv_solvable_formula<node>(scoped))
+			&& pack_can_solve<node>(scoped))
 		{
 			// Closed bv formula: simplify to T/F, but only on a
-			// definite answer. cvc5 returning unknown, or translation
-			// failing, means we cannot decide -- not that it is false.
-			std::optional<bv_sat_status> status
-				= bv_formula_sat_status<node>(
+			// definite answer. The solver returning unknown, or
+			// translation failing, means we cannot decide -- not that
+			// it is false.
+			std::optional<bool> status
+				= pack_sat_status<node>(
 					tau::build_wff_ex(v, scoped, false));
-			if (status == bv_sat_status::sat)
+			if (status == true)
 				return with_kept(_T<node>());
-			if (status == bv_sat_status::unsat) return _F<node>();
+			if (status == false) return _F<node>();
 			DBG(if (!status) LOG_TRACE << "solver undecided";)
 		}
 		// Non-closed, or closed-but-undecided: blast the bv existential
@@ -431,7 +438,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// re-entry that bypasses those bounded hops, add the guard here.)
 		if (bv_blasting && blast_placement == blast_site::per_leaf) {
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
-			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
+			if (auto blasted = pack_preprocess<node>(ex_fm);
 				blasted && blasted != ex_fm)
 				// blast_mode::defer keeps the rewritten formula
 				// without re-entering, leaving the quantifiers
@@ -498,7 +505,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 					expanded)));
 		}
 		if (!neqs.empty() && type_v > 0
-			&& is_bv_type_family<node>(type_v)) {
+			&& pack_type_has_arith_ops<node>(type_v)) {
 			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
 				"with disequations, keeping the binder: "
 				<< LOG_FM(scoped) << "\n";)
@@ -620,7 +627,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		return with_kept(term_boole_normal_form<node>(expanded));
 	}
 	if (!neg.empty() && clause_type > 0
-		&& is_bv_type_family<node>(clause_type)) {
+		&& pack_type_has_arith_ops<node>(clause_type)) {
 		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
 			"negated conjuncts, keeping the block: "
 			<< LOG_FM(scoped) << "\n";)

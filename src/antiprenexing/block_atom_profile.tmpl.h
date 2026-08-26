@@ -62,7 +62,7 @@ block_atom_profile<node> profile_block_atoms(tref formula,
 		p.finite_ba_content = tau::get(formula).find_top(
 			[](tref n) {
 				const size_t t = tau::get(n).get_ba_type();
-				return t > 0 && (is_bv_type_family<node>(t)
+				return t > 0 && (pack_type_has_arith_ops<node>(t)
 					|| is_bool_type<node>(t));
 			}) != nullptr;
 	return p;

@@ -229,7 +229,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		// loop to the (unreachable) solver branch's gate instead of
 		// being resolved earlier.
 		tref fm = parse("ex x : bv[8] x + x = { 2 }:bv[8].");
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		auto [binder_block, body] = strip_block(fm, 1);
 		tref v = newly_freed_var(fm, body);
@@ -258,7 +258,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		// reachable. `x + x`, not `x + { 0 }`, for the same
 		// no-constant-folding reason as the case above.
 		tref fm = parse("ex x : bv[8] x + x = { 1 }:bv[8].");
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		auto [binder_block, body] = strip_block(fm, 1);
 		tref v = newly_freed_var(fm, body);
@@ -285,7 +285,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		} guard;
 		bv_blasting = false;
 		tref fm = parse("ex x : bv[8] x + x = y.");
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		auto [binder_block, body] = strip_block(fm, 1);
 		// x is the one variable body has free that fm (x still bound)

@@ -154,7 +154,7 @@ TEST_SUITE("eliminability") {
 		// bv floor downstream.
 		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c)) {
 			REQUIRE(a.verdicts.contains(v));
@@ -168,7 +168,7 @@ TEST_SUITE("eliminability") {
 		// whatever its variables would be worth on their own.
 		tref c = get_nso_rr("x:bv[4] + y:bv[4] = { 0 }:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
 			CHECK(a.verdict_of(v) == elim_verdict::blasteable);
@@ -181,7 +181,7 @@ TEST_SUITE("eliminability") {
 		// have them, or the quantifier is stranded for good.
 		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = false;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = false;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
 			CHECK(a.verdict_of(v) == elim_verdict::eliminable);
@@ -193,7 +193,7 @@ TEST_SUITE("eliminability") {
 		// atom is bv-typed.
 		tref c = get_nso_rr("x:bv[4] * y:bv[4] = 0:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
 			CHECK(a.verdict_of(v) == elim_verdict::arithmetic);
@@ -201,7 +201,7 @@ TEST_SUITE("eliminability") {
 
 	TEST_CASE("a reference outranks every bv verdict") {
 		tref c1 = get_nso_rr("f(x:bv[4]).").value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c1), { c1 }, ctx);
 		for (tref v : conj_vars(c1))
 			CHECK(a.verdict_of(v) == elim_verdict::frozen);
@@ -227,7 +227,7 @@ TEST_SUITE("eliminability") {
 		trefs fvs = conj_vars(c);
 		tref b = *std::find_if(fvs.begin(), fvs.end(),
 			[](tref v) { return !is_tref_bv_type_family<node_t>(v); });
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>({ b }, { c }, ctx);
 		CHECK(a.verdict_of(b) == elim_verdict::blasteable);
 	}
@@ -423,9 +423,9 @@ TEST_SUITE("eliminability") {
 			== elim_verdict::arithmetic);
 	}
 
-	TEST_CASE("analyse_formula: bv floor follows bv_is_solver_owned") {
+	TEST_CASE("analyse_formula: bv floor follows arith_is_solver_owned") {
 		tref fm = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
-		analysis_context<node_t> owned{}, foreign{}; foreign.bv_is_solver_owned = false;
+		analysis_context<node_t> owned{}, foreign{}; foreign.arith_is_solver_owned = false;
 		CHECK(analyse_formula<node_t>(fm, owned).arith_floor);
 		CHECK_FALSE(analyse_formula<node_t>(fm, foreign).arith_floor);
 		// Without the floor a plain bv equality is eliminable (Boole

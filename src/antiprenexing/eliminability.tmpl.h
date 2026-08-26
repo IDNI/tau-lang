@@ -10,6 +10,20 @@ bool eliminability_comp(tref l, tref r) {
 	return tree<node>::subtree_less(l, r);
 }
 
+/** @copydoc has_foreign_arith_constant */
+template <NodeType node>
+bool has_foreign_arith_constant(tref form) {
+	using tau = tree<node>;
+	auto foreign = [](tref n) {
+		const tau& t = tau::get(n);
+		if (!t.is_ba_constant() && !t.is(tau::bf_t) && !t.is(tau::bf_f))
+			return false;
+		const size_t ty = t.get_ba_type();
+		return ty != 0 && !pack_type_has_arith_ops<node>(ty);
+	};
+	return tau::get(form).find_top(foreign) != nullptr;
+}
+
 template <NodeType node>
 bool eliminability<node>::covers_atom(tref n) const {
 	// Only an ATOM may stop the walk. A conjunct, a connective or a whole
@@ -110,7 +124,7 @@ namespace detail {
  * off the atom's VARIABLES.
  * @tparam node Tree node type.
  * @param m Atomic formula (`is_atomic_fm` must hold).
- * @param bv_is_solver_owned `analysis_context::bv_is_solver_owned`. Unused
+ * @param arith_is_solver_owned `analysis_context::arith_is_solver_owned`. Unused
  *        since the directive above: the two verdicts it used to scope are now
  *        decided without it (arithmetic is classified before it was ever read;
  *        a pure-BA atom is eliminable under both settings). Kept in the
@@ -120,7 +134,7 @@ namespace detail {
  * @endinternal
  */
 template <NodeType node>
-elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
+elim_verdict atom_arith_verdict(tref m, bool arith_is_solver_owned) {
 	using tau = tree<node>;
 	// Arithmetic operators. Not is<node>({...}): that factory's returned
 	// closure captures a std::initializer_list by value, whose backing array
@@ -135,14 +149,17 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
 	};
 	// Arithmetic operators atomic_blasting cannot express
 	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
-	// factor; shl/shr/div/mod need a constant second argument.
+	// factor; shl/shr/div/mod need a constant second argument. Only these
+	// five operators are ever constrained -- add/sub/cast blast
+	// unconditionally, matching `pack_term_is_blasteable`'s own default.
+	// The constant-argument test itself is routed through the owning BA's
+	// classification rather than a bare bv-specific argument test, so this
+	// holds for whichever BA's descriptor owns the term's type.
 	auto blasting_unsupported = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_mul))
-			return !get_bvmul_arguments<node>(n).second;
-		if (t.is(tau::bf_shl) || t.is(tau::bf_shr)
+		if (t.is(tau::bf_mul) || t.is(tau::bf_shl) || t.is(tau::bf_shr)
 			|| t.is(tau::bf_div) || t.is(tau::bf_mod))
-			return !get_arguments<node>(n).second;
+			return !pack_term_is_blasteable<node>(t.get_ba_type(), n);
 		return false;
 	};
 	if (tau::get(m).find_top(is_arith_op))
@@ -151,10 +168,10 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
 	// No arithmetic operator anywhere below `m`: purely Boolean-algebra
 	// content whatever its type, so this pass can eliminate it itself. The
 	// arith-typed-free-variable scan that used to answer `blasteable` here, and
-	// the `bv_is_solver_owned` early return that scoped it, both went with the
+	// the `arith_is_solver_owned` early return that scoped it, both went with the
 	// directive documented above -- a pure-BA atom is eliminable under either
 	// setting, so neither branch had an answer left to give.
-	(void) bv_is_solver_owned;
+	(void) arith_is_solver_owned;
 	return elim_verdict::eliminable;
 }
 
@@ -172,14 +189,14 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
  */
 template <NodeType node>
 subtree_unordered_map<node, elim_verdict> collect_arith_verdicts(tref conj,
-	bool bv_is_solver_owned)
+	bool arith_is_solver_owned)
 {
 	subtree_unordered_map<node, elim_verdict> res;
 	// Named, not a temporary: visit_unique takes `auto&`.
 	auto visit = [&](tref m) -> bool {
 		if (!is_atomic_fm<node>(m)) return true;
 		if (elim_verdict v = atom_arith_verdict<node>(m,
-			bv_is_solver_owned); v != elim_verdict::eliminable)
+			arith_is_solver_owned); v != elim_verdict::eliminable)
 				res.emplace(m, v);
 		return false;
 	};
@@ -222,7 +239,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 		for (tref conj : conjuncts)
 			for (const auto& [m, v] :
 				detail::collect_arith_verdicts<node>(conj,
-					ctx.bv_is_solver_owned))
+					ctx.arith_is_solver_owned))
 						arith_verdicts.emplace(m, v);
 
 	union_find_with_sets<decltype(eliminability_comp<node>), node>
@@ -538,7 +555,7 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 			// whose type's owning BA declares `arith_ops`.
 			const trefs& fvs = get_free_vars<node>(m);
 			arith_res.assign(m, detail::atom_arith_verdict<node>(m,
-				ctx.bv_is_solver_owned));
+				ctx.arith_is_solver_owned));
 			for (tref fv : fvs)
 				if (pack_type_has_arith_ops<node>(tau::get(fv).get_ba_type()))
 					arith_res.merge(m, fv);
@@ -558,7 +575,7 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 	idni::pre_order<node>(form).visit(visit, visit_subtree, up);
 	snapshot_scope(ref_res.scoped.global);
 
-	res.arith_floor = ctx.bv_is_solver_owned;
+	res.arith_floor = ctx.arith_is_solver_owned;
 	return res;
 }
 

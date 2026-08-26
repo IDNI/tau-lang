@@ -68,17 +68,37 @@ inline elim_verdict join(elim_verdict a, elim_verdict b) {
 }
 
 /**
+ * @brief Does @p form carry a constant (or typed `T`/`F`) of a Boolean
+ * algebra whose type does not declare arithmetic operators?
+ *
+ * Such content is invisible to an arithmetic BA's own solver (e.g. bv's
+ * cvc5-backed one), so no arithmetic scope sharing a formula with it can ever
+ * be decided by that solver -- callers use this to tell "the solver owns this
+ * arithmetic content" apart from "nothing here will ever decide it". Untyped
+ * `T`/`F` carries no algebra of its own and does not count. Routed through
+ * `pack_type_has_arith_ops` rather than any one BA's own type-family test, so
+ * it holds for whichever BA(s) of the pack declare `arith_ops`.
+ * @tparam node Tree node type.
+ * @param form Formula to scan.
+ * @return `true` if a constant of a non-arithmetic-owning algebra occurs in
+ * @p form.
+ */
+template <NodeType node>
+bool has_foreign_arith_constant(tref form);
+
+/**
  * @brief Formula-wide inputs the per-block analysis cannot derive from a block.
  *
- * `bv_is_solver_owned` is genuinely a property of the whole formula: a
+ * `arith_is_solver_owned` is genuinely a property of the whole formula: a
  * constant of another Boolean algebra (a `:tau` spec constant, say) is one
- * cvc5 cannot translate at all, so *no* bitvector scope anywhere in the
- * formula will ever be decided by the solver. Computed once at pipeline entry
- * with `!has_foreign_ba_constant<node>(form)` and carried down.
+ * the arithmetic BA's own solver cannot translate at all, so *no* arithmetic
+ * scope anywhere in the formula will ever be decided by it. Computed once at
+ * pipeline entry with `!has_foreign_arith_constant<node>(form)` and carried
+ * down.
  */
 template <NodeType node>
 struct analysis_context {
-	bool bv_is_solver_owned = true;
+	bool arith_is_solver_owned = true;
 };
 
 /**
@@ -314,7 +334,7 @@ struct scoped_verdict_resolver {
  * arith-resolver's kind_of(n))` (both resolvers hold `elim_verdict` directly, so
  * this join subsumes the boolean "does the ref side say frozen" check).
  *
- * `res.arith_floor` is set from `ctx.bv_is_solver_owned` before returning.
+ * `res.arith_floor` is set from `ctx.arith_is_solver_owned` before returning.
  * @tparam node Tree node type.
  * @param form Formula to analyse.
  * @param ctx Formula-wide inputs.
@@ -336,7 +356,7 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
  * `frozen` is seeded at every unresolved reference, at every kept binder, and
  * -- fail closed -- at every wff-level shape this analysis does not otherwise
  * recognise, so an unhandled shape cannot silently leave its variables
- * `eliminable`. @p ctx.bv_is_solver_owned is consulted when seeding an
+ * `eliminable`. @p ctx.arith_is_solver_owned is consulted when seeding an
  * arith-typed atom: `blasteable` only applies while it holds.
  *
  * Only a *bound* variable's own scope can constrain it -- it cannot occur
