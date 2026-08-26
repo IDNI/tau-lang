@@ -132,6 +132,9 @@ template <NodeType node>
 const trefs& get_free_vars(tref n);
 
 template <NodeType node>
+std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars);
+
+template <NodeType node>
 bool has_temp_var(tref n);
 
 template <NodeType node>
