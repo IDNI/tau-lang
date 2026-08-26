@@ -155,7 +155,7 @@ private:
 		interpreter<node> interp;
 		measuring m;
 		idni::measures::timer t;
-		run_session(interpreter<node> i) : interp(std::move(i)), m("run") {}
+		run_session(interpreter<node> i) : interp(std::move(i)), m{"run"} {}
 	};
 	/// @brief What the *next* eval() call's input line answers, while set;
 	/// eval() checks this before parsing src as a normal CLI command.

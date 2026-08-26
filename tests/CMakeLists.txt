@@ -8,6 +8,9 @@ endif ()
 
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	target_compile_options(doctest INTERFACE -Wno-c2y-extensions "-Wno-#warnings")
+endif()
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
 function(add test_name)
