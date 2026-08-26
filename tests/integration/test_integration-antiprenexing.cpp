@@ -199,6 +199,7 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 	// variable must not force the whole block to fall back to anti_prenex,
 	// nor be dropped/mishandled when it does get pulled into the block's
 	// Boole-decomposition candidate set.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("bv atom alongside block var: ex x ((xy=0||Z=3) && xw=0) -> T") {
 		// x = 0 makes both xy = 0 and xw = 0 true regardless of y, w, Z:
 		// tautology, independently of how the unrelated Z:bv[8] atom is
@@ -216,6 +217,7 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 			"&& Z:bv[8] != { 3 }:bv[8].",
 			tau::wff_f) );
 	}
+#endif // TAU_PACK_HAS_BA_BV
 }
 
 // AN-1: qlt_dlo_qe records free-variable (symbolic) endpoints only for
@@ -226,6 +228,7 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 // resolve_quantifiers' omcat branch already gates on a closed scope; the
 // leaf-clause call site (eliminate_block_over_clause's qlt/DLO branch) keeps
 // the binder when an ordering atom survives an undetermined interval.
+#ifdef TAU_PACK_HAS_BA_QLT
 TEST_SUITE("AN-1 symbolic qlt bounds") {
 
 	TEST_CASE("ex x (a < x && x < b) with free a, b is not resolved to T") {
@@ -245,3 +248,4 @@ TEST_SUITE("AN-1 symbolic qlt bounds") {
 		CHECK( tau::get(res).equals_T() );
 	}
 }
+#endif // TAU_PACK_HAS_BA_QLT

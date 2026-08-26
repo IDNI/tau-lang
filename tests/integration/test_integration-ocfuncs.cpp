@@ -712,6 +712,7 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 	// instantiation of the function — aborted with
 	// "ba_types::name: invalid ba_type_id 7".  Registered names also carry a
 	// leading ':' (":sbf"), so a bare "sbf" would never have matched either.
+#ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("[OCF-INST-07] resolve_func_decl_types instantiates") {
 		auto decls = one_dynamic_decl();
 		resolve_func_decl_types<node_t>(decls);
@@ -730,6 +731,7 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 		CHECK(unknown.result_type_id == 0);
 		CHECK_FALSE(unknown.types_resolved());
 	}
+#endif // TAU_PACK_HAS_BA_SBF
 
 	// The contract fix: while Steps 3/5/6 are stubs, `ocfuncs_compile` returns
 	// the input essentially unchanged.  ocfuncs.h documents it as compiling

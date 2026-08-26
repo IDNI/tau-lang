@@ -204,8 +204,10 @@ TEST_SUITE("interpreter: misbehaving streams") {
 TEST_SUITE("repl gc pinning") {
 
 	TEST_CASE("a REPL rec-relation definition survives a gc sweep") {
-		using repl_t = repl_evaluator<qint, qlt, nlang_ba, bv,
-			sbf_ba, hsb>;
+		// Pack-driven, exactly as src/main.cpp instantiates the REPL --
+		// the gc-pinning behaviour under test does not depend on which
+		// BAs make up the pack, so this must not name any of them.
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
 		auto& defs = definitions<node_t>::instance();
 		defs.clear();
 		repl_t::options o;

@@ -145,6 +145,7 @@ TEST_SUITE("eliminability") {
 		CHECK(a.conjuncts_of(unanalysed).empty());
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("a pure-BA bv atom is eliminable even where the solver owns bv") {
 		// User directive 2026-08-14: "bv variables that appear only in atoms
 		// that are purely BA are also eliminable." `&` is not arithmetic, so
@@ -231,6 +232,7 @@ TEST_SUITE("eliminability") {
 		auto a = analyse_block<node_t>({ b }, { c }, ctx);
 		CHECK(a.verdict_of(b) == elim_verdict::blasteable);
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("members maps every category to its vars and atoms") {
 		// x is entangled with a reference; the atom `x z = 0` and both its
@@ -246,6 +248,7 @@ TEST_SUITE("eliminability") {
 		CHECK(a.verdict_of(c2) == elim_verdict::frozen);
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("arith_floor makes bv-typed nodes blasteable without analysis") {
 		auto e = eliminability<node_t>::arith_only();
 		tref bv = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
@@ -291,6 +294,7 @@ TEST_SUITE("eliminability") {
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
 		CHECK(el.has_skip_content(fm));
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("has_frozen finds a reference-frozen node, and nothing else") {
 		tref fm = get_nso_rr("ex y ex z (q(y) && z = 0).").value().main->get();
@@ -365,6 +369,7 @@ TEST_SUITE("eliminability") {
 		CHECK_FALSE(el.skip(z));
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("analyse_formula: bv arithmetic taints its component, only it") {
 		tref fm = get_nso_rr(
 			"ex x (x:bv[4] + y:bv[4] = { 0 }:bv[4] && w = 0).")
@@ -434,6 +439,7 @@ TEST_SUITE("eliminability") {
 		CHECK(analyse_formula<node_t>(fm, foreign).verdict_of(v)
 			== elim_verdict::eliminable);
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("analyse_formula: quantifier scoping does not cross-contaminate") {
 		// Two unrelated binders of the same name: the union-find must not

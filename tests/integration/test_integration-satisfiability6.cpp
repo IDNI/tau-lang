@@ -279,6 +279,7 @@ TEST_SUITE("satisfiability helpers") {
 	// Closes: `calculate_ctn` (src/satisfiability.tmpl.h:200) had no test at
 	// all, and in particular its `is_left` operand-order handling
 	// (lines 213-230) was completely unverified.
+#ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("calculate_ctn: all six kinds, both operand orders") {
 		const size_t sbf_tid = sbf_type_id<node_t>();
 		tref ba_1 = tau::_1(sbf_tid), ba_0 = tau::_0(sbf_tid);
@@ -332,6 +333,7 @@ TEST_SUITE("satisfiability helpers") {
 		CHECK( calculate_ctn<node_t>(three_lt_t, 3) == ba_0 );
 		CHECK( calculate_ctn<node_t>(three_lt_t, 4) == ba_1 );
 	}
+#endif // TAU_PACK_HAS_BA_SBF
 
 	// Closes: `is_initial_ctn_phase` (src/satisfiability.tmpl.h:257) had no
 	// test. Unlike calculate_ctn it reads `condition` without looking at which

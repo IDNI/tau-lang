@@ -111,10 +111,12 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(!maybe_i.has_value());
 	}
 
+#ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("handle type error") {
 		auto maybe_i = tau_api::get_interpreter("o[t]:tau = i[t]:sbf");
 		CHECK(!maybe_i.has_value());
 	}
+#endif // TAU_PACK_HAS_BA_SBF
 
 
 	TEST_CASE("using get_inputs_for_step") {
@@ -251,6 +253,7 @@ TEST_SUITE("Tau API - boole_normal_form regressions") {
 		CHECK( *reduced == "x = 0" );
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE_FIXTURE(api_fixture, "NF-2: bitvector comparisons no longer abort") {
 		// Non-bv `<` is expanded by the construction hooks, but a bv one is
 		// not, so it reaches the BDD-variable selection as a bf_lt.
@@ -262,6 +265,7 @@ TEST_SUITE("Tau API - boole_normal_form regressions") {
 			CHECK( r.has_value() );
 		}
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE_FIXTURE(api_fixture, "malformed input still rejected") {
 		for (const char* s : { "", "x ) ( invalid !!!", "o[t] =" })
