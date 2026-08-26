@@ -13,17 +13,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
-if(TAU_USE_CCACHE)
-	# include(<module>), not include(<file>): an argument carrying the .cmake
-	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
-	# is never looked up on CMAKE_MODULE_PATH, which is where use-ccache.cmake
-	# actually lives (external/parser/cmake). With the extension this failed
-	# with "include could not find requested file: use-ccache.cmake" on every
-	# reconfigure whenever TAU_USE_CCACHE was ON -- latent until something
-	# forced a regenerate, e.g. adding a test target.
-	include(use-ccache)
-endif()
-
 set(namespace "TAU")
 set(PROJECT_NAME tau)
 set(PROJECT_LIB_NAME TAU)
@@ -66,6 +55,17 @@ option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_USE_CCACHE              "Use ccache when building"              ON)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
+
+if(TAU_USE_CCACHE)
+	# include(<module>), not include(<file>): an argument carrying the .cmake
+	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
+	# is never looked up on CMAKE_MODULE_PATH, which is where use-ccache.cmake
+	# actually lives (external/parser/cmake). With the extension this failed
+	# with "include could not find requested file: use-ccache.cmake" on every
+	# reconfigure whenever TAU_USE_CCACHE was ON -- latent until something
+	# forced a regenerate, e.g. adding a test target.
+	include(use-ccache)
+endif()
 
 # Load local cmake settings
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
