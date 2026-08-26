@@ -109,6 +109,26 @@ bool is_untyped(size_t t) {
 	return is_untyped<node>(ba_types<node>::type_tree(t));
 }
 
+template<NodeType node>
+bool is_bool_type(tref t) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "bool";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+template <NodeType node>
+bool is_bool_type(size_t t) {
+	return is_bool_type<node>(ba_types<node>::type_tree(t));
+}
+
 // Asks the pack whether the BA owning this node's type declares arithmetic
 // operators, naming no BA.  Lives here rather than in ba_pack_traits.h because
 // it needs tree<node> to read the ba_type.

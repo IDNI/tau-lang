@@ -89,6 +89,28 @@ bool is_untyped(tref t);
 template <NodeType node>
 bool is_untyped(size_t t);
 
+/**
+ * @brief Checks if @p t has the classical two-element Boolean algebra as its
+ * type ("bool").
+ *
+ * `Bool` is always present in every pack (it is not a `TAU_BAS` entry), but
+ * its descriptor is defined only in `bool_descriptor.tmpl.h`, reached through
+ * `base_ba_dispatcher.h` late in the core include order -- too late for
+ * callers such as `src/antiprenexing/`. This checks the same thing
+ * (`bool_descriptor<Bool, node>::type_name` is `"bool"`) by name, exactly as
+ * `is_tau_type` above does for `"tau"`, so it is reachable everywhere `ba_types.h`
+ * is.
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents bool
+ */
+template <NodeType node>
+bool is_bool_type(tref t);
+
+/** @brief Return `true` if type id @p t represents the bool type. */
+template <NodeType node>
+bool is_bool_type(size_t t);
+
 // -----------------------------------------------------------------------------
 // Deriving a BA's type surface from its descriptor's type_name
 //
