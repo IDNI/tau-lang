@@ -1,6 +1,7 @@
 #!/bin/bash
 
 TGF_FILE=$1
+shift
 
 if [[ -z "$TGF_FILE" ]]; then
 	echo "provide an existing TGF file path"
@@ -19,5 +20,5 @@ if [[ ! -f "$TGF" ]]; then
 fi
 
 echo "Generating parser from $TGF_FILE ..."
-$TGF "$TGF_FILE" gen
+$TGF "$TGF_FILE" gen "$@"
 echo "Generation done"
