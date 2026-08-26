@@ -413,6 +413,14 @@ add_subdirectory(external/parser)
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)
 
+# external/parser keeps its own compile-option table (it is not LTO'd by
+# default), so when tau LTO-compiles, mixing LTO and non-LTO objects in the
+# same COMDAT groups breaks gold's LTO plugin at link time. Force the parser
+# static lib to LTO-compile too whenever tau does, to keep everything uniform.
+if (TARGET tauparser_static AND TAU_LTO_COMPILE_FLAGS AND COMPILE_OPTIONS MATCHES "flto")
+	target_compile_options(tauparser_static PRIVATE "${TAU_LTO_COMPILE_FLAGS}")
+endif()
+
 #
 # Adding src dir
 #

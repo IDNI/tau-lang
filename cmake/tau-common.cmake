@@ -34,9 +34,11 @@ endif()
 # LTO only pays off when something LTO-links it; test targets are all -fno-lto
 if (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
-	set(TAU_LTO_COMPILE ";-flto=auto;-ffat-lto-objects")
+	set(TAU_LTO_COMPILE_FLAGS "-flto=auto;-ffat-lto-objects")
+	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 	set(TAU_LTO_LINK "-flto=auto")
 else()
+	set(TAU_LTO_COMPILE_FLAGS "")
 	set(TAU_LTO_COMPILE "")
 	set(TAU_LTO_LINK "")
 	message(STATUS "LTO off: nothing links with LTO here (tests are -fno-lto)")
