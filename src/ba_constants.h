@@ -86,9 +86,9 @@ struct ba_constants {
 	static void cleanup();
 
 private:
-	inline static std::vector<std::pair<constant, size_t>> C;  // pool of constants
-	// pool of constant tree nodes with type info
-	inline static htrefs T;
+	using constant_pool = std::vector<std::pair<constant, size_t>>;
+	static constant_pool& C();  // pool of constants
+	static htrefs& T();         // pool of constant tree nodes with type info
 };
 
 } // namespace idni::tau_lang
