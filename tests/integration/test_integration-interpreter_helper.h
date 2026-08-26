@@ -41,7 +41,7 @@ std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
 	using node = node_t;
 #ifdef DEBUG
 	std::cout << "run_test/------------------------------------------------------\n";
-	std::cout << "run_test/sample: " << LOG_FM_DUMP(spec) << "\n";
+	std::cout << "run_test/sample: " << tree<node_t>::get(spec).dump_to_str() << "\n";
 #endif // DEBUG
 
 	auto intprtr = interpreter<node>::make_interpreter(spec, ctx);
@@ -65,9 +65,9 @@ std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
 #ifdef DEBUG
 			std::cout << "run_test/output[" << i << "]: ";
 			for (const auto& [var, value]: out.value()) {
-				std::cout << TAU_TO_STR(var) << " <- " << TAU_TO_STR(value) << " ... ";
+				std::cout << tree<node_t>::get(var).to_str() << " <- " << tree<node_t>::get(value).to_str() << " ... ";
 				if (tref io_var = tau::get(value).find_top(is<node_t, tau::io_var>); io_var) {
-					std::cout << "run_test/output[" << i << "]: unexpected io_var " << TAU_TO_STR(io_var) << "\n";
+					std::cout << "run_test/output[" << i << "]: unexpected io_var " << tree<node_t>::get(io_var).to_str() << "\n";
 					intprtr.value().memory.clear();
 					break;
 				}
