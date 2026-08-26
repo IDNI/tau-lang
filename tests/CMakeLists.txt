@@ -13,8 +13,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
+set(TAU_SKIP_TESTS
+	empty_list
+	CACHE STRING "Test targets skipped because covered by REPL tests")
+
 function(add test_name)
 	# message(STATUS "adding test: ${test_name}")
+	if(test_name IN_LIST TAU_SKIP_TESTS)
+		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
+		return()
+	endif()
 	set(N "${test_name}")
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
