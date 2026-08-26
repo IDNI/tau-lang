@@ -208,7 +208,7 @@ struct node {
 	constexpr auto     operator!= (const node& that) const;
 
 	/** @brief Return the pre-computed hash value for this node. */
-	constexpr size_t hashit() const;
+	size_t hashit() const;
 };
 
 /// @brief Placeholder for parser nonterminal grouping.

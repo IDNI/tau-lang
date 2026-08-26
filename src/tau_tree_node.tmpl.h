@@ -199,13 +199,15 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr size_t node<BAs...>::hashit() const {
+size_t node<BAs...>::hashit() const {
 	std::size_t seed = 0;
 	hash_combine(seed, static_cast<size_t>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
-	// In order to have a deterministic hash, we hash the type name
-	hash_combine(seed, get_ba_type_name<node>(ba_type));
+	// In order to have a deterministic hash, we hash the type name --
+	// precomputed per type id: the string build/copy/re-hash here was the
+	// hot constant factor of every hash-consed node.
+	hash_combine(seed, tau_lang::ba_types<node>::name_hash(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool
 	if (nt == type::ba_constant && data != 0 && ba_type != 0)

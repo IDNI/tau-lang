@@ -185,13 +185,25 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 
 // Logging stream for debug messages. Prepends message with "(debug) [channel] "
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
-#define TAU_LOG_DEBUG     BOOST_LOG_STREAM_SEV( \
+//
+// The severity pre-check makes a filtered-out site cost one branch:
+// without it, Boost's open_record runs its attribute-registry lookups on
+// every call before the filter rejects the record, which profiling caught
+// on hot paths. The `for` guard stays a single statement (usable under an
+// unbraced `if`) without tripping -Wdangling-else at call sites.
+#define TAU_LOG_DEBUG     for (bool _tau_log_gate = logging::level() \
+					<= boost::log::trivial::debug; \
+				_tau_log_gate; _tau_log_gate = false) \
+			  BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
 				boost::log::trivial::debug) TAU_LOG_LINE_VALUE
 #define LOG_DEBUG         TAU_LOG_DEBUG
 // Logging stream for trace messages. Prepends message with "(trace) [channel] "
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
-#define TAU_LOG_TRACE     BOOST_LOG_STREAM_SEV( \
+#define TAU_LOG_TRACE     for (bool _tau_log_gate = logging::level() \
+					<= boost::log::trivial::trace; \
+				_tau_log_gate; _tau_log_gate = false) \
+			  BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
 				boost::log::trivial::trace) TAU_LOG_LINE_VALUE
 #define LOG_TRACE         TAU_LOG_TRACE
