@@ -113,12 +113,17 @@ set_tests_properties("test_repl-ltl_cmd-garbage_output_is_unknown" PROPERTIES
 	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|Aborted|core dumped")
 
 # SY-R1: the Algorithm-D game path classifies backend failures too
-add_test(NAME "test_repl-sat-alg_d_no_verdict_is_unknown"
-	COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat F o1[t]:qlt = {1/2}:qlt\""
-)
-set_tests_properties("test_repl-sat-alg_d_no_verdict_is_unknown" PROPERTIES
-	PASS_REGULAR_EXPRESSION "UNKNOWN"
-	FAIL_REGULAR_EXPRESSION "Aborted|core dumped")
+tau_repl_unsupported(_tau_skip "sat F o1[t]:qlt = {1/2}:qlt")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-sat-alg_d_no_verdict_is_unknown")
+else()
+	add_test(NAME "test_repl-sat-alg_d_no_verdict_is_unknown"
+		COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat F o1[t]:qlt = {1/2}:qlt\""
+	)
+	set_tests_properties("test_repl-sat-alg_d_no_verdict_is_unknown" PROPERTIES
+		PASS_REGULAR_EXPRESSION "UNKNOWN"
+		FAIL_REGULAR_EXPRESSION "Aborted|core dumped")
+endif()
 
 # IN-M9 (Batch 6): `run` of a root-positive A never reached the CTL*
 # reducer -- the A node was handed to the solver as a G spec and the run
