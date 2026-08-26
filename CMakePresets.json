@@ -73,6 +73,11 @@
 			"binaryDir": "${sourceDir}/build/coverage"
 		},
 		{
+			"name": "_build_dir-devel",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel"
+		},
+		{
 			"name": "_build-type-debug",
 			"hidden": true,
 			"cacheVariables": {
@@ -101,6 +106,13 @@
 			}
 		},
 		{
+			"name": "_build-type-devel",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Devel"
+			}
+		},
+		{
 			"name": "_build-tests",
 			"hidden": true,
 			"cacheVariables": {
@@ -120,6 +132,34 @@
 			"cacheVariables": {
 				"TAU_BUILD_TESTS": "ON",
 				"TAU_BUILD_EXECUTABLE": "ON"
+			}
+		},
+		{
+			"name": "_build-unit-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_UNIT_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-integration-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_INTEGRATION": "ON"
+			}
+		},
+		{
+			"name": "_build-api-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_API_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-repl-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_TESTS": "ON"
 			}
 		},
 		{
@@ -205,6 +245,24 @@
 			]
 		},
 		{
+			"name": "devel-make-gcc",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			]
+		},
+		{
+			"name": "devel-ninja-gcc",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			]
+		},
+		{
 			"name": "release-make-clang",
 			"inherits": [
 				"_build_dir-release-clang",
@@ -238,6 +296,24 @@
 				"_generator-ninja",
 				"_toolchain-clang",
 				"_build-type-debug"
+			]
+		},
+		{
+			"name": "devel-ninja-clang",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-devel"
+			]
+		},
+		{
+			"name": "devel-make-clang",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-make",
+				"_toolchain-clang",
+				"_build-type-devel"
 			]
 		},
 		{
@@ -293,12 +369,28 @@
 			"inherits": ["debug-ninja-gcc"]
 		},
 		{
+			"name": "devel",
+			"inherits": ["devel-ninja-clang"]
+		},
+		{
+			"name": "devel-ninja",
+			"inherits": ["devel-ninja-clang"]
+		},
+		{
+			"name": "devel-gcc",
+			"inherits": ["devel-ninja-gcc"]
+		},
+		{
 			"name": "release-clang",
 			"inherits": ["release-make-clang"]
 		},
 		{
 			"name": "debug-clang",
 			"inherits": ["debug-make-clang"]
+		},
+		{
+			"name": "devel-clang",
+			"inherits": ["devel-ninja-clang"]
 		},
 		{
 			"name": "release-tests",
@@ -309,6 +401,62 @@
 			"inherits": ["debug", "_build-tests", "_build-type-debug"]
 		},
 		{
+			"name": "devel-tests",
+			"inherits": ["devel", "_build-tests"]
+		},
+		{
+			"name": "devel-ninja-tests",
+			"inherits": ["devel-ninja-clang", "_build-tests"]
+		},
+		{
+			"name": "release-unit-tests",
+			"inherits": ["release", "_build-unit-tests"]
+		},
+		{
+			"name": "debug-unit-tests",
+			"inherits": ["debug", "_build-unit-tests", "_build-type-debug"]
+		},
+		{
+			"name": "devel-unit-tests",
+			"inherits": ["devel", "_build-unit-tests"]
+		},
+		{
+			"name": "release-integration-tests",
+			"inherits": ["release", "_build-integration-tests"]
+		},
+		{
+			"name": "debug-integration-tests",
+			"inherits": ["debug", "_build-integration-tests", "_build-type-debug"]
+		},
+		{
+			"name": "devel-integration-tests",
+			"inherits": ["devel", "_build-integration-tests"]
+		},
+		{
+			"name": "release-api-tests",
+			"inherits": ["release", "_build-api-tests"]
+		},
+		{
+			"name": "debug-api-tests",
+			"inherits": ["debug", "_build-api-tests", "_build-type-debug"]
+		},
+		{
+			"name": "devel-api-tests",
+			"inherits": ["devel", "_build-api-tests"]
+		},
+		{
+			"name": "release-repl-tests",
+			"inherits": ["release", "_build-repl-tests"]
+		},
+		{
+			"name": "debug-repl-tests",
+			"inherits": ["debug", "_build-repl-tests", "_build-type-debug"]
+		},
+		{
+			"name": "devel-repl-tests",
+			"inherits": ["devel", "_build-repl-tests"]
+		},
+		{
 			"name": "release-tau",
 			"inherits": ["release", "_build-executable"]
 		},
@@ -317,12 +465,20 @@
 			"inherits": ["debug", "_build-executable", "_build-type-debug"]
 		},
 		{
+			"name": "devel-tau",
+			"inherits": ["devel", "_build-executable"]
+		},
+		{
 			"name": "release-all",
 			"inherits": ["release", "_build-all"]
 		},
 		{
 			"name": "debug-all",
 			"inherits": ["debug", "_build-all", "_build-type-debug"]
+		},
+		{
+			"name": "devel-all",
+			"inherits": ["devel", "_build-all"]
 		},
 		{
 			"name": "all",
@@ -409,6 +565,14 @@
 			"configurePreset": "debug-ninja"
 		},
 		{
+			"name": "devel",
+			"configurePreset": "devel"
+		},
+		{
+			"name": "devel-ninja",
+			"configurePreset": "devel-ninja"
+		},
+		{
 			"name": "release-clang",
 			"configurePreset": "release-clang"
 		},
@@ -425,12 +589,72 @@
 			"configurePreset": "release-tests"
 		},
 		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
+			"name": "devel-ninja-tests",
+			"configurePreset": "devel-ninja-tests"
+		},
+		{
+			"name": "debug-unit-tests",
+			"configurePreset": "debug-unit-tests"
+		},
+		{
+			"name": "release-unit-tests",
+			"configurePreset": "release-unit-tests"
+		},
+		{
+			"name": "devel-unit-tests",
+			"configurePreset": "devel-unit-tests"
+		},
+		{
+			"name": "debug-integration-tests",
+			"configurePreset": "debug-integration-tests"
+		},
+		{
+			"name": "release-integration-tests",
+			"configurePreset": "release-integration-tests"
+		},
+		{
+			"name": "devel-integration-tests",
+			"configurePreset": "devel-integration-tests"
+		},
+		{
+			"name": "debug-api-tests",
+			"configurePreset": "debug-api-tests"
+		},
+		{
+			"name": "release-api-tests",
+			"configurePreset": "release-api-tests"
+		},
+		{
+			"name": "devel-api-tests",
+			"configurePreset": "devel-api-tests"
+		},
+		{
+			"name": "debug-repl-tests",
+			"configurePreset": "debug-repl-tests"
+		},
+		{
+			"name": "release-repl-tests",
+			"configurePreset": "release-repl-tests"
+		},
+		{
+			"name": "devel-repl-tests",
+			"configurePreset": "devel-repl-tests"
+		},
+		{
 			"name": "debug-all",
 			"configurePreset": "debug-all"
 		},
 		{
 			"name": "release-all",
 			"configurePreset": "release-all"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
 		},
 		{
 			"name": "all",
@@ -443,6 +667,10 @@
 		{
 			"name": "release-tau",
 			"configurePreset": "release-tau"
+		},
+		{
+			"name": "devel-tau",
+			"configurePreset": "devel-tau"
 		},
 		{
 			"name": "debug-asan",
@@ -511,12 +739,72 @@
 			"configurePreset": "release-tests"
 		},
 		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
+			"name": "devel-ninja-tests",
+			"configurePreset": "devel-ninja-tests"
+		},
+		{
+			"name": "debug-unit-tests",
+			"configurePreset": "debug-unit-tests"
+		},
+		{
+			"name": "release-unit-tests",
+			"configurePreset": "release-unit-tests"
+		},
+		{
+			"name": "devel-unit-tests",
+			"configurePreset": "devel-unit-tests"
+		},
+		{
+			"name": "debug-integration-tests",
+			"configurePreset": "debug-integration-tests"
+		},
+		{
+			"name": "release-integration-tests",
+			"configurePreset": "release-integration-tests"
+		},
+		{
+			"name": "devel-integration-tests",
+			"configurePreset": "devel-integration-tests"
+		},
+		{
+			"name": "debug-api-tests",
+			"configurePreset": "debug-api-tests"
+		},
+		{
+			"name": "release-api-tests",
+			"configurePreset": "release-api-tests"
+		},
+		{
+			"name": "devel-api-tests",
+			"configurePreset": "devel-api-tests"
+		},
+		{
+			"name": "debug-repl-tests",
+			"configurePreset": "debug-repl-tests"
+		},
+		{
+			"name": "release-repl-tests",
+			"configurePreset": "release-repl-tests"
+		},
+		{
+			"name": "devel-repl-tests",
+			"configurePreset": "devel-repl-tests"
+		},
+		{
 			"name": "release-all",
 			"configurePreset": "release-all"
 		},
 		{
 			"name": "debug-all",
 			"configurePreset": "debug-all"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
 		},
 		{
 			"name": "all",
