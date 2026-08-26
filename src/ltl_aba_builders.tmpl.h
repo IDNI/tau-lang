@@ -989,11 +989,12 @@ CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm) {
 		result = tau::build_wff_and(result, constraint);
 	}
 
-	// IN-R6: every witness is built over the default bv type (see the
-	// wff_E case in translate_ctl_star); record the type ids so the
+	// IN-R6: every witness is built over the Boolean carrier's type (see
+	// the wff_E case in translate_ctl_star, which builds w_bf over the
+	// same pack_bool_carrier_type<node>()); record the type ids so the
 	// interpreter can register the streams without re-deriving them.
 	std::vector<size_t> witness_types(witnesses.size(),
-		get_ba_type_id<node>(bv_type<node>()));
+		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
 
 	return CtlStarReduction<node>{result, witnesses,
 		std::move(witness_types)};
