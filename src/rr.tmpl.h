@@ -82,7 +82,18 @@ constexpr auto rr<node>::operator!=(const rr<node>& that) const {
 template<idni::tau_lang::NodeType node>
 std::size_t std::hash<idni::tau_lang::rr<node>>::operator()(
 	const idni::tau_lang::rr<node>& rr) const noexcept {
+	// GitHub #80: hash the trees' content, never the `htref` handles.
+	// A handle is a weak-cached shared_ptr (bintree::geth), so hashing it
+	// through std::hash<shared_ptr> hashed its address, which changes as
+	// soon as the last owner of a handle drops and the same tree is
+	// re-fetched -- while operator== (compare_trees) is content-based.
+	// hash_htree routes through the node's own content-derived hash.
+	auto h = [](const idni::htref& p) -> size_t {
+		return p ? idni::hash_htree<node>{}(*p) : 0;
+	};
 	size_t seed = 0;
-	idni::hash_combine(seed, rr.rec_relations, rr.main);
+	for (const auto& [l, r] : rr.rec_relations)
+		idni::hash_combine(seed, h(l), h(r));
+	idni::hash_combine(seed, h(rr.main));
 	return seed;
 }
