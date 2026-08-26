@@ -1,3 +1,5 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
 // Extern-template declarations matching src/instantiate_test_pack.cpp.
 //
 // Force-included into every test TU by tests/CMakeLists.txt's `add()`

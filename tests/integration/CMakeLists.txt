@@ -33,6 +33,7 @@ set(TESTS
 	heuristics-syntactic_path_simplification
 	heuristics-ex_subs_based_elimination
 	heuristics-bv_ba_custom_simplification
+	heuristics-bv_ba_custom_simplification_equivalence
 	heuristics-bv_ba_cvc5_simplification
 	heuristics-bv_predicate_blasting
 	heuristics-bv_predicate_blasting_predicates

@@ -1,7 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Explicit specializations of the base BA dispatcher and constant parser for
-// the legacy <bv, sbf_ba> pack.
+// Definitions for the declarations in base_ba_dispatcher_bv_sbf.h: the base
+// BA dispatcher and constant parser specializations for the <bv, sbf_ba>
+// pack and the <tau_ba<bv, sbf_ba>, bv, sbf_ba> pack built on top of it.
 //
 // These used to be defined `inline` in base_ba_dispatcher.tmpl.h, which every
 // test translation unit includes.  Their bodies call parse_bv/parse_sbf/

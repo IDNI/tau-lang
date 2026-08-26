@@ -53,6 +53,11 @@ set(TAU_HEADERS
 set(TAU_PARSER_SOURCES
 	../parser/tau_parser.generated.cpp
 	../parser/sbf_parser.generated.cpp
+	../parser/bitvector_parser.generated.cpp
+	../parser/qint_parser.generated.cpp
+	../parser/qlt_parser.generated.cpp
+	../parser/hsb_parser.generated.cpp
+	../parser/nlang_parser.generated.cpp
 )
 
 # do not optimize parser sources, they are mostly data and optimization takes too longwhat

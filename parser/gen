@@ -4,6 +4,7 @@
 # missing generator is how stale generated parsers used to ship unnoticed.
 
 TGF_FILE=$1
+shift
 
 if [[ -z "$TGF_FILE" ]]; then
 	echo "provide an existing TGF file path" >&2

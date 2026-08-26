@@ -1,3 +1,5 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
 // Explicit template instantiations for the BA pack used by every
 // test binary and by the production CLI binaries.
 //
