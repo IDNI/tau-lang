@@ -586,13 +586,12 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
 	size_t type = arg1(ch).get_ba_type();
-	// Normalize the bv alternative: ~l builds a symbolic bvnot Term that
-	// would intern separately from the equal VALUE (e.g. {5}' vs {250});
-	// the other algebras' complements are canonical by construction.
-	auto nl = ~l;
-	if (auto* t = std::get_if<cvc5::Term>(&nl))
-		*t = normalize_bv(*t);
-	return build_bf_ba_constant<node>(nl, type, right);
+	// A BA whose complement can intern non-canonically (e.g. bv: ~l
+	// builds a symbolic bvnot Term that would intern separately from
+	// the equal VALUE, {5}' vs {250}) is normalized through its own
+	// descriptor's normalize(), applied generically by normalize_ba()
+	// in the normal-forms pipeline -- not here, so core names no BA.
+	return build_bf_ba_constant<node>(~l, type, right);
 }
 
 } // namespace idni::tau_lang
