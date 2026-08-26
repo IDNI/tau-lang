@@ -113,3 +113,16 @@ add_test(NAME "test_repl-run_cmd-bound_relative_offset_accepted"
 set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTIES
 	PASS_REGULAR_EXPRESSION "\\[3\\] f\\[n\\]\\(x\\)"
 	FAIL_REGULAR_EXPRESSION "Error")
+
+# --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------
+# The reporter's 7-line reproducer (two :tau streams, a cross-stream
+# assignment under a meet-guarded case split) produced no output within 400 s
+# on fd137e86; it was traced to resolve_ex_block's legacy anti_prenex fallback,
+# since deleted. Step 0 now completes in well under a second, so the guard is
+# simply that step 1 is reached before the timeout. `set charvar off` is what
+# lets multi-letter stream names like o0seal parse as one variable.
+add_test(NAME "test_repl-run_cmd-issue76_mixed_tau_streams"
+	COMMAND bash -c "printf 'set charvar off\\ni1 : tau := in console\\ni2 : tau := in console\\nrun ( (o0seal[0]:tau = { o1[t]=1 -> o2[t]=1 }) && (o0law[0]:tau = { o1[t]=1 -> o2[t]=1 }) && ( (i2[t]:tau != 0) ? ((o0seal[t]:tau = o0law[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau)) : ( ((o0law[t-1]:tau & i1[t]:tau) != 0) ? ((o0seal[t]:tau = o0seal[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau & i1[t]:tau)) : ((o0seal[t]:tau = o0seal[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau)) ) ) )\\no3[t]=1 -> o4[t]=1\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-issue76_mixed_tau_streams" PROPERTIES
+	PASS_REGULAR_EXPRESSION "Execution step: 1"
+	TIMEOUT 120)
