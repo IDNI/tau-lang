@@ -432,7 +432,7 @@ class syntactic_path_simplification_dnf {
 					_1<node>(find_ba_type<node>(l)));
 			}
 			tref simp = rewriter::replace_if(n, assignments,
-				is_boolean_operation<node>);
+				while_is_boolean_operation<node>);
 			// If simp is false, current branch is not sat
 			if (tau::get(simp).equals_0()) {
 				// Remove branch
@@ -460,7 +460,7 @@ class syntactic_path_simplification_dnf {
 		auto visit = [&](tref n) {
 			if (skip != nullptr && tau::get(n) == tau::get(skip))
 				return skip = nullptr, false;
-			return is_boolean_operation<node>(n);
+			return while_is_boolean_operation<node>(n);
 		};
 		return pre_order<node>(root).template
 			apply_unique<synt_path_simp_m>(down, visit);
