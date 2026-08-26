@@ -281,8 +281,14 @@ TEST_SUITE("satisfiability helpers") {
 	// (lines 213-230) was completely unverified.
 #ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("calculate_ctn: all six kinds, both operand orders") {
-		const size_t sbf_tid = sbf_type_id<node_t>();
-		tref ba_1 = tau::_1(sbf_tid), ba_0 = tau::_0(sbf_tid);
+		// calculate_ctn (src/satisfiability.tmpl.h) types its Boolean
+		// constants through pack_bool_carrier_type, not a hardcoded sbf --
+		// core naming no BA (AGENTS.md). Match that here instead of
+		// assuming sbf specifically, which only holds when sbf outranks
+		// every other carrier the configured pack offers.
+		const size_t carrier_tid =
+			get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		tref ba_1 = tau::_1(carrier_tid), ba_0 = tau::_0(carrier_tid);
 
 		// equality / inequality are operand-order independent by construction
 		for (bool num_first : { false, true }) {
