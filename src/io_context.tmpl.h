@@ -104,11 +104,24 @@ inline std::optional<std::string> repl_pending_input_stream::get(
 	size_t time_point)
 {
 	if (pending_value) {
-		std::string value = std::move(*pending_value);
+		delivered_value = std::move(*pending_value);
+		delivered_time_point_ = time_point;
 		pending_value.reset();
 		awaiting_ = false;
-		return value;
+		return *delivered_value;
 	}
+	// interpreter::read() aborts the whole step at the first stream without
+	// a value, and the REPL then collects exactly one value before entering
+	// the step again -- so a step needing several console inputs re-reads
+	// the streams that already answered. Hand the same value out again for
+	// the same time point; consuming it once made each restart re-prompt the
+	// earlier streams and lose their values.
+	if (delivered_value && delivered_time_point_ == time_point) {
+		awaiting_ = false;
+		return *delivered_value;
+	}
+	// A new time point: the step this value belonged to is done with it.
+	delivered_value.reset();
 	// no value yet: flag it and return "" so read() stops the step cleanly
 	// (the REPL scans for the awaiting stream and prompts for a value)
 	awaiting_ = true;
@@ -168,7 +181,15 @@ inline std::shared_ptr<serialized_constant_input_stream>
 
 inline std::optional<std::string> file_input_stream::get() {
 	std::string line;
-	std::getline(file, line);
+	// AP2-6: honor the base-class contract -- nullopt at end-of-stream
+	// (and for a file that never opened), instead of returning an empty
+	// line forever, which made EOF indistinguishable from a blank line
+	// and a missing file behave as an instantly-exhausted stream.
+	if (!std::getline(file, line)) {
+		DBG(LOG_TRACE << "file_input_stream(\"" << filename
+			<< "\"): get() = EOF";)
+		return std::nullopt;
+	}
 	DBG(LOG_TRACE << "file_input_stream(\"" << filename << "\"): get() = \"" << line << "\"";)
 	return line;
 }
@@ -334,8 +355,24 @@ void io_context<node>::update_types(
 		if (inputs.contains(var) || outputs.contains(var)) continue;
 		std::string name = get_var_name<node>(var);
 		DBG(LOG_TRACE << "updating stream: " << name;)
-		bool is_input = name == "this" || name[0] == 'i';
-		DBG(assert(is_input || name == "u" || name[0] == 'o');) // TODO: should this raise an undefined io stream error?
+		const bool is_input  = name == "this"
+					|| (!name.empty() && name[0] == 'i');
+		const bool is_output = name == "u"
+					|| (!name.empty() && name[0] == 'o');
+		// EX-2: this used to be a DBG assert carrying a TODO asking
+		// whether it should raise an undefined-io-stream error. It
+		// should. As written, a name matching neither shape aborted a
+		// debug build outright, while a release build (assert compiled
+		// out) silently filed it under `outputs` -- so `zzz[t] = 0.`
+		// crashed one configuration and became an output stream in the
+		// other. Report it and register nothing: both configurations
+		// now reach get_nso_rr's "I/O variable is not defined".
+		if (!is_input && !is_output) {
+			LOG_ERROR << "Undefined I/O stream: " << name
+				<< " (a stream name must be \"this\", \"u\", or"
+				   " start with 'i' or 'o')\n";
+			continue;
+		}
 		auto& streams = is_input ? inputs : outputs;
 		if (streams.find(var) == streams.end()) streams[hvar] = 0;
 	}
@@ -348,11 +385,6 @@ tref io_context<node>::add_input_console(const std::string& name, size_t type_id
 	types.emplace(hvar, type_id);
 	inputs.emplace(hvar, 0);
 	return var;
-}
-
-template <NodeType node>
-tref io_context<node>::add_input_console_no_prompt(const std::string& name, size_t type_id) {
-	return add_input_console(name, type_id);
 }
 
 template <NodeType node>
@@ -371,11 +403,6 @@ tref io_context<node>::add_output_console(const std::string& name, size_t type_i
 	types.emplace(hvar, type_id);
 	outputs.emplace(hvar, 0);
 	return var;
-}
-
-template <NodeType node>
-tref io_context<node>::add_output_console_no_prompt(const std::string& name, size_t type_id) {
-	return add_output_console(name, type_id);
 }
 
 template <NodeType node>

@@ -195,6 +195,67 @@ static std::optional<bool> qlt_atom_holds_in_type3(
 	return std::nullopt;
 }
 
+// ── Algorithm A/B soundness guards (shared with semantic_pwr_optimal) ────────
+//
+// Both guards below gate the T_3 symbolic encoding.  They were inline in
+// `solve_ltl_aba` and `semantic_pwr_optimal` ran the SAME encoding without
+// either of them (LS-2), so they are factored out here and called from both.
+
+// Algorithm A's T_3 encoding only handles atoms whose truth value is decidable
+// from a T_3 type plus the formula's named rational constants.  Atoms
+// involving the qlt extremes `{top}:qlt` / `{bot}:qlt` — or any constant whose
+// finite-rational witness is empty — yield `qlt_atom_holds_in_type3 ==
+// nullopt` for every type, leaving the atom completely unconstrained in the
+// symbolic encoding.  Without this guard ltlsynt happily synthesises a
+// strategy where `α` and `¬α` both hold simultaneously, returning REALIZABLE
+// for direct contradictions like `F(o1={top}) && G(o1!={top})`.
+template <NodeType node>
+static bool alg_a_can_classify(
+    tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	auto a_constants = omcat::collect_qlt_constants<node>(fm);
+	auto a_T3        = omcat::enumerate_qlt_T3(a_constants);
+	if (a_T3.empty()) return false;
+	for (auto& [f, _] : atoms) {
+		bool any_determined = false;
+		for (auto& t : a_T3)
+			if (qlt_atom_holds_in_type3<node>(f, t, a_constants)
+			        .has_value())
+				{ any_determined = true; break; }
+		if (!any_determined) return false;
+	}
+	return true;
+}
+
+// Algorithm A's T_3 encoding has a SINGLE current-output slot (Y) and a SINGLE
+// past-output slot (M).  Two distinct output variables get conflated into the
+// same slot, so `o1[t]>0 && o2[t]<0` becomes "Y>0 && Y<0" — unsatisfiable in
+// any T_3 type — and the encoding returns a spurious verdict.  Multi-input is
+// fine: t3_role_of merges i_k → X but those flow through Algorithm B's P_σ
+// encoding, which is distinguisher-friendly; the conflation is harmful only on
+// the OUTPUT side.
+template <NodeType node>
+static size_t count_distinct_output_vars(
+    const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	std::set<std::string> names;
+	for (auto& [f, _] : atoms) {
+		const auto& t = tree<node>::get(f);
+		if (!t.has_child()) continue;
+		auto add_side = [&](tref side) {
+			if (!side) return;
+			tref iv = tree<node>::get(side).find_top([](tref n) {
+				return is_child<node>(n, tree<node>::io_var); });
+			if (!iv) return;
+			const std::string& nm = get_var_name<node>(iv);
+			if (!nm.empty() && nm[0] == 'o') names.insert(nm);
+		};
+		add_side(t[0].first());
+		add_side(t[0].second());
+	}
+	return names.size();
+}
+
 // Evaluate a pure-output atom under a per-variable T₁ assignment (constant-output
 // strategy). Variable name keyed — unlike qlt_atom_holds_in_type3 which uses
 // fixed M/X/Y roles and can't distinguish o1 from o2. Treats o_k[t-s] (any

@@ -1947,3 +1947,190 @@ TEST_SUITE("Cleanup") {
 		ba_constants<node_t>::cleanup();
 	}
 }
+
+// Coverage-driven additions (2026-08-01). ba_types_inference.tmpl.h measured
+// 84.8% line coverage; the 122 uncovered lines are almost entirely the
+// error-propagation arms (parse_error / inference_error / scope_error) that
+// infer_ba_types raises per syntactic position. Every pre-existing test in this
+// file asserts the SUCCESS shape (`inferred != nullptr`), so the conflict paths
+// never ran.
+//
+// infer_ba_types returns {nullptr, {}} on a type conflict. The rejection cases
+// below were each confirmed empirically to be rejected today; the accepting
+// cases are positive controls, so a change that made the checker reject
+// everything could not make this suite pass vacuously.
+namespace {
+
+// True when the input parses AND type inference succeeds.
+bool infers(const std::string& src, tau::get_options opts) {
+	tref parsed = tree<node_t>::get(src, opts);
+	if (!parsed) return false;             // did not even parse
+	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	return inferred != nullptr;
+}
+
+bool infers_wff(const std::string& src) {
+	return infers(src, parse_opts_wff_no_infer);
+}
+
+bool infers_bf(const std::string& src) {
+	return infers(src, parse_opts_bf_no_infer);
+}
+
+} // namespace
+
+TEST_SUITE("ba_types_inference: type conflicts are rejected") {
+
+	// Two different BA families on the two sides of one equation.
+	TEST_CASE("conflicting families across an equation") {
+		CHECK( !infers_wff("x:bv[8] = y:sbf") );
+		CHECK( !infers_wff("o[t]:tau = i[t]:sbf") );
+	}
+
+	// Same variable annotated twice with incompatible types. This exercises
+	// the resolver's unification failure rather than a local mismatch.
+	TEST_CASE("one variable annotated with two families") {
+		CHECK( !infers_wff("x:bv[8] = 0 && x:sbf = 0") );
+	}
+
+	// Bitvectors of different widths are distinct types, not implicitly
+	// widened -- an explicit ((bv[16]) x:bv[8]) cast is required.
+	TEST_CASE("bitvector widths do not implicitly unify") {
+		CHECK( !infers_wff("x:bv[8] = y:bv[16]") );
+	}
+
+	// The conflict arms are per syntactic position, so a conflict nested
+	// inside a quantifier body goes through the wff_ex / wff_all arms.
+	TEST_CASE("conflicts inside quantifier bodies") {
+		CHECK( !infers_wff("ex x (x:bv[8] = 0 && x:sbf = 0)") );
+		CHECK( !infers_wff("all x (x:bv[8] = 0 && x:sbf = 0)") );
+	}
+
+	// A quantifier that binds a typed variable whose body contradicts the
+	// binder's annotation.
+	TEST_CASE("quantifier binder conflicting with its body") {
+		CHECK( !infers_wff("ex x:bv[8] (x:sbf = 0)") );
+	}
+
+	// Terms, not just formulas, reject mixed families.
+	TEST_CASE("conflicting families inside a term") {
+		CHECK( !infers_bf("x:sbf + y:bv[8]") );
+	}
+
+	// Positive controls: consistent annotations must still be accepted, so
+	// the rejections above are meaningful.
+	TEST_CASE("consistent annotations are accepted") {
+		CHECK( infers_wff("x:bv[8] = y:bv[8]") );
+		CHECK( infers_wff("x:sbf = y:sbf") );
+		CHECK( infers_wff("ex x:bv[8] (x = 0)") );
+		CHECK( infers_wff("all x:bv[8] (x = 0)") );
+		CHECK( infers_bf("x:bv[8] + y:bv[8]") );
+		// An explicit cast is the sanctioned way to cross widths.
+		CHECK( infers_wff("((bv[16]) x:bv[8]) = y:bv[16]") );
+	}
+}
+
+// ── Branch pass: the rr / ref / fallback error arms ─────────────────────────
+//
+// Coverage-driven addition (2026-08-01), branch pass. The suite above covers
+// the conflict arms for variables, equations, quantifiers and terms. What
+// remained cold in ba_types_inference.tmpl.h were the SAME
+// `holds_alternative<inference_error>(updated)` propagation arms in the five
+// functions that handle definitions and references:
+// update_functional_fallback, update_predicate_fallback, update_functional_rr,
+// update_predicate_rr and update_functional_ref.
+//
+// Those positions are only reachable through a recurrence relation or a
+// reference to one, which none of the wff/bf-level cases above construct.
+namespace {
+
+// True when the definitions block parses AND type inference succeeds.
+bool infers_defs(const std::string& src) {
+	tref parsed = tree<node_t>::get(src, parse_opts_definitions_no_infer);
+	if (!parsed) return false;
+	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	return inferred != nullptr;
+}
+
+// Same, for a whole spec (definitions plus a main formula).
+bool infers_spec(const std::string& src) {
+	tref parsed = tree<node_t>::get(src, parse_opts_no_infer);
+	if (!parsed) return false;
+	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	return inferred != nullptr;
+}
+
+} // namespace
+
+TEST_SUITE("ba_types_inference: conflicts in definitions and references") {
+
+	TEST_CASE("a functional definition body conflicting with its parameter") {
+		CHECK( !infers_defs("f(x:bv[8]) := x:sbf.") );
+	}
+
+	TEST_CASE("a predicate definition body conflicting with its parameter") {
+		CHECK( !infers_defs("f(x:bv[8]) := x:sbf = 0.") );
+	}
+
+	// TI-1 (FIXED) -- argument types now propagate across a reference.
+	// `f` takes a bv[8] and `g` handed it an sbf, which inference used to
+	// accept. type_by_function_symbol only consulted a callee's recorded
+	// type when the calling scope was still untyped, so a call site that
+	// already had a type of its own never compared itself against the
+	// callee at all. A definition carries one type across head, body and
+	// parameters, so a disagreeing call site is a conflict in that model.
+	TEST_CASE("TI-1: a reference argument of the wrong family is rejected") {
+		CHECK( !infers_defs("f(x:bv[8]) := x."
+				    "g(y:sbf) := f(y).") );
+	}
+
+	// fp_fallback accepts first | last | capture | ref | wff | bf
+	// (parser/tau.tgf), so a fallback carries its own inferable expression
+	// and its own conflict arm, separate from the definition it guards.
+
+	// These stop at infer_ba_types and never execute the spec -- see TI-2
+	// for why executing one of them is not an option.
+
+	// TI-2 (FIXED) -- a fallback whose type conflicts with the reference it
+	// guards used to be ACCEPTED, while the same annotation one position to
+	// the left (a definition body) was rejected.
+	//
+	// Cause: a fallback is written at the call site, inside whatever scope
+	// encloses the reference, but infer_ba_types opened a fresh scope for
+	// the whole ref-with-fallback ("we must deal with it as a rec
+	// relation"). That is right for the reference's own arguments and wrong
+	// for the fallback: `x:sbf` shadowed the enclosing `x:bv[8]` instead of
+	// conflicting with it. The fallback's typeables are now checked against
+	// the enclosing scope before the new scope hides them.
+	//
+	// It mattered beyond tidiness: `tau <spec> -q` on this exact sample
+	// produced no result within a 120s timeout, where the matching-fallback
+	// version below reaches execution immediately. That is also why this
+	// suite asserts at inference level only -- an execution-level assertion
+	// would have hung the suite rather than failed it.
+	TEST_CASE("TI-2: a conflicting bf fallback is rejected") {
+		CHECK( !infers_spec("g[n](x:bv[8]) := g[n-1](x)."
+				    "g[0](x:bv[8]) := x."
+				    "all x:bv[8] g(x) fallback x:sbf = 0.") );
+	}
+
+	TEST_CASE("a matching bf fallback is accepted") {
+		CHECK( infers_spec("g[n](x:bv[8]) := g[n-1](x)."
+				   "g[0](x:bv[8]) := x."
+				   "all x:bv[8] g(x) fallback x = 0.") );
+	}
+
+	TEST_CASE("a reference used as the fallback is itself typed") {
+		CHECK( infers_spec("f(x:bv[8]) := x."
+				   "g[n](x:bv[8]) := g[n-1](x)."
+				   "g[0](x:bv[8]) := x."
+				   "all x:bv[8] g(x) fallback f(x) = 0.") );
+	}
+
+	TEST_CASE("consistent definitions and references are accepted") {
+		CHECK( infers_defs("f(x:bv[8]) := x.") );
+		CHECK( infers_defs("f(x:bv[8]) := x:bv[8] = 0.") );
+		CHECK( infers_defs("f(x:bv[8]) := x."
+				   "g(y:bv[8]) := f(y).") );
+	}
+}

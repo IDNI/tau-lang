@@ -95,7 +95,10 @@ struct definitions {
 	}
 
 	/** @brief Replace the global type scope with @p global_scope. */
-	void set_global_scope(subtree_map<node, size_t>& global_scope) {
+	// RR-14: by value -- the old non-const lvalue reference moved from
+	// the caller's map silently; now the transfer is visible at the call
+	// site (pass std::move(...) to avoid the copy).
+	void set_global_scope(subtree_map<node, size_t> global_scope) {
 		this->global_scope = std::move(global_scope);
 	}
 
@@ -125,19 +128,13 @@ struct definitions {
 	 *  Do not access this singleton from multiple threads concurrently. */
 	static definitions& instance() {
 		static definitions d;
-		// Register gc callback once to clear stale tref keys in global_scope
-		// and io_context types after garbage collection frees their nodes.
-		static bool gc_registered = false;
-		if (!gc_registered) {
-			gc_registered = true;
-			tau::gc_callbacks.push_back([](const std::unordered_set<tref>&) {
-				auto& inst = definitions::instance();
-				inst.global_scope.clear();
-				inst.ctx.types.clear();
-				inst.ctx.inputs.clear();
-				inst.ctx.outputs.clear();
-			});
-		}
+		// RR-7: the former gc callback here wiped global_scope and the
+		// whole io_context (inputs, outputs, types) on EVERY gc --
+		// destroying live stream/type registrations. It was also
+		// unnecessary: collect_live_refs pins every global_scope key
+		// into `keep` (so those trefs are never freed, never stale),
+		// and ctx.{types,inputs,outputs} are htref-keyed maps whose
+		// nodes survive gc by construction. No callback is needed.
 		return d;
 	}
 

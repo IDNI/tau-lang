@@ -71,6 +71,70 @@ template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause)
 {
 	using tau = tree<node>;
+
+#ifdef TAU_CACHE
+	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	// Neither parameter is reassigned below, but both can arrive carrying a
+	// live right sibling: the 1-arg overload's tau::trim2(n) hands in a var
+	// whose right sibling is the scope it was split from (trim2 returns
+	// child(0), still linked to child(1) via first()'s raw left-child
+	// pointer), and ex_clause is not guaranteed sibling-free at every call
+	// site either. Neither the occurs-/capture-check logic below nor tau's
+	// own structural equality (lcrs_tree::operator==, which compares value
+	// and left-child only, never right_sibling) look past the operand's own
+	// content, so trimming is safe -- and it is what lets leaf_clause.tmpl.h's
+	// witness loop, which re-asks for the same logical (var, ex_clause) pair
+	// across anti_prenex_block's branch recursion, actually land on the same
+	// entry instead of missing on an incidental right-sibling difference.
+	// Caveat: the capture-guard's `bound == var` check below is a raw tref
+	// (pointer) compare, not the content compare above, so it is sibling-
+	// sensitive in principle. It is inert today because `bound` (child 0 of
+	// a 2-child quantifier) always carries its own scope as right sibling,
+	// and a caller's `var` can never carry that same scope as its sibling --
+	// a scope cannot contain itself.
+	const std::pair<tref, tref> key { tau::trim_right_sibling(var),
+		tau::trim_right_sibling(ex_clause) };
+	// Every return, including both identity returns (raw ex_clause) and the
+	// reget'd substitution result, must be trimmed before being STORED: a
+	// cache hit serves back whatever was stored under this trimmed key to
+	// ANY call that hashes to it, not just the call that produced it. The
+	// reget path is not exempt just because it looks freshly built --
+	// replace_if's rebuild and reget's own `get(value, children,
+	// right_sibling())` both carry the *current* ex_clause's right sibling
+	// through unchanged, so an untrimmed return there would just as silently
+	// hand a later call the first call's sibling attachment.
+	//
+	// What gets RETURNED to the caller is a different matter: both current
+	// callers (leaf_clause.tmpl.h's witness loop, the 1-arg overload's
+	// `subs_elim`) detect "did this eliminate anything?" by comparing the
+	// return value against `ex_clause` via tref identity -- a correct, cheap
+	// test only if a content-unchanged result comes back as `ex_clause`
+	// itself. `ex_clause` is NOT guaranteed sibling-free at every call site
+	// (measured: leaf_clause.tmpl.h's `scoped` carries a live right sibling
+	// from the clause it was split out of), so handing back the trimmed twin
+	// there is content-correct but identity-different -- which silently
+	// fools that check into believing a substitution happened when none
+	// did, dropping the variable from the caller's live set without ever
+	// actually eliminating it (measured: this is the root cause of the
+	// TAU_CACHE-only "normalization could not decide" regression on the
+	// many-sorted realizable tests -- the identity function used as `memo`
+	// with TAU_CACHE off never exhibited it). Guard every return path
+	// (lookup hit and fresh computation alike) so a content-unchanged
+	// result always reports back as `ex_clause` itself.
+	auto identity_preserving = [ex_clause](tref r) {
+		return tau::subtree_equals(r, ex_clause) ? ex_clause : r;
+	};
+	if (auto it = cache.find(key); it != cache.end())
+		return identity_preserving(it->second);
+	auto memo = [&key, &identity_preserving](tref r) {
+		return identity_preserving(
+			cache.emplace(key, tau::trim_right_sibling(r)).first->second);
+	};
+#else
+	auto memo = [](tref r) { return r; };
+#endif // TAU_CACHE
+
 	if (auto res = preorder<node>(var, ex_clause); res) {
 		// Capture-check: if the substituted term contains a variable that
 		// is re-bound by a quantifier inside the clause, substituting under
@@ -85,7 +149,7 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 				&& term_vars.contains(tau::get(n).child(0));
 		};
 		if (tau::get(ex_clause).find_top(binds_term_var))
-			return ex_clause;
+			return memo(ex_clause);
 		// Scope-aware replacement: skip quantifiers that bind var to avoid
 		// replacing their bound variable (variable capture prevention)
 		auto query = [&var](tref n) -> bool {
@@ -99,9 +163,42 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 		// replace_if rebuilds nodes without invoking the construction
 		// hooks, so trivially foldable subformulas (constant equations,
 		// T/F connectives...) would survive; rebuild with hooks.
-		return tree<node>::reget(replaced);
+		return memo(tree<node>::reget(replaced));
 	}
-	else return ex_clause;
+	else return memo(ex_clause);
+}
+
+template <NodeType node>
+tref ex_subs_based_elimination(tref fm) {
+	using tau = tree<node>;
+	
+	auto subs_elim = [](tref n) -> tref {
+		if (!is_child<node>(n, tau::wff_ex)) return n;
+		tref var = tau::trim2(n);
+		tref scope = tau::get(n)[0].second();
+		// No "scope contains a wff_or -> decline" guard here. It used to
+		// bail out whenever a disjunction appeared *anywhere* in the scope,
+		// which is far stronger than what soundness needs and is what made
+		// `run` hang on specs built from nested conditionals: those compile
+		// to a conjunction of disjunctions, so a scope like
+		// `ex x (x = c && (p || q) && (r || s))` was left untouched even
+		// though `x = c` is a plain top-level conjunct. The quantifier then
+		// survived into the Boole-decomposition stage, which is exponential
+		// in the number of atoms and has no total budget once the block
+		// algorithm's own `block_boole_max_splits` is spent.
+		//
+		// `ex x (x = t && phi)` == `phi[x := t]` needs three things, all
+		// checked where they belong and none of them a property of `phi`'s
+		// connectives: the witness must come from a conjunctive obligation
+		// (`preorder`'s visit_subtree descends only through wff/wff_and/bf_eq,
+		// so it never takes one from under a wff_or or a wff_neg), `x` must
+		// not occur in `t` (occurs-check in `preorder`), and `t` must not be
+		// captured by a binder inside the scope (capture-check in the
+		// two-argument overload, which declines the substitution outright).
+		tref elim = ex_subs_based_elimination<node>(var, scope);
+		return elim != scope ? elim : n;
+	};
+	return post_order<node>(fm).apply_unique(subs_elim);
 }
 
 } // namespace idni::tau_lang

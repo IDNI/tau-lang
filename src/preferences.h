@@ -27,6 +27,12 @@
 #include <string>
 #include <vector>
 
+// AP2-13: the file logs; when included standalone (after tau.h's
+// trailing undefs) the channel macro is gone -- restore it locally.
+#ifndef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "preferences"
+#endif
+
 namespace idni::tau_lang {
 
 struct PreferenceEntry {
@@ -60,14 +66,31 @@ tref apply_preferences(tref spec, const PreferenceOrder& po) {
 		tref pref_clause = api<node>::get_formula(pref_str);
 		if (pref_clause == nullptr) {
 			// Parse failed (typo in var name, value-type mismatch, etc.).
-			// Skip; do not corrupt the spec.
+			// Skip; do not corrupt the spec. (AP2-13: the header
+			// promised this logging; it was silent.)
+			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+				<< entry.var_name << "' -- clause failed to parse: "
+				<< pref_str;
 			continue;
 		}
 		tref candidate = tau::build_wff_and(result, pref_clause);
-		if (is_ltl_aba_realizable<node>(candidate, 0, false)) {
-			result = candidate;
+		// IN-2 / IN-R4: the realizability check can throw (backend
+		// failure, or a CTL* / semantic-negation spec that has no sound
+		// encoding); a preference is optional, so drop it rather than
+		// let the exception end the process.
+		bool ok = false;
+		try {
+			ok = is_ltl_aba_realizable<node>(candidate, 0, false);
+		} catch (const ltl_synthesis_error& e) {
+			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+				<< entry.var_name << "' -- realizability could not "
+				"be decided: " << e.what();
+			continue;
 		}
-		// else: preference would make the spec unrealisable; drop it.
+		if (ok) result = candidate;
+		else TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+			<< entry.var_name
+			<< "' -- it would make the spec unrealisable";
 	}
 	return result;
 }

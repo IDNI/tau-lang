@@ -108,30 +108,26 @@ template <NodeType node, bool is_wff = true>
 tref push_negation_in(tref fm);
 
 /**
- * @brief Process a single existentially quantified clause in the anti-prenex algorithm.
+ * @brief Apply full syntactic simplifications to a formula.
  *
- * Applies `ex_quantified_boole_decomposition` repeatedly until the quantifier is
- * eliminated or no further simplification is possible.
+ * Combines `simplify_using_equality` (equality propagation) and
+ * `syntactic_path_simplification` (path contradiction/tautology removal) in
+ * sequence.
+ *
+ * @note This pass takes no `skip` predicate, and deliberately so: it used to
+ * accept one for interface consistency with `anti_prenex_block`'s other steps
+ * and then discard it, which read as a guarantee it never gave. Neither
+ * `simplify_using_equality` nor `syntactic_path_simplification` has a
+ * BV-specific check to guard, so a caller that skips bitvector content
+ * elsewhere in the pipeline must not assume this step leaves it alone --
+ * `simplify_using_equality` ends in `to_nnf`, which does rewrite bitvector
+ * comparison atoms.
  * @tparam node Tree node type.
- * @param ex_clause An existentially quantified formula (a single clause).
- * @param[out] quant_eliminated Set to `true` if the quantifier was removed.
- * @return Simplified (possibly quantifier-free) formula.
+ * @param formula Formula to simplify.
+ * @return Simplified formula.
  */
 template <NodeType node>
-tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
-
-/**
- * @brief Resolve/eliminate quantifiers in a formula.
- *
- * Pushes quantifiers inward (via `push_quantifiers_in`), then applies Boole
- * decomposition to eliminate remaining existential quantifiers. Handles
- * bitvector formulas by delegating to the CVC5 solver when the formula is closed.
- * @tparam node Tree node type.
- * @param formula Formula containing quantifiers to eliminate.
- * @return Quantifier-free formula, or a formula with as few quantifiers as possible.
- */
-template<NodeType node>
-tref resolve_quantifiers(tref formula);
+tref syntactic_formula_simplification(tref formula);
 
 // Forward declarations needed by .tmpl.h bodies.
 // Full declarations/definitions come from their respective heuristic headers.
@@ -140,32 +136,6 @@ tref simplify_using_equality(tref fm);
 
 template <NodeType node>
 tref syntactic_path_simplification(tref fm);
-
-template <NodeType node>
-tref ex_subs_based_elimination(tref var, tref ex_clause);
-
-/**
- * @brief Skip predicate that skips nothing; suitable as `anti_prenex_block`'s
- * `skip` argument when no content should be deferred to blasting.
- * @tparam node Tree node type.
- * @param t tref (unused).
- * @return Always `false`.
- */
-template <NodeType node>
-bool no_skip(tref t);
-
-// Note: no default argument for `skip` here -- function templates cannot gain
-// a default argument in a later declaration once an earlier one exists without
-// one, and boolean_algebras/bv/heuristics/bv_predicate_blasting.h forward-declares this function.
-// The single-argument overload below plays the role of the default.
-template <NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
-
-template <NodeType node>
-tref anti_prenex_block(tref formula);
-
-template <NodeType node>
-tref term_boole_normal_form(tref formula);
 
 #include "normal_forms_transformations.tmpl.h"
 

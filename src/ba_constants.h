@@ -17,6 +17,35 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief Strip surrounding whitespace and one pair of enclosing braces
+ * (and, optionally, one pair of matching quotes) from a BA constant source.
+ *
+ * BA1-29: shared preamble of parse_qlt, parse_qint and parse_nlang.
+ * parse_hsb intentionally takes pre-stripped input (hsb literals may
+ * themselves be brace-delimited sets), see hsb.tmpl.h.
+ */
+inline std::string strip_ba_constant_source(std::string s,
+	bool strip_quotes = false)
+{
+	auto trim = [](std::string& x) {
+		x.erase(0, x.find_first_not_of(" \t\n\r"));
+		auto last = x.find_last_not_of(" \t\n\r");
+		if (last != std::string::npos) x = x.substr(0, last + 1);
+	};
+	trim(s);
+	if (!s.empty() && s.front() == '{' && s.back() == '}')
+		s = s.substr(1, s.size() - 2);
+	trim(s);
+	if (strip_quotes) {
+		if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
+			s = s.substr(1, s.size() - 2);
+		else if (s.size() >= 2 && s.front() == '\'' && s.back() == '\'')
+			s = s.substr(1, s.size() - 2);
+	}
+	return s;
+}
+
+/**
  * @brief Static pool of BA constants, providing deduplication and type-indexed lookup.
  *
  * All methods are static; the pool is shared across the lifetime of the program.
@@ -48,7 +77,7 @@ struct ba_constants {
 
 	/**
 	 * @brief Retrieve the raw constant value by its pool index @p constant_id.
-	 * @param constant_id Zero-based index into the constant pool.
+	 * @param constant_id One-based id into the constant pool (0 is invalid).
 	 * @return The constant variant value at that index.
 	 */
 	static constant get(size_t constant_id);
@@ -60,7 +89,7 @@ struct ba_constants {
 	 * typed constant, or returns `std::nullopt` if parsing fails.
 	 * @param constant_source Source text to parse.
 	 * @param type_tree Tree node identifying the BA type.
-	 * @param options Optional parser options string.
+	 * @param options Ignored by every current specialization (BA2-21: kept for signature stability only).
 	 * @return Parsed constant-with-type pair, or `std::nullopt` on failure.
 	 */
 	static std::optional<typename node::constant_with_type> get(
@@ -89,6 +118,9 @@ private:
 	using constant_pool = std::vector<std::pair<constant, size_t>>;
 	static constant_pool& C();  // pool of constants
 	static htrefs& T();         // pool of constant tree nodes with type info (htref to survive gc)
+	// BA2-5: set by cleanup(); a get() afterwards is a programming error --
+	// fail loudly instead of silently re-pooling into a freshly reset pool.
+	inline static bool poisoned = false;
 };
 
 } // namespace idni::tau_lang

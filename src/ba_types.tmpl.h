@@ -176,6 +176,11 @@ tref ba_types<node>::type_tree(size_t ba_type_id) {
 }
 
 template <NodeType node>
+size_t ba_types<node>::count() {
+	return type_trees().size();
+}
+
+template <NodeType node>
 std::string ba_types<node>::name(size_t ba_type_id) {
 
 	if (ba_type_id >= type_trees().size())
@@ -288,6 +293,11 @@ size_t get_ba_type_id(tref ba_type) {
 template<NodeType node>
 tref get_ba_type_tree(size_t ba_type_id) {
 	return ba_types<node>::type_tree(ba_type_id);
+}
+
+template <NodeType node>
+size_t get_ba_type_count() {
+	return ba_types<node>::count();
 }
 
 template <NodeType node>
@@ -500,8 +510,9 @@ bool is_buildable(size_t op, tref n, tref m) {
 			return pack_type_has_arith_ops<node>(unified.value())
 				|| is_untyped<node>(unified.value());
 		}
-		case tau::bf_or: case tau::bf_xor: case tau::bf_and:
-		case tau::bf_neg: {
+		// BA2-15: bf_neg dropped from this switch -- it is unary and a
+		// two-operand buildability answer for it was meaningless.
+		case tau::bf_or: case tau::bf_xor: case tau::bf_and: {
 			return true;
 		}
 		default:

@@ -127,11 +127,27 @@ trefs get_variables(const equation_system<node>& system) {
 	return vars;
 }
 
+// SO-3: a variable-free equation is not automatically satisfied -- reduce it
+// and reject on F instead of reporting an empty solution for e.g. {c} = 0.
+template <NodeType node>
+bool var_free_holds(tref eq) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	tref v = tt(eq) | bf_reduce_canonical<node>() | tt::ref;
+	return !tau::get(v).equals_F();
+}
+
 template <NodeType node>
 std::optional<solution<node>> find_maximal_solution(const equation_system<node>& system) {
 	using tau = tree<node>;
 	trefs vars = get_variables<node>(system);
-	if (vars.empty()) return solution<node>();
+	if (vars.empty()) {
+		if (system.first && !var_free_holds<node>(system.first.value()))
+			return {};
+		for (tref neq : system.second)
+			if (!var_free_holds<node>(neq)) return {};
+		return solution<node>();
+	}
 	auto substitution = solution<node>();
 	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
 	return (system.first)
@@ -146,7 +162,13 @@ std::optional<solution<node>> find_minimal_solution(
 {
 	using tau = tree<node>;
 	trefs vars = get_variables<node>(system);
-	if (vars.empty()) return solution<node>();
+	if (vars.empty()) {
+		if (system.first && !var_free_holds<node>(system.first.value()))
+			return {};
+		for (tref neq : system.second)
+			if (!var_free_holds<node>(neq)) return {};
+		return solution<node>();
+	}
 	auto substitution = solution<node>();
 	for (tref var : vars) substitution[var] = tau::_0(find_ba_type<node>(var));
 	return (system.first)
@@ -159,7 +181,10 @@ template <NodeType node>
 std::optional<solution<node>> find_solution(equality eq) {
 	using tau = tree<node>;
 	trefs vars = get_variables<node>(eq);
-	if (vars.empty()) return solution<node>();
+	if (vars.empty())
+		return var_free_holds<node>(eq)
+			? std::optional<solution<node>>{ solution<node>() }
+			: std::nullopt;
 	auto substitution = solution<node>();
 	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
 	return find_solution<node>(eq, substitution, solver_mode::maximum);
@@ -325,23 +350,30 @@ private:
 		return current;
 	}
 
+	// SO-6: iterative, not self-recursive -- one recursion frame per
+	// skipped zero-minterm overflowed the stack in debug builds for
+	// formulas with many variables.
 	void make_next_choice() {
-		if (exhausted) return;
-		// update the choices from right to left
-		size_t last_changed_value = choices.size();
-		while (last_changed_value > 0)
-			if (choices[--last_changed_value].value ^= true) break;
-		// if all choices are exhausted, we are done
-		if (last_changed_value == 0 && choices[0].value == false) {
-			exhausted = true; return;
+		while (!exhausted) {
+			// update the choices from right to left
+			size_t last_changed_value = choices.size();
+			while (last_changed_value > 0)
+				if (choices[--last_changed_value].value ^= true)
+					break;
+			// if all choices are exhausted, we are done
+			if (last_changed_value == 0
+				&& choices[0].value == false) {
+				exhausted = true; return;
+			}
+			// update the choices from the last changed one on
+			update_choices_from(last_changed_value);
+			// a valid (nonzero) minterm updates current; a zero
+			// one loops to try the next choice
+			if (tref mt = make_current_minterm();
+				!tau::get(mt).equals_0()) {
+				current = mt; return;
+			}
 		}
-		// we update the choices from the last changed value till the end
-		update_choices_from(last_changed_value);
-		// if the current minterm is valid, we update current field, otherwise...
-		if (tref mt = make_current_minterm();
-			!tau::get(mt).equals_0()) { current = mt; return; }
-		// ... we try again with the next choice
-		make_next_choice();
 	}
 
 	void update_choices_from(size_t start) {
@@ -1015,18 +1047,58 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 		}
 		else system.second.insert(eq);
 	}
-	// For a non-aba omcat ordering inequality-only system (no equality), the
-	// owning BA's own solver is authoritative: the BA-level
-	// solve_inequality_system cannot handle bf_lt/bf_gt atoms.
-	if (!system.first.has_value() && !system.second.empty()
+	// For an omcat ordering system, the owning BA's own solver is
+	// authoritative: the BA-level solve_inequality_system cannot handle
+	// bf_lt/bf_gt atoms. bf_neq atoms are compatible too: the owning BA's
+	// quantifier elimination can puncture the satisfying interval at the
+	// excluded point (the U/W execution encoding produces exactly this
+	// mix, e.g. `{0} < o1[t] && o1[t] != {1/2}`).
+	bool has_ordering = false;
+	for (tref neq : system.second)
+		if (is_ordering_atom<node>(neq)) { has_ordering = true; break; }
+	if (has_ordering && !system.first.has_value()
 	    && pack_type_is_non_aba_omcat<node>(options.type_id))
 	{
-		bool all_ordering = true;
+		bool dlo_compatible = true;
 		for (tref neq : system.second)
-			if (!is_ordering_atom<node>(neq)) { all_ordering = false; break; }
-		if (all_ordering)
-			return pack_omcat_solve<node>(options.type_id,
-							system.second, options);
+			if (!is_ordering_atom<node>(neq)
+				&& !tau::get(neq).child_is(tau::bf_neq))
+				{ dlo_compatible = false; break; }
+		// A failed attempt (e.g. a bf_neq in XOR-encoded rather than
+		// comparison form, which the owning BA's QE cannot read) falls
+		// through to the solve-then-verify path below.
+		if (dlo_compatible)
+			if (auto s = pack_omcat_solve<node>(options.type_id,
+					system.second, options); s)
+				return s;
+	}
+	// SO-1: a system that still contains an ordering atom cannot be handed
+	// to solve_system as-is: check_extreme_solution only rejects on
+	// equals_F() after bf_reduce_canonical, so an extreme solution violating
+	// the ordering atom passes silently -- and with no equality present,
+	// solve_inequality_system's minterm_inequality_system_iterator
+	// dereferences an empty traverser on the bf_gt node. Solve the system
+	// WITHOUT its ordering atoms, then verify them against the solution:
+	// substitution folds a ground singleton comparison to T/F at
+	// construction (the owning BA's wff_lt hooks), so anything not
+	// evaluating to T -- violated, undecided, or non-singleton -- declines.
+	// Callers treat "no solution found" as unsolved, not unsat.
+	if (has_ordering) {
+		equation_system<node> rest;
+		rest.first = system.first;
+		inequality_system<node> ords;
+		for (tref neq : system.second)
+			if (is_ordering_atom<node>(neq)) ords.insert(neq);
+			else rest.second.insert(neq);
+		auto sol = solve_system<node>(rest, options);
+		if (!sol) return {};
+		for (tref ord : ords) {
+			tref value = tt(rewriter::replace<node>(ord,
+					sol.value()))
+				| bf_reduce_canonical<node>() | tt::ref;
+			if (!tau::get(value).equals_T()) return {};
+		}
+		return sol;
 	}
 	return solve_system<node>(system, options);
 }
@@ -1051,25 +1123,26 @@ bool check_var_assignment(auto& var_assignments, tref var, tref term) {
 	// Make sure that term does not contain var
 	for (tref tv : term_vars) if (tau::get(tv) == tau::get(var))
 		return false;
-	// First check if adding var := term would create a loop given previous
-	// assignments
-	for (const auto& [v, cv] : var_assignments) {
-		if (cv.contains(var)) for (tref tv : term_vars)
-			if (tau::get(tv) == tau::get(v)) return false;
-	}
-	// Now complete reachable variables given the new assignment to enable future
-	// loop checking
+	// SO-2: close the new assignment's reach set transitively FIRST --
+	// existing entries' sets are already closed (this function's
+	// invariant), so one merge pass suffices. The previous code compared
+	// only the term's DIRECT variables against predecessors and
+	// propagated only those, which made cycle detection map-order
+	// dependent (a chain p -> var -> q -> r -> p was accepted).
 	subtree_set<node> term_cv(term_vars.begin(), term_vars.end());
-	for (auto& [v, cv] : var_assignments) {
-		// Add new reachable variables to previous variable set
-		if (cv.contains(var)) for (tref tv : term_vars)
-			cv.insert(tv);
-		// Add the reachable variables for the current term
-		if (term_cv.contains(v)) {
-			DBG(assert(!cv.contains(var));)
+	for (const auto& [v, cv] : var_assignments)
+		if (term_cv.contains(v))
 			for (tref el : cv) term_cv.insert(el);
-		}
-	}
+	// var reachable from its own term through any chain -> cycle
+	if (term_cv.contains(var)) return false;
+	// A cycle also arises iff some assigned v reaches var while the term
+	// (transitively) reaches v
+	for (const auto& [v, cv] : var_assignments)
+		if (cv.contains(var) && term_cv.contains(v)) return false;
+	// Propagate the CLOSED reach set into every predecessor of var
+	for (auto& [v, cv] : var_assignments)
+		if (cv.contains(var))
+			for (tref el : term_cv) cv.insert(el);
 	// Finally add variable assignment
 	var_assignments.emplace(var, std::move(term_cv));
 	return true;
@@ -1321,12 +1394,8 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	return {};
 }
 
-template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error) {
-	using tau = tree<node>;
+// (SO-7: the trefs overload of solve() was deleted -- zero callers.)
 
-	return solve<node>(tau::build_wff_and(forms), options, error);
-}
 
 
 } // namespace idni::tau_lang

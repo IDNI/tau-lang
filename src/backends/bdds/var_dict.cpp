@@ -5,6 +5,7 @@
 #include <map>
 #include <sstream>
 #include <cassert>
+#include <stdexcept>
 
 #include "var_dict.h"
 
@@ -15,8 +16,12 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // bdd var dict
 
+// BA1-26: anonymous namespace -- these had external linkage under one-letter
+// names in a shared namespace, an ODR/link-collision hazard.
+namespace {
 vector<string> v({ "dummy" });
 map<string, size_t> m;
+} // namespace
 
 sym_t var_dict(const char* s) {
 	if (auto it = m.find(s); it != m.end()) return it->second;
@@ -30,6 +35,10 @@ sym_t var_dict(const char* s) {
 // object, which push_back may move to a new address).
 string var_dict(sym_t n) {
 	assert((size_t)n <= v.size());
+	// BA1-26: a stale/corrupt id in Release must throw, not read OOB.
+	if ((size_t)n > v.size())
+		throw std::out_of_range("var_dict: invalid id "
+			+ std::to_string(n));
 	if ((size_t)n == v.size()) {
 		do {
 			stringstream ss;

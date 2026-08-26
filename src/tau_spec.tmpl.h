@@ -42,8 +42,15 @@ tref tau_spec<node>::get() {
 		return nullptr;
 	};
 
+	// A get() while a continuation is pending IS an error for the caller
+	// that asked (the REPL reports "Syntax Error: Unexpected end" from it),
+	// but GR-R4: it must not be STICKY -- a later parse() may still
+	// complete the spec, so parse_part() removes this entry again.
 	if (is_eof()) {
-		errors_.push_back(eof_msg_.value());
+		if (!eof_error_reported_) {
+			errors_.push_back(eof_msg_.value());
+			eof_error_reported_ = true;
+		}
 		return fail();
 	}
 	if (!errors_.empty()) return fail();
@@ -82,7 +89,7 @@ tref tau_spec<node>::get() {
 		return fail();
 	}
 	defs.get_io_context()->update_types(result.second);
-	defs.set_global_scope(result.second);
+	defs.set_global_scope(std::move(result.second));
 	DBG(TAU_LOG_TRACE << "inferred spec: " << TAU_LOG_FM_DUMP(spec);)
 	spec = canonize_quantifier_ids<node>(tau::reget(spec));
 	if (!spec) {
@@ -112,14 +119,38 @@ bool tau_spec<node>::add(tref expr) {
 	};
 	switch (nt) {
 	case tau::spec:
+		// GR-R3: a second main is refused loudly, as parse() does,
+		// instead of vanishing behind a `true`.
 		if (tref wff = t | tau::main | tt::first | tt::ref; wff)
-			set_main(wff);
+			if (!set_main(wff)) {
+				errors_.push_back("Multiple main formulas: \""
+					+ TAU_TO_STR(main_) + "\" and \""
+					+ TAU_TO_STR(wff) + "\"");
+				return false;
+			}
 		if (trefs defs = t | tau::definitions
 			|| tau::rec_relation || tt::refs; defs.size())
 				for (tref def : defs) add_def(def);
+		// TT2-4: the grammar allows io defs inside `definitions` too
+		// (definitions => (rec_relation | input_def | output_def)+);
+		// dropping them here silently lost the streams from the
+		// rebuilt spec tree (the top-level cases below accept them).
+		if (trefs defs = t | tau::definitions
+			|| tau::input_def || tt::refs; defs.size())
+				for (tref def : defs) add_def(def);
+		if (trefs defs = t | tau::definitions
+			|| tau::output_def || tt::refs; defs.size())
+				for (tref def : defs) add_def(def);
 		break;
 	case tau::bf:
-	case tau::wff:          set_main(expr); break;
+	case tau::wff:
+		if (!set_main(expr)) {
+			errors_.push_back("Multiple main formulas: \""
+				+ TAU_TO_STR(main_) + "\" and \""
+				+ TAU_TO_STR(expr) + "\"");
+			return false;
+		}
+		break;
 	case tau::input_def:
 	case tau::output_def:
 	case tau::rec_relation: add_def(expr); break;
@@ -186,6 +217,13 @@ std::pair<bool, std::string> tau_spec<node>::parse_(
 
 template <NodeType node>
 bool tau_spec<node>::parse_part(size_t part) {
+	// GR-R4: the eof recorded by a premature get() is withdrawn once a
+	// continuation arrives; any OTHER error stays fatal.
+	if (eof_error_reported_ && eof_msg_) {
+		errors_.erase(std::remove(errors_.begin(), errors_.end(),
+			eof_msg_.value()), errors_.end());
+		eof_error_reported_ = false;
+	}
 	if (errors_.size()) return false;
 
 	if (!eof_msg_) current_part_ = parts_[part];
@@ -252,9 +290,14 @@ tref tau_spec<node>::build_parse_tree() {
 				if (!main_ && !main) { // first main found
 					main = c;
 				} else {
+					// TT2-5: when the first main came from
+					// add(), local `main` is null here --
+					// print main_ instead of dereferencing.
 					std::stringstream ss; ss
 						<< "Multiple main formulas: \""
-						<<ptree_to_str(main)<<"\" and \""
+						<< (main ? ptree_to_str(main)
+							: TAU_TO_STR(main_))
+						<< "\" and \""
 						<<ptree_to_str(c) << "\"";
 					errors_.push_back(ss.str());
 					return nullptr;

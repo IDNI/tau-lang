@@ -385,3 +385,25 @@ TEST_CASE("nlang: dispatcher parse_nlang empty => no value") {
 }
 
 } // TEST_SUITE
+
+// BA1-11: nlang_splitter had zero coverage. The bot and or_ branches are
+// oracle-free; the atom branch needs the DeepSeek key and is skipped when
+// it is unset (the no-key deepseek_query returns "", giving an atom whose
+// text is empty -- not asserted here).
+TEST_CASE("nlang: splitter on bot returns bot") {
+	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>(
+		"{nothing}");
+	REQUIRE(result.has_value());
+	auto val = std::get<nlang_ba>(result->first);
+	CHECK( is_nlang_zero(nlang_splitter(val, splitter_type::upper)) );
+}
+
+TEST_CASE("nlang: splitter on a disjunction returns its left branch") {
+	// Built with operator| directly: the grammar's treatment of `|`
+	// inside a constant is config-dependent, but the splitter contract
+	// is about the or_ NODE, not the surface syntax.
+	nlang_ba a{"it is raining"}, b{"it is snowing"};
+	nlang_ba val = a | b;
+	nlang_ba s = nlang_splitter(val, splitter_type::upper);
+	CHECK( s == a );
+}

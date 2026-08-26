@@ -16,6 +16,10 @@ tref push_negation_one_in(tref fm) {
 		const tau& ct = t[0][0];
 		if (!ct.has_child()) return fm;
 		switch (ct[0].value.nt) {
+			// !!A ::= A. Without this case to_nnf cannot remove a
+			// double negation and depends on the construction hooks
+			// doing it -- which squeeze_absorb switches off.
+			case tau::wff_neg: return ct[0].first();
 			case tau::wff_and: return tau::build_wff_or(
 						tau::build_wff_neg(ct[0].first()),
 						tau::build_wff_neg(ct[0].second()));
@@ -72,14 +76,60 @@ tref push_negation_one_in(tref fm) {
 			case tau::bf_ngt: return tau::build_bf_gt(ct[0].first(), ct[0].second());
 			case tau::bf_gteq: return tau::build_bf_ngteq(ct[0].first(), ct[0].second());
 			case tau::bf_ngteq: return tau::build_bf_gteq(ct[0].first(), ct[0].second());
+			// Negated sugar connectives, dualised with the same builders
+			// the construction hooks use. See the bare-sugar block below
+			// for why these can reach to_nnf at all.
+			case tau::wff_imply: return tau::build_wff_and(
+						ct[0].first(),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::wff_rimply: return tau::build_wff_and(
+						ct[0].second(),
+						tau::build_wff_neg(ct[0].first()));
+			case tau::wff_equiv: return tau::build_wff_xor(
+						ct[0].first(), ct[0].second());
+			case tau::wff_xor: return tau::build_wff_equiv(
+						ct[0].first(), ct[0].second());
+			case tau::wff_conditional: return tau::build_wff_conditional(
+						ct[0].first(),
+						tau::build_wff_neg(ct[0].child(1)),
+						tau::build_wff_neg(ct[0].child(2)));
 			default: return fm;
 		}
+	}
+	// The sugar connectives the construction hooks always rewrite away
+	// (`->`, `<-`, `<->`, `^^`, `? :`) can still reach here: a tree built
+	// with hooks off keeps them, and a Tau-BA constant is parsed exactly
+	// that way -- `tau_spec` sets `reget_with_hooks = false` and, unlike
+	// every other parsed formula, a constant never goes through
+	// `api::simplify` (whose `reget` is what desugars them everywhere
+	// else). Negation normal form means `&&`, `||` and negated atoms and
+	// nothing else, and every consumer of it reads the tree that way:
+	// `simplify_using_equality` walked into an implication and registered
+	// its antecedent as an *asserted* equality of the enclosing conjunctive
+	// scope, rewriting and dropping the surrounding conjuncts and returning
+	// a formula that was neither implied by nor implying the input
+	// (issue #69). Rewrite them here with the hooks' own builders so the
+	// contract to_nnf's callers rely on actually holds.
+	if constexpr (is_wff) if (t.has_child()) switch (t[0].value.nt) {
+		case tau::wff_imply: return tau::build_wff_imply(
+					t[0].first(), t[0].second());
+		case tau::wff_rimply: return tau::build_wff_rimply(
+					t[0].first(), t[0].second());
+		case tau::wff_equiv: return tau::build_wff_equiv(
+					t[0].first(), t[0].second());
+		case tau::wff_xor: return tau::build_wff_xor(
+					t[0].first(), t[0].second());
+		case tau::wff_conditional: return tau::build_wff_conditional(
+					t[0].first(), t[0].child(1), t[0].child(2));
+		default: break;
 	}
 	// Boolean function rules
 	if constexpr (!is_wff) if (t.child_is(tau::bf_neg)) {
 		const tau& ct = t[0][0];
 		if (!ct.has_child()) return fm;
 		switch (ct[0].value.nt) {
+			// A'' ::= A, the bf dual of the wff_neg case above.
+			case tau::bf_neg: return ct[0].first();
 			case tau::bf_and: return tau::build_bf_or(
 				tau::build_bf_neg(ct[0].first()),
 				tau::build_bf_neg(ct[0].second()));
@@ -131,8 +181,9 @@ tref to_dnf(tref fm) {
 			if (t.child_is(tau::bf_and)) {
 				auto conj = conjunct_dnfs_to_dnf<node>(
 					t[0].first(), t[0].second());
-				// Perform simplification
-				if (conj != n)
+				// Perform simplification. Structural comparison, as in the
+				// wff branch above (see to_cnf for the rationale).
+				if (tau::get(conj) != tau::get(n))
 					return reduce<node>(conj);
 				else return n;
 			}
@@ -196,11 +247,15 @@ tref to_cnf(tref fm) {
 				else return n;
 			}
 		}
-		if constexpr (!is_wff) if (t.child_is(tau::bf_or)) {
+		if constexpr (!is_wff) if (t.is(tau::bf) && t.child_is(tau::bf_or)) {
 				auto dis = disjunct_cnfs_to_cnf<node>(
 						t[0].first(), t[0].second());
-				// Perform simplification
-				if (dis != n)
+				// Perform simplification. Compare structurally, as the wff
+				// branch above does: `dis` is a freshly built root with no
+				// right sibling while `n` generally has one, so a raw tref
+				// comparison reports "changed" even for a no-op
+				// distribution and pays a full reduce for nothing.
+				if (tau::get(dis) != tau::get(n))
 					return reduce<node, true>(dis);
 				else return n;
 			}
@@ -294,135 +349,6 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 	}
 }
 
-template <NodeType node>
-tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = nullptr) {
-	using tau = tree<node>;
-	LOG_DEBUG << "push_existential_quantifier_one: " << LOG_FM_DUMP(fm);
-	const auto& t = tau::get(fm);
-	DBG(assert(t.child_is(tau::wff_ex));)
-	const tref scoped_fm = t[0].second();
-	const tref quant_var = t[0].first();
-
-	const auto& st = tau::get(scoped_fm);
-	if (st.child_is(tau::wff_or)) {
-		// Push quantifier in
-		tref c0 = tau::build_wff_ex(quant_var, st[0].first(), false);
-		tref c1 = tau::build_wff_ex(quant_var, st[0].second(), false);
-		return tau::build_wff_or(c0, c1);
-	}
-	else if (st.child_is(tau::wff_and)) {
-		// Remove existential, if quant_var does not appear in clause
-		trefs clauses = get_cnf_wff_clauses<node>(scoped_fm);
-		tref no_q_fm = tau::_T();
-		for (tref& clause : clauses) {
-			if (!contains<node>(clause, quant_var)) {
-				no_q_fm = tau::build_wff_and(no_q_fm, clause);
-				clause = tau::_T();
-			}
-		}
-		tref q_fm = tau::build_wff_and(clauses);
-		if (tau::get(q_fm).equals_T()) {
-			if (excluded) excluded->insert(scoped_fm);
-			return scoped_fm;
-		}
-		else if (tau::get(no_q_fm).equals_T()) return fm;
-		else {
-			if (excluded) excluded->insert(no_q_fm);
-			return tau::build_wff_and(
-				tau::build_wff_ex(quant_var, q_fm, false), no_q_fm);
-		}
-	}
-	else if (st.child_is(tau::wff_ex)) {
-		//other ex quant, hence can switch them
-		tref c = tau::build_wff_ex(quant_var, st[0].second());
-		return tau::build_wff_ex(st[0].first(), c);
-	}
-	// Else check if quant_var is contained in subtree
-	else if (contains<node>(scoped_fm, quant_var)) {
-		if (excluded) excluded->insert(fm);
-		return fm;
-	}
-	else {
-		if (excluded) excluded->insert(scoped_fm);
-		return scoped_fm;
-	}
-}
-
-template <NodeType node>
-tref push_universal_quantifier_one(tref fm) {
-	using tau = tree<node>;
-	const auto& t = tau::get(fm);
-	DBG(assert(t.child_is(tau::wff_all));)
-	const tref scoped_fm = t[0].second();
-	const tref quant_var = t[0].first();
-
-	const auto& st = tau::get(scoped_fm);
-	if (st.child_is(tau::wff_and)) {
-		// Push quantifier in
-		const auto c0 = tau::build_wff_all(quant_var, st[0].first(), false);
-		const auto c1 = tau::build_wff_all(quant_var, st[0].second(), false);
-		return tau::build_wff_and(c0, c1);
-	}
-	else if (st.child_is(tau::wff_or)) {
-		// Remove existential, if quant_var does not appear in clause
-		auto clauses = get_dnf_wff_clauses<node>(scoped_fm);
-		tref no_q_fm = tau::_F();
-		for (tref& clause : clauses) {
-			if (!contains<node>(clause, quant_var)) {
-				no_q_fm = tau::build_wff_or(no_q_fm, clause);
-				clause = tau::_F();
-			}
-		}
-		tref q_fm = tau::build_wff_or(clauses);
-		if (tau::get(q_fm).equals_F()) return scoped_fm;
-		else if (tau::get(no_q_fm).equals_F()) return fm;
-		else return tau::build_wff_or(
-			tau::build_wff_all(quant_var, q_fm, false), no_q_fm);
-	}
-	else if (st.child_is(tau::wff_all)) {
-		//other all quant, hence can switch them
-		tref c = tau::build_wff_all(quant_var, st[0].second());
-		return tau::build_wff_all(st[0].first(), c);
-	}
-	// Else check if quant_var is contained in subtree
-	else if (contains<node>(scoped_fm, quant_var)) return fm;
-	else return scoped_fm;
-}
-
-template <NodeType node>
-tref push_quantifiers_in(tref formula) {
-	using tau = tree<node>;
-	subtree_unordered_set<node> excluded_nodes;
-	auto push_quantifiers = [&excluded_nodes](tref n) {
-		// static size_t counter = 0; DBG(assert(counter++ < 12);)
-		if (is_child<node>(n, tau::wff_ex)) {
-			LOG_DEBUG << "push_quantifiers existential: " << LOG_FM(n);
-			tref pushed = push_existential_quantifier_one<node>(n);
-			if (tau::get(pushed) == tau::get(n)) {
-				// Quantifier cannot be pushed deeper
-				for (tref c : tau::get(n).children())
-					excluded_nodes.insert(c);
-				return n;
-			} else return pushed;
-		} else if (is_child<node>(n, tau::wff_all)) {
-			LOG_DEBUG << "push_quantifiers universal: " << LOG_FM(n);
-			tref pushed = push_universal_quantifier_one<node>(n);
-			if (tau::get(pushed) == tau::get(n)) {
-				// Quantifier cannot be pushed deeper
-				for (tref c : tau::get(n).children())
-					excluded_nodes.insert(c);
-				return n;
-			} else return pushed;
-		}
-		LOG_DEBUG << "push_quantifiers nothing to do: " << LOG_FM(n);
-		return n;
-	};
-	auto visit = [&excluded_nodes](tref n) {
-		return visit_wff<node>(n) && !excluded_nodes.contains(n);
-	};
-	return pre_order<node>(formula).apply_unique(push_quantifiers, visit);
-}
-
 // Squeeze all equalities found in n
 template <NodeType node>
 tref squeeze_positives(tref n, size_t type_id) {
@@ -433,6 +359,15 @@ tref squeeze_positives(tref n, size_t type_id) {
 		return is<node, tau::bf_eq>(n) &&
 			find_ba_type<node>(n) == type_id;
 	};
+	// select_top descends through wff_neg, so a bf_eq inside a `!(f = 0)`
+	// would be collected here as if it were positive and its negation
+	// dropped. Callers must therefore hand this an NNF formula, in which a
+	// negated equation is a bf_neq; the assert makes that precondition loud
+	// rather than leaving it to the to_nnf ordering around the call site.
+	DBG(assert(!tau::get(n).find_top([](tref m) {
+		return is<node, tau::wff_neg>(m)
+			&& tree<node>::get(m).child_is(tau::bf_eq);
+	}));)
 	if (trefs eqs = tau::get(n).select_top(match);
 		eqs.size() > 0)
 	{
@@ -440,6 +375,12 @@ tref squeeze_positives(tref n, size_t type_id) {
 			eq = norm_trimmed_equation<node>(eq);
 		}
 		eqs = tt(eqs) | tt::children | tt::refs;
+		// The reshape above can in principle change the vector's size, so
+		// re-check before indexing it.
+		if (eqs.empty()) {
+			LOG_TRACE << "(I) squeeze_positives result: none (reshaped away)";
+			return nullptr;
+		}
 		tref res = tau::build_bf_or(eqs, find_ba_type<node>(eqs[0]));
 		LOG_TRACE << "squeeze_positives result: " << LOG_FM(res);
 		return res;

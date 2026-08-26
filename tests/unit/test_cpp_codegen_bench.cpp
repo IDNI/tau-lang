@@ -21,8 +21,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <unistd.h>
 #include <sstream>
 #include <string>
+
+// CG-N11: per-process scratch directory (mkdtemp) instead of fixed,
+// predictable /tmp names -- concurrent checkouts running this suite used
+// to clobber each other's headers/binaries.
+static const std::string& cg_tmp_dir() {
+	static const std::string dir = [] {
+		std::string t = "/tmp/tau_cg_XXXXXX";
+		char* p = ::mkdtemp(t.data());
+		return std::string(p ? p : "/tmp");
+	}();
+	return dir;
+}
+static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; }
+
 
 using namespace idni::tau_lang;
 using clk = std::chrono::steady_clock;
@@ -93,9 +108,9 @@ static double compiled_seconds(const char* formula_str,
     std::ostringstream hdr_os;
     emit_cpp_program<node_t>(*sol, hdr_os, class_name);
 
-    const char* hdr_path  = "/tmp/_tau_bench_hdr.h";
-    const char* main_path = "/tmp/_tau_bench_main.cpp";
-    const char* exe_path  = "/tmp/_tau_bench_exe";
+    const std::string hdr_path = cg_tmp("_tau_bench_hdr.h");
+    const std::string main_path = cg_tmp("_tau_bench_main.cpp");
+    const std::string exe_path = cg_tmp("_tau_bench_exe");
     { std::ofstream f(hdr_path); f << hdr_os.str(); }
     {
         std::ofstream f(main_path);
@@ -117,12 +132,12 @@ static double compiled_seconds(const char* formula_str,
              "  return 0;\n"
              "}\n";
     }
-    std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I/tmp -o ")
+    std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I" + cg_tmp_dir() + " -o ")
                     + exe_path + " " + main_path + " 2>/dev/null";
     if (::system(cmd.c_str()) != 0) return -1.0;
-    if (::system((std::string(exe_path) + " >/tmp/_tau_bench_out 2>/dev/null").c_str()) != 0)
+    if (::system((std::string(exe_path) + " >" + cg_tmp("_tau_bench_out") + " 2>/dev/null").c_str()) != 0)
         return -1.0;
-    std::ifstream out("/tmp/_tau_bench_out");
+    std::ifstream out(cg_tmp("_tau_bench_out"));
     double sec = -1.0; unsigned s = 0;
     out >> sec >> s; (void)s;
     return sec;
@@ -254,9 +269,65 @@ TEST_SUITE("cpp_codegen_bench") {
             MESSAGE("Interpreter : " << i_rate << " steps/sec"
                     "  (" << s.N_interp << " steps in " << i_sec << "s)");
             MESSAGE("Speedup     : " << speedup << "x");
-            CHECK(c_rate > i_rate);
+            // CG-RT3: the speed comparison is a load-sensitive race on a
+            // shared CI box; it is informative by default and asserted only
+            // when TAU_BENCH_ASSERT is set.
+            if (std::getenv("TAU_BENCH_ASSERT")) CHECK(c_rate > i_rate);
+            else if (!(c_rate > i_rate))
+                MESSAGE("compiled program not faster than the interpreter "
+                        "(not asserted; set TAU_BENCH_ASSERT to enforce)");
         }
     }
+}
+
+
+
+TEST_SUITE("cpp_codegen_bench_correctness") {
+
+	// CG-RT3: the benchmark's `sum` accumulates `o.ok` but is never compared
+	// to the step count — a generated program returning ok=false on every
+	// single step would still pass the timing suite. This asserts the
+	// omitted invariant directly, with a small N so it stays fast.
+	TEST_CASE("[CG-BENCH-CORR-01] every step of the echo spec reports ok=true") {
+		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		tref fm = parse_formula(ECHO_FORMULA);
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		std::ostringstream hdr_os;
+		emit_cpp_program<node_t>(*sol, hdr_os, "BenchCorr");
+
+		const std::string hdr_path = cg_tmp("_tau_bench_corr_hdr.h");
+		const std::string main_path = cg_tmp("_tau_bench_corr_main.cpp");
+		const std::string exe_path = cg_tmp("_tau_bench_corr_exe");
+		{ std::ofstream f(hdr_path); f << hdr_os.str(); }
+		const long N = 10000L;
+		{
+			std::ofstream f(main_path);
+			f << "#include \"_tau_bench_corr_hdr.h\"\n"
+			     "#include <cstdio>\n"
+			     "int main() {\n"
+			     "  BenchCorr c;\n"
+			     "  BenchCorr::Inputs in{};\n"
+			     "  unsigned sum = 0;\n"
+			  << "  for (long i = 0; i < " << N << "L; ++i) {\n"
+			     "    auto o = c.step(in);\n"
+			     "    sum += (unsigned)o.ok;\n"
+			     "  }\n"
+			     "  std::printf(\"%u\\n\", sum);\n"
+			     "  return 0;\n"
+			     "}\n";
+		}
+		std::string cmd = std::string("g++ -O2 -std=c++17 -I" + cg_tmp_dir() + " -o ")
+		                + exe_path + " " + main_path + " 2>&1";
+		REQUIRE(::system(cmd.c_str()) == 0);
+		REQUIRE(::system((std::string(exe_path)
+			+ " >" + cg_tmp("_tau_bench_corr_out")).c_str()) == 0);
+		std::ifstream out(cg_tmp("_tau_bench_corr_out"));
+		unsigned sum = 0; out >> sum;
+		CHECK(sum == (unsigned)N);
+	}
+
 }
 
 

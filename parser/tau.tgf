@@ -263,7 +263,8 @@ solver_mode            => ("minimum" | "min"):solver_mode_minimum
 q_file_name            => '"' file_name '"'.
 file_name              => printable+.
 option_name            => alnum+.
-option_value           => alnum+.
+# '.' admits decimal values (e.g. `set gcgrowth 1.5`).
+option_value           => (alnum | '.')+.
 fragment_name          => ("ltl" :fragment_ltl | "ctl_star" :fragment_ctl_star
                         | "ctl*" :fragment_ctl_star).
 

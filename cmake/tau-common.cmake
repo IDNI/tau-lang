@@ -46,12 +46,19 @@ set(TAU_DEVEL_OPTIONS "-O0;-DNDEBUG;-g0")
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE}")
 set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE};-g")
+# Coverage mirrors Debug semantics; --coverage itself is added in CMakeLists.txt.
+# Without -DDEBUG (and with no -DNDEBUG) asserts stay live while bdd_handle::b is
+# private, which does not compile -- see bdd_handle.h.
+set(TAU_COVERAGE_OPTIONS "-O0;-DDEBUG;-ggdb3")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(COMPILE_OPTIONS "${TAU_DEBUG_OPTIONS}")
 	set(TAU_LINK_OPTIONS "")
 elseif (CMAKE_BUILD_TYPE STREQUAL "Devel")
 	set(COMPILE_OPTIONS "${TAU_DEVEL_OPTIONS}")
+	set(TAU_LINK_OPTIONS "")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Coverage")
+	set(COMPILE_OPTIONS "${TAU_COVERAGE_OPTIONS}")
 	set(TAU_LINK_OPTIONS "")
 elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	set(COMPILE_OPTIONS "${TAU_RELWITHDEBINFO_OPTIONS}")
@@ -99,7 +106,9 @@ function(target_setup target)
 			-Wstrict-aliasing=2
 			-Wfloat-equal
 			-Wwrite-strings
-			-Werror           # warning as errors
+			# warnings as errors in dev configs only, so a newly
+			# introduced warning is caught there, not in Release
+			$<$<OR:$<CONFIG:Debug>,$<CONFIG:Coverage>,$<CONFIG:RelWithDebInfo>>:-Werror>
 			-Wfatal-errors    # first error stops compilation
 			# -ftemplate-backtrace-limit=0
 		)

@@ -305,6 +305,18 @@ tref term_div(tref symbol) {
 		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
+	// A divisor that is provably nonzero: the top element (all ones) or a
+	// bitvector constant with at least one bit set. Anything else -- a
+	// variable, a compound term, the bottom element -- may be zero.
+	auto is_nonzero_divisor = [](const tau& c) {
+		if (c.is(tau::bf_t)) return true;
+		if (!c.is_ba_constant()) return false;
+		const size_t t = c.get_ba_type();
+		if (t == 0 || !is_bv_type_family<node>(t)) return false;
+		auto value = std::get<bv>(c.get_ba_constant());
+		if (!value.isBitVectorValue()) return false;
+		return value.getBitVectorValue().find('1') != std::string::npos;
+	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
 	const tau& c2 = tau::get(symbol)[0][1][0];
@@ -337,7 +349,12 @@ tref term_div(tref symbol) {
 		case tau::bf_f:
 			// 0 / 0 is top (cvc5: bvudiv(0,0) = all_ones)
 			if (c2.is(tau::bf_f)) return tau::_1(c1.get_ba_type());
-			return tau::_0(c2.get_ba_type());
+			// `0 / X -> 0` holds only for a divisor known to be nonzero:
+			// SMT-LIB defines bvudiv(0, 0) as all ones, so with a divisor
+			// that may be zero the quotient is not determined. Same class
+			// as the `X / X -> 1` rule removed below.
+			if (is_nonzero_divisor(c2)) return tau::_0(c2.get_ba_type());
+			break;
 		default: break;
 	}
 	switch (c2.value.nt) {
@@ -360,7 +377,12 @@ tref term_div(tref symbol) {
 		}
 		default: break;
 	}
-	// {c} / {c} is 1 for a non-zero constant c (cvc5: bvudiv(0,0) = all_ones)
+	// {c} / {c} is 1 for a non-zero constant c (cvc5: bvudiv(0,0) = all_ones).
+	// `c1 == c2` alone is plain subtree equality and matches variables too,
+	// so this is gated on c1 actually being a known nonzero constant --
+	// folding `x / x` to 1 regardless of x would be wrong for x = 0. Equal
+	// but unknown-value operands fall through to div_consts below, where
+	// cvc5 computes bvudiv exactly, 0/0 included.
 	if (c1 == c2 && c1.is_ba_constant() && c1.get_ba_type() > 0) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
 		if (const bv cc = std::get<bv>(c1.get_ba_constant());
@@ -414,7 +436,10 @@ tref term_mod(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				return tau::_0(c2.get_ba_type());
 			}
-			// 1 % 0 is top
+			// 1 % 0 is top: SMT-LIB bvurem(x, 0) = x, and the bf
+			// term `1` is the BA top (all-ones), not the number 1.
+			// tau::_1(type) is that same top element, consistent with
+			// the `X / 0 is top` arm above.
 			if (c2.is(tau::bf_f)) return tau::_1(c2.get_ba_type());
 			break;
 		}
@@ -645,8 +670,15 @@ tref term_shl(tref symbol) {
 }
 
 inline int compare_bv_consts(const bv& c1, const bv& c2) {
-	const std::string s1 = c1.getBitVectorValue(2);
-	const std::string s2 = c2.getBitVectorValue(2);
+	// A ba_constant can hold a constant EXPRESSION rather than a value:
+	// the generic BA fold combines two constants with the raw Term
+	// operators (cvc5.tmpl.h operator|/&/^/~ build unsimplified bvor/...),
+	// and nothing between that fold and this comparison normalizes.
+	// getBitVectorValue on such a term throws, so fold it here first.
+	const bv v1 = c1.isBitVectorValue() ? c1 : normalize_bv(c1);
+	const bv v2 = c2.isBitVectorValue() ? c2 : normalize_bv(c2);
+	const std::string s1 = v1.getBitVectorValue(2);
+	const std::string s2 = v2.getBitVectorValue(2);
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
 }
 

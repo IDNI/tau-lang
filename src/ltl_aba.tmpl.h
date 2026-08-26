@@ -23,6 +23,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include <sys/wait.h>
 #include <unistd.h>

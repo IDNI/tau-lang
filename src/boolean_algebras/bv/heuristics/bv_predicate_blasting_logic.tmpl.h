@@ -140,6 +140,9 @@ static rewriter::rules bit_rules(size_t bitwidth) {
 template<NodeType node>
 tref bit(tref operand, int_t bit) {
 	auto bitwidth = get_bv_type_bitwidth<node>(operand);
+	// HE-9: width 0 (untyped operand) would index a 0-length mask string
+	// and wrap `bitwidth - 1` loops to ~SIZE_MAX; refuse instead.
+	if (bitwidth == 0) return nullptr;
 	auto rules = bit_rules<node>(bitwidth);
 	auto call = make_bit_call_from_index<node>(operand, bit);
 	auto rr = make_rr<node>(rules, call);
@@ -222,6 +225,9 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 template<NodeType node>
 tref bvshl_by_one(tref base, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(base);
+	// HE-9: width 0 (untyped operand) would index a 0-length mask string
+	// and wrap `bitwidth - 1` loops to ~SIZE_MAX; refuse instead.
+	if (bitwidth == 0) return nullptr;
 	rewriter::rules rules;
 	auto rule = bvshl_by_one_rule<node>(bitwidth);
 	auto call = make_bvshl_by_one_call<node>(base, shifted);
@@ -295,6 +301,9 @@ static rewriter::rule bvshr_by_one_rule(size_t bitwidth) {
 template<NodeType node>
 tref bvshr_by_one(tref base, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(base);
+	// HE-9: width 0 (untyped operand) would index a 0-length mask string
+	// and wrap `bitwidth - 1` loops to ~SIZE_MAX; refuse instead.
+	if (bitwidth == 0) return nullptr;
 	auto rule = bvshr_by_one_rule<node>(bitwidth);
 	auto call = make_bvshr_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);

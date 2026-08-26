@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
+	antiprenexing
 	bf_fixed_point
 	bf_hooks
 	bf_normalization
+	eliminability
 	interpreter
 	interpreter_ltl_multiio
 	pointwise_revision
@@ -11,7 +13,10 @@ set(TESTS
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
+	placement_matrix
 	quantifiers
+	satisfiability6
+	normalizer_helpers
 	splitter
 	splitter2
 	tau_ba1
@@ -27,6 +32,7 @@ set(TESTS
 	heuristics-trivial_skolem
 	ctl_star
 	ocfuncs
+	bv_stress_check
 )
 
 foreach(X IN LISTS TESTS)
@@ -37,7 +43,7 @@ foreach(X IN LISTS TESTS)
 	target_include_directories("test_integration-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
-foreach(X IN ITEMS ctl_star ocfuncs)
+foreach(X IN ITEMS ctl_star ocfuncs satisfiability6)
 	if(NOT TARGET "test_integration-${X}")
 		continue()
 	endif()

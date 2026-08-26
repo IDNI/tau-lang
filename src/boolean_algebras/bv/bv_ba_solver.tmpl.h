@@ -284,7 +284,8 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 
 /**
  * @brief Checks that the formula can be decided by the bitvector solver:
- * every variable must have an explicitly sized bitvector type. Mixed-type
+ * every variable must have an explicitly sized bitvector type, and the formula
+ * must contain no node kind `bv_eval_node` cannot translate. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
  *
  * Also rejects formulas carrying a non-bv-typed ba_constant (e.g. a `qlt`
@@ -295,7 +296,7 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
  *
  * @tparam node Node type
  * @param form The formula to check
- * @return true if all variables/constants are (explicitly sized) bitvectors
+ * @return true if the formula is within the translator's reach
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form) {
@@ -307,7 +308,41 @@ bool is_bv_solvable_formula(tref form) {
 		return false;
 
 	bool solvable = true;
+	// A formula with no bv content at all satisfied every rejection below
+	// vacuously and was declared solvable, so a plain constant such as `1`
+	// was handed to cvc5, which cannot translate it -- printing
+	// "Failed to translate the formula to cvc5: 1" before the (correct)
+	// result, and making a working normalization look like it had failed.
+	// Reported on issue 28's corrected script, `g[0](y) := 0.
+	// g[n](y) := g[n-1](y)'. n g[5](1)`.
+	bool has_bv = false;
 	auto check = [&](tref n) {
+		// Reject references. Checking variables alone was not enough: a
+		// wff_ref's arguments are perfectly good bv-typed variables, so the
+		// whole formula was declared solvable, and `bv_eval_node` then hit the
+		// reference, returned nullopt and logged "Failed to translate the
+		// formula to cvc5" -- once per resolve pass plus the final gate, four
+		// times for a single normalize_non_temp -- each time after a
+		// cvc5::Solver had been constructed and the tree walked. `ref` covers
+		// both wff_ref and bf_ref: they are named alternatives of the same
+		// `ref` nonterminal.
+		//
+		// Only `ref`, deliberately. It is tempting to reject every node kind
+		// bv_eval_node's switch lacks a case for -- io_var and capture in
+		// particular -- but the grammar makes that wrong: `variable =>
+		// (uconst | io_var | var_name) [typed]`, so an io_var is always
+		// *inside* a variable node and `case tau::variable` translates it by
+		// name, which is exactly how every bv io_var formula gets solved. The
+		// same holds for a capture used as an io_var offset. Rejecting them
+		// costs both correctness and time: measured on
+		// test_integration-satisfiability3, whose six cases are all bv[16]
+		// over io_vars, adding io_var to this list turned 1.4s and all-pass
+		// into a >1500s timeout with a wrong answer, because every scope then
+		// missed the solver shortcut and went to blasting instead.
+		if (is<node>(n, tau::ref))
+			return solvable = false;
+		if (is_bv_type_family<node>(tau::get(n).get_ba_type()))
+			has_bv = true;
 		if (is<node>(n, tau::variable)) {
 			size_t t = tau::get(n).get_ba_type();
 			if (!is_bv_type_family<node>(t)) return solvable = false;
@@ -322,7 +357,72 @@ bool is_bv_solvable_formula(tref form) {
 		return solvable;
 	};
 	pre_order<node>(form).search_unique(check);
-	return solvable;
+	return solvable && has_bv;
+}
+
+/** @copydoc has_foreign_ba_constant */
+template <NodeType node>
+bool has_foreign_ba_constant(tref form) {
+	using tau = tree<node>;
+
+	auto foreign = [](tref n) {
+		const tau& t = tau::get(n);
+		if (!t.is_ba_constant() && !t.is(tau::bf_t) && !t.is(tau::bf_f))
+			return false;
+		const size_t ty = t.get_ba_type();
+		return ty != 0 && !is_bv_type_family<node>(ty);
+	};
+	return tau::get(form).find_top(foreign) != nullptr;
+}
+
+/** @copydoc has_blasting_residue */
+template <NodeType node>
+bool has_blasting_residue(tref form) {
+	using tau = tree<node>;
+
+	// `bit_mask_cte` wraps the mask constant in a bf node, but the pipeline
+	// trims such wrappers, so accept the constant at either depth.
+	auto is_one_hot_mask = [](tref operand) -> bool {
+		if (!operand) return false;
+		tref c = tau::get(operand).is(tau::bf)
+			? tau::trim(operand) : operand;
+		if (!c || !tau::get(c).is_ba_constant()) return false;
+		const auto& cte = tau::get(c).get_ba_constant();
+		if (!std::holds_alternative<bv>(cte)) return false;
+		const bv& term = std::get<bv>(cte);
+		if (!term.isBitVectorValue()) return false;
+		const std::string bits = term.getBitVectorValue();
+		return std::ranges::count(bits, '1') == 1;
+	};
+	auto masking_conjunction = [&is_one_hot_mask](tref n) {
+		if (!tau::get(n).is(tau::bf_and)) return false;
+		return is_one_hot_mask(tau::get(n).first())
+			|| is_one_hot_mask(tau::get(n).second());
+	};
+	return tau::get(form).find_top(masking_conjunction) != nullptr;
+}
+
+/**
+ * @brief Does @p form contain a quantifier of one kind nested inside one of the
+ * other kind?
+ *
+ * cvc5's default counterexample-guided instantiation only instantiates the
+ * innermost quantified subformula, which collapses on interleaved `all`/`ex`
+ * over bitvectors; `bv_formula_sat_status` turns that default off when this
+ * predicate holds. A formula whose quantifiers all point the same way, or whose
+ * two kinds sit in unrelated branches, does not need it.
+ * @tparam node Tree node type.
+ * @param form Formula to inspect.
+ * @return `true` if some `wff_all` has a `wff_ex` below it, or vice versa.
+ */
+template <NodeType node>
+bool has_alternating_quantifiers(tref form) {
+	using tau = tree<node>;
+	for (tref q : tau::get(form).select_all(is<node, tau::wff_all>))
+		if (tau::get(q).find_top(is<node, tau::wff_ex>)) return true;
+	for (tref q : tau::get(form).select_all(is<node, tau::wff_ex>))
+		if (tau::get(q).find_top(is<node, tau::wff_all>)) return true;
+	return false;
 }
 
 template <NodeType node>
@@ -330,25 +430,74 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+#ifdef TAU_CACHE
+	// One cvc5::Solver construction plus one checkSat per call, and the callers
+	// ask repeatedly: resolve_quantifiers is a whole-tree pre_order run at
+	// least three times per eliminate_bv_and_quantifiers, and its open-scope
+	// branch asks twice per scope. The answer depends only on `form`: the one
+	// global config_cvc5_solver reads, `cvc5_options`, is fixed at process
+	// start before the first query (documented at its definition -- flipping
+	// it mid-process would serve verdicts computed under the previous option
+	// set), config_cvc5_solver_alternating_quantifiers reads no global at all,
+	// and the alternation test is a function of the formula -- so the formula
+	// alone is a complete key. Unlike anti_prenex's memo (which had to be
+	// split per bv_blasting setting) there is nothing else to key on.
+	// nullopt is cached too: a formula the translator rejects gets rejected the
+	// same way every time, and re-deriving that costs a full tree walk.
+	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	tref key = tau::trim_right_sibling(form);
+	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	auto memo = [&key](std::optional<bv_sat_status> r) {
+		return cache.emplace(key, r).first->second;
+	};
+#else
+	auto memo = [](std::optional<bv_sat_status> r) { return r; };
+#endif // TAU_CACHE
+
 	subtree_map<node, bv> vars, free_vars;
+	// A fresh solver per query is deliberate, do NOT share one like
+	// normalize_bv's (B12): cvc5 forbids a second checkSat without
+	// incremental mode ("cannot make multiple queries unless incremental
+	// solving is enabled" -- resetAssertions does not lift this), and a
+	// pair of long-lived incremental solvers measured strictly worse on
+	// bv[64]x14 stress: 19.4s -> 30.0s wall and 227MB -> 1.1GB peak RSS
+	// (2026-08-17). The engine construction cost per query is the price of
+	// the non-incremental option set, which is the larger win.
 	cvc5::Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
+	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
+	// quantifiers too, not just the innermost one; without that it does not
+	// finish at all past bv[8]. Applied before the logic is fixed, since
+	// cvc5 resolves its quantifier-module defaults at that point.
+	// See config_cvc5_solver_alternating_quantifiers for the measurements.
+	// Genuine alternation, not merely "both kinds occur somewhere": a
+	// quantifier of one kind must sit *below* one of the other kind. Testing
+	// find_top(wff_all) && find_top(wff_ex) also matched non-alternating
+	// shapes such as `(ex x P(x)) && (all y Q(y))`, which then paid the
+	// strategy change's cost (up to ~1.8x on quantified division, see
+	// config_cvc5_solver_alternating_quantifiers) for no benefit.
+	if (has_alternating_quantifiers<node>(form))
+		config_cvc5_solver_alternating_quantifiers(solver);
+	// decision_only: this function only ever reads the checkSat verdict,
+	// never a model, so satisfiability-preserving preprocessing is admissible
+	// here (see cvc5_option_set::decision_no_models).
+	config_cvc5_solver(solver, true);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
-		return std::nullopt;
+		return memo(std::nullopt);
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 	solver.assertFormula(expr.value());
 	auto result = solver.checkSat();
-	if (result.isSat()) return bv_sat_status::sat;
+	if (result.isSat()) return memo(bv_sat_status::sat);
 	if (result.isUnknown()) {
 		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
-		return bv_sat_status::unknown;
+		return memo(bv_sat_status::unknown);
 	}
-	return bv_sat_status::unsat;
+	return memo(bv_sat_status::unsat);
 }
 
 template <NodeType node>

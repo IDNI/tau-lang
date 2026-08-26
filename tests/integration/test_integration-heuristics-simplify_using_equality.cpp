@@ -324,11 +324,13 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
+		// Order flipped by the 8f1a74c1 parser regen (Debug's
+		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy|zx = 0",
 			"yx|xz = 0",
 			"xy|xz = 0",
 			"yx|zx = 0",
-			"xy|zx = 0",
 		}) );
 	}
 	TEST_CASE("2") {
@@ -359,15 +361,27 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
+		// Each atom is a commutative product whose printed orientation is
+		// a subtree_less tie-break that flips under parser regeneration
+		// (8f1a74c1 did). Accept every orientation combination of the
+		// four kept atoms; the conjunct order itself is stable.
 		CHECK( matches_to_str_to_any_of(res, {
-			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
+			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
+			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
 			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
+			"xy = 0 && vw = 0 && yw = 0 && vx = 0",
+			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
+			"xy = 0 && wv = 0 && wy = 0 && vx = 0",
+			"xy = 0 && wv = 0 && yw = 0 && xv = 0",
+			"xy = 0 && wv = 0 && yw = 0 && vx = 0",
+			"yx = 0 && vw = 0 && wy = 0 && xv = 0",
+			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
+			"yx = 0 && vw = 0 && yw = 0 && xv = 0",
 			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
+			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
+			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
 			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
 			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
-			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
-			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 		}) );
 	}
 	TEST_CASE("8") {
@@ -443,10 +457,15 @@ TEST_SUITE("simplify_using_equality") {
 		// Which side an atom's variable prints on is decided by
 		// simplify_using_equality_term_comp's tau::subtree_less fallback for
 		// two plain variables, a content-hash tie-break that is not a
-		// guaranteed canonical order (see tau_bdd.tmpl.h for the analogous
-		// issue), so accept either orientation for the "z = x" atom.
-		CHECK((tau::get(res).to_str() == "x = 0 || x = y || z = x"
-			|| tau::get(res).to_str() == "x = 0 || x = y || x = z"));
+		// guaranteed canonical order and can flip on a parser regeneration
+		// (the 8f1a74c1 regen did; see tau_bdd.tmpl.h for the analogous
+		// issue), so accept any orientation of the two kept atoms.
+		CHECK( matches_to_str_to_any_of(res, {
+			"x = 0 || x = y || z = x",
+			"x = 0 || x = y || x = z",
+			"x = 0 || y = x || z = x",
+			"x = 0 || y = x || x = z",
+		}) );
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {
@@ -502,5 +521,79 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = simplify_using_equality<node_t>(fm);
 		// i1[t] must NOT be replaced by 0 in the second conjunct
 		CHECK(tau::get(res).to_str() == "i1[t]:tau = 0 && o1[t]:tau = i1[t]:tau");
+	}
+}
+
+// ── Sub-formulas that are not facts of the enclosing scope ───────────────────
+//
+// The pass models a conjunction (its conjuncts are facts of the current
+// scope), a disjunction (which opens a scope) and atomic formulas. `to_nnf`,
+// which it runs first, is what guarantees nothing else appears. When that
+// guarantee did not hold, descending into an implication registered its
+// antecedent and consequent as asserted equalities of the enclosing
+// conjunctive scope: `(x=0 -> y=0) && (y=0 -> z=0)` came back as
+// `(x=0 -> y=0) && z = 0`, with the second link turned into an assertion --
+// a formula equivalent to neither the input nor its negation (issue #69).
+//
+// The sugar node has to be built with the construction hooks off, since they
+// are what desugars `->`. That is not a contrivance: a Tau-BA constant is
+// parsed exactly that way (`tau_spec` sets `reget_with_hooks = false`) and,
+// unlike every other parsed formula, never goes through `api::simplify`,
+// whose `reget` is what desugars them.
+//
+// The fix is in `to_nnf`, so what these pin is the contract -- whatever shape
+// the input arrives in, the result must still mean the same thing. The
+// `visit` guard added alongside is defence in depth for a shape `to_nnf`
+// might not cover and is not reachable from here.
+
+// Builds `wff(sym(args...))` without the hooks that would desugar it.
+static tref raw_sugar(typename node_t::type sym, const trefs& args) {
+	use_hooks_guard<node_t> hooks_off(false);
+	return tau::get(tau::wff, tau::get(sym, args));
+}
+
+TEST_SUITE("simplify_using_equality: non-conjunctive sub-formulas") {
+
+	TEST_CASE("implication chain keeps both links") {
+		tref x0 = get_nso_rr("x = 0.").value().main->get();
+		tref y0 = get_nso_rr("y = 0.").value().main->get();
+		tref z0 = get_nso_rr("z = 0.").value().main->get();
+		tref fm = tau::build_wff_and(
+			raw_sugar(tau::wff_imply, { x0, y0 }),
+			raw_sugar(tau::wff_imply, { y0, z0 }));
+		tref res = simplify_using_equality<node_t>(fm);
+		// The same chain built through the hooks, i.e. desugared.
+		tref expected = tau::build_wff_and(
+			tau::build_wff_imply(x0, y0),
+			tau::build_wff_imply(y0, z0));
+		CHECK( are_nso_equivalent<node_t>(res, expected) );
+	}
+
+	TEST_CASE("reverse implication chain keeps both links") {
+		tref x0 = get_nso_rr("x = 0.").value().main->get();
+		tref y0 = get_nso_rr("y = 0.").value().main->get();
+		tref z0 = get_nso_rr("z = 0.").value().main->get();
+		tref fm = tau::build_wff_and(
+			raw_sugar(tau::wff_rimply, { y0, x0 }),
+			raw_sugar(tau::wff_rimply, { z0, y0 }));
+		tref res = simplify_using_equality<node_t>(fm);
+		tref expected = tau::build_wff_and(
+			tau::build_wff_rimply(y0, x0),
+			tau::build_wff_rimply(z0, y0));
+		CHECK( are_nso_equivalent<node_t>(res, expected) );
+	}
+
+	TEST_CASE("equivalence chain keeps both links") {
+		tref x0 = get_nso_rr("x = 0.").value().main->get();
+		tref y0 = get_nso_rr("y = 0.").value().main->get();
+		tref z0 = get_nso_rr("z = 0.").value().main->get();
+		tref fm = tau::build_wff_and(
+			raw_sugar(tau::wff_equiv, { x0, y0 }),
+			raw_sugar(tau::wff_equiv, { y0, z0 }));
+		tref res = simplify_using_equality<node_t>(fm);
+		tref expected = tau::build_wff_and(
+			tau::build_wff_equiv(x0, y0),
+			tau::build_wff_equiv(y0, z0));
+		CHECK( are_nso_equivalent<node_t>(res, expected) );
 	}
 }

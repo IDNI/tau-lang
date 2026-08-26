@@ -35,11 +35,17 @@ inline std::string classify_parse_error(const std::string& formula) {
 		return "forward time references [t+k] are not allowed "
 		       "(only [t-k])";
 
-	// Missing trailing dot.
+	// Missing trailing dot. AP2-8: only when the input actually looks
+	// like a formula/spec (contains an equation or a temporal keyword) --
+	// a misspelled REPL command otherwise got this misleading hint.
 	{
 		std::string trimmed = formula;
 		size_t end = trimmed.find_last_not_of(" \t\r\n");
-		if (end != std::string::npos && trimmed[end] != '.')
+		bool formula_like = formula.find('=') != std::string::npos
+			|| formula.find("always") != std::string::npos
+			|| formula.find("sometimes") != std::string::npos;
+		if (formula_like && end != std::string::npos
+			&& trimmed[end] != '.')
 			return "missing spec terminator '.' at end of formula";
 	}
 
@@ -52,6 +58,10 @@ inline std::string classify_parse_error(const std::string& formula) {
 		auto it = std::sregex_iterator(s.begin(), s.end(), re_type_extract);
 		for (; it != std::sregex_iterator(); ++it) {
 			std::string t = (*it)[1].str();
+			// AP2-8: numeric colon uses (bv widths, offsets) are
+			// not type annotations -- skip them.
+			if (!t.empty() && std::isdigit(
+				static_cast<unsigned char>(t[0]))) continue;
 			if (std::ranges::find(known_types, t) == known_types.end())
 				return "unknown type annotation ':" + t
 				     + "' (valid: "

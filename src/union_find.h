@@ -76,7 +76,10 @@ struct union_find : public std::map<data_t, data_t, less_t> {
 template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_rank : public union_find<data_t, less_t> {
 private:
-	std::map<data_t, size_t> rank; // rank for union by rank
+	// TT2-12: must use less_t like the parent map -- with a coarser
+	// equivalence (e.g. subtree_less over trefs) the two maps would
+	// otherwise disagree on key identity, degrading ranks to 0.
+	std::map<data_t, size_t, less_t> rank; // rank for union by rank
 
 public:
 	/**
@@ -197,9 +200,13 @@ struct scoped_union_find {
 	 */
 	std::optional<scope_error> close() {
 		if (scopes.size() == 1) {
-			// TODO (HIGH) Check proper closing scopes
-			// DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
-			return std::nullopt; //scope_error{};
+			// TT2-14 verdict: the silent tolerance here is
+			// LOAD-BEARING, not a bug -- e.g. get_nso_rr on a lone
+			// rec_relation drives a resolver that closes at the
+			// global scope (an assert here SIGABRTs that path).
+			// Callers treat close() at global scope as a no-op;
+			// scope_error remains for a future strict mode.
+			return std::nullopt;
 		}
 		scopes.pop_back();
 		return std::nullopt;

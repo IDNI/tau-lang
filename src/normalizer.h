@@ -31,12 +31,24 @@ namespace idni::tau_lang {
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *
  * For formulas without temporal quantifiers (`always`/`sometimes`), applies
- * `eliminate_arithmetic_and_quantifiers` (see normalizer.tmpl.h): resolves closed
- * quantified arithmetic sub-formulas, pushes/eliminates the rest via
- * `anti_prenex_block` (which itself attempts the owning BA's preprocessing for
- * arithmetic-typed content), resolves again, then runs `anti_prenex_block`
- * once more skipping only whatever arithmetic that preprocessing could not
- * resolve, and resolves a final time.
+ * `eliminate_arithmetic_and_quantifiers` (see normalizer.tmpl.h), whose steps are:
+ *  1. `scope_out_independent_conjuncts` -- lift every conjunct that does not
+ *     mention a quantified variable out of that variable's scope, so a
+ *     foreign-typed sibling conjunct cannot stop an arithmetic scope from
+ *     being recognised as closed and solvable;
+ *  2. `resolve_quantifiers` -- decide or blast arithmetic-typed scopes;
+ *  3. an eliminability analysis of the formula, then `anti_prenex` guided by
+ *     it (skipping arithmetic-typed content the analysis marks as the
+ *     solver's to decide), then `resolve_quantifiers` again;
+ *  4. when the pack has an arithmetic theory at all, a second eliminability
+ *     pass -- narrower where a foreign Boolean algebra's constant means the
+ *     solver cannot own the content -- drives `anti_prenex` and
+ *     `resolve_quantifiers` once more, with an optional final blasting
+ *     attempt on the whole formula;
+ *  5. if the result is closed and solvable, ask the solver for a definite
+ *     `sat`/`unsat` and collapse to `T`/`F` on one -- an `unknown` or a
+ *     failed translation leaves the formula as it is, quantifiers included,
+ *     since "cannot decide" is not "false".
  *
  * For formulas with temporal quantifiers, the same pipeline is applied to
  * each inner formula below a temporal quantifier, then the temporal layer
@@ -149,9 +161,13 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 /**
  * @brief Check that a formula does not use Boolean combinations of models.
  *
- * Returns `false` if the formula (or its inner formula when wrapped in `always`)
- * contains any nested `wff_always` or `wff_sometimes` quantifier, which would
- * constitute a Boolean combination of models — an unsupported construct.
+ * What is actually checked (NF-9): nested `wff_always` and nested `wff_F`
+ * only — nested `wff_sometimes` is NOT detected, so e.g.
+ * `(sometimes a) && (sometimes b)` passes the predicate; and any formula
+ * containing a full-LTL / CTL* operator (F/U/R/W/A/E/semantic_neg) is
+ * exempted and returns `true` unconditionally (those manage their own
+ * temporal scope). Callers use this only in DBG asserts, so the gap
+ * weakens a debug guard rather than a runtime result.
  * @tparam node Tree node type.
  * @param n Formula to inspect.
  * @return `true` if no Boolean combination of models is present.
@@ -192,6 +208,41 @@ bool has_no_boolean_combs_of_models(tref n);
  */
 template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n);
+
+/**
+ * @brief Find a relative offset in a definition that its head cannot bind.
+ *
+ * A head declaring no offsets binds no offset variable, so a reference in the
+ * body carrying a relative offset is free — `f(x) := o1[n] = r[n](x)` has
+ * nothing to give `n` a value. Expanding such a definition can only put a
+ * relative offset into the main formula, which `is_valid` rejects; but the
+ * expansion is driven by that very offset (`r[n]` → `r[n-1]` → `r[n-1-1]` →
+ * …) and never terminates, so the main never gets far enough to be checked.
+ * Callers reject the definition up front instead.
+ *
+ * Offsets on stream variables (`o1[n]`) are unaffected: those are resolved per
+ * time step by the interpreter, not by unfolding a definition.
+ * @tparam node Tree node type.
+ * @param head The definition's head (its `ref`, or a node wrapping one).
+ * @param body The definition's body.
+ * @return The offending `ref` node, or `nullptr` when the definition is fine.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // `f` declares no offset, so the `n` in `r[n](x)` is unbound
+ * auto spec = get_nso_rr("r[0](x) := 1. r[n](x) := r[n-1](x)'."
+ *     "f(x) := o1[n] = r[n](x). f(1).").value();
+ * const auto& f = spec.rec_relations[2];
+ * CHECK( get_unbindable_relative_offset<node_t>(
+ *     f.first->get(), f.second->get()) != nullptr );
+ * // `r` declares `[n]`, which binds the `n-1` in its own body
+ * const auto& r = spec.rec_relations[1];
+ * CHECK( get_unbindable_relative_offset<node_t>(
+ *     r.first->get(), r.second->get()) == nullptr );
+ * @endcode
+ */
+template <NodeType node>
+tref get_unbindable_relative_offset(tref head, tref body);
 
 /**
  * @brief Check whether two non-temporal NSO formulas are logically equivalent.
@@ -249,6 +300,9 @@ bool is_nso_impl(tref n1, tref n2);
  * @brief Normalize a formula with temporal simplifications.
  *
  * Full normalization pipeline including:
+ *   0. `flatten_always_conjuncts` — merges top-level `(G A) && (G B)` into
+ *      `G(A && B)` first; load-bearing (NF-10: without it the second G is
+ *      silently dropped downstream, which can flip a satisfiable spec).
  *   1. `normalize` (with temporal quantifiers).
  *   2. `fold_trivial_quantifiers` (remove vacuous quantifiers after substitution).
  *   3. Late `resolve_quantifiers` for residual arithmetic sub-formulas.

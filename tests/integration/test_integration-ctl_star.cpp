@@ -732,3 +732,158 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 		}
 	}
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 9. SEMANTICS — realizability verdicts (LT-25), semantic negation (LT-5)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Everything above this point is parse / NNF / detection only: not one case
+// asserts a realizability verdict on an A / E / `-` formula, even though
+// `is_tau_formula_sat` routes every CTL* formula through
+// `reduce_ctl_star_to_ltl` → `is_ltl_aba_realizable` unconditionally.
+//
+// The gap hid LT-5: `apply_semantic_negation` only re-wraps its argument in
+// `wff_semantic_neg` (the promised role swap has no implementation), the
+// surviving node reaches `skeleton_wff`'s default case, and — because it
+// contains io_vars — is emitted as the propositional constant "1".  Every
+// non-constant `-φ` therefore came back REALIZABLE regardless of φ.
+//
+// Semantic negation is now a hard error instead of a silent TRUE.  These
+// cases pin that, plus the verdicts that DO have a working reduction.
+
+TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE") {
+
+	// A `-φ` over data atoms has no implementation.  It must fail loudly.
+	TEST_CASE("[CTLS-SEM-01] -(always o1=1) is rejected, not REALIZABLE") {
+		tref fm = create_spec("-(always o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// Same for a semantic negation buried inside a Boolean context: the node
+	// survives translation and reaches the skeleton either way.
+	TEST_CASE("[CTLS-SEM-02] -(F o1=1) && G(o1=0) is rejected") {
+		tref fm = create_spec("-(F o1[t] = 1) && G (o1[t] = 0).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// Double semantic negation is still a semantic negation.
+	TEST_CASE("[CTLS-SEM-03] --(o1=1) is rejected") {
+		tref fm = create_spec("--(o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// Constant folding happens in the hooks, BEFORE any of this, so the
+	// constant cases keep a real verdict — and the verdict must be the
+	// folded one (-T ≡ F, -F ≡ T), not an error.
+	TEST_CASE("[CTLS-SEM-04] -T is UNREALIZABLE (folded to F)") {
+		tref fm = create_spec("-T.");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-SEM-05] -F is REALIZABLE (folded to T)") {
+		tref fm = create_spec("-F.");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+} // TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE")
+
+
+TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
+
+	// The A / E reduction (translate_ctl_star): positive `E χ` becomes a
+	// fresh witness output w plus G(w → χ) -- sound for synthesis, possibly
+	// over-strict; positive `A χ` in a universal context (root, ∧, G)
+	// reduces to χ itself; every other placement is REFUSED with
+	// ltl_synthesis_error (LA-N2: the old `A χ ≡ ¬E¬χ` rewrite was vacuous,
+	// any strategy satisfied `¬w ∧ G(w → ¬χ)` by holding w false, so
+	// `A (F i1 = 1)` came out REALIZABLE).  Both directions are pinned.
+	TEST_CASE("[CTLS-AE-01] E(always o1=1) is REALIZABLE") {
+		tref fm = create_spec("E (always o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-AE-02] A(always o1=1) is REALIZABLE") {
+		tref fm = create_spec("A (always o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-AE-03] E(F o1=1) is REALIZABLE") {
+		tref fm = create_spec("E (F o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// LA-N2: A now constrains χ. An input can never be forced, so
+	// `A (F i1 = 1)` and `A (always i1 = 1)` are UNREALIZABLE exactly like
+	// their LTL bodies (test_ltl_negative pins `F (i1 = 1)`).
+	TEST_CASE("[CTLS-AE-05] A(F i1=1) is UNREALIZABLE") {
+		tref fm = create_spec("A (F i1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-AE-06] A(always i1=1) is UNREALIZABLE") {
+		tref fm = create_spec("A (always i1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+	}
+
+	TEST_CASE("[CTLS-AE-07] A(F o1=1) is REALIZABLE") {
+		tref fm = create_spec("A (F o1[t] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+
+	// A under G is still a universal context: G(A φ) ≡ G φ over a tree.
+	TEST_CASE("[CTLS-AE-08] always(A(o1=1)) is REALIZABLE, always(A(i1=1)) is not") {
+		tref fm = create_spec("always (A (o1[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(fm));
+		tref fm2 = create_spec("always (A (i1[t] = 1)).");
+		REQUIRE(fm2 != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm2));
+	}
+
+	// Placements with no sound encoding are refused, never answered.
+	TEST_CASE("[CTLS-AE-09] A under F / || is refused") {
+		tref fm = create_spec("F (A (o1[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm),
+			ltl_synthesis_error);
+		tref fm2 = create_spec("(A (o1[t] = 1)) || (always o1[t] = 0).");
+		REQUIRE(fm2 != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm2),
+			ltl_synthesis_error);
+	}
+
+	TEST_CASE("[CTLS-AE-10] E in negative polarity is refused") {
+		tref fm = create_spec("(E (always o1[t] = 1)) -> (always o1[t] = 0).");
+		REQUIRE(fm != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm),
+			ltl_synthesis_error);
+		tref fm2 = create_spec("(E (always o1[t] = 1)) <-> (always o1[t] = 1).");
+		REQUIRE(fm2 != nullptr);
+		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm2),
+			ltl_synthesis_error);
+	}
+
+	// A / E must not make an outright contradictory conjunct disappear: the
+	// non-quantified half of the spec is still enforced.
+	// Explicit parens throughout: a temporal quantifier (and `E`) scopes over
+	// the rest of a conjunction, so `E X && Y` would otherwise parse as
+	// `E (X && Y)` and the case would be testing a different formula.
+	TEST_CASE("[CTLS-AE-04] E(always o1=1) && G(o1=1) && G(o1=0) is UNREALIZABLE") {
+		tref fm = create_spec(
+		    "(E (always o1[t] = 1)) && ((G (o1[t] = 1)) && (G (o1[t] = 0))).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+	}
+
+} // TEST_SUITE("CTL* semantics - A / E realizability verdicts")

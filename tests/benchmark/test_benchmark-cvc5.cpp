@@ -10,6 +10,13 @@ namespace testing = doctest;
 
 using namespace cvc5;
 
+// cvc5 >= 1.2 deprecated the Solver-based term factory (Solver::mkTerm and
+// friends) in favour of TermManager, and deprecated the default Solver ctor.
+// Follow the production idiom (src/tau.h's `cvc5_term_manager` +
+// `cvc5::Solver solver(cvc5_term_manager)`, mirrored in tests/unit/test_cvc5.cpp):
+// one term manager, every mk* call through it.
+static TermManager bench_term_manager;
+
 TEST_SUITE("sample cvc5 programs") {
 
 	struct TestParameters {
@@ -32,7 +39,7 @@ TEST_SUITE("sample cvc5 programs") {
 			Kind op = params.comparators[rand() % params.comparators.size()];
 			auto left = mkBitvectorFormula(params, vars, depth + 1);
 			auto right = mkBitvectorFormula(params, vars, depth + 1);
-			return params.solver.mkTerm(op, {left, right});
+			return bench_term_manager.mkTerm(op, {left, right});
 		}
 		// if depth == params.literal_depth, choose a random variable or a literal
 		if (depth == params.literal_depth) {
@@ -41,23 +48,23 @@ TEST_SUITE("sample cvc5 programs") {
 				return vars[rand() % vars.size()];
 			} else {
 				// choose a literal
-				return params.solver.mkBitVector(params.bitvector_size, rand() % (1 << params.bitvector_size));
+				return bench_term_manager.mkBitVector(params.bitvector_size, rand() % (1 << params.bitvector_size));
 			}
 		}
 		// otherwise, choose a random operation from the bitvector_ops
 		Kind op = params.bitvector_ops[rand() % params.bitvector_ops.size()];
 		if (op == Kind::BITVECTOR_NOT) {
-			return params.solver.mkTerm(op, { mkBitvectorFormula(params, vars, depth + 1) });
+			return bench_term_manager.mkTerm(op, { mkBitvectorFormula(params, vars, depth + 1) });
 		}
 		if (op == Kind::BITVECTOR_SHL) {
 			// for shift operations, we need a second argument
 			auto left = mkBitvectorFormula(params, vars, depth + 1);
-			auto right = params.solver.mkBitVector(params.bitvector_size, rand() % (1 << params.bitvector_size));
-			return params.solver.mkTerm(op, {left, right});
+			auto right = bench_term_manager.mkBitVector(params.bitvector_size, rand() % (1 << params.bitvector_size));
+			return bench_term_manager.mkTerm(op, {left, right});
 		}
 		auto left = mkBitvectorFormula(params, vars, depth + 1);
 		auto right = mkBitvectorFormula(params, vars, depth + 1);
-		return params.solver.mkTerm(op, {left, right});
+		return bench_term_manager.mkTerm(op, {left, right});
 	}
 
 	Term mkQuantifiedFreeFormula(TestParameters& params, std::vector<Term> vars, size_t clauses_depth = 0) {
@@ -68,17 +75,17 @@ TEST_SUITE("sample cvc5 programs") {
 		// otherwise, choose a random operation from the logical_ops
 		Kind op = params.logical_ops[rand() % params.logical_ops.size()];
 		if (op == Kind::NOT) {
-			return params.solver.mkTerm(op, { mkQuantifiedFreeFormula(params, vars, clauses_depth + 1) });
+			return bench_term_manager.mkTerm(op, { mkQuantifiedFreeFormula(params, vars, clauses_depth + 1) });
 		}
 
 		auto left = mkQuantifiedFreeFormula(params, vars, clauses_depth + 1);
 		auto right = mkQuantifiedFreeFormula(params, vars, clauses_depth + 1);
-		return params.solver.mkTerm(op, { left, right });
+		return bench_term_manager.mkTerm(op, { left, right });
 	}
 
 	Term mkFormula(TestParameters& params) {
 		// create a bitvector sort
-		Sort bvSort = params.solver.mkBitVectorSort(params.bitvector_size);
+		Sort bvSort = bench_term_manager.mkBitVectorSort(params.bitvector_size);
 
 		std::vector<std::pair<std::vector<Term>, std::vector<Term>>> ios;
 		std::vector<Term> vars;
@@ -86,13 +93,13 @@ TEST_SUITE("sample cvc5 programs") {
 		for (size_t t = 0; t <= params.loopback; ++t) {
 			std::vector<Term> is_t;
 			for (size_t i = 1; i <= params.n_inputs; ++i) {
-				auto i_t = params.solver.mkVar(bvSort, "i_" + std::to_string(i) + "_" + std::to_string(t));
+				auto i_t = bench_term_manager.mkVar(bvSort, "i_" + std::to_string(i) + "_" + std::to_string(t));
 				is_t.emplace_back(i_t);
 				vars.emplace_back(i_t);
 			}
 			std::vector<Term> os_t;
 			for (size_t j = 1; j <= params.n_outputs; ++j) {
-				auto o_t = params.solver.mkVar(bvSort, "o_" + std::to_string(j) + "_" + std::to_string(t));
+				auto o_t = bench_term_manager.mkVar(bvSort, "o_" + std::to_string(j) + "_" + std::to_string(t));
 				os_t.emplace_back(o_t);
 				vars.emplace_back(o_t);
 			}
@@ -103,17 +110,17 @@ TEST_SUITE("sample cvc5 programs") {
 
 		auto fml = qf_fml;
 		for (int i = params.loopback; i >= 0; --i) {
-			fml = params.solver.mkTerm(
+			fml = bench_term_manager.mkTerm(
 				Kind::FORALL, {
-					params.solver.mkTerm(Kind::VARIABLE_LIST, ios[i].first /* inputs */),
-					params.solver.mkTerm(Kind::EXISTS, {
-						params.solver.mkTerm(Kind::VARIABLE_LIST, ios[i].second /* outputs */),
+					bench_term_manager.mkTerm(Kind::VARIABLE_LIST, ios[i].first /* inputs */),
+					bench_term_manager.mkTerm(Kind::EXISTS, {
+						bench_term_manager.mkTerm(Kind::VARIABLE_LIST, ios[i].second /* outputs */),
 						fml
 					})
 				});
 		}
 
-		return params.solver.mkTerm(Kind::NOT, {fml});
+		return bench_term_manager.mkTerm(Kind::NOT, {fml});
 	}
 
 	TEST_CASE("initialize random seed") {
@@ -127,7 +134,7 @@ TEST_SUITE("sample cvc5 programs") {
 			.loopback = 0, // TODO (HIGH) check non zero loopback
 			.n_inputs = 2,
 			.n_outputs = 2,
-			.solver = Solver(),
+			.solver = Solver(bench_term_manager),
 			.bitvector_ops = {Kind::BITVECTOR_ADD, Kind::BITVECTOR_SUB, Kind::BITVECTOR_AND, Kind::BITVECTOR_OR, Kind::BITVECTOR_XOR},
 			.logical_ops = {Kind::AND, Kind::OR, Kind::NOT},
 			.comparators = {Kind::EQUAL, Kind::DISTINCT},

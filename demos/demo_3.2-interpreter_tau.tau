@@ -1,50 +1,63 @@
-# To run it you need to compile the project using release.sh (customized with
-# your settings if needed) and then execute the run.sh within the demo directory
-# as follows:
+# Executing specifications whose streams carry Tau specifications.
 #
-# ./run.sh demo_3.2-interpreter_tau.tau
-#
-# This demo should work under any *nix flavour due to the paths used for files.
-# To run it under windows you will need to change the paths to the files.
+# See demos/README.md for how to run this script.
 
-# This demo demonstrate the workings of the interpreter when considering inputs and
-# outputs tau programs.
+# demo_3.1 ran specifications over sbf streams, whose values are simple Boolean
+# functions. This one uses streams of type tau, so the values flowing through
+# them are Tau specifications: the programs read and written are themselves
+# programs.
 
-# Let us define the inputs/outputs from the console (of type tau)
+i1:tau := in console.
+o1:tau := out console.
 
-tau i1 = console
-tau o1 = console
-
-
-# Now, let us consider a simple tau program which always outputs the same program
-# (as the output doesn't depends on the inputs, we must specify the number of
-# steps to be performed when running it).:
+# To start, a specification that does not look at its input at all. Its output at
+# every step is a fixed Tau specification, given as a constant of the Tau Boolean
+# algebra -- the braces of demo_1.1. As in demo_3.1, the run advances at the
+# continue prompt on anything but q, which here is a `# step` comment:
 
 r o1[t] = { o1[t] = i1[t] }
-n
-n
+# step
+# step
 q
 
-# Now let us consider a program that take as inputs actual programs from the
-# console.
+# Now a specification that does read its input. Since a value here is a whole
+# specification, it is typed the way you would write one, ending in a period --
+# unlike the sbf values of demo_3.1, which take no period.
 
-r o1[t] = i1[t]
+# This program echoes its input. Note that the value entered below is a
+# specification with no `always` or `sometimes`, so it is implicitly an `always`
+# statement, and the interpreter prints it back with the `always` made explicit.
+
+# Note also that the run is constrained only at time point 0. A specification
+# asserted at every time point would go on asking for input forever and swallow
+# the rest of this script, so each run below is deliberately bounded.
+
+r o1[0] = i1[0]
 o1[t] = 0.
-
-# Let us provide a slightly more complex example:
-
-r o1[t] = i1[t]'
-G o1[t] = 0.
-
-# Now, let us go into the rabbit hole of recursion. Let us consider the above
-# program but let us provide as input a program that eventually (F) returns a program
-# that returns the same program.
-
-r o1[t] = i1[t]'
-F o1[t] =  { o1[t] = i1[t] }.
-
-# In the future we would provide more complex examples, but we
-# guess you have a taste of how the interpreter works, at least in simple cases.
-#
-
 q
+
+# Next, a program that complements its input rather than echoing it. Complement in
+# the Tau Boolean algebra is negation of the specification, so feeding it
+# `always o1[t] = 0` yields the dual, `sometimes o1[t] != 0`:
+
+r o1[0] = i1[0]'
+always o1[t] = 0.
+q
+
+# Note that this is why the term operator ' is used rather than the formula
+# operator !: the input stream value is a term of the Tau Boolean algebra, not a
+# formula.
+
+# Finally, down the rabbit hole. The specification fed in below is itself one that
+# reads and writes specifications, so complementing it produces a specification
+# about specifications about specifications:
+
+r o1[0] = i1[0]'
+sometimes o1[t] = { o1[t] = i1[t] }.
+q
+
+# The nesting has no fixed depth. A Tau specification is an element of a Boolean
+# algebra like any other, so it can be a value carried on a stream, and a
+# specification reasoning about those values is again just a Tau specification.
+
+quit

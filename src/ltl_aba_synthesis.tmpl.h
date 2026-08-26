@@ -7,6 +7,35 @@ namespace idni::tau_lang {
 
 // ── Spot subprocess ───────────────────────────────────────────────────────────
 
+// LS-9: one parser for the TAU_LTL_TIMEOUT_SEC watchdog (default 60s;
+// explicit "0" disables). Garbage keeps the DEFAULT instead of atoi's 0
+// silently removing the wall-clock cap on external ltlsynt/ltl2tgba.
+// SY-R5: range garbage is clamped to one day with the same warning --
+// `(int) v` used to turn 2^32 into 0 (watchdog silently OFF) and 2^31
+// into a negative, and values near INT_MAX overflowed the poll bound.
+inline constexpr long ltl_timeout_sec_max = 86400;
+
+inline int ltl_timeout_sec() {
+	int timeout_sec = 60;
+	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
+		char* end = nullptr;
+		errno = 0;
+		long v = std::strtol(env_sec, &end, 10);
+		if (end == env_sec || *end != '\0' || v < 0 || errno == ERANGE) {
+			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
+				<< "' is not a non-negative number; keeping the default "
+				<< timeout_sec << "s";
+		} else if (v > ltl_timeout_sec_max) {
+			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC=" << v
+				<< " exceeds the maximum; clamping to "
+				<< ltl_timeout_sec_max << "s";
+			timeout_sec = (int) ltl_timeout_sec_max;
+		} else timeout_sec = (int) v;
+	}
+	return timeout_sec;
+}
+
+
 // Spawn an external command directly via posix_spawnp (no shell), capture
 // its stdout, and return {captured-output, exit-code}.
 //
@@ -73,7 +102,8 @@ static std::pair<std::string, int> spawn_capture(
 	std::thread killer;
 	if (timeout_sec > 0) {
 		killer = std::thread([pid, timeout_sec, &done]() {
-			for (int i = 0; i < timeout_sec * 10 && !done.load(); ++i)
+			const long long polls = 10LL * timeout_sec;
+			for (long long i = 0; i < polls && !done.load(); ++i)
 				::usleep(100'000);
 			if (!done.load()) ::kill(pid, SIGTERM);
 		});
@@ -91,10 +121,18 @@ static std::pair<std::string, int> spawn_capture(
 	}
 	::close(pipefd[0]);
 
-	int status = 0;
-	while (::waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+	// SY-N6: stop the watchdog BEFORE the child is reaped.  After waitpid
+	// returns the PID may already belong to another process, and a poll
+	// firing in the window between the reap and `done.store(true)` would
+	// SIGTERM it.  Once the pipe is drained (above) the child has closed
+	// its stdout and is exiting, so cancelling the kill here cannot let a
+	// still-running child escape the timeout: the watchdog's job -- bound
+	// the time we wait for OUTPUT -- is done.  (A pidfd_open/WNOWAIT
+	// scheme would close the remaining theoretical window.)
 	done.store(true);
 	if (killer.joinable()) killer.join();
+	int status = 0;
+	while (::waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
 
 	int exit_code;
 	if (WIFEXITED(status))        exit_code = WEXITSTATUS(status);
@@ -157,11 +195,7 @@ inline std::pair<bool, std::string> call_ltlsynt(
 	}
 
 	// Configurable timeout: TAU_LTL_TIMEOUT_SEC (default 60). 0 disables.
-	int timeout_sec = 60;
-	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
-		timeout_sec = std::atoi(env_sec);
-		if (timeout_sec < 0) timeout_sec = 0;
-	}
+	int timeout_sec = ltl_timeout_sec();
 
 	// Always write the formula to a temp file and use `-F path`.  The old
 	// inline `--formula="..."` path required shell-escaping every char and
@@ -197,10 +231,31 @@ inline std::pair<bool, std::string> call_ltlsynt(
 	std::remove(tmpfile_path.c_str());
 	LOG_DEBUG << "[ltl_aba] ltlsynt output (exit=" << exit_code << "): " << out;
 
-	if (exit_code == 127) {
+	// LT-7: only exit 127 used to be special-cased, so a watchdog kill
+	// (128 + SIGTERM = 143) or a usage error fell into the `out.empty()`
+	// branch below and every caller read the result as a definitive
+	// UNREALIZABLE.  A slow-but-realizable specification therefore got a
+	// wrong answer with nothing but a LOG_DEBUG trace behind it.
+	switch (classify_spot_exit(exit_code, out)) {
+	case spot_exit_kind::not_found:
+		// IN-N1: a missing backend is no verdict either; returning
+		// {false, ""} here made every caller print "UNREALIZABLE".
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		return {false, ""};
+		throw ltl_synthesis_error("ltlsynt not found on PATH; install "
+			"Spot (>= 2.10) -- realizability is UNKNOWN");
+	case spot_exit_kind::failed: {
+		std::string msg = "ltlsynt produced no verdict (exit "
+		                + std::to_string(exit_code) + ")";
+		if (exit_code == 143)
+			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
+			     + std::to_string(timeout_sec) + "s)";
+		LOG_ERROR << "[ltl_aba] " << msg
+		          << "; the realizability of this specification is UNKNOWN\n";
+		throw ltl_synthesis_error(msg);
+	}
+	case spot_exit_kind::ok:
+		break;
 	}
 	if (out.empty() || out.substr(0, 12) == "UNREALIZABLE") {
 		// Q40-UX3: on UNREAL, optionally produce env counter-strategy.
@@ -222,7 +277,9 @@ inline std::pair<bool, std::string> call_ltlsynt(
 				auto [neg_out, neg_rc] = spawn_capture(neg_argv, timeout_sec);
 				std::remove(neg_path.c_str());
 				if (neg_rc != 127 && neg_out.substr(0, 10) == "REALIZABLE") {
-					std::string env_hoa = neg_out.substr(neg_out.find('\n') + 1);
+					auto nl = neg_out.find('\n');
+					std::string env_hoa = nl == std::string::npos
+						? std::string() : neg_out.substr(nl + 1);
 					std::fprintf(stderr,
 					    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s\n",
 					    env_hoa.c_str());
@@ -244,11 +301,12 @@ inline std::pair<bool, std::string> call_ltlsynt(
 				std::fprintf(stderr, "=== STRATEGY HOA ===\n%s\n", hoa.c_str());
 			} else if (fmt == "dot") {
 				// Pipe HOA through autfilt --dot if available; else fall back to HOA.
-				std::string tmp = "/tmp/tau_strategy_" + std::to_string(::getpid()) + ".hoa";
-				if (FILE* f = std::fopen(tmp.c_str(), "w")) {
-					std::fwrite(hoa.data(), 1, hoa.size(), f);
-					std::fclose(f);
-					auto [dot, rc] = run_cmd("autfilt --dot " + tmp + " 2>/dev/null");
+				// LS-21: mkstemp-style tempfile + argv spawn (no
+				// predictable /tmp name, no shell string concat).
+				std::string tmp = write_tempfile("tau_strategy", hoa);
+				if (!tmp.empty()) {
+					auto [dot, rc] = spawn_capture(
+					    {"autfilt", "--dot", tmp}, timeout_sec);
 					std::remove(tmp.c_str());
 					if (rc == 0 && !dot.empty())
 						std::fprintf(stderr, "=== STRATEGY DOT ===\n%s\n", dot.c_str());
@@ -274,7 +332,12 @@ inline std::pair<bool, std::string> call_ltlsynt(
 		}
 		return {true, hoa};
 	}
-	return {false, ""};
+	// SY-R4: output that starts with neither verdict line is no verdict
+	// (a crashed or foreign binary on PATH printing something else with
+	// exit 0); it used to fall through as UNREALIZABLE.
+	LOG_ERROR << "[ltl_aba] ltlsynt output carried no verdict line; the "
+	             "realizability of this specification is UNKNOWN\n";
+	throw ltl_synthesis_error("ltlsynt output carried no verdict line");
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
@@ -284,20 +347,48 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 	std::istringstream ss(hoa_text);
 	std::string line;
 
-	bool in_body = false;
+	bool in_body = false, seen_states = false, seen_end = false;
 	int cur_state = -1;
+	// A strategy with more states than this is not something ltlsynt
+	// produces for any specification this pipeline builds; an absurd
+	// count is a garbled header, not an automaton (SY-R3).
+	constexpr long max_states = 1L << 22;
 
 	while (std::getline(ss, line)) {
-		if (line.empty() || line == "--END--") continue;
+		if (line.empty()) continue;
+		// SY-4: the automaton ends here; anything after it (a second
+		// automaton, stray diagnostics) must not be spliced in.
+		if (line == "--END--") { seen_end = true; break; }
 		if (line == "--BODY--") { in_body = true; continue; }
 
 		if (!in_body) {
 			if (line.substr(0, 7) == "States:") {
-				aut.num_states = std::stoi(line.substr(7));
+				// LA-8 / SY-1 / SY-R3: a garbled or absurd state
+				// count used to become the EMPTY automaton,
+				// which the verdict layer reads as trivially
+				// REALIZABLE. A strategy has at least one state;
+				// refuse anything else.
+				long n = -1;
+				try {
+					n = std::stol(line.substr(7));
+				} catch (const std::exception&) {
+					n = -1;
+				}
+				if (n < 1 || n > max_states)
+					throw ltl_synthesis_error(
+						"malformed HOA strategy: bad "
+						"state count '" + line + "'");
+				aut.num_states = (int) n;
+				seen_states = true;
 				aut.edges.resize(aut.num_states);
 				aut.state_accepting.resize(aut.num_states, false);
 			} else if (line.substr(0, 6) == "Start:") {
-				aut.initial_state = std::stoi(line.substr(6));
+				try {
+					aut.initial_state =
+						std::stoi(line.substr(6));
+				} catch (const std::exception&) {
+					aut.initial_state = 0;
+				}
 			} else if (line.substr(0, 3) == "AP:") {
 				std::istringstream apl(line.substr(3));
 				int n; apl >> n;
@@ -318,6 +409,12 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 			// e.g. "State: 0" or "State: 0 {0}"
 			std::istringstream sl(line.substr(6));
 			sl >> cur_state;
+			// LT-10: bound the state number before indexing
+			if (cur_state < 0
+				|| cur_state >= (int) aut.num_states) {
+				cur_state = -1;
+				continue;
+			}
 			// Check for state-based acceptance marks
 			if (line.find('{') != std::string::npos)
 				aut.state_accepting[cur_state] = true;
@@ -334,6 +431,8 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 		int dst;
 		if (!(tl >> dst)) continue;
 
+		// LT-10: an edge to an out-of-range destination is dropped
+		if (dst < 0 || dst >= (int) aut.num_states) continue;
 		HoaEdge e;
 		e.guard_label = guard;
 		e.dst = dst;
@@ -345,6 +444,16 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 		aut.edges[cur_state].push_back(e);
 	}
 
+	// LA-8 / SY-1: no header, or a header with no body, is a truncated
+	// or garbled strategy (a timed-out or crashed ltlsynt, a stub on
+	// PATH) -- not an automaton. Refuse rather than execute an
+	// unconstrained program.
+	if (!seen_states || !in_body)
+		throw ltl_synthesis_error(std::string("malformed HOA strategy: ")
+			+ (!seen_states ? "no `States:` header" : "no `--BODY--`")
+			+ (seen_end ? "" : " (and no `--END--`)"));
+	(void) seen_end;
+
 	// Propagate state-based acceptance to edges (for Büchi with state marks)
 	for (int s = 0; s < aut.num_states; ++s)
 		for (auto& e : aut.edges[s])
@@ -354,98 +463,114 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 	return aut;
 }
 
-// ── DPA extraction — Algorithm D Phase 1 ─────────────────────────────────────
+// ── Algorithm D: ltlsynt → parity game ───────────────────────────────────────
+//
+// Declared in algorithm_d_game.h and defined here so it can use the same
+// tempfile + posix_spawn mechanism `call_ltlsynt` uses (LS-10).
+//
+// It used to be popen + an inline `--formula="…"` with hand-rolled escaping of
+// only `" \ $ \``.  That is the exact pattern `call_ltlsynt` retired: a single
+// argument is capped at the Linux MAX_ARG_STRLEN of 131072, so a grown φ*
+// (Algorithm B with many constants, or the semantic-PWR fallback) hits E2BIG
+// and comes back as an empty game — which every caller reads as
+// "unrealizable".  `-F path` has no such cap and needs no escaping at all.
 
-inline std::string call_ltl2tgba_dpa(const std::string& ltl_formula) {
-	// Use posix_spawnp + argv vector so the formula is passed verbatim
-	// (no shell escaping; no MAX_ARG_STRLEN cap on a single quoted arg).
-	int timeout_sec = 60;
-	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
-		timeout_sec = std::atoi(env_sec);
-		if (timeout_sec < 0) timeout_sec = 0;
-	}
-	std::vector<std::string> argv = {
-	    "ltl2tgba", "--parity=min even", "-D", "--complete", "-f", ltl_formula
+namespace alg_d {
+
+inline const SynthGame& call_ltlsynt_game(
+	const std::string& phi_prop,
+	const std::vector<std::string>& ins,
+	const std::vector<std::string>& outs)
+{
+	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
+	// TT2-13 / LG-27: a bounded_cache in runtime-bound mode (`set
+	// cachebound`, 0 = unbounded, FIFO eviction) instead of the previous
+	// unbounded unordered_map of full SynthGame copies — this cache holds
+	// no trefs, so the tree GC never pruned it and the bound is its only
+	// control. The returned reference is valid until a later call inserts
+	// (and possibly evicts); callers copy on assignment.
+	auto csv = [](const std::vector<std::string>& v) {
+		std::string r;
+		for (size_t i = 0; i < v.size(); ++i) { if (i) r += ","; r += v[i]; }
+		return r;
 	};
-	auto [out, _rc] = spawn_capture(argv, timeout_sec);
-	return out;
-}
+	static bounded_cache<std::string, SynthGame> cache{&cache_bound};
+	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
+	// name, so the concatenation is injective.
+	const std::string key =
+		phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
 
-inline DpaAutomaton parse_dpa_hoa(const std::string& hoa_text) {
-	DpaAutomaton dpa;
-	std::istringstream ss(hoa_text);
-	std::string line;
-	bool in_body = false;
-	int cur_state = -1;
+	// Configurable timeout (same env var as call_ltlsynt).
+	int timeout_sec = ltl_timeout_sec();
 
-	while (std::getline(ss, line)) {
-		if (line.empty() || line == "--END--") continue;
-		if (line == "--BODY--") { in_body = true; continue; }
-
-		if (!in_body) {
-			if (line.substr(0, 7) == "States:") {
-				dpa.num_states = std::stoi(line.substr(7));
-				dpa.edges.resize(dpa.num_states);
-			} else if (line.substr(0, 6) == "Start:") {
-				dpa.initial_state = std::stoi(line.substr(6));
-			} else if (line.substr(0, 3) == "AP:") {
-				std::istringstream apl(line.substr(3));
-				int n; apl >> n;
-				for (int i = 0; i < n; ++i) {
-					std::string ap; apl >> ap;
-					if (ap.size() >= 2 && ap.front() == '"' && ap.back() == '"')
-						ap = ap.substr(1, ap.size() - 2);
-					dpa.aps.push_back(ap);
-				}
-			} else if (line.substr(0, 11) == "acc-name: p") {
-				// "acc-name: parity min even N" — extract N
-				std::istringstream al(line);
-				std::string tok;
-				int cnt = 0;
-				while (al >> tok) {
-					++cnt;
-					if (cnt == 5) { // field after "parity min even"
-						try { dpa.num_colors = std::stoi(tok); }
-						catch (...) { LOG_ERROR << "HOA: failed to parse num_colors"; }
-					}
-				}
-				dpa.min_even = (line.find("even") != std::string::npos);
-			} else if (line.substr(0, 11) == "Acceptance:") {
-				// Extract color count from "Acceptance: N ..."
-				std::istringstream al(line.substr(11));
-				al >> dpa.num_colors;
-			}
-			continue;
-		}
-
-		if (line.substr(0, 6) == "State:") {
-			std::istringstream sl(line.substr(6));
-			sl >> cur_state;
-			continue;
-		}
-		if (cur_state < 0 || line.front() != '[') continue;
-
-		size_t rb = line.find(']');
-		if (rb == std::string::npos) continue;
-		std::string guard = line.substr(1, rb - 1);
-		std::istringstream tl(line.substr(rb + 1));
-		int dst;
-		if (!(tl >> dst)) continue;
-
-		DpaEdge e;
-		e.guard_label = guard;
-		e.dst = dst;
-		// Look for acceptance mark {N}
-		std::string rest; tl >> rest;
-		if (!rest.empty() && rest.front() == '{') {
-			try {
-				e.color = std::stoi(rest.substr(1));
-			} catch (...) { LOG_ERROR << "HOA: failed to parse edge color"; }
-		}
-		dpa.edges[cur_state].push_back(e);
+	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
+	if (tmpfile_path.empty()) {
+		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
+		static const SynthGame empty_game{};
+		return empty_game;  // transient — don't cache
 	}
 
-	return dpa;
+	// §14 / Batch O7: --polarity=no.  ltlsynt's polarity optimization
+	// substitutes output APs of constant polarity with their favorable
+	// value BEFORE building the game, so `--print-game-hoa` for
+	// `d_0 U d_1` came back as a 2-state acceptance-"all" machine whose
+	// single sys edge is `[0&1]` — the propositional strategy, with every
+	// alternative discarded.  Algorithm D re-solves the game under DATA
+	// feasibility, where a discarded alternative (set d_1 alone) may be
+	// the only feasible one; the reduced machine then reads as a sys dead
+	// end and textbook dead-end semantics flips a realizable spec
+	// (ALG-D-28).  With --polarity=no ltlsynt emits the genuine arena
+	// (all sys alternatives, real acceptance), which is what a re-solver
+	// needs.
+	std::vector<std::string> argv = {
+	    "ltlsynt", "-F", tmpfile_path,
+	    // --decompose=no: a decomposed spec prints one game per part, and
+	    // the product game needs a single game carrying every d_i (see
+	    // parse_synth_game_hoa's decomposed-game refusal).
+	    "--polarity=no", "--decompose=no", "--print-game-hoa"};
+	if (!ins.empty())  argv.push_back("--ins="  + csv(ins));
+	if (!outs.empty()) argv.push_back("--outs=" + csv(outs));
+
+	auto [hoa, exit_code] = spawn_capture(argv, timeout_sec);
+	std::remove(tmpfile_path.c_str());
+
+	// SY-R1: a timeout, a missing binary or a usage error used to come
+	// back as the EMPTY game, which every caller (Algorithm D, the
+	// semantic-PWR fallback) reads as a definitive UNREALIZABLE. Classify
+	// like call_ltlsynt and throw: no verdict is not a verdict. Nothing
+	// transient is cached.
+	switch (classify_spot_exit(exit_code, hoa)) {
+	case spot_exit_kind::not_found:
+		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
+		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
+		throw ltl_synthesis_error("ltlsynt not found on PATH; install "
+			"Spot (>= 2.10) -- the parity game could not be built");
+	case spot_exit_kind::failed: {
+		std::string msg = "ltlsynt --print-game-hoa produced no game "
+			"(exit " + std::to_string(exit_code) + ")";
+		if (exit_code == 143)
+			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
+			     + std::to_string(timeout_sec) + "s)";
+		LOG_ERROR << "[ltl_aba] " << msg << "\n";
+		throw ltl_synthesis_error(msg);
+	}
+	case spot_exit_kind::ok:
+		break;
+	}
+	// Insert-then-return-reference: the freshly inserted entry is the
+	// newest in FIFO order, so an eviction triggered by this insert can
+	// only remove OLDER entries (bound >= 1) — the reference is safe.
+	auto [it, inserted] = cache.emplace(key, parse_synth_game_hoa(hoa));
+	(void) inserted;  // the find above missed, so this always inserts
+	return it->second;
 }
+
+} // namespace alg_d
+
+// (SY-R2: the "Algorithm D Phase 1" pair call_ltl2tgba_dpa / parse_dpa_hoa
+// was deleted -- zero production callers, superseded by the game-HOA path in
+// alg_d::call_ltlsynt_game / parse_synth_game_hoa, and it had missed the
+// LT-10 hardening.)
 
 } // namespace idni::tau_lang

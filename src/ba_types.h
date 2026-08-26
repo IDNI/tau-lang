@@ -132,6 +132,15 @@ struct ba_types {
 	/** @brief Return the string name for @p ba_type_id. */
 	static std::string name(size_t ba_type_id);
 
+	/**
+	 * @brief Number of registered ba_type ids (valid ids are `[0, count())`).
+	 *
+	 * `type_tree()` and `name()` throw for anything at or past this bound, so
+	 * code that scans the registry must consult it rather than probing for a
+	 * sentinel name.
+	 */
+	static size_t count();
+
 	/** @brief Print the type name for @p ba_type to @p os. */
 	static std::ostream& print(std::ostream& os, size_t ba_type);
 
@@ -164,6 +173,10 @@ tref get_ba_type_tree(size_t ba_type_id);
 /** @brief Return the string name for @p ba_type_id. */
 template <NodeType node>
 std::string get_ba_type_name(size_t ba_type_id);
+
+/** @brief Number of registered ba_type ids; valid ids are `[0, count())`. */
+template <NodeType node>
+size_t get_ba_type_count();
 
 /** @brief Return `true` if @p t1 and @p t2 represent the same BA type. */
 template <NodeType node>

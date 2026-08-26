@@ -59,7 +59,9 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n,
 		type_ids.insert_or_assign(root, merged_tid.value());
 		return merged_tid.value();
 	}
-	type_ids.insert_or_assign(element, tid);
+	// LS-5: store under the ROOT -- type_id_of looks the root up, so a
+	// type attached to a non-root member would be silently invisible.
+	type_ids.insert_or_assign(root, tid);
 	return tid;
 }
 
@@ -98,11 +100,12 @@ subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_reso
 	subtree_map<node, typename type_scoped_resolver<node>::type_id> current_types;
 	auto current_scope = scoped.scopes.back();
 	DBG(LOG_TRACE << "type_scoped_resolver/current_types/current_scope: " << current_scope << "\n";)
-	for(auto [scoped, _] : scoped.uf)
-		if (scoped.first == current_scope) {
-			current_types[scoped.second] = type_id_of(scoped.second);
-			DBG(LOG_TRACE << "\t" << LOG_FM_DUMP(scoped.second)
-				<< " : " << ba_types<node>::name(current_types[scoped.second]) << "\n";)
+	for(auto [scoped_var, _] : scoped.uf)
+		if (scoped_var.first == current_scope) {
+			current_types[scoped_var.second] =
+				type_id_of(scoped_var.second);
+			DBG(LOG_TRACE << "\t" << LOG_FM_DUMP(scoped_var.second)
+				<< " : " << ba_types<node>::name(current_types[scoped_var.second]) << "\n";)
 		}
 	return current_types;
 }
@@ -215,7 +218,7 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			if (!unified) return inference_error{typeable, type, inferred_type};
+			if (!unified) return inference_error{typeable, inferred_type, type};
 			else inferred_type = unified.value();
 			scoped.insert(typeable);
 		}
@@ -232,13 +235,16 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			if (!unified) return inference_error{t, type, inferred_type};
+			if (!unified) return inference_error{t, inferred_type, type};
 			else inferred_type = unified.value();
-			scoped[t] = default_type;
+			// LS-4 (TY-4): store the INFERRED type like the map
+			// variant does -- default_type discarded the more
+			// specific unification result.
+			scoped[t] = inferred_type;
 		}
 	}
 	resolver.open(scoped);
-	return default_type;
+	return inferred_type;
 }
 
 template<NodeType node>

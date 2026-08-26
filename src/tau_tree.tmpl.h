@@ -48,6 +48,15 @@ trefs get_cnf_bf_clauses(tref n);
  * temporal quantifiers, a path is the conjunction of temporally quantified formulas.
  * In other words, disjunctions underneath a temporal quantifier are not taken
  * into account.
+ *
+ * Preconditions and contracts (TT2-20):
+ * - For terms, `bf_xor` is treated as an or-fork: an xor's operands are
+ *   enumerated as if they were disjuncts, and "removing" a path keeps only
+ *   the other operand. This is sound only for the DNF-ish normal forms the
+ *   consumers (solver, splitter, satisfiability, normalizer) feed it -- do
+ *   not hand it arbitrary formulas.
+ * - `apply(transform, callback)` invokes `callback(nullptr)` once on its
+ *   first iteration before any path result exists.
  * @tparam node Tree node class
  */
 template <NodeType node>
@@ -264,18 +273,25 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		return n.ba_type;
 	};
 	if (!base_t::use_hooks) return get_raw(v, ch, len, r);
-	// get with hooks
-	get_hook<node> hook;
-	// set hook first if not hooked
+	// get with hooks: set hook first if not hooked. Construct the
+	// (stateless) get_hook inside the lambda -- the stored std::function
+	// outlives this call, so capturing a local by reference would dangle
+	// (TT1-7).
 	if (!base_t::is_hooked()) base_t::set_hook(
-		[&hook](const node& v, const tref* ch, size_t len, tref r) {
-			return hook(v, ch, len, r);
+		[](const node& v, const tref* ch, size_t len, tref r) {
+			return get_hook<node>{}(v, ch, len, r);
 		});
-	// We only propagate the type information up
-	// Do not propagate bool type as it is reserved for predicate definitions
-	// Use literal 4 instead of bool_type_id<node>() to avoid infinite recursion
-	// (bool_type_id calls this get method, creating a circular dependency)
-	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args && v.nt != fp_fallback) {
+	// We only propagate the type information up.
+	// NOTE (TT1-2): an earlier guard here, `v.ba_type != 4`, claimed to stop
+	// bool-type propagation ("reserved for predicate definitions") but 4 is
+	// qint's pre-registered id, not bool's (bool is registered lazily and
+	// gets an id >= 7), and the clause was a provable no-op anyway: with
+	// v.ba_type nonzero, get_type returns it unchanged and ba_retype is the
+	// identity. It was removed rather than "fixed" because suppressing
+	// bool-child propagation would need bool_type_id here, which calls back
+	// into this get() — a circular dependency; if that intent is ever
+	// implemented it needs a lazily-cached id looked up outside this path.
+	if (v.nt != wff && v.nt != ref_args && v.nt != fp_fallback) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}
@@ -472,6 +488,11 @@ tref tree<node>::get_ba_constant_from_source(
 	tref r = get_ba_constant(ba_constants<node>::get(
 					dict(constant_source_sid),
 					ba_types<node>::type_tree(ba_type_id)));
+	// (A 2026-08-18 REVIEW note here blamed lazy provider init for
+	// order-dependent constant-parse failures in test packs; the real
+	// cause was the Bool-pack test harness's get() specialization
+	// ignoring the requested type — fixed in tests/test_Bool_helpers.h,
+	// 2026-08-19. Nothing is wrong at this call site.)
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
 		<< ba_types<node>::name(ba_type_id) << "` (valid: "
@@ -831,7 +852,13 @@ tref tree<node>::untype(tref term) {
 	trefs ch;
 	for (auto c : n.get_children())
 		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
-	auto retyped = n.value.ba_retype(untyped_type_id<node>());
+	// A ba_constant keeps its type: its data field is always a BA
+	// constants pool index (node::hashit reads the pool unconditionally
+	// since 509fbb37), and constants of different types are distinct
+	// values anyway, so there is nothing to erase -- clearing the type
+	// would only detach the node from its algebra.
+	auto retyped = n.is(tau::ba_constant) ? n.value
+		: n.value.ba_retype(untyped_type_id<node>());
 	return ch.empty() ? tau::get(retyped) : tau::get(retyped, ch);
 }
 
@@ -856,132 +883,9 @@ tref tree<node>::substitute(const auto& changes) const {
 	} else return this->replace(changes);
 }
 
-template <NodeType node>
-std::function<bool(const tref&)> or_predicate(
-	const std::function<bool(const tref&)>* query, size_t count)
-{
-	return [query, count](const tref& t) {
-		for (size_t i = 0; i < count; ++i) if (query[i](t)) return true;
-		return false;
-	};
-}
-
-template <NodeType node>
-std::vector<trefs> select_by_predicates(
-	const trefs refs,
-	const std::function<bool(const tref&)>* queries,
-	const size_t count)
-{
-	std::vector<trefs> result(count);
-	for (const tref& r : refs)
-		for (size_t i = 0; i < count; ++i)
-			if (queries[i](r)) result[i].push_back(r);
-	return result;
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_by_predicates(
-	const std::function<bool(const tref&)>* queries,
-	const size_t count) const
-{
-	auto refs = this->select_top(or_predicate<node>(queries, count));
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_top(or_predicate<node>(queries.begin(), queries.size()));
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_top(or_predicate<node>(queries.data(), queries.size()));
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_until_by_predicates(
-	const std::function<bool(const tref&)>* queries, const size_t count,
-	const auto& until) const
-{
-	auto refs = select_top_until(or_predicate<node>(queries, count), until);
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_until_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_top_until(or_predicate<node>(queries.begin(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_until_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_top_until(or_predicate<node>(queries.data(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_by_predicates(
-	const std::function<bool(const tref&)>* queries, const size_t count) const
-{
-	auto refs = this->select_all(or_predicate<node>(queries, count));
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_all(or_predicate<node>(queries.begin(), queries.size()));
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_all(or_predicate<node>(queries.data(), queries.size()));
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_until_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count,
-		const auto& until) const
-{
-	auto refs = select_all_until(or_predicate<node>(queries, count), until);
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_until_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_all_until(or_predicate<node>(queries.begin(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_until_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_all_until(
-		or_predicate<node>(queries.data(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
+// (TT1-22: or_predicate/select_by_predicates and the 12
+// select_*_by_predicates member definitions deleted -- zero callers,
+// zero tests; see the note in tau_tree.h.)
 
 template<NodeType node>
 tref untype(tref term) {

@@ -1,9 +1,23 @@
-# This is a sample demo script for the Tau REPL.
-# The character `#` is used to comment the code.
-# You could execute all commands available in the Tau REPL, p.e.
+# A minimal template for a Tau REPL demo script.
+#
+# See demos/README.md for how to run this script, and for the conventions the
+# other demos follow.
+
+# Lines starting with # are comments. They are passed to the REPL, which ignores
+# them, so they appear in the transcript as the demo runs. A line containing a
+# doubled hash is dropped by run.sh instead, which is how to leave a note meant
+# for the reader of the script rather than for the transcript. This line is one:
+## you will not see this line when the demo runs.
+
+# Any REPL command can go in a script. `help` lists them all, and
+# `help <command>` explains one:
 
 version
 
-# Remember to always end the script with the quit command.
+# Remember that a blank line is skipped rather than sent, so a run waiting at its
+# `continue? [Enter]/[q]:` prompt has to be advanced by a non-empty line -- the
+# demos use a `# step` comment for that. See demo_3.1-interpreter_sbf.tau.
+
+# End the script with quit, so the REPL exits instead of waiting for more input.
 
 quit

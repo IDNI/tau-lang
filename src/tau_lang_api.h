@@ -16,10 +16,23 @@
 //   - REALIZABLE  = ∃strategy. ∀env. formula holds on every infinite run.
 //   - UNREALIZABLE = ∀strategy. ∃env. formula fails on some infinite run.
 //   - G (globally/always) uses the existing safety pipeline.
-//   - F, U, R, W, S use the full LTL(ABA) pipeline (Spot + ABA oracle).
+//   - F, U, R, W, S, T use the full LTL(ABA) pipeline (Spot + ABA oracle).
 //
 // Environment variables that affect synthesis:
-//   TAU_LTL_ALG=A|B|D      Select synthesis algorithm (default: heuristic)
+//   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no
+//                          heuristic: unset behaves as B, i.e. Algorithm B is
+//                          gated on and the default ABA-oracle path is used
+//                          when B does not apply.  Only A, B and D are
+//                          recognised; any other value (including "C" and
+//                          "auto") disables every gate, falls through to the
+//                          default path, and is reported with a warning.
+//                          Pure-output qlt formulas take Algorithm A
+//                          unconditionally, whatever this is set to.
+//                          Note (LS-20): an EXPLICIT `B` is not a no-op
+//                          relative to unset -- it additionally enables the
+//                          polarity-complete pairwise constraint pass in
+//                          normalization (unset only defaults the gate in
+//                          the builders).
 //   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60)
 //   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
 //   TAU_LTL_EXPORT_STRATEGY_FILE=<path>  Write strategy HOA to file
@@ -28,8 +41,8 @@
 //
 // Version: 1.0 (2026-04-21)
 
-#ifndef __IDNI__TAU__TAU_LTL_API_H__
-#define __IDNI__TAU__TAU_LTL_API_H__
+#ifndef __IDNI__TAU__TAU_LANG_API_H__
+#define __IDNI__TAU__TAU_LANG_API_H__
 
 // ── Core synthesis API ────────────────────────────────────────────────────────
 
@@ -53,7 +66,7 @@ namespace idni::tau_lang {
 //       bool r = is_tau_formula_sat<node_t>(nso.value().main->get());
 //   }
 //
-// Declared in: normalizer.h (included via tau.h)
+// Declared in: satisfiability.h (included via tau.h)
 // Template parameter: NodeType node — use node_t for the default BA pack.
 
 // ── get_nso_rr ────────────────────────────────────────────────────────────────
@@ -88,4 +101,4 @@ namespace idni::tau_lang {
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__TAU_LTL_API_H__
+#endif // __IDNI__TAU__TAU_LANG_API_H__

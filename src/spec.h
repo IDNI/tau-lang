@@ -17,13 +17,18 @@
 // type for that decomposition, with a helper `decompose_spec` that does
 // the split once.
 //
-// This header is additive: existing code paths continue to use `rr`; new
-// code (Algorithms A/B/C/D, GR(1) detection, etc.) opt in by calling
-// `decompose_spec(main)` to get the three components explicitly.
+// This header is additive: existing code paths continue to use `rr`.
+//
+// NOT YET WIRED into production (GR-N1, same status as gr1_detect.h,
+// liveness_decomp.h and mealy_extract.h): at HEAD the only consumers of
+// `decompose_spec` are unit tests.  The intended consumers (the direct
+// game pipeline, GR(1) detection) would opt in by calling
+// `decompose_spec(main)`; until one does, treat this as staged work.
 
 #ifndef __IDNI__TAU__SPEC_H__
 #define __IDNI__TAU__SPEC_H__
 
+#include "gr1_detect.h"
 #include "ltl_aba.h"
 #include "tau_tree.h"
 
@@ -84,13 +89,22 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			if (!has_ltl_operators<node>(body)) {
 				// Pure-safety G.  Also filter out G(F(...)) = GF pattern:
 				// F inside G is a reactive liveness, not invariant.
+				// RR-10: wff_sometimes is F's canonical spelling
+				// (the normalizer rewrites wff_F to it), so
+				// G(sometimes phi) is the same GF reactive shape.
+				// RR-11: only wff_sometimes can appear here --
+				// the enclosing !has_ltl_operators(body) gate
+				// already guarantees no wff_F exists, so the
+				// old wff_F half of this scan was dead (the
+				// sometimes half became live with RR-10).
+				// GR-4 / GR-R1: A/E/`-phi` nest a path formula
+				// and are not invariants either; the shared
+				// predicate keeps the three classifiers in step.
 				bool has_F = false;
 				tau::get(body).find_top([&](tref n) {
-					const auto& nt_node = tree<node>::get(n);
-					if (nt_node.has_child()
-					    && nt_node[0].value.nt == tau::wff_F) {
+					if (gr1_detect_internal::
+						is_temporal_operator_node<node>(n))
 						has_F = true;
-					}
 					return false;
 				});
 				if (has_F) append(s.reactive);
@@ -100,11 +114,26 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			}
 			return;
 		}
-		if (nt == tau::wff_F || nt == tau::wff_U
+		if (nt == tau::wff_F || nt == tau::wff_sometimes
+		 || nt == tau::wff_U
 		 || nt == tau::wff_R || nt == tau::wff_W
 		 || nt == tau::wff_S || nt == tau::wff_T
 		 || nt == tau::wff_A || nt == tau::wff_E
 		 || nt == tau::wff_semantic_neg) {
+			// RR-10: wff_sometimes included -- a top-level
+			// `sometimes phi` is a liveness obligation, not
+			// transient.
+			append(s.reactive);
+			return;
+		}
+		// GR-N2: a compound conjunct with temporal content below a
+		// Boolean top node — `F(a) || G(b)`, `!G(a)`, `G(a) -> F(b)` —
+		// used to fall through to the transient default and be filed
+		// as an initial-only constraint. Any temporal operator
+		// anywhere inside makes it a temporal obligation: reactive.
+		// (Shared predicate: the same one gr1_detect and the two
+		// other classifiers use.)
+		if (!gr1_detect_internal::is_non_temporal<node>(fm)) {
 			append(s.reactive);
 			return;
 		}

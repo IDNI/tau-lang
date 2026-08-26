@@ -94,6 +94,22 @@ template <NodeType node> tref build_wff_and(tref l, tref r);
 template <NodeType node> tref build_wff_and(const auto& wffs);
 /** @brief Build `! n`. */
 template <NodeType node> tref build_wff_neg(tref n);
+// LTL(ABA) operator wrappers (TT2-16: previously defined in the tmpl with
+// no header declaration).
+/** @brief Build `F n` — finally/eventually. */
+template <NodeType node> tref build_wff_F(tref n);
+/** @brief Build `l U r` — strong until. */
+template <NodeType node> tref build_wff_U(tref l, tref r);
+/** @brief Build `l R r` — release. */
+template <NodeType node> tref build_wff_R(tref l, tref r);
+/** @brief Build `l W r` — weak until. */
+template <NodeType node> tref build_wff_W(tref l, tref r);
+/** @brief Build `l S r` — since (past). */
+template <NodeType node> tref build_wff_S(tref l, tref r);
+/** @brief Build `l T r` — trigger (past dual of S). */
+template <NodeType node> tref build_wff_T(tref l, tref r);
+/** @brief Largest canonical quantifier id in @p fm (0 when none). */
+template <NodeType node> int_t find_biggest_quant_id(tref fm);
 
 // ---------------------------------------------------------------------------
 // Constraint builders
@@ -280,12 +296,16 @@ template <NodeType node> tref build_spec(const rr<node>& nso_rr);
 template<NodeType node> tref build_sym(size_t sid);
 /** @brief Build a symbol node from @p sym_name. */
 template<NodeType node> tref build_sym(const std::string& sym_name);
-/** @brief Build a ref-offsets node from @p offsets vector. */
-template<NodeType node> tref build_ref_offsets(const trefs& offsets);
-/** @brief Build a ref-offsets node from @p offset string. */
-template<NodeType node> tref build_ref_offsets(const std::string& offset);
-/** @brief Build a ref-offsets node from @p offsets string vector. */
-template<NodeType node> tref build_ref_offsets(const std::vector<std::string>& offsets);
+/** @brief Build an offsets node from @p offsets vector. */
+template<NodeType node> tref build_offsets(const trefs& offsets);
+/** @brief Build an offsets node from @p offset string. */
+template<NodeType node> tref build_offsets(const std::string& offset);
+/** @brief Build an offsets node from @p offsets string vector. */
+template<NodeType node> tref build_offsets(const std::vector<std::string>& offsets);
+/** @brief Build a shift node `var[t-shift]` from @p var and @p shift. */
+template<NodeType node> tref build_shift(tref var, size_t shift);
+/** @brief Build a shift node from a variable named @p var_name of @p type_id. */
+template<NodeType node> tref build_shift(std::string var_name, size_t type_id, size_t shift);
 /** @brief Build a `ref_args` node from @p args. */
 template<NodeType node> tref build_ref_args(const trefs& args);
 /** @brief Build a `ref_args` node from @p arg_names with type @p type_id. */

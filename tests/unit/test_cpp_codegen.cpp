@@ -79,3 +79,108 @@ TEST_SUITE("cpp_codegen") {
 		CHECK(s.find("case State::q2") != std::string::npos);
 	}
 }
+
+// ── LG-4: disjunctive / parenthesised HOA guards ─────────────────────────────
+//
+// Every emitter tokenised the guard label by top-level '&' and then read each
+// conjunct with `for (char c : idx_str) if (isdigit(c)) idx = idx*10+(c-'0')`.
+// That loop SKIPS '|', '(' and ')' instead of rejecting them, so:
+//   "0|1"   → the digits are concatenated across the '|' → the single literal
+//             (1, true): wrong AP, and the other disjunct vanishes;
+//   "(0|1)" → the leading '(' fails the isdigit test and the whole conjunct is
+//             dropped, silently widening the guard to `true`.
+// Spot prints strategy edge labels as sums of products, so both shapes are
+// real.  The assertions below are on the EMITTED TEXT, so they survive any
+// choice of internal representation.
+
+TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
+
+	// aps: 0 = input i0, 1 = input i1, 2 = output o.
+	static HoaAutomaton two_input_one_output(const char* guard) {
+		HoaAutomaton a;
+		a.num_states = 1;
+		a.initial_state = 0;
+		a.aps = {"i0", "i1", "o"};
+		a.edges.resize(1);
+		a.edges[0].push_back(HoaEdge{guard, 0, false});
+		a.state_accepting = {false};
+		return a;
+	}
+
+	// "0|1" fires on EITHER input.  The digit-concatenating scan reads it as
+	// AP 1 alone, so the emitted dispatch never mentions i0.
+	TEST_CASE("[LG4-01] disjunctive guard keeps both disjuncts") {
+		auto a = two_input_one_output("0|1");
+		std::ostringstream os;
+		emit_cpp_program_prop(a, {"i0", "i1"}, {"o"}, os, "Disj");
+		std::string s = os.str();
+		CHECK(s.find("in.i_i0") != std::string::npos);
+		CHECK(s.find("in.i_i1") != std::string::npos);
+	}
+
+	// "(0|1)&2" assigns the output and gates on either input.  The '(' makes
+	// the first conjunct disappear, so the emitted guard becomes `true` — the
+	// generated program reacts to inputs it was never supposed to react to.
+	TEST_CASE("[LG4-02] parenthesised conjunct is not dropped") {
+		auto a = two_input_one_output("(0|1)&2");
+		std::ostringstream os;
+		emit_cpp_program_prop(a, {"i0", "i1"}, {"o"}, os, "ParenDisj");
+		std::string s = os.str();
+		CHECK(s.find("o.o_o = true") != std::string::npos);
+		CHECK(s.find("in.i_i0") != std::string::npos);
+		CHECK(s.find("in.i_i1") != std::string::npos);
+	}
+
+	// Regression guard: flat conjunctions must keep emitting exactly what they
+	// did before the consolidation.
+	TEST_CASE("[LG4-03] flat conjunctive guards unchanged") {
+		auto a = two_input_one_output("0&!1&2");
+		std::ostringstream os;
+		emit_cpp_program_prop(a, {"i0", "i1"}, {"o"}, os, "Flat");
+		std::string s = os.str();
+		CHECK(s.find("in.i_i0") != std::string::npos);
+		CHECK(s.find("!in.i_i1") != std::string::npos);
+		CHECK(s.find("o.o_o = true") != std::string::npos);
+	}
+
+} // TEST_SUITE("cpp_codegen guard parsing (LG-4)")
+
+
+// ── LG-5: trivially-realizable solutions (num_states == 0) ───────────────────
+//
+// `solve_ltl_aba` returns `num_states = 0` on the constant-output fast path
+// and `is_ltl_aba_realizable` calls that REALIZABLE, so tau_codegen hands the
+// empty automaton straight to the emitters.  The State enum body then comes
+// out empty while `State state_ = State::q0;` still names q0 — the generated
+// header does not compile, and the CLI exits 0 without a word.
+
+TEST_SUITE("cpp_codegen trivial solution (LG-5)") {
+
+	static HoaAutomaton empty_automaton() {
+		HoaAutomaton a;
+		a.num_states = 0;
+		a.initial_state = 0;
+		a.aps = {"i", "o"};
+		a.state_accepting = {};
+		return a;
+	}
+
+	TEST_CASE("[LG5-01] prop emitter does not reference q0 with an empty enum") {
+		auto a = empty_automaton();
+		std::ostringstream os;
+		emit_cpp_program_prop(a, {"i"}, {"o"}, os, "Trivial");
+		std::string s = os.str();
+		CHECK(s.find("State::q0") == std::string::npos);
+		CHECK(s.find("class Trivial {") != std::string::npos);
+		CHECK(s.find("Outputs step(const Inputs&") != std::string::npos);
+	}
+
+	TEST_CASE("[LG5-02] open-prop emitter does not reference q0 either") {
+		auto a = empty_automaton();
+		std::ostringstream os;
+		emit_cpp_program_open_prop(a, {"i"}, {"o"}, {"o"}, os, "TrivialOpen");
+		std::string s = os.str();
+		CHECK(s.find("State::q0") == std::string::npos);
+	}
+
+} // TEST_SUITE("cpp_codegen trivial solution (LG-5)")

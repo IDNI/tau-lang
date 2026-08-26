@@ -294,6 +294,30 @@ std::string llm_query(const std::string& prompt) {
 	return extract_content(response);
 }
 
+// BA1-10: parse a YES/NO oracle reply by word, not by first y/n letter --
+// char scanning made "Answer: YES" hit the 'n' of "Answer" in one polarity
+// order and "cannot say" read as NO in the other. Tokenize on non-alpha and
+// accept only a standalone yes/no word; anything else is a conservative
+// false. One helper, one polarity, all three call sites.
+static bool parse_yes_no(const std::string& ans) {
+	std::string word;
+	auto flush = [&]() -> std::optional<bool> {
+		if (word == "yes") return true;
+		if (word == "no") return false;
+		word.clear();
+		return std::nullopt;
+	};
+	for (char c : ans) {
+		if (std::isalpha(static_cast<unsigned char>(c)))
+			word.push_back(std::tolower(
+				static_cast<unsigned char>(c)));
+		else if (!word.empty())
+			if (auto r = flush(); r) return *r;
+	}
+	if (auto r = flush(); r) return *r;
+	return false;
+}
+
 bool llm_is_empty(const std::string& description) {
 	if (description == "nothing") return true;
 	if (description == "everything") return false;
@@ -314,11 +338,7 @@ bool llm_is_empty(const std::string& description) {
 		+ "' a logical contradiction (always false, impossible)?"
 		  " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
-	bool result = false;
-	for (auto& c : ans) {
-		if (c == 'N' || c == 'n') { result = false; break; }
-		if (c == 'Y' || c == 'y') { result = true;  break; }
-	}
+	bool result = parse_yes_no(ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.is_empty_cache.emplace(description, result).first->second;
 }
@@ -343,11 +363,7 @@ bool llm_is_universal(const std::string& description) {
 		+ "' a tautology (always true, necessarily true in all situations)?"
 		  " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
-	bool result = false;
-	for (auto& c : ans) {
-		if (c == 'Y' || c == 'y') { result = true;  break; }
-		if (c == 'N' || c == 'n') { result = false; break; }
-	}
+	bool result = parse_yes_no(ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.is_universal_cache.emplace(description, result).first->second;
 }
@@ -374,11 +390,7 @@ bool llm_equivalent(const std::string& a, const std::string& b) {
 		+ "' logically equivalent (true in exactly the same situations)?"
 		  " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
-	bool result = false;
-	for (auto& c : ans) {
-		if (c == 'Y' || c == 'y') { result = true;  break; }
-		if (c == 'N' || c == 'n') { result = false; break; }
-	}
+	bool result = parse_yes_no(ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
 	return cache.equivalent_cache.emplace(key_pair, result).first->second;
 }

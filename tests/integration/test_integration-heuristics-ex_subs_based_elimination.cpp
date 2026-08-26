@@ -128,4 +128,29 @@ TEST_SUITE("ex_subs_based_elimination") {
 		CHECK( result != ex_clause );
 		CHECK( !contains<node_t>(result, var) );
 	}
+
+	// The whole-formula driver used to decline any scope holding a wff_or
+	// *anywhere*, so a witness sitting in a plain top-level conjunct was
+	// ignored as soon as some unrelated conjunct was a disjunction -- exactly
+	// the shape nested conditionals produce. The quantifier then survived into
+	// the Boole-decomposition stage, which is exponential in the atom count,
+	// and `run` on such a spec never finished.
+	TEST_CASE("driver: subs applied through a scope holding disjunctions") {
+		tref fm = tau::get("ex x (x = a && (y = 0 || z = 0))", parse_opts_wff);
+		REQUIRE( fm != nullptr );
+		tref result = ex_subs_based_elimination<node_t>(fm);
+		CHECK( result != fm );
+		CHECK( tau::get(result).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	// The complement of the case above: when the only equation for the bound
+	// variable sits *under* a disjunction it is not a witness for the whole
+	// clause, so nothing may be substituted. `preorder`'s traversal stopping
+	// at wff_or is what enforces this, which is why the driver does not need
+	// to test for disjunctions itself.
+	TEST_CASE("driver: no subs when the only equation is under a disjunction") {
+		tref fm = tau::get("ex x ((x = a || x = b) && y = 0)", parse_opts_wff);
+		REQUIRE( fm != nullptr );
+		CHECK( ex_subs_based_elimination<node_t>(fm) == fm );
+	}
 }

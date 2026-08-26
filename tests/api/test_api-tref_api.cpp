@@ -287,6 +287,23 @@ TEST_SUITE("Tau API - tref - using definitions") {
 		CHECK(tau_api::to_str(applied) == "z' = 0");
 		CHECK(!tau_api::contains(applied, tau::ref));
 	}
+	// AP1-4: apply_all_defs used to route through apply_defs({}), which
+	// never consulted the global definitions store -- a ref whose
+	// definition was registered via get_definition() survived unexpanded
+	// into every downstream pipeline (dnf/cnf/nnf/solve/lgrs).
+	TEST_CASE_FIXTURE(api_fixture,
+			"apply_all_defs expands globally registered defs") {
+		REQUIRE(tau_api::get_definition(
+			"apply_all_defs_glob(x) := x'"));
+		tref expr = tau_api::get_formula(
+			"apply_all_defs_glob(z) = 0");
+		REQUIRE(expr);
+		CHECK(tau_api::contains(expr, tau::ref));
+		tref applied = tau_api::apply_all_defs(expr);
+		REQUIRE(applied);
+		CHECK(!tau_api::contains(applied, tau::ref));
+		CHECK(tau_api::to_str(applied) == "z' = 0");
+	}
 }
 
 TEST_SUITE("Tau API - tref - printing") {
@@ -506,19 +523,22 @@ TEST_SUITE("Tau API - tref - solving") {
 		CHECK(!solution.value().empty());
 	}
 	TEST_CASE_FIXTURE(api_fixture, "lgrs") {
-		// NOTE: as of this writing, tau_api::lgrs(tref) aborts (assertion
-		// failure in tree<node>::child_tree, hit inside its internal
-		// norm_all_equations()/apply_all_xor_def() preprocessing) for
-		// every non-null equation tried here -- reproducible directly via
-		// the REPL's `lgrs` command too (e.g. `tau -e "lgrs x = y"`),
-		// independent of this test change. That is a pre-existing bug in
-		// src/ and out of scope for a tests-only change, so only the
-		// documented graceful-failure path is exercised here; the
-		// underlying `subtree_map` solving machinery itself is already
-		// covered by the "solve" test above and by the "lgrs" test suite
-		// in tests/integration/test_integration-solver.cpp (which calls
-		// the free `lgrs<node>()` function directly, bypassing this
-		// wrapper).
+		// FIXED (issue-60): this used to abort for every non-null
+		// equation. The abort was src/api.tmpl.h's non-Boolean screen
+		//     tau::get(eq)[0] ... tau::get(eq)[1]
+		// where `eq` is the whole wff. For a single equality that wff has
+		// exactly ONE child, so [1] was null and operator[] ->
+		// child_tree() tripped assert(c != nullptr)
+		// (src/tau_tree.tmpl.h:579). The line above had already extracted
+		// the equality into `equality`, whose two children are the sides
+		// meant to be checked; the screen now indexes that instead.
+		tref eq = tau_api::get_formula("x | y = 0");
+		REQUIRE(eq);
+		auto solution = tau_api::lgrs(eq);
+		REQUIRE(solution.has_value());
+		CHECK(!solution.value().empty());
+	}
+	TEST_CASE_FIXTURE(api_fixture, "lgrs rejects a null tref") {
 		auto solution = tau_api::lgrs(static_cast<tref>(nullptr));
 		CHECK(!solution.has_value());
 	}
@@ -584,5 +604,25 @@ TEST_SUITE("Tau API - htref - null guards (AP-2)") {
 		CHECK(tau_api::substitute(htref{}, x, x) == nullptr);
 		CHECK(tau_api::substitute(x, htref{}, x) == nullptr);
 		CHECK(tau_api::substitute(x, x, htref{}) == nullptr);
+	}
+}
+
+// AP1-30 + AP1-31(a): direct add_definition and get_stream_def edge coverage.
+TEST_SUITE("Tau API - tref - definition/stream edges") {
+	TEST_CASE_FIXTURE(api_fixture, "add_definition: null args return 0, "
+			"first real id is 1-based") {
+		CHECK( tau_api::add_definition(nullptr, nullptr) == 0 );
+		tref def = tau_api::get_definition("ap130_f(x) := x'");
+		REQUIRE( def );
+		// AP1-6: a registered definition's id is always > 0
+		size_t id = tau_api::add_definition(
+			tau::get(def).first(), tau::get(def).second());
+		CHECK( id > 0 );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "get_stream_def: malformed input "
+			"returns nullptr (AP1-2 pinned)") {
+		CHECK( tau_api::get_stream_def("not a stream def") == nullptr );
+		CHECK( tau_api::get_stream_def("") == nullptr );
 	}
 }

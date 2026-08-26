@@ -41,13 +41,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	// get tau tree node ref from parse tree node ref
 	auto m_ref = [&m](tref t) { return m.at(t); };
 	// get tau tree node instance from parse tree node ref
-	auto m_get = [&m](tref t) { return get(m.at(t)); };
+	// Explicit return type: deduction would decay the reference to a
+	// by-value tree copy, and `.get()` on a copy interns a pointer to a
+	// stack temporary (TT1-5).
+	auto m_get = [&m](tref t) -> const tree<node>& { return get(m.at(t)); };
 
 	bool error = false;
-
-	std::map<size_t, tref> named_constants; // dict named constant names
-	for (auto& [cn, c] : options.named_constants)
-		named_constants[dict(cn)] = c;
 
 	auto transformer = [&](tref t, [[maybe_unused]] tref parent) {
 		// DBG(LOG_TRACE << " -- transforming: "
@@ -161,11 +160,41 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 
 		switch (nt) {
 			// tau tree terminals
-			case digits: // preprocess digits
-				// TODO: ??? check if number fits into data bitsize, if not, create an ext node
-				// maybe only if --ext_nodes option is used?
-				x = getx_data(std::stoul(ptr.get_terminals()));
+			case digits: { // preprocess digits
+				// TODO: ??? if the number does not fit into the
+				// data bitsize, create an ext node instead of
+				// failing. Maybe only if --ext_nodes is used?
+				//
+				// Two ways a literal can go wrong here, both of
+				// which used to be silent or fatal:
+				//  - above 2^64-1 std::stoul throws
+				//    std::out_of_range, and nothing on the parse
+				//    path catches it, so the process terminated;
+				//  - node::data is a bitfield narrower than 64
+				//    bits, so anything above node::data_mask was
+				//    truncated by the node constructor and the
+				//    parse silently continued with a wrong value.
+				// Both are reported as a parse failure.
+				const std::string ds = ptr.get_terminals();
+				size_t value = 0;
+				bool fits = true;
+				try {
+					size_t pos = 0;
+					value = std::stoull(ds, &pos);
+					fits = pos == ds.size();
+				} catch (const std::exception&) { fits = false; }
+				if (!fits || value > node::data_mask) {
+					LOG_ERROR << "Numeric literal `" << ds
+						<< "` is out of range: it must "
+						"not exceed " << node::data_mask;
+					// Keep producing a node so that the rest
+					// of the traversal stays well formed; the
+					// error flag discards the whole tree.
+					error = true, value = 0;
+				}
+				x = getx_data(value);
 				break;
+			}
 
 			case integer: x = getx_data(
 				static_cast<size_t>(process_integer())); break;
@@ -266,54 +295,63 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	DBG(LOG_TRACE << "parse tree: "
 			<< (parse_tree::get(ptr.get()).print_in_line_to_str());)
 
-	auto using_hooks = tau::use_hooks;
-	tau::use_hooks = false;
-	// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
-	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
-	if (error || m.find(ptr.get()) == m.end()) {
-		// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-		return tau::use_hooks = using_hooks, nullptr;
-	}
-	DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
-	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
-	tref transformed = m_ref(ptr.get());
-
-	if (options.infer_ba_types) {
-		auto result = infer_ba_types<node>(transformed,
-			options.global_scope, options.definition_heads,
-			{ .use_defaults = options.use_default_types });
-		transformed = result.first;
-		// If type inference failed
-		if (!transformed) {
-			tau::use_hooks = using_hooks;
-			DBG(if (!transformed) { LOG_TRACE << "inferred is nullptr"; })
+	tref transformed = nullptr;
+	{
+		// Hooks stay off for the whole transformation, and the guard
+		// puts them back on every exit from this scope -- including one
+		// taken by an exception thrown out of the transformer, which
+		// used to leave hooks disabled process-wide. The reget() below
+		// is deliberately outside the scope: it wants hooks back on.
+		use_hooks_guard<node> hooks_off(false);
+		// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
+		post_order<tau_parser::pnode>(ptr.get()).search(transformer);
+		if (error || m.find(ptr.get()) == m.end()) {
+			// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
 			return nullptr;
 		}
-		if (transformed) {
+		DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
+		DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
+		transformed = m_ref(ptr.get());
+
+		if (options.infer_ba_types) {
+			auto result = infer_ba_types<node>(transformed,
+				options.global_scope, options.definition_heads,
+				{ .use_defaults = options.use_default_types });
+			transformed = result.first;
+			// If type inference failed
+			if (!transformed) {
+				DBG(LOG_TRACE << "inferred is nullptr";)
+				return nullptr;
+			}
 			if (options.context) {
 				options.context->update_types(result.second);
 			}
 			if (options.global_scope)
 				*options.global_scope = std::move(result.second);
 		}
-	}
 
-	// Rewrite G(A && G(B)) → G(A) && G(B) before semantic error check.
-	transformed = unnest_nested_always<node>(transformed);
+		// Rewrite G(A && G(B)) → G(A) && G(B) before semantic error check.
+		transformed = unnest_nested_always<node>(transformed);
 
-	//Check for semantic errors in expression
-	if (has_semantic_error<node>(transformed)) {
-		tau::use_hooks = using_hooks;
-		DBG(LOG_TRACE << "transformed has semantic error";)
-		return nullptr;
+		//Check for semantic errors in expression
+		if (has_semantic_error<node>(transformed)) {
+			DBG(LOG_TRACE << "transformed has semantic error";)
+			return nullptr;
+		}
 	}
-	tau::use_hooks = using_hooks;
 	if (options.reget_with_hooks) transformed = reget(transformed);
 
 #ifdef DEBUG
-	// Check that all term nodes have been typed
+	// Check that all term nodes have been typed. NOTE (TT1-18): unqualified
+	// lookup here resolves to the WIDE member tree::is_term_nt, not the
+	// narrow namespace-scope free function -- and that is load-bearing:
+	// qualifying the call to the narrow set makes the assert fire on
+	// ordinary qlt parses (e.g. `always o1[t] > {0}:qlt`), because atoms
+	// the narrow set classifies as terms are legitimately still untyped at
+	// this stage. The invariant actually enforced is the member set's.
 	auto check = [](tref n) {
-		if (is_term_nt(tau::get(n).value.nt) && !tau::get(n).is(tau::capture)) {
+		if (is_term_nt(tau::get(n).value.nt)
+			&& !tau::get(n).is(tau::capture)) {
 			if (tau::get(n).get_ba_type() == 0) {
 				LOG_DEBUG << "Untyped term node: " << tau::get(n).tree_to_str();
 				assert(false);

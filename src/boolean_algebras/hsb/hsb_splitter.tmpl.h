@@ -263,7 +263,12 @@ inline tref simplify_hsb_symbol(tref sym) { return sym; }
 inline tref simplify_hsb_term(tref t) { return t; }
 
 /**
- * @brief Returns a proper sub-element y with `bot < y < x`.
+ * @brief Returns a sub-element y with `bot < y < x` when one is found.
+ *
+ * BA1-5 contract note: @p st is ignored, and when no LRA split is found
+ * the input @p x is returned UNCHANGED -- callers looping "split until
+ * proper subset" must guard against a fixpoint (sbf_splitter, by
+ * contrast, always makes progress).
  */
 inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 	auto k = x.root_kind();

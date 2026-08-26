@@ -13,6 +13,15 @@
 #   -o, --output-dir DIR  Root output directory
 #                         (default: ./tests/benchmark/data)
 #   -t, --timeout SECS    Kill fixture after SECS seconds (default: unlimited)
+#   -T, --overall-timeout SECS
+#                         Overall wall-clock budget for the whole run. Each
+#                         fixture is allowed max(-t, remaining_budget /
+#                         remaining_fixtures) seconds, so time saved by fast
+#                         fixtures is redistributed to the ones after them.
+#                         Fixtures still pending when the budget is exhausted
+#                         are skipped and recorded with kill_reason "budget".
+#                         (default: unlimited)
+#   -j, --jobs N          Run N fixtures in parallel (default: 1)
 #   -m, --memory MB       Kill fixture if RSS exceeds MB megabytes (default: unlimited)
 #   -h, --help            Show this help and exit
 
@@ -28,8 +37,18 @@ TAU_BUILD_DIR="${TAU_BUILD_DIR:-$REPO_ROOT/build-Release}"
 FIXTURE_DIR="${FIXTURE_DIR:-$REPO_ROOT/tests/benchmark/fixtures}"
 DATA_ROOT="${DATA_ROOT:-$REPO_ROOT/tests/benchmark/data}"
 PROFILE_NAME=""
-TIMEOUT_SECS=""  # empty = no limit
-MEMORY_MB=""    # empty = no limit
+TIMEOUT_SECS=""          # empty = no limit
+OVERALL_TIMEOUT_SECS=""  # empty = no overall budget
+MEMORY_MB=""             # empty = no limit
+PARALLEL_JOBS=1          # number of fixtures to run concurrently
+
+# require_positive_int <option> <value>  — abort unless value is an integer >= 1
+require_positive_int() {
+    if [[ ! "$2" =~ ^[0-9]+$ ]] || (( $2 < 1 )); then
+        echo "ERROR: $1 expects a positive integer, got: $2" >&2
+        exit 1
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -39,8 +58,16 @@ while [[ $# -gt 0 ]]; do
         -b|--build-dir)  TAU_BUILD_DIR="$2"; shift 2 ;;
         -f|--fixtures)   FIXTURE_DIR="$2";   shift 2 ;;
         -o|--output-dir) DATA_ROOT="$2";     shift 2 ;;
-        -t|--timeout)    TIMEOUT_SECS="$2";  shift 2 ;;
+        -t|--timeout)
+            require_positive_int "$1" "${2:-}"
+            TIMEOUT_SECS="$2"; shift 2 ;;
+        -T|--T|--overall-timeout)
+            require_positive_int "$1" "${2:-}"
+            OVERALL_TIMEOUT_SECS="$2"; shift 2 ;;
         -m|--memory)     MEMORY_MB="$2";     shift 2 ;;
+        -j|--jobs)
+            require_positive_int "$1" "${2:-}"
+            PARALLEL_JOBS="$2"; shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^$/p' "$0"
             exit 0
@@ -111,7 +138,9 @@ echo "  commit   : $COMMIT_HASH"
 echo "  fixtures : $FIXTURE_DIR"
 echo "  output   : $OUTPUT_DIR"
 echo "  timeout  : ${TIMEOUT_SECS:-unlimited} s"
+echo "  overall  : ${OVERALL_TIMEOUT_SECS:-unlimited} s"
 echo "  memory   : ${MEMORY_MB:-unlimited} MB"
+echo "  parallel : $PARALLEL_JOBS job(s)"
 echo "============================================================"
 
 # ---------------------------------------------------------------------------
@@ -250,10 +279,12 @@ parse_time_to_json() {
     local fixture_name="$2"
     local exit_status="$3"
     local out_file="$4"
-    local kill_reason="${5:-none}"   # "timeout", "memory", or "none"
+    local kill_reason="${5:-none}"   # "timeout", "memory", "budget", or "none"
+    local timeout_s="${6:-null}"     # effective timeout applied, or "null"
 
     # Extract fields with awk — GNU time -v format is stable
-    awk -v fixture="$fixture_name" -v exitcode="$exit_status" -v kill_reason="$kill_reason" '
+    awk -v fixture="$fixture_name" -v exitcode="$exit_status" \
+        -v kill_reason="$kill_reason" -v timeout_s="$timeout_s" '
     function strip(s,    r) {
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
         return s
@@ -284,6 +315,7 @@ parse_time_to_json() {
         printf "  \"fixture\": \"%s\",\n", fixture
         printf "  \"exit_status\": %s,\n", exitcode
         printf "  \"kill_reason\": \"%s\",\n", kill_reason
+        printf "  \"timeout_s\": %s,\n", timeout_s
         printf "  \"user_time_s\": %s,\n", (user_time  != "" ? user_time  : "null")
         printf "  \"system_time_s\": %s,\n", (sys_time   != "" ? sys_time   : "null")
         printf "  \"elapsed_wall_s\": %s,\n", elapsed_s
@@ -303,73 +335,93 @@ parse_time_to_json() {
 }
 
 # ---------------------------------------------------------------------------
-# Main — collect system info, then iterate fixtures
+# Emit a result stub for a fixture that was never launched.  Mirrors the key
+# set and order of parse_time_to_json so downstream consumers see a uniform
+# schema whether or not a fixture actually ran.
 # ---------------------------------------------------------------------------
-collect_system_info
+write_skipped_json() {
+    local fixture_name="$1"
+    local out_file="$2"
+    local kill_reason="$3"
 
-echo ""
-echo "Running benchmarks..."
-echo ""
+    cat > "$out_file" <<JSON
+{
+  "fixture": "$(json_escape "$fixture_name")",
+  "exit_status": null,
+  "kill_reason": "$(json_escape "$kill_reason")",
+  "timeout_s": null,
+  "user_time_s": null,
+  "system_time_s": null,
+  "elapsed_wall_s": null,
+  "cpu_percent": null,
+  "max_rss_kb": null,
+  "minor_page_faults": null,
+  "major_page_faults": null,
+  "voluntary_context_switches": null,
+  "involuntary_context_switches": null,
+  "swaps": null,
+  "fs_inputs": null,
+  "fs_outputs": null,
+  "page_size_bytes": null
+}
+JSON
+}
 
-PASS=0
-FAIL=0
-KILL=0
-KILL_TIMEOUT=0
-KILL_MEMORY=0
+# ---------------------------------------------------------------------------
+# run_fixture_job <fixture> <effective_timeout|""> <result_file> <output_file>
+#   Runs one fixture under /usr/bin/time with optional resource monitoring.
+#   Writes  "STATUS\nKILL_REASON\n"  to result_file (STATUS = PASS|FAIL|KILL|SKIP).
+#   Writes  console lines            to output_file.
+#   Intended to be called inside a subshell so it can be backgrounded.
+# ---------------------------------------------------------------------------
+run_fixture_job() {
+    local fixture="$1"
+    local effective_timeout="$2"
+    local result_file="$3"
+    local output_file="$4"
 
-
-# Discover both .tau and .tau_cli fixtures
-shopt -s nullglob
-fixtures=( "$FIXTURE_DIR"/*.tau "$FIXTURE_DIR"/*.tau_cli )
-
-if [[ ${#fixtures[@]} -eq 0 ]]; then
-    echo "WARNING: No .tau or .tau_cli fixtures found in $FIXTURE_DIR" >&2
-    exit 0
-fi
-
-for fixture in "${fixtures[@]}"; do
-    [[ -f "$fixture" ]] || continue
+    local fname stem
     fname=$(basename "$fixture")
-    stem="${fname}"
+    stem="$fname"
 
-    stdout_file="$OUTPUT_DIR/${stem}.out"             # program stdout for reference
-    stderr_file="$OUTPUT_DIR/${stem}.measured.json"   # stderr contains measurements in JSON
-    time_json_file="$OUTPUT_DIR/${stem}.time.json"    # /usr/bin/time results in JSON
+    local stdout_file="$OUTPUT_DIR/${stem}.out"
+    local stderr_file="$OUTPUT_DIR/${stem}.measured.json"
+    local time_json_file="$OUTPUT_DIR/${stem}.time.json"
 
-    # Run tau under /usr/bin/time, handling .tau and .tau_cli differently
+    local TIME_TMP KILL_FLAG
     TIME_TMP=$(mktemp)
-    KILL_FLAG=$(mktemp)   # written by monitor: "timeout" | "memory" | (empty)
+    KILL_FLAG=$(mktemp)
+
+    local PROC_PID
     if [[ "$fixture" == *.tau ]]; then
         /usr/bin/time -v -o "$TIME_TMP" "$TAU_EXE" "$fixture" -qJ \
-            > "$stdout_file" \
-            2> "$stderr_file" &
+            > "$stdout_file" 2> "$stderr_file" &
         PROC_PID=$!
     elif [[ "$fixture" == *.tau_cli ]]; then
         /usr/bin/time -v -o "$TIME_TMP" bash -c "cat '$fixture' | '$TAU_EXE' -J" \
-            > "$stdout_file" \
-            2> "$stderr_file" &
+            > "$stdout_file" 2> "$stderr_file" &
         PROC_PID=$!
     else
-        echo "  [SKIP] $fname (unknown extension)"
+        printf 'SKIP\nnone\n' > "$result_file"
+        printf '  [SKIP] %s (unknown extension)\n' "$fname" > "$output_file"
         rm -f "$TIME_TMP" "$KILL_FLAG"
-        continue
+        return
     fi
 
     # Start a resource monitor if any limit is active
-    MONITOR_PID=""
-    if [[ -n "$TIMEOUT_SECS" || -n "$MEMORY_MB" ]]; then
+    local MONITOR_PID=""
+    if [[ -n "$effective_timeout" || -n "$MEMORY_MB" ]]; then
         (
-            START_S=$SECONDS
-            MEMORY_KB=$(( ${MEMORY_MB:-0} * 1024 ))
+            local START_S=$SECONDS
+            local MEMORY_KB=$(( ${MEMORY_MB:-0} * 1024 ))
             while kill -0 "$PROC_PID" 2>/dev/null; do
-                # Check timeout
-                if [[ -n "$TIMEOUT_SECS" ]] && (( SECONDS - START_S >= TIMEOUT_SECS )); then
+                if [[ -n "$effective_timeout" ]] && (( SECONDS - START_S >= effective_timeout )); then
                     kill_tree "$PROC_PID"
                     echo "timeout" > "$KILL_FLAG"
                     exit 0
                 fi
-                # Check memory
                 if [[ -n "$MEMORY_MB" ]]; then
+                    local CURRENT_RSS
                     CURRENT_RSS=$(get_tree_rss_kb "$PROC_PID")
                     if (( CURRENT_RSS > MEMORY_KB )); then
                         kill_tree "$PROC_PID"
@@ -383,48 +435,194 @@ for fixture in "${fixtures[@]}"; do
         MONITOR_PID=$!
     fi
 
-    # Wait for the fixture process to finish
-    wait "$PROC_PID" 2>/dev/null || true
-    TAU_EXIT=$?
+    # `|| TAU_EXIT=$?` (not `|| true`) keeps `set -e` happy *and* preserves the
+    # real status; with `|| true` the following `$?` would always read 0.
+    local TAU_EXIT=0
+    wait "$PROC_PID" 2>/dev/null || TAU_EXIT=$?
 
-    # Stop the monitor
     if [[ -n "$MONITOR_PID" ]]; then
         kill "$MONITOR_PID" 2>/dev/null || true
         wait "$MONITOR_PID" 2>/dev/null || true
     fi
 
-    # Determine kill reason
+    local KILL_REASON
     KILL_REASON=$(cat "$KILL_FLAG" 2>/dev/null)
     KILL_REASON="${KILL_REASON:-none}"
     rm -f "$KILL_FLAG"
 
-    # Parse into JSON
-    parse_time_to_json "$TIME_TMP" "$fname" "$TAU_EXIT" "$time_json_file" "$KILL_REASON"
+    parse_time_to_json "$TIME_TMP" "$fname" "$TAU_EXIT" "$time_json_file" \
+        "$KILL_REASON" "${effective_timeout:-null}"
 
-    # Extract summary values for console output
+    local elapsed rss
     elapsed=$(awk -F': +' '/Elapsed \(wall clock\)/ {print $NF}' "$TIME_TMP")
     rss=$(awk -F': +' '/Maximum resident set size/ {print $NF}' "$TIME_TMP")
-
     rm -f "$TIME_TMP"
 
+    local STATUS
     if [[ "$KILL_REASON" != "none" ]]; then
-        echo "  [KILL] $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}  reason=${KILL_REASON}"
-        (( KILL++ )) || true
-        if [[ "$KILL_REASON" == "timeout" ]]; then (( KILL_TIMEOUT++ )) || true; fi
-        if [[ "$KILL_REASON" == "memory"  ]]; then (( KILL_MEMORY++  )) || true; fi
-    elif [[ $TAU_EXIT -eq 0 ]]; then
-        echo "  [OK]   $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
-        echo
-        cat "$stderr_file"
-        (( PASS++ )) || true
+        STATUS="KILL"
+        printf '  [KILL] %s  elapsed=%s  rss=%skB  exit=%s  reason=%s  limit=%ss\n' \
+            "$fname" "$elapsed" "$rss" "$TAU_EXIT" "$KILL_REASON" \
+            "${effective_timeout:-unlimited}" > "$output_file"
+    elif (( TAU_EXIT == 0 )); then
+        STATUS="PASS"
+        {
+            printf '  [OK]   %s  elapsed=%s  rss=%skB  exit=%s\n\n' \
+                "$fname" "$elapsed" "$rss" "$TAU_EXIT"
+            cat "$stderr_file"
+        } > "$output_file"
     else
-        echo "  [FAIL] $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
-        (( FAIL++ )) || true
+        STATUS="FAIL"
+        printf '  [FAIL] %s  elapsed=%s  rss=%skB  exit=%s\n' \
+            "$fname" "$elapsed" "$rss" "$TAU_EXIT" > "$output_file"
     fi
+
+    printf '%s\n%s\n' "$STATUS" "$KILL_REASON" > "$result_file"
+}
+
+# ---------------------------------------------------------------------------
+# Pool state for parallel execution
+# ---------------------------------------------------------------------------
+declare -a POOL_PIDS=()
+declare -a POOL_RESULT_FILES=()
+declare -a POOL_OUTPUT_FILES=()
+
+# harvest_jobs <target>
+#   Waits until the pool has <= target running jobs, processing each completed
+#   job's result and output files and updating the global counters.
+harvest_jobs() {
+    local target="${1:-0}"
+    while (( ${#POOL_PIDS[@]} > target )); do
+        local new_pids=() new_result_files=() new_output_files=()
+        local found_completed=false
+        local i
+        for (( i=0; i < ${#POOL_PIDS[@]}; i++ )); do
+            local pid="${POOL_PIDS[$i]}"
+            if kill -0 "$pid" 2>/dev/null; then
+                new_pids+=("$pid")
+                new_result_files+=("${POOL_RESULT_FILES[$i]}")
+                new_output_files+=("${POOL_OUTPUT_FILES[$i]}")
+            else
+                wait "$pid" 2>/dev/null || true
+                found_completed=true
+                local rf="${POOL_RESULT_FILES[$i]}"
+                local of="${POOL_OUTPUT_FILES[$i]}"
+                if [[ -f "$rf" ]]; then
+                    local status kill_reason
+                    { IFS= read -r status; IFS= read -r kill_reason; } < "$rf"
+                    rm -f "$rf"
+                    [[ -f "$of" ]] && cat "$of"
+                    rm -f "$of"
+                    case "$status" in
+                        PASS) (( PASS++ ))        || true ;;
+                        FAIL) (( FAIL++ ))        || true ;;
+                        KILL) (( KILL++ ))        || true
+                              [[ "$kill_reason" == "timeout" ]] && (( KILL_TIMEOUT++ )) || true
+                              [[ "$kill_reason" == "memory"  ]] && (( KILL_MEMORY++  )) || true ;;
+                        SKIP_BUDGET) (( SKIP_BUDGET++ )) || true ;;
+                    esac
+                fi
+            fi
+        done
+        POOL_PIDS=("${new_pids[@]+"${new_pids[@]}"}")
+        POOL_RESULT_FILES=("${new_result_files[@]+"${new_result_files[@]}"}")
+        POOL_OUTPUT_FILES=("${new_output_files[@]+"${new_output_files[@]}"}")
+        if (( ${#POOL_PIDS[@]} > target )) && [[ "$found_completed" == "false" ]]; then
+            sleep 0.05
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Main — collect system info, then iterate fixtures
+# ---------------------------------------------------------------------------
+collect_system_info
+
+echo ""
+echo "Running benchmarks..."
+echo ""
+
+PASS=0
+FAIL=0
+KILL=0
+KILL_TIMEOUT=0
+KILL_MEMORY=0
+SKIP_BUDGET=0
+
+
+# Discover both .tau and .tau_cli fixtures
+shopt -s nullglob
+fixtures=( "$FIXTURE_DIR"/*.tau "$FIXTURE_DIR"/*.tau_cli )
+
+if [[ ${#fixtures[@]} -eq 0 ]]; then
+    echo "WARNING: No .tau or .tau_cli fixtures found in $FIXTURE_DIR" >&2
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Overall-timeout budget state.
+# BUDGET_LEFT is computed from wall-clock elapsed since run start, which works
+# correctly for both serial (PARALLEL_JOBS=1) and parallel execution.  The
+# per-fixture allowance is the larger of the -t floor and the fair share of
+# the remaining wall-clock budget across the fixtures not yet launched.
+# ---------------------------------------------------------------------------
+TOTAL_FIXTURES=${#fixtures[@]}
+FIXTURE_INDEX=0
+RUN_START_S=$SECONDS
+
+if [[ -n "$OVERALL_TIMEOUT_SECS" && -n "$TIMEOUT_SECS" ]] \
+   && (( TOTAL_FIXTURES * TIMEOUT_SECS > OVERALL_TIMEOUT_SECS )); then
+    echo "NOTE: overall budget (${OVERALL_TIMEOUT_SECS}s) is smaller than" \
+         "${TOTAL_FIXTURES} fixtures x ${TIMEOUT_SECS}s;"
+    echo "      the -t floor takes precedence, so later fixtures may be skipped."
+    echo ""
+fi
+
+for fixture in "${fixtures[@]}"; do
+    [[ -f "$fixture" ]] || continue
+    fname=$(basename "$fixture")
+
+    # Fixtures still to launch, this one included.
+    (( FIXTURE_INDEX++ )) || true
+    FIXTURES_REMAINING=$(( TOTAL_FIXTURES - FIXTURE_INDEX + 1 ))
+
+    # Resolve this fixture's timeout against the remaining budget
+    EFFECTIVE_TIMEOUT="$TIMEOUT_SECS"
+    if [[ -n "$OVERALL_TIMEOUT_SECS" ]]; then
+        BUDGET_LEFT=$(( OVERALL_TIMEOUT_SECS - (SECONDS - RUN_START_S) ))
+        if (( BUDGET_LEFT <= 0 )); then
+            echo "  [SKIP] $fname  reason=budget"
+            write_skipped_json "$fname" "$OUTPUT_DIR/${fname}.time.json" "budget"
+            (( SKIP_BUDGET++ )) || true
+            continue
+        fi
+        # Integer division truncates, which errs towards staying under budget
+        SHARE=$(( BUDGET_LEFT / FIXTURES_REMAINING ))
+        if (( SHARE < 1 )); then SHARE=1; fi
+        if [[ -z "$TIMEOUT_SECS" ]] || (( SHARE > TIMEOUT_SECS )); then
+            EFFECTIVE_TIMEOUT="$SHARE"
+        fi
+    fi
+
+    # Wait for a free slot in the pool
+    harvest_jobs $(( PARALLEL_JOBS - 1 ))
+
+    # Launch fixture as a background subshell
+    JOB_RESULT_FILE=$(mktemp)
+    JOB_OUTPUT_FILE=$(mktemp)
+    (
+        run_fixture_job "$fixture" "$EFFECTIVE_TIMEOUT" "$JOB_RESULT_FILE" "$JOB_OUTPUT_FILE"
+    ) &
+    POOL_PIDS+=($!)
+    POOL_RESULT_FILES+=("$JOB_RESULT_FILE")
+    POOL_OUTPUT_FILES+=("$JOB_OUTPUT_FILE")
 done
+
+# Drain all remaining jobs
+harvest_jobs 0
 
 echo ""
 echo "============================================================"
-echo "  Done.  passed=$PASS  failed=$FAIL  killed=$KILL (timeout=$KILL_TIMEOUT memory=$KILL_MEMORY)"
+echo "  Done.  passed=$PASS  failed=$FAIL  killed=$KILL (timeout=$KILL_TIMEOUT memory=$KILL_MEMORY)  skipped=$SKIP_BUDGET (budget)"
 echo "  Results stored in: $OUTPUT_DIR"
 echo "============================================================"

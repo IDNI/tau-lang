@@ -19,6 +19,7 @@ namespace idni::tau_lang {
 
 // Defined in solver.tmpl.h, which is reached only after this file.
 template <NodeType node> trefs get_variables(equality eq);
+template <NodeType node> bool var_free_holds(tref eq);
 
 // Pick a concrete witness rational from the first non-empty, non-symbolic piece.
 // Returns nullopt if none found.
@@ -62,7 +63,13 @@ static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
 			if (!already) all_vars.push_back(v);
 		}
 	}
-	if (all_vars.empty()) return solution<node>{};
+	// SO-14: a variable-free system is not automatically satisfied --
+	// reduce each atom and reject on F instead of reporting SAT.
+	if (all_vars.empty()) {
+		for (tref atom : sys)
+			if (!var_free_holds<node>(atom)) return {};
+		return solution<node>{};
+	}
 
 	// Build conjunction of all constraints for qlt_dlo_qe_interval
 	tref body = tau::_T();

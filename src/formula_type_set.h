@@ -40,7 +40,10 @@ struct formula_type_set {
 			const std::vector<std::pair<tref, std::string>>& atoms) {
 		formula_type_set fts;
 		for (const auto& [f, _] : atoms)
-			fts.type_ids_.insert(find_ba_type<node>(f));
+			// Skip untyped (0) like from_formula does -- an untyped
+			// atom otherwise defeats single_type().
+			if (size_t tid = find_ba_type<node>(f); tid != 0)
+				fts.type_ids_.insert(tid);
 		return fts;
 	}
 

@@ -1,31 +1,72 @@
-# To run it you need to compile the project using release.sh (customized with
-# your settings if needed) and then execute the run.sh whithin the demo directory
-# as follows:
+# Normal forms, substitution and instantiation, driven from the history store.
 #
-# ./run.sh demo_1.2-commands_and_history.tau
-#
-# This demo should work under any *nix flavour due to the paths used for files.
-# To run it under windows you will need to change the paths to the files.
+# See demos/README.md for how to run this script.
 
-# The above notations used to access the history can also be used in the commands.
-# For example, the following commands will compute the DNF of a Boolean function
-# passed as an argument or as a memory position.
+# Wherever a command expects an expression you can hand it a history position
+# instead, which is how the result of one command becomes the input of the next.
 
-(X | Y) & Z 		# store a Boolean function
-(X | Y') & Z		# store another Boolean function
-dnf %-1 			# convert to DNF the first formula in history
-dnf %1				# also convert to DNF the first formula in history
-(X | Y) & Z'		# store another Boolean function
-dnf %				# convert to DNF the last formula in history
-dnf (X | Y | W) & Z # simply compute the DNF of the given Boolean function
+# The dnf command converts a term to disjunctive normal form.
 
-# The same happens when using formulas. The following command will convert
-# formulas to CNF.
+(X | Y) & Z         # store a term
+(X | Y') & Z        # store another one
+dnf %-1             # convert the one before the last, i.e. (X | Y) & Z
+dnf %1              # same expression, addressed absolutely this time
+(X | Y) & Z'        # store a third one
+dnf %               # convert the last stored expression
+dnf (X | Y | W) & Z # or just pass the term directly
 
-(X Y ) | Z			# store a formula
-cnf %				# convert to CNF the last formula in history
-cnf %-1				# convert to CNF the same formula
-cnf %1				# convert to CNF the first formula in history
-cnf (X Y) | Z		# convert to CNF the given formula
+# Note that identical results share a history slot: the two commands above that
+# convert the same expression report the same position rather than storing it
+# twice.
 
-quit # quit the Tau REPL
+# cnf works the same way, converting to conjunctive normal form.
+
+(X Y) | Z           # store a term
+cnf %               # convert the last stored expression
+cnf %-1             # the same expression, addressed relatively
+cnf %1              # the first stored expression, which is already in CNF
+cnf (X Y) | Z       # or pass it directly
+
+# mnf gives minterm normal form, which is also where redundant parts of a term
+# collapse:
+
+mnf X Y | X
+mnf (X | Y) & (X | Y')
+
+# nnf pushes negation inwards. It applies to formulas, where the negation being
+# moved is the formula level `!`:
+
+nnf !(X = 0 && Y = 0)
+nnf !(X = 0 || Y != 0)
+
+# onf gives order normal form with respect to one chosen variable, so it takes
+# that variable as its first argument. Its implementation is still incomplete
+# and currently leaves most formulas as they are, so treat the shape of the
+# command rather than its result as the thing being shown here:
+
+onf X (X = 0)
+onf X (X Y = 0 || X' Z = 0)
+
+# Two further commands rewrite an expression rather than normalize it.
+
+# subst replaces one subexpression by another, written as [match / replace].
+# Both sides have to be of the same kind, so a term is replaced by a term and a
+# formula by a formula:
+
+subst X | Y [X / Z]
+subst X | Y [X | Y / Z W]
+subst X = 0 && Y = 0 [X = 0 / Z != 0]
+
+# inst is the narrower operation: it instantiates a variable with a term.
+
+inst X | Y [X / 1]
+inst X | Y [X / Z W]
+inst X Y' [Y / 0]
+
+# Since both take history positions too, one command's result feeds the next:
+
+(X | Y) & Z
+subst % [X / W]
+dnf %
+
+quit

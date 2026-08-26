@@ -2,8 +2,12 @@
 
 // Tests for semantic PWR (Optimal Mode) — winning-region-based revision.
 //
-// Tests the Algorithm D-based fallback from pwr-ltl.tex §11:
-//   θ = ψ ∧ Win_0 ∧ G(Win → X Win)
+// Tests the Algorithm D-based fallback from pwr-ltl.tex §11.
+// LS-18: the production code builds θ = ψ ∧ G(Win) ONLY (see
+// semantic_pwr_optimal) -- Win_0 is not conjoined; build_win0_formula is
+// exercised by these tests but has no production caller, and nothing
+// verifies Win_0 ⊆ Win (realizability only guarantees SOME initial ρ
+// wins). Keep that in mind when reading the SPWR-O cases.
 //
 // Test categories:
 //   SPWR-S-*   Safety regression (optimal mode matches fast mode)
@@ -18,6 +22,12 @@
 #include "boolean_algebras/qlt/qlt.h"
 
 using namespace idni::tau_lang;
+
+// PW-N4: the semantic fallback ships OFF; this file is its test surface.
+static const bool semantic_fallback_enabled_for_tests = [] {
+	pwr_semantic_fallback = true;
+	return true;
+}();
 
 static tref spec(const char* s) {
 	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
@@ -209,7 +219,8 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 		T3.push_back(t3);
 		type_A.push_back(1); // D_0 is true in this type
 
-		auto result = alg_d::solve_algorithm_d_full(phi_star, T1_size, T3, type_A, K);
+		auto result = alg_d::solve_algorithm_d_full(phi_star, T1_size,
+			T3, type_A, K, /*init_rho=*/0);
 
 		if (result.realizable) {
 			CHECK(!result.winning_region.empty());
@@ -221,7 +232,8 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 	}
 
 	TEST_CASE("[SPWR-A-02] solve_algorithm_d_full empty input returns unrealizable") {
-		auto result = alg_d::solve_algorithm_d_full("", 0, {}, {}, 0);
+		auto result = alg_d::solve_algorithm_d_full("", 0, {}, {}, 0,
+			/*init_rho=*/0);
 		CHECK_FALSE(result.realizable);
 		CHECK(result.winning_region.empty());
 		CHECK(result.init_rho == -1);
@@ -414,6 +426,9 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		result.synth_game.init = 0;
 		result.K = 1;
 		result.winning_region = {0, 3};
+		// LG-12: Win₀ reads the FIXED initial memory from init_rho now
+		// (the solver sets it; hand-built results must set it too).
+		result.init_rho = 0;
 
 		std::vector<omcat::QltType3> T3;
 		omcat::QltType3 t3_0;
@@ -440,6 +455,187 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 
 }
 
+
+// ============================================================================
+// LS-1 — and_distribute must recurse below a conjunction root
+// ============================================================================
+//
+// `and_distribute` inspects only the ROOT operator, so a top-level `wff_and`
+// makes `get_temporal_op` return NONE and the whole formula comes back
+// unchanged.  `pointwise_revision_temporal` calls it once on the entire spec
+// BEFORE `gather_top_conjuncts`, and the interpreter feeds it exactly the
+// shape `G(∧ inners) ∧ (∧ rest)` produced by `unsqueeze_always` whenever any
+// non-always clause exists.  Result: whole G-blocks get revised or dropped
+// wholesale instead of per conjunct, contrary to pwr-ltl §3 Step 0.
+
+TEST_SUITE("[LS-1: and_distribute below conjunction roots]") {
+
+	static size_t clause_count(tref fm) {
+		std::vector<tref> conjs;
+		gather_top_conjuncts<node_t>(fm, conjs);
+		return conjs.size();
+	}
+
+	// NOTE on the parentheses: `G X && Y` parses as `G (X && Y)` — the
+	// temporal quantifier scopes over the rest of the conjunction.  Without
+	// the explicit parens around each clause the root is an `always`, which
+	// and_distribute already handles, and the case tests nothing.
+	TEST_CASE("[PWR-AD-01] (G(a && b)) && (F c) splits the G block") {
+		tref fm = spec("(G (o1[t] = 0 && o2[t] = 0)) && (F (o3[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		REQUIRE(clause_count(fm) == 2);       // G-block + F, undistributed
+		tref d = and_distribute<node_t>(fm);
+		REQUIRE(d != nullptr);
+		CHECK(clause_count(d) == 3);          // G(a), G(b), F(c)
+	}
+
+	TEST_CASE("[PWR-AD-02] a pure G root still distributes (regression)") {
+		tref fm = spec("G (o1[t] = 0 && o2[t] = 0).");
+		REQUIRE(fm != nullptr);
+		tref d = and_distribute<node_t>(fm);
+		REQUIRE(d != nullptr);
+		CHECK(clause_count(d) == 2);
+	}
+
+	TEST_CASE("[PWR-AD-03] nested conjunction roots distribute too") {
+		tref fm = spec("((G (o1[t] = 0 && o2[t] = 0)) && (G (o3[t] = 0))) "
+		               "&& (F (o4[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		REQUIRE(clause_count(fm) == 3);
+		tref d = and_distribute<node_t>(fm);
+		REQUIRE(d != nullptr);
+		CHECK(clause_count(d) == 4);
+	}
+
+	TEST_CASE("[PWR-AD-04] a formula with nothing to distribute is unchanged") {
+		tref fm = spec("(G (o1[t] = 0)) && (F (o2[t] = 1)).");
+		REQUIRE(fm != nullptr);
+		CHECK(and_distribute<node_t>(fm) == fm);
+	}
+
+}
+
+// ============================================================================
+// LS-2 / LS-16 — semantic_pwr_optimal: coverage + the Algorithm-A guards
+// ============================================================================
+//
+// LS-16: every existing PWR test uses untyped/sbf atoms, so the applicability
+// gate at the top of `semantic_pwr_optimal` returns nullptr and the entire
+// body (skeleton build, solve_algorithm_d_full, Win/θ construction, the sat
+// verification) has never executed.  These cases use qlt atoms so it does.
+//
+// LS-2: the body runs the same T3 encoding as Algorithm A in
+// `ltl_aba_builders`, but WITHOUT Algorithm A's two soundness guards —
+// (a) atoms that no T3 type can classify (`{top}:qlt` / `{bot}:qlt`), and
+// (b) two or more distinct output variables, which the single Y/M slot
+// conflates.  Both must fall back (nullptr) rather than return a θ built from
+// a garbage winning region.
+
+TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
+
+	// Coverage case: a qlt clause + update that pass the applicability gate.
+	// The verdict may legitimately be nullptr (unrealizable via Algorithm D,
+	// or θ not realizable), but whatever comes back must be a sound revision.
+	TEST_CASE("[SPWR-O-01] qlt clause reaches optimal mode") {
+		bdd_init<Bool>();
+		// Optimal mode runs Algorithm D, which shells out to ltlsynt; without
+		// it every verdict below would be vacuous.  Skip explicitly rather
+		// than pass on a nullptr that means "no backend".
+		if (::system("which ltlsynt > /dev/null 2>&1") != 0) {
+			MESSAGE("ltlsynt not on PATH — optimal mode cannot run");
+			return;
+		}
+		tref c = spec("G (o1[t]:qlt < {1/2}:qlt).");
+		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
+		REQUIRE(c != nullptr);
+		REQUIRE(u != nullptr);
+		tref theta = semantic_pwr_optimal<node_t>(c, u, 0);
+		// θ is allowed to be null (Algorithm D may report the clause
+		// unrealizable), but a returned θ must be a sound revision: realizable,
+		// and it must still carry the update it was built from — `theta` is
+		// `update ∧ G(Win)`, so dropping the update would be the failure mode
+		// that matters.
+		//
+		// Membership is checked STRUCTURALLY, via subtree_set.  tref equality
+		// is not structural equality in this tree — that is what the
+		// subtree_map / subtree_set family exists for (see extract_data_atoms'
+		// "structural equality (subtree_equals)" note) — and a raw `cj == u`
+		// comparison reported "update dropped" for a θ that carries it.
+		//
+		// Two shapes are accepted: the update as a top-level conjunct of θ,
+		// and — since both `update` and `G(Win)` are `always` formulas and
+		// this codebase merges those — the update's body among the conjuncts
+		// of a single enclosing G.
+		if (theta) {
+			INFO("theta:  " << tau::get(theta).to_str());
+			INFO("update: " << tau::get(u).to_str());
+			CHECK(is_realizable(theta));
+
+			auto is_always = [](tref n) {
+				const auto& t = tau::get(n);
+				return t.has_child() && t[0].value.nt == tau::wff_always;
+			};
+			std::vector<tref> top;
+			gather_top_conjuncts<node_t>(theta, top);
+			subtree_set<node_t> top_set(top.begin(), top.end());
+			bool keeps_update = top_set.contains(u);
+			if (!keeps_update && is_always(u)) {
+				tref ubody = tau::trim2(u);
+				for (tref cj : top) {
+					if (!is_always(cj)) continue;
+					std::vector<tref> inner;
+					gather_top_conjuncts<node_t>(tau::trim2(cj), inner);
+					subtree_set<node_t> inner_set(inner.begin(), inner.end());
+					if (inner_set.contains(ubody)) { keeps_update = true; break; }
+				}
+			}
+			CHECK(keeps_update);
+		} else {
+			MESSAGE("optimal mode returned nullptr (Algorithm D reported the "
+			        "clause unrealizable) — nothing to assert on theta");
+		}
+	}
+
+	// LS-2 (a): `{top}:qlt` gives qlt_atom_holds_in_type3 == nullopt for every
+	// T3 type, so the atom is completely unconstrained in the symbolic
+	// encoding — `h != false` maps nullopt to "holds".  Algorithm A refuses
+	// this shape; optimal mode must too.
+	//
+	// The clause carries an ordinary rational constant so that
+	// enumerate_qlt_T3 produces a NON-EMPTY type set: with only {top} around,
+	// T3 is empty and the function bails out at build_win_formula for an
+	// unrelated reason, which is what the first draft of this case hit.
+	TEST_CASE("[SPWR-O-02] unclassifiable top/bot qlt atoms fall back") {
+		bdd_init<Bool>();
+		tref c = spec("G (o1[t]:qlt < {1/2}:qlt).");
+		tref u = spec("F (o1[t]:qlt = {top}:qlt).");
+		REQUIRE(c != nullptr);
+		REQUIRE(u != nullptr);
+		CHECK(semantic_pwr_optimal<node_t>(c, u, 0) == nullptr);
+	}
+
+	// LS-2 (b): two distinct output variables share the single Y slot, so
+	// `o1 < 1/2 && o2 > 1/2` collapses to "Y < 1/2 && Y > 1/2".
+	TEST_CASE("[SPWR-O-03] two output variables fall back") {
+		bdd_init<Bool>();
+		tref c = spec("G (o1[t]:qlt < {1/2}:qlt && o2[t]:qlt > {1/2}:qlt).");
+		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
+		REQUIRE(c != nullptr);
+		REQUIRE(u != nullptr);
+		CHECK(semantic_pwr_optimal<node_t>(c, u, 0) == nullptr);
+	}
+
+	// The gate itself must keep rejecting non-omcat atoms.
+	TEST_CASE("[SPWR-O-04] sbf atoms still do not reach optimal mode") {
+		bdd_init<Bool>();
+		tref c = spec("G (o1[t] = 0).");
+		tref u = spec("G (o1[t] = 1).");
+		REQUIRE(c != nullptr);
+		REQUIRE(u != nullptr);
+		CHECK(semantic_pwr_optimal<node_t>(c, u, 0) == nullptr);
+	}
+
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

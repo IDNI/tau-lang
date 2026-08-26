@@ -72,6 +72,9 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 		// implication check below (sat + non-equivalence) is the correct gate.
 		tref new_spec_clause = normalize_with_temp_simp<node>(
 			rewriter::replace<node>(spec_clause, fm, splitter));
+		// nullptr when the definitions in the clause do not settle;
+		// no normalized clause means no splitter to report.
+		if (!new_spec_clause) return false;
 		if (is_tau_formula_sat<node>(new_spec_clause)) {
 			if (!are_tau_equivalent<node>(new_spec_clause, spec_clause))
 				return true;
@@ -387,6 +390,13 @@ tref tau_splitter(tref fm, splitter_type st) {
 		bool good_splitter = false;
 		for (tref& spec : specs) {
 			bool is_aw = is_child<node>(spec, tau::wff_always);
+			// SO-4: only always/sometimes conjuncts carry an inner
+			// wff at [0].first(); a bare atomic conjunct (e.g.
+			// `x = 0` in a clause that has_temp_var through another
+			// conjunct) would have its left BF operand spliced back
+			// as a formula. Skip anything not temporal-wrapped.
+			if (!is_aw && !is_child<node>(spec, tau::wff_sometimes))
+				continue;
 			auto [splitter, type] = nso_tau_splitter<BAs...>(
 					tau::get(spec)[0].first(), st, clause);
 			if (type != splitter_type::bad) {

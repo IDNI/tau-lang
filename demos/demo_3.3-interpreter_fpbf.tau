@@ -1,90 +1,107 @@
-# To run it you need to compile the project using release.sh (c ustomized with
-# your settings if needed) and then execute the run.sh whithin the demo directory
-# as follows:
+# A programmable Boolean function machine -- DRAFT.
 #
-# ./run.sh demo_3.2-interpreter_fpbf.tau
+# See demos/README.md for how to run this script.
 #
-# This demo should work under any *nix flavour due to the paths used for files.
-# To run it under windows you will need to change the paths to the files.
+# IMPORTANT: this demo is a design sketch, not a runnable script. It contains no
+# commands, only the derivation of a specification that has not been written out
+# or executed yet. Read it as notes towards a larger interpreter example.
 #
-# IMPORTANT: This demo is not yet implemented. It is just a draft.
+# The design follows the FPGA -- field programmable gate array -- model, see
+# https://en.wikipedia.org/wiki/Field-programmable_gate_array. An FPGA has an
+# array of gates that computes something, memory holding intermediate results,
+# inputs and outputs, and a way to reprogram the array.
 #
-# The idea of this demo is to give a more complex example for the interpreter.
-# The demo is based in the well-known model of FPGA -field programable
-# gate array- (see https://en.wikipedia.org/wiki/Field-programmable_gate_array for
-# the details).
+# Here the same structure computes Boolean functions rather than output bits, so
+# call it a programmable Boolean function. What gets reprogrammed at run time is
+# the function itself, supplied as coefficients on the input streams.
 #
-# In the FPGA model, we have a programmable array of gates, some memory to store
-# computations, inputs/outputs and a way to update the array gate.
+# Two simplifications keep the specification small: the programmable function
+# takes two variables, and the memory holds a single Boolean algebra element.
+# Both generalize in the obvious way, at the cost of more coefficients.
 #
-# In our case we will deal with programmable Boolean Funtions, i.e. we will
-# copycut the same ideas but in order to compute the result of Boolean
-# functions instead of computing ouput bits.
+# The function is programmed by carrying its coefficients on output streams, one
+# per term. Those outputs hold the current program; the input streams carry the
+# next one. An update signal decides, at each step, whether the outputs take the
+# new coefficients from the inputs or keep the ones they already have. The memory
+# is programmed the same way.
 #
-# In order to keep it simple, we will assume that the programmable Boolean
-# function has only to variables. Moreover, we would restrain the memory to
-# just one Boolean algebra element. These restrictions are just to keep the
-# example simple, more elaborated constructions could be done in the obvious way.
+# Expressions are given in algebraic normal form, which is why the coefficients
+# are indexed by bit patterns: one coefficient per monomial. Note that the
+# exclusive or of algebraic normal form is written ^ -- + is bitvector addition
+# and does not apply here (see demo_1.1 and demo_2.3).
 #
-# In order to program the Boolean function, we will parametrize the function
-# with several ouput variables of the Tau program. The idea is that the
-# output variables will be used to compute the new Boolean function value from
-# the input values. The input values will be given by the input variables of
-# the Tau program.
+# The streams are then:
 #
-# The value to be store in the memory will be parametrized also by output
-# variables of the Tau program. The memory will be updated by the specific
-# inputs given by certain input variables of the Tau program.
+# i0            the update signal
 #
-# We will also consider an input variable defifing the update signal. If the update
-# signal is true, the Boolean function will be updated, otherwise it will remain
-# the same. The memory will be updated in the same way.
+# i1000..i1111  the coefficients of the function to compute from the next step
+#               onwards, if the update signal is set. The function takes three
+#               arguments -- the two inputs and the memory -- hence eight
+#               coefficients, indexed by the three bits after `i1`.
 #
-# Thus, we will consider the following variables:
+# i200..i211    the coefficients of the function computing what to store in
+#               memory from the next step onwards, if the update signal is set.
+#               That function takes the two inputs, hence four coefficients.
 #
-# i0: update signal,
+# i30, i31      the two input values the function is applied to
 #
-# i1...: the new Boolean function describing the Boolean Function to be computed
-# in the next step if the update signal is true.
+# and the outputs:
 #
-# i2...: the new Boolean function describing the Boolean function computing the
-# to be stored in the memory in the next step if the update signal is true.
+# o1000..o1111  the coefficients of the function currently being computed
 #
-# i3..: the input values from which compute the Boolean function.
+# o200..o211    the coefficients of the function currently computing the memory
 #
-# and the following output variables:
+# o3            the value of the current function, applied to the current inputs
 #
-# o1...: the current values of the Bollean function describing what is computed.
+# o4            the value currently held in memory
 #
-# o2...: the current values of the Boolean function describing what is stored in the memory.
+# Let us build the specification piece by piece.
 #
-# o3: the value of the evaluation of the current Boolean function described by o1...
+# First the evaluation of the programmed function. Its value depends on the
+# coefficients, the two inputs, and the memory as it stood at the previous step.
+# In algebraic normal form, with & binding tighter than ^:
 #
-# o4: the value of the evaluation of the current Boolean function described by o2...
+#   o3[t] = o1000[t-1]
+#         ^ o1001[t-1] & o4[t-1]
+#         ^ o1010[t-1] & i31[t-1]
+#         ^ ...
+#         ^ o1111[t-1] & i30[t-1] & i31[t-1] & o4[t-1]
 #
-# In order to simplify further the expressions, the Boolean formulas will be
-# given in algebraic normal form.
+# Then the memory, whose function takes only the two inputs:
 #
-# Let us build our tau program step by step.
+#   o4[t] = o200[t-1]
+#         ^ o201[t-1] & i31[t-1]
+#         ^ o210[t-1] & i30[t-1]
+#         ^ o211[t-1] & i30[t-1] & i31[t-1]
 #
-# First, let us deal with the evaluation of the Boolean function. We must take
-# into account the current Boolean function, the inputs and the previous memory:
+# Next, reprogramming. When the update signal is set, every coefficient takes
+# the value on its input stream:
 #
-# o1[t] = o1000[t-1] + ... + o1111[t-1] & i30[t-1] & i31[t-1] & o4[t-1]
+#   (i0[t] = 1) -> (o1000[t] = i1000[t] && ... && o1111[t] = i1111[t])
+#   (i0[t] = 1) -> (o200[t]  = i200[t]  && ... && o211[t]  = i211[t])
 #
-# Regarding the memopry, we should have
+# and when it is not set, every coefficient keeps the value it had:
 #
-# o2[t] = o200[t-1] + ... + o211[t-1] & i30[t-1] & i31[t-1]
+#   (i0[t] != 1) -> (o1000[t] = o1000[t-1] && ... && o1111[t] = o1111[t-1])
+#   (i0[t] != 1) -> (o200[t]  = o200[t-1]  && ... && o211[t]  = o211[t-1])
 #
-# If the update signal is true, we must update the Boolean function and the memory, i.e.
-# we must have:
+# Note that the update signal is compared against 1, the top element of the
+# Boolean algebra, rather than against T: the streams carry Boolean algebra
+# elements, so i0[t] is a term and `i0[t] = 1` is the formula asserting it is
+# set. T and F are formula constants and would not typecheck here.
 #
-# (i0[t] = T ) -> (o1000[t] = i1000[t] && ... && o1111[t] = i1011[t])
-# (i0[t] = T ) -> (o200[t] = i200[t] && ... && o211[t] = i211[t])
+# The whole specification is the conjunction of those four groups with the two
+# evaluation equations, asserted at every time point. Initial conditions at t=0
+# have to pin down the starting program and the starting memory, since the
+# equations above all refer to t-1.
 #
-# If the update signal is not true, we must keep the Boolean function and the memory
-# as they are, i.e. we must have:
+# What remains to turn this into a working demo:
 #
-# (i0[t] != T ) -> (o1000[t] = o1000[t-1] && ... && o1111[t-1] = o1111[t-1])
-# (i0[t] != T ) -> (o200[t] = o200[t-1] && ... && o211[t-1] = o211[t-1])
-#
+#   - write the eight and four coefficient equations out in full, since the
+#     ellipses above stand for terms that have to be spelled out,
+#   - choose a Boolean algebra for the streams and declare them, as in
+#     demo_3.1-interpreter_sbf.tau,
+#   - give the initial conditions at t=0,
+#   - supply an input file driving a few reprogramming steps, so the run shows
+#     the machine computing one function, being reprogrammed, and then computing
+#     another.

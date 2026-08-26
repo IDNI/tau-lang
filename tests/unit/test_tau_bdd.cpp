@@ -203,10 +203,13 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// expected[0] is the canonical form (see matches_to_any_of); the
-		// rest are orders earlier packs produced -- conjunct order follows
-		// the ba_type pool indices (D8).
+		// Conjunct order is not canonical: it follows the ba_type pool
+		// indices (D8) and the "ab" sub-block order flipped by the
+		// 8f1a74c1 parser regen (subtree interning order changed).
+		// Debug and Release NDEBUG paths also disagree ("xycdbafe" vs
+		// "xycdbaef"). Accept every ordering observed across branches.
 		CHECK((result == "xyefcdba"
+			|| result == "xycdbafe" || result == "xycdbaef"
 			|| result == "xycdabfe" || result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab"
@@ -240,15 +243,29 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		// TODO (D8): conjunct order is not canonical, so debug and
-		// release disagree; collapse to one string once D8 lands.
-		CHECK(matches_to_any_of(tau::get(xx).to_str(), strings{
-			"cdbba&(e'f')'",
-			"ab&(f'e')'bccd",
-			"cabb&(e'f')'d",
-			"adbb&(e'f')'cc",
-			"abbccd&(f'e')'",
-			"(f'e')'dccbba"}));
+		// The product's factor order and duplicate-literal spelling are
+		// a subtree_less / NDEBUG-dependent artifact that shifts with
+		// every parser regeneration (three regens produced five distinct
+		// spellings, differing even in duplicate counts -- idempotent in
+		// a product, so harmless). Pin the content instead: the negated
+		// factor in either orientation, the variables {a, b, c, d}, and
+		// nothing else.
+		std::string res = tau::get(xx).to_str();
+		// The factor prints with or without an explicit `&` (Release
+		// spells the product by juxtaposition: "(f'e')'dccbba").
+		bool factor_found = false;
+		for (const char* f : {"&(e'f')'", "&(f'e')'",
+			"(e'f')'", "(f'e')'"}) {
+			auto pos = res.find(f);
+			if (pos == std::string::npos) continue;
+			factor_found = true;
+			res.erase(pos, std::string(f).size());
+			break;
+		}
+		CHECK( factor_found );
+		std::sort(res.begin(), res.end());
+		res.erase(std::unique(res.begin(), res.end()), res.end());
+		CHECK( res == "abcd" );
 	}
 }
 
@@ -641,9 +658,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		// TODO (D8): conjunct order is not canonical, so debug and
-		// release disagree; collapse to one string once D8 lands.
-		CHECK(matches_to_any_of(tau::get(result).to_str(), strings{"ba", "ab"}));
+		// Product order flipped by the 8f1a74c1 parser regen on Release
+		// (NDEBUG subtree interning order changed); actual is "ab".
+		CHECK((tau::get(result).to_str() == "ab"
+			|| tau::get(result).to_str() == "ba"));
 	}
 }
 
@@ -794,5 +812,107 @@ TEST_SUITE("BDD handle creation") {
 		// tau::get(tau_res->get()).print(std::cout << "res: ") << "\n";
 		CHECK(tau::get(tau_res->get()).to_str() ==
 			"sv&(wx&(yz|y'z')|w'x'&(yz|y'z'))|s'v'&(wx&(yz|y'z')|w'x'&(yz|y'z'))");
+	}
+}
+
+// TT1-3: `bdd_ex` and `bdd_all` could not be instantiated at all.  Under
+// TAU_CACHE (ON in Release) the private recursion at tau_bdd.tmpl.h dropped the
+// `memo` argument, and `tau_term_bdd_handle::bdd_ex` bound its `const trefs&`
+// parameter to `tbdd::bdd_ex`'s `trefs&` -- an error in every config.  Nothing
+// in src/ or tests/ called them, so the breakage stayed latent; these cases
+// keep both entry points instantiated in both configs.
+TEST_SUITE("BDD ex/all quantification") {
+
+	TEST_CASE("bdd_ex removes the quantified variable") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref y  = bdd::build_bdd(tau::get("y", opts), o);
+		trefs v {tx};
+		// ex x (x & y) == y
+		CHECK((bdd::bdd_ex(xy, v, o) == y));
+	}
+
+	TEST_CASE("bdd_all over the only variable of a conjunct is F") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		trefs v {tx};
+		// all x (x & y) == 0
+		CHECK((bdd::bdd_all(xy, v, o) == bdd::F));
+	}
+
+	// TT1-24: the handle wrappers below had zero coverage (which is how
+	// TT1-4's uncompilable convert_to_handle survived).
+	TEST_CASE("convert_to_tau_node registers a mapping convert_to_handle finds") {
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		hbdd::order o {{tx, 0}, {ty, 1}};
+		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		tref n = hbdd::convert_to_tau_node(xy, 0);
+		REQUIRE( n != nullptr );
+		CHECK((hbdd::convert_to_handle(n) == xy));
+	}
+
+	TEST_CASE("handle bdd_ite/bdd_and_many/bdd_or_many mirror tbdd semantics") {
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		hbdd::order o {{tx, 0}, {ty, 1}};
+		hbdd x  = hbdd::build(tau::get("x", opts), o);
+		hbdd y  = hbdd::build(tau::get("y", opts), o);
+		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		hbdd x_or_y = hbdd::build(tau::get("x|y", opts), o);
+		// ite(x, y, y) == y; ite(x, y, 0) == x & y
+		CHECK((x.bdd_ite(y, y, o) == y));
+		CHECK((x.bdd_ite(y, hbdd::build(tau::get("0", opts), o), o)
+			== xy));
+		CHECK((hbdd::bdd_and_many({x, y}, o) == xy));
+		CHECK((hbdd::bdd_or_many({x, y}, o) == x_or_y));
+		// compose: x[x := y] == y (single and simultaneous forms)
+		CHECK((x.bdd_compose(tx, y, o) == y));
+		CHECK((x.bdd_compose({{tx, y}}, o) == y));
+	}
+
+	TEST_CASE("handle bdd_ex/bdd_all accept a const trefs&") {
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		tau_term_bdd<node_t>::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		hbdd::order o {{tx, 0}, {ty, 1}};
+		const trefs v {tx};
+		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		hbdd y  = hbdd::build(tau::get("y", opts), o);
+		hbdd f  = hbdd::build(tau::get("0", opts), o);
+		CHECK((xy.bdd_ex(v, o) == y));
+		CHECK((xy.bdd_all(v, o) == f));
 	}
 }

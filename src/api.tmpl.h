@@ -52,6 +52,129 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_blast_placement(int site) {
+	blast_placement = (site >= static_cast<int>(blast_site::per_leaf)
+		&& site <= static_cast<int>(blast_site::per_formula))
+			? static_cast<blast_site>(site) : blast_site::per_leaf;
+}
+
+template <NodeType node>
+void api<node>::set_blast_method(int mode) {
+	blast_method = (mode >= static_cast<int>(blast_mode::anti_prenex_result)
+		&& mode <= static_cast<int>(blast_mode::defer))
+			? static_cast<blast_mode>(mode)
+			: blast_mode::anti_prenex_result;
+}
+
+template <NodeType node>
+void api<node>::set_solver_placement(int site) {
+	solver_placement = (site >= static_cast<int>(solver_site::eager)
+		&& site <= static_cast<int>(solver_site::per_formula))
+			? static_cast<solver_site>(site) : solver_site::eager;
+}
+
+template <NodeType node>
+void api<node>::set_cvc5_options(int set) {
+	cvc5_options = (set >= static_cast<int>(cvc5_option_set::baseline)
+		&& set <= static_cast<int>(cvc5_option_set::combined_best))
+			? static_cast<cvc5_option_set>(set)
+			: cvc5_option_set::ext_rewrite_no_models;
+}
+
+// The two block budgets keep SIZE_MAX as their internal "unlimited" sentinel
+// (their loops decrement them); the option surface says 0 = unlimited, so the
+// setters translate.
+template <NodeType node>
+void api<node>::set_block_max_splits(size_t n) {
+	block_boole_max_splits = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
+void api<node>::set_block_max_rounds(size_t n) {
+	block_max_rounds = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
+void api<node>::set_max_blast_reentry_depth(size_t n) {
+	max_blast_reentry_depth = n;
+}
+
+template <NodeType node>
+void api<node>::set_block_squeeze_cap(size_t n) {
+	block_squeeze_cap = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_fixpoint_steps(size_t n) {
+	max_fixpoint_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_flag_search_steps(size_t n) {
+	max_flag_search_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_def_passes(size_t n) {
+	max_def_passes = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_enum_steps(size_t n) {
+	max_enum_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_rewrite_rounds(size_t n) {
+	max_rewrite_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_simplify_rounds(size_t n) {
+	max_simplify_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_gc_min_size(size_t n) {
+	interpreter<node>::gc_min_size = n;
+}
+
+template <NodeType node>
+void api<node>::set_gc_growth_factor(double f) {
+	interpreter<node>::gc_growth_factor = f;
+}
+
+template <NodeType node>
+void api<node>::set_spec_size_warn(size_t n) {
+	interpreter<node>::spec_size_warn_threshold = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_revision_alts(size_t n) {
+	interpreter<node>::max_revision_alts = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_consistency_subsets(size_t n) {
+	max_consistency_subsets = n;
+}
+
+template <NodeType node>
+void api<node>::set_cache_bound(size_t n) {
+	cache_bound = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_cover_products(size_t n) {
+	max_cover_products = n;
+}
+
+template <NodeType node>
+void api<node>::set_pwr_semantic_fallback(bool on) {
+	pwr_semantic_fallback = on;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }
@@ -100,33 +223,56 @@ tref api<node>::get_term(const std::string& input, bool simplified) {
 
 template <NodeType node>
 tref api<node>::get_formula(const std::string& input, bool simplified) {
-	return tau::get(input, get_options<node>(tau::wff, simplified));
+	tref fm = tau::get(input, get_options<node>(tau::wff, simplified));
+	if (!fm) return fm;
+	// An io_var's input/output bit is set while parsing a *spec*, so parsing
+	// a bare wff leaves every io_var classified as neither -- and consumers
+	// that need the distinction (transform_io_var,
+	// existentially_quantify_output_streams, the LTL/PWR pipelines) then
+	// reject it or, worse, silently treat inputs as outputs. Resolve here so
+	// the same text yields the same classification whether it arrives as a
+	// formula or inside a spec; this mirrors what get_nso_rr already does for
+	// a bare wff/bf.
+	return resolve_io_vars<node>(
+		*definitions<node>::instance().get_io_context(), fm);
 }
 
 template <NodeType node>
 tref api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
-	tref def = get_definition(function_def, true); // Always simplify to resolve refs
+	// AP1-5: parse and validate BEFORE registering -- routing through
+	// get_definition registered unconditionally, so a rejected
+	// definition stayed in the global store and leaked into later
+	// apply_defs_to_spec calls.
+	tref def = tau::get(function_def,
+		get_options<node>(tau::rec_relation, true));
 	if (!def) return nullptr;
 	// The second child of a rec_relation is the body;
-	// accept only bf or ref (ref may resolve to a bf later)
+	// accept bf or ref (a ref body may resolve to a bf later --
+	// AP1-26: the code rejected refs while doc and the predicate
+	// sibling accepted them)
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::bf) return def;
-	return nullptr;
+	if (nt != tau::bf && nt != tau::ref) return nullptr;
+	add_definition(tau::get(def).first(), tau::get(def).second());
+	return def;
 }
 
 template <NodeType node>
 tref api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
-	tref def = get_definition(predicate_def, true); // Always simplify to resolve refs
+	// AP1-5: parse and validate BEFORE registering (see get_function_def).
+	tref def = tau::get(predicate_def,
+		get_options<node>(tau::rec_relation, true));
 	if (!def) return nullptr;
 	// TODO we could pre resolve all refs to wff
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::wff || nt == tau::ref) return def;
-	return nullptr;
+	if (nt != tau::wff && nt != tau::ref) return nullptr;
+	add_definition(tau::get(def).first(), tau::get(def).second());
+	return def;
 }
 
 template <NodeType node>
 tref api<node>::get_stream_def(const std::string& stream_def) {
 	tref def = tau::get(stream_def, get_options<node>(tau::stream_def, true));
+	if (!def) return nullptr;
 	return tau::trim(def);
 }
 
@@ -156,7 +302,10 @@ size_t api<node>::add_definition(tref head, tref body) {
 	}
 	DBG(TAU_LOG_TRACE << "add_definition/adding head: " << LOG_FM_DUMP(head);)
 	DBG(TAU_LOG_TRACE << "add_definition/adding body: " << LOG_FM_DUMP(body);)
-	return definitions<node>::instance().add(tau::geth(head), tau::geth(body));
+	// AP1-6: 1-based -- the store's 0-based index made the very first
+	// definition return 0, the documented failure value.
+	return definitions<node>::instance().add(
+		tau::geth(head), tau::geth(body)) + 1;
 }
 
 template <NodeType node>
@@ -173,16 +322,30 @@ template <NodeType node>
 tref api<node>::get_spec_or_term(const std::string& expression, bool simplified) {
 	// Try parsing as a full spec first (which handles multiline and
 	// formula inputs); fall back to a bare bf term if that fails.
-	tref       expr = get_spec(expression);
+	// AP1-18: the spec attempt is quiet -- its parse errors are logged
+	// only when the term fallback ALSO fails, so a legitimate bare term
+	// no longer emits spurious ERROR lines on the successful path.
+	tau_spec<node> spec;
+	tref expr = spec.parse(expression) ? spec.get() : nullptr;
 	if (!expr) expr = get_term(expression, simplified);
+	if (!expr)
+		for (const auto& error : spec.errors())
+			TAU_LOG_ERROR << error;
 	return expr;
 }
 
 template <NodeType node>
 tref api<node>::get_formula_or_term(const std::string& expr, bool simplified) {
 	tref e = tau::get(expr, get_options<node>(tau::fm_or_term, simplified));
-	if (e) return tau::trim(e);
-	return nullptr;
+	if (!e) return nullptr;
+	e = tau::trim(e);
+	// AP1-32: classify io_vars like get_formula does, so the same text
+	// yields the same tree through either entry (downstream re-resolution
+	// hid the difference from sat machinery, but the trees differed).
+	if (tau::get(e).is(tau::wff))
+		e = resolve_io_vars<node>(
+			*definitions<node>::instance().get_io_context(), e);
+	return e;
 }
 
 // Querying
@@ -237,7 +400,19 @@ tref api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 
 template <NodeType node>
 tref api<node>::apply_all_defs(tref expr) {
-	return apply_defs(subtree_set<node>{}, expr);
+	// AP1-4: this must apply the globally registered definitions --
+	// routing through apply_defs({}) applied nothing, so after
+	// get_definition() the dnf/cnf/nnf/solve/lgrs pipelines received
+	// refs unexpanded, contradicting the documented contract. Mirrors
+	// the normalizer's apply_defs_to_spec.
+	if (!expr) return nullptr;
+	auto maybe_nso_rr = get_nso_rr(expr);
+	if (!maybe_nso_rr) return nullptr;
+	auto& nso_rr = maybe_nso_rr.value();
+	const auto& defs = definitions<node>::instance().get_sym_defs();
+	nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
+		defs.begin(), defs.end());
+	return nso_rr_apply<node>(nso_rr);
 }
 
 
@@ -472,18 +647,45 @@ bool api<node>::realizable(tref fm) {
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value())
 		return fast.value();
+	// normalize_formula() returns nullptr on failures that are reachable
+	// from user input: a non-well-founded recurrence, a definition set
+	// whose expansion never settles, a fallback type mismatch, or a
+	// get_nso_rr failure. is_tau_formula_sat() dereferences its argument
+	// immediately, so the null has to be caught here.
 	tref nf = normalize_formula(fm);
-	// A data quantifier under a full-LTL operator survives normalization;
-	// feeding that residue to is_tau_formula_sat breaks its no-quantifier
-	// invariant, so route the RAW formula to the LTL-ABA solver instead.
-	if (nf && has_ltl_operators<node>(fm)
-		&& tau::get(nf).find_top(is_quantifier<node>))
-		return is_tau_formula_sat<node>(fm, 0, true);
-	return is_tau_formula_sat<node>(nf, 0, true);
+	if (!nf) {
+		TAU_LOG_ERROR << "Could not normalize the formula; "
+			"its satisfiability cannot be decided";
+		return false;
+	}
+	// LT-7: the synthesis backend reports "no verdict" by throwing
+	// ltl_synthesis_error -- a timed-out, killed or misused ltlsynt is NOT an
+	// UNREALIZABLE answer.  Nothing below this layer catches it, so without a
+	// handler here a slow specification would terminate the process instead of
+	// answering.  Convert it into a logged error verdict, the same shape the
+	// normalize_formula null-gate above uses.  The verdict is `false`, but the
+	// log says UNKNOWN so it is not mistaken for a decided UNREALIZABLE.
+	try {
+		// A data quantifier under a full-LTL operator survives normalization;
+		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
+		// invariant, so route the RAW formula to the LTL-ABA solver instead.
+		if (has_ltl_operators<node>(fm)
+			&& tau::get(nf).find_top(is_quantifier<node>))
+			return is_tau_formula_sat<node>(fm, 0, true);
+		return is_tau_formula_sat<node>(nf, 0, true);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); realizability could not be decided";
+		return false;
+	}
 }
 
 template <NodeType node>
 bool api<node>::unrealizable(tref fm) {
+	// AP1-11: null input is invalid, not "unrealizable" -- match the
+	// htref overload's false (a bool API cannot express errors, and
+	// claiming a verdict for unparseable input is the worse lie).
+	if (!fm) return false;
 	return !realizable(fm);
 }
 
@@ -502,6 +704,9 @@ bool api<node>::sat(tref fm) {
 
 template <NodeType node>
 bool api<node>::unsat(tref fm) {
+	// AP1-11: null input is invalid, not "unsatisfiable" (see
+	// unrealizable above).
+	if (!fm) return false;
 	return !sat(fm);
 }
 
@@ -519,8 +724,23 @@ bool api<node>::valid_spec(tref fm) {
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value())
 		return fast.value();
-	// Valid iff T (tautology) implies the normalized formula
-	return is_tau_impl<node>(tau::_T(), normalize_formula(fm));
+	// Same null contract as realizable(): is_tau_impl() normalizes both
+	// arguments straight away and cannot be handed a null formula.
+	tref nfm = normalize_formula(fm);
+	if (!nfm) {
+		TAU_LOG_ERROR << "Could not normalize the formula; "
+			"its validity cannot be decided";
+		return false;
+	}
+	// Valid iff T (tautology) implies the normalized formula.
+	// Same synthesis-failure gate as realizable() -- see the note there.
+	try {
+		return is_tau_impl<node>(tau::_T(), nfm);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); validity could not be decided";
+		return false;
+	}
 }
 
 
@@ -582,7 +802,11 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return {};
 	}
-	// Exclude non-Boolean operations from equation
+	// Exclude non-Boolean operations from equation. The two sides live under
+	// the bf_eq, not under `eq`: `eq` is the wff wrapping it and has a
+	// single child, so indexing it with [1] tripped the `c != nullptr`
+	// assert in tree<node>::child_tree (Debug) and read a null child
+	// (Release).
 	if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
 		tau::get(equality)[1].find_top(is_non_boolean_term<node>)) {
 		TAU_LOG_ERROR << "Found non-Boolean operation in equation";
@@ -622,7 +846,16 @@ std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	if (has_free_vars<node>(normalized)) return {};
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	return interpreter<node>::make_interpreter(normalized, ctx);
+	// LT-7: make_interpreter reaches ltlsynt through
+	// ltl_to_safety_formula_full; a backend failure must not terminate the
+	// caller.  No interpreter is the honest answer here.
+	try {
+		return interpreter<node>::make_interpreter(normalized, ctx);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); the specification could not be compiled";
+		return {};
+	}
 }
 
 template <NodeType node>
@@ -653,7 +886,15 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	if (has_free_vars<node>(normalized)) return {};
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	return interpreter<node>::make_interpreter(normalized, ctx);
+	// See the tref overload: synthesis-backend failures are answered, not
+	// propagated.
+	try {
+		return interpreter<node>::make_interpreter(normalized, ctx);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); the specification could not be compiled";
+		return {};
+	}
 }
 
 // private helper methods
@@ -665,7 +906,9 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 template <NodeType node>
 std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 	rr<node> nso_rr;
-	auto ctx = *definitions<node>::instance().get_io_context();
+	// AP1-16: by reference -- copying the io_context (three subtree maps
+	// + remaps + console factory) per call was pure waste; all uses read.
+	auto& ctx = *definitions<node>::instance().get_io_context();
 	if (contains(expr, tau::ref)) {
 		typename node::type type = tau::get(expr).get_type();
 		if (type == tau::spec) {
@@ -698,7 +941,7 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 		return nullptr;
 	}
 	defs.get_io_context()->update_types(result.second);
-	defs.set_global_scope(result.second);
+	defs.set_global_scope(std::move(result.second));
 
 	// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.
 	// This arises because the CFG parser is ambiguous: G(X) && G(Y) can

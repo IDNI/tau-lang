@@ -76,12 +76,19 @@ struct type_scoped_resolver {
 	 */
 	element insert(tref n);
 	/**
-	 * @brief Return the type id assigned to @p n, or 0 if unknown.
+	 * @brief Return the type id assigned to @p n, or
+	 * `untyped_type_id<node>()` if none is known.
+	 *
+	 * Not a const lookup (LS-19): @p n is inserted into the current scope
+	 * if absent, and an untyped entry is recorded for its root.
 	 * @param n Formula node to query.
 	 */
 	type_id type_id_of(tref n);
 	/**
 	 * @brief Return the scope level at which @p n was registered.
+	 *
+	 * Not a const lookup (LS-19): @p n is inserted into the current scope
+	 * if absent.
 	 * @param n Formula node to query.
 	 */
 	scope scope_of(tref n);
@@ -171,7 +178,11 @@ template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 /**
- * @brief Open a scope constraining @p refs to have the same type @p inferred_type.
+ * @brief Assign @p default_type to every ref in @p refs IN THE CURRENT scope.
+ *
+ * LS-19: despite the name, this overload never opens a scope (the map and
+ * list overloads delegate here after unifying); it inserts each ref and
+ * assigns the type where it stands.
  * @tparam node Tree node type.
  * @return Unified type id, or `inference_error` on conflict.
  */

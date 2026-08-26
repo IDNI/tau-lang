@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "tau_tree.h"
+#include "ba_constants.h"
 #include "splitter_types.h"
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 
@@ -179,12 +180,25 @@ struct nlang_ba {
 		return (*this | o) & ~(*this & o);
 	}
 
-	// Semantic equality: fast structural path first, then oracle
+	// Structural equality (BA1-8): operator== must be consistent with
+	// std::hash (which hashes to_string()) and with the string-based
+	// `<`/`<=>` below -- a semantic (oracle) == let two equal keys hash
+	// differently, breaking any unordered container keyed on nlang_ba,
+	// and fired blocking HTTP from the constant-pool dedup scan
+	// (ba_constants::get compares variants pairwise on every insertion).
 	bool operator==(const nlang_ba& o) const {
+		return fm->struct_eq(*o.fm);
+	}
+	bool operator!=(const nlang_ba& o) const { return !(*this == o); }
+
+	// Semantic equivalence via the DeepSeek oracle: structural fast path
+	// first, then the network check (blocking I/O, 15s timeout). For
+	// callers that genuinely want LLM-judged equivalence -- never for
+	// container keys or pooling identity.
+	bool semantically_equal(const nlang_ba& o) const {
 		if (fm->struct_eq(*o.fm)) return true;
 		return llm_equivalent(to_string(), o.to_string());
 	}
-	bool operator!=(const nlang_ba& o) const { return !(*this == o); }
 
 	// Fast structural check only (no oracle) — required by BA dispatcher
 	bool operator==(bool b) const {
@@ -256,12 +270,58 @@ inline bool nlang_struct_is_one(const nlang_ba::fptr& f) {
 
 // --- free functions expected by the dispatcher ---
 
+// BA1-9: the dispatcher's is_syntactic_zero/one contract is a CHEAP check on
+// the normalization hot path, so these probes are oracle-free: atoms and
+// unresolved compounds answer false instead of costing an HTTPS round-trip
+// (with a 15s timeout) per uncached atom -- and offline they no longer
+// degrade to a silent false that LOOKS like a verdict. Oracle-backed
+// emptiness/universality stays in normalize_nlang below, which folds
+// contradictions/tautologies to bot/top so later syntactic probes see them
+// structurally.
+inline bool nlang_syntactic_is_one(const nlang_ba::fptr& f);
+
+inline bool nlang_syntactic_is_empty(const nlang_ba::fptr& f) {
+	using K = nlang_ba::formula::kind;
+	switch (f->k) {
+	case K::bot:  return true;
+	case K::top:  return false;
+	case K::atom: return false;
+	case K::not_: return nlang_syntactic_is_one(f->inner);
+	case K::and_:
+		if (nlang_syntactic_is_empty(f->lhs)
+			|| nlang_syntactic_is_empty(f->rhs)) return true;
+		return f->lhs->is_complement_of(*f->rhs);
+	case K::or_:
+		return nlang_syntactic_is_empty(f->lhs)
+			&& nlang_syntactic_is_empty(f->rhs);
+	}
+	return false;
+}
+
+inline bool nlang_syntactic_is_one(const nlang_ba::fptr& f) {
+	using K = nlang_ba::formula::kind;
+	switch (f->k) {
+	case K::top:  return true;
+	case K::bot:  return false;
+	case K::atom: return false;
+	case K::not_: return nlang_syntactic_is_empty(f->inner);
+	case K::or_:
+		if (nlang_syntactic_is_one(f->lhs)
+			|| nlang_syntactic_is_one(f->rhs)) return true;
+		return f->lhs->is_complement_of(*f->rhs);
+	case K::and_:
+		return nlang_syntactic_is_one(f->lhs)
+			&& nlang_syntactic_is_one(f->rhs);
+	}
+	return false;
+}
+
 inline bool is_nlang_zero(const nlang_ba& x) {
-	return nlang_struct_is_empty(x.fm);
+	return nlang_syntactic_is_empty(x.fm);
 }
 
 inline bool is_nlang_one(const nlang_ba& x) {
-	return nlang_struct_is_one(x.fm);
+	return nlang_syntactic_is_one(x.fm);
 }
 
 // Normalize: reduce contradictions to bottom, tautologies to top.
@@ -371,23 +431,7 @@ requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
 	const std::string& src)
 {
-	std::string s = src;
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	auto last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	// Strip surrounding braces
-	if (!s.empty() && s.front() == '{' && s.back() == '}')
-		s = s.substr(1, s.size() - 2);
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	// Strip surrounding quotes
-	if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
-		s = s.substr(1, s.size() - 2);
-	else if (s.size() >= 2 && s.front() == '\'' && s.back() == '\'')
-		s = s.substr(1, s.size() - 2);
+	std::string s = strip_ba_constant_source(src, /*strip_quotes=*/true);
 
 	if (s.empty()) return {};
 

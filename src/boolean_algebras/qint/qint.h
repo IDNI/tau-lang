@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "ba_constants.h"
 #include "splitter_types.h"
 #include "boolean_algebras/qint/parser/qint_parser.generated.h"
 
@@ -38,6 +39,12 @@ template <NodeType node> size_t qint_type_id();
 // extended real line boundaries.
 // Top element:    single entry { -inf -> +inf }
 // Bottom element: empty map
+//
+// Integer-literal semantics (BA1-7): in `{n}:qint` sources the bare integers
+// 0 and 1 are the ALGEBRAIC constants bottom and top, NOT intervals; every
+// other integer n denotes the interval [n, n+1). Consequently [0,1) and
+// [1,2) are unreachable through bare-integer syntax -- write them as
+// explicit intervals instead.
 // -----------------------------------------------------------------------------
 
 namespace qint_detail {
@@ -100,6 +107,11 @@ bool is_qint_one (const qint& x);
 qint normalize_qint(const qint& x);
 tref simplify_qint_symbol(tref sym);
 tref simplify_qint_term(tref t);
+/// BA1-5 contract note: unlike sbf_splitter (which honors every
+/// splitter_type and always makes progress), this splitter ignores @p st
+/// and MAY RETURN @p x UNCHANGED when the element is atomic/degenerate
+/// (e.g. a singleton piece). Callers looping "split until proper subset"
+/// must guard against a fixpoint.
 qint qint_splitter(const qint& x, splitter_type st);
 qint qint_splitter_one();
 

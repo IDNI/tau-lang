@@ -77,9 +77,16 @@ private:
 	std::vector<std::string> parts_{}; // TODO remove this if found unnecessary
 	std::deque<tref> parsed_{};
 	std::optional<std::string> eof_msg_{};
+	// GR-R4: set when get() recorded eof_msg_ in errors_; a later
+	// continuation parse() removes that entry again (non-sticky).
+	bool eof_error_reported_ = false;
 	std::vector<std::string> errors_{};
 	trefs defs_{};
 	tref main_ = nullptr;
+
+	// TT2-2: the streaming operator reads parts_/parsed_.
+	template <NodeType n>
+	friend std::ostream& operator<<(std::ostream&, const tau_spec<n>&);
 };
 
 /**

@@ -13,6 +13,10 @@
 #define __IDNI__TAU__OCFUNCS_H__
 
 #include "normalizer.h"
+// LOG_ERROR & friends.  Included directly rather than relied on transitively:
+// the transitive path happens to exist in Debug but not in Release, where
+// ocfuncs.tmpl.h failed to compile with "'LOG_ERROR' was not declared".
+#include "logging.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -167,6 +171,17 @@ tref ocfuncs_generate_ltl(tref fm, const OCFuncsContext& ctx);
 // propositional LTL formula suitable for synthesis.
 //
 // This is the OCFuncs algorithm: Steps 1-6.
+//
+// V1 STATUS — NOT IMPLEMENTED.  Steps 1, 2 and 4 are real; Steps 3, 5 and 6
+// are stubs: `ocfuncs_enumerate_profiles` emits a single hardcoded profile
+// (type_id = 0), `ocfuncs_eliminate_quantifiers` is a pass-through, and
+// `ocfuncs_generate_ltl` returns `bf_func_app` nodes unchanged with an empty
+// "static consistency constraints" loop body.  Running the pipeline therefore
+// hands back the input essentially unchanged, which is NOT the propositional
+// LTL formula this contract used to promise.
+//
+// Until those steps are real, `ocfuncs_compile` logs an error and returns
+// nullptr rather than returning a formula that only looks compiled.
 template <NodeType node>
 tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls);
 
@@ -185,9 +200,15 @@ void resolve_func_decl_types(FuncDecl& decl);
 template <NodeType node>
 void resolve_func_decl_types(std::vector<FuncDecl>& decls);
 
-// Check if a formula contains function applications
+// Check whether `fm` applies any of the DECLARED functions.
+//
+// The declarations are required, not optional: at parse time a function
+// application is indistinguishable from a recursive-relation reference —
+// `g(o1[t])` and an rr call both parse to `bf_ref > ref > { sym, ref_args }`
+// (`bf_func_app` never appears in a parsed formula).  Only the declaration set
+// says which symbols are OCFuncs functions.
 template <NodeType node>
-bool has_func_applications(tref fm);
+bool has_func_applications(tref fm, const std::vector<FuncDecl>& decls);
 
 } // namespace idni::tau_lang
 

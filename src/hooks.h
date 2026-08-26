@@ -73,8 +73,6 @@ private:
 	static inline const tree<node>& quantifier(const tref* ch);
 	/// @brief Return the quantified formula child from @p ch.
 	static inline const tree<node>& quantified_formula(const tref* ch);
-	/// @brief Return `true` if the children @p ch have a BA-type mismatch.
-	static inline bool check_type_mismatch(const tref* ch);
 
 	// hooks
 	/// @brief Construct the typed BF constant `0` for BA type @p ba_type.
@@ -137,8 +135,11 @@ private:
 	static tref wff_sometimes  (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_always` (universal-temporal) nodes.
 	static tref wff_always     (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Hook for `wff_A` (universal path quantifier) nodes.
 	static tref wff_A          (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Hook for `wff_E` (existential path quantifier) nodes.
 	static tref wff_E          (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Hook for `wff_semantic_neg` (semantic negation, `-`) nodes.
 	static tref wff_semantic_neg(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_conditional` (if-then-else) nodes.
 	static tref wff_conditional(const node& v, const tref* ch, size_t len, tref r);
