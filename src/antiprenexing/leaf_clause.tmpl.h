@@ -135,7 +135,11 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		note_type(t);
 		return false;
 	};
-	for (tref c : conjs) pre_order<node>(c).visit(type_scan);
+	// Pure structural scan (get_ba_type only), so a shared subtree
+	// contributes the same note_type/types_homogeneous result every time
+	// it's reached -- visit_unique is sound and avoids re-walking it once
+	// per path on a blasted DAG.
+	for (tref c : conjs) pre_order<node>(c).visit_unique(type_scan);
 	if (!types_homogeneous) {
 		LOG_ERROR << "eliminate_block_over_clause: dependent conjuncts "
 			"mix BA types, keeping the quantifier block: "

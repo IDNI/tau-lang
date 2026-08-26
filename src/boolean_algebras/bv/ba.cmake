@@ -15,6 +15,7 @@ set(TAU_BA_TESTS
 	tests/test_integration-blasting_correctness_check5.cpp
 	tests/test_integration-bv_hooks.cpp
 	tests/test_integration-heuristics-bv_ba_custom_simplification.cpp
+	tests/test_integration-heuristics-bv_ba_custom_simplification_equivalence.cpp
 	tests/test_integration-heuristics-bv_ba_cvc5_simplification.cpp
 	tests/test_integration-heuristics-bv_predicate_blasting.cpp
 	tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp

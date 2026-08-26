@@ -1,3 +1,5 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
 // Explicit template instantiations for the BA pack used by every
 // test binary and by the production CLI binaries.
 //
@@ -52,8 +54,9 @@ template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tre
 template tref nso_rr_apply             <bool_node_t>(const rr<bool_node_t>&);
 template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
 
-// The hardcoded fixtures of tests/test_Bool_helpers.h and
-// tests/test_sbf_ba_helpers.h, which name bv and sbf whatever the pack is.
+// The hardcoded fixtures of tests/test_Bool_helpers.h,
+// tests/test_sbf_ba_helpers.h and tests/test_sbf_only_helpers.h, which name
+// bv and sbf whatever the pack is.
 #ifdef TAU_PACK_HAS_BA_BV
 
 using bv_bool_node_t = node<bv, Bool>;
@@ -70,5 +73,16 @@ template struct get_hook<bv_sbf_node_t>;
 
 #endif // TAU_PACK_HAS_BA_SBF
 #endif // TAU_PACK_HAS_BA_BV
+
+// The sbf-only fixture of tests/test_sbf_only_helpers.h; guarded on its own
+// since a pack can hold sbf without bv (e.g. -DTAU_BAS=sbf,tau,qint).
+#ifdef TAU_PACK_HAS_BA_SBF
+
+using sbf_bool_node_t = node<sbf_ba, Bool>;
+
+template struct tree    <sbf_bool_node_t>;
+template struct get_hook<sbf_bool_node_t>;
+
+#endif // TAU_PACK_HAS_BA_SBF
 
 } // namespace idni::tau_lang

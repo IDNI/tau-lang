@@ -496,12 +496,9 @@ TEST_SUITE("bv stress check: single rule execution") {
 
 	// Template 5 declares four existential bv locals and binds two of them
 	// to large additive terms containing shifts and `!|`/`!^`. Normalizing
-	// one such rule did not terminate within 25 minutes under the old
-	// bv_blasting=true default -- it is the term size rather than the
-	// bitvector width that drives it: the same rule at bv[2] is no faster
-	// than at bv[8], while cutting either summand of the `s2` term down
-	// makes it return instantly. Passes fast under the shipped defaults
-	// (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	// one such rule used to blow up, driven by term size rather than
+	// bitvector width -- not a defect of the block simplification this
+	// suite otherwise covers. Now completes in ~2s.
 	TEST_CASE("template 5: network style locals") {
 		check_template(5);
 	}

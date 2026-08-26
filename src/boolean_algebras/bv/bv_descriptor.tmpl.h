@@ -165,6 +165,23 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
+	 * @brief `true` when predicate blasting can make progress on @p form.
+	 *
+	 * Blasting rewrites embedded bv arithmetic/comparisons into per-bit
+	 * predicates; it has nothing to rewrite when `is_bv_solvable_formula`
+	 * rejected @p form because some variable's ba_type falls outside the bv
+	 * family (`non_bv_variable`) -- every other rejection (an unresolved
+	 * ref, a missing bitwidth, no bv content at all) leaves that judgment to
+	 * the caller, so this only answers `false` for the one reason blasting
+	 * itself can never resolve.
+	 */
+	static bool formula_is_preprocessable(tref form) {
+		bv_unsolvable_reason reason = bv_unsolvable_reason::ok;
+		is_bv_solvable_formula<node_t>(form, reason);
+		return reason != bv_unsolvable_reason::non_bv_variable;
+	}
+
+	/**
 	 * @brief `true` when @p term's own arithmetic operator has the constant
 	 * argument predicate blasting needs.
 	 *

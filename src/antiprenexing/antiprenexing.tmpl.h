@@ -353,7 +353,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				note_type(t);
 				return false;
 			};
-			pre_order<node>(f).visit(type_scan);
+			// Pure structural scan (get_ba_type only), so a shared subtree
+			// contributes the same note_type/homogeneous result every time
+			// it's reached -- visit_unique is sound and avoids re-walking
+			// it once per path on a blasted DAG.
+			pre_order<node>(f).visit_unique(type_scan);
 			// Decline rather than build a mixed-type bf_or: a matrix
 			// mixing e.g. sbf and tau atoms would otherwise be combined
 			// by build_bf_or under whichever type happened to come first.
@@ -2004,11 +2008,19 @@ using tau = tree<node>;
 					// we cannot decide, not that the formula is false.
 					const trefs& fv = get_free_vars<node>(n);
 					if (fv.empty()) {
-						std::optional<bool> status =
-							pack_sat_status<node>(n);
-						if (status == true) return tau::_T();
-						if (status == false) return tau::_F();
-						DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
+						// Same residue screen as the open branch below: `n`
+						// may already carry a preprocessing-introduced
+						// quantifier alternation from a prior pass, even
+						// though this call adds no new binder itself --
+						// screening avoids handing the solver a closed
+						// query it cannot terminate on.
+						if (!pack_has_preprocessing_residue<node>(n)) {
+							std::optional<bool> status =
+								pack_sat_status<node>(n);
+							if (status == true) return tau::_T();
+							if (status == false) return tau::_F();
+							DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
+						}
 					} else if (!pack_has_preprocessing_residue<node>(n)) {
 						// The residue screen is what keeps this branch
 						// from hanging the process. Closing the free
@@ -2097,8 +2109,17 @@ using tau = tree<node>;
 							== false) return tau::_F();
 					}
 				}
+				// Blasting can only make progress on a scope the owning
+				// algebra's preprocessing classifies as still rewritable
+				// (embedded arithmetic/comparisons it can turn into
+				// predicates). A variable typed outside that algebra's
+				// family leaves nothing for its preprocessing to rewrite,
+				// so blasting cannot close that gap; leave it unresolved
+				// for the outer machinery instead, like every other
+				// give-up path here.
 				if (bv_blasting
-					&& blast_placement == blast_site::per_leaf)
+					&& blast_placement == blast_site::per_leaf
+					&& pack_formula_is_preprocessable<node>(n))
 					if (auto blasted = pack_preprocess<node>(n);
 						blasted && blasted != n)
 						return blasted;

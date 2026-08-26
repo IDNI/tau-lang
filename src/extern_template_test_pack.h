@@ -1,3 +1,5 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
 // Extern-template declarations matching src/instantiate_test_pack.cpp.
 //
 // Force-included into every test TU by tests/CMakeLists.txt's `add()`
@@ -64,6 +66,17 @@ extern template struct get_hook<bv_sbf_node_t>;
 
 #endif // TAU_PACK_HAS_BA_SBF
 #endif // TAU_PACK_HAS_BA_BV
+
+// Mirrors src/instantiate_test_pack.cpp's sbf-only fixture; guarded on its
+// own since a pack can hold sbf without bv (e.g. -DTAU_BAS=sbf,tau,qint).
+#ifdef TAU_PACK_HAS_BA_SBF
+
+using sbf_bool_node_t = node<sbf_ba, Bool>;
+
+extern template struct tree    <sbf_bool_node_t>;
+extern template struct get_hook<sbf_bool_node_t>;
+
+#endif // TAU_PACK_HAS_BA_SBF
 
 } // namespace idni::tau_lang
 

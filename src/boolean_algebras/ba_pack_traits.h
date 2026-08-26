@@ -254,6 +254,38 @@ Form pack_preprocess(Form form) {
 	return out;
 }
 
+/** @brief `true` when @p BA's descriptor classifies a formula's preprocessability. */
+template <typename Node, typename BA, typename Form>
+concept ba_classifies_preprocessing = ba_has_descriptor_v<Node, BA>
+	&& requires(Form f) {
+		ba_descriptor<BA, Node>::formula_is_preprocessable(f);
+	};
+
+/**
+ * @brief `true` when some BA in the pack says its own preprocessing
+ * (@ref pack_preprocess) can still make progress on @p form.
+ *
+ * Formula-level sibling of @ref pack_term_is_blasteable: a BA that offers
+ * preprocessing may also classify which formulas it can actually rewrite, so
+ * a caller can skip the attempt instead of running preprocessing only to get
+ * @p form back unchanged (or, worse, transformed into a shape a later gate
+ * cannot make progress on either). No BA in the pack offering the
+ * classification means nothing can preprocess this formula, so this answers
+ * `false` -- which is the conservative-and-correct choice at the one call
+ * site that reads it: a BA that never offered preprocessing in the first
+ * place could not have made progress there regardless, so skipping the call
+ * skips no step that would otherwise have done something.
+ */
+template <typename Node, typename Form>
+bool pack_formula_is_preprocessable(Form form) {
+	bool out = false;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_classifies_preprocessing<Node, BA, Form>)
+			if (!out) out = ba_descriptor<BA, Node>::formula_is_preprocessable(form);
+	});
+	return out;
+}
+
 /**
  * @brief Switch every BA with a grammar of its own between var and charvar.
  *
