@@ -201,6 +201,7 @@ TEST_SUITE("leaf_clause direct calls") {
 	// to `equals_T()`/`equals_F()` assertions if the kept_set gate is ever
 	// narrowed to frozen-only (or the legacy rewire the region's comment
 	// anticipates lands) and the solver loop becomes reachable.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("blasteable closed conjunct: binder is kept, "
 		"not solver-decided (dead region pin)")
 	{
@@ -301,4 +302,5 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
+#endif // TAU_PACK_HAS_BA_BV
 }
