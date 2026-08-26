@@ -222,7 +222,7 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	}
 
 	// Compute D-bitmask for each T3 type and build the propositional
-	// skeleton φ*(D_i) (LS-12: shared helpers in ltl_aba_builders.tmpl.h).
+	// skeleton φ*(D_i) (LS-12: shared helpers in qlt_ltl_synthesis.tmpl.h).
 	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
 	std::string phi_star = rename_skeleton_props_to_d(
 		ltl_skeleton<node>(clause_and_update, atoms), K);

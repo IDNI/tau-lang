@@ -17,6 +17,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_LTL_SYNTHESIS_TMPL_H__
 
 #include <cctype>
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -29,12 +30,24 @@
 #include "ba_types.h"
 #include "boolean_algebras/qlt/omcat_constants.h"
 #include "boolean_algebras/qlt/qlt.h"
+// Unlike ltl_aba.h / normalizer.h, definitions.h only reaches io_context.h,
+// so it is safe to include directly here -- needed by the LA-10 constant-
+// output witness builder to resolve a freshly-parsed atom's io_vars.
+#include "definitions.h"
 #include "ltl_aba_result.h"
 
 namespace idni::tau_lang {
 
 // Defined in the LTL template files, which follow this one.
 std::pair<std::string, int> run_cmd(const std::string& cmd);
+
+// LT-21: exec'd directly (no shell, no escaping, no popen-throw) by
+// constant_output_realizable, which can call it up to CAP times per gate.
+// Declared without the real definition's default argument (ltl_aba_synthesis.tmpl.h)
+// to avoid a "redefinition of default argument" diagnostic; callers here pass
+// timeout_sec explicitly instead.
+static std::pair<std::string, int> spawn_capture(
+	const std::vector<std::string>& argv, int timeout_sec);
 
 std::pair<bool, std::string> call_ltlsynt(const std::string& formula,
 	const std::vector<std::string>& input_props,
@@ -49,6 +62,24 @@ std::string ltl_skeleton(tref fm,
 
 template <NodeType node>
 bool atom_has_any_input(tref atom);
+
+template <NodeType node>
+bool is_pure_input_atom(tref atom);
+
+template <NodeType node>
+tref resolve_io_vars(io_context<node>& ctx, tref fm);
+
+// LT-8 / LA-N1: used by the Algorithm D fast path to un-vacuate the ABA
+// oracle over the automaton's own d_i-named atoms (ltl_aba_normalization.tmpl.h).
+// Declared without the real definition's default arguments to avoid a
+// "redefinition of default argument" diagnostic; the one call site here
+// passes all four arguments explicitly.
+template <NodeType node>
+static void add_consistency_constraints(
+	const std::vector<std::pair<tref, std::string>>& atoms,
+	std::string& skeleton,
+	std::vector<std::string>* out_constraints,
+	bool polarity_complete);
 
 // ── Algorithm A: binary T_3 type encoding ────────────────────────────────────
 //
@@ -80,6 +111,15 @@ static bool is_algorithm_a_applicable(
 {
 	using tau = tree<node>;
 	if (atoms.empty()) return false;
+	// LG-9: bound K -- the A/B/D encodings compute 1 << K (signed-shift
+	// UB at K >= 31) and enumerate 2^K masks (exponential strings well
+	// before that). Mirrors semantic_pwr's cap.
+	if (atoms.size() > 20) {
+		LOG_WARNING << "[ltl_aba] " << atoms.size() << " data atoms "
+			"exceed the T3-encoding cap (20); falling back to the "
+			"default ABA-oracle path";
+		return false;
+	}
 	for (auto& [f, _] : atoms) {
 		if (!ba_descriptor<qlt, node>::owns_type(find_ba_type<node>(f))) return false;
 		auto bad = tau::get(f).find_top([](tref n) {
@@ -380,7 +420,11 @@ static std::optional<bool> eval_pure_output_atom_at(
 // constant output choice. This fast-path avoids the expensive Algorithm B
 // ltlsynt call for formulas with trivially-satisfiable U/W/R right-sides.
 template <NodeType node>
-static bool constant_output_realizable(
+// LA-10: on success, returns the WINNING assignment (output stream name →
+// T1 position of its constant value) instead of a bare true — the caller
+// materialises it as `always(⋀ o_k = c_k)` so the strategy survives into
+// execution and codegen instead of being discarded.
+static std::optional<std::map<std::string, int>> constant_output_realizable(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
 {
@@ -393,20 +437,20 @@ static bool constant_output_realizable(
 			if (!nm.empty() && nm[0] == 'o') out_names.insert(nm);
 		}
 	}
-	if (out_names.empty()) return false;
+	if (out_names.empty()) return std::nullopt;
 
 	auto constants = omcat::collect_qlt_constants<node>(fm);
 	int T1_size = 2 * (int)constants.size() + 1;
-	if (T1_size <= 0) return false;
+	if (T1_size <= 0) return std::nullopt;
 
 	std::vector<std::string> out_vec(out_names.begin(), out_names.end());
 	int n_out = (int)out_vec.size();
 	unsigned long long total_u = 1;
 	const unsigned long long CAP = 100ULL;
 	for (int i = 0; i < n_out; ++i) {
-		if (total_u > CAP) return false;
+		if (total_u > CAP) return std::nullopt;
 		total_u *= (unsigned long long)T1_size;
-		if (total_u > CAP) return false;
+		if (total_u > CAP) return std::nullopt;
 	}
 	long long total = (long long)total_u;
 
@@ -459,22 +503,66 @@ static bool constant_output_realizable(
 			if (!maybe_taut) continue;
 		}
 
-		// Shell-escape for single-quoted arg.
-		std::string escaped;
-		for (char c : phi) {
-			if (c == '\'') escaped += "'\\''";
-			else escaped += c;
-		}
-		std::string cmd = "ltlfilt -f '" + escaped + "' 2>/dev/null";
-		auto [out, rc] = run_cmd(cmd);
+		// LT-21: exec directly (no shell, no escaping, no popen-throw)
+		// -- this fast path runs up to CAP times on the default
+		// Algorithm-B gate, and run_cmd threw uncaught on popen
+		// failure.
+		auto [out, rc] = spawn_capture({ "ltlfilt", "-f", phi }, 0);
 		while (!out.empty() && std::isspace((unsigned char)out.back())) out.pop_back();
 		if (rc == 0 && out == "1") {
 			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
 			          << "(combo=" << combo << ")";
-			return true;
+			return var_pos;
 		}
 	}
-	return false;
+	return std::nullopt;
+}
+
+// LS-12: shared between solve_ltl_aba_algorithm_a and semantic_pwr_optimal
+// (qlt_semantic_pwr.tmpl.h), which used to carry verbatim copies of both loops.
+//
+// Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i holds (true or
+// undetermined) in T3 type t.
+template <NodeType node>
+static std::vector<int> qlt_type_A_bitmasks(
+	const std::vector<std::pair<tref, std::string>>& atoms,
+	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::Rat>& constants)
+{
+	std::vector<int> type_A(T3.size(), 0);
+	for (int i = 0; i < (int)atoms.size(); ++i)
+		for (int t = 0; t < (int)T3.size(); ++t) {
+			auto h = qlt_atom_holds_in_type3<node>(
+				atoms[i].first, T3[t], constants);
+			if (h != false) type_A[t] |= (1 << i);
+		}
+	return type_A;
+}
+
+// Rename the skeleton's p_i propositions to d_i on word boundaries,
+// highest index first so p1 is not clobbered while renaming p10.
+static inline std::string rename_skeleton_props_to_d(std::string phi_star,
+	int K)
+{
+	for (int i = K; i-- > 0; ) {
+		std::string fp = "p" + std::to_string(i);
+		std::string td = "d_" + std::to_string(i);
+		size_t pos = 0;
+		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
+			size_t end = pos + fp.size();
+			bool l_ok = pos == 0
+				|| (!std::isalnum((unsigned char)phi_star[pos-1])
+				    && phi_star[pos-1] != '_');
+			bool r_ok = end >= phi_star.size()
+				|| (!std::isalnum((unsigned char)phi_star[end])
+				    && phi_star[end] != '_');
+			if (l_ok && r_ok) {
+				phi_star.replace(pos, fp.size(), td);
+				pos += td.size();
+			} else pos = end;
+		}
+	}
+	return phi_star;
 }
 
 template <NodeType node>
@@ -491,19 +579,8 @@ solve_ltl_aba_algorithm_a(
 	if (n_types == 0) return std::nullopt;
 
 	int K = (int)atoms.size();
-	// atom_mask[i] = T₃ type indices where D_i holds (true or undetermined).
-	std::vector<std::vector<int>> atom_mask(K);
-	for (int i = 0; i < K; ++i)
-		for (int t = 0; t < n_types; ++t) {
-			auto h = qlt_atom_holds_in_type3<node>(atoms[i].first, T3[t], constants);
-			if (h != false) atom_mask[i].push_back(t); // true or undetermined: include
-		}
-
-	// Build per-T₃-type D-bitmask, then extract feasible (sigma, rho, A) triples.
-	std::vector<int> type_A(n_types, 0);
-	for (int i = 0; i < K; ++i)
-		for (int t : atom_mask[i])
-			type_A[t] |= (1 << i);
+	// Per-T₃-type D-bitmask, then extract feasible (sigma, rho, A) triples.
+	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
 
 	int T1_size = 2 * (int)constants.size() + 1;
 	std::vector<std::tuple<int,int,int>> feasible_set;
@@ -511,23 +588,9 @@ solve_ltl_aba_algorithm_a(
 	for (int t = 0; t < n_types; ++t)
 		feasible_set.emplace_back(T3[t].pos_m, T3[t].pos_y, type_A[t]);
 
-	// Build phi* skeleton and rename p_i → D_i (highest index first).
-	std::string phi_star = ltl_skeleton<node>(fm, atoms);
-	for (int i = K; i-- > 0; ) {
-		std::string fp = "p" + std::to_string(i);
-		std::string td = "d_" + std::to_string(i);
-		size_t pos = 0;
-		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-			size_t end = pos + fp.size();
-			bool l_ok = pos == 0 || (!std::isalnum((unsigned char)phi_star[pos-1])
-			                         && phi_star[pos-1] != '_');
-			bool r_ok = end >= phi_star.size()
-			         || (!std::isalnum((unsigned char)phi_star[end])
-			             && phi_star[end] != '_');
-			if (l_ok && r_ok) { phi_star.replace(pos, fp.size(), td); pos += td.size(); }
-			else pos = end;
-		}
-	}
+	// Build phi* skeleton and rename p_i → D_i.
+	std::string phi_star = rename_skeleton_props_to_d(
+		ltl_skeleton<node>(fm, atoms), K);
 
 	auto bundle = alg_a::build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star);
 	LOG_DEBUG << "[ltl_aba:algA] skeleton: " << bundle.formula;
@@ -611,23 +674,9 @@ solve_ltl_aba_algorithm_b(
 	std::vector<int> t2_pos_m(T2_size);
 	for (int s = 0; s < T2_size; ++s) t2_pos_m[s] = T2[s].pos_m;
 
-	// Build phi* skeleton and rename p_i → d_i.
-	std::string phi_star = ltl_skeleton<node>(fm, atoms);
-	for (int i = K; i-- > 0; ) {
-		std::string fp = "p" + std::to_string(i);
-		std::string td = "d_" + std::to_string(i);
-		size_t pos = 0;
-		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-			size_t end = pos + fp.size();
-			bool l_ok = pos == 0 || (!std::isalnum((unsigned char)phi_star[pos-1])
-			                         && phi_star[pos-1] != '_');
-			bool r_ok = end >= phi_star.size()
-			         || (!std::isalnum((unsigned char)phi_star[end])
-			             && phi_star[end] != '_');
-			if (l_ok && r_ok) { phi_star.replace(pos, fp.size(), td); pos += td.size(); }
-			else pos = end;
-		}
-	}
+	// Build phi* skeleton and rename p_i → d_i (LT-16: shared helper).
+	std::string phi_star = rename_skeleton_props_to_d(
+		ltl_skeleton<node>(fm, atoms), K);
 
 	auto bundle = alg_b::build_algorithm_b_skeleton(
 		T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star);
@@ -640,6 +689,10 @@ solve_ltl_aba_algorithm_b(
 
 	LtlAbaSolution<node> sol;
 	sol.aut = parse_hoa(hoa_text);
+	// The strategy is over the P_σ / R bookkeeping bits, not over the user's
+	// data atoms (`sol.atoms` is intentionally left empty), so it cannot be
+	// re-encoded as a safety formula.  See LtlAbaSolution::executable (LT-6).
+	sol.executable = false;
 	return sol;
 }
 
@@ -671,49 +724,57 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 		int K = (int)sol.atoms.size();
 		int T1_size = 2 * (int)constants.size() + 1;
 
-		// Compute D-bitmask for each T3 type
-		std::vector<int> type_A(T3.size(), 0);
-		for (int i = 0; i < K; ++i) {
-			for (int t = 0; t < (int)T3.size(); ++t) {
-				auto h = qlt_atom_holds_in_type3<node>(sol.atoms[i].first, T3[t], constants);
-				if (h != false) type_A[t] |= (1 << i);
-			}
-		}
+		// Compute D-bitmask for each T3 type.
+		std::vector<int> type_A = qlt_type_A_bitmasks<node>(sol.atoms, T3, constants);
 
-		// Build φ*(D_i)
-		std::string phi_star = ltl_skeleton<node>(fm, sol.atoms);
-		for (int i = K; i-- > 0; ) {
-			std::string fp = "p" + std::to_string(i);
-			std::string td = "d_" + std::to_string(i);
-			size_t pos = 0;
-			while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-				size_t end = pos + fp.size();
-				bool l_ok = pos == 0 || (!std::isalnum((unsigned char)phi_star[pos-1]) && phi_star[pos-1] != '_');
-				bool r_ok = end >= phi_star.size() || (!std::isalnum((unsigned char)phi_star[end]) && phi_star[end] != '_');
-				if (l_ok && r_ok) { phi_star.replace(pos, fp.size(), td); pos += td.size(); }
-				else pos = end;
-			}
-		}
+		// Build φ*(D_i) (LT-16: shared rename helper).
+		std::string phi_star = rename_skeleton_props_to_d(
+			ltl_skeleton<node>(fm, sol.atoms), K);
 
 		LOG_DEBUG << "[ltl_aba:algD] T3=" << T3.size() << " T1=" << T1_size
 		          << " K=" << K << " phi_star=" << phi_star;
 
-		bool realizable = alg_d::solve_algorithm_d(phi_star, T1_size, T3, type_A, K);
+		// LG-12: fixed initial memory ρ₀ = type_of(0) — the
+		// interpreter's own lookback-at-t=0 convention.
+		bool realizable = alg_d::solve_algorithm_d(phi_star,
+			T1_size, T3, type_A, K,
+			alg_d::initial_memory(constants));
 		LOG_DEBUG << "[ltl_aba:algD] result=" << (realizable ? "REALIZABLE" : "UNREALIZABLE");
 
 		if (!realizable) return synthesis_unrealizable<node>();
 
 		// Realizable: call ltlsynt for the strategy automaton.
-		// Use the simplified propositional formula; data execution may need
-		// the full structural-constraint formula for perfect correctness but
-		// this gives a usable strategy for most test cases.
+		//
+		// LT-8 / LA-N1: the automaton carries the d_i names, so
+		// sol.atoms is renamed to d_i (as Algorithm A does) — without
+		// this the ABA oracle matched nothing by name and passed
+		// vacuously, and the safety encoding mapped every guard to
+		// TRUE.  The earlier straight rename was reverted because the
+		// propositional call below received φ* WITHOUT the ABA
+		// consistency constraints, so ltlsynt was free to choose an
+		// output-contradictory edge (`d_0 & d_1` for (o1>0) U (o1<0),
+		// ALG-D-28) that the un-vacuated oracle then rejected.  The
+		// strategy call therefore now carries the same
+		// add_consistency_constraints suffix the default path uses,
+		// over the renamed atoms: the data-infeasible combinations are
+		// excluded from the strategy instead of being scored by the
+		// oracle afterwards.  (Batch 5 of the 2026-08-18 review.)
+		for (int i = 0; i < K; ++i)
+			sol.atoms[i].second = "d_" + std::to_string(i);
+		std::string strategy_skeleton = phi_star;
+		add_consistency_constraints<node>(sol.atoms, strategy_skeleton,
+			nullptr, /*polarity_complete=*/false);
 		std::vector<std::string> D_outs;
 		for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
-		auto [real2, hoa_text] = call_ltlsynt(phi_star, {}, D_outs);
+		auto [real2, hoa_text] = call_ltlsynt(strategy_skeleton, {}, D_outs);
 		if (!real2) {
 			// Propositional call disagrees — fall through to default path
 			LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";
+			for (int i = 0; i < K; ++i)
+				sol.atoms[i].second = "p" + std::to_string(i);
 		} else {
+			sol.skeleton = strategy_skeleton;
+			sol.output_props = D_outs;
 			sol.aut = parse_hoa(hoa_text);
 			return synthesis_solved(sol);
 		}
@@ -725,6 +786,23 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 	const char* alg_env = std::getenv("TAU_LTL_ALG");
 	const bool alg_b_mode = !alg_env || std::string_view(alg_env) == "B";
 	const bool alg_a_mode = alg_env && std::string_view(alg_env) == "A";
+	// LS-8: only A, B and D are recognised.  Anything else — "C", "auto",
+	// a typo — silently disables every gate and falls through to the
+	// default ABA-oracle path, which is not what the documentation used
+	// to describe.  Say so, once.
+	if (alg_env && *alg_env) {
+		std::string_view v(alg_env);
+		if (v != "A" && v != "B" && v != "D") {
+			static bool warned = false;
+			if (!warned) {
+				warned = true;
+				LOG_WARNING << "[ltl_aba] TAU_LTL_ALG=\"" << v
+				            << "\" is not recognised (only A, B and D "
+				               "are); falling through to the default "
+				               "ABA-oracle path\n";
+			}
+		}
+	}
 	if (is_algorithm_a_applicable<node>(sol.atoms)) {
 		// Check whether any atom has an input variable.
 		bool any_input = false;
@@ -745,31 +823,12 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 		// `F(o1={top}) && G(o1!={top})`.  Falling through to
 		// the default add_consistency_constraints + ABA-oracle
 		// path catches these correctly.
-		bool alg_a_can_classify = true;
-		{
-			auto a_constants = omcat::collect_qlt_constants<node>(fm);
-			auto a_T3        = omcat::enumerate_qlt_T3(a_constants);
-			if (a_T3.empty())
-				alg_a_can_classify = false;
-			else for (auto& [f, _] : sol.atoms) {
-				bool any_determined = false;
-				for (auto& t : a_T3) {
-					auto h = qlt_atom_holds_in_type3<node>(
-					    f, t, a_constants);
-					if (h.has_value()) {
-						any_determined = true;
-						break;
-					}
-				}
-				if (!any_determined) {
-					alg_a_can_classify = false;
-					LOG_DEBUG << "[ltl_aba] atom outside T_3 "
-					             "(top/bot qlt constant?) — "
-					             "skipping Algorithm A";
-					break;
-				}
-			}
-		}
+		bool alg_a_can_classify_ok =
+			alg_a_can_classify<node>(fm, sol.atoms);
+		if (!alg_a_can_classify_ok)
+			LOG_DEBUG << "[ltl_aba] atom outside T_3 "
+			             "(top/bot qlt constant?) — "
+			             "skipping Algorithm A";
 
 		// Algorithm A's T_3 encoding has a SINGLE current-output slot
 		// (Y) and a SINGLE past-output slot (M).  Two distinct output
@@ -785,32 +844,18 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 		// flow through Algorithm B's P_σ encoding which is
 		// distinguisher-friendly.  The conflation is harmful only on
 		// the OUTPUT side.)
-		std::set<std::string> distinct_output_names;
-		for (auto& [f, _] : sol.atoms) {
-			const auto& t = tree<node>::get(f);
-			if (!t.has_child()) continue;
-			auto add_side = [&](tref side) {
-				if (!side) return;
-				tref iv = tree<node>::get(side).find_top([](tref n) {
-					return is_child<node>(n, tree<node>::io_var); });
-				if (!iv) return;
-				const std::string& nm = get_var_name<node>(iv);
-				if (!nm.empty() && nm[0] == 'o')
-					distinct_output_names.insert(nm);
-			};
-			add_side(t[0].first());
-			add_side(t[0].second());
-		}
-		if (distinct_output_names.size() > 1) {
-			alg_a_can_classify = false;
+		const size_t n_out_vars =
+			count_distinct_output_vars<node>(sol.atoms);
+		if (n_out_vars > 1) {
+			alg_a_can_classify_ok = false;
 			LOG_DEBUG << "[ltl_aba] multiple output vars ("
-			          << distinct_output_names.size()
+			          << n_out_vars
 			          << ") — Algorithm A's single-Y/M slot would "
 			             "conflate them; falling through to default "
 			             "ABA-oracle path";
 		}
 
-		if (!any_input && alg_a_can_classify) {
+		if (!any_input && alg_a_can_classify_ok) {
 			// Pure-output: Algorithm A is sound and fast.
 			LOG_DEBUG << "[ltl_aba] using Algorithm A (pure-output)";
 			return propositional_synthesis<node>{
@@ -824,17 +869,81 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 		// must fall through to the default add_consistency_constraints
 		// path, which uses the ABA oracle directly and catches the
 		// pairwise-infeasibility constraints those atoms induce.
-		if (alg_b_mode && alg_a_can_classify) {
+		if (alg_b_mode && alg_a_can_classify_ok) {
 			// Fast-path: constant-output strategy check. If the system
 			// can pick fixed output values that reduce the formula to a
 			// tautology over remaining (input) atoms, REALIZABLE.
 			// Catches trivially-satisfiable U/W/R right-sides that
 			// Algorithm B's large P_σ-encoded formula would make
 			// ltlsynt time out on.
-			if (constant_output_realizable<node>(fm, sol.atoms)) {
+			if (auto win = constant_output_realizable<node>(
+				fm, sol.atoms); win) {
+				// LA-10: materialise the winning constant
+				// combination as `always(⋀ o_k = c_k)` so the
+				// strategy survives into execution and codegen
+				// (it used to be discarded: executable=false,
+				// exit 5 / interpreter refusal).  Any
+				// representative of the winning 1-type works —
+				// atom truth only depends on the type — and
+				// QltType1::realize() picks one (the constant
+				// for a point type, the mediant / ±1 for an
+				// interval).
+				auto constants =
+					omcat::collect_qlt_constants<node>(fm);
 				LtlAbaSolution<node> trivial;
 				trivial.atoms = sol.atoms;
-				// num_states = 0 signals trivially realizable.
+				// Classify props so the codegen data emitter
+				// puts the constant vars into Outputs (the
+				// shared classification loop below is only
+				// reached on the default path).
+				for (auto& [f, name] : trivial.atoms) {
+					if (is_pure_input_atom<node>(f))
+						trivial.input_props
+							.push_back(name);
+					else
+						trivial.output_props
+							.push_back(name);
+				}
+				tref conj = nullptr;
+				bool built_ok = true;
+				for (const auto& [var, pos] : *win) {
+					omcat::QltType1 t1;
+					t1.pos = pos;
+					t1.constants = constants;
+					omcat::Rat v = t1.realize();
+					std::string lit = std::to_string(v.p)
+						+ (v.q == 1 ? std::string()
+						   : "/" + std::to_string(v.q));
+					// Text-parse route: wff start symbol,
+					// io classification resolved by name.
+					std::string expr = var + "[t]:qlt = {"
+						+ lit + "}:qlt";
+					typename tree<node>::get_options opts;
+					opts.parse.start = tree<node>::wff;
+					tref eq = tree<node>::get(expr,
+						std::move(opts));
+					if (!eq) { built_ok = false; break; }
+					eq = resolve_io_vars<node>(
+						*definitions<node>::instance()
+							.get_io_context(), eq);
+					conj = conj
+						? tree<node>::build_wff_and(conj, eq)
+						: eq;
+					trivial.const_outputs.emplace_back(var, lit);
+				}
+				if (built_ok && conj) {
+					trivial.const_formula =
+						tree<node>::build_wff_always(conj);
+					trivial.executable = true;
+				} else {
+					// Fail-safe: keep the sound verdict but
+					// fall back to the pre-LA-10 refusal.
+					LOG_WARNING << "[ltl_aba] constant-output "
+						"witness could not be built; the "
+						"strategy stays non-executable\n";
+					trivial.const_outputs.clear();
+					trivial.executable = false;
+				}
 				return synthesis_solved(trivial);
 			}
 			// Has input vars: Algorithm B required for soundness.
@@ -842,7 +951,7 @@ static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 			return propositional_synthesis<node>{
 				solve_ltl_aba_algorithm_b<node>(fm, sol.atoms)};
 		}
-		if (!alg_a_can_classify)
+		if (!alg_a_can_classify_ok)
 			LOG_DEBUG << "[ltl_aba] T_3 cannot classify atoms — "
 			             "falling through to default ABA-oracle path";
 	} else if (alg_b_mode) {
