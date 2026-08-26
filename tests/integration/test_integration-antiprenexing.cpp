@@ -42,8 +42,31 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
-			// block pipeline, 2026-08-04 (Debug's matcher requires the
-			// canonical shape FIRST): carries a redundant second
+			// complete_quantifier_elimination (the residual-quantifier
+			// fallback added when this variable occurs only in a
+			// non-negated pivot-less shape): a single disjunct, folding
+			// `w = 0` into the kept scope instead of factoring it out.
+			// Equivalent by hand: under `b1 y = 0`, `b1 yz != 0` is
+			// unsatisfiable (b1 yz = (b1 y) z = 0), so the scope reduces
+			// to `b1 w = 0 && (w = 0 || f(b1))`, i.e.
+			// `(w = 0 && ex b1 (b1 y = 0 && b1 w = 0)) || ex b1 (b1 y = 0
+			// && b1 w = 0 && f(b1))`; the first disjunct's existential is
+			// a tautology (b1 = 0), so it collapses to
+			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
+			// pre-deletion shape below. Canonical (produced) shape FIRST:
+			// Debug's matches_to_any_of only checks expected[0].
+			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || f(b1) || w = 0)",
+			// the same single disjunct with the ltl-side pivot tie-break
+			// order (conjuncts and disjuncts permuted; equivalent by
+			// commutativity of the hand-check above).
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
+			// bare-atom leaf routing + the fallback: same two disjuncts
+			// as the 2026-08-04 shape below, with disjunct and conjunct
+			// order flipped by the pivot tie-breaks; equivalent by the
+			// same hand-check.
+			"(ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0)) "
+			"|| (ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1)))",
+			// block pipeline, 2026-08-04: carries a redundant second
 			// disjunct (its two conjuncts force w = 0 and w != 0, so
 			// it is F) and an unabsorbed b1 yz != 0 literal (dead
 			// under b1 y = 0); verified equivalent by hand.
@@ -62,8 +85,27 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
-			// block pipeline, 2026-08-04 (canonical shape first): the
-			// dual of the ex case above -- the second conjunct is
+			// complete_quantifier_elimination's shape, dual of the ex
+			// case above: process_quantifier_block dualises an all-block
+			// by resolving the negated scope as an ex-block and negating
+			// back (`to_nnf(neg(pushed))`), so this is exactly `!(ex-case
+			// result)` renamed to NNF -- sound for the same reason the ex
+			// shape is, by construction, independent of what shape the
+			// wrapped ex-elimination happens to return. Canonical
+			// (produced) shape FIRST: Debug's matches_to_any_of only
+			// checks expected[0].
+			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || wy' = 0)",
+			// the same two conjuncts with the ltl-side pivot tie-break
+			// order (disjuncts permuted; equivalent by commutativity).
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || wy' = 0)",
+			// bare-atom leaf routing + the fallback: dual of the ex
+			// case, conjunct/disjunct order flipped by the pivot
+			// tie-breaks; equivalent by the same hand-check.
+			"(all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0) "
+			"&& (all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1))",
+			// block pipeline, 2026-08-04: the dual, second conjunct is
 			// identically T, and the first folds to the old shape
 			// (b1 = 0 forces w != 0); verified equivalent by hand.
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "

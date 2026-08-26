@@ -103,6 +103,31 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
 template<NodeType node>
 tref resolve_quantifiers(tref formula);
 
+/**
+ * @brief Last-resort complete elimination, one quantifier at a time, by
+ * Boole/Shannon expansion (`eliminate_block_over_clause`'s squeeze, handed a
+ * singleton block).
+ *
+ * `process_quantifier_block`'s pipeline above can give up with quantifiers
+ * still standing: its own pivot selection for Boole-decomposition splitting
+ * only ever picks a NON-negated atom, so a variable occurring solely in `!=`
+ * atoms starves it of a pivot and it re-wraps the block instead of resolving
+ * it. This distributes each remaining quantifier over its scope's
+ * disjunction (`ex v (A|B) = (ex v A)|(ex v B)`) and eliminates `v` from
+ * every resulting OR-free clause with the same squeeze a whole block uses --
+ * which is sound for ANY Boolean algebra, atomless or atomic, not just
+ * `bool`, and itself declines (keeping the binder) exactly where that is not
+ * the case. A quantifier whose scope still holds a temporal operator (the
+ * NZ-1 shape `resolve_quantifiers`' caller documents as genuinely
+ * undecidable) is left exactly as found, before any of that is attempted.
+ * @tparam node Tree node type.
+ * @param formula Formula to eliminate remaining quantifiers from.
+ * @return `formula` with every temporal-free quantifier this squeeze can
+ * discharge eliminated; anything else survives quantified.
+ */
+template<NodeType node>
+tref complete_quantifier_elimination(tref formula);
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__ANTIPRENEXING_H__

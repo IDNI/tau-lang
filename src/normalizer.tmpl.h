@@ -521,6 +521,18 @@ bool has_no_boolean_combs_of_models(tref n) {
  * The proper fix is a tri-state (`true`/`false`/`undecided`) contract threaded
  * through these predicates and their callers; until then this at least makes the
  * case diagnosable.
+ *
+ * One shape among the undecided ones is not a gap to chase: a temporal
+ * operator (`always`, `sometimes`, ...) directly inside a quantifier scope
+ * (e.g. `all b (always b != c)`, NZ-1) is undecidable by this project's
+ * quantifier-elimination machinery on principle, not by omission --
+ * substituting a time-invariant constant for `b` says nothing about a scope
+ * whose truth varies over time, so no case-split on `b` alone can ever
+ * settle it (see `complete_quantifier_elimination`'s doc comment, and
+ * the pinned `UndecidableNormalizationFallback` / `wff_normalization`
+ * tests). That shape is reported at `LOG_WARNING`, not `LOG_ERROR`, so it
+ * does not read as a regression; every other undecided shape keeps
+ * `LOG_ERROR` so a real one still surfaces loudly.
  * @tparam node Tree node type.
  * @param who Name of the calling predicate, for the log line.
  * @param normalized The normalized formula to check.
@@ -533,6 +545,20 @@ bool check_decided(const char* who, tref normalized) {
 	const auto& t = tau::get(normalized);
 	if (t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)) return true;
+	// NZ-1: a quantifier whose scope still holds a temporal operator.
+	auto is_temporal_under_quantifier = [](tref m) {
+		return is_child_quantifier<node>(m)
+			&& tree<node>::get(tree<node>::get(m)[0].second())
+				.find_top(is_temporal_quantifier<node>);
+	};
+	if (t.find_top(is_temporal_under_quantifier)) {
+		LOG_WARNING << who << ": normalization could not decide "
+			<< LOG_FM(normalized) << "; answering negatively. This is a "
+			"conservative fallback, not a proof -- a temporal operator "
+			"directly inside a quantifier scope (NZ-1) is undecidable by "
+			"this pipeline.";
+		return false;
+	}
 	LOG_ERROR << who << ": normalization could not decide "
 		<< LOG_FM(normalized) << "; answering negatively. This is a "
 		"conservative fallback, not a proof.";

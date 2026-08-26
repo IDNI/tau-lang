@@ -962,6 +962,78 @@ quantifier_block<node> collect_quantifier_block(tref n,
 	return blk;
 }
 
+/** @copydoc complete_quantifier_elimination */
+template<NodeType node>
+tref complete_quantifier_elimination(tref formula) {
+	using tau = tree<node>;
+	// Innermost quantifier first (post_order): a nested quantifier's own
+	// scope is already resolved by the time it is substituted into its
+	// parent's, so the parent's substitution never has to look through a
+	// binder of its own.
+	auto step = [](tref n) -> tref {
+		if (!is_child_quantifier<node>(n)) return n;
+		const tau& t = tau::get(n);
+		const tref var = t[0].first();
+		const tref scoped = t[0].second();
+		// The NZ-1 shape (a temporal operator directly inside a
+		// quantifier scope, e.g. `all b (always b != c)`): eliminating `b`
+		// says nothing about a scope whose truth varies over time, so this
+		// is genuinely undecidable by any case-split on `b` alone -- see
+		// check_decided's doc comment, and the pinned
+		// UndecidableNormalizationFallback / wff_normalization tests for
+		// this exact shape.
+		if (tau::get(scoped).find_top(is_temporal_quantifier<node>))
+			return n;
+		// An uninterpreted predicate reference (`wff_ref`, e.g. `f(x)`)
+		// anywhere in the scope: no Boolean-algebra elimination technique
+		// can settle what an opaque predicate holds for, so `v` genuinely
+		// cannot be removed. eliminate_block_over_clause would decline
+		// each such conjunct on its own (correctly, via its unrecognized-
+		// conjunct reservation) and still re-wrap `v` -- but distributing
+		// first, the way the DNF split below does, restructures the
+		// formula into separate quantifiers over independent references
+		// even though nothing was actually eliminated. Declining up front
+		// instead leaves a frozen scope exactly as found, matching
+		// process_quantifier_block's own all-frozen early-out (pinned by
+		// "an all-frozen block is re-wrapped verbatim").
+		if (tau::get(scoped).find_top(is<node, tau::wff_ref>))
+			return n;
+		const bool is_ex = t.child_is(tau::wff_ex);
+		// Dualize ∀ to ∃ over the negated scope -- the same identity
+		// resolve_ex_block uses for a whole block, so only the ∃ case
+		// needs an eliminator below.
+		const tref body = is_ex ? scoped
+			: to_nnf<node>(tau::build_wff_neg(scoped));
+		// `ex v (A|B) = (ex v A)|(ex v B)`: distribute over the scope's
+		// disjunction, then eliminate `v` from each OR-free clause with
+		// the squeeze `eliminate_block_over_clause` already uses for a
+		// whole block -- handed a singleton one here, which is what makes
+		// this sound for ANY Boolean algebra (atomless or atomic, not just
+		// `bool`): that squeeze's own type checks decide, per clause,
+		// whether the elimination applies, and re-wrap `v` around a clause
+		// it must decline.
+		//
+		// This is what the pipeline above gave up on: anti_prenex_block's
+		// own pivot selection (`is_atomic`/`stop_at`) only ever splits on a
+		// NON-negated atom, so a variable occurring solely in `!=` atoms
+		// starves it of a pivot and it re-wraps the whole block instead of
+		// reaching this squeeze at all.
+		const block_eliminability<node> trivial_elim{};
+		const typename term_handle<node>::order empty_order{};
+		tref res = _F<node>();
+		for (tref clause : get_dnf_wff_clauses<node>(to_dnf<node, true>(body)))
+			res = tau::build_wff_or(res, eliminate_block_over_clause<node>(
+				clause, {var}, trivial_elim, empty_order));
+		return is_ex ? res : to_nnf<node>(tau::build_wff_neg(res));
+	};
+	// Do not descend into terms: a tau_ba constant carries its own internal
+	// wff_ex/wff_all over I/O variables (the same guard
+	// select_innermost_blocks and anti_prenex_block's short-circuit use).
+	auto visit = [](tref t) { return while_is_formula<node>(t); };
+	return normalize_atomic_formula_operators<node>(
+		post_order<node>(formula).apply_unique(step, visit));
+}
+
 /**
  * @internal
  * @brief Eliminates one maximal quantifier block over an already-processed matrix.
@@ -970,10 +1042,10 @@ quantifier_block<node> collect_quantifier_block(tref n,
  * to the 6-arg `anti_prenex_block`, which splits disjunctions/conjuncts,
  * Boole-decomposes atomless content, and attempts predicate blasting on
  * whatever leaf clause still needs `skip`-matched (e.g. bitvector) content
- * resolved. There is no further fallback: the legacy step-based algorithm
- * that used to catch residual quantifiers here was deleted 2026-08-04 (see
- * the note in `resolve_ex_block`). ∃-blocks are pushed in directly;
- * ∀-blocks are dualized to ∃-blocks.
+ * resolved. A quantifier still standing after all of that falls to
+ * `complete_quantifier_elimination` (see `resolve_ex_block`'s note) --
+ * temporal-free only, everything else genuinely survives. ∃-blocks are
+ * pushed in directly; ∀-blocks are dualized to ∃-blocks.
  *
  * `blk.body` is required to already be free of unresolved quantifier scope:
  * the pipeline below (`eliminate_block_over_clause` in particular) assumes it
@@ -1223,19 +1295,30 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		};
 		if (has_live_quantifier(r))
 			r = resolve_quantifiers<node>(r);
-		// No further fallback. The legacy step-based `anti_prenex` used
-		// to run here on whatever still carried a quantifier, and was
-		// deleted 2026-08-04 once both full suites passed without it
-		// (319/319, Debug and Release). The experiment that proved it and
-		// the three capabilities that had to be built first -- the
-		// eliminability partition, the leaf_clause merge, and the γ1
-		// `¬atm` fix above (the wrong answer the fallback had been
-		// silently repairing, pinned by Gamma1NegatedBranch) -- are in
-		// this file's history at the deletion commit. Known cost, measured
-		// then: test_integration-satisfiability2 ~17-20x slower than with
-		// the fallback (47 s vs 2.7 s Release); everything else at
-		// baseline. A quantifier this path cannot discharge now simply
-		// survives -- callers treat that as undecided, never as false.
+		// Last resort: Boole/Shannon-eliminate whatever is still quantified,
+		// one variable at a time (complete_quantifier_elimination). The
+		// legacy step-based `anti_prenex` used to run here unconditionally
+		// on whatever still carried a quantifier, and was deleted
+		// 2026-08-04 once both full suites passed without it (319/319,
+		// Debug and Release) -- the experiment that proved it and the three
+		// capabilities that had to be built first (the eliminability
+		// partition, the leaf_clause merge, the γ1 `¬atm` fix above, pinned
+		// by Gamma1NegatedBranch) are in this file's history at the
+		// deletion commit. That measurement predates this pipeline meeting
+		// a variable that occurs only in `!=` atoms: anti_prenex_block's own
+		// pivot selection never splits on a negated atom (see its
+		// `is_atomic`/`stop_at`), so such a variable starves it of a pivot
+		// and it gives up with the block still quantified -- a real
+		// completeness regression against the deleted algorithm, not the
+		// performance trade the deletion accepted.
+		// complete_quantifier_elimination reaches this shape by routing
+		// straight to the same per-clause squeeze eliminate_block_over_
+		// clause already uses (sound for any Boolean algebra, not just
+		// `bool`) instead of anti_prenex_block's atom-pivot splitting; it
+		// skips a scope still holding a temporal operator (the NZ-1 shape,
+		// genuinely undecidable by either algorithm).
+		if (has_live_quantifier(r))
+			r = complete_quantifier_elimination<node>(r);
 		return r;
 	};
 
