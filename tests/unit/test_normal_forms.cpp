@@ -812,6 +812,74 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 	}
 }
 
+// check_decided's NZ-1 arm (added with the bc99a82b port): a temporal
+// operator directly inside a quantifier scope is undecidable by any
+// case-split on the bound variable alone, so complete_quantifier_elimination
+// leaves it quantified and check_decided reports it at WARNING (message
+// carries the "NZ-1" marker) instead of ERROR. Every other undecided shape
+// must keep the ERROR path so a genuine regression still trips loudly.
+TEST_SUITE("NZ1TemporalUnderQuantifier") {
+
+	// The grammar has no quantifier-over-always position; build the shape
+	// the way the pipeline meets it, internally.
+	static tref nz1() {
+		tref spec = get_nso_rr("always o1[t]b != 0.").value().main->get();
+		return tau::build_wff_all_many(get_free_vars<node_t>(spec), spec);
+	}
+
+	static tref bv_undecided() {
+		return get_nso_rr("ex x (x:bv[8] * y:bv[8] = { 1 }:bv[8]"
+			" && q(x)).").value().main->get();
+	}
+
+	// Capture everything the logging core emits during f().
+	static std::string log_of(const std::function<void()>& f) {
+		auto ss = boost::make_shared<std::stringstream>();
+		auto sink = boost::log::add_console_log(*ss);
+		f();
+		boost::log::core::get()->remove_sink(sink);
+		return ss->str();
+	}
+
+	TEST_CASE("normalization keeps the NZ-1 shape quantified and temporal") {
+		tref res = normalize_non_temp<node_t>(nz1());
+		REQUIRE( res != nullptr );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( tau::get(res).find_top(
+			is_child<node_t, tau::wff_always>) != nullptr );
+	}
+
+	TEST_CASE("check_decided answers false with the NZ-1 marker") {
+		tref res = normalize_non_temp<node_t>(nz1());
+		bool decided = true;
+		std::string log = log_of([&]() {
+			decided = check_decided<node_t>("nz1-test", res); });
+		CHECK( !decided );
+		CHECK( log.find("NZ-1") != std::string::npos );
+	}
+
+	TEST_CASE("non-temporal undecided keeps the error path (no NZ-1 marker)") {
+		tref res = normalize_non_temp<node_t>(bv_undecided());
+		bool decided = true;
+		std::string log = log_of([&]() {
+			decided = check_decided<node_t>("bv-test", res); });
+		CHECK( !decided );
+		CHECK( log.find("could not decide") != std::string::npos );
+		CHECK( log.find("NZ-1") == std::string::npos );
+	}
+
+	TEST_CASE("decided formulas stay decided") {
+		CHECK( check_decided<node_t>("t-test", tau::_T()) );
+		CHECK( check_decided<node_t>("f-test", tau::_F()) );
+	}
+
+	// No end-to-end are_nso_equivalent case here: its
+	// has_no_boolean_combs_of_models precondition (DBG-asserted) rejects
+	// a quantified temporal formula handed in directly. The pipeline
+	// reaches check_decided's NZ-1 arm with formulas it built itself;
+	// the direct check_decided cases above pin both arms.
+}
+
 // NF-6 / AP-16. squeeze_absorb disables the process-global tree<node>::use_hooks
 // for the duration of its traversal and used to re-enable it by assigning
 // `true` unconditionally at the end. Two ways that goes wrong: an exception

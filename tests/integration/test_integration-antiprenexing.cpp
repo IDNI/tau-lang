@@ -140,6 +140,83 @@ TEST_SUITE("anti_prenex") {
 		}) );
 	}
 
+	// complete_quantifier_elimination branch coverage (added with the
+	// bc99a82b port). The block pipeline's pivot selection only splits on
+	// non-negated atoms, so a variable occurring solely in `!=` atoms
+	// reaches the fallback; each case below pins one branch of the fallback
+	// so a regression in any of them fails a test instead of passing as a
+	// conservatively-undecided formula.
+	TEST_CASE("cqe: neq-starved ex block is eliminated") {
+		const char* sample = "ex b (by != 0 && bz != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"z != 0 && y != 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: neq-starved all block is eliminated via dualization") {
+		const char* sample = "all b (by = 0 || bz = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"z = 0 || y = 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: disjunctive scope distributes per clause") {
+		const char* sample = "ex b (by != 0 && bz != 0 || bw != 0 && bu != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"z != 0 && y != 0 || u != 0 && w != 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: nested starved quantifiers resolve innermost-first") {
+		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"z != 0 && y != 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: NZ-1 temporal scope keeps its quantifier") {
+		// The grammar has no quantifier-over-always position, so build the
+		// NZ-1 shape the way the pipeline meets it: internally.
+		tref spec = get_nso_rr("always o1[t]b != 0.").value().main->get();
+		const trefs& fv = get_free_vars<node_t>(spec);
+		REQUIRE( !fv.empty() );
+		tref fm = tau::build_wff_all_many(fv, spec);
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"all b2, b1 (always b1 b2 != 0)",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( tau::get(res).find_top(
+			is_child<node_t, tau::wff_always>) != nullptr );
+	}
+	TEST_CASE("cqe: wff_ref scope is frozen verbatim") {
+		const char* sample = "ex b (bw != 0 && q(b)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"ex b1 b1 w != 0 && q(b1)",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) != nullptr );
+	}
+	TEST_CASE("cqe: tau constant internals are not entered") {
+		const char* sample = "ex b (by != 0 && bz != 0) &&"
+			" { (ex v o1[t]v = 0) && o2[t] = 0 } : tau x = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"x{ (ex b1 o1[t]:tau b1 = 0) && o2[t]:tau = 0 }:tau = 0 && z != 0 && y != 0",
+		}) );
+	}
+
 	// Test to see the blow up caused by quantified free function symbols
 	// In particular conversion to Boole normal form causes blow up
 	// TEST_CASE("5") {
