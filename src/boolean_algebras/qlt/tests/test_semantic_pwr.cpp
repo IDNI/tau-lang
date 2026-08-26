@@ -549,10 +549,18 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		tref theta = semantic_pwr_optimal<node_t>(c, u, 0);
+		tref theta = qlt_semantic_pwr_optimal<node_t>(c, u);
+		// qlt_semantic_pwr_optimal itself no longer checks realizability —
+		// that gate moved to the caller (pointwise_revision.h), since it is
+		// an ordinary sat question and not (Q,<) theory.  Mirror the caller
+		// here so this case still exercises the composed production
+		// behaviour: a θ that is not realizable is discarded just as
+		// pointwise_revision_temporal would discard it.
+		if (theta && !is_tau_formula_sat<node_t>(theta, 0)) theta = nullptr;
 		// θ is allowed to be null (Algorithm D may report the clause
-		// unrealizable), but a returned θ must be a sound revision: realizable,
-		// and it must still carry the update it was built from — `theta` is
+		// unrealizable, or the composed θ may not be realizable), but a
+		// returned θ must be a sound revision: realizable, and it must
+		// still carry the update it was built from — `theta` is
 		// `update ∧ G(Win)`, so dropping the update would be the failure mode
 		// that matters.
 		//
@@ -592,7 +600,8 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 			CHECK(keeps_update);
 		} else {
 			MESSAGE("optimal mode returned nullptr (Algorithm D reported the "
-			        "clause unrealizable) — nothing to assert on theta");
+			        "clause unrealizable, or the composed theta was not "
+			        "realizable) — nothing to assert on theta");
 		}
 	}
 
@@ -611,7 +620,7 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("F (o1[t]:qlt = {top}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		CHECK(semantic_pwr_optimal<node_t>(c, u, 0) == nullptr);
+		CHECK(qlt_semantic_pwr_optimal<node_t>(c, u) == nullptr);
 	}
 
 	// LS-2 (b): two distinct output variables share the single Y slot, so
@@ -622,7 +631,7 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		CHECK(semantic_pwr_optimal<node_t>(c, u, 0) == nullptr);
+		CHECK(qlt_semantic_pwr_optimal<node_t>(c, u) == nullptr);
 	}
 
 	// The gate itself must keep rejecting non-omcat atoms.
@@ -632,7 +641,7 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
-		CHECK(semantic_pwr_optimal<node_t>(c, u, 0) == nullptr);
+		CHECK(qlt_semantic_pwr_optimal<node_t>(c, u) == nullptr);
 	}
 
 }
