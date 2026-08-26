@@ -126,3 +126,17 @@ add_test(NAME "test_repl-run_cmd-issue76_mixed_tau_streams"
 set_tests_properties("test_repl-run_cmd-issue76_mixed_tau_streams" PROPERTIES
 	PASS_REGULAR_EXPRESSION "Execution step: 1"
 	TIMEOUT 120)
+
+# --- GitHub #82: state accumulating N clauses in a :tau constant -------------
+# The reporter's reproducer with N=20 clauses in the constant K (their
+# numbering, o1..o40 -- lexicographic variable order separates each clause's
+# pair, which is what exposed the blowup). One step cost 7.9 s at N=20 on
+# fd137e86 and 282 s on c70e41ba: the closed implication check and the tau
+# constant's complement both fed a conjunction of variable-disjoint clauses to
+# one Boole decomposition (2^N). Now decided per component: ~2.3 s in Release,
+# ~42 s in a -O0 Debug build, hence the generous timeout.
+add_test(NAME "test_repl-run_cmd-issue82_accumulated_tau_constant"
+	COMMAND bash -c "printf 'set charvar off\\ni1 : tau := in console\\ni2 : tau := in console\\nrun ( (o0a[0]:tau = { (o1[t]=1 -> o2[t]=1) && (o3[t]=1 -> o4[t]=1) && (o5[t]=1 -> o6[t]=1) && (o7[t]=1 -> o8[t]=1) && (o9[t]=1 -> o10[t]=1) && (o11[t]=1 -> o12[t]=1) && (o13[t]=1 -> o14[t]=1) && (o15[t]=1 -> o16[t]=1) && (o17[t]=1 -> o18[t]=1) && (o19[t]=1 -> o20[t]=1) && (o21[t]=1 -> o22[t]=1) && (o23[t]=1 -> o24[t]=1) && (o25[t]=1 -> o26[t]=1) && (o27[t]=1 -> o28[t]=1) && (o29[t]=1 -> o30[t]=1) && (o31[t]=1 -> o32[t]=1) && (o33[t]=1 -> o34[t]=1) && (o35[t]=1 -> o36[t]=1) && (o37[t]=1 -> o38[t]=1) && (o39[t]=1 -> o40[t]=1) }) && (o0b[0]:tau = { (o1[t]=1 -> o2[t]=1) && (o3[t]=1 -> o4[t]=1) && (o5[t]=1 -> o6[t]=1) && (o7[t]=1 -> o8[t]=1) && (o9[t]=1 -> o10[t]=1) && (o11[t]=1 -> o12[t]=1) && (o13[t]=1 -> o14[t]=1) && (o15[t]=1 -> o16[t]=1) && (o17[t]=1 -> o18[t]=1) && (o19[t]=1 -> o20[t]=1) && (o21[t]=1 -> o22[t]=1) && (o23[t]=1 -> o24[t]=1) && (o25[t]=1 -> o26[t]=1) && (o27[t]=1 -> o28[t]=1) && (o29[t]=1 -> o30[t]=1) && (o31[t]=1 -> o32[t]=1) && (o33[t]=1 -> o34[t]=1) && (o35[t]=1 -> o36[t]=1) && (o37[t]=1 -> o38[t]=1) && (o39[t]=1 -> o40[t]=1) }) && ( (i2[t]:tau != 0) ? ((o0a[t]:tau = o0b[t-1]:tau) && (o0b[t]:tau = o0b[t-1]:tau)) : ((o0a[t]:tau = o0a[t-1]:tau) && (o0b[t]:tau = o0b[t-1]:tau & i1[t]:tau)) ) )\\no3[t]=1 -> o4[t]=1\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-issue82_accumulated_tau_constant" PROPERTIES
+	PASS_REGULAR_EXPRESSION "Execution step: 1"
+	TIMEOUT 300)

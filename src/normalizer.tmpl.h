@@ -732,17 +732,103 @@ bool is_nso_impl(tref n1, tref n2) {
 		return true;
 	}
 
-	tref imp = tau::build_wff_imply(n1, n2);
-	const trefs& vars = get_free_vars<node>(imp);
-	imp = tau::build_wff_all_many(vars, imp);
+	// Decides `all vars (f -> g)` by closing over f's and g's free
+	// variables and normalizing.
+	auto closed_impl_holds = [](tref f, tref g) {
+		tref imp = tau::build_wff_imply(f, g);
+		const trefs& vars = get_free_vars<node>(imp);
+		imp = tau::build_wff_all_many(vars, imp);
+		LOG_DEBUG << "wff: " << LOG_FM(imp);
+		tref nres = normalize_non_temp<node>(imp);
+		check_decided<node>("is_nso_impl", nres);
+		return tau::get(nres).equals_T();
+	};
 
-	LOG_DEBUG << "wff: " << LOG_FM(imp);
-
-	tref nres = normalize_non_temp<node>(imp);
-	const tau& res = tau::get(nres);
-	check_decided<node>("is_nso_impl", nres);
-	LOG_DEBUG << "End is_nso_impl: " << res.get();
-	return res.equals_T();
+	// GitHub #82: decide the implication per connected component rather
+	// than closing the whole `n1 -> n2` over every free variable in one
+	// piece. `find_fixpoint_phi`'s iterates are top-level conjunctions
+	// whose atoms fall into many variable-disjoint components (one per
+	// accumulated clause), and one monolithic normalization of them is
+	// exponential in the component count. Group the conjuncts of BOTH
+	// sides together by shared variables; with P = /\ P_c and Q = /\ Q_c
+	// over the resulting components c (variable-disjoint by
+	// construction), exactly:
+	//
+	//   all V (P -> Q)  iff  for every c: P && !Q_c is unsat,
+	//   P && !Q_c unsat  iff  (P_c && !Q_c) unsat  or  R_c unsat,
+	//
+	// where R_c = /\ of the other components' antecedent parts. The first
+	// disjunct is `all (P_c -> Q_c)` on a component-sized formula; the
+	// second only matters when the first fails, and R_c is unsatisfiable
+	// iff one of those other components is, so they are checked one at a
+	// time and only on demand. When everything is connected this is
+	// exactly the single check it replaces (one component), so it costs
+	// nothing on specs whose state is all one component -- grouping per
+	// consequent conjunct instead would re-decide that one big antecedent
+	// once per conjunct. Consequent conjuncts that are literally
+	// antecedent conjuncts are implied syntactically and dropped first.
+	const trefs ante = get_cnf_wff_clauses<node>(n1);
+	trefs cons;
+	{
+		subtree_unordered_set<node> ante_set(ante.begin(), ante.end());
+		for (tref q : get_cnf_wff_clauses<node>(n2))
+			if (!tau::get(q).equals_T() && !ante_set.contains(q))
+				cons.push_back(q);
+	}
+	if (cons.empty()) {
+		LOG_DEBUG << "End is_nso_impl: true (consequent is syntactically"
+			" contained in the antecedent)";
+		return true;
+	}
+	if (ante.size() + cons.size() <= 2) {
+		const bool holds = closed_impl_holds(n1, n2);
+		LOG_DEBUG << "End is_nso_impl: " << holds;
+		return holds;
+	}
+	// Antecedent conjuncts first, so each group's members split into a
+	// leading antecedent part and a trailing consequent part.
+	trefs both(ante);
+	both.insert(both.end(), cons.begin(), cons.end());
+	subtree_unordered_set<node> cons_set(cons.begin(), cons.end());
+	const trefs& all_vars =
+		get_free_vars<node>(tau::build_wff_imply(n1, n2));
+	const std::vector<trefs> groups =
+		group_by_shared_vars<node>(both, all_vars);
+	std::vector<trefs> group_ante(groups.size()), group_cons(groups.size());
+	for (size_t gi = 0; gi < groups.size(); ++gi)
+		for (tref c : groups[gi])
+			(cons_set.contains(c) ? group_cons : group_ante)[gi]
+				.push_back(c);
+	auto ante_of = [&](size_t gi) -> tref {
+		return group_ante[gi].empty() ? tau::_T()
+			: tau::build_wff_and(group_ante[gi]);
+	};
+	// Lazily decided unsatisfiability of each group's antecedent part.
+	std::vector<std::optional<bool>> group_unsat(groups.size());
+	auto is_group_unsat = [&](size_t gi) -> bool {
+		if (group_ante[gi].empty()) return false;
+		if (!group_unsat[gi]) group_unsat[gi] =
+			closed_impl_holds(ante_of(gi), tau::_F());
+		return *group_unsat[gi];
+	};
+	for (size_t gi = 0; gi < groups.size(); ++gi) {
+		if (group_cons[gi].empty()) continue;
+		if (closed_impl_holds(ante_of(gi),
+			tau::build_wff_and(group_cons[gi]))) continue;
+		// Not implied within its component: the implication still
+		// holds if some other component's antecedent is unsatisfiable.
+		for (size_t gj = 0; gj < groups.size(); ++gj)
+			if (gj != gi && is_group_unsat(gj)) {
+				LOG_DEBUG << "End is_nso_impl: true (antecedent"
+					" unsatisfiable)";
+				return true;
+			}
+		LOG_DEBUG << "End is_nso_impl: false (component not implied: "
+			<< LOG_FM(tau::build_wff_and(group_cons[gi])) << ")";
+		return false;
+	}
+	LOG_DEBUG << "End is_nso_impl: true";
+	return true;
 }
 
 /**
