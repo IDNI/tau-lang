@@ -53,6 +53,8 @@ set(TAU_SOURCES
 	../parser/bitvector_parser.generated.cpp
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
+	base_ba_dispatcher_bv_sbf.cpp
+	instantiate_test_pack.cpp
 )
 
 # grammar tables are mostly data; skip optimizing and LTO-ing them

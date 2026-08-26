@@ -27,6 +27,10 @@ function(add test_name)
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	# extern template declarations for the test BA pack, instantiated once in
+	# libTAU's instantiate_test_pack.cpp instead of per test TU.
+	target_compile_options(${N} PUBLIC
+		-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
 	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest cvc5::cvc5)
 	add_dependencies(${N} tau_header)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
