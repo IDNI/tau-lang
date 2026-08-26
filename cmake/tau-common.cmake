@@ -67,6 +67,17 @@ endif()
 message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
 message(STATUS "TAU_LINK_OPTIONS ${TAU_LINK_OPTIONS}")
 
+# gold links noticeably faster than bfd; use it everywhere when available
+include(CheckLinkerFlag)
+check_linker_flag(CXX "-fuse-ld=gold" TAU_HAVE_GOLD)
+if(TAU_HAVE_GOLD)
+	set(TAU_LINKER "-fuse-ld=gold")
+	set(CMAKE_LINK_DEPENDS_USE_LINKER FALSE)
+else()
+	set(TAU_LINKER "")
+	message(STATUS "gold not available, linking with the default linker")
+endif()
+
 include(git-defs) # for ${TAU_GIT_DEFINITIONS}
 function(target_git_definitions target)
 	target_compile_definitions(${target} PRIVATE ${TAU_GIT_DEFINITIONS})
@@ -126,7 +137,7 @@ function(target_setup target)
 			)
 		endif()
 	endif()
-	target_link_options(${target} PRIVATE "${TAU_LINK_OPTIONS}")
+	target_link_options(${target} PRIVATE "${TAU_LINK_OPTIONS}" ${TAU_LINKER})
 	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
