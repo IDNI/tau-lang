@@ -3,7 +3,7 @@
 #include <cvc5/cvc5.h>
 
 #include "test_init.h"
-#include "boolean_algebras/bv_ba.h"
+#include "boolean_algebras/bv/bv_ba.h"
 
 using namespace cvc5;
 

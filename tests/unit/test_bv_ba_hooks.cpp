@@ -27,7 +27,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-#include "boolean_algebras/bv_ba.h"
+#include "boolean_algebras/bv/bv_ba.h"
 
 using tau_api = api<node_t>;
 
