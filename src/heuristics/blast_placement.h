@@ -117,7 +117,7 @@ enum class blast_site {
 	/// actually displaced blasteable binders.
 	per_block = 1,
 	/// Once per formula, after the final anti-prenex/resolve pass of
-	/// `eliminate_bv_and_quantifiers`.
+	/// `eliminate_arithmetic_and_quantifiers`.
 	per_formula = 2,
 };
 

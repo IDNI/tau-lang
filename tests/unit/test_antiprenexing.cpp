@@ -1813,7 +1813,7 @@ TEST_SUITE("AntiPrenexBlastingCache") {
 		// longer discriminates on this shape (its blast_block declines
 		// and both settings keep the binder identically) -- the
 		// blasting-dependent divergence happens at the
-		// eliminate_bv_and_quantifiers level, which still runs through
+		// eliminate_arithmetic_and_quantifiers level, which still runs through
 		// (and therefore exercises) anti_prenex's per-blasting memo.
 		const bool saved = bv_blasting;
 		bv_blasting = false;

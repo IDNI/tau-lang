@@ -1982,7 +1982,7 @@ using tau = tree<node>;
 				// this check succeed later.
 				//
 				// "Before blasting" holds within one pass only.
-				// eliminate_bv_and_quantifiers calls this function
+				// eliminate_arithmetic_and_quantifiers calls this function
 				// three times and is itself re-entered from the
 				// interpreter's fixpoint loops, so a later pass meets
 				// scopes an earlier one already blasted -- measured on

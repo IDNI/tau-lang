@@ -433,7 +433,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 #ifdef TAU_CACHE
 	// One cvc5::Solver construction plus one checkSat per call, and the callers
 	// ask repeatedly: resolve_quantifiers is a whole-tree pre_order run at
-	// least three times per eliminate_bv_and_quantifiers, and its open-scope
+	// least three times per eliminate_arithmetic_and_quantifiers, and its open-scope
 	// branch asks twice per scope. The answer depends only on `form`: the one
 	// global config_cvc5_solver reads, `cvc5_options`, is fixed at process
 	// start before the first query (documented at its definition -- flipping

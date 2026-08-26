@@ -294,7 +294,7 @@ bool has_foreign_ba_constant(tref form);
  *
  * `resolve_quantifiers` uses this to keep its "ask the solver before blasting"
  * rule true across passes: it queries cvc5 for a bv scope because cvc5 handles
- * bitvector arithmetic natively, but `eliminate_bv_and_quantifiers` runs
+ * bitvector arithmetic natively, but `eliminate_arithmetic_and_quantifiers` runs
  * `resolve_quantifiers` three times and is itself re-entered from the
  * interpreter's fixpoint loops, so a later pass can meet a scope an earlier one
  * already blasted. Only its *open*-scope branch screens on this, because only

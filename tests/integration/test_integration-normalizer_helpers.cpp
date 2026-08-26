@@ -5,7 +5,7 @@
 // denorm_equation, syntactic_variable_simplification,
 // syntactic_atomic_formula_simplification, term_boole_decomposition (both
 // overloads), term_boole_normal_form, is_non_temp_nso_unsat,
-// eliminate_bv_and_quantifiers, is_valid, is_well_founded,
+// eliminate_arithmetic_and_quantifiers, is_valid, is_well_founded,
 // calculate_fixed_point, plus the fold_trivial_quantifiers and
 // push_negation_one_in branches added while fixing NZ-9 and NF-13.
 
@@ -161,7 +161,7 @@ TEST_SUITE("term Boole decomposition") {
 	}
 }
 
-// --- is_non_temp_nso_unsat / eliminate_bv_and_quantifiers --------------------
+// --- is_non_temp_nso_unsat / eliminate_arithmetic_and_quantifiers --------------------
 
 TEST_SUITE("non-temporal satisfiability predicates") {
 
@@ -185,22 +185,22 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 		}
 	}
 
-	// The documented example of eliminate_bv_and_quantifiers: ex x (x|y = 0)
+	// The documented example of eliminate_arithmetic_and_quantifiers: ex x (x|y = 0)
 	// eliminates x entirely.
-	TEST_CASE("eliminate_bv_and_quantifiers removes an eliminable binder") {
+	TEST_CASE("eliminate_arithmetic_and_quantifiers removes an eliminable binder") {
 		tref fm = wff("ex x x|y = 0");
-		tref res = eliminate_bv_and_quantifiers<node_t>(fm);
+		tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm);
 		CHECK( res != nullptr );
 		CHECK( !tau::get(res).find_top(is_quantifier<node_t>) );
 	}
 
-	TEST_CASE("eliminate_bv_and_quantifiers keeps meaning") {
+	TEST_CASE("eliminate_arithmetic_and_quantifiers keeps meaning") {
 		for (const char* s : { "ex x x|y = 0", "all x x y = 0",
 					"ex x (x = 0 && y = 0)",
 					"all x (x = 0 || y != 0)" }) {
 			CAPTURE(s);
 			tref fm = wff(s);
-			tref res = eliminate_bv_and_quantifiers<node_t>(fm);
+			tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm);
 			CHECK( res != nullptr );
 			CHECK( are_nso_equivalent<node_t>(res, fm) );
 		}

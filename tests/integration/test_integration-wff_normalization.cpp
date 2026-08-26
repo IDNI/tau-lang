@@ -599,7 +599,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 	}
 
-	// `has_foreign_ba_constant` is what tells eliminate_bv_and_quantifiers
+	// `has_foreign_ba_constant` is what tells eliminate_arithmetic_and_quantifiers
 	// "cvc5 cannot read this formula at all" apart from "the solver owns this
 	// bv content", and the second anti-prenex pass only skips bv-typed
 	// content in the latter case. Getting this wrong is not a slowdown but a

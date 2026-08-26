@@ -1016,7 +1016,7 @@ TEST_SUITE("with inputs and outputs") {
 	//
 	// Nested conditionals compile to a conjunction of disjunctions in which
 	// the bitvector and Tau atoms sit in the same clauses, so no lift can
-	// separate them. eliminate_bv_and_quantifiers used to skip all bv-typed
+	// separate them. eliminate_arithmetic_and_quantifiers used to skip all bv-typed
 	// content in its second anti-prenex pass on the grounds that the solver
 	// had already decided whatever was closeable -- which does not hold for a
 	// scope the bv translator cannot read at all (it holds a `:tau`

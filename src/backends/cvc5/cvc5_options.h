@@ -147,7 +147,7 @@ inline cvc5_option_set cvc5_options = cvc5_option_set::ext_rewrite_no_models;
 /**
  * @brief Where the cvc5 solver is allowed to be queried.
  *
- * The final closed-formula check at the end of `eliminate_bv_and_quantifiers`
+ * The final closed-formula check at the end of `eliminate_arithmetic_and_quantifiers`
  * is deliberately NOT gated: it is the single "final" solver site that both
  * `per_closed_block` and `per_formula` rely on.
  */

@@ -1853,7 +1853,7 @@ TEST_SUITE("more complex formulas") {
 }
 
 // Regression: resolve_quantifiers must not hand an already-blasted open bv
-// scope to cvc5. eliminate_bv_and_quantifiers runs resolve_quantifiers three
+// scope to cvc5. eliminate_arithmetic_and_quantifiers runs resolve_quantifiers three
 // times and the interpreter re-enters it from its fixpoint loops, so a later
 // pass meets scopes an earlier one blasted. Closing such a scope's free
 // variables wraps blasting's auxiliary quantifiers in a universal block, and
