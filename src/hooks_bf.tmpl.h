@@ -587,11 +587,14 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 	auto l = arg1(ch).get_ba_constant();
 	size_t type = arg1(ch).get_ba_type();
 	// A BA whose complement can intern non-canonically (e.g. bv: ~l
-	// builds a symbolic bvnot Term that would intern separately from
-	// the equal VALUE, {5}' vs {250}) is normalized through its own
-	// descriptor's normalize(), applied generically by normalize_ba()
-	// in the normal-forms pipeline -- not here, so core names no BA.
-	return build_bf_ba_constant<node>(~l, type, right);
+	// builds a symbolic bvnot Term that would intern separately from the
+	// equal VALUE, {5}' vs {250}) needs normalizing right here: this hook
+	// folds at raw construction time, before any caller that only parses
+	// a bf (never running the normalizer's normalize_ba pass) would see
+	// it canonicalized. node::ba::normalize is the same pack-generic,
+	// BA-naming-free dispatcher normalize_ba() itself uses, so core still
+	// names no BA.
+	return build_bf_ba_constant<node>(node::ba::normalize(~l), type, right);
 }
 
 } // namespace idni::tau_lang

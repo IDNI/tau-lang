@@ -93,6 +93,22 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 		return true;
 	}
 
+	// Mirrors ba_descriptor<BA, node>::normalize per alternative -- bv's
+	// complement/arithmetic hooks can intern a constant non-canonically
+	// (e.g. ~{5}:bv[8] as a symbolic bvnot Term rather than the equal
+	// VALUE {250}), so callers that fold at construction time (cte_neg
+	// et al. in hooks_bf.tmpl.h) route every constant through this before
+	// it is pooled.
+	static std::variant<bv, sbf_ba, Bool> normalize(
+		const std::variant<bv, sbf_ba, Bool>& elem)
+	{
+		if (std::holds_alternative<bv>(elem))
+			return normalize_bv(std::get<bv>(elem));
+		else if (std::holds_alternative<Bool>(elem))
+			return normalize_bool(std::get<Bool>(elem));
+		else return normalize_sbf(std::get<sbf_ba>(elem));
+	}
+
 	static std::vector<std::string> types() { return { "bool" }; }
 
 	static tref default_type() { return bool_type(); }
