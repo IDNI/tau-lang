@@ -174,7 +174,7 @@ TEST_SUITE("typed child stripping after inference") {
 TEST_SUITE("untype of a ba_constant") {
 
 	TEST_CASE("keeps the ba_type, so data stays a pool index") {
-		tref c = tau::get_ba_constant(Bool(true), bool_type());
+		tref c = tau::get_ba_constant(Bool(true), bool_type<node_t>());
 		REQUIRE( c != nullptr );
 		const size_t type = tau::get(c).get_ba_type();
 		const size_t id = tau::get(c).get_ba_constant_id();
@@ -191,8 +191,8 @@ TEST_SUITE("untype of a ba_constant") {
 	// constants of the same type must hash apart, and untyping must not
 	// change a constant's hash.
 	TEST_CASE("hashing an untyped ba_constant stays in range") {
-		tref t = tau::get_ba_constant(Bool(true), bool_type());
-		tref f = tau::get_ba_constant(Bool(false), bool_type());
+		tref t = tau::get_ba_constant(Bool(true), bool_type<node_t>());
+		tref f = tau::get_ba_constant(Bool(false), bool_type<node_t>());
 		REQUIRE( t != nullptr );
 		REQUIRE( f != nullptr );
 		CHECK( tau::get(t).value.hashit()
@@ -206,7 +206,7 @@ TEST_SUITE("untype of a ba_constant") {
 	// canonize() is untype()'s caller inside inference; it must keep
 	// constants of the same value but different types apart.
 	TEST_CASE("canonize keeps a typed constant distinct from another type") {
-		tref c = tau::get_ba_constant(Bool(true), bool_type());
+		tref c = tau::get_ba_constant(Bool(true), bool_type<node_t>());
 		REQUIRE( c != nullptr );
 		CHECK( canonize<node_t>(c) == c );
 	}
