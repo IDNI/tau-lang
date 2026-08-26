@@ -38,8 +38,15 @@ cli::options tau_options() {
 		.set_description("show license for Tau");
 	opts["charvar"] = cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
-	opts["blasting"] = cli::option("blasting", 'B', true)
-		.set_description("blasting (enabled by default)");
+	// GitHub #74: the default is the library's `bv_blasting`, not a second
+	// hardcoded one -- a CLI-only `true` here silently overrode the
+	// library's decision to keep predicate blasting off (see tau.h) and
+	// hung every plain `tau` run of a bv accumulator that the API
+	// completed instantly.
+	opts["blasting"] = cli::option("blasting", 'B', bv_blasting)
+		.set_description(std::string("blasting (")
+			+ (bv_blasting ? "enabled" : "disabled")
+			+ " by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
