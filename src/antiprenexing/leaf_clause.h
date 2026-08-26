@@ -25,6 +25,7 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "tau_bdd.h"
 #include "eliminability.h"
 
 namespace idni::tau_lang {
