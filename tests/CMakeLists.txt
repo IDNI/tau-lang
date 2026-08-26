@@ -8,18 +8,36 @@ endif ()
 
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	target_compile_options(doctest INTERFACE -Wno-c2y-extensions "-Wno-#warnings")
+endif()
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
+
+set(TAU_SKIP_TESTS
+	empty_list
+	CACHE STRING "Test targets skipped because covered by REPL tests")
 
 function(add test_name)
 	# message(STATUS "adding test: ${test_name}")
+	if(test_name IN_LIST TAU_SKIP_TESTS)
+		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
+		return()
+	endif()
 	set(N "${test_name}")
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	# extern template declarations for the test BA pack, instantiated once in
+	# libTAU's instantiate_test_pack.cpp instead of per test TU.
+	target_compile_options(${N} PUBLIC
+		-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
 	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest cvc5::cvc5)
 	add_dependencies(${N} tau_header)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
+	target_compile_options(${N} PUBLIC -fno-lto)
+	target_link_options(${N} PUBLIC -fno-lto)
+	target_compile_options(${N} PUBLIC -Wstrict-overflow=2 -Wno-error=strict-overflow)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
 	set_tests_properties(${N}
 		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..

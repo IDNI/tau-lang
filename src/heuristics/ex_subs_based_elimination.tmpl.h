@@ -95,7 +95,6 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	// a scope cannot contain itself.
 	const std::pair<tref, tref> key { tau::trim_right_sibling(var),
 		tau::trim_right_sibling(ex_clause) };
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	// Every return, including both identity returns (raw ex_clause) and the
 	// reget'd substitution result, must be trimmed before being stored: a
 	// cache hit serves back whatever was stored under this trimmed key to
@@ -104,14 +103,20 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	// replace_if's rebuild and reget's own `get(value, children,
 	// right_sibling())` both carry the *current* ex_clause's right sibling
 	// through unchanged, so an untrimmed return there would just as silently
-	// hand a later call the first call's sibling attachment. Trimming here
-	// (rather than only at the two identity-return call sites) closes the
-	// echo risk uniformly and is a no-op today, since both current callers
-	// already pass a sibling-free ex_clause (leaf_clause.tmpl.h's freshly
-	// built `scoped`; the 1-arg overload's `scope`, always the last child of
-	// a 2-child wff_ex).
-	auto memo = [&key](tref r) {
-		return cache.emplace(key, tau::trim_right_sibling(r)).first->second;
+	// hand a later call the first call's sibling attachment.
+	//
+	// Return identity matters too: callers test progress by comparing the
+	// result against `ex_clause` by tref, so a content-unchanged result must
+	// come back as `ex_clause` itself -- handing back the trimmed twin fakes
+	// an elimination that never happened.
+	auto identity_preserving = [ex_clause](tref r) {
+		return tau::subtree_equals(r, ex_clause) ? ex_clause : r;
+	};
+	if (auto it = cache.find(key); it != cache.end())
+		return identity_preserving(it->second);
+	auto memo = [&key, &identity_preserving](tref r) {
+		return identity_preserving(
+			cache.emplace(key, tau::trim_right_sibling(r)).first->second);
 	};
 #else
 	auto memo = [](tref r) { return r; };

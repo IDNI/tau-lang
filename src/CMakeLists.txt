@@ -48,9 +48,21 @@ set(TAU_HEADERS
 )
 
 set(TAU_SOURCES
+	../parser/tau_parser.generated.cpp
+	../parser/sbf_parser.generated.cpp
+	../parser/bitvector_parser.generated.cpp
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
+	base_ba_dispatcher_bv_sbf.cpp
+	instantiate_test_pack.cpp
 )
+
+# grammar tables are mostly data; skip optimizing and LTO-ing them
+set_source_files_properties(
+	../parser/tau_parser.generated.cpp
+	../parser/sbf_parser.generated.cpp
+	../parser/bitvector_parser.generated.cpp
+	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 
 set(CLI_SOURCES
 	main.cpp
@@ -97,6 +109,11 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
 add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
+
+# Nothing links this object library; leaving it in the default build just
+# recompiles TAU_SOURCES for no consumer. Build on demand with
+# `cmake --build <dir> --target TAUo`.
+exclude(${TAU_OBJECT_LIB_NAME})
 
 #
 # static library

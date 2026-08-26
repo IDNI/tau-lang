@@ -12,22 +12,34 @@ namespace idni::tau_lang {
 #define LOG_CHANNEL_NAME "ba_constants"
 
 template <NodeType node>
+typename ba_constants<node>::constant_pool& ba_constants<node>::C() {
+	static constant_pool* c = new constant_pool();
+	return *c;
+}
+
+template <NodeType node>
+htrefs& ba_constants<node>::T() {
+	static htrefs* t = new htrefs();
+	return *t;
+}
+
+template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	LOG_TRACE << "-- get(constant, type_id): "
 		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
 	// LOG_TRACE << dump_to_str();
 	// TODO optimize
 	const auto p = std::make_pair(constant, type_id);
-	for (size_t i = 0; i < C.size(); ++i) if (C[i] == p) {
+	for (size_t i = 0; i < C().size(); ++i) if (C()[i] == p) {
 		LOG_TRACE << "-- returning already pooled: "
-					<< i+1 << " " << LOG_FM(T[i]->get());
-		return T[i]->get();
+					<< i+1 << " " << LOG_FM(T()[i]->get());
+		return T()[i]->get();
 	}
-	C.emplace_back(std::move(p));
-	size_t constant_id = C.size();
+	C().emplace_back(std::move(p));
+	size_t constant_id = C().size();
 	node n = node::ba_constant(constant_id, type_id);
 	tref r = tree<node>::get(n);
-	T.push_back(tree<node>::geth(r));
+	T().push_back(tree<node>::geth(r));
 	// LOG_TRACE << "node constant: " << n;
 	// LOG_TRACE << dump_to_str();
 	// const auto& t = tree<node>::get(r);
@@ -48,17 +60,17 @@ typename ba_constants<node>::constant ba_constants<node>::get(
 	// constant_id == 0 underflows to SIZE_MAX below; the DBG-only asserts
 	// caught both that and an out-of-range id in debug, but release had
 	// no check at all -- an unchecked, likely huge, out-of-bounds access.
-	if (constant_id == 0 || constant_id > C.size())
+	if (constant_id == 0 || constant_id > C().size())
 		throw std::logic_error("ba_constants::get: invalid constant_id "
 			+ std::to_string(constant_id));
-	return C[constant_id - 1].first;
+	return C()[constant_id - 1].first;
 }
 
 template <NodeType node>
 std::ostream& ba_constants<node>::dump(std::ostream& os) {
-	os << "BA constants pool(" << C.size() << "):\n";
-	for (size_t i = 0; i < C.size(); ++i) os << LOG_INDENT << "constant: "
-		<< i+1 <<" "<< LOG_BA(C[i]) <<" : "<< LOG_FM(T[i]->get())<<"\n";
+	os << "BA constants pool(" << C().size() << "):\n";
+	for (size_t i = 0; i < C().size(); ++i) os << LOG_INDENT << "constant: "
+		<< i+1 <<" "<< LOG_BA(C()[i]) <<" : "<< LOG_FM(T()[i]->get())<<"\n";
 	return os;
 }
 
@@ -70,8 +82,9 @@ std::string ba_constants<node>::dump_to_str() {
 
 template <NodeType node>
 void ba_constants<node>::cleanup() {
-	C.clear(); C.shrink_to_fit();
-	T.clear(); T.shrink_to_fit();
+	// both pools are cleared together to keep their indices aligned
+	C().clear();
+	T().clear();
 }
 
 } // namespace idni::tau_lang
