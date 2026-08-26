@@ -43,16 +43,6 @@
 			"binaryDir": "${sourceDir}/build/debug"
 		},
 		{
-			"name": "_build_dir-release-clang",
-			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-clang"
-		},
-		{
-			"name": "_build_dir-debug-clang",
-			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-clang"
-		},
-		{
 			"name": "_build_dir-release-mingw",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-mingw"
@@ -265,7 +255,7 @@
 		{
 			"name": "release-make-clang",
 			"inherits": [
-				"_build_dir-release-clang",
+				"_build_dir-release",
 				"_generator-make",
 				"_toolchain-clang",
 				"_build-type-release"
@@ -274,7 +264,7 @@
 		{
 			"name": "debug-make-clang",
 			"inherits": [
-				"_build_dir-debug-clang",
+				"_build_dir-debug",
 				"_generator-make",
 				"_toolchain-clang",
 				"_build-type-debug"
@@ -283,7 +273,7 @@
 		{
 			"name": "release-ninja-clang",
 			"inherits": [
-				"_build_dir-release-clang",
+				"_build_dir-release",
 				"_generator-ninja",
 				"_toolchain-clang",
 				"_build-type-release"
@@ -292,7 +282,7 @@
 		{
 			"name": "debug-ninja-clang",
 			"inherits": [
-				"_build_dir-debug-clang",
+				"_build_dir-debug",
 				"_generator-ninja",
 				"_toolchain-clang",
 				"_build-type-debug"
@@ -314,6 +304,15 @@
 				"_generator-make",
 				"_toolchain-clang",
 				"_build-type-devel"
+			]
+		},
+		{
+			"name": "relwithdebinfo-ninja-clang",
+			"inherits": [
+				"_build_dir-relwithdebinfo",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-relwithdebinfo"
 			]
 		},
 		{
@@ -354,19 +353,19 @@
 		},
 		{
 			"name": "release",
-			"inherits": ["release-make-gcc"]
+			"inherits": ["release-ninja-clang"]
 		},
 		{
 			"name": "debug",
-			"inherits": ["debug-make-gcc"]
+			"inherits": ["debug-ninja-clang"]
 		},
 		{
 			"name": "release-ninja",
-			"inherits": ["release-ninja-gcc"]
+			"inherits": ["release-ninja-clang"]
 		},
 		{
 			"name": "debug-ninja",
-			"inherits": ["debug-ninja-gcc"]
+			"inherits": ["debug-ninja-clang"]
 		},
 		{
 			"name": "devel",
@@ -377,16 +376,24 @@
 			"inherits": ["devel-ninja-clang"]
 		},
 		{
+			"name": "release-gcc",
+			"inherits": ["release-ninja-gcc"]
+		},
+		{
+			"name": "debug-gcc",
+			"inherits": ["debug-ninja-gcc"]
+		},
+		{
 			"name": "devel-gcc",
 			"inherits": ["devel-ninja-gcc"]
 		},
 		{
 			"name": "release-clang",
-			"inherits": ["release-make-clang"]
+			"inherits": ["release-ninja-clang"]
 		},
 		{
 			"name": "debug-clang",
-			"inherits": ["debug-make-clang"]
+			"inherits": ["debug-ninja-clang"]
 		},
 		{
 			"name": "devel-clang",
@@ -399,6 +406,10 @@
 		{
 			"name": "debug-tests",
 			"inherits": ["debug", "_build-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-ninja-tests",
+			"inherits": ["release-ninja-clang", "_build-tests"]
 		},
 		{
 			"name": "devel-tests",
@@ -494,7 +505,7 @@
 		},
 		{
 			"name": "relwithdebinfo",
-			"inherits": ["relwithdebinfo-make-gcc"]
+			"inherits": ["relwithdebinfo-ninja-clang"]
 		},
 		{
 			"name": "relwithdebinfo-tests",
@@ -587,6 +598,10 @@
 		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-ninja-tests",
+			"configurePreset": "release-ninja-tests"
 		},
 		{
 			"name": "devel-tests",
@@ -737,6 +752,10 @@
 		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-ninja-tests",
+			"configurePreset": "release-ninja-tests"
 		},
 		{
 			"name": "devel-tests",
