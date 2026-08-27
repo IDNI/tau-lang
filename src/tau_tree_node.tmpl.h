@@ -209,9 +209,16 @@ size_t node<BAs...>::hashit() const {
 	// hot constant factor of every hash-consed node.
 	hash_combine(seed, tau_lang::ba_types<node>::name_hash(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
-	// Get ba constant from pool
-	if (nt == type::ba_constant && data != 0 && ba_type != 0)
-		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
+	// Get ba constant from pool. Hashed by content (see ba_constant_hash):
+	// the default variant hash would use e.g. a cvc5 term's creation id and
+	// make node ordering depend on process history (GitHub #89).
+	if (nt == type::ba_constant && data != 0 && ba_type != 0) {
+		const auto c = tau_lang::ba_constants<node>::get(data);
+		hash_combine(seed, c.index(), std::visit([](const auto& v) {
+			return tau_lang::ba_constant_hash<
+				std::decay_t<decltype(v)>>{}(v);
+		}, c));
+	}
 	// Get string from pool, untyped ba_constant also has string as data
 	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
 		hash_combine(seed, dict(data));

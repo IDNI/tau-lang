@@ -4,6 +4,8 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__CVC5_H__
 
 #include <cvc5/cvc5.h>
+#include <string>
+#include <unordered_map>
 
 #include "defs.h"
 
@@ -12,6 +14,38 @@ namespace idni::tau_lang {
 using bv = cvc5::Term;
 
 inline cvc5::TermManager& cvc5_term_manager = *new cvc5::TermManager();
+
+/**
+ * @brief Content-based hash for a BA constant held in a tree node.
+ *
+ * `node::hashit()` feeds a ba_constant's value into the node hash, and node
+ * ordering (`bintree::operator<`, hence DNF clause order, hence which
+ * satisfiable path the interpreter tries first) compares hashes first. For
+ * `bv` the default `std::hash<cvc5::Term>` is the term's creation id, so the
+ * order of two clauses -- and the witness picked for an output the spec
+ * leaves free -- depended on which terms the process had created before
+ * (GitHub #89: same spec, different value per driver and per run). The
+ * `cvc5::Term` specialization hashes the term's printed form instead,
+ * memoized per term id (ids are stable within a process; the map only
+ * grows with distinct terms). Every other BA keeps its `std::hash`, which
+ * is already content-derived (`tau_ba` goes through `rr`'s tree hash).
+ */
+template <typename T>
+struct ba_constant_hash {
+	size_t operator()(const T& v) const { return std::hash<T>{}(v); }
+};
+
+template <>
+struct ba_constant_hash<cvc5::Term> {
+	size_t operator()(const cvc5::Term& t) const {
+		if (t.isNull()) return 0;
+		static std::unordered_map<uint64_t, size_t> memo;
+		const uint64_t id = t.getId();
+		if (auto it = memo.find(id); it != memo.end()) return it->second;
+		return memo.emplace(id,
+			std::hash<std::string>{}(t.toString())).first->second;
+	}
+};
 
 size_t get_cvc5_size(const cvc5::Term& b);
 

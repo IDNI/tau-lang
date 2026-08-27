@@ -490,3 +490,56 @@ TEST_SUITE("Tau API - string - step error paths") {
 		CHECK( !tau_api::get_interpreter("x ) ( invalid !!!").has_value() );
 	}
 }
+
+// GitHub #89: the witness the interpreter picks for an output the spec leaves
+// free depended on what else the process had done before -- the same spec
+// text stepped with the same inputs gave o9 = 0 in a fresh process and o9 = 7
+// after another bitvector spec had run first. Clause order in the normalized
+// step formula follows node ordering, node ordering follows the node hash,
+// and a bv constant's hash was std::hash<cvc5::Term>, i.e. the term's
+// creation id. That is what made the value differ between drivers (CLI vs
+// bindings vs a spec-update router) in the report: each front-end creates a
+// different set of terms before the spec's constants. Hashing constants by
+// content makes the order, and so the witness, a function of the spec alone.
+TEST_SUITE("Tau API - witness stability (#89)") {
+	static std::vector<std::string> drive(const char* spec,
+		const std::vector<std::string>& i1_values)
+	{
+		auto maybe_i = tau_api::get_interpreter(spec);
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		std::vector<std::string> out;
+		for (size_t t = 0; t < i1_values.size(); ++t) {
+			std::map<stream_at, std::string> in;
+			in[stream_at("i1", t)] = i1_values[t];
+			auto maybe_out = tau_api::step(i, in);
+			REQUIRE(maybe_out.has_value());
+			for (auto& [at, v] : maybe_out.value())
+				if (at.name == "o9") out.push_back(v);
+		}
+		return out;
+	}
+
+	TEST_CASE("free-region witness does not depend on prior activity") {
+		const char* spec7 = "always i1[t]:bv[24] > { #x0003e8 }:bv[24]"
+			" -> o9[t]:bv[24] = { #x000007 }:bv[24].";
+		const char* spec50 = "always i1[t]:bv[24] > { #x0003e8 }:bv[24]"
+			" -> o9[t]:bv[24] = { #x000032 }:bv[24].";
+		const std::vector<std::string> in{ "2000", "500", "0" };
+		// Another bv spec runs first, so its constants get their cvc5
+		// term ids before spec7's `7` does -- the report's driver
+		// difference in miniature.
+		auto other = drive(spec50, in);
+		REQUIRE(other.size() == 3);
+		CHECK(other[0] == "50");
+		// The free-region witness must be what a fresh process gives
+		// for this spec on its own. With content-hashed constants the
+		// `o9 = 7` clause sorts first, and being satisfiable for every
+		// input it is the path taken in the free region too. (Before the
+		// fix this sequence produced 7, 7, 7 while a fresh process gave
+		// 7, 0, 0 -- the report's split.)
+		auto witness = drive(spec7, in);
+		CHECK(witness == std::vector<std::string>({ "7", "7", "7" }));
+		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
+	}
+}
