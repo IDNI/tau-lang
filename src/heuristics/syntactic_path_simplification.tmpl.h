@@ -105,16 +105,33 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 			// Remove branch
 			return _F<node>();
 		}
-		// Rebuild assumptions
-		trefs sorted_assms;
-		sorted_assms.reserve(assignments.size());
-		for (auto [v, k] : assignments)
-			if (k == tau::_F())
-				sorted_assms.push_back(tau::build_wff_neg(v));
-			else sorted_assms.push_back(v);
-		// Canonical sorting
-		std::ranges::stable_sort(sorted_assms,
+		// Rebuild assumptions. Sort the TRIMMED (always-positive) atoms,
+		// not the re-negated ones: `syntactic_path_simplification_wff_comp`
+		// classifies an atom as an equality via `child_is(tau::bf_eq)`,
+		// which only looks at the node's own direct child, so a `!(x = y)`
+		// rebuilt with `build_wff_neg` below would never be recognised as
+		// an equality and the eq-first rule would silently stop applying
+		// to every equality that happens to reach this AND negated (which
+		// is always true for an equality that was the positive side of an
+		// `||` before "resolve tautologies" pushed the negation in via De
+		// Morgan) -- leaving the order to the `subtree_less` tie-break,
+		// which is not guaranteed to agree with the order chosen when this
+		// AND is negated back into the original `||` in step 5. That made
+		// the disjunct order of a plain `p || (x = y)` step formula depend
+		// on incidental node-hash tie-breaks instead of being canonical
+		// (see the witness-stability regression: the interpreter picks the
+		// first solvable disjunct, so this decided which witness a free
+		// output got).
+		trefs sorted_keys;
+		sorted_keys.reserve(assignments.size());
+		for (auto& [v, k] : assignments) sorted_keys.push_back(v);
+		std::ranges::stable_sort(sorted_keys,
 			syntactic_path_simplification_wff_comp<node>);
+		trefs sorted_assms;
+		sorted_assms.reserve(sorted_keys.size());
+		for (tref v : sorted_keys)
+			sorted_assms.push_back(assignments[v] == tau::_F()
+				? tau::build_wff_neg(v) : v);
 		tref assms = tau::build_wff_and(sorted_assms);
 		// Make sure to not revisit built assumptions
 		if (tau::get(simp) == get_T<node>())
