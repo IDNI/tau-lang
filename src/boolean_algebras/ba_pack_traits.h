@@ -13,6 +13,7 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <vector>
 
 #include "boolean_algebras/ba_descriptor.h"
 #include "utility/tree_types.h"
@@ -301,7 +302,15 @@ void pack_set_charvar(bool charvar) {
 	});
 }
 
-/** @brief Enable or disable preprocessing on every BA that supports it. */
+/**
+ * @brief Enable or disable every BA's OWN preprocessing switch (bv's
+ * `bv_blasting`, addressed as `bv-blasting`).
+ *
+ * Distinct from the core master `preprocessing` (heuristics/
+ * preprocess_placement.h, set by `api::set_preprocessing`): a BA whose
+ * descriptor declares `preprocess` still needs the master on as well --
+ * see `ba_descriptor<bv,...>::preprocess` (bv_descriptor.tmpl.h).
+ */
 template <typename Node>
 void pack_set_preprocessing(bool enabled) {
 	pack_visit_all<Node>([&]<typename BA>() {
@@ -702,6 +711,113 @@ bool pack_type_output_always_satisfiable(size_t ba_type) {
 	}(std::make_index_sequence<
 		std::tuple_size_v<typename Node::bas_tuple>>{});
 	return out;
+}
+
+/** @brief `true` when @p BA's descriptor declares its own CLI/REPL options. */
+template <typename Node, typename BA>
+concept ba_declares_options = ba_has_descriptor_v<Node, BA>
+	&& ba_has_options_v<Node, BA>;
+
+/**
+ * @brief One BA-declared option paired with the family name that owns it.
+ *
+ * @p family is the owning descriptor's `type_name`, so a parameterized
+ * family (`bv[8]`, `bv[16]`, ...) shares one option set under `bv`, the same
+ * basis @ref pack_owns_ba_type_name matches on.
+ */
+struct ba_named_option {
+	std::string family;
+	ba_option option;
+};
+
+/**
+ * @brief Every BA-declared option in @p Node's pack, paired with its
+ * owning family name.
+ *
+ * Cached: a pack's option set is fixed at compile time. Entries are
+ * de-duplicated by (family, option name), since several widths of one
+ * parameterized family declare the same list against the same globals.
+ */
+template <typename Node>
+const std::vector<ba_named_option>& pack_ba_options() {
+	static const std::vector<ba_named_option> opts = [] {
+		std::vector<ba_named_option> out;
+		pack_visit_all<Node>([&]<typename BA>() {
+			if constexpr (ba_declares_options<Node, BA>) {
+				const std::string family =
+					ba_descriptor<BA, Node>::type_name;
+				for (const ba_option& o :
+						ba_descriptor<BA, Node>::options()) {
+					bool dup = false;
+					for (const auto& e : out)
+						if (e.family == family
+							&& e.option.name
+								== std::string(o.name))
+							{ dup = true; break; }
+					if (!dup) out.push_back({ family, o });
+				}
+			}
+		});
+		return out;
+	}();
+	return opts;
+}
+
+/**
+ * @brief Every family name in @p Node's pack, for answering family
+ * existence.
+ */
+template <typename Node>
+const std::vector<std::string>& pack_ba_families() {
+	static const std::vector<std::string> fams = [] {
+		std::vector<std::string> out;
+		pack_visit_all<Node>([&]<typename BA>() {
+			if constexpr (ba_has_descriptor_v<Node, BA>) {
+				const std::string f =
+					ba_descriptor<BA, Node>::type_name;
+				bool seen = false;
+				for (const auto& e : out)
+					if (e == f) { seen = true; break; }
+				if (!seen) out.push_back(f);
+			}
+		});
+		return out;
+	}();
+	return fams;
+}
+
+/** @brief Outcome of @ref pack_find_ba_option, distinguished for the REPL. */
+enum class ba_option_lookup_status {
+	no_such_family, ///< no BA in this pack has this family name
+	no_such_option, ///< the family exists but declares no such option
+	found,
+};
+
+/** @brief Result of @ref pack_find_ba_option. */
+struct ba_option_lookup_result {
+	ba_option_lookup_status status;
+	/// Valid only when status == found; points into the static storage
+	/// pack_ba_options() owns, so it outlives the call that returned it.
+	const ba_option* option = nullptr;
+};
+
+/**
+ * @brief Resolve a `family-name` REPL/CLI option against @p Node's pack,
+ * distinguishing "no such family" from "no such option" so callers can
+ * report each on its own.
+ */
+template <typename Node>
+ba_option_lookup_result pack_find_ba_option(const std::string& family,
+	const std::string& name)
+{
+	for (const auto& e : pack_ba_options<Node>())
+		if (e.family == family && e.option.name == name)
+			return { ba_option_lookup_status::found, &e.option };
+	bool in_pack = false;
+	for (const auto& f : pack_ba_families<Node>())
+		if (f == family) { in_pack = true; break; }
+	return { in_pack ? ba_option_lookup_status::no_such_option
+		: ba_option_lookup_status::no_such_family, nullptr };
 }
 
 } // namespace idni::tau_lang

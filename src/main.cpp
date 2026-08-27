@@ -39,11 +39,12 @@ cli::options tau_options() {
 		.set_description("charvar (enabled by default)");
 	// GitHub #74: the default is the library's `preprocessing`, not a second
 	// hardcoded one -- a CLI-only `true` here silently overrode the
-	// library's decision to keep predicate blasting off (see tau.h) and
-	// hung every plain `tau` run of a bv accumulator that the API
-	// completed instantly.
-	opts["blasting"] = cli::option("blasting", 'B', preprocessing)
-		.set_description(std::string("blasting (")
+	// library's decision to keep preprocessing off (see tau.h) and hung
+	// every plain `tau` run of a bv accumulator that the API completed
+	// instantly.
+	opts["preprocessing"] = cli::option("preprocessing", 'B', preprocessing)
+		.set_description(std::string("BA preprocessing, e.g. bv predicate "
+			"blasting (")
 			+ (preprocessing ? "enabled" : "disabled")
 			+ " by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
@@ -97,10 +98,6 @@ cli::options tau_options() {
 		.set_description("cap the eventual-flag search past the flag "
 			"boundary; give-up reports unsatisfiable "
 			"(default 500; 0 = unlimited)");
-	opts["max-blast-reentry-depth"] =
-		cli::option("max-blast-reentry-depth", 'D', "0")
-		.set_description("cap blast-block re-entry nesting in "
-			"anti-prenexing (0 = unlimited)");
 	opts["block-squeeze-cap"] = cli::option("block-squeeze-cap", 'z', "0")
 		.set_description("skip block squeezing above this operand-set "
 			"size (0 = unlimited)");
@@ -136,6 +133,20 @@ cli::options tau_options() {
 	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
 		.set_description("gc triggers when node count grows by this "
 			"factor since last sweep (<= 0 disables gc)");
+	// BA-declared options: one CLI flag per option a BA in the configured
+	// pack declares about itself, registered as --<family>-<option> (e.g.
+	// --bv-blasting), with default and description taken from the BA's own
+	// descriptor.
+	for (const auto& e : pack_ba_options<node_t>()) {
+		std::string cli_name = e.family + "-" + e.option.name;
+		if (e.option.kind == ba_option_kind::flag)
+			opts[cli_name] = cli::option(cli_name, '\0',
+				e.option.get_flag())
+				.set_description(e.option.help);
+		else opts[cli_name] = cli::option(cli_name, '\0',
+			std::to_string(e.option.get_count()))
+			.set_description(e.option.help);
+	}
 	return opts;
 }
 
@@ -236,7 +247,7 @@ int main(int argc, char** argv) {
 	tau_api::set_indenting(opts["indenting"].get<bool>());
 	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
-	bool blasting = opts["blasting"].get<bool>();
+	bool preprocess = opts["preprocessing"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by
@@ -250,7 +261,6 @@ int main(int argc, char** argv) {
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
-	tau_api::set_max_blast_reentry_depth(optnum("max-blast-reentry-depth"));
 	tau_api::set_block_squeeze_cap(optnum("block-squeeze-cap"));
 	tau_api::set_max_simplify_rounds(optnum("max-simplify-rounds"));
 	tau_api::set_max_def_passes(optnum("max-def-passes"));
@@ -262,13 +272,22 @@ int main(int argc, char** argv) {
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
+	// Apply each BA-declared CLI option through its own getter/setter pair
+	// -- the same "two views of the same knob" wiring every option above
+	// already uses, just addressed by family-option instead of a bare name.
+	for (const auto& e : pack_ba_options<node_t>()) {
+		std::string cli_name = e.family + "-" + e.option.name;
+		if (e.option.kind == ba_option_kind::flag)
+			e.option.set_flag(opts[cli_name].get<bool>());
+		else e.option.set_count(optnum(cli_name.c_str()));
+	}
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
 			<< files.front();)
 		tau_api::set_severity(sev);
 		tau_api::set_charvar(charvar);
-		tau_api::set_preprocessing(blasting);
+		tau_api::set_preprocessing(preprocess);
 		return run_tau_spec(files.front(), opts);
 	}
 
@@ -276,7 +295,7 @@ int main(int argc, char** argv) {
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,
-		.blasting = blasting,
+		.preprocessing = preprocess,
 		.print_benchmarks = opts["benchmarks"].get<bool>(),
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),

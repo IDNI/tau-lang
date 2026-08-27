@@ -19,8 +19,6 @@ TEST_SUITE("Tau API - runtime limits") {
 	TEST_CASE("plain caps write their globals verbatim") {
 		struct row { void (*set)(size_t); size_t* global; };
 		const row rows[] = {
-			{ &tau_api::set_max_blast_reentry_depth,
-				&max_blast_reentry_depth },
 			{ &tau_api::set_block_squeeze_cap,   &block_squeeze_cap },
 			{ &tau_api::set_max_fixpoint_steps,  &max_fixpoint_steps },
 			{ &tau_api::set_max_flag_search_steps,
@@ -38,6 +36,21 @@ TEST_SUITE("Tau API - runtime limits") {
 			CHECK( *r.global == 0 );
 			*r.global = saved;
 		}
+	}
+
+	// max_blast_reentry_depth (antiprenexing/antiprenexing.tmpl.h) is now
+	// reached only through bv's own bv-blastdepth REPL/CLI option, not
+	// through the api -- set_max_blast_reentry_depth was removed. Set the
+	// global directly, the same "raw-stored, verbatim" contract the loop
+	// above checks for its siblings, the way tests/test_init.h already
+	// sets preprocessing/preprocess_placement globals directly.
+	TEST_CASE("max_blast_reentry_depth writes its global verbatim") {
+		const size_t saved = max_blast_reentry_depth;
+		max_blast_reentry_depth = 77;
+		CHECK( max_blast_reentry_depth == 77 );
+		max_blast_reentry_depth = 0;
+		CHECK( max_blast_reentry_depth == 0 );
+		max_blast_reentry_depth = saved;
 	}
 
 	// The two decrementing block budgets map 0 to SIZE_MAX instead.

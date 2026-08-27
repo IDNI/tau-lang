@@ -48,7 +48,7 @@ void api<node>::set_charvar(bool charvar) {
 
 template <NodeType node>
 void api<node>::set_preprocessing(bool enabled) {
-	pack_set_preprocessing<node>(enabled);
+	preprocessing = enabled;
 }
 
 template <NodeType node>
@@ -92,11 +92,6 @@ void api<node>::set_block_max_splits(size_t n) {
 template <NodeType node>
 void api<node>::set_block_max_rounds(size_t n) {
 	block_max_rounds = n ? n : std::numeric_limits<size_t>::max();
-}
-
-template <NodeType node>
-void api<node>::set_max_blast_reentry_depth(size_t n) {
-	max_blast_reentry_depth = n;
 }
 
 template <NodeType node>

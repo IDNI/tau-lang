@@ -140,7 +140,18 @@ struct api {
 	/// and multi-char variable names ("var" mode, e.g. foo, bar).
 	/// Affects both the tau parser and the SBF parser.
 	static void set_charvar(bool state);
-	/** @brief Enable/disable a BA's preprocessing pass (BV predicate blasting today). */
+	/**
+	 * @brief Enable/disable the core master preprocessing switch
+	 * (`preprocessing` in heuristics/preprocess_placement.h).
+	 *
+	 * This is the pipeline-scheduling gate core itself reads; a BA's own
+	 * preprocessing pass (bv predicate blasting today) also needs its own
+	 * per-BA switch on -- see `bv-blasting` (bv_descriptor.tmpl.h's
+	 * options()) -- so flipping this alone does not by itself turn a BA's
+	 * pass on if that BA's own switch is off. To set every BA's own switch
+	 * instead, without touching this master, use `pack_set_preprocessing`
+	 * (ba_pack_traits.h).
+	 */
 	static void set_preprocessing(bool state);
 	/**
 	 * @brief Select where preprocessing may run (see `preprocess_site`).
@@ -195,11 +206,6 @@ struct api {
 	 * under 20 rounds.
 	 */
 	static void set_block_max_rounds(size_t n);
-	/**
-	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
-	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
-	 */
-	static void set_max_blast_reentry_depth(size_t n);
 	/**
 	 * @brief Operand-set size above which block squeezing declines and the
 	 * general Boole decomposition runs instead; 0 = unlimited (default:

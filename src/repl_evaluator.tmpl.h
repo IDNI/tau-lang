@@ -1076,6 +1076,67 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	return bound;
 }
 
+/**
+ * @brief Split a qualified BA-option name `family-option` on its first '-'.
+ *
+ * Called only once the caller has already confirmed @p x contains a '-', so
+ * `substr(pos + 1)` is always in range.
+ */
+inline std::pair<std::string, std::string> split_ba_option_name(
+	const std::string& x)
+{
+	auto pos = x.find('-');
+	return { x.substr(0, pos), x.substr(pos + 1) };
+}
+
+/**
+ * @brief Parse @p v as a plain non-negative integer, or nullopt on failure.
+ *
+ * Same digits-only rule as set_cmd's local str2count lambda, kept as a free
+ * function here so the BA-option path (which set_cmd's lambda is not in
+ * scope for) can share it without duplicating the parsing logic.
+ */
+inline std::optional<size_t> ba_option_str2count(const std::string& v) {
+	if (v.empty()) return std::nullopt;
+	size_t n = 0;
+	for (char c : v) {
+		if (c < '0' || c > '9') return std::nullopt;
+		n = n * 10 + static_cast<size_t>(c - '0');
+	}
+	return n;
+}
+
+/**
+ * @brief Parse @p v as an on/off flag value, or nullopt on failure.
+ *
+ * Same accepted spellings as set_cmd's local update_bool_value lambda.
+ */
+inline std::optional<bool> ba_option_str2bool(const std::string& v) {
+	if (v == "t" || v == "true" || v == "on" || v == "1"
+		|| v == "y" || v == "yes") return true;
+	if (v == "f" || v == "false" || v == "off" || v == "0"
+		|| v == "n" || v == "no") return false;
+	return std::nullopt;
+}
+
+/**
+ * @brief Raw text of @p n's option_name node, or nullopt when @p n names no
+ * option at all (the bare `get`/`enable`/... form).
+ *
+ * Split out from @ref get_opt so a qualified name (`bv-blasting`) can be
+ * recognised and routed to the BA-option path before get_opt's plain-name
+ * matching ever sees it. get_opt itself is unchanged and still owns
+ * resolution of every core option name.
+ */
+template <NodeType node>
+std::optional<std::string> option_name_str(
+	const typename tree<node>::traverser& n)
+{
+	auto o = n | tau_parser::option_name;
+	if (!o) return std::nullopt;
+	return o | tree<node>::traverser::string;
+}
+
 inline repl_option get_opt(const std::string& x) {
 	if (x.empty())                       return none_opt;
 	if (x == "S" || x == "severity"
@@ -1084,21 +1145,18 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "c" || x == "colors"
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
-	if (x == "B" || x == "blasting")     return blasting_opt;
+	if (x == "B" || x == "preprocessing") return preprocessing_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
 		|| x == "indent")            return indenting_opt;
-	// RE-1: this arm used to claim "B" as well, but blasting_opt above
-	// already matches it, so the benchmarks short option was unreachable
-	// and `get B` silently meant blasting. Benchmarks gets the still-free
-	// lowercase "b" instead, which leaves blasting's "B" alone.
+	// "B" belongs to preprocessing above; benchmarks takes lowercase "b".
 	if (x == "b" || x == "benchmarks"
 		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
 	// Full names only: every single letter that would fit is taken (see
-	// RE-1 above). These two are numeric options, not flags.
+	// the note above). These two are numeric options, not flags.
 	//
 	// No underscore in the spelling: the grammar has
 	// `option_name => alnum+` (parser/tau.tgf:231), so `block_max_splits`
@@ -1112,8 +1170,6 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
 		|| x == "maxflagsearchsteps") return flag_search_steps_opt;
-	if (x == "blastdepth"
-		|| x == "maxblastreentrydepth") return blast_depth_opt;
 	if (x == "squeezecap"
 		|| x == "blocksqueezecap")   return squeeze_cap_opt;
 	if (x == "simplifyrounds"
@@ -1161,6 +1217,9 @@ inline std::optional<boost::log::trivial::severity_level>
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd(const tt& n) {
+	if (auto raw = option_name_str<node>(n);
+		raw && raw->find('-') != std::string::npos)
+			return get_cmd_ba_option(*raw);
 	return get_cmd(get_opt<node>(n));
 }
 
@@ -1182,8 +1241,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ charvar_opt,      [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
-	{ blasting_opt,      [this]() {
-		std::cout << "blasting:            " << pbool[opt.blasting] << "\n"; } },
+	{ preprocessing_opt, [this]() {
+		std::cout << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
 	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    []() {
@@ -1210,8 +1269,6 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
 	{ flag_search_steps_opt, [climit]() {
 		std::cout << "flagsteps:           " << climit(max_flag_search_steps) << "\n"; } },
-	{ blast_depth_opt, [climit]() {
-		std::cout << "blastdepth:          " << climit(max_blast_reentry_depth) << "\n"; } },
 	{ squeeze_cap_opt, [climit]() {
 		std::cout << "squeezecap:          " << climit(block_squeeze_cap) << "\n"; } },
 	{ simplify_rounds_opt, [climit]() {
@@ -1250,13 +1307,41 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		return;
 	}
 #endif // DEBUG
-	if (o == none_opt) { for (auto& [_, v] : printers) v(); return; }
+	if (o == none_opt) {
+		for (auto& [_, v] : printers) v();
+		// Bare `get` also lists the pack's BA-declared options, after the
+		// core ones, sorted by family then option name -- a deterministic
+		// order independent of pack configuration order, so REPL-output
+		// tests never become pack-order-sensitive.
+		auto ba_opts = pack_ba_options<node>();
+		std::ranges::sort(ba_opts, [](const auto& a, const auto& b) {
+			return a.family != b.family ? a.family < b.family
+				: std::string(a.option.name)
+					< std::string(b.option.name);
+		});
+		for (const auto& e : ba_opts) {
+			std::cout << e.family << "-" << e.option.name << ": ";
+			if (e.option.kind == ba_option_kind::flag)
+				std::cout << pbool[e.option.get_flag()] << "\n";
+			else std::cout << e.option.get_count() << "\n";
+		}
+		return;
+	}
 	printers[o]();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd(const tt& n) {
+	if (auto raw = option_name_str<node>(n);
+		raw && raw->find('-') != std::string::npos)
+	{
+		auto ov = n | tau::option_value;
+		if (!ov) { TAU_LOG_ERROR << "Invalid value\n"; return; }
+		set_cmd_ba_option(*raw, ov | tt::string);
+		get_cmd_ba_option(*raw);
+		return;
+	}
 	repl_option o = get_opt<node>(n);
 	auto ov = n | tau::option_value;
 	if (!ov) { TAU_LOG_ERROR << "Invalid value\n"; return; }
@@ -1330,8 +1415,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		TC.set(update_bool_value(opt.colors)); } },
 	{ charvar_opt,   [&]() {
 		update_charvar(update_bool_value(opt.charvar)); } },
-	{ blasting_opt,   [&]() {
-		update_blasting(update_bool_value(opt.blasting)); } },
+	{ preprocessing_opt,   [&]() {
+		update_preprocessing(update_bool_value(opt.preprocessing)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1354,8 +1439,6 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_max_fixpoint_steps(*n); } },
 	{ flag_search_steps_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_flag_search_steps(*n); } },
-	{ blast_depth_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_max_blast_reentry_depth(*n); } },
 	{ squeeze_cap_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_block_squeeze_cap(*n); } },
 	{ simplify_rounds_opt, [&]() { if (auto n = str2count(); n)
@@ -1388,6 +1471,13 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 	const std::function<bool(bool&)>& update_fn)
 {
+	if (auto raw = option_name_str<node>(n);
+		raw && raw->find('-') != std::string::npos)
+	{
+		update_bool_opt_cmd_ba_option(*raw, update_fn);
+		if (!error) get_cmd_ba_option(*raw);
+		return;
+	}
 	auto o = get_opt<node>(n);
 	update_bool_opt_cmd(o, update_fn);
 	if (!error) get_cmd(n);
@@ -1413,7 +1503,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 #endif // DEBUG
 	case colors_opt:           TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
-	case blasting_opt:     	   update_blasting(update_fn(opt.blasting)); break;
+	case preprocessing_opt:    update_preprocessing(update_fn(opt.preprocessing)); break;
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -1422,7 +1512,6 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case block_max_rounds_opt:
 	case fixpoint_steps_opt:
 	case flag_search_steps_opt:
-	case blast_depth_opt:
 	case squeeze_cap_opt:
 	case simplify_rounds_opt:
 	case def_passes_opt:
@@ -1444,6 +1533,76 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+const ba_option* repl_evaluator<BAs...>::resolve_ba_option(
+	const std::string& family, const std::string& name)
+{
+	auto res = pack_find_ba_option<node>(family, name);
+	switch (res.status) {
+	case ba_option_lookup_status::no_such_family:
+		TAU_LOG_ERROR << "No BA named '" << family << "' in this pack ("
+			<< node::ba::types_joined() << ")\n";
+		return nullptr;
+	case ba_option_lookup_status::no_such_option:
+		TAU_LOG_ERROR << "BA '" << family << "' has no option '" << name
+			<< "'\n";
+		return nullptr;
+	case ba_option_lookup_status::found: return res.option;
+	}
+	return nullptr; // unreachable: switch above is exhaustive
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
+	static std::string pbool[] = { "off", "on" };
+	auto [family, name] = split_ba_option_name(dotted);
+	const ba_option* o = resolve_ba_option(family, name);
+	if (!o) return;
+	std::cout << family << "-" << name << ": "
+		<< (o->kind == ba_option_kind::flag
+			? pbool[o->get_flag()] : std::to_string(o->get_count()))
+		<< "\n";
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::set_cmd_ba_option(const std::string& dotted,
+	const std::string& v)
+{
+	auto [family, name] = split_ba_option_name(dotted);
+	const ba_option* o = resolve_ba_option(family, name);
+	if (!o) return;
+	if (o->kind == ba_option_kind::flag) {
+		if (auto b = ba_option_str2bool(v); b) o->set_flag(*b);
+		else TAU_LOG_ERROR << "Invalid value\n";
+	} else if (auto n = ba_option_str2count(v); n) o->set_count(*n);
+	else TAU_LOG_ERROR << "Invalid value: expected a count\n";
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::update_bool_opt_cmd_ba_option(
+	const std::string& dotted, const std::function<bool(bool&)>& update_fn)
+{
+	auto [family, name] = split_ba_option_name(dotted);
+	const ba_option* o = resolve_ba_option(family, name);
+	if (!o) return;
+	if (o->kind != ba_option_kind::flag) {
+		// Same "wrong command shape" error as the core numeric options
+		// (block_max_splits_opt and friends, above), just addressed with
+		// this option's qualified name instead of a bare one.
+		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
+			"`set " << family << "-" << name << " <n>`\n";
+		error = true;
+		return;
+	}
+	bool v = o->get_flag();
+	update_fn(v);
+	o->set_flag(v);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	api<node>::set_charvar(opt.charvar = value);
 	return value;
@@ -1451,8 +1610,8 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool repl_evaluator<BAs...>::update_blasting(bool value) {
-	api<node>::set_preprocessing(opt.blasting = value);
+bool repl_evaluator<BAs...>::update_preprocessing(bool value) {
+	api<node>::set_preprocessing(opt.preprocessing = value);
 	return value;
 }
 
@@ -1582,12 +1741,12 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 	logging::set_filter(opt.severity);
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
-	// Propagate the CLI-provided charvar/blasting values to the api's
-	// global state; without this, --charvar/--blasting have no effect in
-	// REPL mode until the user runs "set"/"toggle" (they were only ever
+	// Propagate the CLI-provided charvar/preprocessing values to the api's
+	// global state; without this, --charvar/--preprocessing have no effect
+	// in REPL mode until the user runs "set"/"toggle" (they were only ever
 	// applied to the api in main.cpp's non-interactive spec-file path).
 	update_charvar(opt.charvar);
-	update_blasting(opt.blasting);
+	update_preprocessing(opt.preprocessing);
 	// console input streams resolve through the REPL cycle, never blocking
 	definitions<node>::instance().get_io_context()->console_input_factory =
 		[](const std::string&) {
@@ -1699,7 +1858,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  highlighting           syntax highlighting of Tau formulas  on/off\n"
 		"  indenting              indenting of Tau formulas            on/off\n"
 		"  charvar (V)            character-variable notation          on/off\n"
-		"  blasting (B)           bitvector predicate blasting         on/off\n"
+		"  preprocessing (B)      BA preprocessing (e.g. bv blasting)  on/off\n"
 		"  benchmarks (b)         print timing benchmarks              on/off\n";
 	static const std::string numeric_options =
 		"and the numeric limit options, set with `set <option> <n>` "
@@ -1710,7 +1869,6 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
 		"  fixpointsteps          temporal-normalization fixpoint steps unlimited\n"
 		"  flagsteps              eventual-flag search steps           unlimited\n"
-		"  blastdepth             blast-block re-entry nesting         unlimited\n"
 		"  squeezecap             block-squeeze operand-set size cap   unlimited\n"
 		"  simplifyrounds         bitvector simplification rounds      unlimited\n"
 		"  defpasses              definition-expansion passes          unlimited\n"
@@ -1723,12 +1881,39 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxsubsets             k-ary consistency subset checks      4096\n"
 		"  cachebound             string-keyed synthesis cache bound   4096\n"
 		"  maxcoverproducts       oracle mixed-type coverage products  256\n";
-	static const std::string all_available_options = std::string{} +
-		"Available options and values:\n" + bool_options +
+	// BA-declared options ("family-option"), sorted by family then option
+	// name for a deterministic listing independent of pack configuration
+	// order. Flags join the enable/disable/toggle-eligible list; counts
+	// (no enable/disable/toggle, same as core's numeric limit options) join
+	// only the get/set list. Both are empty in a pack where no BA declares
+	// any option, leaving all_available_options/bool_available_options
+	// byte-identical to before.
+	auto sorted_ba_options = [](ba_option_kind kind) {
+		auto opts = pack_ba_options<node>();
+		std::vector<ba_named_option> out;
+		for (auto& e : opts) if (e.option.kind == kind) out.push_back(e);
+		std::ranges::sort(out, [](const auto& a, const auto& b) {
+			return a.family != b.family ? a.family < b.family
+				: std::string(a.option.name)
+					< std::string(b.option.name);
+		});
+		std::string s;
+		for (auto& e : out) {
+			std::string label = "  " + e.family + "-" + e.option.name;
+			s += label + std::string(label.size() < 24
+				? 24 - label.size() : 1, ' ') + e.option.help
+				+ (kind == ba_option_kind::flag ? "   on/off\n" : "\n");
+		}
+		return s;
+	};
+	const std::string ba_flag_options = sorted_ba_options(ba_option_kind::flag);
+	const std::string ba_count_options = sorted_ba_options(ba_option_kind::count);
+	const std::string all_available_options = std::string{} +
+		"Available options and values:\n" + bool_options + ba_flag_options +
 		"  severity               severity                             error/info/debug/trace\n"
-		+ numeric_options;
-	static const std::string bool_available_options = std::string{} +
-		"Available options and values:\n" + bool_options;
+		+ numeric_options + ba_count_options;
+	const std::string bool_available_options = std::string{} +
+		"Available options and values:\n" + bool_options + ba_flag_options;
 	switch (nt) {
 	case tau::help_sym: std::cout
 		<< "General commands:\n"

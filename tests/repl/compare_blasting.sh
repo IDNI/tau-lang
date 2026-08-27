@@ -18,7 +18,7 @@ ulimit -v "${MEMORY_LIMIT_KB}" 2>/dev/null || \
 run_normalize() {
 	local mode="$1" out rc
 	out="$(timeout "${TIME_LIMIT_S}" "${TAU}" \
-		-e "set blasting ${mode}. normalize ${FORMULA}." 2>&1)"
+		-e "set bv-blasting ${mode}. normalize ${FORMULA}." 2>&1)"
 	rc=$?
 	if [ "${rc}" -eq 124 ]; then
 		echo "__TIMEOUT__ after ${TIME_LIMIT_S}s [blasting ${mode}]" >&2

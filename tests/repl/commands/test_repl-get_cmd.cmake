@@ -20,12 +20,22 @@ add_repl_test(get_cmd-lists_gc_defaults "get" "gcgrowth: *1.5")
 add_repl_test(get_cmd-lists_specsizewarn_off "get" "specsizewarn: *off")
 
 # --- bare `get` prints every limit option (covers the limit_printers map) ----
-foreach(opt maxsplits maxrounds fixpointsteps flagsteps blastdepth squeezecap
+foreach(opt maxsplits maxrounds fixpointsteps flagsteps squeezecap
 		simplifyrounds defpasses enumsteps rewriterounds gcminsize
 		gcgrowth specsizewarn revisionalts maxsubsets cachebound
 		maxcoverproducts)
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
 endforeach()
+
+# bv declares blastdepth as its own option, so bare `get` lists it after the
+# core options as bv-blastdepth. The command below is plain "get", so the gate
+# is applied by hand against a probe string naming bv.
+tau_repl_unsupported(_tau_skip "get bv-blastdepth")
+if(_tau_skip)
+	tau_repl_record_skip("get_cmd-all_lists_bv-blastdepth")
+else()
+	add_repl_test(get_cmd-all_lists_bv-blastdepth "get" "bv-blastdepth: ")
+endif()
 
 # LT-17 / LG-27: the two Batch-O3 caps ship FINITE (4096); 0 opts back into
 # unlimited/unbounded, same shape as the SO-1 temporal caps above.

@@ -26,6 +26,22 @@
 
 namespace idni::tau_lang {
 
+// bv's own predicate-blasting switch, layered under core's master
+// `preprocessing` (heuristics/preprocess_placement.h): bv_descriptor's
+// preprocess() (bv_descriptor.tmpl.h) blasts only when BOTH are on.
+// Exposed to the CLI/REPL as the `bv-blasting` option, declared by
+// bv_descriptor's options().
+//
+// Defaults to true so a caller who touches neither switch sees exactly the
+// behaviour bv had before this flag existed: blasting runs iff the master
+// `preprocessing` is on, unaffected by this per-BA flag. Flip it off to
+// disable bv's own blasting pass specifically, without touching any other
+// BA's preprocessing.
+//
+// NOT thread-safe, like `preprocessing` above: the tau library assumes
+// single-threaded access. Do not set it concurrently from multiple threads.
+inline bool bv_blasting = true;
+
 // Forward declarations needed by wff_predicate_blasting/quantify_aux_vars
 // (bv_predicate_blasting.tmpl.h) to anti-prenex/eliminate its own
 // freshly-introduced auxiliary bv-typed quantifiers. The full

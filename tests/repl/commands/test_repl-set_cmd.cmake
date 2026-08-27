@@ -31,8 +31,8 @@ add_repl_test(set_cmd-fixpointsteps_zero_unlimited
 	"fixpointsteps: *unlimited")
 add_repl_test(set_cmd-flagsteps
 	"set flagsteps 12. get flagsteps" "flagsteps: *12")
-add_repl_test(set_cmd-blastdepth
-	"set blastdepth 8. get blastdepth" "blastdepth: *8")
+add_repl_test(set_cmd-bv_blastdepth
+	"set bv-blastdepth 8. get bv-blastdepth" "bv-blastdepth: *8")
 add_repl_test(set_cmd-squeezecap
 	"set squeezecap 64. get squeezecap" "squeezecap: *64")
 add_repl_test(set_cmd-simplifyrounds

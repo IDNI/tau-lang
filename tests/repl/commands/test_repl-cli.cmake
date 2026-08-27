@@ -149,7 +149,6 @@ set(TAU_CLI_LIMIT_ROWS
 	"block_max_rounds|block-max-rounds|r|33|maxrounds|33"
 	"max_fixpoint_steps|max-fixpoint-steps|f|9|fixpointsteps|9"
 	"max_flag_search_steps|max-flag-search-steps|F|12|flagsteps|12"
-	"max_blast_reentry_depth|max-blast-reentry-depth|D|8|blastdepth|8"
 	"block_squeeze_cap|block-squeeze-cap|z|64|squeezecap|64"
 	"max_simplify_rounds|max-simplify-rounds|m|1000|simplifyrounds|1000"
 	"max_def_passes|max-def-passes|P|40|defpasses|40"
@@ -185,7 +184,22 @@ foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 		PASS_REGULAR_EXPRESSION "${lflag}")
 endforeach()
 
-# --- blasting default (GitHub #74) -------------------------------------------
+# --- bv-blastdepth CLI flag (BA-declared option) -----------------------------
+# bv declares blastdepth as its own option, addressed bv-blastdepth, present
+# when bv is in the configured pack -- hence gated by hand here rather than
+# through the uniform TAU_CLI_LIMIT_ROWS loop.
+tau_repl_unsupported(_tau_skip "get bv-blastdepth")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-cli-bv_blastdepth_flag")
+else()
+	add_test(NAME "test_repl-cli-bv_blastdepth_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-blastdepth 8 -e \"get bv-blastdepth\"")
+	set_tests_properties("test_repl-cli-bv_blastdepth_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bv-blastdepth: *8"
+		FAIL_REGULAR_EXPRESSION "Error")
+endif()
+
+# --- preprocessing default (GitHub #74) --------------------------------------
 # The library default is `preprocessing = false`
 # (heuristics/preprocess_placement.h), because predicate blasting hands cvc5
 # thousands of auxiliary quantifiers it does not need. The
@@ -197,9 +211,9 @@ endforeach()
 # the reporter's expected 5, 8, 8. The input prompt answers `q` with a parse
 # Error (that is how the run is ended without a tty), so no FAIL regex here.
 add_test(NAME "test_repl-cli-blasting_default_off"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get blasting\"")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get preprocessing\"")
 set_tests_properties("test_repl-cli-blasting_default_off" PROPERTIES
-	PASS_REGULAR_EXPRESSION "blasting: *off"
+	PASS_REGULAR_EXPRESSION "preprocessing: *off"
 	FAIL_REGULAR_EXPRESSION "Error")
 
 tau_repl_unsupported(_tau_skip "i1:bv[8] := in console.")

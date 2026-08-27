@@ -12,6 +12,8 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_DESCRIPTOR_TMPL_H__
 
+#include <array>
+
 #include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
@@ -151,12 +153,65 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return std::nullopt;
 	}
 
-	/** @brief Predicate-blast @p n; returns it unchanged when preprocessing is off. */
+	/**
+	 * @brief Predicate-blast @p n; returns it unchanged unless BOTH the
+	 * core master `preprocessing` switch and bv's own `bv_blasting` switch
+	 * are on.
+	 */
 	static tref preprocess(tref n) {
-		return preprocessing ? bv_predicate_blasting<node_t>(n) : n;
+		return preprocessing && bv_blasting
+			? bv_predicate_blasting<node_t>(n) : n;
 	}
 
-	static void set_preprocessing(bool enabled) { preprocessing = enabled; }
+	/**
+	 * @brief Set bv's OWN preprocessing switch (`bv_blasting`), not the
+	 * core master `preprocessing`.
+	 *
+	 * This is what @ref pack_set_preprocessing (ba_pack_traits.h) calls for
+	 * every BA that declares it -- so "set every BA's own switch" is what
+	 * that capability has always meant; the core master is set separately,
+	 * by `api::set_preprocessing`.
+	 */
+	static void set_preprocessing(bool enabled) { bv_blasting = enabled; }
+
+	/// @name bv-declared CLI/REPL options
+	/// Backing getters/setters for @ref options; plain free functions so
+	/// they decay to the function pointers `ba_option` holds.
+	/// @{
+	static bool get_blasting_option() { return bv_blasting; }
+	static void set_blasting_option(bool enabled) { bv_blasting = enabled; }
+	static size_t get_blastdepth_option() { return max_blast_reentry_depth; }
+	static void set_blastdepth_option(size_t n) {
+		max_blast_reentry_depth = n;
+	}
+	/// @}
+
+	/**
+	 * @brief bv's own CLI/REPL options, addressed as `bv-blasting` and
+	 * `bv-blastdepth`.
+	 *
+	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
+	 * blasting still needs the core master `preprocessing` on as well).
+	 * `blastdepth` mirrors core's `max_blast_reentry_depth`, whose storage
+	 * stays in core (see the comment at its definition in
+	 * antiprenexing.tmpl.h) but which only bv's own blasting pass can ever
+	 * make progress against.
+	 */
+	static std::array<ba_option, 2> options() {
+		return {{
+			{ "blasting", ba_option_kind::flag,
+				get_blasting_option, set_blasting_option,
+				nullptr, nullptr,
+				"enable bv predicate blasting (the global "
+				"`preprocessing` switch gates it too -- both must "
+				"be on for bv to blast)" },
+			{ "blastdepth", ba_option_kind::count,
+				nullptr, nullptr,
+				get_blastdepth_option, set_blastdepth_option,
+				"cap blast-block re-entry nesting in anti-prenexing "
+				"(0 = unlimited)" },
+		}};
+	}
 
 	/**
 	 * @brief `true` when @p form still carries a one-hot bit-mask conjunction

@@ -1888,7 +1888,7 @@ The general options are the following:
 | -l, --license      | show the license                                        |
 | -v, --version      | show the version of the executable                      |
 | -V, --charvar      | char-as-variable short form (enabled by default)        |
-| -B, --blasting     | bitvector predicate blasting (enabled by default)       |
+| -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (disabled by default) |
 | -S, --severity     | severity level (trace/debug/info/error); default `info` |
 | -I, --indenting    | indent formulas in output                               |
 | -H, --highlighting | syntax highlighting                                     |
@@ -1924,7 +1924,6 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (default 500; 0 = unlimited)                 |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (default 500; 0 = unlimited) |
-| -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
 | -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
 | -P, --max-def-passes          | cap definition-expansion passes (0 = unlimited)                                        |
@@ -1932,6 +1931,15 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (0 = unlimited)                                         |
 | -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)                              |
 | -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
+
+Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
+"Selecting Boolean algebras" above) may declare CLI options of its own,
+addressed `--<ba>-<option>`, and present when that BA is part of the build. bv, for instance, declares `--bv-blasting` (bv's own
+predicate-blasting switch, enabled by default) and `--bv-blastdepth` (cap
+blast-block re-entry nesting in anti-prenexing, 0 = unlimited); bv blasts
+only when both `--preprocessing`/`-B` and `--bv-blasting` are on. In a build
+without bv, `--bv-blasting` and `--bv-blastdepth` are not recognized options
+at all.
 
 ## `tau_codegen` — synthesis-to-C++ compiler
 
@@ -2049,9 +2057,9 @@ output of commands. It's off by default.
 * `V|charvar`: Can be on/off. Controls usage of character variables in the
 REPL. It's on by default.
 
-* `B|blasting`: Can be on/off. Controls bitvector predicate blasting, i.e.
-whether bitvector predicates are expanded into their bit-level encoding. It's on
-by default.
+* `B|preprocessing`: Can be on/off. Master switch for every BA-specific
+preprocessing pass, e.g. bv's own predicate blasting (see below) — off
+disables all of them regardless of their own setting. It's off by default.
 
 * `benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
@@ -2081,9 +2089,6 @@ flag boundary; a bounded give-up reports unsatisfiable
 (`--max-flag-search-steps`). Default 500, for the same reason as
 `fixpointsteps`; a give-up reports unsatisfiable, which is wrong but bounded.
 
-* `blastdepth|maxblastreentrydepth`: blast-block re-entry nesting cap in
-anti-prenexing (`--max-blast-reentry-depth`). Unlimited by default.
-
 * `squeezecap|blocksqueezecap`: operand-set size above which block squeezing
 declines (`--block-squeeze-cap`). Unlimited by default.
 
@@ -2111,6 +2116,17 @@ characters (`--spec-size-warn`). 0 (off) by default.
 
 * `revisionalts|maxrevisionalts`: cap on revision alternatives kept per
 specification part (`--max-revision-alts`). Unlimited by default.
+
+Beyond the options above, each Boolean algebra in the configured pack may
+expose options of its own, addressed `<ba>-<option>` and reachable when that
+BA is part of the build; `set`/`get`/`enable`/`disable`/`toggle` route such a
+name to its owning BA the same way they route a bare name to a core option. bv, for
+instance, declares `bv-blasting` (its own predicate-blasting switch,
+mirroring `--bv-blasting`; on by default, but effective only while the
+master `preprocessing` above is also on) and `bv-blastdepth` (blast-block
+re-entry nesting cap in anti-prenexing, mirroring `--bv-blastdepth`;
+unlimited by default). In a session built without bv, `set bv-blasting off`
+reports `No BA named 'bv' in this pack (...)` instead of changing anything.
 
 ## **Functions, predicates and input/output stream variables**
 

@@ -22,7 +22,7 @@ add_repl_test(option_alias-s        "get s"            "status:")
 add_repl_test(option_alias-c        "get c"            "colors:")
 add_repl_test(option_alias-color    "get color"        "colors:")
 add_repl_test(option_alias-V        "get V"            "charvar:")
-add_repl_test(option_alias-blasting "get blasting"     "blasting:")
+add_repl_test(option_alias-preprocessing "get preprocessing" "preprocessing:")
 add_repl_test(option_alias-H        "get H"            "highlighting:")
 add_repl_test(option_alias-highlight "get highlight"   "highlighting:")
 add_repl_test(option_alias-I        "get I"            "indenting:")
@@ -43,13 +43,10 @@ add_repl_test(option_alias-d     "get d"     "debug-repl:|Debug option not avail
 add_repl_test(option_alias-debug "get debug" "debug-repl:|Debug option not available")
 add_repl_test(option_alias-dbg   "get dbg"   "debug-repl:|Debug option not available")
 
-# RE-1 (FIXED): "B" used to be declared twice in get_opt -- first for blasting,
-# then again for benchmarks -- so the benchmarks arm was unreachable and
-# `get B` silently meant blasting. Benchmarks now owns the previously free
-# lowercase "b" and blasting keeps "B". Both are asserted so the two can never
-# collide again unnoticed.
-add_repl_test(option_alias-B_is_blasting   "get B" "blasting:")
-add_repl_test(option_alias-b_is_benchmarks "get b" "benchmarks:")
+# "B" is the master preprocessing switch and "b" is benchmarks; both are
+# asserted so each keeps its own letter.
+add_repl_test(option_alias-B_is_preprocessing "get B" "preprocessing:")
+add_repl_test(option_alias-b_is_benchmarks    "get b" "benchmarks:")
 
 # get_opt's error arm. add_repl_test_fail is required here: the plain helper
 # sets FAIL_REGULAR_EXPRESSION "Error", and the error IS the expected output.
@@ -85,8 +82,12 @@ add_repl_test(option_alias-maxfixpointsteps
 	"get maxfixpointsteps"    "fixpointsteps:")
 add_repl_test(option_alias-maxflagsearchsteps
 	"get maxflagsearchsteps"  "flagsteps:")
-add_repl_test(option_alias-maxblastreentrydepth
-	"get maxblastreentrydepth" "blastdepth:")
+# blastdepth moved out of core's numeric-limit table entirely: it is now
+# bv's own option, addressed bv-blastdepth, with no core alias left pointing
+# at it. add_repl_test's own tau_repl_unsupported check skips this in a
+# pack without bv, since the command text names "bv".
+add_repl_test(option_alias-bv_blastdepth
+	"get bv-blastdepth" "bv-blastdepth:")
 add_repl_test(option_alias-blocksqueezecap
 	"get blocksqueezecap"     "squeezecap:")
 add_repl_test(option_alias-maxsimplifyrounds

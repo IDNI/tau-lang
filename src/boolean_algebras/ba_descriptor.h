@@ -74,6 +74,44 @@ constexpr bool ba_has_hash_constant_v = requires(const BA& x) {
 		-> std::convertible_to<size_t>;
 };
 
+/**
+ * @brief Kind of a BA-declared CLI/REPL option.
+ *
+ * `flag` also accepts enable/disable/toggle; `count` takes a number only.
+ */
+enum class ba_option_kind { flag, count };
+
+/**
+ * @brief One CLI/REPL option a BA declares about itself.
+ *
+ * `name` is the bare option name; the REPL and CLI address it as
+ * `<family>-<name>` (e.g. `bv-blasting`), `<family>` being the owning
+ * descriptor's `type_name` (see @ref pack_ba_options in ba_pack_traits.h).
+ * The getter and setter are the only access path to the value.
+ */
+struct ba_option {
+	const char* name;
+	ba_option_kind kind;
+	bool   (*get_flag)()        = nullptr; ///< set iff kind == flag
+	void   (*set_flag)(bool)    = nullptr; ///< set iff kind == flag
+	size_t (*get_count)()       = nullptr; ///< set iff kind == count
+	void   (*set_count)(size_t) = nullptr; ///< set iff kind == count
+	const char* help            = "";
+};
+
+/**
+ * @brief `true` when @p BA's descriptor declares its own CLI/REPL options.
+ *
+ * Optional capability: a BA declaring no `options()` has none of its own, and
+ * @ref pack_ba_options skips it.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_has_options_v = requires {
+	{ *(ba_descriptor<BA, Node>::options().begin()) }
+		-> std::convertible_to<ba_option>;
+	{ ba_descriptor<BA, Node>::options().end() };
+};
+
 /** @brief constexpr C-string equality, for comparing descriptor type names. */
 constexpr bool ba_name_eq(const char* a, const char* b) {
 	for (; *a || *b; ++a, ++b) if (*a != *b) return false;

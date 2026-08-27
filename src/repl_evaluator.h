@@ -52,6 +52,7 @@
 
 #include <memory>
 
+#include "boolean_algebras/ba_pack_traits.h"
 #include "boolean_algebras/tau/tau_ba.h"
 #include "api.h"
 #include "io_context.h"
@@ -66,17 +67,17 @@ namespace idni::tau_lang {
 
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
+	colors_opt, charvar_opt, preprocessing_opt, highlighting_opt, indenting_opt,
 	print_benchmarks_opt, debug_opt,
 	// Numeric, unlike every option above: they take a count, not a flag, so
 	// enable/disable/toggle do not apply to them. Full names only -- the
 	// single-letter space is exhausted (see the RE-1 note at the name
-	// lookup: "b" is benchmarks and "B" is blasting). One per runtime
+	// lookup: "b" is benchmarks and "B" is preprocessing). One per runtime
 	// limit; each sets the library global through its api setter, and `get`
 	// reads the global back, so the REPL and the CLI options stay two views
 	// of the same knob.
 	block_max_splits_opt, block_max_rounds_opt, fixpoint_steps_opt,
-	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
+	flag_search_steps_opt, squeeze_cap_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
 	spec_size_warn_opt, revision_alts_opt, consistency_subsets_opt,
@@ -114,7 +115,7 @@ struct repl_evaluator {
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
-		bool blasting            = true;  ///< Enable bitvector predicate blasting.
+		bool preprocessing       = true;  ///< Enable BA preprocessing passes (e.g. bv predicate blasting).
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options deliberately have no mirror fields
 		// here: `set` writes the library globals through the api setters
@@ -207,6 +208,22 @@ private:
 	void update_bool_opt_cmd(repl_option o,
 		const std::function<bool(bool&)>& update_fn);
 
+	// BA-declared options, addressed as "family-option" (e.g. "bv-blasting"),
+	// resolved against the pack rather than through get_opt()/repl_option.
+	/// @brief Get and print the BA-declared option named `family-name`.
+	void get_cmd_ba_option(const std::string& dotted);
+	/// @brief Set the BA-declared option named `family-name` to string @p v.
+	void set_cmd_ba_option(const std::string& dotted, const std::string& v);
+	/// @brief Toggle the BA-declared flag option named `family-name` using
+	/// @p update_fn (enable/disable/toggle).
+	void update_bool_opt_cmd_ba_option(const std::string& dotted,
+		const std::function<bool(bool&)>& update_fn);
+	/// @brief Resolve `family-name` against the pack's BA-declared options,
+	/// reporting "no such family" and "no such option" distinctly, and
+	/// returning nullptr on failure.
+	const ba_option* resolve_ba_option(const std::string& family,
+		const std::string& name);
+
 	// substitution and instantiation of formulas
 	/// @brief Execute a substitution command from @p n.
 	tref subst_cmd(const tt& n);
@@ -294,8 +311,9 @@ private:
 	/// @brief Update the charvar option to @p value and return the old value.
 	bool update_charvar(bool value);
 
-	/// @brief Update the blasting option to @p value and return the old value.
-	bool update_blasting(bool value);
+	/// @brief Update the core master preprocessing option to @p value and
+	/// return the old value.
+	bool update_preprocessing(bool value);
 
 	// CTL* fragment gate: returns true if CTL* ops found and fragment not active
 	bool reject_ctl_star_if_disabled(tref fm);
