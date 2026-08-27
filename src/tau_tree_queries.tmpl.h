@@ -237,6 +237,9 @@ int_t node_count (tref fm) {
 }
 
 
+// A width cast (`(bv[N]) x`) counts as non-Boolean: its operand and result
+// live in different algebras, so Boole-decomposing across it produces a
+// mixed-width term no back-end can read.
 template <NodeType node>
 bool is_non_boolean_term(tref n) {
 	using tau = tree<node>;
@@ -244,7 +247,8 @@ bool is_non_boolean_term(tref n) {
 	if (t.is(tau::bf_add) || t.is(tau::bf_sub) || t.is(tau::bf_mul)
 		|| t.is(tau::bf_div) || t.is(tau::bf_mod) || t.is(tau::bf_shr)
 			|| t.is(tau::bf_shl) || t.is(tau::bf_nand)
-			|| t.is(tau::bf_nor) || t.is(tau::bf_xnor))
+			|| t.is(tau::bf_nor) || t.is(tau::bf_xnor)
+			|| t.is(tau::bf_cast))
 		return true;
 	return false;
 }

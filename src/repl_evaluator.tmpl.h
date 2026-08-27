@@ -576,19 +576,29 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	// own leading ':', and BA constants are printed as `{ c }` elsewhere
 	// (see the ba_constant case in tau_tree_printers), so match that form
 	// here -- this branch never ran before, and printed `{c}::sbf`.
-	auto print_constant_case = [&type_id](tref var, const std::string& c) {
+	// A variable carries its own type when it was annotated; prefer it
+	// over the command's: with a cast in the system, `d:bv[24]` may be
+	// solved inside a bv[48] formula, and printing its all-ones value as
+	// the `1` of bv[48] showed 2^48-1 for what is 2^24-1.
+	auto type_of = [&type_id](tref var) {
+		size_t t = tau::get(var).get_ba_type();
+		return t ? t : type_id;
+	};
+	auto print_constant_case_typed = [](tref var, const std::string& c, size_t t) {
 		std::cout << "\t" << tau::get(var).to_str() << " := { " << c
-			<< " }" << ba_types<node>::name(type_id) << "\n";
+			<< " }" << ba_types<node>::name(t) << "\n";
 	};
 
 	auto print_zero_case = [&](tref var) {
-		print_constant_case(var,
-			node::ba::zero(get_ba_type_tree<node>(type_id)));
+		size_t t = type_of(var);
+		print_constant_case_typed(var,
+			node::ba::zero(get_ba_type_tree<node>(t)), t);
 	};
 
 	auto print_one_case = [&](tref var) {
-		print_constant_case(var,
-			node::ba::one(get_ba_type_tree<node>(type_id)));
+		size_t t = type_of(var);
+		print_constant_case_typed(var,
+			node::ba::one(get_ba_type_tree<node>(t)), t);
 	};
 
 	auto print_general_case = [](tref var, tref value) {
