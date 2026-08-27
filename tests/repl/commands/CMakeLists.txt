@@ -26,6 +26,7 @@ include(test_repl-solver_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
 include(test_repl-run_cmd.cmake)
+include(test_repl-run_cmd-crash_regression.cmake)
 
 # substitution and instantiation commands
 include(test_repl-instantiation_cmd.cmake)
