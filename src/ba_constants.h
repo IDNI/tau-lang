@@ -118,6 +118,22 @@ private:
 	using constant_pool = std::vector<std::pair<constant, size_t>>;
 	static constant_pool& C();  // pool of constants
 	static htrefs& T();         // pool of constant tree nodes with type info (htref to survive gc)
+	// O(1) lookup index: (constant, type_id) -> position in C(). C()
+	// stays the id-ordered store (get(constant_id) reads it); this map
+	// only accelerates get(constant, type_id), which used to scan the
+	// pool linearly with full BA equality per entry on the step() hot
+	// path. Same never-destroyed accessor pattern as C()/T() so all
+	// three pools share one lifetime.
+	struct pooled_key_hash {
+		size_t operator()(const std::pair<constant, size_t>& p) const {
+			size_t seed = std::hash<constant>{}(p.first);
+			hash_combine(seed, p.second);
+			return seed;
+		}
+	};
+	using pool_index = std::unordered_map<std::pair<constant, size_t>,
+		size_t, pooled_key_hash>;
+	static pool_index& index_();
 	// BA2-5: set by cleanup(); a get() afterwards is a programming error --
 	// fail loudly instead of silently re-pooling into a freshly reset pool.
 	inline static bool poisoned = false;

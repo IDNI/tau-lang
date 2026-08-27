@@ -1360,7 +1360,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
-		DBG(if (inferred) LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		DBG(if (inferred) TAU_LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 	}
 }
 

@@ -839,17 +839,21 @@ std::pair<std::optional<assignment<node>>, bool>
 		// true -- which throws away the very choice the encoding needs
 		// committed, leaving the bits to the zero fill.
 		const bool state_part = mentions_ltl_state_var<node>(spec_part);
-		for (tref path : expression_paths<node>(spec_part)) {
+		// The io_var time rewrite does not change the formula's or/and
+		// skeleton, so it commutes with path enumeration: rewrite the
+		// whole alternative once instead of once per path (this full-tree
+		// rewrite dominated a replay profile of the load test).
+		tref part_at_t = update_to_time_point(spec_part,
+							formula_time_point);
+		for (tref path : expression_paths<node>(part_at_t)) {
 			// rewriting the inputs and inserting them into memory
-			tref updated = update_to_time_point(path, formula_time_point);
 			// TODO: Check why constant time positions are not being replaced
-			tref current = rewriter::replace<node>(updated, memory);
+			tref current = rewriter::replace<node>(path, memory);
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
 			if (!state_part) current = normalize_non_temp<node>(current);
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
-				<< "step/updated: " << LOG_FM(updated) << "\n"
 				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
 				<< "step/memory: ";
 			for (const auto& [k, v]: memory)
@@ -1042,6 +1046,11 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 	if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc) return;
 
 	const auto t0 = std::chrono::steady_clock::now();
+	// The step rewrite memo is a pure cache holding raw trefs that
+	// collect_live_refs does not walk: drop it rather than pinning its
+	// entries, so gc can free anything only the memo still references.
+	tp_rewrite_memo_.clear();
+	tp_rewrite_memo_t_ = std::numeric_limits<int_t>::min();
 	std::unordered_set<tref> keep;
 	if (pin) for (const auto& [k, v] : *pin) {
 		keep.insert(k);
@@ -1195,14 +1204,21 @@ std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 template <NodeType node>
 tref interpreter<node>::update_to_time_point(
 	tref f, const int_t t) {
-	LOG_TRACE << "update_to_time_point begin\n";
 	// update the f according to current time_point, i.e. for each
 	// input/output var which has a shift, we replace it with the value
 	// corresponding to the current time_point minus the shift.
+	// Memoized per time point: within one t the rewrite of a formula is
+	// a pure function, and step()/get_ubt_ctn_at re-request the same
+	// trees (duplicated alternatives, repeated calls) many times.
+	if (t != tp_rewrite_memo_t_) {
+		tp_rewrite_memo_.clear();
+		tp_rewrite_memo_t_ = t;
+	}
+	if (auto it = tp_rewrite_memo_.find(f); it != tp_rewrite_memo_.end())
+		return it->second;
 	auto io_vars = tau::get(f).select_top(is_child<node, tau::io_var>);
-	auto result = fm_at_time_point<node>(f, io_vars, t);
-	LOG_TRACE << "update_to_time_point[result]: " << LOG_FM_DUMP(result) << "\n";
-	LOG_TRACE << "update_to_time_point end\n";
+	tref result = fm_at_time_point<node>(f, io_vars, t);
+	tp_rewrite_memo_.emplace(f, result);
 	return result;
 }
 
@@ -1481,15 +1497,29 @@ std::optional<typename interpreter<node>::update_plan>
 					// product of both parts' alternatives
 					// in lexicographic preference order --
 					// (⋁A)∧(⋁B) with the stronger pairs
-					// tried first.
+					// tried first. Structural duplicates
+					// are dropped keeping the earliest
+					// (strongest) position -- hash-consing
+					// makes the built conjunction tref the
+					// structural identity -- matching the
+					// dedup pointwise_revision already
+					// applies to its own result.
 					htrefs merged;
+					std::unordered_set<tref> seen;
 					merged.reserve(current_spec[i].first.size()
 						* current_spec[j].first.size());
 					for (const htref& a : current_spec[i].first)
-						for (const htref& b : current_spec[j].first)
-							merged.push_back(tree<node>::geth(
-								tau::build_wff_and(
-									a->get(), b->get())));
+						for (const htref& b : current_spec[j].first) {
+							// a∧a ≡ a: keep the pair flat
+							tref m = a->get() == b->get()
+								? a->get()
+								: tau::build_wff_and(
+									a->get(),
+									b->get());
+							if (seen.insert(m).second)
+								merged.push_back(
+									tree<node>::geth(m));
+						}
 					current_spec[i].first = std::move(merged);
 					part_merged[i] = true;
 					current_spec.erase(current_spec.begin()+j);

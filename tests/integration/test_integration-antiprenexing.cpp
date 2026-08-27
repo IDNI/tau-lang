@@ -53,12 +53,17 @@ TEST_SUITE("anti_prenex") {
 			// && b1 w = 0 && f(b1))`; the first disjunct's existential is
 			// a tautology (b1 = 0), so it collapses to
 			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
-			// pre-deletion shape below.
+			// pre-deletion shape below. Canonical (produced) shape FIRST:
+			// Debug's matches_to_any_of only checks expected[0].
 			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
-			// 2026-08-20 (bare-atom leaf routing; canonical shape
-			// FIRST): same two disjuncts as the 2026-08-04 shape below,
-			// with disjunct and conjunct order flipped by the regen
-			// tie-breaks; equivalent by the same hand-check.
+			// the same single disjunct with main's pivot tie-break order
+			// (conjuncts and disjuncts permuted; equivalent by
+			// commutativity of the hand-check above).
+			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || f(b1) || w = 0)",
+			// 2026-08-20 (bare-atom leaf routing + the fallback): same
+			// two disjuncts as the 2026-08-04 shape below, with disjunct
+			// and conjunct order flipped by the pivot tie-breaks;
+			// equivalent by the same hand-check.
 			"(ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0)) "
 			"|| (ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1)))",
 			// block pipeline, 2026-08-04: carries a redundant second
@@ -86,12 +91,18 @@ TEST_SUITE("anti_prenex") {
 			// back (`to_nnf(neg(pushed))`), so this is exactly `!(ex-case
 			// result)` renamed to NNF -- sound for the same reason the ex
 			// shape is, by construction, independent of what shape the
-			// wrapped ex-elimination happens to return.
+			// wrapped ex-elimination happens to return. Canonical
+			// (produced) shape FIRST: Debug's matches_to_any_of only
+			// checks expected[0].
 			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
 			"&& (w != 0 || wy' = 0)",
-			// 2026-08-20 (bare-atom leaf routing; canonical first):
-			// dual of the ex case, conjunct/disjunct order flipped by
-			// the regen tie-breaks; equivalent by the same hand-check.
+			// the same two conjuncts with main's pivot tie-break order
+			// (disjuncts permuted; equivalent by commutativity).
+			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || wy' = 0)",
+			// 2026-08-20 (bare-atom leaf routing + the fallback): dual
+			// of the ex case, conjunct/disjunct order flipped by the
+			// pivot tie-breaks; equivalent by the same hand-check.
 			"(all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0) "
 			"&& (all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1))",
 			// block pipeline, 2026-08-04: the dual, second conjunct is
@@ -127,6 +138,122 @@ TEST_SUITE("anti_prenex") {
 			"y = 0 && w = 0",
 			"w = 0 && y = 0",
 		}) );
+	}
+
+	// complete_quantifier_elimination branch coverage (added with the
+	// bc99a82b port). The block pipeline's pivot selection only splits on
+	// non-negated atoms, so a variable occurring solely in `!=` atoms
+	// reaches the fallback; each case below pins one branch of the fallback
+	// so a regression in any of them fails a test instead of passing as a
+	// conservatively-undecided formula.
+	//
+	// The four cases below carry a second accepted string (produced shape
+	// first, matching this file's convention -- see the "b4 squeeze_absorb"
+	// cases above): conjunct/disjunct order among the pivot's siblings is
+	// decided by comparing hashes (subtree_less, feeding pivot/representative
+	// selection), and that hash comes from node::hashit(). This tree hashes
+	// the raw ba_type integer; the upstream pins were written against a hash
+	// of the cached type name instead, which is why upstream's order is not
+	// what this tree currently produces. Switching hashit() back to hashing
+	// the type name would make the upstream order the produced one again --
+	// see the rationale at node<BAs...>::hashit() in tau_tree_node.tmpl.h.
+	TEST_CASE("cqe: neq-starved ex block is eliminated") {
+		const char* sample = "ex b (by != 0 && bz != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"y != 0 && z != 0",
+			"z != 0 && y != 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: neq-starved all block is eliminated via dualization") {
+		const char* sample = "all b (by = 0 || bz = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"y = 0 || z = 0",
+			"z = 0 || y = 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: disjunctive scope distributes per clause") {
+		const char* sample = "ex b (by != 0 && bz != 0 || bw != 0 && bu != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"y != 0 && z != 0 || w != 0 && u != 0",
+			"z != 0 && y != 0 || u != 0 && w != 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: nested starved quantifiers resolve innermost-first") {
+		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"y != 0 && z != 0",
+			"z != 0 && y != 0",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+	TEST_CASE("cqe: NZ-1 temporal scope keeps its quantifier") {
+		// The grammar has no quantifier-over-always position, so build the
+		// NZ-1 shape the way the pipeline meets it: internally.
+		tref spec = get_nso_rr("always o1[t]b != 0.").value().main->get();
+		const trefs& fv = get_free_vars<node_t>(spec);
+		REQUIRE( !fv.empty() );
+		tref fm = tau::build_wff_all_many(fv, spec);
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"all b2, b1 (always b1 b2 != 0)",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( tau::get(res).find_top(
+			is_child<node_t, tau::wff_always>) != nullptr );
+	}
+	TEST_CASE("cqe: wff_ref scope is frozen verbatim") {
+		const char* sample = "ex b (bw != 0 && q(b)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"ex b1 b1 w != 0 && q(b1)",
+		}) );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) != nullptr );
+	}
+	TEST_CASE("cqe: tau constant internals are not entered") {
+		const char* sample = "ex b (by != 0 && bz != 0) &&"
+			" { (ex v o1[t]v = 0) && o2[t] = 0 } : tau x = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		// No exact-shape pin here: a formula holding a tau constant prints
+		// with run-to-run conjunct order (node ordering compares hashes
+		// first, and the constant's tau_ba hash is allocation-order
+		// dependent -- the known pivot-order-sensitivity follow-up), so
+		// assert order-insensitively: the starved outer quantifier is
+		// gone from the tree, and the constant survives as a constant
+		// (its internals are pool values, not tree children, so find_top
+		// cannot see into it either way).
+		//
+		// Upstream additionally pins that the constant still displays its
+		// own internal quantifier verbatim -- `out.find("ex b1")`. That
+		// does not hold here, and not because of this quantifier pass:
+		// this tree already folds the cast's internals before freezing
+		// them into the pool, so `{ (ex v o1[t]v = 0) && o2[t] = 0 }:tau`
+		// prints as `{ always o2[t]:tau = 0 }:tau`. `ex v o1[t]v = 0` is
+		// a tautology (witnessed by v = 0), so the fold is sound and the
+		// remaining conjunct is the whole content. Measured identical on
+		// this branch before the merge that brought this case in, so it
+		// is a standing difference in WHEN `: tau` cast internals are
+		// normalized, not a regression -- recorded as an open question
+		// rather than asserted either way here.
+		const std::string out = tau::get(res).to_str();
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( out.find(":tau") != std::string::npos );
+		CHECK( out.find("o2[t]") != std::string::npos );
+		CHECK( out.find("z != 0") != std::string::npos );
+		CHECK( out.find("y != 0") != std::string::npos );
 	}
 
 	// Test to see the blow up caused by quantified free function symbols

@@ -9,13 +9,12 @@ bool check_hook(const char* sample, const char* expected) {
 	tref tau_expected = tau::get(expected, pwff);
 
 #ifdef DEBUG
-	using node = node_t;
 	std::cout << "sample: " << string(sample) << " expected: ";
 	if (tau_expected == 0) cout << "nullptr";
-	else cout << TAU_DUMP_TO_STR(tau_expected);
+	else cout << tree<node_t>::get(tau_expected).dump_to_str();
 	cout << "\n\tgot: ";
 	if (tau_sample == 0) cout << "nullptr";
-	else cout << TAU_DUMP_TO_STR(tau_sample);
+	else cout << tree<node_t>::get(tau_sample).dump_to_str();
 	cout << "\n";
 #endif // DEBUG
 

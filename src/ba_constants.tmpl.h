@@ -24,36 +24,29 @@ htrefs& ba_constants<node>::T() {
 }
 
 template <NodeType node>
+typename ba_constants<node>::pool_index& ba_constants<node>::index_() {
+	static pool_index* i = new pool_index();
+	return *i;
+}
+
+template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	// BA2-5: after cleanup() the C/T pools are out of sync by design
 	// (atexit ordering); interning then would alias fresh constants
 	// with stale trees. Fail loudly instead.
 	if (poisoned) throw std::logic_error(
 		"ba_constants::get called after cleanup()");
-	LOG_TRACE << "-- get(constant, type_id): "
-		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
-	// LOG_TRACE << dump_to_str();
-	// TODO optimize
-	// BA2-9: the pool index (a map beside C/T) stays DEFERRED -- the
-	// constant variant guarantees equality but not ordering/hashing across
-	// all pack types. Dropping the const at least makes the emplace_back
-	// below a real move instead of a silent copy.
+	// No tracing here: this runs for every constant the bv evaluation
+	// hooks fold during a step, and the pool lookup is index-backed.
 	auto p = std::make_pair(constant, type_id);
-	for (size_t i = 0; i < C().size(); ++i) if (C()[i] == p) {
-		LOG_TRACE << "-- returning already pooled: "
-						<< i+1 << " " << LOG_FM(T()[i]->get());
-		return T()[i]->get();
-	}
-	C().emplace_back(std::move(p));
+	if (auto it = index_().find(p); it != index_().end())
+		return T()[it->second]->get();
+	C().emplace_back(p);
 	size_t constant_id = C().size();
+	index_().emplace(std::move(p), constant_id - 1);
 	node n = node::ba_constant(constant_id, type_id);
 	tref r = tree<node>::get(n);
 	T().push_back(tree<node>::geth(r));
-	// LOG_TRACE << "node constant: " << n;
-	// LOG_TRACE << dump_to_str();
-	// const auto& t = tree<node>::get(r);
-	// LOG_TRACE << "node from tree:    " << t.value;
-	LOG_TRACE << "-- returning pooled constant: " << LOG_FM(r);
 	return r;
 }
 
@@ -93,10 +86,12 @@ template <NodeType node>
 void ba_constants<node>::cleanup() {
 	// Both pools live behind leaked function-local statics (see C()/T()
 	// above) so neither ever runs a static destructor at exit -- no
-	// atexit ordering hazard with the BDD/cvc5 backends remains, so both
-	// pools are simply cleared together here to keep their indices aligned.
+	// atexit ordering hazard with the BDD/cvc5 backends remains, so all
+	// three pools are simply cleared together here to keep their indices
+	// aligned.
 	C().clear();
 	T().clear();
+	index_().clear();
 	poisoned = true; // BA2-5: any later get() must fail loudly, see header
 }
 
