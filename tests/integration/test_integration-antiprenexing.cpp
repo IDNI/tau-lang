@@ -94,12 +94,23 @@ TEST_SUITE("anti_prenex") {
 			// wrapped ex-elimination happens to return. Canonical
 			// (produced) shape FIRST: Debug's matches_to_any_of only
 			// checks expected[0].
+			//
+			// Second conjunct's disjunct order updated by d818ac08 (sort
+			// the trimmed positive atoms before re-negating, so the
+			// eq-first rule in syntactic_path_simplification_wff_comp
+			// now recognises `wy' = 0` as an equality behind its
+			// `wff_neg` sibling `w != 0` instead of falling through to
+			// the hash-based subtree_less tie-break): `wy' = 0 || w != 0`
+			// is now the sole canonical, deterministic order -- the
+			// pre-fix `w != 0 || wy' = 0` spelling was never anything but
+			// a hash tie-break artifact of this exact pair, so it is
+			// corrected in place rather than added as a 9th entry.
 			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (w != 0 || wy' = 0)",
+			"&& (wy' = 0 || w != 0)",
 			// the same two conjuncts with main's pivot tie-break order
 			// (disjuncts permuted; equivalent by commutativity).
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (w != 0 || wy' = 0)",
+			"&& (wy' = 0 || w != 0)",
 			// 2026-08-20 (bare-atom leaf routing + the fallback): dual
 			// of the ex case, conjunct/disjunct order flipped by the
 			// pivot tie-breaks; equivalent by the same hand-check.
