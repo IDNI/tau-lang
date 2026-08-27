@@ -177,6 +177,14 @@ struct api {
 	 */
 	static void set_block_max_rounds(size_t n);
 	/**
+	 * @brief Cap the DNF clauses `complete_quantifier_elimination` may
+	 * distribute one quantifier scope into (estimated as the product of
+	 * the scope's CNF factors' disjunct counts). Above the cap the
+	 * quantifier is kept verbatim, with a log line. 0 = unlimited (the
+	 * default).
+	 */
+	static void set_cqe_max_clauses(size_t n);
+	/**
 	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
 	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
 	 */

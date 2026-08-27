@@ -832,6 +832,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "blockmaxsplits")    return block_max_splits_opt;
 	if (x == "maxrounds"
 		|| x == "blockmaxrounds")    return block_max_rounds_opt;
+	if (x == "maxclauses"
+		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
 	if (x == "fixpointsteps"
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
@@ -926,6 +928,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
 	{ block_max_rounds_opt, [climit]() {
 		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ cqe_max_clauses_opt, [climit]() {
+		std::cout << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
 	{ fixpoint_steps_opt, [climit]() {
 		std::cout << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
 	{ flag_search_steps_opt, [climit]() {
@@ -1064,6 +1068,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_block_max_splits(*n); } },
 	{ block_max_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_block_max_rounds(*n); } },
+	{ cqe_max_clauses_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_cqe_max_clauses(*n); } },
 	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_fixpoint_steps(*n); } },
 	{ flag_search_steps_opt, [&]() { if (auto n = str2count(); n)
@@ -1128,6 +1134,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
 	case block_max_splits_opt:
 	case block_max_rounds_opt:
+	case cqe_max_clauses_opt:
 	case fixpoint_steps_opt:
 	case flag_search_steps_opt:
 	case blast_depth_opt:

@@ -178,6 +178,36 @@ TEST_SUITE("anti_prenex") {
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
+	TEST_CASE("cqe: scope over the clause cap keeps its quantifier") {
+		// 2 CNF factors, naive product 4 > cap 3 -> cqe must decline and
+		// re-wrap verbatim. Called DIRECTLY: through anti_prenex the block
+		// pipeline would settle the scope before cqe is ever reached;
+		// atoms are canonicalized first, as anti_prenex's step 3 does.
+		const char* sample = "ex b ((by != 0 || z != 0) && (bx != 0 || w != 0)).";
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		cqe_max_clauses = 3;
+		tref r = complete_quantifier_elimination<node_t>(fm);
+		cqe_max_clauses = std::numeric_limits<size_t>::max();
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) != nullptr );
+	}
+	TEST_CASE("cqe: a scope that needs distributing is still eliminated") {
+		// The reducing to_dnf rebuilds negated atoms as `!=`; cqe must
+		// re-canonicalize them or the per-clause squeeze declines every
+		// clause and re-wraps the quantifier (latent until 2026-08-27,
+		// since the cases above hand cqe scopes that are already DNF).
+		const char* sample = "ex b ((by != 0 || z != 0) && (bx != 0 || w != 0)).";
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		tref r = complete_quantifier_elimination<node_t>(fm);
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
+		// (x != 0 || z != 0) && (y != 0 || w != 0): 4 two-atom clauses,
+		// order-insensitive since cqe's own clause order is hash-driven.
+		trefs clauses = get_dnf_wff_clauses<node_t>(r);
+		CHECK( clauses.size() == 4 );
+		for (tref c : clauses)
+			CHECK( get_cnf_wff_clauses<node_t>(c).size() == 2 );
+	}
 	TEST_CASE("cqe: nested starved quantifiers resolve innermost-first") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();

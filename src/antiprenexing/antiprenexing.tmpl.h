@@ -77,6 +77,16 @@ inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 /// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
 inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 
+/// Maximum number of DNF clauses complete_quantifier_elimination may
+/// distribute one scope into (estimated as the product of the per-factor
+/// disjunct counts of the scope's CNF factors). Above it cqe declines and
+/// re-wraps the quantifier verbatim -- the same escape hatch it takes for
+/// temporal and wff_ref scopes -- and logs a warning. The nomic ratchet
+/// (GitHub #90) handed cqe an 81-factor CNF whose naive product was 2e75
+/// clauses. Runtime-tunable via `api::set_cqe_max_clauses`; same caveats
+/// as block_max_rounds above.
+inline size_t cqe_max_clauses = std::numeric_limits<size_t>::max();
+
 /**
  * @internal
  * @brief Core recursive helper for the anti-prenex block algorithm.
@@ -1060,6 +1070,27 @@ tref complete_quantifier_elimination(tref formula) {
 		// needs an eliminator below.
 		const tref body = is_ex ? scoped
 			: to_nnf<node>(tau::build_wff_neg(scoped));
+		// Product blowup guard: the DNF below multiplies the scope's CNF
+		// factors' disjunct counts, so estimate that product first (in
+		// the overflow-safe division form) and decline past the runtime
+		// cap instead of building an astronomically large DNF.
+		{
+			size_t est = 1;
+			for (tref f : get_cnf_wff_clauses<node>(body)) {
+				const size_t k = get_dnf_wff_clauses<node>(f).size();
+				if (k == 0 || est > cqe_max_clauses / k) {
+					est = std::numeric_limits<size_t>::max();
+					break;
+				}
+				est *= k;
+			}
+			if (est > cqe_max_clauses) {
+				LOG_WARNING << "complete_quantifier_elimination: scope of "
+					<< LOG_FM(var) << " would distribute into more than "
+					<< cqe_max_clauses << " clauses; quantifier kept";
+				return n;
+			}
+		}
 		// `ex v (A|B) = (ex v A)|(ex v B)`: distribute over the scope's
 		// disjunction, then eliminate `v` from each OR-free clause with
 		// the squeeze `eliminate_block_over_clause` already uses for a
@@ -1077,7 +1108,15 @@ tref complete_quantifier_elimination(tref formula) {
 		const block_eliminability<node> trivial_elim{};
 		const typename term_handle<node>::order empty_order{};
 		tref res = _F<node>();
-		for (tref clause : get_dnf_wff_clauses<node>(to_dnf<node, true>(body)))
+		// normalize_atomic_formula_operators after distributing: the
+		// reducing to_dnf rebuilds negated atoms as `bf_neq`, while the
+		// squeeze recognizes only the canonical `f = 0` / `!(f = 0)`
+		// spellings anti_prenex's step 3 established -- without this
+		// every clause carrying a negated atom was declined and re-wrapped
+		// whenever the scope actually needed distributing.
+		for (tref clause : get_dnf_wff_clauses<node>(
+				normalize_atomic_formula_operators<node>(
+					to_dnf<node, true>(body))))
 			res = tau::build_wff_or(res, eliminate_block_over_clause<node>(
 				clause, {var}, trivial_elim, empty_order));
 		return is_ex ? res : to_nnf<node>(tau::build_wff_neg(res));
