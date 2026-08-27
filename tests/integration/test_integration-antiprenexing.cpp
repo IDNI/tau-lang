@@ -208,6 +208,21 @@ TEST_SUITE("anti_prenex") {
 		for (tref c : clauses)
 			CHECK( get_cnf_wff_clauses<node_t>(c).size() == 2 );
 	}
+	TEST_CASE("cqe: v-free conjuncts are not distributed") {
+		// 4 CNF factors, only the last mentions b. Full distribution is
+		// 2^4 = 16 clauses (over cap 8); miniscoped, the b-residue is a
+		// single 2-clause factor and elimination proceeds.
+		cqe_max_clauses = 8;
+		const char* sample = "ex b ((p != 0 || q != 0) && (r != 0 || s != 0) "
+			"&& (t != 0 || u != 0) && (by != 0 || bz != 0)).";
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		tref r = complete_quantifier_elimination<node_t>(fm);
+		cqe_max_clauses = std::numeric_limits<size_t>::max();
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
+		// The b-free factors survive verbatim (not multiplied out).
+		CHECK( get_cnf_wff_clauses<node_t>(r).size() >= 4 );
+	}
 	TEST_CASE("cqe: nested starved quantifiers resolve innermost-first") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
