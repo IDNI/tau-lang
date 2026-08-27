@@ -191,8 +191,21 @@ size_t node<BAs...>::hashit() const {
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool (ba_constant.data is always a ba_constants
 	// pool index, regardless of ba_type -- see node::ba_constant()).
-	if (nt == type::ba_constant && data != 0)
-		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
+	// Hashed by content, not identity: bintree::operator< compares hashes
+	// first, so a constant's default std::hash could make DNF clause order
+	// -- and the witness the interpreter picks for a free output -- depend
+	// on process history (GitHub #89). A BA whose std::hash isn't already
+	// content-derived says so with hash_constant on its descriptor (see
+	// ba_has_hash_constant_v); every other BA falls back to std::hash<BA>.
+	if (nt == type::ba_constant && data != 0) {
+		const auto c = tau_lang::ba_constants<node>::get(data);
+		hash_combine(seed, c.index(), std::visit([](const auto& v) {
+			using BA = std::decay_t<decltype(v)>;
+			if constexpr (ba_has_hash_constant_v<node, BA>)
+				return ba_descriptor<BA, node>::hash_constant(v);
+			else return std::hash<BA>{}(v);
+		}, c));
+	}
 	// Get string from pool
 	else if (tree<node>::is_string_nt(nt))
 		hash_combine(seed, dict(data));

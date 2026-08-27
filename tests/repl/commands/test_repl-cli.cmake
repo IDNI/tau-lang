@@ -16,6 +16,7 @@
 #
 
 include(add_repl_test)
+include(tau_repl_pack)
 
 # --- --version ---------------------------------------------------------------
 # The `version` REPL command is already covered by test_repl-version_cmd; this
@@ -183,3 +184,31 @@ foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	set_tests_properties("test_repl-cli-help_lists-${nm}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "${lflag}")
 endforeach()
+
+# --- blasting default (GitHub #74) -------------------------------------------
+# The library default is `preprocessing = false`
+# (heuristics/preprocess_placement.h), because predicate blasting hands cvc5
+# thousands of auxiliary quantifiers it does not need. The
+# CLI's own option table used to hardcode its own default of `true`, so every
+# plain `tau` invocation silently overrode the library decision, and the
+# single-lookback bv accumulator from #74 hung on the CLI while completing
+# instantly with `-B false` (or through the C++/Python API, which never saw the
+# CLI default). Drives the plain CLI, no -B given: it must finish and produce
+# the reporter's expected 5, 8, 8. The input prompt answers `q` with a parse
+# Error (that is how the run is ended without a tty), so no FAIL regex here.
+add_test(NAME "test_repl-cli-blasting_default_off"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get blasting\"")
+set_tests_properties("test_repl-cli-blasting_default_off" PROPERTIES
+	PASS_REGULAR_EXPRESSION "blasting: *off"
+	FAIL_REGULAR_EXPRESSION "Error")
+
+tau_repl_unsupported(_tau_skip "i1:bv[8] := in console.")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-cli-issue74_bv_accumulator_default_flags")
+else()
+	add_test(NAME "test_repl-cli-issue74_bv_accumulator_default_flags"
+		COMMAND bash -c "printf 'i1:bv[8] := in console.\\nrun (o0s[0]:bv[8] = {#x05}:bv[8]) && (o0s[t]:bv[8] = o0s[t-1]:bv[8] + i1[t]:bv[8]).\\n3\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	set_tests_properties("test_repl-cli-issue74_bv_accumulator_default_flags" PROPERTIES
+		PASS_REGULAR_EXPRESSION "o0s\\[2\\] := 8"
+		TIMEOUT 120)
+endif()

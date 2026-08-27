@@ -447,10 +447,66 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			}
 		}
 		if (dep.empty()) return formula;
-		formula = tau::build_wff_and(dep);
 		// Var-free conjuncts; they must be re-attached to every result
 		// built from the dependent part below
 		const tref indep = tau::build_wff_and(conjs);
+		// GitHub #72: try the dependent part per connected component
+		// under the block's variables -- ex X (A(X1) && B(X2)) with X1,
+		// X2 disjoint is ex X1 A && ex X2 B -- and adopt that only when
+		// every component DECIDES (T or F). Fed to the Boole
+		// decomposition as one formula, N conjuncts with pairwise
+		// disjoint support are a 2^N Shannon expansion: every branch
+		// carries the other N-1 conjuncts unchanged, nothing ever
+		// simplifies a sibling, and when the component in front of the
+		// split is unsatisfiable (the shape a closed implication check
+		// produces) not even the T shortcut prunes it. Decided on its
+		// own, an F component ends the whole conjunction at once and a
+		// T component simply drops out.
+		//
+		// Undecided components are NOT adopted: on a residual (a
+		// component that keeps quantifiers or leaves a formula), the
+		// joint processing below simplifies across components (measured
+		// 2026-08-26 on the nested-block chain a tau constant's
+		// complement produces: per-component residuals grew a 23 KB
+		// body to 43 KB where the joint path shrank it to 0.9 KB, and
+		// that compounded to 20 s over the remaining levels versus 0.3
+		// s). So the per-component pass is a decision pre-check, and on
+		// anything undecided the formula falls through untouched.
+		// Frozen content and references are left out entirely: their
+		// block is re-wrapped verbatim by design (see
+		// process_quantifier_block's all-frozen early-out), and `el`
+		// only knows about references once an analysis registered
+		// them, so those are checked structurally as well.
+		auto has_ref = [](tref f) {
+			return tau::get(f).find_top(is<node, tau::wff_ref>)
+				|| tau::get(f).find_top(is<node, tau::bf_ref>);
+		};
+		if (dep.size() > 1 && !el.has_frozen(formula)
+			&& !has_ref(formula)) {
+			std::vector<trefs> comps =
+				group_by_shared_vars<node>(dep, block);
+			if (comps.size() > 1) {
+				bool all_decided = true;
+				for (const trefs& comp : comps) {
+					const tref cf = tau::build_wff_and(comp);
+					const trefs& cvars = get_free_vars<node>(cf);
+					trefs sub_block;
+					for (tref v : block)
+						if (hasbc(cvars, v, tau::subtree_less))
+							sub_block.push_back(v);
+					tref r = anti_prenex_block<node>(cf, sub_block,
+						used_atms, quant_pattern, order, el,
+						splits_left, elim);
+					if (tau::get(r).equals_F()) return _F<node>();
+					if (!tau::get(r).equals_T()) {
+						all_decided = false;
+						break;
+					}
+				}
+				if (all_decided) return indep;
+			}
+		}
+		formula = tau::build_wff_and(dep);
 		// Chapter 5 steps 2a/2b, now that the dependent part is
 		// isolated. Handed `formula` rather than the original
 		// conjunction so an independent conjunct is never squeezed into

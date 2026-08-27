@@ -43,6 +43,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 			? x.getBitVectorValue(10) : x.toString());
 	}
 
+	/**
+	 * @brief Hash a bv constant by content, not by cvc5 term creation id.
+	 * See hash_bv_constant (backends/cvc5/cvc5.h) and GitHub #89.
+	 */
+	static size_t hash_constant(const bv& x) { return hash_bv_constant(x); }
+
 	static bool matches_type(tref type_tree) {
 		return is_bv_type_family<node_t>(type_tree);
 	}

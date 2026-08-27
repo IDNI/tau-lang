@@ -375,6 +375,70 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 		tref n2 = get_nso_rr("x = 0 && y = 0.").value().main->get();
 		CHECK( !is_nso_impl<node_t>(n1, n2) );
 	}
+
+	// GitHub #82: the implication used to be closed over every free
+	// variable and normalized in one piece, so an antecedent/consequent
+	// pair whose atoms fall into many variable-disjoint components (the
+	// shape find_fixpoint_phi produces for a spec accumulating N clauses)
+	// paid for one N-component Boole decomposition per check. It is now
+	// decided per consequent conjunct against the antecedent conjuncts
+	// its variables connect to. These pin the exactness of that split.
+	TEST_CASE("is_nso_impl (#82): per-conjunct decomposition, all implied") {
+		tref n1 = get_nso_rr("x = 0 && y = 0 && z = 0.").value().main->get();
+		tref n2 = get_nso_rr("x = 0 && (y = 0 || w = 1).").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): one unconnected conjunct is not implied") {
+		// w is untouched by the antecedent, so `w = 0` is not implied even
+		// though every other conjunct is.
+		tref n1 = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		tref n2 = get_nso_rr("x = 0 && y = 0 && w = 0.").value().main->get();
+		CHECK( !is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): an unsatisfiable unconnected antecedent "
+		  "component makes the implication vacuous")
+	{
+		// `x = 0 && x = 1` (over sbf, x = 1 means x is the top element)
+		// is unsatisfiable, and it shares no variable with `w = 0`, so
+		// deciding `w = 0` against its own (empty) component alone would
+		// say false; the whole implication still holds because the
+		// antecedent is unsatisfiable.
+		tref n1 = get_nso_rr("x = 0 && x = 1 && y = 0.").value().main->get();
+		tref n2 = get_nso_rr("y = 0 && w = 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): chained sharing merges components") {
+		// z = 0 follows from x = 0 only through y: x=0 -> y=0 -> z=0, so
+		// the component of `z = 0` must pull in both antecedent conjuncts.
+		tref n1 = get_nso_rr(
+			"x = 0 && (x != 0 || y = 0) && (y != 0 || z = 0).")
+			.value().main->get();
+		tref n2 = get_nso_rr("z = 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): 40 disjoint-support components") {
+		// The reporter's shape, at a size the monolithic check could not
+		// finish: N clauses with pairwise disjoint support, each implied
+		// by its own antecedent clause.
+		std::string a, c;
+		for (int k = 0; k < 40; ++k) {
+			std::string xk = "x" + std::to_string(k),
+				yk = "y" + std::to_string(k);
+			a += std::string(k ? " && " : "") + xk + " = 0 && " + yk + " = 0";
+			c += std::string(k ? " && " : "") + "(" + xk + " != 0 || " + yk + " = 0)";
+		}
+		tref n1 = get_nso_rr((a + ".").c_str()).value().main->get();
+		tref n2 = get_nso_rr((c + ".").c_str()).value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+		// ... and a single broken component is detected.
+		tref n3 = get_nso_rr((c + " && (x7 != 0 || y7 = 1).").c_str())
+			.value().main->get();
+		CHECK( !is_nso_impl<node_t>(n1, n3) );
+	}
 }
 
 // NF-9: reduce_paths and join_paths (dense 0/1/2 path-vector reduction, used

@@ -686,6 +686,61 @@ const trefs& get_free_vars(tref n) {
 	return *it->second.sp;
 }
 
+/**
+ * @internal
+ * @brief Partition formulas into connected components under shared
+ * variables: two formulas land in the same group iff they are linked by a
+ * chain of formulas each pair of which has a variable of @p vars in common.
+ *
+ * This is the factorization behind GitHub #72/#82: for a conjunction whose
+ * conjuncts have pairwise disjoint variable support, `ex X (A(X1) && B(X2))`
+ * with `X1`, `X2` disjoint is `ex X1 A && ex X2 B`, so each group can be
+ * decided on its own instead of feeding the whole conjunction to one Boole
+ * decomposition (a 2^N Shannon expansion when nothing is shared).
+ * @param fms Formulas to group (order preserved within and across groups:
+ *        groups are emitted in order of their first member).
+ * @param vars Variables that count as links, in any order; a formula
+ *        containing none of them forms a singleton group.
+ * @return The groups, each a non-empty subsequence of @p fms.
+ * @endinternal
+ */
+template <NodeType node>
+std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars) {
+	const size_t n = fms.size();
+	// Union-find over formula indices, keyed through the variables.
+	std::vector<size_t> parent(n);
+	for (size_t i = 0; i < n; ++i) parent[i] = i;
+	auto find = [&](size_t i) {
+		while (parent[i] != i) i = parent[i] = parent[parent[i]];
+		return i;
+	};
+	auto unite = [&](size_t a, size_t b) {
+		a = find(a), b = find(b);
+		if (a != b) parent[std::max(a, b)] = std::min(a, b);
+	};
+	// Membership by content, not a binary search: callers hand in e.g. a
+	// quantifier block in binder order, which is not sorted.
+	const subtree_unordered_set<node> links(vars.begin(), vars.end());
+	subtree_unordered_map<node, size_t> first_owner;
+	for (size_t i = 0; i < n; ++i)
+		for (tref v : get_free_vars<node>(fms[i])) {
+			if (!links.contains(v)) continue;
+			auto [it, fresh] = first_owner.emplace(v, i);
+			if (!fresh) unite(it->second, i);
+		}
+	std::vector<trefs> groups;
+	std::vector<size_t> group_of(n, std::numeric_limits<size_t>::max());
+	for (size_t i = 0; i < n; ++i) {
+		const size_t r = find(i);
+		if (group_of[r] == std::numeric_limits<size_t>::max()) {
+			group_of[r] = groups.size();
+			groups.emplace_back();
+		}
+		groups[group_of[r]].push_back(fms[i]);
+	}
+	return groups;
+}
+
 template <NodeType node>
 trefs get_free_vars_appearance_order(tref expression) {
 	using tau = tree<node>;

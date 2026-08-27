@@ -55,6 +55,25 @@ constexpr bool ba_has_descriptor_v = requires {
 		-> std::convertible_to<const char*>;
 };
 
+/**
+ * @brief `true` when @p BA's descriptor content-hashes its own constants.
+ *
+ * Optional capability: `node::hashit()` (tau_tree_node.tmpl.h) visits a
+ * ba_constant's value and, for whichever alternative it holds, prefers
+ * `hash_constant` over `std::hash<BA>` when the owning BA declares it. Most
+ * BAs need nothing here because `std::hash<BA>` is already content-derived;
+ * bv declares it because the default `std::hash<cvc5::Term>` is the term's
+ * creation id, not its content (GitHub #89 -- see hash_bv_constant in
+ * backends/cvc5/cvc5.h). Like `print_constant`, this is probed at the point
+ * of use rather than folded in ba_pack_traits.h, since a variant visit
+ * already names the one BA to ask.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_has_hash_constant_v = requires(const BA& x) {
+	{ ba_descriptor<BA, Node>::hash_constant(x) }
+		-> std::convertible_to<size_t>;
+};
+
 /** @brief constexpr C-string equality, for comparing descriptor type names. */
 constexpr bool ba_name_eq(const char* a, const char* b) {
 	for (; *a || *b; ++a, ++b) if (*a != *b) return false;

@@ -45,3 +45,40 @@ TEST_SUITE("nso_rr unit tests") {
 	}
 
 }
+
+// GitHub #80: std::hash<rr<node>> used to hash the htref handles' addresses
+// (via std::hash<shared_ptr>), while rr::operator== compares tree content. A
+// handle is a weak-cached shared_ptr (bintree::geth), so once the last owner of
+// a handle drops, the next geth of the same tree allocates a fresh htree at a
+// new address and the same formula hashed differently run to run -- the source
+// of the decomposition-effort/witness nondeterminism seen in #76/#89.
+TEST_SUITE("rr hash agrees with equality (#80)") {
+
+	static size_t hash_of(const rr<node_t>& r) {
+		return std::hash<rr<node_t>>{}(r);
+	}
+
+	TEST_CASE("same content through a fresh handle hashes the same") {
+		const char* sample = "g(x) := x = 0. g(y).";
+		auto first = get_nso_rr(sample).value();
+		size_t h1 = hash_of(first);
+		tref main_ref = first.main->get();
+		// Drop every handle so the weak cache entries expire ...
+		first = rr<node_t>{};
+		// ... and let a decoy handle take the freed allocation so the
+		// re-parse below is forced onto a different address.
+		htref decoy = tau::geth(_T<node_t>());
+		auto second = get_nso_rr(sample).value();
+		// Hash-consing gives the same tree back; only the handle is new.
+		CHECK( second.main->get() == main_ref );
+		CHECK( second == get_nso_rr(sample).value() );
+		CHECK( hash_of(second) == h1 );
+	}
+
+	TEST_CASE("different content hashes differently") {
+		auto a = get_nso_rr("x = 0.").value();
+		auto b = get_nso_rr("x = 1.").value();
+		CHECK( a != b );
+		CHECK( hash_of(a) != hash_of(b) );
+	}
+}
