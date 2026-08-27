@@ -41,16 +41,9 @@ size_t& blast_reentry_depth() {
 	return depth;
 }
 
-/// Maximum nesting of `blast_block`'s blast-then-re-enter hop; 0 = unlimited
-/// (the default). Real formulas use one level: blast once, then the re-entry
-/// finds nothing left to blast — bound it if a blasting regression ever
-/// loops. Storage stays here in core (core itself reads it, and this header
-/// must compile in a pack without bv), but bv surfaces it as its own
-/// `bv-blastdepth` CLI/REPL option (bv_descriptor.tmpl.h's options()), since
-/// core never exposes a per-BA knob under a core-facing name.
-/// Runtime-tunable per the runtime-parameter policy; like the other knobs
-/// here it is NOT thread-safe.
-inline size_t max_blast_reentry_depth = 0;
+// `max_blast_reentry_depth` moved to antiprenexing.h (see the comment
+// there): bv_descriptor.tmpl.h, a BA plugin header, reads it directly and
+// this header is not includable from a plugin (see the file-header comment).
 
 /** @internal @brief RAII increment of `blast_reentry_depth`. @endinternal */
 template <NodeType node>

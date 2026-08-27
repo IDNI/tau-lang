@@ -17,6 +17,10 @@
 #include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
+// For `max_blast_reentry_depth`, which get_blastdepth_option()/
+// set_blastdepth_option() below read/write directly; see its declaration
+// comment for why the storage stays in core.
+#include "antiprenexing/antiprenexing.h"
 
 namespace idni::tau_lang {
 
@@ -194,8 +198,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * blasting still needs the core master `preprocessing` on as well).
 	 * `blastdepth` mirrors core's `max_blast_reentry_depth`, whose storage
 	 * stays in core (see the comment at its definition in
-	 * antiprenexing.tmpl.h) but which only bv's own blasting pass can ever
-	 * make progress against.
+	 * antiprenexing/antiprenexing.h) but which only bv's own blasting pass
+	 * can ever make progress against.
 	 */
 	static std::array<ba_option, 2> options() {
 		return {{
