@@ -409,7 +409,13 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	//RULE "{c}' := ~c" (AP1-10: cte_neg had zero callers, so the
 	// `{c} = 1 ::= T or F` wff rules actually produced an unfolded
 	// `{c}' = 0` -- constant negation now folds like or/and/xor do)
-	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0) {
+	//
+	// A tau-type constant is exempt: cte_neg normalizes through the
+	// wrapped spec's full solve pass, while a `{...}:tau` constant holds
+	// what was written. tau_ba::operator~ keeps a negated tau_ba
+	// canonical on its own.
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
+		&& !is_tau_type<node>(arg1(ch).get_ba_type())) {
 		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X.");)
 		return cte_neg(v, ch, len, r);
 	}

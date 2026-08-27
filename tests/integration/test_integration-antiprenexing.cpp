@@ -225,22 +225,10 @@ TEST_SUITE("anti_prenex") {
 		// the tree, and the constant survives as a constant (its
 		// internals are pool values, not tree children, so find_top
 		// cannot see into it either way).
-		//
-		// Upstream additionally pins that the constant still displays its
-		// own internal quantifier verbatim -- `out.find("ex b1")`. That
-		// does not hold here, and not because of this quantifier pass:
-		// this tree already folds the cast's internals before freezing
-		// them into the pool, so `{ (ex v o1[t]v = 0) && o2[t] = 0 }:tau`
-		// prints as `{ always o2[t]:tau = 0 }:tau`. `ex v o1[t]v = 0` is
-		// a tautology (witnessed by v = 0), so the fold is sound and the
-		// remaining conjunct is the whole content. Measured identical on
-		// this branch before the merge that brought this case in, so it
-		// is a standing difference in WHEN `: tau` cast internals are
-		// normalized, not a regression -- recorded as an open question
-		// rather than asserted either way here.
 		const std::string out = tau::get(res).to_str();
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 		CHECK( out.find(":tau") != std::string::npos );
+		CHECK( out.find("ex b1") != std::string::npos );
 		CHECK( out.find("o2[t]") != std::string::npos );
 		CHECK( out.find("z != 0") != std::string::npos );
 		CHECK( out.find("y != 0") != std::string::npos );
