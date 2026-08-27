@@ -14,6 +14,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
 
 #include "tau_tree.h"
+#include "boolean_algebras/tau_ba_factoring.h"
 #include "splitter_types.h"
 #include "splitter.h"
 
@@ -23,13 +24,6 @@
 // bindings, etc... instead of tau,...
 
 namespace idni::tau_lang {
-
-/// Opt-in for support-component factoring of the Tau-BA constant/valid
-/// tests (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h). Off by
-/// default; enabled via `api::set_ba_component_factoring(true)` or the
-/// environment variable TAU_BA_COMPONENT_FACTORING (a value of "0"
-/// disables).
-inline bool ba_component_factoring = false;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.

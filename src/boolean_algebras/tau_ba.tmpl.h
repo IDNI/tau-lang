@@ -175,7 +175,7 @@ static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
  * @endinternal
  */
 template <typename node>
-static int factored_tau_units(tref fm, trefs& units) {
+int factored_tau_units(tref fm, trefs& units) {
 	using tau = tree<node>;
 	trefs clauses = get_cnf_wff_clauses<node>(fm);
 	for (size_t i = 0; i < clauses.size(); ++i) {
@@ -193,18 +193,10 @@ static int factored_tau_units(tref fm, trefs& units) {
 	return 0;
 }
 
-inline bool ba_component_factoring_enabled() {
-	static const bool env = [] {
-		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
-		return v && *v && !(v[0] == '0' && v[1] == '\0');
-	}();
-	return ba_component_factoring || env;
-}
-
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
 // 1 = sat.
 template <typename node>
-static int factored_tau_sat(tref fm) {
+int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
@@ -274,7 +266,7 @@ static int factored_tau_sat(tref fm) {
 // Unit-wise validity (distributes over conjunction unconditionally);
 // -1 = not applicable, 0 = not valid, 1 = valid.
 template <typename node>
-static int factored_tau_valid(tref fm) {
+int factored_tau_valid(tref fm) {
 	using tau = tree<node>;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
