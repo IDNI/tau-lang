@@ -926,6 +926,36 @@ TEST_SUITE("BDD ex/all quantification") {
 // in between, and checks that the second call is not served the first
 // call's answer out of and_memo.
 #ifdef TAU_CACHE
+TEST_SUITE("BDD order cache clearing") {
+	// clear_caches() itself still drops all five memo tables plus
+	// last_order/has_last_order together -- a genuine order change makes
+	// every entry wrong, so there is no way to partially reuse one. This
+	// is no longer exercised around a gc sweep (interpreter::maybe_gc
+	// used to call clear_caches() out of band before every sweep; it no
+	// longer does -- see tau_term_bdd::prune_caches and
+	// collect_live_refs' pinning of last_order's keys instead), but
+	// clear_caches()'s own order-change contract is unchanged and still
+	// needs covering directly.
+	TEST_CASE("clear_caches drops the order cache") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		bdd::clear_caches();
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o);
+		bdd::bdd_and(bx, by, o);
+		REQUIRE(bdd::has_last_order);
+		REQUIRE(!bdd::last_order.empty());
+		bdd::clear_caches();
+		CHECK(!bdd::has_last_order);
+		CHECK(bdd::last_order.empty());
+	}
+}
+
 TEST_SUITE("BDD order cache invalidation") {
 	TEST_CASE("bdd_and recomputes under a new order with no manual clear_caches") {
 		using bdd = tau_term_bdd<node_t>;
@@ -958,6 +988,225 @@ TEST_SUITE("BDD order cache invalidation") {
 		bdd::ref r2 = bdd::bdd_and(bx, by, o2);
 		REQUIRE(!bdd::leaf(r2));
 		CHECK(tau::subtree_equals(bdd::get_var(r2), ty));
+	}
+}
+
+// collect_live_refs() pins two disjoint sources of Tau trefs: the decision
+// variable of every live BDD node (walked from the BDD universe directly),
+// and -- since maybe_gc no longer clears the BDD caches out of band --
+// last_order's keys, so a swept order key can never be left dangling for
+// sync_order_cache()'s next `o == last_order` comparison to dereference.
+TEST_SUITE("BDD collect_live_refs pins last_order") {
+	TEST_CASE("collect_live_refs inserts last_order's keys into the keep set") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		bdd::clear_caches();
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		// "qqorder" is a variable name no other TEST_CASE in this file
+		// uses, so it cannot already be a decision variable somewhere in
+		// the (process-lifetime, never-swept-in-tests) BDD universe from
+		// an earlier test -- unlike "x"/"y", which most other cases also
+		// build BDDs over. It ranks in the order below but is never
+		// built into a BDD, so it can only reach `keep` via last_order,
+		// not via the decision-variable walk -- isolating exactly the
+		// behaviour under test.
+		tref tq = tau::trim(tau::get("qqorder", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tq, 2}};
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o);
+		// Populate last_order through bdd_and: build_bdd alone does not
+		// call sync_order_cache(), so has_last_order would stay false.
+		bdd::bdd_and(bx, by, o);
+		REQUIRE(bdd::has_last_order);
+		REQUIRE(bdd::last_order.contains(tq));
+
+		std::unordered_set<tref> keep;
+		bdd::collect_live_refs(keep);
+		CHECK(keep.contains(tx));
+		CHECK(keep.contains(ty));
+		CHECK(keep.contains(tq));
+	}
+}
+
+TEST_SUITE("BDD prune_caches") {
+	TEST_CASE("prune_caches drops ex_memo/quant_memo entries keyed on a swept variable") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		bdd::clear_caches();
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+
+		const trefs vx {tx};
+		const trefs vy {ty};
+		bdd::bdd_ex(xy, vx, o);
+		bdd::bdd_ex(xy, vy, o);
+		REQUIRE(bdd::ex_memo.contains(vx));
+		REQUIRE(bdd::ex_memo.contains(vy));
+
+		const bdd::quants qx {{tx, bdd::ex}};
+		const bdd::quants qy {{ty, bdd::ex}};
+		bdd::bdd_quant(xy, qx, o);
+		bdd::bdd_quant(xy, qy, o);
+		REQUIRE(bdd::quant_memo.contains(qx));
+		REQUIRE(bdd::quant_memo.contains(qy));
+
+		// ty survives the (simulated) sweep, tx does not.
+		const std::unordered_set<tref> kept {ty};
+		bdd::prune_caches(kept);
+
+		CHECK(!bdd::ex_memo.contains(vx));
+		CHECK(bdd::ex_memo.contains(vy));
+		CHECK(!bdd::quant_memo.contains(qx));
+		CHECK(bdd::quant_memo.contains(qy));
+	}
+}
+
+TEST_SUITE("BDD prune_caches leaves the ref-keyed tables alone") {
+	// and_memo, and_many_memo and ite_memo are keyed (and valued) purely
+	// by BDD-store refs, never by a raw Tau tref, so a Tau-tree sweep
+	// cannot invalidate them -- this encodes the owner's actual
+	// requirement that they simply survive gc.
+	TEST_CASE("and_memo, and_many_memo and ite_memo survive an empty kept set") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		bdd::clear_caches();
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o);
+		bdd::ref bz = bdd::build_bdd(tau::get("z", opts), o);
+
+		bdd::bdd_and(bx, by, o);
+		bdd::refs many {bx, by, bz};
+		bdd::bdd_and_many(std::move(many), o);
+		bdd::bdd_ite(bx, by, bz, o);
+
+		REQUIRE(!bdd::and_memo.empty());
+		REQUIRE(!bdd::and_many_memo.empty());
+		REQUIRE(!bdd::ite_memo.empty());
+		const size_t and_sz = bdd::and_memo.size();
+		const size_t and_many_sz = bdd::and_many_memo.size();
+		const size_t ite_sz = bdd::ite_memo.size();
+
+		// Deliberately empty: if prune_caches() ever touched these
+		// tables, an empty kept set would clear them.
+		const std::unordered_set<tref> kept {};
+		bdd::prune_caches(kept);
+
+		CHECK(bdd::and_memo.size() == and_sz);
+		CHECK(bdd::and_many_memo.size() == and_many_sz);
+		CHECK(bdd::ite_memo.size() == ite_sz);
+	}
+}
+
+// The three suites above prove prune_caches()'s pruning logic in isolation,
+// by calling it directly on a hand-built `kept` set -- but nothing proves
+// that the gc_callback which is supposed to invoke it during a real sweep is
+// ever registered. If sync_order_cache()'s
+// bintree<node>::gc_callbacks.push_back(...) silently failed (or ran but
+// never fired), every one of those direct-call tests would still pass, and
+// a real gc() sweep would never prune anything. This suite drives an actual
+// bintree<node_t>::gc() sweep -- mirroring interpreter::maybe_gc's own
+// sequence, collect_live_refs() into `keep` before gc(keep) -- and checks
+// that an ex_memo/quant_memo entry keyed on a variable that did not survive
+// the sweep is gone afterwards.
+TEST_SUITE("BDD prune_caches via a real gc sweep") {
+	TEST_CASE("a real gc() sweep prunes an ex_memo/quant_memo entry keyed "
+			"on a swept variable") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		bdd::clear_caches();
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+
+		// "unplug" is spelled only from letters (g,h,j,k,l,m,n,p,u) that
+		// no other TEST_CASE in this file ever uses as a bf sample --
+		// neither as a standalone variable, nor embedded in a
+		// multi-letter sample string (the grammar parses e.g.
+		// "xyzqwert" as an AND of its individual single-letter
+		// variables, see "xyzqwert no var" above, so a letter buried in
+		// any earlier sample is just as committed as a standalone one).
+		// So the tref this produces cannot already be a decision
+		// variable of any BDD built earlier in this process: the BDD
+		// store, unlike the Tau tree, is never swept, so any such
+		// history would pin it forever via collect_live_refs' walk of
+		// decision variables (and via add()'s protect_bdd_atom).
+		tref tunplug = tau::trim(tau::get("unplug", opts));
+
+		// tunplug deliberately stays out of o, so it is not pinned via
+		// last_order either; it is never passed to build_bdd/add(), so
+		// it never becomes a decision variable and is never
+		// protect_bdd_atom'd; and nothing here ever takes an htref on
+		// it. It only reaches ex_memo/quant_memo as a *quantified*
+		// variable -- less_then() returns false for a variable absent
+		// from the order, so bdd_ex/bdd_quant do not require it to
+		// already occur in xy's BDD.
+		const trefs v_unplug {tunplug};
+		bdd::bdd_ex(xy, v_unplug, o);
+		REQUIRE(bdd::ex_memo.contains(v_unplug));
+
+		const bdd::quants q_unplug {{tunplug, bdd::ex}};
+		bdd::bdd_quant(xy, q_unplug, o);
+		REQUIRE(bdd::quant_memo.contains(q_unplug));
+
+		// Positive control: tx is pinned twice over -- it is a decision
+		// variable of xy, and a key of last_order via o -- so its own
+		// ex_memo/quant_memo entries must survive the very same sweep.
+		// Without this, a prune_caches() that (incorrectly) wiped the
+		// tables completely would make the CHECKs below pass for the
+		// wrong reason.
+		const trefs v_tx {tx};
+		bdd::bdd_ex(xy, v_tx, o);
+		REQUIRE(bdd::ex_memo.contains(v_tx));
+
+		const bdd::quants q_tx {{tx, bdd::ex}};
+		bdd::bdd_quant(xy, q_tx, o);
+		REQUIRE(bdd::quant_memo.contains(q_tx));
+
+		const size_t m_pre = tau::m_size();
+		std::unordered_set<tref> keep;
+		// Mirrors interpreter::maybe_gc's sequence: pin the BDD
+		// universe's live refs (and last_order's keys) before sweeping.
+		// A bare/empty-keep sweep would not do this, and could free a
+		// tau node a live BDD node still points at, corrupting every
+		// later TEST_CASE in this binary.
+		bdd::collect_live_refs(keep);
+		bintree<node_t>::gc(keep);
+		const size_t m_post = tau::m_size();
+
+		// tunplug must actually have been swept -- otherwise this test
+		// would prove nothing about the gc_callback under test, only
+		// about prune_caches() called on a set that happens to already
+		// exclude tunplug.
+		REQUIRE(m_post < m_pre);
+		// bintree<T>::gc(keep) repopulates `keep` with the complete
+		// survivor set on a real sweep (see its tail: every key it
+		// keeps in M() is inserted into `keep` before gc_callbacks
+		// run), so this equality holds exactly when `keep` is the
+		// authoritative survivor set, i.e. the sweep actually ran --
+		// the same completeness check maybe_gc itself relies on.
+		REQUIRE(keep.size() == m_post);
+		CHECK(!keep.contains(tunplug));
+
+		CHECK(!bdd::ex_memo.contains(v_unplug));
+		CHECK(!bdd::quant_memo.contains(q_unplug));
+		CHECK(bdd::ex_memo.contains(v_tx));
+		CHECK(bdd::quant_memo.contains(q_tx));
 	}
 }
 #endif

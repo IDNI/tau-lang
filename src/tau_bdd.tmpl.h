@@ -122,22 +122,72 @@ void tau_term_bdd<node>::clear_caches() {
 	and_many_memo.clear();
 	quant_memo.clear();
 	ite_memo.clear();
-	// last_order's key comparator (subtree_equality) and hasher
-	// (hash_lcrs_tref) both dereference the tref they are given, and
-	// nothing pins the trefs held only as order keys (a variable can
-	// rank in an order without ever becoming a decision variable in a
-	// live BDD, so collect_live_refs() has no reason to keep it). A
-	// caller that clears the tables out-of-band -- e.g. around a gc
-	// sweep -- must also drop last_order here, or sync_order_cache()'s
-	// next `o == last_order` can hash/compare against a stale, possibly
-	// freed key.
+	// The memo tables are only valid under the order they were computed
+	// with, so a genuine order change must invalidate all five together
+	// -- there is no way to partially reuse a memo entry computed under
+	// a different variable order. This is unrelated to gc: a Tau-tree
+	// sweep no longer clears these tables (see interpreter::maybe_gc);
+	// instead collect_live_refs() pins last_order's keys and
+	// prune_caches() (registered as a gc_callback) drops only the
+	// ex_memo/quant_memo entries that actually reference a swept tref.
 	last_order.clear();
 	has_last_order = false;
+}
+
+/** @internal @copydoc tau_term_bdd::prune_caches(const std::unordered_set<tref>&) @endinternal */
+template<NodeType node>
+void tau_term_bdd<node>::prune_caches(const std::unordered_set<tref>& kept) {
+	// and_memo, and_many_memo and ite_memo hold no Tau trefs -- their
+	// keys and values are BDD-store refs, never a raw tau tref -- so a
+	// Tau-tree sweep cannot invalidate them; leave them untouched.
+	for (auto it = ex_memo.begin(); it != ex_memo.end(); ) {
+		bool live = true;
+		for (tref t : it->first) if (!kept.contains(t)) { live = false; break; }
+		// Iterator-based erase only: erasing by key would invoke
+		// std::map's pointer-comparing std::less on a tref that may
+		// already be dangling.
+		if (!live) it = ex_memo.erase(it);
+		else ++it;
+	}
+	for (auto it = quant_memo.begin(); it != quant_memo.end(); ) {
+		bool live = true;
+		for (const auto& [t, _] : it->first) if (!kept.contains(t)) { live = false; break; }
+		if (!live) it = quant_memo.erase(it);
+		else ++it;
+	}
 }
 
 /** @internal @copydoc tau_term_bdd::sync_order_cache(const order&) @endinternal */
 template<NodeType node>
 void tau_term_bdd<node>::sync_order_cache(const order& o) {
+	// Lazily register prune_caches() as a bintree<node>::gc_callback,
+	// exactly once. sync_order_cache() is the single choke point every
+	// public entry point (bdd_and, bdd_and_many, bdd_ite) calls before
+	// touching a memo table, so this is guaranteed to run before any
+	// ex_memo/quant_memo entry exists; the function-local static's
+	// initialisation is thread-safe. An inline static data member of
+	// this class template would only be instantiated on odr-use, which
+	// is not reliable here. bintree<node>::mtx_ (the Tau tree's own
+	// mutex, not the BDD store's) is taken the same way create_cache()
+	// takes it, protecting gc_callbacks; sync_order_cache() is never
+	// called from inside bintree<node>::gc(), so this cannot deadlock
+	// against the exclusive lock gc() holds while running gc_callbacks.
+	static const bool registered = [] {
+		std::unique_lock lock(bintree<node>::mtx_);
+		bintree<node>::gc_callbacks.push_back(
+			[](const std::unordered_set<tref>& kept) {
+				// Runs with bintree<node>::mtx_ held exclusively by
+				// the sweeping gc() -- touch nothing but pointer-set
+				// lookups and iterator-based erases on our own maps.
+				// No bintree::get/tau::get/comparator/hasher call is
+				// safe here: those dereference nodes that may already
+				// be freed, and would also deadlock re-locking mtx_.
+				tau_term_bdd<node>::prune_caches(kept);
+			});
+		return true;
+	}();
+	(void)registered;
+
 	if (has_last_order && o == last_order) return;
 	clear_caches();
 	last_order = o;
@@ -921,6 +971,15 @@ template<NodeType node>
 void tau_term_bdd<node>::collect_live_refs(std::unordered_set<tref>& keep) {
 	for (const auto& [bn, _] : bintree<tau_bdd_node<node>>::M())
 		if (bn.value.v) keep.insert(bn.value.v);
+#ifdef TAU_CACHE
+	// Pin, don't prune: last_order must keep matching whatever order a
+	// caller passes, or the next sync_order_cache() call would see a
+	// mismatch and clear_caches() all five tables -- defeating the
+	// pruning done for ex_memo/quant_memo by prune_caches(). This costs
+	// one (typically small) variable subtree per variable in the order
+	// currently in use.
+	for (const auto& [k, _] : last_order) keep.insert(k);
+#endif
 }
 
 template<NodeType node>

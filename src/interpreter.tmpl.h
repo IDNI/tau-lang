@@ -1046,22 +1046,6 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 	if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc) return;
 
 	const auto t0 = std::chrono::steady_clock::now();
-	// The step rewrite memo is a pure cache holding raw trefs that
-	// collect_live_refs does not walk: drop it rather than pinning its
-	// entries, so gc can free anything only the memo still references.
-	tp_rewrite_memo_.clear();
-	tp_rewrite_memo_t_ = std::numeric_limits<int_t>::min();
-#ifdef TAU_CACHE
-	// Same reasoning as tp_rewrite_memo_ above, plus a sharper hazard:
-	// tau_term_bdd's last_order is keyed on raw trefs via a comparator
-	// that dereferences them, and a variable can sit in an order without
-	// ever becoming a decision variable in a live BDD -- so
-	// collect_live_refs() below has nothing to pin it by. Clear it (and
-	// the memo tables it guards) before the sweep, so a swept order key
-	// can never be left dangling in last_order for sync_order_cache()'s
-	// next comparison to dereference.
-	tau_term_bdd<node>::clear_caches();
-#endif
 	std::unordered_set<tref> keep;
 	if (pin) for (const auto& [k, v] : *pin) {
 		keep.insert(k);
@@ -1075,10 +1059,36 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 	// ba_constants::T, ba_types::type_trees(), ubt_ctn, original_spec and
 	// the io_context maps hold htrefs — gc() preserves their nodes via M's
 	// non-expired weak_ptr entries, no explicit walk needed. Caches made
-	// with tree<node>::create_cache<>() are filtered by gc_callbacks.
+	// with tree<node>::create_cache<>() are filtered by gc_callbacks, and
+	// (under TAU_CACHE) tau_term_bdd's ex_memo/quant_memo by its own
+	// gc_callback -- see tau_term_bdd::prune_caches.
 	bintree<node>::gc(keep);
 
 	const size_t m_post = tau::m_size();
+	// bintree<node>::gc() early-returns -- leaving keep holding only the
+	// roots passed in above, not every survivor -- when nothing expired
+	// or gc is disabled; M is untouched either way, so keep is
+	// authoritative only when the sweep actually ran. keep is always a
+	// subset of the post-gc survivor set (every entry pinned above is
+	// reachable, hence retained), so keep.size() == m_post is not just a
+	// proxy: a same-size subset of a finite set is the whole set, so
+	// this equality holds exactly when keep IS the complete survivor
+	// set -- a direct, self-checking test, sharper than comparing
+	// m_post < m_pre.
+	if (keep.size() == m_post) {
+		// The step rewrite memo is a pure cache holding raw trefs that
+		// collect_live_refs does not walk, so a completed sweep can
+		// free an entry's key or value out from under it. Prune by
+		// pointer only (tp_rewrite_memo_'s hash/equality are the
+		// default pointer ones, no dereference) rather than clearing;
+		// tp_rewrite_memo_t_ is left alone, the surviving entries are
+		// still valid for that time point.
+		for (auto it = tp_rewrite_memo_.begin();
+				it != tp_rewrite_memo_.end(); )
+			if (!keep.contains(it->first) || !keep.contains(it->second))
+				it = tp_rewrite_memo_.erase(it);
+			else ++it;
+	}
 #ifdef __linux__
 	// Return free heap pages to the OS so RSS reflects live allocation
 	// rather than allocator fragmentation. Cheap (microseconds).

@@ -105,7 +105,11 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * `tref` (`v`), and this BDD store is never swept by
 	 * `bintree<node>::gc()` — so those variables (and, transitively,
 	 * their subtrees, e.g. the cached free-vars vectors) must be pinned
-	 * whenever the Tau tree is collected.
+	 * whenever the Tau tree is collected. Under `TAU_CACHE`, `last_order`'s
+	 * keys are pinned here too: they are not swept from `ex_memo` /
+	 * `quant_memo` (see `prune_caches`), only pruned, so `last_order` must
+	 * keep matching whatever order the caller passes or the very next
+	 * `sync_order_cache()` call would clear all five tables anyway.
 	 * @param keep Set of Tau tree nodes to preserve across gc.
 	 */
 	static void collect_live_refs(std::unordered_set<tref>& keep);
@@ -129,10 +133,26 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/** @brief Clear all memoisation caches. */
 	static void clear_caches();
 
+	/**
+	 * @brief Drop every `ex_memo` / `quant_memo` entry whose key
+	 * references a Tau tref absent from @p kept.
+	 *
+	 * Registered as a `bintree<node>::gc_callback` (see
+	 * `sync_order_cache`), so it runs only when the Tau-tree sweep
+	 * actually happened and @p kept is the authoritative survivor set.
+	 * `and_memo`, `and_many_memo` and `ite_memo` hold no Tau trefs (their
+	 * keys/values are BDD-store refs) and are therefore left untouched.
+	 * Entries are erased by iterator only — never by key, which would
+	 * invoke `ex_memo` / `quant_memo`'s pointer-comparing `std::less` on
+	 * a tref that may already be dangling.
+	 * @param kept Tau trefs that survived the sweep.
+	 */
+	static void prune_caches(const std::unordered_set<tref>& kept);
+
 	// The memo tables are keyed by BDD refs alone, not by order, so a
 	// cached entry is only valid under the order it was computed with.
-	// Every public entry point calls sync_order_cache() first, which
-	// clears all five tables when @p o differs from last_order.
+	// bdd_and, bdd_and_many and bdd_ite call sync_order_cache() first,
+	// which clears all five tables when @p o differs from last_order.
 	static order last_order;      ///< @brief Order the memo caches were last populated under.
 	static bool  has_last_order;  ///< @brief Whether `last_order` holds a valid previous order.
 
