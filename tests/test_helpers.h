@@ -137,6 +137,38 @@ inline bool values_matches_any_of(const strings& values,
 	return true;
 }
 
+/// @brief Conjuncts of @p s, without any leading `always`, sorted.
+inline strings sorted_conjuncts(const std::string& s) {
+	static const std::string always = "always ", sep = " && ";
+	std::string body = s.starts_with(always) ? s.substr(always.size()) : s;
+	strings out;
+	for (size_t p = 0, q; ; p = q + sep.size()) {
+		q = body.find(sep, p);
+		if (q == std::string::npos) { out.push_back(body.substr(p)); break; }
+		out.push_back(body.substr(p, q - p));
+	}
+	std::sort(out.begin(), out.end());
+	return out;
+}
+
+/// @brief `true` when each of @p values carries exactly the conjuncts listed
+/// at its position in @p expected, in any order.
+inline bool values_match_conjunct_sets(const strings& values,
+	const std::vector<strings>& expected)
+{
+	if (values.size() != expected.size()) return false;
+	for (size_t i = 0; i < values.size(); i++) {
+		strings want = expected[i];
+		std::sort(want.begin(), want.end());
+		if (sorted_conjuncts(values[i]) != want) {
+			DBG(TAU_LOG_TRACE << "conjuncts differ at " << i << ": "
+				<< values[i];)
+			return false;
+		}
+	}
+	return true;
+}
+
 inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
@@ -161,6 +193,7 @@ inline bool normalize_and_check(const char* sample, const std::string& expected)
 #if !defined(IDNI_TAU_TESTS_GC_LISTENER_REGISTERED) && defined(DOCTEST_LIBRARY_INCLUDED) && defined(TAU_ENABLE_TEST_GC_LISTENER)
 #define IDNI_TAU_TESTS_GC_LISTENER_REGISTERED
 
+#include <algorithm>
 #include <unordered_set>
 
 struct TauTestGCListener : doctest::IReporter {

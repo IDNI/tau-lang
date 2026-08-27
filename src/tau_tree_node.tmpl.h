@@ -175,19 +175,9 @@ size_t node<BAs...>::hashit() const {
 	hash_combine(seed, static_cast<size_t>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
-	// Hash ba_type directly (integer). Hashing the type NAME instead --
-	// via ba_types<node>::name_hash(), which is defined and available --
-	// makes the hash stable across runs where a parameterized type's id
-	// depends on first-discovery order. That is the better property, but
-	// it yields a DIFFERENT canonical order than the one this tree's
-	// order-sensitive expectations are written against: hashit feeds node
-	// interning, hence tref values, hence subtree_less and pivot
-	// selection, hence printed shape. Switching it re-baselines the
-	// accepted-ordering lists in test_tau_bdd, the cqe antiprenexing
-	// cases, simplify_using_equality and the interpreter value checks --
-	// deliberate work to do on its own, not folded into a merge, so that
-	// an ordering shift stays distinguishable from a real regression.
-	hash_combine(seed, ba_type);
+	// Hash the type name: a parameterized type's id follows first-discovery
+	// order, so hashing the id makes the hash vary between runs.
+	hash_combine(seed, tau_lang::ba_types<node>::name_hash(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool (ba_constant.data is always a ba_constants
 	// pool index, regardless of ba_type -- see node::ba_constant()).

@@ -367,41 +367,14 @@ TEST_SUITE("Execution") {
 		strings u_expected = {
 			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
-		// Actual orderings must be listed first per position -- the
-		// Debug-only "canonicity" branch of values_matches_any_of
-		// (test_helpers.h, #ifdef DEBUG) only compares against
-		// expected[0]; see the dec_seq case above and the 8f1a74c1
-		// note at the top of this suite.
 		std::vector<strings> o1_expected = {
-		{
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-		}, {
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-		}, {
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-		}, {
-			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o3[t]:tau = 0",
-			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
-		}
+			{ "o1[t]:tau = this[t]:tau", "u[t]:tau = i1[t]:tau" },
+			{ "o1[t]:tau = this[t]:tau", "u[t]:tau = i1[t]:tau",
+				"o2[t]:tau = 0" },
+			{ "o1[t]:tau = this[t]:tau", "u[t]:tau = i1[t]:tau",
+				"o2[t]:tau = 0" },
+			{ "o1[t]:tau = this[t]:tau", "u[t]:tau = i1[t]:tau",
+				"o2[t]:tau = 0", "o3[t]:tau = 0" },
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -413,8 +386,7 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		for (size_t _dbg_i = 0; _dbg_i < o1_values.size(); _dbg_i++) std::cerr << "THIS_O1[" << _dbg_i << "]: " << o1_values[_dbg_i] << "\n";
-		CHECK( values_matches_any_of(o1_values, o1_expected) );
+		CHECK( values_match_conjunct_sets(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
 	}

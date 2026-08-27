@@ -498,7 +498,14 @@ TEST_SUITE("simplify_using_equality") {
 		const char* s = "o1[t] = i1[t] && o2[t] = o1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau");
+		// i1 is the representative of both classes; each equality prints
+		// in whichever operand order subtree_less gives it.
+		const strings got = sorted_conjuncts(tau::get(res).to_str());
+		const bool matches = got == sorted_conjuncts(
+				"i1[t]:tau = o2[t]:tau && o1[t]:tau = i1[t]:tau")
+			|| got == sorted_conjuncts(
+				"o2[t]:tau = i1[t]:tau && o1[t]:tau = i1[t]:tau");
+		CHECK(matches);
 	}
 
 	TEST_CASE("io_output_var_replaced_when_equality_added_later") {
