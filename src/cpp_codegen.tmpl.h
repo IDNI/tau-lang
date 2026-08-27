@@ -322,6 +322,32 @@ std::string build_atom_term_expr(tref term, size_t sibling_type = 0) {
 		return "::idni::tau_lang::build_bf_neg<::idni::tau_lang::tau_pack::"
 			"node_t>(" + build_atom_term_expr<node>(inner, sibling_type) + ")";
 	}
+	// A binary bf operator (e.g. `x & y`) is likewise rebuilt with its own
+	// build_bf_* runtime builder, recursing into both operands.
+	{
+		const char* fn = nullptr;
+		if (tau::get(trimmed).is(tau::bf_and)) fn = "build_bf_and";
+		else if (tau::get(trimmed).is(tau::bf_or)) fn = "build_bf_or";
+		else if (tau::get(trimmed).is(tau::bf_xor)) fn = "build_bf_xor";
+		else if (tau::get(trimmed).is(tau::bf_nand)) fn = "build_bf_nand";
+		else if (tau::get(trimmed).is(tau::bf_nor)) fn = "build_bf_nor";
+		else if (tau::get(trimmed).is(tau::bf_xnor)) fn = "build_bf_xnor";
+		else if (tau::get(trimmed).is(tau::bf_shl)) fn = "build_bf_shl";
+		else if (tau::get(trimmed).is(tau::bf_shr)) fn = "build_bf_shr";
+		else if (tau::get(trimmed).is(tau::bf_add)) fn = "build_bf_add";
+		else if (tau::get(trimmed).is(tau::bf_sub)) fn = "build_bf_sub";
+		else if (tau::get(trimmed).is(tau::bf_mul)) fn = "build_bf_mul";
+		else if (tau::get(trimmed).is(tau::bf_div)) fn = "build_bf_div";
+		else if (tau::get(trimmed).is(tau::bf_mod)) fn = "build_bf_mod";
+		if (fn) {
+			tref lhs = tau::get(trimmed).first();
+			tref rhs = tau::get(trimmed).second();
+			return std::string("::idni::tau_lang::") + fn
+				+ "<::idni::tau_lang::tau_pack::node_t>("
+				+ build_atom_term_expr<node>(lhs, sibling_type) + ", "
+				+ build_atom_term_expr<node>(rhs, sibling_type) + ")";
+		}
+	}
 	if (get_free_vars<node>(term).size() != 1 || !is_io_var<node>(trimmed))
 		throw std::runtime_error(
 			"atom operand is neither a ground constant nor a plain "
@@ -758,8 +784,11 @@ std::optional<program_desc> build_program_desc(
 				// the runtime joint solve, not baked here.
 				if (it->second.kind == field_kind::witness_template
 					|| (it->second.kind == field_kind::witness
-						&& template_var_set.count(it->second.var_name)))
+						&& template_var_set.count(it->second.var_name))) {
 					ed.witness_template_props.push_back(prop);
+					ed.witness_template_is_counter.push_back(
+						sol.counter_relativized_props.count(prop) > 0);
+				}
 				else if (it->second.kind == field_kind::witness)
 					var_pos_atoms[it->second.var_name].push_back(
 						prop_to_atom.at(prop));

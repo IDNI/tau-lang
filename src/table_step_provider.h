@@ -32,20 +32,41 @@ struct table_step_provider : step_provider<node> {
 	// edge_witnesses[s][e]: precomputed (name, value) pairs for that edge.
 	// edge_witness_templates[s][e]: atom conjuncts solved per step when the
 	// output value depends on the step's own inputs.
+	// edge_witness_template_is_counter[s][e]: parallel to
+	// edge_witness_templates[s][e], true where that template atom is a
+	// hoisted positional atom's step-counter relativization -- produce()
+	// grounds it at the counter's own absolute step (time_point) instead of
+	// the lookback-shifted formula_time_point every other template atom
+	// uses. Empty (the default) means none are -- every atom grounds at
+	// formula_time_point as before.
 	table_step_provider(
 		codegen::strategy strat,
 		std::vector<std::pair<std::string, tref>> input_atoms,
 		std::vector<std::string> flag_outputs,
 		std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>
 			edge_witnesses = {},
-		std::vector<std::vector<trefs>> edge_witness_templates = {});
+		std::vector<std::vector<trefs>> edge_witness_templates = {},
+		std::vector<std::vector<std::vector<bool>>>
+			edge_witness_template_is_counter = {});
 
 	std::optional<solution<node>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) override;
 
-	// Table mode has no ubt_ctn for appear_within_lookback to walk.
-	bool skip_lookback_filter() const override { return true; }
+	// Every atom this table strategy may consult this run: input guards
+	// (input_atoms_, evaluated unconditionally every step to route edges)
+	// plus every edge's witness-template atoms across every state. Callers
+	// building a table interpreter (emit_main's emitted code, make_table_
+	// provider's in-process callers) pass this to make_table_interpreter's
+	// live_probe_atoms parameter so step()'s input filter can tell, per
+	// step, which declared inputs the strategy actually needs -- the same
+	// substitute-and-simplify test appear_within_lookback runs against
+	// ubt_ctn for the general solve path. A superset across all states is
+	// fine: appear_within_lookback only ever grows its "appeared" set, so
+	// including an atom from a state not currently active can only keep an
+	// input requested longer than strictly necessary, never drop one that
+	// is actually needed.
+	trefs live_probe_atoms() const;
 
 private:
 	// Held as htref, not tref: a provider can sit idle before its
@@ -56,6 +77,10 @@ private:
 	std::vector<std::string> flag_outputs_;
 	std::vector<std::vector<std::vector<std::pair<std::string, htref>>>> edge_witnesses_;
 	std::vector<std::vector<std::vector<htref>>> edge_witness_templates_;
+	// Per (state, edge, template index): true when that template atom is a
+	// hoisted positional atom's step-counter relativization (see the
+	// constructor's doc comment).
+	std::vector<std::vector<std::vector<bool>>> edge_witness_template_is_counter_;
 	// Per (state, edge): true when every template atom is a bf_neq
 	// disequality over an atomless-typed BA -- eligible for the direct
 	// atomless decode instead of a full solve. Structural, so computed

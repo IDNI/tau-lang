@@ -67,6 +67,10 @@ struct edge_desc {
 	// runtime (their trees are program_desc::atoms entries); consumed by the
 	// table_step_provider path, unsupported by the standalone baked step().
 	std::vector<std::string> witness_template_props;
+	// Parallel to witness_template_props: true where that prop is a hoisted
+	// positional atom's step-counter relativization, grounded at the
+	// counter's own absolute step rather than formula_time_point.
+	std::vector<bool> witness_template_is_counter;
 };
 
 // One relative-time data atom (sol.atoms[i]): `ground_expr` is a self-contained C++ expression of type tref rebuilding it, never re-parsed from text.

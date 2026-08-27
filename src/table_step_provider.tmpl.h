@@ -52,11 +52,12 @@ static bool ocltl_is_output_coord(tref v) {
 // constraint naming two undecided coordinates is deferred to the second
 // coordinate's turn, e.g. atomless2's o1[t]!=o2[t] forces o1 before o2).
 //
-// Refuses warmup (time_point < formula_time_point) up front: grounding at
-// that point would expose not-yet-committed coordinates spanning the whole
-// lookback window, including input coordinates this decoder is never
-// entitled to pick -- the general solution_with_max_update path already
-// handles warmup.
+// Grounds at time_point, not formula_time_point: during warm-up that keeps
+// this the real constraint on the step being decided rather than a future
+// position's. Any resulting negative-time (before-stream-start) references
+// simply stay free -- only output-direction vars are tracked as `coords`
+// below, so they become ordinary extra degrees of freedom for the solver.
+// Post warm-up, time_point == formula_time_point, so this is a no-op there.
 //
 // Returns nullopt if some atom doesn't reduce to <=1 free output
 // coordinate, or the system is unsatisfiable for this history; either way
@@ -73,19 +74,19 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 	fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
-
-	if (time_point < formula_time_point) return std::nullopt;
+	(void)formula_time_point; // kept for call-site symmetry with produce()
 
 	trefs grounded;
 	grounded.reserve(tmpls.size());
 	for (tref tmpl : tmpls) {
-		tref updated = update_to_time_point<node>(tmpl, (int_t)formula_time_point);
+		tref updated = update_to_time_point<node>(tmpl, (int_t)time_point);
 		grounded.push_back(rewriter::replace<node>(updated, memory));
 	}
 
 	// New output coordinates to decide, in first-appearance order. A free
-	// var that isn't an output coordinate is left out of `coords`, so any
-	// atom naming it never gets consumed below and the decode bails.
+	// var that isn't one of THIS step's own output coordinates (wrong
+	// direction, or a before-stream-start lookback reference only possible
+	// during warm-up) is left out of `coords` and simply stays free below.
 	trefs coords;
 	auto coord_index = [&](tref v) -> size_t {
 		for (size_t i = 0; i < coords.size(); ++i)
@@ -95,7 +96,9 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 	};
 	for (tref g : grounded)
 		for (tref v : get_free_vars<node>(g))
-			if (ocltl_is_output_coord<node>(v)) coord_index(v);
+			if (ocltl_is_output_coord<node>(v)
+				&& get_io_time_point<node>(v) == (int_t)time_point)
+				coord_index(v);
 
 	solution<node> sol;
 	std::vector<bool> consumed(grounded.size(), false);
@@ -146,7 +149,21 @@ static std::optional<solution<node>> ocltl_direct_decode_edge(
 		if (!v) v = tau::_0(opts.type_id);
 		sol[sol_key] = v;
 	}
-	for (bool c : consumed) if (!c) return std::nullopt; // unexpected shape
+	// An unconsumed atom is fine as long as no coordinate this edge is
+	// deciding is still tangled in it -- e.g. a before-stream-start
+	// lookback reference (only possible during warm-up, grounded at
+	// time_point) never becomes a coordinate and is never substituted, so
+	// such an atom is vacuously satisfiable (an infinite-domain existential
+	// over a coordinate never picked) and safe to leave alone. Two
+	// coordinates still tangled together past every turn is the real
+	// "unexpected shape" this guards against.
+	for (size_t i = 0; i < grounded.size(); ++i) {
+		if (consumed[i]) continue;
+		tref g = rewriter::replace<node>(grounded[i], sol);
+		for (tref v : get_free_vars<node>(g))
+			for (tref c : coords)
+				if (tau::subtree_equals(c, v)) return std::nullopt;
+	}
 	// Commit every coordinate this edge decided, once, only now that the
 	// whole edge succeeded -- v is registered exactly as the solver
 	// produced it. A discarded decode (nullopt above) commits nothing.
@@ -161,8 +178,10 @@ table_step_provider<node>::table_step_provider(
 	std::vector<std::pair<std::string, tref>> input_atoms,
 	std::vector<std::string> flag_outputs,
 	std::vector<std::vector<std::vector<std::pair<std::string, tref>>>> edge_witnesses,
-	std::vector<std::vector<trefs>> edge_witness_templates)
+	std::vector<std::vector<trefs>> edge_witness_templates,
+	std::vector<std::vector<std::vector<bool>>> edge_witness_template_is_counter)
 	: strat_(std::move(strat)), flag_outputs_(std::move(flag_outputs)),
+	  edge_witness_template_is_counter_(std::move(edge_witness_template_is_counter)),
 	  state_(strat_.initial_state)
 {
 	using tau = tree<node>;
@@ -203,6 +222,17 @@ table_step_provider<node>::table_step_provider(
 			elig_state.push_back(eligible);
 		}
 	}
+}
+
+template <NodeType node>
+trefs table_step_provider<node>::live_probe_atoms() const {
+	trefs atoms;
+	atoms.reserve(input_atoms_.size());
+	for (auto& [name, a] : input_atoms_) atoms.push_back(a->get());
+	for (auto& state_edges : edge_witness_templates_)
+		for (auto& edge_tmpls : state_edges)
+			for (auto& h : edge_tmpls) atoms.push_back(h->get());
+	return atoms;
 }
 
 template <NodeType node>
@@ -273,13 +303,24 @@ std::optional<solution<node>> table_step_provider<node>::produce(
 				time_point, formula_time_point, ledger_);
 		if (!ws) {
 			// Ineligible edge, or (defensively) an eligible one whose direct
-			// decode failed at runtime -- the general path.
-			tref conj = tmpls[0];
-			for (size_t k = 1; k < tmpls.size(); ++k)
-				conj = tau::build_wff_and(conj, tmpls[k]);
-			tref updated = update_to_time_point<node>(conj,
-				(int_t)formula_time_point);
-			tref current = rewriter::replace<node>(updated, memory);
+			// decode failed at runtime -- the general path. Each template
+			// atom grounds its own "t": a hoisted positional atom's
+			// relativization means the counter's own absolute step
+			// (time_point), everything else means formula_time_point --
+			// they only diverge during lookback warmup (time_point <
+			// formula_time_point), so this is a no-op split otherwise.
+			const auto& is_counter = state_ < (int)edge_witness_template_is_counter_.size()
+				&& edge_idx < edge_witness_template_is_counter_[state_].size()
+				? edge_witness_template_is_counter_[state_][edge_idx]
+				: std::vector<bool>{};
+			tref conj = nullptr;
+			for (size_t k = 0; k < tmpls.size(); ++k) {
+				bool is_ctr = k < is_counter.size() && is_counter[k];
+				tref grounded = update_to_time_point<node>(tmpls[k],
+					is_ctr ? (int_t)time_point : (int_t)formula_time_point);
+				conj = conj ? tau::build_wff_and(conj, grounded) : grounded;
+			}
+			tref current = rewriter::replace<node>(conj, memory);
 			current = normalize_non_temp<node>(current);
 			ws = solution_with_max_update<node>(current, time_point);
 		}
@@ -339,6 +380,7 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 	strat.num_inputs = (int)in_ap_idx.size();
 	strat.edges.resize(sol.aut.num_states);
 	std::vector<std::vector<trefs>> templates(sol.aut.num_states);
+	std::vector<std::vector<std::vector<bool>>> template_is_counter(sol.aut.num_states);
 	for (int s = 0; s < sol.aut.num_states; ++s) {
 		const auto& edges = sol.aut.edges.size() > (size_t)s
 		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
@@ -349,16 +391,21 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 				ed.guard = build_edge_guard(disjunct,
 					in_ap_idx, flag_out_ap_idx);
 				trefs tmpls;
+				std::vector<bool> is_counter;
 				for (auto& [ap_idx, positive] : parse_guard_lits(disjunct)) {
 					if (!positive) continue;
 					if (ap_idx < 0
 						|| ap_idx >= (int)sol.aut.aps.size()) continue;
-					if (template_props.count(sol.aut.aps[ap_idx]))
-						tmpls.push_back(
-							prop_to_atom.at(sol.aut.aps[ap_idx]));
+					const auto& prop = sol.aut.aps[ap_idx];
+					if (template_props.count(prop)) {
+						tmpls.push_back(prop_to_atom.at(prop));
+						is_counter.push_back(
+							sol.counter_relativized_props.count(prop) > 0);
+					}
 				}
 				strat.edges[s].push_back(std::move(ed));
 				templates[s].push_back(std::move(tmpls));
+				template_is_counter[s].push_back(std::move(is_counter));
 			}
 		}
 	}
@@ -372,7 +419,7 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 	auto provider = std::make_shared<table_step_provider<node>>(
 		std::move(strat), std::move(input_atoms), std::move(flag_outputs),
 		std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>{},
-		std::move(templates));
+		std::move(templates), std::move(template_is_counter));
 	return {provider, {lookback, hip}};
 }
 

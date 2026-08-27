@@ -4061,23 +4061,23 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	}
 
 	// A G() body mixing a positional atom with genuinely temporal (relative)
-	// content is still ambiguous -- only a G() that is purely positional
-	// throughout is transparent. Same temporary-gap wording as above.
+	// content splits at the wff_and: the positional leaf hoists behind the
+	// step counter (anchored at its own absolute step, not the
+	// lookback-shifted formula_time_point), the relative leaf stays in the
+	// skeleton -- both compile. Only reaching a positional atom through
+	// F/U/R/W/S/T (no wff_and to split at) is still refused.
 	TEST_CASE("a positional atom mixed with relative content under the same "
-	          "G is still a hard error, worded as a temporary gap") {
+	          "G compiles: the leaves split and hoist separately") {
 		tref p0 = wff("o[3]:bv[2] = {1}");
 		tref rel = wff("o2[t]:bv[2] = i2[t]:bv[2]");
 		REQUIRE(p0 != nullptr);
 		REQUIRE(rel != nullptr);
 		tref fm = tau::build_wff_always(tau::build_wff_and(p0, rel));
 		REQUIRE(fm != nullptr);
-		bool threw = false;
-		try { solve_ltl_aba<node_t>(fm); }
-		catch (const std::runtime_error& e) {
-			threw = true;
-			CHECK(std::string(e.what()).find("not yet supported") != std::string::npos);
-		}
-		CHECK(threw);
+		std::optional<ltl_aba_solution<node_t>> sol;
+		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
 	}
 
 	// Any Boolean shape of purely positional atoms hoists, not just

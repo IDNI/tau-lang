@@ -241,20 +241,6 @@ group_shift_families(const std::vector<std::pair<tref, std::string>>& atoms)
 	return families;
 }
 
-// True iff every data atom of `atoms` found within `n` is positional, i.e.
-// `n` has no relative-time content -- used by collect_hoist_conjuncts to
-// tell transparent positional scaffolding from a genuine recurrence.
-template <NodeType node>
-static bool subtree_is_purely_positional(
-    tref n,
-    const std::vector<std::pair<tref, std::string>>& atoms)
-{
-	for (auto& [atom_ref, prop] : atoms)
-		if (contains<node>(n, atom_ref) && !atom_is_positional<node>(atom_ref))
-			return false;
-	return true;
-}
-
 // Returns the temporal operator (F/U/R/W/S/T/G/...) enclosing a positional
 // atom of `atoms` within `n`'s subtree, or nullptr if none -- a temporal
 // operator gives a fixed-position fact ambiguous recurring semantics, so
@@ -281,11 +267,14 @@ static tref find_positional_under_temporal_op(
 }
 
 // Splits `fm` into maximal top-level conjuncts, descending through wff_and
-// and a wff_always whose body is purely positional (subtree_is_purely_
-// positional).
+// and unconditionally through a wff_always's body -- G is transparent
+// scaffolding here, not a temporal wrapper of its own, so leaf classification
+// below does the real positional/relative split.
 // A leaf conjunct with a positional atom must be hoistable alone: mixing it
-// with relative-time content, or reaching it through F/U/R/W/S/T, is a hard
-// error; conjuncts without positional content are left untouched.
+// with relative-time content is fine as long as each ends up its own leaf
+// (a wff_and body under G splits into separate conjuncts); reaching a
+// positional atom through F/U/R/W/S/T is still a hard error; conjuncts
+// without positional content are left untouched.
 // Returns the conjuncts to hoist, in discovery order.
 template <NodeType node>
 static std::vector<tref> collect_hoist_conjuncts(
@@ -308,8 +297,7 @@ static std::vector<tref> collect_hoist_conjuncts(
 				walk(op.second());
 				return;
 			}
-			if (op.value.nt == tau::wff_always
-			    && subtree_is_purely_positional<node>(op.first(), atoms)) {
+			if (op.value.nt == tau::wff_always) {
 				walk(op.first());
 				return;
 			}

@@ -24,6 +24,7 @@
 #include "ocltl_phi_delta.h"
 #include "boolean_algebras/nso_ba.h"
 #include <optional>
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>

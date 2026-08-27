@@ -945,13 +945,18 @@ static void add_consistency_constraints(
 // text stay separate, one prop per position, since pairwise mutual-
 // exclusion forbids rely on that.
 // Returns the extra skeleton conjuncts; output_props gains the counter bits.
+// counter_relativized_props gains every prop this pass resolves a hoisted
+// conjunct's atom to -- its "t" means the counter's own absolute step, not
+// formula_time_point's lookback-shifted one (table_step_provider::produce
+// grounds it accordingly).
 template <NodeType node>
 static std::string apply_step_counter_encoding(
     const std::vector<tref>& hoist_conjuncts,
     std::vector<std::pair<tref, std::string>>& atoms,
     std::vector<std::string>& input_props,
     std::vector<std::string>& output_props,
-    int_t& out_max_pos)
+    int_t& out_max_pos,
+    std::set<std::string>& counter_relativized_props)
 {
 	using tau = tree<node>;
 
@@ -1140,6 +1145,7 @@ static std::string apply_step_counter_encoding(
 			}
 			orig_prop[oi] = pname;
 			orig_done[oi] = true;
+			counter_relativized_props.insert(pname);
 		}
 
 		// Drop C's own original positional atoms still present in `atoms`
@@ -1187,6 +1193,11 @@ struct ltl_aba_solution {
 	// away (atom_is_positional can no longer find them); -1 means
 	// build_program_desc derives highest_initial_pos from `atoms` as usual.
 	int_t counter_highest_initial_pos = -1;
+	// Props apply_step_counter_encoding resolved a hoisted conjunct's atom
+	// to: table_step_provider::produce grounds these at the counter's own
+	// absolute step (time_point) instead of the lookback-shifted
+	// formula_time_point every other template atom uses.
+	std::set<std::string> counter_relativized_props;
 };
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────

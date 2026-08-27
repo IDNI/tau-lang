@@ -106,13 +106,20 @@ struct interpreter {
 	 * @param provider Solution source `step()` will consult each step.
 	 * @param lookback Baked lookback (max relative shift across the table's atoms).
 	 * @param highest_initial_pos Baked highest initial position.
+	 * @param live_probe_atoms Atoms (input guards + witness templates) the
+	 *        table strategy may consult, e.g. `table_step_provider::
+	 *        live_probe_atoms()`; seeds `live_probe_atoms` so step()'s
+	 *        input filter can tell which declared inputs a given step
+	 *        actually needs, the same way the general solve path uses
+	 *        `ubt_ctn` (left empty here -- see the member's doc comment).
 	 * @return Initialized interpreter, or `std::nullopt` if a stream in @p ctx
 	 *         could not be opened.
 	 */
 	static std::optional<interpreter> make_table_interpreter(
 		const io_context<node>& ctx,
 		std::shared_ptr<step_provider<node>> provider,
-		int_t lookback, int_t highest_initial_pos = 0);
+		int_t lookback, int_t highest_initial_pos = 0,
+		const trefs& live_probe_atoms = {});
 
 	/**
 	 * @brief Execute one time step without providing explicit input values.
@@ -350,6 +357,13 @@ struct interpreter {
 	void collect_live_refs(std::unordered_set<tref>& keep) const;
 
 	htrefs ubt_ctn;
+	// Table mode only: atoms (input guards + witness templates) a table
+	// strategy may consult, seeded by make_table_interpreter and consulted
+	// by appear_within_lookback ALONGSIDE ubt_ctn (which table mode leaves
+	// empty on purpose -- see make_table_interpreter's doc comment). Kept
+	// separate from ubt_ctn so it never reaches calculate_initial_spec /
+	// get_ubt_ctn_at, whose QE machinery table mode is built to bypass.
+	htrefs live_probe_atoms;
 	/// Partition of spec each with representative for set of output streams.
 	std::vector<std::pair<htref, htref>> original_spec;
 	assignment<node> memory;
@@ -392,6 +406,10 @@ private:
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 	int_t announced_step_ = -1;
+
+	// Freshness ledger for step()'s warm-up direct-decode fallback;
+	// self-pins against GC like table_step_provider's own ledger_.
+	fresh_element_ledger ledger_;
 
 	/// Solution source step() consults; set by make_interpreter/make_table_interpreter.
 	std::shared_ptr<step_provider<node>> provider_;

@@ -232,6 +232,8 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 	  << "\tstrat.edges.resize(" << d.num_states << ");\n"
 	  << "\tvector<vector<vector<tref>>> templates("
 	  << d.num_states << ");\n"
+	  << "\tvector<vector<vector<bool>>> template_is_counter("
+	  << d.num_states << ");\n"
 	  << "\tvector<vector<vector<pair<string, tref>>>> "
 	     "edge_witnesses(" << d.num_states << ");\n";
 	// witness_ctors keys by the field's sanitized cpp_name; edge_witnesses
@@ -253,6 +255,11 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 			for (size_t k = 0; k < e.witness_template_props.size(); ++k)
 				f << (k ? ", " : "") << "atoms.at(\""
 				  << e.witness_template_props[k] << "\")";
+			f << "});\n";
+			f << "\ttemplate_is_counter[" << s << "].push_back({";
+			for (size_t k = 0; k < e.witness_template_is_counter.size(); ++k)
+				f << (k ? ", " : "")
+				  << (e.witness_template_is_counter[k] ? "true" : "false");
 			f << "});\n";
 			f << "\tedge_witnesses[" << s << "].push_back({";
 			for (size_t k = 0; k < e.witness_ctors.size(); ++k) {
@@ -295,10 +302,15 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 	f <<
 		"\n\tauto provider = make_shared<table_step_provider<node_t>>(\n"
 		"\t\tstd::move(strat), std::move(input_atoms), std::move(flag_outputs),\n"
-		"\t\tstd::move(edge_witnesses), std::move(templates));\n"
+		"\t\tstd::move(edge_witnesses), std::move(templates), "
+		"std::move(template_is_counter));\n"
+		// Captured before the move below: step()'s input filter needs this
+		// to tell which declared inputs a given step actually consults,
+		// the same way the general solve path uses ubt_ctn.
+		"\tvector<tref> live_probe_atoms = provider->live_probe_atoms();\n"
 		"\tauto interp = interpreter<node_t>::make_table_interpreter(\n"
 		"\t\tctx, std::move(provider), " << d.lookback << ", "
-		<< d.highest_initial_pos << ");\n"
+		<< d.highest_initial_pos << ", live_probe_atoms);\n"
 		"\tif (!interp) {\n"
 		"\t\tfprintf(stderr, \"interpreter initialization failed\\n\");\n"
 		"\t\treturn 2;\n"

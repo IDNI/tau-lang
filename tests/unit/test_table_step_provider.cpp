@@ -47,12 +47,15 @@ strings run_solve_o1(tref fm, io_context<node_t>& ctx,
 
 // Same as run_solve_o1, but through a table-mode interpreter driven by
 // `provider` instead of re-solving.
-strings run_table_o1(std::shared_ptr<step_provider<node_t>> provider,
+strings run_table_o1(std::shared_ptr<table_step_provider<node_t>> provider,
 	io_context<node_t>& ctx, std::shared_ptr<vector_output_stream> o1,
 	size_t steps, int_t lookback, int_t highest_initial_pos)
 {
+	// Captured before the move below -- same as emit_main's emitted code.
+	trefs live_probe_atoms = provider->live_probe_atoms();
 	auto interp = interpreter<node_t>::make_table_interpreter(
-		ctx, std::move(provider), lookback, highest_initial_pos);
+		ctx, std::move(provider), lookback, highest_initial_pos,
+		live_probe_atoms);
 	if (!interp.has_value()) return {};
 	// api<node_t>::step() is the public wrapper around step()+write() --
 	// write() itself stays private to interpreter, reached only through it.
@@ -364,6 +367,49 @@ TEST_SUITE("table_step_provider") {
 		REQUIRE(sol2.has_value());
 		for (tref tmpl : tmpls2)
 			CHECK(atom_holds(tmpl, memory2, sol2.value(), 1));
+	}
+
+	// During warm-up, get_ubt_ctn_at can quantify away the very coordinate
+	// a step is deciding, collapsing its projection to T; step() must not
+	// read that as "unconstrained" and zero-default into a value the
+	// spec's body forbids. Witnesses are non-deterministic -- validate
+	// against the disequalities via atom_holds, never a specific value.
+	TEST_CASE("warm-up step never zero-defaults a coordinate the "
+	          "spec's own disequalities forbid") {
+		bdd_init<Bool>();
+		std::string spec =
+			"G(! (o1[t]:tau = {T.}:tau) && ! (o1[t]:tau = {F.}:tau) "
+			"&& ! (o2[t]:tau = {T.}:tau) && ! (o2[t]:tau = {F.}:tau) "
+			"&& ! (o1[t]:tau = o2[t]:tau) "
+			"&& ! (o1[t]:tau = o1[t-1]:tau) "
+			"&& ! (o2[t]:tau = o2[t-1]:tau)).";
+
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+
+		auto interp = interpreter<node_t>::make_interpreter(fm, ctx);
+		REQUIRE(interp.has_value());
+
+		// Step 0: formula_time_point == 1 (one step of lookback), so this
+		// is exactly the warm-up call get_ubt_ctn_at's projection collapses.
+		auto [sol0, cont0] = interp->step();
+		REQUIRE(sol0.has_value());
+
+		assignment<node_t> empty_memory;
+		trefs disequalities = {
+			parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
+			parse_tmpl_atom("o1[t]:tau != {F.}:tau."),
+			parse_tmpl_atom("o2[t]:tau != {T.}:tau."),
+			parse_tmpl_atom("o2[t]:tau != {F.}:tau."),
+			parse_tmpl_atom("o1[t]:tau != o2[t]:tau."),
+		};
+		for (tref atom : disequalities)
+			CHECK(atom_holds(atom, empty_memory, sol0.value(), 0));
 	}
 
 	TEST_CASE("cleanup") {

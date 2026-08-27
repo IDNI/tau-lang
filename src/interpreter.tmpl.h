@@ -333,7 +333,14 @@ post_normalization:
 	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
 	std::optional<ltl_aba_solution<node>> ltl_sol;
 	if (has_ltl_operators<node>(spec)) {
-		auto [safety_spec, sol_opt] = ltl_to_safety_formula_full<node>(spec);
+		tref safety_spec;
+		std::optional<ltl_aba_solution<node>> sol_opt;
+		try {
+			std::tie(safety_spec, sol_opt) = ltl_to_safety_formula_full<node>(spec);
+		} catch (const std::exception& e) {
+			LOG_ERROR << "Tau specification refused: " << e.what() << "\n";
+			return {};
+		}
 		if (!safety_spec) {
 			LOG_ERROR << "Tau specification is unsat (not LTL-realizable)\n";
 			return {};
@@ -473,7 +480,8 @@ std::optional<interpreter<node>>
 	interpreter<node>::make_table_interpreter(
 		const io_context<node>& ctx,
 		std::shared_ptr<step_provider<node>> provider,
-		int_t lookback, int_t highest_initial_pos)
+		int_t lookback, int_t highest_initial_pos,
+		const trefs& live_probe_atoms)
 {
 	// Empty spec-side state: table mode has no normalized spec to derive
 	// ubt_ctn / original_spec / output_partition from.
@@ -491,6 +499,9 @@ std::optional<interpreter<node>>
 	// memory position instead of catching up first like the solve path does.
 	i.formula_time_point = (size_t)((int_t)i.time_point + lookback);
 	i.provider_ = std::move(provider);
+	i.live_probe_atoms.reserve(live_probe_atoms.size());
+	for (tref a : live_probe_atoms)
+		i.live_probe_atoms.push_back(tree<node>::geth(a));
 
 	subtree_map<node, size_t> current_inputs;
 	for (const auto& [var, sid] : ctx.inputs) current_inputs[var->get()] = sid;
@@ -723,6 +734,88 @@ static tref canonicalize_committed_value(tref value) {
 	return normalize_ba<node>(value);
 }
 
+// True iff `atom` is a bf_neq disequality over an atomless-typed BA.
+// Duplicates table_step_provider.tmpl.h's ocltl_direct_decode_atom_shaped
+// (core never includes that header).
+template <NodeType node>
+static bool ocltl_direct_atom_shaped(tref atom) {
+	using tau = tree<node>;
+	const auto& t = tau::get(atom);
+	if (!t.has_child()) return false;
+	if (t[0].value.nt != tau::bf_neq) return false;
+	return pack_type_is_atomless<node>(find_ba_type<node>(atom));
+}
+
+// Per-coordinate atomless decode (same algorithm as ocltl_direct_decode_edge)
+// for coordinates the caller couldn't otherwise decide. Requires every atom
+// to be an atomless disequality; bails to nullopt otherwise, or if a
+// `missing` coordinate can't be decided. Coordinates absent from every atom
+// are left undecided (genuinely unconstrained; caller's zero-default handles
+// those).
+template <NodeType node>
+static std::optional<solution<node>> ocltl_direct_decode_missing(
+	const trefs& atoms, const trefs& missing, fresh_element_ledger& ledger)
+{
+	using tau = tree<node>;
+	for (tref a : atoms) if (!ocltl_direct_atom_shaped<node>(a))
+		return std::nullopt;
+
+	// Decode order: first-appearance, restricted to `missing`. `missing`
+	// entries are bf-wrapped; get_free_vars returns the bare variable --
+	// unwrap before comparing.
+	trefs coords;
+	auto is_missing = [&](tref v) {
+		for (tref m : missing) if (tau::subtree_equals(tau::trim(m), v)) return true;
+		return false;
+	};
+	auto in_coords = [&](tref v) {
+		for (tref c : coords) if (tau::subtree_equals(c, v)) return true;
+		return false;
+	};
+	for (tref a : atoms)
+		for (tref v : get_free_vars<node>(a))
+			if (is_missing(v) && !in_coords(v)) coords.push_back(v);
+
+	solution<node> sol;
+	std::vector<bool> consumed(atoms.size(), false);
+	for (tref var : coords) {
+		inequality_system<node> sys;
+		bool var_constrained = false;
+		for (size_t i = 0; i < atoms.size(); ++i) {
+			if (consumed[i]) continue;
+			tref g = rewriter::replace<node>(atoms[i], sol);
+			trefs fv = get_free_vars<node>(g);
+			if (fv.empty()
+				|| (fv.size() == 1 && tau::subtree_equals(fv[0], var))) {
+				sys.insert(g);
+				consumed[i] = true;
+				if (!fv.empty()) var_constrained = true;
+			}
+		}
+		if (sys.empty() && !var_constrained) continue;
+		solver_options opts;
+		opts.type_id = find_ba_type<node>(var);
+		opts.splitter_one = node::ba::splitter_one(
+			get_ba_type_tree<node>(opts.type_id));
+		opts.ledger = &ledger;
+		auto val = solve_inequality_system_atomless<node>(sys, opts);
+		if (!val) return std::nullopt;
+		tref v = nullptr;
+		tref sol_key = var;
+		for (const auto& [k, kv] : *val) {
+			tref k_var = tau::get(k).child_is(tau::variable)
+				? tau::get(k).first_tree().get() : k;
+			if (tau::subtree_equals(k_var, var)) { v = kv; sol_key = k; break; }
+		}
+		if (!v && var_constrained) return std::nullopt;
+		if (!v) continue;
+		sol[sol_key] = v;
+	}
+	for (const auto& [key, v] : sol)
+		ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+	return sol;
+}
+
 template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool>
 	interpreter<node>::step(const assignment<node>& values)
@@ -806,23 +899,123 @@ std::pair<std::optional<assignment<node>>, bool>
 			global.emplace(var, value);
 		}
 	}
-	// Complete outputs using time_point and current solution
+	// Complete outputs using time_point and current solution. A provider's
+	// own step_spec may not be the real per-instant ground constraint
+	// during warm-up (get_ubt_ctn_at quantifies away not-yet-reached
+	// coordinates, including the one this step is deciding), so a bare
+	// "missing from global" reading of it can zero-default a coordinate
+	// the spec forbids. ubt_ctn is empty in table mode, so this only
+	// engages for the solve-based interpreter.
+	trefs missing_outputs;
+	for (const auto& [o, _] : outputs) {
+		const size_t ctype = ctx.type_of(o);
+		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
+		if (!global.contains(ot)) missing_outputs.push_back(ot);
+	}
+	// Automaton-driven specs thread their one-hot state choice through
+	// solve_step_provider's own state_part ordering; a flat direct
+	// re-grounding of ubt_ctn here has no notion of that ordering, so this
+	// fallback is scoped to pure-safety, lookback-only specs with no LTL
+	// state of their own. Automaton-driven specs keep the old zero-default.
+	bool has_ltl_state = std::ranges::any_of(ubt_ctn, [](const htref& h) {
+		return mentions_ltl_state_var<node>(h->get()); });
+	tref direct_conj = nullptr;
+	if (!missing_outputs.empty() && !ubt_ctn.empty() && !has_ltl_state) {
+		trefs direct_parts, raw_atoms;
+		direct_parts.reserve(ubt_ctn.size());
+		// Flatten each h's top-level wff_and structure into individual,
+		// still-symbolic-in-t atoms -- same shape unnest_nested_always uses
+		// to flatten a G-body's own conjuncts.
+		std::function<void(tref, trefs&)> flatten_and = [&](tref n, trefs& out) {
+			const auto& tn = tau::get(n);
+			if (tn.child_is(tau::wff_and)) {
+				flatten_and(tn[0].first(), out);
+				flatten_and(tn[0].second(), out);
+			} else out.push_back(n);
+		};
+		for (const auto& h : ubt_ctn) {
+			flatten_and(h->get(), raw_atoms);
+			tref grounded = update_to_time_point<node>(h->get(), (int_t)time_point);
+			grounded = rewriter::replace<node>(grounded, memory);
+			direct_parts.push_back(normalize_non_temp<node>(grounded));
+		}
+		direct_conj = direct_parts.size() == 1 ? direct_parts.front()
+			: tau::build_wff_and(direct_parts);
+
+		// Fast path first: bounded per-coordinate atomless decode, avoiding
+		// the general solve()'s unbounded growth on a repeated disequality
+		// system. Eligibility is checked on the raw, still-symbolic atom
+		// (grounding is pure substitution and preserves the bf_neq shape,
+		// but normalize_non_temp's boole-normal-form pass on direct_conj
+		// above can reshape it), so the fast path grounds its own copy.
+		if (std::ranges::all_of(raw_atoms,
+				[](tref a) { return ocltl_direct_atom_shaped<node>(a); })) {
+			trefs grounded_atoms;
+			grounded_atoms.reserve(raw_atoms.size());
+			for (tref a : raw_atoms) {
+				tref g = update_to_time_point<node>(a, (int_t)time_point);
+				grounded_atoms.push_back(rewriter::replace<node>(g, memory));
+			}
+			if (auto fast = ocltl_direct_decode_missing<node>(
+					grounded_atoms, missing_outputs, ledger_); fast)
+				for (tref mo : missing_outputs)
+					if (auto it = fast->find(mo); it != fast->end()
+						&& !global.contains(mo)) {
+						tref value = canonicalize_committed_value<node>(it->second);
+						memory.emplace(mo, value);
+						global.emplace(mo, value);
+					}
+		}
+
+		// Whatever the fast path didn't cover: fall back to the general
+		// solve on the same direct instance before considering a default.
+		// Only commit a value for a coordinate actually missing this step
+		// -- the direct instance also drags in free out-of-window lookback
+		// vars (e.g. o1[-1] before stream start).
+		trefs still_missing;
+		for (tref mo : missing_outputs)
+			if (!global.contains(mo)) still_missing.push_back(mo);
+		if (!still_missing.empty()) {
+			if (auto fb = solution_with_max_update<node>(direct_conj, time_point); fb)
+				for (tref mo : still_missing)
+					if (auto it = fb->find(mo); it != fb->end()
+						&& !global.contains(mo)) {
+						// Canonicalize like the primary commit loop, or an
+						// uncommon splitter value grows unbounded across steps.
+						tref value = canonicalize_committed_value<node>(it->second);
+						memory.emplace(mo, value);
+						global.emplace(mo, value);
+					}
+		}
+	}
 	for (const auto& [o, _] : outputs) {
 		const size_t ctype = ctx.type_of(o);
 		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
 		if (auto it = global.find(ot); it == global.end()) {
-			auto emit_default_zero = [&]() {
-				// The owning BA supplies its own zero; nullptr means no BA in
-				// the pack owns this type, so fall back to the generic zero.
-				if (tref zero_term = pack_zero_constant<node>(ctype)) {
-					memory.emplace(ot, zero_term);
-					global.emplace(ot, zero_term);
-					return;
-				}
-				memory.emplace(ot, tau::_0(ctype));
-				global.emplace(ot, tau::_0(ctype));
-			};
-			emit_default_zero();
+			tref zero_term = pack_zero_constant<node>(ctype);
+			if (!zero_term) zero_term = tau::_0(ctype);
+			// Only default to zero once verified consistent with the real
+			// direct ground constraint; error instead of silently
+			// committing a default the spec forbids. Satisfiability, not
+			// equals_T: direct_conj may still carry other, unrelated free
+			// coordinates this substitution leaves open.
+			bool default_ok = true;
+			if (direct_conj) {
+				assignment<node> probe = memory;
+				probe[ot] = zero_term;
+				tref check = rewriter::replace<node>(direct_conj, probe);
+				check = normalize_non_temp<node>(check);
+				default_ok = tau::get(check).equals_T()
+					|| is_non_temp_nso_satisfiable<node>(check);
+			}
+			if (!default_ok) {
+				LOG_ERROR << "Internal error: no valid witness for "
+					<< LOG_FM_DUMP(ot) << " at time_point=" << time_point
+					<< "; the default violates the step's own constraints\n";
+				return {};
+			}
+			memory.emplace(ot, zero_term);
+			global.emplace(ot, zero_term);
 		}
 	}
 	if (global.empty()) LOG_INFO << "currently no output is specified";
@@ -1905,8 +2098,14 @@ bool interpreter<node>::is_excluded_output(tref var) {
 template <NodeType node>
 trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
+	// Table mode leaves ubt_ctn empty on purpose (see its doc comment) and
+	// seeds live_probe_atoms instead; the general solve path is the mirror
+	// image. Walking both covers either case uniformly.
+	htrefs probe_ctn = ubt_ctn;
+	probe_ctn.insert(probe_ctn.end(),
+		live_probe_atoms.begin(), live_probe_atoms.end());
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		for (const auto& h : ubt_ctn) {
+		for (const auto& h : probe_ctn) {
 			tref step_ubt_ctn = update_to_time_point<node>(h->get(),
 				t < formula_time_point ? formula_time_point : t);
 			step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);

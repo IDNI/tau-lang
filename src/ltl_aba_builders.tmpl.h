@@ -130,7 +130,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out = nullptr)
 	// no-op (returns "") when the formula has no positional atoms.
 	std::string step_counter_extra = apply_step_counter_encoding<node>(
 		hoist_conjuncts, sol.atoms, sol.input_props, sol.output_props,
-		sol.counter_highest_initial_pos);
+		sol.counter_highest_initial_pos, sol.counter_relativized_props);
 
 	// Erase each hoisted conjunct's own occurrence site to a literal T.
 	// before the main skeleton walk, rather than relying on an individual
