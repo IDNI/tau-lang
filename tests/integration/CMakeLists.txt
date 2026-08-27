@@ -48,6 +48,7 @@ set(TESTS
 	blasting_correctness_check5
 	bv_stress_check
 	ba_component_factoring
+	simp_tau_unsat_valid_unitwise
 )
 
 foreach(X IN LISTS TESTS)
