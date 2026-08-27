@@ -4,6 +4,8 @@
 
 #include "tau_spec.h"
 
+#include <cstdlib>
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_ba"
 
@@ -142,12 +144,165 @@ static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	return cache.insert_or_assign(key, res).first->second;
 }
 
+/**
+ * @internal
+ * @brief Per-support-component sat/valid decision for a `:tau` constant.
+ *
+ * `is_zero`/`is_one` decide a constant by running the full temporal decision
+ * procedure over its formula. When that formula is a conjunction of units
+ * with pairwise disjoint free supports -- the shape a constant takes when
+ * independent clauses accumulate into it -- every question pays for all
+ * units, although the answer factors: a model of each unit assigns only its
+ * own variables, so models over disjoint supports compose, and validity
+ * distributes over conjunction. `factored_tau_sat`/`factored_tau_valid`
+ * decide per unit group and cache the verdicts per group (the `create_cache`
+ * discipline of `cached_tau_ba_predicate`, compute before emplace), so a
+ * constant that grows by one clause pays for that clause.
+ *
+ * Supports are compared by variable NAME, not by variable node: `o1[t]`,
+ * `o1[t-1]` and `o1[0]` are one stream and must land in one group (a
+ * node-identity grouping such as `group_by_shared_vars` would keep them
+ * apart); the time offset variable is not part of the support
+ * (`get_free_vars` does not descend into io variables). Bound-variable names
+ * are included, which can only merge groups, never split them.
+ *
+ * Conservative gates, each falling back to the monolithic path: any embedded
+ * BA constant inside a unit (its support is invisible from the outside), any
+ * free variable without a printable name, fewer than two groups. A single
+ * `always` hull is split into per-unit hulls first (`always` distributes
+ * over conjunction). Both decisions are taken at start time 0, which is the
+ * only start time the callers use.
+ * @endinternal
+ */
+template <typename node>
+static int factored_tau_units(tref fm, trefs& units) {
+	using tau = tree<node>;
+	trefs clauses = get_cnf_wff_clauses<node>(fm);
+	for (size_t i = 0; i < clauses.size(); ++i) {
+		if (tau::get(clauses[i]).child_is(tau::wff_always)) {
+			trefs aw = get_cnf_wff_clauses<node>(
+				tau::trim2(clauses[i]));
+			clauses[i] = tau::build_wff_always(aw[0]);
+			for (size_t j = 1; j < aw.size(); ++j)
+				clauses.push_back(
+					tau::build_wff_always(aw[j]));
+		}
+	}
+	if (clauses.size() < 2) return -1;
+	units = std::move(clauses);
+	return 0;
+}
+
+inline bool ba_component_factoring_enabled() {
+	static const bool env = [] {
+		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
+		return v && *v && !(v[0] == '0' && v[1] == '\0');
+	}();
+	return ba_component_factoring || env;
+}
+
+// Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
+// 1 = sat.
+template <typename node>
+static int factored_tau_sat(tref fm) {
+	using tau = tree<node>;
+	trefs units;
+	if (factored_tau_units<node>(fm, units) < 0) return -1;
+	for (tref u : units)
+		if (tau::get(u).find_top([](tref t) {
+			return tree<node>::get(t).is_ba_constant(); }))
+			return -1;
+	std::vector<std::vector<std::string>> supp(units.size());
+	for (size_t i = 0; i < units.size(); ++i)
+		for (tref v : tau::get(units[i]).get_free_vars()) {
+			const std::string& nm = get_var_name<node>(v);
+			if (nm.empty()) return -1;
+			supp[i].push_back(nm);
+		}
+	std::vector<std::vector<std::string>> cn;
+	std::vector<trefs> cc;
+	auto shares = [](const std::vector<std::string>& a,
+			 const std::vector<std::string>& b) {
+		for (const auto& x : a) for (const auto& y : b)
+			if (x == y) return true;
+		return false;
+	};
+	for (size_t i = 0; i < units.size(); ++i) {
+		std::vector<size_t> hit;
+		for (size_t c = 0; c < cn.size(); ++c)
+			if (shares(cn[c], supp[i])) hit.push_back(c);
+		if (hit.empty()) {
+			cn.push_back(supp[i]);
+			cc.push_back(trefs{ units[i] });
+			continue;
+		}
+		size_t base = hit[0];
+		cn[base].insert(cn[base].end(),
+			supp[i].begin(), supp[i].end());
+		cc[base].push_back(units[i]);
+		for (size_t k = hit.size(); k-- > 1; ) {
+			size_t c = hit[k];
+			cn[base].insert(cn[base].end(),
+				cn[c].begin(), cn[c].end());
+			cc[base].insert(cc[base].end(),
+				cc[c].begin(), cc[c].end());
+			cn.erase(cn.begin() + c);
+			cc.erase(cc.begin() + c);
+		}
+	}
+	if (cc.size() < 2) return -1;
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	bool all_sat = true;
+	for (size_t c = 0; c < cc.size() && all_sat; ++c) {
+		tref f = cc[c][0];
+		for (size_t j = 1; j < cc[c].size(); ++j)
+			f = tau::build_wff_and(f, cc[c][j]);
+		if (auto it = cache.find(f); it != cache.end()) {
+			all_sat = it->second;
+			continue;
+		}
+		// compute() before emplace: it can create new trees, and a
+		// rehash of `cache` must not happen with a half-built entry.
+		bool sres = is_tau_formula_sat<node>(f);
+		cache.insert_or_assign(f, sres);
+		all_sat = sres;
+	}
+	return all_sat ? 1 : 0;
+}
+
+// Unit-wise validity (distributes over conjunction unconditionally);
+// -1 = not applicable, 0 = not valid, 1 = valid.
+template <typename node>
+static int factored_tau_valid(tref fm) {
+	using tau = tree<node>;
+	trefs units;
+	if (factored_tau_units<node>(fm, units) < 0) return -1;
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	bool all = true;
+	for (size_t i = 0; i < units.size() && all; ++i) {
+		if (auto it = cache.find(units[i]); it != cache.end()) {
+			all = it->second;
+			continue;
+		}
+		bool vres = is_tau_impl<node>(tau::_T(), units[i]);
+		cache.insert_or_assign(units[i], vres);
+		all = vres;
+	}
+	return all ? 1 : 0;
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_zero() const {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache, [](tref normalized) {
+		if (ba_component_factoring_enabled())
+			if (int r = factored_tau_sat<node>(normalized);
+					r >= 0)
+				return r == 0;
 		return !is_tau_formula_sat<node>(normalized);
 	});
 }
@@ -158,6 +313,10 @@ bool tau_ba<BAs...>::is_one() const {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache, [](tref normalized) {
+		if (ba_component_factoring_enabled())
+			if (int r = factored_tau_valid<node>(normalized);
+					r >= 0)
+				return r == 1;
 		return is_tau_impl<node>(tau::_T(), normalized);
 	});
 }

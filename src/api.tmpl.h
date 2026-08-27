@@ -161,6 +161,11 @@ void api<node>::set_indenting(bool indenting) {
 }
 
 template <NodeType node>
+void api<node>::set_ba_component_factoring(bool state) {
+	ba_component_factoring = state;
+}
+
+template <NodeType node>
 void api<node>::set_highlighting(bool highlighting) {
 	pretty_printer_highlighting = highlighting;
 }
