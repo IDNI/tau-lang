@@ -5,8 +5,8 @@
  *
  * Both knobs are plain runtime globals, per the project's runtime-parameter
  * policy (solver strategy and placement belong in a runtime parameter, never
- * in a header constant). Like `heuristics/blast_placement.h`, this header is
- * deliberately dependency-free -- no cvc5, no tau tree -- so that
+ * in a header constant). Like `heuristics/preprocess_placement.h`, this
+ * header is deliberately dependency-free -- no cvc5, no tau tree -- so that
  * `tests/test_init.h` (which defines every test binary's `main()` and is
  * included before any tau header) can read and write them and apply the
  * `TAU_CVC5_OPTIONS` / `TAU_SOLVER_PLACEMENT` environment overrides before
@@ -16,9 +16,10 @@
  * and `api::set_solver_placement`.
  *
  * `solver_site`/`solver_placement` moved here from
- * `heuristics/blast_placement.h` (which still includes this file, so every
- * existing user keeps seeing them unchanged): they select where cvc5 runs,
- * which belongs with how it is configured, not with the blasting knobs.
+ * `heuristics/preprocess_placement.h` (which still includes this file, so
+ * every existing user keeps seeing them unchanged): they select where cvc5
+ * runs, which belongs with how it is configured, not with the preprocessing
+ * knobs.
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
@@ -163,13 +164,13 @@ enum class solver_site {
 };
 
 // `eager` is the measured winner, not just the pre-existing default: the
-// Task 9 matrix's Row A (`bv_blasting=false` crossed with
-// `solver_placement`, see the table above `bv_blasting` in
-// heuristics/blast_placement.h) found `per_closed_block`/`per_formula` fail
-// 2 wff_normalization cases outright (Task 8 smoke), leaving `eager` the
-// only cell standing -- and it already wins W2/W3 among the three.
+// Task 9 matrix's Row A (`preprocessing=false` crossed with
+// `solver_placement`, see the table above `preprocessing` in
+// heuristics/preprocess_placement.h) found `per_closed_block`/`per_formula`
+// fail 2 wff_normalization cases outright (Task 8 smoke), leaving `eager`
+// the only cell standing -- and it already wins W2/W3 among the three.
 //
-// NOT thread-safe, exactly like `bv_blasting`: the tau library assumes
+// NOT thread-safe, exactly like `preprocessing`: the tau library assumes
 // single-threaded access. Do not call set_solver_placement() concurrently.
 inline solver_site solver_placement = solver_site::eager;
 

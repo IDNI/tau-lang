@@ -255,19 +255,19 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 		const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
 		form = anti_prenex<node>(form, el2);
 		form = resolve_quantifiers<node>(form);
-		// Option 5a -- the per-formula blasting destination: one attempt
-		// on the whole formula, after the last anti-prenex/resolve pass
-		// and before the final closed-formula check below. Inert at the
-		// shipped default (`blast_placement == per_leaf`).
+		// Option 5a -- the per-formula preprocessing destination: one
+		// attempt on the whole formula, after the last anti-prenex/resolve
+		// pass and before the final closed-formula check below. Inert at
+		// the shipped default (`preprocess_placement == per_leaf`).
 		//
 		// The final check itself is deliberately NOT gated on
 		// `solver_placement`: it is the single "final" solver site that
 		// both `per_closed_block` and `per_formula` rely on, so it runs
 		// under every setting.
-		if (bv_blasting && blast_placement == blast_site::per_formula)
+		if (preprocessing && preprocess_placement == preprocess_site::per_formula)
 			if (tref blasted = pack_preprocess<node>(form);
 				blasted && blasted != form)
-				form = blast_method == blast_mode::anti_prenex_result
+				form = preprocess_method == preprocess_mode::anti_prenex_result
 					? anti_prenex<node>(blasted,
 						eliminability<node>::arith_only())
 					: blasted;

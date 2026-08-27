@@ -145,12 +145,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return std::nullopt;
 	}
 
-	/** @brief Predicate-blast @p n; returns it unchanged when blasting is off. */
+	/** @brief Predicate-blast @p n; returns it unchanged when preprocessing is off. */
 	static tref preprocess(tref n) {
-		return bv_blasting ? bv_predicate_blasting<node_t>(n) : n;
+		return preprocessing ? bv_predicate_blasting<node_t>(n) : n;
 	}
 
-	static void set_preprocessing(bool enabled) { bv_blasting = enabled; }
+	static void set_preprocessing(bool enabled) { preprocessing = enabled; }
 
 	/**
 	 * @brief `true` when @p form still carries a one-hot bit-mask conjunction

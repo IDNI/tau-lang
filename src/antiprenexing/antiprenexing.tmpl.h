@@ -1,11 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "antiprenexing/antiprenexing.h"
-// `solver_placement`/`solver_site` and the blasting-placement knobs
-// (`bv_blasting`, `blast_placement`, `blast_site`, `blast_method`,
-// `blast_mode`): a dependency-free core header, not a BA plugin -- see its
-// own file comment.
-#include "heuristics/blast_placement.h"
+// `solver_placement`/`solver_site` and the preprocessing-placement knobs
+// (`preprocessing`, `preprocess_placement`, `preprocess_site`,
+// `preprocess_method`, `preprocess_mode`): a dependency-free core header,
+// not a BA plugin -- see its own file comment.
+#include "heuristics/preprocess_placement.h"
 
 namespace idni::tau_lang {
 
@@ -32,7 +32,7 @@ namespace idni::tau_lang {
  * declaration). Named and per-node-type rather than a hidden function-local
  * `static`, and always adjusted through `blast_reentry_guard` so it unwinds on
  * every exit including an exception. Single-threaded, like the rest of this
- * pass -- see `bv_blasting`'s note in `heuristics/bv_predicate_blasting.h`.
+ * pass -- see `preprocessing`'s note in `heuristics/bv_predicate_blasting.h`.
  * @endinternal
  */
 template <NodeType node>
@@ -71,8 +71,8 @@ struct blast_reentry_guard {
 /// resolve_quantifiers2 -> resolve_quantifiers -> anti_prenex chain absorbs
 /// whatever is left unresolved.
 /// Runtime-tunable via `api::set_block_max_splits`. Resource limits belong in a
-/// runtime parameter, never a header constant -- `bv_blasting`
-/// (heuristics/bv_predicate_blasting.h) is the precedent. Like it, this is NOT
+/// runtime parameter, never a header constant -- `preprocessing`
+/// (heuristics/preprocess_placement.h) is the precedent. Like it, this is NOT
 /// thread-safe: the tau library assumes single-threaded access.
 inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 
@@ -170,15 +170,15 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			if (status == false) return tau::_F();
 			DBG(if (!status) LOG_ERROR << "solver undecided on " << LOG_FM(ex_fm);)
 		}
-		if (bv_blasting && blast_placement == blast_site::per_leaf)
+		if (preprocessing && preprocess_placement == preprocess_site::per_leaf)
 			if (auto blasted = pack_preprocess<node>(ex_fm);
 					blasted && blasted != ex_fm) {
-				// blast_mode::defer: hand back the rewritten formula
-				// and leave the quantifiers blasting introduced to
-				// the next resolve pass. Same shape as the
-				// depth-exceeded return just below, and sound for
+				// preprocess_mode::defer: hand back the rewritten
+				// formula and leave the quantifiers preprocessing
+				// introduced to the next resolve pass. Same shape as
+				// the depth-exceeded return just below, and sound for
 				// the same reason.
-				if (blast_method == blast_mode::defer)
+				if (preprocess_method == preprocess_mode::defer)
 					return blasted;
 				// Bound the hop back into the pipeline; see
 				// blast_reentry_depth. Returning `blasted` rather
@@ -1373,7 +1373,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	// that reaches the main pipeline", not literally every block collected.
 	bool blasteable_consumed = false;
 	if (solver_placement == solver_site::per_closed_block
-		|| blast_placement == blast_site::per_block)
+		|| preprocess_placement == preprocess_site::per_block)
 	{
 		tref sub = result;
 		size_t n_blasteable = 0;
@@ -1423,8 +1423,8 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 				else if (st == false)
 					{ result = tau::_F(); handled = true; }
 			}
-			if (!handled && bv_blasting
-				&& blast_placement == blast_site::per_block)
+			if (!handled && preprocessing
+				&& preprocess_placement == preprocess_site::per_block)
 				if (tref bl = pack_preprocess<node>(sub);
 					bl && bl != sub)
 				{
@@ -1438,8 +1438,8 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 					// budget is logged the same way blast_block
 					// logs its own exhaustion, so the two causes
 					// remain distinguishable in the log.
-					if (blast_method
-						== blast_mode::anti_prenex_result)
+					if (preprocess_method
+						== preprocess_mode::anti_prenex_result)
 					{
 						const bool may_reenter =
 							!max_blast_reentry_depth
@@ -2117,8 +2117,8 @@ using tau = tree<node>;
 				// so blasting cannot close that gap; leave it unresolved
 				// for the outer machinery instead, like every other
 				// give-up path here.
-				if (bv_blasting
-					&& blast_placement == blast_site::per_leaf
+				if (preprocessing
+					&& preprocess_placement == preprocess_site::per_leaf
 					&& pack_formula_is_preprocessable<node>(n))
 					if (auto blasted = pack_preprocess<node>(n);
 						blasted && blasted != n)

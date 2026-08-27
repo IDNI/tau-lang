@@ -1,10 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// `solver_placement`/`solver_site` and the blasting-placement knobs
-// (`bv_blasting`, `blast_placement`, `blast_site`, `blast_method`,
-// `blast_mode`): a dependency-free core header, not a BA plugin -- see its
-// own file comment.
-#include "heuristics/blast_placement.h"
+// `solver_placement`/`solver_site` and the preprocessing-placement knobs
+// (`preprocessing`, `preprocess_placement`, `preprocess_site`,
+// `preprocess_method`, `preprocess_mode`): a dependency-free core header,
+// not a BA plugin -- see its own file comment.
+#include "heuristics/preprocess_placement.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "leaf_clause"
@@ -440,15 +440,15 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// max_blast_reentry_depth, and the branch is documented
 		// unreachable through the driver today. If it goes live with a
 		// re-entry that bypasses those bounded hops, add the guard here.)
-		if (bv_blasting && blast_placement == blast_site::per_leaf) {
+		if (preprocessing && preprocess_placement == preprocess_site::per_leaf) {
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
 			if (auto blasted = pack_preprocess<node>(ex_fm);
 				blasted && blasted != ex_fm)
-				// blast_mode::defer keeps the rewritten formula
+				// preprocess_mode::defer keeps the rewritten formula
 				// without re-entering, leaving the quantifiers
-				// blasting introduced to the next resolve pass.
+				// preprocessing introduced to the next resolve pass.
 				return with_kept(
-					blast_method == blast_mode::defer
+					preprocess_method == preprocess_mode::defer
 					? blasted
 					: anti_prenex<node>(blasted,
 						eliminability<node>::arith_only()));

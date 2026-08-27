@@ -47,23 +47,23 @@ void api<node>::set_charvar(bool charvar) {
 }
 
 template <NodeType node>
-void api<node>::set_blasting(bool blasting) {
-	pack_set_preprocessing<node>(blasting);
+void api<node>::set_preprocessing(bool enabled) {
+	pack_set_preprocessing<node>(enabled);
 }
 
 template <NodeType node>
-void api<node>::set_blast_placement(int site) {
-	blast_placement = (site >= static_cast<int>(blast_site::per_leaf)
-		&& site <= static_cast<int>(blast_site::per_formula))
-			? static_cast<blast_site>(site) : blast_site::per_leaf;
+void api<node>::set_preprocess_placement(int site) {
+	preprocess_placement = (site >= static_cast<int>(preprocess_site::per_leaf)
+		&& site <= static_cast<int>(preprocess_site::per_formula))
+			? static_cast<preprocess_site>(site) : preprocess_site::per_leaf;
 }
 
 template <NodeType node>
-void api<node>::set_blast_method(int mode) {
-	blast_method = (mode >= static_cast<int>(blast_mode::anti_prenex_result)
-		&& mode <= static_cast<int>(blast_mode::defer))
-			? static_cast<blast_mode>(mode)
-			: blast_mode::anti_prenex_result;
+void api<node>::set_preprocess_method(int mode) {
+	preprocess_method = (mode >= static_cast<int>(preprocess_mode::anti_prenex_result)
+		&& mode <= static_cast<int>(preprocess_mode::defer))
+			? static_cast<preprocess_mode>(mode)
+			: preprocess_mode::anti_prenex_result;
 }
 
 template <NodeType node>

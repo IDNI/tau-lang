@@ -27,7 +27,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
-#include "heuristics/bv_simplify_options.h"
+#include "heuristics/simplify_options.h"
 #include "interpreter.h"
 #include "utility/measure.h"
 
@@ -140,24 +140,24 @@ struct api {
 	/// and multi-char variable names ("var" mode, e.g. foo, bar).
 	/// Affects both the tau parser and the SBF parser.
 	static void set_charvar(bool state);
-	/** @brief Enable/disable BV blasting. */
-	static void set_blasting(bool state);
+	/** @brief Enable/disable a BA's preprocessing pass (BV predicate blasting today). */
+	static void set_preprocessing(bool state);
 	/**
-	 * @brief Select where predicate blasting may run (see `blast_site`).
+	 * @brief Select where preprocessing may run (see `preprocess_site`).
 	 *
 	 * 0 = `per_leaf` (default, today's behaviour), 1 = `per_block`,
 	 * 2 = `per_formula`. An out-of-range value clamps to the default.
 	 */
-	static void set_blast_placement(int site);
+	static void set_preprocess_placement(int site);
 	/**
-	 * @brief Select what happens to a blasted formula (see `blast_mode`).
+	 * @brief Select what happens to a preprocessed formula (see `preprocess_mode`).
 	 *
 	 * 0 = `anti_prenex_result` (default, today's behaviour: re-enter
-	 * `anti_prenex` on the blasted formula), 1 = `defer` (rewrite only and
-	 * leave the introduced quantifiers to the next resolve pass). An
+	 * `anti_prenex` on the preprocessed formula), 1 = `defer` (rewrite only
+	 * and leave the introduced quantifiers to the next resolve pass). An
 	 * out-of-range value clamps to the default.
 	 */
-	static void set_blast_method(int mode);
+	static void set_preprocess_method(int mode);
 	/**
 	 * @brief Select where the cvc5 solver may be queried (see `solver_site`).
 	 *

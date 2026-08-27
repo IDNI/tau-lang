@@ -17,11 +17,12 @@
 
 #include "tau_tree.h"
 #include "tau_bdd.h"
-// `bv_blasting` and the blasting/solver placement parameters. They belong
-// here, and used to be spelled out here, but live in their own dependency-free
-// header so tests/test_init.h can apply environment overrides without pulling
-// the whole tau tree into every test binary's main(). See there.
-#include "heuristics/blast_placement.h"
+// `preprocessing` and the preprocessing/solver placement parameters. They
+// belong here, and used to be spelled out here, but live in their own
+// dependency-free header so tests/test_init.h can apply environment
+// overrides without pulling the whole tau tree into every test binary's
+// main(). See there.
+#include "heuristics/preprocess_placement.h"
 
 namespace idni::tau_lang {
 

@@ -12,8 +12,8 @@ set(TAU_CORE_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
-	heuristics/blast_placement.h            # runtime placement parameters for blasting and the solver
-	heuristics/bv_simplify_options.h        # runtime option-set for bv simplification heuristics
+	heuristics/preprocess_placement.h       # runtime placement parameters for preprocessing and the solver
+	heuristics/simplify_options.h           # runtime option-set for bv simplification heuristics
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
 	tau_bdd.h          # BDD library over tau trees

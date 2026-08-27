@@ -525,7 +525,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// set), config_cvc5_solver_alternating_quantifiers reads no global at all,
 	// and the alternation test is a function of the formula -- so the formula
 	// alone is a complete key. Unlike anti_prenex's memo (which had to be
-	// split per bv_blasting setting) there is nothing else to key on.
+	// split per `preprocessing` setting) there is nothing else to key on.
 	// nullopt is cached too: a formula the translator rejects gets rejected the
 	// same way every time, and re-deriving that costs a full tree walk.
 	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;

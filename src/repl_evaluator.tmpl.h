@@ -1452,7 +1452,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_blasting(bool value) {
-	api<node>::set_blasting(opt.blasting = value);
+	api<node>::set_preprocessing(opt.blasting = value);
 	return value;
 }
 

@@ -509,13 +509,13 @@ TEST_SUITE("bv stress check: single rule execution") {
 // spec the interpreter carries grows with every iteration.
 //
 // How far this could be pushed used to be bounded by the same normalization
-// blowup that made template 5 unusable, under the old bv_blasting=true
+// blowup that made template 5 unusable, under the old preprocessing=true
 // default. Measured on this generator back then: bv[1] absorbed eight
 // accumulated rules in about a second, bv[2] took over a minute for two and
 // did not return for three, and at bv[4] and above two accumulated rules
 // already did not return -- even though each of those rules on its own ran
 // in well under a second (see the suite above). Under the shipped defaults
-// (bv_blasting=false, Task 9) the bv[2]/bv[4] cases below now pass fast, and
+// (preprocessing=false, Task 9) the bv[2]/bv[4] cases below now pass fast, and
 // the load tester's own default (bv[64], fourteen rules) now passes too --
 // see its own case below for why it still stays opt-in.
 TEST_SUITE("bv stress check: execution") {
@@ -535,9 +535,9 @@ TEST_SUITE("bv stress check: execution") {
 
 	// Used to be the widest accumulation that still returned, and the only
 	// case here that was expensive: about 85s in Release and around five
-	// minutes in Debug under the old bv_blasting=true default, which on its
+	// minutes in Debug under the old preprocessing=true default, which on its
 	// own made the whole ctest run several times longer. Passes fast under
-	// the shipped defaults (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	// the shipped defaults (preprocessing=false, Task 9). Unskipped 2026-08-15.
 	TEST_CASE("2 iterations at bv[2]") {
 		auto res = run_stress({ .iterations = 2, .width = 2 });
 		REQUIRE( res.started );
@@ -545,8 +545,8 @@ TEST_SUITE("bv stress check: execution") {
 	}
 
 	// Two accumulated rules at bv[4]; did not return under the old
-	// bv_blasting=true default. Passes fast under the shipped defaults
-	// (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	// preprocessing=true default. Passes fast under the shipped defaults
+	// (preprocessing=false, Task 9). Unskipped 2026-08-15.
 	TEST_CASE("2 iterations at bv[4]") {
 		auto res = run_stress({ .iterations = 2, .width = 4 });
 		REQUIRE( res.started );
@@ -555,7 +555,7 @@ TEST_SUITE("bv stress check: execution") {
 
 	// The load tester's own default: fourteen rules, all seven templates, at
 	// the bv[64] it ships with. First-ever pass under the shipped defaults
-	// (bv_blasting=false, Task 9): ~99.1s in Release -- no longer "never
+	// (preprocessing=false, Task 9): ~99.1s in Release -- no longer "never
 	// returns", but still over the 60s default-suite bar, so it stays
 	// opt-in rather than joining the suite outright. The cvc5 option-set
 	// selection (backends/cvc5/cvc5_options.h, 2026-08-16) brought

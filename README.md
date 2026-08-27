@@ -2551,7 +2551,7 @@ static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
 (`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
-`set_charvar`, `set_blasting`, `set_indenting`, `set_highlighting`, `set_json` and
+`set_charvar`, `set_preprocessing`, `set_indenting`, `set_highlighting`, `set_json` and
 `set_severity` mirror the command line options.
 
 The underlying tree representation is documented in

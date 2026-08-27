@@ -280,11 +280,11 @@ TEST_SUITE("leaf_clause direct calls") {
 		// Two bv variables, only one in the block: not closed, and with
 		// blasting off the keep-binder fall-through
 		// (leaf_clause.tmpl.h:361-362 / 486-491) must retain ex.
-		struct bv_blasting_guard {
-			bool saved = bv_blasting;
-			~bv_blasting_guard() { bv_blasting = saved; }
+		struct preprocessing_guard {
+			bool saved = preprocessing;
+			~preprocessing_guard() { preprocessing = saved; }
 		} guard;
-		bv_blasting = false;
+		preprocessing = false;
 		tref fm = parse("ex x : bv[8] x + x = y.");
 		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);

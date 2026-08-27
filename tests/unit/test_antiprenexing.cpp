@@ -1132,7 +1132,7 @@ TEST_SUITE("CanonicalQuantifierIds") {
 
 // The two resource limits the block algorithm charges. Both are runtime
 // parameters rather than header constants, per the project's standing policy;
-// `bv_blasting` (heuristics/bv_predicate_blasting.h) is the precedent.
+// `preprocessing` (heuristics/preprocess_placement.h) is the precedent.
 TEST_SUITE("BlockLimits") {
 
 	TEST_CASE("exhausting the split budget keeps quantifiers and does not hang") {
@@ -1776,8 +1776,8 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 
 // AP-20 / AP-21. anti_prenex's memo is Release-only (TAU_CACHE is OFF in the
 // Debug preset), which is why AP-20 -- a cache keyed on the formula alone while
-// the result also depends on the runtime-mutable `bv_blasting` global -- had no
-// regression test at all. Guarding the case on TAU_CACHE rather than on the
+// the result also depends on the runtime-mutable `preprocessing` global -- had
+// no regression test at all. Guarding the case on TAU_CACHE rather than on the
 // build type is what makes it testable: it is compiled out of the Debug run and
 // exercised by the Release one, which is the configuration the cache exists in.
 //
@@ -1789,7 +1789,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 #ifdef TAU_CACHE
 TEST_SUITE("AntiPrenexBlastingCache") {
 
-	TEST_CASE("the memo is keyed on bv_blasting") {
+	TEST_CASE("the memo is keyed on preprocessing") {
 		// An *open* bv scope over blastable arithmetic. Both properties are
 		// needed: `y` free makes the leaf clause's
 		// closed-and-solvable solver test fail, so the solver does not decide it
@@ -1815,14 +1815,14 @@ TEST_SUITE("AntiPrenexBlastingCache") {
 		// blasting-dependent divergence happens at the
 		// eliminate_arithmetic_and_quantifiers level, which still runs through
 		// (and therefore exercises) anti_prenex's per-blasting memo.
-		const bool saved = bv_blasting;
-		bv_blasting = false;
+		const bool saved = preprocessing;
+		preprocessing = false;
 		tref off1 = normalizer<node_t>(fm);
-		bv_blasting = true;
+		preprocessing = true;
 		tref on = normalizer<node_t>(fm);
-		bv_blasting = false;
+		preprocessing = false;
 		tref off2 = normalizer<node_t>(fm);
-		bv_blasting = saved;
+		preprocessing = saved;
 
 		REQUIRE( off1 != nullptr );
 		REQUIRE( on != nullptr );
