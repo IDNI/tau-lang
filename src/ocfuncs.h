@@ -16,7 +16,6 @@
 // LOG_ERROR & friends.  Included directly rather than relied on transitively:
 // the transitive path happens to exist in Debug but not in Release, where
 // ocfuncs.tmpl.h failed to compile with "'LOG_ERROR' was not declared".
-#include "logging.h"
 #include <string>
 #include <vector>
 #include <map>
