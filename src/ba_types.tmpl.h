@@ -129,15 +129,6 @@ bool is_bool_type(size_t t) {
 	return is_bool_type<node>(ba_types<node>::type_tree(t));
 }
 
-// Asks the pack whether the BA owning this node's type declares arithmetic
-// operators, naming no BA.  Lives here rather than in ba_pack_traits.h because
-// it needs tree<node> to read the ba_type.
-template <NodeType node>
-bool pack_tref_has_arith_ops(tref t) {
-	using tau = tree<node>;
-	return pack_type_has_arith_ops<node>(tau::get(t).get_ba_type());
-}
-
 namespace ba_types_detail {
 
 template <NodeType node>
