@@ -113,9 +113,11 @@ TEST_SUITE("AntiPrenexBlock") {
 		auto [res, used] = run_apb("ex x (z = 0 && (xy != 0 || xw != 0)).");
 		// Order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
+		// Order flipped again by the 2026-08-27 regen (left-assoc
+		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
 		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
 			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))",
+			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
 		}) );
 		CHECK( used == 0 );
 	}

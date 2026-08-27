@@ -363,7 +363,9 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = simplify_using_equality<node_t>(fm);
 		// Order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
+		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
 			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
 			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
@@ -372,7 +374,6 @@ TEST_SUITE("simplify_using_equality") {
 			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
 			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
 			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 		}) );
 	}
 	TEST_CASE("8") {

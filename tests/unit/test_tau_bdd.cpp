@@ -148,7 +148,8 @@ TEST_SUITE("BDD creation terms") {
 		// Release's NDEBUG paths produce yet another product order than
 		// Debug (8f1a74c1 parser regen); actual on Release is "erxwtqzy",
 		// same letters, new permutation.
-		CHECK((tau::get(t).to_str() == "erxwtqzy"
+		// 2026-08-27 parser regen: Release permutation added.
+		CHECK((tau::get(t).to_str() == "zwtyxqre" || tau::get(t).to_str() == "erxwtqzy"
 			|| tau::get(t).to_str() == "xyzqwert"
 			|| tau::get(t).to_str() == "ewytrxzq"
 			|| tau::get(t).to_str() == "zrwyexqt"
@@ -197,7 +198,8 @@ TEST_SUITE("BDD and many") {
 		// (subtree interning order changed); actual on Debug is
 		// "xycdbafe". Release's NDEBUG paths produce yet another
 		// permutation, "xycdbaef" (same letters).
-		CHECK((result == "xycdbafe" || result == "xycdbaef"
+		// 2026-08-27 parser regen: Release permutation added.
+		CHECK((result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
 			|| result == "xycdabfe"
 			|| result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
@@ -235,7 +237,10 @@ TEST_SUITE("BDD and many") {
 		// Debug (8f1a74c1 parser regen); actual on Release is
 		// "c&(e'f')'bbda", same factors as the accepted set
 		// {a,b,b,c,d,(e'f')'}, new permutation.
-		CHECK((tau::get(xx).to_str() == "c&(e'f')'bbda"
+		// 2026-08-27 parser regen: "ab&(e'f')'bccd", same factors again.
+		// 2026-08-27 parser regen: Release permutation added.
+		CHECK((tau::get(xx).to_str() == "cbb&(f'e')'da" || tau::get(xx).to_str() == "ab&(e'f')'bccd"
+			|| tau::get(xx).to_str() == "c&(e'f')'bbda"
 			|| tau::get(xx).to_str() == "ab&(f'e')'bccd"
 			|| tau::get(xx).to_str() == "cabb&(e'f')'d"
 			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"

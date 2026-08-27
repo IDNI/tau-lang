@@ -128,7 +128,10 @@ TEST_SUITE("boole_normal_form") {
 		tref res = boole_normal_form<node_t>(fm);
 		// Order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
+		// Order flipped again by the 2026-08-27 regen (left-assoc
+		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
 		CHECK( matches_to_str_to_any_of(res, {
+			"a'bx|ab'x' = 0 || a&(b|x)|a'bx' != 0",
 			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
 			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
@@ -369,8 +372,7 @@ TEST_SUITE("Normalizer bv mixed-type") {
 		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "s = 0 && x+y = 0",
-					       "x+y = 0 && s = 0" }) );
+			" && s = 0.", strings{ "x+y = 0 && s = 0", "s = 0 && x+y = 0" }) );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf
@@ -669,5 +671,94 @@ TEST_SUITE("Normalizer bv sibling-taint") {
 			"   || b3 != b2))))"
 			" || o91[t]:bv[1] = i91[t]:bv[1]"
 			" && i97[t]:bv[1] + i98[t]:bv[1] = i97[t]:bv[1]).") );
+	}
+}
+
+// A bitvector cast is arithmetic to the normalizer, exactly like `+` or
+// `<<`: its operand and result live at different widths, so an equation
+// containing one must be left to the bitvector solver and never
+// Boole-decomposed. Decomposing `(bv[16]) x:bv[8] = c` used to produce a
+// mixed-width `x & { 255 }:bv[16] & 1 & 1 = c` that no back-end could read.
+TEST_SUITE("Normalizer bv cast") {
+
+	TEST_CASE("widening cast equation is kept as an atom") {
+		CHECK( normalize_and_check("(bv[16]) x:bv[8] = { 5 }:bv[16].",
+			"(bv[16]) x = { 5 }:bv[16]") );
+	}
+
+	TEST_CASE("narrowing cast equation is kept as an atom") {
+		CHECK( normalize_and_check("(bv[8]) x:bv[16] = { 7 }:bv[8].",
+			"(bv[8]) x = { 7 }:bv[8]") );
+	}
+
+	TEST_CASE("cast under an operator is kept as an atom") {
+		CHECK( normalize_and_check(
+			"((bv[16]) x:bv[8]) * { 5 }:bv[16] = { 10 }:bv[16].",
+			"(bv[16]) x*{ 5 }:bv[16] = { 10 }:bv[16]") );
+	}
+
+	// Closed cast equations are decided, not merely preserved.
+	TEST_CASE("closed widening cast equations are decided") {
+		CHECK( normalize_and_check("ex x ((bv[16]) x:bv[8] = { 5 }:bv[16]).", tau::wff_t) );
+		CHECK( normalize_and_check("ex x ((bv[16]) x:bv[8] = { 256 }:bv[16]).", tau::wff_f) );
+		CHECK( normalize_and_check("all x ((bv[16]) x:bv[8] <= { 255 }:bv[16]).", tau::wff_t) );
+		// the operand's width may come from the binder instead
+		CHECK( normalize_and_check("ex x:bv[8] ((bv[16]) x = { 5 }:bv[16]).", tau::wff_t) );
+		CHECK( normalize_and_check("ex x:bv[8] ((bv[16]) x = { 256 }:bv[16]).", tau::wff_f) );
+	}
+}
+
+// Same-precedence bitvector operators chain left to right, as in C and
+// SMT-LIB. The grammar used to exclude only the operator itself from its
+// right operand, so a chain of *different* operators at one level was
+// ambiguous and resolved by the order the alternatives are listed in --
+// `a*b/c` parsed as `a*(b/c)` (0 for the #86 percentage), `a%b*c` as
+// `a%(b*c)`, `a>>b<<c` as `a>>(b<<c)`, while `a/b*c` happened to be left.
+TEST_SUITE("Normalizer bv arithmetic associativity") {
+
+	TEST_CASE("multiplicative level is left-associative") {
+		CHECK( normalize_and_check("x:bv[48] = { 3355444 }:bv[48] * { 5 }:bv[48] / { 100 }:bv[48].",
+			"x = { 167772 }:bv[48]") );
+		CHECK( normalize_and_check("x:bv[16] = { 7 }:bv[16] % { 4 }:bv[16] * { 2 }:bv[16].",
+			"x = { 6 }:bv[16]") );
+		CHECK( normalize_and_check("x:bv[16] = { 100 }:bv[16] / { 5 }:bv[16] * { 2 }:bv[16].",
+			"x = { 40 }:bv[16]") );
+		CHECK( normalize_and_check("x:bv[16] = { 3 }:bv[16] * { 4 }:bv[16] % { 5 }:bv[16].",
+			"x = { 2 }:bv[16]") );
+		CHECK( normalize_and_check("x:bv[16] = { 100 }:bv[16] / { 5 }:bv[16] / { 2 }:bv[16].",
+			"x = { 10 }:bv[16]") );
+	}
+
+	TEST_CASE("additive level is left-associative") {
+		CHECK( normalize_and_check("x:bv[16] = { 100 }:bv[16] - { 30 }:bv[16] + { 5 }:bv[16].",
+			"x = { 75 }:bv[16]") );
+		CHECK( normalize_and_check("x:bv[16] = { 100 }:bv[16] - { 30 }:bv[16] - { 5 }:bv[16].",
+			"x = { 65 }:bv[16]") );
+	}
+
+	TEST_CASE("shift level is left-associative") {
+		CHECK( normalize_and_check("x:bv[16] = { 8 }:bv[16] >> { 1 }:bv[16] << { 2 }:bv[16].",
+			"x = { 16 }:bv[16]") );
+	}
+
+	TEST_CASE("precedence between levels is unchanged") {
+		CHECK( normalize_and_check("x:bv[16] = { 2 }:bv[16] * { 3 }:bv[16] + { 4 }:bv[16].",
+			"x = { 10 }:bv[16]") );
+		CHECK( normalize_and_check("x:bv[16] = { 10 }:bv[16] - { 2 }:bv[16] * { 3 }:bv[16].",
+			"x = { 4 }:bv[16]") );
+		CHECK( normalize_and_check("x:bv[16] = { 20 }:bv[16] / { 2 }:bv[16] + { 3 }:bv[16].",
+			"x = { 13 }:bv[16]") );
+		// shifts bind looser than + (as in C)
+		CHECK( normalize_and_check("x:bv[16] = { 1 }:bv[16] << { 2 }:bv[16] + { 1 }:bv[16].",
+			"x = { 8 }:bv[16]") );
+	}
+
+	// `(bv[N]) y & ...` used to parse `(bv[N])` as the parenthesised
+	// io-variable `bv[N]` juxtaposed with y (juxtaposition is bf_and).
+	TEST_CASE("a bare cast is not an io variable named bv") {
+		CHECK( normalize_and_check("x:bv[48] = (bv[48]) { 16777215 }:bv[24] & { 5 }:bv[48].",
+			"x = { 5 }:bv[48]") );
+		CHECK( normalize_and_check("x:bv[48] = (bv[48]) { 16777215 }:bv[24] | { 16 }:bv[48].",
+			"x = { 16777215 }:bv[48]") );
 	}
 }

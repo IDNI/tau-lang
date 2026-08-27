@@ -41,6 +41,7 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
 			// complete_quantifier_elimination (the residual-quantifier
 			// fallback added when this variable occurs only in a
@@ -55,11 +56,12 @@ TEST_SUITE("anti_prenex") {
 			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
 			// pre-deletion shape below. Canonical (produced) shape FIRST:
 			// Debug's matches_to_any_of only checks expected[0].
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
 			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || f(b1) || w = 0)",
 			// the same single disjunct with the ltl-side pivot tie-break
 			// order (conjuncts and disjuncts permuted; equivalent by
 			// commutativity of the hand-check above).
-			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
+			
 			// bare-atom leaf routing + the fallback: same two disjuncts
 			// as the 2026-08-04 shape below, with disjunct and conjunct
 			// order flipped by the pivot tie-breaks; equivalent by the
@@ -94,12 +96,13 @@ TEST_SUITE("anti_prenex") {
 			// wrapped ex-elimination happens to return. Canonical
 			// (produced) shape FIRST: Debug's matches_to_any_of only
 			// checks expected[0].
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || wy' = 0)",
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
 			"&& (w != 0 || wy' = 0)",
 			// the same two conjuncts with the ltl-side pivot tie-break
 			// order (disjuncts permuted; equivalent by commutativity).
-			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (w != 0 || wy' = 0)",
+			
 			// bare-atom leaf routing + the fallback: dual of the ex
 			// case, conjunct/disjunct order flipped by the pivot
 			// tie-breaks; equivalent by the same hand-check.
@@ -123,17 +126,19 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "all x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
 			// disjunct order flipped by the 8f1a74c1 parser regen
 			// (Debug's matches_to_any_of only checks expected[0] --
 			// see test_helpers.h); actual current shape first.
+			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
 			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
 			// block pipeline, 2026-08-04 (canonical shape first):
 			// under y = 0 the kept universal reduces to
 			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
 			// is w = 0 -- so this is y = 0 && w = 0 in a bulkier
 			// spelling; verified equivalent by hand.
-			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
+			
 			// pre-deletion shapes, equivalent.
 			"y = 0 && w = 0",
 			"w = 0 && y = 0",
