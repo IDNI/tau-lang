@@ -203,17 +203,14 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// Conjunct order is not canonical: it follows the ba_type pool
-		// indices (D8) and the "ab" sub-block order flipped by the
-		// 8f1a74c1 parser regen (subtree interning order changed).
-		// Debug and Release NDEBUG paths also disagree ("xycdbafe" vs
-		// "xycdbaef"). Accept every ordering observed across branches.
-		CHECK((result == "xyefcdba"
-			|| result == "xycdbafe" || result == "xycdbaef"
-			|| result == "xycdabfe" || result == "xycdabef"
-			|| result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab"
-			|| result == "xycdfeba" ));
+		// x and y are placed first by the explicit BDD order; a, b, c,
+		// d, e, f are opaque leaves whose relative order is not
+		// canonical. Pin the ordered prefix and check the leaf set.
+		CHECK(result.size() == 8);
+		CHECK(result.substr(0, 2) == "xy");
+		for (char c : std::string("abcdef"))
+			CHECK(std::count(result.begin() + 2, result.end(), c)
+				== 1);
 	}
 
 	TEST_CASE("2") {

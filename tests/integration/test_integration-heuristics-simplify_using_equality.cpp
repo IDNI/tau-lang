@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <regex>
+
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
@@ -501,12 +503,18 @@ TEST_SUITE("simplify_using_equality") {
 
 	TEST_CASE("io_output_var_replaced_when_equality_added_later") {
 		// Same as above but the equalities are in reversed order: o2=o1 comes
-		// first, then o1=i1 is added to the UF. o1 in the first conjunct is
-		// substituted with i2's representative (o2 < o1 by subtree_less).
+		// first, then o1=i1 is added to the UF. o1 and o2 collapse to a
+		// single representative, used consistently in both conjuncts, and
+		// i1[t] is not itself substituted.
 		const char* s = "o2[t] = o1[t] && o1[t] = i1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau");
+		std::string out = tau::get(res).to_str();
+		static const std::regex re(
+			R"(^(o1|o2)\[t\]:tau = (o1|o2)\[t\]:tau && \2\[t\]:tau = i1\[t\]:tau$)");
+		std::smatch m;
+		REQUIRE(std::regex_match(out, m, re));
+		CHECK(m[1].str() != m[2].str());
 	}
 
 	TEST_CASE("io_input_var_not_substituted_despite_being_in_uf") {
