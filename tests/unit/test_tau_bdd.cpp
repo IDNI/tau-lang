@@ -916,3 +916,51 @@ TEST_SUITE("BDD ex/all quantification") {
 		CHECK((xy.bdd_all(v, o) == f));
 	}
 }
+
+// The five bdd_* memo tables (and_memo, ex_memo, and_many_memo, quant_memo,
+// ite_memo) are keyed by BDD refs alone, not by order, so an entry computed
+// under one order is wrong under another -- sync_order_cache() is what is
+// supposed to catch that, at every public entry point, by comparing the
+// order given against last_order and clearing the tables when it differs.
+// Every other TEST_CASE in this file either starts from an explicit
+// clear_caches() or only ever uses one order, so a broken sync_order_cache()
+// would go unnoticed. This suite calls a public entry point (bdd_and) twice,
+// back to back, under two different orders, with no manual clear_caches()
+// in between, and checks that the second call is not served the first
+// call's answer out of and_memo.
+#ifdef TAU_CACHE
+TEST_SUITE("BDD order cache invalidation") {
+	TEST_CASE("bdd_and recomputes under a new order with no manual clear_caches") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		bdd::clear_caches();
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		// Single-variable BDDs: from_bit() interns purely on the
+		// variable's tref, so bx/by are the same refs regardless of
+		// which order build_bdd is given -- only the AND below is
+		// order-sensitive, and it is applied to the very same {bx, by}
+		// pair both times.
+		bdd::order o1 {{tx, 0}, {ty, 1}};
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o1);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o1);
+
+		// x ranks above y: AND puts x at the root, populating and_memo
+		// keyed on {bx, by} under o1.
+		bdd::ref r1 = bdd::bdd_and(bx, by, o1);
+		REQUIRE(!bdd::leaf(r1));
+		CHECK(tau::subtree_equals(bdd::get_var(r1), tx));
+
+		// A genuinely different order, same refs, no manual
+		// clear_caches(): sync_order_cache() must notice on its own and
+		// drop and_memo, or this would come back as the stale o1 answer
+		// (x at the root) served straight out of the {bx, by} entry.
+		bdd::order o2 {{ty, 0}, {tx, 1}};
+		bdd::ref r2 = bdd::bdd_and(bx, by, o2);
+		REQUIRE(!bdd::leaf(r2));
+		CHECK(tau::subtree_equals(bdd::get_var(r2), ty));
+	}
+}
+#endif

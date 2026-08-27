@@ -1051,6 +1051,17 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 	// entries, so gc can free anything only the memo still references.
 	tp_rewrite_memo_.clear();
 	tp_rewrite_memo_t_ = std::numeric_limits<int_t>::min();
+#ifdef TAU_CACHE
+	// Same reasoning as tp_rewrite_memo_ above, plus a sharper hazard:
+	// tau_term_bdd's last_order is keyed on raw trefs via a comparator
+	// that dereferences them, and a variable can sit in an order without
+	// ever becoming a decision variable in a live BDD -- so
+	// collect_live_refs() below has nothing to pin it by. Clear it (and
+	// the memo tables it guards) before the sweep, so a swept order key
+	// can never be left dangling in last_order for sync_order_cache()'s
+	// next comparison to dereference.
+	tau_term_bdd<node>::clear_caches();
+#endif
 	std::unordered_set<tref> keep;
 	if (pin) for (const auto& [k, v] : *pin) {
 		keep.insert(k);

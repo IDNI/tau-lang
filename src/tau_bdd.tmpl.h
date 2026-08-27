@@ -122,6 +122,17 @@ void tau_term_bdd<node>::clear_caches() {
 	and_many_memo.clear();
 	quant_memo.clear();
 	ite_memo.clear();
+	// last_order's key comparator (subtree_equality) and hasher
+	// (hash_lcrs_tref) both dereference the tref they are given, and
+	// nothing pins the trefs held only as order keys (a variable can
+	// rank in an order without ever becoming a decision variable in a
+	// live BDD, so collect_live_refs() has no reason to keep it). A
+	// caller that clears the tables out-of-band -- e.g. around a gc
+	// sweep -- must also drop last_order here, or sync_order_cache()'s
+	// next `o == last_order` can hash/compare against a stale, possibly
+	// freed key.
+	last_order.clear();
+	has_last_order = false;
 }
 
 /** @internal @copydoc tau_term_bdd::sync_order_cache(const order&) @endinternal */
