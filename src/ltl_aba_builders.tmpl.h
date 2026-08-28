@@ -52,7 +52,7 @@ static propositional_synthesis<Node> pack_try_propositional_synthesis(tref fm,
 // partial_out, when non-null, stays populated even when the return value ends up std::nullopt.
 template <NodeType node>
 static std::optional<ltl_aba_solution<node>>
-solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out = nullptr)
+solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 {
 	using tau = tree<node>;
 
