@@ -129,21 +129,18 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 		auto sol = synth(
 			"G(o1[t]:qlt > {0}:qlt && !(o1[t]:qlt < {2}:qlt))");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
 		std::ostringstream os;
-		emit_cpp_program<node_t>(*sol, os);
+		emit_program(*d, os);
 		std::string s = os.str();
-		CHECK(has(s, "double o1"));
+		CHECK(has(s, "tref o1"));
 		REQUIRE(has(s, "o.o1 ="));
-		// Every emitted witness for o1 must be >= 2.
-		size_t pos = 0; bool any = false;
-		while ((pos = s.find("o.o1 = ", pos)) != std::string::npos) {
-			pos += 7;
-			double w = std::strtod(s.c_str() + pos, nullptr);
-			INFO("witness: " << w);
-			CHECK(w >= 2.0);
-			any = true;
-		}
-		CHECK(any);
+
+		long long p = 0, q = 0;
+		REQUIRE(extract_qlt_rational(s, p, q));
+		CHECK(q > 0);
+		CHECK(p >= 2 * q);  // p/q >= 2
 	}
 
 	TEST_CASE("G(o1:qlt > 1/4): exact-rational witness satisfies > 1/4") {

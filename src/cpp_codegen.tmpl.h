@@ -835,11 +835,8 @@ std::optional<program_desc> build_program_desc(
 		const auto& edges = sol.aut.edges.size() > (size_t)s
 		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
 		for (auto& e : edges) {
-			// LG-4: a guard is a sum of products (ltlsynt commonly merges
-			// an edge's alternatives into one disjunctive guard); each
-			// cube becomes its own edge_desc to the same destination, so
-			// a disjunct is never silently dropped or mis-read as the
-			// wrong literal (see alg_d::hoa_guard::to_dnf's doc comment).
+			// A guard is a sum of products; each cube becomes its own
+			// edge_desc so a disjunct is never dropped or mis-read.
 			auto cubes = parse_guard_cubes(e.guard_label);
 			if (!cubes) continue; // unparseable guard -- edge omitted
 			for (auto& cube : *cubes) {
@@ -847,57 +844,70 @@ std::optional<program_desc> build_program_desc(
 				ed.dst = e.dst;
 				ed.guard = guard_from_cube(cube, in_ap_idx, flag_out_ap_idx);
 
-				// Witness fields: group this cube's POSITIVE atoms by
-				// variable (mirrors the old data emitter's var_pos_atoms
-				// grouping) and ask the owning BA for a witness over
-				// their conjunction. A variable absent here (no positive
-				// atom for it on this cube) keeps its outputs default;
-				// the ABA oracle already proved the edge feasible, so an
-				// owner declining to answer at all is a build-time
-				// error, not a silent 0.0 (that was the old path's
-				// choice, kept there for byte-stability -- the new path
-				// does not repeat it).
-				std::map<std::string, std::vector<tref>> var_pos_atoms;
+				// A negative-signed literal enters the conjunction negated,
+				// so the witness the BA picks still satisfies the cube.
+				std::map<std::string, std::vector<std::pair<tref, bool>>>
+					var_atoms;
 				for (auto& [ap_idx, positive] : cube) {
-					if (!positive) continue;
 					if (ap_idx < 0 || ap_idx >= (int)sol.aut.aps.size()) continue;
 					const auto& prop = sol.aut.aps[ap_idx];
 					auto it = ameta.find(prop);
 					if (it == ameta.end()) continue;
-					// A template-kind atom -- or a bakeable one sharing its
-					// variable with template atoms -- is routed by prop for
-					// the runtime joint solve, not baked here.
+					// Routed by prop for the runtime joint solve, which ignores
+					// polarity, so a negative-signed one is dropped here.
 					if (it->second.kind == field_kind::witness_template
 						|| (it->second.kind == field_kind::witness
 							&& template_var_set.count(it->second.var_name))) {
+						if (!positive) continue;
 						ed.witness_template_props.push_back(prop);
 						ed.witness_template_is_counter.push_back(
 							sol.counter_relativized_props.count(prop) > 0);
 					}
-					else if (it->second.kind == field_kind::witness)
-						var_pos_atoms[it->second.var_name].push_back(
-							prop_to_atom.at(prop));
+					else if (it->second.kind == field_kind::witness) {
+						tref atom = prop_to_atom.at(prop);
+						var_atoms[it->second.var_name]
+							.emplace_back(atom, positive);
+					}
 				}
 
-				for (auto& [var, atom_refs] : var_pos_atoms) {
-					tref conj = atom_refs[0];
-					for (size_t ai = 1; ai < atom_refs.size(); ++ai)
-						conj = tau::build_wff_and(conj, atom_refs[ai]);
-					// The io_var this edge's own atoms carry, not the
-					// first-occurrence one in var_io_ref -- a positional
-					// variable's occurrences at different steps are distinct
-					// io_var nodes even though they share var_name.
+				for (auto& [var, atom_list] : var_atoms) {
+					// Not var_io_ref's first-occurrence io_var: a positional
+					// variable's steps are distinct io_var nodes despite sharing var_name.
 					tref io_ref = nullptr;
-					for (tref v : get_free_vars<node>(atom_refs[0]))
+					for (tref v : get_free_vars<node>(atom_list[0].first))
 						if (get_var_name<node>(v) == var) { io_ref = v; break; }
 					if (!io_ref) io_ref = var_io_ref.at(var);
+					size_t ba_type = tau::get(io_ref).get_ba_type();
+
+					// A BA that rejects the full conjunction is retried with
+					// negatives dropped; that fallback stays sound for the cube.
+					tref full_conj = nullptr, pos_conj = nullptr;
+					for (auto& [atom, positive] : atom_list) {
+						tref signed_atom = positive
+							? atom : tau::build_wff_neg(atom);
+						full_conj = full_conj
+							? tau::build_wff_and(full_conj, signed_atom)
+							: signed_atom;
+						if (positive)
+							pos_conj = pos_conj
+								? tau::build_wff_and(pos_conj, atom)
+								: atom;
+					}
+
 					auto w = pack_codegen_witness<node>(
-						tau::get(io_ref).get_ba_type(), io_ref, conj);
-					if (!w)
+						ba_type, io_ref, full_conj);
+					if (!w && pos_conj)
+						w = pack_codegen_witness<node>(
+							ba_type, io_ref, pos_conj);
+					if (!w) {
+						// No pos_conj means every literal was negative and
+						// the owner declined; keep the output default.
+						if (!pos_conj) continue;
 						throw std::runtime_error(
 							"output '" + var + "' is owned by a data BA "
 							"that declined to supply a codegen witness "
 							"for a feasible edge");
+					}
 					ed.witness_ctors.emplace_back(sanitize(var), *w);
 				}
 
@@ -951,7 +961,11 @@ inline void emit_open_streams_appendix(
 	out << "\tstatic std::uint8_t admissible_values_mask(\n";
 	out << "\t    int q, const char* stream) noexcept {\n";
 	for (size_t k = 0; k < nflag; ++k) {
-		out << "\t\tif (std::string(stream) == \"" << d.outputs[k].prop << "\") {\n";
+		// Accept both the bare prop and the "o_"-prefixed alias, so a
+		// --open flag written either way resolves to the same field.
+		out << "\t\tif (std::string(stream) == \"" << d.outputs[k].prop
+		    << "\" || std::string(stream) == \"o_" << d.outputs[k].cpp_name
+		    << "\") {\n";
 		out << "\t\t\tswitch (q) {\n";
 		for (int s = 0; s < d.num_states; ++s) {
 			std::uint8_t mask = 0;
@@ -970,9 +984,108 @@ inline void emit_open_streams_appendix(
 	}
 	out << "\t\treturn 0x0;  // unknown stream\n\t}\n\n";
 
-	// V2 (per-step admissibility dispatch, step_with_oracle_dispatch) is
-	// deferred -- see this function's doc comment; V1 stops at the
-	// registration API + admissible_values_mask above.
+	// ap[] uses inputs-then-flag-outputs order, matching edge_desc::guard.
+	{
+		std::map<std::string, size_t> stream_to_field;
+		for (size_t k = 0; k < nflag; ++k)
+			for (auto& s : d.open_streams)
+				if (s == d.outputs[k].prop
+					|| s == "o_" + d.outputs[k].cpp_name)
+					stream_to_field[s] = k;
+		std::set<size_t> declared_fields;
+		for (auto& kv : stream_to_field) declared_fields.insert(kv.second);
+
+		const size_t nbits = d.inputs.size() + nflag;
+		out << "\toutputs step_with_oracle_dispatch(const inputs& in) noexcept {\n";
+		out << "\t\toutputs o;\n";
+		if (nbits) {
+			out << "\t\tbool ap[" << nbits << "] = {};\n";
+			for (size_t i = 0; i < d.inputs.size(); ++i)
+				out << "\t\tap[" << i << "] = in." << d.inputs[i].cpp_name
+				    << ";\n";
+		} else out << "\t\t(void)in;\n";
+		out << "\n";
+
+		for (auto& s : d.open_streams) {
+			auto it = stream_to_field.find(s);
+			if (it == stream_to_field.end()) continue;
+			size_t k = it->second, idx = d.inputs.size() + k;
+			out << "\t\t{\n";
+			out << "\t\t\tauto mask = admissible_values_mask(state_, \""
+			    << s << "\");\n";
+			out << "\t\t\tauto h = handlers_.find(\"" << s << "\");\n";
+			out << "\t\t\tif (h == handlers_.end()) { o.ok = false; return o; }\n";
+			out << "\t\t\tstd::string f;\n";
+			out << "\t\t\tif (mask & 0x1) f += \"(" << d.outputs[k].cpp_name
+			    << " = 0)\";\n";
+			out << "\t\t\tif ((mask & 0x3) == 0x3) f += \" || \";\n";
+			out << "\t\t\tif (mask & 0x2) f += \"(" << d.outputs[k].cpp_name
+			    << " = 1)\";\n";
+			out << "\t\t\tin_oracle_dispatch_ = true;\n";
+			out << "\t\t\tconst char* response = h->second.first(f.c_str(),\n";
+			out << "\t\t\t    h->second.second);\n";
+			out << "\t\t\tin_oracle_dispatch_ = false;\n";
+			out << "\t\t\tif (!response) { o.ok = false; return o; }\n";
+			out << "\t\t\tbool chose_true = std::strstr(response, \":= 1\") "
+			       "!= nullptr;\n";
+			out << "\t\t\tstd::uint8_t needed = chose_true ? 0x2 : 0x1;\n";
+			out << "\t\t\tif ((mask & needed) == 0) { o.ok = false; return o; }\n";
+			out << "\t\t\tap[" << idx << "] = chose_true;\n";
+			out << "\t\t\to." << d.outputs[k].cpp_name << " = chose_true;\n";
+			out << "\t\t}\n";
+		}
+
+		out << "\n\t\tswitch (state_) {\n";
+		for (int s = 0; s < d.num_states; ++s) {
+			out << "\t\tcase " << s << ": {\n";
+			const auto& edges = (size_t)s < d.edges.size()
+			                   ? d.edges[s] : std::vector<edge_desc>{};
+			size_t edge_idx = 0;
+			for (auto& e : edges) {
+				std::string cond;
+				for (size_t i = 0; i < d.inputs.size(); ++i) {
+					if (e.guard[i] == 0) continue;
+					if (!cond.empty()) cond += " && ";
+					if (e.guard[i] == -1) cond += "!";
+					cond += "ap[" + std::to_string(i) + "]";
+				}
+				for (size_t k = 0; k < nflag; ++k) {
+					if (!declared_fields.count(k)) continue;
+					std::int8_t g = e.guard[d.inputs.size() + k];
+					if (g == 0) continue;
+					if (!cond.empty()) cond += " && ";
+					if (g == -1) cond += "!";
+					cond += "ap[" + std::to_string(d.inputs.size() + k) + "]";
+				}
+				if (cond.empty()) cond = "true";
+				out << "\t\t\tif (" << cond << ") {\n";
+				for (size_t k = 0; k < nflag; ++k) {
+					if (declared_fields.count(k)) continue;
+					std::int8_t g = e.guard[d.inputs.size() + k];
+					if (g == 0) continue;
+					out << "\t\t\t\to." << d.outputs[k].cpp_name << " = "
+					    << (g == 1 ? "true" : "false") << ";\n";
+				}
+				for (auto& [cpp_name, expr] : e.witness_ctors) {
+					std::string sv = "wd_s" + std::to_string(s) + "_e"
+						+ std::to_string(edge_idx) + "_" + cpp_name;
+					out << "\t\t\t\tstatic const tref " << sv << " = "
+					    << expr << ";\n";
+					out << "\t\t\t\to." << cpp_name << " = " << sv << ";\n";
+				}
+				out << "\t\t\t\tstate_ = " << e.dst << ";\n";
+				out << "\t\t\t\treturn o;\n";
+				out << "\t\t\t}\n";
+				++edge_idx;
+			}
+			out << "\t\t\to.ok = false; return o;\n";
+			out << "\t\t}\n";
+		}
+		out << "\t\t}\n";
+		out << "\t\to.ok = false; return o;\n";
+		out << "\t}\n\n";
+	}
+
 	out << "private:\n";
 	out << "\tstd::map<std::string, std::pair<oracle_callback, void*>> handlers_;\n";
 	out << "\tbool in_oracle_dispatch_ = false;\n";
@@ -1018,8 +1131,9 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 	out << "#include <cstdint>\n";
 	if (!d.needs_tau_link || !d.atoms.empty()) out << "#include <cstddef>\n";
 	if (!d.needs_tau_link) out << "#include <vector>\n";
-	if (!has_witness) out << "#include <cassert>\n#include <utility>\n";
-	if (!d.open_streams.empty()) out << "#include <map>\n#include <string>\n";
+	if (!has_witness) out << "#include <cassert>\n#include <utility>\n#include <string>\n";
+	if (!d.open_streams.empty())
+		out << "#include <map>\n#include <string>\n#include <cstring>\n";
 	if (d.needs_tau_link) {
 		// tref + ba_constants<node_t> + ba_descriptor<...> for the witness factory expressions baked into step().
 		out << "#include \"tau_pack.h\"\n";
@@ -1050,6 +1164,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 			out << "\tint initial_state = 0;\n";
 			out << "\tint num_inputs = 0;\n";
 			out << "\tstd::vector<std::vector<edge>> edges;\n";
+			out << "\tstd::vector<std::string> aps;\n";
 			out << "};\n";
 			out << "inline const edge* strategy_step(\n";
 			out << "    const strategy& s, int src, const bool* ap) {\n";
@@ -1104,6 +1219,18 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 		out << "\t" << d.class_name << "() { load_initial_strategy(); }\n\n";
 		out << "\tint state() const noexcept { return state_; }\n\n";
 
+		// Order (inputs, then flag outputs) must match codegen_strategy.h's
+		// edge::guard -- revise() checks a strategy's aps against it.
+		out << "\tstatic const std::vector<std::string>& program_aps() noexcept {\n";
+		out << "\t\tstatic const std::vector<std::string> v = {\n";
+		for (auto& f : d.inputs)
+			out << "\t\t\t\"" << f.prop << "\",\n";
+		for (size_t k = 0; k < nflag; ++k)
+			out << "\t\t\t\"" << d.outputs[k].prop << "\",\n";
+		out << "\t\t};\n";
+		out << "\t\treturn v;\n";
+		out << "\t}\n\n";
+
 		out << "\toutputs step(const inputs& in) noexcept {\n";
 		out << "\t\toutputs o;\n";
 		if (!d.inputs.empty()) {
@@ -1135,12 +1262,18 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 			out << "\t// the new initial state -- matching the interpreter's\n";
 			out << "\t// behaviour where a revised spec restarts the unbound\n";
 			out << "\t// continuation from the current time point.\n";
+			// Public alias for the strategy type revise()/strategy() trade in,
+			// so callers do not need to spell tau_codegen_detail::strategy.
+			out << "\tusing strategy_type = tau_codegen_detail::strategy;\n";
 			out << "\tbool revise(tau_codegen_detail::strategy new_strat) noexcept {\n";
 			out << "\t\tbool valid = new_strat.num_states > 0\n";
 			out << "\t\t\t&& new_strat.initial_state >= 0\n";
 			out << "\t\t\t&& new_strat.initial_state < new_strat.num_states\n";
 			out << "\t\t\t&& new_strat.num_inputs == " << d.inputs.size() << "\n";
-			out << "\t\t\t&& (int)new_strat.edges.size() == new_strat.num_states;\n";
+			out << "\t\t\t&& (int)new_strat.edges.size() == new_strat.num_states\n";
+			out << "\t\t\t// Empty aps means \"unset\"; only a non-empty, mismatching\n";
+			out << "\t\t\t// list is refused.\n";
+			out << "\t\t\t&& (new_strat.aps.empty() || new_strat.aps == program_aps());\n";
 			out << "\t\tif (valid)\n";
 			out << "\t\t\tfor (const auto& sv : new_strat.edges)\n";
 			out << "\t\t\t\tfor (const auto& e : sv)\n";
@@ -1171,6 +1304,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 		out << "\t\tstrat_.num_states = " << d.num_states << ";\n";
 		out << "\t\tstrat_.initial_state = " << d.initial_state << ";\n";
 		out << "\t\tstrat_.num_inputs = " << d.inputs.size() << ";\n";
+		out << "\t\tstrat_.aps = program_aps();\n";
 		out << "\t\tstrat_.edges.resize(" << d.num_states << ");\n";
 		for (int s = 0; s < d.num_states; ++s) {
 			const auto& edges = (size_t)s < d.edges.size()

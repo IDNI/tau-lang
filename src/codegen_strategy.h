@@ -27,6 +27,7 @@
 #define __IDNI__TAU__CODEGEN_STRATEGY_H__
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace idni::tau_lang::codegen {
@@ -47,6 +48,10 @@ struct strategy {
 	// otherwise tell them apart without naming the source spec's I/O split.
 	int num_inputs = 0;
 	std::vector<std::vector<edge>> edges;  // edges[src] = outgoing edges
+	// Atomic-proposition names in guard order (inputs, then flag outputs).
+	// Empty means "unset"; revise() only compares this against the
+	// program's own aps when it is non-empty.
+	std::vector<std::string> aps;
 };
 
 // The first outgoing edge of `src` whose leading `num_inputs` guard entries

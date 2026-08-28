@@ -99,8 +99,8 @@ static bool has_gpp() {
 }
 
 // Used by the cpp_codegen_bench_correctness suite below, which still drives
-// emit_cpp_program directly (not compile_spec) to assert the omitted
-// ok==true invariant.
+// build_program_desc/emit_program directly (not compile_spec) to assert the
+// omitted ok==true invariant.
 static tref parse_formula(const char* s) {
     auto nso_rr = get_nso_rr<node_t>(tau::get(s));
     if (!nso_rr.has_value()) return nullptr;
@@ -325,18 +325,21 @@ TEST_SUITE("cpp_codegen_bench") {
 
 TEST_SUITE("cpp_codegen_bench_correctness") {
 
-	// CG-RT3: the benchmark's `sum` accumulates `o.ok` but is never compared
-	// to the step count — a generated program returning ok=false on every
-	// single step would still pass the timing suite. This asserts the
-	// omitted invariant directly, with a small N so it stays fast.
-	TEST_CASE("[CG-BENCH-CORR-01] every step of the echo spec reports ok=true") {
+	// Must stay single-variable with no input reference: that keeps
+	// needs_tau_link false, since this test's bare compile links no tau SDK.
+	static const char* CONST_FLAG_FORMULA =
+	    "G (o1[t]:bv[1] = {1}:bv[1]).";
+	TEST_CASE("[CG-BENCH-CORR-01] every step of the compiled spec reports ok=true") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		tref fm = parse_formula(ECHO_FORMULA);
+		tref fm = parse_formula(CONST_FLAG_FORMULA);
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl_aba<node_t>(fm);
 		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "BenchCorr");
+		REQUIRE(d.has_value());
+		REQUIRE_FALSE(d->needs_tau_link);
 		std::ostringstream hdr_os;
-		emit_cpp_program<node_t>(*sol, hdr_os, "BenchCorr");
+		emit_program(*d, hdr_os);
 
 		const std::string hdr_path = cg_tmp("_tau_bench_corr_hdr.h");
 		const std::string main_path = cg_tmp("_tau_bench_corr_main.cpp");
@@ -349,7 +352,7 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 			     "#include <cstdio>\n"
 			     "int main() {\n"
 			     "  BenchCorr c;\n"
-			     "  BenchCorr::Inputs in{};\n"
+			     "  BenchCorr::inputs in{};\n"
 			     "  unsigned sum = 0;\n"
 			  << "  for (long i = 0; i < " << N << "L; ++i) {\n"
 			     "    auto o = c.step(in);\n"

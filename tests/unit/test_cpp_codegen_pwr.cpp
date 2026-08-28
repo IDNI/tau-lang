@@ -359,7 +359,7 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 	// CG-RT4 / CG-N5 (FIXED, Batch O6): revise()'s validation used to be
 	// assert()-only; under -DNDEBUG (the flag customer release builds use,
 	// and which g++ -O2 alone does NOT define) those asserts compiled out,
-	// so an invalid Strategy (initial_state out of range for num_states)
+	// so an invalid strategy (initial_state out of range for num_states)
 	// caused OOB std::vector indexing (UB) on the next step() instead of
 	// being rejected. revise() is now `bool` with real runtime refusal;
 	// this test compiles WITH -DNDEBUG specifically to prove the checks
@@ -367,7 +367,7 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 	// (bad initial_state, out-of-range edge dst, mismatched aps) are all
 	// refused with the running strategy and state untouched, and a valid
 	// revision afterwards still succeeds.
-	TEST_CASE("[CG-PWR-NDEBUG-01] revise() with an invalid Strategy under -DNDEBUG") {
+	TEST_CASE("[CG-PWR-NDEBUG-01] revise() with an invalid strategy under -DNDEBUG") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrNdebug");
 		REQUIRE(gen1.has_value());
@@ -383,12 +383,12 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 			     "#include <vector>\n"
 			     "int main() {\n"
 			     "  PwrNdebug c;\n"
-			     "  PwrNdebug::Inputs in;\n"
+			     "  PwrNdebug::inputs in;\n"
 			     "  auto o0 = c.step(in);\n"
 			     "  if (!o0.ok) { std::printf(\"FAIL step0\\n\"); return 1; }\n"
 			     "  int state_before = c.state();\n"
-			     "  // initial_state=99 is out of range for a 1-state Strategy.\n"
-			     "  PwrNdebug::Strategy bad;\n"
+			     "  // initial_state=99 is out of range for a 1-state strategy.\n"
+			     "  PwrNdebug::strategy_type bad;\n"
 			     "  bad.num_states = 1;\n"
 			     "  bad.initial_state = 99;\n"
 			     "  bad.edges.resize(1);\n"
@@ -399,18 +399,18 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 			     "  if (!o1.ok) { std::printf(\"FAIL step_after_refusal\\n\"); return 1; }\n"
 			     "  // An out-of-range edge dst is refused too (the old asserts\n"
 			     "  // never even checked dst).\n"
-			     "  PwrNdebug::Strategy bad2;\n"
+			     "  PwrNdebug::strategy_type bad2;\n"
 			     "  bad2.num_states = 1;\n"
 			     "  bad2.initial_state = 0;\n"
 			     "  bad2.edges.resize(1);\n"
 			     "  bad2.edges[0].push_back({std::vector<int8_t>(PwrNdebug::program_aps().size(), 0), 7});\n"
 			     "  if (c.revise(std::move(bad2))) { std::printf(\"ACCEPTED_BAD_DST\\n\"); return 1; }\n"
 			     "  // A non-empty aps list differing from the program's is refused.\n"
-			     "  PwrNdebug::Strategy bad3 = c.strategy();\n"
+			     "  PwrNdebug::strategy_type bad3 = c.strategy();\n"
 			     "  bad3.aps = {\"__not_this_programs_ap__\"};\n"
 			     "  if (c.revise(std::move(bad3))) { std::printf(\"ACCEPTED_BAD_APS\\n\"); return 1; }\n"
 			     "  // A valid revision afterwards still succeeds.\n"
-			     "  PwrNdebug::Strategy good = c.strategy();\n"
+			     "  PwrNdebug::strategy_type good = c.strategy();\n"
 			     "  if (!c.revise(std::move(good))) { std::printf(\"FAIL good_refused\\n\"); return 1; }\n"
 			     "  if (c.revision_count() != 1) { std::printf(\"FAIL revcount2\\n\"); return 1; }\n"
 			     "  auto o2 = c.step(in);\n"

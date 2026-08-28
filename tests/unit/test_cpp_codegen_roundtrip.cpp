@@ -151,8 +151,9 @@ TEST_SUITE("cpp_codegen_open") {
 
 	TEST_CASE("open emit: scaffolding is spliced into the class") {
 		std::ostringstream os;
-		emit_cpp_program_open_prop(echo_spec(), {"in_sig"}, {"out_sig"},
-			{"o_out_sig"}, os, "EchoCtrl");
+		auto d = build_program_desc_prop(echo_spec(), {"in_sig"}, {"out_sig"},
+			"EchoCtrl", /*revisable=*/false, {"o_out_sig"});
+		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("open_streams()") != std::string::npos);
 		CHECK(s.find("register_open_oracle") != std::string::npos);
@@ -160,16 +161,18 @@ TEST_SUITE("cpp_codegen_open") {
 		CHECK(s.find("admissible_values_mask") != std::string::npos);
 		CHECK(s.find("step_with_oracle_dispatch") != std::string::npos);
 		CHECK(s.find("\"o_out_sig\"") != std::string::npos);
-		// The splice must not have destroyed the base program.
-		CHECK(s.find("Outputs step(") != std::string::npos);
-		CHECK(s.find("enum class State") != std::string::npos);
+		// Splice must not destroy the base program: state is a plain
+		// int, not an enum, so check for the accessor actually emitted.
+		CHECK(s.find("outputs step(") != std::string::npos);
+		CHECK(s.find("int state() const noexcept") != std::string::npos);
 	}
 
 	TEST_CASE("open emit: g++ compile, oracle dispatch, mask, edge walk") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		std::ostringstream os;
-		emit_cpp_program_open_prop(echo_spec(), {"in_sig"}, {"out_sig"},
-			{"o_out_sig"}, os, "EchoCtrl");
+		auto d = build_program_desc_prop(echo_spec(), {"in_sig"}, {"out_sig"},
+			"EchoCtrl", /*revisable=*/false, {"o_out_sig"});
+		emit_program(d, os);
 
 		const std::string hdr_path = cg_tmp("_tau_codegen_open_ctrl.h");
 		const std::string main_path = cg_tmp("_tau_codegen_open_main.cpp");
@@ -187,24 +190,24 @@ TEST_SUITE("cpp_codegen_open") {
 			    "  EchoCtrl c;\n"
 			    "  // echo spec: both output values admissible from q0\n"
 			    "  if (EchoCtrl::admissible_values_mask(\n"
-			    "      EchoCtrl::State::q0, \"o_out_sig\") != 0x3)\n"
+			    "      0, \"o_out_sig\") != 0x3)\n"
 			    "    { std::printf(\"FAILMASK\\n\"); return 1; }\n"
 			    "  // unknown stream is rejected on registration\n"
 			    "  if (c.register_open_oracle(\"o_nope\", &pick_true, nullptr) != -1)\n"
 			    "    { std::printf(\"FAILREG1\\n\"); return 2; }\n"
 			    "  // no handler yet: dispatch must fail closed\n"
-			    "  EchoCtrl::Inputs in;\n"
-			    "  in.i_in_sig = true;\n"
+			    "  EchoCtrl::inputs in;\n"
+			    "  in.in_sig = true;\n"
 			    "  if (c.step_with_oracle_dispatch(in).ok)\n"
 			    "    { std::printf(\"FAILNOH\\n\"); return 3; }\n"
 			    "  if (c.register_open_oracle(\"o_out_sig\", &pick_true, nullptr) != 0)\n"
 			    "    { std::printf(\"FAILREG2\\n\"); return 4; }\n"
 			    "  // oracle picks true; with in=true the 0&1 edge matches\n"
 			    "  auto o1 = c.step_with_oracle_dispatch(in);\n"
-			    "  if (!o1.ok || !o1.o_out_sig)\n"
+			    "  if (!o1.ok || !o1.out_sig)\n"
 			    "    { std::printf(\"FAIL1\\n\"); return 5; }\n"
 			    "  // oracle still picks true; with in=false no edge matches\n"
-			    "  in.i_in_sig = false;\n"
+			    "  in.in_sig = false;\n"
 			    "  if (c.step_with_oracle_dispatch(in).ok)\n"
 			    "    { std::printf(\"FAIL2\\n\"); return 6; }\n"
 			    "  if (c.unregister_open_oracle(\"o_out_sig\") != 0)\n"
@@ -236,13 +239,14 @@ TEST_SUITE("cpp_codegen_open") {
 		a.edges[0].push_back(hoa_edge{"(0|1)&2&3", 0, false});
 		a.edges[0].push_back(hoa_edge{"!3", 0, false});
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"a", "b", "c"}, {"o"}, os, "ParenGate");
+		auto d = build_program_desc_prop(a, {"a", "b", "c"}, {"o"}, "ParenGate");
+		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  ParenGate p;\n"
-			"  ParenGate::Inputs in;\n"
-			"  in.i_a = false; in.i_b = false; in.i_c = true;\n"
+			"  ParenGate::inputs in;\n"
+			"  in.a = false; in.b = false; in.c = true;\n"
 			"  auto o = p.step(in);\n"
-			"  std::printf(\"%s\\n\", (o.ok && !o.o_o) ? \"OK\" : \"WRONGFIRE\");\n",
+			"  std::printf(\"%s\\n\", (o.ok && !o.o) ? \"OK\" : \"WRONGFIRE\");\n",
 			"cgn2");
 		CHECK(result == "OK");
 	}
@@ -259,12 +263,13 @@ TEST_SUITE("cpp_codegen_open") {
 		a.edges[0].push_back(hoa_edge{"t", 1, false}); // must always fire
 		a.edges[1].push_back(hoa_edge{"t", 1, false});
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {}, {"o"}, os, "DeadGuard");
+		auto d = build_program_desc_prop(a, {}, {"o"}, "DeadGuard");
+		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  DeadGuard d;\n"
-			"  DeadGuard::Inputs in;\n"
+			"  DeadGuard::inputs in;\n"
 			"  auto o = d.step(in);\n"
-			"  std::printf(\"%s\\n\", (o.ok && d.state() == DeadGuard::State::q1) "
+			"  std::printf(\"%s\\n\", (o.ok && d.state() == 1) "
 			"? \"OK\" : \"STUCK_AT_Q0\");\n",
 			"cgn9");
 		CHECK(result == "OK");
@@ -283,18 +288,19 @@ TEST_SUITE("cpp_codegen_open") {
 		a.edges[1].push_back(hoa_edge{"!0&1", 2, false});  // q1 -[!i&o]-> q2
 		a.edges[2].push_back(hoa_edge{"1",    0, false});  // q2 -[o]-> q0
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i"}, {"o"}, os, "Cycle3");
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "Cycle3");
+		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  Cycle3 c;\n"
-			"  Cycle3::Inputs in;\n"
-			"  in.i_i = true;\n"
+			"  Cycle3::inputs in;\n"
+			"  in.i = true;\n"
 			"  auto s0 = c.step(in);  // q0 -> q1\n"
-			"  in.i_i = false;\n"
+			"  in.i = false;\n"
 			"  auto s1 = c.step(in);  // q1 -> q2\n"
 			"  auto s2 = c.step(in);  // q2 -[o]-> q0 (guard '1' ignores input)\n"
 			"  bool cycle_ok = s0.ok && s1.ok && s2.ok "
-			"&& c.state() == Cycle3::State::q0;\n"
-			"  in.i_i = false;\n"
+			"&& c.state() == 0;\n"
+			"  in.i = false;\n"
 			"  auto s3 = c.step(in);  // q0 requires i&o: fails\n"
 			"  std::printf(\"%s\\n\", (cycle_ok && !s3.ok) ? \"OK\" : \"BROKEN\");\n",
 			"cgrt02");
@@ -318,18 +324,20 @@ TEST_SUITE("cpp_codegen_open") {
 		a.edges[0].push_back(hoa_edge{"0&1&2", 0, false});
 		a.edges[0].push_back(hoa_edge{"!0&!1&!2", 0, false});
 		std::ostringstream os;
-		emit_cpp_program_open_prop(a, {"i"}, {"o1", "o2"}, {"o1"}, os, "OpenDispatch");
+		auto d = build_program_desc_prop(a, {"i"}, {"o1", "o2"}, "OpenDispatch",
+			/*revisable=*/false, {"o1"});
+		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  OpenDispatch d;\n"
 			"  int rc = d.register_open_oracle(\"o1\", &oracle, nullptr);\n"
 			"  if (rc != 0) { std::printf(\"REG_FAIL\\n\"); return 0; }\n"
-			"  OpenDispatch::Inputs in;\n"
-			"  in.i_i = true;\n"
+			"  OpenDispatch::inputs in;\n"
+			"  in.i = true;\n"
 			"  auto o = d.step_with_oracle_dispatch(in);\n"
 			"  if (!o.ok) { std::printf(\"NO_EDGE_MATCHED\\n\"); return 0; }\n"
-			"  if (!o.o_o2) { std::printf(\"O2_NOT_ASSIGNED\\n\"); return 0; }\n"
+			"  if (!o.o2) { std::printf(\"O2_NOT_ASSIGNED\\n\"); return 0; }\n"
 			"  // a cube whose DECLARED part disagrees with the oracle must not fire\n"
-			"  in.i_i = false;\n"
+			"  in.i = false;\n"
 			"  auto o2 = d.step_with_oracle_dispatch(in);\n"
 			"  std::printf(\"%s\\n\", o2.ok ? \"WRONGFIRE\" : \"OK\");\n",
 			"cgopen02",
