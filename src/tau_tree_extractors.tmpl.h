@@ -762,7 +762,15 @@ trefs get_free_vars_appearance_order(tref expression) {
 	auto up = [&scoped](tref n) {
 		// If quantifier is encountered, remove quantified variable from scoped
 		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
-			scoped.erase(tau::trim(n));
+			// One entry per closing quantifier: erase-by-key on a
+			// multiset drops EVERY equal entry, which under a
+			// same-name nested binder would also unbind the outer
+			// scope. Currently unobservable -- visit_unique consults
+			// scoped only at a variable's first visit, which for a
+			// bound variable is at its binder -- but the bookkeeping
+			// should not rely on that traversal detail.
+			auto it = scoped.find(tau::trim(n));
+			if (it != scoped.end()) scoped.erase(it);
 		}
 	};
 	pre_order<node>(expression).visit_unique(f, all, up);
