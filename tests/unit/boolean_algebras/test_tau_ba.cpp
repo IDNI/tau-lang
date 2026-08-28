@@ -806,7 +806,7 @@ TEST_CASE("G(o1=F) is not zero (realizable)") {	auto b = from_spec("G (o1[t]:tau
 	CHECK(b.is_zero() == false);
 }
 
-TEST_CASE("F(o1=T) is not zero (realizable)") {	auto b = from_spec("F (o1[t]:tau = {T.}:tau).");
+TEST_CASE("F(o1=T) is not zero (realizable)" * doctest::skip(!ltlsynt_available())) {	auto b = from_spec("F (o1[t]:tau = {T.}:tau).");
 	CHECK(b.is_zero() == false);
 }
 

@@ -39,6 +39,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "ltl_aba.h"
 
 using namespace idni::tau_lang;
 
@@ -142,7 +143,7 @@ TEST_SUITE("temporal connectives — Boolean combinations of G") {
 		CHECK(sat_str("(G (o1[t] = 1)) <-> (G (o1[t] = 1))."));
 	}
 
-	TEST_CASE("(G A) <-> (F A) — same A, hold A forever") {
+	TEST_CASE("(G A) <-> (F A) — same A, hold A forever" * doctest::skip(!ltlsynt_available())) {
 		// Both true under "always A" → biconditional T → sat.
 		CHECK(sat_str("(G (o1[t] = 1)) <-> (F (o1[t] = 1))."));
 	}
@@ -152,19 +153,19 @@ TEST_SUITE("temporal connectives — F (eventually) at top level") {
 	// F was already routed correctly via has_ltl_operators, but the
 	// flatten + Boolean-combs route can affect nested-F cases.
 
-	TEST_CASE("F && F — disjoint variables sat") {
+	TEST_CASE("F && F — disjoint variables sat" * doctest::skip(!ltlsynt_available())) {
 		CHECK(sat_str("(F (o1[t] = 1)) && (F (o2[t] = 1))."));
 	}
 
-	TEST_CASE("F && G — sat") {
+	TEST_CASE("F && G — sat" * doctest::skip(!ltlsynt_available())) {
 		CHECK(sat_str("(F (o1[t] = 1)) && (G (o2[t] = 1))."));
 	}
 
-	TEST_CASE("F || F — sat") {
+	TEST_CASE("F || F — sat" * doctest::skip(!ltlsynt_available())) {
 		CHECK(sat_str("(F (o1[t] = 1)) || (F (o2[t] = 1))."));
 	}
 
-	TEST_CASE("F -> G — sat") {
+	TEST_CASE("F -> G — sat" * doctest::skip(!ltlsynt_available())) {
 		// F(a) -> G(b) ≡ G(!a) || G(b) — realizable.
 		CHECK(sat_str("(F (o1[t] = 1)) -> (G (o2[t] = 0))."));
 	}

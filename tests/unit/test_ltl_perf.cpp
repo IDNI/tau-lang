@@ -54,7 +54,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 5.0);
 	}
 
-	TEST_CASE("PERF-F02: F(o=1) simple liveness — < 5s") {
+	TEST_CASE("PERF-F02: F(o=1) simple liveness — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("F (o1[t] = 1).", &r);
@@ -63,7 +63,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 5.0);
 	}
 
-	TEST_CASE("PERF-F03: (o=0) U (o=1) simple until — < 5s") {
+	TEST_CASE("PERF-F03: (o=0) U (o=1) simple until — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("((o1[t] = 0)) U ((o1[t] = 1)).", &r);
@@ -72,7 +72,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 5.0);
 	}
 
-	TEST_CASE("PERF-F04: G(F(o=1)) recurring liveness — < 5s") {
+	TEST_CASE("PERF-F04: G(F(o=1)) recurring liveness — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("G (F (o1[t] = 1)).", &r);
@@ -99,7 +99,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 5.0);
 	}
 
-	TEST_CASE("PERF-F07: (o=1) R (o=0) release — < 5s") {
+	TEST_CASE("PERF-F07: (o=1) R (o=0) release — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("((o1[t] = 1)) R ((o1[t] = 0)).", &r);
@@ -108,7 +108,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 5.0);
 	}
 
-	TEST_CASE("PERF-F08: (o=0) W (o=1) weak until — < 5s") {
+	TEST_CASE("PERF-F08: (o=0) W (o=1) weak until — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("((o1[t] = 0)) W ((o1[t] = 1)).", &r);
@@ -129,7 +129,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 15.0);
 	}
 
-	TEST_CASE("PERF-M02: G(F(o=0)) && G(F(o=1)) oscillation — < 15s") {
+	TEST_CASE("PERF-M02: G(F(o=0)) && G(F(o=1)) oscillation — < 15s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("(G (F (o1[t] = 0))) && (G (F (o1[t] = 1))).", &r);
@@ -138,7 +138,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 15.0);
 	}
 
-	TEST_CASE("PERF-M03: G(i=1 -> F(o=1)) response — < 15s") {
+	TEST_CASE("PERF-M03: G(i=1 -> F(o=1)) response — < 15s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable("G ((i1[t] = 1) -> (F (o1[t] = 1))).", &r);
@@ -147,7 +147,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 15.0);
 	}
 
-	TEST_CASE("PERF-M04: nested U formula — < 15s") {
+	TEST_CASE("PERF-M04: nested U formula — < 15s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable(
@@ -157,7 +157,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		CHECK(sec < 15.0);
 	}
 
-	TEST_CASE("PERF-M05: G(F(o=0)) with input constraint — < 15s") {
+	TEST_CASE("PERF-M05: G(F(o=0)) with input constraint — < 15s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable(

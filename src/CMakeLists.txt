@@ -96,6 +96,8 @@ add_custom_command(
 )
 
 add_custom_target(tau_header ALL DEPENDS ${TAU_HEADER})
+# a file-level DEPENDS across directory scopes is not enough for Unix Makefiles
+add_dependencies(tau_header tau_parsers)
 
 #
 # object library

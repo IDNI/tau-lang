@@ -6,7 +6,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## Project Overview
 
-Tau is an expressive, decidable, and executable formal software specification language. It supports satisfiability checking and program synthesis from logical specifications. The codebase is C++23, built with CMake, and targets Linux, Windows, macOS, and WebAssembly (in progress).
+Tau is an expressive, decidable, and executable formal software specification language. It supports satisfiability checking and program synthesis from logical specifications. The codebase is C++23, built with CMake, and targets Linux, Windows, macOS, and WebAssembly.
 
 ## Build Commands
 
@@ -24,7 +24,7 @@ to `build/<preset>` (e.g. `build/debug`, `build/release`).
 ./dev preset devel-tau                 # Fast optimized build of the tau CLI
 ./dev preset release-tau               # Release build of the tau CLI
 ./dev preset relwithdebinfo            # → build/relwithdebinfo/
-./dev clean [all]                      # Remove build dirs (all: also build/ preset trees)
+./dev clean [all]                      # Remove stray artifacts; `all` also removes build/ and build-*
 ./dev regen [build-dir]                # Build the parser generation target (default build/devel)
 ```
 
@@ -34,7 +34,8 @@ verification, or test runs.
 
 Other presets: `{devel,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau,all}`,
 `coverage`, `release-packages-{deb,rpm}`, `release-mingw*`. Default preset is
-`release` if omitted.
+`release` if omitted. The emscripten family is documented under
+[WebAssembly](#webassembly) below.
 
 Notes:
 - Arguments may appear in any order: preset name, `run`, `-D…`, `-v`,
@@ -52,6 +53,13 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_BUILD_EXECUTABLE=ON` — build the `tau` CLI (already ON in `*-tau`/`*-all` presets)
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
+- WebAssembly-only options are listed under [WebAssembly](#webassembly).
+
+Hashing is done in `uint64_t` regardless of the platform's `size_t` width
+(`external/parser/src/utility/hashing.h`), so the mixing is identical on
+32-bit targets (wasm32) and 64-bit ones. Hash order is observable in printed
+output — compare with `matches_wff_mod_and_or` / `matches_bf_mod_and_or`
+(`tests/test_helpers.h`) rather than pinning a spelling.
 
 ## Running Tests
 
@@ -83,6 +91,60 @@ development (single tests). When the work is finished, run the FULL test
 suite once in `release` before committing — do not run the full suite in
 devel first. Never use debug (`-O0`) builds or test runs for verification;
 debug exists only for gdb.
+
+## WebAssembly
+
+Tau builds for wasm through Emscripten as three separate artifacts: a **library**
+(`tau.js`/`tau.wasm`, an embind wrapper over `src/api.h`), **the test suite**, and
+**the REPL** (`tau_repl.js`, FTXUI over xterm.js). They are separate because their
+link requirements conflict — see the constraints below.
+
+```bash
+./dev dep-emsdk.sh                                  # emsdk → $TAU_SHARED_PREFIX/emsdk
+
+./dev preset emscripten                             # tau.js + tau.wasm + tau.esm.mjs
+node build/emscripten/tau.node.js                   # smoke test
+node bindings/js/tests/parity.js                    # wasm vs native, 140 checks
+
+./dev preset debug-emscripten-tests                 # tau's own suite for wasm
+ctest --test-dir build/debug-emscripten-tests -j 8  # runs each test under node
+
+./dev preset emscripten-pthread                     # tau_repl.js (needs pthreads)
+./dev tau-repl-serve [port] [build-dir]             # serve the REPL page
+```
+
+Options:
+- `-DTAU_BUILD_EMSCRIPTEN=ON` — selects the toolchain; set by the presets. It gates
+  `include(use-emscripten)` before `project()`, which is why no preset names a
+  `toolchainFile` (a preset-supplied one never loads at that point).
+- `-DTAU_BUILD_BINDING_JS=ON` — the embind library, mirroring `TAU_BUILD_BINDING_PYTHON`.
+- `-DTAU_BUILD_BROWSER_TESTS=ON` — runs the wasm suite in headless Chrome as the
+  `browser_suite` ctest entry. Configure installs Chrome and `puppeteer-core` itself
+  via `dep-chrome.sh`/`dep-js-test-deps.sh`. Emscripten-only; fatal otherwise.
+- `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl.js`. Emscripten-only; fatal otherwise.
+
+Four constraints, each of which has broken a build here:
+- **The pack is `sbf,tau,qint,qlt`.** `bv`/`hsb` need cvc5 and `nlang` needs curl,
+  neither of which is ported. So the wasm build is permanently the "pack without
+  `bv`" configuration that exercises a capability fold's empty case.
+- **The library must stay pthread-free.** pthreads mean `SharedArrayBuffer`, which
+  means the embedding page needs COOP/COEP, which would stop `tau.js` being
+  droppable on an arbitrary host. Only the REPL is `-pthread`, because FTXUI's
+  `ScreenInteractive::Install()` spawns threads with no single-threaded fallback;
+  it also needs `-sJSPI`, for the `emscripten_sleep()` in FTXUI's input loop.
+- **Every linked object must agree on the exception encoding.** Tau builds with
+  `-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0`; a Boost dist built the other way
+  fails `wasm-ld` with undefined `__cpp_exception`. `dep-boost.sh` stamps each wasm
+  dist with the encoding that produced it and rebuilds on a mismatch — b2 will not
+  otherwise notice a flag change, since its dependency tracking is mtime-based.
+- **Values that must agree across platforms need a fixed width.** wasm32 is the only
+  32-bit target here, and `size_t` is a word size, not a width. `tau_tree.h`'s node
+  word and `bintree::hash` are `uint64_t` for this reason; do not "simplify" them.
+
+The suite is **73 of 107** non-REPL tests — the rest need the missing algebras. The
+1493 REPL tests are not built for wasm (they would turn on `TAU_BUILD_EXECUTABLE`
+and collide with `tau.js`), so the compiled suites that natively defer to them are
+built for wasm instead.
 
 ## Architecture
 
@@ -241,3 +303,17 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
 - Task annotations: `TODO`, `DOING`, `IDEA`, `FIXME`, `REVIEW`, `DOCUMENTATION`, `MARK` with priority tags `(IMPORTANT)`, `(HIGH)`, `(MEDIUM)`, `(LOW)`, `(VERY LOW)`.
 - External dependencies (CVC5, Boost) are installed to `~/.tau/` by `./dev dep-cvc5.sh` and `./dev dep-boost.sh`.
 - The parser library is a git submodule at `external/parser/`.
+
+### Comments
+
+- Comment only what the code cannot state itself. If the line below already
+  says it, delete the comment. One line where one will do.
+- Describe the code as it stands — never what it replaced, which alternative
+  was rejected, or the debugging that led here.
+- Do prefer a comment where a reader could undo something by accident: a flag
+  that must not be removed, an ordering requirement, a non-obvious platform or
+  tool behaviour.
+- **Never cite an identifier that does not exist.** `[SHAPE-Q-NN]` (in
+  `tests/unit/parser/`), `AP-N` and `BA-N` are real test-case id conventions;
+  do not invent lookalikes for code that has no id. A reference that resolves
+  to nothing costs the next reader more than no reference at all.

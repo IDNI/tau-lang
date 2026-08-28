@@ -23,7 +23,9 @@
 #include <cassert>
 #include <cctype>
 #include <cstdio>
+#ifndef __EMSCRIPTEN__
 #include <sys/wait.h>
+#endif // __EMSCRIPTEN__
 #include <map>
 #include <optional>
 #include <set>

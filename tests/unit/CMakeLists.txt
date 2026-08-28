@@ -11,6 +11,7 @@ set(TESTS
 	ba_types
 	ba_types_inference
 	bounded_cache
+	canonicalize_tref
 	temporal_connectives
 	eliminability
 	execution

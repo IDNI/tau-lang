@@ -64,6 +64,10 @@ static std::pair<std::string, int> spawn_capture(
     const std::vector<std::string>& argv,
     int timeout_sec = 0)
 {
+#ifdef __EMSCRIPTEN__
+	(void)argv; (void)timeout_sec;
+	return {"", 127}; // no process model under wasm; matches the not-on-PATH contract
+#else
 	if (argv.empty()) return {"", -1};
 
 	int pipefd[2];
@@ -139,6 +143,20 @@ static std::pair<std::string, int> spawn_capture(
 	else if (WIFSIGNALED(status)) exit_code = 128 + WTERMSIG(status);
 	else                          exit_code = -1;
 	return {out, exit_code};
+#endif // __EMSCRIPTEN__
+}
+
+// Cached: computed once per process from the same spawn_capture() this file
+// uses to run ltlsynt itself, so this can't drift from call_ltlsynt's own
+// not-found detection. Under Emscripten, spawn_capture() unconditionally
+// returns exit code 127 (no process model), so this is false by construction.
+inline bool ltlsynt_available() {
+	static const bool available = [] {
+		auto [out, exit_code] = spawn_capture({"ltlsynt", "--version"});
+		(void)out;
+		return exit_code != 127;
+	}();
+	return available;
 }
 
 // Legacy shim kept for the few sites still passing a pre-built shell
@@ -146,6 +164,10 @@ static std::pair<std::string, int> spawn_capture(
 // in a follow-up; for now they incur the popen-shell cost only on rarely-
 // hit fallbacks.
 inline std::pair<std::string, int> run_cmd(const std::string& cmd) {
+#ifdef __EMSCRIPTEN__
+	(void)cmd;
+	return {"", 127}; // no process model under wasm; matches the not-on-PATH contract
+#else
 	std::array<char, 4096> buf;
 	std::string result;
 	FILE* raw = popen(cmd.c_str(), "r");
@@ -155,6 +177,7 @@ inline std::pair<std::string, int> run_cmd(const std::string& cmd) {
 	int status = pclose(raw);
 	int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 	return {result, exit_code};
+#endif // __EMSCRIPTEN__
 }
 
 // Write `content` to a fresh /tmp/<prefix>_XXXXXX path.  Caller owns

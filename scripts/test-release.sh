@@ -1,9 +1,7 @@
 #!/bin/bash
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PARSER_ROOT="${REPO_ROOT}/external/parser"
-DEV_ROOT="${PARSER_ROOT}"
-source "${PARSER_ROOT}/scripts/devrc"
+source "$(dirname "${BASH_SOURCE[0]}")/env"
 
+dev_reject_build_type test-release Release "$@"
 cd "${REPO_ROOT}"
 test_entry Release -DTAU_BUILD_TESTS=ON "$@"

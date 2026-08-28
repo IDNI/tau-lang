@@ -15,6 +15,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "ltl_aba.h"
 #include <cstdlib>
 
 using namespace idni::tau_lang;
@@ -34,7 +35,7 @@ static bool realizable(const char* s) {
 
 TEST_SUITE("LTL literature benchmarks") {
 
-	TEST_CASE("LB-01 request-grant: G(i1 -> F o1)") {
+	TEST_CASE("LB-01 request-grant: G(i1 -> F o1)" * doctest::skip(!ltlsynt_available())) {
 		// Classical pattern: every request is eventually granted.
 		// Simple strategy: always grant (o1 := 1).  REALIZABLE.
 		if (skip_benchmarks()) return;
@@ -71,7 +72,7 @@ TEST_SUITE("LTL literature benchmarks") {
 		));
 	}
 
-	TEST_CASE("LB-05 fairness (G-wrapped): G(i1 -> F o1)") {
+	TEST_CASE("LB-05 fairness (G-wrapped): G(i1 -> F o1)" * doctest::skip(!ltlsynt_available())) {
 		// Tau requires the top-level to be temporal-scoped, so the classical
 		// `(GF i) -> (GF o)` is expressed as the stronger request-grant
 		// pattern wrapped in G.  REALIZABLE: always grant.
@@ -90,7 +91,7 @@ TEST_SUITE("LTL literature benchmarks") {
 		));
 	}
 
-	TEST_CASE("LB-07 arbiter: G(i1 -> F o1) && G(i2 -> F o2) && G!(o1 && o2)") {
+	TEST_CASE("LB-07 arbiter: G(i1 -> F o1) && G(i2 -> F o2) && G!(o1 && o2)" * doctest::skip(!ltlsynt_available())) {
 		// Two-client arbiter with mutex.  Each client served eventually;
 		// outputs never simultaneously granted.
 		// REALIZABLE via round-robin.
@@ -102,7 +103,7 @@ TEST_SUITE("LTL literature benchmarks") {
 		));
 	}
 
-	TEST_CASE("LB-08 weak-until: (o1 = 1) W (i1 = 1)") {
+	TEST_CASE("LB-08 weak-until: (o1 = 1) W (i1 = 1)" * doctest::skip(!ltlsynt_available())) {
 		// Weak until: o1 = 1 until i1 happens, or o1 = 1 forever if i1 never does.
 		// REALIZABLE: strategy outputs 1 forever regardless of i1.
 		// (Strong U would be UNREAL — env can withhold i1 = 1 indefinitely.)
@@ -112,7 +113,7 @@ TEST_SUITE("LTL literature benchmarks") {
 		));
 	}
 
-	TEST_CASE("LB-09 persistence: F G o1") {
+	TEST_CASE("LB-09 persistence: F G o1" * doctest::skip(!ltlsynt_available())) {
 		// Eventually always o1 = 1.  REALIZABLE: set o1=1 from t=0 onwards.
 		if (skip_benchmarks()) return;
 		CHECK(realizable(

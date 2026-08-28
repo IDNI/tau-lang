@@ -12,6 +12,7 @@
 #include <sstream>
 #include <numeric>
 #include <charconv>
+#include <cstdint>
 
 
 #include "tau_tree.h"
@@ -222,8 +223,8 @@ template<>
 struct std::hash<idni::tau_lang::qlt_rational> {
 	size_t operator()(const idni::tau_lang::qlt_rational& r) const noexcept {
 		if (!r.sym.empty()) return std::hash<std::string>{}(r.sym) * 17239ULL;
-		if (r.pos_inf) return 0xFFFFFFFFFFFFFFFFULL;
-		if (r.neg_inf) return 0xFFFFFFFFFFFFFFFEULL;
+		if (r.pos_inf) return SIZE_MAX;
+		if (r.neg_inf) return SIZE_MAX - 1;
 		size_t h = std::hash<long long>{}(r.p);
 		h ^= std::hash<long long>{}(r.q) * 2654435761ULL;
 		return h;

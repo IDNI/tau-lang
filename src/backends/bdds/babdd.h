@@ -156,10 +156,10 @@ struct bdd_reference {
 	}
 
 	static size_t hash(const bdd_reference x) {
-		size_t seed = 0;
+		std::uint64_t seed = 0;
 		hash_combine(seed, x.id + x.in);
 		hash_combine(seed, x.shift + x.out);
-		return seed;
+		return static_cast<size_t>(seed);
 	}
 };
 

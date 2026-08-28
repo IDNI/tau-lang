@@ -1,3 +1,22 @@
+# Under Emscripten a test target links to a .js+.wasm pair rather than a
+# native binary, so ctest must run it through node; TEST_RUNNER/TEST_SUFFIX
+# stay empty natively, leaving add_test()'s COMMAND unchanged there.
+if(EMSCRIPTEN)
+	find_program(NODE_EXECUTABLE node REQUIRED)
+	set(TEST_RUNNER "${NODE_EXECUTABLE}")
+	set(TEST_SUFFIX ".js")
+else()
+	set(TEST_RUNNER "")
+	set(TEST_SUFFIX "")
+endif()
+
+# codegen is not supported under Emscripten yet
+set(TAU_TESTS_REQUIRE_CODEGEN
+	test_cpp_codegen_roundtrip
+	test_cpp_codegen_pwr
+	test_cpp_codegen_bench
+	test_cpp_codegen_data_atoms)
+
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	set(DOCTEST_VERSION "v2.4.11")
@@ -56,6 +75,12 @@ set(TAU_SKIP_TESTS
 	test_integration-blasting_correctness_check5
 	test_ltl_strategy_exec
 	CACHE STRING "Test targets skipped because covered by REPL tests")
+
+# The REPL tests that cover these are not built for wasm, so nothing would
+# exercise them there.
+if(EMSCRIPTEN)
+	set(TAU_SKIP_TESTS "")
+endif()
 
 #
 # Which BAs a central suite needs.
@@ -148,6 +173,10 @@ function(add test_name)
 		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
 		return()
 	endif()
+	if(EMSCRIPTEN AND test_name IN_LIST TAU_TESTS_REQUIRE_CODEGEN)
+		message(STATUS "Skipping ${test_name}: codegen not supported under Emscripten yet")
+		return()
+	endif()
 	set(N "${test_name}")
 	foreach(_id ${TAU_TEST_REQUIRES_${N}})
 		if(NOT _id IN_LIST TAU_PACK_BA_IDS)
@@ -187,7 +216,15 @@ function(_tau_add_test_target N src work_dir)
 	target_compile_options(${N} PUBLIC -fno-lto)
 	target_link_options(${N} PUBLIC -fno-lto)
 	target_compile_options(${N} PUBLIC -Wstrict-overflow=2 -Wno-error=strict-overflow)
-	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+	if(EMSCRIPTEN)
+		# the generated grammar tables overflow the default 64KiB wasm stack
+		# at module load (see bindings/js/CMakeLists.txt); test binaries link
+		# the same tables and hit the identical corrupt-heap abort without this
+		target_link_options(${N} PRIVATE
+			"SHELL:-s STACK_SIZE=16777216"
+			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
+	endif()
+	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
 	# on the CI hardware.  Everything else gets the default.
@@ -315,4 +352,24 @@ endif ()
 if (TAU_BUILD_BENCHMARK)
 	enable_testing()
 	add_subdirectory(benchmark)
+endif ()
+
+#
+# The whole suite above, once more, inside headless Chrome
+# (TAU_BUILD_BROWSER_TESTS, see the top-level CMakeLists.txt for the
+# Chrome/puppeteer-core install this depends on). One ctest entry rather
+# than one per test: bindings/js/tests/run-suite-in-chrome.js discovers the
+# list itself via `ctest --show-only=json-v1` so it can share one browser
+# and one static server per directory across the batch, which per-test
+# registration could not give it.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BROWSER_TESTS)
+	enable_testing()
+	add_test(NAME browser_suite
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/run-suite-in-chrome.js"
+			"${PROJECT_BINARY_DIR}")
+	# ~460s observed at the default concurrency (2); 1200s leaves headroom
+	# without masking a genuine hang.
+	set_tests_properties(browser_suite PROPERTIES TIMEOUT 1200)
 endif ()

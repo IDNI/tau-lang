@@ -202,15 +202,12 @@ TEST_SUITE("BDD and many") {
 		bdd::refs bdds = {x,y,z};
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
-		auto result = tau::get(ct).to_str();
-		// x and y are placed first by the explicit BDD order; a, b, c,
-		// d, e, f are opaque leaves whose relative order is not
-		// canonical. Pin the ordered prefix and check the leaf set.
-		CHECK(result.size() == 8);
-		CHECK(result.substr(0, 2) == "xy");
-		for (char c : std::string("abcdef"))
-			CHECK(std::count(result.begin() + 2, result.end(), c)
-				== 1);
+		// The 8 single-letter conjuncts print with no delimiter at all
+		// (bare bf_and juxtaposition), in an order that follows the
+		// ba_type pool indices (D8) rather than anything canonical, so
+		// compare the tree modulo bf_and commutativity instead of the
+		// printed string.
+		CHECK(matches_bf_mod_and_or(ct, "xyefcdba"));
 	}
 
 	TEST_CASE("2") {

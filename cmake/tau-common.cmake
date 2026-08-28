@@ -31,9 +31,12 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-# LTO only pays off when something LTO-links it; test targets are all -fno-lto
-if (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
+# LTO only pays off when something LTO-links it; test targets are all -fno-lto.
+# -ffat-lto-objects is what lets those -fno-lto targets link an LTO-built
+# library, and em++ has no equivalent, so wasm takes the LTO-off path whole.
+if ((TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
+	AND NOT EMSCRIPTEN)
 	set(TAU_LTO_COMPILE_FLAGS "-flto=auto;-ffat-lto-objects")
 	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 	set(TAU_LTO_LINK "-flto=auto")
@@ -73,15 +76,21 @@ endif()
 message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
 message(STATUS "TAU_LINK_OPTIONS ${TAU_LINK_OPTIONS}")
 
-# gold links noticeably faster than bfd; use it everywhere when available
-include(CheckLinkerFlag)
-check_linker_flag(CXX "-fuse-ld=gold" TAU_HAVE_GOLD)
-if(TAU_HAVE_GOLD)
-	set(TAU_LINKER "-fuse-ld=gold")
-	set(CMAKE_LINK_DEPENDS_USE_LINKER FALSE)
-else()
+# gold links noticeably faster than bfd; use it everywhere when available.
+# em++ always links (it ignores -fuse-ld=gold rather than rejecting it), so
+# the check below passes there too, but wasm-ld is em++'s only real linker.
+if(EMSCRIPTEN)
 	set(TAU_LINKER "")
-	message(STATUS "gold not available, linking with the default linker")
+else()
+	include(CheckLinkerFlag)
+	check_linker_flag(CXX "-fuse-ld=gold" TAU_HAVE_GOLD)
+	if(TAU_HAVE_GOLD)
+		set(TAU_LINKER "-fuse-ld=gold")
+		set(CMAKE_LINK_DEPENDS_USE_LINKER FALSE)
+	else()
+		set(TAU_LINKER "")
+		message(STATUS "gold not available, linking with the default linker")
+	endif()
 endif()
 
 include(git-defs) # for ${TAU_GIT_DEFINITIONS}
@@ -116,6 +125,23 @@ function(target_setup target)
 		)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
+	endif()
+	if(EMSCRIPTEN)
+		target_compile_options(${target} PRIVATE
+			# emsdk ships a newer clang than the host one, which reports
+			# unused templates the rest of the toolchains accept
+			-Wno-unused-template
+			-fwasm-exceptions
+			# the standardized wasm-exceptions encoding, not emsdk's
+			# legacy-by-default one; compile+link, must match everywhere an
+			# object is linked into a wasm artifact (B6/D2,
+			# .local/build-emscripten.md)
+			-sWASM_LEGACY_EXCEPTIONS=0
+		)
+		target_link_options(${target} PRIVATE
+			-fwasm-exceptions
+			-sWASM_LEGACY_EXCEPTIONS=0
+		)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")

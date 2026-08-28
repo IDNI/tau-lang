@@ -25,6 +25,11 @@ if(TAU_USE_CCACHE)
 	include(use-ccache)
 endif()
 
+if(TAU_BUILD_EMSCRIPTEN)
+	include(use-emscripten)
+	set_emscripten_toolchain()
+endif()
+
 set(namespace "TAU")
 set(PROJECT_NAME tau)
 set(PROJECT_LIB_NAME TAU)
@@ -50,6 +55,7 @@ option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
 option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"                  OFF)
 option(TAU_BUILD_EXECUTABLE        "Build executable"                      OFF)
 option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"               OFF)
+option(TAU_BUILD_EMSCRIPTEN        "Build for Emscripten"                  OFF)
 option(TAU_BUILD_TESTS             "Build all tests"                       OFF)
 option(TAU_BUILD_UNIT_TESTS        "Build unit tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
@@ -64,7 +70,11 @@ option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
+option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
+option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
+option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl.js (Emscripten only)" OFF)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
+
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 if (TAU_BUILD_JOBS STREQUAL "")
@@ -106,6 +116,7 @@ set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_EXECUTABLE        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_EXECUTABLE PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_EMSCRIPTEN        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_TESTS             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_UNIT_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
@@ -119,6 +130,9 @@ set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BROWSER_TESTS     PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_REPL_WASM         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
@@ -144,6 +158,14 @@ if(TAU_BUILD_BINDING_PYTHON)
 	set(TAU_BUILD_PIC ON)
 endif()
 
+if(TAU_BUILD_BINDING_JS)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
+endif()
+
+if(TAU_BUILD_REPL_WASM)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
+endif()
+
 if(TAU_BUILD_SHARED_LIBRARY)
 	set(TAU_BUILD_PIC ON)
 endif()
@@ -158,6 +180,47 @@ endif()
 
 if(TAU_WINDOWS_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
 	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
+endif()
+
+if(TAU_BUILD_BROWSER_TESTS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_BROWSER_TESTS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+if(TAU_BUILD_REPL_WASM AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_WASM=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+# emcc requires every linked object to agree on -pthread (shared vs
+# non-shared wasm memory), so this goes on the global flags -- ahead of
+# add_subdirectory(src) and js/repl's FetchContent_MakeAvailable(ftxui) --
+# rather than as a target_compile_options() on tau_repl alone. Boost is a
+# prebuilt dependency, so it gets its own pthread-enabled dist instead
+# (TAU_BOOST_PTHREAD below).
+if(TAU_BUILD_REPL_WASM)
+	string(APPEND CMAKE_C_FLAGS " -pthread")
+	string(APPEND CMAKE_CXX_FLAGS " -pthread")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " -pthread")
+endif()
+
+# Every wasm-linked object must agree on the exception-encoding setting
+# (WASM_LEGACY_EXCEPTIONS; see cmake/tau-common.cmake's target_setup(), which
+# carries -fwasm-exceptions and this flag for tau's own targets). That alone
+# does not reach FTXUI's FetchContent build or libtauparser -- add_subdirectory
+# (external/parser) below defines its own target_setup(), of the same name but
+# a different signature, in external/parser/cmake/target_setup.cmake; it wins
+# for the parser's own targets since it is (re-)included after
+# tau-common.cmake's is defined. So this goes on the global flags too, ahead
+# of both, the same way -pthread does above.
+if(EMSCRIPTEN)
+	string(APPEND CMAKE_C_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+	string(APPEND CMAKE_CXX_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
 endif()
 
 #
@@ -261,6 +324,9 @@ message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_MACOS_PACKAGE: ${TAU_MACOS_PACKAGE}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
+message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
+message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
+message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
@@ -359,10 +425,24 @@ endif()
 if(APPLE)
 	list(APPEND DEP_BOOST_ARGS --darwin)
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+	list(APPEND DEP_BOOST_ARGS --emscripten)
+	if(TAU_BUILD_REPL_WASM)
+		# tau_repl links -pthread (see above); Boost.Log must be built
+		# against the same threading model or wasm-ld's EH/thread ABI
+		# checks reject the link, the same way the exceptions mismatch
+		# did for the non-pthread dist.
+		list(APPEND DEP_BOOST_ARGS -DTAU_BOOST_PTHREAD=ON)
+		set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm-pthread/${CMAKE_INSTALL_LIBDIR})
+	else()
+		set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm/${CMAKE_INSTALL_LIBDIR})
+	endif()
+endif()
 message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
 message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
 
 if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten"
 	OR TAU_BUILD_PIC)
 		set(TAU_BUILD_BOOST ON)
 else()
@@ -383,6 +463,12 @@ file(GLOB _boost_config "${BOOST_LIBDIR}/cmake/Boost-*/BoostConfig.cmake")
 if (TAU_BUILD_BOOST OR _boost_config)
 	get_filename_component(Boost_DIR "${_boost_config}" DIRECTORY)
 endif()
+# a cross toolchain confines find_package to CMAKE_FIND_ROOT_PATH, which
+# Boost_DIR alone does not satisfy
+if(CMAKE_CROSSCOMPILING)
+	get_filename_component(_boost_root "${BOOST_LIBDIR}/.." ABSOLUTE)
+	list(APPEND CMAKE_FIND_ROOT_PATH "${_boost_root}")
+endif()
 find_package(Boost REQUIRED COMPONENTS log)
 if (Boost_FOUND)
 	message(STATUS "Boost_DIR: ${Boost_DIR}")
@@ -391,6 +477,44 @@ if (Boost_FOUND)
 	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 else()
 	message(FATAL_ERROR "Boost not found")
+endif()
+
+#
+# Install Chrome and the JS browser-test-harness devDependencies, only when
+# the wasm suite is to be run in a real browser (TAU_BUILD_BROWSER_TESTS,
+# Emscripten-only -- checked above). dep-chrome.sh and dep-js-test-deps.sh
+# are each idempotent, the same way dep-boost.sh/dep-cvc5.sh are above: a
+# second configure with the dependency already in place returns in well
+# under a second.
+#
+if(TAU_BUILD_BROWSER_TESTS)
+	# emsdk bundles its own node/npm/npx (see external/parser/cmake/
+	# use-emscripten.cmake for where TAU_SHARED_PREFIX/emsdk comes from);
+	# putting its bin/ first on PATH means neither script below needs a
+	# system node install.
+	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX}/emsdk/node/*/bin")
+	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
+	if(_tau_emsdk_node_bin_count EQUAL 0)
+		message(FATAL_ERROR
+			"TAU_BUILD_BROWSER_TESTS=ON needs emsdk's bundled node, not found "
+			"under ${TAU_SHARED_PREFIX}/emsdk/node. Run './dev dep-emsdk.sh' "
+			"first (the Emscripten toolchain itself already requires it).")
+	endif()
+	list(GET _tau_emsdk_node_bin 0 _tau_emsdk_node_bin)
+	message(STATUS "Browser tests: using node from ${_tau_emsdk_node_bin}")
+
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			bash ./dev dep-chrome.sh
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			bash ./dev dep-js-test-deps.sh
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
 endif()
 
 # Set RPATH where to find dependencies
@@ -419,6 +543,10 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 # brings its grammar with it. Only the configured pack's BA grammars are
 # generated: nothing is committed any more, so a reduced pack costs less rather
 # than leaving stale files behind.
+#
+# Resolves the tgf binary this build runs: the in-tree target natively, a
+# side native build of external/parser under cross-compilation.
+include(host-tools)
 include(generate-parser)
 set(TAU_GENERATED_PARSER_HEADERS "")
 set(TAU_GENERATED_PARSER_SOURCES "")
@@ -513,6 +641,25 @@ endif ()
 if (TAU_BUILD_BINDING_PYTHON)
 	message(STATUS "Building Python bindings (nanobind + ctypes)")
 	add_subdirectory(bindings/python)
+endif()
+
+#
+# Building JS/WebAssembly embind bindings
+#
+if (TAU_BUILD_BINDING_JS)
+	message(STATUS "Building JS embind bindings")
+	add_subdirectory(bindings/js)
+endif()
+
+#
+# Building the FTXUI REPL as a wasm executable (tau_repl.js/.wasm). A
+# separate target from bindings/js's tau.js: this one is built -pthread (see
+# the global flags above), so it does not reach the binding, which stays
+# pthread-free (D11, .local/build-emscripten.md).
+#
+if (TAU_BUILD_REPL_WASM)
+	message(STATUS "Building wasm REPL (FTXUI + pthreads)")
+	add_subdirectory(js/repl)
 endif()
 
 #

@@ -425,9 +425,15 @@ struct logging {
 		add_console_log(std::cout, keywords::format = formatter);
  	}
 
+#ifdef BOOST_LOG_NO_THREADS
+	using channel_logger_type =
+		boost::log::sources::severity_channel_logger<
+			boost::log::trivial::severity_level, std::string>;
+#else // BOOST_LOG_NO_THREADS
 	using channel_logger_type =
 		boost::log::sources::severity_channel_logger_mt<
 			boost::log::trivial::severity_level, std::string>;
+#endif // BOOST_LOG_NO_THREADS
 
 	/** @brief Return (creating if needed) the per-channel logger for @p channel_name. */
 	inline static channel_logger_type& get_channel_logger(

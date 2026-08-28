@@ -444,7 +444,7 @@ tref tree<node>::get_num(size_t n) {
 
 template <NodeType node>
 tref tree<node>::get_integer(int_t n) {
-	return get(node(integer, static_cast<size_t>(n)));
+	return get(node(integer, static_cast<typename node::T>(n)));
 }
 
 // constants

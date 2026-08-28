@@ -167,26 +167,21 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( matches_to_str_to_any_of(res, {
-			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
-			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
-			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
-		}) );
+		// Operand order permutes at two nesting levels (the outer "||" and
+		// the "&&" inside its first disjunct), a content-hash tie-break at
+		// each level -- compare the tree modulo AND/OR commutativity
+		// instead of enumerating every permutation.
+		CHECK( matches_wff_mod_and_or(res,
+			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0") );
 	}
 	TEST_CASE("3") {
 		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z";
 		tref fm = get_bf_nso_rr("", sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( matches_to_str_to_any_of(res, {
-			"x&(z'|ky)|xy|zk",
-			"x&(z'|ky)|yx|zk",
-			"x&(z'|yk)|xy|zk",
-			"x&(z'|yk)|yx|zk",
-		}) );
+		// Undelimited bf_and juxtaposition ("ky" vs "yk", "yx" vs "xy")
+		// nested inside bf_or -- compare the tree modulo AND/OR
+		// commutativity, since there is no separator to sort on.
+		CHECK( matches_bf_mod_and_or(res, "x&(z'|ky)|yx|zk") );
 	}
 	TEST_CASE("4") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0 || (j = 0 && l = 0) || k = 0 || !(j = 0 && l = 0).";
@@ -198,10 +193,9 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "(ex x x = 0) && (ex x x != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
-		CHECK( matches_to_str_to_any_of(res, {
-			"(ex b1 b1 != 0) && (ex b1 b1 = 0)",
-			"(ex b1 b1 = 0) && (ex b1 b1 != 0)",
-		}) );
+		// The two "ex"-quantified conjuncts commute (wff_and).
+		CHECK( matches_wff_mod_and_or(res,
+			"(ex b1 b1 != 0) && (ex b1 b1 = 0)") );
 	}
 	// syntactic_path_simplification_simplify_wff (the internal helper used
 	// above) assumes NNF-normalized input: it detects contradictions only

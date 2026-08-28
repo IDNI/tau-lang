@@ -77,11 +77,11 @@ inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
 template<>
 struct std::hash<idni::tau_lang::rr_sig> {
 	size_t operator()(const idni::tau_lang::rr_sig& s) const noexcept {
-		size_t seed = 0;
+		std::uint64_t seed = 0;
 		idni::hash_combine(seed, s.name);
 		idni::hash_combine(seed, s.offset_arity);
 		idni::hash_combine(seed, s.arg_arity);
-		return seed;
+		return static_cast<size_t>(seed);
 	}
 };
 

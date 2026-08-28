@@ -18,14 +18,14 @@ node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-node<BAs...> node<BAs...>::replace_data(size_t new_data) const {
+node<BAs...> node<BAs...>::replace_data(T new_data) const {
 	return node(nt, new_data, term, ba_type, ext);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
-	size_t constant_id, size_t ba_type_id)
+	T constant_id, size_t ba_type_id)
 {
 	// LOG_TRACE << " -- node::ba_constant: constant_id: "
 	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
@@ -85,7 +85,7 @@ inline bool is_term_nt(size_t nt) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
+constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
 	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data), ba_type(ba_type),
 		hash(hashit())
@@ -133,6 +133,18 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	//if (term != that.term) return NODE_CAST(term) <=> NODE_CAST(that.term);
 	if (ba_type   != that.ba_type)   return NODE_CAST(ba_type)   <=> NODE_CAST(that.ba_type);
 	if (ext  != that.ext)  return NODE_CAST(ext)  <=> NODE_CAST(that.ext);
+	// data is a pool index for string nts and ba_constant, not a value --
+	// comparing it raw orders by interning position, exactly the
+	// storage-position dependence this function's hash comparison above
+	// is meant to avoid. Dereference to the pooled value where possible.
+	// Strings are ordered, so this closes the gap for them; ba_constant's
+	// pooled type is a variant over the configured BA pack, and packs are
+	// only required to be equality_comparable (ba_descriptor_complete),
+	// not ordered -- bv, a default-pack BA, has no operator<=>, so an
+	// ordered variant comparison is ill-formed there. Raw data is the
+	// only option left for ba_constant. This is a determinism fix, not a
+	// hash-primitive choice, so it applies under every policy.
+	if (tree<node>::is_string_nt(nt)) return dict(data) <=> dict(that.data);
 	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
 #undef NODE_CAST
@@ -170,8 +182,8 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-size_t node<BAs...>::hashit() const {
-	std::size_t seed = 0;
+uint64_t node<BAs...>::hashit() const {
+	std::uint64_t seed = 0;
 	hash_combine(seed, static_cast<size_t>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));

@@ -71,7 +71,9 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 
 ## Cleaning
 
-- `clean [all]` — remove build artifacts; with `all`, also `build/` preset trees
+- `clean [all]` — remove stray artifacts (`tau-config.cmake`, `Testing`); with
+  `all`, also the build trees (`build/` and `build-*`). A bare `clean` never
+  destroys a build tree, matching `external/parser/scripts/clean.sh`.
 
 ## Regenerating parsers
 
@@ -84,6 +86,15 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 - `w64-debug`, `w64-release` — Windows cross-build (MinGW toolchain from parser)
 - `clang <SCRIPT> …` — prefix any build script with clang compilers
 - `dep-boost`, `dep-cvc5` — build dependencies into `~/.tau`
+- `dep-emsdk` — Emscripten SDK into `$TAU_SHARED_PREFIX/emsdk`; a wrapper around
+  the parser's own script, so one install serves both repos
+- `dep-chrome`, `dep-js-test-deps` — pinned Chrome for Testing and
+  `puppeteer-core`, for the browser test suite. A configure with
+  `-DTAU_BUILD_BROWSER_TESTS=ON` runs both itself, so they are rarely called by
+  hand. Neither needs a system node: emsdk bundles node/npm/npx.
+- `dep-boost --emscripten [-DTAU_BOOST_PTHREAD=ON]` — the wasm Boost dists. Two
+  exist because the REPL links `-pthread` and the library must not:
+  `dist-wasm` (`threading=single`) and `dist-wasm-pthread`
 - `binding <BIND_LANG>` — build bindings (currently `python`)
 
 Build flags for legacy `build.sh`: `-v` (verbose), `--target NAME`, `-G GENERATOR`.
@@ -102,6 +113,9 @@ optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 ./dev preset release-mingw-packages
 ./dev preset debug-asan
 ./dev preset coverage
+./dev preset emscripten                 # wasm library (tau.js/.wasm/.esm.mjs)
+./dev preset debug-emscripten-tests     # tau's own suite, run under node
+./dev preset emscripten-pthread         # wasm REPL (tau_repl.js)
 ```
 
 Default preset name is `release` if omitted.
@@ -122,10 +136,21 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
 - `test-debug`, `test-release`, `test-relwithdebinfo` — build all tests + ctest
   (pass `-DTAU_BUILD_TESTS=ON` via each script; extra `-D` flags forwarded)
 - `test-wine` — cross-build and run tests under Wine
+- WebAssembly: configure the `debug-emscripten-tests` preset, then
+  `ctest --test-dir build/debug-emscripten-tests -j 8` runs every test under
+  node. Adding `-DTAU_BUILD_BROWSER_TESTS=ON` registers `browser_suite`, which
+  drives the same binaries in headless Chrome. See the WebAssembly section of
+  [`AGENTS.md`](../AGENTS.md) for the constraints.
 
 ## Benchmarking
 
 - `benchmark`, `bench`, `save-benchmarks`
+
+## Serving the browser REPL
+
+- `tau-repl-serve [port] [build-dir]` — static server with the COOP/COEP headers
+  `SharedArrayBuffer` needs and the right `application/wasm` MIME type. Defaults
+  to `build/emscripten-pthread`, which the `emscripten-pthread` preset produces.
 
 ## Debugging
 

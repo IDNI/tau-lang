@@ -748,14 +748,6 @@ solver_mode get_solver_cmd_mode(tref n) {
 }
 
 template <NodeType node>
-size_t get_solver_cmd_type(tref n) {
-	size_t type = find_ba_type<node>(n);
-	return type > 0 ? type
-		: get_ba_type_id<node>(
-			node::ba::default_type());
-}
-
-template <NodeType node>
 void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 		size_t type_id)
 {
@@ -842,7 +834,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	// the printer needs the BA type of the solution, not the grammar
 	// nonterminal of the argument that get_type_and_arg also returns
 	print_solver_cmd_solution<node>(solution,
-		get_solver_cmd_type<node>(value));
+		find_ba_type_or_default<node>(value));
 }
 
 template <typename... BAs>
@@ -861,7 +853,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	// same as solve_cmd: the printer takes a BA type id, not the grammar
 	// nonterminal that get_type_and_arg also returns
 	print_solver_cmd_solution<node>(solution,
-		get_solver_cmd_type<node>(value));
+		find_ba_type_or_default<node>(value));
 }
 
 template <typename... BAs>

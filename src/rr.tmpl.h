@@ -83,17 +83,25 @@ template<idni::tau_lang::NodeType node>
 std::size_t std::hash<idni::tau_lang::rr<node>>::operator()(
 	const idni::tau_lang::rr<node>& rr) const noexcept {
 	// GitHub #80: hash the trees' content, never the `htref` handles.
-	// A handle is a weak-cached shared_ptr (bintree::geth), so hashing it
-	// through std::hash<shared_ptr> hashed its address, which changes as
-	// soon as the last owner of a handle drops and the same tree is
-	// re-fetched -- while operator== (compare_trees) is content-based.
-	// hash_htree routes through the node's own content-derived hash.
-	auto h = [](const idni::htref& p) -> size_t {
-		return p ? idni::hash_htree<node>{}(*p) : 0;
+	// htref is a shared_ptr<htree>: hashing it directly (as the generic
+	// hash_combine(seed, rr.rec_relations, rr.main) used to) falls
+	// through to std::hash<shared_ptr<htree>>, which hashes the raw
+	// pointer -- non-reproducible across processes/allocators. This is a
+	// determinism bug, not a hash-primitive choice, so it is fixed under
+	// every policy. htree itself is type-erased (just a tref), so there
+	// is no standalone std::hash<htree> to specialize; hash_htree<node>
+	// supplies the missing type context and reads the pointed-to tree's
+	// own content-derived hash instead. A non-null htref can still wrap a
+	// null tref (htree::null()), which hash_tref/bintree::get() cannot
+	// dereference, so both levels of null are checked before hashing.
+	auto htref_hash = [](const idni::htref& h) -> std::uint64_t {
+		return (h && h->get()) ? idni::hash_htree<node>{}(*h) : 0;
 	};
-	size_t seed = 0;
-	for (const auto& [l, r] : rr.rec_relations)
-		idni::hash_combine(seed, h(l), h(r));
-	idni::hash_combine(seed, h(rr.main));
-	return seed;
+	std::uint64_t seed = 0;
+	for (const auto& [a, b] : rr.rec_relations) {
+		idni::hash_combine(seed, htref_hash(a));
+		idni::hash_combine(seed, htref_hash(b));
+	}
+	idni::hash_combine(seed, htref_hash(rr.main));
+	return static_cast<size_t>(seed);
 }

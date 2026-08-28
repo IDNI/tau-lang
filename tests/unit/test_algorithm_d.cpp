@@ -767,7 +767,7 @@ State: 1
 		CHECK(alg_d_realizable("G (o1[t]:qlt > {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-23] F(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
+	TEST_CASE("[ALG-D-23] F(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D" * doctest::skip(!ltlsynt_available())) {
 		// Eventually output > 0: trivially realizable
 		CHECK(alg_d_realizable("F (o1[t]:qlt > {0}:qlt)."));
 	}
@@ -777,7 +777,7 @@ State: 1
 		CHECK(alg_d_realizable("G (o1[t]:qlt < {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-25] GF(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
+	TEST_CASE("[ALG-D-25] GF(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D" * doctest::skip(!ltlsynt_available())) {
 		// Always eventually output > 0: realizable (system sets y > 0 always)
 		CHECK(alg_d_realizable("G F (o1[t]:qlt > {0}:qlt)."));
 	}
@@ -793,7 +793,7 @@ State: 1
 		CHECK(alg_d_realizable("G (o1[t]:qlt > o1[t-1]:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-28] G(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt) REALIZABLE") {
+	TEST_CASE("[ALG-D-28] G(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		// G(y>0) U (y<0): the U releases when y<0; achievable since DLO has both
 		// positive and negative elements
 		CHECK(alg_d_realizable(

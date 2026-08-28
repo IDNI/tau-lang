@@ -209,9 +209,13 @@ TEST_SUITE("LTL fuzz (property-based)") {
 		CHECK(failures == 0);
 	}
 
-	TEST_CASE("CROSS: tau verdict matches Spot (ltlsynt) verdict") {
-		// ltlsynt is a build requirement — fail loudly if missing
-		REQUIRE(::system("which ltlsynt > /dev/null 2>&1") == 0);
+	// spot_decide() popens ltlsynt directly instead of going through tau's
+	// synthesis path, so the precondition is this process being able to spawn:
+	// true under Node, false in a browser. Deliberately not ltlsynt_available(),
+	// which answers whether tau's own path can invoke it and is false under all
+	// of Emscripten -- using it here would skip the case under Node as well.
+	TEST_CASE("CROSS: tau verdict matches Spot (ltlsynt) verdict"
+		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0)) {
 		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  44);
 		int      count = get_env_int ("TAU_FUZZ_COUNT", 300);
 		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
