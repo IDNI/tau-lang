@@ -368,6 +368,7 @@ TEST_SUITE("simplify_using_equality") {
 		// (8f1a74c1 did). Accept every orientation combination of the
 		// four kept atoms; the conjunct order itself is stable.
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
 			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
 			"xy = 0 && vw = 0 && yw = 0 && xv = 0",

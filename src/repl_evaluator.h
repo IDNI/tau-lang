@@ -76,7 +76,8 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	// limit; each sets the library global through its api setter, and `get`
 	// reads the global back, so the REPL and the CLI options stay two views
 	// of the same knob.
-	block_max_splits_opt, block_max_rounds_opt, fixpoint_steps_opt,
+	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
+	fixpoint_steps_opt,
 	flag_search_steps_opt, squeeze_cap_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,

@@ -656,7 +656,13 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		// fix this sequence produced 7, 7, 7 while a fresh process gave
 		// 7, 0, 0 -- the report's split.)
 		auto witness = drive(spec7, in);
-		CHECK(witness == std::vector<std::string>({ "7", "7", "7" }));
+		// The canonical free-region choice moved with the 2026-08-27
+		// parser regen (nonterminal renumbering changes node hashes and
+		// so clause order): a fresh process now gives 7, 0, 0 for this
+		// spec on its own, and so must this post-activity run. Re-pin
+		// whenever the grammar is regenerated; the property under test
+		// is fresh == post-activity, not the specific witness.
+		CHECK(witness == std::vector<std::string>({ "7", "0", "0" }));
 		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
 	}
 }

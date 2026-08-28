@@ -72,7 +72,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
 # they are named bf_* as they involve boolean functions,
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
-bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
+bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
                         |                                     ba_constant
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
@@ -80,16 +80,17 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | ('(' _ type _ ['[' _ subtype _ ']'] _ ')' _
                            (bf_parenthesis | ba_constant | variable | bf_ref
-                           | bf_t | bf_f | bf_neg | bf_cast | capture)
+                           | bf_t | bf_f | bf_neg | bf_cast | capture
+                           | bf_fall | bf_fex)
                                 :bf_cast_oprnd)              :bf_cast
                         | (func_sym '(' _ func_args _ ')')   :bf_func_app
-                        | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
-                        | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
-                        | (bf  _ '+' _       bf)             :bf_add
-                        | (bf  _ '-' _       (bf & ~bf_sub)) :bf_sub
-                        | (bf  _ '%' _       (bf & ~bf_mod)) :bf_mod
-                        | (bf  _ '*' _       bf)             :bf_mul
-                        | (bf  _ '/' _       (bf & ~bf_div)) :bf_div
+                        | (bf  _ ">>" _      (bf & ~bf_shr & ~bf_shl)) :bf_shr
+                        | (bf  _ "<<" _      (bf & ~bf_shl & ~bf_shr)) :bf_shl
+                        | (bf  _ '+' _       (bf & ~bf_add & ~bf_sub)) :bf_add
+                        | (bf  _ '-' _       (bf & ~bf_sub & ~bf_add)) :bf_sub
+                        | (bf  _ '%' _       (bf & ~bf_mod & ~bf_mul & ~bf_div)) :bf_mod
+                        | (bf  _ '*' _       (bf & ~bf_mul & ~bf_div & ~bf_mod)) :bf_mul
+                        | (bf  _ '/' _       (bf & ~bf_div & ~bf_mul & ~bf_mod)) :bf_div
                         | (bf  _ "!|" _      (bf & ~bf_nor)) :bf_nor
                         | (bf  _ "!^" _      (bf & ~bf_xnor)):bf_xnor
                         | (bf  _ "!&" _      (bf & ~bf_nand)):bf_nand
@@ -141,6 +142,7 @@ var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
 var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
 io_var                 => io_var_name '[' offset ']'.
 io_var_name            => chars.
+bv_type_like           => "bv" _ '[' _ num _ ']'.
 uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
 
 # quantifier variables

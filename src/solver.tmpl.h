@@ -1770,6 +1770,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
+		std::optional<size_t> bv_partition_key;
 		// Partition types
 		bool path_sat = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
@@ -1800,6 +1801,15 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			if (!pack_type_has_arith_ops<node>(type)) {
 				conj = norm_equation<node>(conj);
 				conj = apply_all_xor_def<node>(conj);
+			} else {
+				// Every bitvector width goes into ONE partition: a cast
+				// lets the same variable occur in atoms of two widths
+				// (`((bv[16]) d:bv[8]) ... && d:bv[8] != 0`), and solving
+				// those atoms separately assigned d twice, the second
+				// value silently overwriting the first. The bv branch
+				// below regroups by width where it still matters (lgrs).
+				if (!bv_partition_key) bv_partition_key = type;
+				type = bv_partition_key.value();
 			}
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
 				it->second.insert(conj);
@@ -1816,11 +1826,14 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			op.type_id = get_ba_type_id<node>(type_tree);
 			if (pack_type_has_arith_ops<node>(type_tree)) {
 				if (conjs_only_pure_equality<node>(conjs)) {
-					// BV equalities with no arithmetic: treat as Boolean algebra via lgrs
-					std::optional<equality> squeezed;
+					// Without arithmetic (a cast counts as arithmetic) no variable
+					// spans two widths, so each width is an independent Boolean
+					// algebra: squeeze and solve via lgrs per width.
+					std::map<size_t, std::optional<equality>> squeezed_by_width;
 					for (tref raw_eq : conjs) {
 						tref conj = norm_equation<node>(raw_eq);
 						conj = apply_all_xor_def<node>(conj);
+						auto& squeezed = squeezed_by_width[find_ba_type<node>(raw_eq)];
 						if (!squeezed.has_value()) {
 							squeezed = conj;
 						} else {
@@ -1829,12 +1842,15 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 							squeezed = build_bf_eq_0<node>((tau::get(l) | tau::get(r)).get());
 						}
 					}
-					DBG(assert(squeezed.has_value());)
-					if (auto lgrs_sol = lgrs<node>(squeezed.value())) {
-						theory_sat = true;
-						for (const auto& [var, value] : lgrs_sol.value())
-							clause_solution[var] = value;
-					} else skip = true;
+					DBG(assert(!squeezed_by_width.empty());)
+					for (const auto& [_, squeezed] : squeezed_by_width) {
+						DBG(assert(squeezed.has_value());)
+						if (auto lgrs_sol = lgrs<node>(squeezed.value())) {
+							theory_sat = true;
+							for (const auto& [var, value] : lgrs_sol.value())
+								clause_solution[var] = value;
+						} else { skip = true; break; }
+					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
 					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(conjs))) {
 						theory_sat = true;

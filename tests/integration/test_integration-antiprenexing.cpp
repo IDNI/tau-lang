@@ -41,6 +41,7 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
 			// complete_quantifier_elimination (the residual-quantifier
 			// fallback added when this variable occurs only in a
@@ -134,17 +135,19 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "all x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
 			// disjunct order flipped by the 8f1a74c1 parser regen
 			// (Debug's matches_to_any_of only checks expected[0] --
 			// see test_helpers.h); actual current shape first.
+			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
 			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
 			// block pipeline, 2026-08-04 (canonical shape first):
 			// under y = 0 the kept universal reduces to
 			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
 			// is w = 0 -- so this is y = 0 && w = 0 in a bulkier
 			// spelling; verified equivalent by hand.
-			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
+			
 			// pre-deletion shapes, equivalent.
 			"y = 0 && w = 0",
 			"w = 0 && y = 0",
@@ -189,6 +192,51 @@ TEST_SUITE("anti_prenex") {
 		CHECK( out.find("z != 0") != std::string::npos );
 		CHECK( out.find("w != 0") != std::string::npos );
 		CHECK( out.find("u != 0") != std::string::npos );
+	}
+	TEST_CASE("cqe: scope over the clause cap keeps its quantifier") {
+		// 2 CNF factors, naive product 4 > cap 3 -> cqe must decline and
+		// re-wrap verbatim. Called DIRECTLY: through anti_prenex the block
+		// pipeline would settle the scope before cqe is ever reached;
+		// atoms are canonicalized first, as anti_prenex's step 3 does.
+		const char* sample = "ex b ((by != 0 || z != 0) && (bx != 0 || w != 0)).";
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		cqe_max_clauses = 3;
+		tref r = complete_quantifier_elimination<node_t>(fm);
+		cqe_max_clauses = std::numeric_limits<size_t>::max();
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) != nullptr );
+	}
+	TEST_CASE("cqe: a scope that needs distributing is still eliminated") {
+		// The reducing to_dnf rebuilds negated atoms as `!=`; cqe must
+		// re-canonicalize them or the per-clause squeeze declines every
+		// clause and re-wraps the quantifier (latent until 2026-08-27,
+		// since the cases above hand cqe scopes that are already DNF).
+		const char* sample = "ex b ((by != 0 || z != 0) && (bx != 0 || w != 0)).";
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		tref r = complete_quantifier_elimination<node_t>(fm);
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
+		// (x != 0 || z != 0) && (y != 0 || w != 0): 4 two-atom clauses,
+		// order-insensitive since cqe's own clause order is hash-driven.
+		trefs clauses = get_dnf_wff_clauses<node_t>(r);
+		CHECK( clauses.size() == 4 );
+		for (tref c : clauses)
+			CHECK( get_cnf_wff_clauses<node_t>(c).size() == 2 );
+	}
+	TEST_CASE("cqe: v-free conjuncts are not distributed") {
+		// 4 CNF factors, only the last mentions b. Full distribution is
+		// 2^4 = 16 clauses (over cap 8); miniscoped, the b-residue is a
+		// single 2-clause factor and elimination proceeds.
+		cqe_max_clauses = 8;
+		const char* sample = "ex b ((p != 0 || q != 0) && (r != 0 || s != 0) "
+			"&& (t != 0 || u != 0) && (by != 0 || bz != 0)).";
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		tref r = complete_quantifier_elimination<node_t>(fm);
+		cqe_max_clauses = std::numeric_limits<size_t>::max();
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
+		// The b-free factors survive verbatim (not multiplied out).
+		CHECK( get_cnf_wff_clauses<node_t>(r).size() >= 4 );
 	}
 	TEST_CASE("cqe: nested starved quantifiers resolve innermost-first") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";

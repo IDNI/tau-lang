@@ -95,6 +95,16 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	{
 		return parse_tau<BaseBAs...>(src);
 	}
+
+	/// Set tau's component-factoring switch, owned by tau_ba.h.
+	static void set_ba_component_factoring(bool state) {
+		ba_component_factoring = state;
+	}
+
+	/// Read tau's component-factoring switch, owned by tau_ba.h.
+	static bool ba_component_factoring_enabled() {
+		return idni::tau_lang::ba_component_factoring_enabled();
+	}
 };
 
 } // namespace idni::tau_lang

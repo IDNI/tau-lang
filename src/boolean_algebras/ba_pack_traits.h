@@ -321,6 +321,38 @@ void pack_set_preprocessing(bool enabled) {
 }
 
 /**
+ * @brief Set tau's OWN component-factoring switch, owned by tau_ba.h.
+ *
+ * Optional: a pack without tau leaves this a silent no-op, same shape
+ * as @ref pack_set_preprocessing.
+ */
+template <typename Node>
+void pack_set_ba_component_factoring(bool state) {
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+			ba_descriptor<BA, Node>::set_ba_component_factoring(state); })
+			ba_descriptor<BA, Node>::set_ba_component_factoring(state);
+	});
+}
+
+/**
+ * @brief Read tau's OWN component-factoring switch, owned by tau_ba.h.
+ *
+ * Optional: a pack without tau declares nothing, so `false` is the answer --
+ * same "absent means no" convention as @ref pack_has_preprocessing_residue.
+ */
+template <typename Node>
+bool pack_ba_component_factoring_enabled() {
+	bool out = false;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+			ba_descriptor<BA, Node>::ba_component_factoring_enabled(); })
+			if (!out) out = ba_descriptor<BA, Node>::ba_component_factoring_enabled();
+	});
+	return out;
+}
+
+/**
  * @brief `true` when @p BA declares the grammar's arithmetic term operators.
  *
  * Optional capability, so a BA that says nothing simply has none.

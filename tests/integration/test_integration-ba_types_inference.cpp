@@ -2028,6 +2028,35 @@ TEST_SUITE("ba_types_inference: type conflicts are rejected") {
 		// An explicit cast is the sanctioned way to cross widths.
 		CHECK( infers_wff("((bv[16]) x:bv[8]) = y:bv[16]") );
 	}
+
+	// A cast is a type boundary wherever it sits, not only as the direct
+	// child of a comparison: its operand is typed from its own annotation
+	// and must not be re-walked from the enclosing equation's scope (that
+	// re-walk used to record a null replacement for the operand constant
+	// and abort in update_default, or report a spurious width conflict
+	// under a Boolean operator).
+	TEST_CASE("cast nested under an operator keeps its boundary") {
+		CHECK( infers_wff("((bv[16]) x:bv[8]) * y:bv[16] = z:bv[16]") );
+		CHECK( infers_wff("y:bv[16] * ((bv[16]) x:bv[8]) = z:bv[16]") );
+		CHECK( infers_wff("((bv[16]) x:bv[8]) + y:bv[16] = z:bv[16]") );
+		CHECK( infers_wff("((bv[16]) { 255 }:bv[8]) * { 5 }:bv[16] = z:bv[16]") );
+		CHECK( infers_wff("((bv[16]) { 255 }:bv[8]) & y:bv[16] = z:bv[16]") );
+		CHECK( infers_wff("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 255 }:bv[16]") );
+		CHECK( infers_wff("((bv[8]) (((bv[16]) x:bv[8]) * { 5 }:bv[16])) = z:bv[8]") );
+		// bare cast as a Boolean operand: not the io variable `bv[16]`
+		CHECK( infers_wff("(bv[16]) x:bv[8] & y:bv[16] = z:bv[16]") );
+	}
+
+	// A cast operand is typed from its own annotations, or from an
+	// enclosing binder that declares the variable; an operand nobody
+	// types is an inference error, not an untyped node for the solver to
+	// abort on.
+	TEST_CASE("cast operand typing") {
+		CHECK( !infers_wff("(bv[8]) y = { 1 }:bv[8]") );
+		CHECK( infers_wff("ex x:bv[8] ((bv[16]) x = { 5 }:bv[16])") );
+		CHECK( infers_wff("(bv[8]) fall x:bv[4] x = { 1 }:bv[8]") );
+		CHECK( !infers_wff("(bv[8]) fall x x = { 1 }:bv[8]") );
+	}
 }
 
 // ── Branch pass: the rr / ref / fallback error arms ─────────────────────────

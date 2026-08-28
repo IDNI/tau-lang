@@ -207,6 +207,19 @@ struct api {
 	 */
 	static void set_block_max_rounds(size_t n);
 	/**
+	 * @brief Cap the DNF clauses `complete_quantifier_elimination` may
+	 * distribute one quantifier scope into (estimated as the product of
+	 * the scope's CNF factors' disjunct counts). Above the cap the
+	 * quantifier is kept verbatim, with a log line. 0 = unlimited (the
+	 * default).
+	 */
+	static void set_cqe_max_clauses(size_t n);
+	/**
+	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
+	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
+	 */
+	static void set_max_blast_reentry_depth(size_t n);
+	/**
 	 * @brief Operand-set size above which block squeezing declines and the
 	 * general Boole decomposition runs instead; 0 = unlimited (default:
 	 * always squeeze).
@@ -298,6 +311,9 @@ struct api {
 	static void set_pwr_semantic_fallback(bool on);
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
+	/// Enable or disable support-component factoring of the Tau-BA
+	/// constant/valid tests (tau_ba.tmpl.h). Off by default.
+	static void set_ba_component_factoring(bool state);
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
 	/// Enable or disable JSON output format for printing.

@@ -397,6 +397,48 @@ TEST_SUITE("solve") {
 		CHECK ( test_solve_max(system) );
 	}
 
+	// A cast is arithmetic to the solver: the lgrs fast path cannot see
+	// across widths, so a cast equation must go to the bitvector solver.
+	// Routing it through lgrs used to answer "no solution" to a widening
+	// cast that is trivially satisfiable.
+	TEST_CASE("bv: widening cast equality goes to the bv solver") {
+		CHECK ( test_solve("(bv[16]) x:bv[8] = { 5 }:bv[16].") );
+		CHECK ( !test_solve("(bv[16]) x:bv[8] = { 256 }:bv[16].") );
+	}
+
+	TEST_CASE("bv: narrowing cast equality goes to the bv solver") {
+		CHECK ( test_solve("(bv[8]) x:bv[16] = { 7 }:bv[8].") );
+	}
+
+	// A cast lets one variable occur in atoms of two widths. The solver
+	// used to partition atoms by type and solve each partition on its
+	// own, so `d` in the bv[16] quotient and `d` in the bv[8] guard were
+	// assigned independently and the second overwrote the first: the
+	// first system below reported a "solution" with d = 0.
+	TEST_CASE("bv: one variable across widths via a cast is solved jointly") {
+		// a non-zero divisor can never push the widened quotient past 255
+		CHECK ( !test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
+			" && d:bv[8] != { 0 }:bv[8].") );
+		CHECK ( test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
+			" && d:bv[8] = { 0 }:bv[8].") );
+		CHECK ( test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) = { 5 }:bv[16]"
+			" && d:bv[8] = { 3 }:bv[8].") );
+	}
+
+	// Pure equalities of different widths keep their per-width lgrs path.
+	TEST_CASE("bv: pure equalities of different widths") {
+		CHECK ( test_solve("x:bv[8] = { 1 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
+		CHECK ( !test_solve("x:bv[8] = { 1 }:bv[8] && x:bv[8] = { 2 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
+	}
+
+	TEST_CASE("bv: cast under an operator") {
+		// 255 * 5 = 1275 does not fit in 8 bits but does in 16: the widened
+		// product is exact, so the overflow test below is decidable.
+		CHECK ( test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] = { 1275 }:bv[16].") );
+		CHECK ( test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 255 }:bv[16].") );
+		CHECK ( !test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 1275 }:bv[16].") );
+	}
+
 	// BV equality without arithmetic: exercises the lgrs fast path
 	TEST_CASE("bv: single var equality x = {0}:bv[8] (lgrs fast path)") {
 		const char* system = "x:bv[8] = {0}:bv[8].";

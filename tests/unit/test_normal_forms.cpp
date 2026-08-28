@@ -195,6 +195,44 @@ TEST_SUITE("path_expressions") {
 	}
 }
 
+TEST_SUITE("get_leaves") {
+
+	// Distinct atoms: the wff_or hook folds `A || A` into `A`, so a chain
+	// of one repeated atom would collapse to a single leaf.
+	static tref atom_n(size_t i) {
+		return tau::build_bf_eq_0(
+			tau::build_bf_variable("v" + std::to_string(i), 0));
+	}
+
+	TEST_CASE("left-deep or-spine of 300k clauses does not overflow the stack") {
+		// The or-spine of a DNF is a left-deep binary chain, so a recursive
+		// flatten needs one frame per clause (nomic ratchet / GitHub #90).
+		const size_t n = 300000;
+		tref first = atom_n(0);
+		tref fm = first;
+		for (size_t i = 1; i < n; ++i) fm = tau::build_wff_or(fm, atom_n(i));
+		trefs leaves = get_dnf_wff_clauses<node_t>(fm);
+		CHECK(leaves.size() == n);
+		// Leaves are the subtrees as they sit in the spine (sibling links
+		// included), so compare trees, not trefs.
+		CHECK(tau::get(leaves.front()) == tau::get(first));
+		CHECK(tau::get(leaves.back()) == tau::get(atom_n(n - 1)));
+	}
+
+	TEST_CASE("shared subtrees keep their multiplicity and order") {
+		// (a || b) || (b || c)  ->  [a, b, b, c]: b is reached through two
+		// parents and must be spliced in twice, in spine order.
+		tref a = atom_n(0), b = atom_n(1), c = atom_n(2);
+		tref fm = tau::build_wff_or(tau::build_wff_or(a, b),
+			tau::build_wff_or(b, c));
+		trefs leaves = get_dnf_wff_clauses<node_t>(fm);
+		REQUIRE(leaves.size() == 4);
+		auto same = [](tref l, tref r) { return tau::get(l) == tau::get(r); };
+		CHECK(same(leaves[0], a)); CHECK(same(leaves[1], b));
+		CHECK(same(leaves[2], b)); CHECK(same(leaves[3], c));
+	}
+}
+
 TEST_SUITE("normal forms: onf") {
 
 	/* TEST_CASE("T") {

@@ -158,37 +158,29 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	using tau = tree<node>;
 	if (!n) return;
 
-	// Which leaves a subtree flattens to along the and/or spine depends
-	// only on that subtree and `branch`, so memoizing per (tref, branch)
-	// is sound and preserves multiplicity: a syntactic duplicate (e.g.
-	// `A && A`) still contributes two spliced-in copies of A's leaves.
-	//
-	// Local to this call, not a persistent tau::create_cache: its value
-	// type (a container of trefs) isn't introspected by the gc's
-	// for_each_tref_in, so a cache surviving past a gc sweep could hold
-	// dangling trefs. Scoping it to one call avoids that.
-	using cache_t = subtree_unordered_map<node, std::unordered_map<size_t, trefs>>;
-	cache_t cache;
-
-	std::function<const trefs&(tref)> flatten =
-		[&](tref m) -> const trefs& {
-		auto& per_branch = cache[m];
-		if (auto it = per_branch.find((size_t) branch);
-			it != per_branch.end())
-			return it->second;
+	// Explicit-stack pre-order walk along the and/or spine. The previous
+	// recursive flatten needed one frame per nesting level and, since a
+	// DNF's or-spine is a left-deep binary chain, its depth equalled the
+	// clause count and overflowed the 8 MB stack near ~24k clauses
+	// (GitHub #90). It also memoised the full leaf list at every spine
+	// node, which is quadratic in the clause count (30k clauses -> 4 GB).
+	// Leaves are appended left to right with multiplicity preserved (a
+	// shared or duplicated subtree is spliced in once per occurrence), so
+	// no memo is needed: the work is linear in the output size.
+	std::vector<tref> stack{n};
+	while (!stack.empty()) {
+		const tref m = stack.back();
+		stack.pop_back();
 		const auto& t = tau::get(m);
-		trefs result;
 		if (t.is(branch) || t.child_is(branch)) {
-			for (tref c : t.children())
-				for (tref l : flatten(c)) result.push_back(l);
+			const auto children = t.get_children();
+			for (auto it = children.rbegin(); it != children.rend(); ++it)
+				stack.push_back(*it);
 		} else {
 			LOG_TRACE << "adding leaf: " << LOG_FM(m);
-			result.push_back(m);
+			leaves.push_back(m);
 		}
-		return per_branch.emplace((size_t) branch,
-			std::move(result)).first->second;
-	};
-	for (tref l : flatten(n)) leaves.push_back(l);
+	}
 }
 
 template <NodeType node>

@@ -78,6 +78,16 @@ inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 /// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
 inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 
+/// Maximum number of DNF clauses complete_quantifier_elimination may
+/// distribute one scope into (estimated as the product of the per-factor
+/// disjunct counts of the scope's CNF factors). Above it cqe declines and
+/// re-wraps the quantifier verbatim -- the same escape hatch it takes for
+/// temporal and wff_ref scopes -- and logs a warning. The nomic ratchet
+/// (GitHub #90) handed cqe an 81-factor CNF whose naive product was 2e75
+/// clauses. Runtime-tunable via `api::set_cqe_max_clauses`; same caveats
+/// as block_max_rounds above.
+inline size_t cqe_max_clauses = std::numeric_limits<size_t>::max();
+
 /**
  * @internal
  * @brief Core recursive helper for the anti-prenex block algorithm.
@@ -1089,11 +1099,82 @@ tref complete_quantifier_elimination(tref formula) {
 		// reaching this squeeze at all.
 		const block_eliminability<node> trivial_elim{};
 		const typename term_handle<node>::order empty_order{};
-		tref res = _F<node>();
-		for (tref clause : get_dnf_wff_clauses<node>(to_dnf<node, true>(body)))
-			res = tau::build_wff_or(res, eliminate_block_over_clause<node>(
-				clause, {var}, trivial_elim, empty_order));
-		return is_ex ? res : to_nnf<node>(tau::build_wff_neg(res));
+		auto mentions = [&](tref f) { return contains<node>(f, var); };
+		// Residue eliminator: the DNF split + per-clause squeeze, run only
+		// on the var-dependent part `elim` below hands it. Returns nullopt
+		// past the clause cap: the DNF multiplies the residue's CNF
+		// factors' disjunct counts, so that product is estimated first (in
+		// the overflow-safe division form) and cqe declines instead of
+		// building an astronomically large DNF (the nomic ratchet, GitHub
+		// #90, handed it an 81-factor CNF with a naive product of 2e75).
+		auto distribute = [&](tref b) -> std::optional<tref> {
+			size_t est = 1;
+			for (tref f : get_cnf_wff_clauses<node>(b)) {
+				const size_t k = get_dnf_wff_clauses<node>(f).size();
+				if (k == 0 || est > cqe_max_clauses / k) {
+					est = std::numeric_limits<size_t>::max();
+					break;
+				}
+				est *= k;
+			}
+			if (est > cqe_max_clauses) return std::nullopt;
+			tref res = _F<node>();
+			// normalize_atomic_formula_operators after distributing: the
+			// reducing to_dnf rebuilds negated atoms as `bf_neq`, while
+			// the squeeze recognizes only the canonical `f = 0` /
+			// `!(f = 0)` spellings anti_prenex's step 3 established --
+			// without this every clause carrying a negated atom was
+			// declined and re-wrapped whenever the scope actually needed
+			// distributing.
+			for (tref clause : get_dnf_wff_clauses<node>(
+					normalize_atomic_formula_operators<node>(
+						to_dnf<node, true>(b))))
+				res = tau::build_wff_or(res,
+					eliminate_block_over_clause<node>(clause, {var},
+						trivial_elim, empty_order));
+			return res;
+		};
+		// Miniscoping: ex v (A || B) = ex v A || ex v B, and
+		// ex v (A && B) = A && ex v B when v does not occur in A. Exact
+		// for any Boolean algebra; it only shrinks what `distribute` has
+		// to multiply out, which is what keeps a scope whose v-free
+		// factors dominate (the ratchet's 81-factor CNF had 21 distinct
+		// v atoms) from being distributed wholesale.
+		auto elim = [&](auto& self, tref b) -> std::optional<tref> {
+			if (!mentions(b)) return b;
+			const tau& tb = tau::get(b);
+			if (tb.child_is(tau::wff_or)) {
+				auto l = self(self, tb[0].first());
+				if (!l) return std::nullopt;
+				auto r = self(self, tb[0].second());
+				if (!r) return std::nullopt;
+				return tau::build_wff_or(*l, *r);
+			}
+			if (tb.child_is(tau::wff_and)) {
+				tref free = nullptr, dep = nullptr;
+				for (tref c : get_cnf_wff_clauses<node>(b)) {
+					tref& slot = mentions(c) ? dep : free;
+					slot = slot ? tau::build_wff_and(slot, c) : c;
+				}
+				// dep is set: b mentions var, so some factor does. With
+				// nothing to lift, fall through to distribute -- every
+				// factor depends on var and the split is unavoidable.
+				if (free) {
+					auto d = self(self, dep);
+					if (!d) return std::nullopt;
+					return tau::build_wff_and(free, *d);
+				}
+			}
+			return distribute(b);
+		};
+		auto res = elim(elim, body);
+		if (!res) {
+			LOG_WARNING << "complete_quantifier_elimination: scope of "
+				<< LOG_FM(var) << " would distribute into more than "
+				<< cqe_max_clauses << " clauses; quantifier kept";
+			return n;
+		}
+		return is_ex ? *res : to_nnf<node>(tau::build_wff_neg(*res));
 	};
 	// Do not descend into terms: a tau_ba constant carries its own internal
 	// wff_ex/wff_all over I/O variables (the same guard

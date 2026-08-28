@@ -91,11 +91,12 @@ cli::options tau_options() {
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
-	// The two SO-1-exposed caps ship FINITE (matching the inline defaults
-	// in satisfiability.tmpl.h): unlimited hangs on a non-converging spec.
-	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "500")
+	opts["cqe-max-clauses"] = cli::option("cqe-max-clauses", 'Q', "0")
+		.set_description("cap the DNF clauses complete quantifier "
+			"elimination may distribute one scope into (0 = unlimited)");
+	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "0")
 		.set_description("cap temporal-normalization fixpoint steps "
-			"(default 500; 0 = unlimited)");
+			"(0 = unlimited)");
 	opts["max-flag-search-steps"] =
 		cli::option("max-flag-search-steps", 'F', "500")
 		.set_description("cap the eventual-flag search past the flag "
@@ -280,6 +281,7 @@ int main(int argc, char** argv) {
 	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
+	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
 	tau_api::set_block_squeeze_cap(optnum("block-squeeze-cap"));
