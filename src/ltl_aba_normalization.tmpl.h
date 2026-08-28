@@ -1526,7 +1526,13 @@ static std::string apply_step_counter_encoding(
 		}
 		typename tau::get_options opts;
 		opts.parse.start = tau::wff;
-		return tau::get(txt, std::move(opts));
+		tref rel = tau::get(txt, std::move(opts));
+		if (!rel) return rel;
+		// A bare wff parse leaves io_vars unclassified (transform_io_var
+		// later rejects that); resolve them here by name-prefix
+		// direction, the way build_carrier_eq_aux does.
+		return resolve_io_vars<node>(
+			*definitions<node>::instance().get_io_context(), rel);
 	};
 
 	auto drop_prop = [](std::vector<std::string>& props, const std::string& name) {
@@ -1598,10 +1604,18 @@ static std::string apply_step_counter_encoding(
 			assert(rel != nullptr
 				&& "apply_step_counter_encoding: atom relativization failed");
 
+			// Compare against a resolved COPY, not the stored tref:
+			// mutating atoms[k].first would break its match against this
+			// atom's other, unrelativized occurrences elsewhere in the formula.
 			size_t existing = atoms.size();
 			for (size_t k = 0; k < atoms.size(); ++k) {
 				if (hoist_derived[k]) continue;
-				if (tau::subtree_equals(atoms[k].first, rel)) { existing = k; break; }
+				tref natural_resolved = resolve_io_vars<node>(
+					*definitions<node>::instance().get_io_context(),
+					atoms[k].first);
+				if (tau::subtree_equals(natural_resolved, rel)) {
+					existing = k; break;
+				}
 			}
 			std::string pname;
 			if (existing != atoms.size()) {

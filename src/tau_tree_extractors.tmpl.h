@@ -58,7 +58,7 @@ tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 				return t.replace_value(
 					t.value.replace_data(2));
 
-			size_t direction = io_var_direction<node>(var);
+			size_t direction = io_var_direction<node>(n);
 			DBG(LOG_TRACE << "io_var_direction: " << get_var_name<node>(var)
 				<< " " << (direction == 1 ? "IN"
 					: (direction == 2 ? "OUT"
