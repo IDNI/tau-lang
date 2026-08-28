@@ -983,34 +983,77 @@ static void extend_consistency_positive_k_ary_mus(
 	std::vector<bool> explored(std::size_t(1) << n, false);
 	std::vector<uint32_t> mus_masks;
 
+	// Same cap as extend_consistency_positive_k_ary_walk: one synthesis
+	// check per seed. Capping stays sound (the per-edge oracle still
+	// catches an infeasible guard) but can yield a false UNREALIZABLE.
+	size_t checks_spent = 0;
+	bool cap_fired = false;
+	auto warn_capped = [&]() {
+		if (cap_fired) return;
+		cap_fired = true;
+		LOG_WARNING << "[ltl_aba] k-ary consistency "
+			"walk capped after "
+			<< checks_spent << " subset checks "
+			"(--max-consistency-subsets / `set "
+			"maxsubsets`, 0 = unlimited); "
+			"remaining subsets skipped -- the "
+			"verdict stays sound (the oracle "
+			"checks every strategy edge) but may "
+			"be a false UNREALIZABLE\n";
+	};
+	auto over_cap = [&]() {
+		return max_consistency_subsets
+			&& checks_spent >= max_consistency_subsets;
+	};
+	auto feasible_checked = [&](tref t) {
+		++checks_spent;
+		return aba_synthesis_feasible<node>(t);
+	};
+
 	auto process_seed = [&](uint32_t seed) {
+		if (over_cap()) { warn_capped(); return; }
 		tref conj = build_conj(seed);
-		if (aba_synthesis_feasible<node>(conj)) {
+		if (feasible_checked(conj)) {
+			// The check just spent may already be at the cap: if `seed` is
+			// already maximal, the growth loop below makes no further calls
+			// and would never otherwise notice.
+			if (over_cap()) warn_capped();
 			// Grow to a maximal feasible set; every subset of it is feasible too.
 			uint32_t max_set = seed;
 			tref max_conj = conj;
 			for (int i = 0; i < n; ++i) {
 				if (max_set & (1u << i)) continue;
+				if (over_cap()) { warn_capped(); break; }
 				tref grown = tau::build_wff_and(max_conj, atoms[i].first);
-				if (aba_synthesis_feasible<node>(grown)) {
+				if (feasible_checked(grown)) {
 					max_set |= (1u << i);
 					max_conj = grown;
 				}
 			}
 			for_each_submask(max_set, [&](uint32_t s) { explored[s] = true; });
 		} else {
+			// Same as the grow branch: the check just spent may already be
+			// at the cap, before the shrink loop gets a chance to test it.
+			if (over_cap()) warn_capped();
 			// Shrink by deletion, never below size 3 (the oracle floor).
 			uint32_t cur = seed;
+			bool shrink_complete = true;
 			for (int i = 0; i < n; ++i) {
 				if (!(cur & (1u << i))) continue;
 				if (std::popcount(cur) <= 3) break;
+				if (over_cap()) { warn_capped(); shrink_complete = false; break; }
 				uint32_t candidate = cur & ~(1u << i);
-				if (!aba_synthesis_feasible<node>(build_conj(candidate)))
+				if (!feasible_checked(build_conj(candidate)))
 					cur = candidate;
 			}
-			uint32_t complement = universe & ~cur;
-			for_each_submask(complement, [&](uint32_t s) { explored[cur | s] = true; });
-			mus_masks.push_back(cur);
+			// A cap-cut-short shrink is not a proven MUS -- `cur` is whatever
+			// size it had when the cap fired. Recording it would under-constrain
+			// the skeleton instead of leaving the gap for the oracle to catch.
+			if (shrink_complete) {
+				uint32_t complement = universe & ~cur;
+				for_each_submask(complement, [&](uint32_t s) { explored[cur | s] = true; });
+				mus_masks.push_back(cur);
+			}
 		}
 	};
 
@@ -1041,6 +1084,15 @@ static void extend_consistency_positive_k_ary_mus(
 		std::vector<int> sel;
 		for (int i = 0; i < n; ++i) if (m & (1u << i)) sel.push_back(i);
 		if (is_subsumed(sel)) continue;
+		// Skip if any atom is pure-output-lookback: uninitialized lookback
+		// is F at t=0, which makes such atoms spuriously infeasible under G-wrap.
+		bool any_pure_out_lb = false;
+		for (int i : sel) {
+			bool is_mixed = atom_has_any_input<node>(atoms[i].first);
+			bool pure_out_lb = atom_has_lookback<node>(atoms[i].first) && !is_mixed;
+			if (pure_out_lb) { any_pure_out_lb = true; break; }
+		}
+		if (any_pure_out_lb) continue;
 		std::string pat;
 		for (int i : sel) {
 			if (!pat.empty()) pat += " && ";
@@ -1065,15 +1117,6 @@ static void extend_consistency_positive_k_ary(
 	const std::vector<std::pair<tref, std::string>>& atoms = group;
 	const int n = static_cast<int>(atoms.size());
 	if (n < 3) return;  // pairwise already handled by caller
-
-	// Feasibility is downward-closed, so a feasible whole group has no
-	// infeasible subset and the enumeration below would forbid nothing.
-	{
-		tref all = tau::_T();
-		for (const auto& a : atoms)
-			all = tau::build_wff_and(all, a.first);
-		if (aba_synthesis_feasible<node>(all)) return;
-	}
 
 	// Collect existing forbid patterns (as sets of atom indices) so we can
 	// skip subsumed k-subsets.
@@ -1132,10 +1175,17 @@ static void extend_consistency_positive_k_ary(
 	// The mus enumeration's explored bitset is 2^n entries, unallocatable
 	// much past n=22, so groups above that bound fall back to the walk.
 	const bool use_walk = n > 22;
-	if (use_walk)
+	if (use_walk) {
+		// Feasibility is downward-closed: check the whole group up front,
+		// since the walk has no cheap way to notice a feasible group
+		// before paying for the Theta(2^n) descent.
+		tref all = tau::_T();
+		for (const auto& a : atoms)
+			all = tau::build_wff_and(all, a.first);
+		if (aba_synthesis_feasible<node>(all)) return;
 		extend_consistency_positive_k_ary_walk<node>(
 		    atoms, skeleton, out_constraints, existing_forbid_sets, is_subsumed);
-	else
+	} else
 		extend_consistency_positive_k_ary_mus<node>(
 		    atoms, skeleton, out_constraints, existing_forbid_sets, is_subsumed);
 }
