@@ -100,12 +100,11 @@ set_tests_properties("test_repl-cli-option_before_file_ignores_file" PROPERTIES
 	PASS_REGULAR_EXPRESSION "Welcome to the Tau Language Framework")
 
 # --- spec file WITHOUT --quit ------------------------------------------------
-# Without --quit, run_tau_spec() prints "Press ENTER to continue" and reads a
-# line rather than terminating (main.cpp:107-121). With stdin at EOF the
-# getline fails and the loop breaks on the eof/fail guard -- the same guard
-# repl_evaluator::run_cmd uses to avoid spinning forever on closed stdin.
+# run_loop() prints "Press ENTER to continue" only for a step that needs no
+# input, so the fixture below has none. At EOF the getline fails and the loop
+# breaks on the eof/fail guard.
 add_test(NAME "test_repl-cli-spec_file_no_quit"
-	COMMAND bash -c "printf 'o[t] = i[t].\\n' > cli_noquit_fixture.tau && $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> cli_noquit_fixture.tau < /dev/null; r=$?; rm -f cli_noquit_fixture.tau; exit $r")
+	COMMAND bash -c "printf 'o[t] = 0.\\n' > cli_noquit_fixture.tau && $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> cli_noquit_fixture.tau < /dev/null; r=$?; rm -f cli_noquit_fixture.tau; exit $r")
 set_tests_properties("test_repl-cli-spec_file_no_quit" PROPERTIES
 	PASS_REGULAR_EXPRESSION "Press ENTER to continue")
 
