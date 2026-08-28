@@ -106,3 +106,17 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		CHECK( bac::get(f) != variant<bv, sbf_ba, Bool>(sbf_t) );
 	}
 }
+
+TEST_SUITE("ba_constants pooling") {
+	// Regression guard for the pooled-lookup fast path: repeated get of
+	// the same (constant, type) must return the identical pooled tref and
+	// id, whatever lookup structure backs the pool.
+	TEST_CASE("repeated get returns the pooled tref with a stable id") {
+		tref a = tau::get_ba_constant(Bool(true), bool_type());
+		size_t id_a = tau::get(a).get_ba_constant_id();
+		tref b = tau::get_ba_constant(Bool(true), bool_type());
+		CHECK( a == b );
+		CHECK( tau::get(b).get_ba_constant_id() == id_a );
+		CHECK( bac::get(id_a) == variant<bv, Bool>(Bool(true)) );
+	}
+}

@@ -444,6 +444,28 @@ std::string ba_types<node>::name(size_t ba_type_id) {
 }
 
 template <NodeType node>
+size_t ba_types<node>::name_hash(size_t ba_type_id) {
+	// id 0 must short-circuit exactly like get_ba_type_name(0): name(0)
+	// touches type_trees(), whose static initializer is itself building
+	// the untyped type's nodes (and hashing them through here) the first
+	// time -- going through name() recurses into that initialization
+	// (__gnu_cxx::recursive_init_error).
+	if (ba_type_id == 0) {
+		static const size_t h0 = std::hash<std::string>{}(":untyped");
+		return h0;
+	}
+	// index = ba_type id; type_trees() entries are stable once registered
+	// (see id()), so a computed hash never changes. 0 marks "not yet
+	// computed" -- no valid name hashes to 0 in practice, and a spurious
+	// recompute would be harmless (same value again).
+	static std::vector<size_t> cache;
+	if (ba_type_id < cache.size() && cache[ba_type_id])
+		return cache[ba_type_id];
+	if (ba_type_id >= cache.size()) cache.resize(ba_type_id + 1, 0);
+	return cache[ba_type_id] = std::hash<std::string>{}(name(ba_type_id));
+}
+
+template <NodeType node>
 std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
 	return os << name(tid);
 }

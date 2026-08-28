@@ -193,6 +193,43 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 	return get_typeable_type_ids_by_type<node>(n, is<node>(types));
 }
 
+// A bf_cast is a type boundary: its operand is typed from its own
+// annotations (type_annotated_operands), never from the enclosing atomic
+// formula, whose scope merges every member into one type -- the whole point
+// of `(bv[16]) x:bv[8] = c` is that x and c differ in width. A quantifier
+// binder, however, must still learn the width of the variable it binds
+// when that variable only occurs inside a cast: `ex x ((bv[16]) x:bv[8] =
+// c)` otherwise binds an untyped x nobody uses, the binder is dropped, and
+// the annotated x is left free. This lifts, for the variables @p bound
+// already declares, the type each cast operand below @p body annotates
+// them with.
+template <NodeType node>
+std::optional<inference_error> unify_bound_vars_with_cast_operands(tref body,
+		typeables_type_id_map<node>& bound) {
+	using tau = tree<node>;
+	auto casts = tau::get(body).select_all_until(
+		is<node, tau::bf_cast>, is<node, tau::offset>);
+	if (casts.empty()) return std::nullopt;
+	auto vars_it = bound.find(tau::variable);
+	if (vars_it == bound.end()) return std::nullopt;
+	auto& vars = vars_it->second;
+	for (tref c : casts) {
+		auto inner = get_typeable_type_ids_by_type<node>(c,
+			is<node>({tau::variable}), is<node, tau::offset>);
+		if (std::holds_alternative<inference_error>(inner))
+			return std::get<inference_error>(inner);
+		for (const auto& [canonized, type_id]
+				: std::get<typeables_type_id_map<node>>(inner)[tau::variable]) {
+			auto it = vars.find(canonized);
+			if (it == vars.end()) continue; // free here: typed by its annotation
+			if (auto unified = unify<node>(it->second, type_id); unified)
+				it->second = unified.value();
+			else return inference_error{canonized, it->second, type_id};
+		}
+	}
+	return std::nullopt;
+}
+
 template<NodeType node>
 bool is_functional_relation(tref n, const auto& function_symbols) {
 	using tau = tree<node>;
@@ -1130,6 +1167,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					break;
 				} // Incompatible types
 				auto quantified_vars_map = std::get<typeables_type_id_map<node>>(quantified_vars);
+				if (auto lifted = unify_bound_vars_with_cast_operands<node>(
+						t.child(1), quantified_vars_map); lifted) {
+					error = lifted.value();
+					break;
+				}
 				open<node>(resolver, quantified_vars_map);
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 				break;
@@ -1140,13 +1182,17 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				//
 				// If bf is not a top level one, it must have been treated
 				// somewhere else.  We still let traversal descend when the bf
-				// directly wraps a bf_cast so the cast boundary is processed.
+				// contains a bf_cast anywhere below it, so the cast boundary
+				// is processed: the cast may sit under an operator
+				// (`((bv[16]) x:bv[8]) * y`), not only directly under this bf,
+				// and skipping here would leave its operand untyped for the
+				// enclosing equation's update to trip over.
 				if (!is_top_level_bf<node>(parent)) {
-					const auto& ch = tau::get(n).get_children();
-					bool has_cast = std::any_of(ch.begin(), ch.end(),
-						[](tref c){ return tau::get(c).is(tau::bf_cast); });
+					bool has_cast = tau::get(n).find_top(
+						[](tref c){ return tau::get(c).is(tau::bf_cast); })
+						!= nullptr;
 					if (!has_cast) { skip = true; break; }
-					break; // has cast child: descend but open no resolver scope
+					break; // has cast below: descend but open no resolver scope
 				}
 				// bf_cast is a type boundary: its operand is typed directly
 				// from annotations in on_leave, not via the resolver.
@@ -1508,11 +1554,18 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
-				// For children that directly wrap a bf_cast, pick up the
-				// pre-typed version from transformed (produced by
-				// type_annotated_operands in bf on_leave).  Leave all other
+				// For children whose subtree contains a bf_cast, pick up
+				// the pre-typed version from transformed (produced by
+				// type_annotated_operands in bf on_leave and propagated up
+				// through the intermediate operators).  Leave all other
 				// children untouched so update<node> types them from the
 				// resolver, avoiding stale entries from earlier scopes.
+				//
+				// The cast may sit anywhere below the child, not only as
+				// its direct wrapper: `((bv[16]) x:bv[8]) * y = z` used to
+				// re-walk the untyped operand from this equation's scope,
+				// record a null replacement for it (update_ba_constant on a
+				// constant the scope never saw) and abort in update_default.
 				tref new_n = n;
 				{
 					const auto& t = tau::get(n);
@@ -1520,9 +1573,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					bool changed = false;
 					for (auto& c : ch) {
 						if (auto it = transformed.find(c); it != transformed.end()) {
-							const auto& child_chs = tau::get(c).get_children();
-							bool child_has_cast = !child_chs.empty()
-								&& tau::get(child_chs[0]).is(tau::bf_cast);
+							bool child_has_cast = tau::get(c).find_top(
+								[](tref x) { return tau::get(x).is(tau::bf_cast); })
+								!= nullptr;
 							if (child_has_cast) {
 								c = it->second;
 								changed = true;
@@ -1556,6 +1609,54 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// not via the resolver, to avoid conflicts with the
 						// surrounding context's type scope.
 						tref updated = type_annotated_operands<node>(new_n);
+						// A variable the annotations left untyped may still
+						// be declared by an enclosing binder
+						// (`ex x:bv[8] ((bv[16]) x = c)`): take its type from
+						// the open scopes. Whatever leaf is still untyped
+						// after that is an error here, not an untyped node
+						// for the solver to abort on (`(bv[8]) y = c`).
+						// Annotations elsewhere in the same operand count
+						// too (`fall x:bv[4] x`), then the enclosing scopes.
+						subtree_map<node, size_t> known;
+						for (tref v : tau::get(updated).select_all_until(
+								is<node, tau::variable>, is<node, tau::offset>))
+							if (size_t t = tau::get(v).get_ba_type(); t)
+								known.insert_or_assign(canonize<node>(v), t);
+						for (const auto& [v, t] : resolver.all_types())
+							if (t && t != untyped_type_id<node>())
+								known.try_emplace(v, t);
+						subtree_map<node, tref> retyped;
+						tref untyped_leaf = nullptr;
+						// offsets (`i1[t]`) hold untyped index variables
+						// that are not terms: never descend into them
+						auto untyped_leaves = tau::get(updated).select_all_until(
+							[](tref x) {
+								const auto& xt = tau::get(x);
+								return xt.get_ba_type() == 0
+									&& (xt.is(tau::variable) || xt.is(tau::ba_constant)
+										|| xt.is(tau::bf_t) || xt.is(tau::bf_f));
+							}, is<node, tau::offset>);
+						for (tref x : untyped_leaves) {
+							if (tau::get(x).is(tau::variable)) {
+								if (auto it = known.find(canonize<node>(x));
+									it != known.end())
+								{
+									retyped.insert_or_assign(x,
+										update_tref<node>(x, it->second));
+									continue;
+								}
+							}
+							untyped_leaf = x; break;
+						}
+						if (untyped_leaf) {
+							error = inference_error{untyped_leaf,
+								tau::get(parent).get_ba_type(),
+								untyped_type_id<node>()};
+							break;
+						}
+						if (!retyped.empty())
+							updated = type_annotated_operands<node>(
+								rewriter::replace<node>(updated, retyped));
 						if (updated != new_n) transformed.insert_or_assign(n, updated);
 					} else {
 						auto updated = update<node>(resolver, new_n,

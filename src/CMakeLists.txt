@@ -5,6 +5,7 @@ set(TAU_HEADERS
 	../parser/tau_parser.generated.h
 	../parser/bitvector_parser.generated.h
 	../parser/nlang_parser.generated.h
+	../parser/adt_parser.generated.h
 	boolean_algebras/cvc5/cvc5_options.h    # runtime cvc5 option-set and solver placement parameters
 	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
@@ -26,6 +27,8 @@ set(TAU_HEADERS
 	                   # extractors, printers, queries, and
 	                   # transformations from the parse tree
 	ba_types.h         # BA types
+	adt/adt_types.h    # ADT type registry
+	adt/adt_flatten.h  # ADT flattener
 	ba_constants.h     # BA constants pool and binder
 	dict.h             # dictionaries of bdd var names and strings
 	definitions.h      # Storage for function and predicate definitions
@@ -54,13 +57,14 @@ set(TAU_PARSER_SOURCES
 	../parser/tau_parser.generated.cpp
 	../parser/sbf_parser.generated.cpp
 	../parser/bitvector_parser.generated.cpp
+	../parser/adt_parser.generated.cpp
 	../parser/qint_parser.generated.cpp
 	../parser/qlt_parser.generated.cpp
 	../parser/hsb_parser.generated.cpp
 	../parser/nlang_parser.generated.cpp
 )
 
-# do not optimize parser sources, they are mostly data and optimization takes too longwhat
+# grammar tables are mostly data; skip optimizing and LTO-ing them
 set_source_files_properties(${TAU_PARSER_SOURCES}
 	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 

@@ -68,6 +68,9 @@ include(test_repl-onf_cmd-crash_regression.cmake)
 include(test_repl-history_cmd.cmake)
 include(test_repl-definition_cmd.cmake)
 include(test_repl-io_definition_cmd.cmake)
+# ADT (algebraic data type) definitions (def_type_cmd) and their effect on
+# normalize/sat/unsat/solve/run once a `type` statement has been accepted.
+include(test_repl-adt.cmake)
 
 
 # session management and type inspection

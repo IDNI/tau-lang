@@ -42,13 +42,12 @@ TEST_SUITE("bf operator hooks") {
 		tref tau_expected = tau::get(expected);
 
 #ifdef DEBUG
-		using node = node_t;
 		cout << "sample: " << sample << "\nexpected: \t";
 		if (tau_expected == 0) cout << "nullptr";
-		else cout << TAU_DUMP_TO_STR(tau_expected);
+		else cout << tree<node_t>::get(tau_expected).dump_to_str();
 		cout << "\ngot:      \t";
 		if (tau_sample == 0) cout << "nullptr";
-		else cout << TAU_DUMP_TO_STR(tau_sample);
+		else cout << tree<node_t>::get(tau_sample).dump_to_str();
 		cout << "\n";
 #endif // DEBUG
 

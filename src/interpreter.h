@@ -501,6 +501,14 @@ private:
 	/// i.e. strongest, position) and apply the max_revision_alts cap.
 	static htrefs finalize_alternatives(const trefs& alts);
 
+	/// Memo for update_to_time_point, valid for a single time point:
+	/// identical formulas (duplicate alternatives, repeated
+	/// get_ubt_ctn_at calls in one step) are rewritten once. Cleared when
+	/// t changes and before gc -- it is a pure cache whose raw trefs are
+	/// deliberately NOT walked by collect_live_refs.
+	std::unordered_map<tref, tref> tp_rewrite_memo_;
+	int_t tp_rewrite_memo_t_ = std::numeric_limits<int_t>::min();
+
 	/// @brief Partition @p spec by output stream representatives.
 	static std::vector<std::pair<htref, htref>>
 	create_spec_partition(tref spec, auto& output_partition);
@@ -638,6 +646,27 @@ bool has_free_vars(tref fm, bool silent = false);
 template <NodeType node>
 std::optional<interpreter<node>> run(tref form,
 	const io_context<node>& ctx, const size_t steps = 0);
+
+/**
+ * @brief Find the `repl_pending_input_stream` at the bottom of @p stream's
+ * wrapper chain, if any.
+ *
+ * Sees through the ADT grouping wrappers `interpreter<node>::rebuild_inputs`
+ * can put between an io var's entry in `interpreter::inputs` and its
+ * physical stream -- `adt_member_input_stream`'s shared `adt_tuple_reader`,
+ * and this library's own ownership-bridging physical-stream wrapper used
+ * when a stream's source (a caller's remap, or `io_context::
+ * console_input_factory`) can only hand back a `shared_ptr` -- so a caller
+ * that needs to introspect the actual physical stream (the REPL's
+ * `continue_running`, scanning for an awaiting console stream to prompt
+ * for) doesn't need to know those wrapper types exist.
+ * @param stream Any input stream, as stored in `interpreter::inputs`.
+ * @return The underlying `repl_pending_input_stream`, or `nullptr` if
+ * @p stream isn't (transitively) one.
+ */
+template <NodeType node>
+std::shared_ptr<repl_pending_input_stream> find_repl_pending_input(
+	const std::shared_ptr<serialized_constant_input_stream>& stream);
 
 } // namespace idni::tau_lang
 

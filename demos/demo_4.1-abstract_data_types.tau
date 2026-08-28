@@ -1,0 +1,161 @@
+# Abstract data types: aliases, tuples and inheritance.
+#
+# See demos/README.md for how to run this script.
+
+# A type declaration introduces a name for a Boolean algebra type or a tuple of
+# member types. The simplest form is an alias: a new name for an existing base
+# type, with an optional subtype. byte below is just another name for bv[8], so
+# any equation typed with one accepts the other:
+
+type byte = bv[8]. n x:byte = x:bv[8]
+
+# solve resolves the alias to its underlying type when it reports a value:
+
+type byte = bv[8]. solve x:byte = {5}:bv[8]
+
+# A tuple type collects several named members, each with its own type. Point is
+# a pair of sbf-typed coordinates:
+
+type Point = {a: sbf, b: sbf}
+
+# Equality between two values of a tuple type expands member-wise. Note that
+# this expansion happens at parse time, before any normalization -- x and y are
+# both flattened into their a/b components:
+
+type Point = {a: sbf, b: sbf}. x:Point = y:Point
+
+# normalize is free to reorder and simplify the expanded equation like any
+# other formula:
+
+type Point = {a: sbf, b: sbf}. n x:Point = y:Point
+
+# A tuple type may inherit from one or more other tuple types with "of (...)".
+# The parents' members come first, in declaration order, followed by the
+# type's own members -- so Line below flattens to tag, p.a, p.b, q.a, q.b:
+
+type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}
+
+# The same member-wise expansion applies to Line, and it shows the inherited
+# tag member leading the flattened list:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. l:Line = l
+
+# ...which normalizes to T, since every member equals itself:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. n l:Line = l
+
+# A single member is reached with the . operator, on either an inherited or an
+# own member. Annotating the quantified variable, then parenthesizing the body,
+# is what lets a member access see the annotation:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. n ex l:Line (l.tag = 0 && l.p.a = 0)
+
+# Nesting is not limited to one level: a tuple type's own member can itself be
+# a tuple type, not just a base type. Segment below nests Line two levels
+# deep -- s.line.p.a reaches the a coordinate of Line's own p member, so the
+# member path has three components (line, p, a):
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. n ex s:Segment (s.line.p.a = 0 && s.line.tag = 0)
+
+# Member-wise expansion works at any depth, not only at the leaves. Below,
+# s:Segment = s and t:Segment = t fix s and t's type without constraining them
+# (each is trivially true), leaving only s.line = t.line -- which still
+# expands to all five of Line's flattened members, now three levels deep:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. n (s:Segment = s) && (t:Segment = t) && (s.line = t.line)
+
+# solve reports a solution per flattened member, not as a single tuple value --
+# x:Point = x fixes x's type via the equality (which keeps x free, unlike
+# ex x:Point ...) so the solver can solve for it:
+
+type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1 && x.b = 0
+
+# Finally, a tuple-typed stream reads and writes its members together as one
+# value, using a JSON-like wire format: { member: "value", ... }. The console
+# prompts for the whole tuple at once, and a period is never needed -- unlike a
+# tau-valued stream, the wire literal is complete on its own line.
+
+# The spec below is constrained at time points 0 and 1 only, so the run stops
+# needing input after two steps and reaches the continue-or-quit prompt, which
+# a plain q answers to end the run:
+
+type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0] && o[1] = i[1].
+{ a: "1", b: "0" }
+{ a: "0", b: "1" }
+q
+
+# A tuple-typed stream can also read from a file instead of the console, one
+# wire literal per line, exactly like a plain-typed file stream (demo_3.1).
+# demos/fixture/point-length_3.in holds three Point literals:
+#
+#   { a: "1", b: "0" }
+#   { a: "0", b: "1" }
+#   { a: "1", b: "1" }
+#
+# o[t] = i[t] needs a value at every time point, so the run stops on its own
+# once the file is exhausted -- after the three lines above, it reaches the
+# continue-or-quit prompt without asking for further input, the same way a
+# plain sbf file stream does:
+
+type Point = {a: sbf, b: sbf}. i:Point := in file("fixture/point-length_3.in"). o:Point := out console. run o[t] = i[t].
+q
+
+# An output stream can target a file too, and /dev/stdout is a valid target
+# for one -- the written tuple literals show up right here, inline in this
+# transcript, with no "o[t] := " label (a file stream just writes the bare
+# value, one per line, unlike the console's labelled prompt):
+
+type Point = {a: sbf, b: sbf}. i:Point := in file("fixture/point-length_3.in"). o:Point := out file("/dev/stdout"). run o[t] = i[t].
+q
+
+# The wire format nests exactly like the type declaration, not like the
+# dotted flattened member paths -- so a Segment literal nests a whole Line
+# literal under "line", which itself nests two Point literals under "p" and
+# "q". demos/fixture/segment-length_2.in holds two such literals:
+#
+#   { tag: "5", line: { tag: "9", p: { a: "1", b: "0" }, q: { a: "0", b: "1" } } }
+#   { tag: "2", line: { tag: "7", p: { a: "0", b: "0" }, q: { a: "1", b: "1" } } }
+#
+# Reading them through a run reconstructs the same nested shape on the way
+# out, even though internally every one of Segment's six flattened members
+# was read and compared separately. (si/so, not i/o, because a stream name
+# keeps the type it was first declared with for the rest of the session --
+# i/o are already Point above, so reusing them here for a different tuple
+# type would conflict.)
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. si:Segment := in file("fixture/segment-length_2.in"). so:Segment := out console. run so[t] = si[t].
+q
+
+# A spec can also copy just PART of a tuple between streams -- a partial copy.
+# A member the spec does not copy is not left dangling: the emitted tuple
+# initializes it to the default value of that member's own Boolean algebra,
+# which is that algebra's 0. Below, time point 0 copies only member a, so
+# o[0] is emitted with b: "0" -- sbf's default -- even though the input
+# tuple's b member is "1" there; time point 1 copies the whole tuple for
+# comparison. The same defaulting also covers whole time points: step 2 lies
+# beyond every constraint, so o[2] comes out with every member defaulted.
+# (Parenthesizing the member equality is what lets the REPL read a member
+# access on an indexed stream variable -- the same parenthesize-to-see-it
+# pattern as the quantifier examples above. And a partial copy still needs
+# every member to appear at SOME time point of the spec: a member the spec
+# never mentions anywhere has no output stream at all, and the tuple, missing
+# one member, is then never written.)
+
+type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run (o[0].a = i[0].a) && o[1] = i[1].
+{ a: "1", b: "1" }
+{ a: "0", b: "1" }
+q
+
+# "The corresponding BA" is per member: each non-copied member defaults in
+# its own algebra. Partially copying a Segment's line sub-tuple -- one
+# equality that expands to all five of Line's flattened members -- leaves the
+# outer tag, a bv[8] member, non-copied at time point 0, so so[0] is emitted
+# with tag: "0", bv[8]'s default, while the file's first literal carries
+# tag "5". The copied line sub-tuple keeps every value it was read with,
+# its inherited tag "9" included; time point 1 again copies the whole
+# Segment, tag and all:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. si:Segment := in file("fixture/segment-length_2.in"). so:Segment := out console. run (so[0].line = si[0].line) && so[1] = si[1].
+q
+
+quit

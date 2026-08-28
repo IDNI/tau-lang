@@ -160,13 +160,17 @@ TEST_SUITE("bv cast - quantifier operand") {
 	// (bv[N]) fall x x — cast of a bounded universal quantifier.
 	// In the old grammar any bf was accepted as cast operand; the right-lazy
 	// rewrite restricted the list but forgot bf_fall and bf_fex.
+	// The bound variable is annotated: a cast operand is typed from its
+	// own annotations (or an enclosing binder), and `(bv[8]) fall x x`
+	// with x untyped is rejected by inference since the 2026-08-27 grammar
+	// pass (before it, `(bv[8])` "parsed" as the juxtaposition `b v[8]`).
 	TEST_CASE("parse: (bv[8]) fall x x = { 1 }:bv[8]") {
-		auto src = parse_wff("(bv[8]) fall x x = { 1 }:bv[8]");
+		auto src = parse_wff("(bv[8]) fall x:bv[4] x = { 1 }:bv[8]");
 		CHECK( src != nullptr );
 	}
 
 	TEST_CASE("parse: (bv[8]) fex x x = { 1 }:bv[8]") {
-		auto src = parse_wff("(bv[8]) fex x x = { 1 }:bv[8]");
+		auto src = parse_wff("(bv[8]) fex x:bv[4] x = { 1 }:bv[8]");
 		CHECK( src != nullptr );
 	}
 }
@@ -222,7 +226,7 @@ TEST_SUITE("bv cast - quantifier operand - unambiguous") {
 	// parsed as bf_parenthesis(bf_cast(fall x x)), not as any other construct.
 	// This MUST fail before adding bf_fall/bf_fex to bf_cast_oprnd.
 	TEST_CASE("parse forced: ((bv[8]) fall x x) = { 1 }:bv[8]") {
-		auto src = parse_wff("((bv[8]) fall x x) = { 1 }:bv[8]");
+		auto src = parse_wff("((bv[8]) fall x:bv[4] x) = { 1 }:bv[8]");
 		CHECK( src != nullptr );
 	}
 }

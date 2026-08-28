@@ -42,8 +42,15 @@ cli::options tau_options() {
 		.set_description("show license for Tau");
 	opts["charvar"] = cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
-	opts["blasting"] = cli::option("blasting", 'B', true)
-		.set_description("blasting (enabled by default)");
+	// GitHub #74: the default is the library's `bv_blasting`, not a second
+	// hardcoded one -- a CLI-only `true` here silently overrode the
+	// library's decision to keep predicate blasting off (see tau.h) and
+	// hung every plain `tau` run of a bv accumulator that the API
+	// completed instantly.
+	opts["blasting"] = cli::option("blasting", 'B', bv_blasting)
+		.set_description(std::string("blasting (")
+			+ (bv_blasting ? "enabled" : "disabled")
+			+ " by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
@@ -85,6 +92,9 @@ cli::options tau_options() {
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
+	opts["cqe-max-clauses"] = cli::option("cqe-max-clauses", 'Q', "0")
+		.set_description("cap the DNF clauses complete quantifier "
+			"elimination may distribute one scope into (0 = unlimited)");
 	// The two SO-1-exposed caps ship FINITE (matching the inline defaults
 	// in satisfiability.tmpl.h): unlimited hangs on a non-converging spec.
 	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "500")
@@ -245,6 +255,7 @@ int main(int argc, char** argv) {
 	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
+	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
 	tau_api::set_max_blast_reentry_depth(optnum("max-blast-reentry-depth"));

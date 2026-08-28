@@ -171,37 +171,29 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	using tau = tree<node>;
 	if (!n) return;
 
-	// Which leaves a subtree flattens to along the and/or spine depends
-	// only on that subtree and `branch`, so memoizing per (tref, branch)
-	// is sound and preserves multiplicity: a syntactic duplicate (e.g.
-	// `A && A`) still contributes two spliced-in copies of A's leaves.
-	//
-	// Local to this call, not a persistent tau::create_cache: its value
-	// type (a container of trefs) isn't introspected by the gc's
-	// for_each_tref_in, so a cache surviving past a gc sweep could hold
-	// dangling trefs. Scoping it to one call avoids that.
-	using cache_t = subtree_unordered_map<node, std::unordered_map<size_t, trefs>>;
-	cache_t cache;
-
-	std::function<const trefs&(tref)> flatten =
-		[&](tref m) -> const trefs& {
-		auto& per_branch = cache[m];
-		if (auto it = per_branch.find((size_t) branch);
-			it != per_branch.end())
-			return it->second;
+	// Explicit-stack pre-order walk along the and/or spine. The previous
+	// recursive flatten needed one frame per nesting level and, since a
+	// DNF's or-spine is a left-deep binary chain, its depth equalled the
+	// clause count and overflowed the 8 MB stack near ~24k clauses
+	// (GitHub #90). It also memoised the full leaf list at every spine
+	// node, which is quadratic in the clause count (30k clauses -> 4 GB).
+	// Leaves are appended left to right with multiplicity preserved (a
+	// shared or duplicated subtree is spliced in once per occurrence), so
+	// no memo is needed: the work is linear in the output size.
+	std::vector<tref> stack{n};
+	while (!stack.empty()) {
+		const tref m = stack.back();
+		stack.pop_back();
 		const auto& t = tau::get(m);
-		trefs result;
 		if (t.is(branch) || t.child_is(branch)) {
-			for (tref c : t.children())
-				for (tref l : flatten(c)) result.push_back(l);
+			const auto children = t.get_children();
+			for (auto it = children.rbegin(); it != children.rend(); ++it)
+				stack.push_back(*it);
 		} else {
 			LOG_TRACE << "adding leaf: " << LOG_FM(m);
-			result.push_back(m);
+			leaves.push_back(m);
 		}
-		return per_branch.emplace((size_t) branch,
-			std::move(result)).first->second;
-	};
-	for (tref l : flatten(n)) leaves.push_back(l);
+	}
 }
 
 template <NodeType node>
@@ -686,6 +678,61 @@ const trefs& get_free_vars(tref n) {
 #endif
 	auto [it, _] = free_vars_map.emplace(n, intern_free_vars(std::move(fv)));
 	return *it->second.sp;
+}
+
+/**
+ * @internal
+ * @brief Partition formulas into connected components under shared
+ * variables: two formulas land in the same group iff they are linked by a
+ * chain of formulas each pair of which has a variable of @p vars in common.
+ *
+ * This is the factorization behind GitHub #72/#82: for a conjunction whose
+ * conjuncts have pairwise disjoint variable support, `ex X (A(X1) && B(X2))`
+ * with `X1`, `X2` disjoint is `ex X1 A && ex X2 B`, so each group can be
+ * decided on its own instead of feeding the whole conjunction to one Boole
+ * decomposition (a 2^N Shannon expansion when nothing is shared).
+ * @param fms Formulas to group (order preserved within and across groups:
+ *        groups are emitted in order of their first member).
+ * @param vars Variables that count as links, in any order; a formula
+ *        containing none of them forms a singleton group.
+ * @return The groups, each a non-empty subsequence of @p fms.
+ * @endinternal
+ */
+template <NodeType node>
+std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars) {
+	const size_t n = fms.size();
+	// Union-find over formula indices, keyed through the variables.
+	std::vector<size_t> parent(n);
+	for (size_t i = 0; i < n; ++i) parent[i] = i;
+	auto find = [&](size_t i) {
+		while (parent[i] != i) i = parent[i] = parent[parent[i]];
+		return i;
+	};
+	auto unite = [&](size_t a, size_t b) {
+		a = find(a), b = find(b);
+		if (a != b) parent[std::max(a, b)] = std::min(a, b);
+	};
+	// Membership by content, not a binary search: callers hand in e.g. a
+	// quantifier block in binder order, which is not sorted.
+	const subtree_unordered_set<node> links(vars.begin(), vars.end());
+	subtree_unordered_map<node, size_t> first_owner;
+	for (size_t i = 0; i < n; ++i)
+		for (tref v : get_free_vars<node>(fms[i])) {
+			if (!links.contains(v)) continue;
+			auto [it, fresh] = first_owner.emplace(v, i);
+			if (!fresh) unite(it->second, i);
+		}
+	std::vector<trefs> groups;
+	std::vector<size_t> group_of(n, std::numeric_limits<size_t>::max());
+	for (size_t i = 0; i < n; ++i) {
+		const size_t r = find(i);
+		if (group_of[r] == std::numeric_limits<size_t>::max()) {
+			group_of[r] = groups.size();
+			groups.emplace_back();
+		}
+		groups[group_of[r]].push_back(fms[i]);
+	}
+	return groups;
 }
 
 template <NodeType node>

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
+	adt
 	antiprenexing
 	bf_fixed_point
 	bf_hooks
@@ -46,6 +47,8 @@ set(TESTS
 	ctl_star
 	ocfuncs
 	bv_stress_check
+	ba_component_factoring
+	simp_tau_unsat_valid_unitwise
 )
 
 foreach(X IN LISTS TESTS)
@@ -56,7 +59,8 @@ foreach(X IN LISTS TESTS)
 	target_include_directories("test_integration-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
-foreach(X IN ITEMS ctl_star ocfuncs satisfiability6)
+foreach(X IN ITEMS ctl_star ocfuncs satisfiability6
+	ba_component_factoring simp_tau_unsat_valid_unitwise)
 	if(NOT TARGET "test_integration-${X}")
 		continue()
 	endif()

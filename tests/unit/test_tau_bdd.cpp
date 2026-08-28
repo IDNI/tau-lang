@@ -201,15 +201,17 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// "ab" sub-block order flipped by the 8f1a74c1 parser regen
-		// (subtree interning order changed); actual on Debug is
-		// "xycdbafe". Release's NDEBUG paths produce yet another
-		// permutation, "xycdbaef" (same letters).
-		CHECK((result == "xycdbafe" || result == "xycdbaef"
-			|| result == "xycdabfe"
-			|| result == "xycdabef"
-			|| result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab" ));
+		// x and y sit in the explicit order and lead; the remaining six
+		// literals are opaque leaf terms whose relative print order is a
+		// hash/nt-id tie-break that drifts with every parser regen (Debug
+		// and Release differ too) -- not worth pinning as one canonical
+		// permutation. Check content instead: an "xy" prefix and each of
+		// a..f exactly once.
+		REQUIRE(result.size() == 8);
+		CHECK(result.substr(0, 2) == "xy");
+		std::string rest = result.substr(2);
+		std::sort(rest.begin(), rest.end());
+		CHECK(rest == "abcdef");
 	}
 
 	TEST_CASE("2") {
@@ -654,10 +656,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		// Product order flipped by the 8f1a74c1 parser regen on Release
-		// (NDEBUG subtree interning order changed); actual is "ab".
-		CHECK((tau::get(result).to_str() == "ab"
-			|| tau::get(result).to_str() == "ba"));
+		// "ab"/"ba": pure AND-commutative permutation, order is a
+		// hash/nt-id-order-dependent tie-break.
+		auto result_str = tau::get(result).to_str();
+		CHECK((result_str == "ab" || result_str == "ba"));
 	}
 }
 

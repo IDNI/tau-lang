@@ -96,6 +96,11 @@ void api<node>::set_block_max_rounds(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_cqe_max_clauses(size_t n) {
+	cqe_max_clauses = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
 void api<node>::set_max_blast_reentry_depth(size_t n) {
 	max_blast_reentry_depth = n;
 }
@@ -178,6 +183,11 @@ void api<node>::set_pwr_semantic_fallback(bool on) {
 template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
+}
+
+template <NodeType node>
+void api<node>::set_ba_component_factoring(bool state) {
+	ba_component_factoring = state;
 }
 
 template <NodeType node>

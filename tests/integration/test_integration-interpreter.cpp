@@ -51,10 +51,10 @@ TEST_SUITE("Execution") {
 		// order-insensitivity note at the top of this suite.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
-				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
+				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
+				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
 		std::vector<strings> o1_expected = {
@@ -65,10 +65,12 @@ TEST_SUITE("Execution") {
 			},
 			{
 				"<:x> = 0 && <:z> = 0 && <:y> = 0",
+				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0 && <:z> = 0",
 				"<:y> = 0 && <:x> = 0 && <:z> = 0",
 				"<:z> = 0 && <:x> = 0 && <:y> = 0",
-				"<:y> = 0 && <:z> = 0 && <:x> = 0",
+				// 2026-08-28 ADT + left-assoc grammar regen
+				"<:z> = 0 && <:y> = 0 && <:x> = 0",
 			}
 		};
 		io_context<node_t> ctx;
@@ -238,8 +240,8 @@ TEST_SUITE("Execution") {
 		// this suite.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o3[t]:tau = 0 && o2[t]:tau = 0",
 				"always o2[t]:tau = 0 && o3[t]:tau = 0",
+				"always o3[t]:tau = 0 && o2[t]:tau = 0",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -377,29 +379,43 @@ TEST_SUITE("Execution") {
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 		}, {
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 		}, {
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
+			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o3[t]:tau = 0",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
+			// Nonterminal-id re-drift (I4) produced another Release-only
+			// ordering not previously listed; verified: valid ((o1[t] =
+			// this[t] && o3[t] = 0 && u[t] = i1[t] && o2[t] = 0) <->
+			// (o2[t] = 0 && o3[t] = 0 && o1[t] = this[t] && u[t] = i1[t]))
+			// => T. Appended, not placed at [0].
+			"always o1[t]:tau = this[t]:tau && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
+			// 2026-08-28 ADT + left-assoc grammar regen: another
+			// permutation of the same four conjuncts.
+			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 		}
 		};
 		io_context<node_t> ctx;
@@ -1067,6 +1083,43 @@ TEST_SUITE("with inputs and outputs") {
 		auto memory = run_test(sample, ctx, 1);
 		REQUIRE( memory.has_value() );
 		CHECK ( !memory.value().empty() );
+	}
+
+	// GitHub #86/#87/#88: the widen-then-narrow idiom. `(a*b)/c` computed at
+	// the operand width wraps before the divide runs; casting the operands
+	// up, dividing, and casting the quotient back down is exact. The cast
+	// used to be Boole-decomposed by the normalizer into a mixed-width term
+	// that cvc5 rejected ("expecting comparable bit-vector terms"), so a
+	// widened stream could not be run at all.
+	TEST_CASE("widening a stream through a cast") {
+		bdd_init<Bool>();
+		auto spec = create_spec("o1[t]:bv[16] = (bv[16]) i1[t]:bv[8].");
+		io_context<node_t> ctx;
+		strings i1_values = { "200", "7" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(16), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		CHECK ( o1->get_values() == strings{ "200", "7" } );
+	}
+
+	TEST_CASE("percentage via widen-multiply-divide-narrow") {
+		// 200 * 5 = 1000 wraps to 232 at 8 bits (and 232/100 = 2); at 16
+		// bits the product is exact and 1000/100 = 10 fits back into 8 bits.
+		bdd_init<Bool>();
+		auto spec = create_spec("o1[t]:bv[8] = (bv[8]) ( ((bv[16]) i1[t]:bv[8]"
+			" * { 5 }:bv[16]) / { 100 }:bv[16] ).");
+		io_context<node_t> ctx;
+		strings i1_values = { "200", "40" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		CHECK ( o1->get_values() == strings{ "10", "2" } );
 	}
 
 }

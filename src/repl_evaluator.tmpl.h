@@ -181,8 +181,49 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
 	spec.add(arg);
-	for (const htref& d : rr_defs) spec.add(d->get());
-	for (const htref& d : io_defs) spec.add(d->get());
+	auto& defs = definitions<node>::instance();
+	// type_defs first: the registry must see every type before rr_defs/
+	// io_defs are added, regardless of the order they were declared in.
+	// (->get(): type_defs/rr_defs/io_defs store htref, not tref -- see
+	// their declaration comment in repl_evaluator.h for why.)
+	for (const htref& hd : type_defs) spec.add(hd->get());
+	for (const htref& hd : rr_defs) spec.add(hd->get());
+	for (const htref& hd : io_defs) {
+		tref d = hd->get();
+		// A tuple-typed (ADT) io def's per-member registration and its
+		// ctx->adt_streams grouping layout were already fully built when
+		// it was first declared: adt_flatten_rewrite_io_def, called from
+		// adt_flatten_rewrite's def_input_cmd/def_output_cmd case (see
+		// src/adt/adt_flatten.tmpl.h), at the def's own original parse --
+		// the only parse that ever runs adt_flatten for a REPL command.
+		// io_defs itself still holds that def's ORIGINAL, un-flattened
+		// tree (its `typed: <ADT name>` annotation intact) so
+		// def_input_cmd()/def_output_cmd() can echo it back to the user.
+		// Splicing that raw tree back in here, on every later
+		// normalize/sat/solve/run, re-runs infer_ba_types/update_types on
+		// it with no ADT registry left to resolve `<ADT name>` -- which
+		// used to fabricate a SECOND, un-grouped "bare root" stream
+		// registration in ctx alongside the correct per-member one,
+		// silently duplicating it. rebuild_inputs/rebuild_outputs
+		// (interpreter.tmpl.h) would then also try to read/write through
+		// that stray bare-root stream, producing spurious "Failed to
+		// read/write ..." errors during `run`. Since an ADT type is only
+		// ever visible within the single parse that declares it (a
+		// separately parsed later line never sees it -- adt_registry is
+		// rebuilt fresh per parse, see get_applied's own type_defs
+		// prepend above and the REPL test file's comment for why), any
+		// formula argument that legitimately needs this def's members is
+		// already fully typed from that SAME original parse; unlike an
+		// ordinary (non-ADT) cross-line io def -- which DOES still need
+		// this splice, to pick up its type from a def declared on an
+		// earlier, separate line -- a tuple-typed def has nothing left to
+		// contribute here, so it is skipped outright rather than spliced.
+		tref head = tt(d) | tt::first | tt::ref;
+		size_t root_sid = head ? tau::get(head).data() : 0;
+		if (root_sid && defs.get_io_context()->adt_streams.contains(root_sid))
+			continue;
+		spec.add(d);
+	}
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr) {
 		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
@@ -197,7 +238,6 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		return nullptr;
 	}
 	// add defs to global definitions:
-	auto& defs = definitions<node>::instance();
 	for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
 		defs.add(r.first, r.second);
 		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
@@ -617,21 +657,50 @@ void repl_evaluator<BAs...>::continue_running(
 			}
 			running->t.pause();
 			// a console input stream stopped the step needing a value:
-			// find it and prompt for that value (label/type are ours)
+			// find it and prompt for that value (label/type are ours).
+			// find_repl_pending_input sees through an ADT tuple member's
+			// adt_member_input_stream/adt_tuple_reader (and this library's
+			// own ownership-bridging physical-stream wrapper,
+			// interpreter.tmpl.h) to the actual repl_pending_input_stream,
+			// so a tuple-typed console input is found here exactly like a
+			// plain one -- it's the SAME shared stream regardless of which
+			// member var this loop iteration looks at (one physical stream
+			// per tuple root, interpreter.tmpl.h's rebuild_inputs), so only
+			// the first member reached here ever finds it still awaiting:
+			// read_time_point's memo (io_context.tmpl.h) makes every other
+			// member's leaf() reuse the SAME successful read once one
+			// member consumes the pending value, instead of re-querying
+			// the physical stream and re-flagging it awaiting.
 			for (auto& [var, stream] : running->interp.inputs) {
-				auto rp = std::dynamic_pointer_cast<
-					repl_pending_input_stream>(stream);
+				auto rp = find_repl_pending_input<node>(stream);
 				if (!rp || !rp->awaiting()) continue;
 				size_t tp = rp->awaiting_time_point();
-				size_t tid = running->interp.ctx.type_of(var);
-				std::string type_name = get_ba_type_name<node>(tid);
-				if (!type_name.empty() && type_name.front() == ':')
-					type_name.erase(0, 1);
 				std::stringstream lbl;
-				lbl << get_var_name<node>(var) << "[" << tp << "] : "
-					<< type_name << " := ";
+				tref type_tree = nullptr;
+				if (const adt_stream_layout<node>* layout =
+					find_adt_stream_for_member<node>(
+						running->interp.ctx, var); layout)
+				{
+					// One physical stream/prompt for the WHOLE tuple
+					// literal (design doc sec. 4) -- label with the
+					// stream's own root name, not this member's dotted
+					// name, plus a wire-shaped hint of what to type.
+					// type_tree stays null: a tuple literal isn't a single
+					// BA type, so stream_value_incomplete (below) skips
+					// its type-specific incomplete-value checks for it.
+					lbl << dict(layout->root_name_sid) << "[" << tp
+						<< "] := " << adt_wire_hint<node>(*layout) << " ";
+				} else {
+					size_t tid = running->interp.ctx.type_of(var);
+					std::string type_name = get_ba_type_name<node>(tid);
+					if (!type_name.empty() && type_name.front() == ':')
+						type_name.erase(0, 1);
+					lbl << get_var_name<node>(var) << "[" << tp << "] : "
+						<< type_name << " := ";
+					type_tree = get_ba_type_tree<node>(tid);
+				}
 				pending = { pending_request::stream_value, lbl.str(),
-					rp, tp, get_ba_type_tree<node>(tid) };
+					rp, tp, type_tree };
 				reprompt();
 				return; // suspend: wait for the answer
 			}
@@ -670,6 +739,14 @@ bool repl_evaluator<BAs...>::stream_value_incomplete(
 	auto is_unexpected_end = [](const std::string& msg) {
 		return msg.find("Unexpected end of file") != std::string::npos;
 	};
+	// A tuple-typed (ADT) stream's prompt has no single BA type_tree
+	// (continue_running leaves it null: see its own comment) -- a wire
+	// literal isn't type-checked line-by-line the way a single BA
+	// constant is, so there is no type-specific "still incomplete" check
+	// to run for it; treat every line as complete (no multiline
+	// continuation for a tuple literal -- type the whole thing on one
+	// line). Also guards against dereferencing a null type_tree below.
+	if (!type_tree) return false;
 	if (is_sbf_type<node>(type_tree)) {
 		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 		return !result.found && is_unexpected_end(result.parse_error
@@ -681,6 +758,12 @@ bool repl_evaluator<BAs...>::stream_value_incomplete(
 		return !result.found && is_unexpected_end(result.parse_error
 			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC));
 	}
+	// By REPL convention a '.'-terminated line is a completed tau value.
+	// member_path makes "name." a valid prefix (of "name.member"), which
+	// would otherwise reclassify bad values as incomplete and leave the
+	// run silently waiting for more input.
+	if (auto p = src.find_last_not_of(" \t\r\n");
+		p != std::string::npos && src[p] == '.') return false;
 	// tau_spec::parse() returns true on EOF-incomplete input, flags is_eof()
 	tau_spec<node> s;
 	s.parse(src);
@@ -1003,6 +1086,15 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
+	type_defs.push_back(tau::geth(n | tt::first | tt::ref));
+	size_t idx = type_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] "
+		<< tau::get(type_defs[idx]->get()).to_str() << "\n";
+}
+
 // make a nso_rr from the given tau source and binder.
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -1082,6 +1174,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "blockmaxsplits")    return block_max_splits_opt;
 	if (x == "maxrounds"
 		|| x == "blockmaxrounds")    return block_max_rounds_opt;
+	if (x == "maxclauses"
+		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
 	if (x == "fixpointsteps"
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
@@ -1180,6 +1274,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
 	{ block_max_rounds_opt, [climit]() {
 		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ cqe_max_clauses_opt, [climit]() {
+		std::cout << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
 	{ fixpoint_steps_opt, [climit]() {
 		std::cout << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
 	{ flag_search_steps_opt, [climit]() {
@@ -1324,6 +1420,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_block_max_splits(*n); } },
 	{ block_max_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_block_max_rounds(*n); } },
+	{ cqe_max_clauses_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_cqe_max_clauses(*n); } },
 	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_fixpoint_steps(*n); } },
 	{ flag_search_steps_opt, [&]() { if (auto n = str2count(); n)
@@ -1394,6 +1492,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
 	case block_max_splits_opt:
 	case block_max_rounds_opt:
+	case cqe_max_clauses_opt:
 	case fixpoint_steps_opt:
 	case flag_search_steps_opt:
 	case blast_depth_opt:
@@ -1530,6 +1629,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	// definitions of i/o streams
 	case tau::def_input_cmd:      def_input_cmd(command); break;
 	case tau::def_output_cmd:     def_output_cmd(command); break;
+	// definition of ADT types
+	case tau::def_type_cmd:       def_type_cmd(command); break;
 	// qelim
 	case tau::qelim_cmd:          result = qelim_cmd(command); break;
 	// type inspection and session management
@@ -2055,6 +2156,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  <term_rec_relation>     defines a tau function\n"
 		<< "  <def_input_cmd>         defines an input stream variable\n"
 		<< "  <def_output_cmd>        defines an output stream variable\n"
+		<< "  <def_type_cmd>          defines an ADT type\n"
 		<< "  definitions             lists all definitions present in repl\n"
 		<< "  definitions <number>    prints predicate or function at specified position\n"
 		<< "\n"

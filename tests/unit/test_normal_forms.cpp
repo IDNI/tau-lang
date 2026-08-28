@@ -195,6 +195,44 @@ TEST_SUITE("path_expressions") {
 	}
 }
 
+TEST_SUITE("get_leaves") {
+
+	// Distinct atoms: the wff_or hook folds `A || A` into `A`, so a chain
+	// of one repeated atom would collapse to a single leaf.
+	static tref atom_n(size_t i) {
+		return tau::build_bf_eq_0(
+			tau::build_bf_variable("v" + std::to_string(i), 0));
+	}
+
+	TEST_CASE("left-deep or-spine of 300k clauses does not overflow the stack") {
+		// The or-spine of a DNF is a left-deep binary chain, so a recursive
+		// flatten needs one frame per clause (nomic ratchet / GitHub #90).
+		const size_t n = 300000;
+		tref first = atom_n(0);
+		tref fm = first;
+		for (size_t i = 1; i < n; ++i) fm = tau::build_wff_or(fm, atom_n(i));
+		trefs leaves = get_dnf_wff_clauses<node_t>(fm);
+		CHECK(leaves.size() == n);
+		// Leaves are the subtrees as they sit in the spine (sibling links
+		// included), so compare trees, not trefs.
+		CHECK(tau::get(leaves.front()) == tau::get(first));
+		CHECK(tau::get(leaves.back()) == tau::get(atom_n(n - 1)));
+	}
+
+	TEST_CASE("shared subtrees keep their multiplicity and order") {
+		// (a || b) || (b || c)  ->  [a, b, b, c]: b is reached through two
+		// parents and must be spliced in twice, in spine order.
+		tref a = atom_n(0), b = atom_n(1), c = atom_n(2);
+		tref fm = tau::build_wff_or(tau::build_wff_or(a, b),
+			tau::build_wff_or(b, c));
+		trefs leaves = get_dnf_wff_clauses<node_t>(fm);
+		REQUIRE(leaves.size() == 4);
+		auto same = [](tref l, tref r) { return tau::get(l) == tau::get(r); };
+		CHECK(same(leaves[0], a)); CHECK(same(leaves[1], b));
+		CHECK(same(leaves[2], b)); CHECK(same(leaves[3], c));
+	}
+}
+
 TEST_SUITE("normal forms: onf") {
 
 	/* TEST_CASE("T") {
@@ -374,6 +412,70 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 		tref n1 = get_nso_rr("x = 0.").value().main->get();
 		tref n2 = get_nso_rr("x = 0 && y = 0.").value().main->get();
 		CHECK( !is_nso_impl<node_t>(n1, n2) );
+	}
+
+	// GitHub #82: the implication used to be closed over every free
+	// variable and normalized in one piece, so an antecedent/consequent
+	// pair whose atoms fall into many variable-disjoint components (the
+	// shape find_fixpoint_phi produces for a spec accumulating N clauses)
+	// paid for one N-component Boole decomposition per check. It is now
+	// decided per consequent conjunct against the antecedent conjuncts
+	// its variables connect to. These pin the exactness of that split.
+	TEST_CASE("is_nso_impl (#82): per-conjunct decomposition, all implied") {
+		tref n1 = get_nso_rr("x = 0 && y = 0 && z = 0.").value().main->get();
+		tref n2 = get_nso_rr("x = 0 && (y = 0 || w = 1).").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): one unconnected conjunct is not implied") {
+		// w is untouched by the antecedent, so `w = 0` is not implied even
+		// though every other conjunct is.
+		tref n1 = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		tref n2 = get_nso_rr("x = 0 && y = 0 && w = 0.").value().main->get();
+		CHECK( !is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): an unsatisfiable unconnected antecedent "
+		  "component makes the implication vacuous")
+	{
+		// `x = 0 && x = 1` (over sbf, x = 1 means x is the top element)
+		// is unsatisfiable, and it shares no variable with `w = 0`, so
+		// deciding `w = 0` against its own (empty) component alone would
+		// say false; the whole implication still holds because the
+		// antecedent is unsatisfiable.
+		tref n1 = get_nso_rr("x = 0 && x = 1 && y = 0.").value().main->get();
+		tref n2 = get_nso_rr("y = 0 && w = 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): chained sharing merges components") {
+		// z = 0 follows from x = 0 only through y: x=0 -> y=0 -> z=0, so
+		// the component of `z = 0` must pull in both antecedent conjuncts.
+		tref n1 = get_nso_rr(
+			"x = 0 && (x != 0 || y = 0) && (y != 0 || z = 0).")
+			.value().main->get();
+		tref n2 = get_nso_rr("z = 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl (#82): 40 disjoint-support components") {
+		// The reporter's shape, at a size the monolithic check could not
+		// finish: N clauses with pairwise disjoint support, each implied
+		// by its own antecedent clause.
+		std::string a, c;
+		for (int k = 0; k < 40; ++k) {
+			std::string xk = "x" + std::to_string(k),
+				yk = "y" + std::to_string(k);
+			a += std::string(k ? " && " : "") + xk + " = 0 && " + yk + " = 0";
+			c += std::string(k ? " && " : "") + "(" + xk + " != 0 || " + yk + " = 0)";
+		}
+		tref n1 = get_nso_rr((a + ".").c_str()).value().main->get();
+		tref n2 = get_nso_rr((c + ".").c_str()).value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+		// ... and a single broken component is detected.
+		tref n3 = get_nso_rr((c + " && (x7 != 0 || y7 = 1).").c_str())
+			.value().main->get();
+		CHECK( !is_nso_impl<node_t>(n1, n3) );
 	}
 }
 
@@ -891,6 +993,74 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 		CHECK( !is_non_temp_nso_unsat<node_t>(taut) );
 		CHECK( is_non_temp_nso_satisfiable<node_t>(taut) );
 	}
+}
+
+// check_decided's NZ-1 arm (added with the bc99a82b port): a temporal
+// operator directly inside a quantifier scope is undecidable by any
+// case-split on the bound variable alone, so complete_quantifier_elimination
+// leaves it quantified and check_decided reports it at WARNING (message
+// carries the "NZ-1" marker) instead of ERROR. Every other undecided shape
+// must keep the ERROR path so a genuine regression still trips loudly.
+TEST_SUITE("NZ1TemporalUnderQuantifier") {
+
+	// The grammar has no quantifier-over-always position; build the shape
+	// the way the pipeline meets it, internally.
+	static tref nz1() {
+		tref spec = get_nso_rr("always o1[t]b != 0.").value().main->get();
+		return tau::build_wff_all_many(get_free_vars<node_t>(spec), spec);
+	}
+
+	static tref bv_undecided() {
+		return get_nso_rr("ex x (x:bv[8] * y:bv[8] = { 1 }:bv[8]"
+			" && q(x)).").value().main->get();
+	}
+
+	// Capture everything the logging core emits during f().
+	static std::string log_of(const std::function<void()>& f) {
+		auto ss = boost::make_shared<std::stringstream>();
+		auto sink = boost::log::add_console_log(*ss);
+		f();
+		boost::log::core::get()->remove_sink(sink);
+		return ss->str();
+	}
+
+	TEST_CASE("normalization keeps the NZ-1 shape quantified and temporal") {
+		tref res = normalize_non_temp<node_t>(nz1());
+		REQUIRE( res != nullptr );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( tau::get(res).find_top(
+			is_child<node_t, tau::wff_always>) != nullptr );
+	}
+
+	TEST_CASE("check_decided answers false with the NZ-1 marker") {
+		tref res = normalize_non_temp<node_t>(nz1());
+		bool decided = true;
+		std::string log = log_of([&]() {
+			decided = check_decided<node_t>("nz1-test", res); });
+		CHECK( !decided );
+		CHECK( log.find("NZ-1") != std::string::npos );
+	}
+
+	TEST_CASE("non-temporal undecided keeps the error path (no NZ-1 marker)") {
+		tref res = normalize_non_temp<node_t>(bv_undecided());
+		bool decided = true;
+		std::string log = log_of([&]() {
+			decided = check_decided<node_t>("bv-test", res); });
+		CHECK( !decided );
+		CHECK( log.find("could not decide") != std::string::npos );
+		CHECK( log.find("NZ-1") == std::string::npos );
+	}
+
+	TEST_CASE("decided formulas stay decided") {
+		CHECK( check_decided<node_t>("t-test", tau::_T()) );
+		CHECK( check_decided<node_t>("f-test", tau::_F()) );
+	}
+
+	// No end-to-end are_nso_equivalent case here: its
+	// has_no_boolean_combs_of_models precondition (DBG-asserted) rejects
+	// a quantified temporal formula handed in directly. The pipeline
+	// reaches check_decided's NZ-1 arm with formulas it built itself;
+	// the direct check_decided cases above pin both arms.
 }
 
 // NF-6 / AP-16. squeeze_absorb disables the process-global tree<node>::use_hooks

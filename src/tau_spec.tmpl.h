@@ -154,6 +154,20 @@ bool tau_spec<node>::add(tref expr) {
 	case tau::input_def:
 	case tau::output_def:
 	case tau::rec_relation: add_def(expr); break;
+	case tau::type_def:
+		// repl_evaluator's get_applied() prepends every stored type_def
+		// (Task 9's type_defs, mirroring rr_defs/io_defs) into the spec
+		// assembled here -- but that assembly splices already-parsed/
+		// flattened trees (build_parse_tree()/get(), below) and never
+		// re-runs adt_flatten, so a type_def has no registry left to
+		// populate by the time it would reach infer_ba_types via
+		// defs_/spec_defs. Accepting it as a no-op (rather than falling
+		// into `default`'s "unknown node" assert) is what keeps that
+		// otherwise-inert prepend from crashing every get_applied() call
+		// made after a `type` statement, in debug builds, the first time
+		// this path is actually exercised (a normalize/sat/solve/run
+		// following a REPL `type` statement in the same parse).
+		break;
 	default:
 		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
 		DBG(assert(false);)

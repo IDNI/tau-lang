@@ -11,17 +11,29 @@ start                  => spec.
 # start symbol posibilities:
 # spec, spec_multiline. cli, stream_def and fm_or_term (bellow)
 spec                   => [ definitions ] _ wff:main _ ['.' _].
-definitions            => (_ (rec_relation | input_def | output_def) _ '.')+.
+definitions            => (_ (rec_relation | input_def | output_def | type_def) _ '.')+.
 
 spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
-spec_part              => rec_relation | input_def | output_def | main.
+spec_part              => rec_relation | input_def | output_def | type_def | main.
 
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
-input_def              => io_var_name [ typed ] _ ":=" _ "in"    __ stream.
-output_def             => io_var_name [ typed ] _ ":=" _ "out"   __ stream.
+input_def              => io_var_name [ member_path ] [ typed ] _ ":=" _ "in"    __ stream.
+output_def             => io_var_name [ member_path ] [ typed ] _ ":=" _ "out"   __ stream.
 stream                 => "file" _ '(' _ q_file_name  _ ')'
                         | "console":console_sym
                         . # in the future tcp, udp,...
+
+# algebraic data types (ADTs)
+#
+type_def               => "type" __ chars:type_name
+                                [ ( __ "of" __ | _ '/' _ ) type_parents ]
+                                ( __ "is" __ | _ '=' _ ) type_body.
+type_parents           => '(' _ type_name (_ ',' _ type_name)* _ ')'.
+type_body              => tuple | type [ _ '[' _ subtype _ ']' ].
+tuple                  => '{' _ (member_name typed):member (_ ',' _ member)* _ '}'.
+member_name            => chars.
+member_path            => '.' member_name ('.' member_name)*.
+
 ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
@@ -72,7 +84,10 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
 # they are named bf_* as they involve boolean functions,
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
-bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
+                          # `(bv[N])` is a cast prefix, never a parenthesised
+                          # term: in charvar mode `bv[N]` would otherwise also
+                          # parse as the juxtaposition `b v[N]`
+bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
                         |                                     ba_constant
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
@@ -80,16 +95,20 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _
                            (bf_parenthesis | ba_constant | variable | bf_ref
-                           | bf_t | bf_f | bf_neg | bf_cast | capture)
+                           | bf_t | bf_f | bf_neg | bf_cast | capture
+                           | bf_fall | bf_fex)
                                 :bf_cast_oprnd)              :bf_cast
                         | (func_sym '(' _ func_args _ ')')   :bf_func_app
-                        | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
-                        | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
-                        | (bf  _ '+' _       bf)             :bf_add
-                        | (bf  _ '-' _       (bf & ~bf_sub)) :bf_sub
-                        | (bf  _ '%' _       (bf & ~bf_mod)) :bf_mod
-                        | (bf  _ '*' _       bf)             :bf_mul
-                        | (bf  _ '/' _       (bf & ~bf_div)) :bf_div
+                          # operators of one precedence level chain left to
+                          # right: the right operand excludes every operator
+                          # of that level, not just the operator itself
+                        | (bf  _ ">>" _      (bf & ~bf_shr & ~bf_shl)) :bf_shr
+                        | (bf  _ "<<" _      (bf & ~bf_shl & ~bf_shr)) :bf_shl
+                        | (bf  _ '+' _       (bf & ~bf_add & ~bf_sub)) :bf_add
+                        | (bf  _ '-' _       (bf & ~bf_sub & ~bf_add)) :bf_sub
+                        | (bf  _ '%' _       (bf & ~bf_mod & ~bf_mul & ~bf_div)) :bf_mod
+                        | (bf  _ '*' _       (bf & ~bf_mul & ~bf_div & ~bf_mod)) :bf_mul
+                        | (bf  _ '/' _       (bf & ~bf_div & ~bf_mul & ~bf_mod)) :bf_div
                         | (bf  _ "!|" _      (bf & ~bf_nor)) :bf_nor
                         | (bf  _ "!^" _      (bf & ~bf_xnor)):bf_xnor
                         | (bf  _ "!&" _      (bf & ~bf_nand)):bf_nand
@@ -136,11 +155,12 @@ source                 => src_c [ (src_c | space)* src_c ].
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
 # variables, io variables and and uninterpreted constants
-variable               => (uconst | io_var | var_name) [ typed ].
+variable               => (uconst | io_var | var_name) [ member_path ] [ typed ].
 var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
 var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
 io_var                 => io_var_name '[' offset ']'.
 io_var_name            => chars.
+bv_type_like           => "bv" _ '[' _ num _ ']'.
 uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
 
 # quantifier variables
@@ -244,6 +264,7 @@ cli_command            =>
         |                           rec_relation              :def_rr_cmd
         |                           input_def                 :def_input_cmd
         |                           output_def                :def_output_cmd
+        |                           type_def                  :def_type_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ history)       :history_print_cmd
@@ -323,7 +344,7 @@ fm_or_term     => wff | bf.
 @trim all terminals except children of
         sym, digits, type, subtype, integer,
         source, capture, var_name, io_var_name, uconst_name, file_name,
-        ctnvar, option_name, option_value.
+        ctnvar, option_name, option_value, type_name, member_name.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, uconst, spec_part,

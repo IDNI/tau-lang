@@ -141,6 +141,9 @@ template <NodeType node>
 const trefs& get_free_vars(tref n);
 
 template <NodeType node>
+std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars);
+
+template <NodeType node>
 bool has_temp_var(tref n);
 
 template <NodeType node>
@@ -177,6 +180,14 @@ tref unnest_nested_always(tref fm);
 
 #include "io_context.h"
 
+// ADT type registry declarations. adt_types.tmpl.h (which needs the
+// traverser and select_all, not yet defined here) is included further below,
+// next to tau_tree_from_parser.tmpl.h -- see adt_types.h's file header.
+#include "adt/adt_types.h"
+// ADT flattener declarations; same split as adt_types.h/.tmpl.h, for the
+// same reason -- see adt_flatten.h's file header.
+#include "adt/adt_flatten.h"
+
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
@@ -190,6 +201,17 @@ namespace idni::tau_lang {
 
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
 #include "tau_tree_from_parser.tmpl.h"
+
+// Must come after tau_tree_from_parser.tmpl.h: adt_types.tmpl.h uses the
+// traverser (`tt`) and `select_all`, defined earlier in this same block
+// (tau_tree_traverser.tmpl.h, tau_tree_queries.tmpl.h). See adt_types.h's
+// file header for why this is split from its own include.
+#include "adt/adt_types.tmpl.h"
+// adt_flatten.tmpl.h uses adt_registry (just included above), the traverser,
+// is<node,...>, and tree<node>::build_* (declared in tau_tree.h, included at
+// the top of this file, with tau_tree_builders.h/.tmpl.h already pulled in
+// via tau_tree_builders.h above) -- see adt_flatten.h's file header.
+#include "adt/adt_flatten.tmpl.h"
 
 #include "hooks.h"
 
@@ -660,7 +682,7 @@ template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
 		sym, type, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value,
+		ctnvar, option_name, option_value, type_name, member_name,
 	};
 	return string_nts.contains(nt);
 }

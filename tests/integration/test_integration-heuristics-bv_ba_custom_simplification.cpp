@@ -110,7 +110,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref exp = tau::get(expected, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
-		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
+		DBG( TAU_LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
 		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
 	}
 
@@ -124,7 +124,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref exp = tau::get(expected, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
-		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
+		DBG( TAU_LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
 		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
 	}
 
@@ -138,7 +138,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref exp = tau::get(expected, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
-		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
+		DBG( TAU_LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
 		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
 	}
 
@@ -272,9 +272,13 @@ TEST_SUITE("ba bv custom simplification") {
 			"(X:bv[64] * {12}:bv[64]) / {3}:bv[64]");
 	}
 
-	// ... and the unparenthesised spelling really is a constant-folded zero.
-	TEST_CASE("6 * X * 2 / 3 parses as 6 * (X * (2 / 3)) = 0") {
-		check_unchanged("{6}:bv[64] * X:bv[64] * {2}:bv[64] / {3}:bv[64]");
+	// ... and since same-level operators chain left to right (2df99cb7),
+	// the unparenthesised spelling parses as ((6 * X) * 2) / 3 -- the same
+	// tree as above -- so it folds the same way instead of to a
+	// constant-folded 6 * (X * (2 / 3)) = 0 as it did under the old grammar.
+	TEST_CASE("6 * X * 2 / 3 parses left to right as (6 * X * 2) / 3") {
+		check_simplifies_to("{6}:bv[64] * X:bv[64] * {2}:bv[64] / {3}:bv[64]",
+			"(X:bv[64] * {12}:bv[64]) / {3}:bv[64]");
 	}
 }
 

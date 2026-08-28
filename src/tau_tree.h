@@ -205,7 +205,7 @@ struct node {
 	constexpr auto     operator!= (const node& that) const;
 
 	/** @brief Return the pre-computed hash value for this node. */
-	constexpr size_t hashit() const;
+	size_t hashit() const;
 };
 
 /// @brief Placeholder for parser nonterminal grouping.
@@ -525,6 +525,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	struct get_options {
 		tau_parser::parse_options parse{};          ///< Underlying parser options.
 		bool infer_ba_types = true;                 ///< Run BA type inference.
+		bool flatten_adts = true;                   ///< Flatten ADT type_defs before inference.
 		bool use_default_types = true;              ///< Fall back to tau type for unknowns.
 		bool reget_with_hooks = true;               ///< Re-register nodes through hooks.
 		const std::vector<htref>* definition_heads = nullptr; ///< Known definition heads.

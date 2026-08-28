@@ -75,7 +75,8 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	// limit; each sets the library global through its api setter, and `get`
 	// reads the global back, so the REPL and the CLI options stay two views
 	// of the same knob.
-	block_max_splits_opt, block_max_rounds_opt, fixpoint_steps_opt,
+	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
+	fixpoint_steps_opt,
 	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
@@ -224,6 +225,8 @@ private:
 	void def_input_cmd(const tt& n);
 	/// @brief Define an output stream from @p n.
 	void def_output_cmd(const tt& n);
+	/// @brief Define an ADT type from @p n.
+	void def_type_cmd(const tt& n);
 
 	/// @brief Print a "not implemented yet" message.
 	void not_implemented_yet();
@@ -340,13 +343,32 @@ private:
 
 	std::vector<history> H;
 	options opt{};
-	// Held as htrefs, not raw trefs: interpreter::step() calls maybe_gc(),
-	// and bintree<node>::gc() destroys every node that is neither reachable
-	// from a live htref nor in the keep set collect_live_refs() builds --
-	// which never mentions the REPL. A `run` would otherwise free the
-	// definitions this session keeps reading afterwards.
+	// rr_defs/io_defs/type_defs are stored as htref (not plain tref), same
+	// as `history` (H) above: a plain tref is a raw, non-owning pointer into
+	// bintree<node>'s node storage, unprotected from bintree<node>::gc() (run
+	// via interpreter::maybe_gc() during a `run`'s step loop -- see its own
+	// and interpreter::collect_live_refs's comments in interpreter.tmpl.h).
+	// None of these three vectors are walked by any collect_live_refs
+	// implementation (interpreter's, definitions<node>::instance()'s, or
+	// tau_term_bdd's -- the only three maybe_gc() consults), so a plain-tref
+	// entry left over from an earlier REPL line becomes a dangling pointer
+	// the first time gc() actually sweeps -- silently aliasing whatever
+	// unrelated node the freed memory gets reused for on the next
+	// dereference (bug found via a demo session: an ADT `run` generates
+	// enough per-step tree churn to cross gc()'s size/growth threshold,
+	// making it the first realistic way to trigger this, but the hazard
+	// itself is not ADT-specific -- any of the three could go stale the same
+	// way after any run that happens to trigger a sweep). An htref
+	// (`std::shared_ptr<htree>`) keeps its underlying node alive regardless
+	// of gc() -- gc() preserves a node reachable via any live htref through
+	// M's own non-expired weak_ptr entries (see the same interpreter.tmpl.h
+	// comments) -- exactly how `history`/`H` already protects itself.
 	htrefs rr_defs;
 	htrefs io_defs;
+	// ADT type_def statements accepted via def_type_cmd, kept so they can be
+	// prepended (before rr_defs/io_defs) wherever a spec is assembled from
+	// stored definitions -- see get_applied().
+	htrefs type_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 #ifdef TAU_PARSER_HAS_FTXUI

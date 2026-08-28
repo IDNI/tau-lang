@@ -170,24 +170,28 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr size_t node<BAs...>::hashit() const {
+size_t node<BAs...>::hashit() const {
 	std::size_t seed = 0;
 	hash_combine(seed, static_cast<size_t>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
-	// Hash ba_type directly (integer).  The BA-type IDs are assigned
-	// deterministically in ba_types::type_tree_to_idx, so identical node
-	// shapes yield identical hashes without having to stringify the type
-	// (which can invoke tree::print on an uninitialised type-tree and
-	// crash on the small variants used in unit tests).
-	hash_combine(seed, ba_type);
+	// In order to have a deterministic hash, we hash the type name --
+	// precomputed per type id: the string build/copy/re-hash here was the
+	// hot constant factor of every hash-consed node.
+	hash_combine(seed, tau_lang::ba_types<node>::name_hash(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
-	// Get ba constant from pool (ba_constant.data is always a ba_constants
-	// pool index, regardless of ba_type -- see node::ba_constant()).
-	if (nt == type::ba_constant && data != 0)
-		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
-	// Get string from pool
-	else if (tree<node>::is_string_nt(nt))
+	// Get ba constant from pool. Hashed by content (see ba_constant_hash):
+	// the default variant hash would use e.g. a cvc5 term's creation id and
+	// make node ordering depend on process history (GitHub #89).
+	if (nt == type::ba_constant && data != 0 && ba_type != 0) {
+		const auto c = tau_lang::ba_constants<node>::get(data);
+		hash_combine(seed, c.index(), std::visit([](const auto& v) {
+			return tau_lang::ba_constant_hash<
+				std::decay_t<decltype(v)>>{}(v);
+		}, c));
+	}
+	// Get string from pool, untyped ba_constant also has string as data
+	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
 		hash_combine(seed, dict(data));
 	else hash_combine(seed, static_cast<size_t>(data));
 	return seed;
