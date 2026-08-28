@@ -114,10 +114,11 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 	TEST_CASE("[LG4-01] disjunctive guard keeps both disjuncts") {
 		auto a = two_input_one_output("0|1");
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i0", "i1"}, {"o"}, os, "Disj");
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Disj");
+		emit_program(d, os);
 		std::string s = os.str();
-		CHECK(s.find("in.i_i0") != std::string::npos);
-		CHECK(s.find("in.i_i1") != std::string::npos);
+		CHECK(s.find("in.i0") != std::string::npos);
+		CHECK(s.find("in.i1") != std::string::npos);
 	}
 
 	// "(0|1)&2" assigns the output and gates on either input.  The '(' makes
@@ -126,11 +127,12 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 	TEST_CASE("[LG4-02] parenthesised conjunct is not dropped") {
 		auto a = two_input_one_output("(0|1)&2");
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i0", "i1"}, {"o"}, os, "ParenDisj");
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "ParenDisj");
+		emit_program(d, os);
 		std::string s = os.str();
-		CHECK(s.find("o.o_o = true") != std::string::npos);
-		CHECK(s.find("in.i_i0") != std::string::npos);
-		CHECK(s.find("in.i_i1") != std::string::npos);
+		CHECK(s.find("o.o = true") != std::string::npos);
+		CHECK(s.find("in.i0") != std::string::npos);
+		CHECK(s.find("in.i1") != std::string::npos);
 	}
 
 	// Regression guard: flat conjunctions must keep emitting exactly what they
@@ -138,11 +140,13 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 	TEST_CASE("[LG4-03] flat conjunctive guards unchanged") {
 		auto a = two_input_one_output("0&!1&2");
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i0", "i1"}, {"o"}, os, "Flat");
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Flat");
+		emit_program(d, os);
 		std::string s = os.str();
-		CHECK(s.find("in.i_i0") != std::string::npos);
-		CHECK(s.find("!in.i_i1") != std::string::npos);
-		CHECK(s.find("o.o_o = true") != std::string::npos);
+		// Flag-only prop emission bakes guard polarity into the strategy
+		// table's ints, not a textual "!in.iN" conditional.
+		CHECK(s.find("strat_.edges[0].push_back({{1,-1,1}, 0});") != std::string::npos);
+		CHECK(s.find("o.o = true") != std::string::npos);
 	}
 
 } // TEST_SUITE("cpp_codegen guard parsing (LG-4)")
@@ -170,17 +174,19 @@ TEST_SUITE("cpp_codegen trivial solution (LG-5)") {
 	TEST_CASE("[LG5-01] prop emitter does not reference q0 with an empty enum") {
 		auto a = empty_automaton();
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i"}, {"o"}, os, "Trivial");
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "Trivial");
+		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("State::q0") == std::string::npos);
 		CHECK(s.find("class Trivial {") != std::string::npos);
-		CHECK(s.find("Outputs step(const Inputs&") != std::string::npos);
+		CHECK(s.find("outputs step(const inputs&") != std::string::npos);
 	}
 
 	TEST_CASE("[LG5-02] open-prop emitter does not reference q0 either") {
 		auto a = empty_automaton();
 		std::ostringstream os;
-		emit_cpp_program_open_prop(a, {"i"}, {"o"}, {"o"}, os, "TrivialOpen");
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "TrivialOpen", /*revisable=*/false, {"o"});
+		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("State::q0") == std::string::npos);
 	}

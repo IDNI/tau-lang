@@ -313,7 +313,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		std::ostringstream os;
 		emit_program(d, os);
 		std::string s = os.str();
-		CHECK(has(s, "void revise("));
+		CHECK(has(s, "bool revise("));
 		CHECK(has(s, "revision_count"));
 		CHECK(has(s, "int state() const"));
 		CHECK(has(s, "struct strategy"));

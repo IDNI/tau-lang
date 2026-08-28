@@ -385,14 +385,17 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 		const auto& edges = sol.aut.edges.size() > (size_t)s
 		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
 		for (auto& e : edges) {
-			for (auto& disjunct : split_top_level_or(e.guard_label)) {
+			// One edge per cube; an unparsable guard label refuses the edge.
+			auto cubes = parse_guard_cubes(e.guard_label);
+			if (!cubes) continue;
+			for (auto& cube : *cubes) {
 				codegen::edge ed;
 				ed.dst = e.dst;
-				ed.guard = build_edge_guard(disjunct,
+				ed.guard = guard_from_cube(cube,
 					in_ap_idx, flag_out_ap_idx);
 				trefs tmpls;
 				std::vector<bool> is_counter;
-				for (auto& [ap_idx, positive] : parse_guard_lits(disjunct)) {
+				for (auto& [ap_idx, positive] : cube) {
 					if (!positive) continue;
 					if (ap_idx < 0
 						|| ap_idx >= (int)sol.aut.aps.size()) continue;
