@@ -590,6 +590,11 @@ private:
 	/// continuation is solvable at the current time point under the
 	/// current memory -- the one step() would execute (IN-M2).
 	std::optional<size_t> first_solvable_alternative(size_t part);
+
+	/// @brief Thin wrapper over the free solution_with_max_update,
+	/// supplying this interpreter's own time_point.
+	std::optional<assignment<node>> solution_with_max_update(tref spec);
+
 	/// @brief The running spec as step() executes it: per part its chosen
 	/// alternative when known (@p use_memory picks by solvability under
 	/// the current memory, else the last step's choice), the

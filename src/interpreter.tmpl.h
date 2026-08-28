@@ -583,8 +583,8 @@ std::optional<interpreter<node>>
 {
 	// Empty spec-side state: table mode has no normalized spec to derive
 	// ubt_ctn / original_spec / output_partition from.
-	htrefs empty_ubt_ctn;
-	std::vector<std::pair<htref, htref>> empty_spec;
+	std::vector<htrefs> empty_ubt_ctn;
+	std::vector<std::pair<htrefs, htref>> empty_spec;
 	union_find_with_sets<decltype(stream_comp), node> empty_partition(stream_comp);
 	assignment<node> empty_memory;
 	interpreter i{ empty_ubt_ctn, empty_spec, empty_partition, empty_memory, ctx };
@@ -1060,10 +1060,18 @@ std::pair<std::optional<assignment<node>>, bool>
 	// re-grounding of ubt_ctn here has no notion of that ordering, so this
 	// fallback is scoped to pure-safety, lookback-only specs with no LTL
 	// state of their own. Automaton-driven specs keep the old zero-default.
-	bool has_ltl_state = std::ranges::any_of(ubt_ctn, [](const htref& h) {
-		return mentions_ltl_state_var<node>(h->get()); });
+	bool has_ltl_state = std::ranges::any_of(ubt_ctn, [](const htrefs& part) {
+		return std::ranges::any_of(part, [](const htref& h) {
+			return mentions_ltl_state_var<node>(h->get()); }); });
+	// The direct decode conjoins ONE formula per part, so it only applies
+	// while every part has exactly one alternative -- the pure-safety
+	// lookback shape it is scoped to. A part-merged revision (multiple
+	// alternatives) takes the general path below instead.
+	bool single_alt = std::ranges::all_of(ubt_ctn,
+		[](const htrefs& part) { return part.size() == 1; });
 	tref direct_conj = nullptr;
-	if (!missing_outputs.empty() && !ubt_ctn.empty() && !has_ltl_state) {
+	if (!missing_outputs.empty() && !ubt_ctn.empty() && !has_ltl_state
+			&& single_alt) {
 		trefs direct_parts, raw_atoms;
 		direct_parts.reserve(ubt_ctn.size());
 		// Flatten each h's top-level wff_and structure into individual,
@@ -1076,9 +1084,12 @@ std::pair<std::optional<assignment<node>>, bool>
 				flatten_and(tn[0].second(), out);
 			} else out.push_back(n);
 		};
-		for (const auto& h : ubt_ctn) {
+		for (const auto& part : ubt_ctn) {
+			const htref& h = part.front();
 			flatten_and(h->get(), raw_atoms);
-			tref grounded = update_to_time_point<node>(h->get(), (int_t)time_point);
+			// The interpreter's own memoized member, not the free
+			// template -- the member shadows it inside the class.
+			tref grounded = update_to_time_point(h->get(), (int_t)time_point);
 			grounded = rewriter::replace<node>(grounded, memory);
 			direct_parts.push_back(normalize_non_temp<node>(grounded));
 		}
@@ -1096,7 +1107,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			trefs grounded_atoms;
 			grounded_atoms.reserve(raw_atoms.size());
 			for (tref a : raw_atoms) {
-				tref g = update_to_time_point<node>(a, (int_t)time_point);
+				tref g = update_to_time_point(a, (int_t)time_point);
 				grounded_atoms.push_back(rewriter::replace<node>(g, memory));
 			}
 			if (auto fast = ocltl_direct_decode_missing<node>(
@@ -1119,7 +1130,8 @@ std::pair<std::optional<assignment<node>>, bool>
 		for (tref mo : missing_outputs)
 			if (!global.contains(mo)) still_missing.push_back(mo);
 		if (!still_missing.empty()) {
-			if (auto fb = solution_with_max_update<node>(direct_conj, time_point); fb)
+			if (auto fb = ::idni::tau_lang::solution_with_max_update<node>(
+				direct_conj, time_point); fb)
 				for (tref mo : still_missing)
 					if (auto it = fb->find(mo); it != fb->end()
 						&& !global.contains(mo)) {
