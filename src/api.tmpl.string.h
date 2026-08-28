@@ -225,9 +225,9 @@ bool api<node>::sat(const std::string& expr) {
 
 template <NodeType node>
 bool api<node>::unsat(const std::string& expr) {
-	// AP1-11: route through the tref overload so unparseable input is
-	// invalid (false), not "unsatisfiable".
-	return unsat(get_spec_or_term(expr));
+	// Parsed as a bare formula, not a spec, so it is not wrapped and rejected.
+	// Unparseable input yields nullptr, so unsat returns false, not true.
+	return unsat(get_formula_or_term(expr));
 }
 
 template <NodeType node>
