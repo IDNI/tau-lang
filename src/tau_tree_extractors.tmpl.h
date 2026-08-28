@@ -573,6 +573,14 @@ int_t get_max_initial(const trefs& io_vars) {
 template <NodeType node>
 const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
+	// Cache/result shape: right-sibling-trimmed, sorted by subtree_less.
+	auto sorted_trimmed = [](const subtree_set<node>& vars) {
+		trefs out(vars.size());
+		size_t i = 0;
+		for (tref v : vars) out[i++] = tau::trim_right_sibling(v);
+		std::sort(out.begin(), out.end(), tau::subtree_less);
+		return out;
+	};
 
 	static const trefs no_free_vars{};
 
@@ -600,16 +608,41 @@ const trefs& get_free_vars(tref n) {
 			t.is(tau::bf_fall) || t.is(tau::bf_fex);
 	};
 	subtree_unordered_map<node, subtree_set<node>> memo;
-	std::function<const subtree_set<node>&(tref)> walk =
-		[&](tref m) -> const subtree_set<node>& {
+	// `spine`: m continues a chain of the same connective as its parent
+	// (the right operand of `a && (b && (c && ...))`). Its free-variable
+	// set is a suffix of the parent's; publishing it at every spine node
+	// would store k sets of size O(k) for a k-chain. Such nodes still
+	// read the cache (a chain that was a whole constant one step earlier
+	// is cached as the top-level result) but do not publish.
+	std::function<const subtree_set<node>&(tref, bool)> walk =
+		[&](tref m, bool spine) -> const subtree_set<node>& {
 		if (auto it = memo.find(m); it != memo.end()) return it->second;
 		const auto& t = tau::get(m);
+		// Connective and binder nodes are the only ones consulted in and
+		// published to the per-node cache: the walk fans out there, so that
+		// is where a cached result saves work, and leaving atoms and terms
+		// out keeps the cost of an extra lookup per node and of a cache
+		// entry per node (an insertion here, a visit in every
+		// garbage-collection sweep) off the paths made of small formulas.
+		const bool connective = t.is(tau::wff_and) || t.is(tau::wff_or);
+		const bool cacheable = connective || is_binder(t);
+		// A subtree's free-var set is intrinsic to it (see above), so a
+		// result the per-node cache already holds -- from an earlier call
+		// on this or on an enclosing formula -- is valid here as well:
+		// seed the walk from it instead of descending again.
+		if (cacheable) if (auto cached = free_vars_map.find(m);
+			cached != free_vars_map.end())
+		{
+			return memo.emplace(m, subtree_set<node>(
+				cached->second.begin(), cached->second.end()))
+					.first->second;
+		}
 		subtree_set<node> result;
 		if (is_binder(t)) {
 			// Fresh scope: only this binder's own subtree feeds it,
 			// mirroring the original push-scope-then-pop-and-merge.
 			for (tref c : t.children())
-				for (tref v : walk(c)) result.insert(v);
+				for (tref v : walk(c, false)) result.insert(v);
 			if (tref var = t.find_top(
 				(bool(*)(tref)) is_var_or_capture<node>); var)
 			{
@@ -637,16 +670,31 @@ const trefs& get_free_vars(tref n) {
 							jt->second.get().b))
 						result.insert(v);
 			}
-			for (tref c : t.children())
-				for (tref v : walk(c)) result.insert(v);
+			for (tref c : t.children()) {
+				// A wrapper (e.g. `wff`) between two connectives passes
+				// the spine flag through; a connective marks a child
+				// that wraps the same connective as its continuation.
+				const bool s = connective
+					? tau::get(c).child_is(t.is(tau::wff_and)
+						? tau::wff_and : tau::wff_or)
+					: spine;
+				for (tref v : walk(c, s)) result.insert(v);
+			}
 		}
+		// Publish the result of a connective or binder node to the per-node
+		// cache, in the same shape the top-level result takes below, so a
+		// later call -- on this subtree or on any formula containing it --
+		// does not walk it again. Before this, only the top-level result was
+		// cached and each miss re-walked every unchanged subtree; on an
+		// accumulating run that made the per-step cost superlinear in the
+		// number of accumulated clauses.
+		if (cacheable && !spine
+			&& free_vars_map.find(m) == free_vars_map.end())
+			free_vars_map.emplace(m, sorted_trimmed(result));
 		return memo.emplace(m, std::move(result)).first->second;
 	};
-	const subtree_set<node>& free_vars = walk(n);
-	trefs fv(free_vars.size());
-	size_t i = 0;
-	for (tref v : free_vars) fv[i++] = tau::trim_right_sibling(v);
-	std::sort(fv.begin(), fv.end(), tau::subtree_less);
+	const subtree_set<node>& free_vars = walk(n, false);
+	trefs fv = sorted_trimmed(free_vars);
 #ifdef DEBUG
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
 	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);

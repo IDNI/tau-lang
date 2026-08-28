@@ -2,6 +2,9 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include <set>
+#include <algorithm>
+#include <string>
 
 // ── tree::build_shift(const std::string&, size_t) (TT-1) ────────────────────
 
@@ -828,5 +831,76 @@ TEST_SUITE("get_free_vars edge inputs") {
 		const trefs& fv = get_free_vars<node_t>(tau::build_bf_fex(x, body));
 		REQUIRE(fv.size() == 1);
 		CHECK(get_var_name<node_t>(fv[0]) == "y");
+	}
+}
+// ── get_free_vars: per-subtree cache keeps scope handling intact ─────────────
+//
+// get_free_vars memoizes the free-variable sets of spine subtrees (binders,
+// and connectives with a connective or binder child) across calls. These
+// cases warm the cache through an enclosing formula and then ask for its
+// subtrees, checking that a cached answer equals a direct one: binder
+// subtraction still applies at every level, sibling context does not leak,
+// and the result stays trimmed and sorted.
+TEST_SUITE("get_free_vars cache") {
+
+	static std::set<std::string> names(const trefs& vs) {
+		std::set<std::string> out;
+		for (tref v : vs) out.insert(get_var_name<node_t>(v));
+		return out;
+	}
+	static tref var(const char* n) {
+		return tau::build_variable(std::string(n), tau_type_id<node_t>());
+	}
+
+	TEST_CASE("subtree answers after warming through the parent match direct ones") {
+		// F = ex a ((a=0 && (b=0 || c=0)) && ex d (d=0 && e=0))
+		tref left = tau::build_wff_and(x_eq_0("a"),
+			tau::build_wff_or(x_eq_0("b"), x_eq_0("c")));
+		tref inner_body = tau::build_wff_and(x_eq_0("d"), x_eq_0("e"));
+		tref inner = tau::build_wff_ex(var("d"), inner_body, false);
+		tref body = tau::build_wff_and(left, inner);
+		tref F = tau::build_wff_ex(var("a"), body, false);
+
+		// Warm: the whole formula first.
+		CHECK(names(get_free_vars<node_t>(F)) == std::set<std::string>{ "b", "c", "e" });
+		// Then every spine subtree, each of which the walk above visited.
+		CHECK(names(get_free_vars<node_t>(body)) == std::set<std::string>{ "a", "b", "c", "e" });
+		CHECK(names(get_free_vars<node_t>(inner)) == std::set<std::string>{ "e" });
+		CHECK(names(get_free_vars<node_t>(inner_body)) == std::set<std::string>{ "d", "e" });
+		CHECK(names(get_free_vars<node_t>(left)) == std::set<std::string>{ "a", "b", "c" });
+	}
+
+	TEST_CASE("results are sorted by subtree_less and right-sibling-trimmed") {
+		tref body = tau::build_wff_and(
+			tau::build_wff_and(x_eq_0("q"), x_eq_0("p")),
+			tau::build_wff_or(x_eq_0("s"), x_eq_0("r")));
+		tref F = tau::build_wff_ex(var("s"), body, false);
+		const trefs& fv = get_free_vars<node_t>(F);
+		REQUIRE(fv.size() == 3);
+		CHECK(std::is_sorted(fv.begin(), fv.end(), tau::subtree_less));
+		for (tref v : fv) CHECK(!tau::get(v).has_right_sibling());
+		// The cached body answer is the same vector shape, plus the bound one.
+		const trefs& bv = get_free_vars<node_t>(body);
+		REQUIRE(bv.size() == 4);
+		CHECK(std::is_sorted(bv.begin(), bv.end(), tau::subtree_less));
+		for (tref v : bv) CHECK(!tau::get(v).has_right_sibling());
+	}
+
+	TEST_CASE("an accumulating conjunction of independent clauses") {
+		// The shape from IDNI/tau-lang#90: k independent clauses conjoined one
+		// at a time, each query seeing the previous conjunction as a subtree.
+		tref acc = nullptr;
+		std::set<std::string> expect;
+		for (int i = 0; i < 40; ++i) {
+			std::string a = "u" + std::to_string(i), b = "v" + std::to_string(i);
+			tref clause = tau::build_wff_or(x_eq_0(a.c_str()), x_eq_0(b.c_str()));
+			acc = acc ? tau::build_wff_and(acc, clause) : clause;
+			expect.insert(a); expect.insert(b);
+			CHECK(names(get_free_vars<node_t>(acc)) == expect);
+		}
+		// Binding one variable at the top removes exactly that one.
+		tref F = tau::build_wff_ex(var("u7"), acc, false);
+		std::set<std::string> minus = expect; minus.erase("u7");
+		CHECK(names(get_free_vars<node_t>(F)) == minus);
 	}
 }
