@@ -3,8 +3,13 @@
 // Benchmark: compiled tau program vs. real tau interpreter on multiple specs.
 //
 // Each spec is run through BOTH the interpreter (full solver + normalizer per
-// step) and the compiled controller (static automaton, g++ -O3).  The speedup
-// measures the real benefit of ahead-of-time compilation.
+// step) and the compiled artifact compile_spec produces -- the same thing
+// `tau compile` gives a user, driven through the interpreter's table step
+// provider rather than a standalone step() class (an output whose value
+// needs runtime witness solving, such as this file's own o1[t]:tau =
+// i1[t]:tau, has no other way to run at all). The speedup measures the real
+// benefit of ahead-of-time synthesis, not of skipping the interpreter's I/O
+// plumbing.
 //
 // Spec "atomless4" requires an ATOMLESS Boolean algebra: it demands four
 // pairwise-distinct outputs, all strictly between {F.}:tau and {T.}:tau,
@@ -15,11 +20,13 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 #include "cpp_codegen.h"
+#include "tau_compile.h"
 #include "ltl_aba.h"
 
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <unistd.h>
 #include <sstream>
@@ -41,6 +48,7 @@ static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; 
 
 using namespace idni::tau_lang;
 using clk = std::chrono::steady_clock;
+namespace fs = std::filesystem;
 
 // ── formula strings ───────────────────────────────────────────────────────────
 
@@ -90,57 +98,69 @@ static bool has_gpp() {
     return ::system("g++ --version >/dev/null 2>&1") == 0;
 }
 
+// Used by the cpp_codegen_bench_correctness suite below, which still drives
+// emit_cpp_program directly (not compile_spec) to assert the omitted
+// ok==true invariant.
 static tref parse_formula(const char* s) {
     auto nso_rr = get_nso_rr<node_t>(tau::get(s));
     if (!nso_rr.has_value()) return nullptr;
     return nso_rr.value().main->get();
 }
 
-// Synthesize + emit + compile + run N steps.  Returns wall-clock seconds or -1.
-static double compiled_seconds(const char* formula_str,
-                               const std::string& class_name,
+// compiled_seconds' outcome: either a real wall-clock measurement, or the
+// reason there is none. `refused` distinguishes compile_spec declining the
+// spec outright (a legitimate, checked pipeline outcome -- test_codegen_parity
+// treats the same res.ok()==false as parity to verify, not a bug) from the
+// artifact actually failing to run once built (a real defect).
+struct compiled_result {
+    double seconds = -1.0;
+    bool refused = false;
+    std::string error;
+};
+
+// Synthesize + build the real compile_spec artifact, then time it running N
+// steps fed from a synthetic stdin tape. `seconds` covers the run only (the
+// cmake configure+build is not timed).
+//
+// The artifact reads each input from stdin (console_prompt_input_stream::get
+// does one std::getline per call) and stops cleanly at EOF, so "run N steps"
+// means feeding it exactly N*input_vars.size() lines: for each of the N
+// steps, one value per input var, in the order the artifact's own run_loop
+// asks for them. All input vars share the same alternating T./F. value at a
+// given step (order among them does not matter since they agree), matching
+// interp_seconds' own fill pattern below.
+static compiled_result compiled_seconds(const char* formula_str,
+                               const strings& input_vars,
+                               const std::string& tag,
                                long N) {
-    tref fm = parse_formula(formula_str);
-    if (!fm) return -1.0;
-    auto sol = solve_ltl_aba<node_t>(fm);
-    if (!sol) return -1.0;
+    fs::path bdir = fs::temp_directory_path() / ("_tau_bench_" + tag + ".build");
+    std::error_code ec;
+    fs::remove_all(bdir, ec);
 
-    std::ostringstream hdr_os;
-    emit_cpp_program<node_t>(*sol, hdr_os, class_name);
+    auto res = compile_spec<node_t>(formula_str, "", bdir.string());
+    if (!res.ok()) return { -1.0, true, res.error };
 
-    const std::string hdr_path = cg_tmp("_tau_bench_hdr.h");
-    const std::string main_path = cg_tmp("_tau_bench_main.cpp");
-    const std::string exe_path = cg_tmp("_tau_bench_exe");
-    { std::ofstream f(hdr_path); f << hdr_os.str(); }
+    fs::path tape = fs::temp_directory_path() / ("_tau_bench_" + tag + ".stdin");
     {
-        std::ofstream f(main_path);
-        f << "#include \"_tau_bench_hdr.h\"\n"
-             "#include <chrono>\n"
-             "#include <cstdio>\n"
-             "int main() {\n"
-          << "  " << class_name << " c;\n"
-          << "  " << class_name << "::Inputs in{};\n"
-             "  volatile unsigned sum = 0;\n"
-             "  auto t0 = std::chrono::steady_clock::now();\n"
-          << "  for (long i = 0; i < " << N << "L; ++i) {\n"
-             "    auto o = c.step(in);\n"
-             "    sum += (unsigned)o.ok;\n"
-             "  }\n"
-             "  auto t1 = std::chrono::steady_clock::now();\n"
-             "  double sec = std::chrono::duration<double>(t1-t0).count();\n"
-             "  std::printf(\"%.9f %u\\n\", sec, sum);\n"
-             "  return 0;\n"
-             "}\n";
+        std::ofstream f(tape);
+        for (long t = 0; t < N; ++t) {
+            const char* v = (t & 1) ? "T." : "F.";
+            for (size_t k = 0; k < input_vars.size(); ++k) f << v << "\n";
+        }
     }
-    std::string cmd = std::string("g++ -O3 -flto -std=c++17 -I" + cg_tmp_dir() + " -o ")
-                    + exe_path + " " + main_path + " 2>/dev/null";
-    if (::system(cmd.c_str()) != 0) return -1.0;
-    if (::system((std::string(exe_path) + " >" + cg_tmp("_tau_bench_out") + " 2>/dev/null").c_str()) != 0)
-        return -1.0;
-    std::ifstream out(cg_tmp("_tau_bench_out"));
-    double sec = -1.0; unsigned s = 0;
-    out >> sec >> s; (void)s;
-    return sec;
+
+    fs::path out = fs::temp_directory_path() / ("_tau_bench_" + tag + ".out");
+    std::string cmd = "\"" + res.exe_path + "\" < \"" + tape.string()
+                     + "\" > \"" + out.string() + "\" 2>/dev/null";
+    auto t0 = clk::now();
+    int rc = ::system(cmd.c_str());
+    auto t1 = clk::now();
+
+    fs::remove_all(bdir, ec);
+    fs::remove(tape, ec);
+    fs::remove(out, ec);
+    if (rc != 0) return { -1.0, false, "artifact exited with a nonzero status" };
+    return { std::chrono::duration<double>(t1 - t0).count(), false, "" };
 }
 
 // Run tau interpreter for N steps.  Returns wall-clock seconds or -1.
@@ -194,35 +214,50 @@ TEST_SUITE("cpp_codegen_bench") {
         return 0;
     }
 
+    // Opt-in: mirrors TAU_CODEGEN_RUN_SDK_LINK_TEST/TAU_CODEGEN_RUN_PARITY_TEST
+    // -- each spec below drives a real cmake configure+build (compile_spec),
+    // and every step of both the compiled artifact and the interpreter is a
+    // genuine runtime solve over the atomless tau BA rather than a table
+    // lookup, so a handful of steps already cost whole seconds. Stays out of
+    // the default ctest budget.
+    static bool run_bench() {
+        const char* v = std::getenv("TAU_CODEGEN_RUN_BENCH");
+        return v && *v && std::string(v) != "0";
+    }
+
     TEST_CASE("compiled vs interpreter throughput (real interpreter, multi-spec)") {
+        if (!run_bench()) {
+            MESSAGE("TAU_CODEGEN_RUN_BENCH not set; skipping the compile+run "
+                "throughput comparison (drives cmake configure+build per spec)");
+            return;
+        }
         if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 
-        struct Spec {
+        struct bench_spec {
             const char* name;
             const char* formula;
             strings     input_vars;
             strings     output_vars;
             long        N_compiled;
             long        N_interp;
-            // false when the interpreter cannot execute this spec (e.g. pure
-            // inequality specs produce bf_neq nodes the interpreter can't solve)
-            bool        interp_capable = true;
         };
 
-        Spec specs[] = {
+        // Both N_compiled and N_interp are steps, not millions: every step
+        // is a genuine witness solve (see compiled_seconds/interp_seconds),
+        // not a baked table lookup, so counts stay small enough to keep the
+        // whole test in the minutes range rather than hours.
+        bench_spec specs[] = {
             {
                 "echo_simple",
                 ECHO_FORMULA,
                 {"i1"}, {"o1"},
-                10'000'000L, 50L, true
+                300L, 50L
             },
             {
-                // Pure-inequality spec: interpreter can synthesize but not execute.
-                // Only the compiled path is timed; no c > i assertion.
                 "atomless2",
                 ATOMLESS2_FORMULA,
                 {"i1", "i2"}, {"o1", "o2"},
-                10'000'000L, 10L, false
+                10L, 3L
             },
         };
 
@@ -237,25 +272,31 @@ TEST_SUITE("cpp_codegen_bench") {
                 MESSAGE("Spec        : atomless2 — SKIPPED (< 8 GB free)");
                 continue;
             }
-            double c_sec = compiled_seconds(s.formula, std::string(s.name), s.N_compiled);
-            double c_rate = c_sec > 0 ? (double)s.N_compiled / c_sec : -1.0;
+            auto cres = compiled_seconds(s.formula, s.input_vars,
+                                         std::string(s.name), s.N_compiled);
+            double c_rate = cres.seconds > 0
+                ? (double)s.N_compiled / cres.seconds : -1.0;
 
             MESSAGE("────────────────────────────────────────────────────────────────────");
             MESSAGE("Spec        : " << std::string(s.name));
 
-            if (c_sec <= 0) {
-                MESSAGE("Compiled    : FAILED (synthesize/compile/run error)");
-                CHECK(false);  // compiled path must always work
+            // compile_spec declining the spec outright is a legitimate,
+            // checked pipeline outcome (test_codegen_parity treats the same
+            // res.ok()==false as parity to verify, not a bug) -- report and
+            // move on rather than failing the whole suite over it.
+            if (cres.refused) {
+                MESSAGE("Compiled    : SKIPPED (compile_spec refused: "
+                        << cres.error << ")");
+                continue;
+            }
+            if (cres.seconds <= 0) {
+                MESSAGE("Compiled    : FAILED (" << cres.error << ")");
+                CHECK(false);  // a built artifact must always run
                 continue;
             }
 
             MESSAGE("Compiled    : " << c_rate << " steps/sec"
-                    "  (" << s.N_compiled << " steps in " << c_sec << "s)");
-
-            if (!s.interp_capable) {
-                MESSAGE("Interpreter : N/A (pure-inequality spec; interpreter uses equality solver)");
-                continue;
-            }
+                    "  (" << s.N_compiled << " steps in " << cres.seconds << "s)");
 
             double i_sec = interp_seconds(s.formula, s.input_vars,
                                           s.output_vars, s.N_interp);

@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// First-class Spec { transient; invariant; reactive } pipeline type (#5).
+// First-class decomposed_spec { transient; invariant; reactive } pipeline type (#5).
 //
 // A tau LTL(ABA) specification decomposes cleanly into three pieces:
 //
@@ -13,7 +13,7 @@
 // The existing `rr<node>` carries recurrence relations and a single `main`
 // formula — it does not surface this decomposition.  Many parts of the
 // synthesis pipeline effectively re-derive it (splitting conjuncts,
-// collecting G clauses, detecting temporal shapes).  `Spec` is the shared
+// collecting G clauses, detecting temporal shapes).  `decomposed_spec` is the shared
 // type for that decomposition, with a helper `decompose_spec` that does
 // the split once.
 //
@@ -25,8 +25,8 @@
 // game pipeline, GR(1) detection) would opt in by calling
 // `decompose_spec(main)`; until one does, treat this as staged work.
 
-#ifndef __IDNI__TAU__SPEC_H__
-#define __IDNI__TAU__SPEC_H__
+#ifndef __IDNI__TAU__DECOMPOSED_SPEC_H__
+#define __IDNI__TAU__DECOMPOSED_SPEC_H__
 
 #include "gr1_detect.h"
 #include "ltl_aba.h"
@@ -35,7 +35,7 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
-struct Spec {
+struct decomposed_spec {
 	// Non-temporal constraints holding at t=0 only (initial conditions).
 	// May be a null tref when the formula has no transient component.
 	tref transient = nullptr;
@@ -46,7 +46,7 @@ struct Spec {
 };
 
 // Walk a top-level && chain classifying each conjunct as transient,
-// invariant, or reactive; return the resulting Spec.  The conjuncts are
+// invariant, or reactive; return the resulting decomposed_spec.  The conjuncts are
 // joined back up with wff_and within each category.
 //
 // Classification rules (conservative):
@@ -58,9 +58,9 @@ struct Spec {
 //                           is handled by the caller's initial-conditions
 //                           logic).
 template <NodeType node>
-inline Spec<node> decompose_spec(tref main_fm) {
+inline decomposed_spec<node> decompose_spec(tref main_fm) {
 	using tau = tree<node>;
-	Spec<node> s;
+	decomposed_spec<node> s;
 	if (!main_fm) return s;
 
 	std::function<void(tref)> visit = [&](tref fm) {
@@ -146,4 +146,4 @@ inline Spec<node> decompose_spec(tref main_fm) {
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__SPEC_H__
+#endif // __IDNI__TAU__DECOMPOSED_SPEC_H__

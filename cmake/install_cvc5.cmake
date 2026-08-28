@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 #   COMPONENT:   install component name
 #   SYSTEM_NAME: target platform
 function(install_cvc5 DESTINATION COMPONENT SYSTEM_NAME)
-	set(CVC5_DIST_DIR "${TAU_SHARED_PREFIX}/cvc5/dist")
+	set(CVC5_DIST_DIR "${TAU_SHARED_PREFIX_RESOLVED}/cvc5/dist")
 	set(CVC5_LIB_DIR "${CVC5_DIST_DIR}/lib")
 	set(CVC5_LIB_PATTERN "*.so*")
 	set(CVC5_IS_CROSS_WIN FALSE)
@@ -18,7 +18,7 @@ function(install_cvc5 DESTINATION COMPONENT SYSTEM_NAME)
 	set(CVC5_TOOLCHAIN_DLLS "")
 
 	if(SYSTEM_NAME STREQUAL "Windows")
-		set(CVC5_DIST_DIR "${TAU_SHARED_PREFIX}/cvc5/dist-w64")
+		set(CVC5_DIST_DIR "${TAU_SHARED_PREFIX_RESOLVED}/cvc5/dist-w64")
 		set(CVC5_LIB_DIR "${CVC5_DIST_DIR}/bin")
 		set(CVC5_LIB_PATTERN "*.dll")
 		set(CVC5_IS_CROSS_WIN TRUE)

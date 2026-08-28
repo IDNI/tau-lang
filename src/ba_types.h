@@ -148,6 +148,9 @@ struct ba_types {
 	/** @brief Return the integer id for type tree @p ba_type, inserting it if absent. */
 	static size_t id(tref ba_type);
 
+	/** @brief Return the number of registered type trees (valid ids are 0..count()-1). */
+	static size_t count();
+
 	/** @brief Return the type tree corresponding to @p ba_type_id. */
 	static tref type_tree(size_t ba_type_id);
 
@@ -277,6 +280,10 @@ bool pack_owns_ba_type_name(const std::string& name);
 /** @brief Whether @p ba_type_id is reserved or owned by the configured pack, compared by family name. */
 template <NodeType node>
 bool pack_owns_ba_type(size_t ba_type_id);
+
+/** @brief Refine @p type_id to its owner's default parameter if underspecified, else unchanged. */
+template <NodeType node>
+size_t pack_default_ba_type(size_t type_id);
 
 /** @brief Search @p term and its children for any assigned BA type id; return 0 if not found. */
 template <NodeType node>

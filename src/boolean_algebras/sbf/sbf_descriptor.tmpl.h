@@ -15,6 +15,11 @@
 
 namespace idni::tau_lang {
 
+// Defined in sbf_codegen.tmpl.h, included at this file's end; declared here
+// so the descriptor's own definition context can name it.
+template <NodeType node>
+static std::optional<std::string> sbf_codegen_constant_expr(tref cst);
+
 template <typename... PackBAs>
 struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -78,6 +83,14 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 
 	static std::string literal_zero(tref) { return "0"; }
 
+	/** @brief The sbf constant holding @p value (0 or 1), wrapped as a bf constant. */
+	static tref value_constant(size_t, size_t value) {
+		return tau::get(tau::bf, tau::get_ba_constant(
+			typename tau::constant(value ? bdd_handle<Bool>::htrue
+			                              : bdd_handle<Bool>::hfalse),
+			type_tree()));
+	}
+
 	static sbf_ba normalize(const sbf_ba& x) { return normalize_sbf(x); }
 
 	static sbf_ba splitter(const sbf_ba& x, splitter_type st) {
@@ -112,8 +125,15 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 			.to_str(sbf_parser::error::info_lvl::INFO_BASIC)
 			.find("Unexpected end of file") != std::string::npos;
 	}
+
+	/** @brief @p cst's own sbf BDD value, spelled for generated C++. */
+	static std::optional<std::string> codegen_constant_expr(tref cst) {
+		return sbf_codegen_constant_expr<node_t>(cst);
+	}
 };
 
 } // namespace idni::tau_lang
+
+#include "boolean_algebras/sbf/sbf_codegen.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_DESCRIPTOR_TMPL_H__

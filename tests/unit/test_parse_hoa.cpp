@@ -34,7 +34,7 @@ static const char* good_hoa =
 TEST_SUITE("parse_hoa") {
 
 	TEST_CASE("[HOA-01] a well-formed strategy parses") {
-		HoaAutomaton aut = parse_hoa(good_hoa);
+		hoa_automaton aut = parse_hoa(good_hoa);
 		CHECK(aut.num_states == 2);
 		CHECK(aut.initial_state == 0);
 		REQUIRE(aut.aps.size() == 2);
@@ -53,7 +53,7 @@ TEST_SUITE("parse_hoa") {
 	TEST_CASE("[HOA-02] text after --END-- is not spliced in (SY-4)") {
 		std::string two = std::string(good_hoa)
 			+ "HOA: v1\nStates: 7\n--BODY--\nState: 0\n[t] 0\n--END--\n";
-		HoaAutomaton aut = parse_hoa(two);
+		hoa_automaton aut = parse_hoa(two);
 		CHECK(aut.num_states == 2);
 		CHECK(aut.edges[0].size() == 2);
 	}
@@ -90,7 +90,7 @@ TEST_SUITE("parse_hoa") {
 	}
 
 	TEST_CASE("[HOA-08] out-of-range states and edges are dropped, not indexed (LT-10)") {
-		HoaAutomaton aut = parse_hoa(
+		hoa_automaton aut = parse_hoa(
 			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n--BODY--\n"
 			"State: 0\n[0] 5\n[!0] 0\nState: 3\n[t] 0\n--END--\n");
 		CHECK(aut.num_states == 1);
@@ -102,7 +102,7 @@ TEST_SUITE("parse_hoa") {
 	TEST_CASE("[HOA-09] a 1-state strategy with no edge is not executable (LA-R6)") {
 		// parse_hoa accepts it (it is a well-formed header + body); the
 		// encoder must refuse to execute it as `always T`.
-		HoaAutomaton aut = parse_hoa(
+		hoa_automaton aut = parse_hoa(
 			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n--BODY--\nState: 0\n--END--\n");
 		CHECK(aut.num_states == 1);
 		CHECK(aut.edges[0].empty());

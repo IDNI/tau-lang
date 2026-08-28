@@ -22,7 +22,10 @@
 #include "normalizer.h"
 #include "ltl_aba_result.h"
 #include "bounded_cache.h"
+#include "ocltl_phi_delta.h"
+#include "boolean_algebras/nso_ba.h"
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -84,7 +87,7 @@ std::string ltl_skeleton(tref fm,
 // Each S/T subformula is replaced by a fresh propositional state variable
 // in the skeleton.  The DFA transition + initial condition are encoded as
 // LTL constraints (G, X, propositional) that ltlsynt handles natively.
-struct PastTemporalTester {
+struct past_temporal_tester {
 	std::string state_var;
 	/// Informational only (LT-15): always false ((φ S ψ)(−1) = false);
 	/// the encoding hard-codes !state_var at t=0. Kept for the
@@ -100,7 +103,7 @@ struct PastTemporalTester {
 // Build skeleton with temporal testers.  Returns {skeleton, testers}.
 // Caller must call append_tester_constraints() and add state vars to outputs.
 template <NodeType node>
-std::pair<std::string, std::vector<PastTemporalTester>>
+std::pair<std::string, std::vector<past_temporal_tester>>
 ltl_skeleton_with_testers(
     tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms);
@@ -108,7 +111,7 @@ ltl_skeleton_with_testers(
 // Append DFA tester constraints to the skeleton string.
 void append_tester_constraints(
     std::string& skeleton,
-    const std::vector<PastTemporalTester>& testers);
+    const std::vector<past_temporal_tester>& testers);
 
 // ── Input / output classification ────────────────────────────────────────────
 
@@ -196,7 +199,7 @@ tref guard_to_aba(const std::string& guard_label,
 // The result is a pure LTL formula over I ∪ O ∪ W (witnesses).
 
 // State subformula context for CTL* reduction
-struct CtlStarWitness {
+struct ctl_star_witness {
     tref original;       // the E χ subformula
     std::string name;    // fresh witness output name, e.g. "w_0"
     tref path_formula;   // the inner path formula χ
@@ -212,7 +215,7 @@ struct CtlStarWitness {
 // names (`w_<n>`) have no `o` prefix, so classification rests entirely on
 // the direction bit.
 template <NodeType node>
-struct CtlStarReduction {
+struct ctl_star_reduction {
     tref ltl_formula;                    // reduced LTL formula
     std::vector<std::string> witnesses;  // witness output variable names
     // IN-R6: BA type id per witness (index-aligned with `witnesses`);
@@ -222,7 +225,7 @@ struct CtlStarReduction {
 };
 
 template <NodeType node>
-CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm);
+ctl_star_reduction<node> reduce_ctl_star_to_ltl(tref fm);
 
 // Check if a formula contains CTL* path quantifiers (A or E)
 template <NodeType node>
@@ -275,7 +278,7 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 //
 // Forward-declared here; the full struct definition lives in
 // `ltl_aba_normalization.tmpl.h` (per upstream PR #90 god-file split).
-// Forward-decl is enough for `std::optional<LtlAbaSolution<node>>` in the
+// Forward-decl is enough for `std::optional<ltl_aba_solution<node>>` in the
 // signature below — the type only needs to be complete at instantiation
 // sites (interpreter.impl.h, cpp_codegen.tmpl.h), which include the tmpl
 // chain that defines it.
@@ -285,7 +288,7 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 // Defined in ltl_aba_builders.tmpl.h / ltl_aba_normalization.tmpl.h; declared
 // here so the contracts are visible without reading the template bodies.
 //
-// LtlAbaSolution conventions (every algorithm honours these):
+// ltl_aba_solution conventions (every algorithm honours these):
 //   - `aut.num_states == 0` means "realizable with no strategy automaton";
 //     is_ltl_aba_realizable reports such a solution REALIZABLE without
 //     running the ABA oracle; parse_hoa never produces it (a strategy text
@@ -304,7 +307,7 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 // strategy solution, or nullopt when the formula is UNREALIZABLE.  Throws
 // ltl_synthesis_error when no verdict could be obtained.
 template <NodeType node>
-static std::optional<LtlAbaSolution<node>> solve_ltl_aba(tref fm);
+static std::optional<ltl_aba_solution<node>> solve_ltl_aba(tref fm);
 
 // Existential / synthesis feasibility dispatch for a data conjunction:
 // pure-input and pure-output omcat/nlang formulas use existential
@@ -315,14 +318,14 @@ static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input);
 // Multi-state Mealy strategy -> always(phi) with one-hot auxiliary state
 // bits o__ltl_ms<i>__ (see the block comment at the definition).
 template <NodeType node>
-static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol);
+static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
 
 // Initial-state conditions for the encoding above: {init bits, first-step
 // output constraint}; the second element is nullptr when the initial state
 // has no outgoing edge.
 template <NodeType node>
 static std::pair<tref,tref>
-encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
+encode_mealy_initial_conditions(const ltl_aba_solution<node>& sol,
                                 const std::vector<std::string>& sv);
 
 // Convert a realizable LTL formula to a tau-lang safety formula (always(phi))
@@ -340,7 +343,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 template <NodeType node>
 tref ltl_to_safety_formula(tref fm);
 
-// Variant that ALSO returns the LtlAbaSolution<node> (the strategy automaton +
+// Variant that ALSO returns the ltl_aba_solution<node> (the strategy automaton +
 // atoms map) when one was synthesised. The interpreter caches it so that
 // downstream code can introspect the Mealy state at runtime, visualise the
 // strategy, extract boundary traces, etc. — the strategy's information is
@@ -359,7 +362,7 @@ tref ltl_to_safety_formula(tref fm);
 // (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
 // other path (the ppLTLTT tester encoding anchors inside the skeleton).
 template <NodeType node>
-std::tuple<tref, std::optional<LtlAbaSolution<node>>, std::vector<std::string>>
+std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm);
 
 } // namespace idni::tau_lang

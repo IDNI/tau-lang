@@ -13,6 +13,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_CODEGEN_TMPL_H__
 
 #include <cstdio>
+#include <sstream>
 #include <string>
 
 #include "boolean_algebras/qlt/qlt.h"
@@ -21,36 +22,59 @@
 
 namespace idni::tau_lang {
 
-// Format a rational as a C++ double literal.
-//
-// The rational is exact; this conversion is the one place a value is rounded,
-// and it is a real limitation: a double cannot represent every rational, so a
-// midpoint of a narrow interval can still land outside it. Emitting the
-// rational itself is what removes that, and needs the emitted value type.
-inline std::string rational_to_cpp(const qlt_rational& r) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "%.17g", (double)r.p / (double)r.q);
-	std::string s(buf);
-	bool has_dot_or_e = false;
-	for (char c : s) if (c == '.' || c == 'e' || c == 'E') {
-		has_dot_or_e = true; break;
-	}
-	if (!has_dot_or_e) s += ".0";
-	return s;
+// A self-contained C++ expression of type tref: an IIFE that builds the exact
+// rational r as a qlt singleton and registers it through the BA's own
+// constant pool, so the value reaching the generated program is a real qlt
+// constant rather than a double approximation of one.
+template <NodeType node>
+inline std::string qlt_witness_expr(const qlt_rational& r) {
+	std::ostringstream ss;
+	ss << "[]() -> ::idni::tref {\n"
+	   << "\t\t\t\t::idni::tau_lang::qlt_piece p;\n"
+	   << "\t\t\t\tp.lo = ::idni::tau_lang::qlt_endpoint{"
+	   << "::idni::tau_lang::qlt_rational(" << r.p << ", " << r.q << "), "
+	   << "::idni::tau_lang::qlt_bound::CLOSED};\n"
+	   << "\t\t\t\tp.hi = p.lo;\n"
+	   << "\t\t\t\t::idni::tau_lang::qlt singleton{{p}};\n"
+	   << "\t\t\t\tusing node_t = ::idni::tau_lang::tau_pack::node_t;\n"
+	   << "\t\t\t\t::idni::tau_lang::tree<node_t>::constant c = singleton;\n"
+	   << "\t\t\t\t::idni::tref witness_raw = "
+	   << "::idni::tau_lang::ba_constants<node_t>::get(c, "
+	   << "::idni::tau_lang::ba_descriptor<::idni::tau_lang::qlt, node_t>"
+	   << "::type_tree());\n"
+	   << "\t\t\t\treturn ::idni::tau_lang::tree<node_t>::get("
+	   << "::idni::tau_lang::tree<node_t>::bf, witness_raw);\n"
+	   << "\t\t\t}()";
+	return ss.str();
 }
 
-// The codegen_witness capability: a C++ literal satisfying the conjunction of
-// ordering atoms on var. An interval the elimination cannot determine still
-// yields a literal, since the ABA oracle has already found the edge feasible.
+// The codegen_witness capability: a self-contained C++ expression of type
+// tref satisfying the conjunction of ordering atoms on var. An interval the
+// elimination cannot determine still yields a value, since the ABA oracle has
+// already found the edge feasible.
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj) {
 	if (auto interval = qlt_dlo_qe_interval<node>(var, conj); interval)
 		if (auto witness = qlt_pick_witness<node>(*interval); witness)
-			return rational_to_cpp(*witness);
+			return qlt_witness_expr<node>(*witness);
 	// No determined interval, or none of its pieces yields a witness. The ABA
 	// oracle has already found the edge feasible, so emit a value rather than
-	// refusing: 1.0 is what this has always emitted here.
-	return rational_to_cpp(qlt_rational(1, 1));
+	// refusing: 1 is what this has always emitted here.
+	return qlt_witness_expr<node>(qlt_rational(1, 1));
+}
+
+// The codegen_constant_expr capability: @p cst is already trimmed to a closed, single-point qlt value, so this only extracts and spells its rational.
+template <NodeType node>
+static std::optional<std::string> qlt_codegen_constant_expr(tref cst) {
+	using tau = tree<node>;
+	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
+	qlt v = std::get<qlt>(tau::get(cst).get_ba_constant());
+	if (v.pieces.size() != 1) return std::nullopt;
+	const auto& p = v.pieces[0];
+	if (p.lo.bound != qlt_bound::CLOSED || p.hi.bound != qlt_bound::CLOSED
+	    || p.lo.val != p.hi.val || !p.lo.val.is_finite())
+		return std::nullopt;
+	return qlt_witness_expr<node>(p.lo.val);
 }
 
 } // namespace idni::tau_lang

@@ -32,12 +32,12 @@ static bool realizable(const char* s) {
 
 // Ask cvc5 LRA: ∃x:Real. phi(x), where phi is built by the caller.
 // Returns true iff SAT.
-struct LraSolver {
+struct lra_solver {
 	TermManager tm;
 	Sort real_sort;
 	Term x, y; // free variables "o1", "o2"
 
-	LraSolver()
+	lra_solver()
 		: real_sort(tm.getRealSort()),
 		  x(tm.mkVar(real_sort, "o1")),
 		  y(tm.mkVar(real_sort, "o2")) {}
@@ -77,7 +77,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// cvc5: ∃x. x > 1/4 ∧ x < 3/4 → SAT
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {1/4}:qlt) && (o1[t]:qlt < {3/4}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(1, 4)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(3, 4)})
@@ -93,7 +93,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// cvc5: ∃x. x > 3/4 ∧ x < 1/4 → UNSAT
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {3/4}:qlt) && (o1[t]:qlt < {1/4}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(3, 4)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(1, 4)})
@@ -106,7 +106,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 
 	TEST_CASE("QO-03: singleton equality {1/3} — SAT") {
 		bool tau_r = realizable("G ((o1[t]:qlt = {1/3}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::EQUAL, {lra.x, lra.rat(1, 3)});
 		bool cvc5_r = lra.exists_sat(phi);
 		CHECK(tau_r == true);
@@ -117,7 +117,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 	TEST_CASE("QO-04: contradictory equalities {1/3} = {2/3} — UNSAT") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt = {1/3}:qlt) && (o1[t]:qlt = {2/3}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::EQUAL, {lra.x, lra.rat(1, 3)}),
 			lra.tm.mkTerm(Kind::EQUAL, {lra.x, lra.rat(2, 3)})
@@ -130,7 +130,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 
 	TEST_CASE("QO-05: strictly positive half-line — SAT") {
 		bool tau_r = realizable("G ((o1[t]:qlt > {0}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(0)});
 		bool cvc5_r = lra.exists_sat(phi);
 		CHECK(tau_r == true);
@@ -143,7 +143,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)"
 			" && (o1[t]:qlt > {1/2}:qlt) && (o1[t]:qlt < {3/4}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(0)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(1)}),
@@ -161,7 +161,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// (1/2,1/2): open interval — empty (UNSAT)
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {1/2}:qlt) && (o1[t]:qlt < {1/2}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(1, 2)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(1, 2)})
@@ -176,7 +176,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// ∃x. x > -1 ∧ x < 0 (open interval (-1,0))
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {-1}:qlt) && (o1[t]:qlt < {0}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(-1)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(0)})
@@ -191,7 +191,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// ∃x. x > 99/100 ∧ x < 101/100 → SAT (x = 1)
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {99/100}:qlt) && (o1[t]:qlt < {101/100}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(99, 100)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(101, 100)})
@@ -206,7 +206,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// ∃x. x > 1 ∧ x < 1 → UNSAT (empty open interval)
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {1}:qlt) && (o1[t]:qlt < {1}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(1)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(1)})
@@ -220,7 +220,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 	TEST_CASE("QO-11: union of intervals (x<1/4 || x>3/4) — SAT") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt < {1/4}:qlt) || (o1[t]:qlt > {3/4}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::OR, {
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(1, 4)}),
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(3, 4)})
@@ -233,7 +233,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// Closed singleton {1/2}: satisfiable (x=1/2).
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt >= {1/2}:qlt) && (o1[t]:qlt <= {1/2}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GEQ, {lra.x, lra.rat(1, 2)}),
 			lra.tm.mkTerm(Kind::LEQ, {lra.x, lra.rat(1, 2)})
@@ -245,7 +245,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 	TEST_CASE("QO-13: non-strict contradictory (x>=1 && x<=0) — UNSAT") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt >= {1}:qlt) && (o1[t]:qlt <= {0}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GEQ, {lra.x, lra.rat(1)}),
 			lra.tm.mkTerm(Kind::LEQ, {lra.x, lra.rat(0)})
@@ -258,7 +258,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// ∃o1 ∃o2. o1 > 1/3 ∧ o2 < 2/3 : independent intervals.
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {1/3}:qlt) && (o2[t]:qlt < {2/3}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(1, 3)}),
 			lra.tm.mkTerm(Kind::LT, {lra.y, lra.rat(2, 3)})
@@ -273,7 +273,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1/3}:qlt)"
 			" && (o2[t]:qlt > {1/2}:qlt) && (o2[t]:qlt < {1}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(0)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(1, 3)}),
@@ -288,7 +288,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		// Trivial tautology over Q.
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt < {1}:qlt) || (o1[t]:qlt >= {1}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::OR, {
 			lra.tm.mkTerm(Kind::LT,  {lra.x, lra.rat(1)}),
 			lra.tm.mkTerm(Kind::GEQ, {lra.x, lra.rat(1)})
@@ -300,7 +300,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 	TEST_CASE("QO-17: tight closed interval [1/4, 3/4] — SAT") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt >= {1/4}:qlt) && (o1[t]:qlt <= {3/4}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GEQ, {lra.x, lra.rat(1, 4)}),
 			lra.tm.mkTerm(Kind::LEQ, {lra.x, lra.rat(3, 4)})
@@ -314,7 +314,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		bool tau_r = realizable(
 			"G ((o1[t]:qlt > {1234/5678}:qlt)"
 			" && (o1[t]:qlt < {9012/345}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT, {lra.x, lra.rat(1234, 5678)}),
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(9012, 345)})
@@ -329,7 +329,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 			"G ((o1[t]:qlt < {-1}:qlt)"
 			" || ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt))"
 			" || (o1[t]:qlt > {2}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::OR, {
 			lra.tm.mkTerm(Kind::LT, {lra.x, lra.rat(-1)}),
 			lra.tm.mkTerm(Kind::AND, {
@@ -348,7 +348,7 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 			"G ((o1[t]:qlt > {1/2}:qlt)"
 			" && (o1[t]:qlt < {1/2}:qlt)"
 			" && (o1[t]:qlt >= {0}:qlt)).");
-		LraSolver lra;
+		lra_solver lra;
 		auto phi = lra.tm.mkTerm(Kind::AND, {
 			lra.tm.mkTerm(Kind::GT,  {lra.x, lra.rat(1, 2)}),
 			lra.tm.mkTerm(Kind::LT,  {lra.x, lra.rat(1, 2)}),

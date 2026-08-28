@@ -31,7 +31,7 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
-struct LivenessDecomp {
+struct liveness_decomp {
 	// The G(ψ_safe) conjunct, or nullptr if no safety.
 	tref safety_part = nullptr;
 	// Each GF(ψ_j)'s ψ_j body (one entry per GF obligation).
@@ -62,9 +62,9 @@ inline void gather_conjuncts(tref fm, std::vector<tref>& out) {
 } // namespace liveness_decomp_internal
 
 template <NodeType node>
-inline LivenessDecomp<node> decompose_liveness(tref fm) {
+inline liveness_decomp<node> decompose_liveness(tref fm) {
 	using tau = tree<node>;
-	LivenessDecomp<node> d;
+	liveness_decomp<node> d;
 	if (!fm) return d;
 
 	// Classify every conjunct.

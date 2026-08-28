@@ -71,7 +71,7 @@ inline std::string d_pattern(int A, int K) {
 	return ss.str();
 }
 
-struct BSkeletonBundle {
+struct b_skeleton_bundle {
 	std::string formula;
 	std::vector<std::string> outs;  // r_0..r_{n_rbits-1} then d_0..d_{K-1}
 	std::vector<std::string> ins;   // p_0..p_{n_pbits-1}
@@ -89,7 +89,7 @@ struct BSkeletonBundle {
 //                 and D-bitmask of τ = A).
 // t2_pos_m[σ]:   pos_m field of T₂ type σ (needed for Ψ_I grouping).
 // phi_star_ltl:  LTL skeleton over d_0..d_{K-1} in Spot format.
-inline BSkeletonBundle build_algorithm_b_skeleton(
+inline b_skeleton_bundle build_algorithm_b_skeleton(
 	int T1_size,
 	int T2_size,
 	int K,
@@ -97,7 +97,7 @@ inline BSkeletonBundle build_algorithm_b_skeleton(
 	const std::vector<int>& t2_pos_m,
 	const std::string& phi_star_ltl)
 {
-	BSkeletonBundle b;
+	b_skeleton_bundle b;
 	b.T1_size = T1_size;
 	b.T2_size = T2_size;
 	b.K       = K;

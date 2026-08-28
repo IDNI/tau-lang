@@ -29,8 +29,8 @@
 
 namespace idni::tau_lang::mealy {
 
-// Edge of the extracted Mealy machine.
-struct Edge {
+// mealy_edge of the extracted Mealy machine.
+struct mealy_edge {
 	int from_state;       // vertex index (b, q) in the product game
 	int input_sigma;      // T_2 index
 	int output_tau;       // T_3 index
@@ -43,10 +43,10 @@ struct Edge {
 // from/to are DENSE state indices remapped via vertex_to_state -- do
 // not walk edges starting from initial_state without translating it
 // through the same map first.
-struct Mealy {
+struct machine {
 	int num_states = 0;
 	int initial_state = 0;
-	std::vector<Edge> edges;
+	std::vector<mealy_edge> edges;
 };
 
 // Extract a Mealy machine from a winning-strategy witness map.
@@ -55,14 +55,14 @@ struct Mealy {
 // `successor` computes the next vertex from (vertex, τ) using the game's
 // transition function (sh(τ)|_m combined with δ_A(q, J(τ))).
 template <class Successor>
-inline Mealy extract_mealy(
+inline machine extract_mealy(
     const std::vector<int>& winning_vertices,
     int initial_state,
     const std::map<std::pair<int,int>, int>& witness,
     int num_T2,
     Successor successor)
 {
-	Mealy m;
+	machine m;
 	m.initial_state = initial_state;
 	// Assign dense state indices to winning vertices.
 	std::unordered_map<int,int> vertex_to_state;
@@ -79,7 +79,7 @@ inline Mealy extract_mealy(
 			int next_v = successor(v, tau);
 			auto nit = vertex_to_state.find(next_v);
 			if (nit == vertex_to_state.end()) continue;
-			Edge e{qs, sigma, tau, nit->second};
+			mealy_edge e{qs, sigma, tau, nit->second};
 			m.edges.push_back(e);
 		}
 	}

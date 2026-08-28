@@ -365,8 +365,8 @@ inline std::pair<bool, std::string> call_ltlsynt(
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
 
-inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
-	HoaAutomaton aut;
+inline hoa_automaton parse_hoa(const std::string& hoa_text) {
+	hoa_automaton aut;
 	std::istringstream ss(hoa_text);
 	std::string line;
 
@@ -456,7 +456,7 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 
 		// LT-10: an edge to an out-of-range destination is dropped
 		if (dst < 0 || dst >= (int) aut.num_states) continue;
-		HoaEdge e;
+		hoa_edge e;
 		e.guard_label = guard;
 		e.dst = dst;
 		// Edge acceptance mark
@@ -500,7 +500,7 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 
 namespace alg_d {
 
-inline const SynthGame& call_ltlsynt_game(
+inline const synth_game& call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs)
@@ -508,7 +508,7 @@ inline const SynthGame& call_ltlsynt_game(
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
 	// TT2-13 / LG-27: a bounded_cache in runtime-bound mode (`set
 	// cachebound`, 0 = unbounded, FIFO eviction) instead of the previous
-	// unbounded unordered_map of full SynthGame copies — this cache holds
+	// unbounded unordered_map of full synth_game copies — this cache holds
 	// no trefs, so the tree GC never pruned it and the bound is its only
 	// control. The returned reference is valid until a later call inserts
 	// (and possibly evicts); callers copy on assignment.
@@ -517,7 +517,7 @@ inline const SynthGame& call_ltlsynt_game(
 		for (size_t i = 0; i < v.size(); ++i) { if (i) r += ","; r += v[i]; }
 		return r;
 	};
-	static bounded_cache<std::string, SynthGame> cache{&cache_bound};
+	static bounded_cache<std::string, synth_game> cache{&cache_bound};
 	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
 	// name, so the concatenation is injective.
 	const std::string key =
@@ -530,7 +530,7 @@ inline const SynthGame& call_ltlsynt_game(
 	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
 	if (tmpfile_path.empty()) {
 		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		static const SynthGame empty_game{};
+		static const synth_game empty_game{};
 		return empty_game;  // transient — don't cache
 	}
 

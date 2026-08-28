@@ -105,8 +105,10 @@ set(TAU_TEST_REQUIRES_test_ba_types_inference sbf)
 set(TAU_TEST_REQUIRES_test_base_ba_dispatcher bv sbf)
 set(TAU_TEST_REQUIRES_test_bv_ba_hooks bv)
 set(TAU_TEST_REQUIRES_test_by_grammar bv nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_codegen_parity bv qlt sbf)
 set(TAU_TEST_REQUIRES_test_cpp_codegen_bench bv)
 set(TAU_TEST_REQUIRES_test_cpp_codegen_data_atoms bv qlt)
+set(TAU_TEST_REQUIRES_test_cpp_codegen_program_desc qlt)
 set(TAU_TEST_REQUIRES_test_hbdd sbf)
 set(TAU_TEST_REQUIRES_test_hooks bv)
 set(TAU_TEST_REQUIRES_test_integration-ba_types_inference bv sbf)
@@ -349,7 +351,9 @@ endif ()
 #
 # Benchmark testing
 #
-if (TAU_BUILD_BENCHMARK)
+# The valgrind benchmark tests reference the tau executable target, so only
+# add them when that target is actually going to be built.
+if (TAU_BUILD_BENCHMARK AND TAU_BUILD_EXECUTABLE)
 	enable_testing()
 	add_subdirectory(benchmark)
 endif ()

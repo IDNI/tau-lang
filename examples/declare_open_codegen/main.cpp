@@ -6,7 +6,7 @@
 // What this demonstrates:
 //   1. Synthesise spec.tau via `tau_codegen --open o_p0` to emit
 //      program.h. The emitted class gains:
-//        - OracleCallback typedef
+//        - oracle_callback typedef
 //        - register_open_oracle / unregister_open_oracle methods
 //        - open_streams() / open_streams_count() static metadata
 //        - admissible_values_mask(State, stream) static method
@@ -47,7 +47,7 @@ static const char* my_oracle(const char* formula, void* /*user_data*/) {
 }
 
 int main() {
-	TauProgram prog;
+	tau_program prog;
 
 	// ── Step 1: register oracle ─────────────────────────────────
 	int rc = prog.register_open_oracle("o_p0", my_oracle, nullptr);
@@ -57,8 +57,8 @@ int main() {
 	}
 
 	std::printf("Declared open streams: %zu\n",
-	            TauProgram::open_streams_count());
-	for (const char* const* p = TauProgram::open_streams(); *p; ++p) {
+	            tau_program::open_streams_count());
+	for (const char* const* p = tau_program::open_streams(); *p; ++p) {
 		std::printf("  - %s\n", *p);
 	}
 	std::printf("\n");
@@ -66,13 +66,13 @@ int main() {
 	// ── Step 2: per-step loop with externally-orchestrated dispatch ──
 	std::printf("step  state  mask  chosen  ok\n");
 	std::printf("----  -----  ----  ------  --\n");
-	TauProgram::Inputs in;
+	tau_program::inputs in;
 	for (int t = 0; t < 5; ++t) {
 		// Query the admissibility mask for the declared stream at
 		// the current state. Bit 0 = false admissible; bit 1 =
 		// true admissible. 0 = unreachable for o_p0 from this state
 		// (synthesis bug or PWR-narrowed strategy); 3 = both ok.
-		auto mask = TauProgram::admissible_values_mask(prog.state(),
+		auto mask = tau_program::admissible_values_mask(prog.state(),
 		                                                "o_p0");
 
 		// In a real host: build F as a tau-syntax disjunction over

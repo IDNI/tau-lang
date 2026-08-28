@@ -41,6 +41,7 @@
 #ifdef DEBUG
 #  include "interpreter.h"
 #endif
+#include <sstream>
 
 using namespace idni::tau_lang;
 
@@ -263,6 +264,67 @@ TEST_SUITE("ABA oracle correctness") {
 		tref fm = spec("G (F (o1[t] = i1[t])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
+	}
+}
+
+// ── ocLTL runtime-alignment design, Mechanism 1(a): shadow shape match ──────
+//
+// match_ocltl_swap_shape/ocltl_phi_delta_direct are wired behind
+// aba_existential_feasible in SHADOW mode only. These tests pin the shape
+// matcher's recognition of the structured atoms real callers build, and
+// confirm the closed form's sigma=rho=all-false instantiation is unsound
+// against the solver on the simplest possible case a consistency-pruning
+// caller would actually pass.
+TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))") {
+
+	TEST_CASE("match_ocltl_swap_shape recognizes a same-side coordinate equality") {
+		tref atom = wff("o1[t]:tau = o1[t-1]:tau");
+		REQUIRE(atom != nullptr);
+		auto match = match_ocltl_swap_shape<node_t>(atom);
+		REQUIRE(match.has_value());
+		CHECK(match->atoms.size() == 1);
+		CHECK(match->D == 1); // the atom is asserted (not negated)
+	}
+
+	TEST_CASE("match_ocltl_swap_shape refuses a non-atomless (bv) atom") {
+		tref atom = wff("o1[t]:bv[8] = i1[t]:bv[8]");
+		REQUIRE(atom != nullptr);
+		CHECK_FALSE(match_ocltl_swap_shape<node_t>(atom).has_value());
+	}
+
+	TEST_CASE("match_ocltl_swap_shape refuses a disjunction") {
+		tref fm = wff("(o1[t]:tau = o1[t-1]:tau) || (o1[t]:tau = {T.}:tau)");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(match_ocltl_swap_shape<node_t>(fm).has_value());
+	}
+
+	TEST_CASE("known disagreement: phi_delta(sigma=rho=all-false) vs the "
+	          "solver on a trivially-satisfiable single-coordinate constant")
+	{
+		// o1[t] = {T.}, required to hold: trivially satisfiable (set
+		// o1[t] := the algebra's own unit) -- the solver must say so.
+		// atomless2.tau's own atoms include exactly this shape 4 times
+		// (o1[t]/o2[t] each compared to {T.} and {F.}).
+		tref atom = wff("o1[t]:tau = {T.}:tau");
+		REQUIRE(atom != nullptr);
+		bool solver_answer = aba_existential_feasible<node_t>(atom);
+		CHECK(solver_answer == true);
+
+		auto match = match_ocltl_swap_shape<node_t>(atom);
+		REQUIRE(match.has_value());
+		size_t k_sigma = match->dims.d_m + match->dims.d_x;
+		std::vector<bool> sigma(size_t{1} << k_sigma, false);
+		std::vector<bool> rho(size_t{1} << match->dims.d_y, false);
+		bool closed_form = ocltl_phi_delta_direct(
+			match->dims, match->atoms, sigma, rho, match->D);
+
+		// Pinned as a regression: phi_delta(all-false,all-false,D) asks
+		// whether tau's OWN restriction to sigma/rho EXACTLY equals the
+		// totally-generic, no-coincidence type -- any atom that is a real
+		// constraint contradicts that by construction, so the closed form
+		// wrongly says infeasible here.
+		CHECK(closed_form == false);
+		CHECK(closed_form != solver_answer);
 	}
 }
 
@@ -3788,14 +3850,14 @@ TEST_SUITE("[Adversarial: SBF type]") {
 // 1-constant formulas → 75 T_3 types, 7 Q-bits (q_0..q_6), larger but fast.
 TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 
-    struct AlgAGuard {
-        AlgAGuard()  { setenv("TAU_LTL_ALG", "A", 1); }
-        ~AlgAGuard() { unsetenv("TAU_LTL_ALG"); }
+    struct alg_a_guard {
+        alg_a_guard()  { setenv("TAU_LTL_ALG", "A", 1); }
+        ~alg_a_guard() { unsetenv("TAU_LTL_ALG"); }
     };
 
     // 0-constant: atom y = m (output equals previous output) — 3 of 13 types satisfy.
     TEST_CASE("[ALG-A-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants, 13 types)") {
-        AlgAGuard guard;
+        alg_a_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt = o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
@@ -3804,7 +3866,7 @@ TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 
     // 0-constant: atom y > m — strictly increasing output (Q has no max, so realizable).
     TEST_CASE("[ALG-A-02] G(o1[t] > o1[t-1]) is REALIZABLE (0 constants, strictly increasing)") {
-        AlgAGuard guard;
+        alg_a_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
@@ -3813,7 +3875,7 @@ TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 
     // 0-constant contradiction: y>m AND y<m simultaneously → no satisfying type.
     TEST_CASE("[ALG-A-03] G(o1[t] > o1[t-1]) && G(o1[t] < o1[t-1]) is UNREALIZABLE (0 constants)") {
-        AlgAGuard guard;
+        alg_a_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
@@ -3822,7 +3884,7 @@ TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 
     // 1-constant (0): output always strictly above 0.
     TEST_CASE("[ALG-A-04] G(o1[t] > {0}:qlt) is REALIZABLE (1 constant)") {
-        AlgAGuard guard;
+        alg_a_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt).");
         REQUIRE(fm != nullptr);
@@ -3831,7 +3893,7 @@ TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 
     // 1-constant (1/2): eventually output > 1/2 (liveness).
     TEST_CASE("[ALG-A-05] F(o1[t] > {1/2}:qlt) is REALIZABLE (1 constant, liveness)") {
-        AlgAGuard guard;
+        alg_a_guard guard;
         bdd_init<Bool>();
         tref fm = spec("F (o1[t]:qlt > {1/2}:qlt).");
         REQUIRE(fm != nullptr);
@@ -3840,7 +3902,7 @@ TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 
     // 1-constant (0) contradiction: y>0 AND y<0 simultaneously → UNREALIZABLE.
     TEST_CASE("[ALG-A-06] G(o1[t] > {0}:qlt) && G(o1[t] < {0}:qlt) is UNREALIZABLE (1 constant)") {
-        AlgAGuard guard;
+        alg_a_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
@@ -3858,13 +3920,13 @@ TEST_SUITE("[Algorithm A: binary T3 encoding]") {
 // Tests mirror ALG-A-01..06 so the two algorithms agree on all these cases.
 TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
-    struct AlgBGuard {
-        AlgBGuard()  { setenv("TAU_LTL_ALG", "B", 1); }
-        ~AlgBGuard() { unsetenv("TAU_LTL_ALG"); }
+    struct alg_b_guard {
+        alg_b_guard()  { setenv("TAU_LTL_ALG", "B", 1); }
+        ~alg_b_guard() { unsetenv("TAU_LTL_ALG"); }
     };
 
     TEST_CASE("[ALG-B-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants)") {
-        AlgBGuard guard;
+        alg_b_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt = o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
@@ -3872,7 +3934,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     }
 
     TEST_CASE("[ALG-B-02] G(o1[t] > o1[t-1]) is REALIZABLE (0 constants, strictly increasing)") {
-        AlgBGuard guard;
+        alg_b_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
@@ -3880,7 +3942,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     }
 
     TEST_CASE("[ALG-B-03] G(o1[t] > o1[t-1]) && G(o1[t] < o1[t-1]) is UNREALIZABLE (0 constants)") {
-        AlgBGuard guard;
+        alg_b_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
@@ -3888,7 +3950,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     }
 
     TEST_CASE("[ALG-B-04] G(o1[t] > {0}:qlt) is REALIZABLE (1 constant)") {
-        AlgBGuard guard;
+        alg_b_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt).");
         REQUIRE(fm != nullptr);
@@ -3896,7 +3958,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     }
 
     TEST_CASE("[ALG-B-05] F(o1[t] > {1/2}:qlt) is REALIZABLE (1 constant, liveness)") {
-        AlgBGuard guard;
+        alg_b_guard guard;
         bdd_init<Bool>();
         tref fm = spec("F (o1[t]:qlt > {1/2}:qlt).");
         REQUIRE(fm != nullptr);
@@ -3904,7 +3966,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     }
 
     TEST_CASE("[ALG-B-06] G(o1[t] > {0}:qlt) && G(o1[t] < {0}:qlt) is UNREALIZABLE (1 constant)") {
-        AlgBGuard guard;
+        alg_b_guard guard;
         bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
@@ -3913,6 +3975,506 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
 } // TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]")
 
+// ── §31  Positional atoms: X-encoding in the LTL(ABA) skeleton ───────────────
+//
+// A data atom whose io_vars are all at a constant absolute position (o[k],
+// as opposed to the relative o[t]/o[t-1]) is placed at its step via nested
+// X() operators in the ltlsynt skeleton, so absolute ordering survives into
+// the synthesized automaton instead of collapsing into one all-at-once state.
+
+TEST_SUITE("Positional atoms: X-encoding") {
+
+	// Both positional atoms sit inside an implication (A -> B = !A || B).
+	// A conjunct in any Boolean shape whose atoms are ALL positional is a
+	// hoistable max-position conjunct: k_max = max(0,1) = 1, the input
+	// relativizes to a lookback (i[t-1]), guarded once at k_max.
+	TEST_CASE("a positional atom inside an implication hoists and synthesizes") {
+		tref fm = wff("((i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {1})) "
+		              "&& (!(i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {2}))");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("X(p") == std::string::npos);
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
+	}
+
+	// Positional atoms are relativized to a step-counter guard, never placed
+	// via X(): the skeleton carries no X(p...) at all, and the counter's own
+	// bit props (and their G(X(bit) <-> ...) recurrence) show up instead.
+	TEST_CASE("skeleton for a positional spec carries counter bits, no X-placement") {
+		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2})");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("X(p") == std::string::npos);
+		CHECK(sol->skeleton.find("o__ltl_ctr0__") != std::string::npos);
+		CHECK(sol->skeleton.find("G(X(o__ltl_ctr0__) <->") != std::string::npos);
+	}
+
+
+	// The tau grammar's own semantic gate (missing_temp_quants) rejects a
+	// string mixing a bare non-temporal atom with a temporal operator at
+	// the top level, so the two well-formed halves are parsed separately
+	// and composed with the tree builder, bypassing that string-level gate.
+	TEST_CASE("mixed o[0]=1 && G(o2=i2) spec synthesizes without error") {
+		tref p0_atom = wff("o[0]:bv[2] = {1}");
+		tref g_echo  = wff("G(o2[t]:bv[2] = i2[t]:bv[2])");
+		REQUIRE(p0_atom != nullptr);
+		REQUIRE(g_echo != nullptr);
+		tref fm = tau::build_wff_and(p0_atom, g_echo);
+		std::optional<ltl_aba_solution<node_t>> sol;
+		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		REQUIRE(sol.has_value());
+		// o[0] is a top-level conjunct of the whole formula (no G wraps it),
+		// so it is legal scope; the relative atom under its own explicit G
+		// is untouched by the step-counter relativization.
+		CHECK(sol->skeleton.find("X(p") == std::string::npos);
+	}
+
+	// get_spec's pipeline wraps any main formula in a top-level G() by
+	// default; a G() whose entire body is purely positional is that
+	// routine wrapper, not a genuine recurrence, so it synthesizes the
+	// same as the unwrapped atom (subtree_is_purely_positional).
+	TEST_CASE("a positional atom nested inside a purely positional G() synthesizes, not a hard error") {
+		tref fm = wff("G(o[3]:bv[2] = {1})");
+		REQUIRE(fm != nullptr);
+		std::optional<ltl_aba_solution<node_t>> sol;
+		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		REQUIRE(sol.has_value());
+	}
+
+	// F/U/R/W/S/T give a positional atom recurring semantics, genuinely
+	// ambiguous for a fixed absolute-position fact, so the refusal still
+	// applies there, worded as a temporary implementation gap (the
+	// interpreter is the semantic authority), not a permanent disagreement.
+	TEST_CASE("a positional atom nested inside F is still a hard error, "
+	          "worded as a temporary gap") {
+		tref fm = wff("F(o[3]:bv[2] = {1})");
+		REQUIRE(fm != nullptr);
+		bool threw = false;
+		try { solve_ltl_aba<node_t>(fm); }
+		catch (const std::runtime_error& e) {
+			threw = true;
+			CHECK(std::string(e.what()).find("not yet supported") != std::string::npos);
+		}
+		CHECK(threw);
+	}
+
+	// A G() body mixing a positional atom with genuinely temporal (relative)
+	// content splits at the wff_and: the positional leaf hoists behind the
+	// step counter (anchored at its own absolute step, not the
+	// lookback-shifted formula_time_point), the relative leaf stays in the
+	// skeleton -- both compile. Only reaching a positional atom through
+	// F/U/R/W/S/T (no wff_and to split at) is still refused.
+	TEST_CASE("a positional atom mixed with relative content under the same "
+	          "G compiles: the leaves split and hoist separately") {
+		tref p0 = wff("o[3]:bv[2] = {1}");
+		tref rel = wff("o2[t]:bv[2] = i2[t]:bv[2]");
+		REQUIRE(p0 != nullptr);
+		REQUIRE(rel != nullptr);
+		tref fm = tau::build_wff_always(tau::build_wff_and(p0, rel));
+		REQUIRE(fm != nullptr);
+		std::optional<ltl_aba_solution<node_t>> sol;
+		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
+	}
+
+	// Any Boolean shape of purely positional atoms hoists, not just
+	// implication: a disjunction and a negation both synthesize.
+	TEST_CASE("a disjunctive pure-positional conjunct hoists (any-Boolean-"
+	          "shape acceptance)") {
+		tref fm = wff("(o[0]:bv[2] = {1}) || (o[1]:bv[2] = {2})");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
+	}
+
+	TEST_CASE("a negated pure-positional conjunct hoists (any-Boolean-shape "
+	          "acceptance)") {
+		tref fm = wff("!(o[0]:bv[2] = {1})");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
+	}
+
+	// Same-value positional atoms at different positions: o[0]=1 and o[2]=1
+	// relativize to identical text but come from two DIFFERENT source
+	// atoms, so they stay two distinct props. The ground-equality fast
+	// path compares actual constants, not just shape, so no spurious forbid.
+	TEST_CASE("same-value positional atoms at different positions: no "
+	          "spurious forbid after the fast-path tightening") {
+		tref fm = wff("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 2); // stay separate, one prop per position
+		CHECK(sol->consistency_constraints.empty());
+	}
+
+	// Positional atoms route through the automatic step-counter guard: the
+	// skeleton carries the counter's own bits and per-position guard
+	// conjuncts. The three distinct-constant, same-instant atoms (after
+	// relativization) also exercise the ground-equality consistency fast
+	// path.
+	TEST_CASE("skeleton for a 3-position spec carries counter guards, no uniqueness negation block") {
+		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("X(p") == std::string::npos);
+		CHECK(sol->skeleton.find("!p0 & !p1") == std::string::npos);
+		CHECK(sol->skeleton.find("!p1 & !p2") == std::string::npos);
+		CHECK(sol->skeleton.find("o__ltl_ctr0__") != std::string::npos);
+		CHECK(sol->skeleton.find("G(X(o__ltl_ctr0__) <->") != std::string::npos);
+		MESSAGE("3-position counter automaton state count: ", sol->aut.num_states);
+	}
+
+	// No positional atom exists, so the step-counter encoding is a no-op:
+	// the skeleton carries no counter bits and no X-nesting at all.
+	TEST_CASE("skeleton for a relative-only spec gains no counter block") {
+		tref fm = wff("F (o1[t]:bv[8] = i1[t-2]:bv[8])");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("X(") == std::string::npos);
+		CHECK(sol->skeleton.find("o__ltl_ctr") == std::string::npos);
+	}
+
+	// A positional atom's [t] relativization can collide with an atom
+	// already in the list: o1[0]=1 relativizes to the same formula as the
+	// naturally-occurring o1[t]=1 inside F(...). The duplicate is merged
+	// into the existing entry, so only one prop survives.
+	TEST_CASE("a positional atom colliding with a same-instant natural atom "
+	          "merges: no structural duplicate, no spurious self-forbid") {
+		tref p0_atom = wff("o1[0]:bv[2] = {1}");
+		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		REQUIRE(p0_atom != nullptr);
+		REQUIRE(f_atom != nullptr);
+		tref fm = tau::build_wff_and(p0_atom, f_atom);
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		CHECK(sol->consistency_constraints.empty());
+		CHECK(sol->skeleton.find("G(!(p") == std::string::npos);
+	}
+
+	// The same collision, checked end to end via the full
+	// is_ltl_aba_realizable oracle loop, not just solve_ltl_aba. o1[0]=1
+	// discharges both conjuncts by itself, so the spec is REALIZABLE.
+	TEST_CASE("o1[0]=1 && F(o1[t]=1) is REALIZABLE despite the positional/"
+	          "relative duplicate collision") {
+		tref p0_atom = wff("o1[0]:bv[2] = {1}");
+		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		REQUIRE(p0_atom != nullptr);
+		REQUIRE(f_atom != nullptr);
+		tref fm = tau::build_wff_and(p0_atom, f_atom);
+		REQUIRE(fm != nullptr);
+		CHECK(is_ltl_aba_realizable<node_t>(fm, 0, false));
+	}
+
+} // TEST_SUITE("Positional atoms: X-encoding")
+
+// ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────
+
+TEST_SUITE("ltl_explain diagnostics") {
+
+	TEST_CASE("a realizable relative-time formula prints REALIZABLE with a safety formula") {
+		tref fm = wff("F (o1[t] = 0)");
+		REQUIRE(fm != nullptr);
+		std::ostringstream oss;
+		bool ok = ltl_explain<node_t>(fm, oss);
+		std::string out = oss.str();
+		CHECK(ok);
+		CHECK(out.find("REALIZABLE") != std::string::npos);
+		CHECK(out.find("Safety formula:") != std::string::npos);
+		MESSAGE(out);
+	}
+
+	TEST_CASE("an unrealizable formula still prints its diagnostic sections") {
+		tref fm = wff("F (i1[t] = 0)");
+		REQUIRE(fm != nullptr);
+		std::ostringstream oss;
+		bool ok = ltl_explain<node_t>(fm, oss);
+		std::string out = oss.str();
+		CHECK_FALSE(ok);
+		CHECK(out.find("Data atoms") != std::string::npos);
+		CHECK(out.find("LTL skeleton:") != std::string::npos);
+		CHECK(out.find("UNREALIZABLE") != std::string::npos);
+		MESSAGE(out);
+	}
+
+	TEST_CASE("a positional spec is realizable and shows the counter encoding") {
+		tref p0 = wff("o2[0] = 1");
+		tref f_atom = wff("F (o1[t] = 1)");
+		REQUIRE(p0 != nullptr);
+		REQUIRE(f_atom != nullptr);
+		tref fm = tau::build_wff_and(p0, f_atom);
+		REQUIRE(fm != nullptr);
+		std::ostringstream oss;
+		bool ok = ltl_explain<node_t>(fm, oss);
+		std::string out = oss.str();
+		CHECK(ok);
+		CHECK(out.find("o__ltl_ctr") != std::string::npos);
+		CHECK(out.find("REALIZABLE") != std::string::npos);
+		MESSAGE(out);
+	}
+
+	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
+		tref fm = wff("F (o1[0] = 1)");
+		REQUIRE(fm != nullptr);
+		std::ostringstream oss;
+		bool ok = true;
+		CHECK_NOTHROW(ok = ltl_explain<node_t>(fm, oss));
+		std::string out = oss.str();
+		CHECK_FALSE(ok);
+		CHECK(out.find("REFUSED:") != std::string::npos);
+		MESSAGE(out);
+	}
+
+} // TEST_SUITE("ltl_explain diagnostics")
+
+
+// The automatic step-counter encoding flows through ltl_to_safety_formula_full
+// like every other solve_ltl_aba caller. This runs a composed
+// positional+temporal tree through a real interpreter with vector streams,
+// checking the positional output lands at its own step while the temporal
+// (F) conjunct still discharges sanely.
+TEST_SUITE("Positional atoms: executed safety path") {
+
+	// Parse a formula string through `ctx` (wiring its io_vars to ctx's
+	// registered streams the way a real spec's parse would).
+	static tref parse_thru_ctx(io_context<node_t>& ctx, const char* formula) {
+		auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+		if (!nso.has_value()) return nullptr;
+		return nso.value().main->get();
+	}
+
+	// The bare-reparsed positional atom (apply_step_counter_encoding's
+	// relativized "o[t]") now registers as a real output stream, so a full
+	// stepped run succeeds, not just interpreter construction.
+	TEST_CASE("composed positional+temporal tree: safety formula, interpreter "
+	          "construction and a real stepped run all succeed") {
+		bdd_init<Bool>();
+
+		io_context<node_t> ctx;
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o2", bv_type_id<node_t>(2), o2);
+		ctx.add_input("i2", bv_type_id<node_t>(2),
+		              std::make_shared<vector_input_stream>(strings{"2", "2", "2"}));
+
+		tref p0_atom = wff("o[0]:bv[2] = {1}");
+		tref f_echo  = parse_thru_ctx(ctx, "F(o2[t]:bv[2] = i2[t]:bv[2]).");
+		REQUIRE(p0_atom != nullptr);
+		REQUIRE(f_echo != nullptr);
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", bv_type_id<node_t>(2), o);
+		tref fm = tau::build_wff_and(p0_atom, f_echo);
+		REQUIRE(fm != nullptr);
+
+		// The step-counter guard is a top-level positive conjunct here, so
+		// this is legal scope (see enforce_positional_conjunctive_scope);
+		// solving must not throw and must produce a real Mealy strategy.
+		auto [safety, sol] = ltl_to_safety_formula_full<node_t>(fm);
+		REQUIRE(safety != nullptr);
+		REQUIRE(sol.has_value());
+		CHECK(sol->aut.num_states > 0);
+
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		auto vals = o->get_values();
+		REQUIRE(!vals.empty());
+	}
+
+	// Same variable on both sides (o1[0]=1 and F(o1[t]=1)): the positional
+	// atom's relativization collides with the F conjunct's own atom. A real
+	// stepped run still succeeds, with o1 landing 1 at step 0 -- the value
+	// that discharges both conjuncts at once.
+	TEST_CASE("o1[0]=1 && F(o1[t]=1): positional/relative duplicate collision "
+	          "still discharges both conjuncts at step 0") {
+		bdd_init<Bool>();
+
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(2), o1);
+
+		tref p0_atom = wff("o1[0]:bv[2] = {1}");
+		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		REQUIRE(p0_atom != nullptr);
+		REQUIRE(f_atom != nullptr);
+		tref fm = tau::build_wff_and(p0_atom, f_atom);
+		REQUIRE(fm != nullptr);
+
+		auto [safety, sol] = ltl_to_safety_formula_full<node_t>(fm);
+		REQUIRE(safety != nullptr);
+		REQUIRE(sol.has_value());
+		CHECK(sol->atoms.size() == 1); // the duplicate merged away
+
+		auto ran = run<node_t>(fm, ctx, 1);
+		REQUIRE(ran.has_value());
+		auto vals = o1->get_values();
+		REQUIRE(!vals.empty());
+		CHECK(matches_to_any_of(vals[0], strings{"1"}));
+	}
+
+} // TEST_SUITE("Positional atoms: executed safety path")
+
+
+// build_carrier_eq_aux's bare-reparsed S-operator auxiliary atom
+// (o__ltl_s0__) now registers as a real output stream too, so a stepped run
+// with real vector I/O succeeds and the S semantics hold at step 0.
+TEST_SUITE("Since (S) operator: executed safety path") {
+
+	TEST_CASE("(o1=T) S (o2=T) with real streams: o2 lands T at step 0") {
+		bdd_init<Bool>();
+
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+
+		auto nso = get_nso_rr<node_t>(ctx,
+		    tau::get("(o1[t]:tau = {T.}:tau) S (o2[t]:tau = {T.}:tau)."));
+		REQUIRE(nso.has_value());
+		tref fm = nso.value().main->get();
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		auto o2_vals = o2->get_values();
+		REQUIRE(o2_vals.size() == 3);
+		CHECK(matches_to_any_of(o2_vals[0], strings{"T"}));
+	}
+
+} // TEST_SUITE("Since (S) operator: executed safety path")
+
+
+// ── 31. Cross-step shift-chain constraints ───────────────────────────────────
+//
+// solve_ltl_aba abstracts each data atom to an independent proposition, so
+// o1[t] and o1[t-1] are unrelated props to the propositional skeleton.
+// Atoms sharing an io_var name set and BA type but differing in relative
+// shift get a G(X^d(p_lo) <-> ...) family constraint tying them together.
+TEST_SUITE("Cross-step shift-chain constraints") {
+
+	// o1[t]=1 && o1[t-1]!=1 is a complementary pair one step apart: without
+	// the chain constraint the two props are independent, so a strategy can
+	// satisfy both forever even though the spec is semantically UNSAT once
+	// alignment is honoured.
+	TEST_CASE("litmus: G(o1[t]=1 && o1[t-1]!=1) && F(o1[t]=1) is UNREALIZABLE") {
+		tref fm = wff("G((o1[t]:bv[2] = {1}:bv[2]) && (o1[t-1]:bv[2] != {1}:bv[2])) "
+		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(solve_ltl_aba<node_t>(fm).has_value());
+	}
+
+	// Same signal, same disjunct, one step apart: the chain constraint ties
+	// the two instances together (equivalent case) but never excludes the
+	// "always assert o1=1" strategy, so the spec stays realizable.
+	TEST_CASE("G(o1[t]=1 || o1[t-1]=1) && F(o1[t]=1) is REALIZABLE and its "
+	          "skeleton carries the equivalent chain") {
+		tref fm = wff("G((o1[t]:bv[2] = {1}:bv[2]) || (o1[t-1]:bv[2] = {1}:bv[2])) "
+		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("G(X(p0) <-> p1)") != std::string::npos);
+	}
+
+	// Direct check of the classification: the same atom shape at shifts 0
+	// and 1 is semantically equivalent once aligned, so the emitted
+	// constraint is the <-> form, not an implication or a mutual exclusion.
+	TEST_CASE("equivalent-instance atoms (same shape, shifts 0 and 1) get "
+	          "the <-> chain") {
+		tref fm = wff("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {1}:bv[2])");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		REQUIRE(atoms.size() == 2);
+		std::string skeleton, input_assumptions;
+		std::vector<std::string> emitted;
+		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
+		REQUIRE(emitted.size() == 1);
+		CHECK(emitted[0] == "G(X(p0) <-> p1)");
+		CHECK(skeleton.find(emitted[0]) != std::string::npos);
+		CHECK(input_assumptions.empty());
+	}
+
+	// Distinct constants at shifts 0 and 1 for the same signal make the
+	// aligned pair mutually exclusive (!pp && pn && np && nn) -- neither an
+	// equivalence, a complementary pair, nor a one-directional implication.
+	TEST_CASE("mutually-exclusive-instance atoms (distinct constants, "
+	          "shifts 0 and 1) get the mutual-exclusion chain") {
+		tref fm = wff("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {2}:bv[2])");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		REQUIRE(atoms.size() == 2);
+		std::string skeleton, input_assumptions;
+		std::vector<std::string> emitted;
+		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
+		REQUIRE(emitted.size() == 1);
+		CHECK(emitted[0] == "G(X(p0) -> !p1)");
+		CHECK(skeleton.find(emitted[0]) != std::string::npos);
+		CHECK(input_assumptions.empty());
+	}
+
+	// A pure-input shifted pair is an environment fact, not a system
+	// obligation the game can force: its chain constraint must land in the
+	// assumption side, not as a system-side skeleton conjunct.
+	TEST_CASE("pure-input shifted pair (complementary) lands on the "
+	          "assumption side") {
+		tref fm = wff("F(i1[t]:bv[2] = {1}:bv[2]) && F(i1[t-1]:bv[2] != {1}:bv[2])");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		REQUIRE(atoms.size() == 2);
+		std::string skeleton, input_assumptions;
+		std::vector<std::string> emitted;
+		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
+		REQUIRE(emitted.size() == 1);
+		CHECK(emitted[0] == "G(X(p0) <-> !p1)");
+		CHECK(input_assumptions.find(emitted[0]) != std::string::npos);
+		CHECK(skeleton.empty());
+	}
+
+	// Positional atoms have no relative shift (see atom_uniform_shift) and
+	// are excluded from family grouping entirely, so a purely positional
+	// spec gets zero shift-chain constraints.
+	TEST_CASE("purely positional spec gets zero shift-chain constraints") {
+		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		REQUIRE(atoms.size() == 3);
+		std::string skeleton, input_assumptions;
+		std::vector<std::string> emitted;
+		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
+		CHECK(emitted.size() == 0);
+		CHECK(skeleton.empty());
+		CHECK(input_assumptions.empty());
+	}
+}
+
+
+// Opt-in (TAU_PHI_DELTA_CROSSCHECK=1): reports the Mechanism 1(a) shadow
+// crosscheck's aggregate counters (ocltl_swap_stats()) accumulated over
+// every aba_existential_feasible call this test binary made. Placed last
+// (source order) so it reads totals after every other test case has run.
+// Informational only -- does not assert zero disagreements.
+TEST_SUITE("ocltl phi_delta swap: aggregate crosscheck report (opt-in)") {
+	TEST_CASE("report ocltl_swap_stats() accumulated over this binary's run") {
+		if (!std::getenv("TAU_PHI_DELTA_CROSSCHECK")) {
+			MESSAGE("TAU_PHI_DELTA_CROSSCHECK not set; skipping");
+			return;
+		}
+		auto& s = ocltl_swap_stats();
+		MESSAGE("aba_existential_feasible calls=", s.total_calls.load(),
+			" phi_delta-eligible=", s.eligible.load(),
+			" ineligible=", s.ineligible.load(),
+			" agree=", s.agree.load(), " disagree=", s.disagree.load());
+	}
+}
 
 // ── LT-3 / LT-4: the ABA oracle's guard feasibility check ────────────────────
 //

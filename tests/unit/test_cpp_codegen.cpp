@@ -9,74 +9,76 @@
 using namespace idni::tau_lang;
 
 // Helpers.
-static HoaAutomaton simple_mealy_echo() {
+static hoa_automaton simple_mealy_echo() {
 	// 1 state, one self-loop edge per input:
 	//   state q0, guard 0 → q0 setting output 1
 	//   state q0, guard !0 → q0 setting output !1
 	// AP 0 = input "i", AP 1 = output "o".
-	HoaAutomaton a;
+	hoa_automaton a;
 	a.num_states = 1;
 	a.initial_state = 0;
 	a.aps = {"i", "o"};
 	a.edges.resize(1);
-	a.edges[0].push_back(HoaEdge{"0&1",  0, false});
-	a.edges[0].push_back(HoaEdge{"!0&!1", 0, false});
+	a.edges[0].push_back(hoa_edge{"0&1",  0, false});
+	a.edges[0].push_back(hoa_edge{"!0&!1", 0, false});
 	a.state_accepting = {false};
 	return a;
 }
 
 TEST_SUITE("cpp_codegen") {
 
-	TEST_CASE("emits valid C++17 for echo spec") {
+	TEST_CASE("emits valid C++ for echo spec") {
 		auto a = simple_mealy_echo();
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "echo_ctrl");
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i"}, {"o"}, os, "EchoCtrl");
+		emit_program(d, os);
 		std::string s = os.str();
 		// Basic structural assertions.
-		CHECK(s.find("class EchoCtrl {") != std::string::npos);
-		CHECK(s.find("enum class State") != std::string::npos);
-		CHECK(s.find("State::q0") != std::string::npos);
-		CHECK(s.find("struct Inputs") != std::string::npos);
-		CHECK(s.find("struct Outputs") != std::string::npos);
-		CHECK(s.find("Outputs step(const Inputs&") != std::string::npos);
+		CHECK(s.find("class echo_ctrl {") != std::string::npos);
+		CHECK(s.find("struct inputs") != std::string::npos);
+		CHECK(s.find("struct outputs") != std::string::npos);
+		CHECK(s.find("outputs step(const inputs&") != std::string::npos);
 		// Input and output identifiers.
-		CHECK(s.find("i_i") != std::string::npos);
-		CHECK(s.find("o_o") != std::string::npos);
+		CHECK(s.find("bool i") != std::string::npos);
+		CHECK(s.find("bool o") != std::string::npos);
 		// Dispatch logic uses the input.
-		CHECK(s.find("in.i_i") != std::string::npos);
-		// Output assignment present.
-		CHECK(s.find("o.o_o = true") != std::string::npos);
-		CHECK(s.find("o.o_o = false") != std::string::npos);
+		CHECK(s.find("in.i") != std::string::npos);
+		// The strategy table carries the edges' guard/assignment literals.
+		CHECK(s.find("strat_.edges[0].push_back({{1,1}, 0});") != std::string::npos);
+		CHECK(s.find("strat_.edges[0].push_back({{-1,-1}, 0});") != std::string::npos);
 	}
 
 	TEST_CASE("emits ok=false fallback when no edge matches") {
 		auto a = simple_mealy_echo();
 		a.edges[0].pop_back();  // remove the !0&!1 edge → incomplete
+		auto d = build_program_desc_prop(a, {"i"}, {"o"});
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i"}, {"o"}, os);
+		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("o.ok = false") != std::string::npos);
 	}
 
-	TEST_CASE("multi-state emission mentions every state") {
-		HoaAutomaton a;
+	TEST_CASE("multi-state program_desc mentions every state") {
+		hoa_automaton a;
 		a.num_states = 3;
 		a.initial_state = 0;
 		a.aps = {"i", "o"};
 		a.edges.resize(3);
-		a.edges[0].push_back(HoaEdge{"0&1",  1, false});
-		a.edges[1].push_back(HoaEdge{"!0&1", 2, false});
-		a.edges[2].push_back(HoaEdge{"1",    0, false});
+		a.edges[0].push_back(hoa_edge{"0&1",  1, false});
+		a.edges[1].push_back(hoa_edge{"!0&1", 2, false});
+		a.edges[2].push_back(hoa_edge{"1",    0, false});
 		a.state_accepting = {false, false, false};
+		auto d = build_program_desc_prop(a, {"i"}, {"o"});
+		CHECK(d.num_states == 3);
+		REQUIRE(d.edges.size() == 3);
+		CHECK(d.edges[0].size() == 1);
+		CHECK(d.edges[0][0].dst == 1);
+		CHECK(d.edges[1][0].dst == 2);
+		CHECK(d.edges[2][0].dst == 0);
 		std::ostringstream os;
-		emit_cpp_program_prop(a, {"i"}, {"o"}, os);
+		emit_program(d, os);
 		std::string s = os.str();
-		CHECK(s.find("State::q0") != std::string::npos);
-		CHECK(s.find("State::q1") != std::string::npos);
-		CHECK(s.find("State::q2") != std::string::npos);
-		CHECK(s.find("case State::q0") != std::string::npos);
-		CHECK(s.find("case State::q1") != std::string::npos);
-		CHECK(s.find("case State::q2") != std::string::npos);
+		CHECK(s.find("strat_.num_states = 3") != std::string::npos);
 	}
 }
 
@@ -96,13 +98,13 @@ TEST_SUITE("cpp_codegen") {
 TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 
 	// aps: 0 = input i0, 1 = input i1, 2 = output o.
-	static HoaAutomaton two_input_one_output(const char* guard) {
-		HoaAutomaton a;
+	static hoa_automaton two_input_one_output(const char* guard) {
+		hoa_automaton a;
 		a.num_states = 1;
 		a.initial_state = 0;
 		a.aps = {"i0", "i1", "o"};
 		a.edges.resize(1);
-		a.edges[0].push_back(HoaEdge{guard, 0, false});
+		a.edges[0].push_back(hoa_edge{guard, 0, false});
 		a.state_accepting = {false};
 		return a;
 	}
@@ -156,8 +158,8 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 
 TEST_SUITE("cpp_codegen trivial solution (LG-5)") {
 
-	static HoaAutomaton empty_automaton() {
-		HoaAutomaton a;
+	static hoa_automaton empty_automaton() {
+		hoa_automaton a;
 		a.num_states = 0;
 		a.initial_state = 0;
 		a.aps = {"i", "o"};

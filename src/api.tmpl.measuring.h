@@ -292,6 +292,15 @@ api<node>::step(measuring& m, interpreter<node>& i) {
 	return step(i);
 }
 
+template <NodeType node>
+bool api<node>::run(measuring& m, interpreter<node>& i, bool quit_on_idle) {
+	api_measure am("run", m);
+	// Pause/unpause am's timer around the driver's human-input wait, same
+	// as main.cpp's own t.pause()/t.unpause() around its getline.
+	return i.run_loop(0, quit_on_idle,
+		[&am](bool waiting) { waiting ? am.t.pause() : am.t.unpause(); });
+}
+
 MT(tref, infer, (tref expr, bool use_defaults), (expr, use_defaults))
 
 MT(std::optional<std::string>, simplify, (const std::string& expr, bool use_defaults), (expr, use_defaults))

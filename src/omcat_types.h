@@ -9,10 +9,10 @@
 // user-supplied constants.
 //
 // Provides:
-//   - idni::tau_lang::omcat::Rat                   plain rational type.
-//   - idni::tau_lang::omcat::QltType1              1-type of (ℚ, <, Σ).
+//   - idni::tau_lang::omcat::rational                   plain rational type.
+//   - idni::tau_lang::omcat::qlt_type1              1-type of (ℚ, <, Σ).
 //   - enumerate_qlt_T1(constants)                  returns 2|Σ|+1 1-types.
-//   - QltType1::realize()                          concrete rational witness.
+//   - qlt_type1::realize()                          concrete rational witness.
 //   - qlt_type_of(value, sorted_consts)            type of a value.
 
 #ifndef __IDNI__TAU__OMCAT_TYPES_H__
@@ -28,17 +28,17 @@ namespace idni::tau_lang::omcat {
 
 // Plain rational (p/q) — we avoid qlt_rational here to keep this header
 // free of the tau_tree template chain.  Internal use only.
-struct Rat {
+struct rational {
 	long long p = 0, q = 1;
-	Rat() = default;
-	Rat(long long p_, long long q_) : p(p_), q(q_) {
+	rational() = default;
+	rational(long long p_, long long q_) : p(p_), q(q_) {
 		if (q < 0) { p = -p; q = -q; }
 	}
 };
 
 __extension__ typedef __int128 omcat_int128_;
 
-inline int cmp(const Rat& a, const Rat& b) {
+inline int cmp(const rational& a, const rational& b) {
 	// a.p/a.q  vs  b.p/b.q :  cross-multiply. BA2-24: widened to 128-bit
 	// -- long long products overflow for parse-reachable magnitudes and
 	// silently corrupt T1/T2/T3 orderings.
@@ -54,9 +54,9 @@ inline int cmp(const Rat& a, const Rat& b) {
 //   pos = 2i       means c_{i-1} < x < c_i      (interval; i=0 ⇒ (-∞, c_0); i=k ⇒ (c_{k-1}, +∞))
 //   pos = 2i+1     means x = c_i                (point, 0 ≤ i < k)
 // Total: 2k+1 types.
-struct QltType1 {
+struct qlt_type1 {
 	int pos = 0;
-	std::vector<Rat> constants;
+	std::vector<rational> constants;
 
 	bool is_point() const { return (pos & 1) == 1; }
 	bool is_interval() const { return !is_point(); }
@@ -82,27 +82,27 @@ struct QltType1 {
 	// witness mis-orders T2/T3 enumeration).  The interior witness is the
 	// MEDIANT (a.p+b.p)/(a.q+b.q), which lies strictly between a < b for
 	// positive denominators and never needs a product at all.
-	Rat realize() const {
+	rational realize() const {
 		int k = (int)constants.size();
 		if (is_point()) return constants[pos >> 1];
 		int i = pos >> 1;
 		if (i == 0) {
-			if (k == 0) return Rat(0, 1);
-			Rat c = constants[0];
+			if (k == 0) return rational(0, 1);
+			rational c = constants[0];
 			// c - 1 as p/q - 1 = (p - q)/q.
 			return make_reduced((omcat_int128_)c.p - c.q, c.q);
 		}
 		if (i == k) {
-			Rat c = constants[k - 1];
+			rational c = constants[k - 1];
 			return make_reduced((omcat_int128_)c.p + c.q, c.q);
 		}
-		Rat a = constants[i - 1], b = constants[i];
+		rational a = constants[i - 1], b = constants[i];
 		return make_reduced((omcat_int128_)a.p + b.p,
 		                    (omcat_int128_)a.q + b.q);
 	}
 
 private:
-	static Rat make_reduced(omcat_int128_ num, omcat_int128_ den) {
+	static rational make_reduced(omcat_int128_ num, omcat_int128_ den) {
 		if (den < 0) { num = -num; den = -den; }
 		omcat_int128_ x = num < 0 ? -num : num, y = den;
 		while (y != 0) { omcat_int128_ r = x % y; x = y; y = r; }
@@ -115,22 +115,22 @@ private:
 		const omcat_int128_ lim = std::numeric_limits<long long>::max();
 		while (num > lim || num < -lim || den > lim) { num /= 2; den /= 2; }
 		if (den == 0) den = 1;
-		return Rat((long long)num, (long long)den);
+		return rational((long long)num, (long long)den);
 	}
 public:
 };
 
-inline std::vector<QltType1> enumerate_qlt_T1(std::vector<Rat> constants) {
+inline std::vector<qlt_type1> enumerate_qlt_T1(std::vector<rational> constants) {
 	std::sort(constants.begin(), constants.end(),
-	    [](const Rat& a, const Rat& b) { return cmp(a, b) < 0; });
+	    [](const rational& a, const rational& b) { return cmp(a, b) < 0; });
 	constants.erase(std::unique(constants.begin(), constants.end(),
-	    [](const Rat& a, const Rat& b) { return cmp(a, b) == 0; }),
+	    [](const rational& a, const rational& b) { return cmp(a, b) == 0; }),
 	    constants.end());
 	const int k = (int)constants.size();
-	std::vector<QltType1> out;
+	std::vector<qlt_type1> out;
 	out.reserve(2 * k + 1);
 	for (int pos = 0; pos <= 2 * k; ++pos) {
-		QltType1 t;
+		qlt_type1 t;
 		t.pos = pos;
 		t.constants = constants;
 		out.push_back(std::move(t));
@@ -138,7 +138,7 @@ inline std::vector<QltType1> enumerate_qlt_T1(std::vector<Rat> constants) {
 	return out;
 }
 
-inline int qlt_type_of(const Rat& v, const std::vector<Rat>& sorted_consts) {
+inline int qlt_type_of(const rational& v, const std::vector<rational>& sorted_consts) {
 	const int k = (int)sorted_consts.size();
 	for (int i = 0; i < k; ++i) {
 		int c = cmp(v, sorted_consts[i]);
@@ -153,23 +153,23 @@ inline int qlt_type_of(const Rat& v, const std::vector<Rat>& sorted_consts) {
 // Encoded as (pos_m, pos_x, rel) where rel ∈ {LT, EQ, GT} describes the
 // order relation between m and x.  This is the natural exocat T_2 for
 // (memory, input) at a single time step.
-enum class Rel : uint8_t { LT = 0, EQ = 1, GT = 2 };
+enum class relation : uint8_t { LT = 0, EQ = 1, GT = 2 };
 
-struct QltType2 {
+struct qlt_type2 {
 	int pos_m = 0;
 	int pos_x = 0;
-	Rel rel = Rel::LT;
-	std::vector<Rat> constants;
+	relation rel = relation::LT;
+	std::vector<rational> constants;
 
 	// Restriction onto the m-component: just the 1-type of m.
-	QltType1 restrict_m() const {
-		QltType1 t;
+	qlt_type1 restrict_m() const {
+		qlt_type1 t;
 		t.pos = pos_m;
 		t.constants = constants;
 		return t;
 	}
-	QltType1 restrict_x() const {
-		QltType1 t;
+	qlt_type1 restrict_x() const {
+		qlt_type1 t;
 		t.pos = pos_x;
 		t.constants = constants;
 		return t;
@@ -180,36 +180,36 @@ struct QltType2 {
 // Not every (pos_m, pos_x, rel) is admissible: if m's 1-type and x's
 // 1-type already fix their relative order (e.g., m = c_0 and x = c_1 with
 // c_0 < c_1 implies rel must be LT), we emit only the consistent triples.
-inline std::vector<QltType2> enumerate_qlt_T2(const std::vector<Rat>& constants) {
+inline std::vector<qlt_type2> enumerate_qlt_T2(const std::vector<rational>& constants) {
 	auto t1 = enumerate_qlt_T1(constants);
-	std::vector<QltType2> out;
-	// For each pair (tm, tx) of 1-types, determine which Rel values are
+	std::vector<qlt_type2> out;
+	// For each pair (tm, tx) of 1-types, determine which relation values are
 	// consistent.  Use realize() witnesses to test consistency.
 	for (const auto& tm : t1) {
 		for (const auto& tx : t1) {
-			Rat mv = tm.realize();
-			Rat xv = tx.realize();
+			rational mv = tm.realize();
+			rational xv = tx.realize();
 			int c = cmp(mv, xv);
 			// If both are point types, rel is forced by their values.
 			if (tm.is_point() && tx.is_point()) {
-				Rel r = c < 0 ? Rel::LT : (c == 0 ? Rel::EQ : Rel::GT);
-				QltType2 s{tm.pos, tx.pos, r, tm.constants};
+				relation r = c < 0 ? relation::LT : (c == 0 ? relation::EQ : relation::GT);
+				qlt_type2 s{tm.pos, tx.pos, r, tm.constants};
 				out.push_back(std::move(s));
 				continue;
 			}
 			// If they land in the same interval (both non-point, same pos),
 			// all three relations are consistent (interior of a dense order).
 			if (tm.is_interval() && tx.is_interval() && tm.pos == tx.pos) {
-				for (auto r : {Rel::LT, Rel::EQ, Rel::GT}) {
-					QltType2 s{tm.pos, tx.pos, r, tm.constants};
+				for (auto r : {relation::LT, relation::EQ, relation::GT}) {
+					qlt_type2 s{tm.pos, tx.pos, r, tm.constants};
 					out.push_back(std::move(s));
 				}
 				continue;
 			}
 			// Otherwise the positions differ: the witness comparison gives
 			// the unique consistent relation.
-			Rel r = c < 0 ? Rel::LT : (c == 0 ? Rel::EQ : Rel::GT);
-			QltType2 s{tm.pos, tx.pos, r, tm.constants};
+			relation r = c < 0 ? relation::LT : (c == 0 ? relation::EQ : relation::GT);
+			qlt_type2 s{tm.pos, tx.pos, r, tm.constants};
 			out.push_back(std::move(s));
 		}
 	}
@@ -220,41 +220,41 @@ inline std::vector<QltType2> enumerate_qlt_T2(const std::vector<Rat>& constants)
 
 // Returns -1 if both 1-types lie in the same interval (free ordering),
 // otherwise the forced relation: 0=LT, 1=EQ, 2=GT.
-inline int forced_rel_between(const QltType1& ta, const QltType1& tb) {
+inline int forced_rel_between(const qlt_type1& ta, const qlt_type1& tb) {
 	if (ta.is_interval() && tb.is_interval() && ta.pos == tb.pos) return -1;
-	Rat av = ta.realize(), bv = tb.realize();
+	rational av = ta.realize(), bv = tb.realize();
 	int c = cmp(av, bv);
 	return c < 0 ? 0 : (c == 0 ? 1 : 2);
 }
 
 // Transitivity check for a (r_mx, r_xy, r_my) triple.
-inline bool rel3_consistent(Rel r_mx, Rel r_xy, Rel r_my) {
-	if (r_mx == Rel::LT && r_xy == Rel::LT) return r_my == Rel::LT;
-	if (r_mx == Rel::LT && r_xy == Rel::EQ) return r_my == Rel::LT;
-	if (r_mx == Rel::EQ && r_xy == Rel::LT) return r_my == Rel::LT;
-	if (r_mx == Rel::EQ && r_xy == Rel::EQ) return r_my == Rel::EQ;
-	if (r_mx == Rel::EQ && r_xy == Rel::GT) return r_my == Rel::GT;
-	if (r_mx == Rel::GT && r_xy == Rel::EQ) return r_my == Rel::GT;
-	if (r_mx == Rel::GT && r_xy == Rel::GT) return r_my == Rel::GT;
+inline bool rel3_consistent(relation r_mx, relation r_xy, relation r_my) {
+	if (r_mx == relation::LT && r_xy == relation::LT) return r_my == relation::LT;
+	if (r_mx == relation::LT && r_xy == relation::EQ) return r_my == relation::LT;
+	if (r_mx == relation::EQ && r_xy == relation::LT) return r_my == relation::LT;
+	if (r_mx == relation::EQ && r_xy == relation::EQ) return r_my == relation::EQ;
+	if (r_mx == relation::EQ && r_xy == relation::GT) return r_my == relation::GT;
+	if (r_mx == relation::GT && r_xy == relation::EQ) return r_my == relation::GT;
+	if (r_mx == relation::GT && r_xy == relation::GT) return r_my == relation::GT;
 	return true; // (LT,GT) or (GT,LT): any r_my consistent
 }
 
 // 3-type of (memory m, input x, output y) over (ℚ, <, Σ).
-struct QltType3 {
+struct qlt_type3 {
 	int pos_m = 0, pos_x = 0, pos_y = 0;
-	Rel rel_mx = Rel::LT, rel_my = Rel::LT, rel_xy = Rel::LT;
-	std::vector<Rat> constants;
+	relation rel_mx = relation::LT, rel_my = relation::LT, rel_xy = relation::LT;
+	std::vector<rational> constants;
 
-	QltType1 restrict_m() const { QltType1 t; t.pos = pos_m; t.constants = constants; return t; }
-	QltType1 restrict_x() const { QltType1 t; t.pos = pos_x; t.constants = constants; return t; }
-	QltType1 restrict_y() const { QltType1 t; t.pos = pos_y; t.constants = constants; return t; }
+	qlt_type1 restrict_m() const { qlt_type1 t; t.pos = pos_m; t.constants = constants; return t; }
+	qlt_type1 restrict_x() const { qlt_type1 t; t.pos = pos_x; t.constants = constants; return t; }
+	qlt_type1 restrict_y() const { qlt_type1 t; t.pos = pos_y; t.constants = constants; return t; }
 };
 
 // Enumerate all 3-types for (ℚ, <) with the given named constants.
 // Filters the T_1^3 product by forced-relation consistency and transitivity.
-inline std::vector<QltType3> enumerate_qlt_T3(const std::vector<Rat>& constants) {
+inline std::vector<qlt_type3> enumerate_qlt_T3(const std::vector<rational>& constants) {
 	auto t1 = enumerate_qlt_T1(constants);
-	std::vector<QltType3> out;
+	std::vector<qlt_type3> out;
 	for (const auto& tm : t1) {
 		for (const auto& tx : t1) {
 			for (const auto& ty : t1) {
@@ -267,9 +267,9 @@ inline std::vector<QltType3> enumerate_qlt_T3(const std::vector<Rat>& constants)
 						if (f_xy >= 0 && i_xy != f_xy) continue;
 						for (int i_my = 0; i_my < 3; ++i_my) {
 							if (f_my >= 0 && i_my != f_my) continue;
-							Rel r_mx = (Rel)i_mx, r_xy = (Rel)i_xy, r_my = (Rel)i_my;
+							relation r_mx = (relation)i_mx, r_xy = (relation)i_xy, r_my = (relation)i_my;
 							if (rel3_consistent(r_mx, r_xy, r_my)) {
-								QltType3 s;
+								qlt_type3 s;
 								s.pos_m = tm.pos; s.pos_x = tx.pos; s.pos_y = ty.pos;
 								s.rel_mx = r_mx; s.rel_my = r_my; s.rel_xy = r_xy;
 								s.constants = tm.constants;
@@ -294,7 +294,7 @@ inline std::vector<QltType3> enumerate_qlt_T3(const std::vector<Rat>& constants)
 // the system's witness τ to τ ∈ A.
 //
 // For the qlt-only POC we approximate T_3 as admissible pairs of
-// (QltType2, Rat-witnessed next-memory-type ρ'), avoiding the full T_3
+// (qlt_type2, rational-witnessed next-memory-type ρ'), avoiding the full T_3
 // enumeration.  For each (b, σ), the system picks a concrete y (any
 // rational) producing next memory ρ' = type of y.
 //
@@ -318,8 +318,8 @@ inline std::vector<QltType3> enumerate_qlt_T3(const std::vector<Rat>& constants)
 // build such a callable using their preferred ι(ψ) encoding.
 template <class AdmissibleNext>
 inline std::vector<int> Pre_over_T1(
-    const std::vector<QltType1>& T1,
-    const std::vector<QltType2>& T2,
+    const std::vector<qlt_type1>& T1,
+    const std::vector<qlt_type2>& T2,
     const std::vector<int>& W_indices,
     AdmissibleNext admissible_next)
 {
@@ -348,11 +348,11 @@ inline std::vector<int> Pre_over_T1(
 
 // Unconstrained Pre: system can reach any ρ' at the next step.
 inline std::vector<int> Pre_over_T1_any(
-    const std::vector<QltType1>& T1,
-    const std::vector<QltType2>& T2,
+    const std::vector<qlt_type1>& T1,
+    const std::vector<qlt_type2>& T2,
     const std::vector<int>& W_indices)
 {
-	auto admissible = [&](const QltType2&) {
+	auto admissible = [&](const qlt_type2&) {
 		std::vector<int> all;
 		for (const auto& t : T1) all.push_back(t.pos);
 		return all;
@@ -364,7 +364,7 @@ inline std::vector<int> Pre_over_T1_any(
 
 // νX. f(X).  Start with X = T_1, iterate until stable.
 template <class F>
-inline std::vector<int> nu_fixpoint(const std::vector<QltType1>& T1, F f) {
+inline std::vector<int> nu_fixpoint(const std::vector<qlt_type1>& T1, F f) {
 	std::vector<int> cur;
 	for (const auto& t : T1) cur.push_back(t.pos);
 	for (;;) {
@@ -379,7 +379,7 @@ inline std::vector<int> nu_fixpoint(const std::vector<QltType1>& T1, F f) {
 
 // μX. f(X).  Start with X = ∅, iterate until stable.
 template <class F>
-inline std::vector<int> mu_fixpoint(const std::vector<QltType1>& /*T1*/, F f) {
+inline std::vector<int> mu_fixpoint(const std::vector<qlt_type1>& /*T1*/, F f) {
 	std::vector<int> cur;
 	for (;;) {
 		auto next = f(cur);
@@ -403,8 +403,8 @@ inline std::vector<int> mu_fixpoint(const std::vector<QltType1>& /*T1*/, F f) {
 template <class NextRelation>
 inline std::vector<int> reachable_from(
     int b0,
-    const std::vector<QltType1>& T1,
-    const std::vector<QltType2>& T2,
+    const std::vector<qlt_type1>& T1,
+    const std::vector<qlt_type2>& T2,
     NextRelation next)
 {
 	std::vector<char> seen(T1.size(), 0);

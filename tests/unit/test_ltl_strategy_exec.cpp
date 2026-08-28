@@ -510,17 +510,17 @@ TEST_SUITE("Strategy execution: semantic self-verification") {
 
 TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 
-	struct EnvGuard {
+	struct env_guard {
 		std::string key;
 		std::string old_val;
 		bool had;
-		EnvGuard(const char* k, const char* v) : key(k) {
+		env_guard(const char* k, const char* v) : key(k) {
 			const char* c = std::getenv(k);
 			had = c != nullptr;
 			if (had) old_val = c;
 			setenv(k, v, 1);
 		}
-		~EnvGuard() {
+		~env_guard() {
 			if (had) setenv(key.c_str(), old_val.c_str(), 1);
 			else unsetenv(key.c_str());
 		}
@@ -529,7 +529,7 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 	TEST_CASE("[SQ1-01] F(G(o=0)) writes valid HOA to TAU_LTL_EXPORT_STRATEGY_FILE") {
 		std::string tmp = "/tmp/tau_strat_test_" + std::to_string(::getpid()) + ".hoa";
 		{
-			EnvGuard g("TAU_LTL_EXPORT_STRATEGY_FILE", tmp.c_str());
+			env_guard g("TAU_LTL_EXPORT_STRATEGY_FILE", tmp.c_str());
 			auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0))."));
 			REQUIRE(fm.has_value());
 			tref f = fm.value().main->get();

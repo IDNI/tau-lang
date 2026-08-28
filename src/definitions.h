@@ -102,6 +102,29 @@ struct definitions {
 		this->global_scope = std::move(global_scope);
 	}
 
+	/** @brief Capture of every mutable per-spec field (rule table, I/O
+	 *  context, global type scope), for save()/restore() around an
+	 *  isolated compile. */
+	struct snapshot {
+		std::vector<htref> heads;
+		std::vector<htref> bodies;
+		io_context<node> ctx;
+		subtree_map<node, size_t> global_scope;
+	};
+
+	/** @brief Capture the current rule table, I/O context and type scope. */
+	snapshot save() const {
+		return { heads, bodies, ctx, global_scope };
+	}
+
+	/** @brief Replace the rule table, I/O context and type scope with @p s. */
+	void restore(snapshot s) {
+		heads = std::move(s.heads);
+		bodies = std::move(s.bodies);
+		ctx = std::move(s.ctx);
+		global_scope = std::move(s.global_scope);
+	}
+
 	/** @brief Return a reference to the per-node type map in the I/O context. */
 	subtree_htref_map<node, size_t>& get_types() {
 		return ctx.types;

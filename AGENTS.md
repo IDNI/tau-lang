@@ -51,6 +51,7 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_BUILD_UNIT_TESTS=ON` — unit tests only
 - `-DTAU_BUILD_INTEGRATION=ON` — integration tests only
 - `-DTAU_BUILD_EXECUTABLE=ON` — build the `tau` CLI (already ON in `*-tau`/`*-all` presets)
+- `-DTAU_ARTIFACT_PREINST=ON` — pre-instantiate the artifact pack in libTAU.a for faster `tau compile` (defaults to `TAU_BUILD_EXECUTABLE`, sticky once set)
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
 - WebAssembly-only options are listed under [WebAssembly](#webassembly).

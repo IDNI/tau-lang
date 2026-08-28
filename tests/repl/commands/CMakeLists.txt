@@ -50,6 +50,7 @@ include(test_repl-lgrs_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
 include(test_repl-run_cmd.cmake)
+include(test_repl-run_cmd-crash_regression.cmake)
 
 # substitution and instantiation commands
 include(test_repl-instantiation_cmd.cmake)
@@ -86,6 +87,9 @@ include(test_repl-cli.cmake)
 
 # Limit options that change algorithm behavior (give-up branches).
 include(test_repl-limit_effects.cmake)
+
+# `tau compile` verb
+include(test_repl-compile_verb.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command

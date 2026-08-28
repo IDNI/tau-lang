@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Round-trip test: emit C++ program from a known HoaAutomaton, write it to
+// Round-trip test: emit C++ program from a known hoa_automaton, write it to
 // a temp file, compile it with g++ -O3 -flto, link + run a tiny driver,
 // and check runtime behavior matches the synthesized strategy.
 
@@ -39,14 +39,14 @@ std::string unique_tmp(const std::string& suffix) {
 	return cg_tmp("_tau_cg_rt_") + std::to_string(::getpid()) + "_" + suffix;
 }
 
-HoaAutomaton echo_spec() {
-	HoaAutomaton a;
+hoa_automaton echo_spec() {
+	hoa_automaton a;
 	a.num_states = 1;
 	a.initial_state = 0;
 	a.aps = {"in_sig", "out_sig"};
 	a.edges.resize(1);
-	a.edges[0].push_back(HoaEdge{"0&1",   0, false});
-	a.edges[0].push_back(HoaEdge{"!0&!1", 0, false});
+	a.edges[0].push_back(hoa_edge{"0&1",   0, false});
+	a.edges[0].push_back(hoa_edge{"!0&!1", 0, false});
 	a.state_accepting = {false};
 	return a;
 }
@@ -70,14 +70,14 @@ bool compile_and_run_echo(const std::string& header_src) {
 		    "#include \"_tau_codegen_test_ctrl.h\"\n"
 		    "#include <cstdio>\n"
 		    "int main() {\n"
-		    "  EchoCtrl c;\n"
-		    "  EchoCtrl::Inputs in;\n"
-		    "  in.i_in_sig = true;\n"
+		    "  echo_ctrl c;\n"
+		    "  echo_ctrl::inputs in;\n"
+		    "  in.in_sig = true;\n"
 		    "  auto o1 = c.step(in);\n"
-		    "  if (!o1.ok || !o1.o_out_sig) { std::printf(\"FAIL1\\n\"); return 1; }\n"
-		    "  in.i_in_sig = false;\n"
+		    "  if (!o1.ok || !o1.out_sig) { std::printf(\"FAIL1\\n\"); return 1; }\n"
+		    "  in.in_sig = false;\n"
 		    "  auto o2 = c.step(in);\n"
-		    "  if (!o2.ok || o2.o_out_sig)  { std::printf(\"FAIL2\\n\"); return 2; }\n"
+		    "  if (!o2.ok || o2.out_sig)  { std::printf(\"FAIL2\\n\"); return 2; }\n"
 		    "  std::printf(\"OK\\n\");\n"
 		    "  return 0;\n"
 		    "}\n";
@@ -136,8 +136,11 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 
 	TEST_CASE("echo spec: emit → g++ -O3 → run passes") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_ctrl");
+		REQUIRE_FALSE(d.needs_tau_link);
 		std::ostringstream os;
-		emit_cpp_program_prop(echo_spec(), {"in_sig"}, {"out_sig"}, os, "EchoCtrl");
+		emit_program(d, os);
 		CHECK(compile_and_run_echo(os.str()));
 	}
 }
@@ -225,13 +228,13 @@ TEST_SUITE("cpp_codegen_open") {
 	// the edge -- with a=F,b=F,c=T the edge must NOT fire.
 	TEST_CASE("[CG-GUARD-02] compiled: parenthesised disjunctive conjunct must gate the edge") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		HoaAutomaton a;
+		hoa_automaton a;
 		a.num_states = 1;
 		a.initial_state = 0;
 		a.aps = {"a", "b", "c", "o"};
 		a.edges.resize(1);
-		a.edges[0].push_back(HoaEdge{"(0|1)&2&3", 0, false});
-		a.edges[0].push_back(HoaEdge{"!3", 0, false});
+		a.edges[0].push_back(hoa_edge{"(0|1)&2&3", 0, false});
+		a.edges[0].push_back(hoa_edge{"!3", 0, false});
 		std::ostringstream os;
 		emit_cpp_program_prop(a, {"a", "b", "c"}, {"o"}, os, "ParenGate");
 		std::string result = compile_and_run(os.str(),
@@ -247,14 +250,14 @@ TEST_SUITE("cpp_codegen_open") {
 	// CG-N9 (compiled): a guard label "f" listed first must never fire.
 	TEST_CASE("[CG-GUARD-03] compiled: guard 'f' must never fire") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		HoaAutomaton a;
+		hoa_automaton a;
 		a.num_states = 2;
 		a.initial_state = 0;
 		a.aps = {"o"};
 		a.edges.resize(2);
-		a.edges[0].push_back(HoaEdge{"f", 0, false}); // must never fire
-		a.edges[0].push_back(HoaEdge{"t", 1, false}); // must always fire
-		a.edges[1].push_back(HoaEdge{"t", 1, false});
+		a.edges[0].push_back(hoa_edge{"f", 0, false}); // must never fire
+		a.edges[0].push_back(hoa_edge{"t", 1, false}); // must always fire
+		a.edges[1].push_back(hoa_edge{"t", 1, false});
 		std::ostringstream os;
 		emit_cpp_program_prop(a, {}, {"o"}, os, "DeadGuard");
 		std::string result = compile_and_run(os.str(),
@@ -271,14 +274,14 @@ TEST_SUITE("cpp_codegen_open") {
 	// no-matching-edge ok==false path.
 	TEST_CASE("[CG-RT-02] compiled 3-state roundtrip: full cycle + ok=false on no match") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		HoaAutomaton a;
+		hoa_automaton a;
 		a.num_states = 3;
 		a.initial_state = 0;
 		a.aps = {"i", "o"};
 		a.edges.resize(3);
-		a.edges[0].push_back(HoaEdge{"0&1",  1, false});  // q0 -[i&o]-> q1
-		a.edges[1].push_back(HoaEdge{"!0&1", 2, false});  // q1 -[!i&o]-> q2
-		a.edges[2].push_back(HoaEdge{"1",    0, false});  // q2 -[o]-> q0
+		a.edges[0].push_back(hoa_edge{"0&1",  1, false});  // q0 -[i&o]-> q1
+		a.edges[1].push_back(hoa_edge{"!0&1", 2, false});  // q1 -[!i&o]-> q2
+		a.edges[2].push_back(hoa_edge{"1",    0, false});  // q2 -[o]-> q0
 		std::ostringstream os;
 		emit_cpp_program_prop(a, {"i"}, {"o"}, os, "Cycle3");
 		std::string result = compile_and_run(os.str(),
@@ -307,13 +310,13 @@ TEST_SUITE("cpp_codegen_open") {
 	// projection and the undeclared outputs are assigned from it.
 	TEST_CASE("[CG-OPEN-02] compiled: undeclared positive output literal must still be derivable") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		HoaAutomaton a;
+		hoa_automaton a;
 		a.num_states = 1;
 		a.initial_state = 0;
 		a.aps = {"i", "o1", "o2"};
 		a.edges.resize(1);
-		a.edges[0].push_back(HoaEdge{"0&1&2", 0, false});
-		a.edges[0].push_back(HoaEdge{"!0&!1&!2", 0, false});
+		a.edges[0].push_back(hoa_edge{"0&1&2", 0, false});
+		a.edges[0].push_back(hoa_edge{"!0&!1&!2", 0, false});
 		std::ostringstream os;
 		emit_cpp_program_open_prop(a, {"i"}, {"o1", "o2"}, {"o1"}, os, "OpenDispatch");
 		std::string result = compile_and_run(os.str(),

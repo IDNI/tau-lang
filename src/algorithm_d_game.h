@@ -38,7 +38,7 @@ namespace idni::tau_lang::alg_d {
 
 // ── Synthesis game (from ltlsynt --print-game-hoa) ───────────────────────
 
-struct SynthGame {
+struct synth_game {
 	int num_states = 0;
 	int init       = 0;
 	// player[q]: 0 = env (uncontrollable), 1 = sys (controller)
@@ -287,8 +287,8 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
 
 // ── HOA synthesis game parser ─────────────────────────────────────────────
 
-inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
-	SynthGame g;
+inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
+	synth_game g;
 
 	// A decomposed specification prints one game per part. Parsing only the
 	// first would drop the other parts' constraints, and their output APs
@@ -487,12 +487,12 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 
 // ── Call ltlsynt and get parity game ──────────────────────────────────────
 
-// Run ltlsynt on `phi_prop` and parse `--print-game-hoa` into a SynthGame.
+// Run ltlsynt on `phi_prop` and parse `--print-game-hoa` into a synth_game.
 //
 // DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
 // `write_tempfile` + `spawn_capture`, which live in that header and are
 // included after this one; the callers below need only this declaration.
-inline const SynthGame& call_ltlsynt_game(
+inline const synth_game& call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs);
@@ -509,7 +509,7 @@ inline const SynthGame& call_ltlsynt_game(
 // For trans-based acceptance: insert intermediate "color" state per edge.
 // State i in intermediate layer: (q * T1_size + rho) + offset.
 
-struct ProductGame {
+struct product_game {
 	int  n_states = 0;
 	int  init     = 0;
 	std::vector<int> player;
@@ -532,7 +532,7 @@ inline int d_index_from_ap_name(const std::string& ap) {
 /// Project an AP assignment (bit `i` = truth of AP index `i`) onto the
 /// controllable `d_N` APs: bit `N` of the result is set iff `d_N` is true
 /// in @p assignment. @p K bounds the accepted disjunct indices.
-inline int d_pattern_from_assignment(const SynthGame& G, int assignment, int K) {
+inline int d_pattern_from_assignment(const synth_game& G, int assignment, int K) {
 	int pat = 0;
 	for (int ap = 0; ap < (int)G.aps.size(); ++ap) {
 		if (ap >= (int)G.controllable.size() || !G.controllable[ap]) continue;
@@ -547,7 +547,7 @@ inline int d_pattern_from_assignment(const SynthGame& G, int assignment, int K) 
 // game does not mention is unconstrained by the formula, so its D-bit still
 // ranges over both values instead of silently reading as false — otherwise half
 // the system's moves disappear and a realizable spec can report UNREALIZABLE.
-inline std::vector<std::pair<int,int>> sys_choices(const SynthGame& G, int K) {
+inline std::vector<std::pair<int,int>> sys_choices(const synth_game& G, int K) {
 	const int n_aps = (int)G.aps.size();
 	std::vector<int> ap_of_d(K, -1);
 	std::vector<int> other_aps;
@@ -605,14 +605,14 @@ inline std::vector<std::pair<int,int>> sys_choices(const SynthGame& G, int K) {
 // `sorted_constants` must be the sorted, deduplicated constants list the
 // T1/T3 positions were enumerated from (collect_qlt_constants returns it in
 // exactly that form).
-inline int initial_memory(const std::vector<omcat::Rat>& sorted_constants) {
-	return omcat::qlt_type_of(omcat::Rat(0, 1), sorted_constants);
+inline int initial_memory(const std::vector<omcat::rational>& sorted_constants) {
+	return omcat::qlt_type_of(omcat::rational(0, 1), sorted_constants);
 }
 
-inline ProductGame build_product_game(
-	const SynthGame& G,
+inline product_game build_product_game(
+	const synth_game& G,
 	int T1_size,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,   // D-bitmask per T3 type
 	int K,                             // number of D propositions
 	int init_rho)                      // initial memory, from initial_memory()
@@ -666,12 +666,12 @@ inline ProductGame build_product_game(
 
 	// Count intermediate states: one per (q, rho, trans_idx) with edge priority
 	// Intermediate state id = base + offset
-	struct EdgeStub {
+	struct edge_stub {
 		int q, rho, trans_idx, next_q, next_rho;
 		int priority;
 		int player; // pass-through to next_q's player (doesn't matter, single succ)
 	};
-	std::vector<EdgeStub> stubs;
+	std::vector<edge_stub> stubs;
 	// Map (q, rho, trans_idx) → stub_id
 	std::map<std::tuple<int,int,int>, int> stub_map;
 
@@ -725,7 +725,7 @@ inline ProductGame build_product_game(
 		}
 	}
 
-	ProductGame pg;
+	product_game pg;
 	pg.n_states = base_n + (int)stubs.size();
 	// LG-12: the initial memory is the caller-supplied fixed convention
 	// (see initial_memory above) — not position 0, not a solver choice.
@@ -976,7 +976,7 @@ static std::pair<StateSet,StateSet> solve(
 // realizable ALG-D-28.  §14 made the env edges precise (the same T3
 // feasibility filter the sys edges use), so the refusal's reason is gone
 // and the textbook rule is exactly right.
-inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
+inline std::set<int> zielonka_win_player1(const product_game& pg) {
 	std::set<int> V;
 	for (int s = 0; s < pg.n_states; ++s) V.insert(s);
 
@@ -1063,7 +1063,7 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 inline bool solve_algorithm_d(
 	const std::string& phi_star,
 	int T1_size,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,
 	int K,
 	int init_rho)
@@ -1075,11 +1075,11 @@ inline bool solve_algorithm_d(
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 
 	// Get synthesis parity game for φ*(D_i)
-	SynthGame G = call_ltlsynt_game(phi_star, {}, D_outs);
+	synth_game G = call_ltlsynt_game(phi_star, {}, D_outs);
 	if (G.num_states == 0) return false;
 
 	// Build product game (G × T_1)
-	ProductGame pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
+	product_game pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
 	if (pg.n_states == 0) return false;
 
 	// Solve parity game with Zielonka
@@ -1092,11 +1092,11 @@ inline bool solve_algorithm_d(
 
 // ── Extended Algorithm D: returns winning region for semantic PWR ──────────
 
-struct AlgDResult {
+struct alg_d_result {
 	bool realizable = false;
 	std::set<int> winning_region;     // W1 state indices in product game
-	ProductGame product_game;
-	SynthGame synth_game;
+	product_game product_game;
+	synth_game synth_game;
 	int T1_size = 0;
 	int K = 0;                        // number of D propositions
 	// The FIXED initial memory type (LG-12 convention (F), equal to the
@@ -1108,15 +1108,15 @@ struct AlgDResult {
 
 // PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
 // init_rho: the fixed initial memory type — pass initial_memory(constants).
-inline AlgDResult solve_algorithm_d_full(
+inline alg_d_result solve_algorithm_d_full(
 	const std::string& phi_star,
 	int T1_size,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A,
 	int K,
 	int init_rho)
 {
-	AlgDResult result;
+	alg_d_result result;
 	result.T1_size = T1_size;
 	result.K = K;
 

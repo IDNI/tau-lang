@@ -49,18 +49,29 @@ static propositional_synthesis<Node> pack_try_propositional_synthesis(tref fm,
 }
 
 
+// partial_out, when non-null, stays populated even when the return value ends up std::nullopt.
 template <NodeType node>
-static std::optional<LtlAbaSolution<node>>
-solve_ltl_aba(tref fm)
+static std::optional<ltl_aba_solution<node>>
+solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out = nullptr)
 {
+	using tau = tree<node>;
+
 	// Past operators (S, T) are handled at skeleton level via DFA temporal
 	// testers (ppLTLTT approach), not by AST-level compile-away.  The
 	// formula is passed to extract_data_atoms unchanged — S/T nodes are
 	// transparent to atom extraction (they are temporal operators, not
 	// data atoms).  The skeleton generation intercepts S/T and emits
 	// DFA state variables + constraints instead.
-	LtlAbaSolution<node> sol;
+	ltl_aba_solution<node> sol;
 	sol.atoms = extract_data_atoms<node>(fm);
+	if (partial_out) partial_out->atoms = sol.atoms;
+
+	// Split into maximal top-level conjuncts and pick out the ones whose
+	// atoms are all positional (max-position hoisting); throws for the two
+	// temporary refusals -- a conjunct mixing positional and relative-time
+	// atoms, or a positional atom under F/U/R/W/S/T (see the function doc).
+	std::vector<tref> hoist_conjuncts =
+		collect_hoist_conjuncts<node>(fm, sol.atoms);
 
 	// Past operators (S, T) require the ppLTLTT temporal tester encoding
 	// in the default path.  Algorithm A/B/D use ltl_skeleton() which
@@ -73,27 +84,28 @@ solve_ltl_aba(tref fm)
 	// which those fast paths do not have, so they are not offered the formula.
 	if (!has_past)
 		if (auto claim = pack_try_propositional_synthesis<node>(
-			fm, sol.atoms); claim)
+			fm, sol.atoms); claim) {
+				if (!*claim && partial_out) *partial_out = sol;
 				return *claim;
+		}
 
 
 	if (sol.atoms.empty()) {
 		// Purely propositional: no io_var atoms.
 		if (has_past) {
-			std::vector<PastTemporalTester> testers;
+			std::vector<past_temporal_tester> testers;
 			sol.skeleton = skeleton_str_with_testers<node>(fm, sol.atoms, testers);
 			append_tester_constraints(sol.skeleton, testers);
-			std::vector<std::string> out_props;
 			for (const auto& t : testers)
-				out_props.push_back(t.state_var);
-			auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, out_props);
-			if (!real) return std::nullopt;
+				sol.output_props.push_back(t.state_var);
+			auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, sol.output_props);
+			if (!real) { if (partial_out) *partial_out = sol; return std::nullopt; }
 			sol.aut = parse_hoa(hoa);
 			return sol;
 		}
 		sol.skeleton = ltl_skeleton<node>(fm, sol.atoms);
 		auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, {});
-		if (!real) return std::nullopt;
+		if (!real) { if (partial_out) *partial_out = sol; return std::nullopt; }
 		sol.aut = parse_hoa(hoa);
 		return sol;
 	}
@@ -112,15 +124,50 @@ solve_ltl_aba(tref fm)
 			sol.output_props.push_back(name);
 	}
 
+	// Hoist each all-positional conjunct: rewrite it to a lookback formula
+	// guarded by the step counter reaching its own k_max, before the
+	// skeleton walk -- see apply_step_counter_encoding's doc comment. A
+	// no-op (returns "") when the formula has no positional atoms.
+	std::string step_counter_extra = apply_step_counter_encoding<node>(
+		hoist_conjuncts, sol.atoms, sol.input_props, sol.output_props,
+		sol.counter_highest_initial_pos, sol.counter_relativized_props);
+
+	// Erase each hoisted conjunct's own occurrence site to a literal T.
+	// before the main skeleton walk, rather than relying on an individual
+	// atom missing from `sol.atoms` (apply_step_counter_encoding already
+	// dropped them): erasing only the leaf atoms is correct under a
+	// top-level conjunction (1 && x == x) but wrong under any negative-
+	// polarity shape reaching the conjunct -- e.g. a bare negation
+	// `!(o[0]=1)` would erase its atom to "1" and leave "!1" ("0") behind,
+	// turning a vacuous conjunct into a hard-coded falsehood. Replacing the
+	// WHOLE conjunct (whatever its own Boolean shape) is correct regardless
+	// of polarity.
+	tref fm_for_skeleton = fm;
+	if (!hoist_conjuncts.empty()) {
+		subtree_map<node, tref> erase_map;
+		for (tref c : hoist_conjuncts) erase_map[c] = tau::_T();
+		fm_for_skeleton = rewriter::replace<node>(fm, erase_map);
+	}
+
 	// Build skeleton with DFA temporal testers for past operators (S, T).
 	// The ppLTLTT approach (Azzopardi et al., ATVA'23) replaces each S/T
 	// subformula with a fresh propositional state variable and encodes
 	// the DFA transition + initial condition as pure future-LTL constraints
 	// (G, X, propositional) that ltlsynt handles natively.
-	auto [skel, testers] = ltl_skeleton_with_testers<node>(fm, sol.atoms);
-	sol.skeleton = std::move(skel);
+	auto [skel, testers] = ltl_skeleton_with_testers<node>(fm_for_skeleton, sol.atoms);
+	sol.skeleton = std::move(skel) + step_counter_extra;
+
+	// Cross-step shift-chain constraints: tie shifted instances of the same
+	// signal together (e.g. o1[t]=1 and o1[t-1]!=1) before the consistency
+	// pass, which folds the resulting input-only assumptions into its own
+	// wrap so both sets combine behind a single implication.
+	std::string shift_chain_input_assumptions;
+	add_shift_chain_constraints<node>(sol.atoms, sol.skeleton,
+		shift_chain_input_assumptions, &sol.shift_chain_constraints);
+
 	add_consistency_constraints<node>(sol.atoms, sol.skeleton,
-		nullptr, has_past /*polarity_complete*/);
+		&sol.consistency_constraints, has_past /*polarity_complete*/,
+		std::move(shift_chain_input_assumptions));
 
 	// Append DFA tester constraints and register state variables as outputs.
 	append_tester_constraints(sol.skeleton, testers);
@@ -140,7 +187,7 @@ solve_ltl_aba(tref fm)
 
 	auto [realizable, hoa_text] =
 	    call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props);
-	if (!realizable) return std::nullopt;
+	if (!realizable) { if (partial_out) *partial_out = sol; return std::nullopt; }
 
 	sol.aut = parse_hoa(hoa_text);
 	return sol;
@@ -271,7 +318,7 @@ static tref build_state_bit_eq(const std::string& name, int shift, bool set)
 }
 
 template <NodeType node>
-static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
+static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 {
 	using tau = tree<node>;
 	const auto& aut = sol.aut;
@@ -347,7 +394,7 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 // realizable formula), the second element is nullptr.
 template <NodeType node>
 static std::pair<tref,tref>
-encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
+encode_mealy_initial_conditions(const ltl_aba_solution<node>& sol,
                                 const std::vector<std::string>& sv)
 {
 	using tau = tree<node>;
@@ -378,10 +425,49 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 	return {init_sv, init_out};
 }
 
+// ── encode_solution_as_safety ────────────────────────────────────────────────
+// Encodes an already-synthesised ltl_aba_solution as an always(phi) safety formula.
+
+template <NodeType node>
+static tref encode_solution_as_safety(const ltl_aba_solution<node>& sol) {
+	using tau = tree<node>;
+
+	// Purely propositional: realizable but no data constraints to encode.
+	if (sol.atoms.empty()) return tau::_T();
+
+	const auto& aut = sol.aut;
+
+	// Trivially realizable: empty automaton.
+	if (aut.num_states == 0) return tau::_T();
+
+	if (aut.num_states > 1) {
+		LOG_INFO << "[ltl_aba] Multi-state strategy ("
+		         << aut.num_states
+		         << " states) — encoding with auxiliary one-hot state bits";
+		return encode_mealy_as_safety<node>(sol);
+	}
+
+	// Single-state strategy: the self-loop guard is the perpetual output constraint.
+	if (aut.edges.empty() || aut.edges[0].empty())
+		return tau::build_wff_always(tau::_T());
+
+	// Build the disjunction of ABA guard formulas over all edges from state 0.
+	tref combined = tau::_F();
+	for (const auto& e : aut.edges[0]) {
+		tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
+		tref norm_guard = normalize_non_temp<node>(guard_fm);
+		combined = tau::build_wff_or(combined, norm_guard);
+	}
+	tref simplified = normalize_non_temp<node>(combined);
+	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
+	          << LOG_FM(simplified) << ")";
+	return tau::build_wff_always(simplified);
+}
+
 // ── ltl_to_safety_formula ─────────────────────────────────────────────────────
 //
 // `_full` does the work and returns BOTH the safety formula AND the
-// LtlAbaSolution (when one was synthesised). The interpreter caches the
+// ltl_aba_solution (when one was synthesised). The interpreter caches the
 // solution so it can introspect the Mealy state at runtime, visualise the
 // strategy, etc. — info that would otherwise be discarded after encoding.
 //
@@ -389,7 +475,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 // preserve the existing single-return API for callers that don't need it.
 
 template <NodeType node>
-std::tuple<tref, std::optional<LtlAbaSolution<node>>, std::vector<std::string>>
+std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
 ltl_to_safety_formula_full(tref fm) {
 	using tau = tree<node>;
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
@@ -544,6 +630,7 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	// tester variant flattened them to "1". Reduce like is_tau_formula_sat
 	// does (or refuse, via ltl_synthesis_error, where no sound encoding
 	// exists) before explaining anything.
+	// TODO: unlike is_ltl_aba_realizable's fast path, this does not also require has_no_boolean_combs_of_models
 	if (has_ctl_star_operators<node>(fm)) {
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
 		out << "CTL* reduced to LTL: "
@@ -559,73 +646,57 @@ bool ltl_explain(tref fm, std::ostream& out) {
 		return sat;
 	}
 
-	// ── Data atoms (S/T handled at skeleton level via ppLTLTT testers) ───
-	auto atoms = extract_data_atoms<node>(fm);
-	out << "\nData atoms (" << atoms.size() << "):\n";
-	for (auto& [f, name] : atoms)
+	// sol stays populated even when solve_ltl_aba returns std::nullopt.
+	ltl_aba_solution<node> sol;
+	std::optional<ltl_aba_solution<node>> maybe;
+	try {
+		maybe = solve_ltl_aba<node>(fm, &sol);
+	} catch (const std::runtime_error& e) {
+		out << "REFUSED: " << e.what() << "\n";
+		return false;
+	}
+	if (maybe) sol = std::move(*maybe);
+
+	out << "\nData atoms (" << sol.atoms.size() << "):\n";
+	for (auto& [f, name] : sol.atoms)
 		out << "  " << name << "  :=  " << tau::get(f).to_str() << "\n";
 
-	// ── Input / output classification ─────────────────────────────────────
-	std::vector<std::string> input_props, output_props;
-	for (auto& [f, name] : atoms) {
-		if (is_pure_input_atom<node>(f))
-			input_props.push_back(name);
-		else
-			output_props.push_back(name);
-	}
 	out << "\nInput propositions:  ";
-	for (size_t i = 0; i < input_props.size(); ++i) {
+	for (size_t i = 0; i < sol.input_props.size(); ++i) {
 		if (i) out << ", ";
-		out << input_props[i];
+		out << sol.input_props[i];
 	}
-	if (input_props.empty()) out << "(none)";
+	if (sol.input_props.empty()) out << "(none)";
 	out << "\n";
 
 	out << "Output propositions: ";
-	for (size_t i = 0; i < output_props.size(); ++i) {
+	for (size_t i = 0; i < sol.output_props.size(); ++i) {
 		if (i) out << ", ";
-		out << output_props[i];
+		out << sol.output_props[i];
 	}
-	if (output_props.empty()) out << "(none)";
+	if (sol.output_props.empty()) out << "(none)";
 	out << "\n";
 
-	// ── Skeleton with DFA temporal testers (ppLTLTT approach) ────────────
-	auto [skeleton, testers] = ltl_skeleton_with_testers<node>(fm, atoms);
-	std::vector<std::string> consistency_constraints;
-	add_consistency_constraints<node>(atoms, skeleton, &consistency_constraints,
-		has_past_operators<node>(fm) /*polarity_complete*/);
-	append_tester_constraints(skeleton, testers);
-	for (const auto& t : testers)
-		output_props.push_back(t.state_var);
-
-	out << "\nABA consistency constraints added (" << consistency_constraints.size() << "):\n";
-	for (auto& c : consistency_constraints)
+	out << "\nShift-chain constraints added (" << sol.shift_chain_constraints.size() << "):\n";
+	for (auto& c : sol.shift_chain_constraints)
 		out << "  " << c << "\n";
-	if (consistency_constraints.empty())
+	if (sol.shift_chain_constraints.empty())
 		out << "  (none)\n";
 
-	if (!testers.empty()) {
-		out << "\nppLTLTT temporal testers (" << testers.size() << "):\n";
-		for (const auto& t : testers)
-			out << "  " << t.state_var << ": G(X(" << t.state_var
-			    << ") <-> " << t.transition << ")"
-			    << (t.negate_output ? " [negated output]" : "") << "\n";
-	}
+	out << "\nABA consistency constraints added (" << sol.consistency_constraints.size() << "):\n";
+	for (auto& c : sol.consistency_constraints)
+		out << "  " << c << "\n";
+	if (sol.consistency_constraints.empty())
+		out << "  (none)\n";
 
-	// ── LTL skeleton ─────────────────────────────────────────────────────
-	out << "\nLTL skeleton: " << skeleton << "\n";
+	out << "\nLTL skeleton: " << sol.skeleton << "\n";
 
-	// ── Call ltlsynt ─────────────────────────────────────────────────────
-	out << "\nCalling ltlsynt...\n";
-	auto [realizable, hoa_text] = call_ltlsynt(skeleton, input_props, output_props);
-
-	if (!realizable) {
+	if (!maybe) {
 		out << "\nUNREALIZABLE\n";
 		return false;
 	}
 
-	// ── Parse HOA strategy ───────────────────────────────────────────────
-	HoaAutomaton aut = parse_hoa(hoa_text);
+	const hoa_automaton& aut = sol.aut;
 
 	out << "\nStrategy: " << aut.num_states << " state(s), initial state "
 	    << aut.initial_state << "\n";
@@ -651,24 +722,24 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	}
 
 	// ── ABA oracle checks ────────────────────────────────────────────────
-	if (!atoms.empty()) {
+	if (!sol.atoms.empty()) {
 		out << "\nABA oracle checks:\n";
 		bool all_feasible = true;
 		for (int s = 0; s < aut.num_states; ++s) {
 			for (auto& e : aut.edges[s]) {
-				tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, atoms);
 				// LT-20: use the SAME oracle as the real
 				// pipeline (dead-edge pure-input check +
 				// per-BA-type partition) -- the plain
 				// existential check printed the opposite
 				// verdict on dead catch-all edges.
 				bool feasible = guard_is_aba_feasible<node>(
-					e.guard_label, aut.aps, atoms);
+					e.guard_label, aut.aps, sol.atoms);
 				out << "  state " << s << " --[" << e.guard_label
 				    << "]--> " << e.dst << " : ";
 				if (feasible) {
 					out << "feasible\n";
 				} else {
+					tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
 					out << "INFEASIBLE\n";
 					out << "    (formula: " << tau::get(guard_fm).to_str() << ")\n";
 					all_feasible = false;
@@ -681,14 +752,9 @@ bool ltl_explain(tref fm, std::ostream& out) {
 		}
 	}
 
-	// ── Safety formula ───────────────────────────────────────────────────
-	// Re-derive via solve path (atoms already computed above, just encode)
-	tref safety = ltl_to_safety_formula<node>(fm);
-	if (safety) {
-		out << "\nSafety formula: " << tau::get(safety).to_str() << "\n";
-	} else {
-		out << "\nSafety formula: (not encodable as simple always(phi))\n";
-	}
+	// A pure past-LTL formula's safety formula is the full ppLTLTT/Mealy encoding here, not a compiled-away shortcut.
+	tref safety = encode_solution_as_safety<node>(sol);
+	out << "\nSafety formula: " << tau::get(safety).to_str() << "\n";
 
 	out << "\nREALIZABLE\n";
 	return true;
@@ -974,7 +1040,7 @@ bool has_semantic_negation(tref fm) {
 }
 
 template <NodeType node>
-CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm) {
+ctl_star_reduction<node> reduce_ctl_star_to_ltl(tref fm) {
 	using tau = tree<node>;
 	ctl_star_detail::reset_witness_counter();
 
@@ -996,7 +1062,7 @@ CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm) {
 	std::vector<size_t> witness_types(witnesses.size(),
 		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
 
-	return CtlStarReduction<node>{result, witnesses,
+	return ctl_star_reduction<node>{result, witnesses,
 		std::move(witness_types)};
 }
 

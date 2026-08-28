@@ -66,7 +66,7 @@ set(TAU_SOURCES
 	${TAU_GENERATED_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
 	${TAU_PACK_CORE_SOURCES}
-	instantiate_test_pack.cpp
+	instantiate_pack.cpp
 )
 
 
@@ -152,6 +152,14 @@ if(NOT TAU_BUILD_STATIC_LIBRARY)
 	exclude(${TAU_STATIC_LIB_NAME})
 endif()
 
+# `tau compile` links this library as the emitted artifact's tau_prebuilt, so
+# only here -- not the object or shared libraries -- pre-instantiates the
+# artifact pack templates (src/artifact_pack.def) the artifact's main.cpp
+# extern-declares, when TAU_ARTIFACT_PREINST is on.
+if(TAU_ARTIFACT_PREINST)
+	target_sources(${TAU_STATIC_LIB_NAME} PRIVATE instantiate_artifact_pack.cpp)
+endif()
+
 #
 # shared library
 #
@@ -205,35 +213,6 @@ if(TAU_BUILD_EXECUTABLE)
 		message(WARNING "tau: FTXUI not available — legacy terminal REPL will be used")
 	endif()
 endif(TAU_BUILD_EXECUTABLE)
-
-#
-# tau_codegen: tau→C++ program emitter.
-# Always built; depends on the static library.
-#
-add_executable(tau_codegen tau_codegen_cli.cpp)
-target_setup(tau_codegen)
-target_link_libraries(tau_codegen ${TAU_STATIC_LIB_NAME} ${TAU_BA_LINK_LIBS})
-target_include_directories(tau_codegen PUBLIC
-	$<BUILD_INTERFACE:${TAU}/src>
-	$<BUILD_INTERFACE:${TAU}/parser>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src>
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
-	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
-)
-add_dependencies(tau_codegen tau_header)
-
-# Kept out of the default build when tests are off: it is a full-stack
-# translation unit that no non-test target needs (the cpp_codegen tests emit
-# and compile code in-process, they do not run this binary). Build it on
-# demand with
-#   cmake --build <dir> --target tau_codegen
-# It is slated to be merged into the tau CLI as a compile/codegen subcommand.
-# tests/repl/commands/test_repl-codegen_cli.cmake DOES run this binary
-# directly (CG-N6/CG-R1 exit-code coverage), so a *-tests build must include
-# it in the default target set.
-if(NOT TAU_BUILD_TESTS)
-	exclude(tau_codegen)
-endif()
 
 #
 # executable using shared library

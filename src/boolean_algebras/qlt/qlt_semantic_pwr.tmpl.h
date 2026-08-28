@@ -46,9 +46,9 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref build_win_formula(
-	const alg_d::AlgDResult& result,
+	const alg_d::alg_d_result& result,
 	const std::vector<std::pair<tref, std::string>>& atoms,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A)
 {
 	const int K = result.K;
@@ -106,9 +106,9 @@ tref build_win_formula(
 
 template <NodeType node>
 tref build_win0_formula(
-	const alg_d::AlgDResult& result,
+	const alg_d::alg_d_result& result,
 	const std::vector<std::pair<tref, std::string>>& atoms,
-	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::qlt_type3>& T3,
 	const std::vector<int>& type_A)
 {
 	const int K = result.K;

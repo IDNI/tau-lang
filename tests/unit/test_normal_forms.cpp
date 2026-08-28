@@ -266,6 +266,26 @@ TEST_SUITE("GetNewUninterpretedConstant") {
 		REQUIRE(names.size() == 1);
 		CHECK(tau::get(names[0]).get_string() == ":split4");
 	}
+
+	// Freshness fix (normalizer.tmpl.h): two mints from different, mutually
+	// unaware formulas (each with no uconst of the family in sight, so both
+	// would locally compute the same "next" numeral) must still come out
+	// distinct -- otherwise hash-consing would silently alias them into the
+	// same node.
+	TEST_CASE("two mints from different formulas never collide") {
+		tref fm_a = tau::_1(tau_type_id<node_t>());
+		tref fm_b = tau::_1(tau_type_id<node_t>());
+		tref a = get_new_uninterpreted_constant<node_t>(
+			fm_a, "freshtest", tau_type_id<node_t>());
+		tref b = get_new_uninterpreted_constant<node_t>(
+			fm_b, "freshtest", tau_type_id<node_t>());
+		trefs names_a = tau::get(a).select_top(is<node_t, tau::uconst_name>);
+		trefs names_b = tau::get(b).select_top(is<node_t, tau::uconst_name>);
+		REQUIRE(names_a.size() == 1);
+		REQUIRE(names_b.size() == 1);
+		CHECK(tau::get(names_a[0]).get_string()
+			!= tau::get(names_b[0]).get_string());
+	}
 }
 
 // NF-4/NF-22: fold_trivial_quantifiers had zero direct unit tests. It folds

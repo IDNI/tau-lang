@@ -58,19 +58,8 @@ tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 				return t.replace_value(
 					t.value.replace_data(2));
 
-			static const auto io_prefixed_io_var =
-				[](size_t var_sid) -> size_t
-			{
-				return (dict(var_sid)[0] == 'i' || dict(var_sid) == "this")
-						? 1
-						: ((dict(var_sid)[0] == 'o' ||
-						dict(var_sid) == "u")
-							? 2
-							: 0);
-			};
-			size_t var_sid = get_var_name_sid<node>(var);
-			size_t direction = io_prefixed_io_var(var_sid);
-			DBG(LOG_TRACE << "io_prefixed_io_var: " << dict(var_sid)
+			size_t direction = io_var_direction<node>(var);
+			DBG(LOG_TRACE << "io_var_direction: " << get_var_name<node>(var)
 				<< " " << (direction == 1 ? "IN"
 					: (direction == 2 ? "OUT"
 					: "UNRESOLVED I/O"));)

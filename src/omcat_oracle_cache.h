@@ -30,38 +30,38 @@ namespace idni::tau_lang::omcat {
 // Key: a hashable identifier for an atomic-query batch.  The
 // discriminator encodes which atomic relations were queried; the
 // result is the type index (int).
-struct OracleKey {
+struct oracle_key {
 	uint64_t hash;
 	// BA2-7: keep the queried batch and compare it too -- hash-only
 	// equality let FNV collisions alias distinct batches to one cached
 	// answer.
 	std::vector<int> atomic_results;
-	bool operator==(const OracleKey& o) const {
+	bool operator==(const oracle_key& o) const {
 		return hash == o.hash && atomic_results == o.atomic_results;
 	}
 };
-struct OracleKeyHash {
-	size_t operator()(const OracleKey& k) const noexcept {
+struct oracle_key_hash {
+	size_t operator()(const oracle_key& k) const noexcept {
 		return static_cast<size_t>(k.hash);
 	}
 };
 
-class OracleCache {
+class oracle_cache {
 public:
 	// Returns the cached type index for `key`, or -1 if not present.
-	int get(const OracleKey& key) const {
+	int get(const oracle_key& key) const {
 		std::lock_guard<std::mutex> lg(mtx_);
 		auto it = map_.find(key);
 		return it == map_.end() ? -1 : it->second;
 	}
 	// Stores the result; overwrites existing entry.
-	void put(const OracleKey& key, int value) {
+	void put(const oracle_key& key, int value) {
 		std::lock_guard<std::mutex> lg(mtx_);
 		map_[key] = value;
 	}
 	// Compute-and-cache: calls `compute` only on a miss.
 	template <class F>
-	int get_or_compute(const OracleKey& key, F&& compute) {
+	int get_or_compute(const oracle_key& key, F&& compute) {
 		{
 			std::lock_guard<std::mutex> lg(mtx_);
 			auto it = map_.find(key);
@@ -82,18 +82,18 @@ public:
 	}
 private:
 	mutable std::mutex mtx_;
-	std::unordered_map<OracleKey, int, OracleKeyHash> map_;
+	std::unordered_map<oracle_key, int, oracle_key_hash> map_;
 };
 
 // Compute a key by hashing a vector of atomic-query results.  Each atomic
 // query is a small integer (e.g., sign of a comparison).
-inline OracleKey make_oracle_key(const std::vector<int>& atomic_results) {
+inline oracle_key make_oracle_key(const std::vector<int>& atomic_results) {
 	uint64_t h = 1469598103934665603ull; // FNV-1a offset basis
 	for (int r : atomic_results) {
 		h ^= static_cast<uint64_t>(r);
 		h *= 1099511628211ull; // FNV-1a prime
 	}
-	return OracleKey{h, atomic_results};
+	return oracle_key{h, atomic_results};
 }
 
 } // namespace idni::tau_lang::omcat

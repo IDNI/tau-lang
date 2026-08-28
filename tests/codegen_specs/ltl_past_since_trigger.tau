@@ -1,0 +1,1 @@
+((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) S (((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt)) T (o1[t]:qlt > {0}:qlt)).

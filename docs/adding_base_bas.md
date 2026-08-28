@@ -71,7 +71,9 @@ against the line naming it:
 - **identity and classification** — `type_name`, `default_type_priority`,
   `atomless`, `non_aba_omcat`
 - **type system** — `matches_type`, `type_tree`, `owns_type` (by tree and by
-  id), `type_param`, `type_id_for`, `type_tree_for`
+  id), `type_param`, `type_id_for`, `type_tree_for` (`type_param` also lets
+  inference default a type an atomic expression leaves under-specified, e.g.
+  a widthless `:bv`, to the owning BA's own parameterized type)
 - **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
   `is_closed`, `literal_one`, `literal_zero`
 - **normalization** — `normalize`, `splitter`, `splitter_one`

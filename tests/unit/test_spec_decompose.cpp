@@ -1,10 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Unit tests for Spec { transient; invariant; reactive } decomposition (#5).
+// Unit tests for decomposed_spec { transient; invariant; reactive } decomposition (#5).
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "spec.h"
+#include "decomposed_spec.h"
 #include <sstream>
 
 using namespace idni::tau_lang;
@@ -15,7 +15,7 @@ static tref parse(const char* s) {
 	return nso.value().main->get();
 }
 
-TEST_SUITE("Spec decomposition") {
+TEST_SUITE("decomposed_spec decomposition") {
 
 	TEST_CASE("pure invariant: G(o=1)") {
 		tref fm = parse("G ((o1[t] = 1)).");

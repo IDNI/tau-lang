@@ -24,6 +24,14 @@
 
 namespace idni::tau_lang {
 
+// Defined in bv_codegen.tmpl.h, included at this file's end; declared here so
+// the descriptor's own definition context can name it.
+template <NodeType node>
+static std::optional<std::string> bv_codegen_witness(tref var, tref conj);
+
+template <NodeType node>
+static std::optional<std::string> bv_codegen_constant_expr(tref cst);
+
 template <typename... PackBAs>
 struct ba_descriptor<bv, node<PackBAs...>> {
 	using node_t = node<PackBAs...>;
@@ -67,11 +75,19 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return is_bv_type_family<node_t>(ba_type_id);
 	}
 
-	/** @brief The bitwidth of `bv[n]`; the one BA with a real subtype. */
+	/**
+	 * @brief The bitwidth of `bv[n]`, or the default when unspecified.
+	 *
+	 * Reads the subtype directly rather than through get_bv_width: this is
+	 * where type inference (pack_default_ba_type) asks for the default, so
+	 * it cannot itself go through the accessor that now throws on absence.
+	 */
 	static std::optional<unsigned short> type_param(tref type_tree) {
 		if (!matches_type(type_tree)) return std::nullopt;
-		return static_cast<unsigned short>(
-			get_bv_width<node_t>(type_tree));
+		using tt = tau::traverser;
+		auto subtype = tt(type_tree) | tau::subtype | tt::ref;
+		return static_cast<unsigned short>(subtype
+			? tau::get(subtype)[0].get_num() : default_bv_size);
 	}
 
 	static size_t type_id_for(unsigned short bitwidth) {
@@ -300,10 +316,21 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type))),
 			ba_type) });
 	}
+
+	/** @brief A bitvector witness for @p var, spelled for generated C++. */
+	static std::optional<std::string> codegen_witness(tref var, tref conj) {
+		return bv_codegen_witness<node_t>(var, conj);
+	}
+
+	/** @brief @p cst's own bitvector value, spelled for generated C++. */
+	static std::optional<std::string> codegen_constant_expr(tref cst) {
+		return bv_codegen_constant_expr<node_t>(cst);
+	}
 };
 
 } // namespace idni::tau_lang
 
 #include "boolean_algebras/bv/bv_ba_hooks_ext.tmpl.h"
+#include "boolean_algebras/bv/bv_codegen.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_DESCRIPTOR_TMPL_H__

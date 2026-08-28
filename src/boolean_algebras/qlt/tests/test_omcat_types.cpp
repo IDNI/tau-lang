@@ -9,8 +9,8 @@
 #include "boolean_algebras/qlt/omcat_constants.h"
 
 using namespace idni::tau_lang;
-using omcat::QltType1;
-using omcat::Rat;
+using omcat::qlt_type1;
+using omcat::rational;
 using omcat::enumerate_qlt_T1;
 using omcat::qlt_type_of;
 using omcat::cmp;
@@ -25,7 +25,7 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("one constant (c=0): |T_1| = 3") {
-		auto ts = enumerate_qlt_T1({Rat(0, 1)});
+		auto ts = enumerate_qlt_T1({rational(0, 1)});
 		CHECK(ts.size() == 3u);
 		// positions: 0=(-∞,0), 1={0}, 2=(0,+∞)
 		CHECK(ts[0].is_interval());
@@ -34,7 +34,7 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("two constants (0, 1): |T_1| = 5") {
-		auto ts = enumerate_qlt_T1({Rat(0, 1), Rat(1, 1)});
+		auto ts = enumerate_qlt_T1({rational(0, 1), rational(1, 1)});
 		CHECK(ts.size() == 5u);
 		CHECK(ts[0].is_interval()); // (-∞, 0)
 		CHECK(ts[1].is_point());    // {0}
@@ -45,33 +45,33 @@ TEST_SUITE("omcat type enumeration") {
 
 	TEST_CASE("dedup and sort constants") {
 		auto ts = enumerate_qlt_T1(
-			{Rat(1, 1), Rat(0, 1), Rat(1, 1)});
+			{rational(1, 1), rational(0, 1), rational(1, 1)});
 		CHECK(ts.size() == 5u); // still 2 distinct constants ⇒ 5 types
 	}
 
 	TEST_CASE("realize: point type returns the constant") {
-		auto ts = enumerate_qlt_T1({Rat(3, 7)});
+		auto ts = enumerate_qlt_T1({rational(3, 7)});
 		auto w = ts[1].realize();
-		CHECK(cmp(w, Rat(3, 7)) == 0);
+		CHECK(cmp(w, rational(3, 7)) == 0);
 	}
 
 	TEST_CASE("realize: interval type returns value in the interval") {
-		auto ts = enumerate_qlt_T1({Rat(0, 1), Rat(1, 1)});
+		auto ts = enumerate_qlt_T1({rational(0, 1), rational(1, 1)});
 		auto w = ts[2].realize(); // (0, 1)
-		CHECK(cmp(w, Rat(0, 1)) > 0);
-		CHECK(cmp(w, Rat(1, 1)) < 0);
+		CHECK(cmp(w, rational(0, 1)) > 0);
+		CHECK(cmp(w, rational(1, 1)) < 0);
 	}
 
 	TEST_CASE("realize: (-∞, c) returns value below c") {
-		auto ts = enumerate_qlt_T1({Rat(5, 1)});
+		auto ts = enumerate_qlt_T1({rational(5, 1)});
 		auto w = ts[0].realize();
-		CHECK(cmp(w, Rat(5, 1)) < 0);
+		CHECK(cmp(w, rational(5, 1)) < 0);
 	}
 
 	TEST_CASE("realize: (c, +∞) returns value above c") {
-		auto ts = enumerate_qlt_T1({Rat(5, 1)});
+		auto ts = enumerate_qlt_T1({rational(5, 1)});
 		auto w = ts[2].realize();
-		CHECK(cmp(w, Rat(5, 1)) > 0);
+		CHECK(cmp(w, rational(5, 1)) > 0);
 	}
 
 	// AL-R2: `cmp` was widened to 128-bit (BA2-24) because long long
@@ -82,32 +82,32 @@ TEST_SUITE("omcat type enumeration") {
 	// witness then mis-orders T2/T3 enumeration.  The witness must lie
 	// strictly inside the interval and `qlt_type_of` must invert it.
 	TEST_CASE("[AL-R2] realize: interval witness does not overflow for large denominators") {
-		std::vector<Rat> cs = { Rat(1, 3037000499LL), Rat(1, 3037000500LL) };
+		std::vector<rational> cs = { rational(1, 3037000499LL), rational(1, 3037000500LL) };
 		auto ts = enumerate_qlt_T1(cs);
 		REQUIRE(ts.size() == 5u);
 		// sorted: 1/3037000500 < 1/3037000499
 		auto w = ts[2].realize();
-		CHECK(cmp(w, Rat(1, 3037000500LL)) > 0);
-		CHECK(cmp(w, Rat(1, 3037000499LL)) < 0);
+		CHECK(cmp(w, rational(1, 3037000500LL)) > 0);
+		CHECK(cmp(w, rational(1, 3037000499LL)) < 0);
 		for (const auto& t : ts) {
 			auto r = t.realize();
 			CHECK(r.q > 0);
 			CHECK(qlt_type_of(r, t.constants) == t.index());
 		}
 		// Outer intervals with extreme numerators: c-1 / c+1 must not wrap.
-		std::vector<Rat> big = { Rat(LLONG_MAX - 1, 1), Rat(LLONG_MIN + 2, 1) };
+		std::vector<rational> big = { rational(LLONG_MAX - 1, 1), rational(LLONG_MIN + 2, 1) };
 		auto tb = enumerate_qlt_T1(big);
 		REQUIRE(tb.size() == 5u);
-		CHECK(cmp(tb[0].realize(), Rat(LLONG_MIN + 2, 1)) < 0);
-		CHECK(cmp(tb[4].realize(), Rat(LLONG_MAX - 1, 1)) > 0);
-		CHECK(cmp(tb[2].realize(), Rat(LLONG_MIN + 2, 1)) > 0);
-		CHECK(cmp(tb[2].realize(), Rat(LLONG_MAX - 1, 1)) < 0);
+		CHECK(cmp(tb[0].realize(), rational(LLONG_MIN + 2, 1)) < 0);
+		CHECK(cmp(tb[4].realize(), rational(LLONG_MAX - 1, 1)) > 0);
+		CHECK(cmp(tb[2].realize(), rational(LLONG_MIN + 2, 1)) > 0);
+		CHECK(cmp(tb[2].realize(), rational(LLONG_MAX - 1, 1)) < 0);
 	}
 
 	TEST_CASE("qlt_type_of inverts realize") {
-		std::vector<Rat> cs = {
-			Rat(-1, 2), Rat(0, 1),
-			Rat(3, 4)
+		std::vector<rational> cs = {
+			rational(-1, 2), rational(0, 1),
+			rational(3, 4)
 		};
 		auto ts = enumerate_qlt_T1(cs);
 		// cs is already sorted for type_of.
@@ -133,12 +133,12 @@ TEST_SUITE("omcat type enumeration") {
 		//   (1,1) same point {c}: forced EQ           → 1
 		//   (2,2) same interval (c,+∞): 3 relations   → 3
 		//   total = 3 + 3 + 3 + 1 + 3 = 13.
-		auto t2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
+		auto t2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
 		CHECK(t2.size() == 13u);
 	}
 
 	TEST_CASE("T_2 restriction") {
-		auto t2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
+		auto t2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
 		for (const auto& s : t2) {
 			CHECK(s.restrict_m().index() == s.pos_m);
 			CHECK(s.restrict_x().index() == s.pos_x);
@@ -146,8 +146,8 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("Pre: unconstrained, W=T_1 ⇒ Pre = T_1") {
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
 		std::vector<int> W;
 		for (const auto& t : T1) W.push_back(t.pos);
 		auto P = omcat::Pre_over_T1_any(T1, T2, W);
@@ -155,15 +155,15 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("Pre: W=∅ ⇒ Pre=∅") {
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
 		auto P = omcat::Pre_over_T1_any(T1, T2, {});
 		CHECK(P.empty());
 	}
 
 	TEST_CASE("νX. Pre(X) on full T_1 = T_1 (G true)") {
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
 		auto W = omcat::nu_fixpoint(T1, [&](const std::vector<int>& X){
 			return omcat::Pre_over_T1_any(T1, T2, X);
 		});
@@ -171,8 +171,8 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("μX. Pre(X) on empty = ∅ (unreachable)") {
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
 		auto W = omcat::mu_fixpoint(T1, [&](const std::vector<int>& X){
 			return omcat::Pre_over_T1_any(T1, T2, X);
 		});
@@ -180,9 +180,9 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("reachable_from: unrestricted reaches all T_1") {
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
-		auto next_all = [&](const omcat::QltType2&) {
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
+		auto next_all = [&](const omcat::qlt_type2&) {
 			std::vector<int> all;
 			for (const auto& t : T1) all.push_back(t.pos);
 			return all;
@@ -194,9 +194,9 @@ TEST_SUITE("omcat type enumeration") {
 	TEST_CASE("Pre_over_T1 with admissible_next restricted to {0}") {
 		// System can only produce next-memory-type 0 regardless of input.
 		// So Pre(W) = T_1 if 0 ∈ W, else ∅.
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
-		auto only_zero = [&](const omcat::QltType2&) {
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
+		auto only_zero = [&](const omcat::qlt_type2&) {
 			return std::vector<int>{0};
 		};
 		{
@@ -215,9 +215,9 @@ TEST_SUITE("omcat type enumeration") {
 		// G(memory-type = 0):  νX. Pre_{only_0}(X).
 		// Since from any b we can reach 0, and 0 ∈ {0}, starting X = T_1
 		// gives a stable X = T_1.  So the winning set is T_1.
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
-		auto only_zero = [&](const omcat::QltType2&) {
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
+		auto only_zero = [&](const omcat::qlt_type2&) {
 			return std::vector<int>{0};
 		};
 		auto W = omcat::nu_fixpoint(T1, [&](const std::vector<int>& X){
@@ -230,9 +230,9 @@ TEST_SUITE("omcat type enumeration") {
 		// F(memory-type = 0):  μX. B_0 ∪ Pre(X), where B_0 = {b : next can be 0}.
 		// Under our only_zero transition, from ANY b we can force next = 0,
 		// so B_0 = T_1, so μ fixpoint converges to T_1 immediately.
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1)});
-		auto only_zero = [&](const omcat::QltType2&) {
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1)});
+		auto only_zero = [&](const omcat::qlt_type2&) {
 			return std::vector<int>{0};
 		};
 		// The "reach {0}" problem: μX. Pre_only_zero({0}) ∪ Pre(X).
@@ -255,9 +255,9 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("reachable_from: restricted to even positions stays even") {
-		auto T1 = omcat::enumerate_qlt_T1({omcat::Rat(0, 1), omcat::Rat(1, 1)});
-		auto T2 = omcat::enumerate_qlt_T2({omcat::Rat(0, 1), omcat::Rat(1, 1)});
-		auto next_even = [&](const omcat::QltType2&) {
+		auto T1 = omcat::enumerate_qlt_T1({omcat::rational(0, 1), omcat::rational(1, 1)});
+		auto T2 = omcat::enumerate_qlt_T2({omcat::rational(0, 1), omcat::rational(1, 1)});
+		auto next_even = [&](const omcat::qlt_type2&) {
 			std::vector<int> evens;
 			for (const auto& t : T1) if ((t.pos & 1) == 0) evens.push_back(t.pos);
 			return evens;
@@ -267,7 +267,7 @@ TEST_SUITE("omcat type enumeration") {
 	}
 
 	TEST_CASE("ordering predicates") {
-		auto ts = enumerate_qlt_T1({Rat(0, 1), Rat(1, 1)});
+		auto ts = enumerate_qlt_T1({rational(0, 1), rational(1, 1)});
 		// ts[0] = (-∞, 0): < 0 < 1
 		CHECK(ts[0].less_than(0) == true);
 		CHECK(ts[0].less_than(1) == true);
@@ -289,7 +289,7 @@ TEST_SUITE("omcat type enumeration") {
 
 TEST_SUITE("omcat: oracle cache") {
 	TEST_CASE("get miss, put, get hit") {
-		omcat::OracleCache c;
+		omcat::oracle_cache c;
 		auto k = omcat::make_oracle_key({-1, 0, 1});
 		CHECK(c.get(k) == -1);
 		c.put(k, 42);
@@ -297,7 +297,7 @@ TEST_SUITE("omcat: oracle cache") {
 		CHECK(c.size() == 1u);
 	}
 	TEST_CASE("get_or_compute only computes on miss") {
-		omcat::OracleCache c;
+		omcat::oracle_cache c;
 		auto k = omcat::make_oracle_key({1, 2, 3});
 		int calls = 0;
 		auto compute = [&]() { ++calls; return 99; };
@@ -314,7 +314,7 @@ TEST_SUITE("omcat: oracle cache") {
 		CHECK(!(k1 == k3));
 	}
 	TEST_CASE("clear empties the cache") {
-		omcat::OracleCache c;
+		omcat::oracle_cache c;
 		c.put(omcat::make_oracle_key({0}), 1);
 		CHECK(c.size() == 1u);
 		c.clear();
@@ -325,23 +325,23 @@ TEST_SUITE("omcat: oracle cache") {
 TEST_SUITE("omcat: parse_rat_literal") {
 	TEST_CASE("integer") {
 		auto r = omcat::parse_rat_literal("42");
-		CHECK(omcat::cmp(r, omcat::Rat(42, 1)) == 0);
+		CHECK(omcat::cmp(r, omcat::rational(42, 1)) == 0);
 	}
 	TEST_CASE("fraction") {
 		auto r = omcat::parse_rat_literal("3/7");
-		CHECK(omcat::cmp(r, omcat::Rat(3, 7)) == 0);
+		CHECK(omcat::cmp(r, omcat::rational(3, 7)) == 0);
 	}
 	TEST_CASE("negative fraction") {
 		auto r = omcat::parse_rat_literal("-1/2");
-		CHECK(omcat::cmp(r, omcat::Rat(-1, 2)) == 0);
+		CHECK(omcat::cmp(r, omcat::rational(-1, 2)) == 0);
 	}
 	TEST_CASE("decimal") {
 		auto r = omcat::parse_rat_literal("0.25");
-		CHECK(omcat::cmp(r, omcat::Rat(1, 4)) == 0);
+		CHECK(omcat::cmp(r, omcat::rational(1, 4)) == 0);
 	}
 	TEST_CASE("decimal 0.45") {
 		auto r = omcat::parse_rat_literal("0.45");
-		CHECK(omcat::cmp(r, omcat::Rat(9, 20)) == 0);
+		CHECK(omcat::cmp(r, omcat::rational(9, 20)) == 0);
 	}
 	TEST_CASE("invalid returns {0, 0}") {
 		auto r = omcat::parse_rat_literal("not-a-rational");
@@ -350,7 +350,7 @@ TEST_SUITE("omcat: parse_rat_literal") {
 }
 
 // BA2-12: the T3 layer (enumerate_qlt_T3, forced_rel_between,
-// rel3_consistent, QltType3::restrict_*) had no direct coverage -- its only
+// rel3_consistent, qlt_type3::restrict_*) had no direct coverage -- its only
 // production caller is semantic_pwr, whose tests hand-build the vectors.
 TEST_SUITE("qlt T3 enumeration (BA2-12)") {
 
@@ -369,7 +369,7 @@ TEST_SUITE("qlt T3 enumeration (BA2-12)") {
 	}
 
 	TEST_CASE("one constant: forced relations are honored") {
-		auto t3 = omcat::enumerate_qlt_T3({ omcat::Rat(1, 2) });
+		auto t3 = omcat::enumerate_qlt_T3({ omcat::rational(1, 2) });
 		REQUIRE( !t3.empty() );
 		for (const auto& t : t3) {
 			// a forced pair (-1 = free; else 0/1/2 = LT/EQ/GT)

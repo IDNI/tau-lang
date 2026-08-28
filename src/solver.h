@@ -63,6 +63,23 @@ std::optional<solution<node>> solve_inequality_system(
 	const inequality_system<node>& system, const solver_options& options);
 
 /**
+ * @brief Solves an inequality system over an atomless BA without enumeration.
+ *
+ * Implements TABA cor. Multivariate-BFs-over: satisfiability is `m`
+ * independent zero checks, and the witness is built by per-variable
+ * elimination instead of searching the product of per-inequality choices.
+ * Called by `solve_inequality_system` when `pack_type_is_atomless` holds.
+ *
+ * @tparam node Tree node type.
+ * @param system The inequality system to solve.
+ * @param options The solver options.
+ * @return An optional solution.
+ */
+template <NodeType node>
+std::optional<solution<node>> solve_inequality_system_atomless(
+	const inequality_system<node>& system, const solver_options& options);
+
+/**
  * @brief Solves the given equation system.
  *
  * @tparam node Tree node type.

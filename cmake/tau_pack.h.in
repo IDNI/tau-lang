@@ -10,6 +10,39 @@
 #define __IDNI__TAU__TAU_PACK_H__
 
 @TAU_PACK_BA_DEFINES@
+
+// Source tree of the tau binary that built this, for `tau compile`'s emitted CMakeLists.
+#ifndef TAU_CODEGEN_SDK_ROOT
+#  define TAU_CODEGEN_SDK_ROOT "@TAU_SDK_ROOT_PATH@"
+#endif
+
+// Build dir holding libTAU.a and generated headers, for a witness-bearing emitted project.
+#ifndef TAU_CODEGEN_BUILD_DIR
+#  define TAU_CODEGEN_BUILD_DIR "@CMAKE_BINARY_DIR@"
+#endif
+
+// This pack's resolved BA link libs (cmake target names, semicolon-joined), for the same reason.
+#ifndef TAU_CODEGEN_BA_LINK_LIBS
+#  define TAU_CODEGEN_BA_LINK_LIBS "@TAU_BA_LINK_LIBS@"
+#endif
+
+// Install prefix of the Boost/cvc5 builds this build linked (TAU_SHARED_PREFIX_RESOLVED), likewise.
+#ifndef TAU_CODEGEN_SHARED_PREFIX
+#  define TAU_CODEGEN_SHARED_PREFIX "@TAU_SHARED_PREFIX_RESOLVED@"
+#endif
+
+// Compile definitions resolved active on this build (e.g. TAU_PARSER_MEASURE*),
+// so a witness-bearing emitted project's own TU sees the same header-only
+// template layout as the libTAU.a/libtauparser.a it links prebuilt.
+#ifndef TAU_CODEGEN_COMPILE_DEFINITIONS
+#  define TAU_CODEGEN_COMPILE_DEFINITIONS "@TAU_RESOLVED_COMPILE_DEFINITIONS@"
+#endif
+
+// Set when this build's libTAU.a pre-instantiates the artifact pack
+// templates (src/artifact_pack.def), so tau_compile.tmpl.h's emit_main can
+// extern-declare them instead of an emitted artifact instantiating its own.
+@TAU_CODEGEN_ARTIFACT_PREINST_DEFINE@
+
 #include "tau_tree.h"
 @TAU_PACK_INCLUDES@
 

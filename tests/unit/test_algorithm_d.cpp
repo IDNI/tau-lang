@@ -77,7 +77,7 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 	}
 
 	TEST_CASE("[ALG-D-08] D-pattern extraction uses AP names, not AP order") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.aps = {"r_0", "d_1", "d_0"};
 		g.controllable = {true, true, true};
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b110, 2) == 0b11);
@@ -86,7 +86,7 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 	}
 
 	TEST_CASE("[ALG-D-09] D-pattern extraction ignores non-D controllable APs") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.aps = {"acc", "d_0", "grant"};
 		g.controllable = {true, true, true};
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b111, 1) == 0b1);
@@ -98,7 +98,7 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 		CHECK(alg_d::d_index_from_ap_name("d_10") == 10);
 		CHECK(alg_d::d_index_from_ap_name("q_10") == -1);
 		CHECK(alg_d::d_index_from_ap_name("d_x") == -1);
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.aps = {"d_10", "d_2", "d_0"};
 		g.controllable = {true, true, true};
 		CHECK(alg_d::d_pattern_from_assignment(g, 0b111, 11)
@@ -130,7 +130,7 @@ State: 1
 [t] 1
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		CHECK(g.num_states == 2);
 		CHECK(g.init == 0);
 		REQUIRE(g.aps.size() == 2u);
@@ -172,7 +172,7 @@ State: 0 {0}
 [t] 0 {0}
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 1u);
 		CHECK(g.state_priority[0] == 1);
 		REQUIRE(g.edge_priority.size() == 1u);
@@ -196,7 +196,7 @@ State: 0 {0}
 [t] 0 {0}
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 1u);
 		CHECK(g.state_priority[0] == 2);
 		REQUIRE(g.edge_priority.size() == 1u);
@@ -220,7 +220,7 @@ State: 0 {2}
 State: 1
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 2u);
 		// color 2 (even, accepting under min-even since a run stuck on
 		// state 0 has min color 2) must land on an ODD max-odd priority
@@ -241,7 +241,7 @@ State: 0 {2}
 State: 1 {1}
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 2u);
 		CHECK(g.state_priority[0] == 3);  // even winner 2 -> odd 3
 		CHECK(g.state_priority[1] == 2);  // odd loser 1 -> even 2
@@ -259,7 +259,7 @@ State: 0 {2}
 State: 1 {1}
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 2u);
 		CHECK(g.state_priority[0] == 2);
 		CHECK(g.state_priority[1] == 1);
@@ -275,7 +275,7 @@ controllable-AP: 0 2
 State: 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.controllable.size() == 3u);
 		CHECK(g.controllable[0]);
 		CHECK_FALSE(g.controllable[1]);
@@ -292,7 +292,7 @@ properties: trans-acc
 State: 0
 --END--
 )";
-		alg_d::SynthGame g1 = alg_d::parse_synth_game_hoa(hoa_trans);
+		alg_d::synth_game g1 = alg_d::parse_synth_game_hoa(hoa_trans);
 		CHECK(g1.trans_acc);
 
 		std::string hoa_no_trans = R"(HOA: v1
@@ -303,7 +303,7 @@ AP: 1 "p0"
 State: 0
 --END--
 )";
-		alg_d::SynthGame g2 = alg_d::parse_synth_game_hoa(hoa_no_trans);
+		alg_d::synth_game g2 = alg_d::parse_synth_game_hoa(hoa_no_trans);
 		CHECK_FALSE(g2.trans_acc);
 	}
 
@@ -316,7 +316,7 @@ AP: 1 "my_ap"
 State: 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.aps.size() == 1u);
 		CHECK(g.aps[0] == "my_ap");
 	}
@@ -334,7 +334,7 @@ not a transition line
 [1] 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.trans.size() == 2u);
 		REQUIRE(g.trans[0].size() == 2u);
 		CHECK(std::get<0>(g.trans[0][0]) == "0");
@@ -365,7 +365,7 @@ State: 2
 [t] 1
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.player.size() == 3u);
 		CHECK(g.player[0] == 0);
 		CHECK(g.player[1] == 1);
@@ -496,7 +496,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 	TEST_CASE("[ALG-D-20] Zielonka on trivial 2-state game: sys always wins") {
 		// Simple game: state 0 (player 0=env), state 1 (player 1=sys)
 		// Env unconditional → sys. Sys self-loops. All priority 1 (odd → sys wins).
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 2;
 		pg.init      = 0;
 		pg.player    = {0, 1};
@@ -509,7 +509,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 
 	TEST_CASE("[ALG-D-21] Zielonka: env wins if stuck sys") {
 		// State 0 (sys/player 1), priority 0 (even = env wins), no successors
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states  = 1;
 		pg.init      = 0;
 		pg.player    = {1};
@@ -540,7 +540,7 @@ State: 1
 [t] 0
 --END--
 )";
-		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 2u);
 		// The rejecting colour must dominate the uncoloured priority and be
 		// even (even = env wins under the max-odd convention).
@@ -548,7 +548,7 @@ State: 1
 		CHECK(g.state_priority[0] % 2 == 0);
 		CHECK(g.state_priority[1] % 2 == 1);
 
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 2;
 		pg.init     = 0;
 		pg.player   = {0, 0};
@@ -576,7 +576,7 @@ State: 1
 		//   Y = attr_0({1}) = {0,1}, V3 = {} → W0'' = W1'' = {}.
 		//   Correct Zielonka: Y ∪ Wl belongs to the OPPONENT (player 0 here),
 		//   so W0 = {0,1}, W1 = {}.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 2;
 		pg.init     = 0;
 		pg.player   = {0, 0};
@@ -600,7 +600,7 @@ State: 1
 		// merge the opponent attractor Y (which contains sink 2) is credited
 		// to sys in both variants, so sys is reported to win everywhere and
 		// the flip disappears.
-		alg_d::ProductGame env_owns;
+		alg_d::product_game env_owns;
 		env_owns.n_states = 3;
 		env_owns.init     = 0;
 		env_owns.player   = {0, 1, 0};
@@ -611,7 +611,7 @@ State: 1
 		CHECK(W1_env.count(1));
 		CHECK(!W1_env.count(2));
 
-		alg_d::ProductGame sys_owns = env_owns;
+		alg_d::product_game sys_owns = env_owns;
 		sys_owns.player = {1, 1, 0};  // only the choice state changes hands
 		auto W1_sys = alg_d::zielonka_win_player1(sys_owns);
 		CHECK(W1_sys.count(0));   // sys steers to the odd sink
@@ -633,7 +633,7 @@ State: 1
 	TEST_CASE("[ALG-D-44] a stuck sys state loses even at an odd priority") {
 		// Single sys-owned state, priority 1 (odd = sys under max-parity),
 		// no successors.  Sys cannot move → sys loses.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 1;
 		pg.init     = 0;
 		pg.player   = {1};
@@ -646,7 +646,7 @@ State: 1
 	TEST_CASE("[ALG-D-45] a stuck env state loses even at an even priority") {
 		// Mirror image: env-owned, priority 0 (even = env), no successors.
 		// Env cannot move → sys wins the state.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 1;
 		pg.init     = 0;
 		pg.player   = {0};
@@ -659,7 +659,7 @@ State: 1
 	TEST_CASE("[ALG-D-46] a dead end propagates through the attractor") {
 		// 0 (sys) → 1 (sys, stuck).  Sys is forced into the dead end from
 		// state 0, so sys loses both — despite both priorities being odd.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 2;
 		pg.init     = 0;
 		pg.player   = {1, 1};
@@ -672,7 +672,7 @@ State: 1
 	TEST_CASE("[ALG-D-47] a dead end does not poison a live alternative") {
 		// 0 (sys) chooses between the stuck state 1 and the good odd sink 2.
 		// Sys avoids the dead end and wins from 0 and 2; state 1 stays lost.
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 3;
 		pg.init     = 0;
 		pg.player   = {1, 1, 1};
@@ -691,7 +691,7 @@ State: 1
 	// sys win by parity, handed {0,1} to sys, and the one-shot override
 	// only erased 1 — leaving 0 in W1 (false REALIZABLE).
 	TEST_CASE("[ALG-D-49] AL-R1: a dead end next to an env-won successor does not keep the predecessor") {
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 3;
 		pg.init     = 0;
 		pg.player   = {1, 1, 0};
@@ -709,7 +709,7 @@ State: 1
 	// hand-computing the textbook rule shows it stands: env avoids its
 	// dead end by choice, not by a refused attractor.
 	TEST_CASE("[ALG-D-50] textbook: an env dead end is sys-won; an env state with an alternative is not") {
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 3;
 		pg.init     = 0;
 		pg.player   = {0, 0, 0};
@@ -725,7 +725,7 @@ State: 1
 	// [ALG-D-47] with an extra sys edge from the dead end's sibling stays
 	// REALIZABLE.
 	TEST_CASE("[ALG-D-51] dead-end handling keeps live alternatives") {
-		alg_d::ProductGame pg;
+		alg_d::product_game pg;
 		pg.n_states = 4;
 		pg.init     = 0;
 		pg.player   = {1, 1, 0, 1};
@@ -832,7 +832,7 @@ State: 1
 TEST_SUITE("[Algorithm D: product game construction]") {
 
 	TEST_CASE("[ALG-D-55] edge-color layer creates intermediate stub states") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.num_states = 2;
 		g.init = 0;
 		g.player = {1, 0};       // state 0 = sys, state 1 = env
@@ -846,7 +846,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.edge_priority = {{1}, {-1}};
 
 		int T1_size = 1;
-		std::vector<omcat::QltType3> T3(1);
+		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // pattern 1 (d_0 = true) feasible
 
@@ -863,7 +863,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 	}
 
 	TEST_CASE("[ALG-D-56a] pattern-feasible D-pattern: sys wins") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.num_states = 1;
 		g.init = 0;
 		g.player = {1};
@@ -876,7 +876,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.edge_priority = {{-1}};
 
 		int T1_size = 1;
-		std::vector<omcat::QltType3> T3(1);
+		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1}; // D-pattern 1 feasible at (rho=0,rho'=0)
 
@@ -886,7 +886,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 	}
 
 	TEST_CASE("[ALG-D-56b] pattern-infeasible D-pattern: dead end must NOT win for sys") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.num_states = 1;
 		g.init = 0;
 		g.player = {1};
@@ -899,7 +899,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.edge_priority = {{-1}};
 
 		int T1_size = 1;
-		std::vector<omcat::QltType3> T3(1);
+		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {0}; // only pattern 0 feasible — guard needs 1
 
@@ -915,7 +915,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 	// an infeasible pattern (a dead end), and one into env
 	// state 2 whose even self-loop env wins.  Both options lose.
 	TEST_CASE("[ALG-D-56c] AL-R1: dead-end edge plus env-won edge is UNREALIZABLE") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.num_states = 3;
 		g.init = 0;
 		g.player = {1, 1, 0};
@@ -931,7 +931,7 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 		g.edge_priority = {{-1, -1}, {-1}, {-1}};
 
 		int T1_size = 1;
-		std::vector<omcat::QltType3> T3(1);
+		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 0; T3[0].pos_y = 0;
 		std::vector<int> type_A = {1};         // only pattern 1 feasible
 
@@ -961,17 +961,17 @@ TEST_SUITE("[Algorithm D: product game construction]") {
 TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 
 	TEST_CASE("[ALG-D-70] initial_memory is qlt_type_of(0, constants)") {
-		using omcat::Rat;
+		using omcat::rational;
 		// No constants: single interval (-inf, +inf) = position 0.
 		CHECK(alg_d::initial_memory({}) == 0);
 		// 0 is a named constant: the POINT type {0} = position 1.
-		CHECK(alg_d::initial_memory({Rat(0, 1)}) == 1);
+		CHECK(alg_d::initial_memory({rational(0, 1)}) == 1);
 		// 0 below every constant: the interval (-inf, c_0) = position 0.
-		CHECK(alg_d::initial_memory({Rat(1, 2)}) == 0);
+		CHECK(alg_d::initial_memory({rational(1, 2)}) == 0);
 		// 0 strictly between constants: interval (c_0, c_1) = position 2.
-		CHECK(alg_d::initial_memory({Rat(-1, 1), Rat(1, 1)}) == 2);
+		CHECK(alg_d::initial_memory({rational(-1, 1), rational(1, 1)}) == 2);
 		// 0 above every constant: interval (c_{k-1}, +inf) = position 2k.
-		CHECK(alg_d::initial_memory({Rat(-1, 1)}) == 2);
+		CHECK(alg_d::initial_memory({rational(-1, 1)}) == 2);
 	}
 
 	// The end-to-end reproducer for the unsound (E) reading.  The F
@@ -1010,7 +1010,7 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// type_of(0) = {0} (position 1, the dead end), won from position 2.
 	TEST_CASE("[ALG-D-74] fixed rho0 decides: dead end from {0}, "
 	          "win from (0,+inf)") {
-		alg_d::SynthGame g;
+		alg_d::synth_game g;
 		g.num_states = 1;
 		g.init = 0;
 		g.player = {1};                        // sys-owned init
@@ -1026,7 +1026,7 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		// 2 = (0,+inf).  d_0 = "previous output > 0" is realisable only
 		// from m-position 2, staying there (y stays > 0).
 		const int T1_size = 3;
-		std::vector<omcat::QltType3> T3(1);
+		std::vector<omcat::qlt_type3> T3(1);
 		T3[0].pos_m = 2; T3[0].pos_y = 2;
 		std::vector<int> type_A = {1};
 
@@ -1064,8 +1064,8 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		auto small = alg_d::call_ltlsynt_game("d_0", {}, {"d_0"});
 		if (small.num_states == 0) return;
 
-		using omcat::Rat;
-		const std::vector<Rat> constants = {Rat(0, 1)};
+		using omcat::rational;
+		const std::vector<rational> constants = {rational(0, 1)};
 		auto T3 = omcat::enumerate_qlt_T3(constants);
 		const int T1_size = 3;
 		// d_0 = "current output > 0": true exactly in the types whose

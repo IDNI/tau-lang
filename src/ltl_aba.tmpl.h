@@ -10,6 +10,7 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ltl_aba"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <map>

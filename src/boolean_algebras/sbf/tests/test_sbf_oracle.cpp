@@ -34,12 +34,12 @@ static bool realizable(const char* s) {
 // 8-bit truth table over rows; ∃output with given constraints is SAT iff
 // the conjunction of constraints on out[0..7] has a solution, which cvc5
 // decides as pure Boolean SAT (no quantifiers, no UF).
-struct TruthTableSolver {
+struct truth_table_solver {
 	TermManager tm;
 	Sort bs;
 	std::vector<Term> out_bits; // out[row] for row = 0..7
 
-	TruthTableSolver() : bs(tm.getBooleanSort()) {
+	truth_table_solver() : bs(tm.getBooleanSort()) {
 		for (int i = 0; i < 8; ++i)
 			out_bits.push_back(tm.mkConst(bs, "o_r" + std::to_string(i)));
 	}
@@ -79,7 +79,7 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 
 	TEST_CASE("SBF-01: G(o = {X & Y}) — REAL/SAT") {
 		bool tau_r = realizable("G (o1[t]:sbf = {X & Y}:sbf).");
-		TruthTableSolver tts;
+		truth_table_solver tts;
 		auto tt_xy = tts.tt([](bool x, bool y, bool){ return x && y; });
 		CHECK(tau_r == true);
 		CHECK(tts.check(tts.output_equals(tt_xy)) == true);
@@ -88,7 +88,7 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 	TEST_CASE("SBF-02: G(o = {X & Y} && o = {X | Y}) — UNREAL/UNSAT") {
 		bool tau_r = realizable(
 			"G ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X | Y}:sbf)).");
-		TruthTableSolver tts;
+		truth_table_solver tts;
 		auto tt_and = tts.tt([](bool x, bool y, bool){ return x && y; });
 		auto tt_or  = tts.tt([](bool x, bool y, bool){ return x || y; });
 		Term c = tts.tm.mkTerm(Kind::AND, {
@@ -99,7 +99,7 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 
 	TEST_CASE("SBF-03: G(o = {X | (Y & Z)}) — REAL/SAT") {
 		bool tau_r = realizable("G (o1[t]:sbf = {X | (Y & Z)}:sbf).");
-		TruthTableSolver tts;
+		truth_table_solver tts;
 		auto tt_e = tts.tt([](bool x, bool y, bool z){ return x || (y && z); });
 		CHECK(tau_r == true);
 		CHECK(tts.check(tts.output_equals(tt_e)) == true);
@@ -108,7 +108,7 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 	TEST_CASE("SBF-04: G((o={X&Y}) || (o={X|Y})) — REAL/SAT") {
 		bool tau_r = realizable(
 			"G ((o1[t]:sbf = {X & Y}:sbf) || (o1[t]:sbf = {X | Y}:sbf)).");
-		TruthTableSolver tts;
+		truth_table_solver tts;
 		auto tt_and = tts.tt([](bool x, bool y, bool){ return x && y; });
 		auto tt_or  = tts.tt([](bool x, bool y, bool){ return x || y; });
 		Term c = tts.tm.mkTerm(Kind::OR, {
@@ -121,7 +121,7 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 		// Trivial identity: same constraint twice.
 		bool tau_r = realizable(
 			"G ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
-		TruthTableSolver tts;
+		truth_table_solver tts;
 		auto tt_and = tts.tt([](bool x, bool y, bool){ return x && y; });
 		CHECK(tau_r == true);
 		CHECK(tts.check(tts.output_equals(tt_and)) == true);
@@ -130,7 +130,7 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 	TEST_CASE("SBF-06: G(o != {X & Y}) — REAL/SAT (negation)") {
 		// System picks any sbf ≠ X&Y; 2^8 - 1 possibilities exist.
 		bool tau_r = realizable("G (!(o1[t]:sbf = {X & Y}:sbf)).");
-		TruthTableSolver tts;
+		truth_table_solver tts;
 		auto tt_and = tts.tt([](bool x, bool y, bool){ return x && y; });
 		// Constraint: NOT (output == X&Y truth-table).
 		Term eq = tts.output_equals(tt_and);

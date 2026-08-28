@@ -29,6 +29,9 @@ template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
 
 template <NodeType node>
+static std::optional<std::string> qlt_codegen_constant_expr(tref cst);
+
+template <NodeType node>
 static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms);
 
@@ -156,6 +159,11 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/** @brief A rational witness for @p var, spelled for generated C++. */
 	static std::optional<std::string> codegen_witness(tref var, tref conj) {
 		return qlt_codegen_witness<node_t>(var, conj);
+	}
+
+	/** @brief @p cst's own rational, spelled for generated C++. */
+	static std::optional<std::string> codegen_constant_expr(tref cst) {
+		return qlt_codegen_constant_expr<node_t>(cst);
 	}
 
 	/**

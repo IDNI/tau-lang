@@ -76,33 +76,15 @@ option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, t
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 
-set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
-if (TAU_BUILD_JOBS STREQUAL "")
-	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
-endif()
-
-if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
-		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
-	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
-		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
-	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
-endif()
-
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
-
-# Set the number of jobs to use for the build
-if (TAU_BUILD_JOBS EQUAL 0)
-	include(ProcessorCount)
-	ProcessorCount(TAU_BUILD_JOBS)
-	if(TAU_BUILD_JOBS EQUAL 0)
-		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
-		set(TAU_BUILD_JOBS 1)
-	else()
-		math(EXPR TAU_BUILD_JOBS "( ${TAU_BUILD_JOBS} + 1 ) / 2")
-		message(STATUS "Auto setting TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)")
-	endif()
-endif()
-set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
+# resolve TAU_SHARED_PREFIX and TAU_BUILD_JOBS from -D/env/auto into
+# TAU_SHARED_PREFIX_RESOLVED / TAU_BUILD_JOBS_RESOLVED (consumers below must
+# read the _RESOLVED name, not the bare cache variable -- see
+# external/parser/cmake/tau-resolve.cmake). Already include()d once above
+# (before project()) when TAU_BUILD_EMSCRIPTEN is ON, via use-emscripten.cmake;
+# the include_guard makes this a no-op in that case, and both paths set the
+# same directory-scope variables, so ordering relative to project() doesn't
+# matter here.
+include(tau-resolve)
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
@@ -177,6 +159,13 @@ if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 	AND NOT TAU_BUILD_BENCHMARK)
 		set(TAU_BUILD_EXECUTABLE ON)
 endif()
+
+# Whether libTAU.a pre-instantiates the artifact pack templates so `tau
+# compile` links them instead of recompiling per artifact. Defaults to the
+# effective TAU_BUILD_EXECUTABLE above, but is its own cache entry: once set,
+# it stays put across reconfigures even if TAU_BUILD_EXECUTABLE later changes.
+set(TAU_ARTIFACT_PREINST "${TAU_BUILD_EXECUTABLE}" CACHE BOOL
+	"Pre-instantiate the artifact pack in libTAU.a for faster `tau compile`")
 
 if(TAU_WINDOWS_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
 	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
@@ -309,6 +298,7 @@ message(STATUS "TAU_LOG_TRACE_TESTS: ${TAU_LOG_TRACE_TESTS}")
 message(STATUS "TAU_BUILD_STATIC_LIBRARY: ${TAU_BUILD_STATIC_LIBRARY}")
 message(STATUS "TAU_BUILD_SHARED_LIBRARY: ${TAU_BUILD_SHARED_LIBRARY}")
 message(STATUS "TAU_BUILD_EXECUTABLE: ${TAU_BUILD_EXECUTABLE}")
+message(STATUS "TAU_ARTIFACT_PREINST: ${TAU_ARTIFACT_PREINST}")
 message(STATUS "TAU_BUILD_SHARED_EXECUTABLE: ${TAU_BUILD_SHARED_EXECUTABLE}")
 message(STATUS "TAU_BUILD_TESTS: ${TAU_BUILD_TESTS}")
 message(STATUS "TAU_BUILD_UNIT_TESTS: ${TAU_BUILD_UNIT_TESTS}")
@@ -316,7 +306,13 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_API_TESTS: ${TAU_BUILD_API_TESTS}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
+# TAU_BUILD_JOBS_REASON is only set when TAU_BUILD_JOBS_RESOLVED came from
+# auto-detection (see tau-resolve.cmake); empty otherwise (explicit -D/env).
+if(TAU_BUILD_JOBS_REASON)
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED} (${TAU_BUILD_JOBS_REASON})")
+else()
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED}")
+endif()
 message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_RPM_PACKAGE: ${TAU_RPM_PACKAGE}")
 message(STATUS "TAU_DEB_PACKAGE: ${TAU_DEB_PACKAGE}")
@@ -327,7 +323,7 @@ message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
 message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
 message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
-message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
 
@@ -337,7 +333,7 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}")
 
-set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX}" CACHE PATH "Install prefix" FORCE)
+set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX_RESOLVED}" CACHE PATH "Install prefix" FORCE)
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "CMAKE_INSTALL_BINDIR: ${CMAKE_INSTALL_BINDIR}")
 message(STATUS "CMAKE_INSTALL_LIBDIR: ${CMAKE_INSTALL_LIBDIR}")
@@ -364,9 +360,9 @@ message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 #
 if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	set(DEP_CVC5_ARGS
-		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX})
-	set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
+		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}
+		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED})
+	set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX_RESOLVED}/cvc5)
 	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		list(APPEND DEP_CVC5_ARGS --w64)
@@ -413,10 +409,10 @@ endif()
 # Add Boost log library
 #
 set(DEP_BOOST_ARGS
-	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}
+	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}
+	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}
 	-DTAU_BUILD_PIC=${TAU_BUILD_PIC})
-set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX}/boost)
+set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX_RESOLVED}/boost)
 set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	list(APPEND DEP_BOOST_ARGS --w64)
@@ -492,12 +488,12 @@ if(TAU_BUILD_BROWSER_TESTS)
 	# use-emscripten.cmake for where TAU_SHARED_PREFIX/emsdk comes from);
 	# putting its bin/ first on PATH means neither script below needs a
 	# system node install.
-	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX}/emsdk/node/*/bin")
+	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node/*/bin")
 	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
 	if(_tau_emsdk_node_bin_count EQUAL 0)
 		message(FATAL_ERROR
 			"TAU_BUILD_BROWSER_TESTS=ON needs emsdk's bundled node, not found "
-			"under ${TAU_SHARED_PREFIX}/emsdk/node. Run './dev dep-emsdk.sh' "
+			"under ${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node. Run './dev dep-emsdk.sh' "
 			"first (the Emscripten toolchain itself already requires it).")
 	endif()
 	list(GET _tau_emsdk_node_bin 0 _tau_emsdk_node_bin)
@@ -596,14 +592,15 @@ set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent
 set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
 # the parsers are generated by this build, so the generator is part of it
 set(TAU_PARSER_BUILD_TGF ON CACHE BOOL "Build tgf tool" FORCE)
-if (CMAKE_BUILD_TYPE STREQUAL "Devel")
-	set(TAU_PARSER_COMPILE_OPTIONS "-O0;-DNDEBUG;-g0")
-endif()
 add_subdirectory(external/parser)
 
 # tau's own targets get TAU_PARSER_NO_TGF from target_setup(): grammars are
 # compiled ahead of time, so tau never parses .tgf at runtime. It cannot sit on
 # tauparser_static, whose consumers include the tgf tool this build now runs.
+
+# tauparser now exists, so tau_pack.h can be rewritten with the compile
+# definitions actually resolved active on this build (see tau_bas.cmake).
+tau_finalize_pack_compile_definitions()
 
 #
 # load common cmake settings and load functions
@@ -696,7 +693,7 @@ set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")
-set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX}/packages")
+set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX_RESOLVED}/packages")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")

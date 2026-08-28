@@ -405,9 +405,9 @@ inline bool normalize_and_check(const char* sample, const std::string& expected)
 #include <algorithm>
 #include <unordered_set>
 
-struct TauTestGCListener : doctest::IReporter {
+struct tau_test_gc_listener : doctest::IReporter {
 	using tau_ = idni::tau_lang::tau;
-	TauTestGCListener(const doctest::ContextOptions&) {}
+	tau_test_gc_listener(const doctest::ContextOptions&) {}
 	void report_query(const doctest::QueryData&) override {}
 	void test_run_start() override {}
 	void test_run_end(const doctest::TestRunStats&) override {}
@@ -424,7 +424,7 @@ struct TauTestGCListener : doctest::IReporter {
 	void log_message(const doctest::MessageData&) override {}
 	void test_case_skipped(const doctest::TestCaseData&) override {}
 };
-REGISTER_LISTENER("tau_gc", 1, TauTestGCListener);
+REGISTER_LISTENER("tau_gc", 1, tau_test_gc_listener);
 
 #endif // IDNI_TAU_TESTS_GC_LISTENER_REGISTERED
 

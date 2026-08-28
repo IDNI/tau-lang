@@ -70,17 +70,21 @@ inline std::optional<std::string> console_prompt_input_stream::get(size_t time_p
 	std::cout << name << "[" << time_point << "]"
 		<< spacing(name, max_length) << " := ";
 
-#ifdef DEBUG
 	std::optional<std::string> result = this->get();
+	// Empty/failed read means read() will treat this as end-of-input: close
+	// the dangling prompt line (the newline the user's own ENTER, or the
+	// tape's own missing line, never supplied) before anything else prints.
+	if (!result.has_value() || result->empty()) std::cout << "\n";
+
+#ifdef DEBUG
 	std::stringstream ss;
 	ss << "console_prompt_input_stream::get[result]: ";
 	if (result.has_value()) ss << "\"" << result.value() << "\"";
 	else ss << "error";
 	LOG_TRACE << ss.str();
-	return result;
 #endif // DEBUG
 
-	return this->get();
+	return result;
 }
 
 // -- repl_pending_input_stream --

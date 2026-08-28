@@ -47,7 +47,7 @@ else()
 	message(STATUS "LTO off: nothing links with LTO here (tests are -fno-lto)")
 endif()
 
-set(TAU_DEVEL_OPTIONS "-O0;-DNDEBUG;-g0")
+set(TAU_DEVEL_OPTIONS "-O0;-DDEBUG;-g0")
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE}")
 set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE};-g")

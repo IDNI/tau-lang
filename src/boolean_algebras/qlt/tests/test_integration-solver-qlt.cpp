@@ -125,6 +125,16 @@ TEST_SUITE("solve") {
 		const char* system = "x : qlt = 0 && x : qlt != 0.";
 		CHECK( !test_solve(system) );
 	}
+
+	// Regression: normalization renders <= as a negated ordering atom
+	// (bf_nlt/bf_nlteq). The omcat gate in solve() must still recognize
+	// those as ordering atoms and route the system to qlt's own solver;
+	// previously it fell through to the ABA solve_inequality_system, which
+	// cannot handle ordering atoms and crashed.
+	TEST_CASE("interval via <=: {0}:qlt <= x:qlt && x:qlt <= {1}:qlt") {
+		const char* system = "{0}:qlt <= x:qlt && x:qlt <= {1}:qlt.";
+		CHECK( test_solve(system) );
+	}
 }
 
 // SO-1: the DLO diversion in solve(const equations&, ...) only fired for a

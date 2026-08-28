@@ -188,7 +188,7 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 	TEST_CASE("[IAX-MEALY-03] determinise returns automaton (possibly empty)") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
-		HoaAutomaton aut = i->determinise();
+		hoa_automaton aut = i->determinise();
 		// num_states >= 0 by construction.
 		REQUIRE(aut.num_states >= 0);
 	}
@@ -423,7 +423,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		tref spec_tref = nso_rr.value().main->get();
 		REQUIRE(spec_tref != nullptr);
 
-		PreferenceOrder po;
+		preference_order po;
 		tref result = apply_preferences<node_t>(spec_tref, po);
 		REQUIRE(result == spec_tref);
 	}
@@ -434,7 +434,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		REQUIRE(nso_rr.has_value());
 		tref spec_tref = nso_rr.value().main->get();
 
-		PreferenceOrder po;
+		preference_order po;
 		po.entries.push_back({"###invalid_var", "garbage"});
 		// Should not crash; should return spec unchanged (preference dropped).
 		tref result = apply_preferences<node_t>(spec_tref, po);

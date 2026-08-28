@@ -134,6 +134,13 @@ add_repl_test(solver_cmd-qlt-solve-two_vars
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable
 	"solve x : qlt = 0 && x : qlt != 0." "no solution") # qlt.cpp:124-126
 
+# Regression: <= normalizes to a negated ordering atom (bf_nlteq); the omcat
+# gate must still route it to qlt's own solver instead of falling through to
+# the ABA solve_inequality_system, which cannot handle ordering atoms and
+# used to abort the process.
+add_repl_test(solver_cmd-qlt-solve-interval_via_lteq
+	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{") # qlt.cpp:130-133
+
 # mixed -- tests/integration/solver/test_integration-solver-mixed.cpp
 
 add_repl_test(solver_cmd-mixed-qint_qlt

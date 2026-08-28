@@ -2483,7 +2483,7 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 |--------|---------|
 | `src/gr1_detect.h` | `is_gr1_fragment(fm, &n_safety, &n_liveness)` classifier for `⋀ G(ψ_safe) ∧ ⋀ GF(ψ_live)`. |
 | `src/liveness_decomp.h` | `decompose_liveness(fm)` splits GR(1)-shaped formulas into safety part + GF bodies. |
-| `src/spec.h` | `Spec { transient; invariant; reactive }` with `decompose_spec(fm)` classifier. |
+| `src/decomposed_spec.h` | `decomposed_spec { transient; invariant; reactive }` with `decompose_spec(fm)` classifier. |
 | `src/parse_error_hint.h` | `classify_parse_error(formula)` for actionable parse error messages. |
 | `src/tau_lang_api.h` | Stable public API: `tau_lang_is_realizable(formula_str)` returning `{REALIZABLE, UNREALIZABLE, ERROR}`. |
 

@@ -67,7 +67,7 @@ inline std::string neg_atom(int rho, int A, int K, int n_rbits) {
 	return "!(" + r_encode(rho, n_rbits) + " & " + d_pattern(A, K) + ")";
 }
 
-struct SkeletonBundle {
+struct skeleton_bundle {
 	std::string formula;
 	std::vector<std::string> outs; // r_0..r_{n_rbits-1} then D_0..D_{K-1}
 	int n_rbits = 0;
@@ -75,13 +75,13 @@ struct SkeletonBundle {
 	int K       = 0;
 };
 
-inline SkeletonBundle build_algorithm_a_skeleton(
+inline skeleton_bundle build_algorithm_a_skeleton(
 	int T1_size,
 	int K,
 	const std::vector<std::tuple<int,int,int>>& feasible_set, // (sigma, rho, A)
 	const std::string& phi_star_ltl)
 {
-	SkeletonBundle b;
+	skeleton_bundle b;
 	b.T1_size = T1_size;
 	b.K = K;
 

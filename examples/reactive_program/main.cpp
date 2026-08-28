@@ -7,8 +7,8 @@
 #include <cstdio>
 
 int main() {
-	TauProgram p;
-	TauProgram::Inputs in;
+	tau_program p;
+	tau_program::inputs in;
 
 	std::printf("step  o_p0  ok\n");
 	std::printf("----  ----  --\n");

@@ -728,6 +728,15 @@ struct api {
 	static std::optional<std::map<stream_at, std::string>> step(
 		interpreter<node>& i);
 
+	/// Drive the interpreter through its full step loop (see
+	/// interpreter::run_loop): steps until the spec is exhausted, input
+	/// ends, or the user quits.
+	/// @param quit_on_idle  When true, stop instead of prompting once the
+	///   loop goes idle (matches the CLI's `-q`); when false (default),
+	///   prompt interactively.
+	/// @return false if a step's output failed to write; true otherwise.
+	static bool run(interpreter<node>& i, bool quit_on_idle = false);
+
 	/// Run BA type inference on an expression.  Infers types, canonizes
 	/// quantifier IDs, unnests G-in-G, and checks for semantic errors.
 	/// @param use_defaults  When true, apply default type rules.
@@ -985,6 +994,9 @@ struct api {
 		bool interactive = true);
 	/** @brief Advance interpreter one step and record timing. */
 	static std::optional<std::map<stream_at, std::string>> step(measuring& m, interpreter<node>& i);
+	/** @brief Drive the interpreter's full step loop and record timing.
+	 *  @return false if a step's output failed to write; true otherwise. */
+	static bool run(measuring& m, interpreter<node>& i, bool quit_on_idle = false);
 
 	/** @brief Infer types and record timing. */
 	static tref infer(measuring& m, tref expr, bool use_defaults = true);

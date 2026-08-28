@@ -337,9 +337,12 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 
 /**
  * @brief Checks that the formula can be decided by the bitvector solver:
- * every variable must have an explicitly sized bitvector type, and the formula
+ * every variable must have an explicitly sized bitvector type, at least one
+ * bv-typed variable or ba_constant must actually be present, and the formula
  * must contain no node kind `bv_eval_node` cannot translate. Mixed-type
- * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
+ * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5,
+ * and a formula with no bv content at all (e.g. an already-resolved
+ * T/F literal) is not this solver's to claim.
  *
  * Also rejects formulas carrying a non-bv-typed ba_constant (e.g. a `qlt`
  * constant like `{1/3}:qlt`): such a constant can appear in an otherwise
@@ -347,9 +350,19 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
  * concrete value (e.g. during interpretation), so checking only `variable`
  * nodes is not enough to catch the mixed-type case.
  *
+ * A `variable` node is treated as an opaque leaf: its children are not
+ * descended into. An io_var (`o1[t]`, `i1[t-3]`) is itself a `variable`
+ * node whose children carry the time offset/shift bookkeeping, including
+ * an inner, untyped `variable` node for the bare time symbol `t` -- that
+ * bookkeeping is not a data variable and bv_eval_node never looks past the
+ * outer variable's own type when translating it, so inspecting it here
+ * would reject bv-only formulas over their own opaque type mismatch.
+ *
  * @tparam node Node type
  * @param form The formula to check
- * @return true if the formula is within the translator's reach
+ * @return true if the formula is within the translator's reach: all
+ * variables/constants are (explicitly sized) bitvectors and at least one
+ * bv-typed variable/constant was seen
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
@@ -432,7 +445,13 @@ bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 		}
 		return solvable;
 	};
-	pre_order<node>(form).search_unique(check);
+	// Do not descend into a variable node's own children: its offset/shift
+	// bookkeeping (e.g. the untyped `t` inside an io_var) is not data.
+	auto skip_variable_children = [](tref, tref parent = nullptr) {
+		return !(parent && is<node>(parent, tau::variable));
+	};
+	auto up = [](tref) {};
+	pre_order<node>(form).search_unique(check, skip_variable_children, up);
 	if (solvable && !has_bv) reason = bv_unsolvable_reason::no_bv_content;
 	return solvable && has_bv;
 }
@@ -610,6 +629,8 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	using tt = tau::traverser;
 
 	subtree_map<node, bv> vars, free_vars;
+	// Fresh solver per query, same rationale as bv_formula_sat_status above:
+	// checkSat() is not safe to replay on a shared/reset solver instance.
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 

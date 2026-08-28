@@ -767,10 +767,494 @@ std::optional<solution<node>> solve_minterm_system(
 	return find_solution<node>(eq);
 }
 
+// Splitter for a ba_constant coefficient, matching add_minterm_to_disjoint's
+// case-4 call: options.splitter_one for the top element, tau_splitter
+// otherwise. Re-normalizes first since red_and's AND of two DNF operands
+// isn't itself in DNF, which tau_splitter requires.
+template <NodeType node>
+tref atomless_coefficient_splitter(tref cte, const solver_options& options) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	cte = tt(cte) | bf_reduce_canonical<node>() | tt::ref;
+	if (tau::get(cte).equals_1()) return options.splitter_one;
+	return tau_splitter(tau::get(tt(cte) | tau::ba_constant | tt::ref)).get();
+}
+
+// Bad-splitter fallback for a ba_constant coefficient: conjoins a fresh
+// uninterpreted constant into cte (tau_splitter with splitter_type::bad).
+// get_new_uninterpreted_constant's process-wide per-family floor
+// (normalizer.tmpl.h) keeps the minted name globally fresh even though
+// tau_splitter's temporal path only scans the clause it injects into.
+// The caller (atomless_choose_value) still verifies properness itself.
+template <NodeType node>
+tref atomless_bad_splitter(tref cte) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	cte = tt(cte) | bf_reduce_canonical<node>() | tt::ref;
+	return tau_splitter(tau::get(tt(cte) | tau::ba_constant | tt::ref),
+		splitter_type::bad).get();
+}
+
+// Ledger-backed fast path for a per-coordinate exclusion system (Design A):
+// a single variable `var`, every row a plain exclusion `var != v_j`. A
+// ledger-tracked v_j needs zero solver decisions: freeness (TABA,
+// Homomorphisms and Hemimorphisms) licenses treating any value disjoint
+// from the ledger's fresh region as independent of everything committed so
+// far; only external v_j (not ledger-tracked) get a real disjointness check.
+// Row shape (`var != v_j` has complementary cofactors) is checked
+// structurally via hash-consed compare, no solver call.
+// Returns nullopt on any doubt at all, so the general path
+// (atomless_witness/atomless_choose_value) always has the final word.
+template <NodeType node>
+std::optional<tref> atomless_choose_value_ledger(
+	const std::vector<std::pair<tref, tref>>& cofactors, size_t type,
+	const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	if (!options.ledger || cofactors.empty()) return std::nullopt;
+
+	auto red_and = [&](tref a, tref b) {
+		return tt(tau::get(a) & tau::get(b))
+			| bf_reduce_canonical<node>() | tt::ref;
+	};
+	auto red_not = [&](tref a) {
+		return tt(~tau::get(a)) | bf_reduce_canonical<node>() | tt::ref;
+	};
+
+	trefs external; // category (b): non-ledger, nonzero, non-one targets
+	for (const auto& [c0, c1] : cofactors) {
+		if (!tau::subtree_equals(red_not(c0), c1))
+			return std::nullopt; // not exclusion-shaped
+		if (tau::get(c0).equals_0() || tau::get(c0).equals_1())
+			continue; // var!=0 / var!=1 are free (nonzero+proper mint below)
+		if (options.ledger->is_committed(c0)) {
+			// Monotone-scope check: structural only, no solver call --
+			// append-only committed history makes this trivially true.
+			DBG(if (auto gi = options.ledger->committed_generator(c0)) {
+				trefs current;
+				current.reserve(options.ledger->committed_index.size());
+				for (auto& [k, idx] : options.ledger->committed_index)
+					current.push_back(
+						options.ledger->generators.at(idx).value);
+				options.ledger->consult(*gi, current);
+			})
+			continue; // category (a): free by freeness
+		}
+		external.push_back(c0);
+	}
+
+	tref region = options.ledger->fresh_region
+		? options.ledger->fresh_region->get() : nullptr;
+	if (!region) region = tau::_1(type);
+	for (tref v : external) region = red_and(region, red_not(v));
+	if (tau::get(region).equals_0()) return std::nullopt; // real check
+
+	// atomless_bad_splitter needs a ba_constant child, which the literal-1
+	// sentinel (region on this run's very first mint) lacks; use
+	// options.splitter_one directly for that case, same as
+	// atomless_coefficient_splitter's own precedent.
+	tref x = tau::get(region).equals_1()
+		? options.splitter_one
+		: atomless_bad_splitter<node>(region);
+	if (!x || tau::get(x).equals_0()) return std::nullopt; // real check
+	if (tau::get(red_and(region, red_not(x))).equals_0())
+		return std::nullopt; // not a proper split (see atomless_bad_splitter)
+
+	for (tref v : external) // real checks, category (b) only
+		if (!tau::get(red_and(x, v)).equals_0()) return std::nullopt;
+
+	return x;
+}
+
+// Whole-system entry point for the fast path above: `gs` (already XOR-
+// folded, per solve_inequality_system_atomless) constrains exactly one
+// variable `var` -- the shape ocltl_direct_decode_edge always hands in.
+// Cofactor computation mirrors atomless_witness's own (rewriter::replace +
+// bf_reduce_canonical, syntactic, no solver call); atomless_witness's own
+// recursion is not needed since there is nothing left to eliminate after
+// `var`.
+template <NodeType node>
+std::optional<solution<node>> atomless_exclusion_system_ledger(
+	const trefs& gs, tref var, const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	size_t type = find_ba_type<node>(var);
+
+	auto cofactor = [&](tref g, bool value) {
+		tref v = value ? tau::_1(type) : tau::_0(type);
+		tref r = rewriter::replace<node>(g, var, v);
+		return tt(r) | bf_reduce_canonical<node>() | tt::ref;
+	};
+
+	std::vector<std::pair<tref, tref>> cofactors;
+	cofactors.reserve(gs.size());
+	for (tref g : gs)
+		cofactors.emplace_back(cofactor(g, false), cofactor(g, true));
+
+	auto x = atomless_choose_value_ledger<node>(cofactors, type, options);
+	if (!x) return std::nullopt;
+
+	solution<node> sol;
+	sol[var] = *x;
+	return sol;
+}
+
+// Registers a committed witness with the ledger and shrinks its fresh
+// region to exclude it (syntactic only, no solver call): every later mint
+// must stay disjoint from everything ever committed, regardless of which
+// solver sub-path produced the value.
+//
+// Roots the new region as an htref (solver_types.h) so it survives GC
+// across interpreter steps -- the ledger is invisible to
+// interpreter::collect_live_refs's `keep` set, so a plain tref would
+// dangle once a sweep runs.
+template <NodeType node>
+void ledger_commit_witness(fresh_element_ledger& ledger, tref value,
+	size_t type)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	ledger.register_committed(value);
+	tref region = ledger.fresh_region
+		? ledger.fresh_region->get() : nullptr;
+	if (!region) region = tau::_1(type);
+	tref next = tt(tau::get(region) & ~tau::get(value))
+		| bf_reduce_canonical<node>() | tt::ref;
+	ledger.fresh_region = tau::geth(next);
+}
+
+// Choose a value for `var` making every g_i(var, s') != 0, given ground
+// cofactor pairs (c0_i, c1_i), none of which is (0,0) (TABA cor.
+// Multivariate-BFs-over). Disjoint-representatives construction: build
+// pairwise disjoint nonzero r_i <= b_i (b_i = c1_i if nonzero else c0_i)
+// one row at a time, reusing or splitting existing representatives to keep
+// them disjoint (an atomless BA always has a further splitter); x is the
+// union of the c1-side representatives.
+template <NodeType node>
+std::optional<tref> atomless_choose_value(
+	const std::vector<std::pair<tref, tref>>& cofactors, tref var,
+	const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	size_t type = find_ba_type<node>(var);
+
+	auto red_and = [&](tref a, tref b) {
+		return tt(tau::get(a) & tau::get(b))
+			| bf_reduce_canonical<node>() | tt::ref;
+	};
+	auto red_or = [&](tref a, tref b) {
+		return tt(tau::get(a) | tau::get(b))
+			| bf_reduce_canonical<node>() | tt::ref;
+	};
+	auto red_not = [&](tref a) {
+		return tt(~tau::get(a)) | bf_reduce_canonical<node>() | tt::ref;
+	};
+
+	// Per-call memo for red_and(a,b)==0 (containment/overlap): equals_0() is
+	// a fresh Tau-SAT call unless already in the global cache, and
+	// logically-related pairs here reduce to distinct trefs so that cache
+	// misses for them. Keyed on the unordered tref pair, scoped to this
+	// call only.
+	std::map<std::pair<uintptr_t, uintptr_t>, bool> and_zero_memo;
+	auto is_and_zero = [&](tref a, tref b) -> bool {
+		// Keyed on the tref bit pattern, not the pointers themselves:
+		// comparing unrelated pointers with < is undefined behavior. This
+		// key only affects cache lookup speed, not any decision.
+		auto ua = reinterpret_cast<uintptr_t>(a);
+		auto ub = reinterpret_cast<uintptr_t>(b);
+		auto key = ua <= ub ? std::pair(ua, ub) : std::pair(ub, ua);
+		if (auto it = and_zero_memo.find(key); it != and_zero_memo.end())
+			return it->second;
+		bool z = tau::get(red_and(a, b)).equals_0();
+		and_zero_memo.emplace(key, z);
+		return z;
+	};
+
+	std::vector<tref> reps;
+	std::vector<bool> is_c1_side;
+	reps.reserve(cofactors.size());
+	is_c1_side.reserve(cofactors.size());
+	tref reps_union = tau::_0(type);
+
+	// Debug-only: unmutated rep -> ledger generator index, for consult().
+	[[maybe_unused]] std::map<uintptr_t, size_t> ledger_gen_of;
+	// Debug-only: every rep ever pushed, append-only, for consult().
+	[[maybe_unused]] trefs exclusion_log;
+
+	// A second globally-fresh splitter, independent of options.splitter_one,
+	// computed lazily once and reused across every row of this call: covers
+	// the case where a row's coefficient sits entirely on one side of
+	// options.splitter_one, making it useless as a splitter for that row.
+	tref splitter_two = nullptr;
+	bool splitter_two_tried = false;
+	auto get_splitter_two = [&]() -> tref {
+		if (!splitter_two_tried) {
+			splitter_two_tried = true;
+			if (options.splitter_one)
+				splitter_two = atomless_bad_splitter<node>(options.splitter_one);
+		}
+		return splitter_two;
+	};
+
+	for (const auto& [c0, c1] : cofactors) {
+		bool c1_side = !tau::get(c1).equals_0();
+		tref b = c1_side ? c1 : c0;
+		if (tau::get(b).equals_0()) return {}; // (0,0) row: not satisfiable
+
+		// Reuse an existing same-side representative already inside b: no
+		// new disjoint slice, no splitter call, and rows sharing a trivial
+		// cofactor (common once other variables' elimination collapses a
+		// clause to a constant) collapse to a single split instead of one
+		// per row.
+		bool reused = false;
+		tref not_b = red_not(b);
+		for (size_t j = 0; j < reps.size() && !reused; ++j) {
+			if (is_c1_side[j] != c1_side) continue;
+			if (is_and_zero(reps[j], not_b)) {
+				reused = true;
+				// Monotone-scope check: reusing a ledger generator here
+				// must see an exclusion set superset of its mint-time one.
+				DBG(if (auto it = ledger_gen_of.find(
+						reinterpret_cast<uintptr_t>(reps[j]));
+						it != ledger_gen_of.end())
+					options.ledger->consult(it->second, exclusion_log);)
+			}
+		}
+		if (reused) continue;
+
+		tref not_reps_union = red_not(reps_union);
+		if (!is_and_zero(b, not_reps_union)) {
+			tref outside = red_and(b, not_reps_union);
+			// Record: reps (pre-push) is outside's mint-time exclusion set.
+			if (options.ledger) {
+				// This ledger entry outlives the call (per-run scope), so
+				// root it against a later GC sweep (fresh_element_ledger::pin).
+				options.ledger->pin(tau::geth(outside));
+				[[maybe_unused]] size_t gi
+					= options.ledger->mint(outside, reps);
+				DBG(ledger_gen_of[reinterpret_cast<uintptr_t>(outside)] = gi;)
+			}
+			DBG(exclusion_log.push_back(outside);)
+			reps.push_back(outside);
+			is_c1_side.push_back(c1_side);
+			reps_union = red_or(reps_union, outside);
+			continue;
+		}
+
+		// b is fully covered by the reps chosen so far, so it overlaps one of
+		// them: try tau_splitter, options.splitter_one, splitter_two, then
+		// the bad splitter, on each overlapping rep in turn, verifying every
+		// candidate (nonzero, proper subset of c) before trusting it.
+		bool split_done = false;
+		for (size_t j = 0; j < reps.size() && !split_done; ++j) {
+			if (is_and_zero(b, reps[j])) continue;
+			tref c = red_and(b, reps[j]);
+
+			auto try_split = [&](tref s) {
+				if (!s || tau::get(s).equals_0()) return false;
+				if (is_and_zero(c, red_not(s))) return false;
+				// s <= c <= reps[j], so reps_union is unchanged.
+				DBG(ledger_gen_of.erase(reinterpret_cast<uintptr_t>(reps[j]));)
+				reps[j] = red_and(reps[j], red_not(s));
+				// The narrowed reps[j] is itself a rep any later mint must
+				// be scoped disjoint from, same as any other pushed rep.
+				DBG(exclusion_log.push_back(reps[j]);)
+				reps.push_back(s);
+				is_c1_side.push_back(c1_side);
+				DBG(exclusion_log.push_back(s);)
+				return split_done = true;
+			};
+
+			if (try_split(atomless_coefficient_splitter<node>(c, options)))
+				break;
+			if (options.splitter_one) {
+				tref one = options.splitter_one;
+				if (try_split(red_and(c, one))) break;
+				if (try_split(red_and(c, red_not(one)))) break;
+			}
+			if (tref two = get_splitter_two(); two) {
+				if (try_split(red_and(c, two))) break;
+				if (try_split(red_and(c, red_not(two)))) break;
+			}
+			if (try_split(atomless_bad_splitter<node>(c))) break;
+		}
+		if (!split_done) return {}; // splitter machinery failure
+	}
+
+	tref x = tau::_0(type);
+	for (size_t i = 0; i < reps.size(); ++i)
+		if (is_c1_side[i]) x = red_or(x, reps[i]);
+
+	// Defensive re-check: every row must be satisfied by construction above.
+	for (const auto& [c0, c1] : cofactors) {
+		if (!is_and_zero(x, c1)) continue;
+		if (is_and_zero(red_not(x), c0)) return {};
+	}
+	return x;
+}
+
+// Per-variable elimination witness for a pure atomless inequality system:
+// eliminate `var` via g_i(0,.)|g_i(1,.), recurse for a solution s', then
+// pick var's value from the ground cofactors. Boole's expansion guarantees
+// g_i not identically zero implies the eliminated form isn't either, so no
+// per-step re-check is needed.
+template <NodeType node>
+std::optional<solution<node>> atomless_witness(const trefs& gs,
+	const trefs& vars, const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	if (vars.empty()) return solution<node>{};
+
+	tref var = vars.front();
+	trefs rest_vars(vars.begin() + 1, vars.end());
+	size_t type = find_ba_type<node>(var);
+
+	auto cofactor = [&](tref g, bool value) {
+		tref v = value ? tau::_1(type) : tau::_0(type);
+		tref r = rewriter::replace<node>(g, var, v);
+		return tt(r) | bf_reduce_canonical<node>() | tt::ref;
+	};
+
+	trefs c0s, c1s, gs_elim;
+	c0s.reserve(gs.size()); c1s.reserve(gs.size()); gs_elim.reserve(gs.size());
+	for (tref g : gs) {
+		tref c0 = cofactor(g, false), c1 = cofactor(g, true);
+		c0s.push_back(c0); c1s.push_back(c1);
+		gs_elim.push_back(tt(tau::get(c0) | tau::get(c1))
+			| bf_reduce_canonical<node>() | tt::ref);
+	}
+
+	auto rest = atomless_witness<node>(gs_elim, rest_vars, options);
+	if (!rest.has_value()) return {};
+
+	std::vector<std::pair<tref, tref>> cofactors;
+	cofactors.reserve(gs.size());
+	for (size_t i = 0; i < gs.size(); ++i) {
+		tref c0 = rewriter::replace<node>(c0s[i], rest.value());
+		c0 = tt(c0) | bf_reduce_canonical<node>() | tt::ref;
+		tref c1 = rewriter::replace<node>(c1s[i], rest.value());
+		c1 = tt(c1) | bf_reduce_canonical<node>() | tt::ref;
+		cofactors.emplace_back(c0, c1);
+	}
+
+	auto value = atomless_choose_value<node>(cofactors, var, options);
+	if (!value.has_value()) return {};
+
+	solution<node> sol = rest.value();
+	sol[var] = value.value();
+	return sol;
+}
+
+// Deterministic ordering key for the atomless path: subtree_set's own
+// hash-first order folds in a ba_constant's storage-table index, an
+// allocation-order artifact that differs run to run for the same logical
+// value, so re-sort by the pretty-printed form instead, which is stable.
+// Scoped to the atomless entry point only.
+template <NodeType node>
+trefs atomless_stable_sort(trefs xs) {
+	using tau = tree<node>;
+	std::vector<std::pair<std::string, tref>> keyed;
+	keyed.reserve(xs.size());
+	for (tref x : xs) keyed.emplace_back(tau::get(x).to_str(), x);
+	std::ranges::sort(keyed, [](const auto& a, const auto& b) {
+		return a.first < b.first;
+	});
+	trefs sorted;
+	sorted.reserve(xs.size());
+	for (auto& [key, x] : keyed) sorted.push_back(x);
+	return sorted;
+}
+
+template <NodeType node>
+std::optional<solution<node>> solve_inequality_system_atomless(
+	const inequality_system<node>& system, const solver_options& options)
+{
+	// TABA cor. Multivariate-BFs-over: over an atomless BA, {g_i != 0} has a
+	// common nonzero iff no g_i is identically zero -- no product-of-choices
+	// witness search, unlike the general minterm-odometer path below.
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	if (system.empty()) return solution<node>{};
+
+	trefs gs;
+	gs.reserve(system.size());
+	for (tref neq : system) {
+		// A caller may hand this as verbatim `l != r`, not canonical
+		// `g != 0`: fold to g = l + r (XOR) unless r is already 0.
+		tref bf_neq_node = tt(neq) | tau::bf_neq | tt::ref;
+		tref l = tau::get(bf_neq_node).first();
+		tref r = tau::get(bf_neq_node).second();
+		gs.push_back(tau::get(r).equals_0() ? l
+			: tt(tau::get(l) + tau::get(r))
+				| bf_reduce_canonical<node>() | tt::ref);
+	}
+	// Row order feeds atomless_witness's cofactor order and hence
+	// atomless_choose_value's greedy assignment order: re-sort to a
+	// print-stable order, not system's run-dependent hash order.
+	gs = atomless_stable_sort<node>(gs);
+
+	// subtree_set is used only to dedup by structural equality; elimination
+	// order always comes from the print-stable re-sort below, not this
+	// set's run-dependent iteration order. Computed before the zero
+	// pre-check so the ledger fast path (needs vars.size()==1) can run ahead.
+	trefs vars;
+	{
+		subtree_set<node> vs;
+		for (tref g : gs) {
+			trefs found = tau::get(g)
+				.select_top(is_child<node, tau::variable>);
+			vs.insert(found.begin(), found.end());
+		}
+		vars.assign(vs.begin(), vs.end());
+	}
+	// Elimination order (atomless_witness always peels vars.front()) feeds
+	// intermediate-expression size directly: fix it to the same print-stable
+	// order as the rows, for the same reason.
+	vars = atomless_stable_sort<node>(vars);
+
+	// Ledger fast path (Design A): only for the single-variable exclusion
+	// shape ocltl_direct_decode_edge hands in; runs ahead of the per-row
+	// zero pre-check below, which is provably redundant for that row shape
+	// (atomless_choose_value_ledger's own doc). Falls through unchanged on
+	// any other shape.
+	if (options.ledger && vars.size() == 1)
+		if (auto fast = atomless_exclusion_system_ledger<node>(
+				gs, vars.front(), options))
+			return fast;
+
+	for (tref g : gs)
+		if (tau::get(bf_reduced_dnf<node>(g)).equals_0()) {
+			DBG(LOG_TRACE << "solve_inequality_system_atomless"
+				<< "/unsat[identically_zero]: " << LOG_FM(g);)
+			return {};
+		}
+
+	auto sol = atomless_witness<node>(gs, vars, options);
+
+#ifdef DEBUG
+	if (sol.has_value()) {
+		LOG_TRACE << "solve_inequality_system_atomless/solution: ";
+		for (const auto& [k, v] : sol.value())
+			LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
+	} else LOG_TRACE << "solve_inequality_system_atomless/solution: {}";
+#endif // DEBUG
+
+	return sol;
+}
+
 template <NodeType node>
 std::optional<solution<node>> solve_inequality_system(
 	const inequality_system<node>& system, const solver_options& options)
 {
+	if (pack_type_is_atomless<node>(options.type_id))
+		return solve_inequality_system_atomless<node>(system, options);
+
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -984,7 +1468,9 @@ std::optional<solution<node>> solve_system(const equation_system<node>& system,
 	return solve_general_system<node>(system, options);
 }
 
-// Returns true if n is an ordering atom: wff with bf_lt/bf_gt/bf_lteq/bf_gteq child.
+// Returns true if n is an ordering atom: wff with bf_lt/bf_gt/bf_lteq/bf_gteq
+// child, including their negated forms (bf_nlt/bf_ngt/bf_nlteq/bf_ngteq),
+// which is how normalization typically renders these comparisons.
 template <NodeType node>
 bool is_ordering_atom(tref n) {
 	using tau = tree<node>;
@@ -992,7 +1478,9 @@ bool is_ordering_atom(tref n) {
 	if (!fm.is(tau::wff) || !fm.has_child()) return false;
 	auto op = fm[0].value.nt;
 	return op == tau::bf_lt || op == tau::bf_gt
-	    || op == tau::bf_lteq || op == tau::bf_gteq;
+	    || op == tau::bf_lteq || op == tau::bf_gteq
+	    || op == tau::bf_nlt || op == tau::bf_ngt
+	    || op == tau::bf_nlteq || op == tau::bf_ngteq;
 }
 
 // omcat_solve_inequality_system dispatcher: asks the BA owning ba_type_id to

@@ -19,7 +19,7 @@ static TermManager bench_term_manager;
 
 TEST_SUITE("sample cvc5 programs") {
 
-	struct TestParameters {
+	struct test_parameters {
 		size_t loopback;
 		size_t n_inputs;
 		size_t n_outputs;
@@ -32,7 +32,7 @@ TEST_SUITE("sample cvc5 programs") {
 		size_t clauses_depth;
 	};
 
-	Term mkBitvectorFormula(TestParameters& params, std::vector<Term> vars, size_t depth = 0) {
+	Term mkBitvectorFormula(test_parameters& params, std::vector<Term> vars, size_t depth = 0) {
 		// if depth equals zero, return a comparator of bitvectors
 		if (depth == 0) {
 			// choose a random comparator from the comparators
@@ -67,7 +67,7 @@ TEST_SUITE("sample cvc5 programs") {
 		return bench_term_manager.mkTerm(op, {left, right});
 	}
 
-	Term mkQuantifiedFreeFormula(TestParameters& params, std::vector<Term> vars, size_t clauses_depth = 0) {
+	Term mkQuantifiedFreeFormula(test_parameters& params, std::vector<Term> vars, size_t clauses_depth = 0) {
 		// if clause_depth == params.clauses_depth, choose a random var from the vector of vars
 		if (clauses_depth == params.clauses_depth) {
 			return mkBitvectorFormula(params, vars);
@@ -83,7 +83,7 @@ TEST_SUITE("sample cvc5 programs") {
 		return bench_term_manager.mkTerm(op, { left, right });
 	}
 
-	Term mkFormula(TestParameters& params) {
+	Term mkFormula(test_parameters& params) {
 		// create a bitvector sort
 		Sort bvSort = bench_term_manager.mkBitVectorSort(params.bitvector_size);
 
@@ -130,7 +130,7 @@ TEST_SUITE("sample cvc5 programs") {
 	}
 
 	TEST_CASE("bitvector sample 1") {
-		TestParameters params = {
+		test_parameters params = {
 			.loopback = 0, // TODO (HIGH) check non zero loopback
 			.n_inputs = 2,
 			.n_outputs = 2,

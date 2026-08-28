@@ -10,6 +10,7 @@ set(TAU_BA_TESTS
 	tests/test_sbf.cpp
 	tests/test_sbf_ba_parsing.cpp
 	tests/test_sbf_ba_splitter.cpp
+	tests/test_sbf_codegen.cpp
 	tests/test_sbf_oracle.cpp
 )
 set(TAU_BA_TEST_REQUIRES_test_integration-sbf1 bv)

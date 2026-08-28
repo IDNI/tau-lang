@@ -65,32 +65,32 @@ inline bool is_non_temporal(tref fm) {
 	}) == nullptr;
 }
 
-enum class Gr1Conjunct { Safety, Liveness, Other };
+enum class gr1_conjunct { Safety, Liveness, Other };
 
 // Classify a single top-level conjunct.
 template <NodeType node>
-inline Gr1Conjunct classify_conjunct(tref fm) {
+inline gr1_conjunct classify_conjunct(tref fm) {
 	using tau = tree<node>;
-	if (!fm) return Gr1Conjunct::Other;
+	if (!fm) return gr1_conjunct::Other;
 	const auto& t = tau::get(fm);
-	if (!t.has_child()) return Gr1Conjunct::Other;
+	if (!t.has_child()) return gr1_conjunct::Other;
 	auto nt = t[0].value.nt;
 	if (nt == tau::wff_always) {
 		// G(φ).  If φ is non-temporal ⇒ Safety.
 		// If φ is F(ψ) with non-temporal ψ ⇒ Liveness (GF).
 		const auto& inner = t[0][0];
-		if (!inner.has_child()) return Gr1Conjunct::Other;
+		if (!inner.has_child()) return gr1_conjunct::Other;
 		if (is_eventually_node<node>(t[0].first())) {
 			const auto& ff = inner[0][0];
 			if (is_non_temporal<node>(ff.get()))
-				return Gr1Conjunct::Liveness;
-			return Gr1Conjunct::Other;
+				return gr1_conjunct::Liveness;
+			return gr1_conjunct::Other;
 		}
 		if (is_non_temporal<node>(t[0].first()))
-			return Gr1Conjunct::Safety;
-		return Gr1Conjunct::Other;
+			return gr1_conjunct::Safety;
+		return gr1_conjunct::Other;
 	}
-	return Gr1Conjunct::Other;
+	return gr1_conjunct::Other;
 }
 
 // Walk top-level && chain, classifying each leaf.  Supports wff_and with
@@ -112,8 +112,8 @@ inline bool is_gr1_impl(tref fm, int& n_safety, int& n_liveness) {
 		return true;
 	}
 	switch (classify_conjunct<node>(fm)) {
-		case Gr1Conjunct::Safety:   ++n_safety;   return true;
-		case Gr1Conjunct::Liveness: ++n_liveness; return true;
+		case gr1_conjunct::Safety:   ++n_safety;   return true;
+		case gr1_conjunct::Liveness: ++n_liveness; return true;
 		default: return false;
 	}
 }
