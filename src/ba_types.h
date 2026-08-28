@@ -148,9 +148,6 @@ struct ba_types {
 	/** @brief Return the integer id for type tree @p ba_type, inserting it if absent. */
 	static size_t id(tref ba_type);
 
-	/** @brief Return the number of registered type trees (valid ids are 0..count()-1). */
-	static size_t count();
-
 	/** @brief Return the type tree corresponding to @p ba_type_id. */
 	static tref type_tree(size_t ba_type_id);
 

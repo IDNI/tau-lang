@@ -173,11 +173,6 @@ size_t ba_types<node>::id(tref ba_type) {
 		type_trees().push_back(tau::geth(ba_type)), type_trees().size() - 1;
 }
 
-template<NodeType node>
-size_t ba_types<node>::count() {
-	return type_trees().size();
-}
-
 // A ba_type_id past the end of type_trees() means the id was corrupted
 // somewhere upstream; silently clamping it to 0 (untyped) in release --
 // while asserting in debug -- masked that corruption as a valid type,
