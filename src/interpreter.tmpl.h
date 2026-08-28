@@ -1121,28 +1121,15 @@ std::pair<std::optional<assignment<node>>, bool>
 					}
 		}
 
-		// Whatever the fast path didn't cover: fall back to the general
-		// solve on the same direct instance before considering a default.
-		// Only commit a value for a coordinate actually missing this step
-		// -- the direct instance also drags in free out-of-window lookback
-		// vars (e.g. o1[-1] before stream start).
-		trefs still_missing;
-		for (tref mo : missing_outputs)
-			if (!global.contains(mo)) still_missing.push_back(mo);
-		if (!still_missing.empty()) {
-			if (auto fb = ::idni::tau_lang::solution_with_max_update<node>(
-				direct_conj, time_point); fb)
-				for (tref mo : still_missing)
-					if (auto it = fb->find(mo); it != fb->end()
-						&& !global.contains(mo)) {
-						// Canonicalize like the primary commit loop, or an
-						// uncommon splitter value grows unbounded across steps.
-						tref value = canonicalize_committed_value<node>(it->second);
-						memory.emplace(mo, value);
-						global.emplace(mo, value);
-					}
-		}
+		// Left missing on purpose: falls to the zero-default loop, not an
+		// unconstrained solve, which could commit an early wrong witness
+		// for a free out-of-window lookback var (e.g. o1[-1] before start).
 	}
+	// Zero must run before the general solve, or a free lookback var could
+	// get an early, wrong witness. Skip the probe during warm-up, where
+	// it can false-fail on a conjunct that only looks fully pinned.
+	const bool in_warmup = time_point < formula_time_point;
+	trefs zero_default_missing;
 	for (const auto& [o, _] : outputs) {
 		const size_t ctype = ctx.type_of(o);
 		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
@@ -1155,7 +1142,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			// equals_T: direct_conj may still carry other, unrelated free
 			// coordinates this substitution leaves open.
 			bool default_ok = true;
-			if (direct_conj) {
+			if (direct_conj && !in_warmup) {
 				assignment<node> probe = memory;
 				probe[ot] = zero_term;
 				tref check = rewriter::replace<node>(direct_conj, probe);
@@ -1163,15 +1150,31 @@ std::pair<std::optional<assignment<node>>, bool>
 				default_ok = tau::get(check).equals_T()
 					|| is_non_temp_nso_satisfiable<node>(check);
 			}
-			if (!default_ok) {
-				LOG_ERROR << "Internal error: no valid witness for "
-					<< LOG_FM_DUMP(ot) << " at time_point=" << time_point
-					<< "; the default violates the step's own constraints\n";
-				return {};
-			}
-			memory.emplace(ot, zero_term);
-			global.emplace(ot, zero_term);
+			if (default_ok) {
+				memory.emplace(ot, zero_term);
+				global.emplace(ot, zero_term);
+			} else zero_default_missing.push_back(ot);
 		}
+	}
+	if (!zero_default_missing.empty() && direct_conj) {
+		if (auto fb = ::idni::tau_lang::solution_with_max_update<node>(
+			direct_conj, time_point); fb)
+			for (tref ot : zero_default_missing)
+				if (auto it = fb->find(ot); it != fb->end()
+					&& !global.contains(ot)) {
+					// Canonicalize like the primary commit loop, or an
+					// uncommon splitter value grows unbounded across steps.
+					tref value = canonicalize_committed_value<node>(it->second);
+					memory.emplace(ot, value);
+					global.emplace(ot, value);
+				}
+	}
+	for (tref ot : zero_default_missing) {
+		if (global.contains(ot)) continue;
+		LOG_ERROR << "Internal error: no valid witness for "
+			<< LOG_FM_DUMP(ot) << " at time_point=" << time_point
+			<< "; the default violates the step's own constraints\n";
+		return {};
 	}
 	if (global.empty()) LOG_INFO << "currently no output is specified";
 	DBG(LOG_TRACE << dump_to_str();)
