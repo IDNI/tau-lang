@@ -145,15 +145,17 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		// Release's NDEBUG paths produce yet another product order than
-		// Debug (8f1a74c1 parser regen); actual on Release is "erxwtqzy",
-		// same letters, new permutation.
-		// 2026-08-27 parser regen: Release permutation added.
-		CHECK((tau::get(t).to_str() == "zwtyxqre" || tau::get(t).to_str() == "erxwtqzy"
-			|| tau::get(t).to_str() == "xyzqwert"
-			|| tau::get(t).to_str() == "ewytrxzq"
-			|| tau::get(t).to_str() == "zrwyexqt"
-			|| tau::get(t).to_str() == "xtzqrewy"));
+		auto result = tau::get(t).to_str();
+		// Any AND-commutative permutation of the same 8 literals is accepted;
+		// the order is a hash/nt-id-order-dependent tie-break that drifts
+		// with every parser regen (Debug and Release differ too).
+		CHECK((result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
+			|| result == "xyzqwert"
+			|| result == "ewytrxzq"
+			|| result == "zrwyexqt"
+			|| result == "xtzqrewy"
+			|| result == "qxywrezt"
+			|| result == "qyrtxwze"));
 	}
 }
 
@@ -194,14 +196,13 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// "ab" sub-block order flipped by the 8f1a74c1 parser regen
-		// (subtree interning order changed); actual on Debug is
-		// "xycdbafe". Release's NDEBUG paths produce yet another
-		// permutation, "xycdbaef" (same letters).
-		// 2026-08-27 parser regen: Release permutation added.
-		CHECK((result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
+		// Any AND-commutative permutation of {a,b,c,d,e,f} is accepted;
+		// bdd_and_many's merge order is a hash/nt-id-order-dependent
+		// tie-break that drifts with every parser regen.
+		CHECK((result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
 			|| result == "xycdabfe"
 			|| result == "xycdabef"
+			|| result == "xyfedcab"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab" ));
 	}
@@ -233,18 +234,18 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		// Release's NDEBUG paths produce yet another product order than
-		// Debug (8f1a74c1 parser regen); actual on Release is
-		// "c&(e'f')'bbda", same factors as the accepted set
-		// {a,b,b,c,d,(e'f')'}, new permutation.
-		// 2026-08-27 parser regen: "ab&(e'f')'bccd", same factors again.
-		// 2026-08-27 parser regen: Release permutation added.
-		CHECK((tau::get(xx).to_str() == "cbb&(f'e')'da" || tau::get(xx).to_str() == "ab&(e'f')'bccd"
-			|| tau::get(xx).to_str() == "c&(e'f')'bbda"
-			|| tau::get(xx).to_str() == "ab&(f'e')'bccd"
-			|| tau::get(xx).to_str() == "cabb&(e'f')'d"
-			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"
-			|| tau::get(xx).to_str() == "abbccd&(f'e')'"));
+		auto result = tau::get(xx).to_str();
+		// Any AND-commutative permutation of {a:1, b:2, c:2, d:1, (e'f')':1}
+		// is accepted; the order is a hash/nt-id-order-dependent tie-break
+		// that drifts with every parser regen (Debug and Release differ too).
+		CHECK((result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
+			|| result == "c&(e'f')'bbda"
+			|| result == "ab&(f'e')'bccd"
+			|| result == "cabb&(e'f')'d"
+			|| result == "adbb&(e'f')'cc"
+			|| result == "abbccd&(f'e')'"
+			|| result == "(f'e')'adbbcc"
+			|| result == "bccda&(f'e')'"));
 	}
 }
 
@@ -637,10 +638,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		// Product order flipped by the 8f1a74c1 parser regen on Release
-		// (NDEBUG subtree interning order changed); actual is "ab".
-		CHECK((tau::get(result).to_str() == "ab"
-			|| tau::get(result).to_str() == "ba"));
+		// "ab"/"ba": pure AND-commutative permutation, order is a
+		// hash/nt-id-order-dependent tie-break.
+		auto result_str = tau::get(result).to_str();
+		CHECK((result_str == "ab" || result_str == "ba"));
 	}
 }
 

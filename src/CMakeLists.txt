@@ -4,6 +4,7 @@ set(TAU_HEADERS
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
 	../parser/bitvector_parser.generated.h
+	../parser/adt_parser.generated.h
 	boolean_algebras/cvc5/cvc5_options.h    # runtime cvc5 option-set and solver placement parameters
 	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
@@ -25,6 +26,8 @@ set(TAU_HEADERS
 	                   # extractors, printers, queries, and
 	                   # transformations from the parse tree
 	ba_types.h         # BA types
+	adt/adt_types.h    # ADT type registry
+	adt/adt_flatten.h  # ADT flattener
 	ba_constants.h     # BA constants pool and binder
 	dict.h             # dictionaries of bdd var names and strings
 	definitions.h      # Storage for function and predicate definitions
@@ -51,6 +54,7 @@ set(TAU_SOURCES
 	../parser/tau_parser.generated.cpp
 	../parser/sbf_parser.generated.cpp
 	../parser/bitvector_parser.generated.cpp
+	../parser/adt_parser.generated.cpp
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
 	base_ba_dispatcher_bv_sbf.cpp
@@ -62,6 +66,7 @@ set_source_files_properties(
 	../parser/tau_parser.generated.cpp
 	../parser/sbf_parser.generated.cpp
 	../parser/bitvector_parser.generated.cpp
+	../parser/adt_parser.generated.cpp
 	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 
 set(CLI_SOURCES

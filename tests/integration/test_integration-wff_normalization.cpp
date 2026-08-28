@@ -131,8 +131,9 @@ TEST_SUITE("boole_normal_form") {
 		// Order flipped again by the 2026-08-27 regen (left-assoc
 		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
 		CHECK( matches_to_str_to_any_of(res, {
-			"a'bx|ab'x' = 0 || a&(b|x)|a'bx' != 0",
 			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
+			"a'bx|ab'x' = 0 || a&(b|x)|a'bx' != 0",
+			"xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0",
 			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
 			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
@@ -346,8 +347,10 @@ TEST_SUITE("Normalizer bv mixed-type") {
 
 	// Several independent conjuncts must all be lifted, not just the first.
 	TEST_CASE("bv_arith_with_two_sbf_conjuncts") {
+		// verified: valid ((r = 0 && s = 0) <-> (s = 0 && r = 0)) => T
 		CHECK( normalize_and_check("ex x ex y (x:bv[8] + y:bv[8] ="
-			" { 0 }:bv[8]) && s = 0 && r = 0.", "s = 0 && r = 0") );
+			" { 0 }:bv[8]) && s = 0 && r = 0.",
+			strings{"s = 0 && r = 0", "r = 0 && s = 0"}) );
 	}
 
 	// A scope left open by a free bitvector variable cannot be closed by
@@ -372,7 +375,7 @@ TEST_SUITE("Normalizer bv mixed-type") {
 		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "x+y = 0 && s = 0", "s = 0 && x+y = 0" }) );
+			" && s = 0.", strings{ "s = 0 && x+y = 0", "x+y = 0 && s = 0" }) );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf

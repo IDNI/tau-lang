@@ -568,6 +568,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		tau_parser::parse_options parse{};          ///< Underlying parser options.
 		std::map<std::string, tref> named_constants{}; ///< Pre-bound constant names.
 		bool infer_ba_types = true;                 ///< Run BA type inference.
+		bool flatten_adts = true;                   ///< Flatten ADT type_defs before inference.
 		bool use_default_types = true;              ///< Fall back to tau type for unknowns.
 		bool reget_with_hooks = true;               ///< Re-register nodes through hooks.
 		const std::vector<htref>* definition_heads = nullptr; ///< Known definition heads.

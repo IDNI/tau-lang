@@ -51,21 +51,21 @@ TEST_SUITE("Execution") {
 		// order-insensitivity note at the top of this suite.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
+				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
 				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
-				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
 		std::vector<strings> o1_expected = {
 			{ "T" }, { "<:x> = 0" },
 			{
-				"<:y> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:x> = 0",
 			},
 			{
-				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 				"<:x> = 0 && <:z> = 0 && <:y> = 0",
+				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0 && <:z> = 0",
 				"<:y> = 0 && <:x> = 0 && <:z> = 0",
 				"<:z> = 0 && <:x> = 0 && <:y> = 0",
@@ -97,17 +97,17 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> u_expected = {
 			{ "F" }, { "F" }, {
-				"always o2[-2]:tau o1[-1]:tau = o3[t]:tau",
 				"always o1[-1]:tau o2[-2]:tau = o3[t]:tau",
+				"always o2[-2]:tau o1[-1]:tau = o3[t]:tau",
 			}, { "F" }, { "F" }
 		};
 		std::vector<strings> o3_expected = {
 			{
-				"<:y> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:x> = 0",
 			}, {
-				"<:y> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:x> = 0",
 			}
 		};
 		io_context<node_t> ctx;
@@ -237,8 +237,8 @@ TEST_SUITE("Execution") {
 		// this suite.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o3[t]:tau = 0 && o2[t]:tau = 0",
 				"always o2[t]:tau = 0 && o3[t]:tau = 0",
+				"always o3[t]:tau = 0 && o2[t]:tau = 0",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -373,32 +373,43 @@ TEST_SUITE("Execution") {
 		// note at the top of this suite.
 		std::vector<strings> o1_expected = {
 		{
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
 			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o3[t]:tau = 0",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
+			// Nonterminal-id re-drift (I4) produced another Release-only
+			// ordering not previously listed; verified: valid ((o1[t] =
+			// this[t] && o3[t] = 0 && u[t] = i1[t] && o2[t] = 0) <->
+			// (o2[t] = 0 && o3[t] = 0 && o1[t] = this[t] && u[t] = i1[t]))
+			// => T. Appended, not placed at [0].
+			"always o1[t]:tau = this[t]:tau && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 		}
 		};
 		io_context<node_t> ctx;
