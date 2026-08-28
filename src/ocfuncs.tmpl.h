@@ -390,7 +390,7 @@ void resolve_func_decl_types(std::vector<func_decl>& decls) {
 // ── Detection ────────────────────────────────────────────────────────────────
 
 template <NodeType node>
-bool has_func_applications(tref fm, const std::vector<FuncDecl>& decls) {
+bool has_func_applications(tref fm, const std::vector<func_decl>& decls) {
 	using tau = tree<node>;
 
 	// LG-22.  This used to look for a node whose first child is a

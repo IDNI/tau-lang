@@ -252,7 +252,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-01] build_win_formula: empty winning region returns nullptr") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
-		result.game.num_states = 1;
+		result.synth_game.num_states = 1;
 		result.K = 1;
 
 		std::vector<omcat::qlt_type3> T3;
@@ -272,8 +272,8 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-02] build_win0_formula: empty winning region returns nullptr") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
-		result.game.num_states = 1;
-		result.game.init = 0;
+		result.synth_game.num_states = 1;
+		result.synth_game.init = 0;
 		result.K = 1;
 
 		std::vector<omcat::qlt_type3> T3;
@@ -293,7 +293,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-03] build_win_formula: single atom, bit set returns the atom itself") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
-		result.game.num_states = 1;
+		result.synth_game.num_states = 1;
 		result.K = 1;
 		result.winning_region = {0};
 
@@ -315,7 +315,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-04] build_win_formula: single atom, bit clear returns negated atom") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
-		result.game.num_states = 1;
+		result.synth_game.num_states = 1;
 		result.K = 1;
 		result.winning_region = {0};
 
@@ -338,7 +338,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-05] build_win_formula: two winning T3 types yield disjunction of both patterns") {
 		alg_d::alg_d_result result;
 		result.T1_size = 2;
-		result.game.num_states = 1;
+		result.synth_game.num_states = 1;
 		result.K = 1;
 		result.winning_region = {0, 1};
 
@@ -364,7 +364,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-06] build_win_formula: two atoms, mixed-bit pattern builds correct conjunction") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
-		result.game.num_states = 1;
+		result.synth_game.num_states = 1;
 		result.K = 2;
 		result.winning_region = {0};
 
@@ -390,7 +390,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-07] build_win_formula: stub states beyond base_n are ignored") {
 		alg_d::alg_d_result result;
 		result.T1_size = 1;
-		result.game.num_states = 1;
+		result.synth_game.num_states = 1;
 		result.K = 1;
 		result.winning_region = {0, 5};
 
@@ -408,7 +408,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 
 		alg_d::alg_d_result result_no_stub;
 		result_no_stub.T1_size = 1;
-		result_no_stub.game.num_states = 1;
+		result_no_stub.synth_game.num_states = 1;
 		result_no_stub.K = 1;
 		result_no_stub.winning_region = {0};
 
@@ -423,8 +423,8 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 	TEST_CASE("[SPWR-W-08] build_win_formula vs build_win0_formula: all-states vs initial-state-only") {
 		alg_d::alg_d_result result;
 		result.T1_size = 2;
-		result.game.num_states = 2;
-		result.game.init = 0;
+		result.synth_game.num_states = 2;
+		result.synth_game.init = 0;
 		result.K = 1;
 		result.winning_region = {0, 3};
 		// LG-12: Win₀ reads the FIXED initial memory from init_rho now

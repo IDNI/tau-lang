@@ -452,7 +452,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		tref spec_tref = nso_rr.value().main->get();
 		REQUIRE(spec_tref != nullptr);
 
-		PreferenceOrder po;
+		preference_order po;
 		po.entries.push_back({"o1", "1"});
 		tref result = nullptr;
 		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));
@@ -466,7 +466,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		tref spec_tref = nso_rr.value().main->get();
 		REQUIRE(spec_tref != nullptr);
 
-		PreferenceOrder po;
+		preference_order po;
 		po.entries.push_back({"o1", "1"});
 		tref result = nullptr;
 		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));

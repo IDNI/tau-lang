@@ -207,7 +207,7 @@ void resolve_func_decl_types(std::vector<func_decl>& decls);
 // (`bf_func_app` never appears in a parsed formula).  Only the declaration set
 // says which symbols are OCFuncs functions.
 template <NodeType node>
-bool has_func_applications(tref fm, const std::vector<FuncDecl>& decls);
+bool has_func_applications(tref fm, const std::vector<func_decl>& decls);
 
 } // namespace idni::tau_lang
 

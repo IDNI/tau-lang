@@ -4278,7 +4278,7 @@ TEST_SUITE("Positional atoms: executed safety path") {
 		// The step-counter guard is a top-level positive conjunct here, so
 		// this is legal scope (see enforce_positional_conjunctive_scope);
 		// solving must not throw and must produce a real Mealy strategy.
-		auto [safety, sol] = ltl_to_safety_formula_full<node_t>(fm);
+		auto [safety, sol, _aux] = ltl_to_safety_formula_full<node_t>(fm);
 		REQUIRE(safety != nullptr);
 		REQUIRE(sol.has_value());
 		CHECK(sol->aut.num_states > 0);
@@ -4308,7 +4308,7 @@ TEST_SUITE("Positional atoms: executed safety path") {
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
 		REQUIRE(fm != nullptr);
 
-		auto [safety, sol] = ltl_to_safety_formula_full<node_t>(fm);
+		auto [safety, sol, _aux] = ltl_to_safety_formula_full<node_t>(fm);
 		REQUIRE(safety != nullptr);
 		REQUIRE(sol.has_value());
 		CHECK(sol->atoms.size() == 1); // the duplicate merged away

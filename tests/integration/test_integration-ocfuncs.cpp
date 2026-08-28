@@ -602,9 +602,9 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 	// `false` constant — this was not moved with them, and the suite spent
 	// several rounds asserting that an application of an UNDECLARED symbol is
 	// detected.  It must not be: that is exactly the `h(...)` case below.
-	static std::vector<FuncDecl> one_dynamic_decl() {
-		std::vector<FuncDecl> decls;
-		decls.emplace_back("g", FuncMode::DYNAMIC,
+	static std::vector<func_decl> one_dynamic_decl() {
+		std::vector<func_decl> decls;
+		decls.emplace_back("g", func_mode::DYNAMIC,
 		                   std::vector<std::string>{"sbf"}, "sbf");
 		return decls;
 	}
@@ -630,11 +630,11 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 	// when it is empty.  The closure is built by hand so the case does not
 	// depend on how the parser shapes a function application.
 	TEST_CASE("[OCF-INST-03] ocfuncs_enumerate_profiles is a single-profile stub") {
-		OCFuncsContext ctx;
+		ocfuncs_context ctx;
 		auto decls = one_dynamic_decl();
 		REQUIRE(ocfuncs_check_modes(decls, ctx));
 
-		TermClosure closure;
+		term_closure closure;
 		closure.purified_vars["g(o1)"] = "v_g_o1";
 		auto profiles = ocfuncs_enumerate_profiles<node_t>(closure, ctx);
 		CHECK(profiles.size() == 1);
@@ -643,12 +643,12 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 			CHECK(profiles[0].edges.size() == 1);
 		}
 
-		CHECK(ocfuncs_enumerate_profiles<node_t>(TermClosure{}, ctx).empty());
+		CHECK(ocfuncs_enumerate_profiles<node_t>(term_closure{}, ctx).empty());
 	}
 
 	// Step 5 — quantifier elimination is a pass-through in V1.
 	TEST_CASE("[OCF-INST-04] ocfuncs_eliminate_quantifiers is a pass-through") {
-		OCFuncsContext ctx;
+		ocfuncs_context ctx;
 		tref fm = create_spec("o1[t] = 1.");
 		REQUIRE(fm != nullptr);
 		CHECK(ocfuncs_eliminate_quantifiers<node_t>(fm, ctx) == fm);
@@ -656,7 +656,7 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 
 	// Step 6 — LTL generation leaves bf_func_app nodes alone in V1.
 	TEST_CASE("[OCF-INST-05] ocfuncs_generate_ltl leaves func apps unchanged") {
-		OCFuncsContext ctx;
+		ocfuncs_context ctx;
 		tref fm = create_spec("g(o1[t]) = 1.");
 		REQUIRE(fm != nullptr);
 		CHECK(ocfuncs_generate_ltl<node_t>(fm, ctx) == fm);
@@ -724,7 +724,7 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 		CHECK(decls[0].types_resolved());
 
 		// An unknown sort resolves to 0 (untyped) rather than throwing.
-		FuncDecl unknown("h", FuncMode::DYNAMIC,
+		func_decl unknown("h", func_mode::DYNAMIC,
 		                 std::vector<std::string>{"no_such_sort"},
 		                 "no_such_sort");
 		resolve_func_decl_types<node_t>(unknown);
@@ -762,23 +762,23 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 		tref fm = create_spec("o1[t] = 1.");
 		REQUIRE(fm != nullptr);
 
-		auto rejects = [&](const FuncDecl& d) {
-			OCFuncsContext ctx;
-			std::vector<FuncDecl> decls{d};
+		auto rejects = [&](const func_decl& d) {
+			ocfuncs_context ctx;
+			std::vector<func_decl> decls{d};
 			return !ocfuncs_check_modes(decls, ctx);
 		};
-		CHECK(rejects(FuncDecl("", FuncMode::DYNAMIC,
+		CHECK(rejects(func_decl("", func_mode::DYNAMIC,
 		                       std::vector<std::string>{"sbf"}, "sbf")));
-		CHECK(rejects(FuncDecl("k", FuncMode::DYNAMIC,
+		CHECK(rejects(func_decl("k", func_mode::DYNAMIC,
 		                       std::vector<std::string>{}, "sbf")));
-		CHECK(rejects(FuncDecl("k", FuncMode::DYNAMIC,
+		CHECK(rejects(func_decl("k", func_mode::DYNAMIC,
 		                       std::vector<std::string>{"sbf"}, "")));
 
 		// A STATIC declaration is accepted and gets an empty support bound;
 		// the finite-support certificate is left to later analysis.
-		OCFuncsContext ctx;
-		std::vector<FuncDecl> st;
-		st.emplace_back("g", FuncMode::STATIC,
+		ocfuncs_context ctx;
+		std::vector<func_decl> st;
+		st.emplace_back("g", func_mode::STATIC,
 		                std::vector<std::string>{"sbf"}, "sbf");
 		CHECK(ocfuncs_check_modes(st, ctx));
 		CHECK(ctx.support_bounds.count("g") == 1);
