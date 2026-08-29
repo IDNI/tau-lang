@@ -716,9 +716,9 @@ TEST_SUITE("Normalizer bv sibling-taint") {
 		// Use the api entry (inference + io_var resolution +
 		// normalizer), the path the interpreter-built formulas take
 		// and the one the R6 residues were observed through.
-		tref res = api<node_t>::normalize_formula(spec);
-		REQUIRE( res != nullptr );
-		return tau::get(res).find_top(
+		auto res = api<node_t>::normalize_formula(spec);
+		REQUIRE( res.has_value() );
+		return tau::get(res.value()).find_top(
 			is_quantifier<node_t>) == nullptr;
 	}
 

@@ -39,9 +39,9 @@ hoa_automaton echo_spec() {
 }
 
 std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	tref fm = api<node_t>::get_formula(spec);
-	if (!fm) return std::nullopt;
-	return solve_ltl_aba<node_t>(fm);
+	auto fm = api<node_t>::get_formula(spec);
+	if (!fm.has_value()) return std::nullopt;
+	return solve_ltl_aba<node_t>(fm.value());
 }
 
 // Parse a raw wff string.
@@ -100,12 +100,13 @@ std::string read_codegen_spec(const std::string& name) {
 // (tau_compile.tmpl.h step 1): get_spec -> get_nso_rr -> nso_rr_apply ->
 // normalizer, falling back to the bare-formula grammar.
 tref parse_like_compile_spec(const std::string& src) {
-	if (tref spec_tree = api<node_t>::get_spec(src); spec_tree)
-		if (auto nso_rr = get_nso_rr<node_t>(spec_tree); nso_rr)
+	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
+		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value()); nso_rr)
 			if (tref applied = nso_rr_apply<node_t>(*nso_rr); applied)
 				if (tref fm = normalizer<node_t>(applied); fm)
 					return fm;
-	return api<node_t>::get_formula(src);
+	auto fm_r = api<node_t>::get_formula(src);
+	return fm_r.has_value() ? fm_r.value() : nullptr;
 }
 
 // Opt-in: mirrors TAU_CODEGEN_RUN_SDK_LINK_TEST in test_cpp_codegen_data_atoms.cpp
@@ -1066,8 +1067,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// refused immediately, before any per-atom classification runs.
 	TEST_CASE("build_program_desc: an untyped variable is refused at the "
 	          "entry-point check, not classify_output_field's deep one") {
-		tref untyped = api<node_t>::get_formula("o1[t] = 1", false);
-		REQUIRE(untyped != nullptr);
+		auto untyped_r = api<node_t>::get_formula("o1[t] = 1", false);
+		REQUIRE(untyped_r.has_value());
+		tref untyped = untyped_r.value();
 		auto fv = get_free_vars<node_t>(untyped);
 		REQUIRE(!fv.empty());
 		// Sanity: simplified=false really does skip inference entirely, so

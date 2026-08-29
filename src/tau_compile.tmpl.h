@@ -318,11 +318,8 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\tidni::measures::timer run_timer;\n"
 		"\trun_timer.start();\n"
 		"\tbool run_ok = interp->run_loop(0, quit_on_idle);\n"
-		"\tif (print_benchmarks) {\n"
-		"\t\tmeasuring run_m(\"run\");\n"
-		"\t\trun_m.ms = run_timer.stop();\n"
-		"\t\trun_m(cerr);\n"
-		"\t}\n"
+		"\tif (print_benchmarks)\n"
+		"\t\tcerr << \"run: \" << run_timer.stop() << \" ms\\n\";\n"
 		"\t// Flush and leave without running static destructors: the pack's\n"
 		"\t// static state (caches, pools, the leaked cvc5 term manager) has no\n"
 		"\t// safe cross-TU destruction order, and a buffered-stdout artifact\n"
@@ -360,7 +357,8 @@ codegen_result compile_spec(
 	// (trailing '.', stream/rec-relation definitions) -- through the same
 	// nso_rr/normalizer pipeline get_interpreter uses.
 	using tau_api = api<Node>;
-	tref spec_tree = tau_api::get_spec(spec_src);
+	auto spec_res = tau_api::get_spec(spec_src);
+	tref spec_tree = spec_res.has_value() ? spec_res.value() : nullptr;
 	if (!spec_tree) {
 		res.error = "compile: failed to parse spec";
 		return res;

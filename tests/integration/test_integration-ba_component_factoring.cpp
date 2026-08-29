@@ -19,9 +19,11 @@ using tau_api = api<node_t>;
 namespace {
 
 bool api_sat(const std::string& s) {
-	tref f = tau_api::get_formula_or_term(s.c_str());
-	REQUIRE(f != nullptr);
-	return tau_api::sat(f);
+	auto f = tau_api::get_formula_or_term(s.c_str());
+	REQUIRE(f.has_value());
+	auto r = tau_api::sat(f.value());
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 struct factoring_config {

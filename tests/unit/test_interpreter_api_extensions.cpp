@@ -35,7 +35,8 @@ static std::optional<interpreter<node_t>> make(const char* s) {
 
 // Parse a formula string for use as a PWR update (psi).
 static tref parse_formula(const char* s) {
-	return api<node_t>::get_formula(std::string(s));
+	auto r = api<node_t>::get_formula(std::string(s));
+	return r.has_value() ? r.value() : nullptr;
 }
 
 // ============================================================================

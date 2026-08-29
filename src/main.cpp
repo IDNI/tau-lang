@@ -168,36 +168,51 @@ cli::commands tau_commands() {
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
 int run_tau_spec(string spec_file, cli::options& opts) {
-	measuring m("run");
-	idni::measures::timer t;
+	const bool benchmarks = opts["benchmarks"].get<bool>();
+	report rep;
+	auto root = rep.open_if(benchmarks, "run");
 	string src;
-	t.start();
-	auto result = [&](int r) {
-		m.ms = t.stop();
-		if (opts["benchmarks"].get<bool>()) m(std::cerr);
-		return r;
+	auto finish = [&](int code) -> int {
+		// Benchmarks stay plain text: the parser's global TC colorizes
+		// report::print() output unconditionally, which would corrupt a
+		// piped or logged benchmark stream.
+		if (benchmarks) {
+			bool was_enabled = idni::TC.enabled;
+			idni::TC.disable();
+			rep.print(std::cerr);
+			idni::TC.set(was_enabled);
+		}
+		return code;
 	};
-	if (spec_file == "-") {
-		std::ostringstream oss;
-		oss << std::cin.rdbuf(), src = oss.str();
-	} else {
-		DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
-		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
-		if (!ifs) return result(error("Cannot open file " + spec_file));
-		auto l = ifs.tellg();
-		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
+	{
+		auto _ = rep.open_if(benchmarks, "reading input");
+		if (spec_file == "-") {
+			std::ostringstream oss;
+			oss << std::cin.rdbuf(), src = oss.str();
+		} else {
+			DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
+			std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
+			if (!ifs) return error("Cannot open file " + spec_file);
+			auto l = ifs.tellg();
+			src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
+		}
 	}
-	m.part() = { "reading input", t.pause() };
-	if (src.empty()) return result(0);
-	t.unpause();
-	auto maybe_i = tau_api::get_interpreter(m.part(), src);
-	if (!maybe_i) return result(1);
-	auto& i = maybe_i.value();
+	if (src.empty()) return finish(0);
+	auto gi = tau_api::get_interpreter(src);
+	if (!gi.has_value()) {
+		gi.print(std::cerr);
+		rep.append(std::move(gi).report());
+		return finish(1);
+	}
+	auto& i = gi.value();
+	rep.append(std::move(gi).report());
 	bool quit_on_idle = opts["quit"].get<bool>();
-	bool run_ok = tau_api::run(m.part(), i, quit_on_idle);
+	auto run_ok = tau_api::run(i, quit_on_idle);
+	if (!run_ok.has_value()) run_ok.print(std::cerr);
+	rep.append(std::move(run_ok).report());
 	if (quit_on_idle) TAU_LOG_INFO << "No more inputs provided."
 		<< " Terminating.";
-	return result(run_ok ? 0 : 1);
+	return finish(run_ok.has_value() && run_ok.value() ? 0 : 1);
 }
 
 void welcome() {

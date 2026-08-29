@@ -160,12 +160,13 @@ private:
 	/// its benchmarking survive across multiple eval() calls.
 	struct run_session {
 		interpreter<node> interp;
-		measuring m;
-		idni::measures::timer t;
+		report rep;
+		report::scope_guard g;
 		/// @brief Step budget for `run N steps`; 0 means unbounded.
 		size_t steps_to_run = 0;
 		size_t steps_done   = 0;
-		run_session(interpreter<node> i) : interp(std::move(i)), m{"run"} {}
+		run_session(interpreter<node> i)
+			: interp(std::move(i)), g(rep.open("run")) {}
 	};
 	/// @brief What the *next* eval() call's input line answers, while set;
 	/// eval() checks this before parsing src as a normal CLI command.
@@ -352,10 +353,11 @@ private:
 	/// already inferred expression. Returns @p n if inference fails.
 	tref infer_for_match(tref n) const;
 
-	/// @brief Print benchmark measurements from @p m.
-	std::ostream& benchmarks(measuring& m) const;
-	/// @brief Print benchmark measurements from @p m and timer @p t.
-	std::ostream& benchmarks(measuring& m, idni::measures::timer& t) const;
+	/// @brief Print @p res's diagnostics report, if benchmarking is on.
+	template <typename T>
+	void print_benchmarks(const result<T>& res) const;
+	/// @brief Print @p rep, if benchmarking is on.
+	void print_benchmarks(const report& rep) const;
 
 	std::vector<history> H;
 	options opt{};

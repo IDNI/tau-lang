@@ -289,8 +289,9 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 		// into the next (see "parse+infer starts from a clean type
 		// scope..." above) -- this runs mid-loop over the same corpus.
 		compile_detail::scoped_clean_definitions<node_t> clean_defs;
-		tref spec_tree = api<node_t>::get_spec(spec_src);
-		if (!spec_tree) return std::nullopt;
+		auto spec_tree_r = api<node_t>::get_spec(spec_src);
+		if (!spec_tree_r.has_value()) return std::nullopt;
+		tref spec_tree = spec_tree_r.value();
 		auto nso_rr = get_nso_rr<node_t>(spec_tree);
 		if (!nso_rr.has_value()) return std::nullopt;
 		tref spec_fm = nso_rr.value().main->get();
@@ -371,8 +372,8 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 // artifact build.
 tref parse_like_compile_spec_step1(const std::string& src) {
 	compile_detail::scoped_clean_definitions<node_t> clean_defs;
-	if (tref spec_tree = api<node_t>::get_spec(src); spec_tree)
-		if (auto nso_rr = get_nso_rr<node_t>(spec_tree); nso_rr)
+	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
+		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value()); nso_rr)
 			if (tref applied = nso_rr_apply<node_t>(*nso_rr); applied)
 				return normalizer<node_t>(applied);
 	return nullptr;

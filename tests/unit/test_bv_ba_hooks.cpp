@@ -53,10 +53,10 @@ tref bf(const std::string& sample) {
 // Parses a well-formed formula; used for the comparison hooks, which are
 // dispatched from the wff-level hooks in src/hooks.tmpl.h.
 tref wff(const std::string& sample) {
-	tref src = tau_api::get_formula(sample);
-	if (src == nullptr) TAU_LOG_ERROR << "wff parsing failed for: " << sample;
-	REQUIRE(src != nullptr);
-	return src;
+	auto r = tau_api::get_formula(sample);
+	if (!r.has_value()) TAU_LOG_ERROR << "wff parsing failed for: " << sample;
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 } // namespace

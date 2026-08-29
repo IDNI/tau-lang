@@ -57,13 +57,17 @@ tref parse_spec(const char* s) {
 bool sat_str(const char* spec) {
 	tref fm = parse_spec(spec);
 	REQUIRE(fm != nullptr);
-	return api<node_t>::sat(fm);
+	auto r = api<node_t>::sat(fm);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 bool unsat_str(const char* spec) {
 	tref fm = parse_spec(spec);
 	REQUIRE(fm != nullptr);
-	return api<node_t>::unsat(fm);
+	auto r = api<node_t>::unsat(fm);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 } // namespace

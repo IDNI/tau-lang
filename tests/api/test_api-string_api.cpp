@@ -69,22 +69,22 @@ TEST_SUITE("Tau API - string") {
 	// Fixed by routing through get_formula_or_term(), like the
 	// neighbouring string overloads (substitute, dnf, cnf, nnf, ...).
 	TEST_CASE_FIXTURE(api_fixture, "sat/unsat/realizable/unrealizable/valid on well-formed input") {
-		CHECK(tau_api::sat("x = 0"));
-		CHECK(tau_api::realizable("x = 0"));
-		CHECK(!tau_api::unsat("x = 0"));
-		CHECK(!tau_api::unrealizable("x = 0"));
+		CHECK(tau_api::sat("x = 0").value());
+		CHECK(tau_api::realizable("x = 0").value());
+		CHECK(!tau_api::unsat("x = 0").value());
+		CHECK(!tau_api::unrealizable("x = 0").value());
 
 		// a genuine contradiction
-		CHECK(!tau_api::sat("x = 0 && x != 0"));
-		CHECK(tau_api::unsat("x = 0 && x != 0"));
-		CHECK(!tau_api::realizable("x = 0 && x != 0"));
-		CHECK(tau_api::unrealizable("x = 0 && x != 0"));
+		CHECK(!tau_api::sat("x = 0 && x != 0").value());
+		CHECK(tau_api::unsat("x = 0 && x != 0").value());
+		CHECK(!tau_api::realizable("x = 0 && x != 0").value());
+		CHECK(tau_api::unrealizable("x = 0 && x != 0").value());
 
 		// a tautology
-		CHECK(tau_api::valid("x = x"));
-		CHECK(tau_api::valid_spec("x = x"));
-		CHECK(!tau_api::valid("x = 0"));
-		CHECK(!tau_api::valid_spec("x = 0"));
+		CHECK(tau_api::valid("x = x").value());
+		CHECK(tau_api::valid_spec("x = x").value());
+		CHECK(!tau_api::valid("x = 0").value());
+		CHECK(!tau_api::valid_spec("x = 0").value());
 	}
 
 	// boole_normal_form(const string&) routed through
@@ -191,18 +191,19 @@ TEST_SUITE("Tau API - string - malformed input") {
 
 	TEST_CASE_FIXTURE(api_fixture, "formula checks reject malformed input") {
 		for (const auto& s : malformed) {
-			// realizable/valid/valid_spec/sat all bottom out on a null
-			// tref, which every one of them treats as "not satisfied".
-			CHECK(!tau_api::realizable(s));
-			CHECK(!tau_api::valid(s));
-			CHECK(!tau_api::valid_spec(s));
-			CHECK(!tau_api::sat(s));
+			// realizable/valid/valid_spec/sat all bottom out on a
+			// parse failure, reported as a structured error rather
+			// than a value.
+			CHECK(!tau_api::realizable(s).has_value());
+			CHECK(!tau_api::valid(s).has_value());
+			CHECK(!tau_api::valid_spec(s).has_value());
+			CHECK(!tau_api::sat(s).has_value());
 			// AP1-11: malformed input is INVALID, not
-			// "unsatisfiable" -- unrealizable/unsat now return
-			// false for it, matching the htref overloads, instead
+			// "unsatisfiable" -- unrealizable/unsat now report an
+			// error for it, matching the htref overloads, instead
 			// of claiming a verdict for garbage.
-			CHECK(!tau_api::unrealizable(s));
-			CHECK(!tau_api::unsat(s));
+			CHECK(!tau_api::unrealizable(s).has_value());
+			CHECK(!tau_api::unsat(s).has_value());
 		}
 	}
 

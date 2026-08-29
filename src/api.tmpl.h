@@ -240,14 +240,24 @@ inline typename tree<node>::get_options get_options(typename node::type start, b
 }
 
 template <NodeType node>
-tref api<node>::get_term(const std::string& input, bool simplified) {
-	return tau::get(input, get_options<node>(tau::bf, simplified));
+result<tref> api<node>::get_term(const std::string& input, bool simplified) {
+	result<tref> r;
+	tref e = tau::get(input, get_options<node>(tau::bf, simplified));
+	if (!e) r.error(code::parse_error, "Failed to parse term");
+	else    r = e;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_formula(const std::string& input, bool simplified) {
+result<tref> api<node>::get_formula(const std::string& input, bool simplified) {
+	result<tref> r;
 	tref fm = tau::get(input, get_options<node>(tau::wff, simplified));
-	if (!fm) return fm;
+	if (!fm) {
+		r.error(code::parse_error, "Failed to parse formula");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// An io_var's input/output bit is set while parsing a *spec*, so parsing
 	// a bare wff leaves every io_var classified as neither -- and consumers
 	// that need the distinction (transform_io_var,
@@ -256,62 +266,100 @@ tref api<node>::get_formula(const std::string& input, bool simplified) {
 	// the same text yields the same classification whether it arrives as a
 	// formula or inside a spec; this mirrors what get_nso_rr already does for
 	// a bare wff/bf.
-	return resolve_io_vars<node>(
+	r = resolve_io_vars<node>(
 		*definitions<node>::instance().get_io_context(), fm);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
+result<tref> api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
+	result<tref> r;
 	// AP1-5: parse and validate BEFORE registering -- routing through
 	// get_definition registered unconditionally, so a rejected
 	// definition stayed in the global store and leaked into later
 	// apply_defs_to_spec calls.
 	tref def = tau::get(function_def,
 		get_options<node>(tau::rec_relation, true));
-	if (!def) return nullptr;
+	if (!def) {
+		r.error(code::parse_error, "Failed to parse function definition");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// The second child of a rec_relation is the body;
 	// accept bf or ref (a ref body may resolve to a bf later --
 	// AP1-26: the code rejected refs while doc and the predicate
 	// sibling accepted them)
 	auto nt = tau::get(def)[1].get_type();
-	if (nt != tau::bf && nt != tau::ref) return nullptr;
-	add_definition(tau::get(def).first(), tau::get(def).second());
-	return def;
+	if (nt != tau::bf && nt != tau::ref) {
+		r.error(code::invalid_argument, "Not a function definition");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto added = add_definition(tau::get(def).first(), tau::get(def).second());
+	if (!added.has_value()) r.merge(std::move(added));
+	else r = def;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
+result<tref> api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
+	result<tref> r;
 	// AP1-5: parse and validate BEFORE registering (see get_function_def).
 	tref def = tau::get(predicate_def,
 		get_options<node>(tau::rec_relation, true));
-	if (!def) return nullptr;
+	if (!def) {
+		r.error(code::parse_error, "Failed to parse predicate definition");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// TODO we could pre resolve all refs to wff
 	auto nt = tau::get(def)[1].get_type();
-	if (nt != tau::wff && nt != tau::ref) return nullptr;
-	add_definition(tau::get(def).first(), tau::get(def).second());
-	return def;
+	if (nt != tau::wff && nt != tau::ref) {
+		r.error(code::invalid_argument, "Not a predicate definition");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto added = add_definition(tau::get(def).first(), tau::get(def).second());
+	if (!added.has_value()) r.merge(std::move(added));
+	else r = def;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_stream_def(const std::string& stream_def) {
+result<tref> api<node>::get_stream_def(const std::string& stream_def) {
+	result<tref> r;
 	tref def = tau::get(stream_def, get_options<node>(tau::stream_def, true));
-	if (!def) return nullptr;
-	return tau::trim(def);
+	if (!def) r.error(code::parse_error, "Failed to parse stream definition");
+	else      r = tau::trim(def);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_spec(const std::string& src) {
+result<tref> api<node>::get_spec(const std::string& src) {
+	result<tref> r;
 	tau_spec<node> spec;
 	if (!spec.parse(src)) {
-		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
-		return nullptr;
+		for (const auto& error : spec.errors()) {
+			TAU_LOG_ERROR << error;
+			r.error(code::parse_error, error);
+		}
+		if (!r.has_error()) r.error(code::parse_error, "Failed to parse spec");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	if (tref s = spec.get(); s) return s;
-	return nullptr;
+	if (tref s = spec.get(); s) r = s;
+	else r.error(code::parse_error, "Failed to parse spec");
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-size_t api<node>::add_definition(tref head, tref body) {
+result<size_t> api<node>::add_definition(tref head, tref body) {
+	result<size_t> r;
 	DBG(TAU_LOG_TRACE << "add_definition/head: " << LOG_FM_DUMP(head);)
 	DBG(TAU_LOG_TRACE << "add_definition/body: " << LOG_FM_DUMP(body);)
 	if (!head || !body) {
@@ -321,28 +369,41 @@ size_t api<node>::add_definition(tref head, tref body) {
 		if (!body) {
 			DBG(TAU_LOG_TRACE << "add_definition/body is nullptr";)
 		}
-		return 0;
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	DBG(TAU_LOG_TRACE << "add_definition/adding head: " << LOG_FM_DUMP(head);)
 	DBG(TAU_LOG_TRACE << "add_definition/adding body: " << LOG_FM_DUMP(body);)
 	// AP1-6: 1-based -- the store's 0-based index made the very first
 	// definition return 0, the documented failure value.
-	return definitions<node>::instance().add(
+	r = definitions<node>::instance().add(
 		tau::geth(head), tau::geth(body)) + 1;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_definition(const std::string& definition, bool simplified) {
+result<tref> api<node>::get_definition(const std::string& definition, bool simplified) {
+	result<tref> r;
 	DBG(TAU_LOG_TRACE << "get_definition/definition: " << definition;)
 	tref def = tau::get(definition, get_options<node>(tau::rec_relation, simplified));
 	DBG(TAU_LOG_TRACE << "get_definition/def: " << LOG_FM_DUMP(def);)
-	if (!def) return nullptr;
-	add_definition(tau::get(def).first(), tau::get(def).second());
-	return def;
+	if (!def) {
+		r.error(code::parse_error, "Failed to parse definition");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto added = add_definition(tau::get(def).first(), tau::get(def).second());
+	if (!added.has_value()) r.merge(std::move(added));
+	else r = def;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_spec_or_term(const std::string& expression, bool simplified) {
+result<tref> api<node>::get_spec_or_term(const std::string& expression, bool simplified) {
+	result<tref> r;
 	// Try parsing as a full spec first (which handles multiline and
 	// formula inputs); fall back to a bare bf term if that fails.
 	// AP1-18: the spec attempt is quiet -- its parse errors are logged
@@ -350,17 +411,32 @@ tref api<node>::get_spec_or_term(const std::string& expression, bool simplified)
 	// no longer emits spurious ERROR lines on the successful path.
 	tau_spec<node> spec;
 	tref expr = spec.parse(expression) ? spec.get() : nullptr;
-	if (!expr) expr = get_term(expression, simplified);
-	if (!expr)
-		for (const auto& error : spec.errors())
-			TAU_LOG_ERROR << error;
-	return expr;
+	if (expr) {
+		r = expr;
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto term = get_term(expression, simplified);
+	if (!term.has_value()) {
+		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
+		r.merge(std::move(term));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	r = term.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::get_formula_or_term(const std::string& expr, bool simplified) {
+result<tref> api<node>::get_formula_or_term(const std::string& expr, bool simplified) {
+	result<tref> r;
 	tref e = tau::get(expr, get_options<node>(tau::fm_or_term, simplified));
-	if (!e) return nullptr;
+	if (!e) {
+		r.error(code::parse_error, "Failed to parse formula or term");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	e = tau::trim(e);
 	// AP1-32: classify io_vars like get_formula does, so the same text
 	// yields the same tree through either entry (downstream re-resolution
@@ -368,7 +444,10 @@ tref api<node>::get_formula_or_term(const std::string& expr, bool simplified) {
 	if (tau::get(e).is(tau::wff))
 		e = resolve_io_vars<node>(
 			*definitions<node>::instance().get_io_context(), e);
-	return e;
+	if (!e) r.error(code::internal_error, "Failed to parse formula or term");
+	else    r = e;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Querying
@@ -402,15 +481,24 @@ bool api<node>::is_formula(tref fm) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-tref api<node>::apply_def(tref def, tref expr) {
+result<tref> api<node>::apply_def(tref def, tref expr) {
 	return apply_defs(subtree_set<node>{ def }, expr);
 }
 
 template <NodeType node>
-tref api<node>::apply_defs(subtree_set<node> defs, tref expr) {
-	if (!expr) return nullptr;
+result<tref> api<node>::apply_defs(subtree_set<node> defs, tref expr) {
+	result<tref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	auto maybe_nso_rr = get_nso_rr(expr);
-	if (!maybe_nso_rr) return nullptr;
+	if (!maybe_nso_rr.has_value()) {
+		r.merge(std::move(maybe_nso_rr));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	auto& nso_rr = maybe_nso_rr.value();
 	io_context<node>& ctx = *definitions<node>::instance().get_io_context();
 	for (tref def : defs) if (def) {
@@ -421,24 +509,41 @@ tref api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 				tau::geth(resolve_io_vars<node>(ctx, t.second())));
 		}
 	}
-	return nso_rr_apply<node>(nso_rr);
+	tref applied = nso_rr_apply<node>(nso_rr);
+	if (!applied) r.error(code::internal_error, "Failed to apply definitions");
+	else          r = applied;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::apply_all_defs(tref expr) {
+result<tref> api<node>::apply_all_defs(tref expr) {
 	// AP1-4: this must apply the globally registered definitions --
 	// routing through apply_defs({}) applied nothing, so after
 	// get_definition() the dnf/cnf/nnf/solve/lgrs pipelines received
 	// refs unexpanded, contradicting the documented contract. Mirrors
 	// the normalizer's apply_defs_to_spec.
-	if (!expr) return nullptr;
+	result<tref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	auto maybe_nso_rr = get_nso_rr(expr);
-	if (!maybe_nso_rr) return nullptr;
+	if (!maybe_nso_rr.has_value()) {
+		r.merge(std::move(maybe_nso_rr));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	auto& nso_rr = maybe_nso_rr.value();
 	const auto& defs = definitions<node>::instance().get_sym_defs();
 	nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 		defs.begin(), defs.end());
-	return nso_rr_apply<node>(nso_rr);
+	tref applied = nso_rr_apply<node>(nso_rr);
+	if (!applied) r.error(code::internal_error, "Failed to apply definitions");
+	else          r = applied;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 
@@ -461,10 +566,13 @@ std::string api<node>::to_str(tref expression) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-tref api<node>::substitute(tref expr, tref that, tref with) {
+result<tref> api<node>::substitute(tref expr, tref that, tref with) {
+	result<tref> r;
 	if (!expr || !that || !with) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		return nullptr;
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	DBG(TAU_LOG_TRACE << "substitute: \n" << LOG_FM_DUMP(expr) << "\n" << LOG_FM_DUMP(that) << "\n" << LOG_FM_DUMP(with);)
 	// Enforce that all three are consistently terms or formulas.
@@ -472,99 +580,196 @@ tref api<node>::substitute(tref expr, tref that, tref with) {
 	bool e = is_term(expr), t = is_term(that), w = is_term(with);
 	if ((e && e != t) || (e && e != w) || (!e && t != w)) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		return nullptr;
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return tau::get(expr).substitute(that, with);
+	tref s = tau::get(expr).substitute(that, with);
+	if (!s) r.error(code::internal_error, "Substitution failed");
+	else    r = s;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
-	for (auto [that, with] : that_with)
-		expr = substitute(expr, that, with);
-	return expr;
+result<tref> api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
+	result<tref> r;
+	for (auto [that, with] : that_with) {
+		auto sub = substitute(expr, that, with);
+		if (!sub.has_value()) {
+			r.merge(std::move(sub));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		expr = sub.value();
+	}
+	r = expr;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Normal forms
 // ------------------------------------------------------------
 
 template <NodeType node>
-tref api<node>::boole_normal_form(tref expr) {
+result<tref> api<node>::boole_normal_form(tref expr) {
 	// Simplify, apply all registered definitions, then compute BNF
-	expr = simplify(expr);
-	if (!expr) return nullptr;
-	if (tref a = apply_all_defs(expr); a)
-		return tau_lang::boole_normal_form<node>(a);
-	return nullptr;
+	result<tref> r;
+	auto simplified = simplify(expr);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref b = tau_lang::boole_normal_form<node>(applied.value());
+	if (!b) r.error(code::internal_error, "Boole normal form conversion failed");
+	else    r = b;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::dnf(tref expr) {
-	expr = simplify(expr);
-	if (!expr) return nullptr;
-	tref a = apply_all_defs(expr);
-	if (a) {
-		// Dispatch to bf-level or wff-level DNF depending on root type
-		switch (tau::get(a).get_type()) {
-		case tau::bf:  return reduce<node>(to_dnf<node, false>(a));
-		case tau::wff: return reduce<node>(to_dnf<node>(a));
-		default: return nullptr;
-		}
+result<tref> api<node>::dnf(tref expr) {
+	result<tref> r;
+	auto simplified = simplify(expr);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return nullptr;
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref a = applied.value();
+	tref d = nullptr;
+	// Dispatch to bf-level or wff-level DNF depending on root type
+	switch (tau::get(a).get_type()) {
+	case tau::bf:  d = reduce<node>(to_dnf<node, false>(a)); break;
+	case tau::wff: d = reduce<node>(to_dnf<node>(a)); break;
+	default: r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (!d) r.error(code::internal_error, "DNF conversion failed");
+	else    r = d;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::cnf(tref expr) {
-	expr = simplify(expr);
-	if (!expr) return nullptr;
-	tref a = apply_all_defs(expr);
-	if (a) {
-		// Dispatch to wff-level or bf-level CNF depending on root type
-		switch (tau::get(a).get_type()) {
-		case tau::wff: return reduce<node, true>(to_cnf<node>(a));
-		case tau::bf:  return reduce<node, true>(to_cnf<node, false>(a));
-		default: return nullptr;
-		}
+result<tref> api<node>::cnf(tref expr) {
+	result<tref> r;
+	auto simplified = simplify(expr);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return nullptr;
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref a = applied.value();
+	tref c = nullptr;
+	// Dispatch to wff-level or bf-level CNF depending on root type
+	switch (tau::get(a).get_type()) {
+	case tau::wff: c = reduce<node, true>(to_cnf<node>(a)); break;
+	case tau::bf:  c = reduce<node, true>(to_cnf<node, false>(a)); break;
+	default: r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (!c) r.error(code::internal_error, "CNF conversion failed");
+	else    r = c;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::nnf(tref expr) {
-	expr = simplify(expr);
-	if (!expr) return nullptr;
-	tref a = apply_all_defs(expr);
-	if (a) {
-		// wff: full NNF via De Morgan; bf: push negation into sub-terms
-		switch (tau::get(a).get_type()) {
-		case tau::wff: return to_nnf<node>(a);
-		case tau::bf:  return push_negation_in<node, false>(a);
-		default: return nullptr;
-		}
+result<tref> api<node>::nnf(tref expr) {
+	result<tref> r;
+	auto simplified = simplify(expr);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return nullptr;
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref a = applied.value();
+	tref n = nullptr;
+	// wff: full NNF via De Morgan; bf: push negation into sub-terms
+	switch (tau::get(a).get_type()) {
+	case tau::wff: n = to_nnf<node>(a); break;
+	case tau::bf:  n = push_negation_in<node, false>(a); break;
+	default: r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (!n) r.error(code::internal_error, "NNF conversion failed");
+	else    r = n;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Procedures
 // ------------------------------------------------------------
 
 template <NodeType node>
-tref api<node>::syntactic_term_simplification(tref term) {
-	term = simplify(term);
-	if (!term) return nullptr;
-	return syntactic_path_simplification<node>(term);
+result<tref> api<node>::syntactic_term_simplification(tref term) {
+	result<tref> r;
+	auto simplified = simplify(term);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref s = syntactic_path_simplification<node>(simplified.value());
+	if (!s) r.error(code::internal_error, "Syntactic term simplification failed");
+	else    r = s;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::syntactic_formula_simplification(tref fm) {
-	fm = simplify(fm);
-	if (!fm) return nullptr;
-	return tau_lang::syntactic_formula_simplification<node>(fm);
+result<tref> api<node>::syntactic_formula_simplification(tref fm) {
+	result<tref> r;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref s = tau_lang::syntactic_formula_simplification<node>(simplified.value());
+	if (!s) r.error(code::internal_error, "Syntactic formula simplification failed");
+	else    r = s;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::normalize_formula(tref fm) {
-	if (!fm) return nullptr;
+result<tref> api<node>::normalize_formula(tref fm) {
+	result<tref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	DBG(TAU_LOG_TRACE << "normalize_formula(): " << LOG_FM_DUMP(fm);)
 #ifdef DEBUG
 	auto& defs = definitions<node>::instance();
@@ -578,48 +783,118 @@ tref api<node>::normalize_formula(tref fm) {
 	std::cout << *defs.get_io_context();
 #endif
 
-	fm = simplify(fm);
-	if (!fm) return nullptr;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	fm = simplified.value();
 	auto maybe_nso_rr = get_nso_rr(fm);
-	if (!maybe_nso_rr || !maybe_nso_rr.value().main
-		|| tau::get(maybe_nso_rr.value().main).is(tau::bf))
-			return nullptr;
-	return normalizer<node>(maybe_nso_rr.value());
+	if (!maybe_nso_rr.has_value()) {
+		r.merge(std::move(maybe_nso_rr));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (!maybe_nso_rr.value().main
+		|| tau::get(maybe_nso_rr.value().main).is(tau::bf)) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref n = normalizer<node>(maybe_nso_rr.value());
+	if (!n) r.error(code::internal_error, "Normalization failed");
+	else    r = n;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::normalize_term(tref term) {
-	if (!term) return nullptr;
+result<tref> api<node>::normalize_term(tref term) {
+	result<tref> r;
+	if (!term) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	DBG(TAU_LOG_TRACE << "normalize_term(): " << LOG_FM_DUMP(term);)
-	term = simplify(term);
-	if (!term) return nullptr;
+	auto simplified = simplify(term);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	term = simplified.value();
 	DBG(TAU_LOG_TRACE << "inferred term: " << LOG_FM_DUMP(term);)
 	auto maybe_nso_rr = get_nso_rr(term);
-	if (!maybe_nso_rr) return nullptr;
+	if (!maybe_nso_rr.has_value()) {
+		r.merge(std::move(maybe_nso_rr));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	auto& nso_rr = maybe_nso_rr.value();
 	tref main = nso_rr.main->get();
-	if (!main || !tau::get(main).is(tau::bf)) return nullptr;
-	if (contains(main, tau::ref))
-		return bf_normalizer_with_rec_relation<node>(nso_rr);
-	return bf_normalizer_without_rec_relation<node>(main);
+	if (!main || !tau::get(main).is(tau::bf)) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref n = contains(main, tau::ref)
+		? bf_normalizer_with_rec_relation<node>(nso_rr)
+		: bf_normalizer_without_rec_relation<node>(main);
+	if (!n) r.error(code::internal_error, "Normalization failed");
+	else    r = n;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::anti_prenex(tref fm) {
-	if (!fm) return nullptr;
-	fm = simplify(fm);
-	if (!fm) return nullptr;
-	return tau_lang::anti_prenex<node>(fm);
+result<tref> api<node>::anti_prenex(tref fm) {
+	result<tref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref a = tau_lang::anti_prenex<node>(simplified.value());
+	if (!a) r.error(code::internal_error, "Anti-prenex conversion failed");
+	else    r = a;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::eliminate_quantifiers(tref fm) {
-	if (!fm) return nullptr;
-	fm = simplify(fm);
-	if (!fm) return nullptr;
-	if (tref a = apply_all_defs(fm); a)
-		return resolve_quantifiers<node>(tau_lang::anti_prenex<node>(a));
-	return nullptr;
+result<tref> api<node>::eliminate_quantifiers(tref fm) {
+	result<tref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref e = resolve_quantifiers<node>(
+		tau_lang::anti_prenex<node>(applied.value()));
+	if (!e) r.error(code::internal_error, "Quantifier elimination failed");
+	else    r = e;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Whole-query fast path: hand a non-temporal query the owning BA can decide to
@@ -664,109 +939,190 @@ std::optional<bool> ba_fast_path_valid(tref fm) {
 }
 
 template <NodeType node>
-bool api<node>::realizable(tref fm) {
-	fm = simplify(fm);
+result<bool> api<node>::realizable(tref fm) {
+	result<bool> r;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 	// normalization so the downstream pipeline sees a single wff_always.
-	if (fm) fm = flatten_always_conjuncts<node>(fm);
-	if (!fm || !is_formula(fm)) return false;
+	fm = flatten_always_conjuncts<node>(simplified.value());
+	if (!fm || !is_formula(fm)) {
+		r.error(code::invalid_argument, "Invalid formula");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// whole-query BA fast path; falls through when undecided.
-	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value())
-		return fast.value();
-	// normalize_formula() returns nullptr on failures that are reachable
-	// from user input: a non-well-founded recurrence, a definition set
-	// whose expansion never settles, a fallback type mismatch, or a
-	// get_nso_rr failure. is_tau_formula_sat() dereferences its argument
-	// immediately, so the null has to be caught here.
-	tref nf = normalize_formula(fm);
-	if (!nf) {
+	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
+		r = fast.value();
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	// normalize_formula() fails on failures that are reachable from user
+	// input: a non-well-founded recurrence, a definition set whose
+	// expansion never settles, a fallback type mismatch, or a get_nso_rr
+	// failure. is_tau_formula_sat() dereferences its argument immediately,
+	// so the failure has to be caught here; it decides unsatisfiable
+	// rather than propagating an error, matching the definite answer
+	// every other undecidable-shape gate in this function returns.
+	auto nf = normalize_formula(fm);
+	if (!nf.has_value()) {
 		TAU_LOG_ERROR << "Could not normalize the formula; "
 			"its satisfiability cannot be decided";
-		return false;
+		r = false;
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	// LT-7: the synthesis backend reports "no verdict" by throwing
 	// ltl_synthesis_error -- a timed-out, killed or misused ltlsynt is NOT an
 	// UNREALIZABLE answer.  Nothing below this layer catches it, so without a
 	// handler here a slow specification would terminate the process instead of
-	// answering.  Convert it into a logged error verdict, the same shape the
-	// normalize_formula null-gate above uses.  The verdict is `false`, but the
-	// log says UNKNOWN so it is not mistaken for a decided UNREALIZABLE.
+	// answering.  Convert it into a logged error verdict.
 	try {
 		// A data quantifier under a full-LTL operator survives normalization;
 		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
 		// invariant, so route the RAW formula to the LTL-ABA solver instead.
 		if (has_ltl_operators<node>(fm)
-			&& tau::get(nf).find_top(is_quantifier<node>))
-			return is_tau_formula_sat<node>(fm, 0, true);
-		return is_tau_formula_sat<node>(nf, 0, true);
+			&& tau::get(nf.value()).find_top(is_quantifier<node>))
+			r = is_tau_formula_sat<node>(fm, 0, true);
+		else
+			r = is_tau_formula_sat<node>(nf.value(), 0, true);
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); realizability could not be decided";
-		return false;
+		r.error(code::solver_error,
+			"the synthesis backend failed or timed out");
 	}
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::unrealizable(tref fm) {
-	// AP1-11: null input is invalid, not "unrealizable" -- match the
-	// htref overload's false (a bool API cannot express errors, and
-	// claiming a verdict for unparseable input is the worse lie).
-	if (!fm) return false;
-	return !realizable(fm);
+result<bool> api<node>::unrealizable(tref fm) {
+	result<bool> r;
+	// AP1-11: null input is invalid, not "unrealizable".
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto real = realizable(fm);
+	if (!real.has_value()) r.merge(std::move(real));
+	else                   r = !real.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::sat(tref fm) {
-	fm = simplify(fm);
+result<bool> api<node>::sat(tref fm) {
+	result<bool> r;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// G(A) ∧ G(B) ≡ G(A ∧ B); merge top-level conjunctions of G so the
 	// downstream safety pipeline sees one wff_always.  Non-mergeable
 	// Boolean combinations (disjunction, negation, F-on-non-singletons,
 	// etc.) survive flatten unchanged and are routed to the full-LTL
 	// pipeline by is_tau_formula_sat itself — there's no longer a
 	// pre-check that rejects them at this layer.
-	if (fm) fm = flatten_always_conjuncts<node>(fm);
-	return fm && realizable(fm);
+	fm = flatten_always_conjuncts<node>(simplified.value());
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid formula");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto real = realizable(fm);
+	if (!real.has_value()) r.merge(std::move(real));
+	else                   r = real.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::unsat(tref fm) {
+result<bool> api<node>::unsat(tref fm) {
+	result<bool> r;
 	// AP1-11: null input is invalid, not "unsatisfiable" (see
 	// unrealizable above).
-	if (!fm) return false;
-	return !sat(fm);
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto s = sat(fm);
+	if (!s.has_value()) r.merge(std::move(s));
+	else                r = !s.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::valid(tref fm) {
-	fm = simplify(fm);
-	if (fm) fm = flatten_always_conjuncts<node>(fm);
-	return fm && valid_spec(fm);
+result<bool> api<node>::valid(tref fm) {
+	result<bool> r;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	fm = flatten_always_conjuncts<node>(simplified.value());
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid formula");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto vs = valid_spec(fm);
+	if (!vs.has_value()) r.merge(std::move(vs));
+	else                 r = vs.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::valid_spec(tref fm) {
-	fm = simplify(fm);
-	if (!fm) return false;
+result<bool> api<node>::valid_spec(tref fm) {
+	result<bool> r;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	fm = simplified.value();
 	// whole-query BA fast path; falls through when undecided.
-	if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value())
-		return fast.value();
-	// Same null contract as realizable(): is_tau_impl() normalizes both
-	// arguments straight away and cannot be handed a null formula.
-	tref nfm = normalize_formula(fm);
-	if (!nfm) {
+	if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value()) {
+		r = fast.value();
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	// Same contract as realizable(): is_tau_impl() normalizes both
+	// arguments straight away and cannot be handed a null formula, so a
+	// normalization failure decides invalid rather than propagating an
+	// error.
+	auto nfm = normalize_formula(fm);
+	if (!nfm.has_value()) {
 		TAU_LOG_ERROR << "Could not normalize the formula; "
 			"its validity cannot be decided";
-		return false;
+		r = false;
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	// Valid iff T (tautology) implies the normalized formula.
 	// Same synthesis-failure gate as realizable() -- see the note there.
 	try {
-		return is_tau_impl<node>(tau::_T(), nfm);
+		r = is_tau_impl<node>(tau::_T(), nfm.value());
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); validity could not be decided";
-		return false;
+		r.error(code::solver_error,
+			"the synthesis backend failed or timed out");
 	}
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 
@@ -775,24 +1131,33 @@ bool api<node>::valid_spec(tref fm) {
 
 // Solve: apply defs, reject temporal quantifiers, then run the solver.
 template <NodeType node>
-std::optional<subtree_map<node, tref>> api<node>::solve(
+result<subtree_map<node, tref>> api<node>::solve(
 	tref fm, solver_mode mode)
 {
-	fm = simplify(fm);
-	if (!fm) {
+	result<subtree_map<node, tref>> r;
+	auto simplified = simplify(fm);
+	if (!simplified.has_value()) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		return {};
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	tref a = apply_all_defs(fm);
-	if (!a) {
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		return {};
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
+	tref a = applied.value();
 	// Reject formula involving temporal quantification
 	if (tau::get(a).find_top(is_temporal_quantifier<node>)) {
 		TAU_LOG_ERROR << "Found temporal quantifier in formula: "
 			<< TAU_TO_STR(fm);
-		return {};
+		r.error(code::invalid_argument,
+			"Found temporal quantifier in formula");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	DBG(TAU_LOG_TRACE << "solve: " << LOG_FM(a);)
 	// setting solver options
@@ -807,26 +1172,42 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 	auto solution = tau_lang::solve<node>(a, options, solve_error);
 	if (solve_error) {
 		TAU_LOG_ERROR << "Internal error in solver";
-		return {};
+		r.error(code::solver_error, "Internal error in solver");
+	} else if (!solution) {
+		r.error(code::unsat, "No solution");
+	} else {
+		r = std::move(solution.value());
 	}
-	return solution;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // LGRS: normalize the equation, extract the bf_eq equality, then solve.
 template <NodeType node>
-std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
+result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
+	result<subtree_map<node, tref>> r;
 	using tt = tau::traverser;
-	equation = simplify(equation);
-	tref a = apply_all_defs(equation);
-	if (!a) {
-		TAU_LOG_ERROR << "Invalid argument(s)";
-		return {};
+	auto simplified = simplify(equation);
+	if (!simplified.has_value()) {
+		r.merge(std::move(simplified));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
+	auto applied = apply_all_defs(simplified.value());
+	if (!applied.has_value()) {
+		TAU_LOG_ERROR << "Invalid argument(s)";
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref a = applied.value();
 	tref eq = apply_all_xor_def<node>(norm_all_equations<node>(a));
 	tref equality = tt(eq) | tau::bf_eq | tt::ref;
 	if (!eq || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		return {};
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	// Exclude non-Boolean operations from equation. The two sides live under
 	// the bf_eq, not under `eq`: `eq` is the wff wrapping it and has a
@@ -836,57 +1217,87 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
 		tau::get(equality)[1].find_top(is_non_boolean_term<node>)) {
 		TAU_LOG_ERROR << "Found non-Boolean operation in equation";
-		return {};
+		r.error(code::invalid_argument,
+			"Found non-Boolean operation in equation");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	DBG(TAU_LOG_TRACE << "lgrs/applied: " << LOG_FM(eq);)
 	DBG(TAU_LOG_TRACE << "lgrs/equality: " << LOG_FM(equality);)
 
-	return tau_lang::lgrs<node>(eq);
+	auto solution = tau_lang::lgrs<node>(eq);
+	if (!solution) r.error(code::unsat, "No solution");
+	else           r = std::move(solution.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Execution
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(tref spec) {
+result<interpreter<node>> api<node>::get_interpreter(tref spec) {
 	interpreter_options options;
 	return get_interpreter(spec, options);
 }
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
+result<interpreter<node>> api<node>::get_interpreter(tref spec,
 	interpreter_options& options)
 {
+	result<interpreter<node>> r;
 	// Assign the remaps into the global io_context only after every
 	// validation step succeeds: assigning them up front left them in
 	// place -- corrupting later, unrelated calls -- on every one of the
 	// early-return failure paths below.
 	auto& ctx = *definitions<node>::instance().get_io_context();
 	auto maybe_nso_rr = get_nso_rr(spec);
-	if (!maybe_nso_rr) return {};
+	if (!maybe_nso_rr.has_value()) {
+		r.merge(std::move(maybe_nso_rr));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
-	if (!applied) return {};
+	if (!applied) {
+		r.error(code::internal_error, "Failed to apply definitions");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	tref normalized = normalizer<node>(applied);
-	if (!normalized) return {};
+	if (!normalized) {
+		r.error(code::internal_error, "Normalization failed");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-	if (has_free_vars<node>(normalized)) return {};
+	if (has_free_vars<node>(normalized)) {
+		r.error(code::invalid_argument, "Spec contains free variables");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
 	// LT-7: make_interpreter reaches ltlsynt through
 	// ltl_to_safety_formula_full; a backend failure must not terminate the
 	// caller.  No interpreter is the honest answer here.
 	try {
-		return interpreter<node>::make_interpreter(normalized, ctx);
+		auto intr = interpreter<node>::make_interpreter(normalized, ctx);
+		if (!intr) r.error(code::solver_error,
+			"the specification could not be compiled");
+		else       r = std::move(intr.value());
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); the specification could not be compiled";
-		return {};
+		r.error(code::solver_error,
+			"the synthesis backend failed or timed out");
 	}
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	tau_spec<node>& spec)
 {
 	interpreter_options options;
@@ -894,35 +1305,59 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 }
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	tau_spec<node>& spec,
 	interpreter_options& options)
 {
+	result<interpreter<node>> r;
 	// See the tref overload above: remaps are assigned into the global
 	// io_context only once every validation step has succeeded.
 	auto& ctx = *definitions<node>::instance().get_io_context();
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr) {
-		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
-		return {};
+		for (const auto& error : spec.errors()) {
+			TAU_LOG_ERROR << error;
+			r.error(code::parse_error, error);
+		}
+		if (!r.has_error()) r.error(code::parse_error, "Failed to parse spec");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
-	if (!applied) return {};
+	if (!applied) {
+		r.error(code::internal_error, "Failed to apply definitions");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	tref normalized = normalizer<node>(applied);
-	if (!normalized) return {};
+	if (!normalized) {
+		r.error(code::internal_error, "Normalization failed");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-	if (has_free_vars<node>(normalized)) return {};
+	if (has_free_vars<node>(normalized)) {
+		r.error(code::invalid_argument, "Spec contains free variables");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
 	// See the tref overload: synthesis-backend failures are answered, not
 	// propagated.
 	try {
-		return interpreter<node>::make_interpreter(normalized, ctx);
+		auto intr = interpreter<node>::make_interpreter(normalized, ctx);
+		if (!intr) r.error(code::solver_error,
+			"the specification could not be compiled");
+		else       r = std::move(intr.value());
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); the specification could not be compiled";
-		return {};
+		r.error(code::solver_error,
+			"the synthesis backend failed or timed out");
 	}
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // private helper methods
@@ -932,7 +1367,13 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 // For spec nodes, delegates to tau_lang::get_nso_rr.
 // For bare wff/bf nodes, wraps via resolve_io_vars.
 template <NodeType node>
-std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
+result<rr<node>> api<node>::get_nso_rr(tref expr) {
+	result<rr<node>> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	rr<node> nso_rr;
 	// AP1-16: by reference -- copying the io_context (three subtree maps
 	// + remaps + console factory) per call was pure waste; all uses read.
@@ -943,33 +1384,52 @@ std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 			if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
 				ctx, expr); mayb_nso_rr)
 					nso_rr = mayb_nso_rr.value();
-			else return {};
+			else {
+				r.error(code::internal_error,
+					"Failed to resolve recurrence relations");
+				DBG(assert(r.is_well_formed());)
+				return r;
+			}
 		} else {
 			nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
-			if (!nso_rr.main) return {};
+			if (!nso_rr.main) {
+				r.error(code::internal_error,
+					"Failed to resolve I/O variables");
+				DBG(assert(r.is_well_formed());)
+				return r;
+			}
 		}
 	} else nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
-	return nso_rr;
+	r = std::move(nso_rr);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Type inference pipeline: infer BA types → canonize quantifier IDs
 // → unnest G-in-G ambiguity → check semantics → update global scope.
 template <NodeType node>
-tref api<node>::infer(tref expr, bool use_defaults) {
-	if (!expr) return nullptr;
+result<tref> api<node>::infer(tref expr, bool use_defaults) {
+	result<tref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 
 	auto& defs = definitions<node>::instance();
-	auto result = infer_ba_types<node>(expr,
+	auto infer_result = infer_ba_types<node>(expr,
 		defs.get_global_scope(),
 		defs.get_definition_heads(),
 		{ .use_defaults = use_defaults });
-	tref inferred = canonize_quantifier_ids<node>(result.first);
+	tref inferred = canonize_quantifier_ids<node>(infer_result.first);
 	if (!inferred) {
 		DBG(LOG_TRACE << "inferred is nullptr";)
-		return nullptr;
+		r.error(code::internal_error, "Type inference failed");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	defs.get_io_context()->update_types(result.second);
-	defs.set_global_scope(std::move(result.second));
+	defs.get_io_context()->update_types(infer_result.second);
+	defs.set_global_scope(std::move(infer_result.second));
 
 	// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.
 	// This arises because the CFG parser is ambiguous: G(X) && G(Y) can
@@ -982,7 +1442,9 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(inferred)) {
 		DBG(LOG_TRACE << "transformed has semantic error";)
-		return nullptr;
+		r.error(code::invalid_argument, "Expression has semantic error");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	DBG(TAU_LOG_TRACE << "inferred: " << LOG_FM_DUMP(inferred);)
 	#ifdef DEBUG
@@ -995,17 +1457,33 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 			<< "\n";
 	std::cout << *defs.get_io_context();
 #endif
-	return inferred;
+	r = inferred;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-tref api<node>::simplify(tref expr, bool use_defaults) {
-	if (!expr) return nullptr;
-	expr = infer(expr, use_defaults);
-	if (!expr) return nullptr;
-	expr = canonize_quantifier_ids<node>(tau::reget(expr));
-	DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(expr);)
-	return expr;
+result<tref> api<node>::simplify(tref expr, bool use_defaults) {
+	result<tref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inferred = infer(expr, use_defaults);
+	if (!inferred.has_value()) {
+		r.merge(std::move(inferred));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref e = canonize_quantifier_ids<node>(tau::reget(inferred.value()));
+	if (!e) r.error(code::internal_error, "Simplification failed");
+	else {
+		DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(e);)
+		r = e;
+	}
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 } // namespace idni::tau_lang

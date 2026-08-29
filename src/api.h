@@ -6,8 +6,8 @@
  *
  * All operations are exposed as static methods on `api<node>`. Callers typically
  * create a type alias `using tau_api = api<node<BAs...>>` and call through it.
- * Every operation has two flavours: a plain overload and an overload that also
- * records wall-clock timing into a `measuring` tree.
+ * Every operation returns a `result<T>`: a value on success, or a structured
+ * error/diagnostics report on failure (see `tau_diagnostics.h`).
  *
  * Threading contract: the API mutates shared parser settings, pretty-printer
  * flags, definition registries, and other caches without synchronization.
@@ -20,7 +20,6 @@
 // TODO (LOW) add non string api for execution?
 // TODO (HIGH) tests for the htref surface (the tref/string surfaces are
 //             covered by tests/api)
-// TODO (HIGH) error handling
 // TODO (HIGH) decide which parsing get_* methods or other methods will go private if any
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
 
@@ -30,7 +29,6 @@
 #include "heuristics/simplify_options.h"
 #include "interpreter.h"
 #include "tau_diagnostics.h"
-#include "utility/measure.h"
 
 namespace idni::tau_lang {
 
@@ -53,46 +51,12 @@ struct interpreter_options {
 };
 
 /**
- * @brief Hierarchical wall-clock measurement tree.
- *
- * Each node records the name and elapsed milliseconds for one operation;
- * nested sub-operations appear in `parts`.
+ * @brief One-time setup for @p node: the BDD backend and the grammar's
+ * dynamic type names. Call once before the first parse, the way callers
+ * already call `bdd_init<Bool>()` -- this replaces that call.
  */
-struct measuring {
-	std::string name;            ///< Label for this measurement node.
-	double ms = 0;               ///< Elapsed time in milliseconds.
-	std::vector<measuring> parts{}; ///< Child measurements.
-
-	/** @brief Append a new empty child and return a reference to it. */
-	measuring& part();
-	/**
-	 * @brief Print the tree to @p os at indentation @p level.
-	 * @return @p os.
-	 */
-	std::ostream& operator()(std::ostream& os, size_t level = 0) const;
-	/**
-	 * @brief Print the tree as JSON to @p os at indentation @p level.
-	 * @return @p os.
-	 */
-	std::ostream& to_json(std::ostream& os, size_t level = 0) const;
-};
-
-/** @brief Stream the `measuring` tree @p m to @p os in human-readable form. */
-std::ostream& operator<<(std::ostream& os, const measuring& m);
-
-/**
- * @brief RAII timer that records elapsed time into a `measuring` node.
- *
- * Starts timing on construction, stops and writes `ms` on destruction.
- */
-struct api_measure {
-	/** @brief Start timing for operation @p name and record into @p m. */
-	api_measure(std::string name, measuring& m);
-	/** @brief Stop timing and store elapsed milliseconds into `m.ms`. */
-	~api_measure();
-	measuring& m;           ///< Target measurement node.
-	idni::measures::timer t; ///< Underlying timer.
-};
+template <NodeType node>
+void tau_init();
 
 /// Main public API for the Tau language engine.
 ///
@@ -122,22 +86,11 @@ struct api_measure {
 ///   2. **tref** — operates on raw tree pointers (zero-copy, not GC-safe)
 ///   3. **htref** — operates on shared-pointer handles (GC-safe)
 ///
-/// Most methods also have a `measuring&` variant that records profiling data.
-///
-/**
- * @brief One-time setup for @p node: the BDD backend and the grammar's
- * dynamic type names. Call once before the first parse, the way callers
- * already call `bdd_init<Bool>()` -- this replaces that call.
- */
-template <NodeType node>
-void tau_init();
-
-/// @tparam node  A type satisfying the NodeType concept (see tau_tree.h).
-///               In practice, use `node<BAs...>` with your BA pack.
+/// Every method returns a `result<T>` carrying either the value or a
+/// structured diagnostics report (see `tau_diagnostics.h`).
 template <NodeType node>
 struct api {
 	using tau = tree<node>;
-	using optional_string = std::optional<std::string>;
 	using severity_level = boost::log::trivial::severity_level;
 
 	friend tau;
@@ -339,76 +292,77 @@ struct api {
 	/// @param term   Source string in Tau syntax (e.g. "x & y").
 	/// @param simplified  When true (default), infer BA types and apply
 	///                    rewriting hooks after parsing.
-	/// @return Parsed tree reference, or nullptr on parse failure.
-	static tref get_term(const std::string& term, bool simplified = true);
+	/// @return Parsed tree reference, or a structured error on parse failure.
+	static result<tref> get_term(const std::string& term, bool simplified = true);
 	/// @copydoc get_term
 	/// @return GC-safe handle variant.
-	static htref geth_term(const std::string& term, bool simplified = true);
+	static result<htref> geth_term(const std::string& term, bool simplified = true);
 
 	/// Parse a well-formed formula (wff) from a string.
 	/// @param formula  Source string in Tau syntax (e.g. "x = 0").
 	/// @param simplified  When true, infer BA types and apply hooks.
-	/// @return Parsed tree reference, or nullptr on parse failure.
-	static tref get_formula(const std::string& formula, bool simplified = true);
+	/// @return Parsed tree reference, or a structured error on parse failure.
+	static result<tref> get_formula(const std::string& formula, bool simplified = true);
 	/// @copydoc get_formula
-	static htref geth_formula(const std::string& formula, bool simplified = true);
+	static result<htref> geth_formula(const std::string& formula, bool simplified = true);
 
 	/// Parse a function definition (rec_relation with bf body).
 	/// The input must parse as a rec_relation whose body is a bf or a ref.
 	/// The definition is automatically registered in the global definition store.
-	/// @return Parsed tree, or nullptr if the body is not a bf/ref.
-	static tref get_function_def(const std::string& function_def, bool simplified = true);
+	/// @return Parsed tree, or a structured error if the body is not a bf/ref.
+	static result<tref> get_function_def(const std::string& function_def, bool simplified = true);
 	/// @copydoc get_function_def
-	static htref geth_function_def(const std::string& function_def, bool simplified = true);
+	static result<htref> geth_function_def(const std::string& function_def, bool simplified = true);
 
 	/// Parse a predicate definition (rec_relation with wff body).
 	/// The input must parse as a rec_relation whose body is a wff or a ref.
 	/// The definition is automatically registered in the global definition store.
-	/// @return Parsed tree, or nullptr if the body is not a wff/ref.
-	static tref get_predicate_def(const std::string& predicate_def, bool simplified = true);
+	/// @return Parsed tree, or a structured error if the body is not a wff/ref.
+	static result<tref> get_predicate_def(const std::string& predicate_def, bool simplified = true);
 	/// @copydoc get_predicate_def
-	static htref geth_predicate_def(const std::string& predicate_def, bool simplified = true);
+	static result<htref> geth_predicate_def(const std::string& predicate_def, bool simplified = true);
 
 	/// Parse an I/O stream definition (input_def or output_def).
-	/// @return Parsed and trimmed tree, or nullptr on failure.
-	static tref get_stream_def(const std::string& stream_def);
+	/// @return Parsed and trimmed tree, or a structured error on failure.
+	static result<tref> get_stream_def(const std::string& stream_def);
 	/// @copydoc get_stream_def
-	static htref geth_stream_def(const std::string& stream_def);
+	static result<htref> geth_stream_def(const std::string& stream_def);
 
 	/// Parse a full Tau specification (may contain definitions,
 	/// stream declarations, and a main formula terminated by '.').
-	/// @return Parsed spec tree, or nullptr on failure.
-	static tref get_spec(const std::string& spec);
+	/// @return Parsed spec tree, or a structured error on failure.
+	static result<tref> get_spec(const std::string& spec);
 	/// @copydoc get_spec
-	static htref geth_spec(const std::string& spec);
+	static result<htref> geth_spec(const std::string& spec);
 
 	/// Parse a recursive definition (rec_relation) and register it
 	/// in the global definitions store.
-	/// @return Parsed tree, or nullptr on failure.
-	static tref get_definition(const std::string& definition, bool simplified = true);
+	/// @return Parsed tree, or a structured error on failure.
+	static result<tref> get_definition(const std::string& definition, bool simplified = true);
 	/// @copydoc get_definition
-	static htref geth_definition(const std::string& definition, bool simplified = true);
+	static result<htref> geth_definition(const std::string& definition, bool simplified = true);
 
 	/// Parse input as a spec first; if that fails, try parsing as a bf term.
 	/// Useful for REPL-style input where the user may type either.
-	/// @return Parsed tree, or nullptr if neither parse succeeds.
-	static tref get_spec_or_term(const std::string& expression, bool simplified = true);
+	/// @return Parsed tree, or a structured error if neither parse succeeds.
+	static result<tref> get_spec_or_term(const std::string& expression, bool simplified = true);
 	/// @copydoc get_spec_or_term
-	static htref geth_spec_or_term(const std::string& expression, bool simplified = true);
+	static result<htref> geth_spec_or_term(const std::string& expression, bool simplified = true);
 
 	/// Parse input as either a wff or a bf term (single production rule).
-	/// @return Parsed and trimmed tree, or nullptr on failure.
-	static tref get_formula_or_term(const std::string& expression, bool simplified = true);
+	/// @return Parsed and trimmed tree, or a structured error on failure.
+	static result<tref> get_formula_or_term(const std::string& expression, bool simplified = true);
 	/// @copydoc get_formula_or_term
-	static htref geth_formula_or_term(const std::string& expression, bool simplified = true);
+	static result<htref> geth_formula_or_term(const std::string& expression, bool simplified = true);
 
 	/// Register a definition from pre-parsed head and body tree nodes.
 	/// Both are converted to htref internally and added to the global
 	/// definitions store.
-	/// @return The 1-based definition id (>0) on success, or 0 if either
-	///         argument is nullptr (AP1-6: ids are 1-based precisely so
-	///         the first definition is distinguishable from failure).
-	static size_t add_definition(tref head, tref body);
+	/// @return The 1-based definition id (>0) on success (AP1-6: ids are
+	///         1-based precisely so the first definition is distinguishable
+	///         from failure), or a structured error if either argument is
+	///         nullptr.
+	static result<size_t> add_definition(tref head, tref body);
 
 	// -----------------------------------------------------------------------
 	// Querying
@@ -421,7 +375,7 @@ struct api {
 	static bool contains(htref expression, typename node::type nt);
 
 	/// Return true if @p expression parses as (or is) a bf term.
-	/// The string overload attempts get_term() and checks for non-null.
+	/// The string overload attempts get_term() and checks for success.
 	static bool is_term(const std::string& expression);
 	/// Return true if the root node of @p expression is flagged as a term.
 	static bool is_term(tref expression);
@@ -429,7 +383,7 @@ struct api {
 	static bool is_term(htref expression);
 
 	/// Return true if @p expression parses as (or is) a wff.
-	/// The string overload attempts get_formula() and checks for non-null.
+	/// The string overload attempts get_formula() and checks for success.
 	static bool is_formula(const std::string& expression);
 	/// Return true if the root node of @p expression has type wff.
 	static bool is_formula(tref expression);
@@ -442,37 +396,37 @@ struct api {
 
 	/// Apply a single recursive definition to an expression.
 	/// Parses both strings, then delegates to the tref overload.
-	/// @return The rewritten expression, or nullopt on parse failure.
-	static optional_string apply_def(
+	/// @return The rewritten expression, or a structured error on parse failure.
+	static result<std::string> apply_def(
 		const std::string& def,
 		const std::string& expression);
 	/// Apply a single definition tree to an expression tree.
 	/// Internally wraps it in a singleton set and calls apply_defs().
-	static tref apply_def(tref def, tref expression);
+	static result<tref> apply_def(tref def, tref expression);
 	/// @copydoc apply_def(tref,tref)
-	static htref apply_def(htref def, htref expression);
+	static result<htref> apply_def(htref def, htref expression);
 
 	/// Apply a set of recursive definitions to an expression.
 	/// Each definition's head/body pair is added to the expression's
 	/// rec_relation list, then apply_rr_to_formula() rewrites the tree.
-	/// @return The rewritten expression, or nullopt / nullptr on failure.
-	static optional_string apply_defs(
+	/// @return The rewritten expression, or a structured error on failure.
+	static result<std::string> apply_defs(
 		const std::set<std::string>& defs,
 		const std::string& expression);
 	/// @copydoc apply_defs(const std::set<std::string>&,const std::string&)
-	static tref apply_defs(subtree_set<node> defs, tref expression);
+	static result<tref> apply_defs(subtree_set<node> defs, tref expression);
 	/// @copydoc apply_defs(const std::set<std::string>&,const std::string&)
-	static htref apply_defs(const std::set<htref>& defs, htref expression);
+	static result<htref> apply_defs(const std::set<htref>& defs, htref expression);
 
 	/// Apply all globally registered definitions to an expression.
 	/// Equivalent to apply_defs() with an empty definition set (which
 	/// causes only the global store's definitions to be used).
-	static optional_string apply_all_defs(
+	static result<std::string> apply_all_defs(
 		const std::string& expression);
 	/// @copydoc apply_all_defs(const std::string&)
-	static tref apply_all_defs(tref expression);
+	static result<tref> apply_all_defs(tref expression);
 	/// @copydoc apply_all_defs(const std::string&)
-	static htref apply_all_defs(htref expression);
+	static result<htref> apply_all_defs(htref expression);
 
 	// -----------------------------------------------------------------------
 	// Printing
@@ -496,25 +450,25 @@ struct api {
 
 	/// Replace every occurrence of @p that in @p expression with @p with.
 	/// All three arguments must be either all terms or all formulas;
-	/// mismatched types return nullptr / nullopt and log an error.
-	static optional_string substitute(
+	/// mismatched types produce a structured error and log it.
+	static result<std::string> substitute(
 		const std::string& expression,
 		const std::string& that,
 		const std::string& with);
 	/// @copydoc substitute(const std::string&,const std::string&,const std::string&)
-	static tref substitute(tref expression, tref that, tref with);
+	static result<tref> substitute(tref expression, tref that, tref with);
 	/// @copydoc substitute(const std::string&,const std::string&,const std::string&)
-	static htref substitute(htref expression, htref that, htref with);
+	static result<htref> substitute(htref expression, htref that, htref with);
 
 	/// Apply multiple substitutions sequentially (left to right).
 	/// Each key in @p that_with is replaced by its corresponding value.
-	static optional_string substitute(
+	static result<std::string> substitute(
 		const std::string& expression,
 		const std::map<std::string, std::string>& that_with);
 	/// @copydoc substitute(const std::string&,const std::map<std::string,std::string>&)
-	static tref substitute(tref expression, std::map<tref, tref> that_with);
+	static result<tref> substitute(tref expression, std::map<tref, tref> that_with);
 	/// @copydoc substitute(const std::string&,const std::map<std::string,std::string>&)
-	static htref substitute(
+	static result<htref> substitute(
 		htref expression,
 		std::map<htref, htref> that_with);
 
@@ -525,37 +479,37 @@ struct api {
 	/// Convert an expression to Boole normal form.
 	/// Applies all definitions first, then rewrites. Works on both
 	/// bf terms and wff formulas.
-	static optional_string boole_normal_form(
+	static result<std::string> boole_normal_form(
 		const std::string& expression);
 	/// @copydoc boole_normal_form(const std::string&)
-	static tref boole_normal_form(tref expression);
+	static result<tref> boole_normal_form(tref expression);
 	/// @copydoc boole_normal_form(const std::string&)
-	static htref boole_normal_form(htref expression);
+	static result<htref> boole_normal_form(htref expression);
 
 	/// Convert an expression to disjunctive normal form (DNF).
 	/// Dispatches to bf or wff DNF depending on the root node type.
-	static optional_string dnf(const std::string& expression);
+	static result<std::string> dnf(const std::string& expression);
 	/// @copydoc dnf(const std::string&)
-	static tref dnf(tref expression);
+	static result<tref> dnf(tref expression);
 	/// @copydoc dnf(const std::string&)
-	static htref dnf(htref expression);
+	static result<htref> dnf(htref expression);
 
 	/// Convert an expression to conjunctive normal form (CNF).
 	/// Dispatches to bf or wff CNF depending on the root node type.
-	static optional_string cnf(const std::string& expression);
+	static result<std::string> cnf(const std::string& expression);
 	/// @copydoc cnf(const std::string&)
-	static tref cnf(tref expression);
+	static result<tref> cnf(tref expression);
 	/// @copydoc cnf(const std::string&)
-	static htref cnf(htref expression);
+	static result<htref> cnf(htref expression);
 
 	/// Convert an expression to negation normal form (NNF).
 	/// For wff: pushes negation inward via De Morgan's laws.
 	/// For bf: pushes negation into sub-terms.
-	static optional_string nnf(const std::string& expression);
+	static result<std::string> nnf(const std::string& expression);
 	/// @copydoc nnf(const std::string&)
-	static tref nnf(tref expression);
+	static result<tref> nnf(tref expression);
 	/// @copydoc nnf(const std::string&)
-	static htref nnf(htref expression);
+	static result<htref> nnf(htref expression);
 
 	// -----------------------------------------------------------------------
 	// Procedures
@@ -563,104 +517,104 @@ struct api {
 
 	/// Apply cheap non-local simplifications to a bf term, including
 	/// symbolic clause contradiction detection.
-	static optional_string syntactic_term_simplification(
+	static result<std::string> syntactic_term_simplification(
 		const std::string& term);
 	/// @copydoc syntactic_term_simplification(const std::string&)
-	static tref syntactic_term_simplification(tref term);
+	static result<tref> syntactic_term_simplification(tref term);
 	/// @copydoc syntactic_term_simplification(const std::string&)
-	static htref syntactic_term_simplification(htref term);
+	static result<htref> syntactic_term_simplification(htref term);
 
 	/// Apply cheap non-local simplifications to a wff, including
 	/// symbolic clause contradiction and simple equality reasoning.
-	static optional_string syntactic_formula_simplification(
+	static result<std::string> syntactic_formula_simplification(
 		const std::string& formula);
 	/// @copydoc syntactic_formula_simplification(const std::string&)
-	static tref syntactic_formula_simplification(tref formula);
+	static result<tref> syntactic_formula_simplification(tref formula);
 	/// @copydoc syntactic_formula_simplification(const std::string&)
-	static htref syntactic_formula_simplification(htref formula);
+	static result<htref> syntactic_formula_simplification(htref formula);
 
 	/// Fully normalize a bf term: apply definitions, resolve
 	/// recursive relations, and produce a canonical form.
-	/// @return Normalized term, or nullptr if input is not a bf.
-	static optional_string normalize_term(const std::string& term);
+	/// @return Normalized term, or a structured error if input is not a bf.
+	static result<std::string> normalize_term(const std::string& term);
 	/// @copydoc normalize_term(const std::string&)
-	static tref normalize_term(tref term);
+	static result<tref> normalize_term(tref term);
 	/// @copydoc normalize_term(const std::string&)
-	static htref normalize_term(htref term);
+	static result<htref> normalize_term(htref term);
 
 	/// Fully normalize a wff formula: apply definitions, resolve
 	/// recursive relations, and produce a canonical form via the
 	/// normalizer pipeline.
-	/// @return Normalized formula, or nullptr if input is not a wff.
-	static optional_string normalize_formula(const std::string& fm);
+	/// @return Normalized formula, or a structured error if input is not a wff.
+	static result<std::string> normalize_formula(const std::string& fm);
 	/// @copydoc normalize_formula(const std::string&)
-	static tref normalize_formula(tref fm);
+	static result<tref> normalize_formula(tref fm);
 	/// @copydoc normalize_formula(const std::string&)
-	static htref normalize_formula(htref fm);
+	static result<htref> normalize_formula(htref fm);
 
 	/// Push quantifiers inward (anti-prenex transformation).
 	/// Distributes ∀/∃ over ∧/∨ to reduce quantifier scope.
-	static optional_string anti_prenex(const std::string& fm);
+	static result<std::string> anti_prenex(const std::string& fm);
 	/// @copydoc anti_prenex(const std::string&)
-	static tref anti_prenex(tref fm);
+	static result<tref> anti_prenex(tref fm);
 	/// @copydoc anti_prenex(const std::string&)
-	static htref anti_prenex(htref fm);
+	static result<htref> anti_prenex(htref fm);
 
 	/// Eliminate quantifiers by applying anti-prenex followed by
 	/// quantifier resolution. All definitions are applied first.
-	static optional_string eliminate_quantifiers(const std::string& fm);
+	static result<std::string> eliminate_quantifiers(const std::string& fm);
 	/// @copydoc eliminate_quantifiers(const std::string&)
-	static tref eliminate_quantifiers(tref fm);
+	static result<tref> eliminate_quantifiers(tref fm);
 	/// @copydoc eliminate_quantifiers(const std::string&)
-	static htref eliminate_quantifiers(htref fm);
+	static result<htref> eliminate_quantifiers(htref fm);
 
 	/// Check if a specification is realizable (∃ winning system strategy).
 	/// Merges top-level G-conjuncts before normalization, then runs the
 	/// LTL realizability pipeline.
-	static bool realizable(const std::string& spec);
+	static result<bool> realizable(const std::string& spec);
 	/// @copydoc realizable(const std::string&)
-	static bool realizable(tref spec);
+	static result<bool> realizable(tref spec);
 	/// @copydoc realizable(const std::string&)
-	static bool realizable(htref spec);
+	static result<bool> realizable(htref spec);
 
 	/// Check if a specification is unrealizable.  Equivalent to
-	/// `!realizable(spec)`.
-	static bool unrealizable(const std::string& spec);
+	/// negating realizable(spec).
+	static result<bool> unrealizable(const std::string& spec);
 	/// @copydoc unrealizable(const std::string&)
-	static bool unrealizable(tref spec);
+	static result<bool> unrealizable(tref spec);
 	/// @copydoc unrealizable(const std::string&)
-	static bool unrealizable(htref spec);
+	static result<bool> unrealizable(htref spec);
 
 	/// Check satisfiability: true iff the formula is realizable.
 	/// Merges top-level G-conjuncts before checking.
-	static bool sat(const std::string& formula);
+	static result<bool> sat(const std::string& formula);
 	/// @copydoc sat(const std::string&)
-	static bool sat(tref formula);
+	static result<bool> sat(tref formula);
 	/// @copydoc sat(const std::string&)
-	static bool sat(htref formula);
+	static result<bool> sat(htref formula);
 
-	/// Check unsatisfiability.  Equivalent to `!sat(formula)`.
-	static bool unsat(const std::string& formula);
+	/// Check unsatisfiability.  Equivalent to negating sat(formula).
+	static result<bool> unsat(const std::string& formula);
 	/// @copydoc unsat(const std::string&)
-	static bool unsat(tref formula);
+	static result<bool> unsat(tref formula);
 	/// @copydoc unsat(const std::string&)
-	static bool unsat(htref formula);
+	static result<bool> unsat(htref formula);
 
 	/// Check validity: true iff the formula holds for all models.
 	/// Merges top-level G-conjuncts, then checks via valid_spec().
-	static bool valid(const std::string& formula);
+	static result<bool> valid(const std::string& formula);
 	/// @copydoc valid(const std::string&)
-	static bool valid(tref formula);
+	static result<bool> valid(tref formula);
 	/// @copydoc valid(const std::string&)
-	static bool valid(htref formula);
+	static result<bool> valid(htref formula);
 
 	/// Check if T (tautology) implies the normalized formula.
 	/// This is the underlying validity check used by valid().
-	static bool valid_spec(const std::string& spec);
+	static result<bool> valid_spec(const std::string& spec);
 	/// @copydoc valid_spec(const std::string&)
-	static bool valid_spec(tref spec);
+	static result<bool> valid_spec(tref spec);
 	/// @copydoc valid_spec(const std::string&)
-	static bool valid_spec(htref spec);
+	static result<bool> valid_spec(htref spec);
 
 	// -----------------------------------------------------------------------
 	// Solving
@@ -672,58 +626,58 @@ struct api {
 	/// @param formula  A quantifier-free wff.
 	/// @param mode     Solver strategy: general, maximum, minimum, or bitvector.
 	/// @return A map from variable names (or trefs/htrefs) to their
-	///         solution values, or nullopt if no solution exists or
-	///         an error occurred.
-	static std::optional<std::map<std::string, std::string>> solve(
+	///         solution values, or a structured error (code::unsat when no
+	///         solution exists) on failure.
+	static result<std::map<std::string, std::string>> solve(
 		const std::string& formula,
 		solver_mode mode = solver_mode::general);
 	/// @copydoc solve(const std::string&,solver_mode)
-	static std::optional<subtree_map<node, tref>> solve(
+	static result<subtree_map<node, tref>> solve(
 		tref formula,
 		solver_mode mode = solver_mode::general);
 	/// @copydoc solve(const std::string&,solver_mode)
-	static std::optional<std::map<htref, htref>> solve(
+	static result<std::map<htref, htref>> solve(
 		htref formula,
 		solver_mode mode = solver_mode::general);
 
 	/// Compute the Least General Recursive Solution (LGRS) for a
 	/// Boolean equation.  The equation must be a single bf_eq equality
 	/// with no non-Boolean operations.
-	/// @return A map from variables to their LGRS values, or nullopt
-	///         on invalid input.
-	static std::optional<std::map<std::string, std::string>> lgrs(
+	/// @return A map from variables to their LGRS values, or a structured
+	///         error (code::unsat when no solution exists) on invalid input.
+	static result<std::map<std::string, std::string>> lgrs(
 		const std::string& equation);
 	/// @copydoc lgrs(const std::string&)
-	static std::optional<std::map<htref, htref>> lgrs(htref equation);
+	static result<std::map<htref, htref>> lgrs(htref equation);
 	/// @copydoc lgrs(const std::string&)
-	static std::optional<subtree_map<node, tref>> lgrs(tref equation);
+	static result<subtree_map<node, tref>> lgrs(tref equation);
 
 	// -----------------------------------------------------------------------
 	// Execution
 	// ------------------------------------------------------------
 
 	/// Construct an interpreter from a Tau specification string.
-	/// Parses, normalizes, and checks for free variables.  Returns
-	/// nullopt on parse failure, normalization failure, or if the
-	/// normalized formula has free variables.
-	static std::optional<interpreter<node>> get_interpreter(
+	/// Parses, normalizes, and checks for free variables.  Returns a
+	/// structured error on parse failure, normalization failure, or if
+	/// the normalized formula has free variables.
+	static result<interpreter<node>> get_interpreter(
 		const std::string& spec);
 	/// Construct an interpreter with explicit I/O stream remapping.
-	static std::optional<interpreter<node>> get_interpreter(
+	static result<interpreter<node>> get_interpreter(
 		const std::string& spec,
 		interpreter_options& options);
 	/// Construct an interpreter from a pre-parsed spec tree.
-	static std::optional<interpreter<node>> get_interpreter(
+	static result<interpreter<node>> get_interpreter(
 		tref spec);
 	/// Construct an interpreter from a pre-parsed spec tree with options.
-	static std::optional<interpreter<node>> get_interpreter(
+	static result<interpreter<node>> get_interpreter(
 		tref spec,
 		interpreter_options& options);
 	/// Construct an interpreter from a parsed tau_spec object.
-	static std::optional<interpreter<node>> get_interpreter(
+	static result<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec);
 	/// Construct an interpreter from a parsed tau_spec with options.
-	static std::optional<interpreter<node>> get_interpreter(
+	static result<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec,
 		interpreter_options& options);
 
@@ -736,21 +690,21 @@ struct api {
 	/// Parses each input value string into the appropriate BA constant,
 	/// calls the interpreter's step, writes outputs, and processes any
 	/// specification update stream.
-	/// @param interactive  When true (default), returns nullopt if the
-	///   interpreter signals auto_continue=false (used by CLI tools
-	///   to pause and prompt).  When false, always returns outputs
-	///   (used by programmatic callers).
+	/// @param interactive  When true (default), reports code::invalid_state
+	///   if the interpreter signals auto_continue=false (used by CLI tools
+	///   to pause and prompt).  When false, outputs are always returned.
 	/// @return A map from (stream_name, time_point) to output value
-	///         strings, or nullopt on error or interactive pause.
-	static std::optional<std::map<stream_at, std::string>> step(
+	///         strings, or a structured error (code::invalid_state when
+	///         awaiting input or an interactive pause) on failure.
+	static result<std::map<stream_at, std::string>> step(
 		interpreter<node>& i,
 		std::map<stream_at, std::string> inputs,
 		bool interactive = true);
 
 	/// Advance the interpreter by one time step without explicit inputs.
-	/// Used when the specification has no input streams.  Always returns
-	/// nullopt if auto_continue is false.
-	static std::optional<std::map<stream_at, std::string>> step(
+	/// Used when the specification has no input streams. Reports
+	/// code::invalid_state if auto_continue is false.
+	static result<std::map<stream_at, std::string>> step(
 		interpreter<node>& i);
 
 	/// Drive the interpreter through its full step loop (see
@@ -759,284 +713,30 @@ struct api {
 	/// @param quit_on_idle  When true, stop instead of prompting once the
 	///   loop goes idle (matches the CLI's `-q`); when false (default),
 	///   prompt interactively.
-	/// @return false if a step's output failed to write; true otherwise.
-	static bool run(interpreter<node>& i, bool quit_on_idle = false);
+	/// @return false (with a structured error) if a step's output failed
+	///   to write; true otherwise.
+	static result<bool> run(interpreter<node>& i, bool quit_on_idle = false);
 
 	/// Run BA type inference on an expression.  Infers types, canonizes
 	/// quantifier IDs, unnests G-in-G, and checks for semantic errors.
 	/// @param use_defaults  When true, apply default type rules.
-	/// @return The inferred expression, or nullptr on type errors.
-	static tref infer(tref expr, bool use_defaults = true);
+	/// @return The inferred expression, or a structured error on type errors.
+	static result<tref> infer(tref expr, bool use_defaults = true);
 
 	/// Infer types and apply local simplifications (e.g. 1 & 0 → 0,
 	/// canonical quantifier IDs, reget in post-order).
-	static optional_string simplify(const std::string& expr,
+	static result<std::string> simplify(const std::string& expr,
 						bool use_defaults = true);
 	/// @copydoc simplify(const std::string&,bool)
-	static tref simplify(tref expr, bool use_defaults = true);
+	static result<tref> simplify(tref expr, bool use_defaults = true);
 	/// @copydoc simplify(const std::string&,bool)
-	static htref simplify(htref expr, bool use_defaults = true);
-
-	// Measuring variants
-	// ------------------------------------------------------------------
-	// Each method below mirrors a non-measuring counterpart above but
-	// accepts an additional `measuring& m` parameter to record timing.
-	// See the corresponding non-measuring method for semantics.
-
-	static tref get_term(measuring& m, const std::string& term, bool simplified = true);         // bf
-	static htref geth_term(measuring& m, const std::string& term, bool simplified = true);
-
-	/** @brief Parse @p formula and record timing into @p m. */
-	static tref get_formula(measuring& m, const std::string& formula, bool simplified = true);
-	/** @brief Parse @p formula (handle) and record timing. */
-	static htref geth_formula(measuring& m, const std::string& formula, bool simplified = true);
-
-	/** @brief Parse function definition and record timing. */
-	static tref get_function_def(measuring& m, const std::string& function_def, bool simplified = true);
-	/** @brief Parse function definition (handle) and record timing. */
-	static htref geth_function_def(measuring& m, const std::string& function_def, bool simplified = true);
-
-	/** @brief Parse predicate definition and record timing. */
-	static tref get_predicate_def(measuring& m, const std::string& predicate_def, bool simplified = true);
-	/** @brief Parse predicate definition (handle) and record timing. */
-	static htref geth_predicate_def(measuring& m, const std::string& predicate_def, bool simplified = true);
-
-	/** @brief Parse stream definition and record timing. */
-	static tref get_stream_def(measuring& m, const std::string& stream_def);
-	/** @brief Parse stream definition (handle) and record timing. */
-	static htref geth_stream_def(measuring& m, const std::string& stream_def);
-
-	/** @brief Parse specification and record timing. */
-	static tref get_spec(measuring& m, const std::string& spec);
-	/** @brief Parse specification (handle) and record timing. */
-	static htref geth_spec(measuring& m, const std::string& spec);
-
-	/** @brief Parse any definition and record timing. */
-	static tref get_definition(measuring& m, const std::string& definition, bool simplified = true);
-	/** @brief Parse any definition (handle) and record timing. */
-	static htref geth_definition(measuring& m, const std::string& definition, bool simplified = true);
-
-	/** @brief Parse spec/formula/term and record timing. */
-	static tref get_spec_or_term(measuring& m, const std::string& expression, bool simplified = true);
-	/** @brief Parse spec/formula/term (handle) and record timing. */
-	static htref geth_spec_or_term(measuring& m, const std::string& expression, bool simplified = true);
-
-	/** @brief Parse formula/term and record timing. */
-	static tref get_formula_or_term(measuring& m, const std::string& expression, bool simplified = true);
-	/** @brief Parse formula/term (handle) and record timing. */
-	static htref geth_formula_or_term(measuring& m, const std::string& expression, bool simplified = true);
-
-	/** @brief Register a definition and record timing. */
-	static size_t add_definition(measuring& m, tref head, tref body);
-
-	/** @brief Apply definition and record timing. */
-	static optional_string apply_def(measuring& m, const std::string& def, const std::string& expression);
-	/** @brief Apply definition and record timing. */
-	static tref apply_def(measuring& m, tref def, tref expression);
-	/** @brief Apply definition (handle) and record timing. */
-	static htref apply_def(measuring& m, htref def, htref expression);
-
-	/** @brief Apply a set of definitions and record timing. */
-	static optional_string apply_defs(measuring& m, const std::set<std::string>& defs, const std::string& expression);
-	/** @brief Apply a set of definitions and record timing. */
-	static tref apply_defs(measuring& m, subtree_set<node> defs, tref expression);
-	/** @brief Apply a set of definitions (handle) and record timing. */
-	static htref apply_defs(measuring& m, const std::set<htref>& defs, htref expression);
-
-	/** @brief Apply all definitions and record timing. */
-	static optional_string apply_all_defs(measuring& m, const std::string& expression);
-	/** @brief Apply all definitions and record timing. */
-	static tref apply_all_defs(measuring& m, tref expression);
-	/** @brief Apply all definitions (handle) and record timing. */
-	static htref apply_all_defs(measuring& m, htref expression);
-
-	/** @brief Substitute and record timing. */
-	static optional_string substitute(measuring& m, const std::string& expression, const std::string& that, const std::string& with);
-	/** @brief Substitute and record timing. */
-	static tref substitute(measuring& m, tref expression, tref that, tref with);
-	/** @brief Substitute (handle) and record timing. */
-	static htref substitute(measuring& m, htref expression, htref that, htref with);
-
-	/** @brief Apply substitution map and record timing. */
-	static optional_string substitute(measuring& m, const std::string& expression, const std::map<std::string, std::string>& that_with);
-	/** @brief Apply substitution map and record timing. */
-	static tref substitute(measuring& m, tref expression, std::map<tref, tref> that_with);
-	/** @brief Apply substitution map (handle) and record timing. */
-	static htref substitute(measuring& m, htref expression, std::map<htref, htref> that_with);
-
-	/** @brief Boole normal form and record timing. */
-	static optional_string boole_normal_form(measuring& m, const std::string& expression);
-	/** @brief Boole normal form and record timing. */
-	static tref boole_normal_form(measuring& m, tref expression);
-	/** @brief Boole normal form (handle) and record timing. */
-	static htref boole_normal_form(measuring& m, htref expression);
-
-	/** @brief DNF and record timing. */
-	static optional_string dnf(measuring& m, const std::string& expression);
-	/** @brief DNF and record timing. */
-	static tref dnf(measuring& m, tref expression);
-	/** @brief DNF (handle) and record timing. */
-	static htref dnf(measuring& m, htref expression);
-
-	/** @brief CNF and record timing. */
-	static optional_string cnf(measuring& m, const std::string& expression);
-	/** @brief CNF and record timing. */
-	static tref cnf(measuring& m, tref expression);
-	/** @brief CNF (handle) and record timing. */
-	static htref cnf(measuring& m, htref expression);
-
-	/** @brief NNF and record timing. */
-	static optional_string nnf(measuring& m, const std::string& expression);
-	/** @brief NNF and record timing. */
-	static tref nnf(measuring& m, tref expression);
-	/** @brief NNF (handle) and record timing. */
-	static htref nnf(measuring& m, htref expression);
-
-	/** @brief Syntactic term simplification and record timing. */
-	static optional_string syntactic_term_simplification(measuring& m, const std::string& term);
-	/** @brief Syntactic term simplification and record timing. */
-	static tref syntactic_term_simplification(measuring& m, tref term);
-	/** @brief Syntactic term simplification (handle) and record timing. */
-	static htref syntactic_term_simplification(measuring& m, htref term);
-
-	/** @brief Syntactic formula simplification and record timing. */
-	static optional_string syntactic_formula_simplification(measuring& m, const std::string& formula);
-	/** @brief Syntactic formula simplification and record timing. */
-	static tref syntactic_formula_simplification(measuring& m, tref formula);
-	/** @brief Syntactic formula simplification (handle) and record timing. */
-	static htref syntactic_formula_simplification(measuring& m, htref formula);
-
-	/** @brief Normalize term and record timing. */
-	static optional_string normalize_term(measuring& m, const std::string& term);
-	/** @brief Normalize term and record timing. */
-	static tref normalize_term(measuring& m, tref term);
-	/** @brief Normalize term (handle) and record timing. */
-	static htref normalize_term(measuring& m, htref term);
-
-	/** @brief Normalize formula and record timing. */
-	static optional_string normalize_formula(measuring& m, const std::string& fm);
-	/** @brief Normalize formula and record timing. */
-	static tref normalize_formula(measuring& m, tref fm);
-	/** @brief Normalize formula (handle) and record timing. */
-	static htref normalize_formula(measuring& m, htref fm);
-
-	/** @brief Anti-prenex and record timing. */
-	static optional_string anti_prenex(measuring& m, const std::string& fm);
-	/** @brief Anti-prenex and record timing. */
-	static tref anti_prenex(measuring& m, tref fm);
-	/** @brief Anti-prenex (handle) and record timing. */
-	static htref anti_prenex(measuring& m, htref fm);
-
-	/** @brief Eliminate quantifiers and record timing. */
-	static optional_string eliminate_quantifiers(measuring& m, const std::string& fm);
-	/** @brief Eliminate quantifiers and record timing. */
-	static tref eliminate_quantifiers(measuring& m, tref fm);
-	/** @brief Eliminate quantifiers (handle) and record timing. */
-	static htref eliminate_quantifiers(measuring& m, htref fm);
-
-	/** @brief Check realizability and record timing. */
-	static bool realizable(measuring& m, const std::string& spec);
-	/** @brief Check realizability and record timing. */
-	static bool realizable(measuring& m, tref spec);
-	/** @brief Check realizability (handle) and record timing. */
-	static bool realizable(measuring& m, htref spec);
-
-	/** @brief Check unrealizability and record timing. */
-	static bool unrealizable(measuring& m, const std::string& spec);
-	/** @brief Check unrealizability and record timing. */
-	static bool unrealizable(measuring& m, tref spec);
-	/** @brief Check unrealizability (handle) and record timing. */
-	static bool unrealizable(measuring& m, htref spec);
-
-	/** @brief Check satisfiability and record timing. */
-	static bool sat(measuring& m, const std::string& formula);
-	/** @brief Check satisfiability and record timing. */
-	static bool sat(measuring& m, tref formula);
-	/** @brief Check satisfiability (handle) and record timing. */
-	static bool sat(measuring& m, htref formula);
-
-	/** @brief Check unsatisfiability and record timing. */
-	static bool unsat(measuring& m, const std::string& formula);
-	/** @brief Check unsatisfiability and record timing. */
-	static bool unsat(measuring& m, tref formula);
-	/** @brief Check unsatisfiability (handle) and record timing. */
-	static bool unsat(measuring& m, htref formula);
-
-	/** @brief Check validity and record timing. */
-	static bool valid(measuring& m, const std::string& formula);
-	/** @brief Check validity and record timing. */
-	static bool valid(measuring& m, tref formula);
-	/** @brief Check validity (handle) and record timing. */
-	static bool valid(measuring& m, htref formula);
-
-	/** @brief Check specification validity and record timing. */
-	static bool valid_spec(measuring& m, const std::string& spec);
-	/** @brief Check specification validity and record timing. */
-	static bool valid_spec(measuring& m, tref spec);
-	/** @brief Check specification validity (handle) and record timing. */
-	static bool valid_spec(measuring& m, htref spec);
-
-	/** @brief Solve formula and record timing. */
-	static std::optional<std::map<std::string, std::string>> solve(
-		measuring& m, const std::string& formula, solver_mode mode = solver_mode::general);
-	/** @brief Solve formula and record timing. */
-	static std::optional<subtree_map<node, tref>> solve(
-		measuring& m, tref formula, solver_mode mode = solver_mode::general);
-	/** @brief Solve formula (handle) and record timing. */
-	static std::optional<std::map<htref, htref>> solve(
-		measuring& m, htref formula, solver_mode mode = solver_mode::general);
-
-	/** @brief Compute LGRS and record timing. */
-	static std::optional<std::map<std::string, std::string>> lgrs(
-		measuring& m, const std::string& equation);
-	/** @brief Compute LGRS (handle) and record timing. */
-	static std::optional<std::map<htref, htref>> lgrs(measuring& m, htref equation);
-	/** @brief Compute LGRS and record timing. */
-	static std::optional<subtree_map<node, tref>> lgrs(measuring& m, tref equation);
-
-	/** @brief Build interpreter and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(measuring& m, const std::string& spec);
-	/** @brief Build interpreter with options and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(
-		measuring& m, const std::string& spec, interpreter_options& options);
-	/** @brief Build interpreter from tree and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(measuring& m, tref spec);
-	/** @brief Build interpreter from tree with options and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(
-		measuring& m, tref spec, interpreter_options& options);
-	/** @brief Build interpreter from tau_spec and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(measuring& m, tau_spec<node>& spec);
-	/** @brief Build interpreter from tau_spec with options and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(
-		measuring& m, tau_spec<node>& spec, interpreter_options& options);
-
-	/** @brief Get required inputs for next step and record timing. */
-	static std::vector<stream_at> get_inputs_for_step(measuring& m, interpreter<node>& i);
-	/** @brief Advance interpreter one step with inputs and record timing. */
-	static std::optional<std::map<stream_at, std::string>> step(
-		measuring& m, interpreter<node>& i,
-		std::map<stream_at, std::string> inputs,
-		bool interactive = true);
-	/** @brief Advance interpreter one step and record timing. */
-	static std::optional<std::map<stream_at, std::string>> step(measuring& m, interpreter<node>& i);
-	/** @brief Drive the interpreter's full step loop and record timing.
-	 *  @return false if a step's output failed to write; true otherwise. */
-	static bool run(measuring& m, interpreter<node>& i, bool quit_on_idle = false);
-
-	/** @brief Infer types and record timing. */
-	static tref infer(measuring& m, tref expr, bool use_defaults = true);
-	/** @brief Simplify and record timing. */
-	static optional_string simplify(measuring& m, const std::string& expr, bool use_defaults = true);
-	/** @brief Simplify and record timing. */
-	static tref simplify(measuring& m, tref expr, bool use_defaults = true);
-	/** @brief Simplify (handle) and record timing. */
-	static htref simplify(measuring& m, htref expr, bool use_defaults = true);
+	static result<htref> simplify(htref expr, bool use_defaults = true);
 
 private:
 	/// Extract a normalized rr<node> from an expression tree.
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
-	static std::optional<rr<node>> get_nso_rr(tref expr);
+	static result<rr<node>> get_nso_rr(tref expr);
 };
 
 
@@ -1045,6 +745,5 @@ private:
 #include "api.tmpl.h"
 #include "api.tmpl.htref.h"
 #include "api.tmpl.string.h"
-#include "api.tmpl.measuring.h"
 
 #endif // __IDNI__TAU__API_H__

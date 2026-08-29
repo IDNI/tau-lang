@@ -29,48 +29,93 @@ std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::geth_term(const std::string& input, bool simplified) {
-	return tau::geth(get_term(input, simplified));
+result<htref> api<node>::geth_term(const std::string& input, bool simplified) {
+	result<htref> r;
+	auto inner = get_term(input, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_formula(const std::string& input, bool simplified) {
-	return tau::geth(get_formula(input, simplified));
+result<htref> api<node>::geth_formula(const std::string& input, bool simplified) {
+	result<htref> r;
+	auto inner = get_formula(input, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_function_def(const std::string& function_def, bool simplified) {
-	return tau::geth(get_function_def(function_def, simplified));
+result<htref> api<node>::geth_function_def(const std::string& function_def, bool simplified) {
+	result<htref> r;
+	auto inner = get_function_def(function_def, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_predicate_def(const std::string& predicate_def, bool simplified) {
-	return tau::geth(get_predicate_def(predicate_def, simplified));
+result<htref> api<node>::geth_predicate_def(const std::string& predicate_def, bool simplified) {
+	result<htref> r;
+	auto inner = get_predicate_def(predicate_def, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_stream_def(const std::string& stream_def) {
-	return tau::geth(get_stream_def(stream_def));
+result<htref> api<node>::geth_stream_def(const std::string& stream_def) {
+	result<htref> r;
+	auto inner = get_stream_def(stream_def);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_spec(const std::string& src) {
-	return tau::geth(get_spec(src));
+result<htref> api<node>::geth_spec(const std::string& src) {
+	result<htref> r;
+	auto inner = get_spec(src);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_definition(const std::string& definition, bool simplified) {
-	return tau::geth(get_definition(definition, simplified));
+result<htref> api<node>::geth_definition(const std::string& definition, bool simplified) {
+	result<htref> r;
+	auto inner = get_definition(definition, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_spec_or_term(const std::string& expr, bool simplified) {
-	return tau::geth(get_spec_or_term(expr, simplified));
+result<htref> api<node>::geth_spec_or_term(const std::string& expr, bool simplified) {
+	result<htref> r;
+	auto inner = get_spec_or_term(expr, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::geth_formula_or_term(const std::string& expr, bool simplified) {
-	return tau::geth(get_formula_or_term(expr, simplified));
+result<htref> api<node>::geth_formula_or_term(const std::string& expr, bool simplified) {
+	result<htref> r;
+	auto inner = get_formula_or_term(expr, simplified);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Querying
@@ -98,23 +143,50 @@ bool api<node>::is_formula(htref fm) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::apply_def(htref def, htref expression) {
-	if (!def || !expression) return nullptr;
-	return tau::geth(apply_def(def->get(), expression->get()));
+result<htref> api<node>::apply_def(htref def, htref expression) {
+	result<htref> r;
+	if (!def || !expression) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = apply_def(def->get(), expression->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::apply_defs(const std::set<htref>& defs, htref expression) {
-	if (!expression) return nullptr;
+result<htref> api<node>::apply_defs(const std::set<htref>& defs, htref expression) {
+	result<htref> r;
+	if (!expression) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	subtree_set<node> tdefs;
 	for (htref def : defs) if (def) tdefs.insert(def->get());
-	return tau::geth(apply_defs(tdefs, expression->get()));
+	auto inner = apply_defs(tdefs, expression->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::apply_all_defs(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(apply_all_defs(expr->get()));
+result<htref> api<node>::apply_all_defs(htref expr) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = apply_all_defs(expr->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 
@@ -138,153 +210,347 @@ std::string api<node>::to_str(htref expression) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::substitute(htref expr, htref that, htref with) {
-	if (!expr || !that || !with) return nullptr;
-	return tau::geth(substitute(expr->get(), that->get(), with->get()));
+result<htref> api<node>::substitute(htref expr, htref that, htref with) {
+	result<htref> r;
+	if (!expr || !that || !with) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = substitute(expr->get(), that->get(), with->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
-	if (!expr) return nullptr;
+result<htref> api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// Apply substitutions sequentially; each step unwraps htref to tref
 	tref e = expr->get();
 	for (auto [that, with] : that_with) {
 		if (!that || !with) continue;
-		e = substitute(e, that->get(), with->get());
+		auto sub = substitute(e, that->get(), with->get());
+		if (!sub.has_value()) {
+			r.merge(std::move(sub));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		e = sub.value();
 	}
-	return tau::geth(e);
+	r = tau::geth(e);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Normal forms
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::boole_normal_form(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(boole_normal_form(expr->get()));
+result<htref> api<node>::boole_normal_form(htref expr) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = boole_normal_form(expr->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::dnf(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(dnf(expr->get()));
+result<htref> api<node>::dnf(htref expr) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = dnf(expr->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::cnf(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(cnf(expr->get()));
+result<htref> api<node>::cnf(htref expr) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = cnf(expr->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::nnf(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(nnf(expr->get()));
+result<htref> api<node>::nnf(htref expr) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = nnf(expr->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Procedures
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::syntactic_term_simplification(htref term) {
-	if (!term) return nullptr;
-	return tau::geth(syntactic_term_simplification(term->get()));
+result<htref> api<node>::syntactic_term_simplification(htref term) {
+	result<htref> r;
+	if (!term) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = syntactic_term_simplification(term->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::syntactic_formula_simplification(htref fm) {
-	if (!fm) return nullptr;
-	return tau::geth(syntactic_formula_simplification(fm->get()));
-}
-template <NodeType node>
-htref api<node>::normalize_formula(htref fm) {
-	if (!fm) return nullptr;
-	return tau::geth(normalize_formula(fm->get()));
-}
-
-template <NodeType node>
-htref api<node>::normalize_term(htref term) {
-	if (!term) return nullptr;
-	return tau::geth(normalize_term(term->get()));
+result<htref> api<node>::syntactic_formula_simplification(htref fm) {
+	result<htref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = syntactic_formula_simplification(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::anti_prenex(htref fm) {
-	if (!fm) return nullptr;
-	return tau::geth(anti_prenex(fm->get()));
+result<htref> api<node>::normalize_formula(htref fm) {
+	result<htref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = normalize_formula(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::eliminate_quantifiers(htref fm) {
-	if (!fm) return nullptr;
+result<htref> api<node>::normalize_term(htref term) {
+	result<htref> r;
+	if (!term) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = normalize_term(term->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
+}
+
+template <NodeType node>
+result<htref> api<node>::anti_prenex(htref fm) {
+	result<htref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = anti_prenex(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
+}
+
+template <NodeType node>
+result<htref> api<node>::eliminate_quantifiers(htref fm) {
+	result<htref> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// Apply defs at the tref level before eliminating quantifiers
 	// (the tref overload also calls apply_all_defs internally)
-	if (tref a = apply_all_defs(fm->get()); a)
-		if (tref e = eliminate_quantifiers(a); e) return tau::geth(e);
-	return nullptr;
+	auto applied = apply_all_defs(fm->get());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto elim = eliminate_quantifiers(applied.value());
+	if (!elim.has_value()) r.merge(std::move(elim));
+	else                   r = tau::geth(elim.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::realizable(htref fm) {
-	if (!fm) return false;
-	return realizable(fm->get());
+result<bool> api<node>::realizable(htref fm) {
+	result<bool> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = realizable(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::unrealizable(htref fm) {
-	if (!fm) return false;
-	return unrealizable(fm->get());
+result<bool> api<node>::unrealizable(htref fm) {
+	result<bool> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = unrealizable(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::sat(htref fm) {
-	if (!fm) return false;
-	return sat(fm->get());
+result<bool> api<node>::sat(htref fm) {
+	result<bool> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = sat(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::unsat(htref fm) {
-	if (!fm) return false;
-	return unsat(fm->get());
+result<bool> api<node>::unsat(htref fm) {
+	result<bool> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = unsat(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::valid(htref fm) {
-	if (!fm) return false;
-	return valid(fm->get());
+result<bool> api<node>::valid(htref fm) {
+	result<bool> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = valid(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::valid_spec(htref fm) {
-	if (!fm) return false;
-	return valid_spec(fm->get());
+result<bool> api<node>::valid_spec(htref fm) {
+	result<bool> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = valid_spec(fm->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Solving
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::map<htref, htref>> api<node>::solve(htref fm,
+result<std::map<htref, htref>> api<node>::solve(htref fm,
 	solver_mode mode)
 {
-	if (!fm) return {};
-	if (auto solution = solve(fm->get(), mode); solution)
-		return geth(solution.value());
-	return {};
+	result<std::map<htref, htref>> r;
+	if (!fm) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = solve(fm->get(), mode);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = geth<node>(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::map<htref, htref>> api<node>::lgrs(htref equation) {
-	if (!equation) return {};
-	if (auto solution = lgrs(equation->get()); solution)
-		return geth(solution.value());
-	return {};
+result<std::map<htref, htref>> api<node>::lgrs(htref equation) {
+	result<std::map<htref, htref>> r;
+	if (!equation) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = lgrs(equation->get());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = geth<node>(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-htref api<node>::simplify(htref expr, bool use_defaults) {
-	if (!expr) return nullptr;
-	return tau::geth(simplify(expr->get(), use_defaults));
+result<htref> api<node>::simplify(htref expr, bool use_defaults) {
+	result<htref> r;
+	if (!expr) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = simplify(expr->get(), use_defaults);
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = tau::geth(inner.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 } // namespace idni::tau_lang

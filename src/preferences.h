@@ -63,7 +63,8 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		// machinery uniformly.
 		std::string pref_str = "G(" + entry.var_name + "[t] = "
 		                       + entry.preferred_value + ")";
-		tref pref_clause = api<node>::get_formula(pref_str);
+		auto pref_res = api<node>::get_formula(pref_str);
+		tref pref_clause = pref_res.has_value() ? pref_res.value() : nullptr;
 		if (pref_clause == nullptr) {
 			// Parse failed (typo in var name, value-type mismatch, etc.).
 			// Skip; do not corrupt the spec. (AP2-13: the header

@@ -10,39 +10,45 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+template <NodeType node>
+std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
+	std::map<std::string, std::string> sm;
+	for (auto [k, v] : m) sm[to_str<node>(k)] = to_str<node>(v);
+	return sm;
+}
+
 // ------------------------------------------------------------
 // String API — convenience wrappers that accept/return std::string
 // ------------------------------------------------------------
 // Each method parses its string arguments via the corresponding
 // get_* function, delegates to the tref overload, and serializes
-// the result back to a string (or returns nullopt on failure).
+// the result back to a string (or returns a structured error on failure).
 
 template <NodeType node>
 bool api<node>::is_term(const std::string& term) {
-	return get_term(term) != nullptr;
+	return get_term(term).has_value();
 }
 
 template <NodeType node>
 bool api<node>::is_formula(const std::string& formula) {
-	return get_formula(formula) != nullptr;
+	return get_formula(formula).has_value();
 }
 
 // Using definitions
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_def(
+result<std::string> api<node>::apply_def(
 	const std::string& def, const std::string& expr)
 {
 	return apply_defs(std::set<std::string>{ def }, expr);
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_defs(
+result<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
 {
-	// Parse each definition string, collecting them into a tref set;
-	// then parse the expression and apply the definitions.
+	result<std::string> r;
 	subtree_set<node> tdefs;
 	// A definition that fails to parse used to be inserted as nullptr and
 	// then silently skipped by the tref-level apply_defs' "if (def)"
@@ -50,38 +56,52 @@ std::optional<std::string> api<node>::apply_defs(
 	// dropped from a definition that legitimately had no effect. Report
 	// the failure instead of silently continuing without it.
 	for (const std::string& def : defs) {
-		tref d = get_definition(def);
-		if (!d) {
+		auto d = get_definition(def);
+		if (!d.has_value()) {
 			TAU_LOG_ERROR << "Failed to parse definition: " << def;
-			return {};
+			r.merge(std::move(d));
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
-		tdefs.insert(d);
+		tdefs.insert(d.value());
 	}
-	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a) {
-		// get_spec_or_term() parses a bare formula as a one-line spec
-		// (spec(main(wff(...)))); get_nso_rr()'s no-ref branch keeps
-		// that shape rather than unwrapping it the way its ref branch
-		// does (via tau_lang::get_nso_rr's main -> wff/bf navigation),
-		// so content round-trips through nso_rr_apply but the shape
-		// stays spec-wrapped. Only to_str() sees the difference: a
-		// spec-shaped tree renders with the trailing '.' every other
-		// string overload's result lacks. Unwrap here, at the point
-		// content becomes a string, so the tref-level overloads --
-		// which other callers (e.g. get_interpreter) rely on staying
-		// spec-shaped -- are untouched.
-		using tt = typename tau::traverser;
-		if (tau::get(a).is(tau::spec)) {
-			tref main = tt(a) | tau::main | tau::wff | tt::ref;
-			if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
-			if (main) a = main;
-		}
-		return to_str(a);
+	auto parsed = get_spec_or_term(expr);
+	if (!parsed.has_value()) {
+		r.merge(std::move(parsed));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return {};
+	auto applied = apply_defs(tdefs, parsed.value());
+	if (!applied.has_value()) {
+		r.merge(std::move(applied));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref a = applied.value();
+	// get_spec_or_term() parses a bare formula as a one-line spec
+	// (spec(main(wff(...)))); get_nso_rr()'s no-ref branch keeps
+	// that shape rather than unwrapping it the way its ref branch
+	// does (via tau_lang::get_nso_rr's main -> wff/bf navigation),
+	// so content round-trips through nso_rr_apply but the shape
+	// stays spec-wrapped. Only to_str() sees the difference: a
+	// spec-shaped tree renders with the trailing '.' every other
+	// string overload's result lacks. Unwrap here, at the point
+	// content becomes a string, so the tref-level overloads --
+	// which other callers (e.g. get_interpreter) rely on staying
+	// spec-shaped -- are untouched.
+	using tt = typename tau::traverser;
+	if (tau::get(a).is(tau::spec)) {
+		tref main = tt(a) | tau::main | tau::wff | tt::ref;
+		if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
+		if (main) a = main;
+	}
+	r = to_str(a);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_all_defs(const std::string& expr) {
+result<std::string> api<node>::apply_all_defs(const std::string& expr) {
 	return apply_defs(std::set<std::string>{}, expr);
 }
 
@@ -89,30 +109,74 @@ std::optional<std::string> api<node>::apply_all_defs(const std::string& expr) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::substitute(
+result<std::string> api<node>::substitute(
 	const std::string& expr,
 	const std::string& that,
 	const std::string& with)
 {
-	tref e = get_formula_or_term(expr); if (!e) return {};
-	tref t = get_formula_or_term(that); if (!t) return {};
-	tref w = get_formula_or_term(with); if (!w) return {};
-	if (tref s = substitute(e, t, w); s) return to_str(s);
-	return {};
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto t = get_formula_or_term(that);
+	if (!t.has_value()) {
+		r.merge(std::move(t));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto w = get_formula_or_term(with);
+	if (!w.has_value()) {
+		r.merge(std::move(w));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto s = substitute(e.value(), t.value(), w.value());
+	if (!s.has_value()) r.merge(std::move(s));
+	else                r = to_str(s.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::substitute(
+result<std::string> api<node>::substitute(
 	const std::string& expr,
 	const std::map<std::string, std::string>& that_with)
 {
-	tref e = get_formula_or_term(expr); if (!e) return {};
-	for (auto [that, with] : that_with) {
-		tref t = get_formula_or_term(that); if (!t) return {};
-		tref w = get_formula_or_term(with); if (!w) return {};
-		e = substitute(e, t, w); if (!e) return {};
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return to_str(e);
+	tref cur = e.value();
+	for (auto [that, with] : that_with) {
+		auto t = get_formula_or_term(that);
+		if (!t.has_value()) {
+			r.merge(std::move(t));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		auto w = get_formula_or_term(with);
+		if (!w.has_value()) {
+			r.merge(std::move(w));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		auto sub = substitute(cur, t.value(), w.value());
+		if (!sub.has_value()) {
+			r.merge(std::move(sub));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		cur = sub.value();
+	}
+	r = to_str(cur);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 
@@ -120,124 +184,276 @@ std::optional<std::string> api<node>::substitute(
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
+result<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
 	// AP1-17: delegate to the tref overload (it runs simplify first);
 	// the inlined copy skipped it and could diverge on canonization.
-	if (tref b = boole_normal_form(get_formula_or_term(expr)); b)
-		return to_str(b);
-	return {};
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto b = boole_normal_form(e.value());
+	if (!b.has_value()) r.merge(std::move(b));
+	else                r = to_str(b.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::dnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref d = dnf(e); d) return to_str(d);
-	return {};
+result<std::string> api<node>::dnf(const std::string& expr) {
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto d = dnf(e.value());
+	if (!d.has_value()) r.merge(std::move(d));
+	else                r = to_str(d.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::cnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref c = cnf(e); c) return to_str(c);
-	return {};
+result<std::string> api<node>::cnf(const std::string& expr) {
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto c = cnf(e.value());
+	if (!c.has_value()) r.merge(std::move(c));
+	else                r = to_str(c.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::nnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref n = nnf(e); n) return to_str(n);
-	return {};
+result<std::string> api<node>::nnf(const std::string& expr) {
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto n = nnf(e.value());
+	if (!n.has_value()) r.merge(std::move(n));
+	else                r = to_str(n.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Procedures
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::syntactic_term_simplification(
+result<std::string> api<node>::syntactic_term_simplification(
 	const std::string& term)
 {
-	if (tref e = get_term(term); e)
-		if (tref s = syntactic_term_simplification(e); s)
-			return to_str(s);
-	return {};
+	result<std::string> r;
+	auto e = get_term(term);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto s = syntactic_term_simplification(e.value());
+	if (!s.has_value()) r.merge(std::move(s));
+	else                r = to_str(s.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::syntactic_formula_simplification(
+result<std::string> api<node>::syntactic_formula_simplification(
 	const std::string& fm)
 {
-	if (tref e = get_formula(fm); e)
-		if (tref s = syntactic_formula_simplification(e); s)
-			return to_str(s);
-	return {};
+	result<std::string> r;
+	auto e = get_formula(fm);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto s = syntactic_formula_simplification(e.value());
+	if (!s.has_value()) r.merge(std::move(s));
+	else                r = to_str(s.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::normalize_term(const std::string& expr)
+result<std::string> api<node>::normalize_term(const std::string& expr)
 {
-	if (tref term = get_term(expr); term)
-		if (tref n = normalize_term(term); n) return to_str(n);
-	return {};
+	result<std::string> r;
+	auto term = get_term(expr);
+	if (!term.has_value()) {
+		r.merge(std::move(term));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto n = normalize_term(term.value());
+	if (!n.has_value()) r.merge(std::move(n));
+	else                r = to_str(n.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::normalize_formula(
+result<std::string> api<node>::normalize_formula(
 	const std::string& expr)
 {
-	if (tref fm = get_formula(expr); fm)
-		if (tref n = normalize_formula(fm); n) return to_str(n);
-	return {};
+	result<std::string> r;
+	auto fm = get_formula(expr);
+	if (!fm.has_value()) {
+		r.merge(std::move(fm));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto n = normalize_formula(fm.value());
+	if (!n.has_value()) r.merge(std::move(n));
+	else                r = to_str(n.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::anti_prenex(const std::string& expr) {
-	if (tref fm = get_formula(expr); fm)
-		if (tref a = anti_prenex(fm); a) return to_str(a);
-	return {};
+result<std::string> api<node>::anti_prenex(const std::string& expr) {
+	result<std::string> r;
+	auto fm = get_formula(expr);
+	if (!fm.has_value()) {
+		r.merge(std::move(fm));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto a = anti_prenex(fm.value());
+	if (!a.has_value()) r.merge(std::move(a));
+	else                r = to_str(a.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::eliminate_quantifiers(
+result<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
 	// AP1-17: delegate to the tref overload (see boole_normal_form).
-	if (tref e = get_formula(expr); e)
-		if (tref r = eliminate_quantifiers(e); r)
-			return to_str(r);
-	return {};
+	result<std::string> r;
+	auto e = get_formula(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto elim = eliminate_quantifiers(e.value());
+	if (!elim.has_value()) r.merge(std::move(elim));
+	else                   r = to_str(elim.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::realizable(const std::string& expr) {
-	return realizable(get_formula_or_term(expr));
+result<bool> api<node>::realizable(const std::string& expr) {
+	result<bool> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = realizable(e.value());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::unrealizable(const std::string& expr) {
-	return unrealizable(get_formula_or_term(expr));
+result<bool> api<node>::unrealizable(const std::string& expr) {
+	result<bool> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = unrealizable(e.value());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::sat(const std::string& expr) {
-	return sat(get_formula_or_term(expr));
+result<bool> api<node>::sat(const std::string& expr) {
+	result<bool> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = sat(e.value());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::unsat(const std::string& expr) {
+result<bool> api<node>::unsat(const std::string& expr) {
 	// Parsed as a bare formula, not a spec, so it is not wrapped and rejected.
-	// Unparseable input yields nullptr, so unsat returns false, not true.
-	return unsat(get_formula_or_term(expr));
+	result<bool> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = unsat(e.value());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::valid(const std::string& expr) {
-	return valid(get_formula_or_term(expr));
+result<bool> api<node>::valid(const std::string& expr) {
+	result<bool> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = valid(e.value());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::valid_spec(const std::string& expr) {
-	return valid_spec(get_formula_or_term(expr));
+result<bool> api<node>::valid_spec(const std::string& expr) {
+	result<bool> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto inner = valid_spec(e.value());
+	if (!inner.has_value()) r.merge(std::move(inner));
+	else                    r = inner.value();
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 
@@ -274,33 +490,49 @@ std::map<std::string, std::string> serialize_solution(
 }
 
 template <NodeType node>
-std::optional<std::map<std::string, std::string>> api<node>::solve(
+result<std::map<std::string, std::string>> api<node>::solve(
 	const std::string& formula,
 	solver_mode mode)
 {
-	tref fm = get_formula(formula);
-	if (auto solution = solve(fm, mode); solution)
-		return serialize_solution<node>(solution.value(),
-			find_ba_type_or_default<node>(fm));
-	return {};
+	result<std::map<std::string, std::string>> r;
+	auto fm = get_formula(formula);
+	if (!fm.has_value()) {
+		r.merge(std::move(fm));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto solution = solve(fm.value(), mode);
+	if (!solution.has_value()) r.merge(std::move(solution));
+	else r = serialize_solution<node>(solution.value(),
+		find_ba_type_or_default<node>(fm.value()));
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::map<std::string, std::string>> api<node>::lgrs(
+result<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	tref eq = get_formula(equation);
-	if (auto solution = lgrs(eq); solution)
-		return serialize_solution<node>(solution.value(),
-			find_ba_type_or_default<node>(eq));
-	return {};
+	result<std::map<std::string, std::string>> r;
+	auto eq = get_formula(equation);
+	if (!eq.has_value()) {
+		r.merge(std::move(eq));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto solution = lgrs(eq.value());
+	if (!solution.has_value()) r.merge(std::move(solution));
+	else r = serialize_solution<node>(solution.value(),
+		find_ba_type_or_default<node>(eq.value()));
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // Execution
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification)
 {
 	interpreter_options options;
@@ -308,19 +540,27 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 }
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification,
 	interpreter_options& options)
 {
+	result<interpreter<node>> r;
 	DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
 	// Parse the specification string into a tau_spec, logging any
 	// parse errors, then delegate to the tau_spec overload.
 	tau_spec<node> spec;
 	if (!spec.parse(specification)) {
-		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
-		return {};
+		for (const auto& error : spec.errors()) {
+			TAU_LOG_ERROR << error;
+			r.error(code::parse_error, error);
+		}
+		if (!r.has_error()) r.error(code::parse_error, "Failed to parse spec");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	return get_interpreter(spec, options);
+	r = get_interpreter(spec, options);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
@@ -338,15 +578,20 @@ std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 }
 
 template <NodeType node>
-std::optional<std::map<stream_at, std::string>> api<node>::step(
+result<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i, std::map<stream_at, std::string> inputs,
 	bool interactive)
 {
+	result<std::map<stream_at, std::string>> r;
 	DBG(using tau = tree<node>;)
 
 	auto& ctx = i.ctx;
 
-	if (!i.calculate_initial_spec()) return {};
+	if (!i.calculate_initial_spec()) {
+		r.error(code::internal_error, "Failed to calculate initial spec");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 
 	// Build inputs for the step
 	DBG(TAU_LOG_TRACE << "number of inputs: " << inputs.size();)
@@ -363,7 +608,10 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (it == ctx.inputs.end()) {
 			TAU_LOG_ERROR << "Input stream " << in.name
 						<< " not found in context";
-			return {};
+			r.error(code::invalid_input_stream,
+				"Input stream not found in context");
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 		DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
 		step_inputs.emplace_back(
@@ -373,7 +621,6 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)
 	}
 	DBG(TAU_LOG_TRACE << "Step inputs: " << step_inputs.size();)
-	// step_inputs = i.appear_within_lookback(step_inputs);
 	assignment<node> values;
 
 	// parse input values
@@ -388,13 +635,18 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (!cnst) {
 			TAU_LOG_ERROR << "Failed to parse input value "
 								<< input_value;
-			return {};
+			r.error(code::parse_error, "Failed to parse input value");
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 		tref c = build_bf_ba_constant<node>(cnst.value().first, type_id);
 		if (has_open_tau_fm_in_constant<node>(c)) {
 			TAU_LOG_ERROR <<"Constant contains an open tau formula: "
 								<< input_value;
-			return {};
+			r.error(code::invalid_argument,
+				"Constant contains an open tau formula");
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 		values[step_input] = c;
 		DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
@@ -406,13 +658,17 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	if (!output.has_value()) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
-		return {};
+		r.error(code::invalid_state, "No input provided");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	// Write output values so they are recorded for subsequent steps
 	if (!i.write(output.value())) {
 		TAU_LOG_ERROR << "Failed to write outputs";
-		return {};
+		r.error(code::io_error, "Failed to write outputs");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	// Build outputs for the step
@@ -425,7 +681,10 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
 			TAU_LOG_ERROR << "No Boolean algebra element assigned "
 				"to output '" << TAU_TO_STR(out) << "'";
-			return {};
+			r.error(code::invalid_output_stream,
+				"No Boolean algebra element assigned to output");
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
@@ -437,34 +696,47 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 
 	if (interactive && !auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
-		return {};
+		r.error(code::invalid_state, "Auto continue is false");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
-	return outputs;
+	r = std::move(outputs);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::map<stream_at, std::string>> api<node>::step(
+result<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i)
 {
 	// tau is only consulted by DBG tracing since AP1-12 switched the
 	// output serialization to serialize_constant.
 	using tau [[maybe_unused]] = tree<node>;
 
-	if (!i.calculate_initial_spec()) return {};
+	result<std::map<stream_at, std::string>> r;
+	if (!i.calculate_initial_spec()) {
+		r.error(code::internal_error, "Failed to calculate initial spec");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 
 	// Step the interpreter
 	auto [output, auto_continue] = i.step();
 	if (!output.has_value()) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
-		return {};
+		r.error(code::invalid_state, "No input provided");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	// Write output values
 	if (!i.write(output.value())) {
 		TAU_LOG_ERROR << "Failed to write outputs";
-		return {};
+		r.error(code::io_error, "Failed to write outputs");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	// Build outputs for the step. AP1-12: serialize via
@@ -481,7 +753,10 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
 			TAU_LOG_ERROR << "No Boolean algebra element assigned "
 				"to output '" << TAU_TO_STR(out) << "'";
-			return {};
+			r.error(code::invalid_output_stream,
+				"No Boolean algebra element assigned to output");
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
@@ -493,24 +768,41 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
-		return {};
+		r.error(code::invalid_state, "Auto continue is false");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
-	return outputs;
+	r = std::move(outputs);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-bool api<node>::run(interpreter<node>& i, bool quit_on_idle) {
-	return i.run_loop(0, quit_on_idle);
+result<bool> api<node>::run(interpreter<node>& i, bool quit_on_idle) {
+	result<bool> r;
+	if (i.run_loop(0, quit_on_idle)) r = true;
+	else r.error(code::io_error, "Failed to write a step's output");
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::simplify(const std::string& expr,
+result<std::string> api<node>::simplify(const std::string& expr,
 	bool use_defaults)
 {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref s = simplify(e, use_defaults); s) return to_str(s);
-	return {};
+	result<std::string> r;
+	auto e = get_formula_or_term(expr);
+	if (!e.has_value()) {
+		r.merge(std::move(e));
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	auto s = simplify(e.value(), use_defaults);
+	if (!s.has_value()) r.merge(std::move(s));
+	else                r = to_str(s.value());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 } // namespace idni::tau_lang

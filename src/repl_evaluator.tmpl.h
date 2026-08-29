@@ -196,8 +196,8 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
 	if (!n) return n;
-	tref inferred = tau_api::infer(n);
-	return inferred ? inferred : n;
+	auto inferred = tau_api::infer(n);
+	return inferred.has_value() ? inferred.value() : n;
 }
 
 template <typename... BAs>
@@ -267,19 +267,22 @@ std::optional<std::pair<size_t, tref>>
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m) const {
-	if (opt.print_benchmarks) return m(std::cerr);
-	return std::cerr;
+template <typename T>
+void repl_evaluator<BAs...>::print_benchmarks(const result<T>& res) const {
+	if (opt.print_benchmarks) print_benchmarks(res.report());
 }
 
+// Benchmarks stay plain text: the parser's global TC colorizes
+// report::print() output unconditionally, ignoring this session's own
+// color setting, which would corrupt a piped or logged benchmark stream.
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m,
-	idni::measures::timer& t) const
-{
-	m.ms = t.stop();
-	if (opt.print_benchmarks) return m(std::cerr);
-	return std::cerr;
+void repl_evaluator<BAs...>::print_benchmarks(const report& rep) const {
+	if (!opt.print_benchmarks) return;
+	bool was_enabled = idni::TC.enabled;
+	idni::TC.disable();
+	rep.print(std::cerr);
+	idni::TC.set(was_enabled);
 }
 
 template <typename... BAs>
@@ -290,75 +293,90 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	// formula/history argument), n[2] is the formula.
 	tref var = n[1].get();
 	tref arg = n[2].get();
-	measuring m("onf");
-	idni::measures::timer t;
-	t.start();
+	report rep;
+	auto root = rep.open_if(opt.print_benchmarks, "onf");
 	tref r = nullptr;
-	if (auto value = get_any(arg); value)
-		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
-			r = onf<node>(applied, var);
-	return benchmarks(m, t), r;
+	if (auto value = get_any(arg); value) {
+		auto applied = tau_api::apply_all_defs(value);
+		if (!applied.has_value()) {
+			applied.print(std::cerr);
+			rep.append(std::move(applied).report());
+			print_benchmarks(rep);
+			return r;
+		}
+		tref a = applied.value();
+		rep.append(std::move(applied).report());
+		r = onf<node>(a, var);
+	}
+	print_benchmarks(rep);
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
-		r = tau_api::dnf(m, value);
-	return benchmarks(m), r;
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::dnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value();
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
-		r = tau_api::cnf(m, value);
-	return benchmarks(m), r;
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::cnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value();
+	}
+	return r;
 }
 
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
-		r = tau_api::nnf(m, value);
-	return benchmarks(m), r;
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::nnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value();
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::anf_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value) {
 		constexpr size_t bf_type = 0;
 		r = anf<node, bf_type>(value);
 	}
-	return benchmarks(m), r;
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value)
 		r = pnf<node>(value);
-	return benchmarks(m), r;
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
-	measuring m("mnf");
-	idni::measures::timer t;
-	t.start();
+	report rep;
+	auto root = rep.open_if(opt.print_benchmarks, "mnf");
  	tref r = nullptr;
 	tref arg = n[1].get();
 	auto wff_mnf = [](tref applied) {
@@ -366,14 +384,24 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 			reduce<node>(to_dnf<node>(
 				bf_reduce_canonical<node>()(applied))));
 	};
-	if (auto value = get_any(arg); value)
-		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
-			switch (tau::get(applied).get_type()) {
-			case tau::wff: r = wff_mnf(applied); break;
-			case tau::bf:  r = bf_reduced_dnf<node>(applied); break;
-			default: return invalid_argument();
-			}
-	return benchmarks(m, t), r;
+	if (auto value = get_any(arg); value) {
+		auto applied = tau_api::apply_all_defs(value);
+		if (!applied.has_value()) {
+			applied.print(std::cerr);
+			rep.append(std::move(applied).report());
+			print_benchmarks(rep);
+			return r;
+		}
+		tref a = applied.value();
+		rep.append(std::move(applied).report());
+		switch (tau::get(a).get_type()) {
+		case tau::wff: r = wff_mnf(a); break;
+		case tau::bf:  r = bf_reduced_dnf<node>(a); break;
+		default: return invalid_argument();
+		}
+	}
+	print_benchmarks(rep);
+	return r;
 }
 
 template <typename... BAs>
@@ -387,7 +415,6 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// TAU_LOG_TRACE << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
 	// TAU_LOG_TRACE << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
 
-	measuring m;
 	// Since the history command cannot be type-checked we do it here
 	// First try to get bf
 	tref in = get_bf(arg1, true);
@@ -402,8 +429,10 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		// DBG(TAU_LOG_TRACE << "bf in:   " << TAU_LOG_FM_DUMP(in);)
 		// DBG(TAU_LOG_TRACE << "thiz:    " << TAU_LOG_FM_DUMP(thiz);)
 		// DBG(TAU_LOG_TRACE << "with:    " << TAU_LOG_FM_DUMP(with);)
-		tref r = tau_api::substitute(m, in, thiz, with);
-		return benchmarks(m), r;
+		auto res = tau_api::substitute(in, thiz, with);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		return res.value();
 	}
 	// First argument was not a bf so it must be a wff
 	in = get_wff(arg1);
@@ -424,8 +453,10 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// DBG(TAU_LOG_TRACE << "wff in: " << TAU_LOG_FM_DUMP(in);)
 	// DBG(TAU_LOG_TRACE << "thiz:   " << TAU_LOG_FM_DUMP(thiz);)
 	// DBG(TAU_LOG_TRACE << "with:   " << TAU_LOG_FM_DUMP(with);)
-	tref r = tau_api::substitute(m, in, thiz, with);
-	return benchmarks(m), r;
+	auto res = tau_api::substitute(in, thiz, with);
+	print_benchmarks(res);
+	if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+	return res.value();
 }
 
 template <typename... BAs>
@@ -450,25 +481,40 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
 	if (reject_ctl_star_if_disabled(value)) return nullptr;
-	measuring m;
-	tref r;
+	tref r = nullptr;
 	switch (type) {
-		case tau::wff: r = tau_api::normalize_formula(m, value); break;
-		case tau::bf:  r = tau_api::normalize_term(m, value); break;
-		default: return nullptr;
+	case tau::wff: {
+		auto res = tau_api::normalize_formula(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value();
+		break;
 	}
-	return benchmarks(m), r;
+	case tau::bf: {
+		auto res = tau_api::normalize_term(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value();
+		break;
+	}
+	default: return nullptr;
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
 	if (auto value = get_any(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
-		r = tau_api::eliminate_quantifiers(m, value);
-	return benchmarks(m), r;
+	{
+		auto res = tau_api::eliminate_quantifiers(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value();
+	}
+	return r;
 }
 
 template <typename... BAs>
@@ -503,7 +549,6 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
-	measuring m("run");
 
 	// run [N steps] [<fm>]: new or continued session, bounded or natural.
 	auto num_t = n | tau::num;
@@ -535,14 +580,13 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 			spec.add(d->get());
 		}
 
-		auto maybe_i = tau_api::get_interpreter(m.part(), spec);
-		if (!maybe_i) return;
+		auto gi = tau_api::get_interpreter(spec);
+		if (!gi.has_value()) { gi.print(std::cerr); return; }
 
 		// A new formula replaces any stored session.
-		running = std::make_unique<run_session>(std::move(maybe_i.value()));
+		running = std::make_unique<run_session>(std::move(gi).value());
 		running->steps_done   = 0;
 		running->steps_to_run = steps; // 0 = natural
-		running->t.start();
 		continue_running();
 		return;
 	}
@@ -555,7 +599,6 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	}
 		// `run N steps` runs N more steps; bare `run` continues naturally.
 	running->steps_to_run = bounded ? running->steps_done + steps : 0;
-	running->t.start();
 	continue_running();
 }
 
@@ -571,17 +614,16 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	DBG(TAU_LOG_TRACE << "ltl_cmd: " << TAU_LOG_FM(n.value());)
-	measuring m("ltl");
-	idni::measures::timer t;
 
 	tref value = get_any(n[1].get());
 	if (!value) return;
 	// IN-N5: `ltl` was the one formula command with no fragment gate.
 	if (reject_ctl_star_if_disabled(value)) return;
 
-	t.start();
 	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
 
+	idni::measures::timer t;
+	t.start();
 	// IN-R4: the synthesis backend reports "no verdict" by throwing;
 	// nothing above this frame catches it, so a slow or missing ltlsynt
 	// (or a refused CTL* placement) used to terminate the REPL.
@@ -593,7 +635,8 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 			<< "); realizability could not be decided";
 		error = true;
 	}
-	benchmarks(m, t);
+	if (opt.print_benchmarks)
+		std::cerr << "ltl: " << t.stop() << " ms\n";
 }
 
 // Drives a `run` session's step loop, suspending via `pending` (instead of
@@ -608,47 +651,44 @@ void repl_evaluator<BAs...>::continue_running(
 		// At budget: stop cleanly but KEEP the session for a later `run`.
 		if (running->steps_to_run != 0
 			&& running->steps_done >= running->steps_to_run) {
-			running->t.pause();
 			return;
 		}
-		auto& step_m = running->m.part();
-		// time_point advances iff a step produced output; api::step returns
-		// nullopt both when it needs input and when auto_continue is false.
+		// time_point advances iff a step produced output; api::step reports
+		// an error both when it needs input and when auto_continue is false.
 		const size_t tp_before = running->interp.time_point;
 		// IN-R4: a mid-run pointwise-revision update can reach ltlsynt
 		// (through update() -> pointwise_revision), whose failures are
 		// thrown; end the session with a diagnostic instead of the
 		// process.
-		decltype(tau_api::step(step_m, running->interp)) maybe_outputs;
+		result<std::map<stream_at, std::string>> st;
 		try {
-			maybe_outputs = tau_api::step(step_m, running->interp);
+			st = tau_api::step(running->interp);
 		} catch (const ltl_synthesis_error& e) {
 			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, "
 				"timed out or refused the formula during this step ("
 				<< e.what() << "); ending the run";
-			running->m.parts.pop_back();
 			running.reset();
 			error = true;
 			return;
 		}
-		// copy this step's timing before dropping the node (step_m is a
-		// reference into m.parts that pop_back() invalidates)
-		measuring step_m_copy = step_m;
-		running->m.parts.pop_back();
 
-		if (!maybe_outputs) {
+		if (!st.has_value()) {
 			const bool produced =
 				running->interp.time_point != tp_before;
 			// Input-independent step: output already written.
 			// "continue?" prompt, mirroring C++ run(fm, ctx, N).
 			if (produced && running->steps_to_run != 0) {
 				++running->steps_done;
-				if (opt.print_benchmarks) step_m_copy(std::cout, 1);
+				if (opt.print_benchmarks) {
+					bool was_enabled = idni::TC.enabled;
+					idni::TC.disable();
+					st.report().print(std::cout);
+					idni::TC.set(was_enabled);
+				}
 				std::cout << "\n";
 				first = false;
 				continue;
 			}
-			running->t.pause();
 			// a console input stream stopped the step needing a value:
 			// find it and prompt for that value (label/type are ours)
 			for (auto& [var, stream] : running->interp.inputs) {
@@ -681,7 +721,12 @@ void repl_evaluator<BAs...>::continue_running(
 		// cout, so it stays in order and belongs to the step it measures,
 		// before the next "Execution step"), then a blank line
 		++running->steps_done;
-		if (opt.print_benchmarks) step_m_copy(std::cout, 1);
+		if (opt.print_benchmarks) {
+			bool was_enabled = idni::TC.enabled;
+			idni::TC.disable();
+			st.report().print(std::cout);
+			idni::TC.set(was_enabled);
+		}
 		std::cout << "\n";
 		first = false;
 	}
@@ -690,7 +735,10 @@ void repl_evaluator<BAs...>::continue_running(
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::finish_running() {
-	if (running) benchmarks(running->m, running->t);
+	if (running) {
+		running->g.close();
+		print_benchmarks(running->rep);
+	}
 	running.reset();
 	pending.reset();
 }
@@ -825,14 +873,19 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	tref value = get_any(arg);
 	if (!value) return;
-	measuring m;
-	auto solution = tau_api::solve(m, value,
-		get_solver_cmd_mode<node>(n.value()));
-	benchmarks(m);
-	if (!solution) { std::cout << "no solution\n"; return; }
+	auto res = tau_api::solve(value, get_solver_cmd_mode<node>(n.value()));
+	print_benchmarks(res);
+	if (!res.has_value()) {
+		if (report_has_code(res.report(), code::unsat))
+			std::cout << "no solution\n";
+		else
+			res.print(std::cerr);
+		return;
+	}
 
 	// the printer needs the BA type of the solution, not the grammar
 	// nonterminal of the argument that get_type_and_arg also returns
+	std::optional<solution<node>> solution = std::move(res).value();
 	print_solver_cmd_solution<node>(solution,
 		find_ba_type_or_default<node>(value));
 }
@@ -845,13 +898,19 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	tref value = get_any(arg);
 	if (!value) return;
-	measuring m;
-	auto solution = tau_api::lgrs(m, value);
-	benchmarks(m);
-	if (!solution) { std::cout << "no solution\n"; return; }
+	auto res = tau_api::lgrs(value);
+	print_benchmarks(res);
+	if (!res.has_value()) {
+		if (report_has_code(res.report(), code::unsat))
+			std::cout << "no solution\n";
+		else
+			res.print(std::cerr);
+		return;
+	}
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
 	// same as solve_cmd: the printer takes a BA type id, not the grammar
 	// nonterminal that get_type_and_arg also returns
+	std::optional<solution<node>> solution = std::move(res).value();
 	print_solver_cmd_solution<node>(solution,
 		find_ba_type_or_default<node>(value));
 }
@@ -859,54 +918,72 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
 	if (tref value = get_any(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
-		r = tau_api::valid(m, value) ? tau::_T() : tau::_F();
-	return benchmarks(m), r;
+	{
+		auto res = tau_api::valid(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value() ? tau::_T() : tau::_F();
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
 	if (tref value = get_any(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
-		r = tau_api::sat(m, value) ? tau::_T() : tau::_F();
-	return benchmarks(m), r;
+	{
+		auto res = tau_api::sat(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value() ? tau::_T() : tau::_F();
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
 	if (tref value = get_any(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
-		r = tau_api::unsat(m, value) ? tau::_T() : tau::_F();
-	return benchmarks(m), r;
+	{
+		auto res = tau_api::unsat(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value() ? tau::_T() : tau::_F();
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
-		r = tau_api::realizable(m, value) ? tau::_T() : tau::_F();
-	return benchmarks(m), r;
+	if (tref value = get_any(n[1].get()); value) {
+		auto res = tau_api::realizable(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value() ? tau::_T() : tau::_F();
+	}
+	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
-	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
-		r = tau_api::unrealizable(m, value) ? tau::_T() : tau::_F();
-	return benchmarks(m), r;
+	if (tref value = get_any(n[1].get()); value) {
+		auto res = tau_api::unrealizable(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		r = res.value() ? tau::_T() : tau::_F();
+	}
+	return r;
 }
 
 template <typename... BAs>
@@ -1799,7 +1876,6 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		run_abort_ = false;
 		if (stop) finish_running();
 		else {
-			running->t.unpause();
 			if (req.kind == pending_request::stream_value)
 				continue_running(req);
 			else continue_running();

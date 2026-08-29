@@ -17,9 +17,9 @@ using namespace idni::tau_lang;
 namespace {
 
 std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	tref fm = api<node_t>::get_formula(spec);
-	if (!fm) return std::nullopt;
-	return solve_ltl_aba<node_t>(fm);
+	auto fm = api<node_t>::get_formula(spec);
+	if (!fm.has_value()) return std::nullopt;
+	return solve_ltl_aba<node_t>(fm.value());
 }
 
 bool has(const std::string& s, const std::string& pat) {
