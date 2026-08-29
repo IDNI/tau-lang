@@ -781,13 +781,17 @@ TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE") {
 	TEST_CASE("[CTLS-SEM-04] -T is UNREALIZABLE (folded to F)") {
 		tref fm = create_spec("-T.");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK_FALSE(sat.value());
 	}
 
 	TEST_CASE("[CTLS-SEM-05] -F is REALIZABLE (folded to T)") {
 		tref fm = create_spec("-F.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 
 } // TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE")
@@ -805,19 +809,25 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 	TEST_CASE("[CTLS-AE-01] E(always o1=1) is REALIZABLE") {
 		tref fm = create_spec("E (always o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 
 	TEST_CASE("[CTLS-AE-02] A(always o1=1) is REALIZABLE") {
 		tref fm = create_spec("A (always o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 
 	TEST_CASE("[CTLS-AE-03] E(F o1=1) is REALIZABLE") {
 		tref fm = create_spec("E (F o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 
 	// LA-N2: A now constrains χ. An input can never be forced, so
@@ -826,29 +836,39 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 	TEST_CASE("[CTLS-AE-05] A(F i1=1) is UNREALIZABLE") {
 		tref fm = create_spec("A (F i1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK_FALSE(sat.value());
 	}
 
 	TEST_CASE("[CTLS-AE-06] A(always i1=1) is UNREALIZABLE") {
 		tref fm = create_spec("A (always i1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK_FALSE(sat.value());
 	}
 
 	TEST_CASE("[CTLS-AE-07] A(F o1=1) is REALIZABLE") {
 		tref fm = create_spec("A (F o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 
 	// A under G is still a universal context: G(A φ) ≡ G φ over a tree.
 	TEST_CASE("[CTLS-AE-08] always(A(o1=1)) is REALIZABLE, always(A(i1=1)) is not") {
 		tref fm = create_spec("always (A (o1[t] = 1)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 		tref fm2 = create_spec("always (A (i1[t] = 1)).");
 		REQUIRE(fm2 != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm2));
+		auto sat2 = is_tau_formula_sat<node_t>(fm2);
+		REQUIRE(sat2.has_value());
+		CHECK_FALSE(sat2.value());
 	}
 
 	// Placements with no sound encoding are refused, never answered.
@@ -883,7 +903,9 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 		tref fm = create_spec(
 		    "(E (always o1[t] = 1)) && ((G (o1[t] = 1)) && (G (o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat.has_value());
+		CHECK_FALSE(sat.value());
 	}
 
 } // TEST_SUITE("CTL* semantics - A / E realizability verdicts")

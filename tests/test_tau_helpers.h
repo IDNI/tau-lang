@@ -14,7 +14,8 @@ namespace idni::tau_lang {
 inline tref normalize_test_tau(const char* sample) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return nullptr;
-	return normalizer<node_t>(nso_rr.value());
+	auto r = normalizer<node_t>(nso_rr.value());
+	return r.has_value() ? r.value() : nullptr;
 }
 
 inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
@@ -23,7 +24,10 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return std::make_pair(nullptr, nullptr);
 	tref fm = nso_rr.value().main->get();
-	if (do_normalize) fm = normalizer<node_t>(fm);
+	if (do_normalize) {
+		auto r = normalizer<node_t>(fm);
+		fm = r.has_value() ? r.value() : nullptr;
+	}
 	tref s = tau_splitter<bas_pack>(fm, st);
 	return std::make_pair(fm, s);
 }

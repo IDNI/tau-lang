@@ -390,8 +390,8 @@ TEST_SUITE("Tau_splitter_temporal (SO-15)") {
 			splitter_type::upper);
 		REQUIRE( fm != nullptr );
 		REQUIRE( s != nullptr );
-		CHECK( is_tau_formula_sat<node_t>(s) );
-		CHECK( !are_tau_equivalent<node_t>(s, fm) );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
 	}
 
 	TEST_CASE("always && sometimes clause yields a temporal splitter") {
@@ -401,7 +401,7 @@ TEST_SUITE("Tau_splitter_temporal (SO-15)") {
 			splitter_type::upper);
 		REQUIRE( fm != nullptr );
 		REQUIRE( s != nullptr );
-		CHECK( is_tau_formula_sat<node_t>(s) );
-		CHECK( !are_tau_equivalent<node_t>(s, fm) );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
 	}
 }

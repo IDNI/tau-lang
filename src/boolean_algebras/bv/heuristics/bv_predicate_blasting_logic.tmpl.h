@@ -146,7 +146,8 @@ tref bit(tref operand, int_t bit) {
 	auto rules = bit_rules<node>(bitwidth);
 	auto call = make_bit_call_from_index<node>(operand, bit);
 	auto rr = make_rr<node>(rules, call);
-	return nso_rr_apply(rr);
+	auto applied = nso_rr_apply(rr);
+	return applied.has_value() ? applied.value() : nullptr;
 }
 
 //
@@ -232,7 +233,8 @@ tref bvshl_by_one(tref base, tref shifted) {
 	auto rule = bvshl_by_one_rule<node>(bitwidth);
 	auto call = make_bvshl_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return nso_rr_apply(rr);
+	auto applied = nso_rr_apply(rr);
+	return applied.has_value() ? applied.value() : nullptr;
 }
 
 /**
@@ -307,7 +309,8 @@ tref bvshr_by_one(tref base, tref shifted) {
 	auto rule = bvshr_by_one_rule<node>(bitwidth);
 	auto call = make_bvshr_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return nso_rr_apply(rr);
+	auto applied = nso_rr_apply(rr);
+	return applied.has_value() ? applied.value() : nullptr;
 }
 
 //
@@ -631,7 +634,8 @@ tref bvshl(tref base, tref count, tref shifted) {
 	auto rule = bvshl_rule<node>(count);
 	auto call = make_bvshl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return nso_rr_apply(rr);
+	auto applied = nso_rr_apply(rr);
+	return applied.has_value() ? applied.value() : nullptr;
 }
 
 /**
@@ -733,7 +737,8 @@ tref bvshr(tref base, tref count, tref shifted) {
 	auto rule = bvshr_rule<node>(count);
 	auto call = make_bvshr_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return nso_rr_apply(rr);
+	auto applied = nso_rr_apply(rr);
+	return applied.has_value() ? applied.value() : nullptr;
 }
 
 //
@@ -836,7 +841,8 @@ tref bvcast(tref src, tref result) {
 	auto rule = bvcast_rule<node>(src_width, target_width);
 	auto call = make_bvcast_call<node>(src, result);
 	auto rr = make_rr<node>({ rule }, call);
-	return nso_rr_apply(rr);
+	auto applied = nso_rr_apply(rr);
+	return applied.has_value() ? applied.value() : nullptr;
 }
 
 } // namespace idni::tau_lang

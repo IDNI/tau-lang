@@ -6,7 +6,9 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	using tau = tree<node>;
 	DBG(TAU_LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
 	tref substitution = rewriter::replace<node>(eq, sol);
-	tref check = normalizer<node>(substitution);
+	auto normalized = normalizer<node>(substitution);
+	if (!normalized.has_value()) return false;
+	tref check = normalized.value();
 #ifdef DEBUG
 	std::cout << "check_solution/equation: " << TAU_DUMP_TO_STR(eq) << "\n";
 	std::cout << "check_solution/substitution: " << TAU_DUMP_TO_STR(substitution) << "\n";
@@ -16,7 +18,8 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	// equals_T() alone can't see past them, so existentially close what's
 	// left before deciding, exactly as is_non_temp_nso_satisfiable does.
 	if (tau::get(check).equals_T()) return true;
-	return is_non_temp_nso_satisfiable<node>(check);
+	auto sat = is_non_temp_nso_satisfiable<node>(check);
+	return sat.has_value() && sat.value();
 }
 
 inline bool test_find_solution(const char* src) {
@@ -90,9 +93,9 @@ inline bool test_solve_system(
 
 inline bool test_solve(const std::string& system, const solver_options& options) {
 	tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
-	bool solve_error = false;
-	auto solution = solve<node_t>(form, options, solve_error);
-	return solution ? check_solution<node_t>(form, solution.value()) : false;
+	auto solution = solve<node_t>(form, options);
+	return solution.has_value()
+		? check_solution<node_t>(form, solution.value()) : false;
 }
 
 inline bool test_solve(const std::string& system, tref type) {

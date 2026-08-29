@@ -3,14 +3,34 @@
 #include "nso_rr.h"
 #include "execution.h"
 
-#ifdef TAU_MEASURE
-#include "utility/measure.h"
-#endif // TAU_MEASURE
-
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "nso_rr"
 
 namespace idni::tau_lang {
+
+template <NodeType node>
+std::unordered_map<std::string, size_t>& rule_apply_counts() {
+	static std::unordered_map<std::string, size_t> m;
+	return m;
+}
+
+template <NodeType node>
+std::unordered_map<std::string, size_t>& rule_hit_counts() {
+	static std::unordered_map<std::string, size_t> m;
+	return m;
+}
+
+template <NodeType node>
+void flush_rule_counts(report& rep) {
+	auto& applies = rule_apply_counts<node>();
+	auto& hits = rule_hit_counts<node>();
+	for (auto& [name, count] : applies)
+		rep.count(name + " applications", count);
+	for (auto& [name, count] : hits)
+		rep.count(name + " hits", count);
+	applies.clear();
+	hits.clear();
+}
 
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
@@ -24,13 +44,14 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
-#ifdef TAU_MEASURE
-	measures::increase_rule_counter<htref>(r);
-#endif // TAU_MEASURE
-
 	try {
 		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
 							r, n, is_capture);
+		if (rule_counting) {
+			auto name = to_str<node>(r);
+			++rule_apply_counts<node>()[name];
+			if (n != nn) ++rule_hit_counts<node>()[name];
+		}
 #ifdef DEBUG
 	LOG_TRACE << "--------------------------------";
 	LOG_TRACE << "rule:       " << LOG_RULE(r);
@@ -43,10 +64,6 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 		LOG_TRACE << "--------------------------------";
 	}
 #endif // DEBUG
-
-#ifdef TAU_MEASURE
-		if (n != nn) measures::increase_rule_hit<htref>(r);
-#endif // TAU_MEASURE
 
 #ifdef TAU_CACHE
 		cache[{r, n}] = nn;
@@ -268,23 +285,39 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 // Applies the recurrence relations the formula comes with to the formula.
 // This is the rr-overload of nso_rr_apply, complementing the rule/rules overloads.
 template <NodeType node>
-tref nso_rr_apply(const rr<node>& nso_rr) {
+result<tref> nso_rr_apply(const rr<node>& nso_rr) {
+	result<tref> r;
 	LOG_DEBUG << "Start nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
-	tref main = calculate_all_fixed_points<node>(rr_);
-	if (!main) return nullptr;
+	tref main = r.measure("calculate_fixed_points", [&] {
+		return calculate_all_fixed_points<node>(rr_);
+	});
+	if (!main) {
+		r.error(code::internal_error,
+			"fixed point calculation did not terminate");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	// Substitute function and recurrence relation definitions. Called
 	// directly rather than through the traverser pipe so that the
 	// non-termination signal (nullptr) is checked instead of being fed to
 	// `tt::ref`.
-	tref new_main =
-		repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
-	if (!new_main) return nullptr;
+	tref new_main = r.measure("apply_rec_relations", [&] {
+		return repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
+	});
+	if (!new_main) {
+		r.error(code::internal_error,
+			"recurrence relation rewriting did not reach a fixed point");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	LOG_DEBUG << "End nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	LOG_DEBUG << "New main: " << LOG_FM(new_main);
-	return new_main;
+	r = new_main;
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 } // namespace idni::tau_lang

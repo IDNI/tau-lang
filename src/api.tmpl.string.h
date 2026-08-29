@@ -654,14 +654,15 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	}
 
 	// Step the interpreter
-	auto [output, auto_continue] = i.step(values);
-	if (!output.has_value()) {
+	auto step_v = r.take_or_error(i.step(values), code::invalid_state,
+		"No input provided");
+	if (!step_v) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
-		r.error(code::invalid_state, "No input provided");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
+	auto& [output, auto_continue] = *step_v;
 
 	// Write output values so they are recorded for subsequent steps
 	if (!i.write(output.value())) {
@@ -722,14 +723,15 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	}
 
 	// Step the interpreter
-	auto [output, auto_continue] = i.step();
-	if (!output.has_value()) {
+	auto step_v = r.take_or_error(i.step(), code::invalid_state,
+		"No input provided");
+	if (!step_v) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
-		r.error(code::invalid_state, "No input provided");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
+	auto& [output, auto_continue] = *step_v;
 
 	// Write output values
 	if (!i.write(output.value())) {

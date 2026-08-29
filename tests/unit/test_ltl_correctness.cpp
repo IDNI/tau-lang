@@ -33,7 +33,8 @@ static bool realizable(const char* s) {
 		return nso.has_value() ? nso.value().main->get() : nullptr;
 	}();
 	if (!fm) return false;
-	return is_tau_formula_sat<node_t>(fm);
+	auto r = is_tau_formula_sat<node_t>(fm);
+	return r.has_value() && r.value();
 }
 
 // Run formula with given i1 stream for N steps, return o1 values.
@@ -348,7 +349,8 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 		if (!nso.has_value()) return false;
 		tref fm = nso.value().main->get();
 		if (!fm) return false;
-		return is_tau_formula_sat<node_t>(fm);
+		auto r = is_tau_formula_sat<node_t>(fm);
+		return r.has_value() && r.value();
 	}
 
 	TEST_CASE("[CROSS-01] G(o=0):tau — LTL path agrees with safety path") {

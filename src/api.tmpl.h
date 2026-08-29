@@ -509,9 +509,9 @@ result<tref> api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 				tau::geth(resolve_io_vars<node>(ctx, t.second())));
 		}
 	}
-	tref applied = nso_rr_apply<node>(nso_rr);
-	if (!applied) r.error(code::internal_error, "Failed to apply definitions");
-	else          r = applied;
+	auto applied = r.take_or_error(nso_rr_apply<node>(nso_rr),
+		code::internal_error, "Failed to apply definitions");
+	if (applied) r = *applied;
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -539,9 +539,9 @@ result<tref> api<node>::apply_all_defs(tref expr) {
 	const auto& defs = definitions<node>::instance().get_sym_defs();
 	nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 		defs.begin(), defs.end());
-	tref applied = nso_rr_apply<node>(nso_rr);
-	if (!applied) r.error(code::internal_error, "Failed to apply definitions");
-	else          r = applied;
+	auto applied = r.take_or_error(nso_rr_apply<node>(nso_rr),
+		code::internal_error, "Failed to apply definitions");
+	if (applied) r = *applied;
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -802,9 +802,9 @@ result<tref> api<node>::normalize_formula(tref fm) {
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	tref n = normalizer<node>(maybe_nso_rr.value());
-	if (!n) r.error(code::internal_error, "Normalization failed");
-	else    r = n;
+	auto n = r.take_or_error(normalizer<node>(maybe_nso_rr.value()),
+		code::internal_error, "Normalization failed");
+	if (n) r = *n;
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -970,9 +970,10 @@ result<bool> api<node>::realizable(tref fm) {
 	// every other undecidable-shape gate in this function returns.
 	auto nf = normalize_formula(fm);
 	if (!nf.has_value()) {
-		TAU_LOG_ERROR << "Could not normalize the formula; "
-			"its satisfiability cannot be decided";
-		r = false;
+		r.merge(std::move(nf));
+		if (!r.has_error()) r.error(code::internal_error,
+			"Could not normalize the formula; "
+			"its satisfiability cannot be decided");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
@@ -985,11 +986,14 @@ result<bool> api<node>::realizable(tref fm) {
 		// A data quantifier under a full-LTL operator survives normalization;
 		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
 		// invariant, so route the RAW formula to the LTL-ABA solver instead.
-		if (has_ltl_operators<node>(fm)
+		tref target = (has_ltl_operators<node>(fm)
 			&& tau::get(nf.value()).find_top(is_quantifier<node>))
-			r = is_tau_formula_sat<node>(fm, 0, true);
-		else
-			r = is_tau_formula_sat<node>(nf.value(), 0, true);
+			? fm : nf.value();
+		auto sat = is_tau_formula_sat<node>(target, 0, true);
+		if (auto v = r.take_or_error(std::move(sat), code::internal_error,
+			"is_tau_formula_sat returned neither a value nor an "
+			"error while checking realizability"))
+			r = *v;
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); realizability could not be decided";
@@ -1105,16 +1109,21 @@ result<bool> api<node>::valid_spec(tref fm) {
 	// error.
 	auto nfm = normalize_formula(fm);
 	if (!nfm.has_value()) {
-		TAU_LOG_ERROR << "Could not normalize the formula; "
-			"its validity cannot be decided";
-		r = false;
+		r.merge(std::move(nfm));
+		if (!r.has_error()) r.error(code::internal_error,
+			"Could not normalize the formula; "
+			"its validity cannot be decided");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
 	// Valid iff T (tautology) implies the normalized formula.
 	// Same synthesis-failure gate as realizable() -- see the note there.
 	try {
-		r = is_tau_impl<node>(tau::_T(), nfm.value());
+		auto impl = is_tau_impl<node>(tau::_T(), nfm.value());
+		if (auto v = r.take_or_error(std::move(impl), code::internal_error,
+			"is_tau_impl returned neither a value nor an error "
+			"while checking validity"))
+			r = *v;
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); validity could not be decided";
@@ -1166,18 +1175,12 @@ result<subtree_map<node, tref>> api<node>::solve(
 			splitter_one(tau_type<node>()),
 		.mode = mode
 	};
-	bool solve_error = false;
 	// Use fully-expanded formula (a) so function/predicate refs are resolved
 	// before reaching type-specific solvers (fixes bug with typed functions).
-	auto solution = tau_lang::solve<node>(a, options, solve_error);
-	if (solve_error) {
-		TAU_LOG_ERROR << "Internal error in solver";
-		r.error(code::solver_error, "Internal error in solver");
-	} else if (!solution) {
-		r.error(code::unsat, "No solution");
-	} else {
-		r = std::move(solution.value());
-	}
+	auto solution = tau_lang::solve<node>(a, options);
+	if (auto v = r.take_or_error(std::move(solution), code::internal_error,
+		"tau_lang::solve returned neither a value nor an error"))
+		r = std::move(*v);
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1227,8 +1230,9 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	DBG(TAU_LOG_TRACE << "lgrs/equality: " << LOG_FM(equality);)
 
 	auto solution = tau_lang::lgrs<node>(eq);
-	if (!solution) r.error(code::unsat, "No solution");
-	else           r = std::move(solution.value());
+	if (auto v = r.take_or_error(std::move(solution), code::internal_error,
+		"tau_lang::lgrs returned neither a value nor an error"))
+		r = std::move(*v);
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1258,20 +1262,20 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
+	auto applied = r.take_or_error(nso_rr_apply<node>(maybe_nso_rr.value()),
+		code::internal_error, "Failed to apply definitions");
 	if (!applied) {
-		r.error(code::internal_error, "Failed to apply definitions");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	tref normalized = normalizer<node>(applied);
+	auto normalized = r.take_or_error(normalizer<node>(*applied),
+		code::internal_error, "Normalization failed");
 	if (!normalized) {
-		r.error(code::internal_error, "Normalization failed");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
 	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-	if (has_free_vars<node>(normalized)) {
+	if (has_free_vars<node>(*normalized)) {
 		r.error(code::invalid_argument, "Spec contains free variables");
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -1282,10 +1286,15 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 	// ltl_to_safety_formula_full; a backend failure must not terminate the
 	// caller.  No interpreter is the honest answer here.
 	try {
-		auto intr = interpreter<node>::make_interpreter(normalized, ctx);
-		if (!intr) r.error(code::solver_error,
+		auto intr = r.take_or_error(
+			interpreter<node>::make_interpreter(*normalized, ctx),
+			code::solver_error,
 			"the specification could not be compiled");
-		else       r = std::move(intr.value());
+		if (!intr) {
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		r = std::move(*intr);
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); the specification could not be compiled";
@@ -1323,20 +1332,20 @@ result<interpreter<node>> api<node>::get_interpreter(
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
+	auto applied = r.take_or_error(nso_rr_apply<node>(maybe_nso_rr.value()),
+		code::internal_error, "Failed to apply definitions");
 	if (!applied) {
-		r.error(code::internal_error, "Failed to apply definitions");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	tref normalized = normalizer<node>(applied);
+	auto normalized = r.take_or_error(normalizer<node>(*applied),
+		code::internal_error, "Normalization failed");
 	if (!normalized) {
-		r.error(code::internal_error, "Normalization failed");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
 	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-	if (has_free_vars<node>(normalized)) {
+	if (has_free_vars<node>(*normalized)) {
 		r.error(code::invalid_argument, "Spec contains free variables");
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -1346,10 +1355,15 @@ result<interpreter<node>> api<node>::get_interpreter(
 	// See the tref overload: synthesis-backend failures are answered, not
 	// propagated.
 	try {
-		auto intr = interpreter<node>::make_interpreter(normalized, ctx);
-		if (!intr) r.error(code::solver_error,
+		auto intr = r.take_or_error(
+			interpreter<node>::make_interpreter(*normalized, ctx),
+			code::solver_error,
 			"the specification could not be compiled");
-		else       r = std::move(intr.value());
+		if (!intr) {
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		r = std::move(*intr);
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); the specification could not be compiled";

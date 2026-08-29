@@ -10,6 +10,7 @@
 #define __IDNI__TAU__NSO_RR_H__
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -26,6 +27,20 @@ namespace idni::tau_lang {
  */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n);
+
+/** @brief Application/hit counts accumulated by @ref nso_rr_apply(const
+ * rewriter::rule&, const tref&) while @ref rule_counting is set, keyed by
+ * the rule's printable form. One map instance per @p node. */
+template <NodeType node>
+std::unordered_map<std::string, size_t>& rule_apply_counts();
+template <NodeType node>
+std::unordered_map<std::string, size_t>& rule_hit_counts();
+
+/** @brief Emit one report::count() node per rule per metric for whatever
+ * @ref rule_apply_counts / @ref rule_hit_counts have accumulated, then
+ * clear both maps so the next normalization pass starts empty. */
+template <NodeType node>
+void flush_rule_counts(report& rep);
 
 /**
  * @brief Apply a sequence of rewriting rules to @p n, one after another.
@@ -47,10 +62,11 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n);
  * then applies all recurrence relation rules via `step` until no rule fires.
  * @tparam node Tree node type.
  * @param nso_rr Recurrence relation to unfold.
- * @return The main formula with all recurrence relation definitions applied.
+ * @return The main formula with all recurrence relation definitions applied,
+ *         or an error result on failure.
  */
 template <NodeType node>
-tref nso_rr_apply(const rr<node>& nso_rr);
+result<tref> nso_rr_apply(const rr<node>& nso_rr);
 
 
 /** @brief Replace every fp-calculation ref in @p nso_rr's main with its

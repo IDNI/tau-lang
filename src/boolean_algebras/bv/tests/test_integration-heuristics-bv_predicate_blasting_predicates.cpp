@@ -104,8 +104,8 @@ TEST_SUITE("bitblasting") {
 		tref shl1 = bvshl_by_one<node>(x, shifted);
 		tref shr1 = bvshr_by_one<node>(x, shifted);
 		CHECK( tau::get(shl1) != tau::get(shr1) );
-		CHECK( is_non_temp_nso_satisfiable<node>(shl1) );
-		CHECK( is_non_temp_nso_satisfiable<node>(shr1) );
+		CHECK( is_non_temp_nso_satisfiable<node>(shl1).value() );
+		CHECK( is_non_temp_nso_satisfiable<node>(shr1).value() );
 	}
 
 	TEST_CASE("bvadd") {
@@ -214,8 +214,8 @@ TEST_SUITE("bitblasting") {
 			tau::build_wff_and(q3, r1));
 		tref bad = tau::build_wff_and(tau::build_wff_and(constraint, x10),
 			tau::build_wff_and(q3, r2));
-		CHECK( is_non_temp_nso_satisfiable<node>(good) );
-		CHECK( !is_non_temp_nso_satisfiable<node>(bad) );
+		CHECK( is_non_temp_nso_satisfiable<node>(good).value() );
+		CHECK( !is_non_temp_nso_satisfiable<node>(bad).value() );
 	}
 
 	TEST_CASE("bvneq_rule") {
@@ -307,7 +307,9 @@ TEST_SUITE("bitblasting") {
 		// around it never resolves.
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		tref pred_same = bvneq<node>(x, x);
-		CHECK( tau::get(normalizer<node>(pred_same)).equals_F() );
+		auto normalized = normalizer<node>(pred_same);
+		REQUIRE( normalized.has_value() );
+		CHECK( tau::get(normalized.value()).equals_F() );
 	}
 }
 

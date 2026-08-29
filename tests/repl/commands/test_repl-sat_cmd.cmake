@@ -57,15 +57,12 @@ add_repl_test(sat_cmd-tc-quadruple_g_with_non_g_conjunct "sat (G (o1[t] = 0)) &&
 add_repl_test(sat_cmd-tc-g_xor_g_negated_arg_sat "sat (G (o1[t] = 0)) ^^ (G (o1[t] = 1))." ": T")
 
 # AP1-1: a definition set whose expansion oscillates (`f(x) := f(x)'`, the
-# same shape as the normalize_cmd regressions above) makes normalize_formula
-# return nullptr. `sat` used to hand that null straight to is_tau_formula_sat,
-# which dereferences it. The expected output is the verdict, not the
-# diagnostic: the "oscillates" message is printed *before* the crash point, so
-# matching on it would not tell a crash apart from a clean rejection, whereas
-# the ": F" line can only be reached after sat returns.
+# same shape as the normalize_cmd regressions above) fails to normalize.
+# `sat` reports the structured normalization error instead of deciding a
+# verdict, so no ": T"/": F" line is printed.
 # add_repl_test_fail is used because the diagnostic contains "Error".
 add_repl_test_fail(sat_cmd-oscillating_definition
-	"f(x) := f(x)'. sat f(1) = 0" ": F")
+	"f(x) := f(x)'. sat f(1) = 0" "Definition expansion oscillates")
 # GitHub #72: a conjunction of N clauses with pairwise disjoint variable
 # support used to be decided by a single Boole decomposition over the whole
 # formula -- a 2^N Shannon expansion, since no branch ever simplified a

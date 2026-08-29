@@ -59,8 +59,8 @@ static std::string blast_normalize(const std::string& sample) {
 	if (tau::get(wff).find_top(has_arithmetic) && blasted == wff)
 		return "not_blasted";
 	auto result = normalizer<node_t>(blasted);
-	if (!result) return "null";
-	return tau::get(result).to_str();
+	if (!result.has_value()) return "null";
+	return tau::get(result.value()).to_str();
 }
 
 //
@@ -1020,8 +1020,8 @@ static std::string blast_normalize_interval(const std::string& sample) {
 	auto blasted = bv_predicate_blasting<node_t>(typed);
 	if (!blasted) return "blast_error";
 	auto result = normalizer<node_t>(blasted);
-	if (!result) return "null";
-	return tau::get(result).to_str();
+	if (!result.has_value()) return "null";
+	return tau::get(result.value()).to_str();
 }
 
 TEST_SUITE("bf_interval (HE-8)") {

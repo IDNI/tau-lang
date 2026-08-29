@@ -45,7 +45,7 @@ demangling via `cxxabi.h`.
 
 ## Other build types
 
-- **`RelWithDebInfo`** — enables `TAU_MEASURE` and `TAU_CACHE`, builds benchmarks.
+- **`RelWithDebInfo`** — enables `TAU_CACHE`, builds benchmarks.
 - **`Coverage`** — instruments with `--coverage` for `lcov`/`genhtml` reports. Run `make coverage` after `ctest` to generate HTML reports.
 
 ## Useful CMake options

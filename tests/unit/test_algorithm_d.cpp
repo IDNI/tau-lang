@@ -28,7 +28,12 @@ static bool alg_d_realizable(const char* s) {
 	setenv("TAU_LTL_ALG", "D", 1);
 	bdd_init<Bool>();
 	tref fm = spec(s);
-	bool result = (fm != nullptr) && is_tau_formula_sat<node_t>(fm);
+	bool result = false;
+	if (fm != nullptr) {
+		auto r = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(r.has_value());
+		result = r.value();
+	}
 	unsetenv("TAU_LTL_ALG");
 	return result;
 }
@@ -807,7 +812,9 @@ State: 1
 		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = 0).");
 		REQUIRE(fm != nullptr);
-		bool result = is_tau_formula_sat<node_t>(fm);
+		auto sat_r = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(sat_r.has_value());
+		bool result = sat_r.value();
 		unsetenv("TAU_LTL_ALG");
 		// G(o1:sbf = 0) is satisfiable: always output 0
 		CHECK(result);

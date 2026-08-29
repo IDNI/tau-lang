@@ -34,7 +34,8 @@ tref norm_under(const char* sample, solver_site sp, preprocess_site bp,
 	placement_guard g;
 	solver_placement = sp; preprocess_placement = bp;
 	preprocess_method = bm; preprocessing = blasting;
-	return normalizer<node_t>(parse(sample));
+	auto r = normalizer<node_t>(parse(sample));
+	return r.has_value() ? r.value() : nullptr;
 }
 
 } // namespace
@@ -95,9 +96,13 @@ TEST_SUITE("placement matrix") {
 		preprocess_placement = preprocess_site::per_leaf;
 		preprocess_method = preprocess_mode::anti_prenex_result;
 		max_blast_reentry_depth = 1;
-		tref capped = normalizer<node_t>(parse(alternating));
+		auto capped_r = normalizer<node_t>(parse(alternating));
 		max_blast_reentry_depth = 0;
-		tref uncapped = normalizer<node_t>(parse(alternating));
+		auto uncapped_r = normalizer<node_t>(parse(alternating));
+		REQUIRE( capped_r.has_value() );
+		REQUIRE( uncapped_r.has_value() );
+		tref capped = capped_r.value();
+		tref uncapped = uncapped_r.value();
 		REQUIRE( capped != nullptr );
 		CHECK( are_nso_equivalent<node_t>(capped, uncapped) );
 	}

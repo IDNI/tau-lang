@@ -150,6 +150,7 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"#include \"tau_pack.h\"\n"
 		"#include \"table_step_provider.h\"\n"
 		"#include \"cli_options.h\"\n"
+		"#include <chrono>\n"
 		"#include <cstdio>\n"
 		"#include <cstdlib>\n"
 		"#include <cstring>\n"
@@ -315,11 +316,12 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\t\tfprintf(stderr, \"interpreter initialization failed\\n\");\n"
 		"\t\treturn 2;\n"
 		"\t}\n"
-		"\tidni::measures::timer run_timer;\n"
-		"\trun_timer.start();\n"
+		"\tauto run_start = std::chrono::steady_clock::now();\n"
 		"\tbool run_ok = interp->run_loop(0, quit_on_idle);\n"
 		"\tif (print_benchmarks)\n"
-		"\t\tcerr << \"run: \" << run_timer.stop() << \" ms\\n\";\n"
+		"\t\tcerr << \"run: \" << std::chrono::duration<double, std::milli>(\n"
+		"\t\t\tstd::chrono::steady_clock::now() - run_start).count()\n"
+		"\t\t\t<< \" ms\\n\";\n"
 		"\t// Flush and leave without running static destructors: the pack's\n"
 		"\t// static state (caches, pools, the leaked cvc5 term manager) has no\n"
 		"\t// safe cross-TU destruction order, and a buffered-stdout artifact\n"
@@ -368,16 +370,18 @@ codegen_result compile_spec(
 		res.error = "compile: failed to build the recurrence relation from spec";
 		return res;
 	}
-	tref applied = nso_rr_apply<Node>(*nso_rr);
-	if (!applied) {
+	auto applied_r = nso_rr_apply<Node>(*nso_rr);
+	if (!applied_r.has_value()) {
 		res.error = "compile: failed to apply the recurrence relation";
 		return res;
 	}
-	tref fm = normalizer<Node>(applied);
-	if (!fm) {
+	tref applied = applied_r.value();
+	auto normalized = normalizer<Node>(applied);
+	if (!normalized.has_value()) {
 		res.error = "compile: failed to normalize spec";
 		return res;
 	}
+	tref fm = normalized.value();
 	// fm is checked before solve_ltl_aba runs, so it is never a bare-reparsed atom.
 	if (has_free_vars<Node>(fm)) {
 		res.error = "compile: spec has unresolved free variables";

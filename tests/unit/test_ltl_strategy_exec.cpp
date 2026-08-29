@@ -533,7 +533,9 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 			auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0))."));
 			REQUIRE(fm.has_value());
 			tref f = fm.value().main->get();
-			bool result = is_tau_formula_sat<node_t>(f);
+			auto sat_r = is_tau_formula_sat<node_t>(f);
+			REQUIRE(sat_r.has_value());
+			bool result = sat_r.value();
 			CHECK(result);
 		}
 		struct stat st;
@@ -555,7 +557,9 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 		REQUIRE(fm.has_value());
 		tref f = fm.value().main->get();
 		// Just verify it's realizable — state count logged to stderr via LOG_INFO
-		CHECK(is_tau_formula_sat<node_t>(f));
+		auto sat_r = is_tau_formula_sat<node_t>(f);
+		REQUIRE(sat_r.has_value());
+		CHECK(sat_r.value());
 	}
 }
 

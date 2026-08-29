@@ -320,6 +320,10 @@ int main(int argc, char** argv) {
 		else e.option.set_count(optnum(cli_name.c_str()));
 	}
 
+	// Rule counting piggybacks on the benchmarks flag: both paths below
+	// (file spec and REPL) read it from the same "benchmarks" option.
+	rule_counting = opts["benchmarks"].get<bool>();
+
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
 			<< files.front();)

@@ -191,7 +191,7 @@ std::optional<solution<node>> find_solution(equality eq) {
 }
 
 template <NodeType node>
-std::optional<solution<node>> lgrs(equality eq) {
+result<solution<node>> lgrs(equality eq) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
@@ -200,11 +200,19 @@ std::optional<solution<node>> lgrs(equality eq) {
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
+	result<solution<node>> r;
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	if (!eq) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 	if (tau::get(eq).equals_T()) {
 		DBG(LOG_TRACE << "lgrs/solution: {}";)
-		return solution<node>();
+		r = solution<node>();
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	DBG(LOG_TRACE << "lgrs/eq: " << LOG_FM(eq) << "\n";)
@@ -212,7 +220,9 @@ std::optional<solution<node>> lgrs(equality eq) {
 	auto s = find_solution<node>(eq);
 	if (!s.has_value()) {
 		DBG(LOG_TRACE << "lgrs/no solution";)
-		return {};
+		r.error(code::unsat, "No solution found");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
@@ -225,11 +235,14 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/equality: " << LOG_FM(eq);
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
-	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
-	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	auto nr = normalizer<node>(rewriter::replace<node>(eq, phi));
+	if (nr.has_value())
+		LOG_TRACE << "lgrs/check: " << LOG_FM(nr.value()) << "\n";
 #endif // DEBUG
 
-	return phi;
+	r = std::move(phi);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // SO-2: worst-case enumerates all 2^vars polarity combinations with no
@@ -1693,12 +1706,25 @@ bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 
 // entry point for the solver
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, solver_options options, bool& error) {
+result<solution<node>> solve(tref form, solver_options options) {
+	result<solution<node>> r;
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	error = false;  // Initialize error flag
-	if (tau::get(form).equals_T()) return { solution<node>() };
-	if (tau::get(form).equals_F()) return {};
+	if (!form) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (tau::get(form).equals_T()) {
+		r = solution<node>();
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (tau::get(form).equals_F()) {
+		r.error(code::unsat, "No solution found");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
 
 #ifdef DEBUG
 	LOG_TRACE << "solve/form: " << LOG_FM(form);
@@ -1725,7 +1751,14 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		assert(!tau::get(form).find_top(is_unsupported_temporal));
 	}
 #endif // DEBUG
-	form = normalize_non_temp<node>(form);
+	auto normed = r.take_or_error(normalize_non_temp<node>(form),
+		code::internal_error, "Normalization failed");
+	if (!normed) {
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	form = *normed;
+	auto _s = r.open("expression_paths");
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
 		// early to simplify solving
@@ -1773,6 +1806,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		std::optional<size_t> bv_partition_key;
 		// Partition types
 		bool path_sat = false;
+		bool clause_error = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
 			// If path is T, we skip in order to have empty type_partition
 			if (tau::get(conj).equals_T()) {
@@ -1795,7 +1829,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			size_t type = find_ba_type<node>(conj);
 			if (!is_atomic_fm<node>(conj) && !(pack_type_has_arith_ops<node>(type) && is_child_quantifier<node>(conj))) {
 				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
-				error = true;
+				clause_error = true;
 				break;
 			}
 			if (!pack_type_has_arith_ops<node>(type)) {
@@ -1815,7 +1849,13 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				it->second.insert(conj);
 			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
-		if (error) return {};
+		if (clause_error) {
+			r.error(code::solver_error,
+				"Found a clause containing a non-equation "
+				"term the solver cannot handle");
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
 
 		bool theory_sat = false, skip = false;
 		solution<node> clause_solution;
@@ -1838,8 +1878,8 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 							squeezed = conj;
 						} else {
 							tref l = tt(squeezed.value()) | tau::bf_eq | tau::bf | tt::ref;
-							tref r = tt(conj)             | tau::bf_eq | tau::bf | tt::ref;
-							squeezed = build_bf_eq_0<node>((tau::get(l) | tau::get(r)).get());
+							tref r_bf = tt(conj)           | tau::bf_eq | tau::bf | tt::ref;
+							squeezed = build_bf_eq_0<node>((tau::get(l) | tau::get(r_bf)).get());
 						}
 					}
 					DBG(assert(!squeezed_by_width.empty());)
@@ -1892,14 +1932,32 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				a = bf_reduced_dnf<node>(a);
 				clause_solution.emplace(v, a);
 			}
-			return clause_solution;
+			r = std::move(clause_solution);
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
 	}
-	return {};
+	r.error(code::unsat, "No solution found");
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 // (SO-7: the trefs overload of solve() was deleted -- zero callers.)
 
+// ------------------------------------------------------------
+// result-based API
+// ------------------------------------------------------------
 
+template <NodeType node>
+result<solution<node>> solve(const trefs& forms, solver_options options) {
+	result<solution<node>> r;
+	using tau = tree<node>;
+	if (forms.empty()) {
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	return solve<node>(tau::build_wff_and(forms), options);
+}
 
 } // namespace idni::tau_lang

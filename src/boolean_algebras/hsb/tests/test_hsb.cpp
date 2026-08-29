@@ -1534,42 +1534,66 @@ TEST_SUITE("hsb — LTL integration") {
 		gc_fixture gc;
 		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(o1:hsb = {bot}:hsb) is REALIZABLE") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("o1:hsb = {top}:hsb is REALIZABLE") {
 		gc_fixture gc;
 		tref fm = spec("o1[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("F(o1:hsb != {bot}:hsb) is REALIZABLE") {
 		gc_fixture gc;
 		tref fm = spec("F (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(o1:hsb != {bot}:hsb) is REALIZABLE") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(o1:hsb = {top}:hsb) is REALIZABLE") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("always (i:hsb != bot -> o:hsb != bot) is REALIZABLE") {
@@ -1577,14 +1601,22 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(F(o1:hsb != {bot}:hsb)) is REALIZABLE (liveness)") {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(o1:hsb = {bot}:hsb) & F(o1:hsb != {bot}:hsb) is UNREALIZABLE") {
@@ -1592,14 +1624,22 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (o1[t]:hsb = {bot}:hsb) && F (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	TEST_CASE("F(o1:hsb = {top}:hsb) is trivially REALIZABLE") {
 		gc_fixture gc;
 		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("two hsb outputs") {
@@ -1607,7 +1647,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"o1[t]:hsb = {top}:hsb && o2[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("i:hsb != bot -> o:hsb = top") {
@@ -1615,28 +1659,44 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"i1[t]:hsb != {bot}:hsb -> o1[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("always output equals top") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("eventually output equals top") {
 		gc_fixture gc;
 		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("always output not bot (safety)") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("simple implication with hsb") {
@@ -1644,7 +1704,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (i1[t]:hsb = {top}:hsb -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("hsb output with disjunction") {
@@ -1652,14 +1716,22 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"o1[t]:hsb = {top}:hsb || o1[t]:hsb = {bot}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(F(o:hsb = top)) liveness") {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb = {top}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("unrealizable: G(i = top) & G(o = bot) -> contradiction") {
@@ -1668,28 +1740,44 @@ TEST_SUITE("hsb — LTL integration") {
 		// This is realizable since system can always output bot
 		tref fm = spec("G (o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("output equality to top is realizable") {
 		gc_fixture gc;
 		tref fm = spec("o1[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("output equality to bot is realizable") {
 		gc_fixture gc;
 		tref fm = spec("o1[t]:hsb = {bot}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("always implies eventually") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb = {top}:hsb) -> F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("conjunction of always and eventually: o = top forever") {
@@ -1697,7 +1785,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("two output variables always equal") {
@@ -1705,14 +1797,22 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (o1[t]:hsb = o2[t]:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("negation of unrealizable is realizable") {
 		gc_fixture gc;
 		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("always: input implies output response") {
@@ -1720,35 +1820,55 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("hsb constant not equal to bot in spec") {
 		gc_fixture gc;
 		tref fm = spec("o1[t]:hsb != {bot}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("multiple temporal operators: GF with hsb") {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb = {top}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("always output not equal to top (possible)") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb != {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("simple hsb assignment") {
 		gc_fixture gc;
 		tref fm = spec("o1[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("contradiction: o = top AND o = bot is UNREALIZABLE") {
@@ -1756,7 +1876,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	TEST_CASE("disjunction: o = top OR o = bot is REALIZABLE") {
@@ -1764,28 +1888,44 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"o1[t]:hsb = {top}:hsb || o1[t]:hsb = {bot}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("nested always-eventually pattern") {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("safety spec: always not bot") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("liveness spec: eventually top") {
 		gc_fixture gc;
 		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("response: i != bot implies F(o != bot)") {
@@ -1793,7 +1933,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("two outputs: G(o1 = top) and G(o2 = top)") {
@@ -1801,14 +1945,22 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && G (o2[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("output tracks input: G(o1 = i1)") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb = i1[t]:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("output differs from bot whenever input is top") {
@@ -1816,7 +1968,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (i1[t]:hsb = {top}:hsb -> o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("unrealizable: G(o = top) and G(o != top)") {
@@ -1824,7 +1980,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb != {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	TEST_CASE("F(o1 = top) and F(o1 = bot) — both eventualities achievable") {
@@ -1832,7 +1992,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && F (o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(o1 != bot || o2 != bot) — at least one output non-bot") {
@@ -1840,7 +2004,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (o1[t]:hsb != {bot}:hsb || o2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("GF(o = top) and GF(o = bot) — infinitely often alternating") {
@@ -1848,7 +2016,11 @@ TEST_SUITE("hsb — LTL integration") {
 		tref fm = spec(
 			"G (F (o1[t]:hsb = {top}:hsb)) && G (F (o1[t]:hsb = {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE LTL integration
@@ -1891,7 +2063,11 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 		gc_fixture gc;
 		tref fm = spec("o1[t]:hsb = { x[0] < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("pipeline: G with constraint inequality is REALIZABLE") {
@@ -1899,7 +2075,11 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 		tref fm = spec(
 			"G (o1[t]:hsb != { x[0]*0.5 + 0.7 < 0 }:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("pipeline: non-strict inequality { x[0] <= 0 }:hsb parses") {
@@ -1926,7 +2106,11 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 			"o1[t]:hsb = { x[0] < 0 }:hsb && "
 			"o1[t]:hsb != {top}:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("pipeline: mixed constraint and top/bot constants") {
@@ -1935,7 +2119,11 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 			"G (o1[t]:hsb != {bot}:hsb -> "
 			"o2[t]:hsb = { x[0] < 0 }:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("pipeline: 3-variable constraint parses") {
@@ -1963,7 +2151,11 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 			"F (o1[t]:hsb = { x[0] < 0 }:hsb) && "
 			"G (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("pipeline: two constraint constants in one spec") {
@@ -1972,7 +2164,11 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 			"o1[t]:hsb = { x[0] < 0 }:hsb && "
 			"o2[t]:hsb = { x[1] < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE full pipeline constraint parsing
@@ -1996,7 +2192,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("F(o1:hsb!=bot) && F(o2:bv[8]=255) REALIZABLE") {
@@ -2005,7 +2205,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"F (o1[t]:hsb != {bot}:hsb) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- G(hsb) && F(bv) ---
@@ -2016,7 +2220,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- G(bv) && F(hsb) ---
@@ -2027,7 +2235,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"G (o1[t]:bv[8] = {#b11111111}:bv[8]) && F (o2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Safety pattern with mixed types ---
@@ -2038,7 +2250,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(i:bv[8]=255 -> o:hsb=top) REALIZABLE") {
@@ -2047,7 +2263,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Liveness with mixed types ---
@@ -2059,7 +2279,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 			"G (F (o1[t]:hsb != {bot}:hsb)) && "
 			"G (F (o2[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Unrealizable mixed-type spec ---
@@ -2070,7 +2294,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	// --- Three types: hsb + bv + sbf ---
@@ -2083,7 +2311,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"F (o3[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Multi-output mixed-type: two hsb + one bv ---
@@ -2096,7 +2328,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 			"G (o2[t]:hsb = {top}:hsb) && "
 			"F (o3[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mixed-type response pattern ---
@@ -2107,7 +2343,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		tref fm = spec(
 			"G (i1[t]:bv[8] != {0}:bv[8] -> F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mode A spec-model pattern: output token + admissibility ---
@@ -2119,7 +2359,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 			"G (o1[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"G (o2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Temporal: alternating hsb and bv liveness ---
@@ -2131,7 +2375,11 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 			"G (F (o1[t]:hsb = {top}:hsb)) && "
 			"G (F (o2[t]:bv[8] = {#b11111111}:bv[8])).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Input hsb, output bv: the constrained-decoding pattern ---
@@ -2152,7 +2400,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Input bv, output hsb: spec-side hsb constraint ---
@@ -2163,7 +2415,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 		tref fm = spec(
 			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Disjunction across types ---
@@ -2174,7 +2430,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb || o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mixed hsb + qint (dyadic rationals in 1D) ---
@@ -2185,7 +2445,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 			"F (o1[t]:hsb = {top}:hsb) && "
 			"F (o2[t]:qint = {[0, 1)}:qint).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Four types: hsb + bv + sbf + qint ---
@@ -2199,7 +2463,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 			"F (o3[t]:sbf = {X}:sbf) && "
 			"F (o4[t]:qint = {[0, 1)}:qint).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Until with mixed types ---
@@ -2210,7 +2478,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 		tref fm = spec(
 			"(o1[t]:hsb = {top}:hsb) U (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Multiple bv widths + hsb ---
@@ -2223,7 +2495,11 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 			"F (o2[t]:hsb = {top}:hsb) && "
 			"F (o3[t]:bv[8] = {#b1}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE joint LTL(hsb, bv) specs
@@ -2252,7 +2528,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Tick-guarded hsb: at every tick, admissibility is nontrivial ---
@@ -2263,7 +2543,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Tick-guarded bv: at every tick, output token is nonzero ---
@@ -2274,7 +2558,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Combined frame + constraint: two-axis spec ---
@@ -2286,7 +2574,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Full two-axis with bv + hsb: frame + inner + outer ---
@@ -2299,7 +2591,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
 			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Two-point annotation pattern: Point A (input) + Point B (output) ---
@@ -2312,7 +2608,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (i_embed[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb) && "
 			"G (F (o_tick[t]:sbf = {tick}:sbf)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Constrained decoding pattern: token gated by hsb admissibility ---
@@ -2323,7 +2623,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Safety: never output token when inadmissible ---
@@ -2335,7 +2639,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Liveness: eventually produce a nonzero token after each tick ---
@@ -2346,7 +2654,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf -> F (o_token[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Response: input admissibility implies eventual output token ---
@@ -2357,7 +2669,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Multi-stream two-axis: tick + embed(hsb) + token(bv) + admit(hsb) ---
@@ -2371,7 +2687,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb) && "
 			"G (i_embed[t]:hsb != {bot}:hsb -> o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Unrealizable two-axis: contradictory tick constraints ---
@@ -2383,7 +2703,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (o_tick[t]:sbf = {tick}:sbf) && "
 			"G (o_tick[t]:sbf != {tick}:sbf).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	// --- Until across types: admissible until tick ---
@@ -2394,7 +2718,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"(o_admit[t]:hsb != {bot}:hsb) U (o_tick[t]:sbf = {tick}:sbf).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Accumulator-like pattern: count via alternating ---
@@ -2406,7 +2734,11 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 			"G (F (o_token[t]:bv[8] = {255}:bv[8])) && "
 			"G (F (o_token[t]:bv[8] = {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE two-axis temporal patterns
@@ -2754,7 +3086,11 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		tref fm = spec(
 			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL coherence: G(new_assert -> F(checked)) REALIZABLE") {
@@ -2764,7 +3100,11 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 			"G (i_assert[t]:hsb != {bot}:hsb -> "
 			"F (o_verdict[t]:sbf = {ok}:sbf)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL coherence: G(admit=bot -> token=0) masking REALIZABLE") {
@@ -2773,7 +3113,11 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL coherence: GF(admit!=bot) liveness REALIZABLE") {
@@ -2782,7 +3126,11 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		tref fm = spec(
 			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL multi-variable: full pipeline — tick + coherence + token gating REALIZABLE") {
@@ -2793,7 +3141,11 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// =====================================================================
@@ -2907,7 +3259,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_violation[t]:sbf = {violation}:sbf -> "
 			"o_enforce[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(high_count:sbf -> strict_mode:hsb!=bot) REALIZABLE — escalation") {
@@ -2917,7 +3273,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_high_count[t]:sbf = {high}:sbf -> "
 			"o_strict[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Adaptive enforcement: trust-based gating ---
@@ -2929,7 +3289,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_low_trust[t]:sbf = {low}:sbf -> "
 			"o_disclaimer[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(high_trust:sbf -> o_relaxed:hsb=top) REALIZABLE — permissive mode") {
@@ -2939,7 +3303,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_high_trust[t]:sbf = {trusted}:sbf -> "
 			"o_mode[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Commitment tracking: eventually discharge ---
@@ -2951,7 +3319,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_pending[t]:sbf = {pending}:sbf -> "
 			"F (o_discharge[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("GF(o_check:hsb!=bot) liveness for periodic checking REALIZABLE") {
@@ -2960,7 +3332,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 		tref fm = spec(
 			"G (F (o_check[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Failure escalation: mode transitions ---
@@ -2972,7 +3348,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_fail[t]:sbf = {fail}:sbf -> "
 			"F (o_recover[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(i_fail=fail && i_fail2=fail -> o_fallback:hsb!=bot) double failure REALIZABLE") {
@@ -2982,7 +3362,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_fail1[t]:sbf = {fail}:sbf && i_fail2[t]:sbf = {fail}:sbf -> "
 			"o_fallback[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Contradictory accumulator thresholds ---
@@ -2994,7 +3378,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	// --- Multi-accumulator: trust + violations + pending ---
@@ -3009,7 +3397,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_pending[t]:sbf = {pending}:sbf -> "
 			"F (o_fulfill[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Forgiveness decay: after long compliance, relax ---
@@ -3021,7 +3413,11 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 			"G (i_compliant[t]:sbf = {good}:sbf -> "
 			"F (o_relax[t]:hsb = {top}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE stateful LTL(hsb) specs
@@ -3045,7 +3441,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(response_phase:sbf -> admit:hsb!=bot) response gating REALIZABLE") {
@@ -3055,7 +3455,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"G (i_phase[t]:sbf = {response}:sbf -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- CONSIDERS(α) ≡ F(PHASE_THINKING ∧ @B.α) ---
@@ -3067,7 +3471,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"F (o_phase[t]:sbf = {thinking}:sbf && "
 			"o_concept[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- PRE_COMMIT(α, β) ≡ G(thinking∧α → F(response∧β)) ---
@@ -3081,7 +3489,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"F (o_phase[t]:sbf = {response}:sbf && "
 			"o_exec[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Phase coverage: at least one phase active ---
@@ -3093,7 +3505,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"G (o_think[t]:sbf = {think}:sbf || "
 			"o_respond[t]:sbf = {respond}:sbf).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Phase transition: thinking → response ordered ---
@@ -3105,7 +3521,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"G (o_think[t]:sbf = {think}:sbf -> "
 			"F (o_respond[t]:sbf = {respond}:sbf)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Thinking budget: thinking tokens bounded ---
@@ -3118,7 +3538,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"o_token[t]:bv[8] != {0}:bv[8]) && "
 			"G (F (o_phase[t]:sbf = {response}:sbf)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Steering thinking: bias toward high-value continuations ---
@@ -3131,7 +3555,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"i_low_val[t]:sbf = {low}:sbf -> "
 			"o_steer[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Phase-qualified + accumulator: thinking violation count ---
@@ -3145,7 +3573,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"F (o_phase[t]:sbf = {response}:sbf && "
 			"o_recover[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Contradictory phase spec ---
@@ -3157,7 +3589,11 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 			"G (o_phase[t]:sbf = {thinking}:sbf) && "
 			"G (o_phase[t]:sbf = {response}:sbf).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 } // TEST_SUITE guarded LTL(hsb) specs
@@ -3177,7 +3613,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_concept[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Level 3: user says "never do Y" → G(¬concept) ---
@@ -3188,7 +3628,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 		tref fm = spec(
 			"G (o_avoid[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Level 3: conditional → G(scope → ¬concept) ---
@@ -3200,7 +3644,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 			"G (i_scope[t]:sbf = {inscope}:sbf -> "
 			"o_avoid[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Level 3: conditional positive → G(scope → F(concept)) ---
@@ -3212,7 +3660,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 			"G (i_scope[t]:sbf = {inscope}:sbf -> "
 			"F (o_do[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- JIT revision stacking: base spec + user revision ---
@@ -3224,7 +3676,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 			"G (o1[t]:hsb != {bot}:hsb) && "
 			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- JIT revision conflict: two contradictory user revisions ---
@@ -3236,7 +3692,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (i_scope[t]:sbf = {active}:sbf -> o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	// --- Level 4: accumulated preference refinement ---
@@ -3247,7 +3707,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 		tref fm = spec(
 			"G (F (o_preferred[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- PWR weakening pattern: unrealizable → weaken to realizable ---
@@ -3275,7 +3739,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 			"G (i_cond3[t]:sbf = {c3}:sbf -> "
 			"F (o3[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- L3+L4 combined: immediate + accumulated ---
@@ -3287,7 +3755,11 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 			"G (o_avoid[t]:hsb = {bot}:hsb) && "
 			"G (F (o_preferred[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Halfspace coherence under revision: is_hsb_zero infrastructure ---
@@ -3334,7 +3806,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_pointA[t]:hsb != {bot}:hsb -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(i_pointA:sbf=query -> o_pointB:hsb!=bot) A-to-B response REALIZABLE") {
@@ -3344,7 +3820,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_pointA[t]:sbf = {query}:sbf -> "
 			"o_pointB[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Two-point: Point B (output-side) constraints ---
@@ -3355,7 +3835,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 		tref fm = spec(
 			"G (o_pointB[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(o_KA:hsb!=bot && o_KB:hsb!=bot) dual admissibility REALIZABLE") {
@@ -3365,7 +3849,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (o_KA[t]:hsb != {bot}:hsb && "
 			"o_KB[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Cross-axis: G_outer × tick-based inner-temporal ---
@@ -3378,7 +3866,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (o_tick[t]:sbf = {tick}:sbf -> "
 			"o_inner[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(depth_mark:sbf -> layer_ok:hsb!=bot) per-layer constraint REALIZABLE") {
@@ -3388,7 +3880,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_depth[t]:sbf = {layer}:sbf -> "
 			"o_safe[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mechanistic: hidden-layer representation constraints ---
@@ -3400,7 +3896,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_danger[t]:sbf = {danger}:sbf -> "
 			"F (o_safety[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("G(honest_early:sbf -> o_honest_late:hsb!=bot) anti-deception REALIZABLE") {
@@ -3410,7 +3910,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_honest[t]:sbf = {honest}:sbf -> "
 			"o_honest[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Voronoi cell: argmax as halfspace intersection ---
@@ -3457,7 +3961,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_token[t]:bv[8] != {0}:bv[8] -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("Verification mode: contradictory model+spec UNREALIZABLE") {
@@ -3467,7 +3975,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	// --- Full pipeline composition: embedding + spec ---
@@ -3480,7 +3992,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (o_embed[t]:hsb != {bot}:hsb -> "
 			"o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Adaptive enforcement via accumulator + two-point ---
@@ -3492,7 +4008,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_pointA[t]:sbf = {violation}:sbf -> "
 			"F (o_pointB[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Distillation: smaller formula equivalent on distribution ---
@@ -3525,7 +4045,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"i_phase[t]:sbf = {response}:sbf -> "
 			"o_pointB[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Product Mealy state: multi-accumulator + two-point + phase ---
@@ -3540,7 +4064,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 			"G (i_pointA[t]:sbf = {query}:sbf -> "
 			"F (o_pointB[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE two-point annotation & inner-temporal patterns
@@ -3563,7 +4091,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec("G (o_a0[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL template F(a0) — eventual REALIZABLE") {
@@ -3571,7 +4103,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec("F (o_a0[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL template G(!a0) — negated invariant REALIZABLE") {
@@ -3579,7 +4115,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec("G (o_a0[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Size 2: conjunction/disjunction under G ---
@@ -3591,7 +4131,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (o_a0[t]:hsb != {bot}:hsb && "
 			"o_a1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL template G(a0 || a1) — disjunction invariant REALIZABLE") {
@@ -3601,7 +4145,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (o_a0[t]:hsb != {bot}:hsb || "
 			"o_a1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Size 2: Until pattern ---
@@ -3613,7 +4161,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"(o_a0[t]:hsb != {bot}:hsb) U "
 			"(o_a1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Size 3: response pattern ---
@@ -3625,7 +4177,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (i_a0[t]:sbf = {trigger}:sbf -> "
 			"F (o_a1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL template G(a0 -> F(a1 && a2)) — response with conjunction REALIZABLE") {
@@ -3636,7 +4192,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"F (o_a1[t]:hsb != {bot}:hsb && "
 			"o_a2[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Size 3: three-atom conjunction ---
@@ -3649,7 +4209,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"o_a1[t]:hsb != {bot}:hsb && "
 			"o_a2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Size 3: nested temporal ---
@@ -3659,7 +4223,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec("G (F (o_a0[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL template FG(a0) — persistence REALIZABLE") {
@@ -3667,7 +4235,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec("F (G (o_a0[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Size 4: guarded until ---
@@ -3680,7 +4252,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"(o_a1[t]:hsb != {bot}:hsb U "
 			"o_a2[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Two-point mixed templates (from hypothesis_class.py) ---
@@ -3692,7 +4268,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (i_pointA[t]:sbf = {block}:sbf -> "
 			"o_pointB[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("two-point G(a0 -> F(!a1)) — input eventually suppresses REALIZABLE") {
@@ -3702,7 +4282,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (i_pointA[t]:sbf = {suppress}:sbf -> "
 			"F (o_pointB[t]:hsb = {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- CoT-aware templates ---
@@ -3715,7 +4299,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"(o_think[t]:sbf = {think}:sbf U "
 			"o_respond[t]:sbf = {respond}:sbf)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Accumulator-conditioned templates ---
@@ -3727,7 +4315,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (i_acc[t]:sbf = {high}:sbf -> "
 			"o_out[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("accumulator G(acc0 -> F(a0)) — threshold eventually triggers REALIZABLE") {
@@ -3737,7 +4329,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (i_acc[t]:sbf = {high}:sbf -> "
 			"F (o_out[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("accumulator G(acc0 && a0 -> F(a1)) — joint trigger REALIZABLE") {
@@ -3748,7 +4344,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"i_cond[t]:sbf = {active}:sbf -> "
 			"F (o_out[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("accumulator G(acc0 -> !a0) — threshold blocks output REALIZABLE") {
@@ -3758,7 +4358,11 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"G (i_acc[t]:sbf = {high}:sbf -> "
 			"o_blocked[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE invariant and liveness LTL(hsb) specs
@@ -3783,7 +4387,11 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 			"o_careful[t]:hsb != {bot}:hsb) && "
 			"G (F (o_helpful[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Clause addition: base spec + new clause still realizable ---
@@ -3796,7 +4404,11 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
 			"F (o_new[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Clause removal: dropping clause preserves realizability ---
@@ -3809,11 +4421,19 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 			"G (o_x[t]:hsb = {top}:hsb) && "
 			"G (i_flag[t]:sbf = {on}:sbf -> o_x[t]:hsb = {bot}:hsb).");
 		REQUIRE(full != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(full));
+		{
+			auto sat = is_tau_formula_sat<node_t>(full);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 		// After removing second clause
 		tref reduced = spec("G (o_x[t]:hsb = {top}:hsb).");
 		REQUIRE(reduced != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(reduced));
+		{
+			auto sat = is_tau_formula_sat<node_t>(reduced);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mode B (spec-only): token + admit constraints ---
@@ -3825,7 +4445,11 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 			"G (o_admit[t]:hsb != {bot}:hsb) && "
 			"G (o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mode A (joint LLM+spec): embed + token + admit ---
@@ -3848,7 +4472,11 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 			"o_token[t]:bv[8] != {0}:bv[8]) && "
 			"G (o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Incremental BA-Hom: adding generators preserves coherence ---
@@ -3891,8 +4519,16 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 		REQUIRE(fm1 != nullptr);
 		REQUIRE(fm2 != nullptr);
 		// Same spec string produces parseable formulas (session restore)
-		CHECK(is_tau_formula_sat<node_t>(fm1));
-		CHECK(is_tau_formula_sat<node_t>(fm2));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm1);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm2);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- KL proxy: restrictive spec is harder to satisfy ---
@@ -3918,20 +4554,32 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 		// Sub-spec 1
 		tref sub1 = spec("G (o_a[t]:hsb != {bot}:hsb).");
 		REQUIRE(sub1 != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(sub1));
+		{
+			auto sat = is_tau_formula_sat<node_t>(sub1);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 		// Sub-spec 2
 		tref sub2 = spec(
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
 			"F (o_b[t]:hsb != {bot}:hsb)).");
 		REQUIRE(sub2 != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(sub2));
+		{
+			auto sat = is_tau_formula_sat<node_t>(sub2);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 		// Combined
 		tref combined = spec(
 			"G (o_a[t]:hsb != {bot}:hsb) && "
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
 			"F (o_b[t]:hsb != {bot}:hsb)).");
 		REQUIRE(combined != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(combined));
+		{
+			auto sat = is_tau_formula_sat<node_t>(combined);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE spec composition & failure recovery patterns
@@ -3955,7 +4603,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 		bdd_init<Bool>();
 		tref c1 = spec("G (o_polite[t]:hsb != {bot}:hsb).");
 		REQUIRE(c1 != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(c1));
+		{
+			auto sat = is_tau_formula_sat<node_t>(c1);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("Clause split: G(trigger -> F(response)) individually realizable") {
@@ -3965,7 +4617,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"G (i_ask[t]:sbf = {ask}:sbf -> "
 			"F (o_answer[t]:hsb != {bot}:hsb)).");
 		REQUIRE(c2 != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(c2));
+		{
+			auto sat = is_tau_formula_sat<node_t>(c2);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("Clause split: GF(a) individually realizable") {
@@ -3973,7 +4629,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 		bdd_init<Bool>();
 		tref c3 = spec("G (F (o_check[t]:hsb != {bot}:hsb)).");
 		REQUIRE(c3 != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(c3));
+		{
+			auto sat = is_tau_formula_sat<node_t>(c3);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Joint formula: all clauses composed ---
@@ -3987,7 +4647,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"F (o_answer[t]:hsb != {bot}:hsb)) && "
 			"G (F (o_check[t]:hsb != {bot}:hsb)).");
 		REQUIRE(joint != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(joint));
+		{
+			auto sat = is_tau_formula_sat<node_t>(joint);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- LLM-side clause removal: drop LLM clause, keep spec clauses ---
@@ -4002,14 +4666,22 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"G (i_user[t]:sbf = {rule}:sbf -> "
 			"F (o_user[t]:hsb != {bot}:hsb)).");
 		REQUIRE(full != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(full));
+		{
+			auto sat = is_tau_formula_sat<node_t>(full);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 		// After dropping LLM clause
 		tref without_llm = spec(
 			"G (o_spec[t]:hsb != {bot}:hsb) && "
 			"G (i_user[t]:sbf = {rule}:sbf -> "
 			"F (o_user[t]:hsb != {bot}:hsb)).");
 		REQUIRE(without_llm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(without_llm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(without_llm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Targeted surgery: replace one clause while keeping others ---
@@ -4022,13 +4694,21 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (o_concise[t]:hsb != {bot}:hsb).");
 		REQUIRE(strict != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(strict));
+		{
+			auto sat = is_tau_formula_sat<node_t>(strict);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 		// Surgery: replace "always concise" with "eventually concise"
 		tref weaker = spec(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"F (o_concise[t]:hsb != {bot}:hsb).");
 		REQUIRE(weaker != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(weaker));
+		{
+			auto sat = is_tau_formula_sat<node_t>(weaker);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Origin-aware: contradictory LLM clause makes joint unrealizable ---
@@ -4041,11 +4721,19 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"G (o_x[t]:hsb = {top}:hsb) && "
 			"G (o_x[t]:hsb = {bot}:hsb).");
 		REQUIRE(joint != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(joint));
+		{
+			auto sat = is_tau_formula_sat<node_t>(joint);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 		// Drop LLM clause (always-top), keep spec clause
 		tref spec_only = spec("G (o_x[t]:hsb = {bot}:hsb).");
 		REQUIRE(spec_only != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(spec_only));
+		{
+			auto sat = is_tau_formula_sat<node_t>(spec_only);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Clause deactivation: inactive clauses excluded from formula ---
@@ -4058,7 +4746,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"G (o_a[t]:hsb != {bot}:hsb) && "
 			"G (F (o_b[t]:hsb != {bot}:hsb)).");
 		REQUIRE(active != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(active));
+		{
+			auto sat = is_tau_formula_sat<node_t>(active);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Mode A 5-clause joint formula: LLM + spec + user origins ---
@@ -4074,7 +4766,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"F (o_user1[t]:hsb != {bot}:hsb)) && "
 			"G (F (o_spec2[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Drop all LLM clauses, keep user+spec ---
@@ -4088,7 +4784,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 			"F (o_user1[t]:hsb != {bot}:hsb)) && "
 			"G (F (o_spec2[t]:hsb != {bot}:hsb)).");
 		REQUIRE(user_spec != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(user_spec));
+		{
+			auto sat = is_tau_formula_sat<node_t>(user_spec);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- hsb-level clause coherence: clauses don't overlap contradictorily ---
@@ -4185,7 +4885,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"G (i_medical[t]:sbf = {med}:sbf -> "
 			"o_citation[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("Surface: bounded answer obligation G(question -> F(answer))") {
@@ -4195,7 +4899,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"G (i_question[t]:sbf = {yesno}:sbf -> "
 			"F (o_answer[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("Surface: confidence-gated abstention") {
@@ -4206,7 +4914,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"G (i_recommend[t]:sbf = {rec}:sbf -> "
 			"o_confident[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Three-sorted: hsb + Q projections modeled as multi-type ---
@@ -4220,7 +4932,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"i_conf[t]:sbf = {high}:sbf -> "
 			"F (o_commit[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- ω-categoricity: finite constants preserve decidability ---
@@ -4286,7 +5002,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"o_h4[t]:hsb != {bot}:hsb) && "
 			"G (F (o_h5[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Soundness: contradictory classifiers → unrealizable ---
@@ -4309,7 +5029,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"G (o_cls[t]:hsb = {top}:hsb) && "
 			"G (o_cls[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
+		}
 	}
 
 	// --- Conservativity: pipeline filters but doesn't extend ---
@@ -4322,11 +5046,19 @@ TEST_SUITE("hsb — classification halfspace construction") {
 			"G (o_safe[t]:hsb != {bot}:hsb) && "
 			"G (F (o_live[t]:hsb != {bot}:hsb)).");
 		REQUIRE(full != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(full));
+		{
+			auto sat = is_tau_formula_sat<node_t>(full);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 		// Safety-only filter (conservative subset)
 		tref safe_only = spec("G (o_safe[t]:hsb != {bot}:hsb).");
 		REQUIRE(safe_only != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(safe_only));
+		{
+			auto sat = is_tau_formula_sat<node_t>(safe_only);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE classification halfspace construction LTL(hsb,vec,Q)
@@ -4442,7 +5174,11 @@ TEST_SUITE("hsb — concept halfspace composition") {
 			"G (i_medical[t]:sbf = {med}:sbf -> "
 			"o_cites[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("Disjointness in LTL: G(¬(A ∧ B)) REALIZABLE") {
@@ -4453,7 +5189,11 @@ TEST_SUITE("hsb — concept halfspace composition") {
 			"G (o_cat[t]:hsb != {bot}:hsb -> "
 			"o_dog[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Binary relation halfspaces ---
@@ -4503,7 +5243,11 @@ TEST_SUITE("hsb — concept halfspace composition") {
 			"F (o_ans[t]:hsb != {bot}:hsb)) && "
 			"G (o_safe[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE concept halfspace composition
@@ -4666,7 +5410,11 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 			"G (o_safe[t]:hsb != {bot}:hsb) && "
 			"F (o_goal[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	// --- Linear-separability limit: polyhedral cells ---
@@ -4705,7 +5453,11 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 		tref fm = spec(
 			"G (i_a[t]:sbf = {a}:sbf -> o_b[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 	TEST_CASE("LTL: G(¬(A ∧ B)) + F(A) + F(B) disjoint regions REALIZABLE") {
@@ -4717,7 +5469,11 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 			"F (o_a[t]:hsb != {bot}:hsb) && "
 			"F (o_b[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(fm));
+		{
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(sat.has_value());
+			CHECK(sat.value());
+		}
 	}
 
 } // TEST_SUITE halfspace complement and containment

@@ -51,7 +51,9 @@ std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
 		for (size_t i = 0; i < times; ++i) {
 // 			// we execute the i-th step
 
-			auto [out, _] = intprtr.value().step();
+			auto step_res = intprtr.value().step();
+			if (!step_res.has_value()) break;
+			auto [out, _] = step_res.value();
 
 			// The output can be empty if all variables have been assigned in previous steps
 			if (!out.has_value()) {

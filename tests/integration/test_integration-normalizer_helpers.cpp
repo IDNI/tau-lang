@@ -167,12 +167,12 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 
 	// The documented example of is_non_temp_nso_unsat.
 	TEST_CASE("is_non_temp_nso_unsat on a contradiction") {
-		CHECK( is_non_temp_nso_unsat<node_t>(wff("x = 0 && x != 0")) );
+		CHECK( is_non_temp_nso_unsat<node_t>(wff("x = 0 && x != 0")).value() );
 	}
 
 	TEST_CASE("is_non_temp_nso_unsat on a satisfiable formula") {
-		CHECK( !is_non_temp_nso_unsat<node_t>(wff("x = 0")) );
-		CHECK( !is_non_temp_nso_unsat<node_t>(wff("x = 0 || x != 0")) );
+		CHECK( !is_non_temp_nso_unsat<node_t>(wff("x = 0")).value() );
+		CHECK( !is_non_temp_nso_unsat<node_t>(wff("x = 0 || x != 0")).value() );
 	}
 
 	TEST_CASE("is_non_temp_nso_satisfiable agrees with its dual") {
@@ -180,8 +180,8 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 					"x = 0 && x != 0", "x y = 0" }) {
 			CAPTURE(s);
 			tref fm = wff(s);
-			CHECK( is_non_temp_nso_satisfiable<node_t>(fm)
-				== !is_non_temp_nso_unsat<node_t>(fm) );
+			CHECK( is_non_temp_nso_satisfiable<node_t>(fm).value()
+				== !is_non_temp_nso_unsat<node_t>(fm).value() );
 		}
 	}
 

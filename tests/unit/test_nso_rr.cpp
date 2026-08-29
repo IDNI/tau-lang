@@ -19,9 +19,9 @@ TEST_SUITE("nso_rr unit tests") {
 		// apply recurrence relations
 		auto applied = nso_rr_apply<node_t>(rr);
 
-		CHECK( applied != nullptr );
+		CHECK( applied.has_value() );
 		// the result should be a wff (boolean formula) at its root
-		CHECK( tau::get(applied).is(tau::wff) );
+		CHECK( tau::get(applied.value()).is(tau::wff) );
 	}
 
 	TEST_CASE("nso_rr_apply: transform ref args to captures and substitute") {
@@ -37,11 +37,42 @@ TEST_SUITE("nso_rr unit tests") {
 		auto rr = maybe.value();
 
 		auto applied = nso_rr_apply<node_t>(rr);
-		CHECK( applied != nullptr );
+		CHECK( applied.has_value() );
 
 		// The applied main should contain a bf (boolean formula) reference or body
-		CHECK( ((tt(applied) | tau::bf).has_value()
-			|| (tt(applied) | tau::bf_eq).has_value()) );
+		CHECK( ((tt(applied.value()) | tau::bf).has_value()
+			|| (tt(applied.value()) | tau::bf_eq).has_value()) );
+	}
+
+}
+
+TEST_SUITE("rule counting") {
+
+	TEST_CASE("normalizer: rule_counting gates count nodes in the report") {
+		// nso_rr_apply(rule, tref) caches on (rule, formula) identity, so
+		// each case below needs a formula never rewritten anywhere else in
+		// this binary -- otherwise a cache hit skips the counting code
+		// entirely and the assertion below is testing a stale cache, not
+		// the counting logic.
+		auto with_flag = get_nso_rr(
+			"q[m](y) := !q[m-1](y)."
+			"q[0](y) := F."
+			"q(y).");
+		REQUIRE( with_flag.has_value() );
+		rule_counting = true;
+		auto counted = normalizer<node_t>(with_flag.value());
+		rule_counting = false;
+		CHECK( counted.has_value() );
+		CHECK( report_has_code(counted.report(), code::info_count) );
+
+		auto without_flag = get_nso_rr(
+			"p[k](z) := !p[k-1](z)."
+			"p[0](z) := T."
+			"p(z).");
+		REQUIRE( without_flag.has_value() );
+		auto uncounted = normalizer<node_t>(without_flag.value());
+		CHECK( uncounted.has_value() );
+		CHECK( !report_has_code(uncounted.report(), code::info_count) );
 	}
 
 }

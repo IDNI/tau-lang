@@ -44,7 +44,6 @@ include(GNUInstallDirs)
 include(FetchContent)
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
-option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
 option(TAU_LOG_LINES               "Log file and line numbers"             OFF)
 option(TAU_LOG_LINE_PATHS          "Log file with a path and line numbers" OFF)
@@ -87,7 +86,6 @@ option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legac
 include(tau-resolve)
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_CACHE                   PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_LINES               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_LINE_PATHS          PROPERTY STRINGS "OFF" "ON")
@@ -217,24 +215,19 @@ endif()
 #
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	set(TAU_BUILD_BENCHMARK ON)
-	set(TAU_MEASURE ON)
 	set(TAU_CACHE ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	set(TAU_CACHE OFF)
 #	set(TAU_LOG_TRACE_TESTS ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	set(TAU_CACHE ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Devel")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	set(TAU_CACHE ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	message(STATUS "Building with coverage information")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
@@ -270,26 +263,16 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 endif()
 
 
-if(NOT TAU_BUILD_BENCHMARK)
-	set(TAU_MEASURE OFF)
-endif()
-
-if(TAU_MEASURE)
-	set(PARSER_MEASURE ON)
-endif()
-
 #
 # Defining available definitions
 #
 set(TAU_DEFINITIONS
-	TAU_MEASURE
 	TAU_CACHE
 	TAU_LOG_LINES
 	TAU_LOG_LINE_PATHS
 	TAU_LOG_CHANNELS
 )
 
-message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
 message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
 message(STATUS "TAU_LOG_LINE_PATHS: ${TAU_LOG_LINE_PATHS}")

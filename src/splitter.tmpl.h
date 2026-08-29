@@ -70,20 +70,25 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 		// We are dealing with a temporal formula
 		// NOTE: temporal upper splitters do not necessarily imply fm; the
 		// implication check below (sat + non-equivalence) is the correct gate.
-		tref new_spec_clause = normalize_with_temp_simp<node>(
+		auto new_spec_clause_r = normalize_with_temp_simp<node>(
 			rewriter::replace<node>(spec_clause, fm, splitter));
-		// nullptr when the definitions in the clause do not settle;
+		// No value when the definitions in the clause do not settle;
 		// no normalized clause means no splitter to report.
-		if (!new_spec_clause) return false;
-		if (is_tau_formula_sat<node>(new_spec_clause)) {
-			if (!are_tau_equivalent<node>(new_spec_clause, spec_clause))
+		if (!new_spec_clause_r.has_value()) return false;
+		tref new_spec_clause = new_spec_clause_r.value();
+		auto sat = is_tau_formula_sat<node>(new_spec_clause);
+		if (sat.has_value() && sat.value()) {
+			auto eq = are_tau_equivalent<node>(new_spec_clause, spec_clause);
+			if (!(eq.has_value() && eq.value()))
 				return true;
 		}
 	} else {
 		// We are dealing with a non-temporal formula
-		if (is_non_temp_nso_satisfiable<node>(splitter)
+		auto sat = is_non_temp_nso_satisfiable<node>(splitter);
+		if (sat.has_value() && sat.value()
 			&& !are_nso_equivalent<node>(splitter, fm)) {
-			DBG(assert(is_nso_impl<node>(splitter, fm));)
+			DBG(auto impl = is_nso_impl<node>(splitter, fm);
+				assert(impl.has_value() && impl.value());)
 			return true;
 		}
 	}
@@ -423,7 +428,8 @@ tref tau_splitter(tref fm, splitter_type st) {
 		bool is_redundant = false;
 		for (size_t j = 0; j < clauses.size(); ++j) {
 			if ((size_t) i == j) continue;
-			if (is_tau_impl<node>(clauses[j], clauses[i])) {
+			auto impl = is_tau_impl<node>(clauses[j], clauses[i]);
+			if (impl.has_value() && impl.value()) {
 				clauses.erase(clauses.begin() + i);
 				--i, is_redundant = true;
 				break;

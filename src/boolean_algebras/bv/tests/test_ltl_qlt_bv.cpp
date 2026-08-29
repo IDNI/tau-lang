@@ -17,7 +17,8 @@ static bool realizable(const char* s) {
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;
-	return is_tau_formula_sat<node_t>(fm);
+	auto sat = is_tau_formula_sat<node_t>(fm);
+	return sat.has_value() && sat.value();
 }
 
 static strings run_qlt_no_input(const char* formula, size_t steps) {
@@ -744,7 +745,11 @@ TEST_SUITE("grammar_fuzz") {
 		if (nso.has_value()) {
 			tref fm = nso.value().main->get();
 			CHECK(fm != nullptr);
-			if (fm) CHECK(is_tau_formula_sat<node_t>(fm));
+			if (fm) {
+				auto sat = is_tau_formula_sat<node_t>(fm);
+				CHECK(sat.has_value());
+				if (sat.has_value()) CHECK(sat.value());
+			}
 		}
 	}
 
@@ -759,7 +764,11 @@ TEST_SUITE("grammar_fuzz") {
 		if (nso.has_value()) {
 			tref fm = nso.value().main->get();
 			CHECK(fm != nullptr);
-			if (fm) CHECK(is_tau_formula_sat<node_t>(fm));
+			if (fm) {
+				auto sat = is_tau_formula_sat<node_t>(fm);
+				CHECK(sat.has_value());
+				if (sat.has_value()) CHECK(sat.value());
+			}
 		}
 	}
 
@@ -774,7 +783,11 @@ TEST_SUITE("grammar_fuzz") {
 		if (nso.has_value()) {
 			tref fm = nso.value().main->get();
 			CHECK(fm != nullptr);
-			if (fm) CHECK(is_tau_formula_sat<node_t>(fm));
+			if (fm) {
+				auto sat = is_tau_formula_sat<node_t>(fm);
+				CHECK(sat.has_value());
+				if (sat.has_value()) CHECK(sat.value());
+			}
 		}
 	}
 

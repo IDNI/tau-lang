@@ -236,10 +236,14 @@ using pwr_sat_memo = std::map<std::pair<tref, int_t>, bool>;
 
 template <NodeType node>
 bool pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo) {
-	if (!memo) return is_tau_formula_sat<node>(fm, start_time);
+	auto compute = [&] {
+		auto sat = is_tau_formula_sat<node>(fm, start_time);
+		return sat.has_value() && sat.value();
+	};
+	if (!memo) return compute();
 	const auto key = std::make_pair(fm, start_time);
 	if (auto it = memo->find(key); it != memo->end()) return it->second;
-	const bool r = is_tau_formula_sat<node>(fm, start_time);
+	const bool r = compute();
 	(*memo)[key] = r;
 	return r;
 }
@@ -564,9 +568,12 @@ tref pointwise_revision_temporal(
 				tref opt = pack_semantic_pwr_optimal<node>(
 					sc, update);
 				// A revision only helps if it is realizable.
-				if (opt && !is_tau_formula_sat<node>(
-					opt, start_time))
+				if (opt) {
+					auto sat = is_tau_formula_sat<node>(
+						opt, start_time);
+					if (!(sat.has_value() && sat.value()))
 						opt = nullptr;
+				}
 				if (opt) {
 					revised.push_back(opt);
 					continue;

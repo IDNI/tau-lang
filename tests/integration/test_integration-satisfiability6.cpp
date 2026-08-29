@@ -98,7 +98,7 @@ TEST_SUITE("satisfiability public API") {
 	TEST_CASE("is_tau_impl: true case") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
-		CHECK( is_tau_impl<node_t>(f1, f2) );
+		CHECK( is_tau_impl<node_t>(f1, f2).value() );
 	}
 
 	TEST_CASE("is_tau_impl: false case") {
@@ -107,7 +107,7 @@ TEST_SUITE("satisfiability public API") {
 		// satisfiable and the implication does not hold.
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always o2[t] = 0.");
-		CHECK( !is_tau_impl<node_t>(f1, f2) );
+		CHECK( !is_tau_impl<node_t>(f1, f2).value() );
 	}
 
 	// Closes: the "is fm valid" idiom `is_tau_impl(tau::_T(), fm)` used at
@@ -116,10 +116,10 @@ TEST_SUITE("satisfiability public API") {
 	TEST_CASE("is_tau_impl: validity idiom with _T() antecedent") {
 		// A tautology: o1[t] is either 1 or not 1 at every time step.
 		tref valid_fm = create_spec("always (o1[t] = 1 || o1[t] != 1).");
-		CHECK( is_tau_impl<node_t>(tau::_T(), valid_fm) );
+		CHECK( is_tau_impl<node_t>(tau::_T(), valid_fm).value() );
 		// Not a tautology: o1 need not be constantly 1.
 		tref not_valid_fm = create_spec("always o1[t] = 1.");
-		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm) );
+		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm).value() );
 	}
 
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
@@ -127,13 +127,13 @@ TEST_SUITE("satisfiability public API") {
 	TEST_CASE("are_tau_equivalent: equivalent pair") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always !(o1[t] != 1).");
-		CHECK( are_tau_equivalent<node_t>(f1, f2) );
+		CHECK( are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
 	TEST_CASE("are_tau_equivalent: non-equivalent pair") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always o1[t] = 0.");
-		CHECK( !are_tau_equivalent<node_t>(f1, f2) );
+		CHECK( !are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
 	// Closes: `simp_tau_unsat_valid` (src/satisfiability.tmpl.h:1549) had zero
@@ -141,7 +141,7 @@ TEST_SUITE("satisfiability public API") {
 	// return at line 1553.
 	TEST_CASE("simp_tau_unsat_valid: valid formula collapses to T") {
 		tref fm = create_spec("always (o1[t] = 1 || o1[t] != 1).");
-		CHECK( simp_tau_unsat_valid<node_t>(fm) == tau::_T() );
+		CHECK( simp_tau_unsat_valid<node_t>(fm).value() == tau::_T() );
 	}
 
 	// Exercises the clause-filtering loop at src/satisfiability.tmpl.h:1557-1561:
@@ -153,12 +153,12 @@ TEST_SUITE("satisfiability public API") {
 		tref fm = create_spec(
 			"(always (o2[t] = 0 && o2[t-1] = o2[t] && o2[t-1] != 0))"
 			" || (always o1[t] = 1).");
-		tref res = simp_tau_unsat_valid<node_t>(fm);
+		tref res = simp_tau_unsat_valid<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 		// simp_tau_unsat_valid guarantees no particular normal form for the
 		// surviving disjuncts, so only satisfiability-equivalence is asserted.
-		CHECK( is_tau_formula_sat<node_t>(res) );
+		CHECK( is_tau_formula_sat<node_t>(res).value() );
 	}
 
 	// The whole formula is unsatisfiable, so `clauses` stays `{ _F() }` and
@@ -167,7 +167,7 @@ TEST_SUITE("satisfiability public API") {
 		// From test_integration-satisfiability1.cpp:13 (known unsat).
 		tref fm = create_spec(
 			"(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
-		tref res = simp_tau_unsat_valid<node_t>(fm);
+		tref res = simp_tau_unsat_valid<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).equals_F() );
 	}
@@ -397,8 +397,8 @@ TEST_SUITE("satisfiability helpers") {
 	// branches at lines 466-468 are pinned here. Formulas from the doc example
 	// at src/satisfiability.tmpl.h:425-437.
 	TEST_CASE("is_run_satisfiable: T and F short-circuits") {
-		CHECK(  is_run_satisfiable<node_t>(tau::_T()) );
-		CHECK( !is_run_satisfiable<node_t>(tau::_F()) );
+		CHECK(  is_run_satisfiable<node_t>(tau::_T()).value() );
+		CHECK( !is_run_satisfiable<node_t>(tau::_F()).value() );
 	}
 
 	TEST_CASE("is_run_satisfiable: satisfiable fully instantiated run") {
@@ -407,7 +407,7 @@ TEST_SUITE("satisfiability helpers") {
 		// an output stream constantly equal to 1 exists.
 		tref run = wff_of("o1[0] = 1 && o1[1] = o1[0]");
 		REQUIRE( run != nullptr );
-		CHECK( is_run_satisfiable<node_t>(run) );
+		CHECK( is_run_satisfiable<node_t>(run).value() );
 	}
 
 	TEST_CASE("is_run_satisfiable: unsatisfiable fully instantiated run") {
@@ -415,7 +415,7 @@ TEST_SUITE("satisfiability helpers") {
 		// existentially quantified, so no assignment exists.
 		tref run = wff_of("o1[0] = 0 && o1[1] = o1[0] && o1[1] != 0");
 		REQUIRE( run != nullptr );
-		CHECK( !is_run_satisfiable<node_t>(run) );
+		CHECK( !is_run_satisfiable<node_t>(run).value() );
 	}
 
 	TEST_CASE("is_run_satisfiable: input streams are universally quantified") {
@@ -428,11 +428,11 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( io_var_named(io_vars_of(in_run), "i1") != nullptr );
 		REQUIRE( tau::get(io_var_named(io_vars_of(in_run), "i1"))
 			.is_input_variable() );
-		CHECK( !is_run_satisfiable<node_t>(in_run) );
+		CHECK( !is_run_satisfiable<node_t>(in_run).value() );
 		// ...while the same formula over an output stream is satisfiable.
 		tref out_run = tau::trim2(create_spec("always o1[0] = 0."));
 		REQUIRE( out_run != nullptr );
-		CHECK( is_run_satisfiable<node_t>(out_run) );
+		CHECK( is_run_satisfiable<node_t>(out_run).value() );
 	}
 
 	// Closes: `get_lookback_after_normalization` (src/satisfiability.tmpl.h:67)
@@ -667,7 +667,7 @@ TEST_SUITE("satisfiability regression") {
 		tref fm = create_spec("f(x).");
 		REQUIRE( fm != nullptr );
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::ref>) != nullptr );
-		CHECK( transform_to_execution<node_t>(fm) == tau::_F() );
+		CHECK( transform_to_execution<node_t>(fm).value() == tau::_F() );
 	}
 
 	// Closes: the purely non-temporal branch at
@@ -682,13 +682,13 @@ TEST_SUITE("satisfiability regression") {
 			.find_top(is_child<node_t, tau::wff_always>) == nullptr );
 		REQUIRE( tau::get(fm)
 			.find_top(is_child<node_t, tau::wff_sometimes>) == nullptr );
-		CHECK( transform_to_execution<node_t>(fm) == tau::_F() );
+		CHECK( transform_to_execution<node_t>(fm).value() == tau::_F() );
 	}
 
 	TEST_CASE("transform_to_execution: non-temporal satisfiable formula is returned unchanged") {
 		tref fm = create_spec("o1[0] = 0 && o1[1] = o1[0].");
 		REQUIRE( fm != nullptr );
-		tref res = transform_to_execution<node_t>(fm);
+		tref res = transform_to_execution<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 		// `elim_aw(fm)` is the identity here: there is no `wff_always` child

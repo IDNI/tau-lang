@@ -42,7 +42,8 @@ static bool realizable(const char* s) {
 	do_gc();
 	tref fm = spec_parse(s);
 	if (!fm) return false;
-	return is_tau_formula_sat<node_t>(fm);
+	auto r = is_tau_formula_sat<node_t>(fm);
+	return r.has_value() && r.value();
 }
 
 // ── NEG-PARSE tests ────────────────────────────────────────────────────────────
@@ -166,9 +167,13 @@ TEST_SUITE("NEG-CONSIST: determinism — same verdict on repeated evaluation") {
 	static auto consistent = [](const char* formula, int n = 5) -> bool {
 		tref fm = spec_parse(formula);
 		if (!fm) return true; // parse failure is deterministically skipped
-		bool first = is_tau_formula_sat<node_t>(fm);
-		for (int i = 1; i < n; ++i)
-			if (is_tau_formula_sat<node_t>(fm) != first) return false;
+		auto r0 = is_tau_formula_sat<node_t>(fm);
+		if (!r0.has_value()) return false;
+		bool first = r0.value();
+		for (int i = 1; i < n; ++i) {
+			auto r = is_tau_formula_sat<node_t>(fm);
+			if (!r.has_value() || r.value() != first) return false;
+		}
 		return true;
 	};
 

@@ -37,7 +37,9 @@ static tref spec(const char* s) {
 }
 
 static bool is_realizable(tref fm) {
-	return fm && is_tau_formula_sat<node_t>(fm);
+	if (!fm) return false;
+	auto sat = is_tau_formula_sat<node_t>(fm);
+	return sat.has_value() && sat.value();
 }
 
 // ============================================================================
@@ -557,7 +559,10 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		// here so this case still exercises the composed production
 		// behaviour: a θ that is not realizable is discarded just as
 		// pointwise_revision_temporal would discard it.
-		if (theta && !is_tau_formula_sat<node_t>(theta, 0)) theta = nullptr;
+		if (theta) {
+			auto sat = is_tau_formula_sat<node_t>(theta, 0);
+			if (!sat.has_value() || !sat.value()) theta = nullptr;
+		}
 		// θ is allowed to be null (Algorithm D may report the clause
 		// unrealizable, or the composed θ may not be realizable), but a
 		// returned θ must be a sound revision: realizable, and it must

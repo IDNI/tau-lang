@@ -297,9 +297,8 @@ TEST_SUITE("solve") {
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
 		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
-		bool solve_error = false;
-		auto solution = solve<node_t>(form, options, solve_error);
-		return solution ? check_solution<node_t>(form, solution.value()) : false;
+		auto solution = solve<node_t>(form, options);
+		return solution.has_value() ? check_solution<node_t>(form, solution.value()) : false;
 	}
 
 	bool test_solve_min(const std::string system, const tref type = tau_type<node_t>()) {

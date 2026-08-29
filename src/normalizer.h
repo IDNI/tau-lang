@@ -19,6 +19,7 @@
 #define __IDNI__TAU__NORMALIZER_H__
 
 #include "nso_rr.h"
+#include "tau_diagnostics.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -62,18 +63,18 @@ namespace idni::tau_lang {
  * @code{.cpp}
  * // Non-temporal tautology reduces to T
  * tref fm1 = get_nso_rr("x = 0 || x != 0.").value().main->get();
- * CHECK( tau::get(normalize<node_t>(fm1)).equals_T() );
+ * CHECK( tau::get(normalize<node_t>(fm1).value()).equals_T() );
  *
  * // Temporal case: "ex t [t > 3]" normalizes into a formula wrapped in
  * // "always" (see tests/integration/test_integration-wff_normalization.cpp:34-37,
  * // which checks this via the fuller normalizer<node_t> pipeline).
  * tref fm2 = get_nso_rr("ex t [t > 3].").value().main->get();
- * tref res2 = normalize<node_t>(fm2);
+ * tref res2 = normalize<node_t>(fm2).value();
  * CHECK( tau::get(res2).child_is(tau::wff_always) );
  * @endcode
  */
 template <NodeType node>
-tref normalize(tref form);
+result<tref> normalize(tref form);
 
 /**
  * @brief Fold trivial quantifiers and Boolean identities in a WFF.
@@ -123,13 +124,13 @@ tref fold_trivial_quantifiers(tref fm);
  * // See tests/integration/test_integration-wff_normalization.cpp:38-42.
  * tref fm = get_nso_rr(
  *     "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].").value().main->get();
- * tref res = normalize_non_temp<node_t>(fm);
+ * tref res = normalize_non_temp<node_t>(fm).value();
  * // tau::get(res).to_str() ==
  * //   "u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau"
  * @endcode
  */
 template <NodeType node>
-tref normalize_non_temp(tref fm);
+result<tref> normalize_non_temp(tref fm);
 
 /**
  * @brief Build a fresh uninterpreted constant of the given BA type not present in `fm`.
@@ -178,15 +179,15 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
  * // "always"-wrapped models violates it
  * // (see tests/unit/test_normal_forms.cpp:307-318).
  * tref fm1 = get_nso_rr("always x = 0.").value().main->get();
- * CHECK( has_no_boolean_combs_of_models<node_t>(fm1) );
+ * CHECK( has_no_boolean_combs_of_models<node_t>(fm1).value() );
  *
  * tref fm2 = get_nso_rr(
  *     "(always x = 0) && (always y = 0).").value().main->get();
- * CHECK( !has_no_boolean_combs_of_models<node_t>(fm2) );
+ * CHECK( !has_no_boolean_combs_of_models<node_t>(fm2).value() );
  * @endcode
  */
 template <NodeType node>
-bool has_no_boolean_combs_of_models(tref n);
+result<bool> has_no_boolean_combs_of_models(tref n);
 
 /**
  * @brief Determine whether a non-temporal NSO formula is satisfiable.
@@ -200,14 +201,32 @@ bool has_no_boolean_combs_of_models(tref n);
  * @par Example
  * @code{.cpp}
  * tref fm1 = get_nso_rr("x = 0.").value().main->get();
- * CHECK( is_non_temp_nso_satisfiable<node_t>(fm1) );
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(fm1).value() );
  *
  * tref fm2 = get_nso_rr("x = 0 && x != 0.").value().main->get();
- * CHECK( !is_non_temp_nso_satisfiable<node_t>(fm2) );
+ * CHECK( !is_non_temp_nso_satisfiable<node_t>(fm2).value() );
  * @endcode
  */
 template <NodeType node>
-bool is_non_temp_nso_satisfiable(tref n);
+result<bool> is_non_temp_nso_satisfiable(tref n);
+
+/**
+ * @brief Checks whether a non-temporal NSO formula is unsatisfiable.
+ *
+ * Wraps free variables with existential quantifiers, normalizes via
+ * `normalize_non_temp`, and returns `true` if the result is `F`.
+ * @tparam node Tree node type.
+ * @param n The non-temporal formula to test.
+ * @return `true` if the formula is unsatisfiable, `false` otherwise.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
+ * CHECK( is_non_temp_nso_unsat<node_t>(fm).value() );
+ * @endcode
+ */
+template <NodeType node>
+result<bool> is_non_temp_nso_unsat(tref n);
 
 /**
  * @brief Find a relative offset in a definition that its head cannot bind.
@@ -289,12 +308,12 @@ bool are_nso_equivalent(tref n1, tref n2);
  * // (see tests/unit/test_normal_forms.cpp:352-363).
  * tref n1 = get_nso_rr("x = 0 && y = 0.").value().main->get();
  * tref n2 = get_nso_rr("x = 0.").value().main->get();
- * CHECK( is_nso_impl<node_t>(n1, n2) );
- * CHECK( !is_nso_impl<node_t>(n2, n1) );
+ * CHECK( is_nso_impl<node_t>(n1, n2).value() );
+ * CHECK( !is_nso_impl<node_t>(n2, n1).value() );
  * @endcode
  */
 template <NodeType node>
-bool is_nso_impl(tref n1, tref n2);
+result<bool> is_nso_impl(tref n1, tref n2);
 
 /**
  * @brief Normalize a formula with temporal simplifications.
@@ -319,11 +338,11 @@ bool is_nso_impl(tref n1, tref n2);
  * // Same pipeline that backs normalizer(tref) (a thin wrapper around this
  * // function): a tautology reduces to T.
  * tref fm = get_nso_rr("x = 0 || x != 0.").value().main->get();
- * CHECK( tau::get(normalize_with_temp_simp<node_t>(fm)).equals_T() );
+ * CHECK( tau::get(normalize_with_temp_simp<node_t>(fm).value()).equals_T() );
  * @endcode
  */
 template <NodeType node>
-tref normalize_with_temp_simp(tref fm);
+result<tref> normalize_with_temp_simp(tref fm);
 
 /**
  * @brief Normalize a Boolean function that has no recurrence relation.
@@ -391,12 +410,12 @@ tref bf_normalizer_with_rec_relation(const rr<node> &bf);
  * const char* sample =
  *     "all a,b,c,d a'c|b'd = 0 <-> a & b' & d | a' & c | b' & c' & d = 0.";
  * auto nso_rr = get_nso_rr(sample).value();
- * tref res = normalizer<node_t>(nso_rr);
+ * tref res = normalizer<node_t>(nso_rr).value();
  * CHECK( tau::get(res).child_is(tau::wff_t) );
  * @endcode
  */
 template <NodeType node>
-tref normalizer(const rr<node>& nso_rr);
+result<tref> normalizer(const rr<node>& nso_rr);
 
 /**
  * @brief Full normalizer for a plain formula (no recurrence relation).
@@ -409,11 +428,11 @@ tref normalizer(const rr<node>& nso_rr);
  * @par Example
  * @code{.cpp}
  * tref fm = get_nso_rr("x = 0 || x != 0.").value().main->get();
- * CHECK( tau::get(normalizer<node_t>(fm)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(fm).value()).equals_T() );
  * @endcode
  */
 template <NodeType node>
-tref normalizer(tref fm);
+result<tref> normalizer(tref fm);
 
 /**
  * @brief Normalize temporal quantifiers (`always`/`sometimes`) in a formula.

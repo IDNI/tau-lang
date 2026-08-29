@@ -395,7 +395,8 @@ static bool aba_existential_feasible(tref fm) {
 		for (tref v : tau::get(fm).get_free_vars())
 			if (pack_type_output_always_satisfiable<node>(
 				tree<node>::get(v).get_ba_type())) return true;
-		return is_non_temp_nso_satisfiable<node>(fm);
+		auto sat = is_non_temp_nso_satisfiable<node>(fm);
+		return sat.has_value() && sat.value();
 	};
 	ocltl_swap_stats().total_calls.fetch_add(1, std::memory_order_relaxed);
 	bool result = compute();
@@ -443,11 +444,15 @@ static bool aba_synthesis_feasible(tref fm) {
 	// through its own quantifier support instead of DNF/Shannon case-split.
 	// A nullopt (cvc5 unknown or translation failure) is not a "no": fall
 	// through to the general solver rather than reading it as infeasible.
+	auto sat_nt = [](tref f) {
+		auto sr = is_non_temp_nso_satisfiable<node>(f);
+		return sr.has_value() && sr.value();
+	};
 	bool result;
 	if (pack_can_solve<node>(q_fm)) {
 		if (auto sat = pack_sat_status<node>(q_fm)) result = *sat;
-		else result = is_non_temp_nso_satisfiable<node>(q_fm);
-	} else result = is_non_temp_nso_satisfiable<node>(q_fm);
+		else result = sat_nt(q_fm);
+	} else result = sat_nt(q_fm);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE

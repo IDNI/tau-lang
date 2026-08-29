@@ -11,7 +11,7 @@
 // All three are undefined by the includer after this file.
 
 TAU_PACK_FN(bool, is_ltl_aba_realizable, (tref, int_t, bool))
-TAU_PACK_FN(bool, is_tau_formula_sat, (tref, int_t, bool))
+TAU_PACK_FN(result<bool>, is_tau_formula_sat, (tref, int_t, bool))
 TAU_PACK_FN(bool, has_ltl_operators, (tref))
 
 TAU_PACK_CLASS(tree)

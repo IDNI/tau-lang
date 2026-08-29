@@ -140,7 +140,12 @@ static bool alg_b_realizable(const char* s) {
 	setenv("TAU_LTL_ALG", "B", 1);
 	bdd_init<Bool>();
 	tref fm = spec(s);
-	bool result = (fm != nullptr) && is_tau_formula_sat<node_t>(fm);
+	bool result = false;
+	if (fm != nullptr) {
+		auto r = is_tau_formula_sat<node_t>(fm);
+		REQUIRE(r.has_value());
+		result = r.value();
+	}
 	unsetenv("TAU_LTL_ALG");
 	return result;
 }
@@ -187,7 +192,12 @@ TEST_SUITE("[Algorithm B: integration]") {
 		setenv("TAU_LTL_ALG", "A", 1);
 		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:qlt > i1[t]:qlt).");
-		bool result = (fm != nullptr) && is_tau_formula_sat<node_t>(fm);
+		bool result = false;
+		if (fm != nullptr) {
+			auto r = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(r.has_value());
+			result = r.value();
+		}
 		unsetenv("TAU_LTL_ALG");
 		CHECK(result);
 	}
@@ -196,7 +206,12 @@ TEST_SUITE("[Algorithm B: integration]") {
 		setenv("TAU_LTL_ALG", "D", 1);
 		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:qlt > i1[t]:qlt).");
-		bool result = (fm != nullptr) && is_tau_formula_sat<node_t>(fm);
+		bool result = false;
+		if (fm != nullptr) {
+			auto r = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(r.has_value());
+			result = r.value();
+		}
 		unsetenv("TAU_LTL_ALG");
 		CHECK(result);
 	}
@@ -205,7 +220,12 @@ TEST_SUITE("[Algorithm B: integration]") {
 		setenv("TAU_LTL_ALG", "A", 1);
 		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:qlt > i1[t-1]:qlt).");
-		bool result = (fm != nullptr) && is_tau_formula_sat<node_t>(fm);
+		bool result = false;
+		if (fm != nullptr) {
+			auto r = is_tau_formula_sat<node_t>(fm);
+			REQUIRE(r.has_value());
+			result = r.value();
+		}
 		unsetenv("TAU_LTL_ALG");
 		CHECK(result);
 	}

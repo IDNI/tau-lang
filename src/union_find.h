@@ -182,11 +182,13 @@ struct scoped_union_find {
 
 	union_find_by_less<std::pair<size_t, data_t>, scoped_less<data_t, less_t>> uf;
 	scope current = 0;
-	std::deque<size_t> scopes { current };
+	std::deque<size_t> scopes;
 	scope global = 0;
 
 	/** @brief Construct with a single global scope active. */
-	scoped_union_find() {}
+	scoped_union_find() {
+		scopes.push_back(current);
+	}
 
 	/** @brief Open a new nested scope. */
 	void open() {

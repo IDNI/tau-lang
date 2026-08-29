@@ -27,7 +27,8 @@ static bool realizable(const char* s) {
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;
-	return is_tau_formula_sat<node_t>(fm);
+	auto sat = is_tau_formula_sat<node_t>(fm);
+	return sat.has_value() && sat.value();
 }
 
 // Ask cvc5 LRA: ∃x:Real. phi(x), where phi is built by the caller.

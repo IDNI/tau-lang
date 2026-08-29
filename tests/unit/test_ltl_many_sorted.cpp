@@ -27,7 +27,8 @@ static bool realizable(const char* s) {
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;
-	return is_tau_formula_sat<node_t>(fm);
+	auto r = is_tau_formula_sat<node_t>(fm);
+	return r.has_value() && r.value();
 }
 
 // ltlsynt (Spot >= 2.10) is a required dependency for LTL realizability tests.

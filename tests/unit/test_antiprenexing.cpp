@@ -1203,8 +1203,9 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		const size_t ty = tau::get(var).get_ba_type();
 		tref g = rewriter::replace<node_t>(res, var,
 			one ? tau::_1_trimmed(ty) : tau::_0_trimmed(ty));
-		return tau::get(normalize_non_temp<node_t>(tau::reget(g)))
-			.equals_T();
+		auto nr = normalize_non_temp<node_t>(tau::reget(g));
+		REQUIRE( nr.has_value() );
+		return tau::get(nr.value()).equals_T();
 	}
 
 	TEST_CASE("the unique-zero fold keeps the pivot's negation") {
@@ -1283,7 +1284,9 @@ TEST_SUITE("PureBaBvEliminability") {
 		// kept quantifier.
 		tref fm = get_nso_rr("ex x (x:bv[1] != { 0 }:bv[1] "
 			"&& x:bv[1] != { 1 }:bv[1]).").value().main->get();
-		tref r = normalize_non_temp<node_t>(fm);
+		auto r_res = normalize_non_temp<node_t>(fm);
+		REQUIRE( r_res.has_value() );
+		tref r = r_res.value();
 		CHECK_FALSE( tau::get(r).equals_T() );
 	}
 }
@@ -1819,11 +1822,17 @@ TEST_SUITE("AntiPrenexBlastingCache") {
 		// (and therefore exercises) anti_prenex's per-blasting memo.
 		const bool saved = preprocessing;
 		preprocessing = false;
-		tref off1 = normalizer<node_t>(fm);
+		auto off1_r = normalizer<node_t>(fm);
+		REQUIRE( off1_r.has_value() );
+		tref off1 = off1_r.value();
 		preprocessing = true;
-		tref on = normalizer<node_t>(fm);
+		auto on_r = normalizer<node_t>(fm);
+		REQUIRE( on_r.has_value() );
+		tref on = on_r.value();
 		preprocessing = false;
-		tref off2 = normalizer<node_t>(fm);
+		auto off2_r = normalizer<node_t>(fm);
+		REQUIRE( off2_r.has_value() );
+		tref off2 = off2_r.value();
 		preprocessing = saved;
 
 		REQUIRE( off1 != nullptr );
@@ -1866,14 +1875,18 @@ TEST_SUITE("AN-2 finite BA quantifier elimination") {
 	TEST_CASE("normalizer: ex x:bool (x != 0 && x' != 0) is F end-to-end") {
 		const char* sample = "ex x:bool (x != 0 && x' != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = normalizer<node_t>(fm);
+		auto res_r = normalizer<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_F() );
 	}
 
 	TEST_CASE("normalizer: ex x:bool (x != 0) is T end-to-end (control)") {
 		const char* sample = "ex x:bool (x != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = normalizer<node_t>(fm);
+		auto res_r = normalizer<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		CHECK( tau::get(res).equals_T() );
 	}
 }

@@ -15,6 +15,7 @@
 #define __IDNI__TAU__SATISFIABILITY_H__
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -83,17 +84,17 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  * // (see tests/integration/test_integration-satisfiability1.cpp:24-27)
  * tref fm = create_spec(
  *     "(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
- * CHECK(transform_to_execution<node_t>(fm) == tau::_F());
+ * CHECK(transform_to_execution<node_t>(fm).value() == tau::_F());
  *
  * // Satisfiable bitvector conditional: holds for every possible input
  * // (see tests/integration/test_integration-satisfiability3.cpp:38-40)
  * tref fm2 = create_spec(
  *     "(always i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 }).");
- * CHECK(transform_to_execution<node_t>(fm2) != tau::_F());
+ * CHECK(transform_to_execution<node_t>(fm2).value() != tau::_F());
  * @endcode
  */
 template <NodeType node>
-tref transform_to_execution(tref fm, const int_t start_time = 0,
+result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
 					const bool output = false);
 
 /**
@@ -111,18 +112,18 @@ tref transform_to_execution(tref fm, const int_t start_time = 0,
  * // (see tests/integration/test_integration-satisfiability1.cpp:13-14)
  * tref fm_unsat = create_spec(
  *     "(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
- * CHECK(!is_tau_formula_sat<node_t>(fm_unsat));
+ * CHECK(!is_tau_formula_sat<node_t>(fm_unsat).value());
  *
  * // Satisfiable: "always" pins o1 to the constant 1, and "sometimes" only
  * // constrains the unrelated stream o2
  * // (see tests/integration/test_integration-satisfiability1.cpp:17-18)
  * tref fm_sat = create_spec(
  *     "(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0).");
- * CHECK(is_tau_formula_sat<node_t>(fm_sat));
+ * CHECK(is_tau_formula_sat<node_t>(fm_sat).value());
  * @endcode
  */
 template <NodeType node>
-bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
+result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
 	const bool output = false);
 
 /**
@@ -143,12 +144,12 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * // src/boolean_algebras/tau_ba.tmpl.h:105.
  * tref f1 = create_spec("always o1[t] = 1.");
  * tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
- * bool result = is_tau_impl<node_t>(f1, f2);
+ * bool result = is_tau_impl<node_t>(f1, f2).value();
  * // CHECK(result == true);
  * @endcode
  */
 template <NodeType node>
-bool is_tau_impl(tref f1, tref f2);
+result<bool> is_tau_impl(tref f1, tref f2);
 
 /**
  * @brief Check whether two closed temporal formulas are logically equivalent.
@@ -166,12 +167,12 @@ bool is_tau_impl(tref f1, tref f2);
  * // an unsatisfiable formula, so the two are equivalent.
  * tref f1 = create_spec("always o1[t] = 1.");
  * tref f2 = create_spec("always !(o1[t] != 1).");
- * bool result = are_tau_equivalent<node_t>(f1, f2);
+ * bool result = are_tau_equivalent<node_t>(f1, f2).value();
  * // CHECK(result == true);
  * @endcode
  */
 template <NodeType node>
-bool are_tau_equivalent(tref f1, tref f2);
+result<bool> are_tau_equivalent(tref f1, tref f2);
 
 /**
  * @brief Simplify @p fm by removing unsatisfiable or valid temporal sub-formulas.
@@ -191,7 +192,7 @@ bool are_tau_equivalent(tref f1, tref f2);
  * // disjunct is therefore dropped from the result.
  * tref fm = create_spec(
  *     "(always (o2[t] = 0 && o2[t] = 1)) || (always o1[t] = 1).");
- * tref result = simp_tau_unsat_valid<node_t>(fm);
+ * tref result = simp_tau_unsat_valid<node_t>(fm).value();
  * // The unsatisfiable disjunct is dropped; result is satisfiability-
  * // equivalent to create_spec("always o1[t] = 1."). The exact printed
  * // form of `result` is not asserted here since simp_tau_unsat_valid does
@@ -205,7 +206,7 @@ template <typename node> static int factored_tau_sat(tref fm);
 template <typename node> static int factored_tau_valid(tref fm);
 
 template <NodeType node>
-tref simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
+result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
 				const bool output = false);
 
 } // namespace idni::tau_lang

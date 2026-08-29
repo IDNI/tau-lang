@@ -80,9 +80,13 @@ bool atom_holds(tref tmpl, const assignment<node_t>& memory,
 	tref updated = update_to_time_point<node_t>(tmpl, formula_time_point);
 	tref grounded = rewriter::replace<node_t>(updated, memory);
 	tref substituted = rewriter::replace<node_t>(grounded, sol);
-	tref check = normalizer<node_t>(substituted);
+	auto check_r = normalizer<node_t>(substituted);
+	REQUIRE(check_r.has_value());
+	tref check = check_r.value();
 	if (tree<node_t>::get(check).equals_T()) return true;
-	return is_non_temp_nso_satisfiable<node_t>(check);
+	auto sat_r = is_non_temp_nso_satisfiable<node_t>(check);
+	REQUIRE(sat_r.has_value());
+	return sat_r.value();
 }
 
 } // namespace
@@ -397,7 +401,9 @@ TEST_SUITE("table_step_provider") {
 
 		// Step 0: formula_time_point == 1 (one step of lookback), so this
 		// is exactly the warm-up call get_ubt_ctn_at's projection collapses.
-		auto [sol0, cont0] = interp->step();
+		auto sr0 = interp->step();
+		REQUIRE(sr0.has_value());
+		auto [sol0, cont0] = sr0.value();
 		REQUIRE(sol0.has_value());
 
 		assignment<node_t> empty_memory;

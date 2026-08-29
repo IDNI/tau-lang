@@ -71,7 +71,13 @@ int main(int argc, char* argv[]) {
 		std::cerr << "parse error: empty formula\n";
 		return 2;
 	}
-	bool result = is_tau_formula_sat<node_t>(fm);
+	auto sat = is_tau_formula_sat<node_t>(fm);
+	if (!sat.has_value()) {
+		std::cout << "PARSE_ERROR\n";
+		std::cerr << "parse error: could not decide satisfiability\n";
+		return 2;
+	}
+	bool result = sat.value();
 	std::cout << (result ? "REALIZABLE" : "UNREALIZABLE") << "\n";
 	return result ? 0 : 1;
 }

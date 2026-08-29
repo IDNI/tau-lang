@@ -55,7 +55,9 @@ static std::optional<std::string> emit_revised_cpp(
 	const std::string& class_name = "pwr_ctrl")
 {
 	tref revised = revise(spec_src, update_src);
-	if (!revised || !is_tau_formula_sat<node_t>(revised)) return std::nullopt;
+	if (!revised) return std::nullopt;
+	auto sat_r = is_tau_formula_sat<node_t>(revised);
+	if (!sat_r.has_value() || !sat_r.value()) return std::nullopt;
 	auto sol = solve_ltl_aba<node_t>(revised);
 	if (!sol) return std::nullopt;
 	// revisable=true: this desc's formula came out of pointwise revision,

@@ -31,7 +31,7 @@ static std::string normalize_blasting_on(const std::string& s) {
 	bool saved = preprocessing; preprocessing = true;
 	auto r = normalizer<node_t>(wff);
 	preprocessing = saved;
-	return r ? tau::get(r).to_str() : "null";
+	return r.has_value() ? tau::get(r.value()).to_str() : "null";
 }
 
 static std::string normalize_blasting_off(const std::string& s) {
@@ -40,7 +40,7 @@ static std::string normalize_blasting_off(const std::string& s) {
 	bool saved = preprocessing; preprocessing = false;
 	auto r = normalizer<node_t>(wff);
 	preprocessing = saved;
-	return r ? tau::get(r).to_str() : "null";
+	return r.has_value() ? tau::get(r.value()).to_str() : "null";
 }
 
 static void check_blasting_correctness(const char* f) {

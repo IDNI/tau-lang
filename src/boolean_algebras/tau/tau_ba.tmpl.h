@@ -168,16 +168,22 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	subtree_unordered_map<typename tau_ba<BAs...>::node, bool>& cache,
+	bool fallback_on_normalize_failure,
 	auto&& compute)
 {
 	using node = typename tau_ba<BAs...>::node;
-	if (!fm.nso_rr.rec_relations.empty())
-		return compute(normalizer<node>(fm.nso_rr));
+	if (!fm.nso_rr.rec_relations.empty()) {
+		auto normalized = normalizer<node>(fm.nso_rr);
+		if (!normalized.has_value()) return fallback_on_normalize_failure;
+		return compute(normalized.value());
+	}
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	auto normalized = normalizer<node>(fm.nso_rr);
+	if (!normalized.has_value()) return fallback_on_normalize_failure;
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
-	bool res = compute(normalizer<node>(fm.nso_rr));
+	bool res = compute(normalized.value());
 	return cache.insert_or_assign(key, res).first->second;
 }
 
@@ -301,7 +307,8 @@ static int factored_tau_sat(tref fm) {
 		}
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
-		bool sres = is_tau_formula_sat<node>(f);
+		auto sat = is_tau_formula_sat<node>(f);
+		bool sres = sat.has_value() && sat.value();
 		cache.insert_or_assign(f, sres);
 		all_sat = sres;
 	}
@@ -323,7 +330,8 @@ static int factored_tau_valid(tref fm) {
 			all = it->second;
 			continue;
 		}
-		bool vres = is_tau_impl<node>(tau::_T(), units[i]);
+		auto imp = is_tau_impl<node>(tau::_T(), units[i]);
+		bool vres = imp.has_value() && imp.value();
 		cache.insert_or_assign(units[i], vres);
 		all = vres;
 	}
@@ -335,12 +343,16 @@ requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_zero() const {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	return cached_tau_ba_predicate(*this, cache, [](tref normalized) {
+	// Normalization failure falls back to "is zero" = true, matching the
+	// pre-caching-layer contract: an undecidable predicate must not be
+	// treated as a witness of non-zeroness.
+	return cached_tau_ba_predicate(*this, cache, true, [](tref normalized) {
 		if (ba_component_factoring_enabled())
 			if (int r = factored_tau_sat<node>(normalized);
 					r >= 0)
 				return r == 0;
-		return !is_tau_formula_sat<node>(normalized);
+		auto sat = is_tau_formula_sat<node>(normalized);
+		return !(sat.has_value() && sat.value());
 	});
 }
 
@@ -349,12 +361,16 @@ requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_one() const {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	return cached_tau_ba_predicate(*this, cache, [](tref normalized) {
+	// Normalization failure falls back to "is one" = false, matching the
+	// pre-caching-layer contract: an undecidable predicate must not be
+	// treated as a proof of validity.
+	return cached_tau_ba_predicate(*this, cache, false, [](tref normalized) {
 		if (ba_component_factoring_enabled())
 			if (int r = factored_tau_valid<node>(normalized);
 					r >= 0)
 				return r == 1;
-		return is_tau_impl<node>(tau::_T(), normalized);
+		auto imp = is_tau_impl<node>(tau::_T(), normalized);
+		return imp.has_value() && imp.value();
 	});
 }
 
@@ -400,9 +416,13 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 		if (auto it = memo.find(fm.nso_rr); it != memo.end())
 			return tau_ba<BAs...>(it->second.rec_relations, it->second.main);
 	}
-	tref result = nso_rr_apply<node>(fm.nso_rr);
-	result = simp_tau_unsat_valid<node>(result);
-	tau_ba<BAs...> out(tree<node>::geth(result));
+	// No safe normalized form exists on failure; return the element
+	// unchanged, matching splitter()'s fallback below.
+	auto applied = nso_rr_apply<node>(fm.nso_rr);
+	if (!applied.has_value()) return fm;
+	auto simplified = simp_tau_unsat_valid<node>(applied.value());
+	if (!simplified.has_value()) return fm;
+	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
 	std::lock_guard<std::mutex> lock(cache::mtx());
 	cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
 	return out;
@@ -423,7 +443,8 @@ tref normalize_for_splitter(const rr<node>& nso_rr) {
 		if (auto it = memo.find(nso_rr); it != memo.end())
 			return it->second;
 	}
-	tref result = normalizer<node>(nso_rr);
+	auto normalized = normalizer<node>(nso_rr);
+	tref result = normalized.has_value() ? normalized.value() : nullptr;
 	std::lock_guard<std::mutex> lock(cache::mtx());
 	cache::splitter_normalize_memo().emplace(nso_rr, result);
 	return result;
@@ -444,9 +465,11 @@ bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
-	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(
-		normalizer<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr), st);
-	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(s));
+	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	auto normalized = normalizer<node>(fm.nso_rr);
+	if (!normalized.has_value()) return fm;
+	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(normalized.value(), st);
+	return tau_ba<BAs...>(tree<node>::geth(s));
 }
 
 template <typename... BAs>
@@ -460,9 +483,9 @@ requires BAsPack<BAs...>
 bool is_tau_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
-	tref simp_fm = nso_rr_apply<node>(fm.nso_rr);
-	if (!simp_fm) return false;
-	simp_fm = apply_defs_to_spec<node>(simp_fm);
+	auto applied = nso_rr_apply<node>(fm.nso_rr);
+	if (!applied.has_value()) return false;
+	tref simp_fm = apply_defs_to_spec<node>(applied.value());
 	if (!simp_fm) return false;
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;

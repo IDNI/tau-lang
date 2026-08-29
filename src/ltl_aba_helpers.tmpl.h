@@ -511,8 +511,12 @@ static std::string skeleton_wff_with_testers(
 			auto p2 = find_prop<node>(n, atoms);
 			return p2.empty() ? "1" : p2;
 		}
-		tref normalized = normalize_non_temp<node>(n);
-		if (tree<node>::get(normalized).equals_F()) return "0";
+		auto normalized = normalize_non_temp<node>(n);
+		if (!normalized.has_value()) {
+			LOG_ERROR << "skeleton_wff_with_testers: normalization failed";
+			return "0";
+		}
+		if (tree<node>::get(normalized.value()).equals_F()) return "0";
 		return "1";
 	}
 	}

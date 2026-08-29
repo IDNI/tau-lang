@@ -117,7 +117,9 @@ static int tau_decide(const string& spec_str) {
 	if (!nso.has_value()) return -1;
 	tref fm = nso.value().main->get();
 	if (!fm) return -1;
-	return is_tau_formula_sat<node_t>(fm) ? 1 : 0;
+	auto r = is_tau_formula_sat<node_t>(fm);
+	if (!r.has_value()) return -1;
+	return r.value() ? 1 : 0;
 }
 
 // ── Spot oracle ────────────────────────────────────────────────────────────────

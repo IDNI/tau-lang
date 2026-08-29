@@ -135,9 +135,9 @@ struct interpreter {
 	 * @brief Build an interpreter from a normalized Tau specification.
 	 * @param spec Normalized Tau formula.
 	 * @param ctx I/O context.
-	 * @return Initialized interpreter, or `std::nullopt` if the spec is unsatisfiable.
+	 * @return Initialized interpreter, or an error result if the spec is unsatisfiable.
 	 */
-	static std::optional<interpreter> make_interpreter(tref spec,
+	static result<interpreter> make_interpreter(tref spec,
 		const io_context<node>& ctx);
 
 	/**
@@ -166,11 +166,13 @@ struct interpreter {
 		int_t lookback, int_t highest_initial_pos = 0,
 		const trefs& live_probe_atoms = {});
 
+	using step_result = std::pair<std::optional<assignment<node>>, bool>;
+
 	/**
 	 * @brief Execute one time step without providing explicit input values.
 	 * @return Pair (output assignment if successful, whether execution should continue).
 	 */
-	std::pair<std::optional<assignment<node>>, bool> step();
+	result<step_result> step();
 
 	/**
 	 * @brief Execute one time step with the given input @p values.
@@ -184,8 +186,7 @@ struct interpreter {
 	 * that needs a step's outputs for longer must serialize them (or copy
 	 * the trees into its own htref-held storage) before then.
 	 */
-	std::pair<std::optional<assignment<node>>, bool> step(
-						const assignment<node>& values);
+	result<step_result> step(const assignment<node>& values);
 
 	// Step with optional pointwise-revision payload `u`. When `u` is
 	// non-null, the interpreter steps as usual on `values`, then runs
@@ -198,8 +199,7 @@ struct interpreter {
 	// `pointwise_revision_temporal`) with `semantic_pwr_optimal`
 	// (pwr-ltl.tex §11) invoked as its fallback inside
 	// pointwise_revision.h.
-	std::pair<std::optional<assignment<node>>, bool> step(
-						const assignment<node>& values,
+	step_result step(const assignment<node>& values,
 						std::optional<tref> u);
 
 	/**
@@ -593,7 +593,7 @@ private:
 
 	/// @brief Thin wrapper over the free solution_with_max_update,
 	/// supplying this interpreter's own time_point.
-	std::optional<assignment<node>> solution_with_max_update(tref spec);
+	result<assignment<node>> solution_with_max_update(tref spec);
 
 	/// @brief The running spec as step() executes it: per part its chosen
 	/// alternative when known (@p use_memory picks by solvability under
@@ -676,7 +676,7 @@ private:
 	void prune_memory(size_t completed_time_point);
 
 	/// @brief Find an executable specification clause from DNF.
-	static tref get_executable_spec(tref& clause, const size_t start_time = 0);
+	static result<tref> get_executable_spec(tref& clause, const size_t start_time = 0);
 
 	/// @brief Recompute the executable continuations of a part's ordered
 	/// alternatives. Alternatives that are not executable are dropped from
@@ -710,7 +710,7 @@ private:
 	std::string dump_to_str() const;
 
 	template <NodeType N>
-	friend std::optional<interpreter<N>> run(tref,
+	friend result<interpreter<N>> run(tref,
 		const io_context<N>&, const size_t);
 };
 
@@ -762,7 +762,7 @@ bool evaluate_atom(tref atom_ref, const assignment<node>& memory,
  * @tparam node Tree node type.
  */
 template <NodeType node>
-std::optional<assignment<node>> solution_with_max_update(tref spec, size_t time_point);
+result<assignment<node>> solution_with_max_update(tref spec, size_t time_point);
 
 /**
  * @brief Run a Tau specification for at most @p steps time steps.
@@ -773,10 +773,10 @@ std::optional<assignment<node>> solution_with_max_update(tref spec, size_t time_
  * @param form Normalized Tau formula.
  * @param ctx I/O context for stream I/O.
  * @param steps Maximum number of steps (0 = unlimited).
- * @return Interpreter after execution, or `std::nullopt` if initialization failed.
+ * @return Interpreter after execution, or an error result if initialization failed.
  */
 template <NodeType node>
-std::optional<interpreter<node>> run(tref form,
+result<interpreter<node>> run(tref form,
 	const io_context<node>& ctx, const size_t steps = 0);
 
 } // namespace idni::tau_lang

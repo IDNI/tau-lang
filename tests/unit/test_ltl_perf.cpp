@@ -28,7 +28,10 @@ static double timed_realizable(const char* s, bool* result = nullptr) {
 	bool r = false;
 	if (nso.has_value()) {
 		tref fm = nso.value().main->get();
-		if (fm) r = is_tau_formula_sat<node_t>(fm);
+		if (fm) {
+			auto sat = is_tau_formula_sat<node_t>(fm);
+			r = sat.has_value() && sat.value();
+		}
 	}
 	auto t1 = clock_t_::now();
 	if (result) *result = r;

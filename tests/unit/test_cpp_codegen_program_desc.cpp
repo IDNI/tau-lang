@@ -102,9 +102,11 @@ std::string read_codegen_spec(const std::string& name) {
 tref parse_like_compile_spec(const std::string& src) {
 	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
 		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value()); nso_rr)
-			if (tref applied = nso_rr_apply<node_t>(*nso_rr); applied)
-				if (tref fm = normalizer<node_t>(applied); fm)
-					return fm;
+			if (auto applied_r = nso_rr_apply<node_t>(*nso_rr);
+			    applied_r.has_value() && applied_r.value())
+				if (auto fm_r0 = normalizer<node_t>(applied_r.value());
+				    fm_r0.has_value() && fm_r0.value())
+					return fm_r0.value();
 	auto fm_r = api<node_t>::get_formula(src);
 	return fm_r.has_value() ? fm_r.value() : nullptr;
 }

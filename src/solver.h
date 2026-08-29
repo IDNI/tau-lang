@@ -15,6 +15,7 @@
 
 #include "tau_tree.h"
 #include "solver_types.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -33,10 +34,10 @@ std::optional<solution<node>> find_solution(equality eq);
  *
  * @tparam node Tree node type.
  * @param equality The equality to solve.
- * @return An optional solution.
+ * @return The solution, or an error if the equality has no solution.
  */
 template <NodeType node>
-std::optional<solution<node>> lgrs(equality equality);
+result<solution<node>> lgrs(equality equality);
 
 /**
  * @brief Solves the given minterm system.
@@ -131,19 +132,27 @@ template <NodeType node>
 void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments,
 tref var, tref term);
 
+// (SO-7: trefs overload deleted -- zero callers.)
+
+// ------------------------------------------------------------
+// result-based API
+// ------------------------------------------------------------
+
 /**
  * @brief Solves the given tau form.
  *
  * @tparam node Tree node type.
  * @param form The tau form to solve.
  * @param options The solver options.
- * @param error Reports if a clause is found that is not supported within solving
- * @return An optional solution.
+ * @return The solution, or an error if the form has no solution or contains
+ * a clause the solver cannot handle.
  */
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, solver_options options, bool& error);
+result<solution<node>> solve(tref form, solver_options options);
 
-// (SO-7: trefs overload deleted -- zero callers.)
+/** @brief Conjuncts @p forms and delegates to @ref solve(tref, solver_options). */
+template <NodeType node>
+result<solution<node>> solve(const trefs& forms, solver_options options);
 
 } // namespace idni::tau_lang
 

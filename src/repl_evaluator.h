@@ -157,16 +157,17 @@ struct repl_evaluator {
 
 private:
 	/// @brief State for one resumable `run` session: the interpreter and
-	/// its benchmarking survive across multiple eval() calls.
+	/// its benchmarking survive across multiple eval() calls. `rep`
+	/// accumulates one timed scope per continue_running() invocation, so
+	/// the session total never includes the interactive wait between
+	/// invocations.
 	struct run_session {
 		interpreter<node> interp;
 		report rep;
-		report::scope_guard g;
 		/// @brief Step budget for `run N steps`; 0 means unbounded.
 		size_t steps_to_run = 0;
 		size_t steps_done   = 0;
-		run_session(interpreter<node> i)
-			: interp(std::move(i)), g(rep.open("run")) {}
+		run_session(interpreter<node> i) : interp(std::move(i)) {}
 	};
 	/// @brief What the *next* eval() call's input line answers, while set;
 	/// eval() checks this before parsing src as a normal CLI command.

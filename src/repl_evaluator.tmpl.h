@@ -235,7 +235,8 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		defs.add(r.first, r.second);
 		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
 	}
-	tref applied = nso_rr_apply(maybe_nso_rr.value());
+	auto applied_r = nso_rr_apply(maybe_nso_rr.value());
+	tref applied = applied_r.has_value() ? applied_r.value() : nullptr;
 	// tref applied = tau_api::apply_defs(main);
 	DBG(TAU_LOG_TRACE << "applied: " << TAU_LOG_FM_DUMP(applied);)
 	return applied;
@@ -580,11 +581,17 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 			spec.add(d->get());
 		}
 
-		auto gi = tau_api::get_interpreter(spec);
+		report setup_rep;
+		result<interpreter<node>> gi;
+		{
+			auto s = setup_rep.open("setup");
+			gi = tau_api::get_interpreter(spec);
+		}
 		if (!gi.has_value()) { gi.print(std::cerr); return; }
 
 		// A new formula replaces any stored session.
 		running = std::make_unique<run_session>(std::move(gi).value());
+		running->rep.append(std::move(setup_rep));
 		running->steps_done   = 0;
 		running->steps_to_run = steps; // 0 = natural
 		continue_running();
@@ -622,21 +629,22 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
 
-	idni::measures::timer t;
-	t.start();
-	// IN-R4: the synthesis backend reports "no verdict" by throwing;
-	// nothing above this frame catches it, so a slow or missing ltlsynt
-	// (or a refused CTL* placement) used to terminate the REPL.
-	try {
-		ltl_explain<node>(value, std::cout);
-	} catch (const ltl_synthesis_error& e) {
-		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, timed "
-			"out or refused the formula (" << e.what()
-			<< "); realizability could not be decided";
-		error = true;
+	report rep;
+	{
+		auto s = rep.open_if(opt.print_benchmarks, "ltl");
+		// IN-R4: the synthesis backend reports "no verdict" by throwing;
+		// nothing above this frame catches it, so a slow or missing ltlsynt
+		// (or a refused CTL* placement) used to terminate the REPL.
+		try {
+			ltl_explain<node>(value, std::cout);
+		} catch (const ltl_synthesis_error& e) {
+			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, timed "
+				"out or refused the formula (" << e.what()
+				<< "); realizability could not be decided";
+			error = true;
+		}
 	}
-	if (opt.print_benchmarks)
-		std::cerr << "ltl: " << t.stop() << " ms\n";
+	print_benchmarks(rep);
 }
 
 // Drives a `run` session's step loop, suspending via `pending` (instead of
@@ -646,6 +654,11 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::continue_running(
 	std::optional<pending_request> retry)
 {
+	if (!running) return;
+	// Times exactly this invocation's synchronous work: continue_running()
+	// never blocks for input, it suspends via `pending` and returns, so
+	// this scope never spans the interactive wait between invocations.
+	auto s = running->rep.open("run");
 	bool first = true;
 	while (running) {
 		// At budget: stop cleanly but KEEP the session for a later `run`.
@@ -667,6 +680,8 @@ void repl_evaluator<BAs...>::continue_running(
 			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, "
 				"timed out or refused the formula during this step ("
 				<< e.what() << "); ending the run";
+			// close before the session (and its report) is destroyed
+			s.close();
 			running.reset();
 			error = true;
 			return;
@@ -735,10 +750,7 @@ void repl_evaluator<BAs...>::continue_running(
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::finish_running() {
-	if (running) {
-		running->g.close();
-		print_benchmarks(running->rep);
-	}
+	if (running) print_benchmarks(running->rep);
 	running.reset();
 	pending.reset();
 }

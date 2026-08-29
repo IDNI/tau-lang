@@ -30,7 +30,9 @@ static std::optional<interpreter<node_t>> make(const char* s) {
 	auto nso_rr = get_nso_rr<node_t>(ctx, tau::get(s));
 	if (!nso_rr.has_value()) return {};
 	tref spec_tref = nso_rr.value().main->get();
-	return interpreter<node_t>::make_interpreter(spec_tref, ctx);
+	auto interp_r = interpreter<node_t>::make_interpreter(spec_tref, ctx);
+	if (!interp_r.has_value()) return {};
+	return std::move(interp_r.value());
 }
 
 // Parse a formula string for use as a PWR update (psi).
@@ -57,7 +59,9 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 	TEST_CASE("[IAX-INSP-02] reset returns time_point to 0") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
-		auto [_, __] = i->step();
+		auto sr = i->step();
+		REQUIRE(sr.has_value());
+		auto [_, __] = sr.value();
 		// time_point may be 1 after a step (or higher if formula advanced).
 		i->reset();
 		REQUIRE(i->time_point == 0);
@@ -157,7 +161,9 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		for (const auto& [var, _] : i->outputs)
 			CHECK(get_var_name<node_t>(var).rfind("o__ltl_", 0)
 				== std::string::npos);
-		auto [out, _] = i->step();
+		auto sr = i->step();
+		REQUIRE(sr.has_value());
+		auto [out, _] = sr.value();
 		REQUIRE(out.has_value());
 		for (const auto& [var, value] : *out)
 			CHECK(tau::get(var).to_str().find("o__ltl_")
@@ -284,7 +290,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 			CHECK(i->strategy_stale());
 			CHECK(i->visualise_mealy_dot().empty());
 			CHECK(i->determinise().num_states == 0);
-			auto [out, _] = i->step();
+			auto sr = i->step();
+			REQUIRE(sr.has_value());
+			auto [out, _] = sr.value();
 			CHECK(out.has_value());
 		}
 	}
@@ -309,7 +317,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		CHECK(ce == up);
 		CHECK_FALSE(up);
 		// A refused update leaves the interpreter untouched: it steps.
-		auto [out, _] = bad_spec->step();
+		auto sr = bad_spec->step();
+		REQUIRE(sr.has_value());
+		auto [out, _] = sr.value();
 		CHECK(out.has_value());
 	}
 
@@ -340,7 +350,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		REQUIRE(admissible.size() == 1);
 		for (const auto& [var, value] : admissible[0])
 			CHECK(tau::get(value).to_str() == "0");
-		auto [out, _] = i->step(in);
+		auto sr = i->step(in);
+		REQUIRE(sr.has_value());
+		auto [out, _] = sr.value();
 		REQUIRE(out.has_value());
 		for (const auto& [var, value] : *out)
 			CHECK(tau::get(value).to_str() == "0");
@@ -370,7 +382,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 				const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
 				in[build_in_var_at_n<node_t>("i1", t, tid)]
 					= t % 2 ? tau::_1(tid) : tau::_0(tid);
-				auto [out, _] = i->step(in);
+				auto sr = i->step(in);
+				REQUIRE(sr.has_value());
+				auto [out, _] = sr.value();
 				REQUIRE(out.has_value());
 				if (prev) {
 					// read the previous map AFTER this step swept
@@ -403,7 +417,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 			const size_t tid = get_ba_type_id<node_t>(tau_type<node_t>());
 			in[build_in_var_at_n<node_t>("i1", t, tid)]
 				= t % 3 ? tau::_1(tid) : tau::_0(tid);
-			auto [out, _] = i->step(in);
+			auto sr = i->step(in);
+			REQUIRE(sr.has_value());
+			auto [out, _] = sr.value();
 			REQUIRE(out.has_value());
 			if (t == 10) at_10 = i->memory.size();
 		}

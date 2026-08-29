@@ -213,13 +213,6 @@
 			}
 		},
 		{
-			"name": "_build-measure",
-			"hidden": true,
-			"cacheVariables": {
-				"TAU_MEASURE": "ON"
-			}
-		},
-		{
 			"name": "_bas-wasm",
 			"hidden": true,
 			"cacheVariables": {
@@ -657,18 +650,6 @@
 			"inherits": ["coverage-make-gcc"]
 		},
 		{
-			"name": "release-measure",
-			"inherits": ["release", "_build-measure"]
-		},
-		{
-			"name": "debug-measure",
-			"inherits": [
-				"debug",
-				"_build-measure",
-				"_build-type-debug"
-			]
-		},
-		{
 			"name": "release-packages-deb",
 			"inherits": ["release", "_deb-package"]
 		},
@@ -875,14 +856,6 @@
 		{
 			"name": "coverage",
 			"configurePreset": "coverage"
-		},
-		{
-			"name": "release-measure",
-			"configurePreset": "release-measure"
-		},
-		{
-			"name": "debug-measure",
-			"configurePreset": "debug-measure"
 		},
 		{
 			"name": "release-packages-deb",

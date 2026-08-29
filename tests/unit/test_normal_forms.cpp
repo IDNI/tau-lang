@@ -5,6 +5,12 @@
 #include "normal_forms.h"
 #include "normalizer.h"
 
+static tref nnt(tref fm) {
+	auto r = normalize_non_temp<node_t>(fm);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
 TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: T") {
@@ -20,7 +26,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "T.";
 		tref fm = tau::get(tau::get(sample))
 			.find_top(is<node_t, tau::wff>);
-		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
 	}
 
@@ -28,7 +34,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "F.";
 		tref fm = tau::get(tau::get(sample))
 			.find_top(is<node_t, tau::wff>);
-		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		CHECK( tau::get(fm)[0].is(tau::wff_f) );
 	}
 
@@ -38,7 +44,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		tref spec = tau::get(sample);
 		TAU_LOG_TRACE << "spec: " << TAU_LOG_FM_DUMP(spec);
 		tref fm = tt(spec) | tau::spec | tau::main | tau::wff | tt::ref;
-		tref result = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		tref result = unequal_to_not_equal<node_t>(nnt(fm));
 		TAU_LOG_TRACE << "fm:     " << TAU_LOG_FM_DUMP(fm);
 		TAU_LOG_TRACE << "result: " << TAU_LOG_FM_DUMP(result);
 		CHECK( tau::subtree_equals(fm, result) );
@@ -49,7 +55,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_eq  = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
 		CHECK( check_eq.size() == 1 );
@@ -60,7 +66,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 && Y = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		CHECK( check_and.size() == 1 );
@@ -71,7 +77,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0 && Y != 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
 		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
@@ -84,7 +90,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 || Y = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
+		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_or = tau::get(fm).select_all(is<node_t, tau::wff_or>);
 		CHECK( check_eq.size() == 2 );
@@ -372,12 +378,12 @@ TEST_SUITE("FoldTrivialQuantifiers") {
 TEST_SUITE("HasNoBooleanCombsOfModels") {
 	TEST_CASE("plain non-temporal formula satisfies the predicate") {
 		tref fm = get_nso_rr("x = 0.").value().main->get();
-		CHECK( has_no_boolean_combs_of_models<node_t>(fm) );
+		CHECK( has_no_boolean_combs_of_models<node_t>(fm).value() );
 	}
 
 	TEST_CASE("single top-level always wrapper satisfies the predicate") {
 		tref fm = get_nso_rr("always x = 0.").value().main->get();
-		CHECK( has_no_boolean_combs_of_models<node_t>(fm) );
+		CHECK( has_no_boolean_combs_of_models<node_t>(fm).value() );
 	}
 
 	TEST_CASE("boolean combination of two models violates the predicate") {
@@ -386,7 +392,7 @@ TEST_SUITE("HasNoBooleanCombsOfModels") {
 		// reject.
 		tref fm = get_nso_rr(
 			"(always x = 0) && (always y = 0).").value().main->get();
-		CHECK( !has_no_boolean_combs_of_models<node_t>(fm) );
+		CHECK( !has_no_boolean_combs_of_models<node_t>(fm).value() );
 	}
 
 	TEST_CASE("nested always under always violates the predicate") {
@@ -396,7 +402,7 @@ TEST_SUITE("HasNoBooleanCombsOfModels") {
 		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
 		tref inner = tau::build_bf_eq(x, tau::_0(tau_type_id<node_t>()));
 		tref fm = tau::build_wff_always(tau::build_wff_always(inner));
-		CHECK( !has_no_boolean_combs_of_models<node_t>(fm) );
+		CHECK( !has_no_boolean_combs_of_models<node_t>(fm).value() );
 	}
 }
 
@@ -424,14 +430,14 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 		// x=0 && y=0  implies  x=0
 		tref n1 = get_nso_rr("x = 0 && y = 0.").value().main->get();
 		tref n2 = get_nso_rr("x = 0.").value().main->get();
-		CHECK( is_nso_impl<node_t>(n1, n2) );
+		CHECK( is_nso_impl<node_t>(n1, n2).value() );
 	}
 
 	TEST_CASE("is_nso_impl: false when the consequent is stronger") {
 		// x=0  does not imply  x=0 && y=0 (y is unconstrained)
 		tref n1 = get_nso_rr("x = 0.").value().main->get();
 		tref n2 = get_nso_rr("x = 0 && y = 0.").value().main->get();
-		CHECK( !is_nso_impl<node_t>(n1, n2) );
+		CHECK( !is_nso_impl<node_t>(n1, n2).value() );
 	}
 
 	// GitHub #82: the implication used to be closed over every free
@@ -444,7 +450,7 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 	TEST_CASE("is_nso_impl (#82): per-conjunct decomposition, all implied") {
 		tref n1 = get_nso_rr("x = 0 && y = 0 && z = 0.").value().main->get();
 		tref n2 = get_nso_rr("x = 0 && (y = 0 || w = 1).").value().main->get();
-		CHECK( is_nso_impl<node_t>(n1, n2) );
+		CHECK( is_nso_impl<node_t>(n1, n2).value() );
 	}
 
 	TEST_CASE("is_nso_impl (#82): one unconnected conjunct is not implied") {
@@ -452,7 +458,7 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 		// though every other conjunct is.
 		tref n1 = get_nso_rr("x = 0 && y = 0.").value().main->get();
 		tref n2 = get_nso_rr("x = 0 && y = 0 && w = 0.").value().main->get();
-		CHECK( !is_nso_impl<node_t>(n1, n2) );
+		CHECK( !is_nso_impl<node_t>(n1, n2).value() );
 	}
 
 	TEST_CASE("is_nso_impl (#82): an unsatisfiable unconnected antecedent "
@@ -465,7 +471,7 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 		// antecedent is unsatisfiable.
 		tref n1 = get_nso_rr("x = 0 && x = 1 && y = 0.").value().main->get();
 		tref n2 = get_nso_rr("y = 0 && w = 0.").value().main->get();
-		CHECK( is_nso_impl<node_t>(n1, n2) );
+		CHECK( is_nso_impl<node_t>(n1, n2).value() );
 	}
 
 	TEST_CASE("is_nso_impl (#82): chained sharing merges components") {
@@ -475,7 +481,7 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 			"x = 0 && (x != 0 || y = 0) && (y != 0 || z = 0).")
 			.value().main->get();
 		tref n2 = get_nso_rr("z = 0.").value().main->get();
-		CHECK( is_nso_impl<node_t>(n1, n2) );
+		CHECK( is_nso_impl<node_t>(n1, n2).value() );
 	}
 
 	TEST_CASE("is_nso_impl (#82): 40 disjoint-support components") {
@@ -491,11 +497,11 @@ TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
 		}
 		tref n1 = get_nso_rr((a + ".").c_str()).value().main->get();
 		tref n2 = get_nso_rr((c + ".").c_str()).value().main->get();
-		CHECK( is_nso_impl<node_t>(n1, n2) );
+		CHECK( is_nso_impl<node_t>(n1, n2).value() );
 		// ... and a single broken component is detected.
 		tref n3 = get_nso_rr((c + " && (x7 != 0 || y7 = 1).").c_str())
 			.value().main->get();
-		CHECK( !is_nso_impl<node_t>(n1, n3) );
+		CHECK( !is_nso_impl<node_t>(n1, n3).value() );
 	}
 }
 
@@ -983,7 +989,9 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 	}
 
 	TEST_CASE("normalize_non_temp leaves it quantified") {
-		tref res = normalize_non_temp<node_t>(undecidable());
+		auto res_r = normalize_non_temp<node_t>(undecidable());
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_T() );
 		CHECK( !tau::get(res).equals_F() );
@@ -991,15 +999,15 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 	}
 
 	TEST_CASE("is_nso_impl answers false instead of aborting") {
-		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()) );
+		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()).value() );
 	}
 
 	TEST_CASE("is_non_temp_nso_unsat answers false instead of aborting") {
-		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()) );
+		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()).value() );
 	}
 
 	TEST_CASE("is_non_temp_nso_satisfiable answers false instead of aborting") {
-		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()) );
+		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()).value() );
 	}
 
 	TEST_CASE("are_nso_equivalent answers false instead of aborting") {
@@ -1009,9 +1017,9 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 	// Control: a decidable formula still gets a real answer.
 	TEST_CASE("decidable formulas are unaffected") {
 		tref taut = get_nso_rr("x = 0 || x != 0.").value().main->get();
-		CHECK( is_nso_impl<node_t>(tau::_T(), taut) );
-		CHECK( !is_non_temp_nso_unsat<node_t>(taut) );
-		CHECK( is_non_temp_nso_satisfiable<node_t>(taut) );
+		CHECK( is_nso_impl<node_t>(tau::_T(), taut).value() );
+		CHECK( !is_non_temp_nso_unsat<node_t>(taut).value() );
+		CHECK( is_non_temp_nso_satisfiable<node_t>(taut).value() );
 	}
 }
 
@@ -1045,7 +1053,9 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 	}
 
 	TEST_CASE("normalization keeps the NZ-1 shape quantified and temporal") {
-		tref res = normalize_non_temp<node_t>(nz1());
+		auto res_r = normalize_non_temp<node_t>(nz1());
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( tau::get(res).find_top(
@@ -1053,7 +1063,9 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 	}
 
 	TEST_CASE("check_decided answers false with the NZ-1 marker") {
-		tref res = normalize_non_temp<node_t>(nz1());
+		auto res_r = normalize_non_temp<node_t>(nz1());
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		bool decided = true;
 		std::string log = log_of([&]() {
 			decided = check_decided<node_t>("nz1-test", res); });
@@ -1062,7 +1074,9 @@ TEST_SUITE("NZ1TemporalUnderQuantifier") {
 	}
 
 	TEST_CASE("non-temporal undecided keeps the error path (no NZ-1 marker)") {
-		tref res = normalize_non_temp<node_t>(bv_undecided());
+		auto res_r = normalize_non_temp<node_t>(bv_undecided());
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		bool decided = true;
 		std::string log = log_of([&]() {
 			decided = check_decided<node_t>("bv-test", res); });

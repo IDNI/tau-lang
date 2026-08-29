@@ -156,8 +156,8 @@ TEST_SUITE("SO-1 mixed ordering systems") {
 			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
 			.mode = solver_mode::general
 		};
-		bool error = false;
-		return solve<node_t>(form, options, error);
+		auto r = solve<node_t>(form, options);
+		return r.has_value() ? std::optional<solution<node_t>>(r.value()) : std::nullopt;
 	}
 
 	TEST_CASE("unsat equality/ordering mix is declined, not mis-solved") {
@@ -192,8 +192,8 @@ TEST_SUITE("SO-14 qlt ordering systems") {
 			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
 			.mode = solver_mode::general
 		};
-		bool error = false;
-		return solve<node_t>(form, options, error);
+		auto r = solve<node_t>(form, options);
+		return r.has_value() ? std::optional<solution<node_t>>(r.value()) : std::nullopt;
 	}
 
 	TEST_CASE("bounded interval yields a witness inside it") {

@@ -33,7 +33,10 @@ static tref spec(const char* s) {
 
 // Check if a formula is realizable (REAL oracle).
 static bool is_realizable(tref fm) {
-	return fm && is_tau_formula_sat<node_t>(fm);
+	if (!fm) return false;
+	auto r = is_tau_formula_sat<node_t>(fm);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 // PW-RT2: entailment oracle under synthesis semantics -- `a` entails `b`
@@ -41,8 +44,11 @@ static bool is_realizable(tref fm) {
 // unrealizable (the environment can only pick inputs, so a violation of
 // `b` must be forced on every input sequence).
 static bool entails(tref a, tref b) {
-	return a && b && !is_tau_formula_sat<node_t>(
+	if (!a || !b) return false;
+	auto r = is_tau_formula_sat<node_t>(
 		tau::build_wff_and(a, tau::build_wff_neg(b)));
+	REQUIRE(r.has_value());
+	return !r.value();
 }
 
 // ============================================================================

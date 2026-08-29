@@ -25,7 +25,8 @@ static bool realizable(const char* s) {
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;
-	return is_tau_formula_sat<node_t>(fm);
+	auto sat = is_tau_formula_sat<node_t>(fm);
+	return sat.has_value() && sat.value();
 }
 
 // Enumerate all 2^3 valuations of (X, Y, Z) as truth-table rows.

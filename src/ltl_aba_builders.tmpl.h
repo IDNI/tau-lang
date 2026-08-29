@@ -225,11 +225,15 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	// recursion with is_tau_formula_sat: that function routes formulas
 	// like `(G A) || (G B)` here precisely because it can't handle
 	// them itself.  Without the guard, this fast-path would route back.
-	if (!has_ltl_operators<node>(fm)
-	    && has_no_boolean_combs_of_models<node>(fm)) {
+	auto no_bool_combs = [&] {
+		auto nbc = has_no_boolean_combs_of_models<node>(fm);
+		return nbc.has_value() && nbc.value();
+	};
+	if (!has_ltl_operators<node>(fm) && no_bool_combs()) {
 		LOG_DEBUG << "[ltl_aba] safety fast-path "
 		             "(no full-LTL operators, single G)";
-		return is_tau_formula_sat<node>(fm, start_time, output);
+		auto sat = is_tau_formula_sat<node>(fm, start_time, output);
+		return sat.has_value() && sat.value();
 	}
 
 	auto maybe = solve_ltl_aba<node>(fm);
@@ -378,7 +382,12 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 		}
 	}
 
-	tref body = normalize_non_temp<node>(tau::build_wff_and(one_hot, trans));
+	auto body_r = normalize_non_temp<node>(tau::build_wff_and(one_hot, trans));
+	if (!body_r.has_value()) {
+		LOG_ERROR << "[ltl_aba] encode_mealy_as_safety: normalization failed";
+		return nullptr;
+	}
+	tref body = body_r.value();
 	LOG_DEBUG << "[ltl_aba] multi-state safety body: " << LOG_FM(body);
 	return tau::build_wff_always(body);
 }
@@ -455,10 +464,21 @@ static tref encode_solution_as_safety(const ltl_aba_solution<node>& sol) {
 	tref combined = tau::_F();
 	for (const auto& e : aut.edges[0]) {
 		tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
-		tref norm_guard = normalize_non_temp<node>(guard_fm);
-		combined = tau::build_wff_or(combined, norm_guard);
+		auto norm_guard_r = normalize_non_temp<node>(guard_fm);
+		if (!norm_guard_r.has_value()) {
+			LOG_ERROR << "[ltl_aba] encode_solution_as_safety: "
+				"normalization of a guard formula failed";
+			return nullptr;
+		}
+		combined = tau::build_wff_or(combined, norm_guard_r.value());
 	}
-	tref simplified = normalize_non_temp<node>(combined);
+	auto simplified_r = normalize_non_temp<node>(combined);
+	if (!simplified_r.has_value()) {
+		LOG_ERROR << "[ltl_aba] encode_solution_as_safety: "
+			"final normalization failed";
+		return nullptr;
+	}
+	tref simplified = simplified_r.value();
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
 	          << LOG_FM(simplified) << ")";
 	return tau::build_wff_always(simplified);
@@ -605,10 +625,21 @@ ltl_to_safety_formula_full(tref fm) {
 	tref combined = tau::_F();
 	for (const auto& e : aut.edges[0]) {
 		tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
-		tref norm_guard = normalize_non_temp<node>(guard_fm);
-		combined = tau::build_wff_or(combined, norm_guard);
+		auto norm_guard_r = normalize_non_temp<node>(guard_fm);
+		if (!norm_guard_r.has_value()) {
+			LOG_ERROR << "[ltl_aba] ltl_to_safety_formula_full: "
+				"normalization of a guard formula failed";
+			return {nullptr, std::nullopt, {}};
+		}
+		combined = tau::build_wff_or(combined, norm_guard_r.value());
 	}
-	tref simplified = normalize_non_temp<node>(combined);
+	auto simplified_r = normalize_non_temp<node>(combined);
+	if (!simplified_r.has_value()) {
+		LOG_ERROR << "[ltl_aba] ltl_to_safety_formula_full: "
+			"final normalization failed";
+		return {nullptr, std::nullopt, {}};
+	}
+	tref simplified = simplified_r.value();
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
 	          << LOG_FM(simplified) << ")";
 	return {tau::build_wff_always(simplified), std::move(sol), {}};
@@ -641,7 +672,8 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	if (!has_ltl_operators<node>(fm)) {
 		out << "Formula has no LTL operators (treated as G(phi))\n";
 		// Fall through to the existing safety pipeline.
-		bool sat = is_tau_formula_sat<node>(fm, 0, false);
+		auto sat_r = is_tau_formula_sat<node>(fm, 0, false);
+		bool sat = sat_r.has_value() && sat_r.value();
 		out << (sat ? "REALIZABLE" : "UNREALIZABLE") << "\n";
 		return sat;
 	}

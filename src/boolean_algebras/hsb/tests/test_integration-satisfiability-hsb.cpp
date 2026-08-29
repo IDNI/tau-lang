@@ -11,37 +11,49 @@ TEST_SUITE("Configuration") {
 TEST_SUITE("hsb: always") {
 	TEST_CASE("top always sat") {
 		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb).");
-		CHECK(is_tau_formula_sat<node_t>(spec));
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 	TEST_CASE("top and bot always unsat") {
 		// top != bot — stream cannot equal both simultaneously
 		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb) && (always o1[t]:hsb = {bot}:hsb).");
-		CHECK(!is_tau_formula_sat<node_t>(spec));
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(!sat.value());
 	}
 }
 
 TEST_SUITE("hsb: sometimes") {
 	TEST_CASE("sometimes top sat") {
 		tref spec = create_spec("(sometimes o1[t]:hsb = {top}:hsb).");
-		CHECK(is_tau_formula_sat<node_t>(spec));
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 }
 
 TEST_SUITE("hsb: always and sometimes") {
 	TEST_CASE("always top and sometimes top sat") {
 		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb) && (sometimes o1[t]:hsb = {top}:hsb).");
-		CHECK(is_tau_formula_sat<node_t>(spec));
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 	TEST_CASE("always top conflicts sometimes bot unsat") {
 		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb) && (sometimes o1[t]:hsb = {bot}:hsb).");
-		CHECK(!is_tau_formula_sat<node_t>(spec));
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(!sat.value());
 	}
 }
 
 TEST_SUITE("hsb: loopback") {
 	TEST_CASE("loopback sat") {
 		tref spec = create_spec("(always o1[t]:hsb = o1[t-1]:hsb).");
-		CHECK(is_tau_formula_sat<node_t>(spec));
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
 	}
 }
 

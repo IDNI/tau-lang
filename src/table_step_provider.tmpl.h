@@ -321,8 +321,12 @@ std::optional<solution<node>> table_step_provider<node>::produce(
 				conj = conj ? tau::build_wff_and(conj, grounded) : grounded;
 			}
 			tref current = rewriter::replace<node>(conj, memory);
-			current = normalize_non_temp<node>(current);
-			ws = solution_with_max_update<node>(current, time_point);
+			auto normalized = normalize_non_temp<node>(current);
+			if (normalized.has_value()) current = normalized.value();
+			auto ws_r = solution_with_max_update<node>(current, time_point);
+			ws = ws_r.has_value()
+				? std::optional<solution<node>>(ws_r.value())
+				: std::nullopt;
 		}
 		if (!ws) return std::nullopt;
 		for (const auto& [var, value] : ws.value())

@@ -319,7 +319,9 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 				ltl_to_safety_formula_full<node_t>(spec_fm);
 			(void)ltl_sol;
 			if (!safety_spec) return std::nullopt;
-			spec_fm = normalizer<node_t>(safety_spec);
+			auto normalized = normalizer<node_t>(safety_spec);
+			if (!normalized.has_value()) return std::nullopt;
+			spec_fm = normalized.value();
 			if (!spec_fm) return std::nullopt;
 		}
 
@@ -359,7 +361,9 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 		for (auto& [var_bf, const_bf] : output_eqs)
 			conj = build_wff_and<node_t>(conj,
 				build_bf_eq<node_t>(var_bf, const_bf));
-		return is_tau_formula_sat<node_t>(conj);
+		auto sat_r = is_tau_formula_sat<node_t>(conj);
+		if (!sat_r.has_value()) return std::nullopt;
+		return sat_r.value();
 	} catch (...) {
 		return std::nullopt;
 	}
@@ -374,8 +378,11 @@ tref parse_like_compile_spec_step1(const std::string& src) {
 	compile_detail::scoped_clean_definitions<node_t> clean_defs;
 	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
 		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value()); nso_rr)
-			if (tref applied = nso_rr_apply<node_t>(*nso_rr); applied)
-				return normalizer<node_t>(applied);
+			if (auto applied_r = nso_rr_apply<node_t>(*nso_rr);
+			    applied_r.has_value() && applied_r.value())
+				if (auto norm_r = normalizer<node_t>(applied_r.value());
+				    norm_r.has_value())
+					return norm_r.value();
 	return nullptr;
 }
 
