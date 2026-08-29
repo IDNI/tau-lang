@@ -20,6 +20,7 @@ set(TAU_BA_TESTS
 	tests/test_integration-heuristics-bv_ba_cvc5_simplification.cpp
 	tests/test_integration-heuristics-bv_predicate_blasting.cpp
 	tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp
+	tests/test_integration-interpreter-bv.cpp
 	tests/test_integration-satisfiability-bv.cpp
 	tests/test_integration-solver-bv.cpp
 	tests/test_ltl_qlt_bv.cpp
