@@ -77,11 +77,9 @@ TEST_SUITE("bv term helpers") {
 		REQUIRE( fm != nullptr );
 		trefs vars = get_free_vars<node_t>(fm);
 		REQUIRE( vars.size() == 1 );
-		// get_bv_size expects a "type tree" (a `typed` node wrapping a
-		// `subtype` num child, see ba_types<node>::type_tree), not the bare
-		// variable node -- tau::get(v).get_ba_type_tree() synthesizes that
-		// tree from the variable's ba_type id, matching the production call
-		// sites in bv_ba_solver.tmpl.h.
+		// get_bv_size expects a "type tree" (typed > type > subtype),
+		// not the bare variable node -- get_ba_type_tree() synthesizes
+		// that from the variable's ba_type id.
 		CHECK( get_bv_size<node_t>(
 			tau::get(vars[0]).get_ba_type_tree()) == 8 );
 		tref fm16 = parse("Y:bv[16] = { 0 }:bv[16]");
@@ -145,12 +143,13 @@ TEST_SUITE("bv default width") {
 		auto var = tau::get(src).find_top(is<node_t, tau::variable>);
 		tref type_tree = get_ba_type_tree<node_t>(tau::get(var).get_ba_type());
 		using tt = tau::traverser;
-		CHECK( (tt(type_tree) | tau::subtype | tt::ref) != nullptr );
+		CHECK( (tt(type_tree) | tau::type | tau::subtype | tt::ref) != nullptr );
 	}
 
 	// A genuinely widthless type tree reaching the accessor is a loud, defined failure, never UB.
 	TEST_CASE("get_bv_size throws on a genuinely widthless bv type tree") {
-		tref widthless_type = tau::get(tau::typed, tau::get(tau::type, "bv"));
+		tref widthless_type = tau::get(tau::typed,
+			tau::get(tau::type, "bv"));
 		CHECK_THROWS_AS( get_bv_size<node_t>(widthless_type), std::logic_error );
 	}
 }

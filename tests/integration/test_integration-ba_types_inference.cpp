@@ -1941,13 +1941,6 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 }
 
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}
-
 // Coverage-driven additions (2026-08-01). ba_types_inference.tmpl.h measured
 // 84.8% line coverage; the 122 uncovered lines are almost entirely the
 // error-propagation arms (parse_error / inference_error / scope_error) that
@@ -2161,5 +2154,12 @@ TEST_SUITE("ba_types_inference: conflicts in definitions and references") {
 		CHECK( infers_defs("f(x:bv[8]) := x:bv[8] = 0.") );
 		CHECK( infers_defs("f(x:bv[8]) := x."
 				   "g(y:bv[8]) := f(y).") );
+	}
+}
+
+TEST_SUITE("Cleanup") {
+
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

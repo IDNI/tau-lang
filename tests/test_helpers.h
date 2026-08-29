@@ -27,6 +27,17 @@ namespace idni::tau_lang {
 using strings = std::vector<std::string>;
 
 using node_t = tau_lang::node<bas_pack>;
+
+namespace test_init_detail {
+	// The constructor only stores a pointer -- it must never touch the
+	// grammar or build a tree node, since static init order across
+	// translation units is unordered; main() calls it once that ends.
+	struct _tau_init_registrar {
+		_tau_init_registrar() { test_tau_init_hook = &tau_init<node_t>; }
+	};
+	inline _tau_init_registrar _tau_init_registrar_instance;
+}
+
 using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;

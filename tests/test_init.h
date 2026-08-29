@@ -60,6 +60,10 @@ inline void apply_tau_experiment_env() {
 			static_cast<int>(cvc5_options)));
 }
 
+// Set by test_helpers.h once node_t is known; stays a bare pointer here
+// so this header, which must not pull in the tau tree, never has to.
+inline void (*test_tau_init_hook)() = nullptr;
+
 int main(int argc, char** argv) {
 	apply_tau_experiment_env();
 	DBG(std::cout << "Logging severity level: " << logging::level() << "\n";)
@@ -68,5 +72,6 @@ int main(int argc, char** argv) {
 	std::cout << "Logging severity level set: " << logging::level() << "\n";
 #endif // TAU_LOG_TRACE_TESTS
 
+	if (test_tau_init_hook) test_tau_init_hook();
 	return doctest::Context(argc, argv).run();
 }

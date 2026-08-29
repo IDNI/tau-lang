@@ -28,106 +28,27 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());
 	}
-	// The next three cases originally pinned the legacy algorithm's B4
-	// squeeze/absorb; since its deletion they pin the block pipeline on the
-	// same inputs. The expected shapes changed with the switch -- each new
-	// shape was checked equivalent to its input by hand (the conservative
-	// are_nso_equivalent cannot decide reference-carrying formulas) before
-	// being added here, per the redesign's acceptance rule: expectations may
-	// be rewritten, semantics may not. The old shapes are kept in the lists
-	// deliberately -- they are equivalent too, and a future simplification
-	// improvement may legitimately return to them.
+	// Checked equivalent to its input by hand (the conservative
+	// are_nso_equivalent cannot decide reference-carrying formulas).
 	TEST_CASE("b4 squeeze_absorb below ex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
-		CHECK( matches_to_str_to_any_of(res, {
-			// complete_quantifier_elimination (the residual-quantifier
-			// fallback added when this variable occurs only in a
-			// non-negated pivot-less shape): a single disjunct, folding
-			// `w = 0` into the kept scope instead of factoring it out.
-			// Equivalent by hand: under `b1 y = 0`, `b1 yz != 0` is
-			// unsatisfiable (b1 yz = (b1 y) z = 0), so the scope reduces
-			// to `b1 w = 0 && (w = 0 || f(b1))`, i.e.
-			// `(w = 0 && ex b1 (b1 y = 0 && b1 w = 0)) || ex b1 (b1 y = 0
-			// && b1 w = 0 && f(b1))`; the first disjunct's existential is
-			// a tautology (b1 = 0), so it collapses to
-			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
-			// pre-deletion shape below. Canonical (produced) shape FIRST:
-			// Debug's matches_to_any_of only checks expected[0].
-			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
-			// the same single disjunct with main's pivot tie-break order
-			// (conjuncts and disjuncts permuted; equivalent by
-			// commutativity of the hand-check above).
-			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || f(b1) || w = 0)",
-			// 2026-08-20 (bare-atom leaf routing + the fallback): same
-			// two disjuncts as the 2026-08-04 shape below, with disjunct
-			// and conjunct order flipped by the pivot tie-breaks;
-			// equivalent by the same hand-check.
-			"(ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0)) "
-			"|| (ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1)))",
-			// block pipeline, 2026-08-04: carries a redundant second
-			// disjunct (its two conjuncts force w = 0 and w != 0, so
-			// it is F) and an unabsorbed b1 yz != 0 literal (dead
-			// under b1 y = 0); verified equivalent by hand.
-			"(ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))) "
-			"|| (ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0))",
-			// pre-deletion shapes, equivalent; a future simplification
-			// improvement may legitimately return to them.
-			"w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))",
-			"w = 0 || (ex b1 b1 y = 0 && b1 w = 0 && f(b1))",
-			"(ex b1 b1 w = 0 && b1 y = 0 && f(b1)) || w = 0",
-			"(ex b1 b1 y = 0 && b1 w = 0 && f(b1)) || w = 0",
-		}) );
+		// Compared modulo AND/OR order: clause order follows node hash,
+		// so pinning one spelling breaks whenever the grammar changes.
+		CHECK( matches_wff_mod_and_or(res,
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))") );
 	}
 	TEST_CASE("b4 squeeze_absorb below all") {
 		const char* sample = "all x !((((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0)).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		CHECK( matches_to_str_to_any_of(res, {
-			// complete_quantifier_elimination's shape, dual of the ex
-			// case above: process_quantifier_block dualises an all-block
-			// by resolving the negated scope as an ex-block and negating
-			// back (`to_nnf(neg(pushed))`), so this is exactly `!(ex-case
-			// result)` renamed to NNF -- sound for the same reason the ex
-			// shape is, by construction, independent of what shape the
-			// wrapped ex-elimination happens to return. Canonical
-			// (produced) shape FIRST: Debug's matches_to_any_of only
-			// checks expected[0].
-			//
-			// Second conjunct's disjunct order updated by d818ac08 (sort
-			// the trimmed positive atoms before re-negating, so the
-			// eq-first rule in syntactic_path_simplification_wff_comp
-			// now recognises `wy' = 0` as an equality behind its
-			// `wff_neg` sibling `w != 0` instead of falling through to
-			// the hash-based subtree_less tie-break): `wy' = 0 || w != 0`
-			// is now the sole canonical, deterministic order -- the
-			// pre-fix `w != 0 || wy' = 0` spelling was never anything but
-			// a hash tie-break artifact of this exact pair, so it is
-			// corrected in place rather than added as a 9th entry.
+		// Dual of the ex case: process_quantifier_block dualises an
+		// all-block by resolving the negated scope as an ex-block and
+		// negating back, so this is sound for the same reason.
+		CHECK( matches_wff_mod_and_or(res,
 			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (wy' = 0 || w != 0)",
-			// the same two conjuncts with main's pivot tie-break order
-			// (disjuncts permuted; equivalent by commutativity).
-			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (wy' = 0 || w != 0)",
-			// 2026-08-20 (bare-atom leaf routing + the fallback): dual
-			// of the ex case, conjunct/disjunct order flipped by the
-			// pivot tie-breaks; equivalent by the same hand-check.
-			"(all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0) "
-			"&& (all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1))",
-			// block pipeline, 2026-08-04: the dual, second conjunct is
-			// identically T, and the first folds to the old shape
-			// (b1 = 0 forces w != 0); verified equivalent by hand.
-			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0)",
-			// pre-deletion shapes, equivalent.
-			"w != 0 && (all b1 b1 w != 0 || b1 y != 0 || !f(b1))",
-			"w != 0 && (all b1 b1 y != 0 || b1 w != 0 || !f(b1))",
-			"(all b1 b1 w != 0 || b1 y != 0 || !f(b1)) && w != 0",
-			"(all b1 b1 y != 0 || b1 w != 0 || !f(b1)) && w != 0",
-		}) );
+			"&& (wy' = 0 || w != 0)") );
 	}
 	TEST_CASE("b4 squeeze_absorb below all, fully eliminated") {
 		// equivalence guard: same scope under a plain all resolves
@@ -135,23 +56,10 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "all x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
-		CHECK( matches_to_str_to_any_of(res, {
-			// disjunct order flipped by the 8f1a74c1 parser regen
-			// (Debug's matches_to_any_of only checks expected[0] --
-			// see test_helpers.h); actual current shape first.
-			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
-			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
-			// block pipeline, 2026-08-04 (canonical shape first):
-			// under y = 0 the kept universal reduces to
-			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
-			// is w = 0 -- so this is y = 0 && w = 0 in a bulkier
-			// spelling; verified equivalent by hand.
-			
-			// pre-deletion shapes, equivalent.
-			"y = 0 && w = 0",
-			"w = 0 && y = 0",
-		}) );
+		// Compared modulo AND/OR order: clause order follows node hash,
+		// so pinning one spelling breaks whenever the grammar changes.
+		CHECK( matches_wff_mod_and_or(res,
+			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)") );
 	}
 
 	// complete_quantifier_elimination branch coverage (added with the

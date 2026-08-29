@@ -18,8 +18,8 @@ add_test(NAME "test_repl-limit_effect-fixpointsteps_giveup"
 set_tests_properties("test_repl-limit_effect-fixpointsteps_giveup" PROPERTIES
 	PASS_REGULAR_EXPRESSION "find_fixpoint_phi: exceeded 1 steps")
 
-# IN-M3: the shipped default (500) is finite, so the same workload completes
-# under it and the CLI `0` opt-in still means unlimited.
+# fixpointsteps ships unlimited, so this workload completes without
+# ever reaching a cap.
 add_test(NAME "test_repl-limit_effect-fixpointsteps_default_completes"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat always o1[t] = o1[t-2]\"")
 set_tests_properties("test_repl-limit_effect-fixpointsteps_default_completes" PROPERTIES

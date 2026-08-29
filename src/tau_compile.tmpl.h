@@ -193,7 +193,7 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\tprint_json = opts[\"json\"].get<bool>();\n"
 		"\tbool quit_on_idle = opts[\"quit\"].get<bool>();\n"
 		"\tbool print_benchmarks = opts[\"benchmarks\"].get<bool>();\n"
-		"\tbdd_init<Bool>();\n"
+		"\ttau_init<node_t>();\n"
 		"\t// Replay the emitting process's ba-type registry so every baked\n"
 		"\t// numeric type id resolves to the same type here; entries the\n"
 		"\t// artifact's own static init already registered assert by identity.\n";

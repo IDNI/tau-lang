@@ -123,6 +123,14 @@ struct api_measure {
 ///
 /// Most methods also have a `measuring&` variant that records profiling data.
 ///
+/**
+ * @brief One-time setup for @p node: the BDD backend and the grammar's
+ * dynamic type names. Call once before the first parse, the way callers
+ * already call `bdd_init<Bool>()` -- this replaces that call.
+ */
+template <NodeType node>
+void tau_init();
+
 /// @tparam node  A type satisfying the NodeType concept (see tau_tree.h).
 ///               In practice, use `node<BAs...>` with your BA pack.
 template <NodeType node>

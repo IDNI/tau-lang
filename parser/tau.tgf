@@ -72,13 +72,13 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
 # they are named bf_* as they involve boolean functions,
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
-bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
+bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         |                                     ba_constant
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
-                        | ('(' _ type _ ['[' _ subtype _ ']'] _ ')' _
+                        | ('(' _ type _ ')' _
                            (bf_parenthesis | ba_constant | variable | bf_ref
                            | bf_t | bf_f | bf_neg | bf_cast | capture
                            | bf_fall | bf_fex)
@@ -142,7 +142,6 @@ var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
 var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
 io_var                 => io_var_name '[' offset ']'.
 io_var_name            => chars.
-bv_type_like           => "bv" _ '[' _ num _ ']'.
 uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
 
 # quantifier variables
@@ -164,9 +163,9 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ type _ ['[' _ subtype _ ']'].
-type                   => chars.
-subtype                => num.
+typed                  => _ ':' _ type.
+@dynamic type_name defaults tau.
+type                   => type_name [ _ '[' _ num:subtype _ ']' ].
 
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
@@ -323,7 +322,7 @@ fm_or_term     => wff | bf.
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, type, subtype, integer,
+        sym, digits, integer, type_name,
         source, capture, var_name, io_var_name, uconst_name, file_name,
         ctnvar, option_name, option_value.
 

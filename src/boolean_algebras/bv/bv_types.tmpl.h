@@ -9,9 +9,9 @@ template<NodeType node>
 tref bv_type(unsigned short bitwidth) {
 	using tau = tree<node>;
 
-	tref type = tau::get(tau::type, "bv");
 	tref subtype = tau::get(tau::subtype, tau::get_num(bitwidth));
-	return tau::get(tau::typed, type, subtype);
+	tref type = tau::get(node(tau::type, dict("bv")), subtype);
+	return tau::get(tau::typed, type);
 }
 
 template<NodeType node>
@@ -51,7 +51,7 @@ size_t get_bv_width(tref t) {
 	using tt = tau::traverser;
 
 	DBG(assert(is_bv_type_family<node>(t)));
-	size_t num = tt(t) | tau::subtype | tau::num | tt::num;
+	size_t num = tt(t) | tau::type | tau::subtype | tau::num | tt::num;
 	DBG(assert(num && "bv type must have explicit bitwidth");)
 	if (!num) throw std::logic_error(
 		"get_bv_width: bv type has no explicit bitwidth");

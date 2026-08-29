@@ -212,7 +212,7 @@ void welcome() {
 
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
-	bdd_init<Bool>();
+	tau_init<node_t>();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);

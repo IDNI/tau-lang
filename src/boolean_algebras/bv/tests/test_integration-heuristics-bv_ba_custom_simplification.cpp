@@ -272,9 +272,11 @@ TEST_SUITE("ba bv custom simplification") {
 			"(X:bv[64] * {12}:bv[64]) / {3}:bv[64]");
 	}
 
-	// ... and the unparenthesised spelling really is a constant-folded zero.
-	TEST_CASE("6 * X * 2 / 3 parses as 6 * (X * (2 / 3)) = 0") {
-		check_unchanged("{6}:bv[64] * X:bv[64] * {2}:bv[64] / {3}:bv[64]");
+	// Same-level operators chain left to right, so the unparenthesised
+	// spelling folds the same way as the parenthesised one above.
+	TEST_CASE("the unparenthesised spelling folds the same way") {
+		check_simplifies_to("{6}:bv[64] * X:bv[64] * {2}:bv[64] / {3}:bv[64]",
+			"(X:bv[64] * {12}:bv[64]) / {3}:bv[64]");
 	}
 }
 

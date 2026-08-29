@@ -13,7 +13,7 @@ namespace idni::tau_lang {
 // Converts parser tree nodes to tau tree nodes
 // - terminals are collapsed into their parents
 //     ie. shift > num > "10" becomes shift > num("10")
-//     or  variable > type > "sbf" becomes variable > type("sbf")
+//     or  variable > type("sbf") absorbs its type_name child's string
 // - does q_vars transformation from ex x, y to ex x ex y
 // - transforms offset variables to captures
 //
@@ -205,6 +205,20 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				x = getx_data(m_get(ptr.only_child()).data());
 				break;
 
+			case tau_parser::type: {
+				// type_name (a string leaf) converts first; reuse
+				// its interned data and keep subtype as a child,
+				// rather than interning the whole span as one string.
+				trefs ch;
+				for (tref c : ptr.children()) ch.push_back(c);
+				size_t name_data = m_get(ch[0]).data();
+				x = ch.size() == 2
+					? get(node(nt, name_data, is_term, ba_type),
+						m_ref(ch[1]))
+					: getx_data(name_data);
+				break;
+			}
+
 			case wff_all:
 			case wff_ex: x = process_quantifier_vars(wff); break;
 			case bf_fall:
@@ -222,15 +236,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 			}
 
 			case bf_cast: {
-				// children after @trim: [type, bf_operand] or
-				// [type, subtype, bf_operand].  The target type
-				// is interned from the parsed subtrees, the same
-				// shape a ':name[n]' annotation builds, so no BA
-				// is named here.
+				// children after @trim: [type, bf_operand]; the
+				// same type shape a ':name[n]' annotation builds,
+				// so no BA is named here.
 				trefs ch;
 				for (tref c : ptr.children())
 					if (m_ref(c)) ch.push_back(m_ref(c));
-				DBG(assert(ch.size() == 2 || ch.size() == 3);)
+				DBG(assert(ch.size() == 2);)
 				// Reject a type the configured pack does not
 				// have: '(x) y' also parses as an implicit and,
 				// and interning an unowned type here would defer
@@ -245,11 +257,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 					error = true;
 					break;
 				}
-				ba_type = get_ba_type_id<node>(ch.size() == 3
-					? tree<node>::get(tree<node>::typed,
-						ch[0], ch[1])
-					: tree<node>::get(tree<node>::typed,
-						ch[0]));
+				ba_type = get_ba_type_id<node>(
+					tree<node>::get(tree<node>::typed, ch[0]));
 				x = getx(trefs{ch.back()});
 				break;
 			}

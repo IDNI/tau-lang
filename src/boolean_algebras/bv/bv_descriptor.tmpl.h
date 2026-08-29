@@ -85,7 +85,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static std::optional<unsigned short> type_param(tref type_tree) {
 		if (!matches_type(type_tree)) return std::nullopt;
 		using tt = tau::traverser;
-		auto subtype = tt(type_tree) | tau::subtype | tt::ref;
+		auto subtype = tt(type_tree) | tau::type | tau::subtype | tt::ref;
 		return static_cast<unsigned short>(subtype
 			? tau::get(subtype)[0].get_num() : default_bv_size);
 	}

@@ -298,7 +298,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			tref c = form | tt::ref;
 			tref type_tree = tau::get(c).get_ba_type_tree();
 			if (!is_bv_type_family<node>(tau::get(c).get_ba_type())
-				|| !(tt(type_tree) | tau::subtype))
+				|| !(tt(type_tree) | tau::type | tau::subtype))
 				return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree);
 			return make_bitvector_top_elem(bv_size);
@@ -307,7 +307,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			tref c = form | tt::ref;
 			tref type_tree = tau::get(c).get_ba_type_tree();
 			if (!is_bv_type_family<node>(tau::get(c).get_ba_type())
-				|| !(tt(type_tree) | tau::subtype))
+				|| !(tt(type_tree) | tau::type | tau::subtype))
 				return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree);
 			return make_bitvector_bottom_elem(bv_size);
@@ -424,7 +424,7 @@ bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 				return solvable = false;
 			}
 			// the solver requires an explicit bitwidth
-			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype)) {
+			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::type | tau::subtype)) {
 				reason = bv_unsolvable_reason::missing_bitwidth;
 				return solvable = false;
 			}

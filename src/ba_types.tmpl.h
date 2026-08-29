@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <optional>
+#include <vector>
 
 #include "ba_types.h"
 
@@ -358,12 +359,15 @@ tref unify(tref t1, tref t2) {
 	if (is_untyped<node>(t2)) return t1;
 	// If they are the same type return either
 	if (is_same_ba_type<node>(t1, t2)) return t1;
-	// If t1 and t2 have same type name
-	if (tau::subtree_equals(tau::trim(t1), tau::trim(t2))) {
+	// If t1 and t2 have the same family name, subtype aside: subtype is
+	// now type's own child, so a whole-subtree compare would also compare
+	// the width, and typed's children_size no longer reflects it either.
+	tref f1 = tau::trim(t1), f2 = tau::trim(t2);
+	if (tau::get(f1).get_string() == tau::get(f2).get_string()) {
 		// If t1 or t2 does not have a type parameter
-		if (tau::get(t1).children_size() == 1)
+		if (tau::get(f1).children_size() == 0)
 			return t2;
-		if (tau::get(t2).children_size() == 1)
+		if (tau::get(f2).children_size() == 0)
 			return t1;
 	}
 	return nullptr;
@@ -477,8 +481,8 @@ bool pack_owns_ba_type_name(const std::string& name) {
 	return false;
 }
 
-// The type tree is 'typed(type(family)[, subtype])'; only the family name
-// (e.g. "bv" for bv[8]) is compared against the pack's owned types.
+// The type tree is 'typed(type[, subtype])'; only the family name in
+// type's own data (e.g. "bv" for bv[8]) is compared against the pack.
 template <NodeType node>
 bool pack_owns_ba_type(size_t ba_type_id) {
 	using tau = tree<node>;
