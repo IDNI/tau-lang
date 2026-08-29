@@ -42,6 +42,7 @@ set(TAU_CORE_HEADERS
 	base_ba_dispatcher.h
 	interpreter.h
 	pointwise_revision.h
+	tau_diagnostics.h  # idni::tau_lang aliases for the parser library's diagnostics types
 	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h

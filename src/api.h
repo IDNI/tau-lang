@@ -29,6 +29,7 @@
 
 #include "heuristics/simplify_options.h"
 #include "interpreter.h"
+#include "tau_diagnostics.h"
 #include "utility/measure.h"
 
 namespace idni::tau_lang {
