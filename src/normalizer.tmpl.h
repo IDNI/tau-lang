@@ -792,7 +792,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
  * @par Example
  * @code{.cpp}
  * tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
- * CHECK( is_non_temp_nso_unsat<node_t>(fm) );
+ * CHECK( is_non_temp_nso_unsat<node_t>(fm).value() );
  * @endcode
  * @endinternal
  */

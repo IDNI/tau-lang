@@ -414,22 +414,12 @@ result<interpreter<node>>
 			if (mixed) {
 				tref combined = tau::_T();
 				for (tref g : g_parts) {
-					auto ng = normalizer<node>(g);
-					if (!ng.has_value()) {
-						r.merge(std::move(ng));
-						DBG(assert(r.is_well_formed());)
-						return r;
-					}
-					combined = tau::build_wff_and(combined, ng.value());
+					TAU_TRY(tref ng, normalizer<node>(g));
+					combined = tau::build_wff_and(combined, ng);
 				}
 				for (tref o : other_parts) {
-					auto no = normalizer<node>(o);
-					if (!no.has_value()) {
-						r.merge(std::move(no));
-						DBG(assert(r.is_well_formed());)
-						return r;
-					}
-					combined = tau::build_wff_and(combined, no.value());
+					TAU_TRY(tref no, normalizer<node>(o));
+					combined = tau::build_wff_and(combined, no);
 				}
 				spec = combined;
 				goto post_normalization;
@@ -440,13 +430,8 @@ result<interpreter<node>>
 	// Skip normalizer for LTL formulas — it converts wff_F → wff_sometimes,
 	// which would make has_ltl_operators return false and bypass ltl_to_safety_formula.
 	if (!has_ltl_operators<node>(spec) && !witness_ltl_route) {
-		auto nr = normalizer<node>(spec);
-		if (!nr.has_value()) {
-			r.merge(std::move(nr));
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		spec = nr.value();
+		TAU_TRY(tref nr, normalizer<node>(spec));
+		spec = nr;
 	}
 post_normalization:
 	// Full LTL formulas (F/U/R/W) need a different execution strategy.
@@ -482,13 +467,8 @@ post_normalization:
 		ltl_sol = std::move(sol_opt);
 		since_aux_anchor = std::move(unanchored_aux);
 		// Normalize the derived safety formula and recurse with it.
-		auto nr = normalizer<node>(safety_spec);
-		if (!nr.has_value()) {
-			r.merge(std::move(nr));
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		spec = nr.value();
+		TAU_TRY(tref nr, normalizer<node>(safety_spec));
+		spec = nr;
 	}
 	// For each spec clause, we check if it is executable
 	for (tref clause : expression_paths<node>(spec)) {
@@ -3309,13 +3289,8 @@ result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	// previous runs (e.g. sequential test cases sharing the singleton).
 	definitions<node>::instance().clear();
 	DBG(LOG_TRACE << "run[form]: " << LOG_FM(form));
-	auto intr = interpreter<node>::make_interpreter(form, ctx);
-	if (!intr.has_value()) {
-		r.merge(std::move(intr));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	interpreter<node> intrprtr = std::move(intr.value());
+	TAU_TRY(interpreter<node> intrprtr,
+		interpreter<node>::make_interpreter(form, ctx));
 	if (!intrprtr.run_loop(steps)) {
 		r.error(code::io_error, "Failed to write outputs");
 		DBG(assert(r.is_well_formed());)

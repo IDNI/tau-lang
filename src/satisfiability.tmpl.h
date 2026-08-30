@@ -543,19 +543,9 @@ result<bool> is_run_satisfiable(tref fm) {
 
 	DBG(LOG_TRACE << "is_run_satisfiable[sat_fm]: " << LOG_FM(sat_fm));
 
-	auto normed = normalize_non_temp<node>(sat_fm);
-	if (!normed.has_value()) {
-		r.merge(std::move(normed));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = is_non_temp_nso_satisfiable<node>(normed.value());
-	if (!inner.has_value()) {
-		r.merge(std::move(inner));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	r = inner.value();
+	TAU_TRY(tref sat_normed, normalize_non_temp<node>(sat_fm));
+	TAU_TRY(bool sat, is_non_temp_nso_satisfiable<node>(sat_normed));
+	r = sat;
 
 	DBG(LOG_TRACE
 		<< "is_run_satisfiable[result]: " << r.value() << "\n"

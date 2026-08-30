@@ -56,28 +56,16 @@ result<std::string> api<node>::apply_defs(
 	// dropped from a definition that legitimately had no effect. Report
 	// the failure instead of silently continuing without it.
 	for (const std::string& def : defs) {
-		auto d = get_definition(def);
-		if (!d.has_value()) {
+		auto d = r.merge_take(get_definition(def));
+		if (!d) {
 			TAU_LOG_ERROR << "Failed to parse definition: " << def;
-			r.merge(std::move(d));
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
-		tdefs.insert(d.value());
+		tdefs.insert(*d);
 	}
-	auto parsed = get_spec_or_term(expr);
-	if (!parsed.has_value()) {
-		r.merge(std::move(parsed));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto applied = apply_defs(tdefs, parsed.value());
-	if (!applied.has_value()) {
-		r.merge(std::move(applied));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	tref a = applied.value();
+	TAU_TRY(tref parsed, get_spec_or_term(expr));
+	TAU_TRY(tref a, apply_defs(tdefs, parsed));
 	// get_spec_or_term() parses a bare formula as a one-line spec
 	// (spec(main(wff(...)))); get_nso_rr()'s no-ref branch keeps
 	// that shape rather than unwrapping it the way its ref branch
@@ -115,27 +103,11 @@ result<std::string> api<node>::substitute(
 	const std::string& with)
 {
 	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto t = get_formula_or_term(that);
-	if (!t.has_value()) {
-		r.merge(std::move(t));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto w = get_formula_or_term(with);
-	if (!w.has_value()) {
-		r.merge(std::move(w));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto s = substitute(e.value(), t.value(), w.value());
-	if (!s.has_value()) r.merge(std::move(s));
-	else                r = to_str(s.value());
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	TAU_TRY(tref t, get_formula_or_term(that));
+	TAU_TRY(tref w, get_formula_or_term(with));
+	TAU_TRY(tref s, substitute(e, t, w));
+	r = to_str(s);
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -146,33 +118,11 @@ result<std::string> api<node>::substitute(
 	const std::map<std::string, std::string>& that_with)
 {
 	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	tref cur = e.value();
+	TAU_TRY(tref cur, get_formula_or_term(expr));
 	for (auto [that, with] : that_with) {
-		auto t = get_formula_or_term(that);
-		if (!t.has_value()) {
-			r.merge(std::move(t));
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		auto w = get_formula_or_term(with);
-		if (!w.has_value()) {
-			r.merge(std::move(w));
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		auto sub = substitute(cur, t.value(), w.value());
-		if (!sub.has_value()) {
-			r.merge(std::move(sub));
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		cur = sub.value();
+		TAU_TRY(tref t, get_formula_or_term(that));
+		TAU_TRY(tref w, get_formula_or_term(with));
+		TAU_TRY(cur, substitute(cur, t, w));
 	}
 	r = to_str(cur);
 	DBG(assert(r.is_well_formed());)
@@ -188,66 +138,30 @@ result<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
 	// AP1-17: delegate to the tref overload (it runs simplify first);
 	// the inlined copy skipped it and could diverge on canonization.
-	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto b = boole_normal_form(e.value());
-	if (!b.has_value()) r.merge(std::move(b));
-	else                r = to_str(b.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return boole_normal_form(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::dnf(const std::string& expr) {
-	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto d = dnf(e.value());
-	if (!d.has_value()) r.merge(std::move(d));
-	else                r = to_str(d.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return dnf(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::cnf(const std::string& expr) {
-	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto c = cnf(e.value());
-	if (!c.has_value()) r.merge(std::move(c));
-	else                r = to_str(c.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return cnf(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::nnf(const std::string& expr) {
-	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto n = nnf(e.value());
-	if (!n.has_value()) r.merge(std::move(n));
-	else                r = to_str(n.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return nnf(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 // Procedures
@@ -257,87 +171,42 @@ template <NodeType node>
 result<std::string> api<node>::syntactic_term_simplification(
 	const std::string& term)
 {
-	result<std::string> r;
-	auto e = get_term(term);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto s = syntactic_term_simplification(e.value());
-	if (!s.has_value()) r.merge(std::move(s));
-	else                r = to_str(s.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_term(term).and_then(
+		[](tref e) { return syntactic_term_simplification(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::syntactic_formula_simplification(
 	const std::string& fm)
 {
-	result<std::string> r;
-	auto e = get_formula(fm);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto s = syntactic_formula_simplification(e.value());
-	if (!s.has_value()) r.merge(std::move(s));
-	else                r = to_str(s.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula(fm).and_then(
+		[](tref e) { return syntactic_formula_simplification(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::normalize_term(const std::string& expr)
 {
-	result<std::string> r;
-	auto term = get_term(expr);
-	if (!term.has_value()) {
-		r.merge(std::move(term));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto n = normalize_term(term.value());
-	if (!n.has_value()) r.merge(std::move(n));
-	else                r = to_str(n.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_term(expr).and_then(
+		[](tref term) { return normalize_term(term); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::normalize_formula(
 	const std::string& expr)
 {
-	result<std::string> r;
-	auto fm = get_formula(expr);
-	if (!fm.has_value()) {
-		r.merge(std::move(fm));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto n = normalize_formula(fm.value());
-	if (!n.has_value()) r.merge(std::move(n));
-	else                r = to_str(n.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula(expr).and_then(
+		[](tref fm) { return normalize_formula(fm); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<std::string> api<node>::anti_prenex(const std::string& expr) {
-	result<std::string> r;
-	auto fm = get_formula(expr);
-	if (!fm.has_value()) {
-		r.merge(std::move(fm));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto a = anti_prenex(fm.value());
-	if (!a.has_value()) r.merge(std::move(a));
-	else                r = to_str(a.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula(expr).and_then(
+		[](tref fm) { return anti_prenex(fm); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
@@ -345,115 +214,46 @@ result<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
 	// AP1-17: delegate to the tref overload (see boole_normal_form).
-	result<std::string> r;
-	auto e = get_formula(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto elim = eliminate_quantifiers(e.value());
-	if (!elim.has_value()) r.merge(std::move(elim));
-	else                   r = to_str(elim.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula(expr).and_then(
+		[](tref e) { return eliminate_quantifiers(e); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 template <NodeType node>
 result<bool> api<node>::realizable(const std::string& expr) {
-	result<bool> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = realizable(e.value());
-	if (!inner.has_value()) r.merge(std::move(inner));
-	else                    r = inner.value();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return realizable(e); });
 }
 
 template <NodeType node>
 result<bool> api<node>::unrealizable(const std::string& expr) {
-	result<bool> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = unrealizable(e.value());
-	if (!inner.has_value()) r.merge(std::move(inner));
-	else                    r = inner.value();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return unrealizable(e); });
 }
 
 template <NodeType node>
 result<bool> api<node>::sat(const std::string& expr) {
-	result<bool> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = sat(e.value());
-	if (!inner.has_value()) r.merge(std::move(inner));
-	else                    r = inner.value();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return sat(e); });
 }
 
 template <NodeType node>
 result<bool> api<node>::unsat(const std::string& expr) {
 	// Parsed as a bare formula, not a spec, so it is not wrapped and rejected.
-	result<bool> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = unsat(e.value());
-	if (!inner.has_value()) r.merge(std::move(inner));
-	else                    r = inner.value();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return unsat(e); });
 }
 
 template <NodeType node>
 result<bool> api<node>::valid(const std::string& expr) {
-	result<bool> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = valid(e.value());
-	if (!inner.has_value()) r.merge(std::move(inner));
-	else                    r = inner.value();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return valid(e); });
 }
 
 template <NodeType node>
 result<bool> api<node>::valid_spec(const std::string& expr) {
-	result<bool> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto inner = valid_spec(e.value());
-	if (!inner.has_value()) r.merge(std::move(inner));
-	else                    r = inner.value();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return valid_spec(e); });
 }
 
 
@@ -494,38 +294,26 @@ result<std::map<std::string, std::string>> api<node>::solve(
 	const std::string& formula,
 	solver_mode mode)
 {
-	result<std::map<std::string, std::string>> r;
-	auto fm = get_formula(formula);
-	if (!fm.has_value()) {
-		r.merge(std::move(fm));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto solution = solve(fm.value(), mode);
-	if (!solution.has_value()) r.merge(std::move(solution));
-	else r = serialize_solution<node>(solution.value(),
-		find_ba_type_or_default<node>(fm.value()));
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula(formula).and_then([mode](tref fm) {
+		return solve(fm, mode).transform(
+			[fm](const subtree_map<node, tref>& sol) {
+				return serialize_solution<node>(sol,
+					find_ba_type_or_default<node>(fm));
+			});
+	});
 }
 
 template <NodeType node>
 result<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	result<std::map<std::string, std::string>> r;
-	auto eq = get_formula(equation);
-	if (!eq.has_value()) {
-		r.merge(std::move(eq));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto solution = lgrs(eq.value());
-	if (!solution.has_value()) r.merge(std::move(solution));
-	else r = serialize_solution<node>(solution.value(),
-		find_ba_type_or_default<node>(eq.value()));
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula(equation).and_then([](tref eq) {
+		return lgrs(eq).transform(
+			[eq](const subtree_map<node, tref>& sol) {
+				return serialize_solution<node>(sol,
+					find_ba_type_or_default<node>(eq));
+			});
+	});
 }
 
 // Execution
@@ -793,18 +581,9 @@ template <NodeType node>
 result<std::string> api<node>::simplify(const std::string& expr,
 	bool use_defaults)
 {
-	result<std::string> r;
-	auto e = get_formula_or_term(expr);
-	if (!e.has_value()) {
-		r.merge(std::move(e));
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto s = simplify(e.value(), use_defaults);
-	if (!s.has_value()) r.merge(std::move(s));
-	else                r = to_str(s.value());
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return get_formula_or_term(expr).and_then(
+		[use_defaults](tref e) { return simplify(e, use_defaults); }
+	).transform([](tref v) { return to_str(v); });
 }
 
 } // namespace idni::tau_lang
