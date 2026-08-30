@@ -10,7 +10,7 @@
 //   sat  x = 0 && x = 1                                  -> F
 //   valid x = x                                          -> T
 //   normalize x = 0 || x = 0                             -> x = 0
-//   solve x = 0                                          -> x := {0}:tau
+//   solve x = 0                                          -> x := { F }:tau
 // The interpreter step sequence mirrors
 // tests/api/test_api-string_api.cpp "using get_inputs_for_step".
 //
@@ -53,7 +53,7 @@ tauModule().then(tau => {
 			`normalizeFormula("x = 0 || x = 0") -> ${JSON.stringify(norm)}`);
 
 		const sol = tau.solve('x = 0', 'general');
-		check(sol !== null && sol.x === '0',
+		check(sol !== null && sol.x === 'F',
 			`solve("x = 0") -> ${JSON.stringify(sol)}`);
 
 		const toStrOut = tau.toStr('x = 0 || x = 0');

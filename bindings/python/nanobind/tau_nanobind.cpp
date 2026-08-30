@@ -57,6 +57,14 @@ bool leak_warnings() {
 	return false;
 }
 
+// Drops a result<T>'s report and adapts its value/error state to the
+// nullable shape the Python surface exposed before result<T> existed.
+template <typename T>
+std::optional<T> to_optional(idni::tau_lang::result<T> r) {
+	if (!r.has_value()) return std::nullopt;
+	return std::move(r).value();
+}
+
 NB_MODULE(tau, m) {
 	nb::set_leak_warnings(leak_warnings());
 
@@ -140,8 +148,8 @@ NB_MODULE(tau, m) {
 
 	// HOA edge / automaton — exposed for visualise_mealy_dot, determinise,
 	// boundary_traces consumers on the Python side.
-	using HoaEdge = idni::tau_lang::HoaEdge;
-	using HoaAutomaton = idni::tau_lang::HoaAutomaton;
+	using HoaEdge = idni::tau_lang::hoa_edge;
+	using HoaAutomaton = idni::tau_lang::hoa_automaton;
 	nb::class_<HoaEdge>(m, "HoaEdge")
 		.def_ro("guard_label", &HoaEdge::guard_label)
 		.def_ro("dst", &HoaEdge::dst)
@@ -154,8 +162,8 @@ NB_MODULE(tau, m) {
 		.def_ro("state_accepting", &HoaAutomaton::state_accepting);
 
 	// Operator-preference types (plan v10 §6 row A1).
-	using PreferenceEntry = idni::tau_lang::PreferenceEntry;
-	using PreferenceOrder = idni::tau_lang::PreferenceOrder;
+	using PreferenceEntry = idni::tau_lang::preference_entry;
+	using PreferenceOrder = idni::tau_lang::preference_order;
 	nb::class_<PreferenceEntry>(m, "PreferenceEntry")
 		.def(nb::init<>())
 		.def_rw("var_name", &PreferenceEntry::var_name)
@@ -249,9 +257,9 @@ NB_MODULE(tau, m) {
 		// ── PWR / runtime methods ────────────────────────────────────
 		.def("can_extend",
 			[](interpreter_t& i, const std::string& psi_str) {
-				idni::tref psi = tau_api::get_formula(psi_str);
-				if (psi == nullptr) return false;
-				return i.can_extend(psi);
+				auto psi = to_optional(tau_api::get_formula(psi_str));
+				if (!psi) return false;
+				return i.can_extend(*psi);
 			}, "psi"_a,
 			"Per-revision realisability pre-check via syntactic PWR.")
 		.def("admissible_outputs",
@@ -272,9 +280,9 @@ NB_MODULE(tau, m) {
 		// fires between turns (via the user's call cadence), never mid-token.
 		.def("update",
 			[](interpreter_t& i, const std::string& psi_str) {
-				idni::tref psi = tau_api::get_formula(psi_str);
-				if (psi == nullptr) return false;
-				i.update(psi);
+				auto psi = to_optional(tau_api::get_formula(psi_str));
+				if (!psi) return false;
+				i.update(*psi);
 				return true;
 			}, "psi"_a,
 			"Apply pointwise revision: merge the running spec with `psi`.");
@@ -282,14 +290,14 @@ NB_MODULE(tau, m) {
 	// REAL oracle — check realisability of a spec or LTL formula.
 	m.def("is_realizable",
 		[](const std::string& spec_str) -> bool {
-			idni::tref spec = tau_api::get_spec(spec_str);
-			if (spec == nullptr) {
+			auto spec = to_optional(tau_api::get_spec(spec_str));
+			if (!spec) {
 				// Try formula parse as fallback (LTL-only inputs).
-				spec = tau_api::get_formula(spec_str);
-				if (spec == nullptr) return false;
+				spec = to_optional(tau_api::get_formula(spec_str));
+				if (!spec) return false;
 			}
 			return idni::tau_lang::is_ltl_aba_realizable<node_t>(
-				spec, 0, false);
+				*spec, 0, false);
 		}, "spec"_a,
 		"Check realisability of a tau spec / LTL formula (REAL oracle).");
 
@@ -299,10 +307,10 @@ NB_MODULE(tau, m) {
 		-> std::string
 		{
 			using tau_t = idni::tau_lang::tree<node_t>;
-			idni::tref spec = tau_api::get_spec(spec_str);
-			if (spec == nullptr) return "";
+			auto spec = to_optional(tau_api::get_spec(spec_str));
+			if (!spec) return "";
 			idni::tref strengthened = idni::tau_lang::apply_preferences<
-				node_t>(spec, po);
+				node_t>(*spec, po);
 			if (strengthened == nullptr) return "";
 			return tau_t::get(strengthened).to_str();
 		}, "spec"_a, "po"_a,
@@ -310,14 +318,16 @@ NB_MODULE(tau, m) {
 
 	// API functions
 	m.def("get_interpreter",
-		[](const std::string& spec) {
-			return tau_api::get_interpreter(spec);
+		[](const std::string& spec) -> std::optional<interpreter_t> {
+			return to_optional(tau_api::get_interpreter(spec));
 		}, "specification"_a,
 		"Create an interpreter from a specification string.");
 
 	m.def("get_interpreter",
-		[](const std::string& spec, interpreter_options& opts) {
-			return tau_api::get_interpreter(spec, opts);
+		[](const std::string& spec, interpreter_options& opts)
+			-> std::optional<interpreter_t>
+		{
+			return to_optional(tau_api::get_interpreter(spec, opts));
 		}, "specification"_a, "options"_a,
 		"Create an interpreter from a specification string with options.");
 
@@ -330,14 +340,17 @@ NB_MODULE(tau, m) {
 	m.def("step",
 		[](interpreter_t& i,
 			const std::map<stream_at, std::string>& inputs)
+			-> std::optional<std::map<stream_at, std::string>>
 		{
-			return tau_api::step(i, inputs);
+			return to_optional(tau_api::step(i, inputs));
 		}, "interpreter"_a, "inputs"_a,
 		"Step the interpreter with given inputs.");
 
 	m.def("step",
-		[](interpreter_t& i) {
-			return tau_api::step(i);
+		[](interpreter_t& i)
+			-> std::optional<std::map<stream_at, std::string>>
+		{
+			return to_optional(tau_api::step(i));
 		}, "interpreter"_a,
 		"Step the interpreter without inputs (uses remapped streams).");
 
@@ -350,10 +363,10 @@ NB_MODULE(tau, m) {
 		   const std::optional<std::string>& u_str)
 		-> std::optional<std::map<stream_at, std::string>>
 		{
-			auto result = tau_api::step(i, inputs);
+			auto result = to_optional(tau_api::step(i, inputs));
 			if (u_str.has_value() && !u_str->empty()) {
-				idni::tref u = tau_api::get_formula(*u_str);
-				if (u != nullptr) i.update(u);
+				auto u = to_optional(tau_api::get_formula(*u_str));
+				if (u) i.update(*u);
 			}
 			return result;
 		}, "interpreter"_a, "inputs"_a, "u"_a = std::nullopt,

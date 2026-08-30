@@ -51,8 +51,8 @@ boost::log::trivial::severity_level parse_severity(const std::string& lvl) {
 // pretty-printer settings.
 val js_to_str(const std::string& expression) {
 	try {
-		if (tref e = tau_api::get_spec_or_term(expression); e)
-			return val(tau_api::to_str(e));
+		if (auto e = tau_api::get_spec_or_term(expression); e.has_value())
+			return val(tau_api::to_str(e.value()));
 	} catch (const std::exception&) {}
 	return val::null();
 }
@@ -60,8 +60,8 @@ val js_to_str(const std::string& expression) {
 // Parses a full specification and prints it back, validating the input.
 val js_get_spec(const std::string& spec) {
 	try {
-		if (tref s = tau_api::get_spec(spec); s)
-			return val(tau_api::to_str(s));
+		if (auto s = tau_api::get_spec(spec); s.has_value())
+			return val(tau_api::to_str(s.value()));
 	} catch (const std::exception&) {}
 	return val::null();
 }
@@ -75,18 +75,24 @@ val js_normalize_formula(const std::string& formula) {
 }
 
 bool js_sat(const std::string& formula) {
-	try { return tau_api::sat(formula); }
-	catch (const std::exception&) { return false; }
+	try {
+		auto r = tau_api::sat(formula);
+		return r.has_value() && r.value();
+	} catch (const std::exception&) { return false; }
 }
 
 bool js_unsat(const std::string& formula) {
-	try { return tau_api::unsat(formula); }
-	catch (const std::exception&) { return false; }
+	try {
+		auto r = tau_api::unsat(formula);
+		return r.has_value() && r.value();
+	} catch (const std::exception&) { return false; }
 }
 
 bool js_valid(const std::string& formula) {
-	try { return tau_api::valid(formula); }
-	catch (const std::exception&) { return false; }
+	try {
+		auto r = tau_api::valid(formula);
+		return r.has_value() && r.value();
+	} catch (const std::exception&) { return false; }
 }
 
 val js_solve(const std::string& formula, const std::string& mode) {
@@ -166,7 +172,7 @@ EMSCRIPTEN_BINDINGS(tau) {
 	emscripten::function("toStr", &js_to_str);
 
 	emscripten::function("setCharvar", &tau_api::set_charvar);
-	emscripten::function("setBlasting", &tau_api::set_blasting);
+	emscripten::function("setBlasting", &tau_api::set_preprocessing);
 	emscripten::function("setIndenting", &tau_api::set_indenting);
 	emscripten::function("setHighlighting", &tau_api::set_highlighting);
 	emscripten::function("setJson", &tau_api::set_json);

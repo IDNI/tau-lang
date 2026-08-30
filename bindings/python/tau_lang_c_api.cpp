@@ -5,10 +5,9 @@
 
 #define bas_pack tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb
 
-#include "boolean_algebras/qint.h"
-#include "boolean_algebras/qlt.h"
-#include "boolean_algebras/nlang_ba.h"
-#include "boolean_algebras/hsb.h"
+// tau.h already includes every pack member's BA header, in the order the
+// pack requires; pre-including one here duplicates a plugin-local template
+// (e.g. qlt's add_consistency_constraints) with a conflicting declaration.
 #include "tau.h"
 #include "parse_error_hint.h"
 #include "api.h"
@@ -182,7 +181,7 @@ extern "C" int tau_lang_decide(const char* formula) {
 		auto nso = get_nso_rr<node_t>(tau::get(formula));
 		if (!nso.has_value()) {
 			g_last_error = "parse error";
-			auto hint = classify_parse_error(formula);
+			auto hint = classify_parse_error<node_t>(formula);
 			if (!hint.empty()) g_last_error += ": " + hint;
 			return TAU_LTL_PARSE_ERROR;
 		}
@@ -191,8 +190,14 @@ extern "C" int tau_lang_decide(const char* formula) {
 			g_last_error = "empty formula";
 			return TAU_LTL_PARSE_ERROR;
 		}
-		bool r = is_tau_formula_sat<node_t>(fm);
-		return r ? TAU_LTL_REALIZABLE : TAU_LTL_UNREALIZABLE;
+		auto sat_r = is_tau_formula_sat<node_t>(fm);
+		if (!sat_r.has_value()) {
+			std::ostringstream oss;
+			oss << sat_r.report();
+			g_last_error = "internal: " + oss.str();
+			return TAU_LTL_INTERNAL_ERR;
+		}
+		return sat_r.value() ? TAU_LTL_REALIZABLE : TAU_LTL_UNREALIZABLE;
 	} catch (const std::exception& e) {
 		g_last_error = std::string("internal: ") + e.what();
 		return TAU_LTL_INTERNAL_ERR;
@@ -226,7 +231,7 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 		auto nso = get_nso_rr<node_t>(tau::get(formula));
 		if (!nso.has_value()) {
 			g_last_error = "parse error";
-			auto hint = classify_parse_error(formula);
+			auto hint = classify_parse_error<node_t>(formula);
 			if (!hint.empty()) g_last_error += ": " + hint;
 			return TAU_LTL_SYNTH_PARSE_ERROR;
 		}
@@ -235,8 +240,14 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 			g_last_error = "empty formula";
 			return TAU_LTL_SYNTH_PARSE_ERROR;
 		}
-		bool realizable = is_tau_formula_sat<node_t>(fm);
-		if (!realizable) {
+		auto sat_r = is_tau_formula_sat<node_t>(fm);
+		if (!sat_r.has_value()) {
+			std::ostringstream oss;
+			oss << sat_r.report();
+			g_last_error = "internal: " + oss.str();
+			return TAU_LTL_SYNTH_INTERNAL_ERR;
+		}
+		if (!sat_r.value()) {
 			g_last_error = "formula is unrealizable";
 			return TAU_LTL_SYNTH_UNREALIZABLE;
 		}
@@ -334,7 +345,7 @@ extern "C" const char* tau_lang_mealy_output_vars(int64_t handle) {
 
 		std::vector<std::string> output_names;
 		for (const auto& [var, _] : interp.ctx.outputs) {
-			std::string name = get_var_name<node_t>(var);
+			std::string name = get_var_name<node_t>(var->get());
 			if (!name.empty() && name.front() != '_')
 				output_names.push_back(name);
 		}

@@ -43,7 +43,7 @@
 //    serialize_constant core helpers as the REPL's solution printer
 //    (print_solver_cmd_solution, repl_evaluator.tmpl.h). The one difference
 //    left is presentational: the REPL additionally wraps the atomic
-//    true/false constant as "{F}:tau"/"{T}:tau" for console display, a
+//    true/false constant as "{ F }:tau"/"{ T }:tau" for console display, a
 //    decoration the API's map has no type-name slot for, so native.js's
 //    stripAtomicWrap strips only that wrapper -- it never touches the
 //    literal spelling, so a regression back to the generic "0"/"1" would
@@ -83,8 +83,18 @@ function diverges(label, wasmVal, nativeVal) {
 		+ `native=${JSON.stringify(nativeVal)}`);
 }
 
+// A fresh split variable's numeric suffix comes from a process-lifetime
+// counter (get_new_uninterpreted_constant, splitter.tmpl.h): the wasm
+// module is one long-lived instance across this whole run, while each
+// native query is its own subprocess, so the two counters never line up.
+// Compare structure, not that arbitrary spelling.
+function normalizeSplitVars(s) {
+	return s === null ? null : s.replace(/\bsplit\d+\b/g, 'split');
+}
+
 function diffSolve(label, wasmSol, nativeSol) {
-	const same = JSON.stringify(wasmSol) === JSON.stringify(nativeSol);
+	const same = normalizeSplitVars(JSON.stringify(wasmSol))
+		=== normalizeSplitVars(JSON.stringify(nativeSol));
 	check(same, `${label}: wasm=${JSON.stringify(wasmSol)} `
 		+ `native=${JSON.stringify(nativeSol)}`);
 }
@@ -253,7 +263,9 @@ function runMalformedCases(tau) {
 	check(tau.normalizeFormula(badSyntax) === null,
 		'normalizeFormula rejects bad syntax');
 	check(tau.sat(badSyntax) === false, 'sat rejects bad syntax');
-	check(tau.unsat(badSyntax) === true, 'unsat rejects bad syntax');
+	// Unparseable input yields no result, so unsat returns false, not
+	// true (api.tmpl.string.h's unsat(const std::string&)).
+	check(tau.unsat(badSyntax) === false, 'unsat rejects bad syntax');
 	check(tau.valid(badSyntax) === false, 'valid rejects bad syntax');
 	check(tau.solve(badSyntax, 'general') === null,
 		'solve rejects bad syntax');

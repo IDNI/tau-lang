@@ -39,6 +39,8 @@ target_include_directories(${TAU_PYTHON_BINDING_MODULE} PRIVATE
 	"${CMAKE_SOURCE_DIR}/src"
 	"${CMAKE_SOURCE_DIR}/parser"
 	"${CMAKE_SOURCE_DIR}/external/parser/src"
+	"${TAU_PACK_INCLUDE_DIR}"
+	"${TAU_GENERATED_PARSER_DIR}"
 	"${TAU_SHARED_PREFIX}/cvc5/dist/include"
 	"${TAU_SHARED_PREFIX}/boost/dist/include"
 )

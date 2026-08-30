@@ -86,17 +86,15 @@ function nativeNormalize(formula) {
 
 // The REPL's solution printer (print_solver_cmd_solution,
 // repl_evaluator.tmpl.h) wraps the atomic true/false constant as
-// `{<literal>}:<type>` for console display -- console decoration only, added
-// on top of the literal after api<node>::solve(string) already agrees with
-// it (both give tau's "F"/"T", not the generic tree printer's "0"/"1"; see
-// api.tmpl.string.h's serialize_solution). The API's map has no type-name
-// slot to put that decoration in, so it is stripped here for comparison.
-// A compound value is never wrapped this way -- to_str()'s own ba_constant
-// case already renders `{ value }:type` as part of the value itself (with
-// a space, unlike the tight `{value}:type` above), so it never matches this
-// regex and is compared untouched.
+// `{ <literal> }:<type>` for console display -- console decoration only,
+// added on top of the literal after api<node>::solve(string) already agrees
+// with it (both give tau's "F"/"T", not the generic tree printer's "0"/"1";
+// see api.tmpl.string.h's serialize_solution). The API's map has no
+// type-name slot to put that decoration in, so it is stripped here for
+// comparison. A compound value's internal spaces around its operators keep
+// it from matching the single-token capture, so it is compared untouched.
 function stripAtomicWrap(raw) {
-	const m = raw.match(/^\{(\S+)\}:\S+$/);
+	const m = raw.match(/^\{\s*(\S+)\s*\}:\S+$/);
 	return m ? m[1] : raw;
 }
 

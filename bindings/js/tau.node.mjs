@@ -43,7 +43,7 @@ try {
 		`normalizeFormula("x = 0 || x = 0") -> ${JSON.stringify(norm)}`);
 
 	const sol = tau.solve('x = 0', 'general');
-	check(sol !== null && sol.x === '0',
+	check(sol !== null && sol.x === 'F',
 		`solve("x = 0") -> ${JSON.stringify(sol)}`);
 
 	const toStrOut = tau.toStr('x = 0 || x = 0');
