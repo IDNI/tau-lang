@@ -587,7 +587,12 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 			auto s = setup_rep.open("setup");
 			gi = tau_api::get_interpreter(spec);
 		}
-		if (!gi.has_value()) { gi.print(std::cerr); return; }
+		if (!gi.has_value()) {
+			// Surface the setup timing alongside the failure it led to.
+			gi.append(std::move(setup_rep));
+			gi.print(std::cerr);
+			return;
+		}
 
 		// A new formula replaces any stored session.
 		running = std::make_unique<run_session>(std::move(gi).value());
@@ -703,6 +708,19 @@ void repl_evaluator<BAs...>::continue_running(
 				std::cout << "\n";
 				first = false;
 				continue;
+			}
+			if (!step_awaiting_input(st.report())) {
+				// A genuine step failure, not a wait for input: report
+				// it and end the run, mirroring the ltl_synthesis_error
+				// handler above.
+				bool was_enabled = idni::TC.enabled;
+				idni::TC.disable();
+				st.print(std::cerr);
+				idni::TC.set(was_enabled);
+				s.close();
+				running.reset();
+				error = true;
+				return;
 			}
 			// a console input stream stopped the step needing a value:
 			// find it and prompt for that value (label/type are ours)

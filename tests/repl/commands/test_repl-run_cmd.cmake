@@ -560,6 +560,14 @@ set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTI
 	PASS_REGULAR_EXPRESSION "\\[3\\] f\\[n\\]\\(x\\)"
 	FAIL_REGULAR_EXPRESSION "Error")
 
+# --- a genuine step failure (not an input wait) ends the run ----------------
+# An unwritable output file makes api::step fail with code::io_error, not
+# code::invalid_state; continue_running() must report it and stop instead of
+# falling into the "continue?" prompt meant for an awaited input.
+add_repl_test_fail(run_cmd-continue_running-genuine_step_error
+	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run o1[t] = 1."
+	"Failed to write outputs")
+
 # --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------
 # The reporter's 7-line reproducer (two :tau streams, a cross-stream
 # assignment under a meet-guarded case split) produced no output within 400 s
