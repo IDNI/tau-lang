@@ -759,19 +759,15 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
-	auto normalized = r.take_or_error(normalize_non_temp<node>(nn),
+	TAU_TRY_OR(tref normalized, normalize_non_temp<node>(nn),
 		code::internal_error, "non-temporal normalization failed");
-	if (!normalized) {
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
 
 	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
-		  << LOG_FM(*normalized);)
+		  << LOG_FM(normalized);)
 
-	check_decided<node>("is_non_temp_nso_satisfiable", *normalized);
+	check_decided<node>("is_non_temp_nso_satisfiable", normalized);
 
-	bool full = tau::get(*normalized).equals_T();
+	bool full = tau::get(normalized).equals_T();
 	if (lean && *lean != full) {
 		std::cerr << "[TAU_LEAN_DECIDE_CROSSCHECK] disagreement: lean="
 			<< *lean << " full=" << full << " formula=" << fm.to_str()
@@ -815,14 +811,10 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
 	nn = tau::build_wff_ex_many(vars, nn);
-	auto normalized = r.take_or_error(normalize_non_temp<node>(nn),
+	TAU_TRY_OR(tref normalized, normalize_non_temp<node>(nn),
 		code::internal_error, "non-temporal normalization failed");
-	if (!normalized) {
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	check_decided<node>("is_non_temp_nso_unsat", *normalized);
-	r = tau::get(*normalized).equals_F();
+	check_decided<node>("is_non_temp_nso_unsat", normalized);
+	r = tau::get(normalized).equals_F();
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1536,14 +1528,9 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	tref normalized_fm = nullptr;
 	{
 		auto sg = r.open("normalize");
-		auto normalized = r.take_or_error(normalize<node>(fm),
+		TAU_TRY_OR(normalized_fm, normalize<node>(fm),
 			code::internal_error,
 			"quantifier/temporal normalization failed");
-		if (normalized) normalized_fm = *normalized;
-	}
-	if (!normalized_fm) {
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	fm = normalized_fm;
 	// Substitution based eliminations rebuild nodes without running the
@@ -2254,13 +2241,9 @@ result<tref> normalizer(const rr<node>& nso_rr) {
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 
-	auto fm = r.take_or_error(nso_rr_apply<node>(nso_rr),
+	TAU_TRY_OR(tref fm, nso_rr_apply<node>(nso_rr),
 		code::internal_error, "Failed to apply recurrence relations");
-	if (!fm) {
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	auto res = r.take_or_error(normalize_with_temp_simp<node>(*fm),
+	auto res = r.take_or_error(normalize_with_temp_simp<node>(fm),
 		code::internal_error, "Normalization failed");
 	if (res) {
 		r = *res;

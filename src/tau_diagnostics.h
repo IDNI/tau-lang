@@ -53,4 +53,12 @@ inline bool report_has_code(const report& rep, code c) {
 	if (!TAU_TRY_CONCAT(_tau_try_, __LINE__)) return r; \
 	decl = std::move(*TAU_TRY_CONCAT(_tau_try_, __LINE__))
 
+/// Like TAU_TRY, but for a malformed child (neither value nor error): synthesizes
+/// @p c / @p msg via `result::take_or_error` instead of `merge_take`. Same
+/// scope_guard/early-return contract as TAU_TRY.
+#define TAU_TRY_OR(decl, expr, c, msg) \
+	auto TAU_TRY_CONCAT(_tau_try_, __LINE__) = r.take_or_error(expr, c, msg); \
+	if (!TAU_TRY_CONCAT(_tau_try_, __LINE__)) return r; \
+	decl = std::move(*TAU_TRY_CONCAT(_tau_try_, __LINE__))
+
 #endif // __IDNI__TAU__TAU_DIAGNOSTICS_H__

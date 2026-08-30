@@ -1325,10 +1325,8 @@ interpreter<node>::step()
 		return r;
 	}
 
-	auto out = r.take_or_error(step(values.value()), code::internal_error,
+	TAU_TRY_OR(r, step(values.value()), code::internal_error,
 		"Step did not produce a result");
-	if (!out) { DBG(assert(r.is_well_formed());) return r; }
-	r = std::move(*out);
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1676,12 +1674,10 @@ result<tref> interpreter<node>::get_executable_spec(
 	tref executable;
 	{
 		auto sc = r.open("transform_to_execution");
-		auto v = r.take_or_error(
+		TAU_TRY_OR(executable,
 			transform_to_execution<node>(clause, start_time, true),
 			code::unsat, "Specification part could not be "
 			"transformed to an executable form");
-		if (!v) { DBG(assert(r.is_well_formed());) return r; }
-		executable = *v;
 	}
 	DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
 	if (tau::get(executable).equals_F()) {
@@ -1720,16 +1716,15 @@ result<tref> interpreter<node>::get_executable_spec(
 			.mode = solver_mode::general
 		};
 		auto sc = r.open("solve_uninterpreted_constants");
-		auto model = r.take_or_error(solve<node>(constraints, options),
+		TAU_TRY_OR(auto model, solve<node>(constraints, options),
 			code::unsat, "No model for the part's uninterpreted constants");
-		if (!model) { DBG(assert(r.is_well_formed());) return r; }
 
 		LOG_INFO << "Tau specification part " << tau::get(clause) << " is executed setting ";
-		for (const auto& [uc, v] : *model)
+		for (const auto& [uc, v] : model)
 			LOG_INFO << TAU_TO_STR(uc) << " := " << TAU_TO_STR(v);
 
-		executable = rewriter::replace<node>(executable, *model);
-		clause = rewriter::replace<node>(clause, *model);
+		executable = rewriter::replace<node>(executable, model);
+		clause = rewriter::replace<node>(clause, model);
 		LOG_INFO << "Resulting Tau specification part: " << TAU_TO_STR(clause) << "\n";
 		LOG_TRACE << "get_executable_spec[spec]: " << LOG_FM(executable) << "\n";
 	}
@@ -3133,10 +3128,8 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 		return r;
 	}
 	// In case there is no maximal solution for u on any path of spec
-	auto v = r.take_or_error(solve<node>(spec, options),
+	TAU_TRY_OR(r, solve<node>(spec, options),
 		code::unsat, "No update solution found");
-	if (!v) { DBG(assert(r.is_well_formed());) return r; }
-	r = std::move(*v);
 	DBG(assert(r.is_well_formed());)
 	return r;
 }

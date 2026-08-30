@@ -1668,15 +1668,11 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 				// Here we deal with a non-temporal formula
 				// Use aw_fm to store result
 				aw_fm = elim_aw(fm);
-				auto sat = r.take_or_error(
+				TAU_TRY_OR(bool sat,
 					is_non_temp_nso_satisfiable<node>(fm),
 					code::internal_error,
 					"Failed to determine non-temporal satisfiability");
-				if (!sat) {
-					DBG(assert(r.is_well_formed());)
-					return r;
-				}
-				if (!*sat) aw_fm = tau::_F();
+				if (!sat) aw_fm = tau::_F();
 #ifdef TAU_CACHE
 				r = cache.emplace(std::make_pair(fm, start_time),
 						     aw_fm).first->second;
@@ -1728,17 +1724,12 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	{
 		auto _s = r.open("unbounded_continuation");
 		if (!tau::get(aw_after_ev).equals_F() && !st.empty()) {
-			auto normed = r.take_or_error(
+			TAU_TRY_OR(res,
 				normalize_non_temp<node>(to_unbounded_continuation<node>(
 					aw_after_ev, st[0], ubd_aw_fm, start_time,
 					ev_t.second, output)),
 				code::internal_error,
 				"Normalization of the unbounded continuation failed");
-			if (!normed) {
-				DBG(assert(r.is_well_formed());)
-				return r;
-			}
-			res = *normed;
 		} else res = aw_after_ev;
 	}
 	res = elim_aw(res);
@@ -1839,27 +1830,20 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	tref normalized_fm;
 	{
 		auto _s = r.open("normalize");
-		auto normed = r.take_or_error(normalize_with_temp_simp<node>(fm),
+		TAU_TRY_OR(normalized_fm, normalize_with_temp_simp<node>(fm),
 			code::internal_error, "Normalization failed");
-		if (!normed) {
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		normalized_fm = *normed;
 	}
 	{
 		auto _s = r.open("expression_paths");
 		// Convert each disjunct to unbounded continuation
 		for (tref clause : expression_paths<node>(normalized_fm)) {
-			auto ctn = transform_to_execution<node>(
-				clause, start_time, output);
-			auto val = r.take_or_error(std::move(ctn),
+			TAU_TRY_OR(tref val, transform_to_execution<node>(
+				clause, start_time, output),
 				code::internal_error,
 				"transform_to_execution returned neither a "
 				"value nor an error while checking a "
 				"disjunct's satisfiability");
-			if (!val) { DBG(assert(r.is_well_formed());) return r; }
-			if (!tau::get(*val).equals_F()) {
+			if (!tau::get(val).equals_F()) {
 				LOG_DEBUG << "End is_tau_formula_sat: true";
 				memoize(true);
 				DBG(assert(r.is_well_formed());)
@@ -1913,26 +1897,21 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 		return r;
 	}
 	// Negate equivalence for unsat check
-	auto f1n = r.take_or_error(normalize<node>(f1), code::internal_error,
+	TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
 		"Normalization of the first formula failed");
-	if (!f1n) { DBG(assert(r.is_well_formed());) return r; }
-	auto f2n = r.take_or_error(normalize<node>(f2), code::internal_error,
+	TAU_TRY_OR(tref f2n, normalize<node>(f2), code::internal_error,
 		"Normalization of the second formula failed");
-	if (!f2n) { DBG(assert(r.is_well_formed());) return r; }
-	auto equiv_checked = r.take_or_error(normalize_with_temp_simp<node>(
-			tau::build_wff_neg(tau::build_wff_equiv(*f1n, *f2n))),
+	TAU_TRY_OR(tref equiv_check, normalize_with_temp_simp<node>(
+			tau::build_wff_neg(tau::build_wff_equiv(f1n, f2n))),
 		code::internal_error, "Normalization of the equivalence check failed");
-	if (!equiv_checked) { DBG(assert(r.is_well_formed());) return r; }
-	tref equiv_check = *equiv_checked;
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
 	for (const auto& c : expression_paths<node>(equiv_check)) {
-		auto ctn = transform_to_execution<node>(c);
-		auto val = r.take_or_error(std::move(ctn), code::internal_error,
+		TAU_TRY_OR(tref val, transform_to_execution<node>(c),
+			code::internal_error,
 			"transform_to_execution returned neither a value nor "
 			"an error while checking equivalence");
-		if (!val) { DBG(assert(r.is_well_formed());) return r; }
-		if (!tau::get(*val).equals_F()) {
+		if (!tau::get(val).equals_F()) {
 			r = false;
 			DBG(assert(r.is_well_formed());)
 			return r;
@@ -1972,21 +1951,18 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		return r;
 	}
 	if (fv < 0) {
-		auto valid = is_tau_impl<node>(tau::_T(), fm);
-		auto v = r.take_or_error(std::move(valid), code::internal_error,
+		TAU_TRY_OR(bool v, is_tau_impl<node>(tau::_T(), fm),
+			code::internal_error,
 			"is_tau_impl returned neither a value nor an error "
 			"while checking validity");
-		if (!v) { DBG(assert(r.is_well_formed());) return r; }
-		if (*v) {
+		if (v) {
 			r = tau::_T();
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
 	}
-	auto normed = r.take_or_error(normalize_with_temp_simp<node>(fm),
+	TAU_TRY_OR(tref normalized_fm, normalize_with_temp_simp<node>(fm),
 		code::internal_error, "Normalization failed");
-	if (!normed) { DBG(assert(r.is_well_formed());) return r; }
-	tref normalized_fm = *normed;
 	trefs clauses = {tau::_F()};
 	// Check satisfiability of each clause -- unit-wise where exact
 	{
@@ -1996,18 +1972,13 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 			int fs = factor ? factored_tau_sat<node>(clause) : -1;
 			if (fs >= 0) keep = (fs == 1);
 			else {
-				auto ctn = transform_to_execution<node>(
-					clause, start_time, output);
-				auto val = r.take_or_error(std::move(ctn),
+				TAU_TRY_OR(tref val, transform_to_execution<node>(
+					clause, start_time, output),
 					code::internal_error,
 					"transform_to_execution returned "
 					"neither a value nor an error while "
 					"simplifying a disjunct");
-				if (!val) {
-					DBG(assert(r.is_well_formed());)
-					return r;
-				}
-				keep = !tau::get(*val).equals_F();
+				keep = !tau::get(val).equals_F();
 			}
 			if (keep) clauses.push_back(clause);
 		}

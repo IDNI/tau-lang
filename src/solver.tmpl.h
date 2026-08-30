@@ -1751,13 +1751,8 @@ result<solution<node>> solve(tref form, solver_options options) {
 		assert(!tau::get(form).find_top(is_unsupported_temporal));
 	}
 #endif // DEBUG
-	auto normed = r.take_or_error(normalize_non_temp<node>(form),
+	TAU_TRY_OR(form, normalize_non_temp<node>(form),
 		code::internal_error, "Normalization failed");
-	if (!normed) {
-		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	form = *normed;
 	auto _s = r.open("expression_paths");
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
