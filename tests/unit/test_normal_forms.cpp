@@ -263,6 +263,90 @@ TEST_SUITE("normal forms: onf") {
 		// a genuine onf transformation replaces the bare equation
 		CHECK(tau::get(result_rhs).to_str() != tau::get(fm_rhs).to_str());
 	}
+
+	// The bf_neq loop of onf_subformula: a `!=` atom mentioning the onf
+	// variable is rebuilt as the order-constraint pair
+	// bf_nlteq(f_0, x) || bf_nlteq(x, f_1), which the downstream
+	// normalization inside onf then reduces to the cofactor clauses
+	// xy' != 0 || x'y != 0 (conjunct order is interning-order dependent,
+	// so both orders are accepted).
+	TEST_CASE("bf_neq atoms mentioning the variable are order-normalized") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = get_nso_rr("x != y.").value().main->get();
+		tref result = onf<node_t>(fm, x);
+		std::string s = tau::get(result).to_str();
+		CHECK(( s == "yx' != 0 || xy' != 0"
+			|| s == "xy' != 0 || yx' != 0" ));
+	}
+
+	// A bf_neq NOT mentioning the variable is skipped (the `continue`
+	// guard at the top of the loop), while one mentioning it in the same
+	// formula is still transformed.
+	TEST_CASE("bf_neq atoms without the variable are left untouched") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = get_nso_rr("x != y && z != w.").value().main->get();
+		tref result = onf<node_t>(fm, x);
+		std::string s = tau::get(result).to_str();
+		// z != w survives untouched, x != y is decomposed away
+		CHECK( s.find("z != w") != std::string::npos );
+		CHECK( s.find("x != y") == std::string::npos );
+	}
+}
+
+TEST_SUITE("normal forms: atm_formula_order_for_simplification") {
+
+	// The comparator behind boole_normal_form's stable_sort of BDD atoms.
+	// Priority: (1) initial-time atoms before lookback atoms, lowest
+	// initial first; (2) among lookback atoms, higher lookback (max
+	// shift) first, then lowest high time point... then (3) fewer free io
+	// variables first; atoms without io variables always sort last.
+	TEST_CASE("comparator arms") {
+		auto atom = [](const char* sample) {
+			tref fm = get_nso_rr(sample).value().main->get();
+			tref a = tau::get(fm).find_top(
+					is_atomic_bdd_var<node_t>);
+			REQUIRE( a != nullptr );
+			return a;
+		};
+		auto& cmp = atm_formula_order_for_simplification<node_t>;
+		tref a0  = atom("o1[0] = 0.");
+		tref a1  = atom("o1[1] = 0.");
+		tref at  = atom("always o1[t] = 0.");
+		tref at1 = atom("always o1[t-1] = 0.");
+		tref at2 = atom("always o1[t-2] = 0.");
+		tref a2io  = atom("o1[0] = i1[0].");
+		tref ahigh = atom("o1[0] = i1[1].");
+		tref clow  = atom("always o1[t] = i1[t-1].");
+		tref x   = atom("x = 0.");
+		// initial atoms: lowest initial time point first
+		CHECK(  cmp(a0, a1) );
+		CHECK( !cmp(a1, a0) );
+		// irreflexive (strict weak ordering)
+		CHECK( !cmp(a0, a0) );
+		// lookback atoms: higher lookback wins
+		CHECK(  cmp(at1, at) );
+		CHECK( !cmp(at, at1) );
+		CHECK(  cmp(at2, at1) );
+		// initial atoms sort before lookback atoms
+		CHECK(  cmp(a0, at) );
+		CHECK( !cmp(at, a0) );
+		// atoms without io variables always sort last
+		CHECK( !cmp(x, a0) );
+		CHECK(  cmp(a0, x) );
+		// same lowest initial: lower highest initial wins
+		CHECK(  cmp(a0, ahigh) );
+		CHECK( !cmp(ahigh, a0) );
+		// same lowest/highest initial: fewer io variables first
+		CHECK(  cmp(a0, a2io) );
+		CHECK( !cmp(a2io, a0) );
+		// same lookback: higher high time point wins
+		CHECK(  cmp(at1, clow) );
+		CHECK( !cmp(clow, at1) );
+		// same lookback and high time point: fewer io variables first
+		tref c2io = atom("always o1[t-1] = i1[t-1].");
+		CHECK(  cmp(at1, c2io) );
+		CHECK( !cmp(c2io, at1) );
+	}
 }
 
 TEST_SUITE("GetNewUninterpretedConstant") {
