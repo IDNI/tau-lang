@@ -1,0 +1,113 @@
+# LTL temporal operators: syntax, parsing pitfalls, and normalization.
+#
+# See demos/README.md for how to run this script.
+
+# Section 5 of the demos covers the LTL features: the temporal operators
+# (this demo), satisfiability and realizability of temporal formulas
+# (demo_5.2), executing them (demo_5.3), and temporal specifications over
+# combinations of Boolean algebras (demo_5.4).
+
+# A specification talks about streams indexed by time, and the name prefix
+# decides who controls a stream: outputs o1, o2, ... are chosen by the
+# system, inputs i1, i2, ... by the environment. Nothing else marks them --
+# the prefix is the whole convention.
+
+# The always operator holds at every time point. Three spellings parse to
+# the same formula -- G, always, and [] -- and all print back as always:
+
+G (o1[t] = 1)
+always o1[t] = 1
+[] o1[t] = 1
+
+# Note that the history position did not advance: all three spellings
+# produced the same formula, which was already stored.
+
+# sometimes asserts that a formula holds at some time point. It too has
+# three spellings -- sometimes, <>, and the LTL eventually F -- and they
+# are all the same operator, printing back as sometimes:
+
+sometimes o2[t] = 1
+<> o2[t] = 1
+F (o2[t] = 1)
+
+# The binary temporal operators are infix: U (until), R (release), W (weak
+# until), and the past operators S (since) and T (trigger):
+
+(o1[t] = 1) U (i1[t] = 1)
+(o1[t] = 1) R (i1[t] = 1)
+(o1[t] = 1) W (i1[t] = 1)
+(o1[t] = 1) S (i1[t] = 1)
+(o1[t] = 1) T (i1[t] = 1)
+
+# The infix operators bind tighter than && and ||, so a compound operand
+# wants its own parentheses, just as with the prefix operators below.
+
+# There is no next operator. Adjacent time points are reached with offsets
+# instead, as in o1[t] = i1[t-1], which demo_5.3 executes.
+
+# A parsing pitfall: a prefix temporal operator takes the whole rest of the
+# formula as its operand, so the conjunction below ends up UNDER the G:
+
+G (o1[t] = 1) && (o2[t] = 1)
+
+# To combine two temporal formulas, parenthesize each one:
+
+(G (o1[t] = 1)) && (F (o2[t] = 1))
+
+# The whatis command reports what kind of node an expression is:
+
+whatis F o1[t] = 1
+whatis o1[t]
+whatis {181}:bv[8]
+
+# normalize keeps the temporal operators in place and normalizes the
+# non-temporal formulas under them. Under this F -- which prints back in
+# its canonical spelling, sometimes -- quantifier elimination discards the
+# trivially satisfiable conjunct:
+
+n F ((o1[t] = 1) && (ex y (o2[t] = y)))
+
+# Under U and T, a duplicated conjunct is dropped:
+
+n (o1[t] = 1 && o1[t] = 1) U (o2[t] = 1)
+n ((o1[t] = 1 && o1[t] = 1)) T (o2[t] = 1)
+
+# Under R, the tautologous right-hand side collapses to T:
+
+n (o1[t] = 0) R (o2[t] o2[t]' = 0)
+
+# Under W and S, the non-temporal quantifiers are eliminated outright:
+
+n (all x (o1[t] x = 0)) W (o2[t] = 1)
+n (ex y (o1[t] = y && o2[t] = 1)) S (o3[t] = 1)
+
+# The canonical form writes a term equal to 1 as its complement equal to 0:
+
+n always o1[t] = 1 && o1[t-1] = 1
+
+# And an inner contradiction sinks the whole formula:
+
+n G (o1[t] != o1[t])
+
+# qelim likewise reaches under a temporal operator to eliminate the
+# non-temporal quantifiers:
+
+qelim G (all x (o1[t] x = 0))
+
+# Beyond LTL there is a CTL* fragment with the path quantifiers A (on all
+# paths) and E (on some path). The deciding commands reject them until the
+# fragment is switched:
+
+sat E F (o1[t] = 1)
+
+fragment ctl_star
+
+E F (o1[t] = 1)
+sat E F (o1[t] = 1)
+sat A G (o1[t] = 1)
+
+# fragment ltl switches back, which is also the default:
+
+fragment ltl
+
+quit

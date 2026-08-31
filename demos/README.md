@@ -48,9 +48,19 @@ examples.
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
 | `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance, member access, and tuple-typed streams |
+| `demo_5.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`G`, `F`, `U`, `R`, `W`, `S`, `T`), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment |
+| `demo_5.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
+| `demo_5.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
+| `demo_5.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.
+
+The section 5 demos decide formulas containing `U`/`R`/`W`/`S`/`T` or nested
+liveness (such as `G (F ...)`) by calling `ltlsynt` from
+[Spot](https://spot.lre.epita.fr/). Without `ltlsynt` on the `PATH` those
+verdicts come back `UNKNOWN` (never a wrong answer), and the
+strategy-executing run in `demo_5.3` cannot start.
 
 ## Writing a demo
 

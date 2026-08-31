@@ -1,0 +1,76 @@
+# Executing temporal specifications: run sessions, stop, memory, and I/O.
+#
+# See demos/README.md for how to run this script.
+## The G (F ...) specification near the end needs ltlsynt (from Spot) on
+## the PATH.
+
+# The run command of demo_3.x executes safety (always-style) specifications.
+# On this branch it also takes a step count, keeps a paused session between
+# calls, and executes genuine LTL specifications by synthesizing a strategy
+# first.
+
+# Streams are declared as before. The defs listing is only reliable before a
+# run, so look at it now:
+
+o1:tau := out console.
+i1:tau := in file("../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in").
+defs
+
+# run N steps <spec> executes exactly N steps and returns to the prompt --
+# no continue? gate -- and the session is kept alive:
+
+run 3 steps G (o1[t] = 1)
+
+# memory shows the variable bindings the paused session is carrying:
+
+memory
+
+# run N steps, with no formula, continues the same session where it left
+# off, and stop discards it:
+
+run 2 steps
+stop
+
+# An input stream from a file: this run mirrors the file, which holds one
+# tau value per line, alternating F. and T. -- note the trailing period, a
+# tau value is a whole specification:
+
+run 8 steps G (o1[t]:tau = i1[t]:tau)
+stop
+
+# A file stream is read once and never rewound, so reading the same file
+# again needs a fresh stream. This one is consumed with a delay of one
+# step, so step 0 is a warm-up in which only the input moves:
+
+i2:tau := in file("../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in").
+run 7 steps G (o1[t]:tau = i2[t-1]:tau)
+stop
+
+# Output can go to a file as well. Check the result afterwards with
+# cat /tmp/tau_demo_5.3.out :
+
+i3:tau := in file("../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in").
+o2:tau := out file("/tmp/tau_demo_5.3.out").
+run 8 steps G (o2[t]:tau = i3[t]:tau)
+stop
+
+# A top-level F is the same operator as sometimes, so it executes through
+# the classical machinery like any safety-fragment specification. A
+# genuinely reactive specification -- here a nested liveness, grant
+# infinitely often -- is executed by first calling ltlsynt for a strategy
+# and then stepping that strategy:
+
+run 2 steps G (F (o1[t] = 1))
+stop
+
+# Console input works as in demo_3.1: the interpreter prompts per time
+# point, and a tau value ends with a period. The run below is constrained
+# only at time 0, so it stops needing input after one value; at the
+# continue? gate, q ends the run:
+
+i4:tau := in console.
+run o1[0] = i4[0]
+T.
+q
+
+quit

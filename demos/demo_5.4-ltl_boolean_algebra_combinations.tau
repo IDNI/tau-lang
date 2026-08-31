@@ -1,0 +1,61 @@
+# Temporal specifications across Boolean algebras, and their combinations.
+#
+# See demos/README.md for how to run this script.
+## The examples nesting F under G need ltlsynt (from Spot) on the PATH.
+
+# Every algebra Tau knows can appear under the temporal operators. A stream
+# is typed once -- at its declaration or its first typed use -- and keeps
+# that type for the whole session, so this demo gives each algebra its own
+# stream name; reset would clear the bindings if a name were needed back.
+
+# The default algebra, tau, whose constants are Tau specifications:
+
+realizable G (F (o1[t]:tau = {T.}:tau))
+
+# sbf, simple Boolean functions:
+
+realizable F ((o2[t]:sbf = {X | (Y & Z)}:sbf))
+
+# Bitvectors of any width, decided through cvc5 -- here with a shift on the
+# constant:
+
+realizable F ((o3[t]:bv[8] = {181}:bv[8] >> {2}:bv[8]))
+
+# qlt, the theory of the rationals as a dense linear order, with rational
+# constants and the order relations:
+
+realizable (always o4[t]:qlt > {1/4}:qlt && o4[t]:qlt < {3/4}:qlt)
+
+# qint, an atomless algebra of half-open intervals [a, b):
+
+realizable (always o5[t]:qint = {[-1, 0) | [1, 2)}:qint)
+
+# hsb, an algebra built from half-spaces, with top and bot constants:
+
+realizable (always o6[t]:hsb = {top}:hsb)
+
+# nlang, the Lindenbaum-Tarski algebra of natural-language statements:
+
+realizable G (F (o7[t]:nlang = {the sun is shining}:nlang))
+
+# One specification may mix algebras freely -- here five at once:
+
+realizable (always o8[t]:sbf = 1 && o9[t] = 1 && o10[t]:qint = {[0, 1)}:qint && o11[t]:hsb = {top}:hsb && o12[t]:bv[4] = { 1 })
+
+# And a contradiction in any one algebra sinks the whole specification:
+
+realizable (always o8[t]:sbf = 1) && (sometimes o8[t]:sbf = 0)
+
+# Mixing algebras under genuine LTL operators works the same way:
+
+realizable G ((o13[t]:qlt > {0}:qlt) && (o14[t]:sbf = {X & Y}:sbf))
+realizable G ((o13[t]:qlt > {0}:qlt) && (o13[t]:qlt < {1}:qlt)) && F ((o15[t]:bv[8] = {181}:bv[8]))
+
+# Execution is not limited to the Boolean-valued algebras either -- a qlt
+# stream steps like any other:
+
+o16:qlt := out console.
+run 3 steps G (o16[t]:qlt > {0}:qlt)
+stop
+
+quit
