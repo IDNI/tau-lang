@@ -60,7 +60,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	const tt& n, const size_t size, bool silent) const
 {
 	if (size == 0) {
-		if (!silent) std::cout << "history is empty\n";
+		if (!silent) out << "history is empty\n";
 		return {};
 	}
 	auto mem_type = n | tt::only_child | tt::nt;
@@ -75,10 +75,10 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
 		if (!silent) {
-			std::cout << "history location " << TC_OUTPUT
+			out << "history location " << TC_OUTPUT
 				<< (is_relative ? "%-" : "%");
-			if (!is_relative || idx) std::cout << idx;
-			std::cout << TC.CLEAR() << " does not exist\n";
+			if (!is_relative || idx) out << idx;
+			out << TC.CLEAR() << " does not exist\n";
 		}
 		return {};
 	}
@@ -103,15 +103,15 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_history(const htref& mem, const size_t id,
 	const size_t size, bool print_relative_index) const
 {
-	std::cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
+	out << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
 	if (print_relative_index) {
-		std::cout << "/" << TC_OUTPUT;
-		if (size - id == 1) std::cout << "%";
-		else std::cout << "%-" << size - id - 1;
-		std::cout << TC.CLEAR();
+		out << "/" << TC_OUTPUT;
+		if (size - id == 1) out << "%";
+		else out << "%-" << size - id - 1;
+		out << TC.CLEAR();
 	}
-	std::cout << ": ";
-	tau_api::print(std::cout, mem) << "\n";
+	out << ": ";
+	tau_api::print(out, mem) << "\n";
 }
 
 template <typename... BAs>
@@ -126,7 +126,7 @@ void repl_evaluator<BAs...>::history_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::history_list_cmd() {
-	if (H.size() == 0) std::cout << "history is empty\n";
+	if (H.size() == 0) out << "history is empty\n";
 	else for (size_t i = 0; i < H.size(); i++)
 		print_history(H[i], i, H.size());
 }
@@ -282,7 +282,7 @@ void repl_evaluator<BAs...>::print_benchmarks(const report& rep) const {
 	if (!opt.print_benchmarks) return;
 	bool was_enabled = idni::TC.enabled;
 	idni::TC.disable();
-	rep.print(std::cerr);
+	rep.print(err);
 	idni::TC.set(was_enabled);
 }
 
@@ -300,7 +300,7 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	if (auto value = get_any(arg); value) {
 		auto applied = tau_api::apply_all_defs(value);
 		if (!applied.has_value()) {
-			applied.print(std::cerr);
+			applied.print(err);
 			rep.append(std::move(applied).report());
 			print_benchmarks(rep);
 			return r;
@@ -320,7 +320,7 @@ tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
 	if (auto value = get_any(n[1].get()); value) {
 		auto res = tau_api::dnf(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value();
 	}
 	return r;
@@ -333,7 +333,7 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
 	if (auto value = get_any(n[1].get()); value) {
 		auto res = tau_api::cnf(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value();
 	}
 	return r;
@@ -347,7 +347,7 @@ tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
 	if (auto value = get_any(n[1].get()); value) {
 		auto res = tau_api::nnf(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value();
 	}
 	return r;
@@ -388,7 +388,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	if (auto value = get_any(arg); value) {
 		auto applied = tau_api::apply_all_defs(value);
 		if (!applied.has_value()) {
-			applied.print(std::cerr);
+			applied.print(err);
 			rep.append(std::move(applied).report());
 			print_benchmarks(rep);
 			return r;
@@ -432,7 +432,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		// DBG(TAU_LOG_TRACE << "with:    " << TAU_LOG_FM_DUMP(with);)
 		auto res = tau_api::substitute(in, thiz, with);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		return res.value();
 	}
 	// First argument was not a bf so it must be a wff
@@ -456,7 +456,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// DBG(TAU_LOG_TRACE << "with:   " << TAU_LOG_FM_DUMP(with);)
 	auto res = tau_api::substitute(in, thiz, with);
 	print_benchmarks(res);
-	if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+	if (!res.has_value()) { res.print(err); return nullptr; }
 	return res.value();
 }
 
@@ -487,14 +487,14 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	case tau::wff: {
 		auto res = tau_api::normalize_formula(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value();
 		break;
 	}
 	case tau::bf: {
 		auto res = tau_api::normalize_term(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value();
 		break;
 	}
@@ -512,7 +512,7 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	{
 		auto res = tau_api::eliminate_quantifiers(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value();
 	}
 	return r;
@@ -525,7 +525,7 @@ void repl_evaluator<BAs...>::reset_cmd() {
 	rr_defs.clear();
 	io_defs.clear();
 	definitions<node>::instance().clear();
-	std::cout << "Session reset: history, definitions, and IO streams cleared.\n";
+	out << "Session reset: history, definitions, and IO streams cleared.\n";
 }
 
 template <typename... BAs>
@@ -536,12 +536,12 @@ tref repl_evaluator<BAs...>::whatis_cmd(const tt& n) {
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
 	const std::string& node_type = tau::get(value).get_type_name();
-	std::cout << "node type: " << node_type;
+	out << "node type: " << node_type;
 	if (type == tau::bf || type == tau::wff) {
 		size_t ba_type = tau::get(value).get_ba_type();
-		if (ba_type) std::cout << "  BA type: " << ba_types<node>::name(ba_type);
+		if (ba_type) out << "  BA type: " << ba_types<node>::name(ba_type);
 	}
-	std::cout << "\n";
+	out << "\n";
 	return value;
 }
 
@@ -590,7 +590,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		if (!gi.has_value()) {
 			// Surface the setup timing alongside the failure it led to.
 			gi.append(std::move(setup_rep));
-			gi.print(std::cerr);
+			gi.print(err);
 			return;
 		}
 
@@ -617,9 +617,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::stop_cmd() {
-	if (!running) { std::cout << "no run in progress\n"; return; }
+	if (!running) { out << "no run in progress\n"; return; }
 	finish_running();
-	std::cout << "run stopped\n";
+	out << "run stopped\n";
 }
 
 template <typename... BAs>
@@ -641,7 +641,7 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 		// nothing above this frame catches it, so a slow or missing ltlsynt
 		// (or a refused CTL* placement) used to terminate the REPL.
 		try {
-			ltl_explain<node>(value, std::cout);
+			ltl_explain<node>(value, out);
 		} catch (const ltl_synthesis_error& e) {
 			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, timed "
 				"out or refused the formula (" << e.what()
@@ -702,10 +702,10 @@ void repl_evaluator<BAs...>::continue_running(
 				if (opt.print_benchmarks) {
 					bool was_enabled = idni::TC.enabled;
 					idni::TC.disable();
-					st.report().print(std::cout);
+					st.report().print(out);
 					idni::TC.set(was_enabled);
 				}
-				std::cout << "\n";
+				out << "\n";
 				first = false;
 				continue;
 			}
@@ -715,7 +715,7 @@ void repl_evaluator<BAs...>::continue_running(
 				// handler above.
 				bool was_enabled = idni::TC.enabled;
 				idni::TC.disable();
-				st.print(std::cerr);
+				st.print(err);
 				idni::TC.set(was_enabled);
 				s.close();
 				running.reset();
@@ -757,10 +757,10 @@ void repl_evaluator<BAs...>::continue_running(
 		if (opt.print_benchmarks) {
 			bool was_enabled = idni::TC.enabled;
 			idni::TC.disable();
-			st.report().print(std::cout);
+			st.report().print(out);
 			idni::TC.set(was_enabled);
 		}
-		std::cout << "\n";
+		out << "\n";
 		first = false;
 	}
 }
@@ -826,8 +826,8 @@ solver_mode get_solver_cmd_mode(tref n) {
 }
 
 template <NodeType node>
-void print_solver_cmd_solution(std::optional<solution<node>>& solution,
-		size_t type_id)
+void print_solver_cmd_solution(std::ostream& out,
+		std::optional<solution<node>>& solution, size_t type_id)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -835,33 +835,33 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	// type's one/zero (see the ba_constant case in tau_tree_printers). This
 	// also covers the general ba_constant case, unlike a narrower dedicated
 	// bf_t/bf_f branch; type_id is the fallback for untyped variables.
-	if (!solution) { std::cout << "no solution\n"; return; }
+	if (!solution) { out << "no solution\n"; return; }
 
-	std::cout << "solution: {\n";
+	out << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
 		if (tt(value) | tau::ba_constant) {
-			print_binding<node>(std::cout, var, value);
+			print_binding<node>(out, var, value);
 			continue;
 		}
 		size_t t = find_ba_type<node>(var);
 		if (t == 0) t = type_id;
 		std::stringstream ss;
 		if (!serialize_constant<node>(ss, value, t))
-			print_binding<node>(std::cout, var, value);
-		else std::cout << "\t" << tau::get(var).to_str() << " := { "
+			print_binding<node>(out, var, value);
+		else out << "\t" << tau::get(var).to_str() << " := { "
 			<< ss.str() << " }" << ba_types<node>::name(t) << "\n";
 	}
-	std::cout << "}\n";
+	out << "}\n";
 }
 
 // Prints the interpreter memory plus a binding count. Uses the type-agnostic
 // form because memory entries span BA types and not all have a resolvable one.
 template <NodeType node>
-void print_memory(const assignment<node>& memory) {
+void print_memory(std::ostream& out, const assignment<node>& memory) {
 	using tau = tree<node>;
 	using tt = typename tau::traverser;
 	if (memory.empty()) {
-		std::cout << "memory: {}\n0 bindings\n";
+		out << "memory: {}\n0 bindings\n";
 		return;
 	}
 	// subtree_map order is pointer identity, not stable across runs.
@@ -876,10 +876,10 @@ void print_memory(const assignment<node>& memory) {
 	std::sort(other_keys.begin(), other_keys.end(), [](tref a, tref b) {
 		return tau::get(a).to_str() < tau::get(b).to_str();
 	});
-	std::cout << "memory: {\n";
-	for (tref var : io_keys)    print_binding<node>(std::cout, var, memory.at(var));
-	for (tref var : other_keys) print_binding<node>(std::cout, var, memory.at(var));
-	std::cout << "}\n" << memory.size() << " binding"
+	out << "memory: {\n";
+	for (tref var : io_keys)    print_binding<node>(out, var, memory.at(var));
+	for (tref var : other_keys) print_binding<node>(out, var, memory.at(var));
+	out << "}\n" << memory.size() << " binding"
 		<< (memory.size() == 1 ? "" : "s") << "\n";
 }
 
@@ -887,11 +887,11 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::memory_cmd() {
 	if (!running) {
-		std::cout << "no run in progress; memory is only tracked "
+		out << "no run in progress; memory is only tracked "
 			"during an active `run` session\n";
 		return;
 	}
-	print_memory<node>(running->interp.memory);
+	print_memory<node>(out, running->interp.memory);
 }
 
 template <typename... BAs>
@@ -907,16 +907,16 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	print_benchmarks(res);
 	if (!res.has_value()) {
 		if (report_has_code(res.report(), code::unsat))
-			std::cout << "no solution\n";
+			out << "no solution\n";
 		else
-			res.print(std::cerr);
+			res.print(err);
 		return;
 	}
 
 	// the printer needs the BA type of the solution, not the grammar
 	// nonterminal of the argument that get_type_and_arg also returns
 	std::optional<solution<node>> solution = std::move(res).value();
-	print_solver_cmd_solution<node>(solution,
+	print_solver_cmd_solution<node>(out, solution,
 		find_ba_type_or_default<node>(value));
 }
 
@@ -932,16 +932,16 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	print_benchmarks(res);
 	if (!res.has_value()) {
 		if (report_has_code(res.report(), code::unsat))
-			std::cout << "no solution\n";
+			out << "no solution\n";
 		else
-			res.print(std::cerr);
+			res.print(err);
 		return;
 	}
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
 	// same as solve_cmd: the printer takes a BA type id, not the grammar
 	// nonterminal that get_type_and_arg also returns
 	std::optional<solution<node>> solution = std::move(res).value();
-	print_solver_cmd_solution<node>(solution,
+	print_solver_cmd_solution<node>(out, solution,
 		find_ba_type_or_default<node>(value));
 }
 
@@ -954,7 +954,7 @@ tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	{
 		auto res = tau_api::valid(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -969,7 +969,7 @@ tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	{
 		auto res = tau_api::sat(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -984,7 +984,7 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	{
 		auto res = tau_api::unsat(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -997,7 +997,7 @@ tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 	if (tref value = get_any(n[1].get()); value) {
 		auto res = tau_api::realizable(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -1010,7 +1010,7 @@ tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	if (tref value = get_any(n[1].get()); value) {
 		auto res = tau_api::unrealizable(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(std::cerr); return nullptr; }
+		if (!res.has_value()) { res.print(err); return nullptr; }
 		r = res.value() ? tau::_T() : tau::_F();
 	}
 	return r;
@@ -1037,7 +1037,7 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 	}
 	rr_defs.push_back(tau::geth(def));
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
+	out << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
 	// Register definition head early so type inference recognizes it
 	tt rrt(def);
 	htref head = rrt | tt::first | tt::handle;
@@ -1049,17 +1049,17 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
 	auto& defs = definitions<node>::instance();
-	if (rr_defs.empty()) std::cout << "Definitions: empty\n";
-	else std::cout << "Definitions:\n";
+	if (rr_defs.empty()) out << "Definitions: empty\n";
+	else out << "Definitions:\n";
 	for (size_t i = 0; i < rr_defs.size(); i++)
-		std::cout << "    [" << i + 1 << "] "
+		out << "    [" << i + 1 << "] "
 			<< tau::get(rr_defs[i]->get()).to_str() << "\n";
-	if (io_defs.empty()) std::cout << "Streams: empty\n";
-	else std::cout << "Streams:\n";
+	if (io_defs.empty()) out << "Streams: empty\n";
+	else out << "Streams:\n";
 	for (size_t i = 0; i < io_defs.size(); i++)
-		std::cout << "    [" << i + 1 << "] "
+		out << "    [" << i + 1 << "] "
 			<< tau::get(io_defs[i]->get()).to_str() << "\n";
-	std::cout << *defs.get_io_context();
+	out << *defs.get_io_context();
 }
 
 template <typename... BAs>
@@ -1069,7 +1069,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (!num) return;
 	auto i = num | tt::num;
 	if (i && i <= rr_defs.size()) {
-		std::cout << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
+		out << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -1099,7 +1099,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
 	}
 	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
+	out << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 template <typename... BAs>
@@ -1125,7 +1125,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	}
 	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
+	out << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -1334,24 +1334,24 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	std::map<repl_option, std::function<void()>> printers = {
 #ifdef DEBUG
 	{ debug_opt, [this]() {
-		std::cout << "debug-repl:          " << pbool[opt.debug_repl] << "\n"; } },
+		out << "debug-repl:          " << pbool[opt.debug_repl] << "\n"; } },
 #endif // DEBUG
 	{ status_opt,       [this]() {
-		std::cout << "status:              " << pbool[opt.status] << "\n"; } },
+		out << "status:              " << pbool[opt.status] << "\n"; } },
 	{ colors_opt,       [this]() {
-		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
+		out << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ charvar_opt,      [this]() {
-		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
+		out << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ preprocessing_opt, [this]() {
-		std::cout << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
-	{ highlighting_opt, []() {
-		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
-	{ indenting_opt,    []() {
-		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
+		out << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
+	{ highlighting_opt, [this]() {
+		out << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
+	{ indenting_opt,    [this]() {
+		out << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ severity_opt,     [this]() {
-		std::cout << "severity:            " << opt.severity << "\n"; } },
+		out << "severity:            " << opt.severity << "\n"; } },
 	{ print_benchmarks_opt, [this]() {
-		std::cout << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } }
+		out << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } }
 	};
 	// Read from the library globals, not from `opt`: they are what the
 	// algorithm actually consults, and a caller using the api setters
@@ -1362,42 +1362,42 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		return v == 0 || v == std::numeric_limits<size_t>::max()
 			? "unlimited" : std::to_string(v); };
 	std::map<repl_option, std::function<void()>> limit_printers = {
-	{ block_max_splits_opt, [climit]() {
-		std::cout << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
-	{ block_max_rounds_opt, [climit]() {
-		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
-	{ cqe_max_clauses_opt, [climit]() {
-		std::cout << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
-	{ fixpoint_steps_opt, [climit]() {
-		std::cout << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
-	{ flag_search_steps_opt, [climit]() {
-		std::cout << "flagsteps:           " << climit(max_flag_search_steps) << "\n"; } },
-	{ squeeze_cap_opt, [climit]() {
-		std::cout << "squeezecap:          " << climit(block_squeeze_cap) << "\n"; } },
-	{ simplify_rounds_opt, [climit]() {
-		std::cout << "simplifyrounds:      " << climit(max_simplify_rounds) << "\n"; } },
-	{ def_passes_opt, [climit]() {
-		std::cout << "defpasses:           " << climit(max_def_passes) << "\n"; } },
-	{ enum_steps_opt, [climit]() {
-		std::cout << "enumsteps:           " << climit(max_enum_steps) << "\n"; } },
-	{ rewrite_rounds_opt, [climit]() {
-		std::cout << "rewriterounds:       " << climit(max_rewrite_rounds) << "\n"; } },
-	{ gc_min_size_opt, []() {
-		std::cout << "gcminsize:           " << interpreter<node>::gc_min_size << "\n"; } },
-	{ gc_growth_opt, []() {
-		std::cout << "gcgrowth:            " << interpreter<node>::gc_growth_factor << "\n"; } },
-	{ spec_size_warn_opt, []() {
+	{ block_max_splits_opt, [climit, this]() {
+		out << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
+	{ block_max_rounds_opt, [climit, this]() {
+		out << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ cqe_max_clauses_opt, [climit, this]() {
+		out << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
+	{ fixpoint_steps_opt, [climit, this]() {
+		out << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
+	{ flag_search_steps_opt, [climit, this]() {
+		out << "flagsteps:           " << climit(max_flag_search_steps) << "\n"; } },
+	{ squeeze_cap_opt, [climit, this]() {
+		out << "squeezecap:          " << climit(block_squeeze_cap) << "\n"; } },
+	{ simplify_rounds_opt, [climit, this]() {
+		out << "simplifyrounds:      " << climit(max_simplify_rounds) << "\n"; } },
+	{ def_passes_opt, [climit, this]() {
+		out << "defpasses:           " << climit(max_def_passes) << "\n"; } },
+	{ enum_steps_opt, [climit, this]() {
+		out << "enumsteps:           " << climit(max_enum_steps) << "\n"; } },
+	{ rewrite_rounds_opt, [climit, this]() {
+		out << "rewriterounds:       " << climit(max_rewrite_rounds) << "\n"; } },
+	{ gc_min_size_opt, [this]() {
+		out << "gcminsize:           " << interpreter<node>::gc_min_size << "\n"; } },
+	{ gc_growth_opt, [this]() {
+		out << "gcgrowth:            " << interpreter<node>::gc_growth_factor << "\n"; } },
+	{ spec_size_warn_opt, [this]() {
 		const size_t v = interpreter<node>::spec_size_warn_threshold;
-		std::cout << "specsizewarn:        "
+		out << "specsizewarn:        "
 			<< (v ? std::to_string(v) : "off") << "\n"; } },
-	{ revision_alts_opt, [climit]() {
-		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } },
-	{ consistency_subsets_opt, [climit]() {
-		std::cout << "maxsubsets:          " << climit(max_consistency_subsets) << "\n"; } },
-	{ cache_bound_opt, [climit]() {
-		std::cout << "cachebound:          " << climit(cache_bound) << "\n"; } },
-	{ cover_products_opt, [climit]() {
-		std::cout << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } }
+	{ revision_alts_opt, [climit, this]() {
+		out << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } },
+	{ consistency_subsets_opt, [climit, this]() {
+		out << "maxsubsets:          " << climit(max_consistency_subsets) << "\n"; } },
+	{ cache_bound_opt, [climit, this]() {
+		out << "cachebound:          " << climit(cache_bound) << "\n"; } },
+	{ cover_products_opt, [climit, this]() {
+		out << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1423,10 +1423,10 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 					< std::string(b.option.name);
 		});
 		for (const auto& e : ba_opts) {
-			std::cout << e.family << "-" << e.option.name << ": ";
+			out << e.family << "-" << e.option.name << ": ";
 			if (e.option.kind == ba_option_kind::flag)
-				std::cout << pbool[e.option.get_flag()] << "\n";
-			else std::cout << e.option.get_count() << "\n";
+				out << pbool[e.option.get_flag()] << "\n";
+			else out << e.option.get_count() << "\n";
 		}
 		return;
 	}
@@ -1664,7 +1664,7 @@ void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
 	auto [family, name] = split_ba_option_name(dotted);
 	const ba_option* o = resolve_ba_option(family, name);
 	if (!o) return;
-	std::cout << family << "-" << name << ": "
+	out << family << "-" << name << ": "
 		<< (o->kind == ba_option_kind::flag
 			? pbool[o->get_flag()] : std::to_string(o->get_count()))
 		<< "\n";
@@ -1746,10 +1746,10 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 	auto fnt = fn | tt::only_child | tt::nt;
 	if (fnt == tau_parser::fragment_ltl) {
 		opt.fragment = fragment_ltl;
-		std::cout << "fragment: ltl\n";
+		out << "fragment: ltl\n";
 	} else if (fnt == tau_parser::fragment_ctl_star) {
 		opt.fragment = fragment_ctl_star;
-		std::cout << "fragment: ctl_star\n";
+		out << "fragment: ctl_star\n";
 	} else {
 		TAU_LOG_ERROR << "Unknown fragment. Available: ltl, ctl_star\n";
 		error = true;
@@ -1763,13 +1763,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command_type = command | tt::nt;
 #ifdef DEBUG
 	if (opt.debug_repl) {
-		// std::cout << "command: " << command << "\n";
-		command.value_tree().print_tree(std::cout << "tree: ") << "\n";
+		// out << "command: " << command << "\n";
+		command.value_tree().print_tree(out << "tree: ") << "\n";
 	}
 #endif // DEBUG
 	tref result = 0;
 	switch (command_type) {
-	case tau::quit_cmd:           return std::cout << "Quit.\n", 1;
+	case tau::quit_cmd:           return out << "Quit.\n", 1;
 	case tau::clear_cmd:
 		if (r) r->clear();
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -1828,12 +1828,12 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::reset_cmd:          reset_cmd(); break;
 	case tau::comment:            break;
 	// error handling
-	default: error = true; std::cout << std::endl;
+	default: error = true; out << std::endl;
 		TAU_LOG_ERROR << "Unknown command";
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
-		std::cout << "result tree: ") << "\n";
+		out << "result tree: ") << "\n";
 #endif // DEBUG
 	if (result) history_store(result);
 	return 0;
@@ -1841,11 +1841,12 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
+repl_evaluator<BAs...>::repl_evaluator(options opt, std::ostream& out,
+	std::ostream& err): out(out), err(err), opt(opt)
 {
 	TC.set(opt.colors);
 	logging::set_filter(opt.severity);
-	if (opt.experimental) std::cout << "\n!!! Experimental features "
+	if (opt.experimental) out << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
 	// Propagate the CLI-provided charvar/preprocessing values to the api's
 	// global state; without this, --charvar/--preprocessing have no effect
@@ -1910,7 +1911,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 				continue_running(req);
 			else continue_running();
 		}
-		std::cout << "\n", std::cout.flush();
+		out << "\n", out.flush();
 		if (!pending) reprompt();
 		return 0;
 	}
@@ -1929,7 +1930,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		for (const auto& cmd : commands())
 			if (quit = eval_cmd(cmd); quit == 1) break;
 	} else if (!error) return 2;
-	std::cout << "\n", std::cout.flush();
+	out << "\n", out.flush();
 	if (error && opt.error_quits) return quit = 1;
 	if (quit == 0) reprompt();
 	return quit;
@@ -1938,7 +1939,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::version_cmd() {
-	std::cout << full_version << "\n"
+	out << full_version << "\n"
 		<< "algebras: " << node::ba::types_joined() << "\n";
 }
 
@@ -2020,7 +2021,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	const std::string bool_available_options = std::string{} +
 		"Available options and values:\n" + bool_options + ba_flag_options;
 	switch (nt) {
-	case tau::help_sym: std::cout
+	case tau::help_sym: out
 		<< "General commands:\n"
 		<< "  help or h               print overview of available commands in Tau repl\n"
 		<< "  quit or q               exit the Tau repl\n"
@@ -2091,45 +2092,45 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 
 		<< "Type \'help <command>\' for more information about a specific command\n";
 		break;
-	case tau::version_sym: std::cout
+	case tau::version_sym: out
 		<< "version prints the current Tau version\n";
 		break;
-	case tau::quit_sym: std::cout
+	case tau::quit_sym: out
 		<< "quit exits the Tau repl\n";
 		break;
-	case tau::clear_sym: std::cout
+	case tau::clear_sym: out
 		<< "clear clears the terminal screen\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  clear or c              clears the terminal screen\n";
 		break;
-	case tau::get_sym: std::cout
+	case tau::get_sym: out
 		<< "get                       prints all options and their values\n"
 		<< "get <option>              prints the value of the given option\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau::set_sym: std::cout
+	case tau::set_sym: out
 		<< "set <option> [=] <value> sets option to value\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau::enable_sym: std::cout
+	case tau::enable_sym: out
 		<< "enable <option>           enables option\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau::disable_sym: std::cout
+	case tau::disable_sym: out
 		<< "disable <option>          disables option\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau::toggle_sym: std::cout
+	case tau::toggle_sym: out
 		<< "toggle <option>           toggles option value\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau::history_sym: std::cout
+	case tau::history_sym: out
 		<< "the history command shows all stored Tau expressions in the repl history\n"
 		<< "\n"
 		<< "  history or hist                 shows all stored Tau expressions\n"
@@ -2142,7 +2143,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  %<number>               to retrieve the Tau expression stored at position <number>\n\n"
 		<< "stored Tau expressions can be used wherever a command expects a Tau expression\n";
 		break;
-	case tau::normalize_sym: std::cout
+	case tau::normalize_sym: out
 		<< "the normalize command normalizes a Tau expression, prints the result and\n"
 		<< "saves it into the repl history\n"
 		<< "\n"
@@ -2152,7 +2153,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  normalize <term>          normalizes the given term\n"
 		<< "  normalize <repl_history>  normalizes the Tau expression stored at the specified repl history position\n";
 		break;
-	case tau::qelim_sym: std::cout
+	case tau::qelim_sym: out
 		<< "the qelim command eliminates all non-temporal quantifiers, prints the result and\n"
 		<< "saves it into the repl history\n"
 		<< "\n"
@@ -2160,7 +2161,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  qelim <tau>             eliminates non-temporal quantifiers in the given tau formula\n"
 		<< "  qelim <repl_history>    eliminates non-temporal quantifiers in the Tau formula stored at the specified repl history position\n";
 		break;
-	case tau::ltl_sym: std::cout
+	case tau::ltl_sym: out
 		<< "the ltl command prints the full LTL(ABA) translation pipeline\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2178,7 +2179,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  - final synthesized safety formula\n"
 		<< "\n";
 		break;
-	case tau::run_sym: std::cout
+	case tau::run_sym: out
 		<< "the run command executes a Tau formula as a program\n"
 		<< "\n"
 		<< "run automatically chooses a single program from the set of programs satisfying a given Tau formula\n"
@@ -2197,7 +2198,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "with no formula continue the stored one. `N step` (singular) also works.\n"
 		<< "\n";
 		break;
-	case tau::memory_sym: std::cout
+	case tau::memory_sym: out
 		<< "the memory command prints the running interpreter's current\n"
 		<< "memory: the variable-to-value map retained across `run` steps\n"
 		<< "\n"
@@ -2211,7 +2212,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "stay bounded as steps advance rather than grow without limit.\n"
 		<< "\n";
 		break;
-	case tau::solve_sym: std::cout
+	case tau::solve_sym: out
 		<< "the solve command computes a single satisfying assignment for the free variables in a Tau formula\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2224,7 +2225,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  --<type>                           uses the specified type for the solution (sbf or tau)\n"
 		<< "\n";
 		break;
-	case tau::lgrs_sym: std::cout
+	case tau::lgrs_sym: out
 		<< "the lgrs command computes a LGRS for an equation\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2234,7 +2235,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  --<type>                uses the specified type for the solution\n"
 		<< "\n";
 		break;
-	case tau::whatis_sym: std::cout
+	case tau::whatis_sym: out
 		<< "the whatis command shows the inferred type of a Tau expression\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2245,13 +2246,13 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		// the BA type names are whatever the configured pack holds
 		<< "type names: wff, bf, " << node::ba::types_joined() << "\n";
 		break;
-	case tau::reset_sym: std::cout
+	case tau::reset_sym: out
 		<< "the reset command clears the REPL session state\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  reset                   clears history, definitions, and IO streams\n";
 		break;
-	case tau::sat_sym: std::cout
+	case tau::sat_sym: out
 		<< "the sat command checks if a Tau formula is satisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is satisfiable if there exists a variable assignment to non-temporal variables\n"
 		<< "such that for all possible inputs there exist time compatible outputs at each point in time\n"
@@ -2261,7 +2262,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  sat <tau>               checks the given tau formula for satisfiability\n"
 		<< "  sat <repl_history>      checks the Tau formula stored at the specified repl history position for satisfiability\n";
 		break;
-	case tau::valid_sym: std::cout
+	case tau::valid_sym: out
 		<< "the valid command checks if a Tau formula is logically equivalent to T and if so prints T and else F\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2269,7 +2270,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  valid <tau>             checks the given tau formula for validity\n"
 		<< "  valid <repl_history>    checks the Tau formula stored at the specified repl history position for validity\n";
 		break;
-	case tau::unsat_sym: std::cout
+	case tau::unsat_sym: out
 		<< "the unsat command checks if a Tau formula is unsatisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is unsatisfiable if for every variable assignment to non-temporal variables\n"
 		<< "there exist inputs such that there are no time compatible outputs at some point in time\n"
@@ -2279,7 +2280,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  unsat <tau>             checks the given tau formula for unsatisfiability\n"
 		<< "  unsat <repl_history>    checks the Tau formula stored at the specified repl history position for unsatisfiability\n";
 		break;
-	case tau::realizable_sym: std::cout
+	case tau::realizable_sym: out
 		<< "the realizable command checks if a Tau specification is realizable and if so prints T and else F\n\n"
 		<< "a tau specification is realizable if there exists a winning system strategy that, for\n"
 		<< "every possible sequence of inputs, produces outputs satisfying the specification at every point in time\n"
@@ -2289,7 +2290,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  realizable <tau>             checks the given tau formula for realizability\n"
 		<< "  realizable <repl_history>    checks the Tau formula stored at the specified repl history position for realizability\n";
 		break;
-	case tau::unrealizable_sym: std::cout
+	case tau::unrealizable_sym: out
 		<< "the unrealizable command checks if a Tau specification is unrealizable and if so prints T and else F\n\n"
 		<< "a tau specification is unrealizable if no system strategy exists that, for every possible\n"
 		<< "sequence of inputs, produces outputs satisfying the specification at every point in time\n"
@@ -2299,7 +2300,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  unrealizable <tau>             checks the given tau formula for unrealizability\n"
 		<< "  unrealizable <repl_history>    checks the Tau formula stored at the specified repl history position for unrealizability\n";
 		break;
-	case tau::dnf_sym: std::cout
+	case tau::dnf_sym: out
 		<< "dnf converts a Tau expression to disjunctive normal form (DNF)\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2307,7 +2308,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  dnf <tau>               converts the given Tau formula to DNF\n"
 		<< "  dnf <repl_history>      converts the Tau expression stored at the specified repl history position to DNF\n";
 		break;
-	case tau::cnf_sym: std::cout
+	case tau::cnf_sym: out
 		<< "cnf converts a Tau expression to conjunctive normal form (CNF)\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2315,7 +2316,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  cnf <tau>               converts the given Tau formula to CNF\n"
 		<< "  cnf <repl_history>      converts the Tau expression stored at the specified repl history position to CNF\n";
 		break;
-	case tau::nnf_sym: std::cout
+	case tau::nnf_sym: out
 		<< "nnf converts a Tau expression to negation normal form (NNF)\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2323,7 +2324,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  nnf <tau>               converts the given tau formula to NNF\n"
 		<< "  nnf <repl_history>      converts the Tau expression stored at the specified repl history position to NNF\n";
 		break;
-	case tau::mnf_sym: std::cout
+	case tau::mnf_sym: out
 		<< "mnf converts a Tau expression to minterm normal form (MNF)\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2331,14 +2332,14 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  mnf <tau>               converts the given tau formula to MNF\n"
 		<< "  mnf <repl_history>      converts the Tau expression stored at the specified repl history position to MNF\n";
 		break;
-	case tau::onf_sym: std::cout
+	case tau::onf_sym: out
 		<< "onf converts a tau formula to order normal form (ONF) on the specified variable\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  onf <var> <tau>           converts the given tau formula to ONF using <var>\n"
 		<< "  onf <var> <repl_history>  converts the Tau formula stored at the specified repl history position to ONF using <var>\n";
 		break;
-	case tau::subst_sym: std::cout
+	case tau::subst_sym: out
 		<< "the substitute command substitutes a Tau expression in a Tau expression by another Tau expression\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2353,7 +2354,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  In general <match> and <replace> must be of the same type, so either both term or tau\n"
 		<< "\n";
 		break;
-	case tau::inst_sym: std::cout
+	case tau::inst_sym: out
 		<< "the instantiate command instantiates a variable in a Tau formula with the specified term\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2365,7 +2366,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  <value> is the Tau term to instantiate with\n"
 		<< "\n";
 		break;
-	case tau::def_sym: std::cout
+	case tau::def_sym: out
 		<< "the definitions command shows stored input/output stream variables and function and predicate definitions\n"
 		<< "\n"
 		<< "usage:\n"
@@ -2378,7 +2379,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "Examples defining stream variables and functions can be found by typing \'help examples\'\n";
 		break;
-	case tau::examples_sym: std::cout
+	case tau::examples_sym: out
 		<< "examples\n"
 		<< "\n"
 		<< "  # defining an input stream variable\n"

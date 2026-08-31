@@ -50,7 +50,9 @@
 #ifndef __IDNI__TAU__REPL_EVALUATOR_H__
 #define __IDNI__TAU__REPL_EVALUATOR_H__
 
+#include <iostream>
 #include <memory>
+#include <ostream>
 
 #include "boolean_algebras/ba_pack_traits.h"
 #include "boolean_algebras/tau/tau_ba.h"
@@ -109,6 +111,12 @@ struct repl_evaluator {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	/// @brief Sinks for the evaluator's normal and error output; declared
+	/// before every other member so they are ready for any member whose
+	/// construction could print.
+	std::ostream& out;
+	std::ostream& err;
+
 	/** @brief Runtime configuration options for the REPL session. */
 	struct options {
 		bool status              = true;  ///< Print status after each command.
@@ -140,7 +148,8 @@ struct repl_evaluator {
 	 * @brief Construct the evaluator with the given @p opt configuration.
 	 * @param opt REPL options (default-constructed if not provided).
 	 */
-	repl_evaluator(options opt = options{});
+	repl_evaluator(options opt = options{},
+		std::ostream& out = std::cout, std::ostream& err = std::cerr);
 	/**
 	 * @brief Parse and evaluate the REPL source string @p src.
 	 * @param src Command string entered by the user.
