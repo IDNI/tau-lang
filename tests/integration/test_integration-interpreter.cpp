@@ -506,6 +506,52 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	// An update bridging two parts that BOTH already carry a fallback
+	// alternative (from earlier input-conflicting updates) merges them via
+	// the cross product of their alternative lists, deduplicated -- the
+	// `merged`/`seen` block of interpreter::update.
+	TEST_CASE("u[t] = i1[t]: merge_parts_with_alternatives") {
+		bdd_init<Bool>();
+		auto spec = create_spec("u[t] = i1[t]"
+			" && i2[t] & o2[t]' = 0 && i3[t] & o3[t]' = 0.");
+		strings i1_values = { "F", "o2[t] = 0", "o3[t] = 0",
+			"o2[t] = o3[t]", "F" };
+		strings i2_values = { "F", "F", "F", "F", "F" };
+		strings i3_values = { "F", "F", "F", "F", "F" };
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto i2 = std::make_shared<vector_input_stream>(i2_values);
+		auto i3 = std::make_shared<vector_input_stream>(i3_values);
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o3 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_input( "i2", tau_type_id<node_t>(), i2);
+		ctx.add_input( "i3", tau_type_id<node_t>(), i3);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		ctx.add_output("o3", tau_type_id<node_t>(), o3);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 5);
+		REQUIRE( maybe_i.has_value() );
+		strings all_f = { "F", "F", "F", "F", "F" };
+		CHECK( o2->get_values() == all_f );
+		CHECK( o3->get_values() == all_f );
+		// each accepted update echoes on u
+		auto u_values = u->get_values();
+		REQUIRE( u_values.size() == 5 );
+		CHECK( u_values[1] == "always o2[t]:tau = 0" );
+		CHECK( u_values[2] == "always o3[t]:tau = 0" );
+		CHECK( u_values[3] == "always o2[t]:tau = o3[t]:tau" );
+		// the o2 and o3 parts (2 alternatives each) merged into one part
+		// holding the 2x2 cross product of their alternatives
+		const auto& parts = maybe_i.value().original_spec;
+		REQUIRE( parts.size() == 2 );
+		size_t max_alts = 0;
+		for (const auto& [alts, _] : parts)
+			max_alts = std::max(max_alts, alts.size());
+		CHECK( max_alts == 4 );
+	}
+
 	// I1 (factored spec storage): an update that conflicts with the spec
 	// for SOME inputs only (the plain-conjunction sat check treats inputs
 	// universally) appends the update clause as a last-resort alternative
