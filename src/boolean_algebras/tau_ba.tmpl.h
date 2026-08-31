@@ -19,7 +19,22 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 static tref normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
-	return normalize_temporal_quantifiers<node, false>(fm.nso_rr.main->get());
+	// Memoised per main tree: every Boolean operation on constants
+	// (~, &, |, +) normalises the temporal layer of its operands, and the
+	// same constants are operands over and over. Same key discipline as
+	// cached_tau_ba_predicate: the main tree identifies the element only
+	// when it carries no recurrence relations.
+	if (!fm.nso_rr.rec_relations.empty())
+		return normalize_temporal_quantifiers<node, false>(
+			fm.nso_rr.main->get());
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	tref key = fm.nso_rr.main->get();
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	// compute before emplace: normalisation can create new trees, and a
+	// rehash of `cache` must not happen with a half-built entry in it.
+	tref res = normalize_temporal_quantifiers<node, false>(key);
+	return cache.insert_or_assign(key, res).first->second;
 }
 
 template <typename... BAs>
