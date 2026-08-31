@@ -220,9 +220,6 @@ private:
 	/// @brief Define an ADT type from @p n.
 	void def_type_cmd(const tt& n);
 
-	/// @brief Print a "not implemented yet" message.
-	void not_implemented_yet();
-
 	// Tau API
 	/// @brief Normalize the formula in @p n and return the result.
 	tref normalize_cmd(const tt& n);

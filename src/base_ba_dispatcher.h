@@ -108,9 +108,11 @@ struct base_ba_dispatcher {
 	static std::variant<BAs...> splitter(const std::variant<BAs...>& elem, splitter_type st = splitter_type::upper);
 
 	/**
-	 * @brief Splits the element using the default splitter type.
+	 * @brief Returns a splitter of the one element of the given type,
+	 * wrapped as a bf constant tree.
 	 * @param type_tree type of the splitter one element to return.
-	 * @return The split one element as a variant.
+	 * @return The tree for the split one, or nullptr when the algebra
+	 * has no splitter one (e.g. bv).
 	 */
 	static tref splitter_one(tref type_tree);
 

@@ -143,6 +143,28 @@ tref transform_io_var(tref io_var, int_t time_point) {
 	return io_var;
 }
 
+/**
+ * @internal
+ * @brief Prefix @p fm with `ex` quantifiers over every output stream at
+ * @p time_point — the output half of the time-compatible quantification
+ * pattern (see README.md, "Satisfiability and execution").
+ *
+ * Constant-time (initial-condition) variables in @p io_vars are skipped,
+ * as are streams whose value at @p time_point is predefined by
+ * @p initials; each remaining output stream name is quantified once.
+ * The bound variables are deliberately not renamed: the phi/chi
+ * unrolling (`build_step`/`build_step_chi`) splices later steps
+ * underneath the quantifiers built here, and their lookback occurrences
+ * must be captured by exactly these binders.
+ * @tparam node Tree node type.
+ * @param fm Formula to quantify.
+ * @param io_vars IO variable nodes of the surrounding formula.
+ * @param time_point Time step whose output values are quantified.
+ * @param initials Set of `(variable name, time point)` pairs predefined
+ * by explicit initial conditions.
+ * @return @p fm wrapped in one `ex o[time_point]` per output stream.
+ * @endinternal
+ */
 template <NodeType node>
 tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
                                 int_t time_point, const auto& initials)
@@ -177,6 +199,28 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 	return fm;
 }
 
+/**
+ * @internal
+ * @brief Prefix @p fm with `all` quantifiers over every input stream at
+ * @p time_point — the input half of the time-compatible quantification
+ * pattern, dual to `existentially_quantify_output_streams`.
+ *
+ * Constant-time (initial-condition) variables in @p io_vars are skipped,
+ * as are streams whose value at @p time_point is predefined by
+ * @p initials; each remaining input stream name is quantified once, and
+ * the bound variables are not renamed, for the same splicing reason as
+ * in `existentially_quantify_output_streams`. Applied after that
+ * function by the step builders, so the `all` binders end up outermost:
+ * `all i[n] ex o[n] ...`.
+ * @tparam node Tree node type.
+ * @param fm Formula to quantify.
+ * @param io_vars IO variable nodes of the surrounding formula.
+ * @param time_point Time step whose input values are quantified.
+ * @param initials Set of `(variable name, time point)` pairs predefined
+ * by explicit initial conditions.
+ * @return @p fm wrapped in one `all i[time_point]` per input stream.
+ * @endinternal
+ */
 template <NodeType node>
 tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 					int_t time_point, const auto& initials)
@@ -325,6 +369,30 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) 
 	return rewriter::replace<node>(original_fm, changes);
 }
 
+/**
+ * @internal
+ * @brief Build step 0 of the chi unrolling (`find_fixpoint_chi`): the
+ * always-part and the sometimes-flag formula instantiated at
+ * @p time_point, with the flag part hidden behind a placeholder atom.
+ *
+ * Both @p chi and @p st are instantiated at @p time_point; instead of
+ * conjoining the instantiated @p st directly, the placeholder atom
+ * `_pholder[time_point] = 0` is conjoined and mapped to it in
+ * @p pholder_to_st. The placeholder marks the splice point at which
+ * `build_step_chi` inserts step 1; callers recover the real formula by
+ * replacing every placeholder via @p pholder_to_st. Unlike later steps,
+ * step 0 carries no quantifier prefix.
+ * @tparam node Tree node type.
+ * @param chi Always-part local specification driving the recurrence.
+ * @param st Eventual-variable flag formula tracked by the unrolling.
+ * @param io_vars IO variable nodes appearing in @p chi and @p st.
+ * @param time_point Time step at which the unrolling starts.
+ * @param pholder_to_st [in,out] Map extended with the placeholder atom
+ * mapped to the instantiated @p st.
+ * @return Pair `(chi@time_point && placeholder, placeholder)`; the
+ * second element seeds `build_step_chi`'s @p cached_fm splice cursor.
+ * @endinternal
+ */
 template <NodeType node>
 std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 	const trefs& io_vars, int_t time_point, auto& pholder_to_st)
@@ -343,6 +411,35 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 	return std::make_pair(new_fm, c_pholder);
 }
 
+/**
+ * @internal
+ * @brief Extend the phi unrolling (`find_fixpoint_phi`) by one step:
+ * instantiate @p original_fm at time `time_point + step_num`, wrap it in
+ * that step's time-compatible quantifier prefix, and splice it into the
+ * innermost position of the telescope built so far.
+ *
+ * The new step is quantified `all inputs ex outputs` at its own time
+ * point and conjoined underneath every earlier step's quantifiers by
+ * replacing @p cached_fm — the previous step's unquantified
+ * instantiation — with `cached_fm && <quantified new step>`. Writing
+ * `fm@k` for the instantiation at `time_point + k`, the result has the
+ * shape `fm@0 && all i@1 ex o@1 (fm@1 && all i@2 ex o@2 (fm@2 && ...))`;
+ * lookback occurrences inside `fm@k` are intentionally captured by the
+ * earlier steps' binders (see `existentially_quantify_output_streams`).
+ * @tparam node Tree node type.
+ * @param original_fm Always-part local specification to instantiate.
+ * @param prev_fm Telescope built so far (steps `0..step_num-1`).
+ * @param io_vars IO variable nodes appearing in @p original_fm.
+ * @param initials Set of `(variable name, time point)` pairs predefined
+ * by explicit initial conditions (not re-quantified).
+ * @param step_num Index of the step to add; must be `> 0` (step 0 is
+ * built by `fm_at_time_point` in `find_fixpoint_phi`).
+ * @param time_point Time step at which the unrolling started.
+ * @param cached_fm [in,out] Splice cursor: on entry the previous step's
+ * unquantified instantiation, on exit the new step's.
+ * @return @p prev_fm with the new step spliced in.
+ * @endinternal
+ */
 template <NodeType node>
 tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 	const auto& initials, int_t step_num, int_t time_point, tref& cached_fm)
@@ -368,6 +465,41 @@ tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 	return rewriter::replace<node>(prev_fm, changes);
 }
 
+/**
+ * @internal
+ * @brief Extend the chi unrolling (`find_fixpoint_chi`) by one step:
+ * instantiate @p chi and @p st at time `time_point + step_num`, hide the
+ * instantiated @p st behind a fresh placeholder, quantify the step, and
+ * splice it into @p prev_fm as the alternative of raising the flag one
+ * step later.
+ *
+ * The new step `chi@n && _pholder@n` (with `_pholder@n` mapped to the
+ * instantiated @p st in @p pholder_to_st) is quantified
+ * `all inputs ex outputs` at its time point and spliced in by replacing
+ * @p cached_fm — the previous step's placeholder atom — with
+ * `cached_fm || <quantified new step>`. After placeholder substitution
+ * chi therefore reads "the always-part holds and the flag is raised
+ * now, or one step later, or ...", one disjunctive layer per step. When
+ * @p st is `T` (empty sometimes clause) the previous placeholder is
+ * replaced instead of disjoined.
+ * @tparam node Tree node type.
+ * @param chi Always-part local specification driving the recurrence.
+ * @param st Eventual-variable flag formula tracked by the unrolling.
+ * @param prev_fm Chi telescope built so far (steps `0..step_num-1`),
+ * still containing placeholders.
+ * @param io_vars IO variable nodes appearing in @p chi and @p st.
+ * @param initials Set of `(variable name, time point)` pairs predefined
+ * by explicit initial conditions (not re-quantified).
+ * @param step_num Index of the step to add; must be `> 0` (step 0 is
+ * `build_initial_step_chi`).
+ * @param time_point Time step at which the unrolling started.
+ * @param cached_fm [in,out] Splice cursor: on entry the previous step's
+ * placeholder atom, on exit the new step's.
+ * @param pholder_to_st [in,out] Map extended with the new placeholder
+ * atom mapped to the instantiated @p st.
+ * @return @p prev_fm with the new step spliced in (placeholders intact).
+ * @endinternal
+ */
 template <NodeType node>
 tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	const auto& initials, int_t step_num, int_t time_point, tref& cached_fm,
@@ -753,6 +885,27 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	return { chi_prev_replc, step_num - 1 };
 }
 
+/**
+ * @internal
+ * @brief Translate a fixpoint result from constant time points back to
+ * relative (`t`-based) IO variables, keeping genuine initial conditions
+ * constant.
+ *
+ * Inverse of the `fm_at_time_point` instantiation used by the fixpoint
+ * searches: quantifier ids are re-canonized, the lookback is taken as
+ * the greatest constant time point occurring in @p fm, and every IO
+ * variable at a time point above @p highest_init_cond becomes `x[t]`
+ * (when it sits at the lookback itself) or `x[t-k]` (`k` = lookback
+ * minus its time point). Variables at or below @p highest_init_cond are
+ * initial conditions and stay constant.
+ * @tparam node Tree node type.
+ * @param fm Formula over constant-time IO variables, as produced by
+ * `find_fixpoint_phi`/`find_fixpoint_chi` after normalization.
+ * @param highest_init_cond Greatest time point still predefined by an
+ * explicit initial condition.
+ * @return @p fm with all non-initial IO variables made relative again.
+ * @endinternal
+ */
 template <NodeType node>
 tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	using tau = tree<node>;
@@ -790,6 +943,25 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	return rewriter::replace<node>(fm, changes);
 }
 
+/**
+ * @internal
+ * @brief Build the "current" flag stream occurrence for a flag
+ * recurrence rule, anchored to the surrounding formula's lookback.
+ *
+ * Returns the SBF-typed output stream `name[var-(lookback-1)]` when
+ * `lookback >= 2`, and `name[var]` otherwise. Paired with
+ * `build_prev_flag_on_lookback` this always yields two occurrences
+ * exactly one step apart whose deeper member sits at
+ * `max(lookback, 1)`, so a flag rule never increases the formula's
+ * lookback beyond the minimum of 1 it needs.
+ * @tparam node Tree node type.
+ * @param var_name_node Flag stream name node (e.g. `_f0`, `_e0`).
+ * @param var Name of the time variable (typically `"t"`).
+ * @param lookback Lookback of the surrounding formula.
+ * @return The current-step flag occurrence, e.g. `_f0[t-1]` for
+ * `lookback == 2` and `_f0[t]` for `lookback <= 1`.
+ * @endinternal
+ */
 template <NodeType node>
 tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
@@ -800,6 +972,22 @@ tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 	else return build_out_var_at_t<node>(var_name_node, flag_type, var);
 }
 
+/**
+ * @internal
+ * @brief Build the previous-step companion of `build_flag_on_lookback`:
+ * the flag stream occurrence one step before the "current" one.
+ *
+ * Returns the SBF-typed output stream `name[var-lookback]` when
+ * `lookback >= 2`, and `name[var-1]` otherwise — i.e. the occurrence at
+ * the surrounding formula's lookback (at least 1).
+ * @tparam node Tree node type.
+ * @param io_var_node Flag stream name node (e.g. `_f0`, `_e0`).
+ * @param var Name of the time variable (typically `"t"`).
+ * @param lookback Lookback of the surrounding formula.
+ * @return The previous-step flag occurrence, e.g. `_f0[t-2]` for
+ * `lookback == 2` and `_f0[t-1]` for `lookback <= 1`.
+ * @endinternal
+ */
 template <NodeType node>
 tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
@@ -1261,6 +1449,26 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	return { res, max_st_lookback };
 }
 
+/**
+ * @internal
+ * @brief Build the initial segment of a run of the always-part @p aw:
+ * its instantiations at the first @p max_st_lookback time points from
+ * its own lookback onward, conjoined and normalized.
+ *
+ * Used by `to_unbounded_continuation` to seed its run with the early
+ * time points of the original always-part: the eventual-variable flags
+ * were built with the combined sometimes/always lookback
+ * (`transform_to_eventual_variables`), so the flag-augmented
+ * continuation's own instantiations only start that many steps later.
+ * @tparam node Tree node type.
+ * @param aw Original (pre-continuation) always-part.
+ * @param max_st_lookback Greatest lookback among the original
+ * `sometimes` clauses.
+ * @return The conjunction `aw@l && ... && aw@(l+max_st_lookback-1)`,
+ * where `l` is @p aw's lookback, or `nullptr` when @p max_st_lookback
+ * is `0`.
+ * @endinternal
+ */
 template <NodeType node>
 tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw

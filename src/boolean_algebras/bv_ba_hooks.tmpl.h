@@ -640,12 +640,30 @@ tref term_shl(tref symbol) {
 	return symbol;
 }
 
+// Three-way UNSIGNED comparison of two concrete bitvector values:
+// -1 if c1 < c2, 0 if equal, 1 if c1 > c2. Compares the width-padded
+// base-2 strings lexicographically, so both terms must satisfy
+// isBitVectorValue() and have the same width (the callers below only
+// pass constants of the same BA type).
 inline int compare_bv_consts(const bv& c1, const bv& c2) {
 	const std::string s1 = c1.getBitVectorValue(2);
 	const std::string s2 = c2.getBitVectorValue(2);
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
 }
 
+// Constant folding for the bv comparison wffs, called from the wff_*
+// handlers of get_hook in src/hooks.tmpl.h when the arguments' BA type is
+// in the bv family. Shared signature contract:
+//   ch — children array of the `wff` node being interned; ch[0] is the
+//        comparison operator node whose two `bf` children hold the
+//        operands as tau::get(ch[0])[0][0] / tau::get(ch[0])[1][0].
+//   r  — right-sibling tref threaded through interning; the folded node
+//        must keep it, hence tau::get(result, r).
+// Returns the folded T/F wff when both operands are BA constants of the
+// same nonzero (bv) type, else nullptr = no fold, and the caller falls
+// back to tau::get_raw on the unfolded comparison.
+
+// Folds c1 < c2 (unsigned).
 template<NodeType node>
 tref wff_bv_lt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -662,6 +680,7 @@ tref wff_bv_lt(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 !< c2, i.e. c1 >= c2 (unsigned).
 template<NodeType node>
 tref wff_bv_nlt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -678,6 +697,7 @@ tref wff_bv_nlt(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 <= c2 (unsigned).
 template<NodeType node>
 tref wff_bv_lteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -694,6 +714,7 @@ tref wff_bv_lteq(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 !<= c2, i.e. c1 > c2 (unsigned).
 template<NodeType node>
 tref wff_bv_nlteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -710,6 +731,7 @@ tref wff_bv_nlteq(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 > c2 (unsigned).
 template<NodeType node>
 tref wff_bv_gt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -726,6 +748,7 @@ tref wff_bv_gt(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 !> c2, i.e. c1 <= c2 (unsigned).
 template<NodeType node>
 tref wff_bv_ngt(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -742,6 +765,7 @@ tref wff_bv_ngt(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 >= c2 (unsigned).
 template<NodeType node>
 tref wff_bv_gteq(const tref* ch, tref r) {
 	using tau = tree<node>;
@@ -758,6 +782,7 @@ tref wff_bv_gteq(const tref* ch, tref r) {
 	return nullptr;
 }
 
+// Folds c1 !>= c2, i.e. c1 < c2 (unsigned).
 template<NodeType node>
 tref wff_bv_ngteq(const tref* ch, tref r) {
 	using tau = tree<node>;

@@ -390,6 +390,16 @@ tref onf_wff<node>::operator()(tref n) const {
 	return rewriter::replace<node>(nn, changes);
 }
 
+/**
+ * @internal
+ * @copydoc onf_wff::onf_subformula
+ *
+ * Only the bottom-most `bf_eq` is rewritten, and only if it mentions `var`,
+ * while every `bf_neq` mentioning `var` is; `norm_trimmed_equation` first
+ * puts each (in)equality into `g = 0` / `g != 0` form, and both interval
+ * bounds are canonically reduced after substituting for `var`.
+ * @endinternal
+ */
 template <NodeType node>
 tref onf_wff<node>::onf_subformula(tref n) const {
 	using tau = tree<node>;
@@ -850,23 +860,6 @@ inline auto is_wff_bdd_var = [](tref n) {
 
 /**
  * @internal
- * @brief Predicate that classifies a bf node as a BDD variable.
- *
- * In BDD-based reductions of Boolean functions the following node types are
- * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
- * `ba_constant`, `bf_fall`, and `bf_fex`.
- * @tparam node Tree node type.
- *
- * @par Example
- * @code{.cpp}
- * tref fm = get_nso_rr("x = 0.").value().main->get();
- * tref x = tau::get(fm)[0].first(); // the bf variable x
- * CHECK( is_bf_bdd_var<node_t>(x) == true );
- * @endcode
- * @endinternal
- */
-/**
- * @internal
  * @brief The atomic formula kinds `boole_normal_form` treats as BDD variables:
  * `bf_eq`, `bf_lt` and `bf_lteq`.
  *
@@ -889,6 +882,23 @@ bool is_atomic_bdd_var(tref n) {
 	}
 }
 
+/**
+ * @internal
+ * @brief Predicate that classifies a bf node as a BDD variable.
+ *
+ * In BDD-based reductions of Boolean functions the following node types are
+ * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
+ * `ba_constant`, `bf_fall`, and `bf_fex`.
+ * @tparam node Tree node type.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref fm = get_nso_rr("x = 0.").value().main->get();
+ * tref x = tau::get(fm)[0].first(); // the bf variable x
+ * CHECK( is_bf_bdd_var<node_t>(x) == true );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 inline auto is_bf_bdd_var = [](tref n) {
 	using tau = tree<node>;

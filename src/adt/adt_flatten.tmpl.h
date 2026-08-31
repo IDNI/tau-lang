@@ -59,6 +59,7 @@ struct adt_scope_entry { size_t adt_sid; bool is_binder = false; };
 // node: sids are plain dict ids either way.
 using adt_scope_stack = std::vector<std::map<size_t, adt_scope_entry>>;
 
+// First direct child of n with nonterminal nt, or nullptr if none.
 template <NodeType node>
 tref adt_flatten_find_child(tref n, size_t nt) {
 	using tau = tree<node>;
@@ -80,6 +81,7 @@ size_t adt_flatten_var_key(tref head) {
 	return t.data();
 }
 
+// Spelling of a variable head's scope key (see adt_flatten_var_key).
 template <NodeType node>
 std::string adt_flatten_head_str(tref head) {
 	return dict(adt_flatten_var_key<node>(head));

@@ -185,6 +185,10 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 		build_wff_imply<node>(build_wff_neg<node>(x), z)));
 }
 
+// Largest purely-numeric bound-variable name over all quantifiers in fm
+// (0 when there is none); build_wff_all/ex use id + 1 as a fresh name.
+// Names too big for int_t saturate to the int_t maximum. Term subtrees
+// are not descended into.
 template <NodeType node>
 int_t find_biggest_quant_id(tref fm) {
 	using tau = tree<node>;
@@ -994,6 +998,8 @@ tref build_sym(const std::string& sym_name) {
 	return tau::get(tau::sym, sym_name);
 }
 
+// Wraps each given tree in an offset node and collects them under one
+// offsets node.
 template<NodeType node>
 tref build_offsets(const trefs& offsets) {
 	using tau = tree<node>;
@@ -1004,6 +1010,8 @@ tref build_offsets(const trefs& offsets) {
 	return tau::get(tau::offsets, offset_refs);
 }
 
+// Builds an offsets node from variable names; each name becomes an
+// untyped variable offset.
 template<NodeType node>
 tref build_offsets(const std::vector<std::string>& offsets) {
 	trefs vars;
@@ -1013,11 +1021,15 @@ tref build_offsets(const std::vector<std::string>& offsets) {
 	return build_offsets<node>(vars);
 }
 
+// Single-name convenience: an offsets node holding one untyped variable
+// offset.
 template<NodeType node>
 tref build_offsets(const std::string& offset) {
 	return build_offsets<node>(std::vector<std::string>{ offset });
 }
 
+// Builds a shift node `var - shift` from a variable tree and a numeric
+// shift amount.
 template<NodeType node>
 tref build_shift(tref var, size_t shift) {
 	using tau = tree<node>;
@@ -1025,6 +1037,9 @@ tref build_shift(tref var, size_t shift) {
 	return tau::get(tau::shift, var, tau::get_num(shift));
 }
 
+// Name-based overload; note the parameter order: the variable's BA
+// type_id sits between the name and the shift amount (the tref overload
+// takes just (var, shift)).
 template<NodeType node>
 tref build_shift(std::string var_name, size_t type_id, size_t shift) {
 	return build_shift<node>(build_variable<node>(var_name, type_id), shift);

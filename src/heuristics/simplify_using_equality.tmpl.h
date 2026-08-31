@@ -160,6 +160,11 @@ tref simplify_using_equality_direct_atm(tref atm) {
 
 // ── Public helpers ───────────────────────────────────────────────────────────
 
+// Derived consequence terms for one registered `lhs = rhs` equality
+// (negations and the and/or combinations merged into the union-find),
+// cached per (lhs, rhs) pair by simplify_using_equality_add_raw_equality
+// so they are built once. for_each_tref visits every held tref so the
+// cache's entries can be kept alive by gc_expand_callbacks.
 struct simplify_using_equality_cached_consequences {
 	tref lhs_neg = nullptr;
 	tref rhs_neg = nullptr;

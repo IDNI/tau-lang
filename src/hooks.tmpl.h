@@ -52,6 +52,7 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	}
 	LOG_TRACE << ss.str();
 }
+// Trace-logs that a hook rewrite rule fired, naming the rule.
 inline void applied(const std::string& rule) {
 	LOG_TRACE << "[- " << LOG_BRIGHT("APPLIED") << " -] "
 				<< LOG_RULE_COLOR << rule << TC.CLEAR();

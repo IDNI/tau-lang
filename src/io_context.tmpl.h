@@ -710,6 +710,9 @@ struct adt_fmt_node {
 	std::vector<std::pair<std::string, adt_fmt_node>> children;
 };
 
+// Inserts one flattened member's @p leaf value into the nesting tree at the
+// position named by @p path (dict ids, outer -> inner), creating the
+// intermediate nodes on first use so sibling order stays insertion order.
 inline void adt_fmt_insert(adt_fmt_node& node, const std::vector<size_t>& path,
 	size_t depth, const std::string& leaf)
 {
@@ -721,6 +724,9 @@ inline void adt_fmt_insert(adt_fmt_node& node, const std::vector<size_t>& path,
 	adt_fmt_insert(node.children.back().second, path, depth + 1, leaf);
 }
 
+// Renders a nesting tree as one wire-format literal: a leaf as its quoted
+// value, an interior node as `{ key: ..., ... }` in stored (declaration)
+// member order.
 inline std::string adt_fmt_print(const adt_fmt_node& node) {
 	if (node.is_leaf) return "\"" + node.leaf + "\"";
 	std::string s = "{ ";

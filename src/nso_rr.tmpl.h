@@ -82,7 +82,12 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 	return nn;
 }
 
-// calculate fixed points called from main and replace them by their results
+// Bottom-up tree transformer that finds fixpoint calls in a formula (an
+// offset-free reference to a recurrence defined with offsets, e.g. `g(y)`
+// for `g[n](x) := ...`), runs calculate_fixed_point on each, and records
+// the results in `changes` for the caller to substitute. Non-call nodes
+// are rebuilt with their children's recorded replacements. Applied by
+// calculate_all_fixed_points below over a spec's main formula.
 template <NodeType node>
 struct fixed_point_transformer {
 	using tau = tree<node>;
@@ -92,6 +97,13 @@ struct fixed_point_transformer {
 	fixed_point_transformer(const rr<node>& defs)
 		: defs(defs), fpcalls(find_fpcalls(defs)) {}
 
+	// Visitor step: when @p n is a wff- or bf-wrapped reference whose
+	// signature names a fixpoint call (see find_fpcalls), calculate the
+	// fixpoint in @p n's own world (wff or bf, from the wrapper) and
+	// memoize it in `changes`; otherwise rebuild @p n from its children's
+	// recorded replacements. Returns nullptr on an unsupported
+	// multi-index call or a failed fixpoint calculation, which aborts the
+	// traversal.
 	tref operator()(tref n) {
 		const auto& t = tau::get(n);
 		if (!t.has_child()) return n;
@@ -127,6 +139,9 @@ struct fixed_point_transformer {
 		return nn;
 	}
 
+	// The value calculate_fixed_point returns when the enumeration loops:
+	// the ref's own `fallback` clause if it carries one, else F for
+	// predicate (wff) calls and the typed 0 for function (bf) calls.
 	tref get_fallback(type nt, tref ref) {
 		auto fallback = tt(ref) | tau::ref | tau::fp_fallback;
 		if (!fallback) return nt == tau::wff
@@ -135,6 +150,12 @@ struct fixed_point_transformer {
 		return fallback | tt::only_child | tt::ref;
 	}
 
+	// Builds the fixpoint-call table from the definitions: for every
+	// rule head with a nonzero offset arity, maps the OFFSET-FREE
+	// signature (same name and argument arity, offset arity 0) to the
+	// indexed one -- that offset-free form is how a fixpoint call is
+	// written. When several offset arities share a name, the least one
+	// wins (see the in-body TODO).
 	std::unordered_map<rr_sig, rr_sig> find_fpcalls(const rr<node>& defs) {
 		std::unordered_map<rr_sig, rr_sig> fpcalls;
 		for (const auto& [head, _] : defs.rec_relations) {
@@ -179,6 +200,12 @@ struct fixed_point_transformer {
 	std::unordered_map<rr_sig, rr_sig> fpcalls;
 };
 
+// Replaces every fixpoint call in @p nso_rr's main formula by its
+// calculated fixpoint (or fallback) value, leaving the rest of the
+// formula unchanged. Returns the rewritten main, or nullptr when the
+// spec is invalid or any fixpoint calculation fails (multi-index call,
+// non-well-founded definitions, exhausted enumeration budget, or rules
+// that never apply to the call).
 template <NodeType node>
 tref calculate_all_fixed_points(const rr<node>& nso_rr) {
 	if (!is_valid<node>(nso_rr)) return nullptr;
@@ -195,6 +222,15 @@ tref calculate_all_fixed_points(const rr<node>& nso_rr) {
 	return new_main;
 }
 
+// Turns @p nso_rr's definitions into applicable rewrite rules: variables
+// in offset positions and in reference arguments become captures, so a
+// rule head matches any call. In each rule's HEAD every variable
+// argument is converted while being collected; in its BODY only the
+// variables that appeared in the head are converted (a body variable of
+// its own is a value, not a pattern hole). The main formula only gets
+// its offset variables converted. IO stream variables are never touched
+// (they are concrete streams, not pattern holes). Types carried by the
+// converted arguments are preserved on the rebuilt nodes.
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	using tau = tree<node>;

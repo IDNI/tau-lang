@@ -10,6 +10,8 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+// Lifts a tref->tref map (e.g. a solver solution) into owning htref
+// handles so results survive independently of the caches.
 template <NodeType node>
 std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 	std::map<htref, htref> hm;

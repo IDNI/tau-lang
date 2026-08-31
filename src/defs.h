@@ -70,9 +70,9 @@
 #define TAU_DUMP_TO(ref, to) (tree<node>::get(ref).dump(to))
 // helper macro for pretty printing a tau tree tref into a string
 #define TAU_TO_STR(ref) (tree<node>::get(ref).to_str())
-// helper macro for printing a tau tree tref into a string
+// helper macro for rendering a tau tree tref's node structure as a string
 #define TAU_TREE_TO_STR(ref) (tree<node>::get(ref).tree_to_str())
-// helper macro for printing a tau tree tref into a string
+// helper macro for dumping a tau tree tref (debug dump form) into a string
 #define TAU_DUMP_TO_STR(ref) (tree<node>::get(ref).dump_to_str())
 
 namespace idni::tau_lang {

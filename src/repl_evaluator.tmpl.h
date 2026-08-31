@@ -629,6 +629,8 @@ repl_key_action repl_evaluator<BAs...>::on_repl_key(const std::string& key) {
 }
 #endif
 
+// Reads the solver mode requested by a solve command tree: minimum or
+// maximum when a solver_mode node is present, general otherwise.
 template <NodeType node>
 solver_mode get_solver_cmd_mode(tref n) {
 	using tau = tree<node>;
@@ -641,6 +643,8 @@ solver_mode get_solver_cmd_mode(tref n) {
 	} else return solver_mode::general;
 }
 
+// BA type id a solve command runs under: the first type annotation found
+// in the command tree, or the default BA type's id when it has none.
 template <NodeType node>
 size_t get_solver_cmd_type(tref n) {
 	size_t type = find_ba_type<node>(n);
@@ -649,6 +653,10 @@ size_t get_solver_cmd_type(tref n) {
 			node::ba::default_type());
 }
 
+// Prints a solve command's result to stdout: "no solution" for nullopt,
+// otherwise one `var := value` line per assignment. bf_t/bf_f values are
+// rendered as the typed one/zero constant of the variable's own annotated
+// type when it has one, falling back to type_id (the command's type).
 template <NodeType node>
 void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 		size_t type_id)
@@ -892,6 +900,9 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	return bound;
 }
 
+// Maps an option name (short or long alias) to its repl_option. Empty
+// input yields none_opt; an unrecognized name logs an error and yields
+// invalid_opt, so callers can tell "no option given" from a typo.
 inline repl_option get_opt(const std::string& x) {
 	if (x.empty())                       return none_opt;
 	if (x == "S" || x == "severity"
@@ -952,6 +963,8 @@ inline repl_option get_opt(const std::string& x) {
 	return invalid_opt;
 }
 
+// Reads the option_name child of a get/set command tree and resolves it
+// via get_opt(string); none_opt when the command names no option.
 template <NodeType node>
 repl_option get_opt(const typename tree<node>::traverser& n) {
 	auto o = n | tau_parser::option_name;
@@ -959,6 +972,9 @@ repl_option get_opt(const typename tree<node>::traverser& n) {
 	return get_opt(o | tree<node>::traverser::string);
 }
 
+// Parses a severity option value ("e"/"error", "d"/"debug", "t"/"trace",
+// "i"/"info") into a boost severity level; anything else logs an error
+// and yields nullopt.
 inline std::optional<boost::log::trivial::severity_level>
 	str2severity(const std::string& v)
 {

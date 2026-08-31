@@ -73,8 +73,6 @@ private:
 	static inline const tree<node>& quantifier(const tref* ch);
 	/// @brief Return the quantified formula child from @p ch.
 	static inline const tree<node>& quantified_formula(const tref* ch);
-	/// @brief Return `true` if the children @p ch have a BA-type mismatch.
-	static inline bool check_type_mismatch(const tref* ch);
 
 	// hooks
 	/// @brief Construct the typed BF constant `0` for BA type @p ba_type.

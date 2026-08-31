@@ -46,6 +46,9 @@ struct onf_wff {
 	/// @brief Apply ONF conversion to formula `n`.
 	tref operator()(tref n) const;
 private:
+	/// @brief Interval-rewrite step for a single DNF conjunct: applies the
+	/// `f = 0` / `f != 0` rewrite described above w.r.t. `var`, leaving a
+	/// conjunct that contains a non-Boolean term unchanged.
 	tref onf_subformula(tref n) const;
 	tref var = nullptr;
 };

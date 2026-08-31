@@ -216,6 +216,9 @@ bool is_cli_cmd(tref n) {
 }
 
 
+// Number of nodes in the subtree rooted at fm (right siblings of fm
+// itself excluded), counted by full pre-order visit; memoized per
+// subtree under TAU_CACHE.
 template <NodeType node>
 int_t node_count (tref fm) {
 #ifdef TAU_CACHE

@@ -280,12 +280,6 @@ template <NodeType node> tref build_spec(const rr<node>& nso_rr);
 template<NodeType node> tref build_sym(size_t sid);
 /** @brief Build a symbol node from @p sym_name. */
 template<NodeType node> tref build_sym(const std::string& sym_name);
-/** @brief Build a ref-offsets node from @p offsets vector. */
-template<NodeType node> tref build_ref_offsets(const trefs& offsets);
-/** @brief Build a ref-offsets node from @p offset string. */
-template<NodeType node> tref build_ref_offsets(const std::string& offset);
-/** @brief Build a ref-offsets node from @p offsets string vector. */
-template<NodeType node> tref build_ref_offsets(const std::vector<std::string>& offsets);
 /** @brief Build a `ref_args` node from @p args. */
 template<NodeType node> tref build_ref_args(const trefs& args);
 /** @brief Build a `ref_args` node from @p arg_names with type @p type_id. */

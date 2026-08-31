@@ -13,6 +13,10 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+// Extracts the spec update carried by the step's outputs: the tau
+// constant assigned to the `u` output stream at the just-finished time
+// point. Returns nullptr when the context types `u` as anything but tau
+// or the assignment is absent or 0 (i.e. no update requested).
 template <NodeType node>
 tref get_update(interpreter<node>& i, const assignment<node>& output) {
 	auto update_stream = build_out_var_at_n<node>(

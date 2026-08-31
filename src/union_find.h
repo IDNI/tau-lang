@@ -17,11 +17,12 @@
 namespace idni::tau_lang {
 
 
-	/**
- * @brief Union find data structure with set retrieval for tau formulas
- * @tparam comp Comparison function used to decide root after merge,
- * taking the smaller as new root
- * @tparam node Type of tree node
+/**
+ * @brief Base disjoint-set: an element -> parent map with path
+ * compression. Provides insert/root/connected only; the merge policy
+ * lives in the derived structures.
+ * @tparam data_t Element type.
+ * @tparam less_t Ordering for the underlying map.
  */
 template <typename data_t, class less_t = std::less<data_t>>
 
@@ -68,10 +69,10 @@ struct union_find : public std::map<data_t, data_t, less_t> {
 
 
 /**
- * @brief Union find data structure with set retrieval for tau formulas
- * @tparam comp Comparison function used to decide root after merge,
- * taking the smaller as new root
- * @tparam node Type of tree node
+ * @brief Disjoint-set whose merge uses union by rank: the higher-rank
+ * root wins; on a tie the first argument's root wins and its rank grows.
+ * @tparam data_t Element type.
+ * @tparam less_t Ordering for the underlying map.
  */
 template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_rank : public union_find<data_t, less_t> {
@@ -106,10 +107,10 @@ public:
 
 
 /**
- * @brief Union find data structure with set retrieval for tau formulas
- * @tparam comp Comparison function used to decide root after merge,
- * taking the smaller as new root
- * @tparam node Type of tree node
+ * @brief Disjoint-set whose merge keeps the `less_t`-smaller root as the
+ * representative of the merged set.
+ * @tparam data_t Element type.
+ * @tparam less_t Comparator deciding which root survives a merge.
  */
 template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_less : public union_find<data_t, less_t> {
@@ -124,7 +125,7 @@ struct union_find_by_less : public union_find<data_t, less_t> {
 		static const less_t comp;
 		auto root_x = this->root(x), root_y = this->root(y);
 		if (root_x == root_y) return root_x;
-		// Union by rank
+		// Union by less: the less_t-smaller root becomes the parent
 		if (comp(root_x, root_y)) {
 			this->operator[](root_y) = root_x;
 			return root_x;
@@ -170,7 +171,11 @@ struct scoped_union_find {
 	using scope = size_t;
 	using element = std::pair<scope, data_t>;
 
-	/** @brief Error type returned when closing a scope fails (unbalanced scopes). */
+	/**
+	 * @brief Error payload declared for an unbalanced `close`; currently
+	 * never produced — `close()` always returns `std::nullopt` (see the
+	 * TODO there).
+	 */
 	struct scope_error {
 		data_t element;
 	};
@@ -190,8 +195,10 @@ struct scoped_union_find {
 	}
 
 	/**
-	 * @brief Close the current scope.
-	 * @return `scope_error` if the global scope would be closed, else `std::nullopt`.
+	 * @brief Close the current scope; closing the global scope is a
+	 * silent no-op.
+	 * @return Always `std::nullopt`; reporting a `scope_error` on an
+	 * unbalanced close is pending (see the TODO below).
 	 */
 	std::optional<scope_error> close() {
 		if (scopes.size() == 1) {

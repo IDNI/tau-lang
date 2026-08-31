@@ -173,6 +173,13 @@ bool is_tau_impl(tref f1, tref f2);
 template <NodeType node>
 bool are_tau_equivalent(tref f1, tref f2);
 
+// Support-component factoring (defined in boolean_algebras/tau_ba.tmpl.h,
+// same translation unit): used by simp_tau_unsat_valid below to decide its
+// per-path satisfiability tests unit-wise where that is exact.
+inline bool ba_component_factoring_enabled();
+template <typename node> static int factored_tau_sat(tref fm);
+template <typename node> static int factored_tau_valid(tref fm);
+
 /**
  * @brief Simplify @p fm by removing unsatisfiable or valid temporal sub-formulas.
  * @tparam node Tree node type.
@@ -198,13 +205,6 @@ bool are_tau_equivalent(tref f1, tref f2);
  * // not guarantee a particular normal form for the surviving disjuncts.
  * @endcode
  */
-// Support-component factoring (defined in boolean_algebras/tau_ba.tmpl.h,
-// same translation unit): used by simp_tau_unsat_valid below to decide its
-// per-path satisfiability tests unit-wise where that is exact.
-inline bool ba_component_factoring_enabled();
-template <typename node> static int factored_tau_sat(tref fm);
-template <typename node> static int factored_tau_valid(tref fm);
-
 template <NodeType node>
 tref simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
 				const bool output = false);

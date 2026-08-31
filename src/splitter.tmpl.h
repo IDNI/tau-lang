@@ -7,6 +7,12 @@
 
 namespace idni::tau_lang {
 
+// Shared clause-removal engine behind the splitter searches: drops one
+// DNF clause of fm at a time (replacing it by 0 for terms, F for
+// formulas; clauses with temporary io streams are kept when check_temps)
+// and offers each reduced formula to callback. Returns the first reduced
+// formula callback accepts, or fm unchanged when it accepts none. Only
+// splitter_type::upper is implemented; other types assert.
 template<typename ... BAs> requires BAsPack<BAs...>
 tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& callback) {
 	using node = node<BAs...>;
@@ -38,7 +44,8 @@ tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& c
 	return fm;
 }
 
-// Splitter function for a nso tau::ba_constant node holding a BA constant
+// Splits the BA constant held by t: delegates to the element's own BA
+// splitter and rewraps the result as a bf ba_constant tree of t's type.
 template <typename... BAs>
 requires BAsPack<BAs...>
 const tree<node<BAs...>>& tau_splitter(const tree<node<BAs...>>& t,
@@ -84,7 +91,11 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 	return false;
 }
 
-// Find a Boolean function which implies f
+// Given an inequality literal f (g != 0) of clause, searches for a
+// strictly smaller function implying g — by dropping disjuncts of g, or
+// by splitting a coefficient inside one — such that swapping it into
+// clause yields a splitter of original_fm. Returns the rewritten clause,
+// or clause unchanged when no candidate passes is_splitter.
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref good_splitter_using_function(tref f, splitter_type st, tref clause,
@@ -143,7 +154,11 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 	return clause;
 }
 
-// Find a Boolean function which is implied by f
+// Dual of good_splitter_using_function for an equality literal f
+// (g = 0): searches for a function implied by g — weakening one CNF
+// literal of a path to 1, or reverse-splitting a negated coefficient —
+// such that swapping it into clause yields a splitter of original_fm.
+// Returns the rewritten clause, or clause unchanged on failure.
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref good_reverse_splitter_using_function(tref f, splitter_type st,
@@ -205,7 +220,10 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	return clause;
 }
 
-// Return a bad splitter for the provided formula
+// Return a bad splitter for the provided formula: conjuncts a fresh
+// uninterpreted "split" constant != 0 into the left disjunct of the
+// bottom-most wff_or (or into fm as a whole when it has no disjunction),
+// so the result strictly implies fm but is only trivially smaller.
 // We assume the formula is fully normalized by normalizer
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -366,6 +384,10 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 	return { tau_bad_splitter<BAs...>(fm), splitter_type::bad };
 }
 
+// Entry point: returns a formula strictly implying fm that is still
+// satisfiable and not equivalent to it. Non-temporal formulas go to
+// nso_tau_splitter; temporal ones are split per DNF clause, falling back
+// to a bad splitter on the always part when no clause splits.
 // We assume fm to be normalized
 template <typename... BAs>
 requires BAsPack<BAs...>

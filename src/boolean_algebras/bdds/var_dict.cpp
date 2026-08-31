@@ -15,9 +15,13 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // bdd var dict
 
+// symbol -> name table; slot 0 is a dummy so real symbols start at 1
 vector<string> v({ "dummy" });
+// name -> symbol map, the inverse of v
 map<string, size_t> m;
 
+// Intern name s: return its symbol, appending a new entry to v/m the
+// first time the name is seen
 sym_t var_dict(const char* s) {
 	if (auto it = m.find(s); it != m.end()) return it->second;
 	return m.emplace(s, v.size()), v.push_back(s), v.size() - 1;
@@ -44,6 +48,7 @@ string var_dict(sym_t n) {
 	return v[n];
 }
 
+// std::string convenience overload of the interning function above
 sym_t var_dict(const string& s) { return var_dict(s.c_str()); }
 
 } // namespace idni::tau_lang

@@ -1399,29 +1399,6 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 	return build_main_step<node>(form, i);
 }
 
-/**
- * @internal
- * @brief Validates a recurrence relation.
- *
- *  Checks that the main formula has no relative offsets, that no rule's head
- *  contains a shift offset, and that integer-indexed rules do not depend on
- *  future states.
- * @tparam node Tree node type.
- * @param nso_rr The recurrence relation to validate.
- * @return `true` if all validity conditions are satisfied, `false` otherwise.
- *
- * @par Example
- * @code{.cpp}
- * // As in nso_rr_apply, offsets must first be transformed to captures so
- * // the relative-offset variable ("n") is recognized as such.
- * auto nso_rr = get_bf_nso_rr(
- *     "h[n](X):tau := h[n - 1](X)'."
- *     "h[0](X):tau := X.", "h[8](Y)").value();
- * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
- * CHECK( is_valid<node_t>(rr_captures) );
- * @endcode
- * @endinternal
- */
 /** @internal @copydoc get_unbindable_relative_offset @endinternal */
 template <NodeType node>
 tref get_unbindable_relative_offset(tref head, tref body) {
@@ -1449,6 +1426,29 @@ tref get_unbindable_relative_offset(tref head, tref body) {
 	return nullptr;
 }
 
+/**
+ * @internal
+ * @brief Validates a recurrence relation.
+ *
+ *  Checks that the main formula has no relative offsets, that no rule's head
+ *  contains a shift offset, and that integer-indexed rules do not depend on
+ *  future states.
+ * @tparam node Tree node type.
+ * @param nso_rr The recurrence relation to validate.
+ * @return `true` if all validity conditions are satisfied, `false` otherwise.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // As in nso_rr_apply, offsets must first be transformed to captures so
+ * // the relative-offset variable ("n") is recognized as such.
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h[8](Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * CHECK( is_valid<node_t>(rr_captures) );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 bool is_valid(const rr<node>& nso_rr) {
 	using tau = tree<node>;
