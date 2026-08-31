@@ -34,3 +34,6 @@ add_repl_test(instantiation_cmd_wff8 "i (ex x x=0 && y=0) && x=0[y/x|a]" ": \\(e
 add_repl_test(instantiation_cmd_wff9 "i ex x ex x x=0 && y=0 [y/x]" ": ex b2, b1 b1 = 0 && x = 0")
 
 add_repl_test(instantiation_cmd_wff10 "i (ex x x=0 && y=0) && x=0 [y/x]" ": \\(ex b1 b1 = 0 && x = 0\\) && x = 0")
+
+# substituting for something that is not a variable is rejected
+add_repl_test_fail(instantiation_cmd-non_variable "x. i %1[1 / x]" "Invalid argument")

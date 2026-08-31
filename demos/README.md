@@ -29,9 +29,9 @@ when standard input is a pipe rather than a terminal.
 
 The demos use `../tests/integration/test_files/` for sample stream inputs and
 `/tmp` for stream outputs, so they assume a \*nix filesystem layout. On Windows,
-adjust those paths. `demo_4.1-abstract_data_types.tau` instead uses its own
-`fixture/` subdirectory (relative to `demos/`) for its tuple-typed file stream
-examples.
+adjust those paths. `demo_3.4-interpreter_bitvectors.tau` and
+`demo_4.1-abstract_data_types.tau` instead use their own `fixture/`
+subdirectory (relative to `demos/`) for their file stream examples.
 
 ## The demos
 
@@ -39,19 +39,23 @@ examples.
 |------|-------|
 | `demo_1.1-basic_syntax_and_history.tau` | Terms, formulas, quantifiers, constants, stream variables, the history store |
 | `demo_1.2-commands_and_history.tau` | Normal forms (`dnf`, `cnf`, `nnf`, `mnf`, `onf`), `subst`, `inst`, and history references as arguments |
-| `demo_1.3-recurrence_relations.tau` | Defining functions and predicates by recurrence relations |
+| `demo_1.3-recurrence_relations.tau` | Defining functions and predicates by recurrence relations, fixpoint calls and `fallback` |
 | `demo_1.4-normalization.tau` | `normalize` and `qelim`: deciding validity, minimizing, and canonical output |
+| `demo_1.5-temporal_reasoning.tau` | Deciding temporal specifications: `sat`, `unsat`, `valid` and `normalize` over `always`/`sometimes` and time constraints |
 | `demo_2.1-solver.tau` | `solve` and `lgrs`: satisfying assignments, splitters, Tau constants |
 | `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions |
 | `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5 |
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
+| `demo_3.4-interpreter_bitvectors.tau` | Executing specifications over bitvector streams: casts across widths, modular accumulation, widen-multiply-divide-narrow |
+| `demo_3.5-updatable_specifications.tau` | Self-amending specifications: pointwise revision through the update stream `u`, and the `this` stream |
 | `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance, member access, and tuple-typed streams |
 | `demo_5.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`G`, `F`, `U`, `R`, `W`, `S`, `T`), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment |
 | `demo_5.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
 | `demo_5.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
 | `demo_5.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
+| `demo_6.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, and the resource budgets with their give-ups |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.

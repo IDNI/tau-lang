@@ -26,6 +26,13 @@ rr_sig get_rr_sig(tref n) {
 		(r | tau::ref_args || tau::ref_arg).size() };
 }
 
+/**
+ * @brief Classify every io_var in @p fm as input or output by stamping
+ * the io_var node's data field: 1 = input, 2 = output, 0 stays as
+ * unresolved. Streams registered in @p ctx win; unregistered ones fall
+ * back to the name heuristic ('i...'/"this" -> in, 'o...'/"u" -> out).
+ * @return @p fm with the stamped io_var nodes substituted in.
+ */
 template <NodeType node>
 tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 	// Classification (TT2-21, public contract): a stream registered in
@@ -360,12 +367,20 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 	return res;
 }
 
+// Roll back the last apply(): restore the expression saved before the
+// path was erased and clear keep_path, so operator++ advances past the
+// reinstated path. Only one apply() can be undone -- _prev_expr is a
+// single slot, not a history.
 template<NodeType node>
 void expression_paths<node>::iterator::undo_apply() {
 	keep_path = false;
 	_expr = _prev_expr;
 }
 
+// Iterators are equal iff their expressions are structurally equal and
+// their decision vectors agree, with the shorter vector's missing tail
+// read as all "left" (true): a fork not yet visited defaults to its
+// left branch, so the padded states denote the same path.
 template<NodeType node>
 bool expression_paths<node>::iterator::operator==(const iterator& other) const {
 	if (tau::subtree_equals(_expr, other._expr)) {
@@ -735,6 +750,13 @@ std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars) {
 	return groups;
 }
 
+/**
+ * @brief Collect the free `variable` nodes of @p expression in order of
+ * first appearance (pre-order), without duplicates and, unlike
+ * get_free_vars, unsorted and without captures. Occurrences bound by a
+ * logical or functional quantifier in scope are skipped, and `bf_ref`
+ * subtrees are not entered.
+ */
 template <NodeType node>
 trefs get_free_vars_appearance_order(tref expression) {
 	using tau = tree<node>;
@@ -889,6 +911,12 @@ bool has_negative_offset(tref fm) {
 	return false;
 }
 
+/**
+ * @brief Return true if some `rec_relation` in @p fm has a body that is
+ * itself a reference carrying a fixpoint `fallback` clause; a fallback
+ * picks an iterate where a fixpoint is evaluated, so it has no meaning
+ * on the defining side of a definition.
+ */
 template<NodeType node>
 bool has_missplaced_fallback(tref fm) {
 	using tau = tree<node>;

@@ -29,9 +29,10 @@
     10. [Streams](#streams)
     11. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
     12. [Type system](#type-system)
-    13. [Constant time constraints](#constant-time-constraints)
-    14. [Pointwise revision](#pointwise-revision)
-    15. [Reserved symbols](#reserved-symbols)
+    13. [Abstract data types](#abstract-data-types)
+    14. [Constant time constraints](#constant-time-constraints)
+    15. [Pointwise revision](#pointwise-revision)
+    16. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -465,8 +466,10 @@ spec        => [ definitions ] local_spec [ "." ]
              | spec "S" spec           -- since (past LTL)
              | spec "T" spec           -- trigger (past LTL)
              | (spec && spec) | (spec || spec) | !spec
-definitions => ( (function_def | predicate_def | stream_def) "." )+
+definitions => ( (function_def | predicate_def | stream_def | type_def) "." )+
 ```
+where `type_def` declares an abstract data type (see
+[Abstract data types](#abstract-data-types))
 where `local_spec` is a formula defined by the rules:
 
 ```
@@ -1077,13 +1080,14 @@ The order of *all* term operations, bitvector and Boolean alike, is the
 following (from higher precedence to lower):
 
 ```
-(bv[n]) > ' > & > ^ > | > !& > !^ > !| > / > * > % > - > + > << > >> > fex > fall
+(bv[n]) > ' > & > ^ > | > !& > !^ > !| > { %, *, / } > { -, + } > { <<, >> } > fex > fall
 ```
 
-Note that this differs from the conventions of most programming languages in two
-respects: `/` binds tighter than `*`, and `-` binds tighter than `+`. Each
-operator sits at its own precedence level, so parenthesize whenever the intent is
-not obvious.
+The three groups in braces are shared precedence levels: `%`, `*` and `/` sit
+together at one level, `-` and `+` at the next, and `<<` and `>>` at the last.
+Operators of one level chain left to right, so `a + b - c` parses as
+`(a + b) - c` and `a * b / c` as `(a * b) / c`. Parenthesize whenever the
+intent is not obvious.
 
 ## **Functions and predicates**
 
@@ -1174,9 +1178,11 @@ predicates. For example:
 normalize h(x,y,z,w) fallback last
 ```
 
-Note that the fixpoint search is also bounded: if neither a fixpoint nor a loop
-is found after 500 enumeration steps, the search gives up with an error. This is
-a bound on the search, not a proof that no fixpoint exists.
+The enumeration of successive steps is unbounded by default. It can be capped
+with the `-E, --max-enum-steps` command line option or the `enumsteps` REPL
+option (see [REPL options](#repl-options)); if neither a fixpoint nor a loop is
+found within the cap, the search gives up with an error. Such a cap is a bound
+on the search, not a proof that no fixpoint exists.
 
 It should be noted that recurrence relations in the Tau language are a conservative extension,
 meaning that they do not add to the general expressiveness.
@@ -1316,13 +1322,16 @@ does not start.
 
 The syntax of a stream definition is
 ```
-stream_definition => stream_name [":" type] ":=" ("in" | "out") stream
+stream_definition => stream_name [member_path] [":" type] ":=" ("in" | "out") stream
 ```
 where `stream_name` is the name of the stream, `type` is a supported type (`tau`,
-`sbf`, `bv[8]`, `qlt`, `qint`, `nlang`, `hsb`, ...), `in` marks an input stream and
-`out` an output stream, and `stream` is either `console` (meaning that the stream
-reads/outputs values from/to the console) or `file(file_name)` which denotes the
-file from/into which to read/write (in quotes if needed). For example,
+`sbf`, `bv[8]`, `qlt`, `qint`, `nlang`, `hsb`, ..., or a user-defined type — see
+[Abstract data types](#abstract-data-types)), `member_path` is an optional
+tuple-member path (also discussed there), `in` marks an input stream and `out`
+an output stream, and
+`stream` is either `console` (meaning that the stream reads/outputs values
+from/to the console) or `file(file_name)` which denotes the file from/into which
+to read/write (in quotes if needed). For example,
 ```
 i1 : tau := in console
 ```
@@ -1363,6 +1372,10 @@ of numbers.
 If `charvar` is disabled, a variable can be any sequence of letters, numbers and `_`,
 must however be started by a letter.
 
+A variable (or stream variable) of a tuple type may additionally be followed
+by a member path, as in `l.tag` or `s.line.p.a` — see
+[Abstract data types](#abstract-data-types).
+
 In the Tau language a variable can appear free or quantified universally or existentially. Since
 a Tau specification has to be a closed formula, in order to be executable, variables appearing
 in this context must appear under the scope of a quantifier.
@@ -1385,7 +1398,7 @@ is then executed with those assignments.
 
 ### Available types
 
-The Tau Language currently supports the following types:
+The Tau Language currently supports the following base types:
 
 1. `tau`: the type of Tau specifications,
 2. `sbf`: the type of simple Boolean functions,
@@ -1394,6 +1407,10 @@ The Tau Language currently supports the following types:
 5. `qint`: the Boolean algebra of right-closed, left-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
 6. `nlang`: the Natural Language Boolean Algebra (requires `DEEPSEEK_API_KEY`), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
+
+In addition, user-defined type names — aliases of base types and tuple
+types — can be introduced with a `type` definition; see section
+[Abstract data types](#abstract-data-types).
 
 You can type the following elements: variables, streams, recurrence relations,
 constants and (term) constants. In order to do so, you just add the type
@@ -1652,6 +1669,128 @@ Here are some small examples to illustrate the type inference system:
       - the two bitvector widths are distinct types and do not unify,
       - a type mismatch occurs.
 
+## **Abstract data types**
+
+Besides the base types described in [Type system](#type-system), the Tau
+Language supports user-defined types, declared with the keyword `type`. A type
+definition is a definition like any other (see
+[Tau specifications](#tau-specifications)): as part of a specification it is
+terminated by `.`, and it can equally be entered on its own in the REPL, where
+it persists for the session and is listed by `definitions|defs`.
+
+The syntax is:
+
+```
+type_def     => "type" name [ ("of" | "/") type_parents ] ("is" | "=") type_body
+type_parents => "(" name ("," name)* ")"
+type_body    => tuple | type
+tuple        => "{" member ("," member)* "}"
+member       => name ":" type
+```
+
+The spellings `of (...)` and `/ (...)` are interchangeable, and so are `is` and
+`=`. Type definitions may reference types declared later in the same
+specification — resolution is order-independent.
+
+### Aliases
+
+The simplest form introduces a new name (an *alias*) for an existing type:
+
+```
+type byte = bv[8].
+```
+
+Anywhere a type annotation is accepted, `byte` now means `bv[8]`, so
+`x:byte = x:bv[8]` holds. Commands that report values, such as `solve`, resolve
+the alias to its underlying type in their output.
+
+### Tuples
+
+A *tuple* type collects several named members, each with its own type:
+
+```
+type Point = {a: sbf, b: sbf}.
+```
+
+An equality between two values of a tuple type expands member-wise, and the
+expansion happens at parse time, before any normalization: `x:Point = y:Point`
+is read as `x.a = y.a && x.b = y.b`.
+
+An individual member is reached with the `.` operator: `p.a` is member `a` of
+`p`. Member types may themselves be tuple types, nesting to arbitrary depth,
+and a member path then chains accesses: `s.line.p.a`. Member-wise expansion
+works at any depth, not only at the leaves, so an equality between two
+tuple-typed *members* again expands to all their flattened members. When a
+member is accessed on a quantified variable, annotate the variable at the
+binder and parenthesize the body, so that the member access sees the
+annotation:
+
+```
+ex l:Line (l.tag = 0 && l.p.a = 0)
+```
+
+`solve` reports one value per flattened member, not a single tuple value.
+
+### Inheritance
+
+A tuple type may inherit the members of one or more other tuple types:
+
+```
+type Tagged = {tag: byte}.
+type Line of (Tagged) is {p: Point, q: Point}.
+```
+
+The parents' members come first, in declaration order, followed by the type's
+own members, so `Line` flattens to `tag, p.a, p.b, q.a, q.b`.
+
+### Errors and re-declaration
+
+A type definition is rejected with an error when it declares a duplicate type
+name within one specification, a duplicate member (including one introduced
+via inheritance), a cycle (through members, aliases or parents), or when it
+inherits from something that is not a tuple type or is not declared. An
+undeclared name in a *member* position is not an error — it is treated as a
+base (non-ADT) type and passed through unchanged.
+
+Re-declaring a type name in a later REPL command replaces the earlier
+definition: the last definition wins. The same holds for repeated stream
+definitions (tuple-typed ones included) — note, however, that a stream name
+keeps the type it was first declared with for the rest of a REPL session.
+
+### Tuple-typed streams
+
+A stream may be declared with a tuple type; it then reads and writes all its
+members together, as one value, in a JSON-like wire format that nests exactly
+like the type declaration (not like the dotted member paths):
+
+```
+type Point = {a: sbf, b: sbf}.
+i : Point := in console.
+o : Point := out console.
+o[t] = i[t]
+```
+
+with console input (and output) of the form:
+
+```
+{ a: "1", b: "0" }
+```
+
+Unlike a `tau`-valued stream, the wire literal is complete on its own line —
+no terminating period is needed. File streams work the same way, one wire
+literal per line.
+
+A specification may also copy just *part* of a tuple between streams, e.g.
+`(o[0].a = i[0].a)`. A member the specification does not copy at some time
+point is not left dangling: the emitted tuple initializes it to the default
+value of that member's own Boolean algebra, which is that algebra's `0`.
+Beware, however, that a member the specification never mentions at *any* time
+point has no output stream at all, and the tuple, missing one member, is then
+never written.
+
+Many worked examples can be found in
+[`demos/demo_4.1-abstract_data_types.tau`](demos/demo_4.1-abstract_data_types.tau).
+
 ## **Constant time constraints**
 
 Besides the relations between terms, a formula can also constrain the *time point*
@@ -1862,7 +2001,7 @@ The general options are the following:
 | -l, --license      | show the license                                        |
 | -v, --version      | show the version of the executable                      |
 | -V, --charvar      | char-as-variable short form (enabled by default)        |
-| -B, --blasting     | bitvector predicate blasting (enabled by default)       |
+| -B, --blasting     | bitvector predicate blasting (disabled by default)      |
 | -S, --severity     | severity level (trace/debug/info/error); default `info` |
 | -I, --indenting    | indent formulas in output                               |
 | -H, --highlighting | syntax highlighting                                     |
@@ -1896,6 +2035,7 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -W, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
+| -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (default 500; 0 = unlimited)                 |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (default 500; 0 = unlimited) |
 | -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
@@ -1982,7 +2122,7 @@ specific command.
 * `version|v`: shows the version of the Tau REPL. The version of the Tau REPL
 corresponds to the repo commit.
 
-* `quit|q` or `exit`: exits the Tau REPL.
+* `quit|q`: exits the Tau REPL.
 
 * `clear|c`: clears the screen.
 
@@ -2014,7 +2154,7 @@ by default.
 how much information the REPL will provide. It's `info` by default in Release
 builds and `debug` in Debug builds.
 
-* `H|hilight|highlight|highlighting`: Can be on/off. Controls usage of
+* `H|highlight|highlighting`: Can be on/off. Controls usage of
 highlighting in the output of commands. It's off by default.
 
 * `I|indent|indenting`: Can be on/off. Controls usage of indentation in the
@@ -2024,10 +2164,11 @@ output of commands. It's off by default.
 REPL. It's on by default.
 
 * `B|blasting`: Can be on/off. Controls bitvector predicate blasting, i.e.
-whether bitvector predicates are expanded into their bit-level encoding. It's on
-by default.
+whether bitvector predicates are expanded into their bit-level encoding. It's
+off by default (the REPL starts with the value of the `-B, --blasting` command
+line option, which defaults to off).
 
-* `benchmarks|benchmarking`: Can be on/off. Controls printing of timing
+* `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
 
 * `d|dbg|debug`: Can be on/off. Controls debug mode. Only available in Debug
@@ -2044,6 +2185,10 @@ anti-prenexing (`--block-max-splits`). Unlimited by default.
 
 * `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
 (`--block-max-rounds`). Unlimited by default.
+
+* `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
+elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
+default.
 
 * `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
 (`--max-fixpoint-steps`). Default 500 — the search has no convergence
@@ -2089,11 +2234,11 @@ specification part (`--max-revision-alts`). Unlimited by default.
 ## **Functions, predicates and input/output stream variables**
 
 As in other programming languages, you can define functions, predicates (both possibly using recurrence
-relations) but also input and output stream variables. The syntax of the commands
+relations), types, but also input and output stream variables. The syntax of the commands
 is the following:
 
 * `definitions|defs`: shows all the definitions of the current session. That
-includes the definitions of functions, predicates and the input/output stream variables.
+includes the definitions of functions, predicates, types and the input/output stream variables.
 
 * `definitions|defs <number>`: shows the definition of the given function or predicate.
 
@@ -2104,6 +2249,10 @@ recurrence relations. See the Tau Language section
 * `function_def`: defines a function, supporting the usage of
 recurrence relations. See the Tau Language section
 [Functions and predicates](#functions-and-predicates) for more information.
+
+* `type_def`: defines an abstract data type (an alias or a tuple type). See
+the Tau Language section [Abstract data types](#abstract-data-types) for more
+information.
 
 * `<name> [: <type>] := in console | in file(<filename>)`: defines an input stream
 variable. The input variable can read values from the console or from a provided
@@ -2149,7 +2298,7 @@ syntax for `<repl_memory>`:
 You can substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
-* `subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
+* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (this one being a memory position, well-formed formula or Boolean
 function).

@@ -1586,29 +1586,6 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 	return build_main_step<node>(form, i);
 }
 
-/**
- * @internal
- * @brief Validates a recurrence relation.
- *
- *  Checks that the main formula has no relative offsets, that no rule's head
- *  contains a shift offset, and that integer-indexed rules do not depend on
- *  future states.
- * @tparam node Tree node type.
- * @param nso_rr The recurrence relation to validate.
- * @return `true` if all validity conditions are satisfied, `false` otherwise.
- *
- * @par Example
- * @code{.cpp}
- * // As in nso_rr_apply, offsets must first be transformed to captures so
- * // the relative-offset variable ("n") is recognized as such.
- * auto nso_rr = get_bf_nso_rr(
- *     "h[n](X):tau := h[n - 1](X)'."
- *     "h[0](X):tau := X.", "h[8](Y)").value();
- * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
- * CHECK( is_valid<node_t>(rr_captures) );
- * @endcode
- * @endinternal
- */
 /** @internal @copydoc get_unbindable_relative_offset @endinternal */
 template <NodeType node>
 tref get_unbindable_relative_offset(tref head, tref body) {
@@ -1636,6 +1613,29 @@ tref get_unbindable_relative_offset(tref head, tref body) {
 	return nullptr;
 }
 
+/**
+ * @internal
+ * @brief Validates a recurrence relation.
+ *
+ *  Checks that the main formula has no relative offsets, that no rule's head
+ *  contains a shift offset, and that integer-indexed rules do not depend on
+ *  future states.
+ * @tparam node Tree node type.
+ * @param nso_rr The recurrence relation to validate.
+ * @return `true` if all validity conditions are satisfied, `false` otherwise.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // As in nso_rr_apply, offsets must first be transformed to captures so
+ * // the relative-offset variable ("n") is recognized as such.
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h[8](Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * CHECK( is_valid<node_t>(rr_captures) );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 bool is_valid(const rr<node>& nso_rr) {
 	using tau = tree<node>;
@@ -1855,6 +1855,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 	LOG_DEBUG << "max lookback " << max_lookback;
 
+	// Whether any rule application has ever rewritten an enumerated step.
+	// A rule with a capture offset matches every index from its lookback
+	// on, and a fixed-offset rule only indices up to max_lookback, so if
+	// nothing fired at the first two steps nothing ever will: the call
+	// does not reach its definitions at all (typically a kind or type
+	// mismatch between the call site and the stored rules), and silently
+	// enumerating bare `name[i](args)` refs forever used to hang the REPL.
+	bool ever_changed = false;
+
 	for (size_t i = max_lookback; ; i++) {
 		++steps;
 		if (max_enum_steps && steps > max_enum_steps) {
@@ -1881,9 +1890,19 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				}
 				auto prev = current;
 				current = nso_rr_apply<node>(r, prev);
-				if (tau::get(current) != tau::get(prev)) changed = true;
+				if (tau::get(current) != tau::get(prev)) changed = true,
+					ever_changed = true;
 			}
 		} while (changed);
+
+		if (!ever_changed && i > max_lookback) {
+			LOG_ERROR << "calculate_fixed_point: no recurrence rule "
+				"applies to " << LOG_FM(current) << "; the call "
+				"does not match its definitions (kind or type "
+				"mismatch between the call site and the rules); "
+				"giving up.";
+			return nullptr;
+		}
 
 		LOG_DEBUG << "Begin enumeration step";
 		LOG_DEBUG << "current: " << LOG_FM(current);

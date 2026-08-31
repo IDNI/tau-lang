@@ -214,17 +214,27 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
 		size_t default_type) {
-	subtree_set<node> scoped;
+	subtree_set<node> keys;
 	size_t inferred_type = default_type;
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
 			if (!unified) return inference_error{typeable, inferred_type, type};
 			else inferred_type = unified.value();
-			scoped.insert(typeable);
+			keys.insert(typeable);
 		}
 	}
-	return open_same_type(resolver, scoped, inferred_type);
+	// Actually OPEN a scope, as the name says and as the callers (the
+	// functional rec_relation and fixpoint-fallback branches of
+	// infer_ba_types) require: both close() it on leave, and both used to
+	// assign into the CURRENT scope instead -- which leaked a functional
+	// definition's argument types into the surrounding (global) scope, so
+	// an unrelated later use of the same variable name silently inherited
+	// the type (and, downstream, recurrence rules stopped matching).
+	subtree_map<node, size_t> scoped;
+	for (auto t : keys) scoped[t] = inferred_type;
+	resolver.open(scoped);
+	return inferred_type;
 }
 
 template<NodeType node>

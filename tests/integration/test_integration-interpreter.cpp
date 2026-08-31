@@ -1,6 +1,85 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <filesystem>
+#include <fstream>
+
 #include "test_integration-interpreter_helper.h"
+
+// Pointwise revision rebuilds the interpreter's stream maps after every
+// accepted update (interpreter::update -> rebuild_inputs/rebuild_outputs).
+// A file-backed stream's position is execution state: rebuilding used to
+// construct fresh file streams, which reopened inputs at line 1 (so a
+// file-driven update stream re-proposed its first update forever) and
+// truncated outputs. These cases drive a real file_input_stream (declared
+// in the spec itself, not a vector-stream remap -- remaps preserve their
+// cursor through rebuild(), which is exactly why they never caught this).
+TEST_SUITE("Execution: revision stream continuity") {
+
+	TEST_CASE("revision keeps file input stream position") {
+		bdd_init<Bool>();
+		std::string in_file = random_file(".in");
+		{
+			std::ofstream f(in_file);
+			f << "o1[t] = 1.\n" << "o2[t] = 1.\n" << "o3[t] = 1.\n";
+		}
+		// The parse must see the ctx for the spec's file() definition to
+		// register its stream (see the ADT file-stream test).
+		io_context<node_t> ctx;
+		auto u_out = std::make_shared<vector_output_stream>();
+		ctx.add_output("u", tau_type_id<node_t>(), u_out);
+		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
+			"u[t] = i1[t].";
+		tref parsed = tau::get(sample, { .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		// run() both writes the output streams and drives revision, as
+		// the REPL does (raw step() does neither).
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		REQUIRE( maybe_i.has_value() );
+		std::filesystem::remove(in_file);
+		// The three proposals are all satisfiable and mutually
+		// compatible, so u must carry them in file order; with the
+		// rewind bug every step re-read the first line and o2/o3 never
+		// appeared in any u value.
+		auto values = u_out->get_values();
+		REQUIRE( values.size() == 3 );
+		CHECK( values[1].find("o2") != std::string::npos );
+		CHECK( values[2].find("o3") != std::string::npos );
+	}
+
+	TEST_CASE("revision keeps file output stream content") {
+		bdd_init<Bool>();
+		std::string in_file = random_file(".in");
+		std::string out_file = random_file(".out");
+		{
+			std::ofstream f(in_file);
+			// Only the middle step performs a (spec-changing) update;
+			// a T proposal changes nothing and skips the rebuild.
+			f << "T.\n" << "o2[t] = 1.\n" << "T.\n";
+		}
+		io_context<node_t> ctx;
+		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
+			"o1 : tau := out file(\"" + out_file + "\").\n"
+			"o1[t] = i1[t] && u[t] = i1[t].";
+		tref parsed = tau::get(sample, { .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		REQUIRE( maybe_i.has_value() );
+		// o1 echoes i1, one line per step. The update at step 1 used to
+		// reopen (and thereby truncate) the output file, losing the
+		// line step 0 had written.
+		size_t lines = 0;
+		{
+			std::ifstream f(out_file);
+			std::string line;
+			while (std::getline(f, line)) if (!line.empty()) ++lines;
+		}
+		std::filesystem::remove(in_file);
+		std::filesystem::remove(out_file);
+		CHECK( lines == 3 );
+	}
+}
 
 TEST_SUITE("Execution") {
 
@@ -435,6 +514,52 @@ TEST_SUITE("Execution") {
 		CHECK( values_matches_any_of(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
+	}
+
+	// An update bridging two parts that BOTH already carry a fallback
+	// alternative (from earlier input-conflicting updates) merges them via
+	// the cross product of their alternative lists, deduplicated -- the
+	// `merged`/`seen` block of interpreter::update.
+	TEST_CASE("u[t] = i1[t]: merge_parts_with_alternatives") {
+		bdd_init<Bool>();
+		auto spec = create_spec("u[t] = i1[t]"
+			" && i2[t] & o2[t]' = 0 && i3[t] & o3[t]' = 0.");
+		strings i1_values = { "F", "o2[t] = 0", "o3[t] = 0",
+			"o2[t] = o3[t]", "F" };
+		strings i2_values = { "F", "F", "F", "F", "F" };
+		strings i3_values = { "F", "F", "F", "F", "F" };
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto i2 = std::make_shared<vector_input_stream>(i2_values);
+		auto i3 = std::make_shared<vector_input_stream>(i3_values);
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o3 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_input( "i2", tau_type_id<node_t>(), i2);
+		ctx.add_input( "i3", tau_type_id<node_t>(), i3);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		ctx.add_output("o3", tau_type_id<node_t>(), o3);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 5);
+		REQUIRE( maybe_i.has_value() );
+		strings all_f = { "F", "F", "F", "F", "F" };
+		CHECK( o2->get_values() == all_f );
+		CHECK( o3->get_values() == all_f );
+		// each accepted update echoes on u
+		auto u_values = u->get_values();
+		REQUIRE( u_values.size() == 5 );
+		CHECK( u_values[1] == "always o2[t]:tau = 0" );
+		CHECK( u_values[2] == "always o3[t]:tau = 0" );
+		CHECK( u_values[3] == "always o2[t]:tau = o3[t]:tau" );
+		// the o2 and o3 parts (2 alternatives each) merged into one part
+		// holding the 2x2 cross product of their alternatives
+		const auto& parts = maybe_i.value().original_spec;
+		REQUIRE( parts.size() == 2 );
+		size_t max_alts = 0;
+		for (const auto& [alts, _] : parts)
+			max_alts = std::max(max_alts, alts.size());
+		CHECK( max_alts == 4 );
 	}
 
 	// I1 (factored spec storage): an update that conflicts with the spec

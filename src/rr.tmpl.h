@@ -17,6 +17,11 @@ rr<node>::rr(const htref& main) : main(main) {}
 template<NodeType node>
 rr<node>::rr(){}
 
+// Content-based weak ordering of two optional tree handles, comparing
+// the trees themselves, never the handle addresses. Convention: nullptr
+// orders first — an empty handle is less than any non-empty one, and two
+// empty handles are equivalent. rr::operator<=> relies on this so rrs
+// with unset main or rule slots compare without dereferencing them.
 template <NodeType node>
 std::weak_ordering compare_trees(const htref& a, const htref& b) {
 	if (a && b) {

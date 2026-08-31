@@ -11,6 +11,10 @@
 
 namespace idni::tau_lang {
 
+// Main formula of `fm` with its temporal quantifiers normalized;
+// normalize_scopes=false leaves the formulas below the temporal
+// quantifiers as they are. Used by ~, &, |, ^ below so newly combined
+// mains stay in a comparable form; the rec relations are left untouched.
 template <typename... BAs>
 requires BAsPack<BAs...>
 static tref normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
@@ -193,6 +197,11 @@ static int factored_tau_units(tref fm, trefs& units) {
 	return 0;
 }
 
+// Whether component factoring of is_zero/is_one is on: true if the
+// `ba_component_factoring` API flag (tau_ba.h) is set, or the environment
+// variable TAU_BA_COMPONENT_FACTORING is set to a non-empty value other
+// than exactly "0". The environment is read once and latched for the
+// lifetime of the process; the API flag is re-read on every call.
 inline bool ba_component_factoring_enabled() {
 	static const bool env = [] {
 		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
@@ -352,6 +361,10 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+// Normalizes a tau_ba constant: applies its rec relations to the main
+// formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
+// result carries the normalized main only — the rec relations, already
+// applied, are not copied into the returned tau_ba.
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
@@ -361,12 +374,18 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(result));
 }
 
+// Purely syntactic check: the main formula is literally T. No rec
+// relations are applied and no satisfiability check runs — a semantically
+// valid but non-literal main returns false (use is_one() for that).
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_syntactic_one(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
+// Purely syntactic check: the main formula is literally F. No rec
+// relations are applied and no satisfiability check runs — a semantically
+// unsat but non-literal main returns false (use is_zero() for that).
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {

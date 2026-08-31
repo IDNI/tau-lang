@@ -85,6 +85,7 @@ template <NodeType node> struct tau_spec;
 template <NodeType node>
 struct subtree_htref_less {
 	using is_transparent = void;
+	/// Normalize either key form to the `tref` that `subtree_less` orders.
 	static tref to_tref(const htref& h) { return h->get(); }
 	static tref to_tref(tref t) { return t; }
 	bool operator()(const auto& a, const auto& b) const {
@@ -658,6 +659,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		template <typename result_type>
 		result_type operator||(const extractor<result_type>&) const;
 	private:
+		/** @brief Keep the non-null refs of @p n; no value if none. */
 		void set_values(const trefs& n);
 		bool has_value_ = true;
 		trefs values_{};

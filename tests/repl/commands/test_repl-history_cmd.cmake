@@ -50,3 +50,7 @@ add_repl_test(history_store_cmd-quantifiers-ex_all_02_ex_xy_all_wz_x_eq_w_and_y_
 # "all ex" TEST_CASE, all_ex_cases (test_integration-quantifiers.cpp:30-34, 69)
 add_repl_test(history_store_cmd-quantifiers-all_ex_01_all_x_ex_y_x_eq_y "all x ex y x=y."                ": all b2 ex b1 b2 = b1")
 add_repl_test(history_store_cmd-quantifiers-all_ex_02_all_xy_ex_wz_x_eq_w_and_y_eq_z "all x,y ex w,z x=w && y=z." ": all b4, b3 ex b2, b1 b4 = b2 && b3 = b1")
+# referencing a history location beyond the stored entries, absolute and
+# relative (the "%N does not exist" report and its TAU_LOG_ERROR companion)
+add_repl_test_fail(history_ref-absolute_missing "1. mnf %5" "does not exist")
+add_repl_test_fail(history_ref-relative_missing "1. dnf %-5" "does not exist")

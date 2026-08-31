@@ -429,6 +429,16 @@ struct interpreter {
 	bool in_oracle_handler_ = false;
 
 private:
+	/// Per io var, the file stream id its current stream object was opened
+	/// from (entries exist for file-backed streams only). Lets
+	/// `rebuild_inputs`/`rebuild_outputs` keep a file stream's object --
+	/// and with it its read position / already-written content -- across
+	/// the rebuilds `interpreter::update` performs after an accepted
+	/// update, instead of reopening (inputs) or truncating (outputs) the
+	/// file.
+	subtree_map<node, size_t> input_stream_sources;
+	subtree_map<node, size_t> output_stream_sources;
+
 	static bool stream_comp(tref s1, tref s2) {
 		return tau::subtree_less(s1, s2);
 	};
@@ -469,6 +479,8 @@ private:
 		union_find_with_sets<decltype(stream_comp), node> partition;
 		input_streams<node>  inputs;
 		output_streams<node> outputs;
+		subtree_map<node, size_t> input_sources;
+		subtree_map<node, size_t> output_sources;
 		std::string spec_str;
 		// The union-find's move constructor is explicit, so the members
 		// are direct-initialized here rather than brace-aggregated.
@@ -476,10 +488,14 @@ private:
 			std::vector<std::pair<htrefs, htref>>&& s,
 			union_find_with_sets<decltype(stream_comp), node>&& p,
 			input_streams<node>&& i, output_streams<node>&& o,
+			subtree_map<node, size_t>&& isrc,
+			subtree_map<node, size_t>&& osrc,
 			std::string&& str)
 			: ubt_ctn(std::move(c)), spec(std::move(s)),
 			  partition(std::move(p)), inputs(std::move(i)),
-			  outputs(std::move(o)), spec_str(std::move(str)) {}
+			  outputs(std::move(o)), input_sources(std::move(isrc)),
+			  output_sources(std::move(osrc)),
+			  spec_str(std::move(str)) {}
 	};
 	/// @brief Dry-run the pointwise revision of the running spec by
 	/// @p update: the first update clause that yields an entirely
@@ -525,12 +541,24 @@ private:
 	/// @return false if a stream could not be found (interpretation should stop).
 	bool rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
 	/// @brief Build the input stream map for @p current_inputs into @p dst
-	/// (the member map is untouched) -- update() validates before it swaps.
+	/// (no member is touched -- update() validates before it swaps; the
+	/// var -> file-stream-id record goes to @p sources). A variable whose
+	/// entry in @p previous_sources names the same file reuses its stream
+	/// object from @p previous_inputs, keeping the read position across
+	/// rebuilds instead of reopening the file at its first line.
 	bool build_inputs(const subtree_map<node, size_t>& current_inputs,
-		input_streams<node>& dst);
-	/// @brief Build the output stream map for @p current_outputs into @p dst.
+		input_streams<node>& dst,
+		subtree_map<node, size_t>& sources,
+		const input_streams<node>& previous_inputs,
+		const subtree_map<node, size_t>& previous_sources);
+	/// @brief Build the output stream map for @p current_outputs into @p dst;
+	/// same continuity contract as build_inputs (a fresh file_output_stream
+	/// opens with truncation).
 	bool build_outputs(const subtree_map<node, size_t>& current_outputs,
-		output_streams<node>& dst);
+		output_streams<node>& dst,
+		subtree_map<node, size_t>& sources,
+		const output_streams<node>& previous_outputs,
+		const subtree_map<node, size_t>& previous_sources);
 
 	/// @brief Collect all input stream variables from @p dnf into @p current_inputs.
 	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);

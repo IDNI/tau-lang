@@ -103,6 +103,20 @@ TEST_SUITE("minterm_range") {
 		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
 		CHECK ( count == 7 );
 	}
+
+	TEST_CASE("first variable forced negative") {
+		// x'y's single minterm carries a negated leading literal, so
+		// reaching it walks the counter's skip-zero-coefficient path.
+		// (update_choices_from's index-0 negative seeding is
+		// unreachable: a false first choice at index 0 only coincides
+		// with counter wrap-around, which exhausts first.)
+		const char* sample = "x' & y = 0.";
+		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		minterm_range<node_t> rng(fm);
+		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
+		CHECK ( count == 1 );
+	}
 }
 
 TEST_SUITE("minterm_inequality_system_iterator") {
@@ -112,6 +126,11 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		minterm_inequality_system_iterator<node_t> it(sys);
 		CHECK ( (it == minterm_inequality_system_iterator<node_t>::end) );
 	}
+
+	// NOTE: the constructor's exhausted-break arm (an inequality whose bf
+	// has no minterms) is unreachable from parsed input -- the
+	// construction hooks fold any identically-zero bf before a bf_neq
+	// over it can survive, so it stays untested as a defensive guard.
 
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";

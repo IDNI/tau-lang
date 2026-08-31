@@ -10,6 +10,15 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+// Renders a tref->tref map (e.g. a solver solution) as printed strings,
+// skipping entries with a null key or value.
+template <NodeType node>
+std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
+	std::map<std::string, std::string> sm;
+	for (auto [k, v] : m) if (k && v) sm[to_str(k)] = to_str(v);
+	return sm;
+}
+
 // ------------------------------------------------------------
 // String API — convenience wrappers that accept/return std::string
 // ------------------------------------------------------------

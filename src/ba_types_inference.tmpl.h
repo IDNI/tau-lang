@@ -17,6 +17,8 @@
 
 namespace idni::tau_lang {
 
+// A ba_constant whose source text could not be parsed under the type id
+// that inference assigned to it.
 struct parse_error {
 	tref element;
 	size_t type_id;
@@ -25,6 +27,9 @@ struct parse_error {
 template<NodeType node>
 using typeables_type_id_map = std::map<size_t, subtree_map<node, size_t>>;
 
+// True for the node kinds that can carry a BA type and take part in
+// inference: variables, BA constants, bf_t/bf_f and references. Default
+// query of get_typeable_type_ids_by_type.
 template<NodeType node>
 bool is_typeable(tref t) {
 	using tau = tree<node>;
@@ -36,6 +41,9 @@ bool is_typeable(tref t) {
 		|| is<node, tau::ref>(t);
 }
 
+// Logs, at debug level, that @p var received the default type inside the
+// environment @p env; @p bv selects the "Default bv width" wording. The
+// type name is omitted for io variables and ba_constants.
 template <NodeType node>
 void default_typing_message(tref var, tref env, const bool bv = false) {
 	using tau = tree<node>;
@@ -65,6 +73,7 @@ tref canonize(tref t) {
 	return new_t;
 }
 
+// Element-wise canonize.
 template<NodeType node>
 trefs canonize(trefs ts) {
 	trefs new_ts;
@@ -94,6 +103,9 @@ tref unwrap_to_ref(tref n) {
 	return n;
 }
 
+// Returns the signature <symbol id, offset arity, argument arity>
+// identifying a reference. @p func must be a `ref` or wrap one (see
+// unwrap_to_ref); anything else is a debug-assert violation.
 template <NodeType node>
 std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	using tau = tree<node>;
@@ -115,6 +127,9 @@ std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	return std::make_tuple(sym, offset_args, params);
 }
 
+// True iff a bf under @p parent starts its own type context: the parent
+// is null or is none of the bf/bv operators, bf quantifiers and atomic
+// formulas, which type their operands through their own scope instead.
 template<NodeType node>
 bool is_top_level_bf(tref parent) {
 	using tau = tree<node>;
@@ -142,6 +157,8 @@ bool is_top_level_bf(tref parent) {
 	}
 }
 
+// Rebuilds @p n with its value retyped to @p new_type; the children are
+// kept as they are.
 template<NodeType node>
 tref retype(tref n, const size_t new_type) {
 	using tau = tree<node>;
@@ -151,6 +168,11 @@ tref retype(tref n, const size_t new_type) {
 		: tau::get(t.value.ba_retype(new_type));
 };
 
+// Collects the nodes under @p n matching @p query, without descending
+// into nodes matching @p stop (offsets by default), and groups them by
+// node kind into canonized-node -> effective-type maps. Repeated
+// occurrences of one canonized element are unified; returns an
+// inference_error on the first incompatible pair.
 template <NodeType node>
 std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids_by_type(
 		tref n,	const std::function<bool(tref)>& query = is_typeable<node>,
@@ -187,6 +209,8 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 	return typeable_type_ids_by_type;
 }
 
+// Convenience overload: collect exactly the node kinds listed in
+// @p types.
 template <NodeType node>
 std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids_by_type(
 		tref n, const std::initializer_list<size_t>& types) {
@@ -230,6 +254,12 @@ std::optional<inference_error> unify_bound_vars_with_cast_operands(tref body,
 	return std::nullopt;
 }
 
+// Classifies a rec_relation as a function definition (true) or a
+// predicate definition (false). Functional when either side carries a
+// type or is a term, or when the body is a bare reference whose head
+// symbol is recorded in @p function_symbols as called from a term
+// position (see the note in the body). Non-rec_relation nodes return
+// false.
 template<NodeType node>
 bool is_functional_relation(tref n, const auto& function_symbols) {
 	using tau = tree<node>;
@@ -263,6 +293,10 @@ bool is_functional_relation(tref n, const auto& function_symbols) {
 	return false;
 }
 
+// True iff the fixpoint reference @p n is to be typed as a function:
+// the reference itself, or its fp_fallback expression, carries a type
+// or is a term. Call only on refs that carry a fallback; non-ref nodes
+// return false.
 template<NodeType node>
 bool is_functional_fallback(tref n) {
 	using tau = tree<node>;
@@ -281,6 +315,14 @@ bool is_functional_fallback(tref n) {
 	return false;
 }
 
+// True iff the reference @p n stands in a term position: it carries a
+// type itself, or its signature was previously recorded as a function
+// in @p function_symbols. An offset-free reference also counts when an
+// INDEXED function signature with the same name and argument arity is
+// recorded: that is how a fixpoint of a function recurrence is called
+// (`g(y)` for `g[n](x) := ...`, resolved the same way by find_fpcalls
+// in nso_rr.tmpl.h), so the exact-signature lookup alone can never see
+// it. Non-ref nodes return false.
 template<NodeType node>
 bool is_functional_ref(tref n, const auto& function_symbols) {
 	using tau = tree<node>;
@@ -293,10 +335,19 @@ bool is_functional_ref(tref n, const auto& function_symbols) {
 	// If the head was previously defined as a function we also have a functional ref
 	// Otherwise, we have a predicate callback.
 	auto sig = get_function_signature<node>(n);
-	return function_symbols.contains(sig);
+	if (function_symbols.contains(sig)) return true;
+	// Offset-free fixpoint call to an indexed function recurrence.
+	if (std::get<1>(sig) == 0)
+		for (const auto& [fsig, _] : function_symbols)
+			if (std::get<0>(fsig) == std::get<0>(sig)
+				&& std::get<2>(fsig) == std::get<2>(sig)
+				&& std::get<1>(fsig) > 0) return true;
+	return false;
 }
 
-// type all symbols according to their children's types
+// Retypes an interior term node from its children: rebuilds @p n typed
+// with the first non-zero type found among them (0 when none carries
+// one). The children themselves are kept as they are.
 template<NodeType node>
 tref update_ba_symbol(tref n) {
 	using tau = tree<node>;
@@ -317,7 +368,11 @@ tref update_ba_symbol(tref n) {
 	return new_n;
 }
 
-// type all symbols according to their children's types
+// Retypes a bv-only operator (add/sub/..., shifts, nand/nor/xnor) from
+// its children like update_ba_symbol, but only when the first child's
+// type is in the bv type family. Otherwise: returns @p n unchanged when
+// defaults are off (it may still be typed later), an inference_error
+// when they are on.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
 		const type_inference_options& options) {
@@ -335,19 +390,24 @@ std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
 	return inference_error{n, untyped_type_id<node>(), t};
 }
 
-// type all symbols according to their children's types
+// Hoists the reference's type onto its bf_ref wrapper: takes the first
+// BA type found anywhere in the subtree (reference head or arguments),
+// strips the type annotations from the inner ref, and rebuilds the
+// bf_ref carrying that type.
 template<NodeType node>
 tref update_bf_ref(tref n) {
 	using tau = tree<node>;
 
-	// We have one child at least and we know that the types of the
-	// children have already been updated and they are consistent.
-	// We only need to check that the type is bv type family.
 	auto type = find_ba_type<node>(n);
 	auto new_n = untype<node>(tau::get(n).child(0)); //ref
 	return tau::get_typed(tau::bf_ref, new_n, type);
 }
 
+// Returns the type to assign to @p n: if @p n is already typed, the
+// unification of its effective type with the scope's entry (nullopt on
+// conflict); otherwise the scope's entry itself, or the default tau
+// type when that entry is still untyped and defaults are enabled.
+// Precondition: @p types contains @p canonized.
 template<NodeType node>
 std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		const subtree_map<node, size_t>& types,
@@ -364,6 +424,8 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		: types.at(canonized);
 }
 
+// Rebuilds @p n retyped to @p type, dropping any `typed` annotation
+// children.
 template<NodeType node>
 tref update_tref(tref n, size_t type) {
 	using tau = tree<node>;
@@ -378,6 +440,11 @@ tref update_tref(tref n, size_t type) {
 		: tau::get(retyped_val, ch);
 }
 
+// Retypes @p n from the scope snapshot @p types: returns @p n untouched
+// when its canonized form has no entry; otherwise resolves the final
+// type (get_inferred_type), records it in @p resolver and returns the
+// retyped node. inference_error when the node's own type, or the
+// resolver's, conflicts with the inferred one.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_tref(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -398,6 +465,7 @@ std::variant<tref, inference_error, parse_error> update_tref(
 	return inference_error{n, types.at(canonized), tau::get(n).get_ba_type()};
 }
 
+// bf_t/bf_f constants: plain update_tref retyping.
 template<NodeType node>
 inline std::variant<tref, inference_error, parse_error> update_bf_constant(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -406,6 +474,7 @@ inline std::variant<tref, inference_error, parse_error> update_bf_constant(
 	return update_tref<node>(resolver, n, types, options);
 }
 
+// Variables: plain update_tref retyping.
 template<NodeType node>
 inline std::variant<tref, inference_error, parse_error> update_variable(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -414,6 +483,12 @@ inline std::variant<tref, inference_error, parse_error> update_variable(
 	return update_tref<node>(resolver, n, types, options);
 }
 
+// Retypes a ba_constant from the scope snapshot and, if the constant is
+// still unevaluated (data() == 0), parses its source text under the
+// inferred type. Failure modes: nullptr when @p types has no entry for
+// the canonized constant; parse_error when the source does not parse
+// under that type; inference_error on a type or resolver conflict. An
+// entry resolving to no concrete type leaves @p n unchanged.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_ba_constant(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -447,6 +522,8 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 	return n;
 }
 
+// True iff the scope snapshot knows @p n but its entry is still the
+// untyped id -- i.e. the node is about to be typed by default.
 template<NodeType node>
 bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
 	tref canonized = canonize<node>(n);
@@ -458,6 +535,12 @@ bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
 // inference_error from a tref function, a hard compile error on first
 // instantiation. Recover from git and fix the return type if needed.)
 
+// Rewraps a fixpoint reference whose fallback makes it a function:
+// retypes its constants, bf_t/bf_f and variables via update(), checks a
+// plain-term fallback's annotated type against the reference's own type
+// (TI-2 note below), wraps a ref-shaped fallback in the reference's
+// typed bf > bf_ref, and rebuilds the ref as {sym, ref_args, fallback}.
+// Errors from update() and fallback/reference type conflicts propagate.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_functional_fallback(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -476,10 +559,11 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
-	// BA2-22: with use_defaults == false everything can legitimately stay
-	// untyped here; handle it gracefully like update_functional_rr's
-	// `if (is_untyped) return updated;` instead of aborting debug builds.
-	if (is_untyped<node>(type)) return updated;
+	// Untyped is allowed: an offset-free fixpoint call classified as
+	// functional through the recorded function signatures carries no
+	// annotation of its own (see is_functional_ref). (This replaces the
+	// BA2-22 early return -- the checks below are untyped-guarded, and
+	// the fixpoint-call fix needs untyped refs to flow through.)
 	// TI-2: a ref-shaped fallback gets wrapped in the reference's type
 	// below, but a plain term fallback was never checked against it, so
 	// `g(x) fallback x:sbf` with a bv[8] `g` sailed through inference --
@@ -497,9 +581,18 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 		fallback = tau::get_typed(tau::bf,
 			tau::get_typed(tau::bf_ref, fallback, type), type);
 	fallback = tau::get(tau::fp_fallback, fallback);
-	return tau::get(tau::ref, { sym, ref_args, fallback });
+	// Wrap like update_functional_ref does: the call stands in a term
+	// position, so it must come back as a bf > bf_ref chain for the
+	// recurrence's bf rules (and the fixpoint calculation) to see it in
+	// their own world -- a bare ref would keep its parser-given wff
+	// wrapping and match nothing.
+	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref,
+		tau::get(tau::ref, { sym, ref_args, fallback }), type), type);
 }
 
+// Predicate counterpart of update_functional_fallback: retypes the
+// leaves via update(), wraps a ref-shaped fallback in an untyped
+// wff > wff_ref, and rebuilds the ref as {sym, ref_args, fallback}.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -523,6 +616,15 @@ std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 	return tau::get(tau::ref, { sym, ref_args, fallback });
 }
 
+// Rewraps a rec_relation classified as functional: retypes its
+// constants, bf_t/bf_f and variables via update(), strips head/body
+// annotations and any parser-given wff_ref wrapper (see below), wraps
+// ref-shaped sides in the relation's typed bf > bf_ref, records the
+// head signature with that type in @p function_symbols, and rebuilds
+// the rec_relation. Returns nullptr when the body turns out to be a
+// formula (a wff cannot define a function); when the relation's type is
+// still untyped, returns the leaf-updated relation without rewrapping
+// or recording it.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_functional_rr(
 		type_scoped_resolver<node>& resolver, tref n, auto& function_symbols,
@@ -575,6 +677,9 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
 
+// Rewraps a rec_relation classified as a predicate: retypes its
+// variables via update(), then wraps ref-shaped head and body in an
+// untyped wff > wff_ref and rebuilds the rec_relation.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_predicate_rr(
 		type_scoped_resolver<node>& resolver, tref n, const type_inference_options& options) {
@@ -598,6 +703,10 @@ std::variant<tref, inference_error, parse_error> update_predicate_rr(
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
 
+// Rewraps a standalone reference in term position: retypes its
+// constants, bf_t/bf_f and variables via update(), then wraps the
+// untyped ref in bf > bf_ref typed with whatever type the updated
+// subtree carries (possibly none -- untyped is allowed here).
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_functional_ref(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -618,6 +727,9 @@ std::variant<tref, inference_error, parse_error> update_functional_ref(
 	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, new_n, type), type);
 }
 
+// Rewraps a standalone predicate reference: retypes its variables via
+// update(), then wraps it in wff > wff_ref unless @p parent is already
+// a wff_ref providing that wrapper.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_predicate_ref(
 		type_scoped_resolver<node>& resolver, tref n, tref parent,
@@ -634,6 +746,10 @@ std::variant<tref, inference_error, parse_error> update_predicate_ref(
 		: tau::get(tau::wff, tau::get(tau::wff_ref, std::get<tref>(updated)));
 }
 
+// Generic bottom-up rebuild step: replaces each child of @p n with its
+// recorded replacement from @p changes, records the rebuilt node under
+// @p n when anything changed, and returns @p n's current replacement
+// (or @p n itself).
 template<NodeType node>
 tref update_default(tref n, subtree_map<node, tref>& changes) {
 	using tau = tree<node>;
@@ -700,6 +816,27 @@ tref type_annotated_operands(tref n) {
 	return changes.contains(n) ? changes[n] : n;
 }
 
+// The retyping pass infer_ba_types runs when a scope's type information
+// is complete (from on_leave, just before the scope closes). Post-order
+// walk of @p r that rewrites the tree bottom up against a snapshot of
+// resolver.current_types() taken once at entry:
+// - leaves whose node kind is listed in @p types_to_update (variable,
+//   ba_constant, bf_t/bf_f) are retyped from the snapshot, and every
+//   assignment is echoed back into @p resolver so the still-open scopes
+//   stay in sync with the rewritten tree;
+// - bf operators always absorb their children's replacements and, when
+//   selected (their own kind, or tau::typeable_symbol as a wildcard, is
+//   listed), take their type from a child (update_ba_symbol; the
+//   bv-only operators insist on a bv-family type via update_bv_symbol);
+// - bf_ref wrappers, when listed, hoist the subtree type onto
+//   themselves (update_bf_ref);
+// - every other node just absorbs child replacements (update_default);
+//   kinds without a case of their own are ignored even if listed.
+// Leaves already typed by a previous infer_ba_types run are skipped.
+// A separate type_environment stack tracks the nearest enclosing atomic
+// formula / rec_relation / ref only to keep the "default typing" log
+// message small. Returns the rewritten root (or @p r unchanged), or the
+// first inference_error / parse_error met.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update(
 		type_scoped_resolver<node>& resolver, tref r,
@@ -860,6 +997,17 @@ std::variant<tref, inference_error, parse_error> update(
 	return root_changed ? changes[r] : r;
 }
 
+// Reconciles a scope's merged type with previously recorded function
+// definitions. @p type_map maps each canonized reference in the scope
+// to its type id (the tau::ref slice of a typeables map). If @p type is
+// still untyped, the first reference whose signature has a genuinely
+// typed entry in @p available_function_symbols gets that type assigned
+// through @p resolver, and the assignment's result is returned
+// (signature-only entries recorded merely to classify a symbol as
+// functional are skipped). If @p type is concrete, every referenced
+// definition's recorded type must instead unify with it (TI-1 note
+// below); on success the untyped id is returned -- callers only test
+// for inference_error.
 template <NodeType node>
 std::variant<size_t, inference_error> type_by_function_symbol(
 		type_scoped_resolver<node>& resolver,
@@ -901,6 +1049,9 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 	return untyped_type_id<node>();
 }
 
+// Logs @p error at ERROR level: parse_error as an unparsable constant,
+// scope_error as an improperly closed scope, inference_error as an
+// expected/found type mismatch.
 template <NodeType node>
 void inference_error_message(
 		const std::variant<inference_error, parse_error,
@@ -1282,7 +1433,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						}
 						if (conflict) break;
 					}
-					if (is_functional_fallback<node>(n)) {
+					// A fallback call is also functional when it is an
+					// offset-free call to an indexed function recurrence
+					// (is_functional_ref's fixpoint-call matching); its own
+					// annotations alone cannot tell (is_functional_fallback).
+					if (is_functional_fallback<node>(n)
+						|| is_functional_ref<node>(n,
+							available_function_symbols)) {
 						auto unified = unify<node>(arguments_map, header_type);
 						if (std::holds_alternative<inference_error>(unified)) {
 							error = std::get<inference_error>(unified);
@@ -1500,7 +1657,14 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// We need to adjust the wrapping around refs in the body and
 						// the header accordingly.
 						auto new_n = update_default<node>(n, transformed);
+						// Same functional test as on_enter: an offset-free
+						// fixpoint call to an indexed function recurrence
+						// carries no annotation of its own, so it is
+						// recognized through the recorded function
+						// signatures (is_functional_ref).
 						auto updated = is_functional_fallback<node>(new_n)
+							|| is_functional_ref<node>(new_n,
+								available_function_symbols)
 							? update_functional_fallback<node>(resolver, new_n, options)
 							: update_predicate_fallback<node>(resolver, new_n, options);
 						if (std::holds_alternative<parse_error>(updated)) {

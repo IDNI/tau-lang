@@ -428,6 +428,46 @@ TEST_SUITE("cvc5 back-translation correctness") {
 	}
 }
 
+// cvc5_tree_to_tau_tree's per-Kind reconstruction arms, driven with
+// hand-built cvc5 terms (the simplifier only produces a few kinds itself,
+// so most arms are unreachable through bv_ba_cvc5_simplification alone).
+TEST_SUITE("cvc5 tree to tau tree kinds") {
+
+	static cvc5::Sort bv8() { return cvc5_term_manager.mkBitVectorSort(8); }
+
+	static void conv(const cvc5::Term& t, const std::string& expected) {
+		tref r = cvc5_tree_to_tau_tree<node_t>(t);
+		REQUIRE( r != nullptr );
+		CHECK( tree<node_t>::get(r).to_str() == expected );
+	}
+
+	TEST_CASE("comparisons, equality, booleans") {
+		cvc5::Term x = cvc5_term_manager.mkConst(bv8(), "x");
+		cvc5::Term y = cvc5_term_manager.mkConst(bv8(), "y");
+		conv(make_term_equal(x, y), "x = y");
+		conv(make_term_distinct(x, y), "x != y");
+		conv(make_term_less_equal(x, y), "x <= y");
+		conv(make_term_less(x, y), "x < y");
+		conv(make_term_greater(x, y), "x > y");
+		conv(make_term_greater_equal(x, y), "x >= y");
+		conv(cvc5_term_manager.mkBoolean(true), "T");
+		conv(cvc5_term_manager.mkBoolean(false), "F");
+	}
+
+	TEST_CASE("modulo, shifts, width changes, quantifier") {
+		cvc5::Term x = cvc5_term_manager.mkConst(bv8(), "x");
+		cvc5::Term y = cvc5_term_manager.mkConst(bv8(), "y");
+		conv(make_bitvector_mod(x, y), "x%y");
+		conv(make_bitvector_shl(x, y), "x<<y");
+		conv(make_bitvector_shr(x, y), "x>>y");
+		conv(make_bitvector_zero_extend(x, 8), "(bv[16]) x");
+		conv(make_bitvector_extract(x, 3, 0), "(bv[4]) x");
+		cvc5::Term v = cvc5_term_manager.mkVar(bv8(), "v");
+		conv(make_term_forall(v, make_term_equal(v,
+			make_bitvector_bottom_elem(8))), "all b1 b1 = 0");
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

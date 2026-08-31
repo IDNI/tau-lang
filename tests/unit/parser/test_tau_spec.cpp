@@ -313,6 +313,69 @@ TEST_SUITE("TauSpecGet") {
 		REQUIRE( spec.get() != nullptr );
 	}
 
+	TEST_CASE("a line failing alone is re-parsed as continuation of the previous part") {
+		// parse_with_prev_part's success path: line 1 parses complete
+		// (no eof pending), line 2 alone is a hard parse error ("&&"
+		// cannot start a spec) but line 1 + line 2 parse as one spec.
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("o1[t] = 0") );
+		REQUIRE( !spec.is_eof() );
+		CHECK( spec.parse("&& o2[t] = 0.") );
+		CHECK( spec.errors().empty() );
+		std::cout << "PROBE continuation errors: ";
+		for (auto& e : spec.errors()) std::cout << e << " | ";
+		std::cout << "\n";
+		tref fm = spec.get();
+		CHECK( fm != nullptr );
+	}
+
+	TEST_CASE("a continuation that still awaits input keeps expecting more") {
+		// parse_with_prev_part's eof path: line 2 alone is a hard error,
+		// line 1 + line 2 is a valid prefix (unclosed paren), so the
+		// spec goes back to expecting more input; line 3 completes it.
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("o1[t] = 0") );
+		CHECK( spec.parse("&& (o2[t]") );
+		CHECK( spec.is_eof() );
+		CHECK( spec.parse("| o2[t]) = 0.") );
+		tref fm = spec.get();
+		CHECK( fm != nullptr );
+	}
+
+	TEST_CASE("a line failing alone and with the previous part reports the error") {
+		// parse_with_prev_part's failure path: the combined text is no
+		// continuation either, so the original error surfaces.
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("o1[t] = 0") );
+		CHECK( !spec.parse(") ) )") );
+		CHECK( !spec.errors().empty() );
+		CHECK( spec.get() == nullptr );
+	}
+
+	TEST_CASE("conflicting stream types fail to build a spec") {
+		// A type conflict inside one line dies in the tau-tree
+		// transform, before get()'s own inference pass.
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("o1[t]:sbf = 0 && o1[t]:tau = 0.") );
+		CHECK( spec.get() == nullptr );
+		REQUIRE( !spec.errors().empty() );
+		CHECK( spec.errors()[0] == "spec failed to transform to tau tree" );
+	}
+
+	TEST_CASE("def/main type conflict is rejected") {
+		// Both lines parse on their own; the sbf-typed definition body
+		// conflicts with the tau-typed stream only once they are joined,
+		// and the joint transform rejects the spec. (get()'s later
+		// standalone "type inference failed" pass is only reachable via
+		// add()-injected defs, since the transform itself infers types.)
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("f(x) := x:sbf.") );
+		REQUIRE( spec.parse("o1[t]:tau = f(y).") );
+		CHECK( spec.get() == nullptr );
+		REQUIRE( !spec.errors().empty() );
+		CHECK( spec.errors()[0] == "spec failed to transform to tau tree" );
+	}
+
 	TEST_CASE("get() after a genuine (non-eof) parse error stays nullptr and does not crash") {
 		// TT-21: repeated get() after an error is otherwise untested.
 		// Regression test: get() used to skip straight to build_parse_tree()

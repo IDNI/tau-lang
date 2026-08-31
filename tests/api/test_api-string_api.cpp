@@ -491,6 +491,72 @@ TEST_SUITE("Tau API - string - step error paths") {
 	TEST_CASE("get_interpreter reports spec parse failure") {
 		CHECK( !tau_api::get_interpreter("x ) ( invalid !!!").has_value() );
 	}
+
+	// The string-level solve(formula, mode) overload's success path: the
+	// solution map is rendered to strings.
+	TEST_CASE_FIXTURE(api_fixture, "solve with a mode renders the solution to strings") {
+		auto s = tau_api::solve("x = 0", solver_mode::general);
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().size() == 1 );
+		CHECK( s.value().begin()->first == "x" );
+		CHECK( s.value().begin()->second == "0" );
+	}
+
+	// The string-level lgrs(equation) success path: the general solution
+	// map is rendered to strings.
+	TEST_CASE_FIXTURE(api_fixture, "lgrs renders the solution to strings") {
+		auto s = tau_api::lgrs("x = 0");
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().size() == 1 );
+		CHECK( s.value().begin()->first == "x" );
+		CHECK( s.value().begin()->second == "0" );
+	}
+
+	// An input value that parses to a tau constant holding an open (free
+	// variable) formula is rejected.
+	TEST_CASE("step rejects an input constant with an open tau formula") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "i", 0 }] = "o[t] = x";
+		CHECK( !tau_api::step(i, inputs).has_value() );
+	}
+
+	// A step with no inputs computes its outputs but reports "do not
+	// auto-continue" by returning empty (the REPL then asks the user).
+	TEST_CASE("step without inputs does not auto-continue") {
+		auto maybe_i = tau_api::get_interpreter("o7[t] = 0.");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		CHECK( !tau_api::step(i, inputs).has_value() );
+	}
+
+	// A step whose u output proposes an acceptable update routes through
+	// interpreter::update (the string API's own update call site).
+	TEST_CASE("step performs a proposed spec update") {
+		// i9/o8, not i1/o1: this suite shares one io context, and the
+		// witness suite below re-types i1 as :bv[24]
+		auto maybe_i = tau_api::get_interpreter(
+			"u[t] = i9[t] && o8[t] = 0.");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "i9", 0 }] = "F";
+		auto out0 = tau_api::step(i, inputs);
+		REQUIRE( out0.has_value() );
+		inputs.clear();
+		inputs[stream_at{ "i9", 1 }] = "o8[t] = 0";
+		auto out1 = tau_api::step(i, inputs);
+		REQUIRE( out1.has_value() );
+		// the accepted update echoes on the u output
+		bool u_echoed = false;
+		for (auto& [at, v] : out1.value())
+			if (at.name == "u"
+				&& v == "always o8[t]:tau = 0") u_echoed = true;
+		CHECK( u_echoed );
+	}
 }
 
 // GitHub #89: the witness the interpreter picks for an output the spec leaves

@@ -10,6 +10,10 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+// The inverse operator used to cancel @p operation when moving an operand
+// across a block: bf_add <-> bf_sub and bf_mul <-> bf_div. Only these four
+// are valid inputs; anything else returns tau::nul after logging (and
+// asserts in debug builds) — see the caller-bug note in the body.
 template<NodeType node>
 typename node::type inverse_of(size_t operation) {
 	using tau = tree<node>;

@@ -89,6 +89,39 @@ TEST_SUITE("placement matrix") {
 		}
 	}
 
+	// Nonlinear bv blocks (x*x is not invertible by trivial Skolem) cross
+	// the placements on formulas the resolve passes cannot finish alone.
+	// NOTE: even these leave `blk.displaced` empty -- the trailing
+	// blasteable-segment handling of resolve_ex_block
+	// (antiprenexing.tmpl.h ~1494-1512) stayed unreached by every probe
+	// tried (2026-08-31 coverage pass) and remains untested.
+	static constexpr const char* nonlinear =
+		"ex x : bv[8] x * x = { 4 }:bv[8].";
+	static constexpr const char* nonlinear_pair =
+		"ex x : bv[8] ex y : bv[8] (x * y = { 6 }:bv[8]"
+		" && x > { 1 }:bv[8]).";
+
+	TEST_CASE("nonlinear blocks agree across solver placements") {
+		for (const char* s : { nonlinear, nonlinear_pair }) {
+			tref base = norm_under(s, solver_site::eager,
+				blast_site::per_leaf,
+				blast_mode::anti_prenex_result, false);
+			for (solver_site sp : { solver_site::per_closed_block,
+						solver_site::per_formula }) {
+				tref r = norm_under(s, sp, blast_site::per_leaf,
+					blast_mode::anti_prenex_result, false);
+				REQUIRE( r != nullptr );
+				CHECK( are_nso_equivalent<node_t>(r, base) );
+			}
+			// per_closed_block with blasting on per_block
+			tref r = norm_under(s, solver_site::per_closed_block,
+				blast_site::per_block,
+				blast_mode::anti_prenex_result, true);
+			REQUIRE( r != nullptr );
+			CHECK( are_nso_equivalent<node_t>(r, base) );
+		}
+	}
+
 	TEST_CASE("blast re-entry depth cap keeps the result sound") {
 		placement_guard g;
 		bv_blasting = true;

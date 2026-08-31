@@ -13,6 +13,26 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Recursive worker solving one equality f = 0 by successive
+ * variable elimination (TABA Theorem 3.1, quoted in the body).
+ * find_solution(eq), find_maximal_solution and find_minimal_solution
+ * seed @p substitution and call it; lgrs and solve_minterm_system reach
+ * it through find_solution(eq).
+ *
+ * Each level picks the first variable x of f, forms g = f[x:=1] and
+ * h = f[x:=0], and recurses on g & h = 0; while unwinding, x is assigned
+ * h(Z) (g'(Z) in maximum mode) evaluated under the deeper assignments,
+ * so on success @p substitution maps every variable of f to a constant.
+ *
+ * @param substitution In-out. Callers pre-seed a default value for every
+ * variable (1 for maximum, 0 for minimum); entries are overwritten in
+ * place and the map is also returned.
+ * @param mode maximum assigns g'(Z) per variable, any other mode h(Z).
+ * @return nullopt when @p eq has no bf_eq child, when the variable-free
+ * residual g & h is non-zero (the equality is unsatisfiable), or when f
+ * itself has no variables (callers handle constant equalities upfront).
+ */
 template <NodeType node>
 std::optional<solution<node>> find_solution(equality eq,
 	solution<node>& substitution, solver_mode mode)
@@ -109,12 +129,20 @@ std::optional<solution<node>> find_solution(equality eq,
 	return {};
 }
 
+/**
+ * @brief Top-level variables of an equation, in traversal order;
+ * duplicates are not removed.
+ */
 template <NodeType node>
 trefs get_variables(equality eq) {
 	using tau = tree<node>;
 	return tau::get(eq).select_top(is_child<node, tau::variable>);
 }
 
+/**
+ * @brief Variables of a whole system: those of the equality (if any)
+ * followed by those of each inequality; duplicates are not removed.
+ */
 template <NodeType node>
 trefs get_variables(const equation_system<node>& system) {
 	trefs vars;
@@ -139,6 +167,15 @@ bool var_free_holds(tref eq) {
 	return !tau::get(v).equals_F();
 }
 
+/**
+ * @brief Maximal solution of the system's equality part: seeds every
+ * variable of the system with 1 and runs find_solution in maximum mode.
+ *
+ * Inequalities only contribute variables to the seed here; whether the
+ * result satisfies them is checked by check_extreme_solution.
+ * @return Empty solution for a variable-free system, the all-1 seed
+ * when there is no equality, nullopt when the equality is unsatisfiable.
+ */
 template <NodeType node>
 std::optional<solution<node>> find_maximal_solution(const equation_system<node>& system) {
 	using tau = tree<node>;
@@ -158,6 +195,15 @@ std::optional<solution<node>> find_maximal_solution(const equation_system<node>&
 		: substitution;
 }
 
+/**
+ * @brief Minimal solution of the system's equality part: seeds every
+ * variable of the system with 0 and runs find_solution in minimum mode.
+ *
+ * Inequalities only contribute variables to the seed here; whether the
+ * result satisfies them is checked by check_extreme_solution.
+ * @return Empty solution for a variable-free system, the all-0 seed
+ * when there is no equality, nullopt when the equality is unsatisfiable.
+ */
 template <NodeType node>
 std::optional<solution<node>> find_minimal_solution(
 	const equation_system<node>& system)
@@ -234,6 +280,12 @@ std::optional<solution<node>> lgrs(equality eq) {
 	return phi;
 }
 
+// Input iterator enumerating the non-zero minterms of a BF f: every
+// polarity assignment H over f's variables yields the candidate minterm
+// x^H & f(H) (literal product times coefficient), and assignments whose
+// coefficient reduces to 0 are skipped. Dereferencing yields the current
+// minterm as a BF.
+//
 // SO-2: worst-case enumerates all 2^vars polarity combinations with no
 // cutoff or timeout, and solver_options has no budget/deadline field.
 // Capping this iterator would silently truncate the enumeration -- since
@@ -257,6 +309,12 @@ struct minterm_iterator {
 	class sentinel {};
 	static constexpr sentinel end{};
 
+	// Builds one choice per variable of f, each caching partial_bf (f
+	// with the preceding variables already substituted per their
+	// polarity) and partial_minterm (the product of the literals up to
+	// and including this one), then positions on the first non-zero
+	// minterm starting from the all-negative polarity vector. A
+	// variable-free f gives an immediately exhausted iterator.
 	minterm_iterator(tref f) {
 		// FIXME convert vars to a set
 		if (trefs vars = tau::get(f)
@@ -335,6 +393,10 @@ private:
 	tref current;
 	bool exhausted = false;
 
+	// Minterm selected by the current polarity vector: the last choice's
+	// partial_bf with its variable substituted per its polarity (the
+	// coefficient f(H)) conjoined with the full literal product; 0 means
+	// the coefficient vanishes and no minterm exists for this vector.
 	tref make_current_minterm() {
 		tref cte = choices.back().value
 			? rewriter::replace<node>(choices.back().partial_bf,
@@ -355,6 +417,10 @@ private:
 	// SO-6: iterative, not self-recursive -- one recursion frame per
 	// skipped zero-minterm overflowed the stack in debug builds for
 	// formulas with many variables.
+	// Advances the polarity vector like a binary counter (rightmost bit
+	// flips first), refreshes the partials the flip invalidated, and
+	// skips vectors whose minterm is 0; sets exhausted once the counter
+	// wraps around.
 	void make_next_choice() {
 		while (!exhausted) {
 			// update the choices from right to left
@@ -378,6 +444,10 @@ private:
 		}
 	}
 
+	// Recomputes partial_minterm and partial_bf from index start on,
+	// after a polarity flip. When a partial_bf reduces to 0 every
+	// minterm sharing that prefix is 0 as well, so the tail is forced
+	// to all-true and the next increment carries straight past it.
 	void update_choices_from(size_t start) {
 		if (start == 0) {
 			choices[0].partial_minterm = choices[0].value
@@ -410,6 +480,7 @@ private:
 	}
 };
 
+// Range adaptor over minterm_iterator: the non-zero minterms of a BF.
 template <NodeType node>
 struct minterm_range {
 	explicit minterm_range(tref f): f (f) {}
@@ -432,6 +503,11 @@ private:
 	const tref f;
 };
 
+// Input iterator over the candidate minterm systems of an inequality
+// system {g_i != 0}: the Cartesian product of the g_i's non-zero
+// minterms, one per inequality. Each dereference yields the set
+// {m_i != 0}, one candidate for solve_minterm_system; a solution of any
+// candidate solves the original system (cf. solve_inequality_system).
 template <NodeType node>
 struct minterm_inequality_system_iterator {
 
@@ -449,6 +525,9 @@ struct minterm_inequality_system_iterator {
 	struct sentinel {};
 	static constexpr sentinel end{};
 
+	// Builds one minterm range per inequality (over the bf of its
+	// bf_neq) and one iterator per range; exhausted from the start when
+	// the system is empty or some inequality has no non-zero minterm.
 	minterm_inequality_system_iterator(const inequality_system<node>& sys) {
 		if (sys.empty()) { exhausted = true; return; }
 		// for each inequality in the system, we create a minterm range
@@ -500,6 +579,8 @@ private:
 	minterm_system<node> current;
 	bool exhausted = false;
 
+	// Current candidate: each per-inequality iterator's minterm m,
+	// collected as an m != 0 atom.
 	minterm_system<node> make_current_minterm_system() {
 		minterm_system<node> minterms;
 		for (auto& it : minterm_iterators)
@@ -513,6 +594,9 @@ private:
 		return minterms;
 	}
 
+	// Odometer step over the per-inequality iterators: the rightmost
+	// advances, wrapping back to begin() and carrying leftwards;
+	// exhausted once every position has wrapped.
 	void make_next_choice() {
 		if (exhausted) return;
 		size_t last_changed_value = minterm_iterators.size();
@@ -533,6 +617,8 @@ private:
 	}
 };
 
+// Range adaptor over minterm_inequality_system_iterator for one
+// inequality system.
 template <NodeType node>
 class minterm_inequality_system_range {
 public:
@@ -555,6 +641,10 @@ private:
 	inequality_system<node> sys;
 };
 
+/**
+ * @brief Coefficient of a minterm: the conjunction, typed @p type_id,
+ * of the BA constants occurring at the top of @p m.
+ */
 template <NodeType node>
 tref get_constant(minterm m, size_t type_id) {
 	using tau = tree<node>;
@@ -568,6 +658,10 @@ tref get_constant(minterm m, size_t type_id) {
 	return build_bf_and<node>(all_vs, type_id);
 }
 
+/**
+ * @brief Exponent of a minterm (TABA notation X^H): the set of its
+ * top-level literals, i.e. plain and negated variables.
+ */
 template <NodeType node>
 subtree_set<node> get_exponent(tref n) {
 	using tau = tree<node>;
@@ -582,11 +676,27 @@ subtree_set<node> get_exponent(tref n) {
 	return subtree_set<node>(all_vs.begin(), all_vs.end());
 }
 
+/**
+ * @brief Constant-free part of a minterm: the conjunction, typed
+ * @p type_id, of its exponent's literals (see get_exponent).
+ */
 template <NodeType node>
 tref get_minterm(minterm m, size_t type_id) {
 	return build_bf_and<node>(get_exponent<node>(m), type_id);
 }
 
+/**
+ * @brief One step of minterm-system disjointing: rewrites @p m and the
+ * members of @p disjoint so that any two minterms with distinct
+ * exponents end up with disjoint, still non-zero coefficients (the five
+ * cases in the body; case 4, equal coefficients, needs a splitter).
+ *
+ * Precondition: @p disjoint is already pairwise disjoint in this sense.
+ * @param options type_id selects the algebra of the coefficients;
+ * splitter_one must be set for splitting a coefficient equal to 1.
+ * @return The enlarged system, or nullopt when a required splitter is
+ * missing or degenerates to 0.
+ */
 template <NodeType node>
 std::optional<minterm_system<node>> add_minterm_to_disjoint(
 	const minterm_system<node>& disjoint, minterm m,
@@ -692,6 +802,14 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 	return new_disjoint;
 }
 
+/**
+ * @brief Rewrites @p sys so that minterms with distinct exponents have
+ * pairwise disjoint coefficients, by folding add_minterm_to_disjoint
+ * over its elements (preparing Corollary 3.2's construction in
+ * solve_minterm_system).
+ * @return nullopt when a required splitter is missing or degenerate
+ * (propagated from add_minterm_to_disjoint).
+ */
 template <NodeType node>
 std::optional<minterm_system<node>> make_minterm_system_disjoint(
 	const minterm_system<node>& sys, const solver_options& options)
@@ -812,6 +930,18 @@ std::optional<solution<node>> solve_inequality_system(
 	return {};
 }
 
+/**
+ * @brief Core LGRS composition for a mixed system f = 0, {g_i != 0}:
+ * computes the LGRS phi of the equality, rewrites every inequality to
+ * h_i = g_i(phi(X)), solves {h_i != 0} for some T, and returns phi(T) —
+ * reproductivity of the LGRS guarantees f(phi(T)) = 0 (see the body).
+ *
+ * Degenerate systems are delegated: with no equality to
+ * solve_inequality_system, with no inequalities to find_solution.
+ * Variables of phi that T leaves free are set to 0 before evaluation.
+ * @return nullopt when the equality has no zero, when some rewritten
+ * inequality is identically F, or when {h_i != 0} has no solution.
+ */
 template <NodeType node>
 std::optional<solution<node>> solve_general_system(
 	const equation_system<node>& system, const solver_options& options)
@@ -921,6 +1051,12 @@ std::optional<solution<node>> solve_general_system(
 	return solution;
 }
 
+/**
+ * @brief Accepts or rejects a candidate extreme solution: substitutes
+ * it into each inequality of the system and fails on any that reduces
+ * to F. The equality part is not rechecked — the candidate solves it by
+ * construction.
+ */
 template <NodeType node>
 bool check_extreme_solution(const equation_system<node>& system,
 	const solution<node>& substitution)
@@ -945,6 +1081,11 @@ bool check_extreme_solution(const equation_system<node>& system,
 	return true;
 }
 
+/**
+ * @brief Tries the maximal solution of the equality part and keeps it
+ * only if it also satisfies the inequalities; nullopt otherwise,
+ * letting solve_system fall back to other strategies.
+ */
 template <NodeType node>
 std::optional<solution<node>> solve_maximum_system(
 	const equation_system<node>& system)
@@ -955,6 +1096,11 @@ std::optional<solution<node>> solve_maximum_system(
 	else return {};
 }
 
+/**
+ * @brief Tries the minimal solution of the equality part and keeps it
+ * only if it also satisfies the inequalities; nullopt otherwise,
+ * letting solve_system fall back to other strategies.
+ */
 template <NodeType node>
 std::optional<solution<node>> solve_minimum_system(
 	const equation_system<node>& system)
@@ -1233,6 +1379,11 @@ void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref
 	var_assignments.emplace(var, term);
 }
 
+/**
+ * @brief Whether @p f contains a bitvector arithmetic operator or a
+ * width cast — constructs the algebraic (lgrs) route cannot handle, so
+ * such clauses go to the cvc5-based solve_bv instead.
+ */
 template <NodeType node>
 bool has_bv_arithmetic(tref f) {
 	using tau = tree<node>;
@@ -1252,6 +1403,11 @@ bool has_bv_arithmetic(tref f) {
 	}) != nullptr;
 }
 
+/**
+ * @brief True iff @p conjs is non-empty and every conjunct is a bf_eq
+ * with no bv arithmetic or casts, so the bv partition can be squeezed
+ * and solved algebraically per width (via lgrs) instead of via cvc5.
+ */
 template <NodeType node>
 bool bv_conjs_only_pure_equality(const subtree_set<node>& conjs) {
 	using tau = tree<node>;

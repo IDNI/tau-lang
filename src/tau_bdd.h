@@ -200,6 +200,12 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	static tref to_tau_term(ref x, size_t term_type);
 
 private:
+	/**
+	 * @brief Ordering for and-many worklists: compares with the inverter
+	 * flag stripped, so a reference and its complement sort adjacently
+	 * (letting am_sort spot x AND x' = F); ties on the underlying node
+	 * fall back to the full comparison including the flag.
+	 */
 	static constexpr auto am_cmp = [](ref x, ref y) {
 		bool s = x < y;
 		x.inv = false, y.inv = false;
@@ -210,11 +216,47 @@ private:
 	// bdd_and/bdd_ite/bdd_ex/bdd_quant's workers above.
 	static ref bdd_and_many(refs v, const order& o,
 		std::unordered_map<refs, ref>& memo);
+	/**
+	 * @brief One Shannon-expansion step of the and-many recursion.
+	 *
+	 * Picks @p m, the order-smallest decision variable among the
+	 * non-leaf conjuncts of @p v, and cofactors every conjunct on it
+	 * into the high worklist @p h and low worklist @p l (both am_sort
+	 * canonicalised; conjuncts common to both are ANDed once via the
+	 * memoised recursion and re-inserted).
+	 *
+	 * @return Code telling the caller how to finish:
+	 * - 0: recurse on both @p h and @p l, result is add(m, high, low);
+	 * - 1: done, the final result is already in @p res (F on a
+	 *   contradiction, or the AND of the leaf values when no conjunct
+	 *   has a decision variable);
+	 * - 2: the low cofactor collapsed to F, recurse on @p h only,
+	 *   result is add(m, high, F);
+	 * - 3: the high cofactor collapsed to F, recurse on @p l only,
+	 *   result is add(m, F, low).
+	 */
 	static size_t bdd_and_many_iter(const refs& v, refs& h, refs& l, ref& res,
 		tref& m, const order& o, std::unordered_map<refs, ref>& memo);
+	/**
+	 * @brief Canonicalise an and-many worklist: sort by am_cmp, drop T,
+	 * dedupe, AND adjacent leaves together, and collapse the whole list
+	 * to {F} when it contains F or a complementary pair.
+	 */
 	static void am_sort(refs& b);
+	/**
+	 * @brief Rewrite @p v using one @p memo hit: if some memoised
+	 * argument set is a subset of @p v, replace that subset by its
+	 * memoised result ({F} collapses the list). Returns true iff @p v
+	 * changed; callers iterate it to a fixpoint.
+	 */
 	static bool am_simplify(refs& v, const std::unordered_map<refs, ref>& memo);
+	/**
+	 * @brief True iff every element of @p small occurs in @p big; both
+	 * must be non-empty and am_sort-ed (binary search plus range/size
+	 * quick rejects rely on that).
+	 */
 	static bool subset(const refs& small, const refs& big);
+	/** @brief Copy of @p x with the output-inverter flag cleared. */
 	static ref abs(ref x);
 	// Memoised recursive workers, independent of TAU_CACHE: the public
 	// entry points thread through a static map when TAU_CACHE is on, or
@@ -326,9 +368,20 @@ struct tau_term_bdd_handle {
 private:
 	using bdd_fv_cache_t = std::unordered_map<tref, free_vars_ref>;
 #ifdef TAU_CACHE
+	/**
+	 * @brief Worker for get_free_tau_vars: inserts into @p merged the
+	 * free variables of every decision variable in the BDD rooted at
+	 * @p bdd_tref, reusing (but not filling) per-node results already
+	 * present in @p cache.
+	 */
 	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged,
 		bdd_fv_cache_t& cache);
 #else
+	/**
+	 * @brief Worker for get_free_tau_vars: inserts into @p merged the
+	 * free variables of every decision variable in the BDD rooted at
+	 * @p bdd_tref.
+	 */
 	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged);
 #endif
 };

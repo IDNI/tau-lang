@@ -1,0 +1,67 @@
+# Deciding temporal specifications: sat, unsat, valid and normalize over
+# always/sometimes formulas.
+#
+# See demos/README.md for how to run this script.
+
+# demo_1.4 decided formulas about a single, fixed point in time. The same
+# commands decide whole temporal specifications -- formulas built with always
+# and sometimes over streams -- and that is the central claim of the Tau
+# language: whether a specification can be executed indefinitely, whatever its
+# inputs, is a question with a computable answer.
+
+# A specification is satisfiable when, for every input, at each step there
+# exist outputs matching it that do not depend on future inputs. The echo
+# specification is the simplest satisfiable example:
+
+sat always o1[t] = i1[t]
+
+# Satisfiability is decided against all possible input sequences. The next
+# specification demands an output disjoint from the input; since the input may
+# be 1, the output must then be 0, which the second conjunct forbids. No
+# program can promise this, so the specification is unsatisfiable:
+
+sat always (o1[t] & i1[t] = 0 && o1[t] != 0)
+
+# The interplay of always and sometimes is decided too. Repeating the previous
+# output forever makes the output constant, while the sometimes part demands
+# that it differs from the value two steps earlier -- a contradiction:
+
+sat (always o1[t] = o1[t-1]) && (sometimes o1[t] != o1[t-2])
+
+# unsat answers the complementary question, so it reports T where sat reports
+# F. A constant-0 output can never sometimes be 1:
+
+unsat (always o1[t] = 0) && (sometimes o1[t] = 1)
+
+# valid asks whether every program satisfies the specification:
+
+valid always (o1[t] = 0 || o1[t] != 0)
+
+# normalize works on temporal specifications as well, minimizing each temporal
+# part rather than answering T or F -- unless the specification is decided
+# outright. Note how the sometimes part comes back rewritten as an equation:
+
+n (always i1[t]o1[t] = 0) && (sometimes o1[t] = 1)
+
+# A specification with a lookback is satisfiable even though nothing pins its
+# first step: constraints mentioning t-1 only bind from step 1 onwards.
+
+sat always o1[t] = i1[t-1]
+
+# Constant time constraints (demo_1.1) participate in the decision. The
+# specification below writes 0 for the first three steps and 1 afterwards;
+# deciding it makes the engine unroll the constrained steps, and the printed
+# fixpoint shows that unrolling, including internal flag streams named _f*:
+
+sat always ([t < 3] -> o1[t] = 0) && ([t >= 3] -> o1[t] = 1)
+
+# Tightening the constraint into a contradiction flips the answer -- at step 0
+# both guards apply, and the output cannot be 0 and 1 at once:
+
+sat always ([t < 3] -> o1[t] = 0) && ([t >= 0] -> o1[t] = 1)
+
+# Deciding a specification is exactly what the run command of demo_3.1 does
+# before executing it: run refuses a specification whose sat check fails,
+# because no program could execute it indefinitely.
+
+quit
