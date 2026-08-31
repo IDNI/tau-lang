@@ -159,6 +159,16 @@ struct interpreter {
 	io_context<node> ctx;
 
 private:
+	/// Per io var, the file stream id its current stream object was opened
+	/// from (entries exist for file-backed streams only). Lets
+	/// `rebuild_inputs`/`rebuild_outputs` keep a file stream's object --
+	/// and with it its read position / already-written content -- across
+	/// the rebuilds `interpreter::update` performs after an accepted
+	/// update, instead of reopening (inputs) or truncating (outputs) the
+	/// file.
+	subtree_map<node, size_t> input_stream_sources;
+	subtree_map<node, size_t> output_stream_sources;
+
 	static bool stream_comp(tref s1, tref s2) {
 		return tau::subtree_less(s1, s2);
 	};

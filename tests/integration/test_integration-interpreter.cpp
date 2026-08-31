@@ -1,6 +1,85 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <filesystem>
+#include <fstream>
+
 #include "test_integration-interpreter_helper.h"
+
+// Pointwise revision rebuilds the interpreter's stream maps after every
+// accepted update (interpreter::update -> rebuild_inputs/rebuild_outputs).
+// A file-backed stream's position is execution state: rebuilding used to
+// construct fresh file streams, which reopened inputs at line 1 (so a
+// file-driven update stream re-proposed its first update forever) and
+// truncated outputs. These cases drive a real file_input_stream (declared
+// in the spec itself, not a vector-stream remap -- remaps preserve their
+// cursor through rebuild(), which is exactly why they never caught this).
+TEST_SUITE("Execution: revision stream continuity") {
+
+	TEST_CASE("revision keeps file input stream position") {
+		bdd_init<Bool>();
+		std::string in_file = random_file(".in");
+		{
+			std::ofstream f(in_file);
+			f << "o1[t] = 1.\n" << "o2[t] = 1.\n" << "o3[t] = 1.\n";
+		}
+		// The parse must see the ctx for the spec's file() definition to
+		// register its stream (see the ADT file-stream test).
+		io_context<node_t> ctx;
+		auto u_out = std::make_shared<vector_output_stream>();
+		ctx.add_output("u", tau_type_id<node_t>(), u_out);
+		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
+			"u[t] = i1[t].";
+		tref parsed = tau::get(sample, { .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		// run() both writes the output streams and drives revision, as
+		// the REPL does (raw step() does neither).
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		REQUIRE( maybe_i.has_value() );
+		std::filesystem::remove(in_file);
+		// The three proposals are all satisfiable and mutually
+		// compatible, so u must carry them in file order; with the
+		// rewind bug every step re-read the first line and o2/o3 never
+		// appeared in any u value.
+		auto values = u_out->get_values();
+		REQUIRE( values.size() == 3 );
+		CHECK( values[1].find("o2") != std::string::npos );
+		CHECK( values[2].find("o3") != std::string::npos );
+	}
+
+	TEST_CASE("revision keeps file output stream content") {
+		bdd_init<Bool>();
+		std::string in_file = random_file(".in");
+		std::string out_file = random_file(".out");
+		{
+			std::ofstream f(in_file);
+			// Only the middle step performs a (spec-changing) update;
+			// a T proposal changes nothing and skips the rebuild.
+			f << "T.\n" << "o2[t] = 1.\n" << "T.\n";
+		}
+		io_context<node_t> ctx;
+		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
+			"o1 : tau := out file(\"" + out_file + "\").\n"
+			"o1[t] = i1[t] && u[t] = i1[t].";
+		tref parsed = tau::get(sample, { .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		REQUIRE( maybe_i.has_value() );
+		// o1 echoes i1, one line per step. The update at step 1 used to
+		// reopen (and thereby truncate) the output file, losing the
+		// line step 0 had written.
+		size_t lines = 0;
+		{
+			std::ifstream f(out_file);
+			std::string line;
+			while (std::getline(f, line)) if (!line.empty()) ++lines;
+		}
+		std::filesystem::remove(in_file);
+		std::filesystem::remove(out_file);
+		CHECK( lines == 3 );
+	}
+}
 
 TEST_SUITE("Execution") {
 

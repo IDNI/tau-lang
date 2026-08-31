@@ -267,8 +267,21 @@ template<NodeType node>
 bool interpreter<node>::rebuild_inputs(
 	const subtree_map<node, size_t>& current_inputs)
 {
-	// Close all input streams
+	// A file-backed stream's read position is execution state: this
+	// rebuild runs not only at construction but after every accepted
+	// update (interpreter::update), and constructing a fresh
+	// file_input_stream reopens the file at its first line, re-feeding
+	// values the run has already consumed (a file-driven update stream
+	// then re-proposes its first update forever). Keep the previous
+	// stream object whenever the variable's backing file is unchanged
+	// (tracked in input_stream_sources). Remapped and console streams
+	// keep their own semantics: a remap's rebuild() already preserves
+	// whatever its owner shares, and console streams carry no position.
+	input_streams<node> previous_inputs = std::move(inputs);
+	subtree_map<node, size_t> previous_sources =
+					std::move(input_stream_sources);
 	inputs.clear();
+	input_stream_sources.clear();
 
 	// Reverse index from a flattened tuple member's own (canonized) io var
 	// to the adt_stream_layout root it belongs to (ctx.adt_streams, Task 7),
@@ -327,9 +340,40 @@ bool interpreter<node>::rebuild_inputs(
 					physical = std::make_unique<
 						adt_shared_physical_input_stream>(
 							remap->second->rebuild());
-				else if (layout.stream_id != 0)
-					physical = std::make_unique<file_input_stream>(
-						dict(layout.stream_id));
+				else if (layout.stream_id != 0) {
+					// Same continuity rule as the plain file branch
+					// below: reuse the group's previous physical file
+					// stream, reachable through any previous member
+					// adapter of this root. The reader itself is
+					// rebuilt against the current layout; only the
+					// physical stream (and its position) carries over.
+					std::shared_ptr<serialized_constant_input_stream>
+						old_physical;
+					for (auto& c : layout.components) {
+						auto ps = previous_sources.find(
+								c.io_var->get());
+						if (ps == previous_sources.end()
+							|| ps->second != layout.stream_id)
+								continue;
+						auto pv = previous_inputs.find(
+								c.io_var->get());
+						if (pv == previous_inputs.end()) continue;
+						if (auto m = std::dynamic_pointer_cast<
+							adt_member_input_stream<node>>(
+								pv->second))
+						{
+							old_physical = m->reader
+								->physical_stream();
+							break;
+						}
+					}
+					if (old_physical) physical = std::make_unique<
+						adt_shared_physical_input_stream>(
+							std::move(old_physical));
+					else physical = std::make_unique<
+						file_input_stream>(
+							dict(layout.stream_id));
+				}
 				else if (ctx.console_input_factory)
 					physical = std::make_unique<
 						adt_shared_physical_input_stream>(
@@ -348,6 +392,9 @@ bool interpreter<node>::rebuild_inputs(
 			adapter->reader = reader_it->second;
 			adapter->path = comp->path;
 			inputs.emplace(var, std::move(adapter));
+			if (layout.stream_id != 0 && !ctx.input_remaps.contains(
+					dict(root_sid)))
+				input_stream_sources[var] = layout.stream_id;
 			continue;
 		}
 
@@ -358,8 +405,21 @@ bool interpreter<node>::rebuild_inputs(
 				ctx.console_input_factory
 					? ctx.console_input_factory(vn)
 					: std::make_shared<console_prompt_input_stream>(vn));
-			else inputs.emplace(var,
-				std::make_shared<file_input_stream>(dict(stream_id)));
+			else {
+				// Continuity across update rebuilds (see the note at
+				// the top): keep the previous stream object when this
+				// variable already read from the same file.
+				auto ps = previous_sources.find(var);
+				auto pv = previous_inputs.find(var);
+				if (ps != previous_sources.end()
+					&& ps->second == stream_id
+					&& pv != previous_inputs.end())
+					inputs.emplace(var, pv->second);
+				else inputs.emplace(var,
+					std::make_shared<file_input_stream>(
+						dict(stream_id)));
+				input_stream_sources[var] = stream_id;
+			}
 		}
 	}
 	return true;
@@ -369,8 +429,15 @@ template<NodeType node>
 bool interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
 {
-	// Delete old streams
+	// Same continuity rule as rebuild_inputs: a fresh file_output_stream
+	// opens with truncation, so rebuilding after an accepted update used
+	// to wipe everything the run had already written. Keep the previous
+	// stream object when the variable's backing file is unchanged.
+	output_streams<node> previous_outputs = std::move(outputs);
+	subtree_map<node, size_t> previous_sources =
+					std::move(output_stream_sources);
 	outputs.clear();
+	output_stream_sources.clear();
 
 	// Same grouping as rebuild_inputs above, mirrored for the output side.
 	subtree_map<node, size_t> adt_member_root; // member io var -> root_name_sid
@@ -408,8 +475,36 @@ bool interpreter<node>::rebuild_outputs(
 				else if (layout.stream_id == 0)
 					physical = std::make_unique<
 						console_prompt_output_stream>(root_name);
-				else physical = std::make_unique<file_output_stream>(
-					dict(layout.stream_id));
+				else {
+					// Continuity: reuse the group's previous physical
+					// file stream (see rebuild_inputs' ADT branch).
+					std::shared_ptr<serialized_constant_output_stream>
+						old_physical;
+					for (auto& c : layout.components) {
+						auto ps = previous_sources.find(
+								c.io_var->get());
+						if (ps == previous_sources.end()
+							|| ps->second != layout.stream_id)
+								continue;
+						auto pv = previous_outputs.find(
+								c.io_var->get());
+						if (pv == previous_outputs.end()) continue;
+						if (auto m = std::dynamic_pointer_cast<
+							adt_member_output_stream<node>>(
+								pv->second))
+						{
+							old_physical = m->writer
+								->physical_stream();
+							break;
+						}
+					}
+					if (old_physical) physical = std::make_unique<
+						adt_shared_physical_output_stream>(
+							std::move(old_physical));
+					else physical = std::make_unique<
+						file_output_stream>(
+							dict(layout.stream_id));
+				}
 				writer_it = adt_writers.emplace(root_sid,
 					std::make_shared<adt_tuple_writer<node>>(
 						std::move(physical), layout)).first;
@@ -421,6 +516,9 @@ bool interpreter<node>::rebuild_outputs(
 			adapter->writer = writer_it->second;
 			adapter->path = comp->path;
 			outputs.emplace(var, std::move(adapter));
+			if (layout.stream_id != 0 && !ctx.output_remaps.contains(
+					dict(root_sid)))
+				output_stream_sources[var] = layout.stream_id;
 			continue;
 		}
 
@@ -429,8 +527,19 @@ bool interpreter<node>::rebuild_outputs(
 		else {
 			if (stream_id == 0) outputs.emplace(var,
 				std::make_shared<console_prompt_output_stream>(vn));
-			else outputs.emplace(var,
-				std::make_shared<file_output_stream>(dict(stream_id)));
+			else {
+				// Continuity across update rebuilds (see above).
+				auto ps = previous_sources.find(var);
+				auto pv = previous_outputs.find(var);
+				if (ps != previous_sources.end()
+					&& ps->second == stream_id
+					&& pv != previous_outputs.end())
+					outputs.emplace(var, pv->second);
+				else outputs.emplace(var,
+					std::make_shared<file_output_stream>(
+						dict(stream_id)));
+				output_stream_sources[var] = stream_id;
+			}
 		}
 	}
 	return true;

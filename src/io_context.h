@@ -136,6 +136,7 @@ struct repl_pending_input_stream : public serialized_constant_input_stream {
 	virtual ~repl_pending_input_stream() = default;
 	/** @brief Rebuild by returning a new `repl_pending_input_stream`. */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
+	/** @brief Sequential variant of `get(time_point)`: same contract. */
 	virtual std::optional<std::string> get() override;
 	/** @brief Return the set value, or "" after flagging `awaiting()`. */
 	virtual std::optional<std::string> get(size_t time_point) override;
@@ -549,7 +550,21 @@ struct adt_tuple_writer {
 	 */
 	bool collect(size_t time_point, const std::vector<size_t>& path,
 		const std::string& leaf);
+	/**
+	 * @brief The group's single physical stream.
+	 *
+	 * Mirror of `adt_tuple_reader::physical_stream`: lets
+	 * `interpreter::rebuild_outputs` carry the group's file-backed
+	 * physical stream over into the writer it builds for a revised
+	 * specification, so an accepted update does not reopen (and thereby
+	 * truncate) the tuple stream's output file.
+	 */
+	std::shared_ptr<serialized_constant_output_stream> physical_stream() const {
+		return physical;
+	}
 private:
+	/// @brief Format @p leaves as one nested tuple literal, members in
+	/// layout order, nesting rebuilt from their paths (wire format).
 	std::string format(const std::map<std::vector<size_t>, std::string>& leaves) const;
 
 	std::shared_ptr<serialized_constant_output_stream> physical;
