@@ -72,9 +72,35 @@ template <NodeType node>
 tref syntactic_path_simplification_simplify_wff(tref root) {
 	using tau = tree<node>;
 	tref skip = nullptr;
-	auto down = [&skip](tref n) {
+	// A conjunction whose conjuncts yield no assignment cannot yield one
+	// at any nested wff_and of its own flattening either: their conjuncts
+	// are a subset. Mark those nested nodes done once, or the conjuncts
+	// of a k-chain get re-collected at each of its k spine nodes.
+	//
+	// Invariant this relies on: mark_spine visits exactly the wff nodes
+	// that get_cnf_wff_clauses (get_leaves along the wff_and spine)
+	// descends through, so a marked node's conjuncts are a subset of
+	// the marking node's. Both walk the same spine: a wff whose child
+	// is wff_and, then that wff_and's children. If one of them changes,
+	// the other must follow; the debug check below catches a drift.
+	std::unordered_set<tref> done;
+	auto mark_spine = [&done](auto&& self, tref m) -> void {
+		if (!tau::get(m).is(tau::wff)) return;
+		if (!tau::get(m)[0].is(tau::wff_and)) return;
+		if (!done.insert(m).second) return;
+		for (tref c : tau::get(m)[0].children()) self(self, c);
+	};
+	auto down = [&skip, &done, &mark_spine](tref n) {
 		// Skip intermediate nodes
 		if (!tau::get(n).is(tau::wff)) return n;
+		if (done.count(n)) {
+			// A marked node must yield no assumption: every conjunct
+			// of its flattening is a disjunction (the only conjuncts
+			// the loop below skips).
+			DBG(for (tref l : get_cnf_wff_clauses<node>(n))
+				assert(tau::get(l).child_is(tau::wff_or));)
+			return n;
+		}
 		const tau& t_n = tau::get(n)[0];
 		// Skip or
 		if (t_n.is(tau::wff_or))
@@ -91,6 +117,7 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 				assignments.emplace(tau::trim2(l), _F<node>());
 			else assignments.emplace( l, _T<node>());
 		}
+		if (assignments.empty()) mark_spine(mark_spine, n);
 		tref simp = rewriter::replace(n, assignments);
 		// If simp is false, current branch is not sat
 		if (tau::get(simp).equals_F()) {

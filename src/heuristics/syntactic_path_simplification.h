@@ -13,6 +13,8 @@
 #ifndef __IDNI__TAU__SYNTACTIC_PATH_SIMPLIFICATION_H__
 #define __IDNI__TAU__SYNTACTIC_PATH_SIMPLIFICATION_H__
 
+#include <unordered_set>
+
 namespace idni::tau_lang {
 
 /**
