@@ -173,6 +173,7 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	auto root = rep.open_if(benchmarks, "run");
 	string src;
 	auto finish = [&](int code) -> int {
+		root.close();
 		// Benchmarks stay plain text: the parser's global TC colorizes
 		// report::print() output unconditionally, which would corrupt a
 		// piped or logged benchmark stream.

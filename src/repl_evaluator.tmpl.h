@@ -302,6 +302,7 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 		if (!applied.has_value()) {
 			applied.print(err);
 			rep.append(std::move(applied).report());
+			root.close();
 			print_benchmarks(rep);
 			return r;
 		}
@@ -309,6 +310,7 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 		rep.append(std::move(applied).report());
 		r = onf<node>(a, var);
 	}
+	root.close();
 	print_benchmarks(rep);
 	return r;
 }
@@ -390,6 +392,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 		if (!applied.has_value()) {
 			applied.print(err);
 			rep.append(std::move(applied).report());
+			root.close();
 			print_benchmarks(rep);
 			return r;
 		}
@@ -401,6 +404,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 		default: return invalid_argument();
 		}
 	}
+	root.close();
 	print_benchmarks(rep);
 	return r;
 }
