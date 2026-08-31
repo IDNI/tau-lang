@@ -129,10 +129,23 @@ struct fixed_point_transformer {
 			if (!fp) return nullptr;
 			return changes.emplace(n, fp).first->second;
 		}
-		// RR-6: `changes` is only ever keyed by the parent nodes, so
-		// the old contains(ref) propagation branch here was dead --
-		// the rebuild always returned the identical canonical node.
-		return n;
+		// RR-6 claimed this propagation branch was dead ("changes is
+		// only ever keyed by the parent nodes") and replaced it with
+		// `return n`. That is falsified in practice: without the
+		// propagation, a self-recreating definition pair
+		// (g(x) := h(g(x)), h(x) := x') makes the fixpoint machinery
+		// enumerate ever-growing h-wrapped steps that no oscillation
+		// or visited check can catch -- an uninterruptible hang on
+		// `n g(0:sbf)` (demo_6.1's defpasses section). Keep main's
+		// propagating rebuild.
+		bool changed = false;
+		trefs ch;
+		if (changes.contains(ref))
+			changed = true, ch.push_back(changes[ref]);
+		else ch.push_back(ref);
+		auto nn = tau::get(t.value, ch);
+		if (changed) changes[n] = nn;
+		return nn;
 	}
 
 	// The value calculate_fixed_point returns when the enumeration loops:

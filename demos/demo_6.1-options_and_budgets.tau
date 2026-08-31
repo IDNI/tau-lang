@@ -71,17 +71,19 @@ n b(y:sbf) fallback last
 set enumsteps 0
 n b(y:sbf) fallback last
 
-# defpasses caps definition expansion. The pair below re-creates g2 with
-# every expansion pass, so it can never settle; the budget bounds how many
-# passes are attempted before reporting. (Uncapped, an oscillation detector
-# catches this particular pair too -- the budget is for the searches nothing
-# detects.)
+# defpasses caps definition expansion, and rewriterounds caps the rewrite
+# rounds inside a single pass. The pair below re-creates g2 with every
+# expansion, so it can never settle -- and beside recurrence relations the
+# expansion can grow instead of cycling, which no oscillation detector can
+# catch. Only a budget stops such a search and reports:
 
 set defpasses 1
+set rewriterounds 200
 g2(x):sbf := h2(g2(x))
 h2(x):sbf := x'
 n g2(0:sbf)
 set defpasses 0
+set rewriterounds 0
 
 # The remaining budgets follow the same pattern on other searches: maxsplits,
 # maxrounds, blastdepth and squeezecap bound anti-prenexing, maxclauses bounds

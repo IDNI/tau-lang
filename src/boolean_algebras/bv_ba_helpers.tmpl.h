@@ -39,8 +39,16 @@ template<NodeType node>
 bool is_zero_bv_constant(tref t) {
 	using tau = tree<node>;
 
+	DBG( LOG_INFO << "Checking if tref " << LOG_FM_TREE(t) << " is a zero bitvector constant.\n"; )
 
+	DBG( assert(tau::get(t).is_ba_constant()); )
 
+	auto constant = tau::get(t).get_ba_constant();
+	auto cte = std::get<bv>(constant);
+	if (!cte.isBitVectorValue()) return false;
+	std::string bv_str = cte.getBitVectorValue();
+	return bv_str == "0";
+}
 
 // Build a BA-constant tree node holding the all-zero bitvector of
 // `bitwidth` bits, typed with the bv[bitwidth] type id.

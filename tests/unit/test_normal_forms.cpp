@@ -275,6 +275,8 @@ TEST_SUITE("normal forms: onf") {
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_ex>) != nullptr );
 		tref result = onf<node_t>(fm, x);
 		CHECK( tau::get(result).find_top(is<node_t, tau::wff_ex>) != nullptr );
+	}
+
 	// The bf_neq loop of onf_subformula: a `!=` atom mentioning the onf
 	// variable is rebuilt as the order-constraint pair
 	// bf_nlteq(f_0, x) || bf_nlteq(x, f_1), which the downstream
