@@ -73,10 +73,10 @@ static tref wff(const char* s) {
 
 TEST_SUITE("LTL parser") {
 
-	TEST_CASE("F operator parses as wff_F") {
+	TEST_CASE("F operator parses as wff_sometimes") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_F));
+		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
 	TEST_CASE("U operator parses as wff_U") {
@@ -110,10 +110,19 @@ TEST_SUITE("LTL parser") {
 		CHECK(tau::get(fm)[0].is(tau::wff_f));
 	}
 
-	TEST_CASE("has_ltl_operators: true for F") {
+	TEST_CASE("has_ltl_operators: false for top-level F, true nested") {
+		// F is one node with sometimes: a top-level F belongs to the
+		// safety fragment; a nested eventually routes to the LTL
+		// pipeline.
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
-		CHECK(has_ltl_operators<node_t>(fm));
+		CHECK_FALSE(has_ltl_operators<node_t>(fm));
+		tref gf = wff("G (F (o1[t] = 0))");
+		REQUIRE(gf != nullptr);
+		CHECK(has_ltl_operators<node_t>(gf));
+		tref fg = wff("F (G (o1[t] = 0))");
+		REQUIRE(fg != nullptr);
+		CHECK(has_ltl_operators<node_t>(fg));
 	}
 
 	TEST_CASE("has_ltl_operators: false for G/always only") {
@@ -169,9 +178,9 @@ TEST_SUITE("LTL(ABA) realizability") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(input = 0) is unrealizable") {
+	TEST_CASE("G(F(input = 0) is unrealizable") {
 		// System cannot force an input variable; environment can always send 1.
-		tref fm = spec("F (i1[t] = 0).");
+		tref fm = spec("G (F (i1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -291,11 +300,11 @@ TEST_SUITE("LTL printer") {
 		return s.find(sub) != std::string::npos;
 	};
 
-	TEST_CASE("F operator prints as 'F'") {
+	TEST_CASE("F operator prints as 'sometimes' (canonical spelling)") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::string s = tau::get(fm).to_str();
-		CHECK(has_substr(s, "F "));
+		CHECK(has_substr(s, "sometimes "));
 	}
 
 	TEST_CASE("U operator prints as 'U'") {
@@ -423,7 +432,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 
 	TEST_CASE("unrealizable F(input = 0) returns nullptr") {
 		// The system cannot force inputs; the formula is unrealizable.
-		tref fm = spec("F (i1[t] = 0).");
+		tref fm = spec("G (F (i1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		tref safety = ltl_to_safety_formula<node_t>(fm);
 		CHECK(safety == nullptr);
@@ -500,8 +509,9 @@ TEST_SUITE("LTL normalization correctness") {
 		// structurally wrapped by checking the outermost node.
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		// The raw parsed formula should have wff_F at the top (not wff_always).
-		CHECK(tau::get(fm)[0].is(tau::wff_F));
+		// The raw parsed formula should have wff_sometimes at the top
+		// (not wff_always).
+		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 }
 
@@ -539,8 +549,8 @@ TEST_SUITE("LTL equivalences") {
 	}
 
 	// F(i=0) and T U (i=0) are both unrealizable — same semantics.
-	TEST_CASE("F(i=0) and T U (i=0) have same (un)realizability") {
-		tref f1 = spec("F (i1[t] = 0).");
+	TEST_CASE("G(F(i=0) and T U (i=0) have same (un)realizability") {
+		tref f1 = spec("G (F (i1[t] = 0)).");
 		tref f2 = spec("(T U (i1[t] = 0)).");
 		REQUIRE(f1 != nullptr);
 		REQUIRE(f2 != nullptr);
@@ -824,6 +834,10 @@ TEST_SUITE("LTL interpreter dispatch") {
 	// Helper: parse spec with io_context populated from the formula string.
 	static std::optional<interpreter<node_t>>
 	make_ltl_interp(const char* s) {
+		// The classical execution path gives sometimes/F obligations
+		// sbf-typed eventual-variable flags; solving them needs the
+		// BDD backend.
+		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto nso = get_nso_rr<node_t>(ctx, tau::get(s));
 		if (!nso.has_value()) return {};
@@ -964,16 +978,16 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	}
 
 	// UNREALIZABLE: F(o1&i1=1) — system can set o1=1 but environment may never set i1=1.
-	TEST_CASE("F(o1&i1=1) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] & i1[t]) = 1).");
+	TEST_CASE("G(F(o1&i1=1) is UNREALIZABLE") {
+		tref fm = spec("G (F((o1[t] & i1[t]) = 1)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// UNREALIZABLE: F(o1|i1=0) — o1|i1=0 requires BOTH to be 0;
 	// environment can always make i1 nonzero.
-	TEST_CASE("F(o1|i1=0) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] | i1[t]) = 0).");
+	TEST_CASE("G(F(o1|i1=0) is UNREALIZABLE") {
+		tref fm = spec("G (F((o1[t] | i1[t]) = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1030,15 +1044,15 @@ TEST_SUITE("LTL interpreted tau constants") {
 	}
 
 	// UNREALIZABLE with {T.}: F(o1&i1={T.}) — system can't force environment to 1.
-	TEST_CASE("F(o1&i1={T.}) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] & i1[t]) = {T.}:tau).");
+	TEST_CASE("G(F(o1&i1={T.}) is UNREALIZABLE") {
+		tref fm = spec("G (F((o1[t] & i1[t]) = {T.}:tau)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// UNREALIZABLE with {F.}: F(o1|i1={F.}) — environment can always make i1 nonzero.
-	TEST_CASE("F(o1|i1={F.}) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] | i1[t]) = {F.}:tau).");
+	TEST_CASE("G(F(o1|i1={F.}) is UNREALIZABLE") {
+		tref fm = spec("G (F((o1[t] | i1[t]) = {F.}:tau)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1271,18 +1285,18 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 
 	// ── sbf UNREALIZABLE cases ────────────────────────────────────────────────
 
-	TEST_CASE("F(o1:sbf & i1:sbf = 1) is UNREALIZABLE") {
+	TEST_CASE("G(F(o1:sbf & i1:sbf = 1) is UNREALIZABLE") {
 		bdd_init<Bool>();
 		// Environment can always keep i1:sbf = 0, preventing o1&i1 = 1.
-		tref fm = spec("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
+		tref fm = spec("G (F ((o1[t]:sbf & i1[t]:sbf) = 1)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:sbf | i1:sbf = 0) is UNREALIZABLE") {
+	TEST_CASE("G(F(o1:sbf | i1:sbf = 0) is UNREALIZABLE") {
 		bdd_init<Bool>();
 		// Requires both o1 and i1 to be 0; environment can always keep i1 != 0.
-		tref fm = spec("F ((o1[t]:sbf | i1[t]:sbf) = 0).");
+		tref fm = spec("G (F ((o1[t]:sbf | i1[t]:sbf) = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1386,10 +1400,10 @@ TEST_SUITE("LTL bitvector type with nontrivial constants") {
 
 	// ── bv UNREALIZABLE case ──────────────────────────────────────────────────
 
-	TEST_CASE("F(o1:bv[8] & i1:bv[8] = {#b10110101}:bv[8]) is UNREALIZABLE") {
+	TEST_CASE("G(F(o1:bv[8] & i1:bv[8] = {#b10110101}:bv[8]) is UNREALIZABLE") {
 		// System can set o1 to any value, but environment can keep i1=0,
 		// ensuring o1&i1 never matches the target pattern.
-		tref fm = spec("F ((o1[t]:bv[8] & i1[t]:bv[8]) = {#b10110101}:bv[8]).");
+		tref fm = spec("G (F ((o1[t]:bv[8] & i1[t]:bv[8]) = {#b10110101}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1510,10 +1524,10 @@ TEST_SUITE("LTL dyadic type with nontrivial constants") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1:qint & i1:qint) = {top}:qint) is UNREALIZABLE") {
+	TEST_CASE("G(F((o1:qint & i1:qint) = {top}:qint) is UNREALIZABLE") {
 		// Intersection = top requires both operands = top.
 		// Environment can keep i1 != top, so the system cannot force the meet = top.
-		tref fm = spec("F ((o1[t]:qint & i1[t]:qint) = {top}:qint).");
+		tref fm = spec("G (F ((o1[t]:qint & i1[t]:qint) = {top}:qint)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1558,9 +1572,9 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1:qlt & i1:qlt) = {top}:qlt) is UNREALIZABLE") {
+	TEST_CASE("G(F((o1:qlt & i1:qlt) = {top}:qlt) is UNREALIZABLE") {
 		// Intersection = top requires both to be top; env can keep i1 != top.
-		tref fm = spec("F ((o1[t]:qlt & i1[t]:qlt) = {top}:qlt).");
+		tref fm = spec("G (F ((o1[t]:qlt & i1[t]:qlt) = {top}:qlt)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1598,9 +1612,9 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1:qlt & i1:qlt) = {3}:qlt) is UNREALIZABLE (env blocks singleton)") {
+	TEST_CASE("G(F((o1:qlt & i1:qlt) = {3}:qlt) is UNREALIZABLE (env blocks singleton)") {
 		// Need both o1 = {3} and i1 = {3}; env can play i1 ≠ {3} forever.
-		tref fm = spec("F ((o1[t]:qlt & i1[t]:qlt) = {3}:qlt).");
+		tref fm = spec("G (F ((o1[t]:qlt & i1[t]:qlt) = {3}:qlt)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1643,9 +1657,9 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1:qlt & i1:qlt) = {c}:qlt) is UNREALIZABLE (env blocks named singleton)") {
+	TEST_CASE("G(F((o1:qlt & i1:qlt) = {c}:qlt) is UNREALIZABLE (env blocks named singleton)") {
 		// As with the interpreted constant case: env can play i1 ≠ {c} forever.
-		tref fm = spec("F ((o1[t]:qlt & i1[t]:qlt) = {c}:qlt).");
+		tref fm = spec("G (F ((o1[t]:qlt & i1[t]:qlt) = {c}:qlt)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1696,10 +1710,10 @@ TEST_SUITE("LTL nlang type with nontrivial constants") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1:nlang & i1:nlang) = {everything}:nlang) is UNREALIZABLE") {
+	TEST_CASE("G(F((o1:nlang & i1:nlang) = {everything}:nlang) is UNREALIZABLE") {
 		// Meet = everything requires both operands to be everything.
 		// Environment can keep i1 != everything, blocking realization.
-		tref fm = spec("F ((o1[t]:nlang & i1[t]:nlang) = {everything}:nlang).");
+		tref fm = spec("G (F ((o1[t]:nlang & i1[t]:nlang) = {everything}:nlang)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1778,11 +1792,11 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1[t] & i1[t-1]) = {T.}:tau) is UNREALIZABLE (width 1)") {
+	TEST_CASE("G(F((o1[t] & i1[t-1]) = {T.}:tau) is UNREALIZABLE (width 1)") {
 		// Meet = top requires o1=top AND i1[t-1]=top.  The environment controls
 		// i1[t-1] and can always choose i1[t-1] ≠ top, so no output strategy
 		// can force the meet = top for all inputs.
-		tref fm = spec("F ((o1[t]:tau & i1[t-1]:tau) = {T.}:tau).");
+		tref fm = spec("G (F ((o1[t]:tau & i1[t-1]:tau) = {T.}:tau)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1809,9 +1823,9 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1[t] & i1[t-2]) = {T.}:tau) is UNREALIZABLE (width 2)") {
+	TEST_CASE("G(F((o1[t] & i1[t-2]) = {T.}:tau) is UNREALIZABLE (width 2)") {
 		// Same argument as t-1 case: environment keeps i1[t-2] ≠ top.
-		tref fm = spec("F ((o1[t]:tau & i1[t-2]:tau) = {T.}:tau).");
+		tref fm = spec("G (F ((o1[t]:tau & i1[t-2]:tau) = {T.}:tau)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1839,9 +1853,9 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F((o1[t] & i1[t-3]) = {T.}:tau) is UNREALIZABLE (width 3)") {
+	TEST_CASE("G(F((o1[t] & i1[t-3]) = {T.}:tau) is UNREALIZABLE (width 3)") {
 		// Environment keeps i1[t-3] ≠ top; meet can never be top.
-		tref fm = spec("F ((o1[t]:tau & i1[t-3]:tau) = {T.}:tau).");
+		tref fm = spec("G (F ((o1[t]:tau & i1[t-3]:tau) = {T.}:tau)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1875,16 +1889,16 @@ TEST_SUITE("LTL nontrivial oracle: inputs + outputs + lookback") {
 	// Propositionally REALIZABLE (both props can be true); ABA oracle rejects:
 	//   ∀i1[t-1]. ∃o1[t]. (o1={X&Y}) ∧ (o1=i1[t-1])
 	// fails when i1[t-1] ≠ {X&Y}.
-	TEST_CASE("F(o1:sbf={X&Y} && o1:sbf=i1[t-1]:sbf) is UNREALIZABLE (env blocks)") {
-		tref fm = spec("F ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf)).");
+	TEST_CASE("G(F(o1:sbf={X&Y} && o1:sbf=i1[t-1]:sbf) is UNREALIZABLE (env blocks)") {
+		tref fm = spec("G (F ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf))).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// UNREALIZABLE (qlt): requires o1 = {[0,1]} AND o1 = i1[t-1] at same step.
 	// Environment can keep i1[t-1] ≠ {[0,1]} forever.
-	TEST_CASE("F(o1:qlt={[0,1]} && o1:qlt=i1[t-1]:qlt) is UNREALIZABLE (env blocks, qlt)") {
-		tref fm = spec("F ((o1[t]:qlt = {[0, 1]}:qlt) && (o1[t]:qlt = i1[t-1]:qlt)).");
+	TEST_CASE("G(F(o1:qlt={[0,1]} && o1:qlt=i1[t-1]:qlt) is UNREALIZABLE (env blocks, qlt)") {
+		tref fm = spec("G (F ((o1[t]:qlt = {[0, 1]}:qlt) && (o1[t]:qlt = i1[t-1]:qlt))).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2257,8 +2271,8 @@ TEST_CASE("(o1[t]:sbf = i2[t-1]:sbf) U ((o1[t]:sbf = {X}:sbf) R (o2[t]:sbf = {Y}
     CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf)) is UNREALIZABLE") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf)).");
+TEST_CASE("G(F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf)) is UNREALIZABLE") {
+    tref fm = spec("G (F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
@@ -2327,8 +2341,8 @@ TEST_CASE("(o1[t]:sbf = {X & Y}:sbf) W (o2[t]:sbf = i1[t-1]:sbf && o2[t]:sbf = {
     CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("F (o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf) is UNREALIZABLE") {
-    tref fm = spec("F (o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf).");
+TEST_CASE("G(F(o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf) is UNREALIZABLE") {
+    tref fm = spec("G (F (o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
@@ -2441,7 +2455,7 @@ TEST_CASE("sbf: Deeply nested until with ABA consistency (REALIZABLE)") {
 }
 
 TEST_CASE("sbf: ABA inconsistency with output forced to equal past input (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec("G (F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
@@ -2477,7 +2491,7 @@ TEST_CASE("sbf: Complex nesting with mirroring current input (REALIZABLE)") {
 }
 
 TEST_CASE("sbf: Unrealizable due to forced input equality across time (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-2]:sbf) && (o2[t]:sbf = i1[t-3]:sbf) && (o1[t]:sbf = {X}:sbf) && (o2[t]:sbf = {X'}:sbf)).");
+    tref fm = spec("G (F((o1[t]:sbf = i1[t-2]:sbf) && (o2[t]:sbf = i1[t-3]:sbf) && (o1[t]:sbf = {X}:sbf) && (o2[t]:sbf = {X'}:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
@@ -2723,13 +2737,13 @@ TEST_CASE("Unrealizable: Always o1 equals both i1 and i2, forcing i1=i2 always (
 }
 
 TEST_CASE("Unrealizable: Eventually o1 equals both constant 3 and i1 from two steps ago (qlt)") {
-    tref fm = spec("F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) ).");
+    tref fm = spec("G (F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) )).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
 
 TEST_CASE("Unrealizable: Eventually o1=3, o2=1/2, and both mirror inputs from two steps ago (qlt)") {
-    tref fm = spec("F( (o1[t]:qlt = {3}:qlt) && (o2[t]:qlt = {1/2}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) && (o2[t]:qlt = i2[t-2]:qlt) ).");
+    tref fm = spec("G (F( (o1[t]:qlt = {3}:qlt) && (o2[t]:qlt = {1/2}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) && (o2[t]:qlt = i2[t-2]:qlt) )).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
@@ -2755,7 +2769,7 @@ TEST_CASE("SBF: Realizable nested until with past input and release") {
 }
 
 TEST_CASE("SBF: Unrealizable due to forcing past input to specific constant") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec("G (F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 }
@@ -2834,7 +2848,7 @@ TEST_CASE("[SU-02] (o1:qlt={3}) U ((o2:qlt={1/2}) S (o1[t-1]:qlt=i1[t-1]:qlt)) i
 }
 
 TEST_CASE("[SU-03] F((o1[t]:sbf & i1[t]:sbf) = 1) is UNREALIZABLE (S pending)") {
-    tref fm = spec("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
+    tref fm = spec("G (F ((o1[t]:sbf & i1[t]:sbf) = 1)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); // TODO: S compilation
 }
@@ -3048,7 +3062,7 @@ TEST_CASE("[SU-37] (((o1:sbf={X&Y}) U (i1[t-1]:sbf={Z})) S (o2:sbf=i2[t-2]:sbf))
 }
 
 TEST_CASE("[SU-38] F((o1:qlt=i1[t]:qlt) & (i2[t]:qlt={0})) is UNREALIZABLE (S pending)") {
-    tref fm = spec("F ((o1[t]:qlt = i1[t]:qlt) && (i2[t]:qlt = {0}:qlt)).");
+    tref fm = spec("G (F ((o1[t]:qlt = i1[t]:qlt) && (i2[t]:qlt = {0}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); // TODO: S compilation
 }
@@ -3511,7 +3525,7 @@ TEST_SUITE("Adversarial: parser and errors") {
 	TEST_CASE("Deep nesting of F operators") {
 		tref fm = spec("F(F(F(F(o1[t] = 0)))).");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_F));
+		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
 	TEST_CASE("F applied to boolean true") {

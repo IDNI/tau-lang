@@ -326,6 +326,16 @@ tref normalize(tref form) {
 			// normalize_temporal_quantifiers already does.
 			if (!is_aw && !is_child<node>(temp, tau::wff_sometimes))
 				continue;
+			// F and sometimes are one node now, so a NESTED
+			// eventually (G(F φ), F(G φ), F(F φ)) matches here
+			// where the old separate wff_F spelling did not.
+			// Those shapes belong to the ltl_aba pipeline;
+			// running the quantifier eliminator under them only
+			// manufactures NZ-1 fallbacks and mixed-type QE
+			// errors. Leave them untouched, like U/R/W/S/T.
+			if (tau::get(tau::trim2(temp)).find_top(
+					is_temporal_quantifier<node>))
+				continue;
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
 			f = eliminate_bv_and_quantifiers<node>(f);
@@ -507,7 +517,7 @@ tref get_ref(tref n) {
 }
 
 // Check that the Tau formula does not use Boolean combinations of models.
-// LTL formulas (containing wff_F / wff_U / wff_R / wff_W) are handled by the
+// LTL formulas (containing wff_U / wff_R / wff_W) are handled by the
 // LTL(ABA) pipeline and bypass the safety pipeline entirely, so they are
 // exempt from this check.
 template <NodeType node>
@@ -518,7 +528,7 @@ bool has_no_boolean_combs_of_models(tref n) {
 		const auto& t = tau::get(x);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tau::wff_F || nt == tau::wff_U
+		return nt == tau::wff_U
 		    || nt == tau::wff_R || nt == tau::wff_W
 		    || nt == tau::wff_A || nt == tau::wff_E
 		    || nt == tau::wff_semantic_neg;
@@ -526,15 +536,11 @@ bool has_no_boolean_combs_of_models(tref n) {
 	if (tau::get(n).find_top(is_ltl_op)) return true;
 	const auto& fm = tau::get(n);
 	if (is<node>(fm.first(), tau::wff_always)) {
-		// check that there is no wff_always or wff_F in the subtree
+		// check that there is no wff_always in the subtree
 		if (fm[0][0].find_top(is<node, tau::wff_always>))
-			return false;
-		if (fm[0][0].find_top(is<node, tau::wff_F>))
 			return false;
 	} else {
 		if (fm.find_top(is<node, tau::wff_always>))
-			return false;
-		if (fm.find_top(is<node, tau::wff_F>))
 			return false;
 	}
 	return true;
@@ -612,7 +618,6 @@ bool is_non_temp_nso_satisfiable(tref n) {
 
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
-	DBG(assert(!fm.find_top(is<node, tau::wff_F>));)
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
@@ -649,7 +654,6 @@ bool is_non_temp_nso_unsat(tref n) {
 	using tau = tree<node>;
 	DBG(assert(n != nullptr));
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
-	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_F>));)
 
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
@@ -1155,6 +1159,17 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	const auto& t = tau::get(clause);
 	trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
 	trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
+	// F and sometimes are one node now, so a nested eventually (G(F φ),
+	// F(G φ)) surfaces in these selections where the old wff_F spelling
+	// stayed invisible. Such clauses belong to the ltl_aba pipeline; the
+	// pairwise always/sometimes machinery below cannot decide them (NZ-1
+	// conservative fallbacks only), so leave them untouched.
+	auto nested_temporal = [](tref part) {
+		return tau::get(tau::trim2(part)).find_top(
+			is_temporal_quantifier<node>) != nullptr;
+	};
+	for (tref p : aw_parts) if (nested_temporal(p)) return clause;
+	for (tref p : st_parts) if (nested_temporal(p)) return clause;
 	if ((aw_parts.size() == 1 && st_parts.empty()) ||
 		(aw_parts.empty() && st_parts.size() == 1))
 		return clause;
@@ -1280,7 +1295,7 @@ inline tref flatten_always_conjuncts(tref fm) {
 	auto has_nested_temporal = [](tref body) {
 		const auto& bt = tau::get(body);
 		return bt.find_top(is_child<node, tau::wff_always>)
-			|| bt.find_top(is_child<node, tau::wff_F>);
+			|| bt.find_top(is_child<node, tau::wff_sometimes>);
 	};
 	for (tref b : always_bodies)
 		if (has_nested_temporal(b)) return fm;

@@ -675,13 +675,27 @@ tref normalize_temporal_quantifiers(tref fm) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tree<node>::wff_F || nt == tree<node>::wff_U
+		return nt == tree<node>::wff_U
 		    || nt == tree<node>::wff_R || nt == tree<node>::wff_W
 		    || nt == tree<node>::wff_S || nt == tree<node>::wff_T
 		    || nt == tree<node>::wff_A || nt == tree<node>::wff_E
 		    || nt == tree<node>::wff_semantic_neg;
 	};
 	if (tau::get(fm).find_top(is_ltl_op_node)) return fm;
+	// F and sometimes are one node now.  A nested eventually (G(F φ),
+	// F(G φ), possibly through negations) belongs to the ltl_aba pipeline
+	// -- the old wff_F spelling was exempted by the check above, and
+	// pushing negation through it here (¬F → G¬) would collapse the
+	// formula into always-nesting the safety pipeline cannot decide.
+	{
+		auto is_g_or_f = [](tref n) {
+			return is_child<node>(n, tree<node>::wff_always)
+			    || is_child<node>(n, tree<node>::wff_sometimes);
+		};
+		for (tref tq : tau::get(fm).select_top(is_g_or_f))
+			if (tau::get(tau::trim2(tq)).find_top(is_g_or_f))
+				return fm;
+	}
 	if (has_temp_var<node>(fm)) {
 		const bool has_temp_quant = tau::get(fm).find_top(st_aw);
 		if (has_temp_quant) {

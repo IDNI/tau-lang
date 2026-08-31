@@ -209,15 +209,8 @@ tref build_wff_semantic_neg(tref l) {
 	return tau::get(tau::wff, tau::get(tau::wff_semantic_neg, l));
 }
 
-// LTL(ABA) operators: F (finally), U (until), R (release), W (weak until), S, T
-template <NodeType node>
-tref build_wff_F(tref l) {
-	DBG(assert(l != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_F, l));
-}
-
+// LTL(ABA) operators: U (until), R (release), W (weak until), S, T.
+// F (finally) is the same operator as sometimes -- build_wff_sometimes.
 template <NodeType node>
 tref build_wff_U(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
@@ -1265,11 +1258,6 @@ tref tree<node>::build_wff_E(tref l) {
 template <NodeType node>
 tref tree<node>::build_wff_semantic_neg(tref l) {
 	return tau_lang::build_wff_semantic_neg<node>(l);
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_F(tref l) {
-	return tau_lang::build_wff_F<node>(l);
 }
 
 template <NodeType node>

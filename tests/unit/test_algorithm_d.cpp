@@ -995,10 +995,14 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	// game is the genuine arena, not the polarity-reduced strategy.)  The
 	// convention itself — one fixed initial state — is proven without the
 	// env mediation by [ALG-D-74] below.
+	// The liveness conjunct is spelled G(F(...)): since the F/sometimes
+	// unification a TOP-LEVEL `G(..) && F(..)` is the safety fragment and
+	// never reaches Algorithm D; the nested form keeps this an end-to-end
+	// game-path pin with the same phantom-memory verdict.
 	TEST_CASE("[ALG-D-71] phantom initial memory cannot win end-to-end: "
-	          "G(o1[t-1]>0) && F(o1>1) UNREALIZABLE") {
+	          "G(o1[t-1]>0) && G(F(o1>1)) UNREALIZABLE") {
 		CHECK_FALSE(alg_d_realizable(
-			"(G (o1[t-1]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
+			"(G (o1[t-1]:qlt > {0}:qlt)) && (G (F (o1[t]:qlt > {1}:qlt)))."));
 	}
 
 	// The convention flip, one level below the env mediation: a hand-built
@@ -1050,10 +1054,10 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 
 	// Guard in the other direction: the same shape winnable from
 	// ρ₀ = type_of(0) stays REALIZABLE (>= admits the defaulted 0 itself).
-	TEST_CASE("[ALG-D-72] G(o1[t-1]>=0) && F(o1>1) stays REALIZABLE "
+	TEST_CASE("[ALG-D-72] G(o1[t-1]>=0) && G(F(o1>1)) stays REALIZABLE "
 	          "from type_of(0)") {
 		CHECK(alg_d_realizable(
-			"(G (o1[t-1]:qlt >= {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
+			"(G (o1[t-1]:qlt >= {0}:qlt)) && (G (F (o1[t]:qlt > {1}:qlt)))."));
 	}
 
 	// The three former disagreement sites refer to the same state now:

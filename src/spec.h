@@ -52,7 +52,7 @@ struct Spec {
 // Classification rules (conservative):
 //   - wff_always(φ)       → invariant component if φ is non-temporal,
 //                           else reactive (G(F(...)) etc.).
-//   - wff_F / U / R / W   → reactive.
+//   - wff_sometimes (F) / U / R / W → reactive.
 //   - wff_S / T           → reactive (past-LTL, compiled via S/T pass).
 //   - non-temporal        → transient (hold at t=0; their G-lift, if any,
 //                           is handled by the caller's initial-conditions
@@ -89,14 +89,12 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			if (!has_ltl_operators<node>(body)) {
 				// Pure-safety G.  Also filter out G(F(...)) = GF pattern:
 				// F inside G is a reactive liveness, not invariant.
-				// RR-10: wff_sometimes is F's canonical spelling
-				// (the normalizer rewrites wff_F to it), so
-				// G(sometimes phi) is the same GF reactive shape.
-				// RR-11: only wff_sometimes can appear here --
-				// the enclosing !has_ltl_operators(body) gate
-				// already guarantees no wff_F exists, so the
-				// old wff_F half of this scan was dead (the
-				// sometimes half became live with RR-10).
+				// RR-10: F and sometimes are one node
+				// (wff_sometimes), and a sometimes at the TOP
+				// of this body is not "nested" from the body's
+				// own point of view, so has_ltl_operators(body)
+				// can be false here while the G above makes the
+				// shape reactive -- this scan catches it.
 				// GR-4 / GR-R1: A/E/`-phi` nest a path formula
 				// and are not invariants either; the shared
 				// predicate keeps the three classifiers in step.
@@ -114,7 +112,7 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			}
 			return;
 		}
-		if (nt == tau::wff_F || nt == tau::wff_sometimes
+		if (nt == tau::wff_sometimes
 		 || nt == tau::wff_U
 		 || nt == tau::wff_R || nt == tau::wff_W
 		 || nt == tau::wff_S || nt == tau::wff_T

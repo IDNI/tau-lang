@@ -586,8 +586,9 @@ std::optional<interpreter<node>>
 		}
 	}
 	// Find a satisfiable unbound continuation from spec.
-	// Skip normalizer for LTL formulas — it converts wff_F → wff_sometimes,
-	// which would make has_ltl_operators return false and bypass ltl_to_safety_formula.
+	// Skip normalizer for LTL formulas (U/R/W/S/T or a nested sometimes) —
+	// they belong to ltl_to_safety_formula, and the normalizer's
+	// always/sometimes machinery cannot decide them.
 	if (!has_ltl_operators<node>(spec) && !witness_ltl_route)
 		spec = normalizer<node>(spec);
 post_normalization:
@@ -1944,7 +1945,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 	// (pointwise_revision_temporal, pwr-ltl.tex §3), one alternative at a
 	// time; its single revised formula becomes that alternative.
 	auto has_nested_temporal = [](tref f) {
-		return tree<node>::get(f).find_top([](tref m) {
+		if (tree<node>::get(f).find_top([](tref m) {
 			const auto& t = tree<node>::get(m);
 			if (!t.is(tree<node>::wff) || !t.has_child())
 				return false;
@@ -1953,9 +1954,20 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			    || nt == tree<node>::wff_R
 			    || nt == tree<node>::wff_W
 			    || nt == tree<node>::wff_S
-			    || nt == tree<node>::wff_T
-			    || nt == tree<node>::wff_F;
-		}) != nullptr;
+			    || nt == tree<node>::wff_T;
+		}) != nullptr) return true;
+		// F and sometimes are one node: a plain sometimes clause
+		// belongs to the factored decomposition below, but a NESTED
+		// eventually (G(F φ), F(G φ)) is beyond it.
+		auto is_g_or_f = [](tref m) {
+			return is_child<node>(m, tree<node>::wff_always)
+			    || is_child<node>(m, tree<node>::wff_sometimes);
+		};
+		for (tref tq : tree<node>::get(f).select_top(is_g_or_f))
+			if (tree<node>::get(tree<node>::trim2(tq))
+					.find_top(is_g_or_f))
+				return true;
+		return false;
 	};
 	{
 		bool nested = has_nested_temporal(update);

@@ -9,9 +9,12 @@ namespace idni::tau_lang {
 
 // True if `nt` is one of the full-LTL operators we add (not G/always).
 // G is aliased to wff_always and handled by the existing safety pipeline.
+// F is aliased to wff_sometimes and is NOT in this set: top-level boolean
+// combinations of always/sometimes belong to the safety pipeline (which
+// encodes lookback-atom initial-value semantics faithfully); a NESTED
+// sometimes routes to this pipeline via has_ltl_operators below.
 static inline bool is_full_ltl_nt(size_t nt) {
-	return nt == tau_parser::wff_F
-	    || nt == tau_parser::wff_U
+	return nt == tau_parser::wff_U
 	    || nt == tau_parser::wff_R
 	    || nt == tau_parser::wff_W
 	    || nt == tau_parser::wff_S
@@ -27,7 +30,6 @@ static bool is_temporal_op(tref n) {
 	auto nt = t[0].value.nt;
 	return nt == tau::wff_always
 	    || nt == tau::wff_sometimes
-	    || nt == tau::wff_F
 	    || nt == tau::wff_U
 	    || nt == tau::wff_R
 	    || nt == tau::wff_W
@@ -86,6 +88,29 @@ bool has_ltl_operators(tref fm) {
 		if (!t.has_child()) return false;
 		return is_full_ltl_nt(t[0].value.nt);
 	}) != nullptr;
+	// F is unified with wff_sometimes.  A top-level boolean combination of
+	// always/sometimes stays in the safety pipeline (eventual variables,
+	// lookback-faithful), but a NESTED sometimes -- G(F φ), F(G φ), F(F φ)
+	// -- is beyond that machinery (NZ-1 conservative fallbacks, fixpoint
+	// give-ups) and must route here.  always-under-always carries no
+	// liveness and stays with the safety pipeline as before.
+	if (!result) {
+		auto is_g_or_f = [](tref n) {
+			return is_child<node>(n, tree<node>::wff_always)
+			    || is_child<node>(n, tree<node>::wff_sometimes);
+		};
+		for (tref tq : tau::get(fm).select_top(is_g_or_f)) {
+			tref body = tau::trim2(tq);
+			if (is_child<node>(tq, tau::wff_sometimes)
+				? tau::get(body).find_top(is_g_or_f) != nullptr
+				: tau::get(body).find_top(
+					is_child<node, tau::wff_sometimes>)
+						!= nullptr) {
+				result = true;
+				break;
+			}
+		}
+	}
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -283,7 +308,6 @@ static std::string skeleton_wff_with_testers(
 	case tau::wff_always:
 		return "G(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
 	case tau::wff_sometimes:
-	case tau::wff_F:
 		return "F(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
 	case tau::wff_U:
 		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)

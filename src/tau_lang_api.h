@@ -15,8 +15,12 @@
 //   - Time indices: o1[t] = current output; o1[t-k] = k steps lookback.
 //   - REALIZABLE  = ∃strategy. ∀env. formula holds on every infinite run.
 //   - UNREALIZABLE = ∀strategy. ∃env. formula fails on some infinite run.
-//   - G (globally/always) uses the existing safety pipeline.
-//   - F, U, R, W, S, T use the full LTL(ABA) pipeline (Spot + ABA oracle).
+//   - G (globally/always/[]) and F (eventually/sometimes/<>) are each one
+//     operator under three spellings.  Boolean combinations of top-level
+//     G/F statements over non-temporal bodies use the existing safety
+//     pipeline.
+//   - U, R, W, S, T and nested liveness (G(F φ), F(G φ), …) use the full
+//     LTL(ABA) pipeline (Spot + ABA oracle).
 //
 // Environment variables that affect synthesis:
 //   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no

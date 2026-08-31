@@ -1289,7 +1289,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	{
 		auto is_unsupported_temporal = [](tref n) {
 			const auto& t = tree<node>::get(n);
-			return t.is(tau::wff_F) || t.is(tau::wff_U)
+			return t.is(tau::wff_U)
 				|| t.is(tau::wff_R) || t.is(tau::wff_W)
 				|| t.is(tau::wff_S) || t.is(tau::wff_T);
 		};

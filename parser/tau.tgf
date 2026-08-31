@@ -42,9 +42,8 @@ ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 # wff and bf expressions
 #
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
-                        | (("sometimes" | "<>")  _ wff)      :wff_sometimes
+                        | (("sometimes" | "<>" | "F")  _ wff) :wff_sometimes
                         | (("always"    | "[]"  | "G")  _ wff) :wff_always
-                        | ("F"  _ wff)                       :wff_F
                         | ("A"  _ wff)                       :wff_A
                         | ("E"  _ wff)                       :wff_E
                         | ('-'  _ wff)                       :wff_semantic_neg

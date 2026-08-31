@@ -10,7 +10,10 @@ add_repl_test(unrealizable_cmd-t "unrealizable T" ": F")
 # unrealizable specs
 add_repl_test(unrealizable_cmd-F               "unrealizable F"                ": T")
 add_repl_test(unrealizable_cmd-contradiction   "unrealizable X = 0 && X != 0"  ": T")
-add_repl_test(unrealizable_cmd-input_eventually "unrealizable F (i1[t] = 0)"   ": T")
+# top-level F ≡ sometimes: trace existence, so F over an input is
+# satisfiable; the unrealizable reactive form is the nested G (F ...)
+add_repl_test(unrealizable_cmd-input_eventually "unrealizable F (i1[t] = 0)"   ": F")
+add_repl_test(unrealizable_cmd-nested_input_gf  "unrealizable G (F (i1[t] = 0))" ": T")
 
 # realizable specs
 add_repl_test(unrealizable_cmd-T                "unrealizable T"               ": F")

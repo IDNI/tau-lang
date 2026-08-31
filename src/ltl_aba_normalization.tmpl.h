@@ -1374,7 +1374,7 @@ static tref compile_since_trigger_rec(
 	}
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
-	// wff_F, wff_U, wff_R, wff_W, wff_always, etc.)
+	// wff_sometimes, wff_U, wff_R, wff_W, wff_always, etc.)
 	//
 	// The spine polarity is propagated, NOT the old boolean is_outer:
 	//   wff_and  keeps a positive spine (asserting A ∧ B asserts both);

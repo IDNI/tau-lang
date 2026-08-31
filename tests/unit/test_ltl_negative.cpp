@@ -106,13 +106,16 @@ TEST_SUITE("NEG-PARSE: malformed formulas return nullptr") {
 
 TEST_SUITE("NEG-UNREAL: known-UNREALIZABLE formulas return false") {
 
-	// Input variable: system cannot control environment
-	TEST_CASE("NEG-UNREAL-01: F(input=0) — cannot force env") {
-		CHECK_FALSE(realizable("F (i1[t] = 0)."));
+	// F is one operator with sometimes, so a TOP-LEVEL F over an input is
+	// decided by the safety pipeline as trace existence and is
+	// satisfiable; the reactive "cannot force env" verdict lives in the
+	// nested forms (NEG-UNREAL-03 below).
+	TEST_CASE("NEG-UNREAL-01: F(input=0) — trace existence, satisfiable") {
+		CHECK(realizable("F (i1[t] = 0)."));
 	}
 
-	TEST_CASE("NEG-UNREAL-02: F(input=1) — cannot force env") {
-		CHECK_FALSE(realizable("F (i1[t] = 1)."));
+	TEST_CASE("NEG-UNREAL-02: F(input=1) — trace existence, satisfiable") {
+		CHECK(realizable("F (i1[t] = 1)."));
 	}
 
 	TEST_CASE("NEG-UNREAL-03: G(F(input=0)) — cannot force env infinitely often") {

@@ -1369,7 +1369,9 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	}
 
 	if (!has_ltl_operators<node>(fm)) {
-		out << "Formula has no LTL operators (treated as G(phi))\n";
+		out << "Formula is in the always/sometimes safety fragment; "
+			"decided by the safety pipeline (a formula without "
+			"temporal operators is treated as G(phi))\n";
 		// Fall through to the existing safety pipeline.
 		bool sat = is_tau_formula_sat<node>(fm, 0, false);
 		out << (sat ? "REALIZABLE" : "UNREALIZABLE") << "\n";
@@ -1609,23 +1611,11 @@ static tref translate_ctl_star(tref fm,
 		// but no longer a universal context: w marks SOME state).
 		tref translated_inner = translate_ctl_star<node>(
 			inner, constraints, witnesses, true, false);
-		// IN-R6: rewrite every `sometimes` inside the witness
-		// constraint to its full-LTL twin `F`.  The two operators are
-		// the same eventuality (LS-3), but `sometimes` is not a
-		// full-LTL operator, so a constraint like
-		// `G(w=1 → sometimes χ)` would route the whole reduced
-		// formula into the safety pipeline, whose eventual-variable
-		// transform cannot handle sometimes-under-G — while as
-		// `G(w=1 → F χ)` the formula self-routes to ltlsynt, which
-		// handles it natively (the sat path already ends up there).
-		for (;;) {
-			tref st = tau::get(translated_inner).find_top(
-				is_child<node, tau::wff_sometimes>);
-			if (!st) break;
-			translated_inner = rewriter::replace<node>(
-				translated_inner, st,
-				build_wff_F<node>(tau::trim2(st)));
-		}
+		// IN-R6 (historical): this used to rewrite `sometimes` to its
+		// then-separate twin node `F` so the reduced constraint
+		// `G(w=1 → F χ)` would route to ltlsynt.  F and sometimes are
+		// one node now, and a nested sometimes self-routes to this
+		// pipeline via has_ltl_operators, so no rewrite is needed.
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
 		witnesses.push_back(wname);
@@ -1741,7 +1731,6 @@ static tref translate_ctl_star(tref fm,
 		case tau::wff_neg:      return tau::build_wff_neg(new_children[0]);
 		case tau::wff_sometimes:return tau::build_wff_sometimes(new_children[0]);
 		case tau::wff_always:   return tau::build_wff_always(new_children[0]);
-		case tau::wff_F:        return tau::build_wff_F(new_children[0]);
 		default:                break; // falls to the LT-13 LOG_ERROR
 		}
 	} else if (nch == 2) {

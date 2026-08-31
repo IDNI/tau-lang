@@ -22,9 +22,13 @@ set_tests_properties("test_repl-ctl_star-normalize_U_not_sometimes" PROPERTIES
 add_repl_test(ctl_star-sat_U_contradictory_target
 	"sat (o1[t] = 1) U (o1[t] = 0 && o1[t] = 1)" ": F")
 
-# F over an input is realizability, not existential-trace semantics
-add_repl_test(ctl_star-sat_F_input_unrealizable "sat F i1[t] = 1" ": F")
+# F is one operator with sometimes: a top-level F is decided by the
+# safety pipeline as trace existence, so an input eventually being 1 is
+# satisfiable; the reactive input/output distinction lives in the nested
+# forms (see sat_GF_input below)
+add_repl_test(ctl_star-sat_F_input_trace_exists "sat F i1[t] = 1" ": T")
 add_repl_test(ctl_star-sat_F_output_realizable "sat F o1[t] = 1" ": T")
+add_repl_test(ctl_star-sat_GF_input_unrealizable "sat G (F i1[t] = 1)" ": F")
 
 # crash regressions: these aborted the Debug REPL (normalizer
 # !find_top(wff_always) / satisfiability st.size() < 2 asserts)
@@ -38,8 +42,12 @@ add_repl_test(ctl_star-sat_A_sometimes_contradiction_no_abort
 add_repl_test_fail(ctl_star-valid_A_always_no_abort
 	"fragment ctl_star. valid A (always o1[t] = 1)" ": [TF]")
 
-# CTL* verdicts through the api path (IN-R7): A constrains its body
-add_repl_test(ctl_star-sat_A_F_input "fragment ctl_star. sat A (F i1[t] = 1)" ": F")
+# CTL* verdicts through the api path (IN-R7): A constrains its body.
+# A (F φ) reduces to the top-level F, which since the F/sometimes
+# unification is trace existence -- so the input form is satisfiable;
+# the reactive input case is pinned via the nested A (G (F ...)) below.
+add_repl_test(ctl_star-sat_A_F_input "fragment ctl_star. sat A (F i1[t] = 1)" ": T")
+add_repl_test(ctl_star-sat_A_GF_input "fragment ctl_star. sat A (G (F i1[t] = 1))" ": F")
 add_repl_test(ctl_star-sat_A_F_output "fragment ctl_star. sat A (F o1[t] = 1)" ": T")
 add_repl_test(ctl_star-sat_always_A_output
 	"fragment ctl_star. sat always (A (o1[t] = 1))" ": T")
@@ -65,7 +73,7 @@ add_repl_test_fail(fragment_gate-qelim_blocks_A_by_default
 add_repl_test(ltl_cmd-ctl_star_A_F_output_reduced
 	"fragment ctl_star. ltl A (F o1[t] = 1)" "CTL\\* reduced to LTL")
 add_repl_test_fail(ltl_cmd-ctl_star_A_F_input_unrealizable
-	"fragment ctl_star. ltl A (F i1[t] = 1)" "UNREALIZABLE")
+	"fragment ctl_star. ltl A (G (F i1[t] = 1))" "UNREALIZABLE")
 add_repl_test_fail(ltl_cmd-ctl_star_semneg_refused
 	"fragment ctl_star. ltl -(F o1[t] = 1)" "UNKNOWN")
 add_test(NAME "test_repl-ltl_cmd-ctl_star_semneg_not_realizable"
@@ -79,7 +87,7 @@ set_tests_properties("test_repl-ltl_cmd-ctl_star_semneg_not_realizable" PROPERTI
 # produce a diagnostic and a live REPL, not a dead process; the second
 # command proves the REPL survived.
 add_test(NAME "test_repl-ltl_cmd-backend_failure_is_unknown"
-	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1. sat always o1[t] = 1\""
+	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl G (F o1[t] = 1). sat always o1[t] = 1\""
 )
 set_tests_properties("test_repl-ltl_cmd-backend_failure_is_unknown" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN[^\n]*\n(.*\n)*.*: T"
@@ -89,7 +97,7 @@ set_tests_properties("test_repl-ltl_cmd-backend_failure_is_unknown" PROPERTIES
 
 # IN-N1: no Spot on PATH is UNKNOWN, not "UNREALIZABLE (propositional)"
 add_test(NAME "test_repl-ltl_cmd-no_spot_is_unknown"
-	COMMAND bash -c "PATH=/nonexistent-dir-without-spot $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1\""
+	COMMAND bash -c "PATH=/nonexistent-dir-without-spot $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl G (F o1[t] = 1)\""
 )
 set_tests_properties("test_repl-ltl_cmd-no_spot_is_unknown" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"
@@ -106,7 +114,7 @@ set_tests_properties("test_repl-sat-garbled_hoa_is_unknown" PROPERTIES
 
 # SY-R4: exit 0 with no verdict line is UNKNOWN, not UNREALIZABLE
 add_test(NAME "test_repl-ltl_cmd-garbage_output_is_unknown"
-	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/garbage0:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F o1[t] = 1\""
+	COMMAND bash -c "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/garbage0:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl G (F o1[t] = 1)\""
 )
 set_tests_properties("test_repl-ltl_cmd-garbage_output_is_unknown" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"
@@ -114,7 +122,7 @@ set_tests_properties("test_repl-ltl_cmd-garbage_output_is_unknown" PROPERTIES
 
 # SY-R1: the Algorithm-D game path classifies backend failures too
 add_test(NAME "test_repl-sat-alg_d_no_verdict_is_unknown"
-	COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat F o1[t]:qlt = {1/2}:qlt\""
+	COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat G (F o1[t]:qlt = {1/2}:qlt)\""
 )
 set_tests_properties("test_repl-sat-alg_d_no_verdict_is_unknown" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"

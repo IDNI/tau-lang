@@ -52,17 +52,18 @@ inline size_t max_cover_products = 256;
 
 // ── Detection ────────────────────────────────────────────────────────────────
 
-// True iff the formula contains any full-LTL operator: wff_F, wff_U, wff_R,
-// wff_W, and the past operators wff_S, wff_T (past formulas must route to
-// the LTL pipeline's temporal testers).  wff_always (G) is already handled
-// by the safety pipeline.
+// True iff the formula needs the LTL pipeline: it contains a full-LTL
+// operator — wff_U, wff_R, wff_W, or the past operators wff_S, wff_T (past
+// formulas must route to the LTL pipeline's temporal testers) — or a NESTED
+// wff_sometimes (G(F φ), F(G φ), ...).  wff_always (G) and top-level boolean
+// combinations of always/sometimes are handled by the safety pipeline.
 template <NodeType node>
 bool has_ltl_operators(tref fm);
 
 // ── Data-atom extraction ──────────────────────────────────────────────────────
 
 // A "data atom" is a maximal subtree that contains no temporal operators
-// (wff_always, wff_F, wff_U, wff_R, wff_W) but does contain at least one
+// (wff_always, wff_sometimes, wff_U, wff_R, wff_W) but does contain at least one
 // io_var.  Each distinct atom is assigned a fresh proposition name "p0","p1"...
 //
 // Returns a vector of {tref, proposition_name} in discovery order.

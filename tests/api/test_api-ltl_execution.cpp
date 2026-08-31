@@ -27,6 +27,10 @@ namespace {
 std::vector<std::string> drive(const char* spec, size_t steps,
 	const std::function<std::string(size_t)>& input_at)
 {
+	// The classical execution path introduces sbf-typed eventual-variable
+	// flags for sometimes/F obligations, and solving them needs the BDD
+	// backend -- initialize it like every other executing test does.
+	bdd_init<Bool>();
 	std::vector<std::string> values;
 	auto maybe_i = tau_api::get_interpreter(spec);
 	REQUIRE_MESSAGE(maybe_i.has_value(), spec);

@@ -39,21 +39,20 @@ inline bool is_temporal_operator_node(tref n) {
 	if (!t.has_child()) return false;
 	auto nt = t[0].value.nt;
 	return nt == tau::wff_always  || nt == tau::wff_sometimes
-	    || nt == tau::wff_F       || nt == tau::wff_U
+	    || nt == tau::wff_U
 	    || nt == tau::wff_R       || nt == tau::wff_W
 	    || nt == tau::wff_S       || nt == tau::wff_T
 	    || nt == tau::wff_A       || nt == tau::wff_E
 	    || nt == tau::wff_semantic_neg;
 }
 
-// True iff `n` is F in either spelling (GR-3).
+// True iff `n` is F/sometimes (one node since the spellings were unified).
 template <NodeType node>
 inline bool is_eventually_node(tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
 	if (!t.has_child()) return false;
-	auto nt = t[0].value.nt;
-	return nt == tau::wff_F || nt == tau::wff_sometimes;
+	return t[0].value.nt == tau::wff_sometimes;
 }
 
 template <NodeType node>

@@ -820,11 +820,13 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	// LA-N2: A now constrains χ. An input can never be forced, so
-	// `A (F i1 = 1)` and `A (always i1 = 1)` are UNREALIZABLE exactly like
-	// their LTL bodies (test_ltl_negative pins `F (i1 = 1)`).
-	TEST_CASE("[CTLS-AE-05] A(F i1=1) is UNREALIZABLE") {
-		tref fm = create_spec("A (F i1[t] = 1).");
+	// LA-N2: A now constrains χ. Since the F/sometimes unification a
+	// TOP-LEVEL F is trace existence (satisfiable even over an input), so
+	// the "cannot force env" pin uses the nested G(F ...) body, which
+	// routes through synthesis; `A (always i1 = 1)` below stays
+	// UNREALIZABLE as before.
+	TEST_CASE("[CTLS-AE-05] A(G(F i1=1)) is UNREALIZABLE") {
+		tref fm = create_spec("A (G (F i1[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}

@@ -25,7 +25,7 @@ namespace idni::tau_lang {
 // ---------------------------------------------------------------------------
 
 // Identify the temporal operator kind of a wff node.
-enum class temporal_op { NONE, ALWAYS, SOMETIMES, F, U, R, W, S, T };
+enum class temporal_op { NONE, ALWAYS, SOMETIMES, U, R, W, S, T };
 
 template <NodeType node>
 temporal_op get_temporal_op(tref fm) {
@@ -36,7 +36,6 @@ temporal_op get_temporal_op(tref fm) {
 	auto nt = t[0].value.nt;
 	if (nt == tau::wff_always)    return temporal_op::ALWAYS;
 	if (nt == tau::wff_sometimes) return temporal_op::SOMETIMES;
-	if (nt == tau::wff_F)         return temporal_op::F;
 	if (nt == tau::wff_U)         return temporal_op::U;
 	if (nt == tau::wff_R)         return temporal_op::R;
 	if (nt == tau::wff_W)         return temporal_op::W;
@@ -50,7 +49,7 @@ bool is_temporal(tref fm) {
 	return get_temporal_op<node>(fm) != temporal_op::NONE;
 }
 
-// Check if the operator is binary (U/R/W/S/T) vs unary (G/F/sometimes).
+// Check if the operator is binary (U/R/W/S/T) vs unary (G, F/sometimes).
 inline bool is_binary_temporal(temporal_op op) {
 	return op == temporal_op::U || op == temporal_op::R
 	    || op == temporal_op::W || op == temporal_op::S
@@ -112,9 +111,9 @@ role_pair<node> decompose_roles(tref fm) {
 	using tau = tree<node>;
 	auto op = get_temporal_op<node>(fm);
 	// Only valid for binary temporal operators (U/R/W/S/T).
-	// G, F, sometimes are unary — do not call this on them.
+	// G and F/sometimes are unary — do not call this on them.
 	if (op == temporal_op::ALWAYS || op == temporal_op::SOMETIMES
-	    || op == temporal_op::F || op == temporal_op::NONE)
+	    || op == temporal_op::NONE)
 		return { nullptr, nullptr };
 	tref lhs = tau::get(fm)[0].first();
 	tref rhs = tau::get(fm)[0].child(1);
@@ -279,14 +278,10 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 		return rebuild_from_roles<node>(op_phi, r_inv, commit_psi);
 	}
 
-	// Case 2b: Same unary temporal operator (G/F/sometimes).
-	// LS-3: F and sometimes are the same eventually operator under two
-	// node kinds -- match them as equal so `F(a)` vs `sometimes(b)` is
-	// revised instead of dropped through the operator-mismatch case.
-	auto eventually_normal = [](temporal_op op) {
-		return op == temporal_op::F ? temporal_op::SOMETIMES : op;
-	};
-	if (eventually_normal(op_phi) == eventually_normal(op_psi)
+	// Case 2b: Same unary temporal operator (G or F/sometimes -- one node
+	// since the spellings were unified, so `F(a)` vs `sometimes(b)`
+	// matches structurally).
+	if (op_phi == op_psi
 	    && !is_binary_temporal(op_phi)
 	    && op_phi != temporal_op::NONE) {
 		tref inner_phi = tau::get(phi)[0].first();
@@ -295,12 +290,7 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 			start_time, memo);
 		if (op_phi == temporal_op::ALWAYS)
 			return tau::build_wff_always(r_inner);
-		if (op_phi == temporal_op::SOMETIMES)
-			return build_wff_sometimes<node>(r_inner);
-		if (op_phi == temporal_op::F)
-			return build_wff_F<node>(r_inner);
-		// LS-14: unreachable -- the guard admits only ALWAYS/SOMETIMES/F,
-		// each handled above.
+		return build_wff_sometimes<node>(r_inner);
 	}
 
 	// Case 3: Non-temporal vs binary temporal — lift the step formula
@@ -340,7 +330,7 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 
 	// Case 5: F vs U/W — unwrap F(α) as commitment
 	// F(α) = ⊤ U α.  If ψ is U-based, decompose and recurse.
-	if (op_phi == temporal_op::F && (op_psi == temporal_op::U
+	if (op_phi == temporal_op::SOMETIMES && (op_psi == temporal_op::U
 	    || op_psi == temporal_op::W)) {
 		tref inner_phi = tau::get(phi)[0].first();
 		auto [inv_psi, commit_psi] = decompose_roles<node>(psi);
@@ -514,17 +504,13 @@ tref pointwise_revision_temporal(
 
 		// Step 3: Recursive revision against best-matching update clause
 		tref best = nullptr;
-		// PW-R1: F and sometimes are the same eventually operator under
-		// two node kinds (LS-3 matched them inside revise(); the clause
-		// selection here still told them apart and fell back to the
-		// first update clause).
-		auto eventually_normal = [](temporal_op op) {
-			return op == temporal_op::F ? temporal_op::SOMETIMES : op;
-		};
+		// PW-R1 (historical): F and sometimes were two node kinds and
+		// had to be normalized for this comparison; they are one node
+		// now, so the operator kinds compare directly.
 		for (tref uc : update_clauses) {
 			// Step 4: Clause selection — try same-structure match first
-			temporal_op op_sc = eventually_normal(get_temporal_op<node>(sc));
-			temporal_op op_uc = eventually_normal(get_temporal_op<node>(uc));
+			temporal_op op_sc = get_temporal_op<node>(sc);
+			temporal_op op_uc = get_temporal_op<node>(uc);
 			if (op_sc == op_uc && op_sc != temporal_op::NONE) {
 				best = uc;
 				break;

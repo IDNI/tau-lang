@@ -420,7 +420,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ main,                60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
-			{ wff_F,              381 },
 			{ wff_A,              377 },
 			{ wff_E,              378 },
 			{ wff_U,              382 },
@@ -515,7 +514,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	// };
 	auto inc_indent = [&](size_t nt) {
 		static const std::vector<size_t> indents = {
-			wff_sometimes, wff_F, wff_A, wff_E, wff_always, wff_conditional,
+			wff_sometimes, wff_A, wff_E, wff_always, wff_conditional,
 			wff_all, wff_ex, wff_imply, wff_equiv
 		};
 		bool ret = pretty_printer_indenting &&
@@ -663,7 +662,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			}
 
 			case wff_sometimes:     out("sometimes "); break;
-			case wff_F:             out("F "); break;
 			case wff_A:             out("A "); break;
 			case wff_E:             out("E "); break;
 			case wff_always:        out("always "); break;

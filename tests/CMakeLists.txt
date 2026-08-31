@@ -83,8 +83,10 @@ function(add test_name)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
-	# on the CI hardware.  Everything else gets the default.
-	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression)$")
+	# on the CI hardware.  test_ltl_fuzz sits at ~480-530s in devel
+	# builds and times out under parallel ctest load with only 600.
+	# Everything else gets the default.
+	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression|ltl_fuzz)$")
 		set(_TAU_TEST_TIMEOUT 1500)
 	else()
 		set(_TAU_TEST_TIMEOUT 600)

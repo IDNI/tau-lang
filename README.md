@@ -457,8 +457,8 @@ Formally, a specification is a (possibly empty) list of definitions followed by
 a single formula, its *main* formula:
 ```
 spec        => [ definitions ] local_spec [ "." ]
-             | "G" local_spec          -- globally (always)
-             | "F" local_spec          -- eventually (sometimes)
+             | "G" local_spec          -- globally (aliases: always, [])
+             | "F" local_spec          -- eventually (aliases: sometimes, <>)
              | spec "U" spec           -- until
              | spec "R" spec           -- release
              | spec "W" spec           -- weak until
@@ -471,8 +471,8 @@ where `local_spec` is a formula defined by the rules:
 
 ```
 local_spec => ("(" local_spec ")")
-            | (("sometimes" | "<>") local_spec)
-            | (("always"    | "[]") local_spec)
+            | (("sometimes" | "<>" | "F") local_spec)
+            | (("always"    | "[]" | "G") local_spec)
             | (local_spec "?" local_spec ":" local_spec)
             | ("all" variable ("," variable)* local_spec)
             | ("ex"  variable ("," variable)* local_spec)
@@ -497,6 +497,9 @@ Furthermore, `term` is discussed in the sections
 [Boolean functions](#boolean-functions) and [Bitvectors](#bitvectors).
 Note that `always` and `sometimes` are ordinary formula-level operators, and a
 specification with no `always` or `sometimes` at all is implicitly an `always` statement.
+`G`/`always`/`[]` are three spellings of the same operator, and so are
+`F`/`sometimes`/`<>` — each triple parses to one operator and prints back as
+`always` and `sometimes` respectively.
 The `predicate` non-terminal in the above grammar describes how
 to add predicate definitions directly into a formula. See the subsection
 [Functions and predicates](#functions-and-predicates) for the
@@ -562,8 +565,8 @@ liveness and until-style operators.
 
 ```
 spec => ...
-      | "F" spec               -- eventually / finally
-      | "G" spec               -- globally
+      | "F" spec               -- eventually / finally (aliases: sometimes, <>)
+      | "G" spec               -- globally (aliases: always, [])
       | spec "U" spec          -- until
       | spec "R" spec          -- release
       | spec "W" spec          -- weak until
@@ -571,8 +574,13 @@ spec => ...
       | spec "T" spec          -- trigger (past LTL)
 ```
 
-`G` (globally) and `F` (eventually) are the primary temporal operators.  `U`, `R`,
-`W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
+`G` (globally) and `F` (eventually) are the primary temporal operators; `G` is
+the same operator as `always`/`[]` and `F` the same operator as
+`sometimes`/`<>`.  A formula built from boolean combinations of top-level
+`G`/`F` statements over non-temporal bodies is decided by the safety pipeline;
+`U`, `R`, `W`, `S`, `T` and nested liveness (such as `G (F φ)`) extend the
+language beyond that fragment and are decided through LTL synthesis
+(`ltlsynt`).  `S` (since) and `T` (trigger)
 are the past-LTL duals of `U` and `R` respectively; they are compiled away to
 auxiliary variables before being passed to the synthesis engine.
 

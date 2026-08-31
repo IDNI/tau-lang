@@ -63,7 +63,6 @@ template <NodeType node>
 bool is_temporal_quantifier(tref n) {
 	return tree<node>::get(n).is(node::type::wff_always)
 		|| tree<node>::get(n).is(node::type::wff_sometimes)
-		|| tree<node>::get(n).is(node::type::wff_F)
 		|| tree<node>::get(n).is(node::type::wff_U)
 		|| tree<node>::get(n).is(node::type::wff_R)
 		|| tree<node>::get(n).is(node::type::wff_W)

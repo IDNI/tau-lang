@@ -416,6 +416,9 @@ TEST_SUITE("Execution") {
 			// 2026-08-28 ADT + left-assoc grammar regen: another
 			// permutation of the same four conjuncts.
 			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
+			// 2026-08-31 F/sometimes unification regen: another
+			// permutation of the same four conjuncts.
+			"always u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 		}
 		};
 		io_context<node_t> ctx;

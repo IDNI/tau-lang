@@ -72,8 +72,10 @@ add_repl_test(strategy_exec-exec_io_01_g_o1_eq_i1_4steps
 add_repl_test(strategy_exec-exec_io_02_g_o1_eq_sbf_x_and_y_3steps
 	"o1:sbf := out console. run 3 steps G (o1[t]:sbf = {X & Y}:sbf)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := ") # :258
-add_repl_test(strategy_exec-exec_io_03_f_o1_eq_i1_3steps
-	"i1:tau := in file(\\\"${SE_A2J}\\\"). o1:tau := out console. run 3 steps F (o1[t]:tau = i1[t]:tau)."
+# spelled G (F ...) so it still executes through a synthesized strategy (a
+# top-level F is the safety fragment since the F/sometimes unification)
+add_repl_test(strategy_exec-exec_io_03_gf_o1_eq_i1_3steps
+	"i1:tau := in file(\\\"${SE_A2J}\\\"). o1:tau := out console. run 3 steps G (F (o1[t]:tau = i1[t]:tau))."
 	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z]") # :274
 
 # EXEC-LB: lookback; only steps with a defined lookback are asserted.

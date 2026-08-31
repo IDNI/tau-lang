@@ -18,11 +18,15 @@ add_repl_test(realizable_cmd-disjunct  "realizable X = 0 || Y = 0" ": T")
 add_repl_test(realizable_cmd-F             "realizable F"                ": F")
 add_repl_test(realizable_cmd-contradiction "realizable X = 0 && X != 0"  ": F")
 
-# temporal cases: a system can always force one of its own outputs, but
-# it cannot force a value onto an input it merely reads
+# temporal cases: F is one operator with sometimes, so a TOP-LEVEL F is
+# decided by the safety pipeline as trace existence -- an input eventually
+# being 0 is satisfiable on some trace. The reactive distinction shows up
+# in the nested forms, which route through synthesis: the system can grant
+# its own output infinitely often, but cannot force an input.
 add_repl_test(realizable_cmd-output_eventually "realizable F (o1[t] = 0)"      ": T")
-add_repl_test(realizable_cmd-input_eventually  "realizable F (i1[t] = 0)"      ": F")
+add_repl_test(realizable_cmd-input_eventually  "realizable F (i1[t] = 0)"      ": T")
 add_repl_test(realizable_cmd-nested_temporal   "realizable G (F (o1[t] = 0))"  ": T")
+add_repl_test(realizable_cmd-nested_input_gf   "realizable G (F (i1[t] = 0))"  ": F")
 add_repl_test(realizable_cmd-always_output     "realizable always (o1[t] = 0)" ": T")
 
 # with rec-relation defs
@@ -470,7 +474,8 @@ add_repl_test(realizable_cmd-ltl_correctness-equiv_13_g_o_eq_0_and_g_o_eq_1 "rea
 # EQUIV-14: direct literal CHECK_FALSE -> F
 add_repl_test(realizable_cmd-ltl_correctness-equiv_14_f_o_eq_0_and_g_o_eq_1 "realizable F (o1[t] = 0) && G (o1[t] = 1)." ": F")
 # EQUIV-15: direct literal CHECK_FALSE -> F
-add_repl_test(realizable_cmd-ltl_correctness-equiv_15_f_mixed_atom_tau "realizable F ((o1[t] & i1[t]) = {T.}:tau)." ": F")
+# top-level F ≡ sometimes: trace existence, so the mixed atom is satisfiable
+add_repl_test(realizable_cmd-ltl_correctness-equiv_15_f_mixed_atom_tau "realizable F ((o1[t] & i1[t]) = {T.}:tau)." ": T")
 # EQUIV-16: direct literal CHECK -> T
 add_repl_test(realizable_cmd-ltl_correctness-equiv_16_g_o_eq_i_tau "realizable G (o1[t]:tau = i1[t]:tau)." ": T")
 # EQUIV-17: r1 == r2, and CHECK(r1) -> both T
@@ -745,7 +750,9 @@ add_repl_test(realizable_cmd-ltl_qlt_bv-qr_14_g_lookback_lt_strictly_increasing 
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_15_g_gt_lookback_increasing "realizable G (o1[t]:qlt > o1[t-1]:qlt)." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_16_g_empty_interval_unreal "realizable G (o1[t]:qlt > {1}:qlt && o1[t]:qlt < {0}:qlt)." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_17_g_eq_i1_and_gt1_unreal "realizable G (o1[t]:qlt = i1[t]:qlt && o1[t]:qlt > {1}:qlt)." ": F")
-add_repl_test(realizable_cmd-ltl_qlt_bv-qr_18_f_eq_i1_and_lt0_unreal "realizable F (o1[t]:qlt = i1[t]:qlt && o1[t]:qlt < {0}:qlt)." ": F")
+# spelled G (F ...) so it keeps exercising the LTL pipeline (a top-level F
+# is the safety fragment since the F/sometimes unification)
+add_repl_test(realizable_cmd-ltl_qlt_bv-qr_18_gf_eq_i1_and_lt0_unreal "realizable G (F (o1[t]:qlt = i1[t]:qlt && o1[t]:qlt < {0}:qlt))." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_19_g_gt_i1_and_lt_i1_unreal "realizable G (o1[t]:qlt > i1[t]:qlt && o1[t]:qlt < i1[t]:qlt)." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_21_g_gt1_and_g_lt0_unreal "realizable G (o1[t]:qlt > {1}:qlt) && G (o1[t]:qlt < {0}:qlt)." ": F")
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_22_g_eq_i1_and_f_neq_i1_unreal "realizable G (o1[t]:qlt = i1[t]:qlt) && F (o1[t]:qlt != i1[t]:qlt)." ": F")
