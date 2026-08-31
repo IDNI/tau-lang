@@ -4,7 +4,7 @@
 
 set -e
 
-for g in tau sbf bitvector adt qint qlt hsb nlang; do
+for g in tau sbf bitvector adt qint qlt hsb nlang hoa; do
 	echo "regenerating parser/${g}_parser.generated.{h,cpp}"
 	./parser/gen "parser/${g}.tgf" --header-only false
 done

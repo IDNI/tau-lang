@@ -397,6 +397,7 @@ if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/qlt.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/hsb.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/nlang.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/hoa.tgf")
 endif()
 
 #

@@ -62,6 +62,7 @@ set(TAU_PARSER_SOURCES
 	../parser/qlt_parser.generated.cpp
 	../parser/hsb_parser.generated.cpp
 	../parser/nlang_parser.generated.cpp
+	../parser/hoa_parser.generated.cpp
 )
 
 # grammar tables are mostly data; skip optimizing and LTO-ing them

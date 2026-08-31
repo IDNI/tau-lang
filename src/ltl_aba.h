@@ -22,6 +22,7 @@
 #include "normalizer.h"
 #include "bounded_cache.h"
 #include "boolean_algebras/nlang_ba.h"
+#include "../parser/hoa_parser.generated.h"
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -187,7 +188,9 @@ struct HoaAutomaton {
     std::vector<bool> state_accepting;  // true if state has acceptance mark
 };
 
-// Parses the HOA strategy text that follows ltlsynt's REALIZABLE line.
+// Parses the HOA strategy text that follows ltlsynt's REALIZABLE line,
+// through the parser/hoa.tgf grammar (hoa_parser); the numeric checks the
+// grammar cannot express live in the walker here.
 // Throws ltl_synthesis_error on a malformed or truncated automaton (no
 // `States:` header, a non-positive or absurd state count, no `--BODY--`):
 // LA-8/SY-1 -- such text used to parse to the EMPTY automaton, which the
