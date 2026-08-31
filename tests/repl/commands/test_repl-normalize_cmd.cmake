@@ -89,3 +89,29 @@ add_repl_test(normalize_cmd-pred_shaped_def_used_as_argument
 add_repl_test(normalize_cmd-recursive_defs_in_argument_position
 	"succ(int[0](1)) := int[1](1). succ(int[1](1)) := int[2](1). pred(int[t](1)) := int[t-1](1). add(int[0](1), x) := x. add(x, int[0](1)) := x. add(x, y) := add(pred(x), succ(y)). normalize add(int[3](1), int[10](1))"
 	"succ.*succ.*succ.*int")
+
+# Fixpoint calls to FUNCTION recurrences. An offset-free call (`g(y)`) parses
+# as a wff reference, and is_functional_ref only matched exact signatures, so
+# the call was never reclassified into the rules' own bf world: no rule ever
+# applied to the enumerated steps and calculate_fixed_point enumerated bare
+# g[i](y) refs forever -- a silent REPL hang with no cap set. Indexed calls
+# (`n g[5](y)`, above) always worked, since their signature matches exactly.
+add_repl_test(normalize_cmd-fp_call_function_loop_default_fallback
+	"g[0](x) := 0. g[n](x) := g[n-1](x)'. normalize g(y)"
+	": 0")
+add_repl_test(normalize_cmd-fp_call_function_loop_fallback_last
+	"g[0](x) := 0. g[n](x) := g[n-1](x)'. normalize g(y) fallback last"
+	": 1")
+add_repl_test(normalize_cmd-fp_call_function_converging
+	"g[0](x):sbf := 0. g[n](x):sbf := g[n-1](x) | x. normalize g(y:sbf)"
+	": y")
+
+# The same hang, one step removed: a FUNCTIONAL definition's argument types
+# used to leak into the surrounding scope (open_same_type assigned in the
+# current scope instead of opening one), so after defining g over :sbf y, an
+# unrelated later call `k(y)` had its y typed :sbf while k's stored rule
+# captures were :tau -- the rules silently never matched and the (predicate)
+# fixpoint enumeration ran forever.
+add_repl_test(normalize_cmd-fp_call_after_unrelated_function_def
+	"g[0](y):sbf := 0. g[n](y):sbf := g[n-1](y)'. k[0](x) := x = 0. k[n](x) := k[n-1](x) && x != 1. normalize k(y)"
+	": y = 0")

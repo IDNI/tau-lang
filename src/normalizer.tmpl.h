@@ -1668,6 +1668,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 	LOG_DEBUG << "max lookback " << max_lookback;
 
+	// Whether any rule application has ever rewritten an enumerated step.
+	// A rule with a capture offset matches every index from its lookback
+	// on, and a fixed-offset rule only indices up to max_lookback, so if
+	// nothing fired at the first two steps nothing ever will: the call
+	// does not reach its definitions at all (typically a kind or type
+	// mismatch between the call site and the stored rules), and silently
+	// enumerating bare `name[i](args)` refs forever used to hang the REPL.
+	bool ever_changed = false;
+
 	for (size_t i = max_lookback; ; i++) {
 		++steps;
 		if (max_enum_steps && steps > max_enum_steps) {
@@ -1694,9 +1703,19 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				}
 				auto prev = current;
 				current = nso_rr_apply<node>(r, prev);
-				if (tau::get(current) != tau::get(prev)) changed = true;
+				if (tau::get(current) != tau::get(prev)) changed = true,
+					ever_changed = true;
 			}
 		} while (changed);
+
+		if (!ever_changed && i > max_lookback) {
+			LOG_ERROR << "calculate_fixed_point: no recurrence rule "
+				"applies to " << LOG_FM(current) << "; the call "
+				"does not match its definitions (kind or type "
+				"mismatch between the call site and the rules); "
+				"giving up.";
+			return nullptr;
+		}
 
 		LOG_DEBUG << "Begin enumeration step";
 		LOG_DEBUG << "current: " << LOG_FM(current);

@@ -335,10 +335,19 @@ bool is_functional_ref(tref n, const auto& function_symbols) {
 	// If the head was previously defined as a function we also have a functional ref
 	// Otherwise, we have a predicate callback.
 	auto sig = get_function_signature<node>(n);
-	return function_symbols.contains(sig);
+	if (function_symbols.contains(sig)) return true;
+	// Offset-free fixpoint call to an indexed function recurrence.
+	if (std::get<1>(sig) == 0)
+		for (const auto& [fsig, _] : function_symbols)
+			if (std::get<0>(fsig) == std::get<0>(sig)
+				&& std::get<2>(fsig) == std::get<2>(sig)
+				&& std::get<1>(fsig) > 0) return true;
+	return false;
 }
 
-// type all symbols according to their children's types
+// Retypes an interior term node from its children: rebuilds @p n typed
+// with the first non-zero type found among them (0 when none carries
+// one). The children themselves are kept as they are.
 template<NodeType node>
 tref update_ba_symbol(tref n) {
 	using tau = tree<node>;
@@ -563,7 +572,9 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
-	DBG(assert(!is_untyped<node>(type));)
+	// Untyped is allowed: an offset-free fixpoint call classified as
+	// functional through the recorded function signatures carries no
+	// annotation of its own (see is_functional_ref).
 	// TI-2: a ref-shaped fallback gets wrapped in the reference's type
 	// below, but a plain term fallback was never checked against it, so
 	// `g(x) fallback x:sbf` with a bv[8] `g` sailed through inference --
@@ -581,9 +592,18 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 		fallback = tau::get_typed(tau::bf,
 			tau::get_typed(tau::bf_ref, fallback, type), type);
 	fallback = tau::get(tau::fp_fallback, fallback);
-	return tau::get(tau::ref, { sym, ref_args, fallback });
+	// Wrap like update_functional_ref does: the call stands in a term
+	// position, so it must come back as a bf > bf_ref chain for the
+	// recurrence's bf rules (and the fixpoint calculation) to see it in
+	// their own world -- a bare ref would keep its parser-given wff
+	// wrapping and match nothing.
+	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref,
+		tau::get(tau::ref, { sym, ref_args, fallback }), type), type);
 }
 
+// Predicate counterpart of update_functional_fallback: retypes the
+// leaves via update(), wraps a ref-shaped fallback in an untyped
+// wff > wff_ref, and rebuilds the ref as {sym, ref_args, fallback}.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -1423,7 +1443,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						}
 						if (conflict) break;
 					}
-					if (is_functional_fallback<node>(n)) {
+					// A fallback call is also functional when it is an
+					// offset-free call to an indexed function recurrence
+					// (is_functional_ref's fixpoint-call matching); its own
+					// annotations alone cannot tell (is_functional_fallback).
+					if (is_functional_fallback<node>(n)
+						|| is_functional_ref<node>(n,
+							available_function_symbols)) {
 						auto unified = unify<node>(arguments_map, header_type);
 						if (std::holds_alternative<inference_error>(unified)) {
 							error = std::get<inference_error>(unified);
@@ -1627,7 +1653,14 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// We need to adjust the wrapping around refs in the body and
 						// the header accordingly.
 						auto new_n = update_default<node>(n, transformed);
+						// Same functional test as on_enter: an offset-free
+						// fixpoint call to an indexed function recurrence
+						// carries no annotation of its own, so it is
+						// recognized through the recorded function
+						// signatures (is_functional_ref).
 						auto updated = is_functional_fallback<node>(new_n)
+							|| is_functional_ref<node>(new_n,
+								available_function_symbols)
 							? update_functional_fallback<node>(resolver, new_n, options)
 							: update_predicate_fallback<node>(resolver, new_n, options);
 						if (std::holds_alternative<parse_error>(updated)) {
