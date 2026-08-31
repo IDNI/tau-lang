@@ -140,3 +140,11 @@ add_test(NAME "test_repl-run_cmd-issue82_accumulated_tau_constant"
 set_tests_properties("test_repl-run_cmd-issue82_accumulated_tau_constant" PROPERTIES
 	PASS_REGULAR_EXPRESSION "Execution step: 1"
 	TIMEOUT 300)
+
+# --- sbf multiline value continuation ---------------------------------------
+# An incomplete sbf value ("x |") keeps the prompt open (the sbf-parser
+# unexpected-end check in awaiting_more_input); the next line completes it.
+add_test(NAME "test_repl-run_cmd-sbf_multiline_value"
+	COMMAND bash -c "printf 'run always o1[t]:sbf = i1[t]\\nx |\\ny\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-sbf_multiline_value" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := x \\| x' y")

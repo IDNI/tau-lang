@@ -22,3 +22,8 @@ add_repl_test(history_print_cmd-empty_relative "history %-1" "history is empty")
 add_repl_test(history_print_cmd-non_empty_absolute "1. history %1" ": 1")
 add_repl_test(history_print_cmd-non_empty_relative "1. history %" ": 1")
 add_repl_test(history_print_cmd-non_empty_last "1. T. history %-1" ": 1")
+
+# referencing a history location beyond the stored entries, absolute and
+# relative (the "%N does not exist" report and its TAU_LOG_ERROR companion)
+add_repl_test_fail(history_ref-absolute_missing "1. mnf %5" "does not exist")
+add_repl_test_fail(history_ref-relative_missing "1. dnf %-5" "does not exist")
