@@ -27,19 +27,36 @@ n {50}:bv[8] - {20}:bv[8]
 n {10}:bv[8] * {20}:bv[8]
 n {100}:bv[8] / {10}:bv[8]
 
-# Bit shifts and the bitwise negated connectives !& !| !^ (nand, nor, xnor) are
-# available too, and a term can be cast to a bitvector type with (bv[n]):
+# Constants may also be written in binary, with a #b prefix:
+
+n {#b1010}:bv[8]
+
+# Bit shifts are available in both directions:
 
 n {1}:bv[8] << {3}:bv[8]
+n {200}:bv[8] >> {3}:bv[8]
 
-# The precedence of the bitvector operators is unusual, and worth knowing before
-# writing anything dense: / binds tighter than *, and - binds tighter than +.
-# The full order, loosest last, is
+# ... as are the bitwise negated connectives !& !| !^ (nand, nor, xnor):
+
+n {12}:bv[8] !& {10}:bv[8]
+n {12}:bv[8] !| {10}:bv[8]
+n {12}:bv[8] !^ {10}:bv[8]
+
+# A term is cast to another bitvector width with (bv[n]). Widths never mix
+# implicitly -- bv[8] and bv[16] are distinct types, and unifying them is a
+# type error -- so a cast is how a value crosses widths:
+
+n (bv[16]) {200}:bv[8]
+
+# The precedence of the term operators, loosest last, is
 #
-#   (bv[n]) > ' > & > ^ > | > !& > !^ > !| > / > * > % > - > + > << > >> > fex > fall
+#   (bv[n]) > ' > & > ^ > | > !& > !^ > !| > { %, *, / } > { -, + } > { <<, >> } > fex > fall
 #
-# Every operator sits on its own level, so parenthesize whenever the reading is
-# not obvious.
+# The groups in braces are shared levels whose operators chain left to right,
+# so the expression below is (20 - 5) + 3 = 18 rather than 20 - (5 + 3) = 12.
+# Parenthesize whenever the reading is not obvious:
+
+n {20}:bv[8] - {5}:bv[8] + {3}:bv[8]
 
 # Equations over bitvectors are solved with the same solve command used in
 # demo_2.1. A linear equation, where the answer wraps around the width:
@@ -53,6 +70,13 @@ solve x:bv[16] * y:bv[16] = {512}:bv[16] && x:bv[16] = {8}:bv[16]
 # Remainders, and a constraint with a unique answer:
 
 solve x:bv[8] % {2}:bv[8] = {1}:bv[8]
+
+# Casts matter for arithmetic, because it wraps. Taking 5% of 200 at 8 bits
+# would wrap the product (200 * 5 = 1000, far beyond 255); widening first
+# keeps it exact, and the quotient fits back into 8 bits. This is the
+# widen-multiply-divide-narrow idiom, and demo_3.4 runs it over streams:
+
+solve x:bv[8] = (bv[8]) ( ((bv[16]) {200}:bv[8] * {5}:bv[16]) / {100}:bv[16] )
 
 # sat, unsat and valid work over bitvectors too. Modular arithmetic has zero
 # divisors, so a nonzero 8-bit value can square to zero -- 16 * 16 = 256, which

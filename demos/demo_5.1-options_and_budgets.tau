@@ -1,0 +1,94 @@
+# REPL options and resource budgets.
+#
+# See demos/README.md for how to run this script.
+
+# Everything configurable in the REPL is an option. get with no argument lists
+# them all with their current values; get with a name reads a single one:
+
+get
+get charvar
+
+# The boolean options are switched with set, enable, disable or toggle:
+
+toggle colors
+get colors
+toggle colors
+disable status
+enable status
+
+# severity picks how much the REPL reports (error/info/debug/trace); note the
+# prompt announcing the debug level while it is active:
+
+set severity debug
+set severity info
+
+# charvar is worth a closer look, because it changes what a variable IS. With
+# charvar on -- the default -- a variable is a single letter plus digits, so
+# xyzvw below is a product of five variables (juxtaposition is conjunction,
+# demo_1.1), and normalization orders them:
+
+n xyzvw
+
+# With charvar off, a variable is any word: the same input is now one variable
+# named xyzvw, and descriptive names become possible:
+
+set charvar off
+n xyzvw
+n count' | count
+set charvar on
+
+# The numeric options in the get listing are budgets. Each caps one of the
+# engine's iterative searches; 0 means unlimited, which is the default for all
+# but the two gc knobs. They exist because several procedures search rather
+# than compute: a search that does not converge is better cut off loudly than
+# left running. Reaching a budget is a bound on the search, never an answer
+# about the input. Every budget has a command line twin (--max-fixpoint-steps,
+# --max-enum-steps, ... -- see the README).
+
+# fixpointsteps caps the temporal-normalization fixpoint search behind the
+# decision procedures of demo_1.5. A specification with lookback 2 needs at
+# least 2 steps, so a cap of 1 makes that phase give up with an error -- here
+# another phase of the sat procedure still decides the query afterwards:
+
+set fixpointsteps 1
+sat always o1[t] = o1[t-2]
+set fixpointsteps 0
+
+# enumsteps caps the fixpoint enumeration of recurrence relations (demo_1.3).
+# The function below alternates 0, 1, 0, ... forever; its loop is only
+# recognized at the third enumerated step, so a budget of 2 cuts the search
+# off before the loop (and the fallback answer) can be found -- reaching a
+# budget bounds the search, it does not answer for the input:
+
+b[0](x):sbf := 0
+b[n](x):sbf := b[n-1](x)'
+set enumsteps 2
+n b(y:sbf) fallback last
+
+# With the budget lifted, the same call detects the loop and returns the
+# fallback:
+
+set enumsteps 0
+n b(y:sbf) fallback last
+
+# defpasses caps definition expansion. The pair below re-creates g2 with
+# every expansion pass, so it can never settle; the budget bounds how many
+# passes are attempted before reporting. (Uncapped, an oscillation detector
+# catches this particular pair too -- the budget is for the searches nothing
+# detects.)
+
+set defpasses 1
+g2(x):sbf := h2(g2(x))
+h2(x):sbf := x'
+n g2(0:sbf)
+set defpasses 0
+
+# The remaining budgets follow the same pattern on other searches: maxsplits,
+# maxrounds, blastdepth and squeezecap bound anti-prenexing, maxclauses bounds
+# complete quantifier elimination, simplifyrounds and rewriterounds bound
+# rewriting, flagsteps bounds the eventual-flag search of satisfiability, and
+# specsizewarn / revisionalts guard the updatable runs of demo_3.5. gcminsize
+# and gcgrowth tune the interpreter's tree garbage collector and keep their
+# defaults unless set.
+
+quit

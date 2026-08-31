@@ -70,6 +70,13 @@ type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. typ
 
 type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1 && x.b = 0
 
+# solve --min and --max (demo_2.2) work over tuple types too, again per
+# flattened member. The constraints below leave several solutions, and the
+# option picks a maximal, respectively minimal, one:
+
+type Point = {a: sbf, b: sbf}. solve --max x:Point = x && x.a & x.b = 0
+type Point = {a: sbf, b: sbf}. solve --min x:Point = x && (x.a | x.b) = 1
+
 # Finally, a tuple-typed stream reads and writes its members together as one
 # value, using a JSON-like wire format: { member: "value", ... }. The console
 # prompts for the whole tuple at once, and a period is never needed -- unlike a

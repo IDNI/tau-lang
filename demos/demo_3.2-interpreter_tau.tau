@@ -60,4 +60,14 @@ q
 # algebra like any other, so it can be a value carried on a stream, and a
 # specification reasoning about those values is again just a Tau specification.
 
+# Like sbf streams (demo_3.1), tau streams can be attached to files. An input
+# file holds one value per line -- whole specifications, each ended by its
+# period. The file below alternates F. and T., the program complements each
+# value, and the run stops asking once the file is exhausted:
+
+i2:tau := in file("../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in").
+o2:tau := out console.
+r o2[t] = i2[t]'
+q
+
 quit
