@@ -303,3 +303,21 @@ add_test(NAME "test_repl-adt-run_then_normalize_then_run"
 set_tests_properties("test_repl-adt-run_then_normalize_then_run" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o2\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
 	FAIL_REGULAR_EXPRESSION "Error")
+
+# A run spec whose `type` declaration was made on an EARLIER line: the
+# session-stored type must reach the run command's own parse, or `i[0].a`
+# stays an unflattened member access on a tuple-typed io var and the whole
+# spec degrades. The crossed (permuted) member copy below is the sharpest
+# probe of that degradation: unflattened, it collapses to the STRAIGHT copy
+# `o[0]:Point = i[0]:Point` -- losing the permutation -- and the input
+# stream then rejects its own wire literal ("Syntax Error: Unexpected end of
+# file ... { a: \"1\", b: \"0\" }"), because the tuple was never taken apart
+# into per-member streams. Flattened, the members swap: a takes i.b (0) and
+# b takes i.a (1). Both members are mentioned so the output is emitted at
+# all (see the "member mentioned at NO time point" case in
+# tests/integration/test_integration-adt.cpp).
+add_test(NAME "test_repl-adt-cross_line_run_crossed_members"
+	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}\\ni:Point := in console. o:Point := out console. run (o[0].a = i[0].b) && (o[0].b = i[0].a).\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-adt-cross_line_run_crossed_members" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
+	FAIL_REGULAR_EXPRESSION "Error")
