@@ -1668,14 +1668,19 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 	LOG_DEBUG << "max lookback " << max_lookback;
 
-	// Families defined by the driving recurrence: (name sid, ref-arg
-	// arity), matching is_functional_ref's fixpoint-call family match.
-	std::set<std::pair<size_t, size_t>> def_families;
+	// Families defined by the driving recurrence: the full rr_sig (name,
+	// offset arity, AND ref-arg arity), matching is_functional_ref's
+	// fixpoint-call family match. Name+arg_arity alone would conflate an
+	// indexed family like `f[n]/f[0]` with an unrelated plain function
+	// `f(x)` of the same name/arity (see validate_rr_case_types's family
+	// key in tau_tree_extractors.tmpl.h for the same fix and the fuller
+	// rationale) -- here that conflation would make this guard treat a
+	// residual belonging to the unrelated plain function as if it were
+	// part of the recurrence this call actually drives.
+	std::set<rr_sig> def_families;
 	for (const auto& r : nso_rr.rec_relations)
-		if (tref h = unwrap_to_ref<node>(r.first->get()); h) {
-			auto s = get_rr_sig<node>(h);
-			def_families.insert({ s.name, s.arg_arity });
-		}
+		if (tref h = unwrap_to_ref<node>(r.first->get()); h)
+			def_families.insert(get_rr_sig<node>(h));
 
 	// Support for the partial-match guard below (search "Partial-match
 	// guard" for the rationale). Hoisted out of the `for (i)` loop since
@@ -1702,6 +1707,21 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			untyped_rules.emplace_back(
 				tau::geth(strip_types(ur.first->get())),
 				tau::geth(strip_types(ur.second->get())));
+	// The untyped probe's own saturation cap. Stripping types only
+	// ENABLES matches (never blocks one the typed loop above already
+	// found), so an untyped re-saturation can diverge on a shape the
+	// typed loop never reached -- e.g. cross-family type-blocked mutual
+	// recursion (`a[n](x:sbf) := b[n](x)` with `b[n](x:tau) := a[n](x)`:
+	// each family is internally consistent on its own, so
+	// validate_rr_case_types passes both, the typed loop leaves a
+	// residual, and the untyped probe would rewrite a->b->a->b... with
+	// no fixed point, forever). Reuse max_enum_steps when the caller set
+	// a finite bound (0 means unlimited); otherwise fall back to a
+	// generous but finite constant so the guard that exists to turn a
+	// hang into a fast error cannot itself hang.
+	static constexpr size_t probe_saturation_fallback_cap = 10000;
+	const size_t probe_cap = max_enum_steps
+		? max_enum_steps : probe_saturation_fallback_cap;
 	subtree_unordered_set<node> legit_uninterpreted;
 
 	// Whether any rule application has ever rewritten an enumerated step.
@@ -1788,8 +1808,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		// document order.
 		trefs residuals;
 		for (tref rr_ref : tau::get(current).select_all(is<node, tau::ref>)) {
-			auto s = get_rr_sig<node>(rr_ref);
-			if (def_families.contains({ s.name, s.arg_arity })
+			if (def_families.contains(get_rr_sig<node>(rr_ref))
 				&& !legit_uninterpreted.contains(rr_ref))
 				residuals.push_back(rr_ref);
 		}
@@ -1797,6 +1816,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			tref untyped_current = strip_types(current);
 			tref probe = untyped_current;
 			bool probe_changed;
+			bool probe_exhausted = false;
+			size_t probe_steps = 0;
 			do {
 				probe_changed = false;
 				// Deliberately does not re-check lookbacks[ri] > i (the
@@ -1811,6 +1832,18 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 					if (tau::get(probe) != tau::get(pprev))
 						probe_changed = true;
 				}
+				if (probe_changed && ++probe_steps >= probe_cap) {
+					// Divergence, not silence: the probe kept finding
+					// something to rewrite, so some rule's shape DOES
+					// cover this residual -- it was genuinely type-
+					// blocked in the typed loop above. Exhausting the
+					// cap is therefore itself the "blocked" verdict,
+					// same as if the probe had stabilized on a changed
+					// result; fall through to attribution below with
+					// whatever the probe last produced.
+					probe_exhausted = true;
+					break;
+				}
 			} while (probe_changed);
 			subtree_unordered_set<node> probe_refs;
 			for (tref pr : tau::get(probe).select_all(is<node, tau::ref>))
@@ -1822,6 +1855,12 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 					break;
 				}
 			}
+			// A stabilized probe with every residual's untyped shape
+			// still present means none of them was ever going to match
+			// (the normal, legitimate case, handled below); an
+			// exhausted (diverging) probe never gets to claim that --
+			// name whichever residual triggered this probe run.
+			if (!blocked && probe_exhausted) blocked = residuals.front();
 			if (blocked) {
 				LOG_ERROR << "calculate_fixed_point: `"
 					<< LOG_FM(blocked) << "` remains after every rule"

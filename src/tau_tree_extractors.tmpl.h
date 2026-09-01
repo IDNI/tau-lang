@@ -120,14 +120,21 @@ rewriter::rules get_rec_relations(tref rrs) {
 		*definitions<node>::instance().get_io_context(), rrs);
 }
 
-// TI-3: every case of one recurrence family (same symbol name and
-// ref-arg arity) must agree on the effective BA types of its head
-// arguments. Cases are entered as separate statements and inferred
-// independently, so a half-annotated family type-checks per case but can
-// never match one set of call arguments: the indexed call silently fails
-// to expand and the fixpoint enumeration never reaches its base case
-// (2026-09-01). Reject the family at assembly time with a message that
-// names both offending cases.
+// TI-3: every case of one recurrence family (same symbol name, offset
+// arity, AND ref-arg arity -- the full rr_sig, matching how
+// is_functional_ref/the fixpoint-call machinery itself identifies a
+// family: get_rr_sig's own three fields, not just a name+arg_arity
+// subset of it. An indexed family `f[n]/f[0]` and an unrelated plain
+// function `f(x)` sharing the name and argument count are DIFFERENT
+// families -- name+arg_arity alone would conflate them, wrongly rejecting
+// the unrelated plain function as "a case of recurrence f" the moment an
+// indexed family of the same name/arity also exists.) must agree on the
+// effective BA types of its head arguments. Cases are entered as separate
+// statements and inferred independently, so a half-annotated family
+// type-checks per case but can never match one set of call arguments: the
+// indexed call silently fails to expand and the fixpoint enumeration
+// never reaches its base case (2026-09-01). Reject the family at assembly
+// time with a message that names both offending cases.
 //
 // Per-position state accumulated across every case of one family: the
 // effective BA type id pinned so far (0 = still a wildcard -- no case has
@@ -142,12 +149,11 @@ bool validate_rr_case_types(const rr<node>& defs) {
 		std::vector<size_t> types; // 0 = unpinned/wildcard so far
 		std::vector<tref> heads;   // case head that pinned types[i]
 	};
-	std::map<std::pair<size_t, size_t>, family_state> families;
+	std::map<rr_sig, family_state> families;
 	for (const auto& r : defs.rec_relations) {
 		tref head = unwrap_to_ref<node>(r.first->get());
 		if (!head) continue;
-		auto sig = get_rr_sig<node>(head);
-		std::pair<size_t, size_t> fam{ sig.name, sig.arg_arity };
+		rr_sig fam = get_rr_sig<node>(head);
 		// Only the head's OWN immediate ref_arg children (ref > ref_args
 		// > ref_arg, one level each way): a recursive descendant search
 		// here would also pick up ref_args belonging to a nested ref used
