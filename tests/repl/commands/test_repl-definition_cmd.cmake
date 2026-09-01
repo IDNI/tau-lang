@@ -36,3 +36,9 @@ add_repl_test(def_input_stream_cmd "data_in:tau := in console" "in console")
 
 # defining an output stream
 add_repl_test(def_output_stream_cmd "data_out:tau := out console" "out console")
+
+# A typed head classifies a definition as functional, so a formula body
+# cannot define it. Used to hard-crash (null tref from update_functional_rr
+# inserted into the transformed map): the only acceptable outcome is a
+# clean error.
+add_repl_test_fail(def_typed_head_formula_body_cmd "p5(u):sbf := u = 0" "cannot define a function")
