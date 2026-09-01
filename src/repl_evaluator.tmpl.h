@@ -1407,13 +1407,15 @@ void repl_evaluator<BAs...>::reprompt() {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-int repl_evaluator<BAs...>::eval(const std::string& src) {
+idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
+	const std::string& src)
+{
 	// while a `run` session is pending, src is its answer, not a new command
 	if (pending) {
 		// incomplete value: return 2 so more lines accumulate (multiline)
 		if (!run_abort_ && pending->kind == pending_request::stream_value
 			&& stream_value_incomplete(src, pending->type_tree))
-					return 2;
+					return idni::diagnostics::result<int>(2);
 		auto req = *pending;
 		pending.reset();
 		if (!run_abort_ && req.kind == pending_request::stream_value)
@@ -1431,7 +1433,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		}
 		std::cout << "\n", std::cout.flush();
 		if (!pending) reprompt();
-		return 0;
+		return idni::diagnostics::result<int>(0);
 	}
 	error = false;
 	auto tau_spec = tt(make_cli(src));
@@ -1440,11 +1442,12 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		auto commands = tau_spec || tau::cli_command;
 		for (const auto& cmd : commands())
 			if (quit = eval_cmd(cmd); quit == 1) break;
-	} else if (!error) return 2;
+	} else if (!error) return idni::diagnostics::result<int>(2);
 	std::cout << "\n", std::cout.flush();
-	if (error && opt.error_quits) return quit = 1;
+	if (error && opt.error_quits)
+		return idni::diagnostics::result<int>(quit = 1);
 	if (quit == 0) reprompt();
-	return quit;
+	return idni::diagnostics::result<int>(quit);
 }
 
 template <typename... BAs>

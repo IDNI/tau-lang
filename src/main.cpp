@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
 	string e = opts["evaluate"].get<string>();
 	if (e.size()) {
 		DBG(TAU_LOG_TRACE << "evaluating REPL command: " << e;)
-		return re.eval(e);
+		return re.eval(e).value_or(0);
 	}
 	DBG(TAU_LOG_TRACE << "running REPL";)
 	welcome();

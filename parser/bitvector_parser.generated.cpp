@@ -1,12 +1,14 @@
-// This file is generated from a file src/../parser/bitvector.tgf by
+// This file is generated from a file parser/bitvector.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "bitvector_parser.generated.h"
 
 namespace bitvector_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -28,20 +30,20 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(11), (T(5)));
 //G6:   __E_binary_1(12)     => __E_binary_0(11).
 	p(NT(12), (NT(11)));
-//G7:   __E_binary_1(12)     => __E_binary_0(11) __E_binary_1(12).
-	p(NT(12), (NT(11)+NT(12)));
+//G7:   __E_binary_1(12)     => __E_binary_1(12) __E_binary_0(11).
+	p(NT(12), (NT(12)+NT(11)));
 //G8:   binary(8)            => __E_binary_1(12).
 	p(NT(8), (NT(12)));
 //G9:   __E_hexadecimal_2(13) => xdigit(4).
 	p(NT(13), (NT(4)));
-//G10:  __E_hexadecimal_2(13) => xdigit(4) __E_hexadecimal_2(13).
-	p(NT(13), (NT(4)+NT(13)));
+//G10:  __E_hexadecimal_2(13) => __E_hexadecimal_2(13) xdigit(4).
+	p(NT(13), (NT(13)+NT(4)));
 //G11:  hexadecimal(7)       => __E_hexadecimal_2(13).
 	p(NT(7), (NT(13)));
 //G12:  __E_decimal_3(14)    => digit(3).
 	p(NT(14), (NT(3)));
-//G13:  __E_decimal_3(14)    => digit(3) __E_decimal_3(14).
-	p(NT(14), (NT(3)+NT(14)));
+//G13:  __E_decimal_3(14)    => __E_decimal_3(14) digit(3).
+	p(NT(14), (NT(14)+NT(3)));
 //G14:  decimal(6)           => __E_decimal_3(14).
 	p(NT(6), (NT(14)));
 //G15:  __E___4(15)          => space(1) _(5).
@@ -54,5 +56,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace bitvector_parser_data

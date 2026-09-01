@@ -56,6 +56,7 @@
 #include "api.h"
 #include "io_context.h"
 #include "tau_spec.h"
+#include "utility/diagnostics.h"
 #include "utility/repl.h"
 #ifdef TAU_PARSER_HAS_FTXUI
 #include "utility/repl_ftxui.h"
@@ -138,9 +139,9 @@ struct repl_evaluator {
 	/**
 	 * @brief Parse and evaluate the REPL source string @p src.
 	 * @param src Command string entered by the user.
-	 * @return Exit code (0 = success, non-zero = error/quit).
+	 * @return Exit code (0 = success, 1 = quit, 2 = incomplete input).
 	 */
-	int eval(const std::string& src);
+	idni::diagnostics::result<int> eval(const std::string& src);
 	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
 	void reprompt();
 #ifdef TAU_PARSER_HAS_FTXUI

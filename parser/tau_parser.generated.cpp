@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "tau_parser.generated.h"
 
 namespace tau_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -40,16 +42,16 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(54), (NT(9)+NT(55)+NT(9)+T(1)));
 //G12:  __E_definitions_4(60) => __E_definitions_2(54).
 	p(NT(60), (NT(54)));
-//G13:  __E_definitions_4(60) => __E_definitions_2(54) __E_definitions_4(60).
-	p(NT(60), (NT(54)+NT(60)));
+//G13:  __E_definitions_4(60) => __E_definitions_4(60) __E_definitions_2(54).
+	p(NT(60), (NT(60)+NT(54)));
 //G14:  definitions(51)      => __E_definitions_4(60).
 	p(NT(51), (NT(60)));
 //G15:  __E_spec_multiline_5(62) => _(9) spec_part(31) _(9) '.'.
 	p(NT(62), (NT(9)+NT(31)+NT(9)+T(1)));
 //G16:  __E_spec_multiline_6(63) => null.
 	p(NT(63), (nul));
-//G17:  __E_spec_multiline_6(63) => __E_spec_multiline_5(62) __E_spec_multiline_6(63).
-	p(NT(63), (NT(62)+NT(63)));
+//G17:  __E_spec_multiline_6(63) => __E_spec_multiline_6(63) __E_spec_multiline_5(62).
+	p(NT(63), (NT(63)+NT(62)));
 //G18:  __E_spec_multiline_7(64) => _(9) '.'.
 	p(NT(64), (NT(9)+T(1)));
 //G19:  __E_spec_multiline_7(64) => null.
@@ -124,8 +126,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(81), (NT(9)+T(19)+NT(9)+NT(25)));
 //G54:  __E_type_parents_17(82) => null.
 	p(NT(82), (nul));
-//G55:  __E_type_parents_17(82) => __E_type_parents_16(81) __E_type_parents_17(82).
-	p(NT(82), (NT(81)+NT(82)));
+//G55:  __E_type_parents_17(82) => __E_type_parents_17(82) __E_type_parents_16(81).
+	p(NT(82), (NT(82)+NT(81)));
 //G56:  type_parents(78)     => '(' _(9) type_name(25) __E_type_parents_17(82) _(9) ')'.
 	p(NT(78), (T(12)+NT(9)+NT(25)+NT(82)+NT(9)+T(13)));
 //G57:  type_body(80)        => tuple(83).
@@ -144,8 +146,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(87), (NT(9)+T(19)+NT(9)+NT(85)));
 //G64:  __E_tuple_21(88)     => null.
 	p(NT(88), (nul));
-//G65:  __E_tuple_21(88)     => __E_tuple_20(87) __E_tuple_21(88).
-	p(NT(88), (NT(87)+NT(88)));
+//G65:  __E_tuple_21(88)     => __E_tuple_21(88) __E_tuple_20(87).
+	p(NT(88), (NT(88)+NT(87)));
 //G66:  tuple(83)            => '{' _(9) member(85) __E_tuple_21(88) _(9) '}'.
 	p(NT(83), (T(22)+NT(9)+NT(85)+NT(88)+NT(9)+T(23)));
 //G67:  member_name(26)      => chars(27).
@@ -154,8 +156,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(89), (T(1)+NT(26)));
 //G69:  __E_member_path_23(90) => null.
 	p(NT(90), (nul));
-//G70:  __E_member_path_23(90) => __E_member_path_22(89) __E_member_path_23(90).
-	p(NT(90), (NT(89)+NT(90)));
+//G70:  __E_member_path_23(90) => __E_member_path_23(90) __E_member_path_22(89).
+	p(NT(90), (NT(90)+NT(89)));
 //G71:  member_path(68)      => '.' member_name(26) __E_member_path_23(90).
 	p(NT(68), (T(1)+NT(26)+NT(90)));
 //G72:  __E_ref_24(91)       => offsets(92).
@@ -196,8 +198,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(102), (NT(9)+T(19)+NT(9)+NT(101)));
 //G90:  __E___E_ref_args_27_30(103) => null.
 	p(NT(103), (nul));
-//G91:  __E___E_ref_args_27_30(103) => __E___E_ref_args_27_29(102) __E___E_ref_args_27_30(103).
-	p(NT(103), (NT(102)+NT(103)));
+//G91:  __E___E_ref_args_27_30(103) => __E___E_ref_args_27_30(103) __E___E_ref_args_27_29(102).
+	p(NT(103), (NT(103)+NT(102)));
 //G92:  __E_ref_args_27(99)  => __E___E_ref_args_27_28(100) __E___E_ref_args_27_30(103).
 	p(NT(99), (NT(100)+NT(103)));
 //G93:  __E_ref_args_27(99)  => null.
@@ -718,8 +720,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(235), (NT(2)));
 //G351: __E___E_source_104_106(236) => null.
 	p(NT(236), (nul));
-//G352: __E___E_source_104_106(236) => __E___E_source_104_105(235) __E___E_source_104_106(236).
-	p(NT(236), (NT(235)+NT(236)));
+//G352: __E___E_source_104_106(236) => __E___E_source_104_106(236) __E___E_source_104_105(235).
+	p(NT(236), (NT(236)+NT(235)));
 //G353: __E_source_104(234)  => __E___E_source_104_106(236) src_c(29).
 	p(NT(234), (NT(236)+NT(29)));
 //G354: __E_source_104(234)  => null.
@@ -740,8 +742,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(237), (NT(2)));
 //G362: __E_src_c_108(238)   => null.
 	p(NT(238), (nul));
-//G363: __E_src_c_108(238)   => __E_src_c_107(237) __E_src_c_108(238).
-	p(NT(238), (NT(237)+NT(238)));
+//G363: __E_src_c_108(238)   => __E_src_c_108(238) __E_src_c_107(237).
+	p(NT(238), (NT(238)+NT(237)));
 //G364: src_c(29)            => '{' __E_src_c_108(238) '}'.
 	p(NT(29), (T(22)+NT(238)+T(23)));
 //G365: __E_variable_109(239) => uconst(30).
@@ -768,8 +770,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(243), ~(NT(433)) & ~(NT(434)) & (NT(5)));
 //G376: __E_var_name_113(244) => null.
 	p(NT(244), (nul));
-//G377: __E_var_name_113(244) => digit(3) __E_var_name_113(244).
-	p(NT(244), (NT(3)+NT(244)));
+//G377: __E_var_name_113(244) => __E_var_name_113(244) digit(3).
+	p(NT(244), (NT(244)+NT(3)));
 //G378: var_name(18)         => __E_var_name_112(243) __E_var_name_113(244).	 # guarded: charvar
 	p(NT(18), (NT(243)+NT(244)));
 	p.back().guard = "charvar";
@@ -785,8 +787,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(246), (T(48)));
 //G384: __E_var_name_116(247) => null.
 	p(NT(247), (nul));
-//G385: __E_var_name_116(247) => __E_var_name_115(246) __E_var_name_116(247).
-	p(NT(247), (NT(246)+NT(247)));
+//G385: __E_var_name_116(247) => __E_var_name_116(247) __E_var_name_115(246).
+	p(NT(247), (NT(247)+NT(246)));
 //G386: var_name(18)         => __E_var_name_114(245) __E_var_name_116(247).	 # guarded: var
 	p(NT(18), (NT(245)+NT(247)));
 	p.back().guard = "var";
@@ -810,8 +812,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(251), (NT(9)+T(19)+NT(9)+NT(28)));
 //G396: __E_q_vars_120(252)  => null.
 	p(NT(252), (nul));
-//G397: __E_q_vars_120(252)  => __E_q_vars_119(251) __E_q_vars_120(252).
-	p(NT(252), (NT(251)+NT(252)));
+//G397: __E_q_vars_120(252)  => __E_q_vars_120(252) __E_q_vars_119(251).
+	p(NT(252), (NT(252)+NT(251)));
 //G398: q_vars(115)          => q_var(28) __E_q_vars_120(252).
 	p(NT(115), (NT(28)+NT(252)));
 //G399: q_var(28)            => capture(17).
@@ -826,8 +828,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(253), (NT(9)+T(19)+NT(9)+NT(248)));
 //G404: __E_offsets_122(254) => null.
 	p(NT(254), (nul));
-//G405: __E_offsets_122(254) => __E_offsets_121(253) __E_offsets_122(254).
-	p(NT(254), (NT(253)+NT(254)));
+//G405: __E_offsets_122(254) => __E_offsets_122(254) __E_offsets_121(253).
+	p(NT(254), (NT(254)+NT(253)));
 //G406: offsets(92)          => '[' _(9) offset(248) __E_offsets_122(254) _(9) ']'.
 	p(NT(92), (T(20)+NT(9)+NT(248)+NT(254)+NT(9)+T(21)));
 //G407: offset(248)          => integer(15).
@@ -858,14 +860,14 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(259), (T(48)));
 //G420: __E_chars_127(260)   => null.
 	p(NT(260), (nul));
-//G421: __E_chars_127(260)   => __E_chars_126(259) __E_chars_127(260).
-	p(NT(260), (NT(259)+NT(260)));
+//G421: __E_chars_127(260)   => __E_chars_127(260) __E_chars_126(259).
+	p(NT(260), (NT(260)+NT(259)));
 //G422: chars(27)            => alpha(5) __E_chars_127(260).
 	p(NT(27), (NT(5)+NT(260)));
 //G423: __E_digits_128(261)  => digit(3).
 	p(NT(261), (NT(3)));
-//G424: __E_digits_128(261)  => digit(3) __E_digits_128(261).
-	p(NT(261), (NT(3)+NT(261)));
+//G424: __E_digits_128(261)  => __E_digits_128(261) digit(3).
+	p(NT(261), (NT(261)+NT(3)));
 //G425: digits(12)           => __E_digits_128(261).
 	p(NT(12), (NT(261)));
 //G426: num(170)             => digits(12).
@@ -898,8 +900,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(265), (T(50)));
 //G440: __E_comment_132(266) => null.
 	p(NT(266), (nul));
-//G441: __E_comment_132(266) => __E_comment_131(265) __E_comment_132(266).
-	p(NT(266), (NT(265)+NT(266)));
+//G441: __E_comment_132(266) => __E_comment_132(266) __E_comment_131(265).
+	p(NT(266), (NT(266)+NT(265)));
 //G442: __E_comment_133(267) => '\n'.
 	p(NT(267), (T(51)));
 //G443: __E_comment_133(267) => '\r'.
@@ -926,8 +928,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(270), (T(1)+NT(9)+NT(269)+NT(9)));
 //G454: __E_cli_135(271)     => null.
 	p(NT(271), (nul));
-//G455: __E_cli_135(271)     => __E_cli_134(270) __E_cli_135(271).
-	p(NT(271), (NT(270)+NT(271)));
+//G455: __E_cli_135(271)     => __E_cli_135(271) __E_cli_134(270).
+	p(NT(271), (NT(271)+NT(270)));
 //G456: __E_cli_136(272)     => '.' _(9).
 	p(NT(272), (T(1)+NT(9)));
 //G457: __E_cli_136(272)     => null.
@@ -1246,8 +1248,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(379), (NT(10)+NT(380)));
 //G614: __E_solve_options_179(381) => null.
 	p(NT(381), (nul));
-//G615: __E_solve_options_179(381) => __E_solve_options_178(379) __E_solve_options_179(381).
-	p(NT(381), (NT(379)+NT(381)));
+//G615: __E_solve_options_179(381) => __E_solve_options_179(381) __E_solve_options_178(379).
+	p(NT(381), (NT(381)+NT(379)));
 //G616: solve_options(305)   => __E_solve_options_179(381).
 	p(NT(305), (NT(381)));
 //G617: __E_solve_option_180(382) => solver_mode(383).
@@ -1276,14 +1278,14 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(74), (T(59)+NT(21)+T(59)));
 //G629: __E_file_name_183(388) => printable(8).
 	p(NT(388), (NT(8)));
-//G630: __E_file_name_183(388) => printable(8) __E_file_name_183(388).
-	p(NT(388), (NT(8)+NT(388)));
+//G630: __E_file_name_183(388) => __E_file_name_183(388) printable(8).
+	p(NT(388), (NT(388)+NT(8)));
 //G631: file_name(21)        => __E_file_name_183(388).
 	p(NT(21), (NT(388)));
 //G632: __E_option_name_184(389) => alnum(6).
 	p(NT(389), (NT(6)));
-//G633: __E_option_name_184(389) => alnum(6) __E_option_name_184(389).
-	p(NT(389), (NT(6)+NT(389)));
+//G633: __E_option_name_184(389) => __E_option_name_184(389) alnum(6).
+	p(NT(389), (NT(389)+NT(6)));
 //G634: option_name(23)      => __E_option_name_184(389).
 	p(NT(23), (NT(389)));
 //G635: __E_option_value_185(390) => alnum(6).
@@ -1292,8 +1294,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(390), (T(1)));
 //G637: __E_option_value_186(391) => __E_option_value_185(390).
 	p(NT(391), (NT(390)));
-//G638: __E_option_value_186(391) => __E_option_value_185(390) __E_option_value_186(391).
-	p(NT(391), (NT(390)+NT(391)));
+//G638: __E_option_value_186(391) => __E_option_value_186(391) __E_option_value_185(390).
+	p(NT(391), (NT(391)+NT(390)));
 //G639: option_value(24)     => __E_option_value_186(391).
 	p(NT(24), (NT(391)));
 //G640: bf_cmd_arg(33)       => history(376).
@@ -1440,5 +1442,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace tau_parser_data
