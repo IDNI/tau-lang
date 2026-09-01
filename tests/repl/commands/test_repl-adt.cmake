@@ -6,17 +6,18 @@
 # `tau -e` is single-valued (only the last -e survives), so every non-`run`
 # case below chains its commands with '.' inside ONE -e string -- exactly
 # how test_repl-normalize_cmd.cmake/test_repl-sat_cmd.cmake/
-# test_repl-solver_cmd.cmake chain a definition and its use. This also keeps
-# the `type Point = ...` and the command that references `Point` in the SAME
-# parse, which is what actually lets the ADT flattener (src/adt/
-# adt_flatten.tmpl.h) see the type: it builds its registry fresh from
-# whatever tree it is handed, so a type declared on an earlier, separately
-# parsed REPL line is not visible to a later command's parse (each `-X`
-# stdin line is its own parse). def_type_cmd's own `type_defs` storage
-# (repl_evaluator.h/.tmpl.h) mirrors rr_defs/io_defs for get_applied()'s
-# spec assembly, but that assembly runs on already-parsed/flattened trees,
-# so it does not retroactively fix a later line's parse either -- hence
-# every case here keeps the definition and its use on one line.
+# test_repl-solver_cmd.cmake chain a definition and its use. This is not a
+# functional requirement for ADT visibility any more: def_type_cmd's own
+# `type_defs` storage (repl_evaluator.h/.tmpl.h) is now threaded into
+# make_cli()'s get_options as session_type_defs, reaching adt_flatten/
+# adt_registry::build (src/adt/adt_flatten.tmpl.h, src/adt/
+# adt_types.tmpl.h), so a `type` declared on one REPL line IS visible to a
+# later, separately parsed line's `type`-annotated commands -- see the
+# `adt-cross_line_*` cases below (via add_multiline_repl_test, tests/repl/
+# add_repl_test.cmake), which declare the type on its own line and use it on
+# a later one. The one-`-e`-string style above is kept for the rest of this
+# file's cases simply because it is the more compact way to write a REPL
+# test, not because cross-line would fail.
 #
 # Member-path/annotation syntax notes (verified against build-Debug/tau
 # before being written here):
@@ -79,6 +80,31 @@ add_repl_test(adt-solve
 add_repl_test_fail(adt-unknown_member
 	"type Point = {a: sbf, b: sbf}. n ex x:Point (x.c = 0)"
 	"ADT")
+
+# --- session-stored types reaching a later, separately parsed line ---------
+# Session-stored types now reach later lines: the tuple equality expands
+# member-wise even though the type was declared on an earlier line (before
+# this fix, the second line's own parse saw no `Point` at all, and `x = y`
+# stayed an unflattened, plain-typed equality). Expected output verified
+# live against the equivalent SAME-line case ("type Point = ... . n x:Point
+# = y:Point" in one -e string): normalize's canonical term ordering prints
+# `y.b = x.b && y.a = x.a`, not the declaration-order `x.a = y.a && ...` --
+# member-wise expansion, not textual order, is what this case asserts.
+add_multiline_repl_test(adt-cross_line_tuple_equality
+	"y\\.b = x\\.b && y\\.a = x\\.a"
+	"type Point = {a: sbf, b: sbf}"
+	"n x:Point = y:Point")
+
+# ... and a later same-name re-declaration wins (last-def-wins across
+# lines): P2's SECOND declaration (with member `b`) is the one the session
+# carries forward, so `x.b` resolves instead of degrading to an unknown/
+# base-typed member; `ex x.a, x.b (x.b = 0)` is a tautology (a component can
+# always be set to 0), which normalize reduces straight to `T`.
+add_multiline_repl_test(adt-cross_line_redeclaration
+	": T"
+	"type P2 = {a: sbf}"
+	"type P2 = {a: sbf, b: sbf}"
+	"n ex x:P2 (x.b = 0)")
 
 # --- run over ADT-typed console streams -------------------------------------
 # Declaring an ADT-typed input/output stream through the REPL's def_input_cmd/

@@ -196,8 +196,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		// ctx->adt_streams grouping layout were already fully built when
 		// it was first declared: adt_flatten_rewrite_io_def, called from
 		// adt_flatten_rewrite's def_input_cmd/def_output_cmd case (see
-		// src/adt/adt_flatten.tmpl.h), at the def's own original parse --
-		// the only parse that ever runs adt_flatten for a REPL command.
+		// src/adt/adt_flatten.tmpl.h), at the def's own original parse.
 		// io_defs itself still holds that def's ORIGINAL, un-flattened
 		// tree (its `typed: <ADT name>` annotation intact) so
 		// def_input_cmd()/def_output_cmd() can echo it back to the user.
@@ -209,17 +208,30 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		// silently duplicating it. rebuild_inputs/rebuild_outputs
 		// (interpreter.tmpl.h) would then also try to read/write through
 		// that stray bare-root stream, producing spurious "Failed to
-		// read/write ..." errors during `run`. Since an ADT type is only
-		// ever visible within the single parse that declares it (a
-		// separately parsed later line never sees it -- adt_registry is
-		// rebuilt fresh per parse, see get_applied's own type_defs
-		// prepend above and the REPL test file's comment for why), any
-		// formula argument that legitimately needs this def's members is
-		// already fully typed from that SAME original parse; unlike an
+		// read/write ..." errors during `run`.
+		//
+		// This is still safe now that session type_defs became visible
+		// cross-line (this file's own type_defs is now threaded through
+		// make_cli()'s get_options into adt_flatten/adt_registry::build,
+		// so an ADT type declared on an earlier REPL line is no longer
+		// invisible to a later line's parse -- see the REPL test file's
+		// header comment). That makes THIS def's own original
+		// declaration parse resolve correctly even when its ADT type
+		// came from an earlier line (adt_flatten_rewrite_io_def now sees
+		// it too there), but it does not change what re-splicing here
+		// would do: get_applied()'s spec assembly (tau_spec::add +
+		// tau_spec::get_nso_rr, tau_spec.tmpl.h) never calls tau::get or
+		// adt_flatten at all -- it combines already-resolved trees
+		// directly via infer_ba_types/the rewriter, structurally
+		// bypassing the flattener no matter what a registry could
+		// resolve elsewhere. So splicing this raw, un-flattened tree
+		// back in would still hit "no ADT registry left to resolve
+		// `<ADT name>`" regardless of session visibility; unlike an
 		// ordinary (non-ADT) cross-line io def -- which DOES still need
-		// this splice, to pick up its type from a def declared on an
-		// earlier, separate line -- a tuple-typed def has nothing left to
-		// contribute here, so it is skipped outright rather than spliced.
+		// this splice, since infer_ba_types (not adt_flatten) resolves
+		// its base type, and infer_ba_types DOES run here -- a
+		// tuple-typed def has nothing left to contribute here, so it is
+		// skipped outright rather than spliced.
 		tref head = tt(d) | tt::first | tt::ref;
 		size_t root_sid = head ? tau::get(head).data() : 0;
 		if (root_sid && defs.get_io_context()->adt_streams.contains(root_sid))
@@ -855,7 +867,21 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
-	type_defs.push_back(tau::geth(n | tt::first | tt::ref));
+	tref def = n | tt::first | tt::ref;
+	size_t name_sid = tt(def) | tau::type_name | tt::data;
+	// A redeclaration (same type name) replaces the earlier entry rather
+	// than piling up: session_type_defs (get_options, threaded into
+	// adt_registry::build via adt_flatten) always wants THIS session's
+	// latest definition for a name to reach later lines, and the vector
+	// otherwise grows unboundedly across a long REPL session re-declaring
+	// the same type. Declaration order of the surviving entries is not
+	// otherwise preserved (the redeclaration moves to the back); build()'s
+	// own last-def-wins-in-vector-order semantics only matter for a session
+	// list with duplicates, which this keeps from ever happening.
+	std::erase_if(type_defs, [&](const htref& hd) {
+		return (tt(hd->get()) | tau::type_name | tt::data) == name_sid;
+	});
+	type_defs.push_back(tau::geth(def));
 	size_t idx = type_defs.size() - 1;
 	std::cout << "[" << idx + 1 << "] "
 		<< tau::get(type_defs[idx]->get()).to_str() << "\n";
@@ -893,7 +919,8 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		.reget_with_hooks = false,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
-		.context = defs.get_io_context()
+		.context = defs.get_io_context(),
+		.session_type_defs = &type_defs
 	};
 	auto bound = tau::get(tau_parser::tree::get(t), opts);
 	if (!bound) return fail();

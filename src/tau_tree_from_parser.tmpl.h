@@ -254,7 +254,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	tref transformed = m_ref(ptr.get());
 
 	if (options.flatten_adts) {
-		transformed = adt_flatten<node>(transformed, options.context);
+		transformed = adt_flatten<node>(transformed, options.context,
+			options.session_type_defs);
 		if (!transformed) {
 			tau::use_hooks = using_hooks;
 			return nullptr;
