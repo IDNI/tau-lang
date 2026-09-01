@@ -155,6 +155,12 @@ std::optional<rr<node>> tau_spec<node>::get_nso_rr() {
 template <NodeType node>
 typename tree<node>::get_options tau_spec<node>::get_options() const {
 	auto& defs = definitions<node>::instance();
+	// Deliberately leaves .session_type_defs unset (nullptr): tau_spec is
+	// used for both a REPL line (repl_evaluator::make_cli, which sets its
+	// OWN .session_type_defs on the tree<node>::get_options it builds
+	// directly -- see repl_evaluator.tmpl.h) and a spec-file/`run` parse,
+	// which has no REPL session to draw from at all. So a spec-file/`run`
+	// parse never sees REPL session types, by design.
 	return typename tau::get_options{
 		.parse = { .start = tau::spec_multiline },
 		.infer_ba_types = true,

@@ -41,9 +41,10 @@ endfunction()
 # helper instead for a case that needs each argument on its OWN REPL line
 # (e.g. a `type` declaration on one line whose effect a LATER, separately
 # parsed line must see). Each of <line1>... is piped, one per line, via
-# `printf` into `tau -X` (interactive mode, like the file's other raw
-# printf-driven add_test entries), followed by a trailing `q` to exit
-# cleanly. Argument order is (name, regex, lines...) -- unlike
+# `printf` into `tau -X` (interactive mode, like commands/test_repl-adt.cmake's
+# other raw printf-driven add_test entries, e.g. its lines 176/203/255/265/302),
+# followed by a trailing `q` to exit cleanly. Argument order is
+# (name, regex, lines...) -- unlike
 # add_repl_test/add_echo_repl_test's (name, cmd, regex) -- since CMake's
 # variadic tail (ARGN) must come last in the parameter list.
 function(add_multiline_repl_test test_name test_regex)

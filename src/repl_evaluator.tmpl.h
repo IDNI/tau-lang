@@ -184,8 +184,14 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 	tau_spec<node> spec;
 	spec.add(arg);
 	auto& defs = definitions<node>::instance();
-	// type_defs first: the registry must see every type before rr_defs/
-	// io_defs are added, regardless of the order they were declared in.
+	// type_defs is spliced first only for parallel structure with rr_defs/
+	// io_defs below -- tau_spec::add's type_def case is a no-op (see its
+	// own comment, tau_spec.tmpl.h), so this loop has no functional effect
+	// on the spec assembled here today; get_applied()'s actual cross-line
+	// ADT visibility comes from upstream, via make_cli()'s
+	// session_type_defs (see this file's def_type_cmd/make_cli), which
+	// resolves an io/rr def's own ADT annotations at ITS declaration parse,
+	// before it ever reaches type_defs/get_applied.
 	// (->get(): type_defs/rr_defs/io_defs store htref, not tref -- see
 	// their declaration comment in repl_evaluator.h for why.)
 	for (const htref& hd : type_defs) spec.add(hd->get());
@@ -219,19 +225,30 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		// declaration parse resolve correctly even when its ADT type
 		// came from an earlier line (adt_flatten_rewrite_io_def now sees
 		// it too there), but it does not change what re-splicing here
-		// would do: get_applied()'s spec assembly (tau_spec::add +
-		// tau_spec::get_nso_rr, tau_spec.tmpl.h) never calls tau::get or
-		// adt_flatten at all -- it combines already-resolved trees
-		// directly via infer_ba_types/the rewriter, structurally
-		// bypassing the flattener no matter what a registry could
-		// resolve elsewhere. So splicing this raw, un-flattened tree
-		// back in would still hit "no ADT registry left to resolve
-		// `<ADT name>`" regardless of session visibility; unlike an
-		// ordinary (non-ADT) cross-line io def -- which DOES still need
-		// this splice, since infer_ba_types (not adt_flatten) resolves
-		// its base type, and infer_ba_types DOES run here -- a
-		// tuple-typed def has nothing left to contribute here, so it is
-		// skipped outright rather than spliced.
+		// would do. get_applied() only ever calls tau_spec::add(tref) on
+		// spec (never tau_spec::parse(string)), so spec's parts_/parsed_
+		// stay empty; get_nso_rr() -> get() (tau_spec.tmpl.h) DOES still
+		// call tau::get(...) once, at :54-55, but on the ptree
+		// build_parse_tree() returns for that empty parts_ -- an empty
+		// `spec` ptree node with no children (build_parse_tree()'s own
+		// defs.empty()/!main branch) -- so that one tau::get call parses
+		// NONE of the user's actual text or spliced trees; nothing is
+		// there yet for adt_flatten to see either way. The real spliced
+		// content -- this def's raw tree (added via add()'s
+		// input_def/output_def case into defs_) and arg's formula (via
+		// add()'s wff/bf case into main_) -- is merged in AFTERWARDS by
+		// plain tree-node constructors (tau::get(tau::main, main_),
+		// tau::get(tau::definitions, spec_defs), tau::get(tau::spec, ...),
+		// tau_spec.tmpl.h:63-72), which build a node from an existing
+		// tref and never re-parse or re-flatten it. So splicing this raw,
+		// un-flattened tree back in would still hit "no ADT registry left
+		// to resolve `<ADT name>`" regardless of session visibility --
+		// bypassed by construction (no parse ever touches it), not by
+		// content; unlike an ordinary (non-ADT) cross-line io def --
+		// which DOES still need this splice, since infer_ba_types (which
+		// DOES run here, via get()'s own direct call, tau_spec.tmpl.h:76)
+		// resolves its base type -- a tuple-typed def has nothing left to
+		// contribute here, so it is skipped outright rather than spliced.
 		tref head = tt(d) | tt::first | tt::ref;
 		size_t root_sid = head ? tau::get(head).data() : 0;
 		if (root_sid && defs.get_io_context()->adt_streams.contains(root_sid))
