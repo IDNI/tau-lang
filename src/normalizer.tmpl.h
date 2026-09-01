@@ -1668,6 +1668,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 	LOG_DEBUG << "max lookback " << max_lookback;
 
+	// Families defined by the driving recurrence: (name sid, ref-arg
+	// arity), matching is_functional_ref's fixpoint-call family match.
+	std::set<std::pair<size_t, size_t>> def_families;
+	for (const auto& r : nso_rr.rec_relations)
+		if (tref h = unwrap_to_ref<node>(r.first->get()); h) {
+			auto s = get_rr_sig<node>(h);
+			def_families.insert({ s.name, s.arg_arity });
+		}
+
 	// Whether any rule application has ever rewritten an enumerated step.
 	// A rule with a capture offset matches every index from its lookback
 	// on, and a fixed-offset rule only indices up to max_lookback, so if
@@ -1715,6 +1724,80 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				"mismatch between the call site and the rules); "
 				"giving up.";
 			return nullptr;
+		}
+
+		// Partial-match guard: rules were applied to saturation, yet the
+		// step still holds a reference into a family this recurrence
+		// defines. This is only a defect when some rule's PATTERN
+		// actually covers this position and a type mismatch is what
+		// blocked it (typically the family's cases disagree on argument
+		// types -- normally caught earlier by validate_rr_case_types;
+		// this is the fallback for any future partial-match cause). It
+		// is NOT a defect when no rule covers this position at all
+		// regardless of type -- e.g. a step-only recurrence (no base
+		// case) enumerated down to an offset no rule's pattern reaches
+		// leaves an uninterpreted call that are_nso_equivalent treats as
+		// an opaque atom, and a fixpoint parametric in it can still be
+		// found (see "no initial condition",
+		// test_integration-nso_rr_fixed_point.cpp).
+		//
+		// Tell the two apart by re-attempting saturation on an UNTYPED
+		// clone of both the step and the rules, via the exact same
+		// per-rule application the loop above just used: if that still
+		// changes nothing, no rule's shape (kind/offset) was ever going
+		// to match here regardless of type, so the residual is
+		// legitimately left alone. If it DOES change something, some
+		// rule's shape does cover this position and only the type
+		// blocked it -- error.
+		tref first_residual = nullptr;
+		for (tref rr_ref : tau::get(current).select_all(is<node, tau::ref>)) {
+			auto s = get_rr_sig<node>(rr_ref);
+			if (def_families.contains({ s.name, s.arg_arity })) {
+				first_residual = rr_ref;
+				break;
+			}
+		}
+		if (first_residual) {
+			// apply_unique takes its callable by non-const lvalue
+			// reference (see pre_order<node>::apply_unique's signature
+			// in external/parser/src/utility/tree.h/
+			// tree_traversals_pre_order.tmpl.h) -- it must be a named
+			// variable, not a temporary lambda, or overload resolution
+			// fails to bind. Mirrors resolve_io_vars's `resolve` lambda
+			// above, passed the same way.
+			auto do_untype = [](tref m) { return untype<node>(m); };
+			auto strip_types = [&do_untype](tref n) {
+				return pre_order<node>(n).apply_unique(do_untype);
+			};
+			tref untyped_current = strip_types(current);
+			rewriter::rules untyped_rules;
+			for (const auto& ur : nso_rr.rec_relations)
+				untyped_rules.emplace_back(
+					tau::geth(strip_types(ur.first->get())),
+					tau::geth(strip_types(ur.second->get())));
+			tref probe = untyped_current;
+			bool probe_changed;
+			do {
+				probe_changed = false;
+				for (const auto& ur : untyped_rules) {
+					tref pprev = probe;
+					probe = nso_rr_apply<node>(ur, probe);
+					if (tau::get(probe) != tau::get(pprev))
+						probe_changed = true;
+				}
+			} while (probe_changed);
+			if (tau::get(probe) != tau::get(untyped_current)) {
+				LOG_ERROR << "calculate_fixed_point: `"
+					<< LOG_FM(first_residual) << "` remains after"
+					" every rule was applied to saturation; one of"
+					" its cases never matches the call (kind or"
+					" type mismatch); giving up.";
+				return nullptr;
+			}
+			DBG(LOG_TRACE << "calculate_fixed_point: `"
+				<< LOG_FM(first_residual) << "` remains, but no rule"
+				" matches it even untyped; legitimately"
+				" uninterpreted, continuing";)
 		}
 
 		LOG_DEBUG << "Begin enumeration step";
