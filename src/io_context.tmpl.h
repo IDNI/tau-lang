@@ -704,10 +704,15 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 // Ordered (insertion-order, NOT sorted) nesting tree built from a layout's
 // components in layout order, so the formatted literal's member order
 // matches the type's declared member order rather than dict-id order.
+// key lives on the node itself (rather than in a std::pair sibling) so
+// vector<adt_fmt_node> stays a plain self-referential container: some
+// libstdc++ versions can't resolve pair<string, T>'s conditionally-explicit
+// constructors while T is still an incomplete self-reference.
 struct adt_fmt_node {
+	std::string key;
 	bool is_leaf = false;
 	std::string leaf;
-	std::vector<std::pair<std::string, adt_fmt_node>> children;
+	std::vector<adt_fmt_node> children;
 };
 
 // Inserts one flattened member's @p leaf value into the nesting tree at the
@@ -718,10 +723,10 @@ inline void adt_fmt_insert(adt_fmt_node& node, const std::vector<size_t>& path,
 {
 	if (depth == path.size()) { node.is_leaf = true; node.leaf = leaf; return; }
 	std::string key = dict(path[depth]);
-	for (auto& [k, child] : node.children)
-		if (k == key) return adt_fmt_insert(child, path, depth + 1, leaf);
-	node.children.emplace_back(key, adt_fmt_node{});
-	adt_fmt_insert(node.children.back().second, path, depth + 1, leaf);
+	for (auto& child : node.children)
+		if (child.key == key) return adt_fmt_insert(child, path, depth + 1, leaf);
+	node.children.push_back(adt_fmt_node{key, false, {}, {}});
+	adt_fmt_insert(node.children.back(), path, depth + 1, leaf);
 }
 
 // Renders a nesting tree as one wire-format literal: a leaf as its quoted
@@ -731,10 +736,10 @@ inline std::string adt_fmt_print(const adt_fmt_node& node) {
 	if (node.is_leaf) return "\"" + node.leaf + "\"";
 	std::string s = "{ ";
 	bool first = true;
-	for (const auto& [k, child] : node.children) {
+	for (const auto& child : node.children) {
 		if (!first) s += ", ";
 		first = false;
-		s += k + ": " + adt_fmt_print(child);
+		s += child.key + ": " + adt_fmt_print(child);
 	}
 	s += " }";
 	return s;
