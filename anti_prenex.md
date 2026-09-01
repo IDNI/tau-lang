@@ -3,8 +3,10 @@
 Spec: Chapter 5 of `taba0.5.tex` (= ch. 5, p. 51 of `taba0.5.pdf`). Paper steps
 `2a`–`2k` are cited inline; step `(3)`, the universal branch, is handled by
 dualisation in `PROCESS_BLOCK`. Of steps `2e`–`2j` — one Boole decomposition
-on a chosen pivot — exactly one pivot class survives, as the unique split
-(§6): the equation whose truth substitutes a binder variable away. All other
+on a chosen pivot — the unique split (§6) keeps the one binder-killing pivot
+class: the equation whose truth substitutes a binder variable away.
+`TRY_DECOMPOSE` (§6) restores the general step, under a no-duplication
+licence, for the atom whose two signs sit in sibling conjuncts. All remaining
 case analysis is `EXPAND` (§6), distributing disjuncts the formula already
 contains.
 
@@ -212,8 +214,9 @@ through its `ASK` fallback live in `solver_memo` under that table's flush rule.
    rewrites one.
 5. **Case analysis stays inside the formula's own atom vocabulary — no
    manufactured atoms.** Every multiplying step — 2d, the case witness, the
-   unique split, `EXPAND` — distributes members the formula already contains
-   or splits on an atom it already contains: the split's F-arm conjoins the
+   unique split, `TRY_DECOMPOSE`, `EXPAND` — distributes members the
+   formula already contains or splits on an atom it already contains: the
+   split's F-arm conjoins the
    NEGATION of an atom of ψ while `[atm ↦ F]` erases every other occurrence,
    so the vocabulary never grows and the atom is RETIRED rather than barred —
    bare selection (§6) can never take it again, and no barred-atom set
@@ -221,10 +224,13 @@ through its `ASK` fallback live in `solver_memo` under that table's flush rule.
    What the rest of Boole decomposition provided is recovered piecewise: a
    pin substitutes out through the witness rung (spine level), the case
    witness (all branches of one disjunct), and the unique split (any bare
-   occurrence, however deep), a constant-false atom folds
-   through `FOLD_DECIDED`, a finished variable leaves through scope
-   narrowing's settle move, and the rest is decided at the leaves, where the
-   clause methods are complete.
+   occurrence, however deep), the licensed decomposition takes the
+   both-signed atom whose worlds span sibling conjuncts (both cofactors
+   erase every occurrence; the surviving guard literals are one-signed, so
+   its census never re-selects the atom — retired, not barred), a
+   constant-false atom folds through `FOLD_DECIDED`, a finished variable
+   leaves through scope narrowing's settle move, and the rest is decided at
+   the leaves, where the clause methods are complete.
 6. **Everything the algorithm builds is simplified at the point of
    construction** — an atom by `SIMPLIFY_ATOM`, a cofactor by `SIMPLIFY_TERM`, a
    formula built by substituting into one or conjoining onto one by `SIMPLIFY` —
@@ -257,7 +263,8 @@ through its `ASK` fallback live in `solver_memo` under that table's flush rule.
    `PUSH_OVER_CONJUNCTION` narrows scopes — splitting the disjoint, settling
    the final — before its fast paths, elimination tries witnesses before
    methods, the push kills binders — pin, case pin, then the unique split —
-   before expanding, and `EXPAND` queues cheap members first. A new branch
+   then decomposes licensed — before expanding, and `EXPAND` queues cheap
+   members first. A new branch
    joins the ladder at its cost class — never ahead of a cheaper one.
 
 ---
@@ -866,6 +873,9 @@ PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
     r ← TRY_UNIQUE_SPLIT(ψ, X, ctx)    // one Boole decomposition on a UNIQUE
     if r ≠ ⊥: return r                 //   atom of ψ (§6, the unique split);
                                        //   beats expansion (inv. 8)
+    r ← TRY_DECOMPOSE(ψ, X, ctx)       // one LICENSED Boole decomposition on
+    if r ≠ ⊥: return r                 //   a census atom (§6): separates the
+                                       //   worlds EXPAND would multiply
     return EXPAND(ψ, X, ctx)
 
 INCIDENCE(conjuncts, X) → (parts, Xs):
@@ -876,12 +886,16 @@ INCIDENCE(conjuncts, X) → (parts, Xs):
     // remainder. Near-linear.
 ```
 
-### The unique split, then expansion — paper steps 2e–2k, redone
+### The unique split, the licensed decomposition, then expansion — paper steps 2e–2k, redone
 
-Two mechanisms replace the pivot ladder below the case-witness rung. The
+Three mechanisms replace the pivot ladder below the case-witness rung. The
 UNIQUE SPLIT keeps exactly one pivot class from the paper's 2e–2j — the
 equation whose truth substitutes a binder variable away — selected through
 the candidate index below and spent before anything multiplies blindly.
+Between it and the floor, `TRY_DECOMPOSE` restores the general
+decomposition for the atom no rung above can take: both-signed across
+sibling conjuncts, licensed by a no-duplication test on its built
+cofactors.
 `EXPAND` is the floor: it distributes `∃X` over ONE disjunctive conjunct the
 formula already contains and hands every case back to `PUSH_BLOCK`, which
 runs the full ladder on each and re-enters here for the next disjunct. Both
@@ -1025,9 +1039,56 @@ TRY_UNIQUE_SPLIT(ψ, X, ctx) → formula | ⊥:
 ```
 
 ```
+TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
+    // Reached only past the unique split: what remains is case structure
+    // SPANNING conjuncts — an atom's two signs at member tops of two
+    // DIFFERENT disjunctive conjuncts — a shape no rung above takes flat.
+    // One Boole decomposition on such an atom separates the worlds:
+    //     ∃X ψ  =  ∃X (a ∧ ψ[a ↦ T])  ∨  ∃X (¬a ∧ ψ[a ↦ F])      — any BA
+    // Exact for ANY atom of ψ (inv. 5). An X-free guard hoists through
+    // PUSH_BLOCK's strip; an X-containing one rides as a dependent
+    // conjunct. Both cofactors erase every occurrence and each arm keeps
+    // one ONE-SIGNED guard literal, so the census below (both signs
+    // required) never re-selects the atom — retired, not barred (inv. 5).
+
+    // CENSUS, rank order COVER: one pass over the member tops of ψ's
+    // disjunctive conjuncts (equation and order atoms), counting signed
+    // coverage; a candidate must occur in BOTH signs; rank by total
+    // coverage, ties by the weaker side, then content order. The rank
+    // only orders the tries — the licence decides. Ranking by cofactor
+    // size instead selects atoms that partition the LEAST structure.
+    cands ← the top 3 both-signed atoms by coverage ; if ∅: return ⊥
+
+    // THE LICENCE, on BUILT cofactors of the TOUCHED region — the
+    // conjuncts carrying the atom; the rest is one shared subtree in
+    // both arms, its sub-pushes folding through push_memo:
+    //     Σc∋a |c[a ↦ T]| + |c[a ↦ F]|   ≤   Σc∋a |c| + (Σc∋a |c|)/4
+    // The decomposition must SEPARATE material, not copy it: a passing
+    // atom partitions its region between the arms; a failing one would
+    // specialise shared bulk per path — the multiplication the ladder
+    // exists to avoid. First licensed candidate wins.
+    a ← first of cands passing ; if none: return ⊥
+
+    // Arms share EXPAND's budget — one taint story (§1, cache scope);
+    // exhaustion re-wraps (inv. 3). Smaller arm first; ∃'s T
+    // short-circuit never builds the second (inv. 7's spirit).
+    if ctx.expand_count ≥ ctx.expand_max: taint ; return REWRAP(ψ, X ∩ FV(ψ))
+    acc ← an empty SIMPLIFIED_OR_JOIN
+    for (g, C) in ⟨(a, ψ[a ↦ T]), (¬a, ψ[a ↦ F])⟩, smaller |C| first:
+        if ctx.expand_count ≥ ctx.expand_max:
+            taint ; insert REWRAP(g ∧ C, X ∩ FV(g ∧ C)) into acc ; break
+        ctx.expand_count ← ctx.expand_count + 1
+        b ← SIMPLIFY(g ∧ C)                                        // inv. 6
+        insert PUSH_BLOCK(b, X ∩ FV(b), ctx) into acc
+        if acc decided T: break
+    return acc's result
+```
+
+```
 EXPAND(ψ, X, ctx):
     // Reached only when every rung above failed: ψ connected, mixed census,
-    // no spine pin, no case pin, no UNIQUE candidate, no settled variable.
+    // no spine pin, no case pin, no UNIQUE candidate, no licensed
+    // decomposition atom, no settled variable.
     //     ∃X(E ∧ (⋁ⱼ dⱼ) ∧ S′)  =  ⋁ⱼ ∃X(E ∧ dⱼ ∧ S′)            — any BA
     E ← FOLD_DECIDED(the plain conjuncts of ψ, X, ctx)
     if E = F: return F
@@ -1519,6 +1580,7 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
 | `TRY_FAST_PATHS` (2a, 2b) | leaves: both go straight to `ELIMINATE_BLOCK`, never back into `PUSH_BLOCK` |
 | the witness and case-witness rungs (§6) | `X` strictly shrinks — the pin or case pin deletes its binder before re-entry |
 | `TRY_UNIQUE_SPLIT`, binary arms (§6) | T-arm: `|X|` strictly shrinks. F-arm: `|X|` constant while the OCC index's bare-candidate set loses `atm` for good — `[atm ↦ F]` erases every occurrence and mints no term, and the conjoined `¬atm` is not bare (the filter, §6) — modulo the same chained channel as `EXPAND`'s caveat below: a term the arm-edge `SIMPLIFY` mints can be a fresh bare candidate. The SHARED `ctx.expand_max` bounds both arms' count outright |
+| `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant while BOTH arms lose every occurrence of the atom — the substitution erases and mints no term, and the surviving guard literal is one-signed, invisible to the both-signs census — modulo the same chained channel as the split's caveat (an arm-edge `SIMPLIFY` can mint); the SHARED `ctx.expand_max` bounds the arm count outright |
 | `EXPAND` | lexicographic (`|X|`, multiset of top-level disjunctive-conjunct sizes), modulo ONE caveat: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `|D|` at selection time — and the case-edge `SIMPLIFY` builds no disjunction node, but it can GROW an inherited one: a CHAINED pin — formed inside `d` by a construction-time substitution, unpropagated because propagation runs once (§3) — fires here and can push a member past `|D|`. Well-foundedness therefore rests on `ctx.expand_max`, which bounds the case count outright |
 | `ELIMINATE_BLOCK` pre-steps | `X` shrinks or the clause is decided |
 | `ELIMINATE_BITVECTOR_CLAUSE` (router) | one guarded conversion per conjunct — a rewrite, no recursion — then two variable-disjoint sub-clauses, each handed to its engine exactly once; no re-entry into the push |
@@ -1534,8 +1596,9 @@ chained channel — `EXPAND`'s chained pin and the split F-arm's minted
 candidate — which the shared `ctx.expand_max` bounds. `push_memo` needs no
 in-progress state either way: a key met mid-computation is an unwritten
 entry — a plain miss, recomputed — and any X-preserving cycle passes through
-`EXPAND` or a split F-arm (the strip fires once per chain; 2d and the scope
-split strictly shrink the formula; the witness rung, the case witness, and
+`EXPAND`, a split F-arm, or a decomposition arm (the strip fires once per
+chain; 2d and the scope split strictly shrink the formula; the witness
+rung, the case witness, and
 the settle move strictly shrink `X`), so the one shared budget caps its
 depth (§6).
 
