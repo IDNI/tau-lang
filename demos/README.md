@@ -44,11 +44,11 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_1.5-temporal_reasoning.tau` | Deciding temporal specifications: `sat`, `unsat`, `valid` and `normalize` over `always`/`sometimes` and time constraints |
 | `demo_2.1-solver.tau` | `solve` and `lgrs`: satisfying assignments, splitters, Tau constants |
 | `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions |
-| `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5 |
+| `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5; the `min`/`max` builtins |
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
-| `demo_3.4-interpreter_bitvectors.tau` | Executing specifications over bitvector streams: casts across widths, modular accumulation, widen-multiply-divide-narrow |
+| `demo_3.4-interpreter_bitvectors.tau` | Executing specifications over bitvector streams: casts across widths, modular and saturating accumulation, widen-multiply-divide-narrow |
 | `demo_3.5-updatable_specifications.tau` | Self-amending specifications: pointwise revision through the update stream `u`, and the `this` stream |
 | `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance, member access, and tuple-typed streams |
 | `demo_4.2-adt_functions_and_predicates.tau` | Functions and predicates over tuple members: typed heads, body annotations, mixed-algebra tuples, deep member paths |

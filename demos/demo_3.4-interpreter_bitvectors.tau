@@ -30,15 +30,27 @@ o2:bv[8] := out console.
 r o2[0] = i2[0] && o2[t] = o2[t-1] + i2[t]
 q
 
+# The wrap above is silent. To saturate instead -- clamp at 255 and stay
+# there -- use the builtin min: o3[t-1]' is the bitwise complement, i.e.
+# 255 - o3[t-1], so min(i3[t], o3[t-1]') is the largest addend that cannot
+# push the sum past 255 (the README's "checked and saturating arithmetic"
+# section derives this and its subtraction dual). Same inputs as above:
+# 200, then 200 + 100 = 300 clamps to 255, then 255 + 7 stays 255:
+
+i3:bv[8] := in file("fixture/bv8-length_3.in").
+o3:bv[8] := out console.
+r o3[0] = i3[0] && o3[t] = o3[t-1] + min(i3[t], o3[t-1]')
+q
+
 # When wrapping is not wanted, compute wide and narrow the result: the
 # widen-multiply-divide-narrow idiom. Taking 5% of an 8-bit value by
 # multiplying first would wrap (200 * 5 = 1000, far beyond 255); casting up to
 # 16 bits first keeps the product exact, and the quotient fits back into 8
 # bits. The outputs below are 5% of 200, 100 and 7 -- 10, 5 and 0:
 
-i3:bv[8] := in file("fixture/bv8-length_3.in").
-o3:bv[8] := out console.
-r o3[t] = (bv[8]) ( ((bv[16]) i3[t] * {5}:bv[16]) / {100}:bv[16] )
+i4:bv[8] := in file("fixture/bv8-length_3.in").
+o4:bv[8] := out console.
+r o4[t] = (bv[8]) ( ((bv[16]) i4[t] * {5}:bv[16]) / {100}:bv[16] )
 q
 
 # Bitvector streams can also read from the console. The prompt names the
@@ -48,9 +60,9 @@ q
 # emits an unconstrained default 0; q then ends the run at the continue
 # prompt:
 
-i4:bv[8] := in console.
-o4:bv[8] := out console.
-r o4[0] = i4[0] / {2}:bv[8]
+i5:bv[8] := in console.
+o5:bv[8] := out console.
+r o5[0] = i5[0] / {2}:bv[8]
 90
 q
 
