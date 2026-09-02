@@ -4,9 +4,10 @@ Spec: Chapter 5 of `taba0.5.tex` (= ch. 5, p. 51 of `taba0.5.pdf`). Paper steps
 `2a`–`2k` are cited inline; step `(3)`, the universal branch, is handled by
 dualisation in `PROCESS_BLOCK`. Of steps `2e`–`2j` — one Boole decomposition
 on a chosen pivot — the unique split (§6) keeps the one binder-killing pivot
-class: the equation whose truth substitutes a binder variable away.
-`TRY_DECOMPOSE` (§6) restores the general step, under a no-duplication
-licence, for the atom whose two signs sit in sibling conjuncts. All remaining
+class: the equation whose truth substitutes a binder variable away. Two
+licensed decompositions (§6) restore the general step under no-duplication
+tests: `TRY_DECOMPOSE` for the atom whose two signs sit in sibling
+conjuncts, `TRY_CUT_DECOMPOSE` for the atom cheapest to cut. All remaining
 case analysis is `EXPAND` (§6), distributing disjuncts the formula already
 contains.
 
@@ -44,6 +45,12 @@ f′       complement             ∪ · +    join, meet, ring sum
          over the hash-consed DAG (the sort convention of 2d, the case
          witness, and EXPAND, and the metric of §5's size acceptance), O(1)
          to maintain
+‖φ‖      distinct formula nodes reachable from φ, a unit counted as one leaf
+         (§4) — the DAG count against |φ|'s tree count, the currency of the
+         cut licence (§6). Computed on first demand by one traversal and
+         cached on the node
+neg(φ)   the NNF of ¬φ — TO_NNF's NEG (§3), factored — a pure function of
+         the node: computed on first demand and cached on it, like ‖φ‖
 h(φ)     cached structural hash, set at construction from the node's kind and
          its children's hashes — wide enough that collisions are negligible.
          Every input is canonical (phase-0 binder ids, source names for free
@@ -128,7 +135,7 @@ term representation, per component (PREPARE_TERMS):
 | `subsume_max` | threshold on a clause's negative count, above which `SUBSUME_NEGATIVES` (finite method only) skips its O4 scan. `K = 32`, provisional pending benchmarks — free to tune: subsumption costs no precision, so neither taint nor flush attaches (unlike `qbf_node_max` — cache scope, below) |
 | `qbf_node_max` | node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of ONE sweep, checked by allocation high-water mark — past which it falls back to `ASK`. `K′ = 2²⁰`, provisional pending benchmarks |
 | `case_max` | threshold on a case pin's branch count, above which the case witness (`TRY_CASE_WITNESS`, `TRY_WITNESS_DEEP`) declines — each branch copies the surrounding spine, repaid only by the deleted binder. Past it phase 4 degrades gracefully: the unique split peels the same conjunct two arms at a time. `K″ = 16`, provisional pending benchmarks — free to tune. Phase 2's `TRY_WITNESS_DEEP` predates any ctx and reads the constant `K″` bare |
-| `expand_max` | budget on cases built by `EXPAND`, counted per component (`ctx.expand_count`) — past it, the still-unexpanded members re-wrap as ONE pending block and every finished case is kept (inv. 3). `K‴ = 2¹⁴`, provisional pending benchmarks — a hit TAINTS its computation (cache scope, below): the result is returned, never cached, so a raise regains precision with no flush |
+| `expand_max` | budget on cases built by `EXPAND` — shared by the split's and both decompositions' arms (§6) — counted per component (`ctx.expand_count`) — past it, the still-unexpanded members re-wrap as ONE pending block and every finished case is kept (inv. 3). `K‴ = 2¹⁴`, provisional pending benchmarks — a hit TAINTS its computation (cache scope, below): the result is returned, never cached, so a raise regains precision with no flush |
 | `accept_growth` | growth factor of the per-component SIZE ACCEPTANCE (§5): a component push whose result exceeds `max(γ·\|input\|, accept_floor)` is discarded for the re-wrapped input (inv. 3). `γ = 16`, provisional pending benchmarks — free to tune: the verdict is re-derived outside every cache and acts only through the formula it re-wraps, so neither taint nor flush attaches (cache scope, below) |
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires. Moderate growth is routine and often repaid downstream; the test exists for DETONATION — the multiplicative regime where one block's result sits orders beyond repayment. `2²⁰`, provisional pending benchmarks |
 | `keep_functional` | emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below) |
@@ -137,6 +144,7 @@ term representation, per component (PREPARE_TERMS):
 | `quant_memo` | functional-quantifier term → term, GLOBAL — the key IS the query (`ASK`'s convention) and names term, kind, and quantified set in one node; entries are pure functions of it. `SETTLE_FUNCTIONAL`'s discharges may share it (see `DISCHARGE`) |
 | `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable)`, GLOBAL. Filled and read by `COF`; consumers: the phase-4 pin matches (pin iff `usable ∧ f₁ = f₀′`, with `t = f₀`), `ADMIT`'s UNIQUE classification (the same test — a pin and a UNIQUE pivot are one property, met at different positions), and `FOLD_DECIDED`; pure functions of the key — the settled term already reflects `keep_functional` |
 | `occ_memo` | `formula node → { equation atom ↦ (bare, in_or, count) }`, GLOBAL — filled by `OCC` (§6, the unique split); purely structural, unit-opaque; order atoms never enter (no UNIQUE class exists for them) |
+| `atoms_memo` | `formula node → the atoms occurring in it`, units opaque (§4), GLOBAL — purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) and by `CUT_WALK`'s incidence graph (§6): a conjunct's atoms are one lookup, never a walk |
 | `pool` | `atom → (UNIQUE verdict at each block variable of the atom in prio order, admission index)`, per COMPONENT — recorded lazily by `ADMIT` (§6, the unique split); prio-dependent, so scoped like `prio` itself. Admission order is a function of the component input alone, making the last-resort tie-break canonical |
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
@@ -152,32 +160,38 @@ shared across `ANTI_PRENEX` runs, components, and blocks — exactly when its ke
 names everything its entries depend on. The variable set is explicit: the
 ordered `X` of `push_memo`/`elim_memo` fixes the type, every atom's block
 subset (`FV(atm) ∩ P = FV(atm) ∩ X`), and the relative prios; `cof_memo`
-carries its `x`; `quant_memo`'s key is the query itself; `occ_memo` is purely
-structural; `solver_memo` and `qbf_memo` involve none. `pool` is the one
-prio-dependent table and scopes with the component accordingly. The mode:
+carries its `x`; `quant_memo`'s key is the query itself; `occ_memo` and
+`atoms_memo` are purely structural; `solver_memo` and `qbf_memo` involve
+none. `pool` is the one prio-dependent table and scopes with the component
+accordingly. The mode:
 `keep_functional` joins `push_memo`'s and
 `elim_memo`'s keys alone — their entries embed `DISCHARGE`'s output, which the
 flag switches — while `cof_memo` needs no flag, its settled-term key being
 formed AFTER `SETTLE_FUNCTIONAL` applied the mode. Every tie-break anywhere is
 the content order (§1) — a pure function of content — so no cached entry
-embeds construction history. One caveat: five configuration knobs sit in no
-key — the solver configuration, `qbf_node_max`, `expand_max`, and the
-acceptance pair `accept_growth`/`accept_floor`. The budgets are handled by
-TAINT, the solver configuration by a flush, the acceptance pair by NEITHER:
-its verdict is re-derived outside every cache (§5, after the completed
-component push) and acts only by re-wrapping a formula — later keys contain
-that formula, so no entry embeds the verdict, and a re-tuned γ or floor
-simply re-judges the same pushes. TAINT: a computation that
-hit a budget — an `expand_max` exhaustion re-wrap, a `qbf_node_max` sweep
-abandoned to `ASK` that ended `unknown` — returns its result (sound, inv. 3)
-but writes NO `push_memo`/`elim_memo` entry, and taint is TRANSITIVE: a
-result assembled from a tainted subresult is tainted too. So no entry embeds
-budget or counter state — in particular not `ctx.expand_count`'s value at
-computation time — and raising a budget needs no flush; the price is
-recomputation where the budget bound. The FLUSH: `solver_memo` is valid per
-solver configuration and is flushed when it changes; a `push_memo`/`elim_memo`
-entry that embedded a genuine solver `unknown` (budget-free — the
-budget-involved ones were tainted, never written) stays sound (inv. 3) yet
+embeds construction history. One deliberate exception: the cut walk a
+decomposition arm inherits (§6) sits in no key. It steers only WHICH of
+several equivalent results a push builds, so an entry computed under any
+walk serves every caller; the price is that a `push_memo` entry is a
+function of its key only up to equivalence. One caveat: five configuration
+knobs sit in no key — the solver configuration, `qbf_node_max`,
+`expand_max`, and the acceptance pair `accept_growth`/`accept_floor`. The
+budgets are handled by TAINT, the solver configuration by a flush, the
+acceptance pair by NEITHER: its verdict is re-derived outside every cache
+(§5, after the completed component push) and acts only by re-wrapping a
+formula — later keys contain that formula, so no entry embeds the verdict,
+and a re-tuned γ or floor simply re-judges the same pushes. TAINT: a
+computation that hit a budget — an `expand_max` exhaustion re-wrap, a
+`qbf_node_max` sweep abandoned to `ASK` that ended `unknown` — returns its
+result (sound, inv. 3) but writes NO `push_memo`/`elim_memo` entry, and
+taint is TRANSITIVE: a result assembled from a tainted subresult is tainted
+too. So no entry embeds budget or counter state — in particular not
+`ctx.expand_count`'s value at computation time — and raising a budget needs
+no flush; the price is recomputation where the budget bound. The FLUSH:
+`solver_memo` is valid per solver configuration and is flushed when it
+changes; a `push_memo`/`elim_memo` entry that embedded a genuine solver
+`unknown` (budget-free — the budget-involved ones were tainted, never
+written) stays sound (inv. 3) yet
 blind to a stronger solver — flush both on a configuration change to reclaim
 that precision. `qbf_memo` is exempt from every flush:
 `DECIDE_FINITE` records there only verdicts its own BDD sweep produced —
@@ -214,23 +228,25 @@ through its `ASK` fallback live in `solver_memo` under that table's flush rule.
    rewrites one.
 5. **Case analysis stays inside the formula's own atom vocabulary — no
    manufactured atoms.** Every multiplying step — 2d, the case witness, the
-   unique split, `TRY_DECOMPOSE`, `EXPAND` — distributes members the
+   unique split, both decompositions, `EXPAND` — distributes members the
    formula already contains or splits on an atom it already contains: the
-   split's F-arm conjoins the
-   NEGATION of an atom of ψ while `[atm ↦ F]` erases every other occurrence,
-   so the vocabulary never grows and the atom is RETIRED rather than barred —
-   bare selection (§6) can never take it again, and no barred-atom set
-   exists.
+   split's F-arm conjoins the NEGATION of an atom of ψ while `[atm ↦ F]`
+   erases every other occurrence, and `EXPAND`'s exclusions are complements
+   of literal members of a disjunct of ψ, so the vocabulary never grows and
+   the atom is RETIRED rather than barred — bare selection (§6) can never
+   take it again, and no barred-atom set exists.
    What the rest of Boole decomposition provided is recovered piecewise: a
    pin substitutes out through the witness step (spine level), the case
    witness (all branches of one disjunct), and the unique split (any bare
-   occurrence, however deep), the licensed decomposition takes the
-   both-signed atom whose worlds span sibling conjuncts (both cofactors
-   erase every occurrence; the surviving guard literals are one-signed, so
-   its census never re-selects the atom — retired, not barred), a
-   constant-false atom folds through `FOLD_DECIDED`, a finished variable
-   leaves through scope narrowing's settle move, and the rest is decided at
-   the leaves, where the clause methods are complete.
+   occurrence, however deep); the licensed decompositions take the
+   both-signed atom whose worlds span sibling conjuncts, then any atom cheap
+   to cut — both cofactors erase every reachable occurrence, and the guard
+   left behind is one-signed for the first step's census and a lone
+   top-level literal for the second's candidate rule, so neither re-selects
+   its atom (retired, not barred); a constant-false atom folds through
+   `FOLD_DECIDED`, a finished variable leaves through scope narrowing's
+   settle move, and the rest is decided at the leaves, where the clause
+   methods are complete.
 6. **Everything the algorithm builds is simplified at the point of
    construction** — an atom by `SIMPLIFY_ATOM`, a cofactor by `SIMPLIFY_TERM`, a
    formula built by substituting into one or conjoining onto one by `SIMPLIFY` —
@@ -240,8 +256,9 @@ through its `ASK` fallback live in `solver_memo` under that table's flush rule.
    top-level interaction: `SIMPLIFIED_OR_JOIN`/`SIMPLIFIED_AND_JOIN` (§3). So the
    push adds no re-simplification pass of its own; its deep `SIMPLIFY`s —
    `EXPAND`'s case merge, where E's and d's material first meet, and the
-   case witness's and unique split's arm edges, where a substitution just
-   rewrote the copy — are construction sites, not passes.
+   case witness's, the unique split's, and the decompositions' arm edges,
+   where a substitution just rewrote the copy — are construction sites, not
+   passes.
    Not cosmetic: expansion multiplies the formula, and every step that avoids
    one — the pin matches, the case pins, the UNIQUE classification,
    `FOLD_DECIDED`, O1–O4 — turns on a *syntactic* test over simplified
@@ -254,18 +271,19 @@ through its `ASK` fallback live in `solver_memo` under that table's flush rule.
    strict.** Every dispatch tries its options cheapest class first, and a
    cheaper step's success makes the dearer steps unreachable: a memo hit, a
    syntactic test on hash-consed values, a `T`/`F` fold — constant — before
-   one traversal (`SIGN_CENSUS`, `TRY_WITNESS`, the incidence pass) before
-   anything that multiplies (an expansion, 2b's cross product, a solver
-   call). Sound because every step is one-way (§3): it decides or falls
-   through, never approximates. It is why the memo wrappers sit outside the
-   workers, the dispatcher tries the fast paths before 2d and the expansion,
-   `PUSH_OVER_DISJUNCTION` orders its disjuncts smallest-first,
-   `PUSH_OVER_CONJUNCTION` narrows scopes — splitting the disjoint, settling
-   the final — before its fast paths, elimination tries witnesses before
-   methods, the push kills binders — pin, case pin, then the unique split —
-   then decomposes licensed — before expanding, and `EXPAND` queues cheap
-   members first. A new branch
-   joins the ladder at its cost class — never ahead of a cheaper one.
+   one traversal (`SIGN_CENSUS`, `TRY_WITNESS`, the incidence pass, the cut
+   walk) before anything that multiplies (an expansion, 2b's cross product,
+   a solver call). Sound because every step is one-way (§3): it decides or
+   falls through, never approximates. It is why the memo wrappers sit
+   outside the workers, the dispatcher tries the fast paths before 2d and
+   the expansion, `PUSH_OVER_DISJUNCTION` orders its disjuncts
+   smallest-first, `PUSH_OVER_CONJUNCTION` narrows scopes — splitting the
+   disjoint, settling the final — before its fast paths, elimination tries
+   witnesses before methods, the push kills binders — pin, case pin, then
+   the unique split — then decomposes licensed — by separation, then by
+   cut — before expanding, and `EXPAND` queues cheap members first. A new
+   branch joins the ladder at its cost class — never ahead of a cheaper
+   one.
 
 ---
 
@@ -432,6 +450,44 @@ NORMALIZE_OPERATORS(φ):
     a ≱ b     ↦  a < b                              // bf_ngteq
     a ≯ b     ↦  a ≤ b                              // bf_ngt
     // Postcondition for arithmetic-typed content: only un-negated ≤ and < remain.
+```
+
+```
+TO_NNF(φ):
+    // ¬ down to the atoms, at most one per atom (inv. 4). Phase 1 rebuilds
+    // the raw input bottom-up in one memoized pass; from phase 3 on every
+    // node is in NNF already and the only work is NEG, cached on the node
+    // as neg(φ) (§1).
+    ¬ψ ↦ NEG(ψ)      atom ↦ atom      ∧ / ∨ / Qx ↦ rebuilt over the children
+
+NEG(ψ) → the NNF of ¬ψ:                      // neg(ψ): computed once per node
+    T ↦ F ; F ↦ T ; atom ↦ ¬atom ; ¬ψ′ ↦ TO_NNF(ψ′)
+    ∃x.ψ′ ↦ ∀x.NEG(ψ′) ; ∀x.ψ′ ↦ ∃x.NEG(ψ′)  // a unit's quantifiers flip in —
+                                             //   and back out on the second
+                                             //   negation (§5)
+    ⋀ⱼ mⱼ ↦ SIMPLIFIED_OR_JOIN(NEG(mⱼ) : j)                     // De Morgan
+    ⋁ⱼ mⱼ ↦ FACTORED NEGATION, below
+
+    // FACTORED NEGATION. A push result's members share material by
+    // construction — EXPAND's cases, the decomposition arms, the case
+    // witness's branches differ in a guard or one member and share the
+    // rest. Plain De Morgan on ⋁ⱼ(C ∧ restⱼ) gives ⋀ⱼ(¬C ∨ ¬restⱼ): one
+    // disjunction per member, each carrying every ¬c — a shape the
+    // ENCLOSING block can only expand, member-fold. Pulling the shared
+    // conjuncts out first,
+    //     ¬⋁ⱼ(C ∧ restⱼ)  =  ⋁_{c∈C} ¬c  ∨  ¬⋁ⱼ restⱼ              — any BA
+    // leaves a flat disjunction — one literal per shared conjunct, one
+    // negated residue — which the enclosing ∃ distributes over for free
+    // (2d's race); the hard shape survives only inside the residue. Always,
+    // on the full intersection; the residue is negated by this same
+    // recursion (§8). A member equal to C leaves the residue T, and ¬T = F
+    // drops out of the join. Only this polarity factors: the dual,
+    // ¬⋀ⱼ(D ∨ restⱼ) = ⋀¬d ∧ ¬⋀ restⱼ, would turn De Morgan's disjunction
+    // — the shape ∃ distributes over — into a conjunction, the hard shape.
+    C ← ⋂ⱼ conjuncts(mⱼ)        // a non-conjunction: its own one-element set
+    if C = ∅: return SIMPLIFIED_AND_JOIN(NEG(mⱼ) : j)             // De Morgan
+    rests ← SIMPLIFIED_OR_JOIN(SIMPLIFIED_AND_JOIN(conjuncts(mⱼ) ∖ C) : j)
+    return SIMPLIFIED_OR_JOIN(NEG(c) : c ∈ C, NEG(rests))
 ```
 
 `TO_NNF`, `SIMPLIFY` (constant folding, absorption, per-path contradiction, unit
@@ -609,7 +665,10 @@ PROCESS_BLOCK(blk, kf):
 The two negations flip already-pushed inner quantifiers in and back out; the ∃
 machinery treats an inner binder as opaque and transports it — free-variable
 substitution is the one operation that reaches inside a unit's body (§4, what
-may touch a unit).
+may touch a unit). The outbound negation is where `TO_NNF`'s factoring (§3)
+pays: `r` is an OR-join of arms and cases that share material by
+construction, and factored negation hands the enclosing block a flat
+disjunction instead of a conjunction of one disjunction per member.
 
 ```
 PUSH_EX_BLOCK(body, X, kf):
@@ -632,8 +691,8 @@ PUSH_EX_BLOCK(body, X, kf):
                                                   //   counter (§1, ctx table)
         ctx.pool ← ∅                              // per component, like prio (§1)
         ctx.push_memo, ctx.elim_memo, ctx.cof_memo, ctx.occ_memo,
-            ctx.quant_memo, ctx.solver_memo, ctx.qbf_memo ← the global tables
-                                                  // cross-run, never reset (§1)
+            ctx.atoms_memo, ctx.quant_memo, ctx.solver_memo, ctx.qbf_memo
+            ← the global tables                   // cross-run, never reset (§1)
         body ← PREPARE_TERMS(body, P, ctx.order)  // BDD-back both sides of every
                                                   //   atom touching P (§1). A
                                                   //   FORMULA-level binder unit
@@ -683,7 +742,8 @@ keys — re-derivable capital, exactly what a raised γ reclaims.
 ## 6. The push — paper step 2
 
 ```
-PUSH_BLOCK(φ, X, ctx):                            // memo wrapper
+PUSH_BLOCK(φ, X, ctx, walk = ⊥):                  // memo wrapper. walk: a cut
+                                                  //   arm's remaining walk (§6)
     // KEY CANONICALISATION, two halves of one idea — nothing enters the key
     // that ∃X does not scope:
     X ← X ∩ FV(φ), keeping X's order   // tight downstream quantification. FV
@@ -694,7 +754,7 @@ PUSH_BLOCK(φ, X, ctx):                            // memo wrapper
         //   variables never enters the key — expansion cases that differ only
         //   in emitted guard facts converge to ONE state (§6, Expansion)
         indep ← ⋀ { cᵢ : FV(cᵢ) ∩ X = ∅ }
-        return SIMPLIFIED_AND_JOIN(indep, PUSH_BLOCK(⋀ the rest, X, ctx))
+        return SIMPLIFIED_AND_JOIN(indep, PUSH_BLOCK(⋀ the rest, X, ctx, walk))
     k ← (φ, X, ctx.keep_functional)
                    // global: the key names all the entry depends on (§1, cache
                    //   scope), so it suffices across components and runs. No
@@ -704,22 +764,24 @@ PUSH_BLOCK(φ, X, ctx):                            // memo wrapper
                    //   entry is unwritten, so it is a plain miss and
                    //   recomputes — the old in-progress branch minus the
                    //   bookkeeping — and an X-preserving cycle must pass
-                   //   through EXPAND (§8), whose budget caps the depth
+                   //   through a budgeted step (§8), whose shared budget caps
+                   //   the depth. walk stays OUT of the key: every walk yields
+                   //   an equivalent result, so one entry serves them all
     if ctx.push_memo[k] exists: return ctx.push_memo[k]
-    r ← PUSH_BLOCK_UNCACHED(φ, X, ctx)
+    r ← PUSH_BLOCK_UNCACHED(φ, X, ctx, walk)
     if r is untainted: ctx.push_memo[k] ← r    // a budget-hit result is
                                                //   returned, never cached
                                                //   (§1, cache scope)
     return r
 
-PUSH_BLOCK_UNCACHED(φ, X, ctx):                   // dispatcher
+PUSH_BLOCK_UNCACHED(φ, X, ctx, walk):             // dispatcher
     if φ is not a conjunction:        // a conjunction tries the fast paths in
                                       //   PUSH_OVER_CONJUNCTION, after scope
                                       //   narrowing
         r ← TRY_FAST_PATHS(φ, X, ctx)                 // 2a / 2b
         if r ≠ ⊥: return r
     if φ = ⋁ dᵢ:  return PUSH_OVER_DISJUNCTION(φ, X, ctx)
-    if φ = ⋀ cᵢ:  return PUSH_OVER_CONJUNCTION(φ, X, ctx)
+    if φ = ⋀ cᵢ:  return PUSH_OVER_CONJUNCTION(φ, X, ctx, walk)
     if φ is an atom, a negated atom, or a nested binder:
         return ELIMINATE_BLOCK(φ, X, ctx)
                              // a one-literal (or one-unit) clause. A nested
@@ -734,17 +796,25 @@ PUSH_BLOCK_UNCACHED(φ, X, ctx):                   // dispatcher
 
 ### 2a / 2b — the two whole-formula fast paths
 
-Both end in one-atom clauses handed to §7; neither eliminates anything itself.
-Both classify per X-touching leaf — a subtree no `x ∈ X` touches is a constant
-under `∃X` and stays neutral.
+Both end in small clauses handed to §7 — one atom, or the top-level positives
+plus one; neither eliminates anything itself. Both classify per X-touching
+leaf — a subtree no `x ∈ X` touches is a constant under `∃X` and stays
+neutral.
 
 **2a** distributes `∃X` to each negated atom in one pass, X-free parts riding
 along: `∃X.(¬(f=0) ∧ (¬(g=0) ∨ c))` becomes `∃_X f ≠ 0 ∧ (∃_X g ≠ 0 ∨ c)`.
+Positive literals at the TOP level ride too: with `p = 0` a conjunct, every
+negated leaf takes it along as one two-literal clause, `∃X.(p=0 ∧ ¬(g=0))`,
+under a single `∀_X p = 0` — so a guard literal left by a decomposition or
+an exclusive case no longer refutes the path.
 **2b** collapses `⋀(⋁ positives)` by distributing on *terms*, reaching a
 one-atom clause without an expansion.
 
 ```
 TRY_FAST_PATHS(φ, X, ctx) → formula | ⊥:
+    P ← the top-level conjuncts of φ that are positive equation literals
+                              // ∅ unless φ is a conjunction; X-touching by
+                              //   PUSH_OVER_CONJUNCTION's wrapper invariant
     c ← SIGN_CENSUS(φ, X)     // descends ∧/∨ only. A maximal X-free subtree is
                               //   NEUTRAL: counted once in c.free, not descended.
                               //   X-touching leaves: pos = equation, neg =
@@ -752,13 +822,25 @@ TRY_FAST_PATHS(φ, X, ctx) → formula | ⊥:
                               //   (not descended)
     if c.other > 0: return ⊥
 
-    if c.pos = 0 and c.neg > 0:                                        // 2a
+    if c.pos = |P| and c.neg > 0:                                      // 2a
+        // Every positive leaf is one of the top-level literals — a conjunct
+        // of EVERY DNF clause. ∃X(A ∧ B) ≡ ∃X A ∧ ∃X B for negated atoms —
+        // Cor. 5.1, J₁ = ∅; the capability IS atomlessness (inv. 1). With
+        // P, per DNF clause and f the squeeze of P:
+        //     ∃X(P ∧ ⋀ᵢNᵢ ∧ C)  =  C ∧ ∀_X f=0 ∧ ⋀ᵢ ∃_X f′gᵢ≠0
+        //                       =  C ∧ ⋀ᵢ ∃X(P ∧ Nᵢ)
+        // — the clause identity §7 applies (cor:qelim-main), then the tier-1
+        // identity per leaf — and the leaf-wise transform refactors back
+        // through the ∧/∨ skeleton, c.free unconstrained. The ∀_X f=0 half
+        // is emitted ONCE at the top: an X-free clause needs it, every other
+        // clause implies it, and §7 discharges it once (quant_memo) however
+        // many leaves carry P. WHY: a decomposition's positive arm and
+        // EXPAND's exclusive cases leave exactly such a top-level literal,
+        // which used to refute 2a and force an expansion. The push routes;
+        // §7 reasons (inv. 1).
         if not EX_DISTRIBUTES_OVER_NEGATIVES(ctx.type): return ⊥
-        // ∃X(A ∧ B) ≡ ∃X A ∧ ∃X B for negated atoms — Cor. 5.1, J₁ = ∅; the
-        // capability IS atomlessness (inv. 1). c.free is unconstrained: per DNF
-        // clause ∃X(⋀ᵢNᵢ ∧ C) = C ∧ ⋀ᵢ∃X Nᵢ, and the leaf-wise transform
-        // refactors back through the ∧/∨ skeleton.
-        return DISTRIBUTE_TO_ATOMS(φ, X, ctx)
+        return SIMPLIFIED_AND_JOIN(ELIMINATE_BLOCK(⋀P, X, ctx),
+                                   DISTRIBUTE_TO_ATOMS(φ minus P, X, ctx, P))
 
     if c.free = 0 and c.neg = 0 and c.pos > 0:                         // 2b
         // f₁=0 ∧ f₂=0 ≡ f₁∪f₂=0 (prop:squeeze-pos) + distributing ∧ over ∨, on
@@ -768,13 +850,14 @@ TRY_FAST_PATHS(φ, X, ctx) → formula | ⊥:
         return SIMPLIFIED_OR_JOIN(ELIMINATE_BLOCK(t = 0, X, ctx) : t ∈ S)
     return ⊥
 
-DISTRIBUTE_TO_ATOMS(φ, X, ctx):
+DISTRIBUTE_TO_ATOMS(φ, X, ctx, P):
     // Rebuild φ's ∧/∨ skeleton, replacing each X-touching LITERAL l — atom plus
-    // its enclosing ¬, if any — by ELIMINATE_BLOCK(l, X, ctx). The ¬ goes INSIDE
-    // the elimination: replacing the bare atom under a kept ¬ would compute
-    // ¬(∀_X f = 0), not ∃_X f ≠ 0. X-free subtrees are left verbatim, with no
-    // vacuous binder. Nodes are reassembled with the result joins, so a decided
-    // literal folds through the skeleton.
+    // its enclosing ¬, if any — by ELIMINATE_BLOCK(⋀P ∧ l, X, ctx): the
+    // top-level positives ride into every leaf's clause (2a, above). The ¬
+    // goes INSIDE the elimination: replacing the bare atom under a kept ¬
+    // would compute ¬(∀_X f = 0), not ∃_X f ≠ 0. X-free subtrees are left
+    // verbatim, with no vacuous binder. Nodes are reassembled with the result
+    // joins, so a decided literal folds through the skeleton.
 ```
 
 ### 2d — distribute over disjunction
@@ -799,7 +882,7 @@ PUSH_OVER_DISJUNCTION(⋁dᵢ, X, ctx):
 ### Conjunction — narrow scopes, then dispatch
 
 ```
-PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
+PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx, walk):
     // Wrapper invariant: every conjunct touches X (PUSH_BLOCK strips the
     // rest), and X ⊆ FV(ψ). A DISJUNCTIVE conjunct is one whose top node is
     // ∨ — NNF (inv. 4), flat ∧-spines, and unit opacity (§4) make top-level
@@ -876,6 +959,10 @@ PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
     r ← TRY_DECOMPOSE(ψ, X, ctx)       // one LICENSED Boole decomposition on
     if r ≠ ⊥: return r                 //   a census atom (§6): separates the
                                        //   worlds EXPAND would multiply
+    r ← TRY_CUT_DECOMPOSE(ψ, X, ctx, walk)   // one LICENSED Boole decomposition
+    if r ≠ ⊥: return r                       //   on the atom cheapest to CUT
+                                             //   (§6): adds little, hands two
+                                             //   smaller problems back
     return EXPAND(ψ, X, ctx)
 
 INCIDENCE(conjuncts, X) → (parts, Xs):
@@ -886,23 +973,26 @@ INCIDENCE(conjuncts, X) → (parts, Xs):
     // remainder. Near-linear.
 ```
 
-### The unique split, the licensed decomposition, then expansion — paper steps 2e–2k, redone
+### The unique split, the licensed decompositions, then expansion — paper steps 2e–2k, redone
 
-Three mechanisms replace the pivot ladder below the case-witness step. The
+Four mechanisms replace the pivot ladder below the case-witness step. The
 UNIQUE SPLIT keeps exactly one pivot class from the paper's 2e–2j — the
 equation whose truth substitutes a binder variable away — selected through
 the candidate index below and spent before anything multiplies blindly.
-Between it and the floor, `TRY_DECOMPOSE` restores the general
-decomposition for the atom no step above can take: both-signed across
-sibling conjuncts, licensed by a no-duplication test on its built
-cofactors.
-`EXPAND` is the floor: it distributes `∃X` over ONE disjunctive conjunct the
-formula already contains and hands every case back to `PUSH_BLOCK`, which
-runs the full ladder on each and re-enters here for the next disjunct. Both
-feed the same state sharing: a case's state is an ordinary push key, so
-SHARING is `push_memo` firing — two cases that converge (same surviving
-dependent conjuncts, same pending disjuncts) are one key, solved once.
-Everything is arranged for that convergence: children assemble in the
+Between it and the floor, two licensed decompositions restore the general
+step for atoms no step above can take, each under a no-duplication test on
+its built cofactors: `TRY_DECOMPOSE` takes the atom that SEPARATES sibling
+conjuncts, judged in tree size over the conjuncts it touches;
+`TRY_CUT_DECOMPOSE` takes the atom cheapest to CUT, judged in shared size
+over the whole body. `EXPAND` is the floor: it distributes `∃X` over ONE
+disjunctive conjunct the formula already contains — in EXCLUSIVE cases, each
+literal member's complement conjoined into the cases after it — and hands
+every case back to `PUSH_BLOCK`, which runs the full ladder on each and
+re-enters here for the next disjunct. All feed the same state sharing: a
+case's state is an ordinary push key, so SHARING is `push_memo` firing —
+two cases that converge (same surviving dependent conjuncts, same pending
+disjuncts) are one key, solved once. Everything is arranged for that
+convergence: children assemble in the
 content order (§3, joins), X-free material leaves the key at birth
 (`PUSH_BLOCK`) — which is also what keeps the split's guard residue out of
 sub-push keys — the witness steps and the split substitute pins out, and the
@@ -1045,11 +1135,13 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     // DIFFERENT disjunctive conjuncts — a shape no step above takes flat.
     // One Boole decomposition on such an atom separates the worlds:
     //     ∃X ψ  =  ∃X (a ∧ ψ[a ↦ T])  ∨  ∃X (¬a ∧ ψ[a ↦ F])      — any BA
-    // Exact for ANY atom of ψ (inv. 5). An X-free guard hoists through
-    // PUSH_BLOCK's strip; an X-containing one rides as a dependent
-    // conjunct. Both cofactors erase every occurrence and each arm keeps
-    // one ONE-SIGNED guard literal, so the census below (both signs
-    // required) never re-selects the atom — retired, not barred (inv. 5).
+    // Exact for ANY atom of ψ (inv. 5); arms by DECOMPOSE_ARMS below. Both
+    // cofactors erase every occurrence and each arm keeps one ONE-SIGNED
+    // guard literal, so the census below (both signs required) never
+    // re-selects the atom, nor does the cut step's candidate rule — retired,
+    // not barred (inv. 5).
+    if ctx.expand_count ≥ ctx.expand_max: return ⊥    // spent: EXPAND re-wraps
+                                                      //   and taints
 
     // CENSUS, rank order COVER: one pass over the member tops of ψ's
     // disjunctive conjuncts (equation and order atoms), counting signed
@@ -1068,28 +1160,126 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     // specialise shared bulk per path — the multiplication the ladder
     // exists to avoid. First licensed candidate wins.
     a ← first of cands passing ; if none: return ⊥
+    return DECOMPOSE_ARMS(ψ, a, ψ[a ↦ T], ψ[a ↦ F], X, ctx)
+                                  // the touched conjuncts' cofactors are the
+                                  //   licence's, already built
 
-    // Arms share EXPAND's budget — one taint story (§1, cache scope);
-    // exhaustion re-wraps (inv. 3). Smaller arm first; ∃'s T
-    // short-circuit never builds the second (inv. 7's spirit).
+DECOMPOSE_ARMS(ψ, a, C_T, C_F, X, ctx, walk = ⊥):
+    // The two arms of ∃X ψ = ∃X (a ∧ C_T) ∨ ∃X (¬a ∧ C_F) — both
+    // decompositions' emission. An X-free guard hoists through PUSH_BLOCK's
+    // strip; an X-containing one rides as a dependent conjunct. Arms share
+    // EXPAND's budget — one taint story (§1, cache scope); exhaustion
+    // re-wraps (inv. 3). Smaller arm first; ∃'s T short-circuit never
+    // builds the second (inv. 7's spirit); an arm that folds to a constant
+    // is no case and charges nothing. walk: the cut step's remaining walk,
+    // handed down with the push (TRY_CUT_DECOMPOSE, below).
     if ctx.expand_count ≥ ctx.expand_max: taint ; return REWRAP(ψ, X ∩ FV(ψ))
     acc ← an empty SIMPLIFIED_OR_JOIN
-    for (g, C) in ⟨(a, ψ[a ↦ T]), (¬a, ψ[a ↦ F])⟩, smaller |C| first:
-        if ctx.expand_count ≥ ctx.expand_max:
-            taint ; insert REWRAP(g ∧ C, X ∩ FV(g ∧ C)) into acc ; break
-        ctx.expand_count ← ctx.expand_count + 1
+    for (g, C) in ⟨(a, C_T), (¬a, C_F)⟩, smaller |C| first:
         b ← SIMPLIFY(g ∧ C)                                        // inv. 6
-        insert PUSH_BLOCK(b, X ∩ FV(b), ctx) into acc
+        if b ∈ {T, F}: insert b into acc
+        else if ctx.expand_count ≥ ctx.expand_max:
+            taint ; insert REWRAP(b, X ∩ FV(b)) into acc ; break
+        else:
+            ctx.expand_count ← ctx.expand_count + 1
+            insert PUSH_BLOCK(b, X ∩ FV(b), ctx, walk) into acc
         if acc decided T: break
     return acc's result
 ```
 
 ```
+TRY_CUT_DECOMPOSE(ψ, X, ctx, walk) → formula | ⊥:
+    // Reached only past TRY_DECOMPOSE: no atom separates ψ cheaply. The
+    // opposite question — which atom is cheap to CUT: its two cofactors
+    // share everything it does not touch, so the same identity
+    //     ∃X ψ  =  ∃X (a ∧ ψ[a ↦ T])  ∨  ∃X (¬a ∧ ψ[a ↦ F])      — any BA
+    // adds little material and hands two smaller problems back to the
+    // ladder, whose recursion builds the decomposition DIAGRAM one level
+    // per invocation: arms reaching the same sub-problem meet in push_memo.
+    // Exact for any atom (inv. 5): substitution reaches every occurrence
+    // outside units (§4), and a unit-internal copy stays sound unreplaced
+    // (the split's argument).
+    if ctx.expand_count ≥ ctx.expand_max: return ⊥    // spent: EXPAND re-wraps
+                                                      //   and taints
+
+    // CANDIDATES: every atom with a reachable occurrence in a conjunct
+    // other than its own top-level literal — deep or at a member top,
+    // equation or order atom, X-free or not, either sign. A LONE top-level
+    // literal is excluded because pinning it reproduces ψ — and that is
+    // what retires an atom in its own arm, where the guard is exactly such
+    // a literal, for this step and TRY_DECOMPOSE alike (inv. 5, §8). A
+    // literal with occurrences still standing qualifies, once — its cut is
+    // the propagation SIMPLIFY's sweep did not make: a literal the sweep
+    // itself minted (the chained channel, §8), or a case fact EXPAND's
+    // assembly leaves unpropagated in the pending disjuncts (above).
+    cands ← the candidate atoms of ψ ; if ∅: return ⊥
+
+    // THE WALK: the try order is a Cuthill–McKee walk over the incidence
+    // graph of candidates and conjuncts (CUT_WALK, below). Consecutive
+    // atoms are neighbours, so successive cuts erode ψ from one end and
+    // the conjuncts straddling pinned and unpinned atoms stay one band
+    // wide. A cut arm inherits the walk past its atom (DECOMPOSE_ARMS):
+    // the arm's body differs from ψ only where that atom stood, so the
+    // walk still orders it — atoms gone are dropped, atoms it lacks are
+    // appended in content order — and both arms continue the SAME walk,
+    // which is what makes their sub-problems coincide. Any other entry
+    // walks afresh.
+    if walk = ⊥: walk ← CUT_WALK(ψ, cands)
+    else: walk ← (walk ∩ cands, in walk order)
+                 ++ (cands ∖ walk, in content order)
+
+    // THE LICENCE, in shared size: the two cofactors together may MINT —
+    // create nodes the hash-cons store did not hold — at most a quarter of
+    // ψ's distinct nodes:
+    //     mints(ψ[a ↦ T]) + mints(ψ[a ↦ F])   ≤   ‖ψ‖ / 4
+    // Untouched conjuncts are the same nodes in both cofactors and cost
+    // nothing; material the pin rewrites differently per arm is minted
+    // twice and counts in full. No touched-region carve-out
+    // (TRY_DECOMPOSE's): sharing is counted directly, across the arms too.
+    // Measured at no extra cost — the store's allocations over the rewrite
+    // (§10) — and the rewrite is abandoned the moment the count passes the
+    // bound: not a cut, next atom.
+    for a in walk:
+        C_T, C_F ← ψ[a ↦ T], ψ[a ↦ F], abandoned past ‖ψ‖/4 mints in total
+        if abandoned: continue
+        return DECOMPOSE_ARMS(ψ, a, C_T, C_F, X, ctx, the walk past a)
+    return ⊥
+
+CUT_WALK(ψ, cands) → atom list:            // Cuthill–McKee on the incidence
+    // graph: an edge joins a candidate to each conjunct of ψ holding a
+    // reachable occurrence of it — atoms_memo (§1), one lookup per
+    // conjunct. Degree = incident conjuncts. Linear in the occurrences.
+    walk ← [] ; queue ← []                 // pushing marks visited
+    while some candidate is unvisited:
+        push the unvisited candidate of least degree (content-order ties)
+        while queue is nonempty:
+            a ← pop front ; append a to walk
+            for c in the conjuncts incident to a, in content order:
+                push the unvisited candidates of c, least degree first
+                    (content-order ties)
+    return walk
+```
+
+```
 EXPAND(ψ, X, ctx):
     // Reached only when every step above failed: ψ connected, mixed census,
-    // no spine pin, no case pin, no UNIQUE candidate, no licensed
-    // decomposition atom, no settled variable.
-    //     ∃X(E ∧ (⋁ⱼ dⱼ) ∧ S′)  =  ⋁ⱼ ∃X(E ∧ dⱼ ∧ S′)            — any BA
+    // no spine pin, no case pin, no UNIQUE candidate, no atom licensed to
+    // separate or to cut, no settled variable.
+    //     ∃X(E ∧ (⋁ⱼ dⱼ) ∧ S′)  =  ⋁ⱼ ∃X(E ∧ exclⱼ ∧ dⱼ ∧ S′)      — any BA
+    // with exclⱼ the complements of the LITERAL members before dⱼ.
+    // EXCLUSIVE CASES: members are not mutually exclusive, so distributing
+    // over them as they stand builds CONSENSUS cases — on (¬g ∨ ¬P) ∧
+    // (g ∨ ¬Q) the cases ¬g ∧ ¬Q and ¬P ∧ g, plus the redundant ¬P ∧ ¬Q —
+    // and each level's negation hands the next level a wider image to
+    // expand. Shannon on a literal member makes the cases disjoint,
+    //     ∃X(E ∧ (ℓ ∨ R) ∧ S′)  =  ∃X(E ∧ ℓ ∧ S′)  ∨  ∃X(E ∧ ¬ℓ ∧ R ∧ S′),
+    // and the conjoined complement folds the sibling disjunct by unit
+    // elimination. Only literal members qualify — a non-literal's
+    // complement is a disjunction and would ADD case structure; the
+    // non-literal members keep plain distribution among themselves, still
+    // exclusive from every literal case, so the identity stays exact. The
+    // size sort below already puts the literals first. A complement is a
+    // top-level positive the fast path 2a tolerates (§6, 2a).
     E ← FOLD_DECIDED(the plain conjuncts of ψ, X, ctx)
     if E = F: return F
     S ← the disjunctive conjuncts of ψ
@@ -1100,26 +1290,34 @@ EXPAND(ψ, X, ctx):
         //   Expanding the disjunct whose latest variable is outermost retires
         //   variables in quantifier order — once every disjunct touching x is
         //   expanded, x settles (scope narrowing) and drains.
-    acc ← an empty SIMPLIFIED_OR_JOIN
+    acc ← an empty SIMPLIFIED_OR_JOIN ; excl ← an empty SIMPLIFIED_AND_JOIN
     for d in stable_sort(members of D, by |d|):       // 2d's convention: cheap
-                                                      //   deciders first
+                                                      //   deciders first — the
+                                                      //   literals, then the
+                                                      //   rest
         if ctx.expand_count ≥ ctx.expand_max:
             // Graceful exhaustion: every finished case is kept; the remainder
             //   is ONE sound pending block (inv. 3), decided later like any
-            //   re-wrap once enclosing blocks close it (§4). The exhaustion
-            //   TAINTS every enclosing computation (§1, cache scope): results
-            //   embedding it are returned, never cached
-            φp ← SIMPLIFIED_AND_JOIN(⋀E, ⋁ of the remaining members, ⋀(S ∖ {D}))
+            //   re-wrap once enclosing blocks close it (§4). It carries the
+            //   exclusions so far — under them the remaining members'
+            //   disjunction is its own exclusive decomposition. The
+            //   exhaustion TAINTS every enclosing computation (§1, cache
+            //   scope): results embedding it are returned, never cached
+            φp ← SIMPLIFIED_AND_JOIN(⋀E, excl, ⋁ of the remaining members,
+                                     ⋀(S ∖ {D}))
             insert REWRAP(φp, X ∩ FV(φp)) into acc
             break
         ctx.expand_count ← ctx.expand_count + 1
         dc ← FOLD_DECIDED(the conjuncts of d, X, ctx)
-        if dc = F: continue                          // dead case: no copy built
-        c ← SIMPLIFY(⋀E ∧ ⋀dc)    // DEEP, but over E ∪ d alone — the pending
-                                  //   disjuncts S∖{D} are NEVER re-simplified:
-                                  //   normalization is paid where material
-                                  //   meets, not per split over the whole ψ
-        if c = F: continue
+        if dc = F: continue                  // dead case: no copy built, and
+                                             //   no exclusion — it is implied
+        c ← SIMPLIFY(⋀E ∧ excl ∧ ⋀dc)   // DEEP, but over E ∪ excl ∪ d alone —
+                                  //   the pending disjuncts S∖{D} are NEVER
+                                  //   re-simplified: normalization is paid
+                                  //   where material meets, not per split
+                                  //   over the whole ψ; the exclusions reach
+                                  //   them at their own expansion
+        if c = F: continue                           // dead too: no exclusion
         insert PUSH_BLOCK(SIMPLIFIED_AND_JOIN(c, ⋀(S ∖ {D})), X, ctx) into acc
                                   // the wrapper narrows X and strips what the
                                   //   case decided about free variables; the
@@ -1127,6 +1325,10 @@ EXPAND(ψ, X, ctx):
                                   //   pins d exposed, settling what d
                                   //   completed, splitting what d disconnected
         if acc decided T: return T                       // ∃'s short-circuit
+        if d is a literal: insert NORMALIZE_OPERATORS(NEG(d)) into excl
+                                  // the cases after d exclude its worlds — an
+                                  //   equation's ¬, an arithmetic order atom's
+                                  //   mirror (§3)
     return acc's result
 ```
 
@@ -1577,30 +1779,32 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
 |---|---|
 | `PUSH_BLOCK` key canonicalisation | the stripped remainder is a proper sub-conjunction, and the strip fires at most once per chain — the remainder holds no X-free conjunct |
 | `PUSH_OVER_DISJUNCTION`, `PUSH_OVER_CONJUNCTION` scope narrowing | strict subformula or a strictly smaller block: a disjunct or one part of the split is a proper sub-conjunction; the settle move strictly shrinks `X`, and its replacement conjuncts hold no disjunction |
-| `TRY_FAST_PATHS` (2a, 2b) | leaves: both go straight to `ELIMINATE_BLOCK`, never back into `PUSH_BLOCK` |
+| `TRY_FAST_PATHS` (2a, 2b) | leaves: both go straight to `ELIMINATE_BLOCK` — 2a's as the two-literal clauses `⋀P ∧ l` plus the one clause `⋀P` — never back into `PUSH_BLOCK` |
 | the witness and case-witness steps (§6) | `X` strictly shrinks — the pin or case pin deletes its binder before re-entry |
 | `TRY_UNIQUE_SPLIT`, binary arms (§6) | T-arm: `|X|` strictly shrinks. F-arm: `|X|` constant while the OCC index's bare-candidate set loses `atm` for good — `[atm ↦ F]` erases every occurrence and mints no term, and the conjoined `¬atm` is not bare (the filter, §6) — modulo the same chained channel as `EXPAND`'s caveat below: a term the arm-edge `SIMPLIFY` mints can be a fresh bare candidate. The SHARED `ctx.expand_max` bounds both arms' count outright |
-| `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant while BOTH arms lose every occurrence of the atom — the substitution erases and mints no term, and the surviving guard literal is one-signed, invisible to the both-signs census — modulo the same chained channel as the split's caveat (an arm-edge `SIMPLIFY` can mint); the SHARED `ctx.expand_max` bounds the arm count outright |
-| `EXPAND` | lexicographic (`|X|`, multiset of top-level disjunctive-conjunct sizes), modulo ONE caveat: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `|D|` at selection time — and the case-edge `SIMPLIFY` builds no disjunction node, but it can GROW an inherited one: a CHAINED pin — formed inside `d` by a construction-time substitution, unpropagated because propagation runs once (§3) — fires here and can push a member past `|D|`. Well-foundedness therefore rests on `ctx.expand_max`, which bounds the case count outright |
+| `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant while BOTH arms lose every occurrence of the atom — the substitution erases and mints no term, and the surviving guard literal is one-signed and alone, invisible to the both-signs census and to the cut step's candidate rule — modulo the same chained channel as the split's caveat (an arm-edge `SIMPLIFY` can mint); the SHARED `ctx.expand_max` bounds the arm count outright |
+| `TRY_CUT_DECOMPOSE`, binary arms (§6) | `|X|` constant while both arms lose every reachable occurrence of the atom and keep only its guard — a lone top-level literal, which the candidate rule excludes (§6) — so neither decomposition takes the atom again; modulo the same chained channel (an arm-edge `SIMPLIFY` can mint); the SHARED `ctx.expand_max` bounds the arm count outright |
+| `EXPAND` | lexicographic (`|X|`, multiset of top-level disjunctive-conjunct sizes), modulo ONE caveat: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `|D|` at selection time — plus exclusion LITERALS, never disjunctions, whose unit elimination only shrinks; the case-edge `SIMPLIFY` builds no disjunction node, but it can GROW an inherited one: a CHAINED pin — formed inside `d` by a construction-time substitution, unpropagated because propagation runs once (§3) — fires here and can push a member past `|D|`. Well-foundedness therefore rests on `ctx.expand_max`, which bounds the case count outright |
 | `ELIMINATE_BLOCK` pre-steps | `X` shrinks or the clause is decided |
 | `ELIMINATE_BITVECTOR_CLAUSE` (router) | one guarded conversion per conjunct — a rewrite, no recursion — then two variable-disjoint sub-clauses, each handed to its engine exactly once; no re-entry into the push |
 | swallowed binder units (`ELIMINATE_FINITE_CLAUSE`, `SOLVE_ARITHMETIC`) | a unit is decided wholesale or re-wrapped, never opened; each enclosing block makes exactly one attempt on it (one post-order pass, §4) — no fixpoint across blocks |
 | `DECIDE_FINITE` | one syntactic `BIT_BLAST` pass, then one BDD sweep over a finite bit set, budgeted by `ctx.qbf_node_max` |
 | `PROCESS_ALL_BLOCKS` | one post-order pass over a finite tree; each run is eliminated once |
 | §5 size acceptance | no recursion edge: the test runs on a COMPLETED component push and only replaces its result by a re-wrap (inv. 3) |
+| `TO_NNF`, factored negation (§3) | `NEG(rests)` recurses on a NEW node, not a subformula — but every residue member lost the shared conjuncts, so `\|rests\|` is strictly below the negated disjunction's |
 
 No elimination method re-enters `ANTI_PRENEX`, so the phases of §3 run once per
 call. Every recursion edge above strictly decreases the lexicographic measure
 (`|X|`, then the candidate/disjunctive-conjunct material) except the one
-chained channel — `EXPAND`'s chained pin and the split F-arm's minted
-candidate — which the shared `ctx.expand_max` bounds. `push_memo` needs no
-in-progress state either way: a key met mid-computation is an unwritten
-entry — a plain miss, recomputed — and any X-preserving cycle passes through
-`EXPAND`, a split F-arm, or a decomposition arm (the strip fires once per
-chain; 2d and the scope split strictly shrink the formula; the witness
-step, the case witness, and
-the settle move strictly shrink `X`), so the one shared budget caps its
-depth (§6).
+chained channel — `EXPAND`'s chained pin and the atoms an arm-edge
+`SIMPLIFY` mints for the split and the decompositions — which the shared
+`ctx.expand_max` bounds. `push_memo` needs no in-progress state either way:
+a key met mid-computation is an unwritten entry — a plain miss, recomputed —
+and any X-preserving cycle passes through `EXPAND`, a split F-arm, or a
+decomposition arm (the strip fires once per chain; 2d and the scope split
+strictly shrink the formula; the witness step, the case witness, and the
+settle move strictly shrink `X`), so the one shared budget caps its depth
+(§6).
 
 ---
 
@@ -1615,12 +1819,13 @@ depth (§6).
   and `ASK` fallbacks should use the word-level original instead of the
   converted form; and whether conversion may reach inside a translatable
   unit's body (§4).
-- **`SIGN_CENSUS` is the one remaining per-state walk** on the expansion
-  path. Its result is a pure function of `(node, X ∩ FV)` and could be cached
-  per node the way `OCC`'s map is (§6), if profiling ever shows it hot; the
+- **`SIGN_CENSUS` is the one deep per-state walk** on the expansion path
+  above the cut step (whose `‖ψ‖` traversal and walk are its own, §6). Its
+  result is a pure function of `(node, X ∩ FV)` and could be cached per
+  node the way `OCC`'s map is (§6), if profiling ever shows it hot; the
   census aborts on the first `other` leaf — and the moment the counts refute
-  both 2a and 2b at once, `pos > 0` with `neg > 0` or `free > 0` — so this
-  is deliberately not done yet.
+  both 2a and 2b at once: a positive beyond the top-level literals with
+  `neg > 0` or `free > 0` — so this is deliberately not done yet.
 - **`ZERO`/absorb pivots stay retired.** The unique split restores only the
   class whose T-arm deletes a binder by substitution. The paper's absorb arm
   (2i/2j — `p = 0` proven, the reproductive solution `r(x) = f₀ ∪ x·f₁′`)
@@ -1638,6 +1843,21 @@ depth (§6).
   dial does not clear — matrices dominated by deep definitional binder
   units, opaque to the census, `OCC`, and every ladder step — which needs
   a mechanism of its own, not a setting.
+- **`TRY_CUT_DECOMPOSE`'s walk is the cheapest one.** Its seed is the
+  candidate of fewest conjuncts; the classic pseudo-peripheral seed costs a
+  few more passes and may cut better. The licence probes by rewriting;
+  `atoms_memo` could carry each occurrence's depth and skip an atom whose
+  rebuilt paths alone exceed the bound, without a rewrite. Both wait for
+  profiling.
+- **One step at a time cannot see the diagram's width.** The cut step
+  builds the decomposition diagram one level per invocation and judges
+  only that level's cost; how many DISTINCT sub-problems a level leaves
+  after merging — the width a levelled construction could bound directly —
+  reaches it only through the shared budget, late. A cheap cut can also
+  change little: the memo, scope narrowing, and the candidate rule answer
+  that in mechanism, unmeasured. If a family walls on cascades the budget
+  catches late, an explicit levelled diagram with a width bound is the
+  recorded alternative.
 
 ---
 
@@ -1648,18 +1868,29 @@ Constraints on any implementation of this document, each independent of the
 setting can explain, because the executor's cost stops tracking the
 algorithm's:
 
-- **Every walk must be DAG-honest.** Assumption 1 prices a shared subtree
-  once; that is a property of the WALKS, not of the store. Dualisation
-  (`TO_NNF`/`¬` in `PROCESS_BLOCK`), constructor flattening, the result
-  joins' member expansion, the census and incidence passes, and phase 2's
-  traversal all revisit shared children — memoize or dedup each per NODE,
-  or its cost tracks the TREE count, which the push drives far beyond the
-  DAG size (§5, size acceptance).
+- **Every pass over formulas must cache its result per node.** The formula
+  is stored with identical subformulas shared (assumption 1), so it has two
+  sizes: `|·|`, the count as written out in full, where a shared part counts
+  once per place it appears, and `‖·‖`, the count in memory, where it counts
+  once. The algorithm's cost tracks the second only if every pass —
+  dualisation (`TO_NNF`/`¬` in `PROCESS_BLOCK` — the `neg(φ)` property,
+  §1), constructor flattening, the result joins' member expansion, the
+  census and incidence passes, phase 2's traversal, substitution — processes
+  a subformula once, however many places it appears in. A pass without that
+  cache costs the written-out size, which the push drives far beyond the
+  in-memory size (§5). With the cut licence (§6) this stops being a matter
+  of speed: that licence is stated in `‖·‖`, so it approves as small a
+  formula that an uncached pass then pays for at written-out scale, and the
+  budget no longer describes the cost. Per-node caching is an assumption the
+  licence depends on, not an optimisation.
 - **Substitution needs occurrence guards.** `[x ← t]` must return an
   untouched subtree by one cached-FV test; `[atm ↦ T/F]` needs the
-  analogous guard — a per-node cached atom vocabulary with exactly the
-  substitution's own reach (unit-opaque, §4). One memo per rewrite, shared
-  across every conjunct of the site: the copies overlap.
+  analogous guard — `atoms_memo` (§1), a per-node atom vocabulary with
+  exactly the substitution's own reach (unit-opaque, §4). One memo per
+  rewrite, shared across every conjunct of the site: the copies overlap.
+  The cut licence (§6) reads its measure off this rewrite: the nodes it
+  MINTS are the store's allocations during the rewrite, and the rewrite
+  stops at the bound — a failed probe costs no more than the bound allows.
 - **Unit elimination sweeps once.** Inside `SIMPLIFY`, the literal
   conjuncts' truth assignments bind DISTINCT atoms — a complement pair has
   already decided the junction — so they commute: apply them as one
