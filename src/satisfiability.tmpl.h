@@ -906,6 +906,123 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
  * @return @p fm with all non-initial IO variables made relative again.
  * @endinternal
  */
+/**
+ * @internal
+ * @brief Drop conjuncts that are exact time-shifted copies of another
+ * conjunct of @p fm.
+ *
+ * Justification: @p fm is used under an enclosing "always" from a start
+ * point s on. If D equals C shifted k>=1 steps further into the past,
+ * then for every t >= s+k the instance D(t) coincides with C(t-k), which
+ * "always C" already provides -- D adds nothing there. For t < s+k, D(t)
+ * reaches back across the start point into territory the specification
+ * never governed (only explicit initial conditions live there), so
+ * keeping D wrongly constrains that boundary. Removing exact shifted
+ * copies therefore only deletes implied conjuncts and corrects the
+ * boundary instantiation.
+ * A conjunct the specification itself carries as an explicit shifted
+ * clause must keep its (boundary-widening) meaning: an explicit C(t-1)
+ * next to C(t) governs one step below the start on purpose, and today's
+ * behaviour for it (usually F under an initial condition, since it
+ * constrains the input there) is the correct reading of that intent.
+ * The filter therefore groups the conjuncts of @p fm into classes of
+ * exact time-shifts of each other -- identified by their printed form
+ * re-based to a common newest time point, so the comparison is
+ * independent of the (per-stage, per-conjunct) time frame the pipeline
+ * happens to print them in -- and keeps, per class, as many members
+ * (newest first) as the user's own specification contributes to that
+ * class. Only the excess older members, which exist solely through the
+ * fixpoint's copying, are dropped; a class without any user-side anchor
+ * is left untouched, so a key mismatch degrades to today's verdict
+ * rather than to deleting a user-written clause.
+ * @param user_conjuncts The top-level conjuncts of the specification as
+ * it entered the fixpoint computation; their class multiplicities bound
+ * what may be dropped.
+ * @endinternal
+ */
+template <NodeType node>
+tref drop_shifted_conjunct_copies(tref fm, const trefs& user_conjuncts) {
+	using tau = tree<node>;
+	trefs cs = get_leaves<node>(fm, tau::wff_and);
+	if (cs.size() < 2) return fm;
+	trefs io = tau::get(fm).select_top(is_child<node, tau::io_var>);
+	if (get_max_shift<node>(io) <= 0) return fm;
+	// Base of a conjunct: the smallest [t-k] shift it references, i.e.
+	// how far its newest reference sits behind t. Conjuncts without IO
+	// variables or touching an absolute (initial) time point take no
+	// part in the classification and are never dropped.
+	auto base_of = [](tref c, trefs& cio_out) -> int_t {
+		cio_out = tau::get(c).select_top(is_child<node, tau::io_var>);
+		if (cio_out.empty()) return -1;
+		int_t b = -1;
+		for (tref v : cio_out) {
+			if (is_io_initial<node>(v)) return -1;
+			const int_t s = get_io_var_shift<node>(v);
+			if (b < 0 || s < b) b = s;
+		}
+		return b;
+	};
+	// Class key: the printed form of the conjunct re-based so that its
+	// newest reference sits at a fixed common shift. Printing after a
+	// uniform re-base makes two conjuncts compare equal exactly when one
+	// is a pure time-shift of the other, regardless of which time frame
+	// their stage of the pipeline printed them in. (Printed forms are
+	// required because the variable builders used by shift_io_vars_in_fm
+	// produce nodes that print identically to the fixpoint's own [t-k]
+	// variables but are not pointer-identical to them.)
+	std::vector<int_t> bases(cs.size(), -1);
+	int_t maxb = 0;
+	std::vector<trefs> cios(cs.size());
+	for (size_t i = 0; i < cs.size(); ++i) {
+		bases[i] = base_of(cs[i], cios[i]);
+		maxb = std::max(maxb, bases[i]);
+	}
+	std::vector<int_t> ubases(user_conjuncts.size(), -1);
+	std::vector<trefs> ucios(user_conjuncts.size());
+	for (size_t i = 0; i < user_conjuncts.size(); ++i) {
+		ubases[i] = base_of(user_conjuncts[i], ucios[i]);
+		maxb = std::max(maxb, ubases[i]);
+	}
+	auto key_of = [&maxb](tref c, const trefs& cio, int_t b) {
+		if (b == maxb) return TAU_TO_STR(c);
+		return TAU_TO_STR(shift_io_vars_in_fm<node>(c, cio, maxb - b));
+	};
+	std::map<std::string, int_t> user_mult;
+	for (size_t i = 0; i < user_conjuncts.size(); ++i)
+		if (ubases[i] >= 0) ++user_mult[key_of(
+			user_conjuncts[i], ucios[i], ubases[i])];
+	std::map<std::string, std::vector<size_t>> classes;
+	for (size_t i = 0; i < cs.size(); ++i)
+		if (bases[i] >= 0) classes[key_of(
+			cs[i], cios[i], bases[i])].push_back(i);
+	std::set<size_t> drop;
+	for (auto& [key, members] : classes) {
+		// Only drop within classes anchored in the user's own conjuncts.
+		// If key matching ever fails (a normalization changing a
+		// conjunct's printed shape between the collection point and
+		// here), the class counts zero user members and is left alone -
+		// the spec then answers as it did before this filter existed,
+		// instead of a mismatch deleting a clause the user wrote.
+		auto it = user_mult.find(key);
+		if (it == user_mult.end()) continue;
+		const size_t keep = std::max<size_t>((size_t) it->second, 1);
+		if (members.size() <= keep) continue;
+		// Keep the newest members; drop the older excess, but never a
+		// member sharing its base with a kept one.
+		std::stable_sort(members.begin(), members.end(),
+			[&](size_t a, size_t b) { return bases[a] < bases[b]; });
+		const int_t kept_base = bases[members[keep - 1]];
+		for (size_t m = keep; m < members.size(); ++m)
+			if (bases[members[m]] > kept_base)
+				drop.insert(members[m]);
+	}
+	if (drop.empty()) return fm;
+	trefs kept;
+	for (size_t i = 0; i < cs.size(); ++i)
+		if (!drop.contains(i)) kept.push_back(cs[i]);
+	return tau::build_wff_and(kept);
+}
+
 template <NodeType node>
 tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	using tau = tree<node>;
@@ -1201,6 +1318,11 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	io_vars = tau::get(tau::build_wff_and(fm, flag_initials))
 			.select_top(is_child<node, tau::io_var>);
 
+	// The specification's own top-level conjuncts (after the flag
+	// transformation, before the fixpoint): their shift-class
+	// multiplicities bound what the shift-copy filter below may drop.
+	trefs user_conjuncts = get_leaves<node>(fm, tau::wff_and);
+
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
@@ -1216,6 +1338,24 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 
 	ubd_ctn = normalize_non_temp<node>(ubd_ctn);
 	ubd_ctn = transform_back_non_initials<node>(ubd_ctn, point_after_inits - 1);
+	// The fixpoint may return a conjunction that carries, next to a
+	// conjunct C over [t..t-k], an exact time-shifted copy of C one or
+	// more steps further back (guarded forms need one extra fixpoint
+	// step, and the extra step's older instance survives the
+	// back-translation as a [t-1]-shifted twin). Under the enclosing
+	// "always" the twin is redundant for every t past the start -- C at
+	// t-1 already follows from C holding at all earlier points -- but
+	// when the run below instantiates ubd_ctn AT the start point, the
+	// twin reaches one step BEFORE the start and constrains the input
+	// there: an accumulating-guard spec with an initial condition then
+	// reads unsatisfiable even though for every input a run exists.
+	// Dropping exact shifted copies removes only implied conjuncts and
+	// restores the boundary.
+	// Shifted twins can only arise from extra fixpoint steps; when the
+	// fixpoint stabilised immediately the continuation carries none, and
+	// skipping the filter keeps that (common) path untouched.
+	if (steps > 0) ubd_ctn = drop_shifted_conjunct_copies<node>(
+						ubd_ctn, user_conjuncts);
 
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = tau::get(ubd_ctn).select_top(is_child<node, tau::io_var>);
