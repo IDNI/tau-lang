@@ -143,7 +143,7 @@ bool is_top_level_bf(tref parent) {
 		case tau::bf_nor: case tau::bf_nand: case tau::bf_xnor:
 		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
-		case tau::bf_shl:
+		case tau::bf_shl: case tau::bf_min: case tau::bf_max:
 		// bf quantifiers
 		case tau::bf_fall: case tau::bf_fex:
 		// bf atomic formulas
@@ -952,7 +952,7 @@ std::variant<tref, inference_error, parse_error> update(
 			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 			case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 			case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
-			case tau::bf_nor: {
+			case tau::bf_nor: case tau::bf_min: case tau::bf_max: {
 				// only bv types allowed
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {

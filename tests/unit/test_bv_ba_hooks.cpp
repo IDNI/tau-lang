@@ -407,6 +407,50 @@ TEST_SUITE("bv_term_cast: operand forms") {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// term_min / term_max
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("bv term_min/term_max: constant folding") {
+
+	TEST_CASE("min/max of two constants") {
+		CHECK(bf("min({3}:bv[8], {10}:bv[8])") == bf("{3}:bv[8]"));
+		CHECK(bf("max({3}:bv[8], {10}:bv[8])") == bf("{10}:bv[8]"));
+	}
+
+	// 200 as a signed 8-bit value would be -56, i.e. below 100; min/max
+	// must compare unsigned like the comparison operators do.
+	TEST_CASE("min/max are unsigned across the sign bit") {
+		CHECK(bf("min({200}:bv[8], {100}:bv[8])") == bf("{100}:bv[8]"));
+		CHECK(bf("max({200}:bv[8], {100}:bv[8])") == bf("{200}:bv[8]"));
+	}
+
+	// 1:bv[8] is the all-ones top element (the unsigned maximum) and
+	// 0:bv[8] the bottom element (the minimum), so both are absorbing or
+	// neutral for min/max on either side.
+	TEST_CASE("top and bottom element operands") {
+		CHECK(bf("min(1:bv[8], {5}:bv[8])") == bf("{5}:bv[8]"));
+		CHECK(bf("min({5}:bv[8], 1:bv[8])") == bf("{5}:bv[8]"));
+		CHECK(bf("max(1:bv[8], {5}:bv[8])") == bf("1:bv[8]"));
+		CHECK(bf("max({5}:bv[8], 1:bv[8])") == bf("1:bv[8]"));
+		CHECK(bf("min(0:bv[8], {5}:bv[8])") == bf("0:bv[8]"));
+		CHECK(bf("min({5}:bv[8], 0:bv[8])") == bf("0:bv[8]"));
+		CHECK(bf("max(0:bv[8], {5}:bv[8])") == bf("{5}:bv[8]"));
+		CHECK(bf("max({5}:bv[8], 0:bv[8])") == bf("{5}:bv[8]"));
+	}
+
+	// The same identities with a variable operand, plus idempotence; these
+	// fold structurally, without knowing the variable's value.
+	TEST_CASE("variable operands fold against top, bottom and self") {
+		CHECK(bf("min(x:bv[8], 0:bv[8])") == bf("0:bv[8]"));
+		CHECK(bf("min(x:bv[8], 1:bv[8])") == bf("x:bv[8]"));
+		CHECK(bf("max(x:bv[8], 0:bv[8])") == bf("x:bv[8]"));
+		CHECK(bf("max(x:bv[8], 1:bv[8])") == bf("1:bv[8]"));
+		CHECK(bf("min(x:bv[8], x:bv[8])") == bf("x:bv[8]"));
+		CHECK(bf("max(x:bv[8], x:bv[8])") == bf("x:bv[8]"));
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

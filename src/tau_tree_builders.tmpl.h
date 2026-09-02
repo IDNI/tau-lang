@@ -699,6 +699,24 @@ tref build_bf_mod(tref l, tref r) {
 }
 
 template <NodeType node>
+tref build_bf_min(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::bf, tau::get(tau::bf_min, l, r));
+}
+
+template <NodeType node>
+tref build_bf_max(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::bf, tau::get(tau::bf_max, l, r));
+}
+
+template <NodeType node>
 tref build_bf_cast(tref operand, size_t target_type_id) {
 	DBG(assert(operand != nullptr);)
 	DBG(assert(target_type_id > 0);)
@@ -1442,6 +1460,16 @@ tref tree<node>::build_bf_div(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_bf_mod(tref l, tref r) {
 	return tau_lang::build_bf_mod<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_min(tref l, tref r) {
+	return tau_lang::build_bf_min<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_max(tref l, tref r) {
+	return tau_lang::build_bf_max<node>(l, r);
 }
 
 // -----------------------------------------------------------------------------

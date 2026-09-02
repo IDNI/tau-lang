@@ -172,9 +172,9 @@ TEST_SUITE("syntactic_path_simplification") {
 		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
 			"x = 0 && (z != 0 || k = 0 && y = 0) || y = 0 && x = 0 || z = 0 && k = 0",
+			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
-			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 		}) );
 	}
 	TEST_CASE("3") {
@@ -184,10 +184,10 @@ TEST_SUITE("syntactic_path_simplification") {
 		// Order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"x&(z'|yk)|yx|zk",
 			"x&(z'|ky)|yx|zk",
 			"x&(z'|ky)|xy|zk",
 			"x&(z'|yk)|xy|zk",
-			"x&(z'|yk)|yx|zk",
 		}) );
 	}
 	TEST_CASE("4") {

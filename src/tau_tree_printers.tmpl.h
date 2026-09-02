@@ -61,6 +61,8 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::bf_mod
 			|| nt == tau::bf_shr
 			|| nt == tau::bf_shl
+			|| nt == tau::bf_min
+			|| nt == tau::bf_max
 			|| nt == tau::bf_f
 			|| nt == tau::bf_t
 			// added for debugging purposes in overloading
@@ -361,7 +363,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		static const std::set<size_t> no_wrap_for = {
 			bf_ref, bf_neg, ba_constant, bf_t,
 			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
-			variable, ref_args, start
+			variable, ref_args, start, bf_min, bf_max
 		};
 		// priority map (lower number = higher priority)
 		static const std::map<size_t, size_t> prio = {
@@ -433,6 +435,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf,                 790 },
 			{ rec_relation,       900 },
 			{ ref_args,           900 },
+			// call-style, self-delimiting like ref_args
+			{ bf_min,             900 },
+			{ bf_max,             900 },
 		};
 
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
@@ -622,6 +627,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				break;
 			}
 
+			case bf_min:            out("min("); break;
+			case bf_max:            out("max("); break;
+
 			case wff_sometimes:     out("sometimes "); break;
 			case wff_always:        out("always "); break;
 
@@ -804,6 +812,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 			case rec_relation:      out(" := "); break;
 			case ref_args:
+			case bf_min:
+			case bf_max:
 			case offsets:
 			case type_parents:      // ", "-separated type_name list
 			case tuple:             out(", "); break; // ", "-separated member list
@@ -863,7 +873,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case tuple:             out("}"); break;
 			case offset:            if (pnt == io_var) out("]");
 						break;
-			case ref_args:          out(")"); break;
+			case ref_args:
+			case bf_min:
+			case bf_max:            out(")"); break;
 			case io_var: {
 				// Counterpart to the var_name case in on_enter above: print
 				// the dotted member suffix (if any) now that the offset

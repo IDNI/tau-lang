@@ -1212,6 +1212,7 @@ bool has_bv_arithmetic(tref f) {
 			|| is<node, tau::bf_mod>(n) || is<node, tau::bf_shl>(n)
 			|| is<node, tau::bf_shr>(n) || is<node, tau::bf_nand>(n)
 			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n)
+			|| is<node, tau::bf_min>(n)  || is<node, tau::bf_max>(n)
 			// a width cast crosses algebras; lgrs cannot see across it
 			|| is<node, tau::bf_cast>(n);
 	}) != nullptr;

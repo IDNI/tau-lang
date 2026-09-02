@@ -143,11 +143,11 @@ TEST_SUITE("Execution") {
 				"<:y> = 0 && <:x> = 0",
 			},
 			{
+				"<:z> = 0 && <:x> = 0 && <:y> = 0",
 				"<:x> = 0 && <:z> = 0 && <:y> = 0",
 				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0 && <:z> = 0",
 				"<:y> = 0 && <:x> = 0 && <:z> = 0",
-				"<:z> = 0 && <:x> = 0 && <:y> = 0",
 			}
 		};
 		io_context<node_t> ctx;
@@ -316,8 +316,8 @@ TEST_SUITE("Execution") {
 		// this suite.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o2[t]:tau = 0 && o3[t]:tau = 0",
 				"always o3[t]:tau = 0 && o2[t]:tau = 0",
+				"always o2[t]:tau = 0 && o3[t]:tau = 0",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -456,6 +456,7 @@ TEST_SUITE("Execution") {
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 		}, {
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
@@ -464,6 +465,7 @@ TEST_SUITE("Execution") {
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
@@ -471,6 +473,8 @@ TEST_SUITE("Execution") {
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
 			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
@@ -541,7 +545,11 @@ TEST_SUITE("Execution") {
 		REQUIRE( u_values.size() == 5 );
 		CHECK( u_values[1] == "always o2[t]:tau = 0" );
 		CHECK( u_values[2] == "always o3[t]:tau = 0" );
-		CHECK( u_values[3] == "always o2[t]:tau = o3[t]:tau" );
+		// the equation's operand order is a hash/nt-id-order-dependent
+		// tie-break that drifts with parser regens; both are the same
+		// update
+		CHECK(( u_values[3] == "always o2[t]:tau = o3[t]:tau"
+			|| u_values[3] == "always o3[t]:tau = o2[t]:tau" ));
 		// the o2 and o3 parts (2 alternatives each) merged into one part
 		// holding the 2x2 cross product of their alternatives
 		const auto& parts = maybe_i.value().original_spec;

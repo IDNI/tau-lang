@@ -88,10 +88,12 @@ add_repl_test_fail(adt-unknown_member
 # stayed an unflattened, plain-typed equality). Expected output verified
 # live against the equivalent SAME-line case ("type Point = ... . n x:Point
 # = y:Point" in one -e string): normalize's canonical term ordering prints
-# `y.b = x.b && y.a = x.a`, not the declaration-order `x.a = y.a && ...` --
-# member-wise expansion, not textual order, is what this case asserts.
+# `y.<m> = x.<m>` pairs, not the declaration-order `x.a = y.a && ...` --
+# member-wise expansion, not textual order, is what this case asserts. The
+# conjunct order between the two members is a tie-break that drifts with
+# parser regens, so both orders are accepted.
 add_multiline_repl_test(adt-cross_line_tuple_equality
-	"y\\.b = x\\.b && y\\.a = x\\.a"
+	"(y\\.b = x\\.b && y\\.a = x\\.a|y\\.a = x\\.a && y\\.b = x\\.b)"
 	"type Point = {a: sbf, b: sbf}"
 	"n x:Point = y:Point")
 

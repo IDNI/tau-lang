@@ -829,6 +829,8 @@ bool tree<node>::is_term_nt(size_t nt) {
 		case bf_mod:
 		case bf_shr:
 		case bf_shl:
+		case bf_min:
+		case bf_max:
 		case bf_and:
 		case bf_nand:
 		case bf_neg:

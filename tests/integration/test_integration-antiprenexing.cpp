@@ -56,8 +56,9 @@ TEST_SUITE("anti_prenex") {
 			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
 			// pre-deletion shape below. Canonical (produced) shape FIRST:
 			// Debug's matches_to_any_of only checks expected[0].
-			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
 			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || f(b1) || w = 0)",
+			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))",
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
 			// the same single disjunct with the ltl-side pivot tie-break
 			// order (conjuncts and disjuncts permuted; equivalent by
 			// commutativity of the hand-check above).
@@ -96,9 +97,9 @@ TEST_SUITE("anti_prenex") {
 			// wrapped ex-elimination happens to return. Canonical
 			// (produced) shape FIRST: Debug's matches_to_any_of only
 			// checks expected[0].
-			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (w != 0 || wy' = 0)",
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || wy' = 0)",
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
 			"&& (w != 0 || wy' = 0)",
 			// the same two conjuncts with the ltl-side pivot tie-break
 			// order (disjuncts permuted; equivalent by commutativity).
@@ -131,8 +132,8 @@ TEST_SUITE("anti_prenex") {
 			// disjunct order flipped by the 8f1a74c1 parser regen
 			// (Debug's matches_to_any_of only checks expected[0] --
 			// see test_helpers.h); actual current shape first.
-			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
 			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
+			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
 			// block pipeline, 2026-08-04 (canonical shape first):
 			// under y = 0 the kept universal reduces to
 			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
@@ -155,7 +156,9 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (by != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
+			"y != 0 && z != 0",
 			"z != 0 && y != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
@@ -164,7 +167,9 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "all b (by = 0 || bz = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// disjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
+			"y = 0 || z = 0",
 			"z = 0 || y = 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
@@ -173,7 +178,9 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (by != 0 && bz != 0 || bw != 0 && bu != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// clause/conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
+			"y != 0 && z != 0 || w != 0 && u != 0",
 			"z != 0 && y != 0 || u != 0 && w != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
@@ -227,7 +234,9 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
+			"y != 0 && z != 0",
 			"z != 0 && y != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
@@ -251,7 +260,9 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (bw != 0 && q(b)).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
+			"ex b1 q(b1) && b1 w != 0",
 			"ex b1 b1 w != 0 && q(b1)",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );

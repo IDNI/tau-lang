@@ -355,4 +355,44 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
 		remainder, aux);
 }
 
+// Shared body of bvmin/bvmax: the predicate
+//   ((left < right) -> result = low) && (!(left < right) -> result = high)
+// where (low, high) is (left, right) for min and (right, left) for max --
+// max reuses the same single bvlt recurrence with the copied sides swapped,
+// which at equal operands still picks the shared value through the negated
+// branch. Equality is spelled !bvneq, the one bit-level equality entry point.
+template<NodeType node>
+static tref bv_pick_by_order(tref left, tref right, tref result, bool pick_smaller) {
+	using tau = tree<node>;
+
+	// bvlt/bvneq read the bitwidth off their first operand (left and
+	// result respectively); the fresh result variable always carries one,
+	// the operands do after type inference -- bail out like the other
+	// builders if either is missing.
+	if (get_bv_type_bitwidth<node>(result) == 0
+		|| get_bv_type_bitwidth<node>(left) == 0) return nullptr;
+	auto lt = bvlt<node>(left, right);
+	if (!lt) return nullptr;
+	auto eq = [&](tref operand) -> tref {
+		auto neq = bvneq<node>(result, operand);
+		return neq ? tau::build_wff_neg(neq) : nullptr;
+	};
+	auto eq_low = eq(pick_smaller ? left : right);
+	auto eq_high = eq(pick_smaller ? right : left);
+	if (!eq_low || !eq_high) return nullptr;
+	return tau::build_wff_and(
+		tau::build_wff_imply(lt, eq_low),
+		tau::build_wff_imply(tau::build_wff_neg(lt), eq_high));
+}
+
+template<NodeType node>
+tref bvmin(tref left, tref right, tref result) {
+	return bv_pick_by_order<node>(left, right, result, true);
+}
+
+template<NodeType node>
+tref bvmax(tref left, tref right, tref result) {
+	return bv_pick_by_order<node>(left, right, result, false);
+}
+
 } // namespace idni::tau_lang

@@ -938,6 +938,18 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				conjoin(bvcast<node>(src, bf_result));
 				break;
 			}
+			case tau::bf_min: case tau::bf_max: {
+				auto left = lookup(tau::get(t).child(0));
+				auto right = lookup(tau::get(t).child(1));
+				auto result = tau::build_variable(type_id);
+				auto bf_result = tau::get(tau::bf, result);
+				vars.push_back(result);
+				changes[t] = result;
+				conjoin((nt == tau::bf_min)
+					? bvmin<node>(left, right, bf_result)
+					: bvmax<node>(left, right, bf_result));
+				break;
+			}
 			// Nand, nor and xnor are treated in the hooks so we never get those
 			// cases at this point.
 			default: {

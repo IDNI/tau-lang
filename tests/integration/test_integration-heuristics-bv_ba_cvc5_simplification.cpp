@@ -465,6 +465,19 @@ TEST_SUITE("cvc5 tree to tau tree kinds") {
 		conv(make_term_forall(v, make_term_equal(v,
 			make_bitvector_bottom_elem(8))), "all b1 b1 = 0");
 	}
+
+	// min/max are emitted to cvc5 as ite(bvule(a,b), a, b) and
+	// ite(bvule(a,b), b, a); the reverse translation must recognize
+	// those two shapes so simplification round-trips terms holding them.
+	TEST_CASE("ite of ule reconstructs min/max") {
+		cvc5::Term x = cvc5_term_manager.mkConst(bv8(), "x");
+		cvc5::Term y = cvc5_term_manager.mkConst(bv8(), "y");
+		cvc5::Term cond = make_term_less_equal(x, y);
+		conv(cvc5_term_manager.mkTerm(cvc5::Kind::ITE, {cond, x, y}),
+			"min(x, y)");
+		conv(cvc5_term_manager.mkTerm(cvc5::Kind::ITE, {cond, y, x}),
+			"max(x, y)");
+	}
 }
 
 TEST_SUITE("Cleanup") {

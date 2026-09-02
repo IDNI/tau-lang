@@ -517,6 +517,10 @@ template<NodeType node> tref term_nor(tref symbol);
 template<NodeType node> tref term_xnor(tref symbol);
 /** @brief Simplify a `nand` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_nand(tref symbol);
+/** @brief Simplify a `min` bitvector symbol node @p symbol (unsigned). */
+template<NodeType node> tref term_min(tref symbol);
+/** @brief Simplify a `max` bitvector symbol node @p symbol (unsigned). */
+template<NodeType node> tref term_max(tref symbol);
 
 /** @brief Apply all BV symbol-level simplifications to @p symbol. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);

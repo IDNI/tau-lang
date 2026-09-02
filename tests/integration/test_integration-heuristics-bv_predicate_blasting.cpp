@@ -51,7 +51,8 @@ static std::string blast_normalize(const std::string& sample) {
 		switch (tau::get(n).get_type()) {
 			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 			case tau::bf_div: case tau::bf_mod: case tau::bf_shl:
-			case tau::bf_shr: case tau::bf_cast: return true;
+			case tau::bf_shr: case tau::bf_min: case tau::bf_max:
+			case tau::bf_cast: return true;
 			default: return false;
 		}
 	};
@@ -535,6 +536,112 @@ TEST_SUITE("bved") {
 		CHECK(blast_normalize(
 			"ex x ex q ex r (x = { 10 }:bv[4] && x / { 3 }:bv[4] = q && x % { 3 }:bv[4] = r"
 			" && r = { 2 }:bv[4])") == "F");
+	}
+}
+
+//
+// bvmin / bvmax: min(a, b) and max(a, b) blast through a fresh result
+// variable r constrained by the predicate
+//   ((a < b) -> r = a) && (!(a < b) -> r = b)      (min; the dual for max)
+// after which the min/max term is replaced by r. Every case keeps at least
+// one variable operand so construction-time constant folding cannot bypass
+// the blasting. The T/F pairs pin each implication branch separately.
+//
+TEST_SUITE("bvmin") {
+
+	TEST_CASE("bvmin: left smaller picks left") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && min(x, { 5 }:bv[4]) = { 3 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvmin: left smaller does not pick right") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && min(x, { 5 }:bv[4]) = { 5 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvmin: right smaller picks right") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && min(x, { 3 }:bv[4]) = { 3 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvmin: equal operands take the not-less branch") {
+		CHECK(blast_normalize("ex x ex y (x = { 7 }:bv[4] && y = { 7 }:bv[4] && min(x, y) = { 7 }:bv[4])") == "T");
+	}
+
+	// 12 as a signed 4-bit value is -4, which would sort below 3; the
+	// comparison must be unsigned like bvlt's.
+	TEST_CASE("bvmin: comparison is unsigned across the sign bit") {
+		CHECK(blast_normalize("ex x (x = { 12 }:bv[4] && min(x, { 3 }:bv[4]) = { 3 }:bv[4])") == "T");
+		CHECK(blast_normalize("ex x (x = { 12 }:bv[4] && min(x, { 3 }:bv[4]) = { 12 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvmin: variable operands pin the result exactly") {
+		CHECK(blast_normalize("ex x ex y (x = { 9 }:bv[4] && y = { 2 }:bv[4] && min(x, y) = { 2 }:bv[4])") == "T");
+		CHECK(blast_normalize("ex x ex y (x = { 9 }:bv[4] && y = { 2 }:bv[4] && min(x, y) = { 9 }:bv[4])") == "F");
+	}
+}
+
+TEST_SUITE("bvmax") {
+
+	TEST_CASE("bvmax: right larger picks right") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && max(x, { 5 }:bv[4]) = { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvmax: right larger does not pick left") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && max(x, { 5 }:bv[4]) = { 3 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvmax: left larger picks left") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && max(x, { 3 }:bv[4]) = { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvmax: equal operands take the not-greater branch") {
+		CHECK(blast_normalize("ex x ex y (x = { 7 }:bv[4] && y = { 7 }:bv[4] && max(x, y) = { 7 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvmax: comparison is unsigned across the sign bit") {
+		CHECK(blast_normalize("ex x (x = { 12 }:bv[4] && max(x, { 3 }:bv[4]) = { 12 }:bv[4])") == "T");
+		CHECK(blast_normalize("ex x (x = { 12 }:bv[4] && max(x, { 3 }:bv[4]) = { 3 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvmax: variable operands pin the result exactly") {
+		CHECK(blast_normalize("ex x ex y (x = { 9 }:bv[4] && y = { 2 }:bv[4] && max(x, y) = { 9 }:bv[4])") == "T");
+		CHECK(blast_normalize("ex x ex y (x = { 9 }:bv[4] && y = { 2 }:bv[4] && max(x, y) = { 2 }:bv[4])") == "F");
+	}
+}
+
+TEST_SUITE("bvmin/bvmax composition") {
+
+	// min(5, 2) = 2, then max(2, 3) = 3: the inner result variable feeds
+	// the outer predicate through the changes/lookup replacement chain.
+	TEST_CASE("nested min under max") {
+		CHECK(blast_normalize("ex a ex b (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && max(min(a, b), { 3 }:bv[4]) = { 3 }:bv[4])") == "T");
+	}
+
+	// a + b = 7 and a - b = 3 are themselves replaced by result variables
+	// before min compares them.
+	TEST_CASE("min over arithmetic operands") {
+		CHECK(blast_normalize("ex a ex b (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && min(a + b, a - b) = { 3 }:bv[4])") == "T");
+	}
+
+	// The saturating-add idiom from the README under blasting: with
+	// x = 13, x' = 2, so min(y, x') clamps y = 5 down to 2 and the sum
+	// saturates at 15 instead of wrapping.
+	TEST_CASE("saturating add: x + min(y, x') saturates") {
+		CHECK(blast_normalize("ex x ex y (x = { 13 }:bv[4] && y = { 5 }:bv[4]"
+			" && x + min(y, x') = { 15 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("blasting leaves no min/max operators behind") {
+		tref blasted = blast_formula("ex a ex b (a = { 5 }:bv[4] && b = { 2 }:bv[4]"
+			" && max(min(a, b), { 3 }:bv[4]) = { 3 }:bv[4])");
+		REQUIRE(blasted != nullptr);
+		auto has_minmax = [](tref n) {
+			switch (tau::get(n).get_type()) {
+				case tau::bf_min: case tau::bf_max: return true;
+				default: return false;
+			}
+		};
+		CHECK( !tau::get(blasted).find_top(has_minmax) );
 	}
 }
 
@@ -1153,7 +1260,8 @@ TEST_SUITE("nested arithmetic operands") {
 			switch (tau::get(n).get_type()) {
 				case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 				case tau::bf_div: case tau::bf_mod: case tau::bf_shl:
-				case tau::bf_shr: case tau::bf_cast: return true;
+				case tau::bf_shr: case tau::bf_min: case tau::bf_max:
+				case tau::bf_cast: return true;
 				default: return false;
 			}
 		};

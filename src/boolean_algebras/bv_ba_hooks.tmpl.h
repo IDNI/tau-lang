@@ -906,6 +906,78 @@ tref bv_term_cast(tref symbol, size_t target_type_id) {
 	return new_symbol;
 }
 
+// min(a, b), unsigned. Every fold returns one of the two operands: 0 (the
+// bottom element) is absorbing and 1 (the all-ones top element) neutral,
+// and of two constants the smaller is kept, so no new constant is built.
+template<NodeType node>
+tref term_min(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_min/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	auto first = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].first());
+	};
+	auto second = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].second());
+	};
+	// min(0, X) and min(X, 0) are 0
+	if (c1.is(tau::bf_f)) return first();
+	if (c2.is(tau::bf_f)) return second();
+	// min(1, X) is X and min(X, 1) is X
+	if (c1.is(tau::bf_t)) return second();
+	if (c2.is(tau::bf_t)) return first();
+	// min(X, X) is X
+	if (c1 == c2) return first();
+	// min({ ... }, { ... })
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return compare_bv_consts(std::get<bv>(c1.get_ba_constant()),
+				std::get<bv>(c2.get_ba_constant())) <= 0
+			? first() : second();
+	}
+	return symbol;
+}
+
+// max(a, b), unsigned: the dual of term_min above (1 absorbing, 0 neutral).
+template<NodeType node>
+tref term_max(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_max/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	auto first = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].first());
+	};
+	auto second = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].second());
+	};
+	// max(1, X) and max(X, 1) are 1
+	if (c1.is(tau::bf_t)) return first();
+	if (c2.is(tau::bf_t)) return second();
+	// max(0, X) is X and max(X, 0) is X
+	if (c1.is(tau::bf_f)) return second();
+	if (c2.is(tau::bf_f)) return first();
+	// max(X, X) is X
+	if (c1 == c2) return first();
+	// max({ ... }, { ... })
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return compare_bv_consts(std::get<bv>(c1.get_ba_constant()),
+				std::get<bv>(c2.get_ba_constant())) >= 0
+			? first() : second();
+	}
+	return symbol;
+}
+
 template <NodeType node_t>
 tref simplify_bv_symbol(tref symbol) {
 	using tau = tree<node_t>;
@@ -921,6 +993,8 @@ tref simplify_bv_symbol(tref symbol) {
 		case tau::bf_nor: return term_nor<node_t>(symbol);
 		case tau::bf_xnor: return term_xnor<node_t>(symbol);
 		case tau::bf_nand: return term_nand<node_t>(symbol);
+		case tau::bf_min: return term_min<node_t>(symbol);
+		case tau::bf_max: return term_max<node_t>(symbol);
 		default: return symbol;
 	}
 }

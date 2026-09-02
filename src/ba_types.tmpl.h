@@ -476,7 +476,7 @@ bool is_buildable(size_t op, tref n, tref m) {
 		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 		case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
-		case tau::bf_nor: {
+		case tau::bf_nor: case tau::bf_min: case tau::bf_max: {
 			return is_bv_type_family<node>(unified.value()) || is_untyped<node>(unified.value());
 		}
 		case tau::bf_or: case tau::bf_xor: case tau::bf_and:

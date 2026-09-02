@@ -84,6 +84,8 @@ TEST_SUITE("pretty printer") {
 			{ "x:bv[8] !| y:bv[8] = 0.", "x!|y = 0." },
 			{ "x:bv[8] !^ y:bv[8] = 0.", "x!^y = 0." },
 			{ "(bv[16]) x:bv[8] = 0.",   "(bv[16]) x = 0." },
+			{ "min(x:bv[8], y:bv[8]) = 0.", "min(x, y) = 0." },
+			{ "max(x:bv[8], y:bv[8]) = 0.", "max(x, y) = 0." },
 			{ "always [t < 3] -> o1[t] = 0.",
 				"always [t < 3] -> o1[t]:tau = 0." },
 			{ "always [t != 0] -> o1[t] = 0.",

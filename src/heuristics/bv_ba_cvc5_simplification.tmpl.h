@@ -177,6 +177,31 @@ tref cvc5_tree_to_tau_tree(bv n,
 			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
 		}
 
+		case Kind::ITE: {
+			// A tau term can express an ITE only in the two shapes
+			// make_bitvector_min/max emit (and their strict-order
+			// variants, which flip nothing for equal operands):
+			//   ite(a <= b, a, b) = ite(a < b, a, b) = min(a, b)
+			//   ite(a <= b, b, a) = ite(a < b, b, a) = max(a, b)
+			// Any other ITE is untranslatable like any unknown kind.
+			const auto& c = n[0];
+			if (c.getKind() == Kind::BITVECTOR_ULE
+				|| c.getKind() == Kind::BITVECTOR_ULT) {
+				const bool is_min = c[0] == n[1] && c[1] == n[2];
+				const bool is_max = c[0] == n[2] && c[1] == n[1];
+				if (is_min || is_max) {
+					auto left = rec(c[0]);
+					auto right = rec(c[1]);
+					if (left == nullptr || right == nullptr)
+						return nullptr;
+					return is_min
+						? build_bf_min<node>(left, right)
+						: build_bf_max<node>(left, right);
+				}
+			}
+			DBG(LOG_DEBUG << "Untranslatable ITE shape during tree translation\n";)
+			return nullptr;
+		}
 		default: {
 			DBG(LOG_DEBUG << "Unexpected bitvector kind during tree translation: "
 					<< n.getKind() << "\n";)

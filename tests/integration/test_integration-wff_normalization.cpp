@@ -131,6 +131,7 @@ TEST_SUITE("boole_normal_form") {
 		// Order flipped again by the 2026-08-27 regen (left-assoc
 		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
 		CHECK( matches_to_str_to_any_of(res, {
+			"ab'x'|a'bx = 0 || a&(b|x)|a'bx' != 0",
 			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
 			"a'bx|ab'x' = 0 || a&(b|x)|a'bx' != 0",
 			"xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0",

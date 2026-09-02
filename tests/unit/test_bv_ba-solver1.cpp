@@ -79,6 +79,40 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 }
 
+// min/max are converted for cvc5 as ite(bvule(a,b), ...); these check the
+// conversion by validity/satisfiability of the defining properties.
+TEST_SUITE("cvc5_satisfiability: min/max") {
+
+	TEST_CASE("all x all y min(x, y:bv[4]) <= x") {
+		auto formula = parse_bv_formula("all x all y min(x, y:bv[4]) <= x");
+		CHECK( is_bv_formula_valid<node_t>(formula) );
+	}
+
+	TEST_CASE("all x all y ( min(x, y:bv[4]) = x || min(x, y) = y )") {
+		auto formula = parse_bv_formula(
+			"all x all y ( min(x, y:bv[4]) = x || min(x, y) = y )");
+		CHECK( is_bv_formula_valid<node_t>(formula) );
+	}
+
+	TEST_CASE("all x all y min(x, y:bv[4]) + max(x, y) = x + y") {
+		auto formula = parse_bv_formula(
+			"all x all y min(x, y:bv[4]) + max(x, y) = x + y");
+		CHECK( is_bv_formula_valid<node_t>(formula) );
+	}
+
+	TEST_CASE("ex x min(x, { 3 }:bv[4]) = { 2 }:bv[4]") {
+		auto formula = parse_bv_formula(
+			"ex x min(x, { 3 }:bv[4]) = { 2 }:bv[4]");
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+	}
+
+	TEST_CASE("ex x max(x, { 3 }:bv[4]) < { 3 }:bv[4]") {
+		auto formula = parse_bv_formula(
+			"ex x max(x, { 3 }:bv[4]) < { 3 }:bv[4]");
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+	}
+}
+
 // BA-1: is_bv_formula_sat collapsed a definite "unsat" and a "cannot
 // decide" (cvc5 unknown, or translation failure) into the same false
 // return. bv_formula_sat_status exposes the distinction; is_bv_formula_sat

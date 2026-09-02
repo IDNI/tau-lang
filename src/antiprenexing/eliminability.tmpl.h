@@ -128,11 +128,13 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
 		return t.is(tau::bf_add) || t.is(tau::bf_sub)
 			|| t.is(tau::bf_mul) || t.is(tau::bf_div)
 			|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
-			|| t.is(tau::bf_shr) || t.is(tau::bf_cast);
+			|| t.is(tau::bf_shr) || t.is(tau::bf_min)
+			|| t.is(tau::bf_max) || t.is(tau::bf_cast);
 	};
 	// Arithmetic operators atomic_blasting cannot express
 	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
 	// factor; shl/shr/div/mod need a constant second argument.
+	// min/max blast unconditionally (bvmin/bvmax take any operands).
 	auto blasting_unsupported = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::bf_mul))

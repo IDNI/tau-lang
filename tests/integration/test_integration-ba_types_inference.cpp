@@ -1177,6 +1177,25 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( check_symbol<tau::bf_shl>(inferred, bv16_type_id<node_t>) );
 	}
 
+	// min/max parse as builtins (bf_min/bf_max, not bf_ref) and type like
+	// the other bv-only term operators: one operand's annotation fixes
+	// the node's type and propagates to the other operand.
+	TEST_CASE("bv bf_min symbol") {
+		tref parsed = parse_bf("min(x:bv[16], y)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_min>(inferred, bv16_type_id<node_t>) );
+	}
+
+	TEST_CASE("bv bf_max symbol") {
+		tref parsed = parse_bf("max(x:bv[16], y)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_max>(inferred, bv16_type_id<node_t>) );
+	}
+
 	TEST_CASE("bv[8] bf_shl symbol") {
 		tref parsed = parse_bf("x:bv[8] << y");
 		CHECK( parsed != nullptr );
@@ -2091,11 +2110,23 @@ TEST_SUITE("ba_types_inference: type conflicts are rejected") {
 		CHECK( !infers_bf("x:sbf + y:bv[8]") );
 	}
 
+	// min/max are bitvector-only builtins: operands from any other BA
+	// family are a type-resolution error even when they are consistent
+	// with each other.
+	TEST_CASE("min/max reject non-bitvector operands") {
+		CHECK( !infers_bf("min(x:sbf, y:sbf)") );
+		CHECK( !infers_bf("max(x:sbf, y:sbf)") );
+		CHECK( !infers_bf("min(x:sbf, y)") );
+		CHECK( !infers_bf("max(x:sbf, y)") );
+	}
+
 	// Positive controls: consistent annotations must still be accepted, so
 	// the rejections above are meaningful.
 	TEST_CASE("consistent annotations are accepted") {
 		CHECK( infers_wff("x:bv[8] = y:bv[8]") );
 		CHECK( infers_wff("x:sbf = y:sbf") );
+		CHECK( infers_bf("min(x:bv[8], y:bv[8])") );
+		CHECK( infers_bf("max(x:bv[8], y:bv[8])") );
 		CHECK( infers_wff("ex x:bv[8] (x = 0)") );
 		CHECK( infers_wff("all x:bv[8] (x = 0)") );
 		CHECK( infers_bf("x:bv[8] + y:bv[8]") );

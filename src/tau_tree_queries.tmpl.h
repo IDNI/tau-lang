@@ -251,6 +251,7 @@ bool is_non_boolean_term(tref n) {
 		|| t.is(tau::bf_div) || t.is(tau::bf_mod) || t.is(tau::bf_shr)
 			|| t.is(tau::bf_shl) || t.is(tau::bf_nand)
 			|| t.is(tau::bf_nor) || t.is(tau::bf_xnor)
+			|| t.is(tau::bf_min) || t.is(tau::bf_max)
 			|| t.is(tau::bf_cast))
 		return true;
 	return false;

@@ -149,7 +149,8 @@ TEST_SUITE("BDD creation terms") {
 		// Any AND-commutative permutation of the same 8 literals is accepted;
 		// the order is a hash/nt-id-order-dependent tie-break that drifts
 		// with every parser regen (Debug and Release differ too).
-		CHECK((result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
+		INFO("result: " << result);
+		CHECK((result == "xzrqeywt" || result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
 			|| result == "xyzqwert"
 			|| result == "ewytrxzq"
 			|| result == "zrwyexqt"
@@ -199,7 +200,8 @@ TEST_SUITE("BDD and many") {
 		// Any AND-commutative permutation of {a,b,c,d,e,f} is accepted;
 		// bdd_and_many's merge order is a hash/nt-id-order-dependent
 		// tie-break that drifts with every parser regen.
-		CHECK((result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
+		INFO("result: " << result);
+		CHECK((result == "xydcefab" || result == "xydcabfe" || result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
 			|| result == "xycdabfe"
 			|| result == "xycdabef"
 			|| result == "xyfedcab"
@@ -238,7 +240,8 @@ TEST_SUITE("BDD and many") {
 		// Any AND-commutative permutation of {a:1, b:2, c:2, d:1, (e'f')':1}
 		// is accepted; the order is a hash/nt-id-order-dependent tie-break
 		// that drifts with every parser regen (Debug and Release differ too).
-		CHECK((result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
+		INFO("result: " << result);
+		CHECK((result == "abbd&(f'e')'cc" || result == "d&(e'f')'bbcca" || result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
 			|| result == "c&(e'f')'bbda"
 			|| result == "ab&(f'e')'bccd"
 			|| result == "cabb&(e'f')'d"

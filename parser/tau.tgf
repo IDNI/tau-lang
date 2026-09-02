@@ -47,7 +47,10 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("all"     __ q_vars  __ wff)      :wff_all
                         | ("ex"      __ q_vars  __ wff)      :wff_ex
-                        | ref                                :wff_ref
+                          # a 2-argument min/max call is always the builtin
+                          # bitvector term (bf_min/bf_max), never a predicate
+                          # reference: the names are reserved
+                        | (ref & ~bf_min & ~bf_max)          :wff_ref
                         |                                     constraint
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<-"  _ wff)              :wff_rimply
@@ -83,6 +86,11 @@ bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
+                          # builtin bitvector minimum/maximum; listed before
+                          # ref so rule order wins the ambiguity with a
+                          # 2-argument function call named min/max
+                        | ("min" _ '(' _ bf _ ',' _ bf _ ')') :bf_min
+                        | ("max" _ '(' _ bf _ ',' _ bf _ ')') :bf_max
                         | ref                                :bf_ref
                         | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _
                            (bf_parenthesis | ba_constant | variable | bf_ref
@@ -257,10 +265,13 @@ option_value           => (alnum | '.')+.
 #
 bf_cmd_arg             => history | bf.
 wff_cmd_arg            => history | wff.
-nf_cmd_arg             => history | ref | wff | bf.
+                          # ref is excluded from a bare min/max call so the
+                          # builtin (bf_min/bf_max) wins at the command level
+                          # too, not only inside larger formulas
+nf_cmd_arg             => history | (ref & ~bf_min & ~bf_max) | wff | bf.
 onf_cmd_arg            => history | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
-spec_arg               => history | spec | ref | wff | bf.
+spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
           wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'

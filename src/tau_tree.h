@@ -869,6 +869,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_div(tref l, tref r);
 	/** @brief Build `l % r`. */
 	static tref build_bf_mod(tref l, tref r);
+	/** @brief Build `min(l, r)` (unsigned bitvector minimum). */
+	static tref build_bf_min(tref l, tref r);
+	/** @brief Build `max(l, r)` (unsigned bitvector maximum). */
+	static tref build_bf_max(tref l, tref r);
 
 	// Terminal, variable and constant builders
 	/** @brief Build the `T` (true) BA constant for type @p ba_tid. */

@@ -185,6 +185,10 @@ template <NodeType node> tref build_bf_mul(tref l, tref r);
 template <NodeType node> tref build_bf_div(tref l, tref r);
 /** @brief Build `l % r`. */
 template <NodeType node> tref build_bf_mod(tref l, tref r);
+/** @brief Build `min(l, r)` (unsigned bitvector minimum). */
+template <NodeType node> tref build_bf_min(tref l, tref r);
+/** @brief Build `max(l, r)` (unsigned bitvector maximum). */
+template <NodeType node> tref build_bf_max(tref l, tref r);
 /** @brief Build a cast of @p operand to @p target_type_id. */
 template <NodeType node> tref build_bf_cast(tref operand, size_t target_type_id);
 

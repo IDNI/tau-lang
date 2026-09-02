@@ -136,6 +136,10 @@ inline cvc5::Term make_bitvector_div(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_mod(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_shl(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rhs);
+// Unsigned min/max; no bvmin/bvmax kind exists, both are ITE over
+// BITVECTOR_ULE.
+inline cvc5::Term make_bitvector_min(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term make_bitvector_max(const cvc5::Term& lhs, const cvc5::Term& rhs);
 // Indexed ops: widen `t` by `extra_bits` zero bits / extract bits
 // hi..lo inclusive (hi >= lo; both within the width of `t`).
 inline cvc5::Term make_bitvector_zero_extend(const cvc5::Term& t, size_t extra_bits);
