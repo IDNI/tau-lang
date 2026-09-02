@@ -1,0 +1,104 @@
+# Whole abstract data types as definition arguments.
+#
+# See demos/README.md for how to run this script.
+
+# demo_4.2 and demo_4.3 pass tuple MEMBERS into definitions. This demo passes
+# whole tuple VALUES -- a Point as a Point. The mechanism is the same
+# parse-time flattening: a tuple-typed argument is rewritten into its list of
+# flattened members, so a definition accepts a whole tuple exactly when it
+# declares ONE PARAMETER PER FLATTENED MEMBER, each carrying that member's
+# type. Point has two sbf members, so a "function of a Point" is a two-
+# parameter definition:
+
+norm(u,v):sbf := u | v
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (norm(p) = 0)
+
+# (The (p:Point = p) conjunct is demo_4.1's trick for fixing p's type while
+# leaving it free, so the result displays the expansion. Quantifying instead
+# decides the formula, as always:)
+
+type Point = {a: sbf, b: sbf}. n ex p:Point (norm(p) = 0)
+
+# The whole tuple IS its flattened member list -- the same definition answers
+# to both calling styles, and equating them proves it:
+
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (norm(p) = norm(p.a, p.b))
+
+# A predicate of a Point works the same way. As in demo_4.2, a predicate
+# types its parameters inside the body -- and here EVERY parameter needs its
+# own annotation, since nothing else pins them:
+
+origin(u,v) := (u:sbf = 0 && v:sbf = 0)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && origin(p)
+type Point = {a: sbf, b: sbf}. n ex p:Point origin(p)
+
+# Two Points make four flattened members, so a relation between two Points is
+# a four-parameter predicate -- applied to p and q whole, it expands to the
+# member-wise comparison:
+
+eqp(u1,v1,u2,v2) := (u1:sbf = u2 && v1:sbf = v2)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (q:Point = q) && eqp(p, q)
+
+# Whole-tuple arguments mix freely with member arguments in one formula:
+
+mir(u,v):sbf := u & v'
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (mir(p) = p.a)
+
+# solve (demo_2.1) handles definitions applied to whole tuples too, and still
+# reports one value per flattened member:
+
+type Point = {a: sbf, b: sbf}. solve x:Point = x && norm(x) = 1 && x.a = 0
+
+# A SUB-tuple is a value of its own type, so a member path that stops at a
+# nested Point feeds the same two-parameter definitions -- here through
+# demo_4.1's Segment chain, and between the two halves of a Pair:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. n (s:Segment = s) && (norm(s.line.p) = 0)
+type Point = {a: sbf, b: sbf}. type Pair = {u: Point, v: Point}. n (w:Pair = w) && (norm(w.u) = norm(w.v))
+
+# A mixed tuple flattens into members of DIFFERENT algebras, and the
+# parameters carry them one by one -- Pix (demo_4.2) pairs a bv[8] member
+# with an sbf member, so a predicate of a Pix types one parameter in each:
+
+lit(w,o) := (w:bv[8] != 0 && o:sbf = 1)
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. n ex p:Pix lit(p)
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. solve x:Pix = x && lit(x) && x.v = {7}:bv[8]
+
+# Recurrence relations (demo_4.3) take whole tuples the same way. sw swaps
+# its two parameters at every step, so the offset's parity picks which member
+# of the Point comes back -- sw[3] lands on b, sw[4] back on a:
+
+sw[0](u,v):sbf := u
+sw[n](u,v):sbf := sw[n-1](v,u)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (sw[3](p) = 1)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (sw[4](p) = 1)
+
+# Recursive predicates of a Point follow demo_4.3's rule -- EVERY case must
+# see EVERY parameter's type. The step case below mentions u on its own, but
+# its only v is the recursive call, so a trivially true typed equation
+# supplies v's type. Indexed and fixpoint calls then both work:
+
+za[0](u,v) := (u:sbf = 0 && v:sbf = 0)
+za[n](u,v) := za[n-1](u,v) && (u:sbf != 1) && (v:sbf = v)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && za[2](p)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && za(p)
+
+# And a looping recurrence over a Point falls back and answers to fallback
+# (demo_1.3) exactly as over plain variables:
+
+wq[0](u,v) := (u:sbf = 0 && v:sbf = 0)
+wq[n](u,v) := !wq[n-1](u,v) && (u:sbf = u) && (v:sbf = v)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && wq(p)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && wq(p) fallback first
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && wq(p) fallback last
+
+# The one rule that makes or breaks this combination is ARITY. A definition
+# matches the FLATTENED argument list, so a two-parameter definition applied
+# to two whole Points sees four arguments and matches nothing -- this is
+# demo_4.2's "does not see through a whole tuple" example, seen from the
+# other side. eqp above is the fix: four parameters for four members.
+
+twop(u,v) := (u:sbf = v)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (q:Point = q) && twop(p, q)
+
+quit

@@ -53,6 +53,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance, member access, and tuple-typed streams |
 | `demo_4.2-adt_functions_and_predicates.tau` | Functions and predicates over tuple members: typed heads, body annotations, mixed-algebra tuples, deep member paths |
 | `demo_4.3-adt_recurrence_relations.tau` | Recurrence relations over tuple members: indexed and fixpoint calls, loops and `fallback`, bitvector members |
+| `demo_4.4-adts_as_arguments.tau` | Whole tuple values as definition arguments: one parameter per flattened member, sub-tuples, mixed algebras, recurrences |
 | `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, and the resource budgets with their give-ups |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 

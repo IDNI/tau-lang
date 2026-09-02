@@ -94,7 +94,9 @@ type octet = bv[8]. type Pix2 = {v: octet, on: sbf}. n ex p:Pix2 (invb(p.v) = 0)
 # rewrites the application's arguments -- each tuple becomes its list of
 # members -- but the definition still expects its original arity, so the
 # application below never expands. Pass the members pairwise instead, as in
-# the two-Point diag example above:
+# the two-Point diag example above -- or declare the definition with one
+# parameter per flattened member and pass the tuples whole, which is
+# demo_4.4's subject:
 
 type Point = {a: sbf, b: sbf}. n diag(p:Point, q:Point)
 
