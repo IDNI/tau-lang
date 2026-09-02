@@ -1151,6 +1151,57 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
+	// Regression test: a guarded update with an initial condition is
+	// satisfiable but was reported unsat. The guarded two-clause split
+	// needs one extra fixpoint step, and the extra step's older instance
+	// survived the back-translation as a [t-1]-shifted twin of an
+	// existing conjunct; instantiated at the start point, the twin
+	// constrained the input one step before time 0 and for-all-inputs
+	// collapsed to F. The equation form of the same latch (next case)
+	// never had the problem: its fixpoint stabilises in zero steps.
+	TEST_CASE("guarded update with init is satisfiable") {
+		const char* sample = "(o1[0] = 0) && ((i1[t] = 1)"
+			" ? (o1[t] = o1[t-1] | 1) : (o1[t] = o1[t-1])).";
+		io_context<node_t> ctx;
+		strings i1_values = { "F", "T", "F" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto memory = run_test(sample, ctx, 3);
+		REQUIRE ( memory.has_value() );
+		CHECK ( !memory.value().empty() );
+	}
+
+	// The equation form of the same latch, as the control for the case
+	// above: it must keep running unchanged.
+	TEST_CASE("equation form of the guarded latch runs") {
+		const char* sample = "(o1[0] = 0)"
+			" && (o1[t] = o1[t-1] | i1[t]).";
+		io_context<node_t> ctx;
+		strings i1_values = { "F", "T", "F" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto memory = run_test(sample, ctx, 3);
+		REQUIRE ( memory.has_value() );
+		CHECK ( !memory.value().empty() );
+	}
+
+	// The mirror control for the fix: an EXPLICITLY written shifted
+	// clause next to its unshifted original deliberately governs one
+	// step below the start and stays boundary-constraining - with the
+	// init contradicting it at time 0 this spec is unsat today and must
+	// remain unsat (only fixpoint-created twins may be dropped, never a
+	// clause the specification itself carries).
+	TEST_CASE("deliberate shifted twin stays unsat") {
+		const char* sample = "(o1[0] = 0) && (o1[t] = i1[t])"
+			" && (o1[t-1] = i1[t-1]).";
+		io_context<node_t> ctx;
+		strings i1_values = { "T", "F" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto memory = run_test(sample, ctx, 2);
+		CHECK ( (!memory.has_value() || memory.value().empty()) );
+	}
+
 	// Regression test: nested conditionals over a mix of `:tau` and `:bv[N]`
 	// streams reported "Internal error: Tau specification is unexpectedly
 	// unsat" at step 0 instead of producing a solution.
