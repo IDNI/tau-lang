@@ -96,6 +96,14 @@ inst X | Y [X / 1]
 inst X | Y [X / Z W]
 inst X Y' [Y / 0]
 
+# inst takes the same multiple forms as subst: comma separated pairs are
+# simultaneous, bracket groups compose sequentially, and the match side of
+# every pair must be a variable:
+
+inst X & Y [X / A, Y / B]
+inst X & Y [X / Y, Y / X]
+inst A | C [A / B] [B / D]
+
 # Since both take history positions too, one command's result feeds the next:
 
 (X | Y) & Z

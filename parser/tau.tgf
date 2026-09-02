@@ -280,9 +280,16 @@ spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
 subst_group            => '[' _ nf_cmd_arg _ '/' _ nf_cmd_arg
                         (_ ',' _ nf_cmd_arg _ '/' _ nf_cmd_arg)* _ ']'.
 # TODO (MEDIUM) check if could we only have one case?
+# issue #99: like subst, inst accepts several comma separated pairs per group
+# (simultaneous) and several bracket groups (sequential); the match side of
+# every pair must be a variable, which the evaluator checks
 inst_args              =>
-          wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'
-        | bf_cmd_arg  _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'.
+          wff_cmd_arg (_ inst_group)+
+        | bf_cmd_arg  (_ inst_group)+.
+# one '[ variable / value, ... ]' group of the inst command; kept in the tree
+# (not inlined) so the evaluator sees the group boundaries
+inst_group             => '[' _ bf _ '/' _ bf_cmd_arg
+                        (_ ',' _ bf _ '/' _ bf_cmd_arg)* _ ']'.
 
 # symbols usable for detailed help message
 #

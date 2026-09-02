@@ -559,17 +559,10 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		return r;
 	};
 
-	if (tau::get(t.child(2)).is(tau::subst_group))
-		// each bracket group rewrites the previous group's result
-		for (size_t g = 2; in && g < sz; ++g)
-			in = step(in, tau::get(t.child(g)).get_children());
-	else {
-		// inst_cmd delegates here with a rebuilt flat
-		// [sym, input, match, replace] node, i.e. a single pair
-		trefs pairs;
-		for (size_t i = 2; i < sz; ++i) pairs.push_back(t.child(i));
-		in = step(in, pairs);
-	}
+	// each bracket group (subst_group, or inst_group when inst_cmd
+	// delegates here) rewrites the previous group's result
+	for (size_t g = 2; in && g < sz; ++g)
+		in = step(in, tau::get(t.child(g)).get_children());
 	return benchmarks(m), in;
 }
 
@@ -577,14 +570,21 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
 	// DBG(TAU_LOG_TRACE << "inst_cmd" << LOG_FM_DUMP(n.value());)
+	// children: [0] the command symbol, [1] the input expression, then
+	// one inst_group per bracket group, shaped exactly like subst's
+	// groups (issue #99). The only difference to subst is that every
+	// pair's match side must be a variable, checked here before
+	// delegating to subst_cmd on the node as parsed
 	const auto& t = n.value_tree();
-	if (!t[2][0].is(tau::variable)) {
-		TAU_LOG_ERROR << "Invalid argument\n";
-		return nullptr;
+	for (size_t g = 2; g < t.children_size(); ++g) {
+		const trefs pairs = tau::get(t.child(g)).get_children();
+		for (size_t i = 0; i + 1 < pairs.size(); i += 2)
+			if (!tau::get(pairs[i])[0].is(tau::variable)) {
+				TAU_LOG_ERROR << "Invalid argument\n";
+				return nullptr;
+			}
 	}
-	tref nn = tau::get(t.value, { t.first(), t.second(),
-			t.third(), t.child(3) });
-	return subst_cmd(nn);
+	return subst_cmd(n);
 }
 
 template <typename... BAs>
@@ -1954,15 +1954,21 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n";
 		break;
 	case tau::inst_sym: std::cout
-		<< "the instantiate command instantiates a variable in a Tau formula with the specified term\n"
+		<< "the instantiate command instantiates one or more variables in a Tau formula with the specified terms\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  instantiate <input> '[' <variable> / <value> ']'\n"
+		<< "  instantiate <input> '[' <variable> / <value> , <variable> / <value> , ... ']'\n"
+		<< "  instantiate <input> '[' ... ']' '[' ... ']' ...\n"
 		<< "\n"
 		<< "where:\n"
 		<< "  <input> is the Tau term to instantiate in\n"
 		<< "  <variable> is the variable to be instantiated\n"
 		<< "  <value> is the Tau term to instantiate with\n"
+		<< "\n"
+		<< "  Pairs and bracket groups behave exactly as in the substitute command: the pairs\n"
+		<< "  of one group are applied simultaneously, several groups compose sequentially,\n"
+		<< "  and the same type safety and no-match reporting apply (see 'help subst')\n"
 		<< "\n";
 		break;
 	case tau::def_sym: std::cout

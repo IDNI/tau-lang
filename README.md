@@ -1797,6 +1797,12 @@ well-formed or Boolean function expression.
 * `instantiate|inst|i <repl_memory|term> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position or Boolean function in the given expression.
 
+`instantiate` accepts the same multiple forms as `substitute`: several comma
+separated `var/value` pairs in one bracket are applied simultaneously
+(`i x & y [x / y, y / x]` swaps `x` and `y`), and several bracket groups
+compose sequentially. The match side of every pair must be a variable, and
+the same type safety and no-match reporting apply.
+
 ## **Logical procedures**
 
 The Tau REPL also provides a set of logical procedures that allow you to check
