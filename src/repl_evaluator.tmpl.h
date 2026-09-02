@@ -1591,11 +1591,21 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 					return idni::diagnostics::result<int>(2);
 		auto req = *pending;
 		pending.reset();
-		if (!run_abort_ && req.kind == pending_request::stream_value)
-			req.stream->set(src);
+		// A tuple-typed console stream prompts for whole wire literals
+		// ({ ... }); a bare q/quit can never be one (req.type_tree is null
+		// exactly for tuple prompts -- see continue_running), so accept it
+		// as "end the run" here too. Without this, a piped script has no
+		// way to leave an always-constrained tuple run: q would be fed to
+		// the wire parser, rejected, and re-prompted until end-of-file.
+		// Plain streams are untouched -- there a bare q could be a value.
 		bool stop = run_abort_
-			|| (req.kind == pending_request::continue_or_quit
+			|| ((req.kind == pending_request::continue_or_quit
+				|| (req.kind == pending_request::stream_value
+					&& !req.type_tree))
 				&& (src == "q" || src == "quit"));
+		if (!run_abort_ && !stop
+			&& req.kind == pending_request::stream_value)
+			req.stream->set(src);
 		run_abort_ = false;
 		if (stop) finish_running();
 		else {
