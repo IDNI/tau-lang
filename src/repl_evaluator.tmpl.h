@@ -169,6 +169,35 @@ tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
 	return inferred ? inferred : n;
 }
 
+// Structural equality ignoring types: `typed` annotation children are skipped
+// and every node value is compared with its BA type id erased. Used to match
+// a fully unannotated pattern against occurrences whose types were resolved
+// by inference -- a pattern parsed from the command line can never carry
+// those resolved ids, so it could never be strictly equal to them.
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::equal_modulo_types(tref a, tref b) const {
+	const auto& na = tau::get(a);
+	const auto& nb = tau::get(b);
+	// a ba_constant's data field reads differently depending on its
+	// ba_type, and constants of different types are distinct anyway, so
+	// compare those verbatim (see tree::untype)
+	auto key = [](const auto& n) {
+		return n.is(tau::ba_constant) ? n.value
+			: n.value.ba_retype(untyped_type_id<node>());
+	};
+	if (!(key(na) == key(nb))) return false;
+	trefs ca, cb;
+	for (tref c : na.get_children())
+		if (!tau::get(c).is(tau::typed)) ca.push_back(c);
+	for (tref c : nb.get_children())
+		if (!tau::get(c).is(tau::typed)) cb.push_back(c);
+	if (ca.size() != cb.size()) return false;
+	for (size_t i = 0; i < ca.size(); ++i)
+		if (!equal_modulo_types(ca[i], cb[i])) return false;
+	return true;
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_any(tref arg) const {
@@ -396,52 +425,152 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// DBG(TAU_LOG_TRACE << "subst_cmd" << LOG_FM_DUMP(n.value());)
-	tref arg1 = n | tt::second | tt::ref;
-	tref arg2 = n | tt::third  | tt::ref;
-	tref arg3 = n | tt::fourth | tt::ref;
-	// TAU_LOG_TRACE << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
-	// TAU_LOG_TRACE << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
-	// TAU_LOG_TRACE << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
+	// children: [0] the command symbol, [1] the input expression, then one
+	// subst_group per bracket group (issue #99), each holding two children
+	// per comma separated match/replace pair. Groups compose sequentially
+	// -- each is applied to the previous group's result -- while the pairs
+	// inside a group are applied simultaneously
+	const auto& t = n.value_tree();
+	size_t sz = t.children_size();
+	DBG(assert(sz >= 3);)
 
 	measuring m;
 	// Since the history command cannot be type-checked we do it here
 	// First try to get bf
-	tref in = get_bf(arg1, true);
-	if (in) { // BF substitution
-		tref thiz = get_bf(arg2), with = get_bf(arg3);
-		if (!in || !thiz || !with) return invalid_argument();
-		in = infer_for_match(in), thiz = infer_for_match(thiz),
-			with = infer_for_match(with);
-		// strip bf of variables so we match also quantifiers
-		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
-			thiz = tau::trim(thiz),	with = tau::trim(with);
-		// DBG(TAU_LOG_TRACE << "bf in:   " << TAU_LOG_FM_DUMP(in);)
-		// DBG(TAU_LOG_TRACE << "thiz:    " << TAU_LOG_FM_DUMP(thiz);)
-		// DBG(TAU_LOG_TRACE << "with:    " << TAU_LOG_FM_DUMP(with);)
-		tref r = tau_api::substitute(m, in, thiz, with);
-		return benchmarks(m), r;
-	}
+	tref in = get_bf(t.second(), true);
+	bool bf_in = in != nullptr;
 	// First argument was not a bf so it must be a wff
-	in = get_wff(arg1);
-	// Now sort out the remaining argument types
-	tref with, thiz = get_bf(arg2, true);
-	if (thiz) with = get_bf(arg3);
-	else thiz = get_wff(arg2), with = get_wff(arg3);
-	// Check for correct argument types
-	if (!thiz || !in || !with) {
-		TAU_LOG_ERROR << "Invalid argument\n";
-		return nullptr;
+	if (!bf_in) in = get_wff(t.second());
+	if (!in) return invalid_argument();
+
+	// one simultaneous substitution step: all of a group's pairs, laid out
+	// flat as match/replace successors in `pairs`, applied in a single
+	// pass over `in`, so no pair's replacement is ever re-matched by
+	// another pair of the same group
+	auto step = [&](tref in, const trefs& pairs) -> tref {
+		DBG(assert(pairs.size() >= 2 && pairs.size() % 2 == 0);)
+		// infer_for_match hides inference failures, but whether the
+		// input actually inferred is needed below: only then can a
+		// failing result inference be attributed to the substitution
+		tref in_inferred = tau_api::infer(in);
+		bool in_typed = in_inferred != nullptr;
+		if (in_typed) in = in_inferred;
+		// structurally keyed so a re-parsed duplicate pattern is caught
+		subtree_map<node, tref> changes;
+		for (size_t i = 0; i + 1 < pairs.size(); i += 2) {
+			tref thiz, with;
+			if (bf_in) {
+				// a bf input takes only bf pairs
+				thiz = get_bf(pairs[i]),
+				with = get_bf(pairs[i + 1]);
+			} else {
+				// a wff input takes a bf/bf or a wff/wff
+				// pair, decided per pair
+				thiz = get_bf(pairs[i], true);
+				if (thiz) with = get_bf(pairs[i + 1]);
+				else thiz = get_wff(pairs[i]),
+					with = get_wff(pairs[i + 1]);
+			}
+			if (!thiz || !with) return invalid_argument();
+			// only the match side needs the inferred,
+			// type-annotated form (matching is type-id sensitive);
+			// the replacement is left as parsed so an unannotated
+			// replacement can adopt the matched context's type
+			// during the result inference below -- inferring it
+			// here would stamp the default type on it and
+			// manufacture a conflict with any non-default context.
+			// An input that could not be inferred at all still
+			// carries its raw parsed nodes, so the pattern has to
+			// stay raw as well or the two could never be
+			// structurally equal
+			tref raw = thiz;
+			if (in_typed) thiz = infer_for_match(thiz);
+			// strip bf of variables so we match also quantifiers
+			if (is<node, tau::bf>(thiz)
+				&& is_child<node, tau::variable>(thiz))
+				thiz = tau::trim(thiz), with = tau::trim(with),
+				raw = tau::trim(raw);
+			auto add_change = [&](tref key, tref val) {
+				if (!changes.emplace(key, val).second) {
+					TAU_LOG_ERROR << "Duplicate match"
+						" pattern in substitution\n";
+					return false;
+				}
+				return true;
+			};
+			if (contains<node>(in, thiz)) {
+				if (!add_change(thiz, with)) return nullptr;
+				continue;
+			}
+			// The inferred pattern has no occurrence. A pattern
+			// carrying no annotation at all is underspecified
+			// rather than default-typed for matching purposes:
+			// fall back to matching it with types erased, so it
+			// also finds occurrences whose types were resolved by
+			// inference (e.g. a variable an earlier substitution
+			// or bracket group introduced into a non-default-typed
+			// context). Annotated patterns stay strict.
+			auto is_annotated = [](tref c) {
+				return tau::get(c).is(tau::typed)
+					|| tau::get(c).get_ba_type()
+						!= untyped_type_id<node>();
+			};
+			trefs occs;
+			if (!tau::get(raw).find_top(is_annotated)) {
+				auto q = [&](tref el) {
+					return equal_modulo_types(el, raw);
+				};
+				occs = rewriter::select_top<node>(in, q);
+			}
+			// a pattern that does not occur in the input can never
+			// fire; say so instead of silently returning the input
+			// unchanged. A warning, not an error: substituting
+			// into an expression the pattern is absent from is
+			// legitimate in history-driven flows
+			if (occs.empty())
+				TAU_LOG_WARNING << "Substitution pattern did"
+					" not match anything in the input: "
+					<< tau::get(thiz).to_str() << "\n";
+			else for (tref occ : occs)
+				if (!add_change(occ, with)) return nullptr;
+		}
+		tref r = tau_api::substitute(m, in,
+			std::map<tref, tref>(changes.begin(), changes.end()));
+		// Reject a result that no longer type-checks (e.g. an sbf
+		// subterm replaced by a bv one, or mismatched bv widths)
+		// instead of storing an ill-typed expression that every later
+		// inference-running command would fail on. Untyped expressions
+		// carry the default type and unannotated replacements are
+		// resolved by inference against their context, so only
+		// genuinely conflicting annotations are rejected. An input
+		// that already failed inference is left to the old behavior.
+		if (r && in_typed) {
+			tref inferred = tau_api::infer(r);
+			if (!inferred) {
+				TAU_LOG_ERROR << "Substitution rejected: "
+					"the result is not well-typed\n";
+				return nullptr;
+			}
+			// keep the fully inferred result so the next group
+			// and later type-id sensitive commands (further
+			// subst, n, sat, ...) see resolved types
+			r = inferred;
+		}
+		return r;
+	};
+
+	if (tau::get(t.child(2)).is(tau::subst_group))
+		// each bracket group rewrites the previous group's result
+		for (size_t g = 2; in && g < sz; ++g)
+			in = step(in, tau::get(t.child(g)).get_children());
+	else {
+		// inst_cmd delegates here with a rebuilt flat
+		// [sym, input, match, replace] node, i.e. a single pair
+		trefs pairs;
+		for (size_t i = 2; i < sz; ++i) pairs.push_back(t.child(i));
+		in = step(in, pairs);
 	}
-	in = infer_for_match(in), thiz = infer_for_match(thiz),
-		with = infer_for_match(with);
-	// strip bf of variables so we match also quantifiers
-	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
-		thiz = tau::trim(thiz),	with = tau::trim(with);
-	// DBG(TAU_LOG_TRACE << "wff in: " << TAU_LOG_FM_DUMP(in);)
-	// DBG(TAU_LOG_TRACE << "thiz:   " << TAU_LOG_FM_DUMP(thiz);)
-	// DBG(TAU_LOG_TRACE << "with:   " << TAU_LOG_FM_DUMP(with);)
-	tref r = tau_api::substitute(m, in, thiz, with);
-	return benchmarks(m), r;
+	return benchmarks(m), in;
 }
 
 template <typename... BAs>
@@ -1588,7 +1717,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 
 		<< "Substitution and instantiation command:\n"
-		<< "  substitute, subst or s  substitute a Tau expression in a Tau expression by another\n"
+		<< "  substitute, subst or s  substitute one or more Tau expressions in a Tau expression by others\n"
 		<< "  instantiate, inst or i  instantiate a variable in a Tau expression with a Tau term\n"
 		<< "\n"
 
@@ -1793,10 +1922,12 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  onf <var> <repl_history>  converts the Tau formula stored at the specified repl history position to ONF using <var>\n";
 		break;
 	case tau::subst_sym: std::cout
-		<< "the substitute command substitutes a Tau expression in a Tau expression by another Tau expression\n"
+		<< "the substitute command substitutes one or more Tau expressions in a Tau expression by other Tau expressions\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  substitute <input> '[' <match> / <replace> ']'\n"
+		<< "  substitute <input> '[' <match> / <replace> , <match> / <replace> , ... ']'\n"
+		<< "  substitute <input> '[' ... ']' '[' ... ']' ...\n"
 		<< "\n"
 		<< "where:\n"
 		<< "  <input> is the Tau expression in which to replace\n"
@@ -1805,6 +1936,21 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "  Note that if <input> is of type term, <match> and <replace> must be of type term\n"
 		<< "  In general <match> and <replace> must be of the same type, so either both term or tau\n"
+		<< "\n"
+		<< "  All pairs of a bracket group are applied simultaneously in a single pass over\n"
+		<< "  its input: every <match> is found against the original expression and no pair's\n"
+		<< "  <replace> is ever re-matched by another pair of the group, so\n"
+		<< "  'substitute x & y [x / y, y / x]' swaps x and y\n"
+		<< "  Repeating the same <match> in two pairs of one group is an error\n"
+		<< "\n"
+		<< "  Several bracket groups compose sequentially: each group is applied to the\n"
+		<< "  previous group's result, so 'substitute a | c [a / b] [b / d]' chains a to d\n"
+		<< "  while 'substitute a | c [a / b, b / d]' yields b | c\n"
+		<< "\n"
+		<< "  The result must remain well-typed: a <replace> whose type conflicts with the\n"
+		<< "  matched context (a different base type, or a different bitvector width) is\n"
+		<< "  rejected. An unannotated <replace> adopts the matched context's type\n"
+		<< "  A <match> that does not occur in <input> is reported with a warning\n"
 		<< "\n";
 		break;
 	case tau::inst_sym: std::cout

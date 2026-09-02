@@ -395,13 +395,19 @@ struct api {
 	/** @brief Replace @p that with @p with inside @p expression. */
 	static htref substitute(htref expression, htref that, htref with);
 
-	/** @brief Apply all substitutions in @p that_with to @p expression. */
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static optional_string substitute(
 		const std::string& expression,
 		const std::map<std::string, std::string>& that_with);
-	/** @brief Apply all substitutions in @p that_with to @p expression. */
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static tref substitute(tref expression, std::map<tref, tref> that_with);
-	/** @brief Apply all substitutions in @p that_with to @p expression. */
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static htref substitute(
 		htref expression,
 		std::map<htref, htref> that_with);

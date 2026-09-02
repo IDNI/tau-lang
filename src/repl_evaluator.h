@@ -304,6 +304,10 @@ private:
 	/// already inferred expression. Returns @p n if inference fails.
 	tref infer_for_match(tref n) const;
 
+	/// @brief Structural equality of @p a and @p b ignoring type
+	/// annotations and resolved BA type ids.
+	bool equal_modulo_types(tref a, tref b) const;
+
 	/// @brief Print benchmark measurements from @p m.
 	std::ostream& benchmarks(measuring& m) const;
 	/// @brief Print benchmark measurements from @p m and timer @p t.

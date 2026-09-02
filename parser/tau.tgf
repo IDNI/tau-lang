@@ -213,9 +213,12 @@ cli_command            =>
 # possibility of using wff or bf as source expression as is kind of naive
 # to use them in this context. A more interesting feature would be to
 # allow such changes in rec relations, redifining the existing ones.
+# issue #99: several comma separated match/replace pairs are accepted and
+# applied simultaneously in one pass, so no pair rewrites another's
+# replacement; several bracket groups may follow, each applied sequentially
+# to the previous group's result
         | (("s" | "subst" | "substitute")
-                :subst_sym __ nf_cmd_arg _ '[' _
-                        nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
+                :subst_sym __ nf_cmd_arg (_ subst_group)+)    :subst_cmd
         | (("i" | "inst" | "instantiate")
                 :inst_sym __ inst_args)                       :inst_cmd
 # normal forms
@@ -272,6 +275,10 @@ nf_cmd_arg             => history | (ref & ~bf_min & ~bf_max) | wff | bf.
 onf_cmd_arg            => history | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
 spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
+# one '[ match / replace, ... ]' group of the subst command; the group node is
+# kept in the tree (not inlined) so the evaluator sees the group boundaries
+subst_group            => '[' _ nf_cmd_arg _ '/' _ nf_cmd_arg
+                        (_ ',' _ nf_cmd_arg _ '/' _ nf_cmd_arg)* _ ']'.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
           wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'

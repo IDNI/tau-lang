@@ -1764,10 +1764,31 @@ syntax for `<repl_memory>`:
 You can substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
-* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
+* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>, ...]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (this one being a memory position, well-formed formula or Boolean
-function).
+function). Several comma separated `match/replace` pairs may be given in one
+command; all pairs are applied simultaneously in a single pass over the input,
+so every match is found against the original expression and no pair's
+replacement is ever re-matched by another pair (`s x & y [x / y, y / x]` swaps
+`x` and `y`). Repeating the same match pattern in two pairs is an error.
+The result must remain well-typed: a replacement whose type conflicts with the
+matched context (e.g. `s x:sbf & y:sbf = 0 [x:sbf / z:bv[16]]`, or mismatched
+bitvector widths) is rejected at substitution time instead of storing an
+ill-typed expression. Untyped expressions carry the default type (`tau`) and
+an unannotated replacement adopts the matched context's type
+(`s x:sbf & y:sbf = 0 [x:sbf / z]` yields `zy = 0` with `z` typed `sbf`).
+A pair whose match pattern does not occur in the input is reported with a
+warning instead of silently leaving the input unchanged. An input that cannot
+be type-inferred at all (e.g. bitvector arithmetic without width annotations)
+is matched as parsed, so `s a + b = c [a / d]` substitutes `a` even though
+the expression carries no type information.
+Several bracket groups may follow the input: each group is applied to the
+result of the previous one, while the pairs inside a group stay simultaneous.
+So `s a | c [a / b] [b / d]` chains — the `b` introduced by the first group
+is rewritten to `d` by the second — whereas `s a | c [a / b, b / d]` yields
+`b | c`. The same match pattern may appear in different groups (that is what
+chaining is for); repeating it inside one group is still an error.
 
 * `instantiate|inst|i <repl_memory|tau> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position, well-formed formula or Boolean function in the given

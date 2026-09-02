@@ -57,6 +57,39 @@ subst X | Y [X / Z]
 subst X | Y [X | Y / Z W]
 subst X = 0 && Y = 0 [X = 0 / Z != 0]
 
+# Several pairs can go in one command, comma separated. All pairs are applied
+# simultaneously in a single pass over the input, so no pair ever rewrites
+# another pair's replacement: a swap really swaps instead of collapsing both
+# variables into one.
+
+subst A | B | C | D [A / X, B / Y, C / Z]
+subst X & Y [X / Y, Y / X]
+subst X = 0 && Y = 0 [X = 0 / A = 0, Y = 0 / B = 0]
+
+# Several bracket groups compose sequentially instead: each group is applied
+# to the previous group's result, so here the B introduced by the first group
+# IS rewritten to D by the second -- compare with the comma form above, where
+# no pair ever rewrites another pair's replacement:
+
+subst A | C [A / B] [B / D]
+subst A | C [A / B, B / D]
+
+# Substitution keeps the result well-typed: a replacement whose type conflicts
+# with the matched context (say, replacing an sbf subterm by a bv[16] one, or
+# mixing bitvector widths) is rejected with an error instead of being stored.
+# An unannotated replacement simply adopts the matched context's type -- here
+# Z becomes an sbf variable:
+
+subst X:sbf & Y:sbf = 0 [X:sbf / Z]
+
+# A match pattern that does not occur in the input is reported with a warning
+# rather than silently returning the input unchanged. And an input that cannot
+# be type-inferred at all -- like bitvector arithmetic without width
+# annotations -- is matched as parsed, so unannotated patterns still
+# substitute in it:
+
+subst A + B = C [A / D]
+
 # inst is the narrower operation: it instantiates a variable with a term.
 
 inst X | Y [X / 1]

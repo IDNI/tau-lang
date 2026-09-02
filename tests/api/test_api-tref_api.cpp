@@ -338,6 +338,38 @@ TEST_SUITE("Tau API - tref - substitution") {
 		REQUIRE(result);
 		CHECK(tau_api::to_str(result) == "y+b");
 	}
+	// Issue #99: the map overload substitutes all pairs simultaneously in
+	// one pass over the original expression, so a pair's replacement is
+	// never re-matched by another pair. A swap is the observable witness:
+	// applying the pairs one after another would collapse x and y into a
+	// single variable instead of exchanging them.
+	TEST_CASE_FIXTURE(api_fixture, "substitute map is simultaneous") {
+		tref x = tau_api::get_term("x");
+		tref y = tau_api::get_term("y");
+		tref expr = tau_api::get_term("x + y");
+		REQUIRE(x);
+		REQUIRE(y);
+		REQUIRE(expr);
+		std::map<tref, tref> that_with{ { x, y }, { y, x } };
+		tref result = tau_api::substitute(expr, that_with);
+		REQUIRE(result);
+		CHECK(tau_api::to_str(result) == "y+x");
+	}
+	TEST_CASE_FIXTURE(api_fixture, "substitute map does not chain") {
+		tref a = tau_api::get_term("a");
+		tref b = tau_api::get_term("b");
+		tref c = tau_api::get_term("c");
+		tref expr = tau_api::get_term("a + c");
+		REQUIRE(a);
+		REQUIRE(b);
+		REQUIRE(c);
+		REQUIRE(expr);
+		// the b introduced by the first pair must not be rewritten to c
+		std::map<tref, tref> that_with{ { a, b }, { b, c } };
+		tref result = tau_api::substitute(expr, that_with);
+		REQUIRE(result);
+		CHECK(tau_api::to_str(result) == "b+c");
+	}
 
 	// AP-6: substitute(tref, tref, tref) called is_term() on expr/that/with
 	// unconditionally; is_term() dereferences its argument, so a null tref
