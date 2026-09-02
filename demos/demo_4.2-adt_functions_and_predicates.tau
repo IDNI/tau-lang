@@ -1,0 +1,119 @@
+# Functions and predicates over abstract data types.
+#
+# See demos/README.md for how to run this script.
+
+# This demo combines the definitions of demo_1.3 with the tuple types of
+# demo_4.1. Two rules make the combination work. First, tuple flattening
+# happens at parse time, so by the time a definition is applied, a member
+# access such as p.a is already a plain variable of the member's own type --
+# definitions take tuple MEMBERS as arguments, at the call site. Second, a
+# definition must know that member type to accept the argument: a function
+# carries it on the head, a predicate annotates a parameter inside its body.
+
+# A function over sbf, applied to a member of a tuple-typed variable. As in
+# demo_4.1, the types are declared in the same command that uses them --
+# that convention still works, and a session also carries every type
+# declared on an earlier line forward to the commands after it. Annotating
+# the quantified variable, then parenthesizing the body, is what lets the
+# member accesses see the annotation. The quantifier ranges over every
+# member at once, so the formula is decided outright:
+
+f(u):sbf := u'
+type Point = {a: sbf, b: sbf}. n ex p:Point (f(p.a) = 0 && p.b = 1)
+
+# To display the expansion instead of deciding it, fix the variable's type
+# with a trivially true equality (the demo_4.1 trick) and leave it free:
+
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (f(p.a) = p.b)
+
+# A predicate has no head type to carry its Boolean algebra, so it types a
+# parameter inside the body instead -- the annotation is absorbed into the
+# definition and the applications below expand just like the function's:
+
+pz(u) := (u:sbf = 0)
+type Point = {a: sbf, b: sbf}. n ex p:Point (pz(p.a) && p.b = 1)
+
+# solve (demo_2.1) accepts predicate applications over members, and still
+# reports one value per flattened member:
+
+type Point = {a: sbf, b: sbf}. solve x:Point = x && pz(x.a) && x.b != 0
+
+# A definition can take several members as separate arguments -- of the same
+# tuple, or of different ones. One annotated parameter is enough, since the
+# body's equality types the other by unification. diag holds exactly when
+# its two arguments are equal:
+
+diag(u,v) := (u:sbf = v)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && diag(p.a, p.b)
+type Point = {a: sbf, b: sbf}. n ex p:Point ex q:Point (diag(p.a, q.a) && diag(p.b, q.b))
+
+# Members keep their own Boolean algebra through a definition, so a mixed
+# tuple routes each member to the right solver. Pix pairs a bitvector member
+# with an sbf member; inv is complement over bv[8], and the solution below
+# reports each member in its own algebra:
+
+inv(u):bv[8] := u'
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. n ex p:Pix (inv(p.v) = 0)
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. solve x:Pix = x && x.on = 1 && inv(x.v) = {7}:bv[8]
+
+# Member paths of any depth work as arguments too. Here f reaches three
+# levels into demo_4.1's Segment chain, first displayed, then solved --
+# note the solution mixes the depth-1 bitvector tag with a depth-3 sbf leaf:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. n (s:Segment = s) && (f(s.line.p.a) = s.line.q.a)
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. solve s:Segment = s && f(s.line.p.a) = 1 && s.tag = {3}:bv[8]
+
+# Four things are worth knowing about this combination -- three are the
+# usual ways to break it, and one is a nuance about aliases that now
+# resolves correctly rather than breaking.
+
+# First, the definition must carry the member's type, as every definition
+# above does. An untyped definition defaults to the tau algebra, and a typed
+# member does not unify with it:
+
+unt(u) := u'
+type Point = {a: sbf, b: sbf}. n ex p:Point (unt(p.a) = 0)
+
+# Second, a definition's head can name a type ALIAS instead of the member's
+# BASE type, and it resolves -- as long as the alias is already known to
+# the session. `byte` was declared above (for inv), so it is already in
+# scope when inva's head is parsed, and the alias unifies with the
+# flattened member just like the base type would:
+
+inva(u):byte := u'
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. n ex p:Pix (inva(p.v) = 0)
+
+# The alias still has to be known BEFORE the head that names it, though. A
+# fresh alias, named here for the first time, does not yet unify with the
+# flattened member:
+
+invb(u):octet := u'
+type octet = bv[8]. type Pix2 = {v: octet, on: sbf}. n ex p:Pix2 (invb(p.v) = 0)
+
+# Third, a definition does not see through a WHOLE tuple value. Flattening
+# rewrites the application's arguments -- each tuple becomes its list of
+# members -- but the definition still expects its original arity, so the
+# application below never expands. Pass the members pairwise instead, as in
+# the two-Point diag example above:
+
+type Point = {a: sbf, b: sbf}. n diag(p:Point, q:Point)
+
+# Fourth, member access belongs at the call site, not in a definition body.
+# A parameter has no tuple type, so the checker now rejects a member access
+# on it right at DEFINITION time, before zp is ever applied:
+
+zp(x) := (x.a = 0 && x.b = 0)
+
+# zp was therefore never stored. Calling it afterward finds no matching
+# definition -- same as diag's whole-Point call above -- so the application
+# just carries the flattened members along symbolically instead of
+# expanding:
+
+type Point = {a: sbf, b: sbf}. n zp(p:Point)
+
+# (Parenthesizing the body does not change this: the entry-time check
+# rejects zp's definition the same way with or without the parentheses.
+# The parenthesize-to-see-it rule from demo_4.1 still matters for a body
+# that DOES get stored -- see f and pz above.)
+
+quit

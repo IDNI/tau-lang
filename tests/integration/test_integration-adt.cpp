@@ -41,6 +41,56 @@ static bool check_adt_solution(tref eq, const solution<node_t>& sol) {
 	return tau::get(check).equals_T();
 }
 
+// Runs `spec_body` (preceded by `preamble`, e.g. a definition) over a
+// two-line Point input file and returns the output file's lines, following
+// the "interpreter: tuple io through file streams" case's own idiom: the
+// type/def/stream declarations sit on SEPARATE lines, since two quoted file
+// names on one line are a greedy-capture mis-parse. `tag` keeps concurrent
+// cases' temp files apart.
+static std::vector<std::string> run_point_spec(const std::string& tag,
+	const std::string& preamble, const std::string& spec_body)
+{
+	namespace fs = std::filesystem;
+	fs::path in_p  = fs::temp_directory_path() / ("tau_test_adt_" + tag + "_in.txt");
+	fs::path out_p = fs::temp_directory_path() / ("tau_test_adt_" + tag + "_out.txt");
+	{
+		std::ofstream f(in_p);
+		f << "{ a: \"1\", b: \"0\" }\n" << "{ a: \"0\", b: \"1\" }\n";
+	}
+	io_context<node_t> ctx;
+	std::string spec_src =
+		"type Point = {a: sbf, b: sbf}.\n"
+		+ preamble +
+		"i:Point := in file(\"" + in_p.string() + "\").\n"
+		"o:Point := out file(\"" + out_p.string() + "\").\n"
+		+ spec_body;
+	tref parsed = tau::get(spec_src, { .context = &ctx });
+	REQUIRE( parsed != nullptr );
+	auto nso_rr = get_nso_rr<node_t>(ctx, parsed);
+	REQUIRE( nso_rr.has_value() );
+	// A spec carrying definitions needs its rec_relations expanded INTO the
+	// main formula before the interpreter sees it -- an unexpanded `f(...)`
+	// call leaves make_interpreter with an unresolvable ref and it returns
+	// nullopt. Every production entry point does this (api::get_interpreter's
+	// nso_rr_apply, which is also what `tau <spec-file>` reaches;
+	// repl_evaluator::run_cmd's get_any), which is why the rest of this file
+	// gets away with a bare `.main->get()`: those specs have no definitions,
+	// and nso_rr_apply is a no-op on an empty rule set. Normalization is NOT
+	// done here on purpose: make_interpreter normalizes its own argument.
+	tref applied = nso_rr_apply<node_t>(nso_rr.value());
+	REQUIRE( applied != nullptr );
+	auto maybe_i = run<node_t>(applied, ctx, 2);
+	CHECK( maybe_i.has_value() );
+	std::vector<std::string> lines;
+	{
+		std::ifstream f(out_p.string());
+		for (std::string l; std::getline(f, l);) lines.push_back(l);
+	}
+	std::error_code ec;
+	fs::remove(in_p, ec); fs::remove(out_p, ec);
+	return lines;
+}
+
 TEST_SUITE("adt integration") {
 
 	TEST_CASE("normalize: flattened equals hand-flattened") {
@@ -311,5 +361,76 @@ TEST_SUITE("adt integration") {
 		CHECK( lines[1] == "{ a: \"1\", b: \"0\" }" );
 		std::error_code ec;
 		fs::remove(in_p, ec); fs::remove(out_p, ec);
+	}
+
+	// --- member OPERATIONS on tuple streams ---------------------------------
+	// The three cases below go past the plain member COPY the tests above
+	// pin: a complemented member, a permuted (crossed) copy, and a member
+	// passed through a definition. All three were reported broken (unsat /
+	// collapse to the straight copy plus an unparseable input wire literal /
+	// "expected :sbf, found :Point"), and all three are symptoms of ONE
+	// cause that lives outside this file: a run spec whose `type` declaration
+	// is not visible to the parse that reads the spec leaves `i[t].a` an
+	// unflattened member access on a tuple-typed io var. Cross-line REPL
+	// visibility is what used to break that (fixed on this branch; pinned by
+	// tests/repl/commands/test_repl-adt.cmake's adt-cross_line_* cases,
+	// including a run over ADT streams). These integration cases parse the
+	// type and the spec together, so they pin the OTHER half of the contract:
+	// that with the type visible, a member operation, a permutation and a
+	// definition call each flatten and execute correctly end to end.
+	//
+	// Each writes its own input file rather than reading a checked-in
+	// fixture: tests/integration/test_files/ is only ever reached through a
+	// working-directory-relative path (and only from commented-out code in
+	// test_integration-interpreter.cpp), whereas the file-stream test above
+	// already establishes the self-contained temp-file idiom this file uses.
+
+	TEST_CASE("run: member operation on a tuple stream (complement)") {
+		// Member a is complemented, member b copied, so the input
+		// { a: "1", b: "0" } / { a: "0", b: "1" } must come out as
+		// { a: "0", b: "0" } / { a: "1", b: "1" }. Reported symptom when the
+		// member paths do not flatten: the whole always-spec normalizes to F
+		// ("Tau specification is unsat") -- an operator applied to a member
+		// is what tells the two sides apart, so a copy survives unflattened
+		// where this does not.
+		bdd_init<Bool>();
+		auto lines = run_point_spec("memberop", "",
+			"(o[t].a = i[t].a') && (o[t].b = i[t].b).");
+		REQUIRE( lines.size() == 2 );
+		CHECK( lines[0] == "{ a: \"0\", b: \"0\" }" );
+		CHECK( lines[1] == "{ a: \"1\", b: \"1\" }" );
+	}
+
+	TEST_CASE("run: crossed member copy between tuple streams") {
+		// o.a takes i.b and o.b takes i.a, so the two members swap. Reported
+		// symptom when the member paths do not flatten: the spec collapses
+		// to the STRAIGHT copy `o[t]:Point = i[t]:Point` (the permutation is
+		// lost), and the input stream then rejects its own wire literal
+		// ("Unexpected end of file"), because the tuple never got taken
+		// apart into per-member streams.
+		bdd_init<Bool>();
+		auto lines = run_point_spec("crossed", "",
+			"(o[t].a = i[t].b) && (o[t].b = i[t].a).");
+		REQUIRE( lines.size() == 2 );
+		CHECK( lines[0] == "{ a: \"0\", b: \"1\" }" );
+		CHECK( lines[1] == "{ a: \"1\", b: \"0\" }" );
+	}
+
+	TEST_CASE("run: definition applied to a tuple stream member") {
+		// Same outputs as the complement case, with the complement moved
+		// into a definition. The head annotation `f(x):sbf` is REQUIRED and
+		// is not part of what is pinned here: an UNtyped head applied to any
+		// typed argument fails inference identically without ADTs in the
+		// picture ("f(i[t]:sbf), expected :tau, found :sbf" for a plain
+		// `i:sbf` stream), so it is a definition-typing rule, not a tuple
+		// one. What this case pins is that the member path flattens INSIDE
+		// the ref argument -- the reported symptom was inference failing on
+		// an unflattened `f(i[t]:Point.a)`.
+		bdd_init<Bool>();
+		auto lines = run_point_spec("memberdef", "f(x):sbf := x'.\n",
+			"(o[t].a = f(i[t].a)) && (o[t].b = i[t].b).");
+		REQUIRE( lines.size() == 2 );
+		CHECK( lines[0] == "{ a: \"0\", b: \"0\" }" );
+		CHECK( lines[1] == "{ a: \"1\", b: \"1\" }" );
 	}
 }

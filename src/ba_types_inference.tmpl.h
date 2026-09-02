@@ -632,7 +632,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 // annotations and any parser-given wff_ref wrapper (see below), wraps
 // ref-shaped sides in the relation's typed bf > bf_ref, records the
 // head signature with that type in @p function_symbols, and rebuilds
-// the rec_relation. Returns nullptr when the body turns out to be a
+// the rec_relation. Returns a parse_error when the body turns out to be a
 // formula (a wff cannot define a function); when the relation's type is
 // still untyped, returns the leaf-updated relation without rewrapping
 // or recording it.
@@ -666,8 +666,17 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	};
 	head = unwrap_wff_ref(head);
 	body = unwrap_wff_ref(body);
-	// If the body is a formula and not a term, reject
-	if (tau::get(body).is(tau::wff)) return nullptr;
+	// If the body is a formula and not a term, reject with a proper error:
+	// a null tref returned here used to flow into the caller's transformed
+	// map unchecked and crash the parent rebuild (update_default) on a null
+	// child. The head's type is what classified this relation as functional,
+	// so say exactly that.
+	if (tau::get(body).is(tau::wff)) {
+		LOG_ERROR << "a formula cannot define a function: the head of `"
+			<< LOG_FM(head) << "` carries a type, so its body must be"
+			" a term; remove the head type to define a predicate";
+		return parse_error{ body, find_ba_type<node>(std::get<tref>(updated)) };
+	}
 	size_t type = find_ba_type<node>(std::get<tref>(updated));
 	// DBG(assert(!is_untyped<node>(type)));
 	if (is_untyped<node>(type)) return updated;
@@ -767,8 +776,10 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 
 	trefs ch;
 	for (tref c : tau::get(n).children()) {
-		if (changes.find(c) != changes.end())
-			ch.push_back(changes[c]);
+		if (auto it = changes.find(c); it != changes.end()) {
+			DBG(assert(it->second != nullptr);)
+			ch.push_back(it->second);
+		}
 		else ch.push_back(c);
 	}
 
@@ -1619,7 +1630,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					error = std::get<inference_error>(updated);
 					break;
 				}
-				if (std::get<tref>(updated) != new_n) transformed.insert_or_assign(n, std::get<tref>(updated));
+				if (tref u = std::get<tref>(updated); !u) {
+					// Never insert a null replacement: the parent's
+					// update_default would rebuild with a null child.
+					error = parse_error{ n, 0 };
+					break;
+				} else if (u != new_n) transformed.insert_or_assign(n, u);
 				if (resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = scope_error{n};

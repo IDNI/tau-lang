@@ -94,6 +94,45 @@ TEST_SUITE("rec relations fixed point") {
 			"f(x).";
 		CHECK( fp_test_T(sample) );
 	}
+
+	TEST_CASE("cross-family type-blocked mutual recursion") {
+		// Each family is internally consistent on its own (validate_rr_
+		// case_types, 2a, passes both -- a single case per family has
+		// nothing to disagree with): `a`'s one case requires its
+		// argument :sbf, `b`'s requires :tau. A same-index mutual
+		// reference here (`a[n](x):=b[n](x)`, `b[n](x):=a[n](x)`, no
+		// "-1") would be rejected earlier by the PRE-EXISTING
+		// is_well_founded cyclic check -- see "detect cycle indirect"
+		// above, which is exactly that shape -- so this uses a
+		// decreasing (well-founded) mutual reference instead: `a[n]`
+		// hands off to `b[n-1]`, `b[n]` hands off to `a[n-1]`, well-
+		// founded because a genuinely decreasing offset never adds an
+		// edge to is_well_founded's same-index dependency graph (see
+		// get_ref_info/is_well_founded above). Enumerating `a(x)`:
+		// steps 0 and 1 dead-end on the shift itself (index 0 has
+		// nowhere to decrement to, both typed and untyped -- the same
+		// "no initial condition" shape above, legitimately
+		// uninterpreted, not an error); step 2 reaches `a[2](x)` ->
+		// `b[1](x)` where `b[n]`'s pattern DOES structurally cover the
+		// position (its own decrement, 1-1=0, is valid) but x's type
+		// (:sbf, from `a`) blocks `b[n]`'s (:tau) pattern -- exactly
+		// the defect calculate_fixed_point's residual-ref guard (2b)
+		// exists to catch, exercising its untyped-probe/attribution
+		// path end to end (unlike the uncommitted Step-6 sanity check,
+		// this is now committed coverage for that branch). The whole
+		// binary is TIMEOUT-bounded at the ctest level
+		// (tests/integration/CMakeLists.txt) so a regression that made
+		// this (or the guard's own saturation cap, sized for a
+		// genuinely diverging probe that this well-founded, naturally-
+		// terminating shape does not exercise) hang would fail by
+		// timeout rather than hanging ctest, mirroring how the REPL
+		// tests bound their own pre-fix-hang reproducers.
+		const char* sample =
+			"a[n](x:sbf) := b[n-1](x)."
+			"b[n](x:tau) := a[n-1](x)."
+			"a(x).";
+		CHECK( fp_test_fail(sample) );
+	}
 }
 
 TEST_SUITE("rec relations well foundedness") {

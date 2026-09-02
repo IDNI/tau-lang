@@ -575,6 +575,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		const std::vector<htref>* definition_heads = nullptr; ///< Known definition heads.
 		subtree_map<node, size_t>* global_scope = nullptr;    ///< Pre-known global types.
 		io_context<node>* context = nullptr;        ///< I/O stream context.
+		const std::vector<htref>* session_type_defs = nullptr; ///< REPL-session type_defs to pre-register before flattening.
 	};
 
 	/** @brief Convert parser @p result to a tree using @p options. */

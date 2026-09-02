@@ -120,6 +120,104 @@ rewriter::rules get_rec_relations(tref rrs) {
 		*definitions<node>::instance().get_io_context(), rrs);
 }
 
+// TI-3: every case of one recurrence family (same symbol name, offset
+// arity, AND ref-arg arity -- the full rr_sig, matching how
+// is_functional_ref/the fixpoint-call machinery itself identifies a
+// family: get_rr_sig's own three fields, not just a name+arg_arity
+// subset of it. An indexed family `f[n]/f[0]` and an unrelated plain
+// function `f(x)` sharing the name and argument count are DIFFERENT
+// families -- name+arg_arity alone would conflate them, wrongly rejecting
+// the unrelated plain function as "a case of recurrence f" the moment an
+// indexed family of the same name/arity also exists.) must agree on the
+// effective BA types of its head arguments. Cases are entered as separate
+// statements and inferred independently, so a half-annotated family
+// type-checks per case but can never match one set of call arguments: the
+// indexed call silently fails to expand and the fixpoint enumeration
+// never reaches its base case (2026-09-01). Reject the family at assembly
+// time with a message that names both offending cases.
+//
+// Per-position state accumulated across every case of one family: the
+// effective BA type id pinned so far (0 = still a wildcard -- no case has
+// pinned this position, e.g. because every case's argument there is a
+// non-variable match pattern, such as a nested ref, with no variable type
+// to read), and the head that pinned it, for the error message.
+template <NodeType node>
+bool validate_rr_case_types(const rr<node>& defs) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	struct family_state {
+		std::vector<size_t> types; // 0 = unpinned/wildcard so far
+		std::vector<tref> heads;   // case head that pinned types[i]
+	};
+	std::map<rr_sig, family_state> families;
+	for (const auto& r : defs.rec_relations) {
+		tref head = unwrap_to_ref<node>(r.first->get());
+		if (!head) continue;
+		rr_sig fam = get_rr_sig<node>(head);
+		// Only the head's OWN immediate ref_arg children (ref > ref_args
+		// > ref_arg, one level each way): a recursive descendant search
+		// here would also pick up ref_args belonging to a nested ref used
+		// AS one of this head's arguments (e.g. `add(int[0](1), x)`'s
+		// `int[0](1)` pattern argument has ref_args of its own), inflating
+		// this case's argument count/shape against a sibling case and
+		// producing a false "disagree".
+		std::vector<size_t> types;
+		for (tref a : (tt(head) | tau::ref_args || tau::ref_arg).values()) {
+			// ref_arg's type lives on its argument variable (ref_arg >
+			// bf > variable), not on the ref_arg node itself -- see
+			// transform_ref_args_to_captures's def_transformer, which
+			// reads the same t[0][0] for the same reason. A non-variable
+			// argument (e.g. a nested ref used as a match pattern, as
+			// above) has no variable type to read and stays untyped (0):
+			// handled as a wildcard below, never a real disagreement.
+			const auto& at = tau::get(a);
+			tref var = (at.children_size() > 0
+					&& at[0].children_size() > 0
+					&& at[0][0].is(tau::variable))
+				? at[0][0].get() : a;
+			types.push_back(get_effective_ba_type<node>(var));
+		}
+		DBG(LOG_TRACE << "validate_rr_case_types: " << LOG_FM(head)
+			<< " collected " << types.size() << " arg type(s)";
+			for (size_t ti : types) LOG_TRACE << "  type id: " << ti;)
+		auto [it, inserted] = families.try_emplace(fam);
+		family_state& fs = it->second;
+		if (inserted) {
+			fs.types.assign(types.size(), 0);
+			fs.heads.assign(types.size(), nullptr);
+		}
+		// arg_arity is part of the family key, so every case should
+		// collect exactly that many immediate ref_args; a mismatch would
+		// mean this collection and get_rr_sig's own count disagree, which
+		// should not happen -- skip rather than index out of bounds or
+		// misreport an arity slip as a type disagreement.
+		if (types.size() != fs.types.size()) {
+			DBG(LOG_TRACE << "validate_rr_case_types: arity mismatch "
+				"collecting immediate ref_args for `" << LOG_FM(head)
+				<< "` (" << types.size() << " vs " << fs.types.size()
+				<< "); skipping";)
+			continue;
+		}
+		for (size_t i = 0; i < types.size(); ++i) {
+			if (!types[i]) continue; // wildcard here: pins nothing
+			if (!fs.types[i]) { // first case to pin this position
+				fs.types[i] = types[i];
+				fs.heads[i] = head;
+				continue;
+			}
+			if (fs.types[i] != types[i]) {
+				LOG_ERROR << "the cases of recurrence `"
+					<< LOG_FM(head) << "` disagree on their argument"
+					" types (`" << LOG_FM(fs.heads[i])
+					<< "` vs `" << LOG_FM(head) << "`); annotate the"
+					" argument the same way in every case";
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 	using tau = tree<node>;
@@ -130,8 +228,12 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 						   : tau::get(r);
 	r = t.get();
 	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
-	if (t.is(tau::rec_relation))
-		return { { get_rec_relations<node>(ctx, r), (htref) nullptr } };
+	if (t.is(tau::rec_relation)) {
+		auto rec_only = rr<node>(get_rec_relations<node>(ctx, r),
+			(htref) nullptr);
+		if (!validate_rr_case_types<node>(rec_only)) return {};
+		return { rec_only };
+	}
 	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
 
 	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
@@ -157,6 +259,7 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 	for (const auto& rec_relation : nso_rr.rec_relations)
 		if (!check_resolved_io_vars(rec_relation.second))
 			return {};
+	if (!validate_rr_case_types<node>(nso_rr)) return {};
 	DBG(LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr);)
 	return nso_rr;
 }
