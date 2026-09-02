@@ -56,6 +56,9 @@ TEST_SUITE("anti_prenex") {
 			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
 			// pre-deletion shape below.
 			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
+			// 2026-09-02 (binary temporal word-synonym regen): the same
+			// disjunct with `f(b1)` and `w = 0` swapped; equivalent.
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || f(b1) || w = 0)",
 			// 2026-08-28 (ADT + left-assoc grammar regen): the same
 			// single disjunct with conjuncts and disjuncts permuted.
 			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))",
@@ -93,6 +96,10 @@ TEST_SUITE("anti_prenex") {
 			// wrapped ex-elimination happens to return.
 			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
 			"&& (w != 0 || wy' = 0)",
+			// 2026-09-02 (binary temporal word-synonym regen): the same
+			// shape with the commutative product written y'w; equivalent.
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || y'w = 0)",
 			// 2026-08-28 (ADT + left-assoc grammar regen): disjuncts and
 			// the commutative product y'w permuted; equivalent.
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
@@ -149,8 +156,11 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (by != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order moves with parser regens (last: 2026-09-02
+		// word-synonym regen); both orders are the same formula
 		CHECK( matches_to_str_to_any_of(res, {
 			"z != 0 && y != 0",
+			"y != 0 && z != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -158,8 +168,10 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "all b (by = 0 || bz = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// disjunct order moves with parser regens (last: 2026-09-02)
 		CHECK( matches_to_str_to_any_of(res, {
 			"z = 0 || y = 0",
+			"y = 0 || z = 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -167,9 +179,12 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (by != 0 && bz != 0 || bw != 0 && bu != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order moves with parser regens (last: 2026-09-02)
 		CHECK( matches_to_str_to_any_of(res, {
 			"z != 0 && y != 0 || u != 0 && w != 0",
 			"z != 0 && y != 0 || w != 0 && u != 0",
+			"y != 0 && z != 0 || u != 0 && w != 0",
+			"y != 0 && z != 0 || w != 0 && u != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -222,8 +237,10 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order moves with parser regens (last: 2026-09-02)
 		CHECK( matches_to_str_to_any_of(res, {
 			"z != 0 && y != 0",
+			"y != 0 && z != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -246,8 +263,10 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (bw != 0 && q(b)).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
+		// conjunct order moves with parser regens (last: 2026-09-02)
 		CHECK( matches_to_str_to_any_of(res, {
 			"ex b1 b1 w != 0 && q(b1)",
+			"ex b1 q(b1) && b1 w != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) != nullptr );

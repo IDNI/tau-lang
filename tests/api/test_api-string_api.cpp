@@ -609,15 +609,15 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		auto witness = drive(spec7, in);
 		// The canonical free-region choice moves with every parser regen
 		// (nonterminal renumbering changes node hashes and so clause
-		// order). Re-pinned after the 2026-08-28 main-into-ltl merge
-		// regen (ADT + LTL grammars combined): a fresh process gives
-		// 7, 7, 7 for spec7 and 50, 50, 50 for spec50 on their own
+		// order). Re-pinned after the 2026-09-02 regen (word synonyms
+		// for the binary temporal operators): a fresh process gives
+		// 7, 0, 0 for spec7 and 50, 0, 0 for spec50 on their own
 		// (verified by driving each alone), and so must these
 		// post-activity runs. Re-pin whenever the grammar is regenerated;
 		// the property under test is fresh == post-activity, not the
 		// specific witness.
-		CHECK(witness == std::vector<std::string>({ "7", "7", "7" }));
-		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
+		CHECK(witness == std::vector<std::string>({ "7", "0", "0" }));
+		CHECK(other == std::vector<std::string>({ "50", "0", "0" }));
 	}
 }
 

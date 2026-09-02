@@ -31,13 +31,22 @@ sometimes o2[t] = 1
 F (o2[t] = 1)
 
 # The binary temporal operators are infix: U (until), R (release), W (weak
-# until), and the past operators S (since) and T (trigger):
+# until), and the past operators S (since) and T (trigger). Each also has
+# a word spelling -- until, release, weak_until, since and trigger -- and,
+# as with the always and sometimes spellings above, both spellings of an
+# operator parse to the very same formula, so the word form re-entered
+# right after its letter form does not advance the history position:
 
 (o1[t] = 1) U (i1[t] = 1)
+(o1[t] = 1) until (i1[t] = 1)
 (o1[t] = 1) R (i1[t] = 1)
+(o1[t] = 1) release (i1[t] = 1)
 (o1[t] = 1) W (i1[t] = 1)
+(o1[t] = 1) weak_until (i1[t] = 1)
 (o1[t] = 1) S (i1[t] = 1)
+(o1[t] = 1) since (i1[t] = 1)
 (o1[t] = 1) T (i1[t] = 1)
+(o1[t] = 1) trigger (i1[t] = 1)
 
 # The infix operators bind tighter than && and ||, so a compound operand
 # wants its own parentheses, just as with the prefix operators below.

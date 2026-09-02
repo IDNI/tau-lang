@@ -72,11 +72,11 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>"  _ bf)               :bf_ngt
                         | (bf    _ ">="  _ bf)               :bf_gteq
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
-                        | (wff   _ "U"   _ wff)              :wff_U
-                        | (wff   _ "R"   _ wff)              :wff_R
-                        | (wff   _ "W"   _ wff)              :wff_W
-                        | (wff   _ "S"   _ wff)              :wff_S
-                        | (wff   _ "T"   _ wff)              :wff_T
+                        | (wff   _ ("U" | "until")      _ wff) :wff_U
+                        | (wff   _ ("R" | "release")    _ wff) :wff_R
+                        | (wff   _ ("W" | "weak_until") _ wff) :wff_W
+                        | (wff   _ ("S" | "since")      _ wff) :wff_S
+                        | (wff   _ ("T" | "trigger")    _ wff) :wff_T
                         |                                     capture.
 # relational operators for base types
 #

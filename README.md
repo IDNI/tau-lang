@@ -460,11 +460,11 @@ a single formula, its *main* formula:
 spec        => [ definitions ] local_spec [ "." ]
              | "G" local_spec          -- globally (aliases: always, [])
              | "F" local_spec          -- eventually (aliases: sometimes, <>)
-             | spec "U" spec           -- until
-             | spec "R" spec           -- release
-             | spec "W" spec           -- weak until
-             | spec "S" spec           -- since (past LTL)
-             | spec "T" spec           -- trigger (past LTL)
+             | spec "U" spec           -- until (alias: until)
+             | spec "R" spec           -- release (alias: release)
+             | spec "W" spec           -- weak until (alias: weak_until)
+             | spec "S" spec           -- since (past LTL) (alias: since)
+             | spec "T" spec           -- trigger (past LTL) (alias: trigger)
              | (spec && spec) | (spec || spec) | !spec
 definitions => ( (function_def | predicate_def | stream_def | type_def) "." )+
 ```
@@ -503,6 +503,10 @@ specification with no `always` or `sometimes` at all is implicitly an `always` s
 `G`/`always`/`[]` are three spellings of the same operator, and so are
 `F`/`sometimes`/`<>` — each triple parses to one operator and prints back as
 `always` and `sometimes` respectively.
+The binary temporal operators likewise each have a word spelling:
+`until` for `U`, `release` for `R`, `weak_until` for `W`, `since` for `S`
+and `trigger` for `T`. Both spellings of an operator parse to the same
+formula, which prints back in the single-letter form.
 The `predicate` non-terminal in the above grammar describes how
 to add predicate definitions directly into a formula. See the subsection
 [Functions and predicates](#functions-and-predicates) for the
@@ -570,11 +574,11 @@ liveness and until-style operators.
 spec => ...
       | "F" spec               -- eventually / finally (aliases: sometimes, <>)
       | "G" spec               -- globally (aliases: always, [])
-      | spec "U" spec          -- until
-      | spec "R" spec          -- release
-      | spec "W" spec          -- weak until
-      | spec "S" spec          -- since (past LTL)
-      | spec "T" spec          -- trigger (past LTL)
+      | spec "U" spec          -- until (alias: until)
+      | spec "R" spec          -- release (alias: release)
+      | spec "W" spec          -- weak until (alias: weak_until)
+      | spec "S" spec          -- since (past LTL) (alias: since)
+      | spec "T" spec          -- trigger (past LTL) (alias: trigger)
 ```
 
 `G` (globally) and `F` (eventually) are the primary temporal operators; `G` is
@@ -608,6 +612,11 @@ an alternative surface syntax that is automatically reduced to such indices.
 | `φ S ψ` | φ has held since (some past time at which) ψ held (since — past dual of U) |
 | `φ T ψ` | ψ has held since (some past time at which) φ held, or ψ has always held (trigger — past dual of R) |
 
+Every binary operator can also be written by its name — `until`, `release`,
+`weak_until`, `since`, `trigger` — and the prefix operators as
+`sometimes`/`<>` (for `F`) and `always`/`[]` (for `G`); each spelling parses
+to the same operator.
+
 Standard equivalences hold: `F φ ≡ T U φ`, `G φ ≡ F ¬ φ → ⊥ ≡ φ R ⊥`,
 `φ W ψ ≡ G φ ∨ (φ U ψ)`.  Past duals: `φ S ψ` is the since operator and
 `φ T ψ` is its release-like dual.
@@ -620,6 +629,9 @@ F (o1[t] = 0)
 
 -- Output o1 must stay 0 until input i1 is 1
 (o1[t] = 0) U (i1[t] = 1)
+
+-- The same specification with the word spelling
+(o1[t] = 0) until (i1[t] = 1)
 
 -- Infinitely often the output must echo the input
 G (F (o1[t] = i1[t]))

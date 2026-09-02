@@ -833,6 +833,89 @@ TEST_CASE("[SHAPE-U-15] F(F) always unrealizable") {
 
 } // SHAPE-U
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SHAPE-SYN: word synonyms of the temporal operators — each spelling must
+// parse to the IDENTICAL (interned) tree as its single-letter form
+// ═══════════════════════════════════════════════════════════════════════════
+
+TEST_SUITE("SHAPE-SYN: temporal operator word synonyms") {
+
+// Binary infix operators: U/until, R/release, W/weak_until, S/since, T/trigger
+
+TEST_CASE("[SHAPE-SYN-01] until == U") {
+	tref letter = spec("(o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt).");
+	tref word   = spec("(o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+TEST_CASE("[SHAPE-SYN-02] release == R") {
+	tref letter = spec("(o1[t]:qlt > {0}:qlt) R (o2[t]:qlt > {0}:qlt).");
+	tref word   = spec("(o1[t]:qlt > {0}:qlt) release (o2[t]:qlt > {0}:qlt).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+TEST_CASE("[SHAPE-SYN-03] weak_until == W") {
+	tref letter = spec("(o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt).");
+	tref word   = spec("(o1[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+TEST_CASE("[SHAPE-SYN-04] since == S") {
+	tref letter = spec("(o1[t]:qlt > {0}:qlt) S (o2[t]:qlt > {0}:qlt).");
+	tref word   = spec("(o1[t]:qlt > {0}:qlt) since (o2[t]:qlt > {0}:qlt).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+TEST_CASE("[SHAPE-SYN-05] trigger == T") {
+	tref letter = spec("(o1[t]:qlt > {0}:qlt) T (o2[t]:qlt > {0}:qlt).");
+	tref word   = spec("(o1[t]:qlt > {0}:qlt) trigger (o2[t]:qlt > {0}:qlt).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+
+// Word synonyms nest and mix with letter forms and other temporal operators
+
+TEST_CASE("[SHAPE-SYN-06] G(a until (b since c)) mixes word forms") {
+	tref letter = spec("G ((o1[t]:qlt > {0}:qlt) U ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))).");
+	tref word   = spec("G ((o1[t]:qlt > {0}:qlt) until ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt))).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+TEST_CASE("[SHAPE-SYN-07] (a weak_until b) release c left-nested word forms") {
+	tref letter = spec("F (((o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt)) R (o3[t]:qlt > {0}:qlt)).");
+	tref word   = spec("F (((o1[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt)) release (o3[t]:qlt > {0}:qlt)).");
+	REQUIRE(letter != nullptr); REQUIRE(word != nullptr);
+	CHECK(word == letter);
+	CHECK(is_tau_formula_sat<node_t>(word));
+}
+
+// The pre-existing prefix aliases keep working and stay interchangeable
+
+TEST_CASE("[SHAPE-SYN-08] sometimes == <> == F") {
+	tref f    = spec("F (o1[t]:qlt > {0}:qlt).");
+	tref word = spec("sometimes (o1[t]:qlt > {0}:qlt).");
+	tref sym  = spec("<> (o1[t]:qlt > {0}:qlt).");
+	REQUIRE(f != nullptr); REQUIRE(word != nullptr); REQUIRE(sym != nullptr);
+	CHECK(word == f);
+	CHECK(sym == f);
+}
+TEST_CASE("[SHAPE-SYN-09] always == [] == G") {
+	tref g    = spec("G (o1[t]:qlt > {0}:qlt).");
+	tref word = spec("always (o1[t]:qlt > {0}:qlt).");
+	tref sym  = spec("[] (o1[t]:qlt > {0}:qlt).");
+	REQUIRE(g != nullptr); REQUIRE(word != nullptr); REQUIRE(sym != nullptr);
+	CHECK(word == g);
+	CHECK(sym == g);
+}
+
+} // SHAPE-SYN
+
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

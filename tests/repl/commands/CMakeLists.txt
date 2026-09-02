@@ -49,6 +49,9 @@ include(test_repl-solver_cmd.cmake)
 include(test_repl-lgrs_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
+# word synonyms of the temporal operators (until, release, weak_until,
+# since, trigger) and the prefix aliases (sometimes/<>, always/[])
+include(test_repl-ltl_synonyms.cmake)
 include(test_repl-run_cmd.cmake)
 
 # substitution and instantiation commands
