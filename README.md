@@ -641,6 +641,32 @@ The cast operand must be a parenthesized term, a constant, a variable, a
 function call, `0`, `1`, a negation, a functional quantifier or another cast;
 wrap anything else in parentheses.
 
+### Division and remainder by zero
+
+Division and remainder are total functions with the SMT-LIB semantics of
+`bvudiv` and `bvurem` (as implemented by CVC5). Neither raises an error on a
+zero divisor; instead, for a bitvector `x` of width `w`:
+
+```
+x / 0  =  2^w - 1     (all-ones, the maximum value of bv[w])
+x % 0  =  x
+```
+
+In particular `x / 0` yields the *maximum* of the type — the least safe
+default for anything metering, pricing or otherwise accumulating — so never
+rely on it implicitly. When a divisor can be zero, guard it in the
+specification and pick the zero-case value explicitly:
+
+```
+always ( ( i2[t]:bv[24] != { #x000000 }:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] / i2[t]:bv[24] ) )
+      || ( i2[t]:bv[24] =  { #x000000 }:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+```
+
+Here `1200 / 3` gives `400` as usual, while a zero divisor gives `0` — the
+spec author's own choice — instead of the inherited `16777215`.
+
+### Precedence of term operations
+
 The order of *all* term operations, bitvector and Boolean alike, is the
 following (from higher precedence to lower):
 
