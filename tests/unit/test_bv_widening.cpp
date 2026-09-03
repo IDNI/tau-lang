@@ -985,6 +985,54 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
 	}
+
+	// Task 8 pwr-update repro: an interpreter update submitted through the
+	// u stream widens to exactly the shape
+	// "always o1[t]:bv[8] = min(i2[t]:bv[8] * {3}:bv[8], {100}:bv[8])"
+	// (confirmed by a trace-level rerun: the printed u value carried the
+	// fully elaborated "(bv[8]) min(((bv[16]) i2[t]*{3}), {100}) = o1[t]"
+	// shape). This pins that exact clause shape as satisfiable AND
+	// executable in isolation, through both is_tau_formula_sat (basic
+	// satisfiability) and transform_to_execution (the actual gate
+	// get_executable_spec/compute_part_continuations uses to decide
+	// whether an interpreter can run a spec part) -- confirming no defect
+	// in the widened temporal/QE path for this update-shaped assignment.
+	// (An initial version of the corresponding integration test, in
+	// tests/integration/test_integration-interpreter.cpp, transiently hit
+	// a "No update performed: updated specification is unsat" warning;
+	// traced to that test's fixture pinning a conflicting baseline for
+	// o1, routing pointwise_revision through its separate "I1"
+	// last-resort-alternative path -- unrelated to this clause shape, and
+	// not reproduced here or in the corrected integration test. See the
+	// Task 8 report.)
+	//
+	// Fresh stream names o9/i9, unused elsewhere in this file, sidestep
+	// the global stream-name-type registry trap documented in
+	// test_integration-bv_stress_check.cpp -- definitions<node_t>::
+	// instance() persists a name's type for the whole process; clearing
+	// it first is a defensive, belt-and-braces measure since o9/i9 are
+	// otherwise fresh here. Names must start with the io_context
+	// classifier's recognized prefixes -- 'i'/'o'/'u'/'this' -- an
+	// arbitrary name like p1/q2 is rejected by update_types before
+	// parsing even gets to the formula itself.
+	TEST_CASE("pwr minimal repro: update-shaped bv assignment is satisfiable and executable") {
+		definitions<node_t>::instance().clear();
+		bv_widening_scope widen;
+		const char* sample = "always o9[t]:bv[8] = "
+			"min(i9[t]:bv[8] * { 3 }:bv[8], { 100 }:bv[8]).";
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE(nso_rr.has_value());
+		tref normalized = normalizer<node_t>(nso_rr.value());
+		REQUIRE(normalized != nullptr);
+		INFO("normalized: " << tree<node_t>::get(normalized).to_str());
+		CHECK(is_tau_formula_sat<node_t>(normalized));
+		tref executable = transform_to_execution<node_t>(normalized);
+		INFO("transform_to_execution result: "
+			<< (executable ? tree<node_t>::get(executable).to_str()
+				: std::string("<nullptr>")));
+		CHECK(executable != tau::_F());
+		CHECK(executable != nullptr);
+	}
 }
 
 // ---------------------------------------------------------------------------
