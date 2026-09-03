@@ -856,10 +856,10 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 
 	// Defs-expansion probe: `normalizer<node_t>` is the SAME shared pipeline
 	// entry `normalizer(rr)` reaches after `nso_rr_apply` has already
-	// expanded `fn`'s definition (normalizer.tmpl.h: bf_normalizer_with_
-	// rec_relation/normalizer(rr) call nso_rr_apply, THEN
-	// normalize_with_temp_simp, where the widening hook now sits at the
-	// very top). If widening ran BEFORE the ref were expanded instead, the
+	// expanded `fn`'s definition (normalizer.tmpl.h: normalizer(const
+	// rr<node>&) calls nso_rr_apply, THEN normalize_with_temp_simp
+	// directly, where the widening hook now sits at the very top). If
+	// widening ran BEFORE the ref were expanded instead, the
 	// atom's left side would still be an opaque bf_ref, needed_width would
 	// return 0 (its documented "opaque subterm" case), and widen_atom
 	// would skip the atom entirely -- leaving it modular (deciding TRUE
@@ -929,5 +929,26 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		tref normalized = normalizer<node_t>(nso_rr.value());
 		REQUIRE(normalized != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(normalized));
+	}
+
+	// Post-review fix: a D4 cap violation (needed width W exceeds a
+	// capped bv_max_width) makes widen_bv_arithmetic return nullptr,
+	// which normalize_with_temp_simp/normalize_non_temp now propagate
+	// (Task 6's own gated snippet: `if (!fm) return nullptr;`). Before
+	// this round's fix, none of the many call sites of those two
+	// functions across solver.tmpl.h/satisfiability.tmpl.h/
+	// interpreter.tmpl.h/normalizer.tmpl.h checked for that nullptr
+	// before dereferencing it -- in Debug this SIGABRT'd (an assertion
+	// deep in tree<node>::get on a null tref); in Release it was
+	// undefined behavior. This drives the cap violation through a real,
+	// public entry point (is_tau_formula_sat, which calls
+	// normalize_with_temp_simp directly) and asserts a clean `false`
+	// (unsat, a conservative "cannot decide" answer -- not a proof, and
+	// not a crash).
+	TEST_CASE("D4 cap violation through a real entry point fails cleanly, not a crash") {
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12); // x*y at bv[8] needs W=16 > 12
+		auto fm = parse_wff("o:bv[8] = x * y");
+		CHECK( !is_tau_formula_sat<node_t>(fm) );
 	}
 }

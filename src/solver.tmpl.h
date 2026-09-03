@@ -1258,6 +1258,11 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	assert(!tau::get(form).find_top(is_temporal_quantifier<node>));
 #endif // DEBUG
 	form = normalize_non_temp<node>(form);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here for the first time; propagate it as this
+	// function's own established error convention rather than
+	// dereferencing it below.
+	if (!form) { error = true; return {}; }
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
 		// early to simplify solving

@@ -331,6 +331,15 @@ tref normalize(tref form) {
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
 	//	using tt = tau::traverser;
+	// Guard against a nullptr ARGUMENT, not just a nullptr result: since
+	// normalize_non_temp/normalize_with_temp_simp can themselves now
+	// return nullptr (the D4 cap below), a growing set of call sites feed
+	// one of THOSE results straight back in as another call's fm (e.g.
+	// `normalize_non_temp<node>(to_unbounded_continuation<node>(...))`,
+	// satisfiability.tmpl.h). Without this, such a chain would crash
+	// inside widen_bv_arithmetic's own tau::get(fm) below rather than
+	// propagating cleanly.
+	if (!fm) return nullptr;
 	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
 	// runs (including the cache lookup just below, so a cached result is
 	// keyed on the already-widened formula). Unconditionally called --
@@ -589,6 +598,16 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it the same as any other
+	// undecidable shape check_decided reports -- a conservative
+	// "answering negatively" fallback, not a proof.
+	if (!normalized) {
+		LOG_ERROR << "is_non_temp_nso_satisfiable: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const auto& t = tau::get(normalized);
 
 	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
@@ -627,6 +646,14 @@ bool is_non_temp_nso_unsat(tref n) {
 	const trefs& vars = get_free_vars<node>(nn);
 	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
+	// See is_non_temp_nso_satisfiable above: a D4 cap violation surfaces
+	// as nullptr; treat it as undecidable, answering negatively.
+	if (!normalized) {
+		LOG_ERROR << "is_non_temp_nso_unsat: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const auto& t = tau::get(normalized);
 	check_decided<node>("is_non_temp_nso_unsat", normalized);
 	return t.equals_F();
@@ -678,6 +705,15 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
 	tref ndir1 = normalize_non_temp<node>(imp1);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, answering
+	// negatively, same as any other shape check_decided reports.
+	if (!ndir1) {
+		LOG_ERROR << "are_nso_equivalent: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const tau& tdir1 = tau::get(ndir1);
 	check_decided<node>("are_nso_equivalent", ndir1);
 	if (tdir1.equals_F()) {
@@ -685,6 +721,12 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 	tref ndir2 = normalize_non_temp<node>(imp2);
+	if (!ndir2) {
+		LOG_ERROR << "are_nso_equivalent: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const tau& tdir2 = tau::get(ndir2);
 	check_decided<node>("are_nso_equivalent", ndir2);
 	const bool res = (tdir1.equals_T() && tdir2.equals_T());
@@ -750,6 +792,15 @@ bool is_nso_impl(tref n1, tref n2) {
 		imp = tau::build_wff_all_many(vars, imp);
 		LOG_DEBUG << "wff: " << LOG_FM(imp);
 		tref nres = normalize_non_temp<node>(imp);
+		// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+		// surfaces as nullptr here; treat it as undecidable, answering
+		// negatively, same as any other shape check_decided reports.
+		if (!nres) {
+			LOG_ERROR << "is_nso_impl: normalization failed "
+				"(bv-widening cap exceeded); answering negatively. This "
+				"is a conservative fallback, not a proof.";
+			return false;
+		}
 		check_decided<node>("is_nso_impl", nres);
 		return tau::get(nres).equals_T();
 	};
@@ -885,6 +936,16 @@ bool are_bf_equal(tref n1, tref n2) {
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
 	tref normalized = normalize_non_temp<node>(bf_equal_fm);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, answering
+	// negatively, same as any other shape check_decided-style callers
+	// report.
+	if (!normalized) {
+		LOG_ERROR << "are_bf_equal: normalization failed (bv-widening cap "
+			"exceeded); answering negatively. This is a conservative "
+			"fallback, not a proof.";
+		return false;
+	}
 	LOG_TRACE << "Normalized: " << LOG_FM(normalized);
 
 	auto check = tt(normalized) | tau::wff_t;
@@ -1148,6 +1209,9 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
+	// Guard against a nullptr ARGUMENT, not just a nullptr result: see
+	// normalize_non_temp's own copy of this comment.
+	if (!fm) return nullptr;
 	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
 	// runs. Unconditionally called -- widen_bv_arithmetic itself is a no-op
 	// when the `bv_widening` flag is off (see bv_widening.h) -- and any D4
@@ -1986,7 +2050,13 @@ tref normalizer(const rr<node>& nso_rr) {
 	tref res = normalize_with_temp_simp<node>(fm);
 
 	LOG_DEBUG << "End normalizer";
-	LOG_DEBUG << "Result: " << LOG_FM(res);
+	// res may now be nullptr (a D4 bv-widening cap violation, already
+	// LOG_ERROR'd by the pass) -- LOG_FM would dereference it whenever
+	// debug/trace logging is enabled, so guard it; the nullptr itself is
+	// intentionally propagated to the caller below, same as the
+	// pre-existing nso_rr_apply failure path just above.
+	if (res) LOG_DEBUG << "Result: " << LOG_FM(res);
+	else LOG_DEBUG << "Result: nullptr (bv-widening cap exceeded)";
 	return res;
 }
 

@@ -796,6 +796,11 @@ std::pair<std::optional<assignment<node>>, bool>
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
 			current = normalize_non_temp<node>(current);
+			// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+			// pass) surfaces as nullptr here; treat this path as
+			// unsolvable (same as solution_with_max_update finding no
+			// solution below) rather than dereferencing it.
+			if (!current) continue;
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
@@ -820,7 +825,11 @@ std::pair<std::optional<assignment<node>>, bool>
 				auto substituted = rewriter::replace<node>(
 						current, path_solution.value());
 				auto check = normalize_non_temp<node>(substituted);
-				LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
+				// check is debug-log-only; a D4 bv-widening cap
+				// violation surfaces as nullptr here, and LOG_FM would
+				// dereference it whenever trace logging is enabled.
+				if (check) LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
+				else LOG_TRACE << "step/check: nullptr (bv-widening cap exceeded)\n";
 			} else {
 				LOG_TRACE << "step/solution: no solution\n";
 			}
@@ -1032,8 +1041,13 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		}
 		LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
 
-		// Eliminate added quantifiers
-		part_alts.push_back(normalize_non_temp<node>(step_ubt_ctn));
+		// Eliminate added quantifiers. A D4 bv-widening cap violation
+		// (already LOG_ERROR'd by the pass) surfaces as nullptr here;
+		// drop this alternative rather than pushing a null tref that
+		// step()'s consuming loop would later dereference.
+		if (tref normalized = normalize_non_temp<node>(step_ubt_ctn);
+			normalized)
+				part_alts.push_back(normalized);
 		}
 		upd_ubt_ctn.push_back(std::move(part_alts));
 	}
@@ -1152,6 +1166,10 @@ tref interpreter<node>::get_executable_spec(
 
 	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 	tref executable = transform_to_execution<node>(clause, start_time, true);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; propagate a clean nullptr rather than
+	// dereferencing it below.
+	if (!executable) return nullptr;
 	DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
 	if (tau::get(executable).equals_F()) return nullptr;
 	// Make sure that no constant time position is smaller than 0
@@ -1168,6 +1186,7 @@ tref interpreter<node>::get_executable_spec(
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
 		executable, io_vars, start_time);
+	if (!constraints) return nullptr;
 	if (tau::get(constraints).equals_F()) return nullptr;
 	DBG(LOG_TRACE << "compute_systems/constraints: " << constraints;)
 	if (!tau::get(constraints).equals_T()) {
