@@ -76,13 +76,34 @@ TEST_SUITE("bv widening - needed_width") {
 		size_t m; widths("(x * y) % z", 8, m); CHECK(m == 16);
 	}
 	TEST_CASE("user cast is a boundary") {
-		// ((bv[4]) x) contributes width 4 regardless of what's inside
-		size_t m; CHECK(widths("((bv[4]) x) + y", 8, m) == 9);
+		// ((bv[16]) x) contributes its own target width (16), not x's base_w
+		// (8) or the sibling's width -- bv[16] must dominate max(16, 8) + 1
+		// = 17. (bv[4] would be masked by the wider sibling: max(4, 8) + 1
+		// happens to equal max(8, 8) + 1, so it wouldn't catch an
+		// implementation that ignores the cast boundary and just reuses
+		// base_w for x.)
+		size_t m; CHECK(widths("((bv[16]) x) + y", 8, m) == 17);
 	}
 	TEST_CASE("constant shift amount adds to the width") {
 		size_t m; CHECK(widths_typed("x:bv[8] << { 3 }:bv[8]", 8, m) == 11);
 	}
 	TEST_CASE("variable shift amount never grows") {
 		size_t m; CHECK(widths("x << y", 8, m) == 8);
+	}
+	TEST_CASE("opaque child (capture) propagates as 0") {
+		// `$X` parses to a bare `capture` node under `bf` -- opaque to
+		// needed_width (default: return 0). The whole bf_add is therefore
+		// opaque too and returns 0; maxW is untouched by the opaque side
+		// itself (its own recursive call returns before touching maxW) --
+		// it still reflects the real sibling `y`'s width (8), since that
+		// side is genuinely computed before the operator discovers its
+		// other child is opaque and gives up.
+		size_t m; CHECK(widths("$X + y", 8, m) == 0); CHECK(m == 8);
+	}
+	TEST_CASE("maxW survives a discarded (non-kept) branch") {
+		// bf_mod keeps only the left operand's width (8), discarding the
+		// right operand (y * z, width 16) from the return value -- but
+		// maxW must still record that peak.
+		size_t m; CHECK(widths("x % (y * z)", 8, m) == 8); CHECK(m == 16);
 	}
 }

@@ -4,6 +4,7 @@
 #include "bv_widening.h"            // Only for IDE resolution, not really needed.
 
 #include <algorithm>
+#include <stdexcept>
 #include <string>
 
 namespace idni::tau_lang {
@@ -11,7 +12,11 @@ namespace idni::tau_lang {
 // Read the literal shift amount out of a `bf_shl` operator node, or `0`
 // when it is not a literal bitvector constant (a variable shift amount
 // executes at the left operand's width and may wrap -- see the `bf_shl`
-// rule in bv_widening.h).
+// rule in bv_widening.h). A shift amount too large to fit `unsigned long
+// long` (an exceedingly wide bitvector literal) is treated the same way:
+// `std::stoull` throwing is caught and folded into the same "no known
+// growth" fallback as a non-constant amount, rather than propagating an
+// uncaught exception out of needed_width.
 //
 // `op` is the operator node directly under a `bf` wrapper (i.e. `n[0]`
 // for the `bf` node whose operator is `bf_shl`). Its second child (`op[1]`)
@@ -28,8 +33,12 @@ size_t bf_shl_shift_amount(const tree<node>& op) {
 			&& is_bv_type_family<node>(amount.get_ba_type()))
 	{
 		const auto c = amount.get_ba_constant();
-		return static_cast<size_t>(
-			std::stoull(std::get<bv>(c).getBitVectorValue(10)));
+		try {
+			return static_cast<size_t>(
+				std::stoull(std::get<bv>(c).getBitVectorValue(10)));
+		} catch (const std::exception&) {
+			return 0; // too large (or malformed) to parse: no known growth
+		}
 	}
 	return 0;
 }
