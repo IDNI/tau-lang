@@ -9,6 +9,7 @@
 
 #include "boolean_algebras/bv_ba.h"
 #include "bv_widening.h"
+#include "heuristics/bv_predicate_blasting.h"
 
 using tau_api = api<node_t>;
 
@@ -983,5 +984,163 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		REQUIRE(fm != nullptr);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Task 7: blasting backend support for widened bv atoms.
+//
+// atomic_blasting (bv_predicate_blasting.tmpl.h) hoists a fresh auxiliary
+// variable for every bf_add/bf_sub/bf_shl/bf_shr/bf_mul/bf_div/bf_mod/
+// bf_min/bf_max node it blasts. Before this task, every such hoisted
+// variable was typed with the ATOM's own single ba_type (captured once,
+// `auto type_id = tau::get(term).get_ba_type();`, term being the whole
+// atomic comparison) rather than the specific subterm's own width.
+//
+// That coincides with the atom's type in two situations: (1) any unwidened
+// atom (today's production trees always have one uniform width throughout
+// an atom, casts aside -- and bf_cast already reads its OWN target type,
+// not the shared type_id), and (2) a widened "extend-all" shape
+// (comparisons, both-compound equality, bf_interval): the amended D2/D3
+// rule widens EVERY operator uniformly to the atom's own final W, so the
+// atom's type and every subterm's type are the same value again.
+//
+// It breaks for the widened "truncating assignment" shape (o = ...): the
+// outer cast resets the ATOM's own type back to base_w, while everything
+// INSIDE that cast still runs at the wider, genuinely different W -- see
+// widen_atom's own "assignment truncation" tests above. These cases build
+// exactly that shape with a real (non-constant-folded) bf_mul/bf_add and
+// bf_min node inside it, so the hoisted intermediates' widths actually
+// matter to the final bit-level constraints.
+//
+// Literal-constant-only analogues of Task 6's own end-to-end samples (e.g.
+// "o = min({16}*{16}, {200})") do NOT exercise this: with both operands
+// literal, the widened RHS folds away to a single constant before blasting
+// ever sees a bf_mul/bf_min node (Task 6's own report traces this exactly).
+// These cases instead bind the variable side through a separate equality
+// conjunct (`x = { 16 }:bv[8] && ... x * { 16 }:bv[8] ...`), which pins the
+// value just as deterministically while keeping `x` a genuine `variable`
+// node the tree can never constant-fold -- the same idiom the existing
+// bv_predicate_blasting integration suite already uses throughout (e.g.
+// "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4])").
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Sets bv_blasting for the lifetime of the enclosing scope and restores
+// whatever value it had before, even on a REQUIRE-failure stack unwind --
+// same RAII shape as bv_widening_scope/bv_max_width_scope above.
+struct bv_blasting_scope {
+	bool prev;
+	bv_blasting_scope() : prev(bv_blasting) { bv_blasting = true; }
+	~bv_blasting_scope() { bv_blasting = prev; }
+};
+
+// Direct-call idiom, mirroring tests/integration/test_integration-heuristics-
+// bv_predicate_blasting.cpp's own blast_normalize helper: widen (only when
+// bv_widening is on -- widen_bv_arithmetic is otherwise a pass-through
+// no-op, per the "OFF mode" test above, so calling it unconditionally would
+// also be fine, but skipping it when off keeps this helper honest about
+// which stage a nullptr came from), blast, then normalize the result down
+// to a printed constant.
+std::string widen_blast_normalize(tref fm) {
+	tref widened = bv_widening ? widen_bv_arithmetic<node_t>(fm) : fm;
+	if (!widened) return "widen_error";
+	tref blasted = bv_predicate_blasting<node_t>(widened);
+	if (!blasted) return "blast_error";
+	tref result = normalizer<node_t>(blasted);
+	if (!result) return "null";
+	return tree<node_t>::get(result).to_str();
+}
+
+} // namespace
+
+TEST_SUITE("bv widening - blasting backend (Task 7)") {
+
+	TEST_CASE("checked multiply under truncating assignment: per-subterm width required") {
+		// o:bv[8] = min(x * {16}, {200}): needed_width(mul) = 8+8 = 16;
+		// min keeps max(16,8) = 16 -- both the mul AND the min node end up
+		// typed bv[16], while the atom itself resets to bv[8] (truncating
+		// assignment). x is pinned to 16 via a separate equality conjunct
+		// so the mul survives blasting as a genuine bf_mul node (a literal
+		// "{16}*{16}" would instead fold away to a plain 256:bv[16]
+		// constant before blasting ever ran -- see the block comment
+		// above). Exact: 16*16 = 256 (fits in 16 bits); min(256,200) =
+		// 200; truncating cast to bv[8] is lossless (200 <= 255) -> o
+		// must equal 200 for the whole conjunction to hold.
+		//
+		// Under the pre-fix code, the hoisted "product" (mul) and "result"
+		// (min) aux variables are wrongly typed bv[8] instead of bv[16] --
+		// this either corrupts the bit-level constraints (silently wrong
+		// verdict) or trips a cross-width construction guard (an abort in
+		// Debug, an "Incompatible type information" error in Release),
+		// per the project's established pattern for that class of defect.
+		bv_widening_scope widen;
+		bv_blasting_scope blast;
+		tref fm = parse_wff(
+			"ex x ex o (x = { 16 }:bv[8] && "
+			"o:bv[8] = min(x * { 16 }:bv[8], { 200 }:bv[8]) && "
+			"o = { 200 }:bv[8])");
+		CHECK(widen_blast_normalize(fm) == "T");
+	}
+
+	TEST_CASE("saturating add under truncating assignment: per-subterm width required") {
+		// o:bv[8] = min(x + {90}, {250}): needed_width(add) =
+		// max(8,8)+1 = 9; min keeps max(9,8) = 9 -- the add AND the min
+		// node end up typed bv[9] while the atom resets to bv[8]. x is
+		// pinned to 200 the same way as above. Exact: 200+90 = 290 (fits
+		// in 9 bits, max 511, no wrap); min(290,250) = 250; truncating
+		// cast to bv[8] is lossless (250 <= 255) -> o must equal 250.
+		bv_widening_scope widen;
+		bv_blasting_scope blast;
+		tref fm = parse_wff(
+			"ex x ex o (x = { 200 }:bv[8] && "
+			"o:bv[8] = min(x + { 90 }:bv[8], { 250 }:bv[8]) && "
+			"o = { 250 }:bv[8])");
+		CHECK(widen_blast_normalize(fm) == "T");
+	}
+
+	TEST_CASE("identity for unwidened trees: same shape, bv_widening off") {
+		// Same shape as the checked-multiply case above, bv_widening left
+		// at its default (off): with no widening, the mul's own ba_type
+		// is bv[8], identical to the atom's own type -- the pre-fix
+		// shared-type_id code and the per-subterm fix compute the exact
+		// same value here, so this must already pass before this task's
+		// fix and must keep passing after it (the brief's "identity for
+		// unwidened trees" requirement, pinned as an explicit test rather
+		// than only relied on via the full-suite regression run).
+		// Modular: 16*16 mod 256 = 0; min(0,200) = 0; o must equal 0.
+		REQUIRE(!bv_widening);
+		bv_blasting_scope blast;
+		tref fm = parse_wff(
+			"ex x ex o (x = { 16 }:bv[8] && "
+			"o:bv[8] = min(x * { 16 }:bv[8], { 200 }:bv[8]) && "
+			"o = { 0 }:bv[8])");
+		CHECK(widen_blast_normalize(fm) == "T");
+	}
+
+	TEST_CASE("decline cleanly: variable*variable multiply is outside blasting's constant-factor limit") {
+		// o:bv[8] = min(x * y, {200}), x and y both free variables --
+		// neither side of the widened mul is a compile-time constant, so
+		// get_bvmul_arguments<node> (bv_predicate_blasting.tmpl.h:25-41)
+		// returns (nullptr, nullptr) and atomic_blasting's bf_mul case
+		// sets error=true (bv_predicate_blasting_arithmetic.tmpl.h's
+		// bvmul requires a constant factor; bv_predicate_blasting.tmpl.h
+		// :897-899's "if (!constant) { error = true; break; }"). This is
+		// unrelated to this task's fix (the decline happens before
+		// build_variable is ever reached) -- kept here as the required
+		// "outside blasting's limits" companion case, confirming the
+		// widened tree still makes blasting decline CLEANLY (a nullptr
+		// return), not crash. Calling bv_predicate_blasting directly
+		// (rather than through solver.tmpl.h's has_bv_arithmetic-gated
+		// dispatch) means the cvc5 fallback this would normally trigger
+		// in production is not reachable from here -- see the task-7
+		// report for the fuller read of that route.
+		bv_widening_scope widen;
+		bv_blasting_scope blast;
+		tref fm = parse_wff("o:bv[8] = min(x * y, { 200 }:bv[8])");
+		tref widened = widen_bv_arithmetic<node_t>(fm);
+		REQUIRE(widened != nullptr);
+		CHECK(bv_predicate_blasting<node_t>(widened) == nullptr);
 	}
 }
