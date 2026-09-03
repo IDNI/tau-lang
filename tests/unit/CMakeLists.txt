@@ -18,6 +18,7 @@ set(TESTS
 	bv_ba-solver1
 	bv_ba-solver2
 	bv_ba-cast
+	bv_widening
 	cvc5
 	eliminability
 	execution
