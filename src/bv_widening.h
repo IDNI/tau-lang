@@ -154,15 +154,21 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  *   (etc.) puts around it. Its two (three for `bf_interval`) children are
  *   `bf`-nonterminal sides.
  * @return `atom` unchanged (same tref) when: its own BA type is not
- *   bv-family (nothing to elaborate); any side is opaque to
- *   `needed_width` (a `bf_ref`/`capture`/... subterm the pass cannot
- *   reason about); or the computed `W` equals the atom's already-declared
- *   width (nothing to elaborate -- this is also what makes repeated
- *   application idempotent for the truncating-assignment shape, since the
+ *   bv-family (nothing to elaborate); every side is ALREADY uniformly
+ *   expressed at the atom's own current width (`is_side_saturated_at` --
+ *   the idempotency guard for the extend-all-sides shapes: re-running
+ *   `needed_width` on an already-widened comparison/interval/
+ *   both-compound-equality atom would otherwise inflate `W` without bound,
+ *   since a `bf_cast` boundary's declared width is always trusted at face
+ *   value); any side is opaque to `needed_width` (a `bf_ref`/`capture`/...
+ *   subterm the pass cannot reason about); or the computed `W` equals the
+ *   atom's already-declared width (this is what makes repeated application
+ *   idempotent for the truncating-assignment shape specifically, since the
  *   outer truncating cast resets the rebuilt atom's own auto-propagated
- *   type back down to `base_w`). Returns `nullptr`, after `LOG_ERROR`-ing
- *   the cap violation, when the computed `W` exceeds `bv_max_width` (the
- *   D4 width cap).
+ *   type back down to `base_w` -- the saturation guard above never matches
+ *   that shape, because its untouched bare side is never "saturated").
+ *   Returns `nullptr`, after `LOG_ERROR`-ing the cap violation, when the
+ *   computed `W` exceeds `bv_max_width` (the D4 width cap).
  */
 template <NodeType node>
 tref widen_atom(tref atom);

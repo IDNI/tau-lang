@@ -222,6 +222,68 @@ bool is_bare_storage_side(tref side) {
 	}
 }
 
+// True iff `side` is ALREADY expressed uniformly at width `W`: every
+// operator node on the way down is typed `bv[W]`, and every leaf
+// (`variable`, `ba_constant`, `bf_t`, `bf_f`) is wrapped in a `(bv[W])`
+// cast -- i.e. exactly the shape `widen_term(..., W)` produces for the
+// "extend-all-sides" atom rules (comparisons, `bf_interval`, both-compound
+// equality). A bare, uncast leaf is NEVER considered saturated (case
+// `variable`/`ba_constant`/`bf_t`/`bf_f` below returns `false`
+// unconditionally) -- widen_term always upcasts a leaf whenever it does
+// any work at all, so an untouched leaf directly under an operator can
+// only mean this side was never elaborated. A `bf_cast` (a boundary,
+// whether user-written or produced by a prior widen_term call) is
+// "saturated at W" iff its own declared target is exactly `W` -- its
+// operand is never inspected, mirroring widen_term's own treatment of
+// casts as opaque boundaries.
+//
+// This is the idempotency guard for the extend-all-sides atom shapes (see
+// widen_atom's doc comment): it is checked BEFORE needed_width ever runs
+// again, specifically because needed_width's bf_cast-boundary rule (Task
+// 3, locked behavior) cannot distinguish "a genuinely wide value" from "a
+// zero-extended narrower one" -- re-running it on an already-widened,
+// non-truncated comparison would blindly re-sum already-wide cast-boundary
+// widths (e.g. a bf_mul of two already-(bv[W])-cast operands recomputes to
+// W+W, not W) and inflate without bound under repeated application. The
+// truncating-assignment shape never satisfies this check (its untouched
+// bare side always hits the leaf case and returns false), which is
+// correct: that shape's idempotency is already handled correctly by
+// needed_width's own recomputation (the outer truncating cast is itself a
+// boundary matching base_w, so W == base_w naturally on a second call) --
+// see the "idempotent (assignment shape)" test.
+template <NodeType node>
+bool is_side_saturated_at(tref side, size_t W) {
+	using tau = tree<node>;
+
+	const tau& op = tau::get(side)[0];
+	switch (op.value.nt) {
+	case tau::bf_parenthesis:
+		return is_side_saturated_at<node>(op.child(0), W);
+	case tau::bf_cast:
+		return get_bv_width<node>(op.get_ba_type()) == W;
+	case tau::variable:
+	case tau::ba_constant:
+	case tau::bf_t:
+	case tau::bf_f:
+		return false; // a bare, uncast leaf is never "already widened"
+	default: {
+		// An opaque subterm (bf_ref, capture, ...) has ba_type 0 (or, in
+		// principle, some non-bv type) -- get_bv_width DBG-asserts on
+		// anything that isn't bv-family, so it must never be called on
+		// one. Guard explicitly rather than relying on op.get_ba_type()
+		// happening to equal W (it can't, since W is always a bv-family
+		// width here, but 0 would still reach get_bv_width unguarded).
+		const size_t op_type = op.get_ba_type();
+		if (op_type == 0 || !is_bv_type_family<node>(op_type)) return false;
+		if (get_bv_width<node>(op_type) != W) return false;
+		if (!is_side_saturated_at<node>(op.child(0), W)) return false;
+		if (op.children_size() > 1
+				&& !is_side_saturated_at<node>(op.child(1), W)) return false;
+		return true;
+	}
+	}
+}
+
 template <NodeType node>
 tref widen_atom(tref atom) {
 	using tau = tree<node>;
@@ -233,6 +295,19 @@ tref widen_atom(tref atom) {
 	const size_t base_w = get_bv_width<node>(atom_type);
 	const bool is_interval = n.value.nt == tau::bf_interval;
 	const size_t nsides = is_interval ? 3 : 2;
+
+	// Idempotency guard (see is_side_saturated_at's doc comment): if every
+	// side is ALREADY uniformly expressed at the atom's own current width,
+	// this atom is already in the pass's canonical "extend-all" widened
+	// form -- return it unchanged rather than letting needed_width
+	// recompute (and inflate) it below.
+	{
+		bool all_saturated = true;
+		for (size_t i = 0; i < nsides && all_saturated; ++i)
+			if (!is_side_saturated_at<node>(n.child(i), base_w))
+				all_saturated = false;
+		if (all_saturated) return atom;
+	}
 
 	// Step 2: needed_width on every side; any opaque side (returns 0,
 	// e.g. bf_ref/capture) -- skip the atom entirely, unchanged.

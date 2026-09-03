@@ -164,6 +164,35 @@ struct bv_max_width_scope {
 	~bv_max_width_scope() { bv_max_width = prev; }
 };
 
+// Structural check for the "truncating assignment" atom shape (widen_atom
+// step 4, exactly-one-bare-storage-side): exactly one side of `w` must be
+// the untouched bare variable, structurally identical (subtree_equals --
+// NOT raw tref ==, see the first assignment-truncation test's long comment
+// for why: rebuilding a parent with one sibling replaced changes the
+// untouched child's own hash-consed tref in this codebase's
+// left-child/right-sibling storage, even though nothing about the child
+// itself changed) to `bare_ref`; found position-agnostically since neither
+// rule nor test should assume which side stays bare. The other side must
+// be a single outer bf_cast to `base_w`. Checks the atom's own type resets
+// to `base_w` too (auto-propagated from the untouched bare side).
+void check_truncating_assignment_shape(tref w, tref bare_ref, size_t base_w) {
+	const auto& wn = tree<node_t>::get(w);
+	INFO("elaborated atom: " << wn.to_str());
+	const bool child0_is_var =
+		tree<node_t>::get(wn.child(0))[0].value.nt == tau::variable;
+	const bool child1_is_var =
+		tree<node_t>::get(wn.child(1))[0].value.nt == tau::variable;
+	REQUIRE(child0_is_var != child1_is_var); // exactly one bare side
+	tref bare_side = child0_is_var ? wn.child(0) : wn.child(1);
+	tref cast_side = child0_is_var ? wn.child(1) : wn.child(0);
+	CHECK(tree<node_t>::subtree_equals(bare_side, bare_ref)); // untouched
+
+	const auto& rhs_op = tree<node_t>::get(cast_side)[0];
+	CHECK(rhs_op.value.nt == tau::bf_cast);
+	CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()) == base_w);
+	CHECK(wn.get_ba_type() == bv_type_id<node_t>(base_w));
+}
+
 } // namespace
 
 TEST_SUITE("bv widening - atom elaboration shapes") {
@@ -308,13 +337,16 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		CHECK(widen_atom<node_t>(atom) == nullptr);
 	}
 
-	TEST_CASE("idempotent: widen_atom(widen_atom(a)) == widen_atom(a)") {
+	TEST_CASE("idempotent (assignment shape): widen_atom(widen_atom(a)) == widen_atom(a)") {
 		// Uses the truncating-assignment shape: needed_width on the
 		// rebuilt RHS sees only the outer (bv[8]) cast (a boundary, per
 		// the cast rule) and never descends into the wide internals, so
 		// the second call recomputes W == base_w == 8 and is a no-op --
 		// see the doc comment on widen_atom for why this specifically
-		// relies on the truncating cast resetting the atom's own type.
+		// relies on the truncating cast resetting the atom's own type
+		// (rather than the is_side_saturated_at guard, which never
+		// matches this shape at all -- the untouched bare side always
+		// fails it).
 		tref src = parse_wff("o:bv[8] = min(x * y, {200})");
 		tref atom = find_atom(src, tau::bf_eq);
 		tref w1 = widen_atom<node_t>(atom);
@@ -323,6 +355,36 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref w2 = widen_atom<node_t>(w1);
 		REQUIRE(w2 != nullptr);
 		CHECK(w2 == w1);
+	}
+
+	TEST_CASE("idempotent (extend-all shape): widen_atom(widen_atom(a)) == widen_atom(a)") {
+		// Regression test for a Critical review finding: comparisons (and
+		// bf_interval, and both-compound equality) never truncate, so
+		// nothing resets the atom's own type back to base_w the way the
+		// assignment shape's outer cast does -- re-running needed_width
+		// naively on an already-widened "x*y <= z" would see two
+		// already-(bv[16])-cast mul operands and recompute 16+16=32,
+		// inflating W without bound on every re-application. Task 6 calls
+		// this pass inside normalize_non_temp, which runs every step, so
+		// this MUST be a true no-op, not just "eventually settles" or
+		// "hits the cap". The is_side_saturated_at guard is what makes
+		// this hold: on the second call it recognizes every side is
+		// already uniformly bv[16] and returns w1 immediately, before
+		// needed_width ever runs again.
+		tref src = parse_wff("x:bv[8] * y <= z");
+		tref atom = find_atom(src, tau::bf_lteq);
+		tref w1 = widen_atom<node_t>(atom);
+		REQUIRE(w1 != nullptr);
+		CHECK(w1 != atom); // sanity: the first call did real work
+		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(16));
+		tref w2 = widen_atom<node_t>(w1);
+		REQUIRE(w2 != nullptr);
+		CHECK(w2 == w1);
+		// Three, then four, applications: confirm it truly saturates
+		// rather than merely surviving one extra round.
+		tref w3 = widen_atom<node_t>(w2);
+		REQUIRE(w3 != nullptr);
+		CHECK(w3 == w1);
 	}
 
 	TEST_CASE("bf_interval: all three sides extended together") {
@@ -349,5 +411,175 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		collect_cast_widths(w, widths_found);
 		CHECK(widths_found.size() == 4); // x, y, z, k each wrapped once
 		for (size_t cw : widths_found) CHECK(cw == 16);
+	}
+
+	TEST_CASE("assignment truncation, bare side on the right: min(x*y, k) = o") {
+		// Same rule as "assignment truncation" above, but the bare storage
+		// side is written on the RIGHT this time (min(x*y,{200}) = o,
+		// rather than o = min(x*y,{200})) -- is_bare_storage_side is
+		// checked on both sides independently and the truncating cast is
+		// placed on whichever side is NOT bare, so orientation must not
+		// matter. check_truncating_assignment_shape finds the bare side
+		// position-agnostically, so this pins that guarantee explicitly.
+		tref src = parse_wff("min(x * y, {200}) = o:bv[8]");
+		tref atom = find_atom(src, tau::bf_eq);
+		tref o_side = tree<node_t>::get(atom).child(1); // o is written second
+		tref w = widen_atom<node_t>(atom);
+		REQUIRE(w != nullptr);
+		CHECK(w != atom);
+		check_truncating_assignment_shape(w, o_side, 8);
+
+		std::vector<size_t> widths_found;
+		collect_cast_widths(w, widths_found);
+		CHECK(widths_found.size() == 3); // x, y at bv[16] + 1 truncating bv[8]
+		CHECK(std::count(widths_found.begin(), widths_found.end(), 8) == 1);
+		CHECK(std::count(widths_found.begin(), widths_found.end(), 16) == 2);
+	}
+
+	TEST_CASE("assignment truncation, bf_neq: o != min(x*y, k)") {
+		// Same rule, bf_neq instead of bf_eq -- widen_atom's step-4 guard
+		// checks `nt == bf_eq || nt == bf_neq` explicitly; this pins that
+		// bf_neq is not accidentally left out, and that the rebuilt atom
+		// keeps its own nt (bf_neq, not silently turned into bf_eq).
+		tref src = parse_wff("o:bv[8] != min(x * y, {200})");
+		tref atom = find_atom(src, tau::bf_neq);
+		tref o_side = tree<node_t>::get(atom).child(0);
+		tref w = widen_atom<node_t>(atom);
+		REQUIRE(w != nullptr);
+		CHECK(w != atom);
+		CHECK(tree<node_t>::get(w).is(tau::bf_neq)); // nt preserved
+		check_truncating_assignment_shape(w, o_side, 8);
+	}
+
+	TEST_CASE("shl atom: constant shift amount is upcast, value preserved") {
+		// x:bv[8] << {3} <= z, a comparison (extend-all shape): needed
+		// W = 11 (bf_shl: l=8, +3 for the literal amount). Both the
+		// shifted operand AND the (constant) shift amount must end up at
+		// bv[11] -- the amount is "upcast to W like any leaf" per the
+		// design (D2/D3 amendment): its VALUE (3) is unchanged by
+		// zero-extension, only its declared width grows.
+		tref src = parse_wff("x:bv[8] << {3} <= z");
+		tref atom = find_atom(src, tau::bf_lteq);
+		tref w = widen_atom<node_t>(atom);
+		REQUIRE(w != nullptr);
+		CHECK(w != atom);
+		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(11));
+
+		tref shl_node = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_shl));
+		REQUIRE(shl_node != nullptr);
+		const auto& shl = tree<node_t>::get(shl_node);
+		CHECK(get_bv_width<node_t>(shl.get_ba_type()) == 11);
+
+		// The shifted operand (x) is cast to bv[11].
+		const auto& x_op = tree<node_t>::get(shl.child(0))[0];
+		CHECK(x_op.value.nt == tau::bf_cast);
+		CHECK(get_bv_width<node_t>(x_op.get_ba_type()) == 11);
+
+		// The shift amount: find the ba_constant wherever it ended up --
+		// either still wrapped in a literal bf_cast (if not folded) or
+		// directly re-typed (if term_cast's constant-folding hook folded
+		// it away, as it did for {200} in the assignment-truncation
+		// tests above) -- either way its VALUE must still read "3".
+		tref amt_const = tree<node_t>::get(shl.child(1))
+			.find_top(is<node_t>(tau::ba_constant));
+		REQUIRE(amt_const != nullptr);
+		const auto& amt = tree<node_t>::get(amt_const);
+		CHECK(get_bv_width<node_t>(amt.get_ba_type()) == 11);
+		CHECK(std::get<bv>(amt.get_ba_constant()).getBitVectorValue(10) == "3");
+	}
+
+	TEST_CASE("div atom: both operands widened, not just the dividend") {
+		// x*y/z <= k: `*`/`/`/`%` are same-precedence and left-associative
+		// in this grammar (parser/tau.tgf:107-109, the right operand of
+		// each is explicitly excluded from being a bare bf_mul/bf_div/
+		// bf_mod, forcing left grouping) so this parses as (x*y)/z with no
+		// parens needed. Needed W = 16 (bf_div keeps only the dividend's
+		// width for the RESULT -- max(x*y)=16 -- but widen_term has no
+		// per-operator exceptions: it widens EVERY child uniformly, so
+		// the divisor z must also end up cast to bv[16] even though
+		// needed_width's own formula never used its width in computing W.
+		// This is the "both operands at W" property from the amended
+		// D2/D3 rule (ALL operators run at W).
+		tref src = parse_wff("x:bv[8] * y / z <= k");
+		tref atom = find_atom(src, tau::bf_lteq);
+		tref w = widen_atom<node_t>(atom);
+		REQUIRE(w != nullptr);
+		CHECK(w != atom);
+		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
+
+		tref div_node = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_div));
+		REQUIRE(div_node != nullptr);
+		const auto& div = tree<node_t>::get(div_node);
+		CHECK(get_bv_width<node_t>(div.get_ba_type()) == 16);
+		// dividend (x*y): a bf_mul somewhere in this side, retyped bv[16]
+		// (found via find_top rather than assumed at a fixed depth, so a
+		// transparent bf_parenthesis wrapper, if any survives, can't
+		// break this check).
+		tref mul_node = tree<node_t>::get(div.child(0))
+			.find_top(is<node_t>(tau::bf_mul));
+		REQUIRE(mul_node != nullptr);
+		CHECK(get_bv_width<node_t>(tree<node_t>::get(mul_node).get_ba_type())
+			== 16);
+		// divisor z: a leaf, so widening it means wrapping it in a cast
+		const auto& divisor_op = tree<node_t>::get(div.child(1))[0];
+		CHECK(divisor_op.value.nt == tau::bf_cast);
+		CHECK(get_bv_width<node_t>(divisor_op.get_ba_type()) == 16);
+	}
+
+	TEST_CASE("opaque side: returned unchanged (same tref)") {
+		// ((bv[8]) x) + $X <= z, parsed WITHOUT type inference
+		// (infer_ba_types = false): with inference ON, a Debug-only
+		// consistency check in tau_tree_from_parser.tmpl.h ("Check that
+		// all term nodes have been typed") DBG-aborts, because a capture
+		// ($X) is never assigned a type by inference at all -- it is not
+		// in the "typeable" node-kind set inference collects
+		// (ba_types_inference.tmpl.h's get_typeable_type_ids_by_type only
+		// ever looks at ref/variable/ba_constant/bf_t/bf_f) -- so it is
+		// left untyped post-inference, which that Debug check treats as a
+		// bug. Task 3's own needed_width "$X + y" test sidesteps the same
+		// check the same way (.infer_ba_types = false); with inference
+		// off, the check does not run at all, for anything.
+		//
+		// Turning inference off means bare `x`/`z` stay untyped too (only
+		// a ba_constant's or a bf_cast's OWN `[ typed ]` suffix is folded
+		// "for free" straight from the parse tree, independent of
+		// inference -- see bv_widening.h's needed_width doc comment and
+		// the "user cast is a boundary" needed_width test above), so an
+		// explicit `(bv[8])` cast on x is what gives this atom a
+		// bv-family type at all: construction-time auto-propagation
+		// (tree<node>::get's get_type, tied to hooks, not to inference)
+		// picks up bv[8] from the cast, all the way up through the
+		// bf_add and the bf_lteq atom itself.
+		//
+		// $X itself is opaque to needed_width (bv_widening.h's doc
+		// comment lists capture alongside bf_ref as the canonical opaque
+		// examples) -- the whole bf_add side is therefore opaque too, and
+		// widen_atom must skip the atom entirely rather than partially
+		// elaborate it. (This also exercises is_side_saturated_at's own
+		// opaque-node guard on the way there: without it, checking
+		// whether the bf_add side is "already saturated" would call
+		// get_bv_width on $X's ba_type 0 and DBG-assert too.)
+		auto opts = tau::get_options{
+			.parse = { .start = tau::wff },
+			.infer_ba_types = false
+		};
+		tref src = tree<node_t>::get("((bv[8]) x) + $X <= z", opts);
+		REQUIRE(src != nullptr);
+		tref atom = find_atom(src, tau::bf_lteq);
+		// Sanity: confirm the premise (a genuinely bv-family atom) before
+		// asserting on the opaque-side behavior it's meant to exercise.
+		REQUIRE(is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
+		CHECK(widen_atom<node_t>(atom) == atom);
+	}
+
+	TEST_CASE("not bv-family: returned unchanged (same tref)") {
+		// Plain x = y with no bv annotation and no arithmetic: x, y
+		// default to the non-bv (sbf) boolean algebra, so the atom's own
+		// BA type is not bv-family at all -- widen_atom's very first
+		// check must skip it, before needed_width or anything else runs.
+		tref src = parse_wff("x = y");
+		tref atom = find_atom(src, tau::bf_eq);
+		CHECK(!is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
+		CHECK(widen_atom<node_t>(atom) == atom);
 	}
 }
