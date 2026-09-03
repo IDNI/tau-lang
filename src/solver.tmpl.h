@@ -249,7 +249,11 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
 	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
-	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	// check is trace-log-only; a D4 bv-widening cap violation surfaces as
+	// nullptr here, and LOG_FM would dereference it whenever trace
+	// logging is enabled.
+	if (check) LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	else LOG_TRACE << "lgrs/check: nullptr (bv-widening cap exceeded)\n";
 #endif // DEBUG
 
 	return phi;

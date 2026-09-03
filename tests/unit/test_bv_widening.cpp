@@ -10,6 +10,7 @@
 #include "boolean_algebras/bv_ba.h"
 #include "bv_widening.h"
 
+using tau_api = api<node_t>;
 
 TEST_SUITE("Configuration") {
 
@@ -950,5 +951,37 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		bv_max_width_scope cap(12); // x*y at bv[8] needs W=16 > 12
 		auto fm = parse_wff("o:bv[8] = x * y");
 		CHECK( !is_tau_formula_sat<node_t>(fm) );
+	}
+
+	// Second post-review round: normalizer<node>(tref) (normalizer.tmpl.h,
+	// a thin `return normalize_with_temp_simp<node>(fm);` wrapper) has its
+	// own call sites that were still unguarded -- api<node_t>::
+	// get_interpreter (api.tmpl.h) is the public entry point for building
+	// an executable interpreter, and it already had a pre-existing guard
+	// (`if (!normalized) return {};`, predating this feature, for other
+	// nullptr sources) immediately after its own normalizer<node>() call.
+	// This drives the SAME D4 cap violation through that real, public
+	// entry point with a genuine executable (io-var-carrying) spec, and
+	// confirms it now also fails cleanly for this new nullptr source.
+	//
+	// This does NOT reach interpreter<node_t>::make_interpreter's OWN
+	// internal `spec = normalizer<node>(spec);` guard (interpreter.tmpl.h
+	// ~571): api::get_interpreter normalizes and null-checks BEFORE ever
+	// calling make_interpreter, so a cap violation is always caught one
+	// layer up from here. make_interpreter's own guard is reachable
+	// instead via the REPL/CLI `run(tref, ...)` path
+	// (interpreter.tmpl.h's `run` function calls make_interpreter
+	// directly on a freshly-parsed, not-yet-normalized spec) -- exercising
+	// THAT specific path would need constructing a raw io_context<node_t>
+	// and driving the REPL/CLI runner directly, which none of the
+	// existing unit-test infrastructure in this file sets up; noting this
+	// explicitly rather than reaching for it.
+	TEST_CASE("D4 cap violation through get_interpreter fails cleanly, not a crash") {
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12); // i[t]*i[t] at bv[8] needs W=16 > 12
+		tref fm = tau_api::get_formula("o[t]:bv[8] = i[t]:bv[8] * i[t]:bv[8]");
+		REQUIRE(fm != nullptr);
+		auto maybe_i = tau_api::get_interpreter(fm);
+		CHECK(!maybe_i.has_value());
 	}
 }

@@ -569,6 +569,15 @@ std::optional<interpreter<node>>
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
 	// Find a satisfiable unbound continuation from spec
 	spec = normalizer<node>(spec);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat the spec as unrealizable, the same
+	// as the "no clause was executable" failure path below, rather than
+	// dereferencing it in expression_paths.
+	if (!spec) {
+		LOG_ERROR << "Tau specification failed to normalize "
+			"(bv-widening cap exceeded)\n";
+		return {};
+	}
 	// For each spec clause, we check if it is executable
 	for (tref clause : expression_paths<node>(spec)) {
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
@@ -1335,6 +1344,15 @@ void interpreter<node>::update(tref update) {
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
 	shifted_update = normalizer<node>(shifted_update);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; reject the update cleanly, the same as
+	// the other "No update performed" guards above -- the current spec
+	// (original_spec/memory) is left untouched (B1: never half-commit).
+	if (!shifted_update) {
+		LOG_WARNING << "No update performed: normalization failed "
+			"(bv-widening cap exceeded)\n";
+		return;
+	}
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 	// std::cout << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
@@ -1617,6 +1635,13 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		return r;
 	};
 	update = normalizer<node>(update);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; fold it into the SAME nullopt convention
+	// this function already uses for "definitions in a clause do not
+	// settle" -- the caller (interpreter::update) already treats a
+	// nullopt revision as "the update cannot be accepted", leaving the
+	// current spec untouched (B1: never half-commit).
+	if (!update) return {};
 	// If the update is T, nothing changes
 	if (tau::get(update).equals_T()) return to_htrefs(alts);
 	for (tref clause : expression_paths<node>(update)) {
