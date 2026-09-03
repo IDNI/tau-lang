@@ -229,9 +229,12 @@ tref term_mul(tref symbol) {
 		// c2 (c2 == 0 never overflows: the product is trivially 0). Under
 		// bv_widening, leave the node symbolic for the later elaboration
 		// pass instead of wrapping now.
-		if (bv_widening && c2.getBitVectorValue(10) != "0") {
-			bv back = normalize_bv(make_bitvector_div(res, c2));
-			if (compare_bv_consts(back, c1) != 0) return symbol;
+		if (bv_widening) {
+			const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+			if (compare_bv_consts(c2, make_bitvector_bottom_elem(width)) != 0) {
+				bv back = normalize_bv(make_bitvector_div(res, c2));
+				if (compare_bv_consts(back, c1) != 0) return symbol;
+			}
 		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
