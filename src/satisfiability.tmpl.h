@@ -1479,12 +1479,19 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @param max_st_lookback Greatest lookback among the original
  * `sometimes` clauses.
  * @return The conjunction `aw@l && ... && aw@(l+max_st_lookback-1)`,
- * where `l` is @p aw's lookback, or `nullptr` when @p max_st_lookback
- * is `0`.
+ * where `l` is @p aw's lookback, wrapped in an engaged `std::optional`;
+ * the engaged value is `nullptr` when @p max_st_lookback is `0` (the
+ * legitimate "no initial segment at all" answer, which callers must treat
+ * as an empty conjunct, not as a failure). Returns `std::nullopt` -- a
+ * distinct channel -- when normalizing the segment failed, i.e. on a D4
+ * bv-widening cap violation (already `LOG_ERROR`'d by the pass): callers
+ * must propagate that failure rather than continue without the initial
+ * run, since silently dropping those conjuncts only ever makes the
+ * remaining formula EASIER to satisfy (an anti-conservative answer).
  * @endinternal
  */
 template <NodeType node>
-tref make_initial_run(tref aw, const int_t max_st_lookback) {
+std::optional<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using tau = tree<node>;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
@@ -1497,12 +1504,11 @@ tref make_initial_run(tref aw, const int_t max_st_lookback) {
 			run = normalize_non_temp<node>(
 						tau::build_wff_and(run, current_aw));
 			// A D4 bv-widening cap violation (already LOG_ERROR'd by the
-			// pass) surfaces as nullptr here; return it immediately --
-			// falling through to the `else` branch on the next iteration
-			// would silently overwrite it with `current_aw`, masking the
-			// failure as this function's own legitimate "nothing yet"
-			// nullptr (see this function's doc comment).
-			if (!run) return nullptr;
+			// pass) surfaces as nullptr here; report it on the failure
+			// channel, which is what keeps it distinguishable from the
+			// legitimate `max_st_lookback == 0` nullptr below (see this
+			// function's doc comment).
+			if (!run) return std::nullopt;
 		}
 		else run = current_aw;
 	}
@@ -1590,8 +1596,16 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 					st_flags, st_io_vars, time_point - 1);
 	st_io_vars = tau::get(st_flags).select_top(is_child<node, tau::io_var>);
 
-	// Create the initial phase of the always part
-	tref run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
+	// Create the initial phase of the always part. std::nullopt (as opposed
+	// to an engaged nullptr, which just means "no initial segment", the
+	// max_st_lookback == 0 case) is a normalization failure -- a D4
+	// bv-widening cap violation -- and must be propagated like every other
+	// guarded site below: continuing with `run = nullptr` would silently
+	// DROP the initial-run conjuncts and make the remaining search easier,
+	// i.e. answer satisfiable/realizable when it must not.
+	auto initial_run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
+	if (!initial_run) return nullptr;
+	tref run = *initial_run;
 	// Check if flag can be raised up to the highest initial condition + 2
 	// which corresponds to checking the sometimes statement up to time point
 	// of the highest initial condition + 1

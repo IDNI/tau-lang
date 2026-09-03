@@ -14,6 +14,8 @@
 #ifndef __IDNI__TAU__SATISFIABILITY_H__
 #define __IDNI__TAU__SATISFIABILITY_H__
 
+#include <optional>
+
 #include "tau_tree.h"
 
 namespace idni::tau_lang {

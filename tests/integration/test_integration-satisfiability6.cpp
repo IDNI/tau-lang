@@ -581,10 +581,19 @@ TEST_SUITE("satisfiability helpers") {
 		// transform_io_var, which needs the in/out classification.
 		tref aw = spec_always_body("always o1[t] = o1[t-1].");
 		REQUIRE( aw != nullptr );
-		// the loop body never runs, so `run` stays nullptr
-		CHECK( make_initial_run<node_t>(aw, 0) == nullptr );
+		// the loop body never runs, so `run` stays nullptr -- but that is
+		// the LEGITIMATE empty-run answer, reported on the success channel
+		// (an engaged optional holding nullptr), not the failure channel
+		// (std::nullopt, reserved for a normalization/D4-cap failure so
+		// that to_unbounded_continuation can tell the two apart instead of
+		// silently dropping the initial-run conjuncts).
+		auto empty_run = make_initial_run<node_t>(aw, 0);
+		REQUIRE( empty_run.has_value() );
+		CHECK( *empty_run == nullptr );
 
-		tref run = make_initial_run<node_t>(aw, 2);
+		auto run_opt = make_initial_run<node_t>(aw, 2);
+		REQUIRE( run_opt.has_value() );
+		tref run = *run_opt;
 		REQUIRE( run != nullptr );
 		// every io_var of the run refers to a constant time point
 		trefs rvs = io_vars_of(run);
