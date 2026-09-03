@@ -173,6 +173,39 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
 template <NodeType node>
 tref widen_atom(tref atom);
 
+/**
+ * @brief Whole-formula `bv_widening` pass: rewrite every bv-family atom in
+ * `fm` via `widen_atom`.
+ *
+ * A pure pass-through no-op (returns `fm` unchanged, same tref) when the
+ * `bv_widening` runtime flag (see `bv_widening_options.h`) is `false`, or
+ * when `fm` contains no bv atom that `widen_atom` actually changes -- so
+ * callers may call this unconditionally without checking the flag
+ * themselves.
+ *
+ * Collects every node whose own nt is one of `bf_eq`, `bf_neq`, `bf_lt`,
+ * `bf_nlt`, `bf_lteq`, `bf_nlteq`, `bf_gt`, `bf_ngt`, `bf_gteq`, `bf_ngteq`,
+ * or `bf_interval` (`parser/tau.tgf:64-74`) anywhere in `fm` -- including
+ * under quantifiers, since the search descends through the whole tree --
+ * runs `widen_atom` on each, and rewrites only the ones that actually
+ * changed (a non-bv-family atom, or a bv atom already at its saturated
+ * width, comes back unchanged from `widen_atom` and is left out of the
+ * replacement map entirely, so an all-unchanged formula also short-circuits
+ * to the `fm`-unchanged fast path).
+ *
+ * @tparam node Tree node type.
+ * @param fm A `wff`-nonterminal (or any other) node ref to rewrite.
+ * @return `fm` unchanged (same tref) when `bv_widening` is off or no atom
+ *   needs rewriting; otherwise `fm` with every changed bv atom replaced by
+ *   its `widen_atom` result. Returns `nullptr`, exactly like `widen_atom`
+ *   itself (which already `LOG_ERROR`s the cap violation before returning
+ *   `nullptr`), the moment any one atom's required width exceeds
+ *   `bv_max_width` (the D4 width cap) -- callers should treat a `nullptr`
+ *   result the same way they treat a failed normalization.
+ */
+template <NodeType node>
+tref widen_bv_arithmetic(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "bv_widening.tmpl.h"

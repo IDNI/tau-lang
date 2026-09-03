@@ -356,4 +356,46 @@ tref widen_atom(tref atom) {
 	return tau::get(n.get_type(), new_sides[0], new_sides[1]);
 }
 
+template <NodeType node>
+tref widen_bv_arithmetic(tref fm) {
+	using tau = tree<node>;
+
+	if (!bv_widening) return fm; // pass fully inert when the flag is off
+
+	// The full bv-family atom nt set widen_atom knows how to elaborate --
+	// parser/tau.tgf:64-74. `is<node>({...})` (tau_tree_queries.tmpl.h) is
+	// the factory overload that returns a std::function<bool(tref)>,
+	// suitable directly as select_top's predicate.
+	//
+	// select_top descends through the whole tree (quantifiers included --
+	// a quantifier node's own nt never matches the atom predicate, so
+	// recursion continues underneath it), collecting every bv-widening-
+	// eligible atom node, wherever it is nested.
+	trefs atoms = tau::get(fm).select_top(is<node>({
+		tau::bf_eq, tau::bf_neq, tau::bf_lt, tau::bf_nlt,
+		tau::bf_lteq, tau::bf_nlteq, tau::bf_gt, tau::bf_ngt,
+		tau::bf_gteq, tau::bf_ngteq, tau::bf_interval
+	}));
+	if (atoms.empty()) return fm; // no bv atom at all: nothing to do
+
+	// Build the replacement map for the CHANGED atoms only: widen_atom is
+	// itself a no-op (returns the same tref) for a non-bv-family atom or
+	// an already-saturated bv atom, so those are simply left out of
+	// `changes` rather than mapped to themselves. The map type MUST be the
+	// project's subtree_map (a std::map ordered by subtree_less, tree.h)
+	// -- NOT std::map<tref, tref> keyed on raw pointer identity -- since
+	// that is the type rewriter::replace's subtree_map overload expects
+	// (the idiom used throughout, e.g.
+	// normal_forms_transformations.tmpl.h's shift_io_vars_in_fm).
+	subtree_map<node, tref> changes;
+	for (tref atom : atoms) {
+		tref widened = widen_atom<node>(atom);
+		if (widened == nullptr) return nullptr; // D4 cap: propagate the failure
+		if (widened != atom) changes[atom] = widened;
+	}
+	if (changes.empty()) return fm; // every atom was already a no-op
+
+	return rewriter::replace<node>(fm, changes);
+}
+
 } // namespace idni::tau_lang

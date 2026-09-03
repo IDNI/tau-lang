@@ -164,6 +164,17 @@ struct bv_max_width_scope {
 	~bv_max_width_scope() { bv_max_width = prev; }
 };
 
+// Sets bv_widening for the lifetime of the enclosing scope and restores
+// whatever value it had before, even on a REQUIRE-failure stack unwind.
+// Local copy of the RAII guard in test_bv_ba_hooks.cpp -- widen_atom's own
+// tests never needed it (widen_atom doesn't consult the flag itself; only
+// widen_bv_arithmetic does), but the whole-formula pass tests below do.
+struct bv_widening_scope {
+	bool prev;
+	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
+	~bv_widening_scope() { bv_widening = prev; }
+};
+
 // Structural check for the "truncating assignment" atom shape (widen_atom
 // step 4, exactly-one-bare-storage-side): exactly one side of `w` must be
 // the untouched bare variable, structurally identical (subtree_equals --
@@ -581,5 +592,121 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref atom = find_atom(src, tau::bf_eq);
 		CHECK(!is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
 		CHECK(widen_atom<node_t>(atom) == atom);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// widen_bv_arithmetic
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("bv widening - whole formula pass") {
+
+	TEST_CASE("OFF mode: fm returned unchanged (same tref)") {
+		// bv_widening is false by default and no scope guard turns it on
+		// here -- widen_bv_arithmetic must be a pure pass-through no-op,
+		// checked by pointer identity (hash-consing makes this a valid
+		// check for an UNTOUCHED tree: no rewrite means no rebuild at all,
+		// so there is no rebuilt-sibling tref-mismatch pitfall here the way
+		// there is for widen_atom's own truncating-assignment tests).
+		REQUIRE(!bv_widening);
+		tref src = parse_wff("o:bv[8] = min(x * y, {200})"); // would genuinely widen if ON
+		CHECK(widen_bv_arithmetic<node_t>(src) == src);
+	}
+
+	TEST_CASE("mixed formula: only the bv atom is rewritten, the sbf atom is left alone") {
+		// (x*y <= z) && (a = b): the left conjunct is a genuine bv-family
+		// comparison needing widening (W=16, as in widen_atom's own
+		// "comparison" test above); the right conjunct, plain `a = b` with
+		// no bv annotation, defaults to the non-bv (sbf) boolean algebra
+		// (as in widen_atom's own "not bv-family" test) -- same atom nt
+		// (bf_eq/bf_lteq both live in widen_bv_arithmetic's collected atom
+		// set regardless of BA type), different BA type. Confirms the pass
+		// collects atoms by nt across BA types and lets widen_atom's own
+		// per-atom no-op check filter out the non-bv one.
+		bv_widening_scope widen;
+		tref src = parse_wff("(x:bv[8] * y <= z) && (a = b)");
+		tref bv_atom = find_atom(src, tau::bf_lteq);
+		tref sbf_atom = find_atom(src, tau::bf_eq);
+		REQUIRE(is_bv_type_family<node_t>(tree<node_t>::get(bv_atom).get_ba_type()));
+		REQUIRE(!is_bv_type_family<node_t>(tree<node_t>::get(sbf_atom).get_ba_type()));
+		tref direct_widened_bv_atom = widen_atom<node_t>(bv_atom);
+		REQUIRE(direct_widened_bv_atom != nullptr);
+		CHECK(direct_widened_bv_atom != bv_atom); // sanity: real work to do
+
+		tref w = widen_bv_arithmetic<node_t>(src);
+		REQUIRE(w != nullptr);
+		CHECK(w != src);
+
+		// The bv side was rewritten to exactly what widen_atom itself
+		// produces (structural comparison -- see widen_atom's own tests
+		// for why raw tref equality is the wrong tool across a rebuild
+		// that changes a sibling).
+		tref w_bv_atom = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_lteq));
+		REQUIRE(w_bv_atom != nullptr);
+		CHECK(tree<node_t>::subtree_equals(w_bv_atom, direct_widened_bv_atom));
+
+		// The sbf side is untouched: still there, still exactly `a = b`,
+		// still not bv-family.
+		tref w_sbf_atom = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_eq));
+		REQUIRE(w_sbf_atom != nullptr);
+		CHECK(tree<node_t>::subtree_equals(w_sbf_atom, sbf_atom));
+		CHECK(!is_bv_type_family<node_t>(tree<node_t>::get(w_sbf_atom).get_ba_type()));
+	}
+
+	TEST_CASE("quantified formula: a bv atom nested under quantifiers is rewritten") {
+		// all x:bv[8] all y all z (x*y <= z): today's inference unifies all
+		// three variables to one width (bv[8], from x's own annotation),
+		// keeping this a single-width sample -- the point of this test is
+		// only that select_top finds the atom despite the wff_all
+		// wrappers, not any cross-width interaction.
+		bv_widening_scope widen;
+		tref src = parse_wff("all x:bv[8] all y all z (x * y <= z)");
+		tref atom = find_atom(src, tau::bf_lteq);
+		REQUIRE(is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
+		tref direct = widen_atom<node_t>(atom);
+		REQUIRE(direct != nullptr);
+		CHECK(direct != atom); // sanity: real work to do
+
+		tref w = widen_bv_arithmetic<node_t>(src);
+		REQUIRE(w != nullptr);
+		CHECK(w != src);
+
+		// Semantic check, not a specific root nt: `wff` wraps its operator
+		// exactly like `bf` wraps bf_add/etc. (parser/tau.tgf:44-48), so
+		// the parsed/rewritten root is a `wff` node whose child(0) is
+		// `wff_all` -- not `wff_all` itself. Rather than pin that one-level
+		// wrapper shape (fragile if a normalization step or a different
+		// parse path adds/removes wrapping), assert the two things that
+		// actually matter here: all three quantifiers survive the pass,
+		// and the bv atom nested underneath them was genuinely rewritten
+		// to widen_atom's own result.
+		//
+		// select_all (not select_top) is required to count them: each
+		// wff_all's own body is itself a `wff` wrapping the next wff_all,
+		// so the three quantifiers are nested inside one another, not
+		// siblings -- select_top stops descending into a matched node's
+		// children ("we are only interested in the top nodes",
+		// tree_rewriter.tmpl.h), so it would only ever find the outermost
+		// one (x's) and silently miss y's and z's nested underneath it.
+		trefs w_quantifiers = tree<node_t>::get(w).select_all(is<node_t>(tau::wff_all));
+		CHECK(w_quantifiers.size() == 3);
+		tref w_atom = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_lteq));
+		REQUIRE(w_atom != nullptr);
+		CHECK(tree<node_t>::subtree_equals(w_atom, direct));
+	}
+
+	TEST_CASE("nullptr propagation: any atom hitting the D4 cap aborts the whole pass") {
+		// Two conjuncts: the first would need W=16 (exceeds the capped
+		// bv_max_width=12, exactly like widen_atom's own "cap exceeded"
+		// test), the second is a perfectly fine, small bv atom (W=9, well
+		// under the cap) that WOULD be rewritten successfully in isolation.
+		// widen_bv_arithmetic must still return nullptr overall: one
+		// atom's cap violation aborts the whole pass, not just its own
+		// atom -- LOG_ERROR noise from the cap-violating atom is expected
+		// here, exactly as in widen_atom's own cap test.
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12); // x*y at bv[8] needs 16 > 12
+		tref src = parse_wff("(o:bv[8] = min(x * y, z)) && (p:bv[8] = w + w2)");
+		CHECK(widen_bv_arithmetic<node_t>(src) == nullptr);
 	}
 }
