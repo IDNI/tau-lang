@@ -2,6 +2,7 @@
 
 #include "boolean_algebras/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "../parser/bitvector_parser.generated.h"
+#include "bv_widening_options.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_hooks"
@@ -11,15 +12,26 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+// Forward declaration: defined below (near the comparison hooks), but the
+// fit-gated folding in term_add/term_sub/term_mul/term_shl -- all defined
+// earlier in this file -- needs it. Their calls to compare_bv_consts are
+// non-dependent (bv is not a template parameter), so ordinary two-phase
+// lookup requires a declaration visible at this point.
+int compare_bv_consts(const bv& c1, const bv& c2);
+
 template<NodeType node>
 tref term_add(tref symbol) {
 	using tau = tree<node>;
 
 	DBG(LOG_TRACE << "term_add/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto add_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto add_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_add(c1, c2);
 		res = normalize_bv(res); // Normalize result
+		// Unsigned add overflow iff the wrapped result is less than either
+		// operand (here c1). Under bv_widening, leave the node symbolic so
+		// the later elaboration pass can widen it instead of wrapping now.
+		if (bv_widening && compare_bv_consts(res, c1) < 0) return symbol;
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
@@ -91,7 +103,11 @@ tref term_sub(tref symbol) {
 
 	DBG(LOG_TRACE << "term_sub/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto sub_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto sub_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
+		// Unsigned sub underflow iff c1 < c2. Under bv_widening, leave the
+		// node symbolic so the later elaboration pass can widen it instead
+		// of wrapping now.
+		if (bv_widening && compare_bv_consts(c1, c2) < 0) return symbol;
 		bv res = make_bitvector_sub(c1, c2);
 		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
@@ -206,9 +222,17 @@ tref term_mul(tref symbol) {
 
 	DBG(LOG_TRACE << "term_mul/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto mul_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto mul_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_mul(c1, c2);
 		res = normalize_bv(res); // Normalize result
+		// Wrapped iff the product does not round-trip through division by
+		// c2 (c2 == 0 never overflows: the product is trivially 0). Under
+		// bv_widening, leave the node symbolic for the later elaboration
+		// pass instead of wrapping now.
+		if (bv_widening && c2.getBitVectorValue(10) != "0") {
+			bv back = normalize_bv(make_bitvector_div(res, c2));
+			if (compare_bv_consts(back, c1) != 0) return symbol;
+		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
@@ -550,9 +574,16 @@ tref term_shl(tref symbol) {
 
 	DBG(LOG_TRACE << "term_shl/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto shl_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto shl_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_shl(c1, c2);
 		res = normalize_bv(res); // Normalize result
+		// Wrapped iff the shift does not round-trip through the same shift
+		// right. Under bv_widening, leave the node symbolic for the later
+		// elaboration pass instead of wrapping now.
+		if (bv_widening) {
+			bv back = normalize_bv(make_bitvector_shr(res, c2));
+			if (compare_bv_consts(back, c1) != 0) return symbol;
+		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)

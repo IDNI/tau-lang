@@ -451,6 +451,99 @@ TEST_SUITE("bv term_min/term_max: constant folding") {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// bv_widening: fit-gated constant folding.
+//
+// With bv_widening on, term_add/sub/mul/shl must decline to fold a constant
+// operation whose exact result does not fit the operands' width -- the node
+// is left symbolic (the operator survives) for the later elaboration pass to
+// widen. With bv_widening off (the default), folding is bit-identical to
+// today: it always happens, wrapping/truncating modularly.
+//
+// Every TEST_CASE that flips bv_widening to true restores it to false before
+// returning, so a failure partway through a case does not leak the flag into
+// later tests.
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("bv widening: fit-gated constant folding") {
+
+	TEST_CASE("add: wrap declined when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{200}:bv[8] + {100}:bv[8]"); // 300 wraps to 44 at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) != nullptr);
+		bv_widening = false;
+	}
+
+	TEST_CASE("add: fit still folds when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{100}:bv[8] + {50}:bv[8]"); // 150 fits at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) == nullptr);
+		CHECK(src == bf("{150}:bv[8]"));
+		bv_widening = false;
+	}
+
+	TEST_CASE("add: wrap still folds modularly when bv_widening is off") {
+		CHECK(bf("{200}:bv[8] + {100}:bv[8]") == bf("{44}:bv[8]"));
+	}
+
+	TEST_CASE("sub: underflow declined when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{200}:bv[8] - {201}:bv[8]"); // 200 - 201 underflows
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_sub>) != nullptr);
+		bv_widening = false;
+	}
+
+	TEST_CASE("sub: fit still folds when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{200}:bv[8] - {100}:bv[8]"); // 100, no underflow
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_sub>) == nullptr);
+		CHECK(src == bf("{100}:bv[8]"));
+		bv_widening = false;
+	}
+
+	TEST_CASE("sub: underflow still folds modularly when bv_widening is off") {
+		CHECK(bf("{200}:bv[8] - {201}:bv[8]") == bf("{255}:bv[8]"));
+	}
+
+	TEST_CASE("mul: wrap declined when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{16}:bv[8] * {16}:bv[8]"); // 256 wraps to 0 at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) != nullptr);
+		bv_widening = false;
+	}
+
+	TEST_CASE("mul: fit still folds when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{15}:bv[8] * {15}:bv[8]"); // 225 fits at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) == nullptr);
+		CHECK(src == bf("{225}:bv[8]"));
+		bv_widening = false;
+	}
+
+	TEST_CASE("mul: wrap still folds modularly when bv_widening is off") {
+		CHECK(bf("{16}:bv[8] * {16}:bv[8]") == bf("0:bv[8]"));
+	}
+
+	TEST_CASE("shl: wrap declined when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{129}:bv[8] << {1}:bv[8]"); // 258 wraps to 2 at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) != nullptr);
+		bv_widening = false;
+	}
+
+	TEST_CASE("shl: fit still folds when bv_widening is on") {
+		bv_widening = true;
+		tref src = bf("{1}:bv[8] << {2}:bv[8]"); // 4 fits at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) == nullptr);
+		CHECK(src == bf("{4}:bv[8]"));
+		bv_widening = false;
+	}
+
+	TEST_CASE("shl: wrap still folds modularly when bv_widening is off") {
+		CHECK(bf("{129}:bv[8] << {1}:bv[8]") == bf("{2}:bv[8]"));
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
