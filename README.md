@@ -754,7 +754,150 @@ always o1[t]:bv[24] = ( i1[t]:bv[24] - min(i1[t]:bv[24], i2[t]:bv[24]) ).    # s
 ```
 
 The checked-multiplication patterns keep their branches: the product itself
-wraps, so no post-hoc `min` can recover it.
+wraps, so no post-hoc `min` can recover it. The
+[exact (widened) arithmetic mode](#exact-widened-arithmetic-mode) below lifts
+exactly this restriction, for callers willing to opt in.
+
+### Exact (widened) arithmetic mode
+
+Everything above is *modular*: intermediate results wrap silently at the
+operands' declared width, so a computation that must not overflow has to be
+reasoned about with the guard patterns above, or, for addition and
+subtraction only, with the `min`/`max` idiom that closes this section. Tau
+also offers an opt-in **exact (widened) arithmetic mode** that instead
+computes each atomic formula's arithmetic exactly, as over the naturals, at
+whatever width is needed to avoid any overflow, and truncates only once, at
+the point where a result is actually stored. Under this mode the
+checked-multiplication gap admitted just above disappears: `min(i1*i2, K)`
+becomes a correct, guard-free saturating multiplication.
+
+The mode is off by default and changes nothing when disabled. Turn it on
+with:
+
+* the command line options `-y`, `--bv-widening` (enable the mode; disabled
+  by default) and `-Y`, `--bv-max-width <n>` (cap the width the mode is
+  allowed to compute at; `0` means the default, 1024). Both apply whether
+  Tau is run as a REPL or given a specification file directly.
+* the matching REPL options `y|bvwidening` (on/off) and `bvmaxwidth`
+  (numeric, `set bvmaxwidth <n>`; `0` resets it to the default 1024).
+* the API setters `api::set_bv_widening(bool)` and
+  `api::set_bv_max_width(size_t)`.
+
+**Semantics.** For every bitvector atomic formula (an equality, a
+comparison, an interval), the mode computes, bottom-up, the minimum width
+`W` at which none of the atom's arithmetic can overflow:
+
+| Node                                    | Needed width                                              |
+|------------------------------------------|------------------------------------------------------------|
+| variable, io_var, constant               | its own declared width `w`                                 |
+| `a + b`                                  | `max(width(a), width(b)) + 1`                               |
+| `a - b`                                  | `max(width(a), width(b))`                                   |
+| `a * b`                                  | `width(a) + width(b)`                                       |
+| `a / b`, `a % b`                         | `width(a)` (a quotient or remainder never exceeds the dividend) |
+| `a << k` (`k` a constant)                | `width(a) + k`                                              |
+| `a >> k`, `a >> v` (either kind of shift right) | `width(a)`                                          |
+| `a << v` (`v` a variable)                | `width(a)` -- see caveat below                              |
+| `min(a, b)`, `max(a, b)`                 | `max(width(a), width(b))`                                   |
+| `&`, `\|`, `^`, `'`, `!&`, `!\|`, `!^`   | `max` of the operand widths -- run at `W` like everything else, see caveat below |
+
+`W` is the largest of these over the whole atom. Every leaf is upcast once
+to `bv[W]` by zero-extension and every operator is retyped `bv[W]`; there is
+no interior truncation anywhere. The only place a result is ever cut back
+down is an equality with exactly one bare variable/stream side (an
+"assignment"): there, the *other* side is computed at `W` and then cast
+down, truncating, to the variable's own declared width -- so
+`o1[t] = i1[t] + i2[t]` still stores the same wrapped sum as in the default
+mode, while `o1[t] = min(i1[t] + i2[t], K)` lets `min` see the exact,
+unwrapped sum before it clamps. A comparison, an interval, or an equality
+between two compound expressions is instead extended on both sides and
+compared or equated exactly, with no truncation at all -- this is where the
+mode is most visible: `i1*i2 <= c` stops wrapping.
+
+**Caveats.**
+
+* Subtraction still wraps on underflow: `-`'s needed width never grows on
+  its own (`max(width(a), width(b))`), so an underflowing subtraction still
+  wraps, just at `W` rather than at the base width when it sits above an
+  already-widened operand. Guard it exactly as in the default mode, with
+  `a >= b`.
+* A variable-amount left shift is the one operation the mode cannot bound:
+  accounting for every possible shift amount could need up to
+  `w + 2^{w_v} - 1` bits, so `a << v` for a variable `v` still executes at
+  `W` and can still wrap there. A constant-amount shift, `a << k`, is fully
+  accounted for and exact.
+* Complement and the other negating bitwise operators (`'`, `!&`, `!|`,
+  `!^`) act at `W`, not at the operand's own declared width, because every
+  operator in the atom runs at the atom's computed width. So `x'` means
+  `2^W - 1 - x`, not the base-width complement zero-extended -- meaning the
+  saturating idiom `min(i2, i1')` from the previous section no longer means
+  "clamp against `i1`'s own maximum" once `i1'` is computed at some wider
+  `W`. If a specific width is intended, pin it explicitly with a cast,
+  exactly as in the default mode:
+
+  ```
+  (bv[8]) i1[t]:bv[8]'          # the base-width (8-bit) complement, regardless of the surrounding computation's width
+  ```
+
+  A cast is always a boundary for this pass: whatever it wraps is
+  elaborated as its own, independent computation and re-enters the
+  surrounding atom already fixed at the cast's declared width, recovering
+  today's exact meaning even with the mode switched on.
+
+**Payoff.** With the mode on, the two saturating patterns that need a
+branch in the default mode -- and the checked multiply that needs one no
+matter what, per the admission above -- both collapse to a single `min`:
+
+```
+always o1[t]:bv[8] = min( i1[t]:bv[8] + i2[t]:bv[8], { 200 }:bv[8] ).   # guard-free saturating +
+
+  200 + 100  ->  200   (exact sum 300 does not fit under {200}, so min clamps to it)
+  200 + 100  ->  44    (default mode: the sum itself already wrapped to 44 before min ever ran)
+```
+
+```
+always o1[t]:bv[8] = min( i1[t]:bv[8] * i2[t]:bv[8], { 200 }:bv[8] ).   # guard-free checked *
+
+  16 * 16  ->  200   (exact product 256 does not fit under {200}, so min clamps to it)
+  16 * 16  ->  0     (default mode: the product itself already wrapped to 0; no post-hoc min can recover it)
+```
+
+The second pattern is the one this section opened by ruling out: with the
+mode on, the multiplication itself never wraps, so `min` sees the real
+product and the previously-impossible checked multiply becomes an ordinary
+guard-free expression.
+
+**Cap.** `W` is bounded by `--bv-max-width`/`bvmaxwidth` (default 1024); a
+formula that would need a wider computation fails cleanly instead of
+growing without bound. Exceeding it logs two error lines and the query
+answers conservatively rather than crashing or hanging, e.g.:
+
+```
+(Error) bv-widening: required width 16 exceeds bv-max-width 8
+(Error) is_tau_formula_sat: normalization failed (bv-widening cap exceeded); answering unsat. This is a conservative fallback, not a proof.
+```
+
+A satisfiability check answers unsat (`F`), a validity check answers "not
+valid", and constructing or updating a specification that would exceed the
+cap is rejected the same way -- in every case this is a conservative
+fallback the cap forces, not a proof that the formula is actually
+unsatisfiable/invalid/unacceptable.
+
+**Cost.** The mode is inert -- identical performance -- when off. When on,
+a ground or lightly-quantified spec runs about as fast as the default mode;
+widening one atom's arithmetic by a few dozen extra bits is cheap for CVC5.
+Quantified nonlinear arithmetic is a different story: doubling the width of
+a product inside a quantifier can turn an instant query into an
+intractable one, e.g.
+`valid all x all y ((x:bv[64]*y:bv[64])/y = x || y = {0}:bv[64])` answers in
+well under a second in the default mode but does not finish in five minutes
+once widened to bv[128]. The mode is at its best for executable specs and
+ground or lightly-quantified reasoning; deep quantified nonlinear
+arithmetic may need the cap, or restructuring the specification, to stay
+tractable.
+
+The guard idioms from the previous section remain the answer in the
+default mode, and stay available -- and correct -- with the exact mode
+switched on too.
 
 ### Precedence of term operations
 
