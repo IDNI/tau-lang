@@ -21,6 +21,7 @@
 #define __IDNI__TAU__NSO_RR_H__
 
 #include "tau_tree.h"
+#include "bv_widening_options.h"
 
 namespace idni::tau_lang {
 

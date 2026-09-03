@@ -710,3 +710,224 @@ TEST_SUITE("bv widening - whole formula pass") {
 		CHECK(widen_bv_arithmetic<node_t>(src) == nullptr);
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Task 6: pipeline integration + end-to-end cvc5 semantics.
+//
+// Every case below sets `bv_widening = true` BEFORE parsing, not merely
+// before calling widen_bv_arithmetic: term_add/term_sub/term_mul's
+// fit-gated constant folding (Task 2) checks the SAME global flag at
+// construction time, and deliberately leaves an overflowing constant
+// operation (e.g. `{16}*{16}` at bv[8]) symbolic -- unfolded -- exactly
+// when bv_widening is on, so that the tree still contains a genuine
+// bf_mul/bf_add/bf_sub node for widen_bv_arithmetic's needed_width to see.
+// Parsing the same source with the flag off folds it immediately via
+// ordinary (wrapping) bv hardware semantics, which is what the "modular"
+// half of each pair below relies on.
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
+
+	TEST_CASE("mul comparison no longer wraps") {
+		bv_widening = true;
+		// {16}*{16} = 256 -> modular bv[8] gives 0 <= 10 TRUE;
+		// exact 256 <= 10 FALSE.
+		auto fm = parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] <= { 10 }:bv[8]");
+		CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm)) );
+		bv_widening = false;
+		CHECK( is_bv_formula_valid<node_t>(fm) );
+	}
+
+	TEST_CASE("guard-free checked multiply") {
+		bv_widening = true;
+		// o:bv[8] = min({16}*{16}, {200}): exact min(256,200)=200 ->
+		// the truncating (bv[8]) cast is lossless and o solves to 200.
+		auto fm = parse_wff("o = min({ 16 }:bv[8] * { 16 }:bv[8], { 200 }:bv[8])");
+		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm));
+		REQUIRE(sol.has_value());
+		// `o` is the sole free variable (every other subterm is a
+		// constant): the same size==1 idiom test_bv_ba-solver2.cpp uses,
+		// then read the model's constant the way
+		// bf_shl_shift_amount/test_bv_widening.cpp:499 already does
+		// (getBitVectorValue(10) on the ba_constant's underlying bv).
+		REQUIRE(sol.value().size() == 1);
+		const tref val = sol.value().begin()->second;
+		CHECK(std::get<bv>(tree<node_t>::get(val)[0].get_ba_constant())
+			.getBitVectorValue(10) == "200");
+		bv_widening = false;
+	}
+
+	TEST_CASE("saturating add via min") {
+		bv_widening = true;
+		// o:bv[8] = min({200}+{90}, {250}): exact sum 290 at W=9 (bf_add
+		// is max(l,r)+1 = 9, well clear of 511), min(290,250)=250,
+		// truncates losslessly (250 <= 255) -> o solves to 250. (250, not
+		// 255: 255 is bv[8]'s all-ones top element, which the comparison
+		// hooks canonicalize to a distinct `bf_t` node rather than a
+		// plain ba_constant -- picking 250 keeps the model-value read
+		// below a single, unambiguous code path.)
+		// Same solve+model-check shape as the checked-multiply case.
+		auto fm = parse_wff("o = min({ 200 }:bv[8] + { 90 }:bv[8], { 250 }:bv[8])");
+		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm));
+		REQUIRE(sol.has_value());
+		REQUIRE(sol.value().size() == 1);
+		const tref val = sol.value().begin()->second;
+		CHECK(std::get<bv>(tree<node_t>::get(val)[0].get_ba_constant())
+			.getBitVectorValue(10) == "250");
+		bv_widening = false;
+	}
+
+	TEST_CASE("subtraction underflow wraps at W (D1)") {
+		bv_widening = true;
+		// {20}*{15} - {10} <= {50}: bf_sub's own rule is `max(l, r)` (it
+		// never grows on its own), but here it sits ABOVE a widened mul
+		// (needed_width(bf_mul(20,15)) = 8+8 = 16), so its own width is
+		// inherited as max(16, 8) = 16, not the base width 8 -- "identical
+		// to today" only holds when sub's operands are both already at
+		// base_w, which is NOT the case here.
+		// modular (bv_widening off): 20*15 mod 256 = 44 (cvc5 8-bit
+		// hardware multiply); 44 - 10 = 34 (no underflow); 34 <= 50 TRUE.
+		// exact (W=16): 20*15 = 300 (fits in 16 bits, no wrap);
+		// 300 - 10 = 290 (16-bit, no underflow); 290 <= 50 FALSE.
+		auto fm = parse_wff(
+			"({ 20 }:bv[8] * { 15 }:bv[8]) - { 10 }:bv[8] <= { 50 }:bv[8]");
+		CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm)) );
+		bv_widening = false;
+		CHECK( is_bv_formula_valid<node_t>(fm) );
+	}
+
+	TEST_CASE("complement fold: X <= top element is a trivial BA identity (unaffected by widening)") {
+		// This was the original "complement at W" pin. The controller's
+		// run showed the widened formula prints as the bare constant `T`
+		// -- re-deriving by hand from the spec rules (not just re-running)
+		// shows T is actually CORRECT here, for a reason that has nothing
+		// to do with exact-vs-modular semantics: {255} is bv[8]'s all-ones
+		// value, so it parses directly as `bf_t` (test_bv_ba_hooks.cpp's
+		// own "an all-ones literal is the top element" fact), and
+		// `wff_lteq`'s own comparison-folding hook has a standing BA law,
+		// unrelated to bv_widening, "$X <= 1 ::= T." (hooks.tmpl.h:1288-
+		// 1291, where "1" is the BA's top element) -- X <= top is TRUE for
+		// ANY X, so the WHOLE atom folds to `wff_t` at parse time, before
+		// widen_bv_arithmetic ever runs (there is no bf_lteq atom left for
+		// select_top to find, so the pass is correctly a no-op on an
+		// already-constant formula). T is therefore correct regardless of
+		// widening; this sample never actually exercised the amended D3
+		// complement-at-W rule at all -- see the next case for that.
+		bv_widening = true;
+		auto fm = parse_wff("({ 16 }:bv[8] * { 16 }:bv[8])' <= { 255 }:bv[8]");
+		tref widened = widen_bv_arithmetic<node_t>(fm);
+		REQUIRE(widened != nullptr);
+		CHECK(widened == fm); // already fully folded at parse time: no-op
+		CHECK( is_bv_formula_valid<node_t>(widened) );
+		bv_widening = false;
+		CHECK( is_bv_formula_valid<node_t>(fm) );
+	}
+
+	TEST_CASE("complement at W (amended D3): exact vs modular, solver-checked") {
+		// ex x ((x * {255})' <= {200}): bf_neg's rule is `w = l` -- it runs
+		// AT its operand's own computed width, which here is the widened
+		// 16-bit product (amended D3: complement does not drop back to the
+		// atom's base width). Avoids the previous case's trap: {200} is an
+		// ordinary bv[8] constant (neither 0 nor 255), so no comparison
+		// identity fires, and this is a genuine ex-quantified atom that
+		// must actually reach the solver.
+		//
+		// modular (bv_widening off, native bv[8] hardware arithmetic): as
+		// x ranges over 0..255, x*255 mod 256 = (256 - x) mod 256 takes
+		// EVERY value in [0,255] (255 is -1 mod 256, so this is a
+		// bijection); its one's complement (255 - that value) therefore
+		// also ranges over all of [0,255]. Concretely x=1: 1*255 mod 256 =
+		// 255, complement = 255-255 = 0, and 0 <= 200 -- so `ex x (...)`
+		// is SAT.
+		// exact (W=16, no wrap since x*255 <= 255*255 = 65025 < 65536):
+		// the exact product ranges over [0, 65025], so the exact 16-bit
+		// complement (65535 - product) ranges over [65535-65025, 65535] =
+		// [510, 65535] -- ALWAYS >= 510, so "<= 200" can never hold for
+		// ANY x: UNSAT.
+		auto fm = parse_wff("ex x ((x:bv[8] * { 255 }:bv[8])' <= { 200 }:bv[8])");
+		CHECK( is_bv_formula_sat<node_t>(fm) ); // modular
+		bv_widening = true;
+		tref widened = widen_bv_arithmetic<node_t>(fm);
+		REQUIRE(widened != nullptr);
+		INFO("widened formula: " << tree<node_t>::get(widened).to_str());
+		CHECK( !is_bv_formula_sat<node_t>(widened) ); // exact
+		bv_widening = false;
+	}
+
+	// Defs-expansion probe: `normalizer<node_t>` is the SAME shared pipeline
+	// entry `normalizer(rr)` reaches after `nso_rr_apply` has already
+	// expanded `fn`'s definition (normalizer.tmpl.h: bf_normalizer_with_
+	// rec_relation/normalizer(rr) call nso_rr_apply, THEN
+	// normalize_with_temp_simp, where the widening hook now sits at the
+	// very top). If widening ran BEFORE the ref were expanded instead, the
+	// atom's left side would still be an opaque bf_ref, needed_width would
+	// return 0 (its documented "opaque subterm" case), and widen_atom
+	// would skip the atom entirely -- leaving it modular (deciding TRUE
+	// below) even with the flag on. Deciding FALSE therefore proves both
+	// that the pass is wired into the real pipeline AND that it runs after
+	// definition expansion, not before.
+	TEST_CASE("defs probe: widening reaches an expanded definition's arithmetic") {
+		// The head's argument MUST carry an explicit base-type annotation
+		// (`x:bv[8]`) -- an unannotated definition head/argument defaults
+		// to `:tau` (a known project trap: see
+		// test_integration-ba_types_inference.cpp's "consistent
+		// definitions and references are accepted", `f(x:bv[8]) := x.`),
+		// and calling an inferred-:tau `fn` with a bv[8] argument is a
+		// genuine type conflict (Debug asserts/aborts on it; Release
+		// reports "Incompatible type information").
+		const char* sample =
+			"fn(x:bv[8]) := x * x."
+			"fn({ 16 }:bv[8]) <= { 10 }:bv[8].";
+		// modular: fn(16) = 16*16 mod 256 = 0; 0 <= 10 decides TRUE.
+		CHECK(normalize_and_check(sample, tau::wff_t));
+		// exact: fn(16) = 256 (W=16, no wrap); 256 <= 10 decides FALSE.
+		bv_widening_scope widen;
+		CHECK(normalize_and_check(sample, tau::wff_f));
+	}
+
+	// Route/eliminability audit (brief Step 5): a widened atom carries a
+	// bf_cast (the (bv[16]) upcast on its operands); has_bv_arithmetic
+	// (solver.tmpl.h) already treats bf_cast as arithmetic, so a widened
+	// atom routes to solve_bv, not lgrs. A quantified widened atom must
+	// still decide correctly through the FULL stack (is_tau_formula_sat),
+	// not be silently dropped by a blasting-classification mismatch
+	// between has_bv_arithmetic and atom_arith_verdict's
+	// blasting_unsupported lambda (eliminability.tmpl.h:138) -- see the
+	// report for the full read of both call sites.
+	TEST_CASE("route/eliminability audit: quantified widened atom stays satisfiable") {
+		bv_widening_scope widen;
+		// ex x (x*x <= {200}): x=0 makes 0<=200 true even at the exact
+		// (widened, W=16) width, so this must decide SAT through the full
+		// is_tau_formula_sat stack exactly as it would unwidened.
+		const char* sample = "ex x (x * x <= { 200 }:bv[8]).";
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE(nso_rr.has_value());
+		tref normalized = normalizer<node_t>(nso_rr.value());
+		REQUIRE(normalized != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(normalized));
+	}
+
+	// A stricter variant of the audit above: `x * {3}` (a genuine constant
+	// factor) is the shape get_bvmul_arguments<node>/atom_arith_verdict's
+	// `blasting_unsupported` lambda considers blasting-SUPPORTED --
+	// classifying the widened atom `blasteable` -- yet after widening the
+	// non-constant operand is `(bv[16]) x`, a bf_cast, not a bare
+	// variable. Reading confirms this is not actually a gap:
+	// bv_predicate_blasting.tmpl.h's own traversal has a dedicated
+	// `case tau::bf_cast` (line ~920, pre-existing, unrelated to this
+	// feature -- casts were already legal user syntax) that introduces an
+	// auxiliary variable plus a linking `bvcast` predicate for any cast
+	// node it visits, so a widened `bf_cast`-wrapped operand is blasted
+	// like any other cast, not a special or unsupported case. Kept as an
+	// empirical guard rather than relying on that reading alone: x=0
+	// trivially satisfies the atom under both modular and exact semantics.
+	TEST_CASE("route/eliminability audit: widened constant-factor mul stays satisfiable") {
+		bv_widening_scope widen;
+		const char* sample = "ex x (x:bv[8] * { 3 }:bv[8] <= { 200 }:bv[8]).";
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE(nso_rr.has_value());
+		tref normalized = normalizer<node_t>(nso_rr.value());
+		REQUIRE(normalized != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(normalized));
+	}
+}

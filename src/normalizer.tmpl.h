@@ -331,6 +331,16 @@ tref normalize(tref form) {
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
 	//	using tt = tau::traverser;
+	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
+	// runs (including the cache lookup just below, so a cached result is
+	// keyed on the already-widened formula). Unconditionally called --
+	// widen_bv_arithmetic itself is a no-op when the `bv_widening` flag is
+	// off (see bv_widening.h) -- and any D4 cap error is already logged by
+	// the pass, so a nullptr here just propagates the failure.
+	if (bv_widening) {
+		fm = widen_bv_arithmetic<node>(fm);
+		if (!fm) return nullptr;
+	}
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
 	// stay uncached).
@@ -1138,6 +1148,15 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
+	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
+	// runs. Unconditionally called -- widen_bv_arithmetic itself is a no-op
+	// when the `bv_widening` flag is off (see bv_widening.h) -- and any D4
+	// cap error is already logged by the pass, so a nullptr here just
+	// propagates the failure.
+	if (bv_widening) {
+		fm = widen_bv_arithmetic<node>(fm);
+		if (!fm) return nullptr;
+	}
 	fm = normalize<node>(fm);
 	// Substitution based eliminations rebuild nodes without running the
 	// construction hooks, so trivially foldable residues (constant

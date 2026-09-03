@@ -19,6 +19,7 @@
 #define __IDNI__TAU__NORMALIZER_H__
 
 #include "nso_rr.h"
+#include "bv_widening.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

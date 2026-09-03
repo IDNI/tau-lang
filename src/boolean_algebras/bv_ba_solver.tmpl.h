@@ -65,7 +65,16 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			return bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
 		}
 		// Hooks normalize these wrappers to their contained bitvector formulas.
-		case tau::wff: case tau::bf:
+		// bf_parenthesis is transparent too -- "(" bf ")" carries no
+		// semantics of its own (needed_width/widen_term already treat it
+		// as a pass-through, bv_widening.h); missing it here meant any
+		// bv formula containing one (e.g. bv_widening's own `(x*y)'`
+		// shape, forced by the grammar around a complement/cast operand)
+		// silently failed to translate -- default: return nullopt below
+		// -- which made both a formula AND its negation "fail to
+		// translate", so is_bv_formula_valid (unsat of the negation)
+		// came back true regardless of the formula's real semantics.
+		case tau::wff: case tau::bf: case tau::bf_parenthesis:
 		/*case tau::bv:*/ {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
 		}
