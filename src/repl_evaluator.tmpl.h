@@ -1085,6 +1085,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
 	if (x == "B" || x == "blasting")     return blasting_opt;
+	if (x == "y" || x == "bvwidening")   return bvwidening_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1132,6 +1133,7 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "specsizewarn")             return spec_size_warn_opt;
 	if (x == "revisionalts"
 		|| x == "maxrevisionalts")   return revision_alts_opt;
+	if (x == "bvmaxwidth")               return bv_max_width_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1187,6 +1189,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ blasting_opt,      [this]() {
 		std::cout << "blasting:            " << pbool[opt.blasting] << "\n"; } },
+	{ bvwidening_opt,    [this]() {
+		std::cout << "bvwidening:          " << pbool[opt.bv_widening] << "\n"; } },
 	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    []() {
@@ -1236,7 +1240,12 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "specsizewarn:        "
 			<< (v ? std::to_string(v) : "off") << "\n"; } },
 	{ revision_alts_opt, [climit]() {
-		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } }
+		std::cout << "revisionalts:        " << climit(interpreter<node>::max_revision_alts) << "\n"; } },
+	// Not a "0 = unlimited" cap like the others above: bv_max_width is a
+	// hard ceiling that is never itself 0 (the api setter treats 0 as
+	// "leave the default 1024 unchanged"), so print the plain value.
+	{ bv_max_width_opt, []() {
+		std::cout << "bvmaxwidth:          " << bv_max_width << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1331,6 +1340,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		update_charvar(update_bool_value(opt.charvar)); } },
 	{ blasting_opt,   [&]() {
 		update_blasting(update_bool_value(opt.blasting)); } },
+	{ bvwidening_opt,   [&]() {
+		update_bv_widening(update_bool_value(opt.bv_widening)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1374,7 +1385,9 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ spec_size_warn_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_spec_size_warn(*n); } },
 	{ revision_alts_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_max_revision_alts(*n); } } };
+		api<node>::set_max_revision_alts(*n); } },
+	{ bv_max_width_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_bv_max_width(*n); } } };
 	setters[o]();
 }
 
@@ -1409,6 +1422,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case colors_opt:           TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
 	case blasting_opt:     	   update_blasting(update_fn(opt.blasting)); break;
+	case bvwidening_opt:       update_bv_widening(update_fn(opt.bv_widening)); break;
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -1428,6 +1442,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case gc_growth_opt:
 	case spec_size_warn_opt:
 	case revision_alts_opt:
+	case bv_max_width_opt:
 		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
 			"`set <option> <n>`\n", error = true;
 		return;
@@ -1446,6 +1461,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_blasting(bool value) {
 	api<node>::set_blasting(opt.blasting = value);
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_bv_widening(bool value) {
+	api<node>::set_bv_widening(opt.bv_widening = value);
 	return value;
 }
 
@@ -1538,12 +1560,17 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
-	// Propagate the CLI-provided charvar/blasting values to the api's
-	// global state; without this, --charvar/--blasting have no effect in
-	// REPL mode until the user runs "set"/"toggle" (they were only ever
+	// Propagate the CLI-provided charvar/blasting/bv-widening values to the
+	// api's global state; without this, --charvar/--blasting have no effect
+	// in REPL mode until the user runs "set"/"toggle" (they were only ever
 	// applied to the api in main.cpp's non-interactive spec-file path).
+	// bv-widening/bv-max-width are also applied unconditionally in
+	// main.cpp before this constructor runs, so this call is a no-op there
+	// -- kept for consistency and so a caller constructing the evaluator
+	// directly (bypassing main.cpp) still gets the propagation.
 	update_charvar(opt.charvar);
 	update_blasting(opt.blasting);
+	update_bv_widening(opt.bv_widening);
 	// console input streams resolve through the REPL cycle, never blocking
 	definitions<node>::instance().get_io_context()->console_input_factory =
 		[](const std::string&) {
@@ -1649,6 +1676,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  colors                 use term colors                      on/off\n"
 		"  charvar                use character variables              on/off\n"
 		"  blasting               bitvector predicate blasting         on/off\n"
+		"  bvwidening             exact (widened) bitvector arithmetic on/off\n"
 		"  highlighting           syntax highlighting of Tau formulas  on/off\n"
 		"  indenting              indenting of Tau formulas            on/off\n"
 		"  benchmarks             print timing benchmarks              on/off\n";
@@ -1671,7 +1699,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  gcminsize              gc trigger floor (tree nodes)        256\n"
 		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
 		"  specsizewarn           updated-spec size warning (chars)    off\n"
-		"  revisionalts           revision alternatives kept per part  unlimited\n";
+		"  revisionalts           revision alternatives kept per part  unlimited\n"
+		"  bvmaxwidth             exact-bitvector computation width cap 1024\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options +
 		"  severity               severity                             error/info/debug/trace\n"

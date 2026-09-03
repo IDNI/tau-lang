@@ -47,6 +47,12 @@ cli::options tau_options() {
 		.set_description(std::string("blasting (")
 			+ (bv_blasting ? "enabled" : "disabled")
 			+ " by default)");
+	opts["bv-widening"] = cli::option("bv-widening", 'y', bv_widening)
+		.set_description(std::string("exact (widened) bitvector arithmetic (")
+			+ (bv_widening ? "enabled" : "disabled") + " by default)");
+	opts["bv-max-width"] = cli::option("bv-max-width", 'Y', "0")
+		.set_description("cap the widened bitvector computation width "
+			"(0 = default 1024)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
@@ -221,6 +227,7 @@ int main(int argc, char** argv) {
 	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
 	bool blasting = opts["blasting"].get<bool>();
+	bool bv_widening_opt = opts["bv-widening"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by
@@ -243,6 +250,12 @@ int main(int argc, char** argv) {
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
+	// Unlike `--blasting` (only propagated on the REPL path via the
+	// options struct below, never on the spec-file path -- see the
+	// GitHub #74 comment above), bv-widening/bv-max-width are applied
+	// here unconditionally so they take effect in spec-file mode too.
+	tau_api::set_bv_widening(bv_widening_opt);
+	tau_api::set_bv_max_width(optnum("bv-max-width"));
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
@@ -257,6 +270,7 @@ int main(int argc, char** argv) {
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,
 		.blasting = blasting,
+		.bv_widening = bv_widening_opt,
 		.print_benchmarks = opts["benchmarks"].get<bool>(),
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),
