@@ -84,6 +84,89 @@ namespace idni::tau_lang {
 template <NodeType node>
 size_t needed_width(tref bf, size_t base_w, size_t& maxW);
 
+/**
+ * @brief Rebuild a `bf` subtree at width `W`, upcasting leaves and
+ * retyping every operator node to `bv[W]` -- the term-level half of the
+ * `bv_widening` atom-elaboration pass (see `widen_atom` for the atom-level
+ * rules that call this).
+ *
+ * Every leaf (`variable`, `ba_constant`, `bf_t`, `bf_f`) is wrapped in a
+ * single zero-extending `(bv[W])` cast (`build_bf_cast`). An existing
+ * user-written `bf_cast` is treated the same way -- it is a boundary (per
+ * the design: "the pass treats a cast operand as an independent
+ * sub-computation whose result is the cast's declared width"), so its own
+ * operand is left completely untouched and the whole existing cast is
+ * simply wrapped in one more, outer, `(bv[W])` cast.
+ *
+ * Every other operator node (`bf_add`, `bf_sub`, `bf_mul`, `bf_div`,
+ * `bf_mod`, `bf_min`, `bf_max`, `bf_and`, `bf_or`, `bf_xor`, `bf_nand`,
+ * `bf_nor`, `bf_xnor`, `bf_neg`, `bf_shl`, `bf_shr` -- the bitwise ops and
+ * both shift operands included, per the amended D2/D3 rule that ALL
+ * operators run at `W`) is rebuilt with its children widened first, then
+ * retyped `bv[W]` via `tree<node>::get_typed`. There are no interior
+ * truncations anywhere.
+ *
+ * `bf_parenthesis` needs no special case: like `bf_neg` it wraps a single
+ * child, so it falls into the same generic rebuild and is simply retyped
+ * `bv[W]` -- it is a purely transparent grouping wrapper, so widening it
+ * this way does not change what it means.
+ *
+ * @tparam node Tree node type.
+ * @param bf_node A `bf`-nonterminal node ref (see `needed_width`'s doc
+ *   comment above for the `bf -> op -> ...` shape every `bf` subtree has).
+ * @param base_w The already-declared/unified width of the atom this term
+ *   belongs to (used only to decide whether any work is needed at all).
+ * @param W The target width to elaborate at (`>= base_w`, computed by the
+ *   caller via `needed_width`).
+ * @return `bf_node` unchanged (same tref) when `W == base_w` -- the no-op
+ *   fast path; otherwise a newly built (or hash-consed-identical) `bf`
+ *   node, always typed `bv[W]`.
+ */
+template <NodeType node>
+tref widen_term(tref bf_node, size_t base_w, size_t W);
+
+/**
+ * @brief Elaborate one bv-family atomic formula per the `bv_widening`
+ * mode's rules (design spec section 2): compute the atom's overflow-free
+ * width `W` (via `needed_width` on every side), then either extend every
+ * side exactly or extend one side and wrap it in a truncating cast:
+ *
+ *  - **Comparisons** (`bf_lt`, `bf_nlt`, `bf_lteq`, `bf_nlteq`, `bf_gt`,
+ *    `bf_ngt`, `bf_gteq`, `bf_ngteq`), **`bf_interval`**, and an
+ *    **equality/inequality between two compound sides**: every side is
+ *    rebuilt with `widen_term(side, base_w, W)` and the atom is
+ *    reassembled with the same nt -- both/all sides end up typed `bv[W]`,
+ *    exactly, with no truncation.
+ *  - **`bf_eq`/`bf_neq` with exactly one bare-storage side** (a
+ *    `variable` -- which covers io_vars and uninterpreted constants
+ *    alike, they all parse into `tau::variable`, see
+ *    `parser/tau.tgf:149`, possibly under transparent `bf_parenthesis`
+ *    wrappers): the bare side is left completely untouched, the other
+ *    side is elaborated at `W` via `widen_term`, and the result is
+ *    wrapped in a truncating `build_bf_cast<node>(..., bv_type_id<node>(
+ *    base_w))` -- "assignment" semantics.
+ *
+ * @tparam node Tree node type.
+ * @param atom A node ref whose own nt is one of `bf_eq`, `bf_neq`,
+ *   `bf_lt`, `bf_nlt`, `bf_lteq`, `bf_nlteq`, `bf_gt`, `bf_ngt`,
+ *   `bf_gteq`, `bf_ngteq`, or `bf_interval` -- the comparison/equality
+ *   node itself, *not* the enclosing `wff` wrapper that `build_bf_eq`
+ *   (etc.) puts around it. Its two (three for `bf_interval`) children are
+ *   `bf`-nonterminal sides.
+ * @return `atom` unchanged (same tref) when: its own BA type is not
+ *   bv-family (nothing to elaborate); any side is opaque to
+ *   `needed_width` (a `bf_ref`/`capture`/... subterm the pass cannot
+ *   reason about); or the computed `W` equals the atom's already-declared
+ *   width (nothing to elaborate -- this is also what makes repeated
+ *   application idempotent for the truncating-assignment shape, since the
+ *   outer truncating cast resets the rebuilt atom's own auto-propagated
+ *   type back down to `base_w`). Returns `nullptr`, after `LOG_ERROR`-ing
+ *   the cap violation, when the computed `W` exceeds `bv_max_width` (the
+ *   D4 width cap).
+ */
+template <NodeType node>
+tref widen_atom(tref atom);
+
 } // namespace idni::tau_lang
 
 #include "bv_widening.tmpl.h"

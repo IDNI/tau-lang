@@ -147,4 +147,138 @@ size_t needed_width(tref bf_node, size_t base_w, size_t& maxW) {
 	return w;
 }
 
+// Rebuilds a single operator node (or a `bf_parenthesis`/`bf_neg`-style
+// single-child wrapper, when `r == nullptr`) with widened children and
+// wraps it in a `bf` node, exactly the shape `build_bf_min` (etc.) use --
+// except typed at `wide_tid` via `tree<node>::get_typed`. Wrapping in `bf`
+// triggers the ordinary construction-time hooks (constant folding etc.,
+// see the module doc comment's Trap 1) exactly as any other `bf` node
+// construction would.
+template <NodeType node>
+tref rebuild_bf_op(typename node::type nt, tref l, tref r, size_t wide_tid) {
+	using tau = tree<node>;
+
+	if (r == nullptr)
+		return tau::get(tau::bf, tau::get_typed(nt, l, wide_tid));
+	return tau::get(tau::bf, tau::get_typed(nt, l, r, wide_tid));
+}
+
+template <NodeType node>
+tref widen_term(tref bf_node, size_t base_w, size_t W) {
+	using tau = tree<node>;
+
+	if (W == base_w) return bf_node;
+	const tau& op = tau::get(bf_node)[0];
+	const size_t wide_tid = bv_type_id<node>(W);
+	switch (op.value.nt) {
+	// Leaves and user-cast boundaries: wrap the *whole* incoming bf_node
+	// (cast included, for bf_cast -- its own operand is an independent
+	// sub-computation and is left untouched) in one more, outer cast.
+	case tau::variable:
+	case tau::ba_constant:
+	case tau::bf_t:
+	case tau::bf_f:
+	case tau::bf_cast:
+		return build_bf_cast<node>(bf_node, wide_tid);
+	// Every other operator (bf_add/sub/mul/div/mod/min/max/and/or/xor/
+	// nand/nor/xnor/neg/shl/shr, and the purely transparent
+	// bf_parenthesis wrapper, which needs no special case since it has
+	// one child just like bf_neg) is rebuilt with widened children and
+	// retyped bv[W]. No interior truncations anywhere (amended D2/D3):
+	// bitwise ops and both shift operands run at W like everything else.
+	default: {
+		tref l = widen_term<node>(op.child(0), base_w, W);
+		tref r = (op.children_size() > 1)
+			? widen_term<node>(op.child(1), base_w, W) : nullptr;
+		// op.value.nt is the raw size_t bitfield (tau_tree.h: `const T nt :
+		// nt_bits`); get_type() is the proper accessor that static_casts it
+		// to node::type (tau_tree.tmpl.h) -- required here since
+		// rebuild_bf_op's first parameter is strongly typed, and an
+		// unscoped enum only converts implicitly *to* an integral type,
+		// never the other way around.
+		return rebuild_bf_op<node>(op.get_type(), l, r, wide_tid);
+	}
+	}
+}
+
+// True iff the `bf` side `side` is bare storage: a `variable` (which
+// covers io_vars and uninterpreted constants alike -- see
+// parser/tau.tgf:149, `variable => (uconst | io_var | var_name) [
+// member_path ] [ typed ]` -- so no separate uconst check is needed),
+// possibly under one or more transparent `bf_parenthesis` wrappers. A
+// user-cast side (`bf_cast`) is deliberately NOT bare storage: per the
+// design, a cast is an independent sub-computation boundary, not the
+// declared storage target itself.
+template <NodeType node>
+bool is_bare_storage_side(tref side) {
+	using tau = tree<node>;
+
+	tref cur = side;
+	for (;;) {
+		const tau& op = tau::get(cur)[0];
+		if (op.value.nt != tau::bf_parenthesis)
+			return op.value.nt == tau::variable;
+		cur = op.child(0);
+	}
+}
+
+template <NodeType node>
+tref widen_atom(tref atom) {
+	using tau = tree<node>;
+
+	const tau& n = tau::get(atom);
+	const size_t atom_type = n.get_ba_type();
+	if (!is_bv_type_family<node>(atom_type)) return atom; // not bv: no-op
+
+	const size_t base_w = get_bv_width<node>(atom_type);
+	const bool is_interval = n.value.nt == tau::bf_interval;
+	const size_t nsides = is_interval ? 3 : 2;
+
+	// Step 2: needed_width on every side; any opaque side (returns 0,
+	// e.g. bf_ref/capture) -- skip the atom entirely, unchanged.
+	tref sides[3];
+	size_t maxW = 0;
+	for (size_t i = 0; i < nsides; ++i) {
+		sides[i] = n.child(i);
+		if (needed_width<node>(sides[i], base_w, maxW) == 0) return atom;
+	}
+
+	// Step 3: W == base_w -> nothing to elaborate; W > bv_max_width ->
+	// loud, logged cap error (D4).
+	const size_t W = maxW;
+	if (W == base_w) return atom;
+	if (W > bv_max_width) {
+		LOG_ERROR << "bv-widening: required width " << W
+			<< " exceeds bv-max-width " << bv_max_width;
+		return nullptr;
+	}
+
+	// Step 5: bf_eq/bf_neq with exactly one bare-storage side --
+	// truncating "assignment" semantics: the bare side is untouched, the
+	// other side is elaborated at W and truncated back to base_w.
+	if (!is_interval
+			&& (n.value.nt == tau::bf_eq || n.value.nt == tau::bf_neq)) {
+		const bool bare0 = is_bare_storage_side<node>(sides[0]);
+		const bool bare1 = is_bare_storage_side<node>(sides[1]);
+		if (bare0 != bare1) {
+			const size_t other_i = bare0 ? 1 : 0;
+			tref wide_other = widen_term<node>(sides[other_i], base_w, W);
+			tref truncated = build_bf_cast<node>(wide_other,
+				bv_type_id<node>(base_w));
+			tref l = bare0 ? sides[0] : truncated;
+			tref r = bare0 ? truncated : sides[1];
+			return tau::get(n.get_type(), l, r);
+		}
+	}
+
+	// Step 4: comparisons, bf_interval, and both-compound equality --
+	// extend every side exactly, no truncation.
+	trefs new_sides;
+	new_sides.reserve(nsides);
+	for (size_t i = 0; i < nsides; ++i)
+		new_sides.push_back(widen_term<node>(sides[i], base_w, W));
+	if (is_interval) return tau::get(n.get_type(), new_sides);
+	return tau::get(n.get_type(), new_sides[0], new_sides[1]);
+}
+
 } // namespace idni::tau_lang
