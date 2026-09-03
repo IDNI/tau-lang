@@ -1192,3 +1192,133 @@ TEST_SUITE("bv widening - blasting backend (Task 7)") {
 		CHECK(bv_predicate_blasting<node_t>(widened) == nullptr);
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Task 9: pinned realizability/satisfiability truth-value flips through the
+// full `is_tau_formula_sat`/`api<node_t>::realizable` entry points, on vs.
+// off. Every earlier end-to-end flip (Task 6's suite above) goes through
+// `is_bv_formula_valid`/`is_bv_formula_sat` directly on an explicitly
+// `widen_bv_arithmetic`-called tree; these instead exercise the production
+// pipeline entry points a caller actually uses (`is_tau_formula_sat` calls
+// `normalize_with_temp_simp` -- and hence the widening hook -- internally,
+// per satisfiability.tmpl.h:1880; `api::realizable` layers `simplify` +
+// `normalize_formula` + `is_tau_formula_sat` on top of that, per
+// api.tmpl.h:562-566).
+//
+// As Task 6's report establishes, `bv_widening` must be set BEFORE parsing,
+// not just before normalizing: the fit-gated constant folding in
+// `term_mul`/`term_add`/`term_sub` (Task 2) reads the same global flag at
+// construction time and leaves an overflowing constant operation symbolic
+// exactly when the flag is on -- so each side of a flip below re-parses the
+// SAME source string fresh under the flag state it is checking, rather than
+// reusing one parsed tree across both states.
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("bv widening - realizability on/off") {
+
+	TEST_CASE("both-compound equality: exact product breaks the modular wrap-to-zero") {
+		// {16}*{16} = {0}: LHS is a compound multiply (needed_width =
+		// 8+8 = 16); RHS is a plain constant leaf (needed_width = 8) --
+		// NEITHER side is a bare storage term (variable/io_var), so this
+		// does not qualify for the "truncating assignment" rule. It falls
+		// to the general rule (design doc S2, "Equality between two
+		// compound sides"): extend both sides to the common W and compare
+		// EXACTLY, with nothing to truncate.
+		//
+		// Modular (bv_widening off): term_mul folds the constant pair at
+		// native bv[8] hardware arithmetic: 16*16 mod 256 = 0, so the
+		// atom is (some representation of) 0 = 0 -- decided TRUE by
+		// is_tau_formula_sat regardless of exactly which construction-
+		// time step resolves it (note: {0}:bv[8] is itself canonicalized
+		// to the BA bottom element bf_f, symmetric to the {255}->bf_t
+		// top-element canonicalization documented in
+		// test_bv_ba_hooks.cpp -- needed_width's `case tau::bf_f:` arm
+		// treats it as an ordinary base_w leaf, same as a ba_constant, so
+		// this does not change the width analysis below) -- SAT.
+		bv_widening = false;
+		CHECK(is_tau_formula_sat<node_t>(
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")));
+
+		// Exact (bv_widening on, set BEFORE parsing so the fit-gate
+		// leaves 16*16 unfolded -- the "load-bearing" ordering Task 6's
+		// end-to-end suite established): W = needed_width(mul) = 16;
+		// 16*16 = 256 exactly (fits in 16 bits, no fit-gate trip once
+		// widen_bv_arithmetic re-extends both operands to bv[16] during
+		// normalization, at which point the mul re-folds to the plain
+		// constant {256}:bv[16]); 256 != 0 -> UNSAT.
+		bv_widening_scope widen;
+		CHECK(!is_tau_formula_sat<node_t>(
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")));
+	}
+
+	TEST_CASE("both-compound comparison: exact product clears a threshold the modular wrap never reaches") {
+		// Reverse-direction companion: {16}*{16} > {200}. Same
+		// needed-width analysis (LHS compound mul, RHS plain constant
+		// leaf) -- this time the "Comparisons" rule applies (both sides
+		// zero-extended to W, compared exactly).
+		//
+		// Modular: 16*16 mod 256 = 0; 0 > 200 -> FALSE, decided UNSAT by
+		// is_tau_formula_sat (the {255}/bf_t "top/bottom operands are not
+		// folded by comparisons" trap documented in test_bv_ba_hooks.cpp
+		// means the LHS's canonicalized-to-bf_f zero may not fold away at
+		// parse time the way the equality case above can -- irrelevant
+		// here since is_tau_formula_sat fully normalizes and decides any
+		// residual ground atom regardless).
+		bv_widening = false;
+		CHECK(!is_tau_formula_sat<node_t>(
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")));
+
+		// Exact: 256 > 200 -> TRUE -- SAT.
+		bv_widening_scope widen;
+		CHECK(is_tau_formula_sat<node_t>(
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")));
+	}
+
+	// Temporal case: a genuine realizability flip through the full
+	// always/io-stream stack, checked via api<node_t>::realizable (the
+	// spec-level entry point this task's brief names explicitly).
+	//
+	// Fresh stream name o1, cleared from definitions<node_t>::instance()
+	// first as a defensive measure (the global stream-name-type registry
+	// trap documented in test_integration-bv_stress_check.cpp) even though
+	// grepping this file confirms o1 is not used as a real parsed sample
+	// anywhere else in it. "o1" starts with the io_context classifier's
+	// recognized 'o' prefix, so it needs no separate stream declaration
+	// (matching the "pwr minimal repro" case above).
+	TEST_CASE("temporal: always o1*o1=0 && o1>10 flips realizable on/off") {
+		definitions<node_t>::instance().clear();
+		const char* spec =
+			"always (o1[t]:bv[8] * o1[t]:bv[8] = { 0 }:bv[8] "
+			"&& o1[t]:bv[8] > { 10 }:bv[8])";
+		// o1*o1 = 0 is the same "compound (mul) vs. plain constant"
+		// shape as the two non-temporal cases above (needed_width(mul) =
+		// 16; RHS constant leaf needed_width = 8 -- neither side is a
+		// bare storage term, since the LHS is compound). o1 > 10 is its
+		// own independent atom, needed_width = max(8,8) = 8 -- already
+		// at base width, so this second conjunct is IDENTICAL under
+		// both flag states; only the equality conjunct's meaning changes.
+		//
+		// Modular (bv_widening off): o1[t] = 16 at every time step
+		// satisfies BOTH conjuncts simultaneously: 16*16 mod 256 = 0
+		// (first conjunct), and 16 > 10 (second) -- REALIZABLE.
+		bv_widening = false;
+		tref fm_off = tau_api::get_formula(spec);
+		REQUIRE(fm_off != nullptr);
+		CHECK(tau_api::realizable(fm_off));
+
+		// Exact (bv_widening on, set before parsing): the equality is now
+		// extended to W = 16 and compared EXACTLY (not mod 256). As an
+		// unsigned integer over o1's declared domain [0,255] (o1's
+		// declared width is its own range constraint regardless of
+		// widening -- design doc S2, "Variables inside arithmetic ...
+		// keep their declared sort"), o1*o1 computed exactly (never
+		// overflowing 16 bits, since 255*255 = 65025 < 65536) equals 0
+		// if and only if o1 = 0. The second conjunct demands o1 > 10, so
+		// no single value of o1[t] can satisfy both conjuncts at once --
+		// UNREALIZABLE.
+		bv_widening_scope widen;
+		tref fm_on = tau_api::get_formula(spec);
+		REQUIRE(fm_on != nullptr);
+		CHECK(!tau_api::realizable(fm_on));
+	}
+}
