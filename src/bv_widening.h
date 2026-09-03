@@ -15,8 +15,10 @@
  *  - `variable`, `ba_constant`, `bf_t`, `bf_f` (leaves): `base_w`.
  *  - `bf_parenthesis`: transparent -- the width of its single inner `bf`.
  *  - `bf_cast`: a boundary -- its own target type's width, regardless of
- *    what is inside (the operand is re-elaborated independently, later, by
- *    the caller).
+ *    what is inside. The operand is left untouched: it computes exactly as
+ *    it does in the default (modular) mode, at its own widths, and its
+ *    result enters the surrounding widened computation at the cast's
+ *    declared width.
  *  - `bf_add`: `max(l, r) + 1` (a carry-out bit may be needed).
  *  - `bf_sub`: `max(l, r)` (two's-complement subtraction does not grow).
  *  - `bf_mul`: `l + r` (the product of an l-bit and an r-bit value fits in
@@ -92,11 +94,12 @@ size_t needed_width(tref bf, size_t base_w, size_t& maxW);
  *
  * Every leaf (`variable`, `ba_constant`, `bf_t`, `bf_f`) is wrapped in a
  * single zero-extending `(bv[W])` cast (`build_bf_cast`). An existing
- * user-written `bf_cast` is treated the same way -- it is a boundary (per
- * the design: "the pass treats a cast operand as an independent
- * sub-computation whose result is the cast's declared width"), so its own
- * operand is left completely untouched and the whole existing cast is
- * simply wrapped in one more, outer, `(bv[W])` cast.
+ * user-written `bf_cast` is treated the same way -- it is a boundary, so
+ * its own operand is left completely untouched (it keeps computing exactly
+ * as in the default mode, at its own widths, and its result enters the
+ * surrounding widened computation at the cast's declared width) and the
+ * whole existing cast is simply wrapped in one more, outer, `(bv[W])`
+ * cast.
  *
  * Every other operator node (`bf_add`, `bf_sub`, `bf_mul`, `bf_div`,
  * `bf_mod`, `bf_min`, `bf_max`, `bf_and`, `bf_or`, `bf_xor`, `bf_nand`,
@@ -155,12 +158,16 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  *   `bf`-nonterminal sides.
  * @return `atom` unchanged (same tref) when: its own BA type is not
  *   bv-family (nothing to elaborate); every side is ALREADY uniformly
- *   expressed at the atom's own current width (`is_side_saturated_at` --
- *   the idempotency guard for the extend-all-sides shapes: re-running
- *   `needed_width` on an already-widened comparison/interval/
- *   both-compound-equality atom would otherwise inflate `W` without bound,
- *   since a `bf_cast` boundary's declared width is always trusted at face
- *   value); any side is opaque to `needed_width` (a `bf_ref`/`capture`/...
+ *   expressed at the atom's own current width and at least one leaf is
+ *   pinned there by a `(bv[W])` cast over a strictly narrower operand
+ *   (`is_side_saturated_at` -- the idempotency guard for the
+ *   extend-all-sides shapes: re-running `needed_width` on an
+ *   already-widened comparison/interval/both-compound-equality atom would
+ *   otherwise inflate `W` without bound, since a `bf_cast` boundary's
+ *   declared width is always trusted at face value; see that function's
+ *   own comment for why the narrowing-cast requirement is what keeps a
+ *   fresh, never-widened atom such as `{16}*{16} <= {10}` widenable);
+ *   any side is opaque to `needed_width` (a `bf_ref`/`capture`/...
  *   subterm the pass cannot reason about); or the computed `W` equals the
  *   atom's already-declared width (this is what makes repeated application
  *   idempotent for the truncating-assignment shape specifically, since the

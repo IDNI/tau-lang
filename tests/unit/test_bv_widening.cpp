@@ -96,6 +96,26 @@ TEST_SUITE("bv widening - needed_width") {
 	TEST_CASE("variable shift amount never grows") {
 		size_t m; CHECK(widths("x << y", 8, m) == 8);
 	}
+	TEST_CASE("all-ones shift amount (canonicalized to the top element) still counts") {
+		// {255}:bv[8] is bv[8]'s all-ones value, which the construction
+		// hooks canonicalize to the TOP ELEMENT node `bf_t`, not a
+		// `ba_constant` (test_bv_ba_hooks.cpp: bf("{255}:bv[8]") ==
+		// bf("1:bv[8]")). It is a perfectly literal amount all the same --
+		// 2^8 - 1 = 255 -- so the bf_shl rule must give l + 255 = 263 and
+		// not fall into the "no known growth" branch meant for VARIABLE
+		// amounts, which would answer 8 and leave the shift wrapping.
+		// Parsed with hooks ON (unlike widths()/widths_typed() above),
+		// since it is the hooks that perform the canonicalization at all.
+		auto opts = tau::get_options{
+			.parse = { .start = tau::bf },
+			.reget_with_hooks = true
+		};
+		tref src = tree<node_t>::get("x:bv[8] << { 255 }:bv[8]", opts);
+		REQUIRE(src != nullptr);
+		size_t m = 0;
+		CHECK(needed_width<node_t>(src, 8, m) == 263);
+		CHECK(m == 263);
+	}
 	TEST_CASE("opaque child (capture) propagates as 0") {
 		// `$X` parses to a bare `capture` node under `bf` -- opaque to
 		// needed_width (default: return 0). The whole bf_add is therefore
@@ -398,6 +418,91 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref w3 = widen_atom<node_t>(w2);
 		REQUIRE(w3 != nullptr);
 		CHECK(w3 == w1);
+	}
+
+	TEST_CASE("idempotent (extend-all shape, folded constant leaf): x*y <= {200}") {
+		// Regression test for the Critical finding of the whole-branch
+		// review. The case above keeps every leaf under a surviving
+		// (bv[16]) cast only because all three of x, y, z are variables.
+		// A CONSTANT leaf keeps no cast: bv_term_cast
+		// (bv_ba_hooks.tmpl.h:862-941) folds any cast of a ba_constant /
+		// bf_t / bf_f into a bare, retyped constant at construction time,
+		// so the widened atom here is
+		//     mul((bv[16]) x, (bv[16]) y) <= {200}:bv[16]
+		// with nothing but a plain bv[16] constant on the right. The
+		// pre-fix guard returned false for every bare leaf, so that side
+		// was never "saturated", needed_width re-ran at base_w = 16, and
+		// the bf_mul rule recomputed 16 + 16 = 32 -- one escalation step
+		// per re-entry (16 -> 32 -> 64 -> ... -> the D4 cap, whose
+		// conservative fallback then flips answers), and re-entry is
+		// routine: normalize_non_temp runs inside is_tau_formula_sat,
+		// solve() and the fixpoint loops. The ba_type checks are the sharp
+		// end of this test: under the bug w2 comes back typed bv[32].
+		tref src = parse_wff("x:bv[8] * y <= {200}");
+		tref atom = find_atom(src, tau::bf_lteq);
+		tref w1 = widen_atom<node_t>(atom);
+		REQUIRE(w1 != nullptr);
+		CHECK(w1 != atom); // sanity: the first call did real work
+		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(16));
+		tref w2 = widen_atom<node_t>(w1);
+		REQUIRE(w2 != nullptr);
+		CHECK(w2 == w1);
+		CHECK(tree<node_t>::get(w2).get_ba_type() == bv_type_id<node_t>(16));
+		tref w3 = widen_atom<node_t>(w2);
+		REQUIRE(w3 != nullptr);
+		CHECK(w3 == w1);
+	}
+
+	TEST_CASE("idempotent (extend-all shape, shl with a constant amount)") {
+		// Same Critical finding, second shape: x:bv[8] << {3} <= z widens
+		// to W = 11 (the bf_shl rule, l + the literal amount), and the
+		// shift AMOUNT is exactly the kind of folded constant leaf
+		// described above -- ({3}:bv[11], its cast folded away). This one
+		// does not double on re-entry, it creeps: needed_width re-run at
+		// base_w = 11 recomputes 11 + 3 = 14, then 17, 20, ... adding the
+		// amount again on every re-application, so it drifts through a
+		// long series of subtly different widths (each with different
+		// W-dependent semantics) before any cap notices.
+		tref src = parse_wff("x:bv[8] << {3} <= z");
+		tref atom = find_atom(src, tau::bf_lteq);
+		tref w1 = widen_atom<node_t>(atom);
+		REQUIRE(w1 != nullptr);
+		CHECK(w1 != atom); // sanity: the first call did real work
+		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(11));
+		tref w2 = widen_atom<node_t>(w1);
+		REQUIRE(w2 != nullptr);
+		CHECK(w2 == w1);
+		CHECK(tree<node_t>::get(w2).get_ba_type() == bv_type_id<node_t>(11));
+		tref w3 = widen_atom<node_t>(w2);
+		REQUIRE(w3 != nullptr);
+		CHECK(w3 == w1);
+	}
+
+	TEST_CASE("saturation guard does not fire on same-width user casts") {
+		// The false-positive direction of the idempotency guard, pinned.
+		// ((bv[8]) x) * ((bv[8]) y) <= {200}:bv[8] is uniformly typed
+		// bv[8] -- every operator bv[8], both cast boundaries declared
+		// bv[8], the constant leaf bv[8] -- so leaf-and-operator
+		// saturation alone would call it "already widened" and skip it,
+		// silently leaving the product modular at 8 bits. It is NOT this
+		// pass's output, though: widen_term only ever emits a (bv[W]) cast
+		// over something strictly narrower than W, and each of these casts
+		// wraps an operand of its own width. Requiring one such widening
+		// cast before accepting saturation is what keeps this atom (and a
+		// cast-free one like {16}*{16} <= {10}, covered by the end-to-end
+		// suite below) widenable: W = 8 + 8 = 16 here, exactly as without
+		// the user casts.
+		tref src = parse_wff(
+			"((bv[8]) x:bv[8]) * ((bv[8]) y:bv[8]) <= {200}:bv[8]");
+		tref atom = find_atom(src, tau::bf_lteq);
+		tref w = widen_atom<node_t>(atom);
+		REQUIRE(w != nullptr);
+		CHECK(w != atom);
+		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
+		// ... and the result of THAT is a fixed point, as always.
+		tref w2 = widen_atom<node_t>(w);
+		REQUIRE(w2 != nullptr);
+		CHECK(w2 == w);
 	}
 
 	TEST_CASE("bf_interval: all three sides extended together") {
@@ -716,7 +821,7 @@ TEST_SUITE("bv widening - whole formula pass") {
 // ---------------------------------------------------------------------------
 // Task 6: pipeline integration + end-to-end cvc5 semantics.
 //
-// Every case below sets `bv_widening = true` BEFORE parsing, not merely
+// Every case below turns `bv_widening` on BEFORE parsing, not merely
 // before calling widen_bv_arithmetic: term_add/term_sub/term_mul's
 // fit-gated constant folding (Task 2) checks the SAME global flag at
 // construction time, and deliberately leaves an overflowing constant
@@ -730,18 +835,31 @@ TEST_SUITE("bv widening - whole formula pass") {
 
 TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 
+	// Every case below drives the flag with the bv_widening_scope RAII guard
+	// rather than assigning the global by hand: a REQUIRE failure inside a
+	// hand-flipped case would unwind past the restoring assignment and leak
+	// `bv_widening = true` into every later case in the binary. Where a case
+	// needs BOTH truth values, the widened half runs inside an explicit
+	// inner scope (the flag must be ON at PARSE time -- see the block
+	// comment above) and the modular half after it, preserving exactly the
+	// ordering the hand flips had.
+
 	TEST_CASE("mul comparison no longer wraps") {
-		bv_widening = true;
 		// {16}*{16} = 256 -> modular bv[8] gives 0 <= 10 TRUE;
 		// exact 256 <= 10 FALSE.
-		auto fm = parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] <= { 10 }:bv[8]");
-		CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm)) );
-		bv_widening = false;
+		tref fm = nullptr;
+		{
+			bv_widening_scope widen;
+			fm = parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] <= { 10 }:bv[8]");
+			CHECK( !is_bv_formula_valid<node_t>(
+				widen_bv_arithmetic<node_t>(fm)) );
+		}
+		REQUIRE(!bv_widening);
 		CHECK( is_bv_formula_valid<node_t>(fm) );
 	}
 
 	TEST_CASE("guard-free checked multiply") {
-		bv_widening = true;
+		bv_widening_scope widen;
 		// o:bv[8] = min({16}*{16}, {200}): exact min(256,200)=200 ->
 		// the truncating (bv[8]) cast is lossless and o solves to 200.
 		auto fm = parse_wff("o = min({ 16 }:bv[8] * { 16 }:bv[8], { 200 }:bv[8])");
@@ -756,11 +874,10 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		const tref val = sol.value().begin()->second;
 		CHECK(std::get<bv>(tree<node_t>::get(val)[0].get_ba_constant())
 			.getBitVectorValue(10) == "200");
-		bv_widening = false;
 	}
 
 	TEST_CASE("saturating add via min") {
-		bv_widening = true;
+		bv_widening_scope widen;
 		// o:bv[8] = min({200}+{90}, {250}): exact sum 290 at W=9 (bf_add
 		// is max(l,r)+1 = 9, well clear of 511), min(290,250)=250,
 		// truncates losslessly (250 <= 255) -> o solves to 250. (250, not
@@ -776,11 +893,9 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		const tref val = sol.value().begin()->second;
 		CHECK(std::get<bv>(tree<node_t>::get(val)[0].get_ba_constant())
 			.getBitVectorValue(10) == "250");
-		bv_widening = false;
 	}
 
 	TEST_CASE("subtraction underflow wraps at W (D1)") {
-		bv_widening = true;
 		// {20}*{15} - {10} <= {50}: bf_sub's own rule is `max(l, r)` (it
 		// never grows on its own), but here it sits ABOVE a widened mul
 		// (needed_width(bf_mul(20,15)) = 8+8 = 16), so its own width is
@@ -791,10 +906,15 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// hardware multiply); 44 - 10 = 34 (no underflow); 34 <= 50 TRUE.
 		// exact (W=16): 20*15 = 300 (fits in 16 bits, no wrap);
 		// 300 - 10 = 290 (16-bit, no underflow); 290 <= 50 FALSE.
-		auto fm = parse_wff(
-			"({ 20 }:bv[8] * { 15 }:bv[8]) - { 10 }:bv[8] <= { 50 }:bv[8]");
-		CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm)) );
-		bv_widening = false;
+		tref fm = nullptr;
+		{
+			bv_widening_scope widen;
+			fm = parse_wff("({ 20 }:bv[8] * { 15 }:bv[8]) - { 10 }:bv[8] "
+				"<= { 50 }:bv[8]");
+			CHECK( !is_bv_formula_valid<node_t>(
+				widen_bv_arithmetic<node_t>(fm)) );
+		}
+		REQUIRE(!bv_widening);
 		CHECK( is_bv_formula_valid<node_t>(fm) );
 	}
 
@@ -815,13 +935,17 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// already-constant formula). T is therefore correct regardless of
 		// widening; this sample never actually exercised the amended D3
 		// complement-at-W rule at all -- see the next case for that.
-		bv_widening = true;
-		auto fm = parse_wff("({ 16 }:bv[8] * { 16 }:bv[8])' <= { 255 }:bv[8]");
-		tref widened = widen_bv_arithmetic<node_t>(fm);
-		REQUIRE(widened != nullptr);
-		CHECK(widened == fm); // already fully folded at parse time: no-op
-		CHECK( is_bv_formula_valid<node_t>(widened) );
-		bv_widening = false;
+		tref fm = nullptr;
+		{
+			bv_widening_scope widen;
+			fm = parse_wff(
+				"({ 16 }:bv[8] * { 16 }:bv[8])' <= { 255 }:bv[8]");
+			tref widened = widen_bv_arithmetic<node_t>(fm);
+			REQUIRE(widened != nullptr);
+			CHECK(widened == fm); // already fully folded at parse time: no-op
+			CHECK( is_bv_formula_valid<node_t>(widened) );
+		}
+		REQUIRE(!bv_widening);
 		CHECK( is_bv_formula_valid<node_t>(fm) );
 	}
 
@@ -848,12 +972,13 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// ANY x: UNSAT.
 		auto fm = parse_wff("ex x ((x:bv[8] * { 255 }:bv[8])' <= { 200 }:bv[8])");
 		CHECK( is_bv_formula_sat<node_t>(fm) ); // modular
-		bv_widening = true;
-		tref widened = widen_bv_arithmetic<node_t>(fm);
-		REQUIRE(widened != nullptr);
-		INFO("widened formula: " << tree<node_t>::get(widened).to_str());
-		CHECK( !is_bv_formula_sat<node_t>(widened) ); // exact
-		bv_widening = false;
+		{
+			bv_widening_scope widen;
+			tref widened = widen_bv_arithmetic<node_t>(fm);
+			REQUIRE(widened != nullptr);
+			INFO("widened formula: " << tree<node_t>::get(widened).to_str());
+			CHECK( !is_bv_formula_sat<node_t>(widened) ); // exact
+		}
 	}
 
 	// Defs-expansion probe: `normalizer<node_t>` is the SAME shared pipeline
@@ -1235,7 +1360,10 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// test_bv_ba_hooks.cpp -- needed_width's `case tau::bf_f:` arm
 		// treats it as an ordinary base_w leaf, same as a ba_constant, so
 		// this does not change the width analysis below) -- SAT.
-		bv_widening = false;
+		// (Asserted, not assigned: the flag is off by default and every
+		// case that turns it on does so through the RAII guard, so the
+		// modular half only has to state the precondition it relies on.)
+		REQUIRE(!bv_widening);
 		CHECK(is_tau_formula_sat<node_t>(
 			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")));
 
@@ -1264,7 +1392,7 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// parse time the way the equality case above can -- irrelevant
 		// here since is_tau_formula_sat fully normalizes and decides any
 		// residual ground atom regardless).
-		bv_widening = false;
+		REQUIRE(!bv_widening);
 		CHECK(!is_tau_formula_sat<node_t>(
 			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")));
 
@@ -1301,7 +1429,7 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// Modular (bv_widening off): o1[t] = 16 at every time step
 		// satisfies BOTH conjuncts simultaneously: 16*16 mod 256 = 0
 		// (first conjunct), and 16 > 10 (second) -- REALIZABLE.
-		bv_widening = false;
+		REQUIRE(!bv_widening);
 		tref fm_off = tau_api::get_formula(spec);
 		REQUIRE(fm_off != nullptr);
 		CHECK(tau_api::realizable(fm_off));
@@ -1320,5 +1448,66 @@ TEST_SUITE("bv widening - realizability on/off") {
 		tref fm_on = tau_api::get_formula(spec);
 		REQUIRE(fm_on != nullptr);
 		CHECK(!tau_api::realizable(fm_on));
+	}
+
+	// The REVERSE-direction temporal sentinel, and the discriminating
+	// end-to-end case for the Critical folded-constant idempotency finding
+	// (the two unit re-application tests above pin the same bug at the
+	// widen_atom level; this one pins what it costs a user).
+	//
+	// Both atoms that matter here carry a folded constant leaf after
+	// widening -- `{2}:bv[16]` and `{250}:bv[16]`, their casts eaten by
+	// bv_term_cast -- so under the pre-fix guard the multiply atom is
+	// re-widened on every re-entry into normalization (16 -> 32 -> 64 ...),
+	// and re-entry through api::realizable is plentiful: normalize_formula,
+	// then is_tau_formula_sat's own normalize_with_temp_simp, then a
+	// normalize_non_temp per step of the continuation/fixpoint search. Once
+	// the escalation passes bv_max_width the pass returns nullptr, and
+	// is_tau_formula_sat's conservative fallback answers "not sat" -- i.e.
+	// UNREALIZABLE, the exact opposite of the right answer, and
+	// indistinguishable from a real verdict without reading the log.
+	//
+	// bv_max_width is capped at 20 for the case: it is NOT what makes the
+	// test discriminating (with the default 1024 the pre-fix escalation
+	// still ends at the cap, just seven re-widenings later, having asked
+	// cvc5 to reason about 1024-bit multiplies on the way). It only makes
+	// the failure land on the FIRST re-entry (32 > 20), so the test stays
+	// fast and deterministic instead of depending on how many times the
+	// pipeline happens to re-normalize. With the fix, W stays 16 forever
+	// and the cap is never approached.
+	TEST_CASE("temporal (reverse direction): exact product clears a threshold modular wrapping cannot") {
+		definitions<node_t>::instance().clear();
+		// Fresh stream name o2 (see the o1 note above for why it is
+		// cleared first and why no stream declaration is needed).
+		const char* spec =
+			"always (o2[t]:bv[8] >= { 128 }:bv[8] "
+			"&& o2[t]:bv[8] <= { 200 }:bv[8] "
+			"&& o2[t]:bv[8] * { 2 }:bv[8] >= { 250 }:bv[8])";
+		// The first two conjuncts pin o2[t] into [128, 200] and are
+		// identical under both modes (needed_width = max(8,8) = 8, already
+		// the base width). The third is the discriminating one: the LHS is
+		// a compound multiply (needed_width = 8 + 8 = 16) against a plain
+		// constant, so it takes the "Comparisons" rule -- both sides
+		// zero-extended to W = 16, compared exactly.
+		//
+		// Modular (bv_widening off): for o2 in [128, 200], 2*o2 is in
+		// [256, 400] and therefore ALWAYS wraps: 2*o2 mod 256 = 2*o2 - 256
+		// lands in [0, 144], never >= 250. No value of o2[t] satisfies all
+		// three conjuncts -- UNREALIZABLE.
+		REQUIRE(!bv_widening);
+		tref fm_off = tau_api::get_formula(spec);
+		REQUIRE(fm_off != nullptr);
+		CHECK(!tau_api::realizable(fm_off));
+
+		// Exact (bv_widening on, set before parsing): 2*o2 is computed at
+		// W = 16 and never wraps, so it is in [256, 400] for the whole
+		// pinned range -- every one of those values is >= 250, and e.g.
+		// o2[t] = 128 satisfies all three conjuncts at every time step --
+		// REALIZABLE.
+		bv_widening_scope widen;
+		bv_max_width_scope cap(20);
+		tref fm_on = tau_api::get_formula(spec);
+		REQUIRE(fm_on != nullptr);
+		CHECK(tau_api::realizable(fm_on));
 	}
 }

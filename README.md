@@ -847,11 +847,11 @@ mode is most visible: `i1*i2 <= c` stops wrapping.
   (bv[8]) i1[t]:bv[8]'          # the base-width (8-bit) complement, regardless of the surrounding computation's width
   ```
 
-  A cast is always a boundary for this pass: whatever it wraps is
-  elaborated as its own, independent computation and re-enters the
-  surrounding atom already fixed at the cast's declared width, recovering
-  today's exact meaning even with the mode switched on — e.g. adding the
-  cast to the query above,
+  A cast is always a boundary for this pass: whatever it wraps is left
+  untouched — it computes exactly as it does in the default mode, at its
+  own widths — and its result enters the surrounding widened computation at
+  the cast's declared width, recovering today's exact meaning even with the
+  mode switched on — e.g. adding the cast to the query above,
   `sat ex x ((bv[8]) (x:bv[8] * { 255 }:bv[8])' <= { 200 }:bv[8]).`, answers
   `T` again with `--bv-widening` still on.
 
