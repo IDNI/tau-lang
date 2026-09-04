@@ -170,6 +170,11 @@ void api<node>::set_ba_component_factoring(bool state) {
 }
 
 template <NodeType node>
+void api<node>::set_bv_case_split(bool state) {
+	bv_case_split = state;
+}
+
+template <NodeType node>
 void api<node>::set_highlighting(bool highlighting) {
 	pretty_printer_highlighting = highlighting;
 }
