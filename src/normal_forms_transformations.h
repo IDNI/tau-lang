@@ -58,6 +58,22 @@ enum MemorySlotPost {
 template <NodeType node>
 tref unequal_to_not_equal(tref fm);
 
+/**
+ * @brief Rewrite the order atoms into literals over `<` and `<=`.
+ *
+ * Rewrites `$X !< $Y` into `!($X < $Y)`, `$X !<= $Y` into `!($X <= $Y)`,
+ * and the `>` / `>=` atoms (and their negations) into the swapped `<` /
+ * `<=` (negated) atoms, so that a formula only carries `bf_lt` and `bf_lteq`
+ * order atoms, possibly under `wff_neg`. The order-atom counterpart of
+ * unequal_to_not_equal, used by dnf_cnf_to_reduced to present the order
+ * atoms as BDD variables.
+ * @tparam node Tree node type.
+ * @param fm The formula to transform.
+ * @return Transformed formula with all order atoms as (negated) `bf_lt` / `bf_lteq`.
+ */
+template <NodeType node>
+tref order_atoms_to_literals(tref fm);
+
 
 /**
  * @brief Normalize an equality or disequality to the form `expr (!)= 0`.
