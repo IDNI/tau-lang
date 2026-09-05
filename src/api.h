@@ -261,6 +261,10 @@ struct api {
 	/// Enable/disable support-component factoring of the Tau-BA
 	/// constant/valid tests (tau_ba.tmpl.h). Off by default.
 	static void set_ba_component_factoring(bool state);
+	/// Enable/disable the test-point elimination of quantified bitvector
+	/// variables compared only against constants (normalizer.tmpl.h). Off by
+	/// default.
+	static void set_bv_case_split(bool state);
 	/** @brief Enable/disable ANSI colour highlighting in output. */
 	static void set_highlighting(bool state);
 	/** @brief Enable/disable JSON output mode. */
