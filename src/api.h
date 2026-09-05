@@ -168,6 +168,12 @@ struct api {
 	 */
 	static void set_block_max_splits(size_t n);
 	/**
+	 * @brief Enable/disable the quantifier-free decision of closed bitvector
+	 * formulas whose binders are all of one kind (bv_ba.h,
+	 * `bv_quantifier_free_decision`). Off by default.
+	 */
+	static void set_bv_quantifier_free_decision(bool state);
+	/**
 	 * @brief Set the anti-prenex driver's maximum round count.
 	 *
 	 * Bounds how many times the driver re-collects innermost blocks before

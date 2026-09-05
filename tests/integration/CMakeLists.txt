@@ -50,6 +50,7 @@ set(TESTS
 	bv_stress_check
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise
+	bv_quantifier_free_decision
 )
 
 foreach(X IN LISTS TESTS)

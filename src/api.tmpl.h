@@ -90,6 +90,11 @@ void api<node>::set_block_max_splits(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_bv_quantifier_free_decision(bool state) {
+	bv_quantifier_free_decision = state;
+}
+
+template <NodeType node>
 void api<node>::set_block_max_rounds(size_t n) {
 	block_max_rounds = n ? n : std::numeric_limits<size_t>::max();
 }
