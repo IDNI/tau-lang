@@ -155,11 +155,12 @@ term representation, per component (PREPARE_TERMS):
 | `expand_max` | budget on cases built by `EXPAND` — shared by `TRY_DECOMPOSE`'s arms (§6) — counted per component (`ctx.expand_count`) — past it, the still-unexpanded members re-wrap as ONE pending block and every finished case is kept (inv. 3). `K‴ = 2¹⁴`. A hit taints its computation (cache scope, below) |
 | `accept_growth` | growth factor of the per-component SIZE ACCEPTANCE (§5): a component push whose result exceeds `max(γ·\|input\|, accept_floor)` is discarded for the re-wrapped input (inv. 3). `γ = 16`. Neither taint nor flush attaches (cache scope, below) |
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires — moderate growth is routine and often repaid downstream; the test exists for detonation (§5). `2²⁰` |
+| `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
 | `keep_functional` | emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below) |
 | `push_memo` | `(φ, X, keep_functional) → formula`, GLOBAL (cache scope, below). Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(clause, X, keep_functional) → formula`, GLOBAL. The key names everything an elimination reads, so it is exact |
 | `quant_memo` | functional-quantifier term → term, GLOBAL — the key IS the query (`ASK`'s convention) and names term, kind, and quantified set in one node; entries are pure functions of it. `SETTLE_FUNCTIONAL`'s discharges may share it (see `DISCHARGE`) |
-| `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`; consumers: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Pure functions of the key — the settled term already reflects `keep_functional` |
+| `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`; consumers: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `SETTLE_FUNCTIONAL(TERM_OF(·), ctx)`, before calling `COF`. Pure functions of the key — the settled term already reflects `keep_functional` |
 | `atoms_memo` | `formula node → the atoms occurring in it`, units opaque (§4), GLOBAL — purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
@@ -182,8 +183,8 @@ carries its `x`; `quant_memo`'s key is the query itself; `atoms_memo` is
 purely structural; `solver_memo` and `qbf_memo` involve none.
 `keep_functional` joins `push_memo`'s and `elim_memo`'s keys alone — their
 entries embed `DISCHARGE`'s output, which the flag switches — while
-`cof_memo`'s settled-term key is formed after `SETTLE_FUNCTIONAL` applied the
-mode. Every tie-break is the content order (§1), so no entry embeds
+`cof_memo`'s settled-term key is formed by each caller after
+`SETTLE_FUNCTIONAL` applied the mode. Every tie-break is the content order (§1), so no entry embeds
 construction history. Five knobs sit in no key — the solver configuration,
 `qbf_node_max`, `expand_max`, `accept_growth` and `accept_floor` — and are
 handled three ways. TAINT: a computation that hit a budget — an `expand_max`
@@ -191,7 +192,13 @@ exhaustion re-wrap, a `qbf_node_max` sweep abandoned to `ASK` that ended
 `unknown` — returns its result (sound, inv. 3) but writes no
 `push_memo`/`elim_memo` entry, and taint is transitive through every result
 assembled from it; so no entry embeds budget or counter state, and raising a
-budget needs no flush, only recomputation where the budget bound. FLUSH:
+budget needs no flush, only recomputation where the budget bound. Taint is
+CARRIED BY A COUNTER, never by the result: results are hash-consed nodes,
+and the same formula can be built untainted elsewhere, so no mark may sit
+on a node. `ctx.taint_count` counts budget hits; each source increments it,
+and each memo wrapper reads it before its computation and writes the entry
+only if it is unchanged after — transitivity for free, since a hit inside
+the computation is a hit inside every enclosing one. FLUSH:
 `solver_memo` is valid per solver configuration and is flushed when it
 changes; a `push_memo`/`elim_memo` entry that embedded a genuine solver
 `unknown` stays sound (inv. 3) yet blind to a stronger solver, so both are
@@ -217,11 +224,12 @@ fallback live in `solver_memo` under that table's flush rule.
    no atom mentions variables of two types, so the shared-atom partition in
    `PUSH_EX_BLOCK` cannot merge across types — every component is
    type-homogeneous, which makes `ctx.type` well defined. `COLLECT_RUN` does no
-   type test. A mixed-type component arises only through a non-atomic conjunct
-   (a reference with arguments of several types, a nested binder), and every
-   elimination method freezes those it cannot read — a reference always, a
-   surviving binder unless its body is translatable for the method's engine, in
-   which case the unit is swallowed whole into a query (§7), never opened.
+   type test. The partition descends into nested binders, so an atom inside
+   a unit connects like any other; a reference connects nothing — it may
+   mention variables of several components and types, and every elimination
+   method freezes it — and a surviving binder is frozen unless its body is
+   translatable for the method's engine, in which case the unit is swallowed
+   whole into a query (§7), never opened.
 3. **A surviving quantifier is sound.** Callers read it as *undecided*, never as
    false. Every graceful exit re-wraps; no method may answer `F` for "cannot
    decide".
@@ -320,14 +328,17 @@ ELIMINATE_BY_SUBSTITUTION(φ):                        // one global pass
             if ψ* ≠ ⊥: n ← ψ*
     return φ
 
-TRY_WITNESS(x, ψ) → formula | ⊥:
+TRY_WITNESS(x, ψ, ctx = ⊥) → formula | ⊥:
     // ∃x.(x = t ∧ ψ′(x)) ≡ ψ′(t), any type. Returns the witnessed BODY, never a
     // binder — only the caller knows what failure means (x stays in the block
     // in ELIMINATE_BLOCK step 1, its direct caller; phase 2 reaches the same
-    // match per spine through TRY_WITNESS_DEEP). The call sites straddle
-    // NORMALIZE_OPERATORS, so the SPELLED match is spelling-agnostic:
+    // match per spine through TRY_WITNESS_DEEP, with no ctx: nothing is
+    // BDD-backed there, so only the spelled match applies). The call sites
+    // straddle NORMALIZE_OPERATORS, so the SPELLED match is spelling-agnostic:
     // x = t | t = x | x + t = 0 | …, and g ≠ 0 may still occur at phase 2.
-    // On BDD-backed conjuncts — phase 4 — the match reads COF (§6): a
+    // On BDD-backed conjuncts — phase 4, ctx present — the match reads COF
+    // (§6) on the conjunct's SETTLED term, SETTLE_FUNCTIONAL(TERM_OF(c), ctx)
+    // — cof_memo's key (§1), which every pin site forms itself: a
     // positive f = 0 PINS x iff usable ∧ f₀ ∪ f₁ = 1. Boole's expansion
     // f = x′f₀ ∪ xf₁ puts the zeros of f at f₀ ≤ x ≤ f₁′, an interval
     // that f₀ ∪ f₁ = 1 (f₁′ ≤ f₀) collapses to a point:
@@ -350,10 +361,14 @@ TRY_WITNESS(x, ψ) → formula | ⊥:
     // f[x ← f₁′] = f₁f₀ ∪ f₁′f₁ IS p = 0, so a strict pin folds it to T
     // and no site emits a residual on its own. Several pins on x: a strict
     // one first, else the smallest witness — the scan holds every COF
-    // entry already.
-    if some top-level conjunct of ψ pins x — the spelled match, or COF's:
+    // entry already. The result is SIMPLIFIED here (inv. 6): a formula
+    // built by substitution, handed to every caller ready to recurse into.
+    if some top-level conjunct of ψ pins x — the spelled match, or, with ctx,
+            COF(SETTLE_FUNCTIONAL(TERM_OF(c), ctx), x, ctx).pin on an
+            equation conjunct c:
         c ← a strict pin among them, else the pin of smallest ‖f₁′‖
-        return ψ with x replaced by c's witness in EVERY conjunct, c included
+        return SIMPLIFY(ψ with x replaced by c's witness in EVERY conjunct,
+                        c included)
     return ⊥
 
 TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
@@ -418,8 +433,9 @@ TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
 
 A CASE PIN for `x` (both phases use the notion): a disjunction `D = ⋁ᵢ dᵢ`
 every branch of which has a conjunct pinning `x` with witness `tᵢ`
-(`TRY_WITNESS`'s match — spelled at phase 2, COF's at phase 4), `x ∉ FV(tᵢ)`,
-with at most `K″` branches. The match
+(`TRY_WITNESS`'s match — spelled at phase 2, COF's at phase 4, read on the
+settled term and choosing among several pins of a branch as `TRY_WITNESS`
+does), `x ∉ FV(tᵢ)`, with at most `K″` branches. The match
 stays at `D`'s TOP branches deliberately: expanding nested ∧/∨ structure into
 deeper cases lets guard disjunctions that merely CONTAIN solving atoms
 qualify, and their distribution duplicates without telescoping. A member that
@@ -535,6 +551,37 @@ invariant 6:
   terms inside terms.
 - `SIMPLIFY_ATOM(a)` — `SIMPLIFY_TERM` on both sides, then fold a constant-only
   atom to `T`/`F`.
+
+The remaining primitives are defined by their contracts alone:
+
+- `CANONICALISE_BINDER_IDS(φ)` — renames every binder, formula binders and
+  functional-quantifier subscripts alike, to canonical ids by position, so
+  alpha-variants are one node: phase 0's normaliser and the key of `ASK`
+  and `DECIDE_FINITE` (§7).
+- `φ[x ← t]` and `φ[atm ↦ T/F]` — capture-aware substitution, each returning
+  an untouched subtree by one cached test, `FV` and `atoms_memo` (§10);
+  `[x ← t]` descends into units (§4) and re-simplifies what it touches
+  (§1), `[atm ↦ T/F]` erases every reachable occurrence, units opaque.
+- `COLLECT_RUN(h)` — the maximal same-kind quantifier run from `h`, with its
+  matrix (§4).
+- `CONNECTED_COMPONENTS(X, body)` — the partition of `X` by atom
+  connectivity, descending into nested binders, references connecting
+  nothing (§5); each component in `X`'s order.
+- `PREPARE_TERMS(body, P, order)` — §1's term representation over `P`:
+  both sides of every atom touching `P` backed by a BDD whose decision
+  variables are `P` in the given order, everything else in the leaves,
+  functional quantifiers slid onto the leaves, binder units transported
+  opaque.
+- `SQUEEZE_POSITIVES(φ)` — for an ∧/∨ skeleton whose leaves are positive
+  equations, terms `t₁ … t_k` with `φ ≡ t₁ = 0 ∨ … ∨ t_k = 0`, obtained by
+  distributing ∧ over ∨ on terms, a conjunction squeezing to the union
+  (prop:squeeze-pos; §6, 2b).
+- `SPLIT_ARITHMETIC(clause, X)` — `(A, X_A), (B, X_B)`: `A` the impure
+  conjuncts closed under the variables reaching them, to a fixpoint, with
+  `X_A` those variables; `B` and `X_B` the rest, disjoint (§7, the router).
+- `IS_LINEAR_ARITHMETIC(c)`, `LINEAR_ARITHMETIC_TO_BA(c)` — black boxes
+  (§7, the router; §9).
+- `METHOD(τ)`, `EX_DISTRIBUTES_OVER_NEGATIVES(τ)` — the type table (§7).
 
 **The result joins** assemble already-simplified formulas into a disjunction or
 conjunction:
@@ -696,11 +743,17 @@ disjunction instead of a conjunction of one disjunction per member.
 
 ```
 PUSH_EX_BLOCK(body, X, kf):
-    // Partition at ENTRY: merge two block variables when some atom of `body`
-    // mentions both. Components then share no atom, push sequentially without
-    // interference, may reuse ranks 1..|P|, and are TYPE-HOMOGENEOUS (inv. 2),
-    // which gives ELIMINATE_BLOCK one type to dispatch on. Connectivity only
-    // decays during the push — PUSH_OVER_CONJUNCTION narrows scopes on the way.
+    // Partition at ENTRY: merge two block variables when some ATOM of `body`
+    // mentions both — an atom inside a nested binder included: the walk
+    // descends through every formula node, units and all, so the partition
+    // is the atom connectivity of the whole body. A REFERENCE merges
+    // nothing: a block variable inside one is frozen by every method (§7),
+    // never resolved, so a reference mentioning two components straddles
+    // them harmlessly. Components then share no atom, push sequentially
+    // without interference, may reuse ranks 1..|P|, and are TYPE-HOMOGENEOUS
+    // (inv. 2), which gives ELIMINATE_BLOCK one type to dispatch on.
+    // Connectivity only decays during the push — PUSH_OVER_CONJUNCTION
+    // narrows scopes on the way.
     for P in CONNECTED_COMPONENTS(X, body):       // each keeps X's order;
                                                   //   0-based: P[0] outermost
         ctx.type  ← the BA type of P
@@ -716,6 +769,7 @@ PUSH_EX_BLOCK(body, X, kf):
         ctx.push_memo, ctx.elim_memo, ctx.cof_memo, ctx.atoms_memo,
             ctx.quant_memo, ctx.solver_memo, ctx.qbf_memo
             ← the global tables                   // cross-run, never reset (§1)
+        ctx.taint_count ← the global counter      // likewise (§1, cache scope)
         body ← PREPARE_TERMS(body, P, ctx.order)  // BDD-back both sides of every
                                                   //   atom touching P (§1). A
                                                   //   FORMULA-level binder unit
@@ -781,10 +835,12 @@ PUSH_BLOCK(φ, X, ctx):                            // memo wrapper
                    //   X-preserving cycle passes through a budgeted step
                    //   (§8), whose shared budget caps the depth
     if ctx.push_memo[k] exists: return ctx.push_memo[k]
+    t ← ctx.taint_count
     r ← PUSH_BLOCK_UNCACHED(φ, X, ctx)
-    if r is untainted: ctx.push_memo[k] ← r    // a budget-hit result is
-                                               //   returned, never cached
-                                               //   (§1, cache scope)
+    if ctx.taint_count = t: ctx.push_memo[k] ← r   // no budget hit inside:
+                                                   //   a tainted result is
+                                                   //   returned, never cached
+                                                   //   (§1, cache scope)
     return r
 
 PUSH_BLOCK_UNCACHED(φ, X, ctx):                   // dispatcher
@@ -873,10 +929,11 @@ TRY_FAST_PATHS(φ, X, ctx) → formula | ⊥:
         // which would otherwise refute 2a and force an expansion. The push
         // routes; §7 reasons (inv. 1).
         if not EX_DISTRIBUTES_OVER_NEGATIVES(ctx.type): return ⊥
-        return SIMPLIFIED_AND_JOIN(ELIMINATE_BLOCK(⋀P, X ∩ FV(⋀P), ctx),
+        return SIMPLIFIED_AND_JOIN(ELIMINATE_BLOCK(⋀P, X, ctx),
                                    DISTRIBUTE_TO_ATOMS(φ minus P, X, ctx, P))
-                              // the consistency check's key (below): one
-                              //   elim_memo entry serves both
+                              // the wrapper narrows X to the clause (§7), so
+                              //   this is the consistency check's key
+                              //   (below): one elim_memo entry serves both
 
     if c.free = 0 and c.neg = 0 and c.pos > 0:                         // 2b
         // f₁=0 ∧ f₂=0 ≡ f₁∪f₂=0 (prop:squeeze-pos) + distributing ∧ over ∨, on
@@ -975,16 +1032,17 @@ PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
     // freeze or reach the solver. Memoized under the clause: paid exactly
     // when the positive set changed.
     P ← the positive PURE equation conjuncts of ψ (§1)
-    if P ≠ ∅ and ELIMINATE_BLOCK(⋀P, X ∩ FV(⋀P), ctx) = F: return F
+    if P ≠ ∅ and ELIMINATE_BLOCK(⋀P, X, ctx) = F: return F
 
     // Binder-killing steps, cheapest first (inv. 8); EXPAND, which
     // multiplies, is the floor.
     for x in X:
-        ψ* ← TRY_WITNESS(x, ψ)                    // a pin at spine level: one
+        ψ* ← TRY_WITNESS(x, ψ, ctx)               // a pin at spine level: one
         if ψ* ≠ ⊥:                                //   scan, no copies. On BDD-
             return PUSH_BLOCK(ψ*, X ∖ {x}, ctx)   //   backed conjuncts the
-                                                  //   match reads COF: pin iff
-                                                  //   usable ∧ f₀ ∪ f₁ = 1,
+                                                  //   match reads COF on the
+                                                  //   settled term (§3): pin
+                                                  //   iff usable ∧ f₀ ∪ f₁ = 1,
                                                   //   witness f₁′, residual
                                                   //   p = 0 (§1, cof_memo)
     for x in X:                                    // a case witness beats the
@@ -1007,13 +1065,17 @@ PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
                                        //   worlds EXPAND would multiply
     return EXPAND(ψ, X, ctx)
 
+PARTS(conjuncts, X) → parts:
+    // ONE pass over cached FV sets — an intersection per conjunct, no
+    // descent (§1): union-find merging block variables that co-occur in a
+    // conjunct; parts = the conjuncts grouped by component. Near-linear.
+    // The grouping alone is what §7 shares — the freeze, the squeeze's
+    // components, the finite tier-2 split.
+
 INCIDENCE(conjuncts, X) → (parts, Xs):
-    // ONE pass over cached FV sets — a kind test and an intersection per
-    // conjunct, no descent (§1): union-find merging block variables that
-    // co-occur in a conjunct → parts, the conjuncts grouped by component; a
-    // variable flagged on touching a disjunctive conjunct that is not a
-    // negative tree (§1, one cached leaf test) → Xs, the unflagged
-    // remainder. Near-linear.
+    // PARTS plus one kind test per conjunct: a variable flagged on touching
+    // a disjunctive conjunct that is not a negative tree (§1, one cached
+    // leaf test) → Xs, the unflagged remainder.
 ```
 
 ### The licensed decomposition, then expansion — paper steps 2e–2k
@@ -1125,8 +1187,9 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
 
 DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
     // The two arms of ∃X ψ = ∃X (a ∧ C_T) ∨ ∃X (¬a ∧ C_F).
-    // PIN ARM: when a is an equation f = 0 that PINS a block variable —
-    // COF at x gives pin, the witness step's own test — then under a,
+    // PIN ARM: when a is an equation whose settled term f PINS a block
+    // variable — COF at x gives pin, the witness step's own test on the
+    // same key (§3) — then under a,
     // x = f₁′ uniquely, and the T-arm is ∃(X ∖ {x}) (a ∧ C_T)[x ← f₁′]:
     // the same worlds with one binder fewer, the guard kept and substituted
     // into its residual p = 0 (TRY_WITNESS, §3), T for a strict pin. This
@@ -1146,8 +1209,12 @@ DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
     // always fits and exhaustion can only re-wrap the second (inv. 3).
     // Smaller arm first — ∃'s T short-circuit never builds the second; an
     // arm that folds to a constant is no case and charges nothing.
-    x ← a is an equation f = 0 ? the innermost x ∈ X ∩ FV(f) with
-            COF(f, x, ctx).pin : ⊥                             // the pin, if any
+    f ← a is an equation ? SETTLE_FUNCTIONAL(TERM_OF(a), ctx) : ⊥
+                                                  // cof_memo's key (§1), formed
+                                                  //   by the caller at every
+                                                  //   pin site
+    x ← f ≠ ⊥ ? the innermost x ∈ X ∩ FV(f) with COF(f, x, ctx).pin : ⊥
+                                                  // the pin, if any
     arm_T ← x = ⊥ ? (a ∧ C_T, X) : ((a ∧ C_T)[x ← f₁′], X ∖ {x})
                                                   // binder deleted; a → p = 0
     arm_F ← (¬a ∧ C_F, X)
@@ -1156,7 +1223,8 @@ DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
         b ← SIMPLIFY(φ)                                            // inv. 6
         if b ∈ {T, F}: insert b into acc
         else if ctx.expand_count ≥ ctx.expand_max:
-            taint ; insert REWRAP(b, Y ∩ FV(b)) into acc ; break
+            ctx.taint_count ← ctx.taint_count + 1          // §1, cache scope
+            insert REWRAP(b, Y ∩ FV(b)) into acc ; break
         else:
             ctx.expand_count ← ctx.expand_count + 1
             insert PUSH_BLOCK(b, Y ∩ FV(b), ctx) into acc
@@ -1219,6 +1287,7 @@ EXPAND(ψ, X, ctx):
             //   disjunction is its own exclusive decomposition. The
             //   exhaustion TAINTS every enclosing computation (§1, cache
             //   scope): results embedding it are returned, never cached
+            ctx.taint_count ← ctx.taint_count + 1
             φp ← SIMPLIFIED_AND_JOIN(⋀E, excl, ⋁ of the remaining members,
                                      ⋀(S ∖ {D}))
             insert REWRAP(φp, X ∩ FV(φp)) into acc
@@ -1263,27 +1332,43 @@ ELIMINATE_BLOCK(clause, X, ctx):                      // memo wrapper
     // some x ∈ X. Other block variables may occur in the clause: the settle
     // move's Xs excludes them, and the methods read them as free.
     if clause ∈ {T, F}: return clause
+    X ← X ∩ FV(clause), keeping X's order  // PUSH_BLOCK's key canonicalisation:
+                                           //   nothing enters the key that ∃X
+                                           //   does not scope — 2a's leaf
+                                           //   clauses and 2b's terms arrive
+                                           //   under the whole block
+    if X = ∅: return clause
     k ← (clause, X, ctx.keep_functional)   // exact key (ctx table); nothing
                       //   below recurses back into the push
     if ctx.elim_memo[k] exists: return ctx.elim_memo[k]
+    t ← ctx.taint_count
     r ← ELIMINATE_BLOCK_UNCACHED(clause, X, ctx)
-    if r is untainted: ctx.elim_memo[k] ← r    // §1, cache scope: a
-                                               //   budget-hit result is
-                                               //   returned, never cached
+    if ctx.taint_count = t: ctx.elim_memo[k] ← r   // no budget hit inside:
+                                                   //   a tainted result is
+                                                   //   returned, never cached
+                                                   //   (§1, cache scope)
     return r
 
 ELIMINATE_BLOCK_UNCACHED(clause, X, ctx):
     // Type-agnostic pre-steps — pure identities, run once here, not per method.
  1. for x in X:                                // a witness beats any method:
         if clause ∈ {T, F}: break              //   cheaper and exact (inv. 8)
-        ψ* ← TRY_WITNESS(x, clause)
+        ψ* ← TRY_WITNESS(x, clause, ctx)
         if ψ* ≠ ⊥: clause ← ψ* ; X ← X ∖ {x}   // ⊥ leaves x and clause untouched
     if clause ∈ {T, F}: return clause
- 2. drop from X every variable not occurring in clause
-    if X = ∅: return clause
+ 2. // The witness pass substitutes into every conjunct, the pin included,
+    // so a conjunct can lose its last block variable — the pin's residual
+    // p = 0, or a sibling. STRIP those, PUSH_BLOCK's own move,
+    // ∃X(indep ∧ dep) = indep ∧ ∃X.dep, one cached FV test per conjunct:
+    // the method contract (every conjunct mentions some x ∈ X) then holds.
+    indep ← ⋀ { c ∈ conjuncts of clause : FV(c) ∩ X = ∅ }
+    clause ← ⋀ the rest
+    drop from X every variable not occurring in clause
+    if X = ∅: return SIMPLIFIED_AND_JOIN(indep, clause)
  3. M ← METHOD(ctx.type)
-    if M = ⊥: return REWRAP(clause, X)         // no method for τ: undecided (inv. 3)
-    return M(clause, X, ctx)
+    if M = ⊥: return SIMPLIFIED_AND_JOIN(indep, REWRAP(clause, X))
+                                               // no method for τ: undecided (inv. 3)
+    return SIMPLIFIED_AND_JOIN(indep, M(clause, X, ctx))
 ```
 
 The type table — adding a type is one row plus one method obeying the contract:
@@ -1298,7 +1383,8 @@ The type table — adding a type is one row plus one method obeying the contract
 
 - **Given:** a single conjunctive clause — a negative tree (§1) is one
   conjunct of it; `X` non-empty; every `x ∈ X` occurs in the clause; every
-  conjunct mentions some `x ∈ X`; `X` homogeneous of type `τ`.
+  conjunct mentions some `x ∈ X` (`ELIMINATE_BLOCK`'s narrowing and strip
+  guarantee both); `X` homogeneous of type `τ`.
   Other variables of the enclosing component may occur in the clause and are
   read as FREE — the settle move's sub-blocks (§6) are how they arrive.
 - **Return:** a formula equivalent to `∃X.clause`. Discharge what the method
@@ -1321,7 +1407,7 @@ FREEZE_OPAQUE_COMPONENTS(clause, X, opaque?) → (frozen, clause, X):
     // occurrence outside the wrap — and its OTHER variables then bind further
     // conjuncts the same way. The closure the bullet names is exactly:
     // freeze every connected component that contains an opaque conjunct.
-    parts ← the conjuncts of clause, grouped by INCIDENCE's union-find (§6)
+    parts ← PARTS(the conjuncts of clause, X)                          // §6
             // every conjunct touches some x ∈ X, so the grouping is total
     O  ← ⋃ { p ∈ parts : some conjunct of p is opaque? }
     if O = ∅: return (T, clause, X)
@@ -1352,8 +1438,8 @@ SQUEEZE(clause, X) → (f, comps, negatives, clause):
     //   A swallowed binder unit or a conversion emission (finite method) is
     //   not an atom — it rides along untouched
  2. f ← ⋃ { positives of clause }                        // squeeze; ⋃{} = 0
-    comps ← [(F_k, X_k)]: INCIDENCE (§6) over the POSITIVES alone, negatives
-            ignored — F_k the union of component k, X_k = X ∩ FV(F_k),
+    comps ← [(F_k, X_k)]: PARTS (§6) over the POSITIVES alone, negatives
+            ignored — F_k the union of part k's terms, X_k = X ∩ FV(F_k),
             so f = ⋃_k F_k over pairwise disjoint X_k
     //   The push's own incidence pass counts negatives as connections, so a
     //   clause whose positives are linked only through negative material
@@ -1450,7 +1536,9 @@ TREE_CONDITION(t, comps, X, ctx) → formula:
     // The condition for a negative tree conjunct t (§1), modulo pos: t with
     // every literal ¬(g = 0) replaced by NEGATIVE_CONDITION(g, …), its ∨
     // nodes assembled by SIMPLIFIED_OR_JOIN and its ∧ nodes by
-    // SIMPLIFIED_AND_JOIN, bottom-up, memoized per node. Exact wherever
+    // SIMPLIFIED_AND_JOIN, bottom-up, memoized per node within this call —
+    // comps and X are fixed here, so a memo local to the call is exact, and
+    // a tree's repeated subtrees and literals pay once. Exact wherever
     // one condition per DNF clause of t is (the atomless method): distribute
     // ∃X over t's disjunctions, apply the clause identity to each DNF
     // clause — the same positive part throughout — and refactor, sound
@@ -1703,7 +1791,7 @@ FINITE_TIER2(clause, X, ctx) → formula:
     // surrender — never the 2^k formula expansion. A negative tree blasts
     // as written: BIT_BLAST is compositional.
     // ONE QUERY PER PART. A query needs only what its non-positive
-    // material touches: split the clause by INCIDENCE (§6) over ALL its
+    // material touches: split the clause by PARTS (§6) over ALL its
     // conjuncts into variable-disjoint parts, then
     //     ∃X ⋀_parts = ⋀_parts ∃X_part. part                   — any BA
     // and a part holding positives alone is ∃X_part(⋀F = 0) = its own pos
@@ -1715,7 +1803,7 @@ FINITE_TIER2(clause, X, ctx) → formula:
     // conjuncts, touch only some components, and the untouched ones never
     // enter the blast.
     acc ← an empty SIMPLIFIED_AND_JOIN ; open ← []
-    for part in INCIDENCE(the conjuncts of clause, X).parts holding a
+    for part in PARTS(the conjuncts of clause, X) holding a
             non-positive conjunct, smallest first:
         r ← FINITE_QUERY(⋀part, X ∩ FV(⋀part), ctx)
         if r is a re-wrap: open += r
@@ -1827,9 +1915,13 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
     r ← the BDD sweep over BIT_BLAST(q), budgeted by ctx.qbf_node_max
     if r ∈ {T, F}: ctx.qbf_memo[k] ← r ; return r    // mathematical truth —
                                                      //   never flushed (§1)
-    ASK(q, ctx): sat ⇒ return T, unsat ⇒ return F, unknown ⇒ return unknown
-                                                     // cached in solver_memo
-                                                     //   under ITS flush rule
+    ASK(q, ctx): sat ⇒ return T, unsat ⇒ return F,   // cached in solver_memo
+                 unknown ⇒ ctx.taint_count ← ctx.taint_count + 1 ; return unknown
+                                                     //   under ITS flush rule;
+                                                     //   the budget bound and
+                                                     //   nothing decided: a
+                                                     //   taint source (§1,
+                                                     //   cache scope)
 ```
 
 ---
@@ -1845,7 +1937,7 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
 | `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant — strictly smaller in a pin atom's T-arm, whose binder is substituted away — while both arms lose every occurrence of the atom, and a surviving guard literal is one-signed, invisible to the both-signs census; modulo the same chained channel as `EXPAND`'s caveat below (an arm-edge `SIMPLIFY` can create a pin), the shared `ctx.expand_max` bounds the arm count outright |
 | `TRY_DECOMPOSE`'s fold (§6) | a candidate `FOLD_DECIDED` proves `F` is folded, not decomposed: `|X|` constant, every occurrence of the atom erased — strictly fewer atoms, no arm, no budget |
 | `EXPAND` | lexicographic (`|X|`, multiset of top-level disjunctive-conjunct sizes), modulo ONE caveat: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `|D|` at selection time — plus CONJOINABLE exclusions — literals, whose unit elimination only shrinks, and negative trees, each the size of the member it complements and so smaller than `\|D\|`; the case-edge `SIMPLIFY` builds no disjunction node, but it can GROW an inherited one: a CHAINED pin — formed inside `d` by a construction-time substitution, unpropagated because propagation runs once (§3) — fires here and can push a member past `|D|`. Well-foundedness therefore rests on `ctx.expand_max`, which bounds the case count outright |
-| `ELIMINATE_BLOCK` pre-steps | `X` shrinks or the clause is decided |
+| `ELIMINATE_BLOCK` pre-steps | `X` shrinks, an X-free conjunct is hoisted, or the clause is decided |
 | `ELIMINATE_BITVECTOR_CLAUSE` (router) | one guarded conversion per conjunct — a rewrite, no recursion — then two variable-disjoint sub-clauses, each handed to its engine exactly once; no re-entry into the push |
 | swallowed binder units (`ELIMINATE_FINITE_CLAUSE`, `SOLVE_ARITHMETIC`) | a unit is decided wholesale or re-wrapped, never opened; each enclosing block makes exactly one attempt on it (one post-order pass, §4) — no fixpoint across blocks |
 | `FINITE_TIER2` | one query per variable-disjoint part of the clause, then at most one joint closing over the surviving re-wraps — rewrites, no recursion; each part decided or re-wrapped exactly once |
