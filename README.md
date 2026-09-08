@@ -786,7 +786,7 @@ with:
   allowed to compute at; `0` means the default, 1024). Both apply whether
   Tau is run as a REPL or given a specification file directly.
 * the matching REPL options `y|bvwidening` (on/off) and `bvmaxwidth`
-  (numeric, `set bvmaxwidth <n>`; `0` resets it to the default 1024).
+  (numeric, `set bvmaxwidth <n>`; `0` leaves the current cap unchanged).
 * the API setters `api::set_bv_widening(bool)` and
   `api::set_bv_max_width(size_t)`.
 
@@ -1687,6 +1687,8 @@ The general options are the following:
 |--------------------|-------------------------------------------------------|
 | -V, --charvar      | charvar (enabled by default)                          |
 | -B, --blasting     | bitvector predicate blasting (disabled by default)    |
+| -y, --bv-widening  | exact (widened) bitvector arithmetic (disabled by default) |
+| -Y, --bv-max-width | cap on the width exact bitvector arithmetic may compute at (0 = default 1024) |
 | -S, --severity     | severity level (trace/debug/info/error)               |
 | -I, --indenting    | indenting of the formulas                             |
 | -H, --highlighting | syntax highlighting                                   |
@@ -1799,6 +1801,11 @@ whether bitvector predicates are expanded into their bit-level encoding. It's
 off by default (the REPL starts with the value of the `-B, --blasting` command
 line option, which defaults to off).
 
+* `y|bvwidening`: Can be on/off. Controls the
+[exact (widened) bitvector arithmetic mode](#exact-widened-arithmetic-mode).
+It's off by default (the REPL starts with the value of the `-y, --bv-widening`
+command line option).
+
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
 
@@ -1858,6 +1865,11 @@ characters (`--spec-size-warn`). 0 (off) by default.
 
 * `revisionalts|maxrevisionalts`: cap on revision alternatives kept per
 specification part (`--max-revision-alts`). Unlimited by default.
+
+* `bvmaxwidth`: cap on the width the exact bitvector arithmetic mode may
+compute at (`--bv-max-width`). 1024 by default; unlike the budgets above it is
+a hard ceiling that is never unlimited, and setting it to 0 leaves the current
+value unchanged.
 
 ## **Functions, predicates and input/output stream variables**
 
@@ -2026,8 +2038,9 @@ static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
 (`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
-`set_charvar`, `set_blasting`, `set_indenting`, `set_highlighting`, `set_json` and
-`set_severity` mirror the command line options.
+`set_charvar`, `set_blasting`, `set_bv_widening`, `set_bv_max_width`,
+`set_indenting`, `set_highlighting`, `set_json` and `set_severity` mirror the
+command line options.
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and
