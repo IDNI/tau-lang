@@ -916,7 +916,9 @@ tractable.
 
 The guard idioms from the previous section remain the answer in the
 default mode, and stay available — and correct — with the exact mode
-switched on too.
+switched on too. [`demos/demo_2.4-exact_bitvector_arithmetic.tau`](demos/demo_2.4-exact_bitvector_arithmetic.tau)
+walks through the mode interactively, including the cap and a saturating
+stream accumulator.
 
 ### Precedence of term operations
 
