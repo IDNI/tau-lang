@@ -117,7 +117,6 @@ enum class table {
 	// structural per-node facets — unconditional
 	atoms_memo,    ///< §1: formula node → the atoms occurring in it, units opaque (subst.h)
 	size_memo,     ///< §1 `|φ|` (dag.h `size`)
-	members_memo,  ///< D1 member view (dag.h `members`)
 	neg_memo,      ///< §1 `neg(φ)` (dag.h `cached_neg`/`cache_neg`; filled by layer 1)
 	negative_tree_memo, ///< §1 NEGATIVE TREE flag (dag.h `is_negative_tree`)
 	leaf_fv_memo   ///< §1 leaf hazard: FV contributed by a BDD-backed term's leaves (terms.h `leaf_fv`)
@@ -239,16 +238,6 @@ struct table_traits<node, table::size_memo> {
 };
 
 template <NodeType node>
-struct table_traits<node, table::members_memo> {
-	using key_t   = tref;
-	using value_t = tref_set; ///< D1 member view in occurrence order (dag.h)
-	using map_t   = subtree_unordered_map<node, value_t>;
-	static constexpr bool gated          = false;
-	static constexpr bool taint_aware    = false;
-	static constexpr bool solver_flushed = false;
-};
-
-template <NodeType node>
 struct table_traits<node, table::neg_memo> {
 	using key_t   = tref;
 	using value_t = tref; ///< a bare `tref` value is walked by GC introspection
@@ -291,9 +280,8 @@ typename table_traits<node, T>::map_t* table_ptr();
 // --- reads, writes, the wrapper, the flush -------------------------------------------
 
 /// Pointer to the entry for `key`, or `nullptr` on a miss or a missing
-/// table. The reference-returning facet accessors (`members`, `atoms`,
-/// `leaf_fv`) are built on this; the pointer is stable until a GC sweep
-/// rebuilds the table.
+/// table. The reference-returning facet accessors (`atoms`, `leaf_fv`) are
+/// built on this; the pointer is stable until a GC sweep rebuilds the table.
 template <table T, NodeType node>
 const typename table_traits<node, T>::value_t*
 find(const typename table_traits<node, T>::key_t& key);

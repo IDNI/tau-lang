@@ -14,13 +14,14 @@
  * as binders, `BDD_ID` leaves read); it is wrapped, not reimplemented.
  *
  * Every cached facet below lives in one of ctx.h's UNCONDITIONAL structural
- * tables (`size_memo`, `members_memo`, `neg_memo`, `negative_tree_memo`;
- * fwd.h, cache gating), reached through ctx.h's `find`/`store`, so it is
- * O(1) on a second query in every build type and may return a reference
- * into the table: "|φ| and FV(φ) are set at construction, never
- * recomputed" (§10). Such a reference is invalidated by a
- * `bintree<node>::gc()` sweep, which rebuilds the tables — copy it before
- * any call that can construct nodes.
+ * tables (`size_memo`, `neg_memo`, `negative_tree_memo`; fwd.h, cache
+ * gating), reached through ctx.h's `find`/`store`, so it is O(1) on a
+ * second query in every build type: "|φ| and FV(φ) are set at construction,
+ * never recomputed" (§10). A reference into such a table (or into
+ * `get_free_vars`' table) is invalidated by a `bintree<node>::gc()` sweep,
+ * which rebuilds the tables — copy it before any call that can construct
+ * nodes. The member view is NOT cached: it is one linear walk of the chain,
+ * and every consumer processes every member anyway.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__DAG_H__
@@ -104,17 +105,22 @@ struct content_order {
 /**
  * @brief D1 member view: the members of an ∧-node or ∨-node — the FULL
  * same-connective flattening (associativity; both nesting sides, as
- * `get_leaves` does), in the order they occur. A canonical chain built by
- * `canonical_and`/`canonical_or` or by the joins (layer 1) has its members
- * deduplicated and in content order; an input node not yet rebuilt may hold
- * duplicates and any order. A node that is not a connective has the
- * one-element view `{n}`. Cached per node.
+ * `get_leaves` does), in the order they occur, duplicates included. A
+ * canonical chain built by `canonical_and`/`canonical_or` or by the joins
+ * (layer 1) has its members deduplicated and in content order by
+ * construction; an input node not yet rebuilt may hold duplicates and any
+ * order. A node that is not a connective has the one-element view `{n}`.
+ * NOT cached: one linear walk of the chain per call, returned by value.
+ * Every consumer processes every member anyway, so the walk is not an
+ * extra cost; the joins' O(1) membership test during assembly is their own
+ * local set, not this list.
  */
 template <NodeType node>
-const trefs& members(tref n);
+trefs members(tref n);
 
-/// `m` is a member of the connective node `n` (D1): a binary search over the
-/// content-ordered member list of a canonical chain; a linear scan otherwise.
+/// `m` is a member of the connective node `n` (D1): a linear scan of the
+/// member view, O(chain length). A convenience for one-off tests; a step
+/// that tests membership repeatedly builds its own set from `members`.
 template <NodeType node>
 bool is_member(tref n, tref m);
 

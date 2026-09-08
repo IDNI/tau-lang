@@ -53,7 +53,7 @@
  *     `#ifdef TAU_CACHE` only, the accessors are passthroughs otherwise, and
  *     no result may depend on a hit;
  *   - the STRUCTURAL per-node tables (`atoms_memo`, `size_memo`,
- *     `members_memo`, `neg_memo`, `negative_tree_memo`, `leaf_fv_memo`) are
+ *     `neg_memo`, `negative_tree_memo`, `leaf_fv_memo`) are
  *     UNCONDITIONAL, like the existing `get_free_vars` table: their entries
  *     are pure functions of the node, and being always present lets the
  *     facet accessors return references into them (ruling: "not gate the
@@ -61,7 +61,9 @@
  * The `#ifdef` lives in ctx.tmpl.h's `table_ptr` alone. Per-pass memos the
  * spec writes as local state (the driver's post-order memo, substitution's
  * one memo per rewrite, `TREE_CONDITION`'s call-local memo) are plain
- * locals.
+ * locals. NOT cached at all (ruling, same date): the D1 member view —
+ * collecting a chain's conjuncts or disjuncts is one linear walk, and every
+ * consumer processes every member anyway.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__FWD_H__
@@ -106,8 +108,7 @@ using simplify_formula_fn = std::function<tref(tref)>;
  * `for_each_tref` opts the type into GC introspection (`HasForEachTref`), so
  * the collector pins and checks the members whether or not they are
  * subtrees of the key — a plain `trefs` value is deliberately NOT walked by
- * the tree's caches. The value type of `atoms_memo`, `members_memo` and
- * `leaf_fv_memo`.
+ * the tree's caches. The value type of `atoms_memo` and `leaf_fv_memo`.
  */
 struct tref_set {
 	trefs items;
