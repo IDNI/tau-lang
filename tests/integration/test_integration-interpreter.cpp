@@ -128,12 +128,14 @@ TEST_SUITE("Execution") {
 		// kept as fallback orderings for values_matches_any_of's full
 		// any-of behavior in non-Debug builds. See the 8f1a74c1
 		// order-insensitivity note at the top of this suite.
+		// Re-pinned 2026-09-07 after the ba_constant regen (parser ids
+		// shifted, so the hash-driven conjunct order moved).
 		std::vector<strings> u_expected = {
 			{ "F" }, {
+				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
-				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
 		std::vector<strings> o1_expected = {
@@ -314,10 +316,11 @@ TEST_SUITE("Execution") {
 		// expected[0], so the actual ordering must be listed first; see
 		// the dec_seq case above and the 8f1a74c1 note at the top of
 		// this suite.
+		// Re-pinned 2026-09-07 after the ba_constant regen.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o3[t]:tau = 0 && o2[t]:tau = 0",
 				"always o2[t]:tau = 0 && o3[t]:tau = 0",
+				"always o3[t]:tau = 0 && o2[t]:tau = 0",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -473,6 +476,8 @@ TEST_SUITE("Execution") {
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
+			// Re-pinned 2026-09-07 after the ba_constant regen.
+			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",

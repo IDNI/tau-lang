@@ -141,7 +141,7 @@ constraint =>
         | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_lt.
 
 # constants
-ba_constant            => '{' _ (capture | source) _ '}' [ typed ].
+ba_constant            => '{' space* (capture | source) space* '}' [ typed ].
 source                 => src_c [ (src_c | space)* src_c ].
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
