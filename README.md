@@ -820,6 +820,45 @@ between two compound expressions is instead extended on both sides and
 compared or equated exactly, with no truncation at all — this is where the
 mode is most visible: `i1*i2 <= c` stops wrapping.
 
+**The mode changes what formulas mean.** Widening is not a faster or more
+precise way of answering the same question: it rewrites every atom into a
+different formula, one over exact arithmetic, *before* any decision
+procedure sees it, so satisfiability, validity, normalization, `solve`, and
+the realizability of a specification are all decided for that rewritten
+formula. A formula whose truth depends on wrap-around can therefore flip
+its answer when the mode is switched on:
+
+```
+sat ex x:bv[4] (x:bv[4] << {4}:bv[4] != {0}:bv[4]).
+
+  modular                        ->  F   (a 4-bit value shifted left by 4 is always 0)
+  widened (--bv-widening)        ->  T   (the shift runs at W = 8: 1 << 4 = 16 != 0, so x = 1 works)
+
+valid all x:bv[8] (x:bv[8] + x:bv[8] >= x:bv[8]).
+
+  modular                        ->  F   (128 + 128 wraps to 0 < 128)
+  widened (--bv-widening)        ->  T   (the sum runs at W = 9 and never wraps)
+
+n x:bv[4] << {4}:bv[4] = {0}:bv[4]
+
+  modular                        ->  T
+  widened (--bv-widening)        ->  (bv[8]) x<<{ 4 }:bv[8] = 0
+```
+
+Neither answer is wrong; they answer different questions. The modular
+answer is the one for the formula as written over `bv[4]`/`bv[8]`, and the
+widened answer is the one for its exact-arithmetic reading. So the mode
+must be chosen for a specification as a whole, not toggled around
+individual queries, and a wrap-around that a specification *relies on*
+(a mask computed by shifting, a counter meant to roll over) has to be
+pinned with an explicit cast, which the mode leaves untouched:
+`sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4]).` answers
+`F` in both modes. The only construct that keeps its modular meaning on
+its own is the assignment truncation described above:
+`always o1[t]:bv[4] = i1[t]:bv[4] << {4}:bv[4] && o1[t] != {0}:bv[4]` stays
+unsatisfiable with the mode on, because the shifted value is cut back to
+4 bits when it is stored in `o1[t]`.
+
 **Caveats.**
 
 * Subtraction still wraps on underflow: `-`'s needed width never grows on

@@ -37,9 +37,64 @@ n xyzvw
 n count' | count
 set charvar on
 
-# The numeric options in the get listing are budgets. Each caps one of the
-# engine's iterative searches; 0 means unlimited, which is the default for all
-# but the two gc knobs. They exist because several procedures search rather
+# bvwidening is the other option that changes what the input MEANS, this time
+# for bitvector arithmetic. Off (the default), arithmetic is modular and every
+# intermediate result wraps at the width of its type; on, each atom computes
+# exactly, at whatever width avoids overflow (demo_2.4 walks through the
+# mode). Because the rewrite happens before any decision procedure runs, it
+# changes the answers themselves: sat, valid, normalize and solve all decide
+# the rewritten, exact-arithmetic formula. A 4-bit value shifted left by 4 is
+# always 0 in the modular reading, so no x makes it nonzero ...
+
+get bvwidening
+sat ex x:bv[4] (x:bv[4] << {4}:bv[4] != {0}:bv[4])
+solve x:bv[4] << {4}:bv[4] != {0}:bv[4]
+
+# ... whereas widened the shift runs at 8 bits, where 1 << 4 = 16, so the
+# same query is satisfiable and solve finds a witness:
+
+set bvwidening on
+sat ex x:bv[4] (x:bv[4] << {4}:bv[4] != {0}:bv[4])
+solve x:bv[4] << {4}:bv[4] != {0}:bv[4]
+
+# Validity moves the same way: x + x >= x fails at 8 bits (128 + 128 wraps to
+# 0) but holds once the sum is computed exactly at 9 bits:
+
+set bvwidening off
+valid all x:bv[8] (x:bv[8] + x:bv[8] >= x:bv[8])
+set bvwidening on
+valid all x:bv[8] (x:bv[8] + x:bv[8] >= x:bv[8])
+
+# And normalize returns different formulas, because it is given different
+# formulas: modular, the shift is provably 0 and the equation collapses to T;
+# widened, the atom is retyped to 8 bits and stays as it is:
+
+set bvwidening off
+n x:bv[4] << {4}:bv[4] = {0}:bv[4]
+set bvwidening on
+n x:bv[4] << {4}:bv[4] = {0}:bv[4]
+
+# Neither answer is wrong: each is the answer for its own reading of the
+# formula. So pick the mode for a specification as a whole rather than
+# toggling it around single queries, and pin any wrap-around a specification
+# relies on with an explicit cast, which the mode leaves untouched. The cast
+# below keeps the shift at 4 bits, so the query answers F in both modes:
+
+sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4])
+set bvwidening off
+sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4])
+
+# bvmaxwidth is the mode's companion numeric option: the widest computation
+# the mode may build, 1024 by default (set bvmaxwidth 0 leaves the current
+# cap unchanged rather than lifting it, unlike the budgets below). Exceeding
+# it is reported loudly and answered conservatively; demo_2.4 shows it. The
+# command line twins are -y / --bv-widening and -Y / --bv-max-width.
+
+get bvmaxwidth
+
+# The remaining numeric options in the get listing are budgets. Each caps one
+# of the engine's iterative searches; 0 means unlimited, which is the default
+# for all but the two gc knobs. They exist because several procedures search rather
 # than compute: a search that does not converge is better cut off loudly than
 # left running. Reaching a budget is a bound on the search, never an answer
 # about the input. Every budget has a command line twin (--max-fixpoint-steps,
