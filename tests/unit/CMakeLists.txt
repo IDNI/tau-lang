@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	apply_rule
 	antiprenexing
+	anti_prenex_dag
+	anti_prenex_terms
+	anti_prenex_subst
+	anti_prenex_prims
+	anti_prenex_ctx
 	adt_flatten
 	adt_parsing
 	adt_types
