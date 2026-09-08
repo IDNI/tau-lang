@@ -5,7 +5,7 @@
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
-#include "anti_prenex/foundations/dag.h"
+#include "anti_prenex/anti_prenex.h"
 
 using namespace idni::tau_lang;
 namespace ap = idni::tau_lang::anti_prenexing;

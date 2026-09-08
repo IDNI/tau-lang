@@ -45,12 +45,12 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * @param order            the live BDD order (`ctx.order`), for `subst_term`
  * @param simplify_formula re-simplifier for FORMULA arguments of touched
- *                         references (`identity_formula` by default,
- *                         `simplify` from layer 1)
+ *                         references (identity at layer 0, `simplify` from
+ *                         layer 1)
  */
 template <NodeType node>
 tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
-	const simplify_formula_fn& simplify_formula = identity_formula);
+	const simplify_formula_fn& simplify_formula = {});
 
 /**
  * @brief §3 `φ[atm ↦ T/F]`: erases every REACHABLE occurrence of the atom
@@ -66,9 +66,8 @@ tref subst_atom(tref phi, tref atm, bool value);
 /**
  * @brief §1 `atoms_memo`: `formula node → the atoms occurring in it`, units
  * opaque (§4), purely structural — exactly `subst_atom`'s reach. Sorted by
- * `subtree_less<node>` (binary-searchable, like `fv`). The UNCONDITIONAL
- * structural table `atoms_memo` of ctx.h (value type `tref_set`, fwd.h),
- * so the reference is valid in every build type; invalidated by a GC sweep.
+ * `subtree_less<node>` (binary-searchable, like `fv`). GLOBAL table under
+ * `TAU_CACHE` (ctx.h); recomputed otherwise.
  */
 template <NodeType node>
 const trefs& atoms(tref n);
