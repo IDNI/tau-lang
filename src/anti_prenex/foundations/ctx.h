@@ -4,37 +4,29 @@
  * @file ctx.h
  * @brief Anti-prenexing foundations (layer 0), package E: `ctx` (the §1 ctx
  * table), the memo tables — the six §1 result tables and the structural
- * per-node facet tables — the memo wrapper with the taint rule, and the
- * flush.
+ * per-node facet tables — the memo wrapper with the taint rule (§1 cache
+ * scope, §6 `PUSH_BLOCK`), and the flush.
  *
- * CACHE GATING (rulings 2026-09-07, fwd.h): every table is an entry of
- * `enum class table` with a `table_traits` specialisation and is a static
- * GC-registered `create_cache` instance. A table with `gated == true` (the
- * six §1 result tables) exists under `#ifdef TAU_CACHE` only — `TAU_CACHE`
- * is OFF in Debug — and no result may depend on a hit; a table with
- * `gated == false` (the structural per-node facets) is UNCONDITIONAL, so
- * its accessors may return references into it. THE `#ifdef` LIVES IN
- * ctx.tmpl.h's `table_ptr` ALONE: consumers reach a table only through
- * `find` / `lookup` / `store` / `memoised` / `flush_solver_dependent`, which
- * see a missing table as a miss, a no-op, or plain computation.
- *
- * §1 CACHE SCOPE, the one rule: a table is GLOBAL — outliving the call,
- * shared across `ANTI_PRENEX` runs, components and blocks — exactly when its
- * key names everything its entries depend on. Three policies cover the knobs
- * that sit in no key: TAINT (a computation that hit a budget returns its
- * result but writes no `push_memo`/`elim_memo` entry; carried by the GLOBAL
- * counter `taint_count`, read by the wrapper before and after), FLUSH
- * (`solver_memo` is valid per solver configuration and is flushed when it
- * changes, `push_memo` and `elim_memo` with it; `qbf_memo` is exempt: its
- * entries are mathematical truths), NEITHER (the acceptance pair).
+ * Every table is an entry of `enum class table` with a `table_traits`
+ * specialisation, a static GC-registered `create_cache` instance. `gated`
+ * tables (the six §1 result tables) exist under `#ifdef TAU_CACHE` only —
+ * OFF in Debug — and no result may depend on a hit; unconditional tables
+ * (the structural facets) always exist, so their accessors may return
+ * references. THE `#ifdef` LIVES IN ctx.tmpl.h's `table_ptr` ALONE:
+ * consumers reach a table only through `find` / `lookup` / `store` /
+ * `memoised` / `flush_solver_dependent`, which see a missing table as a
+ * miss, a no-op, or plain computation. Taint and flush are the §1 policies
+ * for knobs that sit in no key; `qbf_memo` is exempt from every flush.
  *
  * Every function taking a `ctx` takes it by MUTABLE REFERENCE: EXPAND and
- * DECOMPOSE_ARMS write `expand_count`.
+ * DECOMPOSE_ARMS write `expand_count`. Single-threaded, like every knob and
+ * cache in the library.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
 
+#include <optional>
 #include <unordered_map>
 
 #include "fwd.h"
@@ -54,10 +46,9 @@ namespace idni::tau_lang::anti_prenexing {
  */
 template <NodeType node>
 struct ctx {
-	/// §1 `type`: the block's BA type `τ`, a `ba_types<node>` id. Single, by
-	/// invariant 2 (components are type-homogeneous). `0` is the codebase's
-	/// untyped id and means "not set up".
-	size_t type = 0;
+	/// §1 `type`: the block's BA type `τ`. Single, by invariant 2 (components
+	/// are type-homogeneous). `0` (the untyped id) means "not set up".
+	ba_type_id type = 0;
 	/// §1 `order`: BDD variable order, inner → LOWER rank; §5 `P[i] ↦ |P| - i`.
 	var_order<node> order;
 	/// §1 `prio`: variable priority, inner → HIGHER rank; §5 `P[i] ↦ i + 1`.
@@ -85,7 +76,7 @@ struct ctx {
 	 * (`P[0]` outermost), the knobs read from options.h AT THIS CALL,
 	 * `keep_functional`, `expand_count = 0`.
 	 */
-	static ctx for_component(const block& P, size_t type, bool keep_functional);
+	static ctx for_component(const block& P, ba_type_id type, bool keep_functional);
 };
 
 // --- taint ----------------------------------------------------------------------
@@ -278,16 +269,19 @@ template <NodeType node, table T>
 typename table_traits<node, T>::map_t* table_ptr();
 
 // --- reads, writes, the wrapper, the flush -------------------------------------------
+// Template parameters are `<node, table>` throughout, the order of
+// `table_traits`; both are always spelled explicitly (a `key_t` parameter is a
+// non-deduced context): `find<node, table::push_memo>(key)`.
 
 /// Pointer to the entry for `key`, or `nullptr` on a miss or a missing
 /// table. The reference-returning facet accessors (`atoms`, `leaf_fv`) are
 /// built on this; the pointer is stable until a GC sweep rebuilds the table.
-template <table T, NodeType node>
+template <NodeType node, table T>
 const typename table_traits<node, T>::value_t*
 find(const typename table_traits<node, T>::key_t& key);
 
 /// Read table `T`: a copy of the entry for `key`, or nothing.
-template <table T, NodeType node>
+template <NodeType node, table T>
 std::optional<typename table_traits<node, T>::value_t>
 lookup(const typename table_traits<node, T>::key_t& key);
 
@@ -295,7 +289,7 @@ lookup(const typename table_traits<node, T>::key_t& key);
 /// the key) and return a reference to the stored value — for a gated table
 /// with `TAU_CACHE` off, a reference to a static scratch copy of `value`,
 /// valid until the next `store` on that table.
-template <table T, NodeType node>
+template <NodeType node, table T>
 const typename table_traits<node, T>::value_t&
 store(const typename table_traits<node, T>::key_t& key,
 	typename table_traits<node, T>::value_t value);
@@ -309,7 +303,7 @@ store(const typename table_traits<node, T>::key_t& key,
  * a tainted result is returned, never cached. Plain `compute()` when the
  * table does not exist — nothing else.
  */
-template <table T, NodeType node, typename Compute>
+template <NodeType node, table T, typename Compute>
 typename table_traits<node, T>::value_t
 memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 

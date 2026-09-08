@@ -42,8 +42,10 @@ tref canonicalise_binder_ids(tref phi);
  * order (`X[0]` outermost) — every graceful exit of invariant 3, and (D3)
  * the key builder of `push_memo`/`elim_memo`. NO narrowing: the callers
  * narrow (§5 acceptance passes `P ∩ FV(dep)`, §6 `PUSH_BLOCK` narrows first).
- * Bound variables keep their ids (`calculate_quant_id = false`); `|·|` and
- * `FV` are published. An empty `X` returns `φ`.
+ * Bound variables keep their ids (`calculate_quant_id = false`). Nothing is
+ * published: `|·|` and `FV` are computed lazily on first query. `X` must be
+ * duplicate-free (a repeated variable would build a vacuous inner binder and
+ * a non-canonical D3 key). An empty `X` returns `φ`.
  */
 template <NodeType node>
 tref rewrap(tref phi, const block& X, binder kind = binder::ex);

@@ -45,12 +45,12 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * @param order            the live BDD order (`ctx.order`), for `subst_term`
  * @param simplify_formula re-simplifier for FORMULA arguments of touched
- *                         references (identity at layer 0, `simplify` from
- *                         layer 1)
+ *                         references (`identity_formula` by default,
+ *                         `simplify` from layer 1)
  */
 template <NodeType node>
 tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
-	const simplify_formula_fn& simplify_formula = {});
+	const simplify_formula_fn& simplify_formula = identity_formula);
 
 /**
  * @brief §3 `φ[atm ↦ T/F]`: erases every REACHABLE occurrence of the atom

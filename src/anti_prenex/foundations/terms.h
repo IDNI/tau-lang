@@ -3,37 +3,34 @@
 /**
  * @file terms.h
  * @brief Anti-prenexing foundations (layer 0), package B: term BDDs — the §1
- * term representation per component, and the term-level primitives of §3
- * (`SIMPLIFY_TERM`, `SIMPLIFY_ATOM`, `TERM_OF`, `NORM_EQUATION`,
- * `PREPARE_TERMS`) plus `‖·‖` (§1, §10).
- *
- * §1, term representation: a term is a BDD whose DECISION VARIABLES are
- * exactly the component's variables `P` and whose LEAVES hold everything
- * else — free variables, constants, references, foreign-typed sub-terms, and
- * functional quantifiers over block-free bodies. Consequences: cofactoring on
- * `x ∈ P` is CHILD SELECTION; `∀_P f` / `∃_P f` are the meet / join of the
- * leaves; substitution is a BDD compose PLUS rewriting `x` inside the leaves;
- * depth is bounded by `|P|`; a FUNCTIONAL QUANTIFIER is transparent (its
- * body is backed over `P` and the quantifier slides onto the body's leaves);
- * LEAF HAZARD — a block variable inside a leaf is where cofactoring does not
- * reach (`leaf_fv`, the `usable` guard of COF, COFACTOR_REDUCE's FV check).
+ * term representation per component (decision variables = the component
+ * `P`, everything else in the leaves; cofactor = child selection; `∀_P`/`∃_P`
+ * = meet/join of the leaves; substitution = compose plus leaf rewrite;
+ * functional quantifiers transparent; the LEAF HAZARD) and the term-level
+ * primitives of §3 (`SIMPLIFY_TERM`, `SIMPLIFY_ATOM`, `TERM_OF`,
+ * `NORM_EQUATION`, `PREPARE_TERMS`) plus `‖·‖` (§1, §10).
  *
  * Built on the existing `tau_term_bdd_handle<node>` (`term_handle`): its
  * `build(term, order)` treats exactly the order's keys as decision variables
  * and everything else as a leaf, which IS this representation; `bdd_ex` /
- * `bdd_all` / `bdd_quant` quantify over a set, `bdd_compose` substitutes,
- * `convert_to_tau_node` / `to_tau_term` round-trip through `BDD_ID` nodes.
- * The library's operation memos are keyed by BDD refs and are valid under
- * ONE order (`sync_order_cache`), so one order is live at a time (D2).
+ * `bdd_all` quantify over a set, `bdd_compose` substitutes, `to_tau_term`
+ * converts back to a plain `bf`, `convert_to_tau_node` mints the `BDD_ID`
+ * node a BDD-backed term is stored as. The library's operation memos are
+ * keyed by BDD refs and valid under ONE order (`sync_order_cache`).
  *
- * D2 (fwd.h): a term is BDD-backed only while its component is pushed and
- * eliminated; `finish_terms` converts survivors back when the component
- * closes; the round trip must be idempotent.
+ * THE LIVE ORDER IS THE CALLER'S: every BDD primitive here takes the order
+ * as an explicit parameter (the component's `ctx.order`, §5); nothing in
+ * this file stores one. Only one order may be live at a time, so a
+ * component's `finish_terms` (D2) runs before the next `prepare_terms`.
+ * The two simplifiers default to the empty order — phases 1, 2 and 5, where
+ * nothing is BDD-backed (§3).
  *
- * `term_of` and `norm_equation` live here rather than in prims.h because
- * both are term operations (`l + r` is a BDD ring sum). Inside this
- * namespace `norm_equation` hides `tau_lang::norm_equation`
- * (normal_forms_transformations); qualify to reach the old one.
+ * `term_of` and `norm_equation` live here because both are term operations
+ * (`l + r` is a ring sum). Inside this namespace `norm_equation` hides
+ * `tau_lang::norm_equation` (normal_forms_transformations), which does NOT
+ * descend through a formula negation; call the old one fully qualified, and
+ * a test pins that the two disagree on `¬(l = r)` so neither is "fixed"
+ * into the other.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_H__
@@ -50,12 +47,12 @@ namespace idni::tau_lang::anti_prenexing {
  * representation over `P`: both sides of every atom TOUCHING `P` (one cached
  * FV test each) rebuilt as BDD-backed terms whose decision variables are `P`
  * in the given order, everything else in the leaves; an atom not touching
- * `P` untouched; a FORMULA-level binder unit transported opaque (§7
- * translates it at query time); a TERM-level functional quantifier
- * `∀_Y`/`∃_Y` SLID onto its body's leaves — `∀_Y(x·b₁ ∪ x′·b₀) =
- * x·∀_Y b₁ ∪ x′·∀_Y b₀`, dually for `∃_Y`, innermost first, linear in the
- * body's BDD. Memoised per atom and per term. Sets the component's order
- * (one order live at a time, D2).
+ * `P` untouched; a FORMULA-level binder transported opaque (§7 translates it
+ * at query time); a TERM-level functional quantifier `∀_Y`/`∃_Y` SLID onto
+ * its body's leaves — `∀_Y(x·b₁ ∪ x′·b₀) = x·∀_Y b₁ ∪ x′·∀_Y b₀`, dually for
+ * `∃_Y`, innermost first, linear in the body's BDD. Memoised per atom and
+ * per term. The caller (§5) owns `order` and passes it to every later term
+ * operation.
  *
  * @param body  the component's body, a `wff`
  * @param P     the component, `X`'s order
@@ -86,7 +83,7 @@ bool is_bdd_backed(tref term);
  * cofactored on.
  */
 template <NodeType node>
-tref cofactor(tref f, tref x, bool bit);
+tref cofactor(tref f, tref x, bool bit, const var_order<node>& order);
 
 /// §1 `∀_X f = f₀·f₁` over a block: ONE BDD quantification, never expanded
 /// to 2^|X| terms; when `X` covers all decision variables this is the meet of
@@ -99,11 +96,13 @@ template <NodeType node>
 tref exists_over(tref f, const block& X, const var_order<node>& order);
 
 /**
- * @brief The SYMBOLIC functional-quantifier term `∀_Y f` / `∃_Y f` (`bf_fall`
- * / `bf_fex`), subscripts in a fixed order so alpha-variants and permutations
- * of `Y` give one node. `Y` is excluded from its `FV`. The key of §1
- * `quant_memo` ("the key IS the query") and DISCHARGE's `keep_functional`
- * emission (layer 3).
+ * @brief The SYMBOLIC functional-quantifier term `∀_Y f` / `∃_Y f`: a nested
+ * chain of single-variable `bf_fall` / `bf_fex` nodes (the builders and the
+ * parser allow no other shape), the subscripts in CONTENT ORDER
+ * (`subtree_less`, the order `get_free_vars` returns), outermost first, so
+ * permutations of `Y` give one node. `Y` is excluded from its `FV`. The key
+ * of §1 `quant_memo` ("the key IS the query") and DISCHARGE's
+ * `keep_functional` emission (layer 3).
  */
 template <NodeType node>
 tref functional_quantifier(binder kind, const block& Y, tref f);
@@ -125,7 +124,7 @@ bool carries_functional_quantifier(tref f);
  */
 template <NodeType node>
 tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
-	const simplify_formula_fn& simplify_formula = {});
+	const simplify_formula_fn& simplify_formula = identity_formula);
 
 // --- the two aggressive normalisers of invariant 6 --------------------------------
 
@@ -141,26 +140,28 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
  * incompleteness behind every syntactic test of the spec.
  */
 template <NodeType node>
-tref simplify_term(tref t);
+tref simplify_term(tref t, const var_order<node>& order = {});
 
 /// §3 `SIMPLIFY_ATOM(a)`: `simplify_term` on both sides, then fold a
 /// constant-only atom to `T`/`F` (an equation via the BA's zero test, an
 /// order atom via the BA's comparison). `a` is a `wff` atom, optionally
 /// under one `¬` (folded through).
 template <NodeType node>
-tref simplify_atom(tref a);
+tref simplify_atom(tref a, const var_order<node>& order = {});
 
 // --- reading and rewriting equations ---------------------------------------------
 
 /// §3 `TERM_OF(atom)`: for `l = r` (through one `¬`), the term `l + r` —
 /// read off without touching the atom (equations stay as written, inv. 4).
+/// `order` is the live order (the ring sum of two BDD-backed sides is a BDD
+/// operation).
 template <NodeType node>
-tref term_of(tref atom);
+tref term_of(tref atom, const var_order<node>& order);
 
 /// §3 `NORM_EQUATION`: `l = r ↦ l + r = 0`, descending through one `¬`.
 /// Called in exactly one place, `SQUEEZE` step 1 (§7).
 template <NodeType node>
-tref norm_equation(tref atom);
+tref norm_equation(tref atom, const var_order<node>& order);
 
 // --- in-memory size and the leaf hazard -------------------------------------------
 

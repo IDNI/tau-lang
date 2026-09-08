@@ -21,9 +21,11 @@ namespace idni::tau_lang::anti_prenexing {
 //   sweep (heuristics/), tau_lang::norm_equation
 //   (normal_forms_transformations), bdd_node_count
 //   (heuristics/bv_predicate_blasting.tmpl.h).
-// Open checks: to_tau_term's output form and round-trip idempotence (D2);
-//   how BDD_ID nodes print and pass the construction hooks (D4); where
-//   bf_fall/bf_fex subscripts are stored, for a canonical symbolic term.
+// Open checks: round-trip idempotence of the BDD_ID node (D2 — the
+//   library mints a fresh serial per conversion; interning is package B's
+//   ruling); how BDD_ID nodes pass the construction hooks (D4).
+// Tests must include: tau_lang::norm_equation (fully qualified) and this
+//   namespace's norm_equation disagree on ¬(l = r) — pins the difference.
 // Tests: tests/unit/test_anti_prenex_terms.cpp.
 
 } // namespace idni::tau_lang::anti_prenexing

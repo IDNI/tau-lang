@@ -17,7 +17,7 @@ namespace idni::tau_lang::anti_prenexing {
 //   else: for a `gated` table it returns nullptr when off; for an
 //   unconditional (structural) table it always returns the instance.
 //   find/lookup/store/memoised/flush treat a nullptr table as miss /
-//   no-op / plain compute.
+//   no-op / plain compute. Template parameter order is <node, table>.
 // Reuse: tree<node>::template create_cache<map_t>() bound to a
 //   function-local static reference for every instance (as get_free_vars
 //   does); GC introspection walks pair keys, bare tref values, and the

@@ -7,21 +7,27 @@
  * member view (D1), the raw canonical chain constructors, the `neg(φ)` slot,
  * and the node classification of §1.
  *
- * Built on the existing hash-consed tree (`tree<node>`, `bintree`): a `tref`
- * IS structural identity, `node::hash` is content-based, side tables are
- * `create_cache` maps (GC-registered). Free variables come from the existing
- * `get_free_vars` (scope-correct, memoised, functional quantifiers treated
- * as binders, `BDD_ID` leaves read); it is wrapped, not reimplemented.
+ * Built on the existing hash-consed tree: a `tref` IS structural identity,
+ * `hash_lcrs_tref` is the content hash, side tables are ctx.h's tables.
+ * Free variables come from the existing `get_free_vars`, wrapped, not
+ * reimplemented.
  *
- * Every cached facet below lives in one of ctx.h's UNCONDITIONAL structural
- * tables (`size_memo`, `neg_memo`, `negative_tree_memo`; fwd.h, cache
- * gating), reached through ctx.h's `find`/`store`, so it is O(1) on a
- * second query in every build type: "|φ| and FV(φ) are set at construction,
- * never recomputed" (§10). A reference into such a table (or into
- * `get_free_vars`' table) is invalidated by a `bintree<node>::gc()` sweep,
- * which rebuilds the tables — copy it before any call that can construct
- * nodes. The member view is NOT cached: it is one linear walk of the chain,
- * and every consumer processes every member anyway.
+ * Cached facets (`formula_size`, `neg_of`, `is_negative_tree`) live in
+ * ctx.h's unconditional structural tables and are filled LAZILY: the
+ * accessor computes on the first query and stores; nothing is written at
+ * construction, and the accessor is the table's only writer. After the first
+ * query a facet is O(1) in every build type (§10: "never recomputed"). A
+ * reference into a table — including `fv`'s, which points into
+ * `get_free_vars`' table — is invalidated by a `bintree<node>::gc()` sweep,
+ * which rebuilds the tables: copy it before any call that can construct
+ * nodes.
+ *
+ * WRAPPER CONVENTION: every predicate and accessor here takes the `wff`
+ * WRAPPER node (`tau::get(n).is(tau::wff)`), the shape every `build_wff_*`
+ * returns and every `tref` in this module is. The wrapper-form helpers of the
+ * codebase are the `is_child_*` family (tau_tree_queries.tmpl.h); the bare
+ * `is_quantifier` / `is_temporal_quantifier` test the INNER node and must
+ * not be used here.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__DAG_H__
@@ -34,25 +40,31 @@ namespace idni::tau_lang::anti_prenexing {
 // --- sizes, free variables, hash ---------------------------------------------
 
 /**
- * @brief §1 `|φ|`: the cached node count — `1 + Σ|children|` over the FORMULA
- * children; an atom counts 1, its terms are not children; a D1 chain counts
- * as ONE node, `1 + Σ|members|`. A tree count over the hash-consed DAG, so a
- * shared subtree counts once per place it appears. The sort convention of
- * 2d, the case witness and EXPAND, and the metric of §5's size acceptance.
+ * @brief §1 `|φ|`: the node count — `1 + Σ|children|` over the FORMULA
+ * children; an atom counts 1 whatever its terms (plain or `BDD_ID`), so the
+ * count is invariant across D2's boundary; a D1 chain counts as ONE node,
+ * `1 + Σ|members|` over its flattened members, so the binary shape never
+ * leaks; the `wff` wrapper and its operator node together count 1; a
+ * reference and a temporal operator count 1, opaque like an atom;
+ * `|¬ψ| = 1 + |ψ|`; a binder `|Qx.ψ| = 1 + |ψ|`. A tree count over the
+ * hash-consed DAG: a shared subtree counts once per place it appears. The
+ * sort convention of 2d, the case witness and EXPAND, and the metric of
+ * §5's size acceptance.
  *
- * Populated by the module's constructors at construction and, for nodes
- * built elsewhere (parsed input), by one memoised post-order fill at first
- * query.
+ * Lazy: computed on the first query from the children's (cached) sizes and
+ * stored in `size_memo`; O(1) after that. The first query on an unmeasured
+ * subtree is one linear walk of it.
  */
 template <NodeType node>
-size_t size(tref n);
+size_t formula_size(tref n);
 
 /**
  * @brief §1 `FV(φ)`: the cached free-variable set — leaf occurrences (inside
  * `BDD_ID` terms and reference arguments) included, quantified subscripts
  * (formula binders AND functional quantifiers) excluded. Sorted by
  * `subtree_less<node>`, as `get_free_vars` returns it, so `std::binary_search`
- * applies.
+ * applies. A thin wrapper over `get_free_vars`; the reference points into
+ * its table.
  */
 template <NodeType node>
 const trefs& fv(tref n);
@@ -67,15 +79,13 @@ template <NodeType node>
 block fv_intersect(tref n, const block& X);
 
 /**
- * @brief §1 `h(φ)`: the node's structural hash, set at construction from the
- * node's kind and its children's hashes. A pure function of CONTENT: every
- * input is canonical (phase-0 binder ids, source names for free variables,
- * BDD-canonical terms), so it is identical across runs, components and
- * inputs sharing subtrees. Returns `hash_lcrs_tref<node>{}(n)`: the node's
- * value hash combined with its child list's hash, right sibling EXCLUDED —
- * the functor the tree's own hashed maps use. Neither `node::hash` (the
- * value alone, no children) nor `bintree::hash` (which includes the right
- * sibling chain) is `h(φ)`.
+ * @brief §1 `h(φ)`: the structural hash, a pure function of CONTENT
+ * (phase-0 binder ids, source names for free variables, BDD-canonical
+ * terms), identical across runs, components and inputs sharing subtrees.
+ * Returns `hash_lcrs_tref<node>{}(n)`: the node's value hash combined with
+ * its child list's hash, right sibling EXCLUDED — the functor the tree's own
+ * hashed maps use. Neither `node::hash` (the value alone, no children) nor
+ * `bintree::hash` (which includes the right sibling chain) is `h(φ)`.
  */
 template <NodeType node>
 size_t content_hash(tref n);
@@ -83,11 +93,13 @@ size_t content_hash(tref n);
 // --- content order --------------------------------------------------------------
 
 /**
- * @brief §1 CONTENT ORDER: the canonical total order on nodes — by `h`, ties
- * broken by structural comparison (kind by a fixed rank, children left to
- * right, variables by identifier). A pure function of content: the tie-break
- * of last resort everywhere (result-join emission, EXPAND's disjunct key), so
- * no order anywhere depends on construction history. Strict weak ordering;
+ * @brief §1 CONTENT ORDER: the canonical total order on nodes, the tie-break
+ * of last resort everywhere (result-join emission, EXPAND's disjunct key),
+ * so no order anywhere depends on construction history. Implemented by
+ * `subtree_less<node>`: node value first (hash, then kind and payload), then
+ * the child list, right siblings ignored — deterministic and content-derived
+ * within a build (it bottoms out in `std::hash`, so it is not stable across
+ * toolchains, which no use in the spec needs). Strict weak ordering;
  * `content_less(a, b)` and `content_less(b, a)` both false iff `a` and `b`
  * are the same node.
  */
@@ -110,10 +122,9 @@ struct content_order {
  * (layer 1) has its members deduplicated and in content order by
  * construction; an input node not yet rebuilt may hold duplicates and any
  * order. A node that is not a connective has the one-element view `{n}`.
- * NOT cached: one linear walk of the chain per call, returned by value.
- * Every consumer processes every member anyway, so the walk is not an
- * extra cost; the joins' O(1) membership test during assembly is their own
- * local set, not this list.
+ * NOT cached: one linear walk of the chain per call, returned by value —
+ * every consumer processes every member anyway, and the joins' O(1)
+ * membership test during assembly is their own local set, not this list.
  */
 template <NodeType node>
 trefs members(tref n);
@@ -126,11 +137,14 @@ bool is_member(tref n, tref m);
 
 /**
  * @brief D1 RAW constructor of a canonical ∧-chain: members sorted in content
- * order, deduplicated, folded RIGHT-NESTED, `|·|` and `FV` published. NO
+ * order, deduplicated, folded RIGHT-NESTED through `build_wff_and`. NO
  * simplification rules — T/F, complement, absorption belong to the joins
- * (layer 1); the construction hooks (D4) still fold what they fold. One
- * member returns it; `members` must not be empty (the empty join is the
- * joins' business). Substitution rebuilds through these.
+ * (layer 1); the construction hooks (D4) still fold what they fold, so the
+ * returned node may have fewer members than the input list, or be a single
+ * member, or a constant. Nothing is published: sizes and FV are computed
+ * lazily on first query, from the RETURNED node. One member returns it;
+ * `members` must not be empty (the empty join is the joins' business).
+ * Substitution rebuilds through these.
  */
 template <NodeType node>
 tref canonical_and(trefs members);
@@ -139,18 +153,25 @@ tref canonical_and(trefs members);
 template <NodeType node>
 tref canonical_or(trefs members);
 
+/// The complementary literal of `l`: `¬a` for an atom `a`, `a` for `¬a`.
+/// O(1), one node construction — never `NEG` (layer 1). The joins' unit-
+/// elimination test (§3) is a membership test against `complement_of(l)`.
+template <NodeType node>
+tref complement_of(tref l);
+
 // --- neg(φ) slot ----------------------------------------------------------------
 
 /// §1 `neg(φ)`: the cached NNF of `¬φ`, a pure function of the node computed
-/// on first demand by `NEG` (layer 1) and cached here. `nullptr` on a miss.
+/// on first demand by `NEG` (layer 1) and stored in `neg_memo` through
+/// `set_neg`. `nullptr` on a miss.
 template <NodeType node>
-tref cached_neg(tref n);
+tref neg_of(tref n);
 
-/// Record `neg(n) = negated` (layer 1 writes; cache-gated, fwd.h).
+/// Record `neg(n) = negated` (layer 1 writes).
 template <NodeType node>
-void cache_neg(tref n, tref negated);
+void set_neg(tref n, tref negated);
 
-// --- classification (§1 atom shapes, literals, units, trees) ---------------------
+// --- classification (§1 atom shapes, literals, binders, trees) -------------------
 
 /// `wff` node of the shapes `is_atomic_fm` lists (`f = g`, `f ≤ g`, `f < g`
 /// and, before phase 3, the fused negated/mirrored operators).
@@ -174,8 +195,9 @@ template <NodeType node> bool is_false(tref n);
 /// ∧-node / ∨-node (a D1 chain or an input node).
 template <NodeType node> bool is_conjunction(tref n);
 template <NodeType node> bool is_disjunction(tref n);
-/// A formula binder node, `wff_ex`/`wff_all` — a UNIT once its run is final (§4).
-template <NodeType node> bool is_unit(tref n);
+/// A formula binder node, `wff_ex`/`wff_all`. (The spec calls one a UNIT once
+/// its run is final, §4 — a property of the pass, not of the node.)
+template <NodeType node> bool is_binder(tref n);
 /// `wff_ref` — a reference: opaque, connects nothing (inv. 2), frozen by
 /// every method (§7).
 template <NodeType node> bool is_reference(tref n);
@@ -185,12 +207,12 @@ template <NodeType node> bool is_temporal(tref n);
  * @brief §1 NEGATIVE TREE: an ∨-node all of whose leaves are negated
  * equations — ∧-nodes allowed inside. FINAL for scope narrowing (§6), taken
  * whole by the leaf methods (§7), a disjunctive conjunct for EXPAND.
- * Memoised (cache-gated).
+ * Lazily cached in `negative_tree_memo`.
  */
 template <NodeType node> bool is_negative_tree(tref n);
 /// §1 FLAT: a negative tree whose members are all literals; NESTED otherwise.
 template <NodeType node> bool is_flat_tree(tref n);
-/// §1 PLAIN conjunct: not an ∨-node — a literal, a unit, a reference.
+/// §1 PLAIN conjunct: not an ∨-node — a literal, a binder, a reference.
 template <NodeType node> bool is_plain_conjunct(tref n);
 /// §1 DISJUNCTIVE conjunct: an ∨-node, a negative tree included.
 template <NodeType node> bool is_disjunctive_conjunct(tref n);
