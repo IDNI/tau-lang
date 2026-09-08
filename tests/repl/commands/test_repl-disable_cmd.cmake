@@ -9,3 +9,7 @@ include(add_repl_test)
 
 add_repl_test(disable_cmd-status "disable status" "status: *off")
 add_repl_test(disable_cmd-colors "disable colors" "colors: *off")
+
+add_repl_test(disable_cmd-bvwidening
+	"enable bvwidening. disable bvwidening. get bvwidening"
+	"bvwidening: *off")
