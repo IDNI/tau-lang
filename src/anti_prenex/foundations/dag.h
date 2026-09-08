@@ -42,18 +42,23 @@ namespace idni::tau_lang::anti_prenexing {
 /**
  * @brief §1 `|φ|`: the node count — `1 + Σ|children|` over the FORMULA
  * children; an atom counts 1 whatever its terms (plain or `BDD_ID`), so the
- * count is invariant across D2's boundary; a D1 chain counts as ONE node,
- * `1 + Σ|members|` over its flattened members, so the binary shape never
- * leaks; the `wff` wrapper and its operator node together count 1; a
- * reference and a temporal operator count 1, opaque like an atom;
- * `|¬ψ| = 1 + |ψ|`; a binder `|Qx.ψ| = 1 + |ψ|`. A tree count over the
+ * count is invariant across D2's boundary; the `wff` wrapper and its
+ * operator node together count 1; a reference and a temporal operator count
+ * 1, opaque like an atom, their bodies not descended into; `|¬ψ| = 1 + |ψ|`;
+ * a binder `|Qx.ψ| = 1 + |ψ|`. Every node of a D1 chain's binary spine
+ * counts like any other node (D1), so a k-member chain costs
+ * `k−1 + Σ|members|` — the deliberate deviation from the n-ary reading of
+ * the spec's `|φ|` recorded in D1, which keeps this a plain `1 + Σ|children|`
+ * count and stays independent of the nesting direction. A tree count over the
  * hash-consed DAG: a shared subtree counts once per place it appears. The
  * sort convention of 2d, the case witness and EXPAND, and the metric of
  * §5's size acceptance.
  *
  * Lazy: computed on the first query from the children's (cached) sizes and
  * stored in `size_memo`; O(1) after that. The first query on an unmeasured
- * subtree is one linear walk of it.
+ * subtree is one `pre_order` walk of it, accumulating in the traversal's
+ * post-order `up` callback; every wrapper it passes is measured, not only
+ * the queried one.
  */
 template <NodeType node>
 size_t formula_size(tref n);
@@ -137,14 +142,16 @@ bool is_member(tref n, tref m);
 
 /**
  * @brief D1 RAW constructor of a canonical ∧-chain: members sorted in content
- * order, deduplicated, folded RIGHT-NESTED through `build_wff_and`. NO
- * simplification rules — T/F, complement, absorption belong to the joins
- * (layer 1); the construction hooks (D4) still fold what they fold, so the
- * returned node may have fewer members than the input list, or be a single
- * member, or a constant. Nothing is published: sizes and FV are computed
- * lazily on first query, from the RETURNED node. One member returns it;
- * `members` must not be empty (the empty join is the joins' business).
- * Substitution rebuilds through these.
+ * order, deduplicated, folded LEFT-NESTED through the BINARY
+ * `build_wff_and(l, r)` — not the n-ary overload, whose `_T()` seed only
+ * disappears while the construction hooks are on. NO simplification rules —
+ * T/F, complement, absorption belong to the joins (layer 1); the hooks (D4)
+ * still fold what they fold, so the returned node may have fewer members
+ * than the input list, or be a single member, or a constant. Nothing is
+ * published: sizes and FV are computed lazily on first query, from the
+ * RETURNED node. One member returns it (right sibling trimmed); `members`
+ * must not be empty (the empty join is the joins' business) — an empty list
+ * returns the neutral constant. Substitution rebuilds through these.
  */
 template <NodeType node>
 tref canonical_and(trefs members);
@@ -153,7 +160,8 @@ tref canonical_and(trefs members);
 template <NodeType node>
 tref canonical_or(trefs members);
 
-/// The complementary literal of `l`: `¬a` for an atom `a`, `a` for `¬a`.
+/// The complementary literal of `l`: `¬a` for an atom `a`, `a` for `¬a` (any
+/// `¬` is stripped rather than doubled, so the result of two calls is `l`).
 /// O(1), one node construction — never `NEG` (layer 1). The joins' unit-
 /// elimination test (§3) is a membership test against `complement_of(l)`.
 template <NodeType node>
