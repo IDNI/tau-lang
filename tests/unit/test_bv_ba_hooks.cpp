@@ -553,6 +553,51 @@ TEST_SUITE("bv widening: fit-gated constant folding") {
 	TEST_CASE("shl: wrap still folds modularly when bv_widening is off") {
 		CHECK(bf("{129}:bv[8] << {1}:bv[8]") == bf("{2}:bv[8]"));
 	}
+
+	TEST_CASE("mul: a zero factor folds even when bv_widening is on") {
+		// c2 == 0 can never overflow (the product is 0), so the round-trip
+		// check is skipped and the fold happens exactly as when off --
+		// whichever side the zero is on.
+		bv_widening_scope widen;
+		CHECK(bf("{16}:bv[8] * {0}:bv[8]") == bf("0:bv[8]"));
+		CHECK(bf("{0}:bv[8] * {16}:bv[8]") == bf("0:bv[8]"));
+	}
+
+	TEST_CASE("add: an exact fit at the top still folds when bv_widening is on") {
+		// 128 + 127 = 255 is bv[8]'s largest value: no overflow, so it
+		// folds (to the canonical top element), while the top element
+		// plus anything nonzero wraps and is declined -- the fit gate
+		// reads the top element as the constant 255 it is.
+		bv_widening_scope widen;
+		CHECK(bf("{128}:bv[8] + {127}:bv[8]") == bf("1:bv[8]"));
+		tref src = bf("1:bv[8] + {10}:bv[8]"); // 255 + 10 = 265 wraps to 9
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) != nullptr);
+	}
+
+	TEST_CASE("add: top plus X folds modularly when bv_widening is off") {
+		CHECK(bf("1:bv[8] + {10}:bv[8]") == bf("{9}:bv[8]"));
+	}
+
+	TEST_CASE("mul: an exact fit at the top still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		CHECK(bf("{51}:bv[8] * {5}:bv[8]") == bf("1:bv[8]")); // 255 exactly
+		tref src = bf("{128}:bv[8] * {2}:bv[8]"); // 256 wraps to 0
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) != nullptr);
+	}
+
+	TEST_CASE("shl: a fit that lands on the top bit still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		CHECK(bf("{1}:bv[8] << {7}:bv[8]") == bf("{128}:bv[8]"));
+		tref src = bf("{1}:bv[8] << {8}:bv[8]"); // 256 wraps to 0
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) != nullptr);
+	}
+
+	TEST_CASE("div, mod and shr are never gated: they cannot overflow") {
+		bv_widening_scope widen;
+		CHECK(bf("{200}:bv[8] / {3}:bv[8]") == bf("{66}:bv[8]"));
+		CHECK(bf("{200}:bv[8] % {3}:bv[8]") == bf("{2}:bv[8]"));
+		CHECK(bf("{200}:bv[8] >> {3}:bv[8]") == bf("{25}:bv[8]"));
+	}
 }
 
 TEST_SUITE("Cleanup") {
