@@ -12,11 +12,13 @@
  * tables (the six §1 result tables) exist under `#ifdef TAU_CACHE` only —
  * OFF in Debug — and no result may depend on a hit; unconditional tables
  * (the structural facets) always exist, so their accessors may return
- * references. THE `#ifdef` LIVES IN ctx.tmpl.h's `table_ptr` ALONE:
- * consumers reach a table only through `find` / `lookup` / `store` /
- * `memoised` / `flush_solver_dependent`, which see a missing table as a
- * miss, a no-op, or plain computation. Taint and flush are the §1 policies
- * for knobs that sit in no key; `qbf_memo` is exempt from every flush.
+ * references — `store` and `memoised` return one for an unconditional table
+ * and a value for a gated one, split by a `requires` clause. THE `#ifdef`
+ * LIVES IN ctx.tmpl.h's `table_ptr` ALONE: consumers reach a table only
+ * through `find` / `lookup` / `store` / `memoised` /
+ * `flush_solver_dependent`, which see a missing table as a miss, a no-op, or
+ * plain computation. Taint and flush are the §1 policies for knobs that sit
+ * in no key; `qbf_memo` is exempt from every flush.
  *
  * Every function taking a `ctx` takes it by MUTABLE REFERENCE: EXPAND and
  * DECOMPOSE_ARMS write `expand_count`. Single-threaded, like every knob and
@@ -26,11 +28,29 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
 
+#include <array>
+#include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <utility>
 
 #include "fwd.h"
 #include "options.h"
+
+/// The reference-returning `store` and `memoised` hand back a reference into
+/// a table, never to an argument — but GCC's `-Wdangling-reference` heuristic
+/// flags any call that returns a reference and takes a CLASS-TYPE temporary,
+/// however that temporary is passed. `atoms`' and `leaf_fv`' fills are
+/// exactly that shape (`store(n, tref_set{…})`), so without this every such
+/// call would be an error under `-Werror`. Measured on GCC 16: the scalar
+/// facets (`size_memo`, `negative_tree_memo`) never trip it, the `tref_set`
+/// ones always do. The attribute (GCC 14+) states what the heuristic cannot
+/// see; elsewhere it expands to nothing.
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(gnu::no_dangling)
+#	define TAU_ANTI_PRENEX_NO_DANGLING [[gnu::no_dangling]]
+#else
+#	define TAU_ANTI_PRENEX_NO_DANGLING
+#endif
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -89,7 +109,10 @@ struct ctx {
 template <NodeType node>
 size_t taint_count();
 
-/// The one increment every source of taint calls.
+/// The one increment every source of taint calls. The counter is per `node`
+/// type, so a taint source in code templated on the BDD node type (the
+/// `qbf_node_max` sweep of DECIDE_FINITE) must name the FORMULA node type
+/// here, the one whose tables the wrapper guards.
 template <NodeType node>
 void taint();
 
@@ -107,22 +130,45 @@ enum class table {
 	qbf_memo,      ///< canonical closed pure-Boolean query → T / F; never flushed
 	// structural per-node facets — unconditional
 	atoms_memo,    ///< §1: formula node → the atoms occurring in it, units opaque (subst.h)
-	size_memo,     ///< §1 `|φ|` (dag.h `size`)
-	neg_memo,      ///< §1 `neg(φ)` (dag.h `cached_neg`/`cache_neg`; filled by layer 1)
+	size_memo,     ///< §1 `|φ|` (dag.h `formula_size`, its only writer)
+	neg_memo,      ///< §1 `neg(φ)` (dag.h `neg_of`/`set_neg`; filled by layer 1)
 	negative_tree_memo, ///< §1 NEGATIVE TREE flag (dag.h `is_negative_tree`)
-	leaf_fv_memo   ///< §1 leaf hazard: FV contributed by a BDD-backed term's leaves (terms.h `leaf_fv`)
+	leaf_fv_memo,  ///< §1 leaf hazard: FV contributed by a BDD-backed term's leaves (terms.h `leaf_fv`)
+	count_         ///< NOT a table: the enumerator count, so `all_tables` sizes itself
 };
 
+/// Every table, in enum order. `flush_solver_dependent` walks this list and
+/// acts on the `solver_flushed` flag rather than on a hand-written set, so a
+/// new table cannot be forgotten there. The array is sized by `count_` and
+/// the assertion below checks it position by position, so a table added
+/// ANYWHERE in the enum — appended included — and not listed here is a
+/// compile error rather than a table the flush silently skips.
+inline constexpr std::array<table, static_cast<size_t>(table::count_)>
+all_tables = {
+	table::push_memo, table::elim_memo, table::quant_memo, table::cof_memo,
+	table::solver_memo, table::qbf_memo, table::atoms_memo,
+	table::size_memo, table::neg_memo, table::negative_tree_memo,
+	table::leaf_fv_memo
+};
+static_assert([] {
+		for (size_t i = 0; i < all_tables.size(); ++i)
+			if (static_cast<size_t>(all_tables[i]) != i) return false;
+		return true;
+	}(),
+	"`all_tables` must list every table exactly once, in enum order");
+
 /// Structural hash of a `(tref, tref)` key, consistent with
-/// `subtree_pair_equal<node, tref>` (both ignore right siblings). Never
-/// replace with `std::hash<std::pair<…>>`: that hashes a `tref` by pointer
-/// and would give equal keys unequal hashes.
+/// `subtree_pair_equal<node, tref>` (both ignore right siblings). The two
+/// CONTENT hashes are mixed by `idni::hash_combine`; never hand a `tref`
+/// itself to `hash_combine` or to `std::hash<std::pair<…>>`, which route it
+/// through `portable_hash`, i.e. hash it by POINTER — equal keys would then
+/// get unequal hashes and the entry would be lost.
 template <NodeType node>
 struct tref_pair_hash {
 	size_t operator()(const std::pair<tref, tref>& k) const {
-		const size_t a = hash_lcrs_tref<node>{}(k.first);
-		const size_t b = hash_lcrs_tref<node>{}(k.second);
-		return a ^ (b + 0x9e3779b97f4a7c15ULL + (a << 6) + (a >> 2));
+		std::uint64_t seed = hash_lcrs_tref<node>{}(k.first);
+		idni::hash_combine(seed, hash_lcrs_tref<node>{}(k.second));
+		return static_cast<size_t>(seed);
 	}
 };
 
@@ -131,8 +177,9 @@ struct tref_pair_hash {
 template <NodeType node>
 struct tref_bool_hash {
 	size_t operator()(const std::pair<tref, bool>& k) const {
-		return hash_lcrs_tref<node>{}(k.first)
-			^ (k.second ? size_t(0x9e3779b97f4a7c15ULL) : size_t(0));
+		std::uint64_t seed = hash_lcrs_tref<node>{}(k.first);
+		idni::hash_combine(seed, k.second);
+		return static_cast<size_t>(seed);
 	}
 };
 
@@ -272,10 +319,25 @@ typename table_traits<node, T>::map_t* table_ptr();
 // Template parameters are `<node, table>` throughout, the order of
 // `table_traits`; both are always spelled explicitly (a `key_t` parameter is a
 // non-deduced context): `find<node, table::push_memo>(key)`.
+//
+// LIFETIME of a pointer or reference INTO a table: stable across every later
+// insertion — the maps are node-based `unordered_map`s, which keep mapped
+// values put across a rehash, so a recursive fill may hold a parent's
+// reference while its children insert — and invalidated only by a
+// `bintree<node>::gc()` sweep, which REBUILDS every registered table. Nothing
+// in this module sweeps (the callers are the interpreter's `maybe_gc` and the
+// tests), so a facet reference is good for the length of a run; copy it
+// before any call that can sweep. dag.h states the same rule for `fv`.
+//
+// `store` and `memoised` come in two forms, chosen by the table's `gated`
+// flag: an unconditional table always has storage and hands out a REFERENCE;
+// a gated table has none with `TAU_CACHE` off, so it can only return a VALUE.
+// The split is a `requires` clause rather than a second name, so a caller
+// that asks a gated table for a reference fails to compile in both build
+// types instead of in Release alone.
 
-/// Pointer to the entry for `key`, or `nullptr` on a miss or a missing
-/// table. The reference-returning facet accessors (`atoms`, `leaf_fv`) are
-/// built on this; the pointer is stable until a GC sweep rebuilds the table.
+/// Pointer to the entry for `key`, or `nullptr` on a miss or a missing table.
+/// A read; the lazy fills go through `memoised` below.
 template <NodeType node, table T>
 const typename table_traits<node, T>::value_t*
 find(const typename table_traits<node, T>::key_t& key);
@@ -285,32 +347,63 @@ template <NodeType node, table T>
 std::optional<typename table_traits<node, T>::value_t>
 lookup(const typename table_traits<node, T>::key_t& key);
 
-/// Write table `T` unconditionally (for entries that are pure functions of
-/// the key) and return a reference to the stored value — for a gated table
-/// with `TAU_CACHE` off, a reference to a static scratch copy of `value`,
-/// valid until the next `store` on that table.
+/// Write an UNCONDITIONAL table and return a reference to the stored value.
+/// Insert or assign: an entry is a pure function of its key, so a rewrite
+/// stores the same value and any outstanding reference stays valid.
 template <NodeType node, table T>
+	requires (!table_traits<node, T>::gated)
+TAU_ANTI_PRENEX_NO_DANGLING
 const typename table_traits<node, T>::value_t&
 store(const typename table_traits<node, T>::key_t& key,
 	typename table_traits<node, T>::value_t value);
 
+/// Write a GATED table, or do nothing when it does not exist. No return
+/// value: with `TAU_CACHE` off there is nothing to hand back a reference to.
+template <NodeType node, table T>
+	requires (table_traits<node, T>::gated)
+void store(const typename table_traits<node, T>::key_t& key,
+	typename table_traits<node, T>::value_t value);
+
 /**
- * @brief §1/§6 memo wrapper: return the entry for `key`; on a miss compute
- * `compute()`, and record it — for a `taint_aware` table only if
- * `taint_count` is unchanged across the computation (a hit inside the
- * computation is a hit inside every enclosing one: transitivity for free),
- * for every other table unconditionally. The result is always returned;
- * a tainted result is returned, never cached. Plain `compute()` when the
- * table does not exist — nothing else.
+ * @brief §1/§6 memo wrapper for a GATED table: return the entry for `key`;
+ * on a miss compute `compute()` and record it — for a `taint_aware` table
+ * only if `taint_count` is unchanged across the computation (a hit inside
+ * the computation is a hit inside every enclosing one: transitivity for
+ * free), for every other table unconditionally. The result is always
+ * returned; a tainted result is returned, never cached. Plain `compute()`
+ * when the table does not exist — nothing else.
  */
 template <NodeType node, table T, typename Compute>
+	requires (table_traits<node, T>::gated)
 typename table_traits<node, T>::value_t
 memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 
+/**
+ * @brief The same wrapper for an UNCONDITIONAL table: the lazy fill of a
+ * structural facet (`formula_size`, `neg_of`, `is_negative_tree`, `atoms`,
+ * `leaf_fv`) — compute on the first query, store, hand back a reference into
+ * the table, so an accessor can return `const trefs&`. The accessor is the
+ * table's only writer (§10: computed once, never recomputed). No structural
+ * table is `taint_aware`: a facet is a pure function of its node, and a
+ * budget hit cannot change it. `compute()` may recurse into `memoised` on
+ * the same table — the reference this call returns survives those
+ * insertions (LIFETIME, above) — but recursion costs one frame per level,
+ * so a whole-tree fill belongs in a post-order walk (`pre_order`'s `up`
+ * callback) that calls `find`/`store` per node, not in a recursive
+ * `compute`.
+ */
+template <NodeType node, table T, typename Compute>
+	requires (!table_traits<node, T>::gated)
+TAU_ANTI_PRENEX_NO_DANGLING
+const typename table_traits<node, T>::value_t&
+memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
+
 /// §1 FLUSH: the solver configuration changed — clear every `solver_flushed`
-/// table (`solver_memo`, `push_memo`, `elim_memo`), whole tables. `qbf_memo`
-/// is exempt. Caller: the api layer on a solver option change (layer 4+);
-/// until then a test-only entry point.
+/// table (`solver_memo`, `push_memo`, `elim_memo`), whole tables: an entry
+/// carries no record of whether it embedded a solver verdict. `qbf_memo` is
+/// exempt (its entries are mathematical truths), and so is every structural
+/// table. Caller: the api layer on a solver option change (layer 4+); until
+/// then a test-only entry point.
 template <NodeType node>
 void flush_solver_dependent();
 
