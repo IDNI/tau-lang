@@ -124,15 +124,31 @@ size_t needed_width(tref bf, size_t base_w, size_t& maxW);
  * @return `bf_node` unchanged (same tref) when `W == base_w` -- the no-op
  *   fast path; otherwise a newly built (or hash-consed-identical) `bf`
  *   node, always typed `bv[W]`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // The left side of "x:bv[8] * y <= z", rebuilt at 16 bits: the product
+ * // is retyped bv[16] and each variable gets one zero-extending cast, so
+ * // it prints as "(bv[16]) x*(bv[16]) y" (see tests/unit/test_bv_widening.cpp,
+ * // "widen_term: a variable leaf becomes one (bv[W]) cast ...").
+ * tref src = tree<node_t>::get("x:bv[8] * y <= z",
+ *     tau::get_options{ .parse = { .start = tau::wff } });
+ * tref atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_lteq));
+ * tref side = tree<node_t>::get(atom).child(0);
+ * tref wide = widen_term<node_t>(side, 8, 16);
+ * CHECK( get_bv_width<node_t>(tree<node_t>::get(wide).get_ba_type()) == 16 );
+ * CHECK( widen_term<node_t>(side, 8, 8) == side ); // W == base_w: identity
+ * @endcode
  */
 template <NodeType node>
 tref widen_term(tref bf_node, size_t base_w, size_t W);
 
 /**
  * @brief Elaborate one bv-family atomic formula per the `bv_widening`
- * mode's rules (design spec section 2): compute the atom's overflow-free
- * width `W` (via `needed_width` on every side), then either extend every
- * side exactly or extend one side and wrap it in a truncating cast:
+ * mode's rules (README, "Exact (widened) arithmetic mode"): compute the
+ * atom's overflow-free width `W` (via `needed_width` on every side), then
+ * either extend every side exactly or extend one side and wrap it in a
+ * truncating cast:
  *
  *  - **Comparisons** (`bf_lt`, `bf_nlt`, `bf_lteq`, `bf_nlteq`, `bf_gt`,
  *    `bf_ngt`, `bf_gteq`, `bf_ngteq`), **`bf_interval`**, and an
@@ -175,7 +191,31 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  *   type back down to `base_w` -- the saturation guard above never matches
  *   that shape, because its untouched bare side is never "saturated").
  *   Returns `nullptr`, after `LOG_ERROR`-ing the cap violation, when the
- *   computed `W` exceeds `bv_max_width` (the D4 width cap).
+ *   computed `W` exceeds `bv_max_width` (the D4 width cap; the cap itself
+ *   is inclusive, `W == bv_max_width` is allowed).
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Assignment shape: "o:bv[8] = min(x * y, {200})" needs W = 16 (the
+ * // product). o is bare storage and stays untouched; the other side is
+ * // computed at 16 bits and truncated back once, giving
+ * //   o = (bv[8]) min((bv[16]) x*(bv[16]) y, {200}:bv[16])
+ * // (see tests/unit/test_bv_widening.cpp, "assignment truncation").
+ * tref src = tree<node_t>::get("o:bv[8] = min(x * y, { 200 })",
+ *     tau::get_options{ .parse = { .start = tau::wff } });
+ * tref atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_eq));
+ * tref wide = widen_atom<node_t>(atom);
+ * CHECK( tree<node_t>::get(wide).get_ba_type() == bv_type_id<node_t>(8) );
+ * CHECK( widen_atom<node_t>(wide) == wide ); // idempotent
+ *
+ * // Comparison shape: "x:bv[8] * y <= z" extends every side to bv[16] and
+ * // truncates nothing, so the atom itself is typed bv[16] afterwards.
+ * src = tree<node_t>::get("x:bv[8] * y <= z",
+ *     tau::get_options{ .parse = { .start = tau::wff } });
+ * atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_lteq));
+ * CHECK( tree<node_t>::get(widen_atom<node_t>(atom)).get_ba_type()
+ *     == bv_type_id<node_t>(16) );
+ * @endcode
  */
 template <NodeType node>
 tref widen_atom(tref atom);
@@ -209,6 +249,22 @@ tref widen_atom(tref atom);
  *   `nullptr`), the moment any one atom's required width exceeds
  *   `bv_max_width` (the D4 width cap) -- callers should treat a `nullptr`
  *   result the same way they treat a failed normalization.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 16 * 16 wraps to 0 at 8 bits, so "{16}*{16} <= {10}" is valid in the
+ * // default mode; widened, the product is the exact 256 and the atom is
+ * // false. The flag must be on at PARSE time too: the construction-time
+ * // constant folding reads it and leaves an overflowing product symbolic
+ * // only when it is set (see tests/unit/test_bv_widening.cpp, "mul
+ * // comparison no longer wraps").
+ * bv_widening = true;
+ * tref fm = tree<node_t>::get("{ 16 }:bv[8] * { 16 }:bv[8] <= { 10 }:bv[8]",
+ *     tau::get_options{ .parse = { .start = tau::wff } });
+ * CHECK( !is_bv_formula_valid<node_t>(widen_bv_arithmetic<node_t>(fm)) );
+ * bv_widening = false;
+ * CHECK( widen_bv_arithmetic<node_t>(fm) == fm ); // off: pass-through
+ * @endcode
  */
 template <NodeType node>
 tref widen_bv_arithmetic(tref fm);

@@ -112,9 +112,17 @@ tref fold_trivial_quantifiers(tref fm);
  * subtypes (see NOTE in implementation); residual trivial quantifiers are folded
  * later by `normalize_with_temp_simp`.
  *
+ * When the `bv_widening` mode is on (see bv_widening_options.h), the
+ * formula's bitvector atoms are first elaborated by `widen_bv_arithmetic`,
+ * so the cache is keyed on the already-widened formula.
+ *
  * @tparam node Tree node type.
- * @param fm Non-temporal formula to normalize.
- * @return Normalized formula.
+ * @param fm Non-temporal formula to normalize; a `nullptr` is passed
+ * through unchanged, so a failed upstream normalization can be chained.
+ * @return Normalized formula, or `nullptr` when the `bv_widening` width cap
+ * (`bv_max_width`) is exceeded by some atom -- the violation has already
+ * been logged by the widening pass; callers treat it as a failed
+ * normalization.
  *
  * @par Example
  * @code{.cpp}
@@ -189,7 +197,9 @@ bool has_no_boolean_combs_of_models(tref n);
  * `normalize_non_temp`, and returns `true` if the result is `T`.
  * @tparam node Tree node type.
  * @param n Non-temporal formula to test (must not contain `always`/`sometimes`).
- * @return `true` if satisfiable.
+ * @return `true` if satisfiable; `false` also when normalization fails on
+ * a `bv_widening` width-cap violation (a logged, conservative fallback,
+ * not a proof of unsatisfiability).
  *
  * @par Example
  * @code{.cpp}
@@ -250,7 +260,9 @@ tref get_unbindable_relative_offset(tref head, tref body);
  * @tparam node Tree node type.
  * @param n1 First formula.
  * @param n2 Second formula.
- * @return `true` if `n1` and `n2` are equivalent.
+ * @return `true` if `n1` and `n2` are equivalent; `false` also when
+ * normalization fails on a `bv_widening` width-cap violation (a logged,
+ * conservative fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -275,7 +287,9 @@ bool are_nso_equivalent(tref n1, tref n2);
  * @tparam node Tree node type.
  * @param n1 Antecedent formula.
  * @param n2 Consequent formula.
- * @return `true` if `n1 => n2` is valid.
+ * @return `true` if `n1 => n2` is valid; `false` also when normalization
+ * fails on a `bv_widening` width-cap violation (a logged, conservative
+ * fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -301,9 +315,14 @@ bool is_nso_impl(tref n1, tref n2);
  *      a fixed point).
  *   5. Temporal layer simplification: removes implied `always`/`sometimes` parts.
  *
+ * When the `bv_widening` mode is on (see bv_widening_options.h), the
+ * bitvector atoms are elaborated by `widen_bv_arithmetic` before step 1.
+ *
  * @tparam node Tree node type.
- * @param fm Formula to normalize.
- * @return Fully normalized formula.
+ * @param fm Formula to normalize; a `nullptr` is passed through unchanged.
+ * @return Fully normalized formula, or `nullptr` when the `bv_widening`
+ * width cap (`bv_max_width`) is exceeded by some atom -- already logged by
+ * the widening pass; callers treat it as a failed normalization.
  *
  * @par Example
  * @code{.cpp}
