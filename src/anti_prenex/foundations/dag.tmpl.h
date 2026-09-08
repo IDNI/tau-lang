@@ -16,7 +16,10 @@ namespace idni::tau_lang::anti_prenexing {
 //   the classification predicates, atom_of, the binder accessors.
 // Reuse: get_free_vars (tau_tree_extractors.tmpl.h), node::hash,
 //   subtree_less / subtree_equality, get_leaves, create_cache.
-// Cache gating: every per-node table is `#ifdef TAU_CACHE` (fwd.h).
+// Tables: the facet tables are the UNCONDITIONAL structural entries of
+//   ctx.h's `enum class table` (size_memo, members_memo, neg_memo,
+//   negative_tree_memo), reached through ctx.h's find/store — never a
+//   private `#ifdef TAU_CACHE` table here (fwd.h, cache gating).
 // Tests: tests/unit/test_anti_prenex_dag.cpp.
 
 } // namespace idni::tau_lang::anti_prenexing

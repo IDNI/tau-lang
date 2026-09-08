@@ -11,15 +11,17 @@
 namespace idni::tau_lang::anti_prenexing {
 
 // TODO(package E): definitions of every declaration in ctx.h —
-//   ctx::for_component, taint_count, taint, table_instance (TAU_CACHE only),
-//   lookup, store, memoised, flush_solver_dependent.
-// The `#ifdef TAU_CACHE` lives HERE and in the table_instance declaration
-//   only: lookup/store/memoised/flush are passthroughs when off.
-// Reuse: tree<node>::template create_cache<map_t>() for every instance
-//   (GC-registered; keys and cof_entry values are walked by
-//   for_each_tref_in — pairs and HasForEachTref types; a trefs value is
-//   not walked, which is safe for atoms_memo because its atoms are
-//   subtrees of the key).
+//   ctx::for_component, taint_count, taint, table_ptr, find, lookup, store,
+//   memoised, flush_solver_dependent.
+// The `#ifdef TAU_CACHE` lives in table_ptr's definition HERE and nowhere
+//   else: for a `gated` table it returns nullptr when off; for an
+//   unconditional (structural) table it always returns the instance.
+//   find/lookup/store/memoised/flush treat a nullptr table as miss /
+//   no-op / plain compute.
+// Reuse: tree<node>::template create_cache<map_t>() bound to a
+//   function-local static reference for every instance (as get_free_vars
+//   does); GC introspection walks pair keys, bare tref values, and the
+//   HasForEachTref value types cof_entry and tref_set (fwd.h).
 // Tests: tests/unit/test_anti_prenex_ctx.cpp (the persistence and taint
 //   tests under #ifdef TAU_CACHE, i.e. Release).
 

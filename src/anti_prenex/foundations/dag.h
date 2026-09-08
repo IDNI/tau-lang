@@ -13,9 +13,14 @@
  * `get_free_vars` (scope-correct, memoised, functional quantifiers treated
  * as binders, `BDD_ID` leaves read); it is wrapped, not reimplemented.
  *
- * Every facet below is O(1) on a second query in Release (cache gating,
- * fwd.h) and never a walk that the algorithm's cost model does not allow:
- * "|φ| and FV(φ) are set at construction, never recomputed" (§10).
+ * Every cached facet below lives in one of ctx.h's UNCONDITIONAL structural
+ * tables (`size_memo`, `members_memo`, `neg_memo`, `negative_tree_memo`;
+ * fwd.h, cache gating), reached through ctx.h's `find`/`store`, so it is
+ * O(1) on a second query in every build type and may return a reference
+ * into the table: "|φ| and FV(φ) are set at construction, never
+ * recomputed" (§10). Such a reference is invalidated by a
+ * `bintree<node>::gc()` sweep, which rebuilds the tables — copy it before
+ * any call that can construct nodes.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__DAG_H__
@@ -65,7 +70,11 @@ block fv_intersect(tref n, const block& X);
  * node's kind and its children's hashes. A pure function of CONTENT: every
  * input is canonical (phase-0 binder ids, source names for free variables,
  * BDD-canonical terms), so it is identical across runs, components and
- * inputs sharing subtrees. Reads `node::hash`.
+ * inputs sharing subtrees. Returns `hash_lcrs_tref<node>{}(n)`: the node's
+ * value hash combined with its child list's hash, right sibling EXCLUDED —
+ * the functor the tree's own hashed maps use. Neither `node::hash` (the
+ * value alone, no children) nor `bintree::hash` (which includes the right
+ * sibling chain) is `h(φ)`.
  */
 template <NodeType node>
 size_t content_hash(tref n);

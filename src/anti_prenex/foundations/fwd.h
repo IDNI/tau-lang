@@ -44,13 +44,24 @@
  * D5  Counters only. Every knob (options.h) is a size or step counter; there
  *     is no wall-clock budget anywhere.
  *
- * CACHE GATING (ruling, same date): the spec's tables and per-node facet
- * tables are caches and are gated like the existing ones — a static
- * GC-registered `create_cache` table under `#ifdef TAU_CACHE`, nothing
- * otherwise; no result may depend on a hit. The `#ifdef` lives in ctx.h
- * alone. Per-pass memos the spec writes as local state (the driver's
- * post-order memo, substitution's one memo per rewrite, `TREE_CONDITION`'s
- * call-local memo) are unconditional.
+ * CACHE GATING (rulings, same date and Sep 7 review): every table is an
+ * entry of ctx.h's `enum class table`, a static GC-registered `create_cache`
+ * instance reached only through ctx.h's `find` / `lookup` / `store` /
+ * `memoised`. Two classes:
+ *   - the six §1 result tables (`push_memo`, `elim_memo`, `quant_memo`,
+ *     `cof_memo`, `solver_memo`, `qbf_memo`) are CACHES: they exist under
+ *     `#ifdef TAU_CACHE` only, the accessors are passthroughs otherwise, and
+ *     no result may depend on a hit;
+ *   - the STRUCTURAL per-node tables (`atoms_memo`, `size_memo`,
+ *     `members_memo`, `neg_memo`, `negative_tree_memo`, `leaf_fv_memo`) are
+ *     UNCONDITIONAL, like the existing `get_free_vars` table: their entries
+ *     are pure functions of the node, and being always present lets the
+ *     facet accessors return references into them (ruling: "not gate the
+ *     caches in order to enable the return of references").
+ * The `#ifdef` lives in ctx.tmpl.h's `table_ptr` alone. Per-pass memos the
+ * spec writes as local state (the driver's post-order memo, substitution's
+ * one memo per rewrite, `TREE_CONDITION`'s call-local memo) are plain
+ * locals.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__FWD_H__
@@ -88,6 +99,20 @@ using var_order = typename term_handle<node>::order;
 /// SIMPLIFY"). Layer 0 passes none, meaning the identity; layer 1 supplies
 /// `simplify`.
 using simplify_formula_fn = std::function<tref(tref)>;
+
+/**
+ * @brief A set of node handles stored as a table VALUE: sorted by
+ * `subtree_less<node>` (binary-searchable, like `get_free_vars`' result).
+ * `for_each_tref` opts the type into GC introspection (`HasForEachTref`), so
+ * the collector pins and checks the members whether or not they are
+ * subtrees of the key — a plain `trefs` value is deliberately NOT walked by
+ * the tree's caches. The value type of `atoms_memo`, `members_memo` and
+ * `leaf_fv_memo`.
+ */
+struct tref_set {
+	trefs items;
+	void for_each_tref(auto&& f) const { for (tref t : items) f(t); }
+};
 
 /**
  * @brief §1 `cof_memo` entry, the value of `COF(f, x)`: (f₀, f₁, p, usable, pin).

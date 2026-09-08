@@ -66,8 +66,9 @@ tref subst_atom(tref phi, tref atm, bool value);
 /**
  * @brief §1 `atoms_memo`: `formula node → the atoms occurring in it`, units
  * opaque (§4), purely structural — exactly `subst_atom`'s reach. Sorted by
- * `subtree_less<node>` (binary-searchable, like `fv`). GLOBAL table under
- * `TAU_CACHE` (ctx.h); recomputed otherwise.
+ * `subtree_less<node>` (binary-searchable, like `fv`). The UNCONDITIONAL
+ * structural table `atoms_memo` of ctx.h (value type `tref_set`, fwd.h),
+ * so the reference is valid in every build type; invalidated by a GC sweep.
  */
 template <NodeType node>
 const trefs& atoms(tref n);

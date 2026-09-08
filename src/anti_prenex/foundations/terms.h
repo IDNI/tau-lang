@@ -177,7 +177,9 @@ size_t mem_size(tref n);
 /// §1 LEAF HAZARD: the free variables contributed by the LEAVES of a
 /// BDD-backed term alone (a block variable here is hidden from cofactoring:
 /// inside a reference argument or a foreign-typed subterm, including one
-/// inside a functional quantifier's body). Sorted like `fv`.
+/// inside a functional quantifier's body). Sorted like `fv`. Stored in
+/// ctx.h's UNCONDITIONAL structural table `leaf_fv_memo`, hence the
+/// reference return in every build type.
 template <NodeType node>
 const trefs& leaf_fv(tref f);
 
