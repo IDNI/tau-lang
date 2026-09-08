@@ -657,6 +657,13 @@ The cast operand must be a parenthesized term, a constant, a variable, a
 function call, `0`, `1`, a negation, a functional quantifier or another cast;
 wrap anything else in parentheses.
 
+A cast converts between bitvector widths only. Its operand must itself be a
+bitvector term, and its result is a bitvector of the target width that takes
+part in the surrounding formula like any other term: casting an `sbf` or
+`tau` term, or mixing a cast with a non-bitvector sibling as in
+`((bv[8]) x:bv[4]) & y:sbf = 0`, is a type error reported during type
+inference.
+
 ### Division and remainder by zero
 
 Division and remainder are total functions with the SMT-LIB semantics of
