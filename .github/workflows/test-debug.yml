@@ -62,9 +62,9 @@ jobs:
           submodules: recursive
 
       # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
-      - name: Cache ~/.tau (cvc5 + boost)
+      - name: Restore ~/.tau (cvc5 + boost)
         id: cache-tau
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.tau
           key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
@@ -76,6 +76,15 @@ jobs:
       - name: Build boost
         if: steps.cache-tau.outputs.cache-hit != 'true'
         run: ./dev dep-boost.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # saved here, before the build, so a failing build or test does not
+      # discard the deps and force a rebuild on the next run
+      - name: Save ~/.tau (cvc5 + boost)
+        if: steps.cache-tau.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.tau
+          key: ${{ steps.cache-tau.outputs.cache-primary-key }}
 
       - name: Build tau and tests, run tests (Debug)
         run: ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
