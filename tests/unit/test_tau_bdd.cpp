@@ -156,7 +156,8 @@ TEST_SUITE("BDD creation terms") {
 			|| result == "zrwyexqt"
 			|| result == "xtzqrewy"
 			|| result == "qxywrezt"
-			|| result == "qyrtxwze"));
+			|| result == "qyrtxwze"
+			|| result == "wetyzrxq"));
 	}
 }
 
@@ -248,7 +249,8 @@ TEST_SUITE("BDD and many") {
 			|| result == "adbb&(e'f')'cc"
 			|| result == "abbccd&(f'e')'"
 			|| result == "(f'e')'adbbcc"
-			|| result == "bccda&(f'e')'"));
+			|| result == "bccda&(f'e')'"
+			|| result == "baccd&(f'e')'"));
 	}
 }
 

@@ -81,6 +81,7 @@ TEST_SUITE("anti_prenex") {
 			"w = 0 || (ex b1 b1 y = 0 && b1 w = 0 && f(b1))",
 			"(ex b1 b1 w = 0 && b1 y = 0 && f(b1)) || w = 0",
 			"(ex b1 b1 y = 0 && b1 w = 0 && f(b1)) || w = 0",
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || f(b1) || w = 0)",
 		}) );
 	}
 	TEST_CASE("b4 squeeze_absorb below all") {
@@ -119,6 +120,8 @@ TEST_SUITE("anti_prenex") {
 			"w != 0 && (all b1 b1 y != 0 || b1 w != 0 || !f(b1))",
 			"(all b1 b1 w != 0 || b1 y != 0 || !f(b1)) && w != 0",
 			"(all b1 b1 y != 0 || b1 w != 0 || !f(b1)) && w != 0",
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || y'w = 0)",
 		}) );
 	}
 	TEST_CASE("b4 squeeze_absorb below all, fully eliminated") {
@@ -251,6 +254,7 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
 			"all b2, b1 (always b1 b2 != 0)",
+			"all b2, b1 (always b2 b1 != 0)",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( tau::get(res).find_top(

@@ -607,8 +607,8 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		auto witness = drive(spec7, in);
 		// The canonical free-region choice moves with every parser regen
 		// (nonterminal renumbering changes node hashes and so clause
-		// order). Re-pinned after the 2026-09-07 ba_constant regen: a
-		// fresh process gives 7, 0, 0 for spec7 and 50, 0, 0 for spec50
+		// order). Re-pinned after nonterminals became name-hashed: a
+		// fresh process gives 7, 0, 0 for spec7 and 50, 50, 50 for spec50
 		// on their own (verified by driving each alone through the
 		// spec-file runner), and so must these post-activity runs.
 		// Re-pin whenever the grammar is regenerated; the property
@@ -618,6 +618,6 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 			<< witness[2] << " other: " << other[0] << ","
 			<< other[1] << "," << other[2]);
 		CHECK(witness == std::vector<std::string>({ "7", "0", "0" }));
-		CHECK(other == std::vector<std::string>({ "50", "0", "0" }));
+		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
 	}
 }
