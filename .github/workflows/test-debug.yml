@@ -1,0 +1,80 @@
+name: Test Debug
+
+on:
+  push:
+    branches: [ "devel", "devel/**" ]
+  pull_request:
+    branches: [ "devel", "devel/**" ]
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux debug tests
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # ./dev and the image build both need the parser submodule
+          submodules: recursive
+
+      # container-driver builder; required for --cache-to type=gha
+      - uses: docker/setup-buildx-action@v3
+
+      # cvc5 and boost are built from source and cached under the shared
+      # 'tau-deps' scope. Change the scope name to force a rebuild.
+      - name: Build deps stage (cvc5 + boost, cached)
+        run: |
+          ./dev docker deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build debug tests and run them
+        run: |
+          ./dev docker build-debug \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  macos:
+    name: macOS debug tests
+    runs-on: macos-15
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+      # bump to force a rebuild of the cached ~/.tau dependency tree
+      TAU_DEPS_EPOCH: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
+      - name: Cache ~/.tau (cvc5 + boost)
+        id: cache-tau
+        uses: actions/cache@v4
+        with:
+          path: ~/.tau
+          key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
+
+      - name: Build cvc5
+        if: steps.cache-tau.outputs.cache-hit != 'true'
+        run: ./dev dep-cvc5.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Build boost
+        if: steps.cache-tau.outputs.cache-hit != 'true'
+        run: ./dev dep-boost.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Build tau and tests, run tests (Debug)
+        run: ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Run tau
+        run: ./build/debug/tau -v
