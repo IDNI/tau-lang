@@ -45,8 +45,10 @@ std::pair<std::string, int> run_cmd(const std::string& cmd);
 // constant_output_realizable, which can call it up to CAP times per gate.
 // Declared without the real definition's default argument (ltl_aba_synthesis.tmpl.h)
 // to avoid a "redefinition of default argument" diagnostic; callers here pass
-// timeout_sec explicitly instead.
-static std::pair<std::string, int> spawn_capture(
+// timeout_sec explicitly instead. Not static: the definition is inline in a
+// header a unit may never include, and gcc rejects a static function that a
+// unit declares but never defines.
+std::pair<std::string, int> spawn_capture(
 	const std::vector<std::string>& argv, int timeout_sec);
 
 std::pair<bool, std::string> call_ltlsynt(const std::string& formula,

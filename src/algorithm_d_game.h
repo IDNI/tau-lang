@@ -492,7 +492,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 // DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
 // `write_tempfile` + `spawn_capture`, which live in that header and are
 // included after this one; the callers below need only this declaration.
-inline const synth_game& call_ltlsynt_game(
+// Not spelled inline here: a unit that includes this header without the
+// definition (the qlt plugin's own) would declare an inline function it
+// never defines, which gcc rejects; the definition is inline and is
+// emitted by every unit that includes it.
+const synth_game& call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs);

@@ -60,7 +60,7 @@ inline int ltl_timeout_sec() {
 //
 // The caller passes argv as a vector of C++ strings.  An empty
 // `timeout_sec` (or 0) disables the kill-after-N-seconds watchdog.
-static std::pair<std::string, int> spawn_capture(
+inline std::pair<std::string, int> spawn_capture(
     const std::vector<std::string>& argv,
     int timeout_sec = 0)
 {
