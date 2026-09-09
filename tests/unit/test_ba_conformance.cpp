@@ -276,16 +276,19 @@ void check_rendering() {
 	using desc = ba_descriptor<BA, node_t>;
 	tref type = desc::type_tree();
 
-	if constexpr (requires { desc::print_constant(std::declval<BA>()); }) {
+	if constexpr (requires(std::ostream& os, const BA& x) {
+		{ desc::print_constant(os, x) } -> std::same_as<std::ostream&>; })
+	{
 		auto one = parsed_literal<BA>(desc::literal_one(type), type);
 		auto zero = parsed_literal<BA>(desc::literal_zero(type), type);
 		REQUIRE(one.has_value());
 		REQUIRE(zero.has_value());
-		const std::string po = desc::print_constant(one.value());
-		const std::string pz = desc::print_constant(zero.value());
-		CHECK(po.size() > 0);
-		CHECK(pz.size() > 0);
-		CHECK(po != pz);
+		std::ostringstream po, pz;
+		desc::print_constant(po, one.value());
+		desc::print_constant(pz, zero.value());
+		CHECK(po.str().size() > 0);
+		CHECK(pz.str().size() > 0);
+		CHECK(po.str() != pz.str());
 	}
 
 	if constexpr (requires { requires desc::can_host_bool; }) {
