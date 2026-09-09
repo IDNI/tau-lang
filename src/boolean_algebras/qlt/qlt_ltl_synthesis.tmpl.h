@@ -67,7 +67,7 @@ template <NodeType node>
 bool is_pure_input_atom(tref atom);
 
 template <NodeType node>
-tref resolve_io_vars(io_context<node>& ctx, tref fm);
+tref resolve_io_vars(const io_context<node>& ctx, tref fm);
 
 // LT-8 / LA-N1: used by the Algorithm D fast path to un-vacuate the ABA
 // oracle over the automaton's own d_i-named atoms (ltl_aba_normalization.tmpl.h).

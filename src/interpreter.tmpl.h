@@ -626,6 +626,9 @@ result<interpreter<node>>
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
+	// Bare formulas reach this entry point without spec parsing, so the
+	// in/out bits are stamped here; idempotent on an already-classified tree.
+	spec = resolve_io_vars<node>(ctx, spec);
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
 	// IN-M9 (found by the IN-RT4 api-level execution tests): CTL* specs
 	// reached this point unreduced.  A/E are not full-LTL operators, so
