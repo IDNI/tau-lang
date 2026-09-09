@@ -184,20 +184,19 @@ result<htref> api<node>::substitute(htref expr, std::map<htref, htref> that_with
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	// Apply substitutions sequentially; each step unwraps htref to tref
-	tref e = expr->get();
+	// Unwrap htref to tref, then apply all pairs in one simultaneous
+	// pass -- matches the tref overload's semantics (see api.tmpl.h).
+	std::map<tref, tref> unwrapped;
 	for (auto [that, with] : that_with) {
-		if (!that || !with) continue;
-		auto sub = r.merge_take(substitute(e, that->get(), with->get()));
-		if (!sub) {
+		if (!that || !with) {
+			r.error(code::invalid_argument, "Invalid argument(s)");
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
-		e = *sub;
+		unwrapped.emplace(that->get(), with->get());
 	}
-	r = tau::geth(e);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return substitute(expr->get(), unwrapped).transform(
+		[](tref v) { return tau::geth(v); });
 }
 
 // Normal forms

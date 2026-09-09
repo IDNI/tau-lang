@@ -180,11 +180,31 @@ requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator!=(const node& that) const {
 	return !(*this == that);
 }
+// Hash of a nonterminal's name.
+inline size_t nt_hash_of_name(const std::string& nm) {
+	size_t h = std::hash<std::string>{}(nm);
+	if (!h) h = 1;  // reserve 0 as the "not computed" marker
+	return h;
+}
+
+// Nonterminal hashed by NAME (cached per id), not by id: a regen renumbers
+// ids, which permutes node ordering and re-rolls anti-prenexing's cost
+// (#414). Same reason ba_types::name_hash hashes the type name below.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static size_t nt_name_hash(size_t nt) {
+	// index = nt id; 0 marks "not yet computed"
+	static std::vector<size_t> cache;
+	if (nt < cache.size() && cache[nt]) return cache[nt];
+	if (nt >= cache.size()) cache.resize(nt + 1, 0);
+	return cache[nt] = nt_hash_of_name(node<BAs...>::name(nt));
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 uint64_t node<BAs...>::hashit() const {
 	std::uint64_t seed = 0;
-	hash_combine(seed, static_cast<size_t>(nt));
+	hash_combine(seed, nt_name_hash<BAs...>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
 	// Hash the type name: a parameterized type's id follows first-discovery

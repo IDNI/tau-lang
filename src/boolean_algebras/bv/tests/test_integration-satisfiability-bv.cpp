@@ -147,6 +147,68 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 }
 
+// min/max are converted for cvc5 as ite(bvule(a,b), ...); these check the
+// conversion by validity/satisfiability of the defining properties.
+TEST_SUITE("cvc5_satisfiability: min/max") {
+
+	TEST_CASE("all x all y min(x, y:bv[4]) <= x") {
+		const std::string sample = "all x all y min(x, y:bv[4]) <= x";
+		auto formula = tau::get(sample, parse_opts_wff);
+		CHECK( is_bv_formula_valid<node_t>(formula) );
+	}
+
+	TEST_CASE("all x all y ( min(x, y:bv[4]) = x || min(x, y) = y )") {
+		const std::string sample =
+			"all x all y ( min(x, y:bv[4]) = x || min(x, y) = y )";
+		auto formula = tau::get(sample, parse_opts_wff);
+		CHECK( is_bv_formula_valid<node_t>(formula) );
+	}
+
+	TEST_CASE("all x all y min(x, y:bv[4]) + max(x, y) = x + y") {
+		const std::string sample =
+			"all x all y min(x, y:bv[4]) + max(x, y) = x + y";
+		auto formula = tau::get(sample, parse_opts_wff);
+		CHECK( is_bv_formula_valid<node_t>(formula) );
+	}
+
+	TEST_CASE("ex x min(x, { 3 }:bv[4]) = { 2 }:bv[4]") {
+		const std::string sample = "ex x min(x, { 3 }:bv[4]) = { 2 }:bv[4]";
+		auto formula = tau::get(sample, parse_opts_wff);
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+	}
+
+	TEST_CASE("ex x max(x, { 3 }:bv[4]) < { 3 }:bv[4]") {
+		const std::string sample = "ex x max(x, { 3 }:bv[4]) < { 3 }:bv[4]";
+		auto formula = tau::get(sample, parse_opts_wff);
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+	}
+}
+
+// BA-1: is_bv_formula_sat collapsed a definite "unsat" and a "cannot
+// decide" (cvc5 unknown, or translation failure) into the same false
+// return. bv_formula_sat_status exposes the distinction; is_bv_formula_sat
+// must still behave exactly as before on top of it.
+TEST_SUITE("bv_formula_sat_status (BA-1)") {
+
+	TEST_CASE("sat formula") {
+		const std::string sample = "ex x x = { 1 }:bv[4]";
+		auto formula = tau::get(sample, parse_opts_wff);
+		auto status = bv_formula_sat_status<node_t>(formula);
+		REQUIRE( status.has_value() );
+		CHECK( status.value() == bv_sat_status::sat );
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+	}
+
+	TEST_CASE("unsat formula") {
+		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
+		auto formula = tau::get(sample, parse_opts_wff);
+		auto status = bv_formula_sat_status<node_t>(formula);
+		REQUIRE( status.has_value() );
+		CHECK( status.value() == bv_sat_status::unsat );
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

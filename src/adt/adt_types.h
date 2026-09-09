@@ -91,14 +91,14 @@ template <NodeType node>
 struct adt_registry {
 	/**
 	 * @brief Collect every `type_def` under @p spec, plus every tree in
-	 * @p prior_type_defs, and resolve all of them.
+	 * @p session_type_defs, and resolve all of them.
 	 *
-	 * @p prior_type_defs supplies declarations from earlier, separately
+	 * @p session_type_defs supplies declarations from earlier, separately
 	 * parsed statements (a REPL session's own accumulated `type_def`s) so
 	 * a name they declared resolves here too; they are collected first, in
 	 * order, followed by @p spec's own `type_def`s, in declaration order. A
 	 * `type_def` for a name already collected -- whether the earlier one came
-	 * from @p prior_type_defs or from @p spec itself -- always replaces it,
+	 * from @p session_type_defs or from @p spec itself -- always replaces it,
 	 * after `LOG_WARNING` names the type: whether two declarations for one
 	 * name land in the same parse or in two separate ones is an artifact of
 	 * how the caller fed text in, not a distinction in what the user meant,
@@ -113,7 +113,7 @@ struct adt_registry {
 	 * passed through unchanged.
 	 */
 	static std::optional<adt_registry> build(tref spec,
-		const htrefs* prior_type_defs = nullptr);
+		const std::vector<htref>* session_type_defs = nullptr);
 
 	/** @brief Return `true` if @p name_sid has a `type_def` in this registry. */
 	bool defines(size_t name_sid) const;
@@ -137,7 +137,7 @@ struct adt_registry {
 	bool empty() const;
 	/**
 	 * @brief Return `true` if @p build's own @p spec argument held at least
-	 * one `type_def` (independent of any @p prior_type_defs supplied).
+	 * one `type_def` (independent of any @p session_type_defs supplied).
 	 *
 	 * Distinguishes "this parse itself asserts ADT types" from "every type
 	 * this registry knows about was declared elsewhere": an unresolvable
@@ -145,7 +145,7 @@ struct adt_registry {
 	 * declares a type. A printed-and-reparsed flattened spec (no `type_def`
 	 * left, since flattening erases them) never does, so a stray dotted name
 	 * such flattening produced elsewhere is not one -- even though a
-	 * @p prior_type_defs entry from an earlier, separate parse may still make
+	 * @p session_type_defs entry from an earlier, separate parse may still make
 	 * this registry non-empty. See adt_resolve_var's use of this in
 	 * adt_flatten.tmpl.h for why that keeps flatten(flatten(x)) == flatten(x).
 	 */

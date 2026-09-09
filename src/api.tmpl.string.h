@@ -121,11 +121,15 @@ result<std::string> api<node>::substitute(
 {
 	result<std::string> r;
 	TAU_TRY(tref cur, get_formula_or_term(expr));
+	// Parse every pair, then apply them all in one simultaneous pass --
+	// matches the tref overload's semantics (see api.tmpl.h).
+	std::map<tref, tref> parsed;
 	for (auto [that, with] : that_with) {
 		TAU_TRY(tref t, get_formula_or_term(that));
 		TAU_TRY(tref w, get_formula_or_term(with));
-		TAU_TRY(cur, substitute(cur, t, w));
+		parsed.emplace(t, w);
 	}
+	TAU_TRY(cur, substitute(cur, parsed));
 	r = to_str(cur);
 	DBG(assert(r.is_well_formed());)
 	return r;

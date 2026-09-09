@@ -334,7 +334,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 
 		if (options.flatten_adts) {
 			transformed = adt_flatten<node>(transformed, options.context,
-				options.prior_type_defs);
+				options.session_type_defs);
 			if (!transformed) return nullptr;
 		}
 

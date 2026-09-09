@@ -42,6 +42,28 @@ n {12}:bv[8] !& {10}:bv[8]
 n {12}:bv[8] !| {10}:bv[8]
 n {12}:bv[8] !^ {10}:bv[8]
 
+# The unsigned minimum and maximum of two terms are builtins. Like the
+# comparison operators they compare unsigned, so 200 -- which a signed 8-bit
+# reading would call -56 -- is the maximum here:
+
+n min({3}:bv[8], {10}:bv[8])
+n max({200}:bv[8], {100}:bv[8])
+
+# min and max are defined only for bitvectors: on any other Boolean algebra
+# they are rejected during type resolution, as here on sbf:
+
+n min(x:sbf, y:sbf)
+
+# For the solver they lower to an if-then-else over an unsigned comparison,
+# and the pair satisfies the usual algebra:
+
+valid min(x:bv[8], y:bv[8]) + max(x:bv[8], y:bv[8]) = x:bv[8] + y:bv[8]
+
+# Their main use is clamping: min(x, cap) never exceeds the cap. Below the
+# cap the clamp is the identity, so this constraint pins x exactly:
+
+solve min(x:bv[8], {100}:bv[8]) = {7}:bv[8]
+
 # A term is cast to another bitvector width with (bv[n]). Widths never mix
 # implicitly -- bv[8] and bv[16] are distinct types, and unifying them is a
 # type error -- so a cast is how a value crosses widths:

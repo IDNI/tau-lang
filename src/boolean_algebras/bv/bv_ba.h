@@ -569,6 +569,10 @@ template<NodeType node> tref wff_bv_ngt(const tref* ch, tref r);
 template<NodeType node> tref wff_bv_gteq(const tref* ch, tref r);
 /** @brief Fold `!>=` over the constants in @p ch. */
 template<NodeType node> tref wff_bv_ngteq(const tref* ch, tref r);
+/** @brief Simplify a `min` bitvector symbol node @p symbol (unsigned). */
+template<NodeType node> tref term_min(tref symbol);
+/** @brief Simplify a `max` bitvector symbol node @p symbol (unsigned). */
+template<NodeType node> tref term_max(tref symbol);
 
 /** @brief Apply all BV symbol-level simplifications to @p symbol. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);

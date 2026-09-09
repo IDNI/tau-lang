@@ -116,8 +116,8 @@ TEST_SUITE("AntiPrenexBlock") {
 		// Order flipped again by the 2026-08-27 regen (left-assoc
 		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
 		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
 			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))",
+			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
 		}) );
 		CHECK( used == 0 );
 	}

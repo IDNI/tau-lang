@@ -146,6 +146,18 @@ inline Term make_bitvector_shr(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
 }
 
+// Unsigned minimum/maximum. SMT-LIB has no bvmin/bvmax kind: both lower
+// to ITE over BITVECTOR_ULE (unsigned, like every comparison here).
+inline Term make_bitvector_min(const Term& l, const Term& r) {
+	return cvc5_term_manager.mkTerm(Kind::ITE,
+		{cvc5_term_manager.mkTerm(Kind::BITVECTOR_ULE, {l, r}), l, r});
+}
+
+inline Term make_bitvector_max(const Term& l, const Term& r) {
+	return cvc5_term_manager.mkTerm(Kind::ITE,
+		{cvc5_term_manager.mkTerm(Kind::BITVECTOR_ULE, {l, r}), r, l});
+}
+
 // Widen `t` by `extra_bits` leading zero bits.
 inline Term make_bitvector_zero_extend(const Term& t, size_t extra_bits) {
 	auto op = cvc5_term_manager.mkOp(Kind::BITVECTOR_ZERO_EXTEND, {(uint32_t)extra_bits});

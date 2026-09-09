@@ -602,10 +602,45 @@ result<tref> api<node>::substitute(tref expr, tref that, tref with) {
 template <NodeType node>
 result<tref> api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 	result<tref> r;
-	for (auto [that, with] : that_with) {
-		TAU_TRY(expr, substitute(expr, that, with));
+	if (!expr) {
+		TAU_LOG_ERROR << "Invalid argument(s)";
+		r.error(code::invalid_argument, "Invalid argument(s)");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
-	r = expr;
+	// Validate every pair the way the single-pair overload does and
+	// collect the pairs into a structurally keyed map (matching compares
+	// subtrees, not pointers), then apply them all in one simultaneous
+	// pass: every match is found against the original expression and no
+	// pair's replacement is re-matched by another pair, so {x/y, y/x}
+	// swaps instead of collapsing both variables into one.
+	bool e = is_term(expr);
+	subtree_map<node, tref> changes;
+	for (auto [that, with] : that_with) {
+		if (!that || !with) {
+			TAU_LOG_ERROR << "Invalid argument(s)";
+			r.error(code::invalid_argument, "Invalid argument(s)");
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		bool t = is_term(that), w = is_term(with);
+		if ((e && e != t) || (e && e != w) || (!e && t != w)) {
+			TAU_LOG_ERROR << "Invalid argument(s)";
+			r.error(code::invalid_argument, "Invalid argument(s)");
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		// two structurally equal match patterns are ambiguous
+		if (!changes.emplace(that, with).second) {
+			TAU_LOG_ERROR << "Invalid argument(s)";
+			r.error(code::invalid_argument, "Invalid argument(s)");
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+	}
+	tref s = tau::get(expr).substitute(changes);
+	if (!s) r.error(code::internal_error, "Substitution failed");
+	else    r = s;
 	DBG(assert(r.is_well_formed());)
 	return r;
 }

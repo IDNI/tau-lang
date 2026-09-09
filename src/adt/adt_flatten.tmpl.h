@@ -174,7 +174,7 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 		// erases them) and no annotation reaching here either, so its own
 		// stray dotted names must stay k_not_adt, unresolved and untouched,
 		// for flatten(flatten(x)) == flatten(x) to hold even when a
-		// prior_type_defs entry from an earlier parse keeps the registry
+		// session_type_defs entry from an earlier parse keeps the registry
 		// itself non-empty.
 		if (!path_sids.empty() && reg.declares_locally()) {
 			LOG_ERROR << "ADT: member access on '"
@@ -1080,9 +1080,9 @@ bool adt_flatten_check_io_def_file_name(tref n) {
 
 template <NodeType node>
 tref adt_flatten(tref spec, io_context<node>* ctx,
-		const htrefs* prior_type_defs) {
+		const std::vector<htref>* session_type_defs) {
 	using tau = tree<node>;
-	auto reg_opt = adt_registry<node>::build(spec, prior_type_defs);
+	auto reg_opt = adt_registry<node>::build(spec, session_type_defs);
 	if (!reg_opt) return nullptr; // adt_registry::build already LOG_ERROR'd
 
 	// Reject every input_def/output_def whose own head carries a
@@ -1103,7 +1103,7 @@ tref adt_flatten(tref spec, io_context<node>* ctx,
 			return nullptr;
 
 	// Fast path for the fully-empty case: nothing declared anywhere, so no
-	// variable could carry an ADT type. @p prior_type_defs can make the
+	// variable could carry an ADT type. @p session_type_defs can make the
 	// registry non-empty on a spec with no type_def of its own -- the
 	// printed-and-reparsed output of an earlier flatten reparses "x.a" as a
 	// bare variable "x" plus a member_path ".a" (there is no type_def left

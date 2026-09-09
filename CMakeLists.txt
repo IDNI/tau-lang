@@ -749,6 +749,13 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
 elseif (TAU_BUILD_EXECUTABLE AND TAU_MACOS_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+	# DragNDrop (.dmg) shells out to hdiutil, so it is only usable when the
+	# build actually runs on macOS. The ZIP stays in the list either way.
+	if (APPLE)
+		list(APPEND CPACK_GENERATOR "DragNDrop")
+		set(CPACK_DMG_VOLUME_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+		set(CPACK_DMG_FORMAT "UDZO")
+	endif()
 elseif (TAU_BUILD_EXECUTABLE AND TAU_RPM_PACKAGE)
 	set(CPACK_GENERATOR "RPM")
 	set(CPACK_RPM_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.rpm")

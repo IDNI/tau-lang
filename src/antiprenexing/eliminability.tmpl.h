@@ -145,12 +145,13 @@ elim_verdict atom_arith_verdict(tref m, bool arith_is_solver_owned) {
 		return t.is(tau::bf_add) || t.is(tau::bf_sub)
 			|| t.is(tau::bf_mul) || t.is(tau::bf_div)
 			|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
-			|| t.is(tau::bf_shr) || t.is(tau::bf_cast);
+			|| t.is(tau::bf_shr) || t.is(tau::bf_min)
+			|| t.is(tau::bf_max) || t.is(tau::bf_cast);
 	};
 	// Arithmetic operators atomic_blasting cannot express
 	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
 	// factor; shl/shr/div/mod need a constant second argument. Only these
-	// five operators are ever constrained -- add/sub/cast blast
+	// five operators are ever constrained -- add/sub/cast/min/max blast
 	// unconditionally, matching `pack_term_is_blasteable`'s own default.
 	// The constant-argument test itself is routed through the owning BA's
 	// classification rather than a bare bv-specific argument test, so this

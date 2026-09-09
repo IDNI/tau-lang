@@ -1836,11 +1836,13 @@ bool has_compound_term_ops(tref f) {
 			|| is<node, tau::bf_mod>(n) || is<node, tau::bf_shl>(n)
 			|| is<node, tau::bf_shr>(n) || is<node, tau::bf_nand>(n)
 			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n)
+			|| is<node, tau::bf_min>(n)  || is<node, tau::bf_max>(n)
 			// A BA's own simplification may turn arithmetic into bitwise or
 			// logical ops or casts; those count as compound too, so
 			// conjs_only_pure_equality routes them to the pack solver, not LGRS.
 			|| is<node, tau::bf_and>(n) || is<node, tau::bf_or>(n)
 			|| is<node, tau::bf_neg>(n) || is<node, tau::bf_xor>(n)
+			// a width cast crosses algebras; lgrs cannot see across it
 			|| is<node, tau::bf_cast>(n);
 	}) != nullptr;
 }
@@ -1979,7 +1981,21 @@ result<solution<node>> solve(tref form, solver_options options) {
 			if (tau::get(conj).equals_F()) continue;
 			size_t type = find_ba_type<node>(conj);
 			if (!is_atomic_fm<node>(conj) && !(pack_type_has_arith_ops<node>(type) && is_child_quantifier<node>(conj))) {
-				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
+				// A ref surviving to this point matched no definition
+				// (calls that COULD match were expanded upstream, and a
+				// mismatched call is rejected by validate_rr_call_types)
+				// -- an uninterpreted predicate is fine to normalize but
+				// has no solutions to enumerate. Name it, instead of the
+				// generic message, so the user looks at the definition
+				// rather than at the solver.
+				if (tref uref = tau::get(conj).find_top(
+						is<node, tau::ref>); uref)
+					LOG_ERROR << "Cannot solve `" << TAU_TO_STR(conj)
+						<< "`: it contains an unresolved reference `"
+						<< TAU_TO_STR(uref) << "` with no matching"
+						" definition";
+				else LOG_ERROR << "Found clause containing non-equation: "
+					<< TAU_TO_STR(path);
 				clause_error = true;
 				break;
 			}

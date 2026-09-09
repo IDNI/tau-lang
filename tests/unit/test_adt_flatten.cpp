@@ -108,7 +108,7 @@ TEST_SUITE("adt flatten") {
 		// spec argument requires one -- but the point of this test is
 		// what defs/names carry forward into the SEPARATE calls below,
 		// mirroring how a REPL/tau_spec session ever supplies a
-		// prior_type_defs entry: a `type` statement declared once, resolved
+		// session_type_defs entry: a `type` statement declared once, resolved
 		// on a later, separate parse.
 		htrefs defs;
 		tau_dynamic_context names;
@@ -126,13 +126,13 @@ TEST_SUITE("adt flatten") {
 
 		tref once = tau::get("ex x:Point x = 0.",
 			{ .parse = { .dynamic_ctx = &names },
-			  .infer_ba_types = false, .prior_type_defs = &defs });
+			  .infer_ba_types = false, .session_type_defs = &defs });
 		REQUIRE(once);
 		std::string printed = tau::get(once).to_str();
 
 		tref twice = tau::get(printed,
 			{ .parse = { .dynamic_ctx = &names },
-			  .infer_ba_types = false, .prior_type_defs = &defs });
+			  .infer_ba_types = false, .session_type_defs = &defs });
 		REQUIRE(twice);
 		CHECK(tau::get(once).to_str() == tau::get(twice).to_str());
 	}

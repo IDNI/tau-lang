@@ -51,7 +51,10 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("all"     __ q_vars  __ wff)      :wff_all
                         | ("ex"      __ q_vars  __ wff)      :wff_ex
-                        | ref                                :wff_ref
+                          # a 2-argument min/max call is always the builtin
+                          # bitvector term (bf_min/bf_max), never a predicate
+                          # reference: the names are reserved
+                        | (ref & ~bf_min & ~bf_max)          :wff_ref
                         |                                     constraint
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<-"  _ wff)              :wff_rimply
@@ -89,6 +92,11 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
+                          # builtin bitvector minimum/maximum; listed before
+                          # ref so rule order wins the ambiguity with a
+                          # 2-argument function call named min/max
+                        | ("min" _ '(' _ bf _ ',' _ bf _ ')') :bf_min
+                        | ("max" _ '(' _ bf _ ',' _ bf _ ')') :bf_max
                         | ref                                :bf_ref
                         | ('(' _ type _ ')' _
                            (bf_parenthesis | ba_constant | variable | bf_ref
@@ -144,7 +152,7 @@ constraint =>
         | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_lt.
 
 # constants
-ba_constant            => '{' _ (capture | source) _ '}' [ typed ].
+ba_constant            => '{' space* (capture | source) space* '}' [ typed ].
 source                 => src_c [ (src_c | space)* src_c ].
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
@@ -225,9 +233,12 @@ cli_command            =>
 # possibility of using wff or bf as source expression as is kind of naive
 # to use them in this context. A more interesting feature would be to
 # allow such changes in rec relations, redifining the existing ones.
+# issue #99: several comma separated match/replace pairs are accepted and
+# applied simultaneously in one pass, so no pair rewrites another's
+# replacement; several bracket groups may follow, each applied sequentially
+# to the previous group's result
         | (("s" | "subst" | "substitute")
-                :subst_sym __ nf_cmd_arg _ '[' _
-                        nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
+                :subst_sym __ nf_cmd_arg (_ subst_group)+)    :subst_cmd
         | (("i" | "inst" | "instantiate")
                 :inst_sym __ inst_args)                       :inst_cmd
 # normal forms
@@ -291,14 +302,28 @@ fragment_name          => ("ltl" :fragment_ltl | "ctl_star" :fragment_ctl_star
 #
 bf_cmd_arg             => history | bf.
 wff_cmd_arg            => history | wff.
-nf_cmd_arg             => history | ref | wff | bf.
+                          # ref is excluded from a bare min/max call so the
+                          # builtin (bf_min/bf_max) wins at the command level
+                          # too, not only inside larger formulas
+nf_cmd_arg             => history | (ref & ~bf_min & ~bf_max) | wff | bf.
 onf_cmd_arg            => history | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
-spec_arg               => history | spec | ref | wff | bf.
+spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
+# one '[ match / replace, ... ]' group of the subst command; the group node is
+# kept in the tree (not inlined) so the evaluator sees the group boundaries
+subst_group            => '[' _ nf_cmd_arg _ '/' _ nf_cmd_arg
+                        (_ ',' _ nf_cmd_arg _ '/' _ nf_cmd_arg)* _ ']'.
 # TODO (MEDIUM) check if could we only have one case?
+# issue #99: like subst, inst accepts several comma separated pairs per group
+# (simultaneous) and several bracket groups (sequential); the match side of
+# every pair must be a variable, which the evaluator checks
 inst_args              =>
-          wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'
-        | bf_cmd_arg  _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'.
+          wff_cmd_arg (_ inst_group)+
+        | bf_cmd_arg  (_ inst_group)+.
+# one '[ variable / value, ... ]' group of the inst command; kept in the tree
+# (not inlined) so the evaluator sees the group boundaries
+inst_group             => '[' _ bf _ '/' _ bf_cmd_arg
+                        (_ ',' _ bf _ '/' _ bf_cmd_arg)* _ ']'.
 
 # symbols usable for detailed help message
 #

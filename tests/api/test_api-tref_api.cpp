@@ -373,6 +373,43 @@ TEST_SUITE("Tau API - tref - substitution") {
 		tref result = sub_r.value();
 		CHECK(tau_api::to_str(result) == "y+b");
 	}
+	// Issue #99: the map overload substitutes all pairs simultaneously in
+	// one pass over the original expression, so a pair's replacement is
+	// never re-matched by another pair. A swap is the observable witness:
+	// applying the pairs one after another would collapse x and y into a
+	// single variable instead of exchanging them.
+	TEST_CASE_FIXTURE(api_fixture, "substitute map is simultaneous") {
+		auto x_r = tau_api::get_term("x");
+		auto y_r = tau_api::get_term("y");
+		auto expr_r = tau_api::get_term("x + y");
+		REQUIRE(x_r.has_value());
+		REQUIRE(y_r.has_value());
+		REQUIRE(expr_r.has_value());
+		tref x = x_r.value(), y = y_r.value(), expr = expr_r.value();
+		std::map<tref, tref> that_with{ { x, y }, { y, x } };
+		auto sub_r = tau_api::substitute(expr, that_with);
+		REQUIRE(sub_r.has_value());
+		tref result = sub_r.value();
+		CHECK(tau_api::to_str(result) == "y+x");
+	}
+	TEST_CASE_FIXTURE(api_fixture, "substitute map does not chain") {
+		auto a_r = tau_api::get_term("a");
+		auto b_r = tau_api::get_term("b");
+		auto c_r = tau_api::get_term("c");
+		auto expr_r = tau_api::get_term("a + c");
+		REQUIRE(a_r.has_value());
+		REQUIRE(b_r.has_value());
+		REQUIRE(c_r.has_value());
+		REQUIRE(expr_r.has_value());
+		tref a = a_r.value(), b = b_r.value(), c = c_r.value(),
+			expr = expr_r.value();
+		// the b introduced by the first pair must not be rewritten to c
+		std::map<tref, tref> that_with{ { a, b }, { b, c } };
+		auto sub_r = tau_api::substitute(expr, that_with);
+		REQUIRE(sub_r.has_value());
+		tref result = sub_r.value();
+		CHECK(tau_api::to_str(result) == "b+c");
+	}
 
 	// AP-6: substitute(tref, tref, tref) called is_term() on expr/that/with
 	// unconditionally; is_term() dereferences its argument, so a null tref

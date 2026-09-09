@@ -329,10 +329,10 @@ TEST_SUITE("simplify_using_equality") {
 		// Order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
+			"yx|zx = 0",
 			"yx|xz = 0",
 			"xy|zx = 0",
 			"xy|xz = 0",
-			"yx|zx = 0",
 		}) );
 	}
 	TEST_CASE("2") {
@@ -368,6 +368,7 @@ TEST_SUITE("simplify_using_equality") {
 		// (8f1a74c1 did). Accept every orientation combination of the
 		// four kept atoms; the conjunct order itself is stable.
 		CHECK( matches_to_str_to_any_of(res, {
+			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
 			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && vw = 0 && wy = 0 && xv = 0",

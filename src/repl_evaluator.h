@@ -369,6 +369,10 @@ private:
 	/// @brief Print @p rep, if benchmarking is on.
 	void print_benchmarks(const report& rep) const;
 
+	/// @brief Structural equality of @p a and @p b ignoring type
+	/// annotations and resolved BA type ids.
+	bool equal_modulo_types(tref a, tref b) const;
+
 	std::vector<history> H;
 	options opt{};
 	// Held as htrefs, not raw trefs: interpreter::step() calls maybe_gc(),

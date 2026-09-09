@@ -1072,6 +1072,8 @@ term => (term _ '+' _ term) | (term _ '-' _ term) | (term _ '*' _ term)
       | (term _ '/' _ term) | (term _ '%' _ term) | (term _ "!&" _ term)
       | (term _ "!|" _ term) | (term _ "!^" _ term) | (term _ "<<" _ term)
       | (term _ ">>" _ term) | ("(" "bv" "[" bit_width "]" ")" _ term)
+      | ("min" _ "(" _ term _ "," _ term _ ")")
+      | ("max" _ "(" _ term _ "," _ term _ ")")
 ```
 
 where `term` is as above are as above and
@@ -1090,9 +1092,23 @@ the new operators meaning is given in the following table:
 | `<<`              | left shift of bitvector by a number of bits            |
 | `>>`              | right shift of bitvector by a number of bits           |
 | `(bv[n])`         | cast of a term to a bitvector of width `n`             |
+| `min(x, y)`       | unsigned minimum of two bitvectors                     |
+| `max(x, y)`       | unsigned maximum of two bitvectors                     |
 
-The last entry is a cast. It converts its operand to the bitvector type of the
-given width, for example:
+`min` and `max` are call-style builtins, defined only for bitvectors: using
+them on operands of any other Boolean algebra is a type-resolution error. Like
+the comparison operators they compare unsigned, so e.g.
+`max({200}:bv[8], {100}:bv[8])` is `{200}:bv[8]` even though 200 is negative
+as a signed 8-bit value. For satisfiability they are handed to CVC5 as
+`ite(bvule(x, y), ...)`; under predicate blasting (`-B`) they blast through a
+fresh result variable `r` constrained by
+`((x < y) -> r = x) && ((x >= y) -> r = y)` (the dual for `max`), with no
+constant-operand precondition. Being self-delimiting they take no part in
+operator precedence, and the names `min` and `max` are reserved: a user
+function of that name can no longer be called with exactly two arguments.
+
+The `(bv[n])` entry is a cast. It converts its operand to the bitvector type
+of the given width, for example:
 
 ```
 (bv[8]) x = { #x1f } : bv[8]
@@ -1101,6 +1117,107 @@ given width, for example:
 The cast operand must be a parenthesized term, a constant, a variable, a
 function call, `0`, `1`, a negation, a functional quantifier or another cast;
 wrap anything else in parentheses.
+
+### Division and remainder by zero
+
+Division and remainder are total functions with the SMT-LIB semantics of
+`bvudiv` and `bvurem` (as implemented by CVC5). Neither raises an error on a
+zero divisor; instead, for a bitvector `x` of width `w`:
+
+```
+x / 0  =  2^w - 1     (all-ones, the maximum value of bv[w])
+x % 0  =  x
+```
+
+In particular `x / 0` yields the *maximum* of the type — the least safe
+default for anything metering, pricing or otherwise accumulating — so never
+rely on it implicitly. When a divisor can be zero, guard it in the
+specification and pick the zero-case value explicitly:
+
+```
+always ( ( i2[t]:bv[24] != { #x000000 }:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] / i2[t]:bv[24] ) )
+      || ( i2[t]:bv[24] =  { #x000000 }:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+```
+
+Here `1200 / 3` gives `400` as usual, while a zero divisor gives `0` — the
+spec author's own choice — instead of the inherited `16777215`.
+
+### Overflow: checked and saturating arithmetic
+
+`+`, `-`, `*` and `<<` are modular, with the SMT-LIB semantics of `bvadd`,
+`bvsub`, `bvmul` and `bvshl`: results wrap around at the bit width silently —
+there is no error, no flag and no carry bit. A wrapped value looks like any
+other value, so a specification that must not wrap has to say so itself. Since
+Tau is a constraint language, the overflow condition is expressible with the
+ordinary operators, and a specification can branch on it. The patterns below
+are the recommended forms; all examples use `bv[24]`, whose maximum is
+`{ #xffffff }` (16777215), but nothing in them is width-specific.
+
+**Saturating addition.** Unsigned addition overflowed iff the sum is smaller
+than an operand:
+
+```
+always ( ( ( i1[t]:bv[24] + i2[t]:bv[24] ) >= i1[t]:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] + i2[t]:bv[24] ) )
+      || ( ( i1[t]:bv[24] + i2[t]:bv[24] ) <  i1[t]:bv[24] && o1[t]:bv[24] = { #xffffff }:bv[24] ) ).
+
+  16777115 + 100  ->  16777215   (exact sum, no clamp needed)
+  16777215 + 100  ->  16777215   (clamped instead of wrapping to 99)
+```
+
+**Checked multiplication by a constant.** The largest safe operand
+`floor((2^w - 1) / n)` is itself a constant, so the guard is a plain
+comparison — no arithmetic at all. For `n = 5` at width 24 the threshold is
+`{ #x333333 }`:
+
+```
+always ( ( i1[t]:bv[24] <= { #x333333 }:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] * { #x000005 }:bv[24] ) )
+      || ( i1[t]:bv[24] >  { #x333333 }:bv[24] && o1[t]:bv[24] = { #xffffff }:bv[24] ) ).
+
+  3355443  ->  16777215   (largest exact product)
+  3355444  ->  16777215   (clamped instead of wrapping to 4)
+```
+
+**Checked multiplication by a variable.** When the multiplier is itself a
+stream there is no precomputable threshold; the round-trip test
+`(a * b) / b = a` detects the wrap (guard the divisor per
+[Division and remainder by zero](#division-and-remainder-by-zero)):
+
+```
+always ( ( i2[t]:bv[24] != { #x000000 }:bv[24] && ( ( i1[t]:bv[24] * i2[t]:bv[24] ) / i2[t]:bv[24] ) =  i1[t]:bv[24]
+           && o1[t]:bv[24] = ( i1[t]:bv[24] * i2[t]:bv[24] ) )
+      || ( i2[t]:bv[24] != { #x000000 }:bv[24] && ( ( i1[t]:bv[24] * i2[t]:bv[24] ) / i2[t]:bv[24] ) != i1[t]:bv[24]
+           && o1[t]:bv[24] = { #xffffff }:bv[24] )
+      || ( i2[t]:bv[24] =  { #x000000 }:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+
+  4000000 * 5  ->  16777215   (detected; the raw product wraps)
+```
+
+**Saturating (monus) subtraction.** Underflow is an ordering comparison:
+
+```
+always ( ( i1[t]:bv[24] >= i2[t]:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] - i2[t]:bv[24] ) )
+      || ( i1[t]:bv[24] <  i2[t]:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+
+  100 - 1000  ->  0   (clamped instead of 16776316)
+```
+
+Getting the addition predicate subtly wrong is easy, so prefer copying these
+forms over re-deriving them.
+
+With the [`min`/`max` builtins](#bitvectors), the two saturating forms above
+collapse to single expressions — no branch at all. `i1'` is the bitwise
+complement, i.e. `2^w - 1 - i1`, so the addend below can never push the sum
+past the maximum:
+
+```
+always o1[t]:bv[24] = ( i1[t]:bv[24] + min(i2[t]:bv[24], i1[t]:bv[24]') ).   # saturating +
+always o1[t]:bv[24] = ( i1[t]:bv[24] - min(i1[t]:bv[24], i2[t]:bv[24]) ).    # saturating (monus) -
+```
+
+The checked-multiplication patterns keep their branches: the product itself
+wraps, so no post-hoc `min` can recover it.
+
+### Precedence of term operations
 
 The order of *all* term operations, bitvector and Boolean alike, is the
 following (from higher precedence to lower):
@@ -1988,7 +2105,10 @@ as explained in step 1 above.
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
 In particular, we require that `T` and `F` are reserved for truth values in Tau specifications
 and `0` and `1` stand for the corresponding Boolean
-algebra elements.
+algebra elements. The names `min` and `max` are reserved for the builtin
+bitvector operations (see [Bitvectors](#bitvectors)): a two-argument call
+`min(x, y)` or `max(x, y)` always denotes the builtin, never a user-defined
+function of the same name.
 
 # **Command line interface**
 
@@ -2339,10 +2459,31 @@ syntax for `<repl_memory>`:
 You can substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
-* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
+* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>, ...]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (this one being a memory position, well-formed formula or Boolean
-function).
+function). Several comma separated `match/replace` pairs may be given in one
+command; all pairs are applied simultaneously in a single pass over the input,
+so every match is found against the original expression and no pair's
+replacement is ever re-matched by another pair (`s x & y [x / y, y / x]` swaps
+`x` and `y`). Repeating the same match pattern in two pairs is an error.
+The result must remain well-typed: a replacement whose type conflicts with the
+matched context (e.g. `s x:sbf & y:sbf = 0 [x:sbf / z:bv[16]]`, or mismatched
+bitvector widths) is rejected at substitution time instead of storing an
+ill-typed expression. Untyped expressions carry the default type (`tau`) and
+an unannotated replacement adopts the matched context's type
+(`s x:sbf & y:sbf = 0 [x:sbf / z]` yields `zy = 0` with `z` typed `sbf`).
+A pair whose match pattern does not occur in the input is reported with a
+warning instead of silently leaving the input unchanged. An input that cannot
+be type-inferred at all (e.g. bitvector arithmetic without width annotations)
+is matched as parsed, so `s a + b = c [a / d]` substitutes `a` even though
+the expression carries no type information.
+Several bracket groups may follow the input: each group is applied to the
+result of the previous one, while the pairs inside a group stay simultaneous.
+So `s a | c [a / b] [b / d]` chains — the `b` introduced by the first group
+is rewritten to `d` by the second — whereas `s a | c [a / b, b / d]` yields
+`b | c`. The same match pattern may appear in different groups (that is what
+chaining is for); repeating it inside one group is still an error.
 
 * `instantiate|inst|i <repl_memory|tau> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position, well-formed formula or Boolean function in the given
@@ -2350,6 +2491,12 @@ well-formed or Boolean function expression.
 
 * `instantiate|inst|i <repl_memory|term> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position or Boolean function in the given expression.
+
+`instantiate` accepts the same multiple forms as `substitute`: several comma
+separated `var/value` pairs in one bracket are applied simultaneously
+(`i x & y [x / y, y / x]` swaps `x` and `y`), and several bracket groups
+compose sequentially. The match side of every pair must be a variable, and
+the same type safety and no-match reporting apply.
 
 ## **Logical procedures**
 

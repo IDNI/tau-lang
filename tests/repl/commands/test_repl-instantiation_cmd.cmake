@@ -37,3 +37,32 @@ add_repl_test(instantiation_cmd_wff10 "i (ex x x=0 && y=0) && x=0 [y/x]" ": \\(e
 
 # substituting for something that is not a variable is rejected
 add_repl_test_fail(instantiation_cmd-non_variable "x. i %1[1 / x]" "Invalid argument")
+
+# Multiple instantiation (issue #99, mirroring subst)
+#
+# Several comma separated variable/value pairs in one bracket are applied
+# SIMULTANEOUSLY; several bracket groups compose sequentially, each applied
+# to the previous group's result.
+
+# two pairs at once
+add_repl_test(instantiation_cmd_multi "i x & y [x / a, y / b]" ": ab")
+
+# simultaneity: a swap exchanges the variables instead of collapsing them
+add_repl_test(instantiation_cmd_multi_swap "i x & y [x / y, y / x]" ": yx")
+
+# wff input with two pairs
+add_repl_test(instantiation_cmd_multi_wff
+	"i x = 0 && y = 0 [x / 1, y / 0]" ": F")
+
+# groups chain: the b introduced by the first group is rewritten to d
+add_repl_test(instantiation_cmd_groups_chain "i a | c [a / b] [b / d]" ": d\\|c")
+
+# every pair's match side must be a variable, in any pair of any group
+add_repl_test_fail(instantiation_cmd_multi_non_variable
+	"i x | y [x / 1, x & y / 0]" "Invalid argument")
+add_repl_test_fail(instantiation_cmd_groups_non_variable
+	"i x | y [x / 1] [x & y / 0]" "Invalid argument")
+
+# a duplicate variable inside one group is an error
+add_repl_test_fail(instantiation_cmd_multi_dup
+	"i x | y [x / 1, x / 0]" "[Dd]uplicate")

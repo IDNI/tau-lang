@@ -33,12 +33,11 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
-	const htrefs* prior_type_defs)
-{
+	const std::vector<htref>* session_type_defs) {
 	using tau = tree<node>;
 	using tt = typename tau::traverser;
 
-	// 1. Collect every type_def: prior_type_defs (an earlier, separate
+	// 1. Collect every type_def: session_type_defs (an earlier, separate
 	// parse's declarations) first, then spec's own, both in declaration
 	// order, through one path -- a spec is parsed in parts, so whether two
 	// declarations for one name land in the same parse or in two separate
@@ -60,8 +59,8 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 			order.push_back(name_sid);
 		}
 	};
-	if (prior_type_defs)
-		for (const htref& h : *prior_type_defs) declare(h->get());
+	if (session_type_defs)
+		for (const htref& h : *session_type_defs) declare(h->get());
 	bool declares_locally = false;
 	for (tref td : tau::get(spec).select_all(is<node, tau::type_def>)) {
 		declares_locally = true;

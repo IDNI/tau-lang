@@ -157,7 +157,7 @@ bool tau_spec<node>::add(tref expr) {
 	case tau::type_def: {
 		// Recorded into this spec's own context (not defs_/spec_defs: a
 		// type_def carries no wff/bf content for infer_ba_types to see),
-		// so get_options()'s prior_type_defs hands it to adt_flatten on
+		// so get_options()'s session_type_defs hands it to adt_flatten on
 		// every later part() of this same spec.
 		//
 		// A later declaration replaces an earlier one of the same name
@@ -200,7 +200,7 @@ typename tree<node>::get_options tau_spec<node>::get_options() const {
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
 		.context = defs.get_io_context(),
-		.prior_type_defs = &type_defs_
+		.session_type_defs = &type_defs_
 	};
 }
 template <NodeType node>

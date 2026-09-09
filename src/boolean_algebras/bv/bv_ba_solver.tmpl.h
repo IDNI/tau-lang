@@ -277,6 +277,16 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
+		case tau::bf_min: {
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
+			return (l && r) ? std::optional<bv>(make_bitvector_min(l.value(), r.value())) : std::nullopt;
+		}
+		case tau::bf_max: {
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
+			return (l && r) ? std::optional<bv>(make_bitvector_max(l.value(), r.value())) : std::nullopt;
+		}
 		case tau::ba_constant: {
 			// is_bv_solvable_formula only inspects variable nodes, so a
 			// formula whose variables are all bitvectors but which also

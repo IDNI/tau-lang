@@ -460,14 +460,19 @@ struct api {
 	/// @copydoc substitute(const std::string&,const std::string&,const std::string&)
 	static result<htref> substitute(htref expression, htref that, htref with);
 
-	/// Apply multiple substitutions sequentially (left to right).
-	/// Each key in @p that_with is replaced by its corresponding value.
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static result<std::string> substitute(
 		const std::string& expression,
 		const std::map<std::string, std::string>& that_with);
-	/// @copydoc substitute(const std::string&,const std::map<std::string,std::string>&)
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static result<tref> substitute(tref expression, std::map<tref, tref> that_with);
-	/// @copydoc substitute(const std::string&,const std::map<std::string,std::string>&)
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static result<htref> substitute(
 		htref expression,
 		std::map<htref, htref> that_with);

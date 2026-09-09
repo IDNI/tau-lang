@@ -71,7 +71,7 @@ inline std::optional<rr<node_t>> get_nso_rr(const char* sample)
 {
 	// DBG(TAU_LOG_TRACE << "get_nso_rr: " << sample;)
 	tref spec = tau::get(sample);
-	assert(spec != nullptr);
+	if (!spec) return {};
 	return get_nso_rr<node_t>(spec);
 }
 
@@ -121,7 +121,7 @@ inline bool matches_to_any_of(const std::string& fm_str, const strings& expected
 		DBG(TAU_LOG_TRACE << "found in expected: " << fm_str;)
 		return true;
 	}
-	DBG(TAU_LOG_TRACE << "not found in expected: " << fm_str;)
+	TAU_LOG_ERROR << "not found in expected: " << fm_str;
 	return false;
 }
 
@@ -389,6 +389,18 @@ inline bool matches_bf_mod_and_or(tref result, const char* expected_bf) {
 inline bool matches_wff_mod_and_or(tref result, const char* expected_wff) {
 	tref expected = tau::get(expected_wff, parse_wff());
 	return expected && matches_tree_mod_and_or(result, expected);
+}
+
+// True if result matches any one of several structurally distinct expected
+// shapes, each up to AND/OR commutativity -- for a formula an algorithm may
+// legitimately return in more than one equivalent tree shape, only one of
+// which the hash order of a given build actually prints.
+inline bool matches_wff_mod_and_or_any_of(tref result,
+	const strings& expected_wffs)
+{
+	for (const auto& e : expected_wffs)
+		if (matches_wff_mod_and_or(result, e.c_str())) return true;
+	return false;
 }
 
 // Parses actual_wff (a printed result, e.g. an output stream value) with the

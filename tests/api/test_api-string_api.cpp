@@ -697,19 +697,23 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		REQUIRE(other.size() == 3);
 		CHECK(other[0] == "50");
 		// The free-region witness must be what a fresh process gives
-		// for this spec on its own. With content-hashed constants the
-		// `o9 = 7` clause sorts first, and being satisfiable for every
-		// input it is the path taken in the free region too. (Before the
-		// fix this sequence produced 7, 7, 7 while a fresh process gave
-		// 7, 0, 0 -- the report's split.)
+		// for this spec on its own. (Before the fix this sequence
+		// produced 7, 7, 7 while a fresh process gave 7, 0, 0 -- the
+		// report's split.)
 		auto witness = drive(spec7, in);
 		// The canonical free-region choice moves with every parser regen
 		// (nonterminal renumbering changes node hashes and so clause
-		// order). A fresh process gives 7, 7, 7 for spec7 and 50, 50, 50
-		// for spec50 on their own (verified by driving each alone), and
-		// so must these post-activity runs. Re-pin whenever the grammar
-		// is regenerated; the property under test is fresh ==
-		// post-activity, not the specific witness.
+		// order). Re-pinned after nonterminals started hashing by name: a
+		// fresh process gives 7, 7, 7 for spec7 and 50, 50, 50 for spec50
+		// on their own, and so must these post-activity runs -- each spec
+		// keeps its own constant throughout, so there is no cross-spec
+		// bleed regardless of which value the free region settles on.
+		// Re-pin whenever the grammar is regenerated; the property
+		// under test is fresh == post-activity, not the specific
+		// witness.
+		INFO("witness: " << witness[0] << "," << witness[1] << ","
+			<< witness[2] << " other: " << other[0] << ","
+			<< other[1] << "," << other[2]);
 		CHECK(witness == std::vector<std::string>({ "7", "7", "7" }));
 		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
 	}
