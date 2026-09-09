@@ -281,28 +281,35 @@ template<NodeType node>
 bool interpreter<node>::rebuild_inputs(
 	const subtree_map<node, size_t>& current_inputs)
 {
-	// A file-backed stream's read position is execution state: this
-	// rebuild runs not only at construction but after every accepted
-	// update (interpreter::update), and constructing a fresh
-	// file_input_stream reopens the file at its first line, re-feeding
-	// values the run has already consumed (a file-driven update stream
-	// then re-proposes its first update forever). Keep the previous
-	// stream object whenever the variable's backing file is unchanged
-	// (tracked in input_stream_sources). Remapped and console streams
-	// keep their own semantics: a remap's rebuild() already preserves
-	// whatever its owner shares, and console streams carry no position.
+	// Hand off the current maps as the previous state build_inputs may
+	// reuse streams from; restore them verbatim on failure so a rejected
+	// rebuild leaves the interpreter exactly as it was.
 	input_streams<node> previous_inputs = std::move(inputs);
 	subtree_map<node, size_t> previous_sources =
 					std::move(input_stream_sources);
 	inputs.clear();
 	input_stream_sources.clear();
-	return build_inputs(current_inputs, inputs);
+	input_streams<node> new_inputs;
+	subtree_map<node, size_t> new_sources;
+	if (!build_inputs(current_inputs, previous_inputs, previous_sources,
+		new_inputs, new_sources))
+	{
+		inputs = std::move(previous_inputs);
+		input_stream_sources = std::move(previous_sources);
+		return false;
+	}
+	inputs = std::move(new_inputs);
+	input_stream_sources = std::move(new_sources);
+	return true;
 }
 
 template<NodeType node>
 bool interpreter<node>::build_inputs(
 	const subtree_map<node, size_t>& current_inputs,
-	input_streams<node>& inputs)
+	const input_streams<node>& previous_inputs,
+	const subtree_map<node, size_t>& previous_sources,
+	input_streams<node>& out_inputs,
+	subtree_map<node, size_t>& out_sources) const
 {
 	// Reverse index from a flattened tuple member's own (canonized) io var
 	// to the adt_stream_layout root it belongs to (ctx.adt_streams, Task 7),
@@ -372,14 +379,14 @@ bool interpreter<node>::build_inputs(
 					std::shared_ptr<serialized_constant_input_stream>
 						old_physical;
 					for (auto& c : layout.components) {
-						auto ps = input_stream_sources.find(
+						auto ps = previous_sources.find(
 								c.io_var->get());
-						if (ps == input_stream_sources.end()
+						if (ps == previous_sources.end()
 							|| ps->second != layout.stream_id)
 								continue;
-						auto pv = this->inputs.find(
+						auto pv = previous_inputs.find(
 								c.io_var->get());
-						if (pv == this->inputs.end()) continue;
+						if (pv == previous_inputs.end()) continue;
 						if (auto m = std::dynamic_pointer_cast<
 							adt_member_input_stream<node>>(
 								pv->second))
@@ -413,39 +420,34 @@ bool interpreter<node>::build_inputs(
 			auto adapter = std::make_shared<adt_member_input_stream<node>>();
 			adapter->reader = reader_it->second;
 			adapter->path = comp->path;
-			inputs.emplace(var, std::move(adapter));
+			out_inputs.emplace(var, std::move(adapter));
 			if (layout.stream_id != 0 && !ctx.input_remaps.contains(
 					dict(root_sid)))
-				input_stream_sources[var] = layout.stream_id;
+				out_sources[var] = layout.stream_id;
 			continue;
 		}
 
 		if (auto it = ctx.input_remaps.find(vn); it != ctx.input_remaps.end()) {
-			inputs.emplace(var, std::move(it->second->rebuild()));
+			out_inputs.emplace(var, std::move(it->second->rebuild()));
 		} else {
-			if (stream_id == 0) inputs.emplace(var,
+			if (stream_id == 0) out_inputs.emplace(var,
 				ctx.console_input_factory
 					? ctx.console_input_factory(vn)
 					: std::make_shared<console_prompt_input_stream>(vn));
 			else {
-				// Continuity across update rebuilds (see
-				// rebuild_inputs' note): keep the previous stream
-				// object when this variable already read from the
-				// same file. Reads the member state directly -- it is
-				// still the live, not-yet-replaced previous state at
-				// this point for every caller (update()'s validate
-				// step hasn't committed yet; rebuild_inputs cleared it
-				// first, so there is correctly nothing to find here).
-				auto ps = input_stream_sources.find(var);
-				auto pv = this->inputs.find(var);
-				if (ps != input_stream_sources.end()
+				// Continuity across update rebuilds: keep the
+				// previous stream object when this variable already
+				// read from the same file, instead of reopening it.
+				auto ps = previous_sources.find(var);
+				auto pv = previous_inputs.find(var);
+				if (ps != previous_sources.end()
 					&& ps->second == stream_id
-					&& pv != this->inputs.end())
-					inputs.emplace(var, pv->second);
-				else inputs.emplace(var,
+					&& pv != previous_inputs.end())
+					out_inputs.emplace(var, pv->second);
+				else out_inputs.emplace(var,
 					std::make_shared<file_input_stream>(
 						dict(stream_id)));
-				input_stream_sources[var] = stream_id;
+				out_sources[var] = stream_id;
 			}
 		}
 	}
@@ -456,22 +458,35 @@ template<NodeType node>
 bool interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
 {
-	// Same continuity rule as rebuild_inputs: a fresh file_output_stream
-	// opens with truncation, so rebuilding after an accepted update used
-	// to wipe everything the run had already written. Keep the previous
-	// stream object when the variable's backing file is unchanged.
+	// Same handoff as rebuild_inputs: a fresh file_output_stream opens
+	// with truncation, so build_outputs is given the previous state to
+	// reuse from, and it is restored verbatim on failure.
 	output_streams<node> previous_outputs = std::move(outputs);
 	subtree_map<node, size_t> previous_sources =
 					std::move(output_stream_sources);
 	outputs.clear();
 	output_stream_sources.clear();
-	return build_outputs(current_outputs, outputs);
+	output_streams<node> new_outputs;
+	subtree_map<node, size_t> new_sources;
+	if (!build_outputs(current_outputs, previous_outputs, previous_sources,
+		new_outputs, new_sources))
+	{
+		outputs = std::move(previous_outputs);
+		output_stream_sources = std::move(previous_sources);
+		return false;
+	}
+	outputs = std::move(new_outputs);
+	output_stream_sources = std::move(new_sources);
+	return true;
 }
 
 template<NodeType node>
 bool interpreter<node>::build_outputs(
 	const subtree_map<node, size_t>& current_outputs,
-	output_streams<node>& outputs)
+	const output_streams<node>& previous_outputs,
+	const subtree_map<node, size_t>& previous_sources,
+	output_streams<node>& out_outputs,
+	subtree_map<node, size_t>& out_sources) const
 {
 	// Same grouping as build_inputs above, mirrored for the output side.
 	// Called both from rebuild_outputs (construction) and directly from
@@ -518,14 +533,14 @@ bool interpreter<node>::build_outputs(
 					std::shared_ptr<serialized_constant_output_stream>
 						old_physical;
 					for (auto& c : layout.components) {
-						auto ps = output_stream_sources.find(
+						auto ps = previous_sources.find(
 								c.io_var->get());
-						if (ps == output_stream_sources.end()
+						if (ps == previous_sources.end()
 							|| ps->second != layout.stream_id)
 								continue;
-						auto pv = this->outputs.find(
+						auto pv = previous_outputs.find(
 								c.io_var->get());
-						if (pv == this->outputs.end()) continue;
+						if (pv == previous_outputs.end()) continue;
 						if (auto m = std::dynamic_pointer_cast<
 							adt_member_output_stream<node>>(
 								pv->second))
@@ -552,34 +567,32 @@ bool interpreter<node>::build_outputs(
 			auto adapter = std::make_shared<adt_member_output_stream<node>>();
 			adapter->writer = writer_it->second;
 			adapter->path = comp->path;
-			outputs.emplace(var, std::move(adapter));
+			out_outputs.emplace(var, std::move(adapter));
 			if (layout.stream_id != 0 && !ctx.output_remaps.contains(
 					dict(root_sid)))
-				output_stream_sources[var] = layout.stream_id;
+				out_sources[var] = layout.stream_id;
 			continue;
 		}
 
 		if (auto it = ctx.output_remaps.find(vn); it != ctx.output_remaps.end())
-			outputs.emplace(var, std::move(it->second->rebuild()));
+			out_outputs.emplace(var, std::move(it->second->rebuild()));
 		else {
-			if (stream_id == 0) outputs.emplace(var,
+			if (stream_id == 0) out_outputs.emplace(var,
 				std::make_shared<console_prompt_output_stream>(vn));
 			else {
-				// Continuity across update rebuilds (see
-				// build_inputs' plain-file branch): reads the
-				// member state directly, still the live,
-				// not-yet-replaced previous state at this point
-				// for every caller.
-				auto ps = output_stream_sources.find(var);
-				auto pv = this->outputs.find(var);
-				if (ps != output_stream_sources.end()
+				// Continuity across update rebuilds: keep the
+				// previous stream object when this variable already
+				// wrote to the same file, instead of truncating it.
+				auto ps = previous_sources.find(var);
+				auto pv = previous_outputs.find(var);
+				if (ps != previous_sources.end()
 					&& ps->second == stream_id
-					&& pv != this->outputs.end())
-					outputs.emplace(var, pv->second);
-				else outputs.emplace(var,
+					&& pv != previous_outputs.end())
+					out_outputs.emplace(var, pv->second);
+				else out_outputs.emplace(var,
 					std::make_shared<file_output_stream>(
 						dict(stream_id)));
-				output_stream_sources[var] = stream_id;
+				out_sources[var] = stream_id;
 			}
 		}
 	}
@@ -2393,17 +2406,26 @@ std::optional<typename interpreter<node>::update_plan>
 			continue;
 		}
 
-		// PW-4 (B1): open the revised streams into locals BEFORE
-		// anything is committed -- a failure here used to leave the
-		// interpreter half-updated (new spec, cleared stream maps).
+		// Open the revised streams into locals BEFORE anything is
+		// committed, reading this->inputs/input_stream_sources only
+		// as the previous state to reuse from -- a candidate clause
+		// rejected below leaves the interpreter untouched.
 		output_streams<node> new_outputs;
 		input_streams<node>  new_inputs;
-		if (!build_outputs(out_stream_ids, new_outputs)) {
+		subtree_map<node, size_t> new_output_sources;
+		subtree_map<node, size_t> new_input_sources;
+		if (!build_outputs(out_stream_ids, this->outputs,
+			this->output_stream_sources, new_outputs,
+			new_output_sources))
+		{
 			LOG_WARNING << "No update performed: output stream "
 				"rebuild failed for the revised specification\n";
 			continue;
 		}
-		if (!build_inputs(in_stream_ids, new_inputs)) {
+		if (!build_inputs(in_stream_ids, this->inputs,
+			this->input_stream_sources, new_inputs,
+			new_input_sources))
+		{
 			LOG_WARNING << "No update performed: input stream "
 				"rebuild failed for the revised specification\n";
 			continue;
@@ -2413,6 +2435,7 @@ std::optional<typename interpreter<node>::update_plan>
 		return update_plan(std::move(current_ubd_ctn),
 			std::move(current_spec), std::move(uf),
 			std::move(new_inputs), std::move(new_outputs),
+			std::move(new_input_sources), std::move(new_output_sources),
 			TAU_TO_STR(updated_spec));
 	}
 	// No more clause left in update and all clauses are not realizable
@@ -2442,6 +2465,8 @@ bool interpreter<node>::update(tref update) {
 	output_partition = std::move(plan->partition);
 	outputs = std::move(plan->outputs);
 	inputs = std::move(plan->inputs);
+	output_stream_sources = std::move(plan->output_sources);
+	input_stream_sources = std::move(plan->input_sources);
 	// The systems for solver need to be recomputed at beginning of next step
 	final_system = false;
 	chosen_alt_.clear();
@@ -2455,9 +2480,9 @@ bool interpreter<node>::update(tref update) {
 
 template <NodeType node>
 bool interpreter<node>::can_extend(tref psi) {
-	// Dry-run update(): plan_update computes everything update() would
-	// commit without mutating the interpreter, so the two agree by
-	// construction (PW-N9 / IN-M7).
+	// Dry-run update(): plan_update leaves the interpreter unchanged by
+	// construction (its build_inputs/build_outputs calls write only into
+	// the returned plan), so the two agree without a separate guard here.
 	if (psi == nullptr) return true;
 	return plan_update(psi).has_value();
 }

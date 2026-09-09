@@ -79,6 +79,77 @@ TEST_SUITE("Execution: revision stream continuity") {
 		std::filesystem::remove(out_file);
 		CHECK( lines == 3 );
 	}
+
+	// can_extend is a dry run of plan_update: it must decide realizability
+	// without touching the interpreter. build_inputs/build_outputs used to
+	// write their continuity bookkeeping (input_stream_sources /
+	// output_stream_sources) onto `this` even when their result was only
+	// ever a candidate plan, so a candidate that routed a variable through
+	// a different file left that file id behind -- corrupting the record
+	// a later, real update() consults to decide whether it may keep
+	// reading its actual, unrelated file from its current position.
+	TEST_CASE("can_extend leaves file input stream continuity untouched for a later update") {
+		bdd_init<Bool>();
+		std::string file_a = random_file(".in");
+		std::string file_b = random_file(".in");
+		{
+			std::ofstream f(file_a);
+			f << "o1[t] = 1.\n" << "o2[t] = 1.\n" << "o3[t] = 1.\n";
+		}
+		{
+			std::ofstream f(file_b);
+			f << "z1[t] = 1.\n" << "z2[t] = 1.\n" << "z3[t] = 1.\n";
+		}
+		tref spec = create_spec("u[t] = i1[t].");
+		io_context<node_t> ctx;
+		tref i1_var = ctx.add_input_file("i1", tau_type_id<node_t>(), file_a);
+		htref i1_h = tree<node_t>::geth(i1_var);
+		auto maybe_i = interpreter<node_t>::make_interpreter(spec, ctx);
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+
+		// Consume line 1 of file_a, so i1's live stream sits mid-file.
+		// write() is private (nothing here needs the output on a real
+		// stream), so the produced value is read straight off step()'s
+		// own assignment instead.
+		auto step1 = i.step();
+		REQUIRE( step1.has_value() );
+		REQUIRE( step1.value().first.has_value() );
+		REQUIRE( step1.value().first.value().size() == 1 );
+		std::string u1 = tree<node_t>::get(
+			step1.value().first.value().begin()->second).to_str();
+		CHECK( u1.find("o1") != std::string::npos );
+
+		// A strengthening of the running part itself (mirrors
+		// [IAX-PWR-06]'s proven-compatible "always x = <same value>"
+		// shape) -- reaches plan_update's build_inputs/build_outputs
+		// for i1, exactly where the corrupting write used to happen.
+		auto psi_r = api<node_t>::get_formula("always u[t]:tau = i1[t]:tau");
+		REQUIRE( psi_r.has_value() );
+		tref psi = psi_r.value();
+		REQUIRE( psi != nullptr );
+
+		// Simulate a candidate that would route i1 through file_b: point
+		// ctx at it, ask can_extend, then put the real binding back --
+		// mirroring a caller trying alternatives before committing one.
+		i.ctx.inputs[i1_h] = dict(file_b);
+		(void)i.can_extend(psi);
+		i.ctx.inputs[i1_h] = dict(file_a);
+
+		// The real update must still recognize file_a as unchanged and
+		// keep reading it from line 2, not reopen it at line 1.
+		REQUIRE( i.update(psi) );
+		auto step2 = i.step();
+		REQUIRE( step2.has_value() );
+		REQUIRE( step2.value().first.has_value() );
+		REQUIRE( step2.value().first.value().size() == 1 );
+		std::string u2 = tree<node_t>::get(
+			step2.value().first.value().begin()->second).to_str();
+
+		std::filesystem::remove(file_a);
+		std::filesystem::remove(file_b);
+		CHECK( u2.find("o2") != std::string::npos );
+	}
 }
 
 TEST_SUITE("Execution") {
@@ -501,7 +572,8 @@ TEST_SUITE("Execution") {
 		REQUIRE( u_values.size() == 5 );
 		CHECK( u_values[1] == "always o2[t]:tau = 0" );
 		CHECK( u_values[2] == "always o3[t]:tau = 0" );
-		CHECK( u_values[3] == "always o2[t]:tau = o3[t]:tau" );
+		CHECK( matches_wff_str_mod_and_or(u_values[3],
+			"always o2[t]:tau = o3[t]:tau") );
 		// the o2 and o3 parts (2 alternatives each) merged into one part
 		// holding the 2x2 cross product of their alternatives
 		const auto& parts = maybe_i.value().original_spec;

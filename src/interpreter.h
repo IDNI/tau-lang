@@ -571,13 +571,15 @@ private:
 	void seed_aux_lookback_bits(const std::map<std::string, int>& bits);
 
 	/// @brief Everything update() needs to commit, computed without
-	/// mutating the interpreter (PW-4 / PW-N9 / IN-M7).
+	/// mutating the interpreter.
 	struct update_plan {
 		std::vector<htrefs> ubt_ctn;
 		std::vector<std::pair<htrefs, htref>> spec;
 		union_find_with_sets<decltype(stream_comp), node> partition;
 		input_streams<node>  inputs;
 		output_streams<node> outputs;
+		subtree_map<node, size_t> input_sources;
+		subtree_map<node, size_t> output_sources;
 		std::string spec_str;
 		// The union-find's move constructor is explicit, so the members
 		// are direct-initialized here rather than brace-aggregated.
@@ -585,10 +587,13 @@ private:
 			std::vector<std::pair<htrefs, htref>>&& s,
 			union_find_with_sets<decltype(stream_comp), node>&& p,
 			input_streams<node>&& i, output_streams<node>&& o,
+			subtree_map<node, size_t>&& is,
+			subtree_map<node, size_t>&& os,
 			std::string&& str)
 			: ubt_ctn(std::move(c)), spec(std::move(s)),
 			  partition(std::move(p)), inputs(std::move(i)),
-			  outputs(std::move(o)), spec_str(std::move(str)) {}
+			  outputs(std::move(o)), input_sources(std::move(is)),
+			  output_sources(std::move(os)), spec_str(std::move(str)) {}
 	};
 	/// @brief Dry-run the pointwise revision of the running spec by
 	/// @p update: the first update clause that yields an entirely
@@ -638,13 +643,23 @@ private:
 	/// @brief Rebuild the output stream map from @p current_outputs.
 	/// @return false if a stream could not be found (interpretation should stop).
 	bool rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
-	/// @brief Build the input stream map for @p current_inputs into @p dst
-	/// (the member map is untouched) -- update() validates before it swaps.
+	/// @brief Build the input stream map for @p current_inputs into
+	/// @p out_inputs/@p out_sources, reusing a stream from
+	/// @p previous_inputs when @p previous_sources says the same file
+	/// backs the variable. Touches no member state -- callers (including
+	/// a dry run such as can_extend) decide whether to keep the result.
 	bool build_inputs(const subtree_map<node, size_t>& current_inputs,
-		input_streams<node>& dst);
-	/// @brief Build the output stream map for @p current_outputs into @p dst.
+		const input_streams<node>& previous_inputs,
+		const subtree_map<node, size_t>& previous_sources,
+		input_streams<node>& out_inputs,
+		subtree_map<node, size_t>& out_sources) const;
+	/// @brief Build the output stream map for @p current_outputs; see
+	/// build_inputs for the continuity/side-effect contract.
 	bool build_outputs(const subtree_map<node, size_t>& current_outputs,
-		output_streams<node>& dst);
+		const output_streams<node>& previous_outputs,
+		const subtree_map<node, size_t>& previous_sources,
+		output_streams<node>& out_outputs,
+		subtree_map<node, size_t>& out_sources) const;
 
 	/// @brief Collect all input stream variables from @p dnf into @p current_inputs.
 	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);
