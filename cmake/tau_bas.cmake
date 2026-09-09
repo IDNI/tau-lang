@@ -104,6 +104,14 @@ function(tau_resolve_ba_pack)
 
 	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
 	string(REPLACE "," ";" _ba_ids "${_bas_nospace}")
+	# a repeated id would reach node<...> as a duplicate variant alternative
+	# and fail inside std::variant instead of here
+	set(_ba_ids_unique ${_ba_ids})
+	list(REMOVE_DUPLICATES _ba_ids_unique)
+	if(NOT "${_ba_ids_unique}" STREQUAL "${_ba_ids}")
+		message(FATAL_ERROR
+			"TAU_BAS names a BA more than once: ${TAU_BAS}")
+	endif()
 
 	set(_headers "")
 	set(_sources_extra "")
