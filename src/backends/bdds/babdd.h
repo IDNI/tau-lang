@@ -15,6 +15,7 @@
 #include <functional>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 #include "backends/bdds/var_dict.h"
 #include "boolean_algebras/bool_ba.h"
@@ -532,6 +533,17 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static bdd_ref add(const bdd_node_t& n) { return add(n.v, n.h, n.l); }
 
+	// idW-bit ids can address at most 2^idW nodes; past that, interning a
+	// new node would alias it to an existing id. Report once and fail to
+	// F rather than silently corrupting the universe.
+	static bdd_ref universe_full() {
+		static bool warned = false;
+		if (!warned) warned = true, std::cerr <<
+			"bdd: universe full (idW=" << +o.idW << "), "
+			"further nodes alias to F\n";
+		return F;
+	}
+
 	// Canonicalizing node constructor ("mk"): returns the unique
 	// reference denoting (v ? h : l). Collapses h == l; with input
 	// inverters orders the children by id, recording a swap in the
@@ -540,8 +552,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// into the reference's out bit -- so a function and its
 	// complement share one stored node.
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
+		if (V.size() >= (size_t{1} << o.idW)) return universe_full();
 #ifdef DEBUG
-		assert(V.size() < pow(2, o.idW));
 		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
@@ -598,7 +610,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// true map to F and T, and with output inverters an already
 	// interned ~b is reused via the out bit
 	static bdd_ref add(const B& b) {
-		DBG(assert(V.size() < pow(2, o.idW)));
+		if (V.size() >= (size_t{1} << o.idW)) return universe_full();
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return bdd_ref(0,0,it->second);
@@ -1188,9 +1200,20 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref add(bdd_node_t b) { return add(b.v, b.h, b.l); }
 
+	// idW-bit ids can address at most 2^idW nodes; past that, interning a
+	// new node would alias it to an existing id. Report once and fail to
+	// F rather than silently corrupting the universe.
+	static bdd_ref universe_full() {
+		static bool warned = false;
+		if (!warned) warned = true, std::cerr <<
+			"bdd: universe full (idW=" << +o.idW << "), "
+			"further nodes alias to F\n";
+		return F;
+	}
+
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
+		if (V.size() >= (size_t{1} << o.idW)) return universe_full();
 #ifdef DEBUG
-		assert(V.size() < pow(2, o.idW));
 		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
