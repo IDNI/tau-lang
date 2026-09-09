@@ -865,7 +865,9 @@ TEST_SUITE("BDD ex/all quantification") {
 		hbdd xy = hbdd::build(tau::get("xy", opts), o);
 		tref n = hbdd::convert_to_tau_node(xy, 0);
 		REQUIRE( n != nullptr );
-		CHECK((hbdd::convert_to_handle(n) == xy));
+		auto found = hbdd::convert_to_handle(n);
+		REQUIRE( found.has_value() );
+		CHECK((*found == xy));
 	}
 
 	TEST_CASE("handle bdd_ite/bdd_and_many/bdd_or_many mirror tbdd semantics") {

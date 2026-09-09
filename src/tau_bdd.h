@@ -13,6 +13,8 @@
 #ifndef TAU_TAU_BDD_H
 #define TAU_TAU_BDD_H
 
+#include <optional>
+
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -339,8 +341,9 @@ struct tau_term_bdd_handle {
 	/** @brief Build a Tau node from @p term using @p o; registers the mapping
 	 * in @p U (see the handle overload -- no deduplication). */
 	static tref convert_to_tau_node(tref term, const order& o);
-	/** @brief Retrieve the BDD handle for an existing Tau BDD node @p tau_node. */
-	static term_handle convert_to_handle(tref tau_node);
+	/** @brief Retrieve the BDD handle for an existing Tau BDD node @p tau_node,
+	 * or nullopt if @p tau_node has no entry in @p U. */
+	static std::optional<term_handle> convert_to_handle(tref tau_node);
 	/** @brief Convert this handle to a Tau term of type @p term_type. */
 	tref to_tau_term(size_t term_type) const;
 
