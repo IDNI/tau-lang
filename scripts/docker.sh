@@ -5,7 +5,7 @@ PROGRESS="auto" # "auto" or "plain"
 
 build() {
         echo "Building: '${@}'"
-        docker build --progress=${PROGRESS} "$@" .
+        docker buildx build --progress=${PROGRESS} "$@" .
 }
 
 run() {
