@@ -1095,8 +1095,8 @@ inline bool solve_algorithm_d(
 struct alg_d_result {
 	bool realizable = false;
 	std::set<int> winning_region;     // W1 state indices in product game
-	product_game product_game;
-	synth_game synth_game;
+	struct product_game product_game;
+	struct synth_game synth_game;
 	int T1_size = 0;
 	int K = 0;                        // number of D propositions
 	// The FIXED initial memory type (LG-12 convention (F), equal to the
