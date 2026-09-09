@@ -127,6 +127,11 @@ inline size_t hsb_halfspace_pool::insert(const hsb_halfspace& h) {
 }
 
 inline const hsb_halfspace& hsb_halfspace_pool::get(size_t idx) {
+	static const hsb_halfspace empty{};
+	if (idx >= pool_.size()) {
+		DBG(assert(false));
+		return empty;
+	}
 	return pool_[idx];
 }
 
@@ -198,6 +203,7 @@ inline hsb::kind hsb::root_kind() const noexcept {
 }
 
 inline const hsb_halfspace& hsb::root_halfspace() const {
+	DBG(assert(root_kind() == kind::halfspace));
 	return hsb_halfspace_pool::get(hsb_tree::get(root_ref()).value.data);
 }
 
