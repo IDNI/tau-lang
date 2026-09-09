@@ -2,7 +2,7 @@ name: Ubuntu CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, 'feature/**', 'issue/**']
   pull_request:
     branches: [main, master, develop]
   workflow_dispatch:
@@ -11,6 +11,13 @@ jobs:
   build-and-test:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+
+    # the default pack, and the pack without bv: the only configuration
+    # that exercises a capability fold's empty case
+    strategy:
+      fail-fast: false
+      matrix:
+        pack: ["", "sbf,tau,qint"]
 
     env:
       CC: gcc-13
@@ -41,7 +48,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: ccache-ubuntu-24.04-gcc13
+          key: ccache-ubuntu-24.04-gcc13-${{ matrix.pack }}
           max-size: 200M
 
       # ── cvc5 (prebuilt binary — no more building from source) ───────────────
@@ -88,7 +95,10 @@ jobs:
             -DTAU_BUILD_API_TESTS=ON \
             -DTAU_BUILD_REPL_TESTS=ON \
             -DCVC5_DIR="${CVC5_DIR}" \
+            ${TAU_BAS_ARG} \
             -G Ninja
+        env:
+          TAU_BAS_ARG: ${{ matrix.pack != '' && format('-DTAU_BAS={0}', matrix.pack) || '' }}
 
       - name: Build all targets
         run: cmake --build build-ci -j$(nproc)
