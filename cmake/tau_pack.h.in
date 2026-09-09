@@ -51,6 +51,10 @@ namespace idni::tau_lang::tau_pack {
 /** @brief Node type of the configured pack. */
 using node_t = node<@TAU_PACK_NODE_ARGS@>;
 
+// Every BA of the pack must satisfy ba_descriptor_complete; a missing
+// member is reported here, with the BA and the line of ba_descriptor.h
+// naming the requirement.
+@TAU_PACK_DESCRIPTOR_ASSERTS@
 /** @brief Whether the tau wrapper BA is part of the configured pack. */
 inline constexpr bool has_tau_ba = @TAU_PACK_HAS_TAU_CPP@;
 

@@ -219,6 +219,21 @@ function(tau_resolve_ba_pack)
 	set(TAU_BA_TESTS_RESOLVED "${_ba_tests}" PARENT_SCOPE)
 	set(TAU_BA_LINK_LIBS "${_link_libs}" PARENT_SCOPE)
 	set(TAU_BA_REQUIRED_PACKAGES "${_required_packages}" PARENT_SCOPE)
+	# one static_assert per BA of the pack: a concept-id in a static_assert
+	# makes the compiler name the requirement a descriptor fails, which a
+	# fold into one bool cannot
+	set(_descriptor_asserts "")
+	foreach(_t ${_base_types})
+		string(APPEND _descriptor_asserts
+			"static_assert(ba_descriptor_complete<${_t}, node_t>,\n"
+			"\t\"${_t}: incomplete descriptor\");\n")
+	endforeach()
+	if(_has_tau)
+		string(APPEND _descriptor_asserts
+			"static_assert(ba_descriptor_complete<tau_ba<${_base_types_str}>, node_t>,\n"
+			"\t\"tau_ba: incomplete descriptor\");\n")
+	endif()
+	set(TAU_PACK_DESCRIPTOR_ASSERTS "${_descriptor_asserts}" PARENT_SCOPE)
 	set(TAU_PACK_NODE_ARGS "${_node_args}" PARENT_SCOPE)
 	set(TAU_PACK_HAS_TAU "${_has_tau}" PARENT_SCOPE)
 	set(TAU_PACK_BASE_BAS "${_base_types_str}" PARENT_SCOPE)
