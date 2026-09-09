@@ -9,7 +9,16 @@ endif ()
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	target_compile_options(doctest INTERFACE -Wno-c2y-extensions "-Wno-#warnings")
+	# -Wno-c2y-extensions only exists in newer clang. Probe the positive form:
+	# clang accepts an unknown -Wno-* silently, so -Wno- cannot be probed.
+	include(CheckCXXCompilerFlag)
+	set(CMAKE_REQUIRED_FLAGS "-Werror")
+	check_cxx_compiler_flag("-Wc2y-extensions" TAU_HAVE_WC2Y_EXTENSIONS)
+	unset(CMAKE_REQUIRED_FLAGS)
+	if(TAU_HAVE_WC2Y_EXTENSIONS)
+		target_compile_options(doctest INTERFACE -Wno-c2y-extensions)
+	endif()
+	target_compile_options(doctest INTERFACE "-Wno-#warnings")
 endif()
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
