@@ -1,0 +1,15 @@
+#!/bin/sh
+# Run a command with git authenticated to github.com when a gh_token secret
+# is mounted; without it clones stay anonymous. The token stays in this
+# process's environment, so it never reaches a gitconfig or an image layer.
+#
+# No .sh extension: only scripts/*.sh are ./dev subcommands.
+
+if [ -s /run/secrets/gh_token ]; then
+	GIT_CONFIG_COUNT=1
+	GIT_CONFIG_KEY_0="url.https://x-access-token:$(cat /run/secrets/gh_token)@github.com/.insteadOf"
+	GIT_CONFIG_VALUE_0="https://github.com/"
+	export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+fi
+
+exec "$@"

@@ -71,10 +71,10 @@ case "${CMD}" in
                 build --target deps -t tau:deps "${@:2}"
                 ;;
         "build-debug")
-                build --target build --build-arg BUILD_TYPE="Debug" -t tau:debug "${@:2}"
+                build --target build --build-arg BUILD_PRESET="debug" -t tau:debug "${@:2}"
                 ;;
         "build-release")
-                build --target build --build-arg BUILD_TYPE="Release" -t tau:build "${@:2}"
+                build --target build --build-arg BUILD_PRESET="release" -t tau:build "${@:2}"
                 ;;
         "packages")
                 build --target packages -t tau:packages "${@:2}" && \
