@@ -240,9 +240,11 @@ TEST_SUITE("bv term_mod: top and bottom element operands") {
 		CHECK(bf("1:bv[8] % 1:bv[8]") == bf("0:bv[8]"));
 	}
 
-	// Note: this arm builds the bitvector *value* 1, not the top element.
-	TEST_CASE("1 % 0 is the value one") {
-		CHECK(bf("1:bv[8] % 0:bv[8]") == bf("{1}:bv[8]"));
+	// bvurem(x, 0) = x, and 1:bv[8] is the top element (255), so the result
+	// is the top element again -- not the bitvector value 1.
+	TEST_CASE("1 % 0 is the top element") {
+		CHECK(bf("1:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
+		CHECK(bf("{255}:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
 	}
 
 	TEST_CASE("X % 1") {                       // 10 % 255 = 10
@@ -455,5 +457,48 @@ TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Symbolic division operands: the folds must respect bvudiv(0, 0) = all ones.
+// `x / x` is 1 and `0 / x` is 0 only when x != 0; for x = 0 both are the top
+// element, so neither may be folded while x is symbolic. The equalities are
+// decided through the full sat pipeline so a fold that pre-empts cvc5 shows
+// up as a wrong answer. Formulas are parsed with wff() first: the string
+// overloads of api::sat/valid go through get_spec_or_term (specification
+// first, then term), and in Debug valid() on the quantified formulas below
+// aborted in build_wff_neg during normalization through that path, while
+// the same text through the REPL answers correctly.
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
+
+	TEST_CASE("x / x is the top element at x = 0") {
+		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])")));
+		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])")));
+	}
+
+	TEST_CASE("x / x is one for x != 0") {
+		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])")));
+	}
+
+	TEST_CASE("0 / x is the top element at x = 0") {
+		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {255}:bv[8])")));
+		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {0}:bv[8])")));
+	}
+
+	TEST_CASE("0 / x is zero for x != 0") {
+		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> {0}:bv[8] / x = {0}:bv[8])")));
+	}
+
+	TEST_CASE("0 / constant still folds") {
+		CHECK(bf("0:bv[8] / {7}:bv[8]") == bf("0:bv[8]"));
+		CHECK(bf("0:bv[8] / {0}:bv[8]") == bf("1:bv[8]"));
+	}
+
+	TEST_CASE("top element % 0 is the top element through sat") {
+		CHECK(tau_api::sat(wff("{255}:bv[8] % 0 = {255}:bv[8]")));
+		CHECK(!tau_api::sat(wff("{255}:bv[8] % 0 = {1}:bv[8]")));
 	}
 }
