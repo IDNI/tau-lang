@@ -75,6 +75,15 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 					nt = bf_and; break;
 				case io_var_name:
 					nt = var_name; break;
+				// type_ref is the open counterpart of type, used
+				// only in annotation positions; it must never
+				// reach the tree, so it collapses onto type here.
+				case type_ref:
+					nt = tau_parser::type; break;
+				// type_ref_name is the open counterpart of
+				// type_name, used for a parent in type_parents.
+				case type_ref_name:
+					nt = tau_parser::type_name; break;
 				default: break;
 			}
 			return static_cast<type>(nt);
@@ -206,9 +215,10 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				break;
 
 			case tau_parser::type: {
-				// type_name (a string leaf) converts first; reuse
-				// its interned data and keep subtype as a child,
-				// rather than interning the whole span as one string.
+				// type_name/type_ref_name (a string leaf) converts
+				// first; reuse its interned data and keep subtype as
+				// a child, rather than interning the whole span as
+				// one string.
 				trefs ch;
 				for (tref c : ptr.children()) ch.push_back(c);
 				size_t name_data = m_get(ch[0]).data();
@@ -322,6 +332,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 		transformed = m_ref(ptr.get());
 
+		if (options.flatten_adts) {
+			transformed = adt_flatten<node>(transformed, options.context,
+				options.prior_type_defs);
+			if (!transformed) return nullptr;
+		}
+
 		if (options.infer_ba_types) {
 			auto result = infer_ba_types<node>(transformed,
 				options.global_scope, options.definition_heads,
@@ -412,13 +428,20 @@ tref tree<node>::get(tau_parser::result& result, get_options&& options) {
 template<NodeType node>
 tref tree<node>::get(const std::string& str) {
 	get_options opts;
+	// The (const std::string&, get_options&) overload below falls back to a
+	// local container when opts.parse.dynamic_ctx is null, same as here.
 	return get(str, opts);
 }
 
 template <NodeType node>
 tref tree<node>::get(const std::string& source, get_options& options) {
+	// A parse with no caller-owned context still needs one, so a name a
+	// type_def declares can be used later in this same parse.
+	tau_dynamic_context fallback_names;
+	auto parse = options.parse;
+	if (!parse.dynamic_ctx) parse.dynamic_ctx = &fallback_names;
 	auto result = tau_parser::instance()
-		.parse(source.c_str(), source.size(), options.parse);
+		.parse(source.c_str(), source.size(), parse);
 	return tree<node>::get(result, options);
 }
 
@@ -429,7 +452,11 @@ tref tree<node>::get(const std::string& source, get_options&& options) {
 
 template <NodeType node>
 tref tree<node>::get(std::istream& is, get_options& options) {
-	auto result = tau_parser::instance().parse(is, options.parse);
+	// See the (const std::string&, get_options&) overload's own comment.
+	tau_dynamic_context fallback_names;
+	auto parse = options.parse;
+	if (!parse.dynamic_ctx) parse.dynamic_ctx = &fallback_names;
+	auto result = tau_parser::instance().parse(is, parse);
 	return tree<node>::get(result, options);
 }
 
@@ -442,7 +469,11 @@ template <NodeType node>
 tref tree<node>::get_from_file(const std::string& filename,
 	get_options& options)
 {
-	auto result = tau_parser::instance().parse(filename, options.parse);
+	// See the (const std::string&, get_options&) overload's own comment.
+	tau_dynamic_context fallback_names;
+	auto parse = options.parse;
+	if (!parse.dynamic_ctx) parse.dynamic_ctx = &fallback_names;
+	auto result = tau_parser::instance().parse(filename, parse);
 	return tree<node>::get(result, options);
 }
 

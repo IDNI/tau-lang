@@ -391,6 +391,16 @@ inline bool matches_wff_mod_and_or(tref result, const char* expected_wff) {
 	return expected && matches_tree_mod_and_or(result, expected);
 }
 
+// Parses actual_wff (a printed result, e.g. an output stream value) with the
+// wff grammar and compares against expected_wff under matches_wff_mod_and_or.
+// False if actual_wff fails to parse.
+inline bool matches_wff_str_mod_and_or(const std::string& actual_wff,
+	const char* expected_wff)
+{
+	tref actual = tau::get(actual_wff.c_str(), parse_wff());
+	return actual && matches_wff_mod_and_or(actual, expected_wff);
+}
+
 inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;

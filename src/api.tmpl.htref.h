@@ -10,8 +10,8 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
-/// Convert a subtree_map<node,tref> to a map<htref,htref> by wrapping
-/// every key and value with tree<node>::geth() for GC safety.
+// Lifts a tref->tref map (e.g. a solver solution) into owning htref
+// handles so results survive independently of the caches.
 template <NodeType node>
 std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 	std::map<htref, htref> hm;

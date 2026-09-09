@@ -697,3 +697,24 @@ TEST_SUITE("regression/oversized numeric literals") {
 		CHECK( tau::get(sample) != nullptr );
 	}
 }
+
+TEST_SUITE("regression/get_options reused across calls") {
+
+	// tree<node>::get(const std::string&, get_options&) pointed
+	// options.parse.dynamic_ctx at a function-local fallback container
+	// without resetting it before returning. A caller reusing one
+	// get_options lvalue for a second call then read a dangling pointer
+	// and segfaulted instead of taking the null-dynamic_ctx fallback path
+	// again.
+	TEST_CASE("one shared get_options lvalue survives two calls") {
+		tau::get_options opts = {
+			.parse = { .start = tau::wff },
+			.infer_ba_types = false, .reget_with_hooks = false
+		};
+		tref a = tau::get("T", opts);
+		tref b = tau::get("F", opts);
+		CHECK( a != nullptr );
+		CHECK( b != nullptr );
+		CHECK( opts.parse.dynamic_ctx == nullptr );
+	}
+}

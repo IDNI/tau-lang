@@ -16,6 +16,9 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+// True iff the BA type of constant node `t` belongs to the bv family.
+// Precondition (DBG-asserted): tau::get(t).is_ba_constant(). Checks the
+// type only; it does not inspect the stored constant value.
 template<NodeType node>
 bool is_bv_constant(tref t) {
 	using tau = tree<node>;
@@ -33,6 +36,9 @@ bool is_bv_constant(tref t) {
 
 
 
+// Bit width of the BA type of node `t`. No DBG precondition; if the type
+// is not in the bv family this logs an error and returns 0 (0 is never a
+// valid bv width, so it doubles as the failure value).
 template<NodeType node>
 size_t get_bv_type_bitwidth(tref t) {
 	auto type = tree<node>::get(t).get_ba_type();
@@ -43,6 +49,11 @@ size_t get_bv_type_bitwidth(tref t) {
 	return get_bv_width<node>(type);
 }
 
+// Numeric (unsigned) value of the bitvector constant in `t`, parsed from
+// its base-2 string. Precondition: `t` is a BA constant holding a `bv`
+// (std::get throws otherwise; not DBG-asserted here). Returns nullopt if
+// the term is not a concrete bitvector value or the value does not fit
+// in size_t (the stoull failure is logged).
 template<NodeType node>
 std::optional<size_t> get_bv_constant_value(tref t) {
 	auto constant = tree<node>::get(t).get_ba_constant();

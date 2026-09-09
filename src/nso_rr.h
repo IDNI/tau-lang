@@ -1,5 +1,16 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+/**
+ * @file nso_rr.h
+ * @brief Applying recurrence relations to NSO formulas.
+ *
+ * Declares the `nso_rr_apply` overloads: apply one rewriting rule or an
+ * ordered sequence of rules to a tree, and unfold a full `rr<node>` —
+ * calculating the fixed points its main formula calls and applying the
+ * recurrence relation definitions until no rule fires (implementations
+ * in nso_rr.tmpl.h).
+ */
+
 // TODO (LOW) rename file to msnso_rr.h
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

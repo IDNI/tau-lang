@@ -83,6 +83,11 @@ private:
 	std::vector<std::string> errors_{};
 	trefs defs_{};
 	tref main_ = nullptr;
+	// span a spec's parts, since a type declared in one part must stay
+	// live for the parts parsed after it; mutable so the const
+	// get_options() can hand out their addresses
+	mutable htrefs type_defs_{};
+	mutable tau_dynamic_context names_{};
 
 	// TT2-2: the streaming operator reads parts_/parsed_.
 	template <NodeType n>

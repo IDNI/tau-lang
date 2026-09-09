@@ -606,6 +606,52 @@ TEST_SUITE("Tau API - string - step error paths") {
 	TEST_CASE("get_interpreter reports spec parse failure") {
 		CHECK( !tau_api::get_interpreter("x ) ( invalid !!!").has_value() );
 	}
+
+	// An input value that parses to a tau constant holding an open (free
+	// variable) formula is rejected.
+	TEST_CASE("step rejects an input constant with an open tau formula") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "i", 0 }] = "o[t] = x";
+		CHECK( !tau_api::step(i, inputs).has_value() );
+	}
+
+	// A step with no inputs computes its outputs but reports "do not
+	// auto-continue" by returning empty (the REPL then asks the user).
+	TEST_CASE("step without inputs does not auto-continue") {
+		auto maybe_i = tau_api::get_interpreter("o7[t] = 0.");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		CHECK( !tau_api::step(i, inputs).has_value() );
+	}
+
+	// A step whose u output proposes an acceptable update routes through
+	// interpreter::update (the string API's own update call site).
+	TEST_CASE("step performs a proposed spec update") {
+		// i9/o8, not i1/o1: this suite shares one io context, and the
+		// witness suite below re-types i1 as :bv[24]
+		auto maybe_i = tau_api::get_interpreter(
+			"u[t] = i9[t] && o8[t] = 0.");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "i9", 0 }] = "F";
+		auto out0 = tau_api::step(i, inputs);
+		REQUIRE( out0.has_value() );
+		inputs.clear();
+		inputs[stream_at{ "i9", 1 }] = "o8[t] = 0";
+		auto out1 = tau_api::step(i, inputs);
+		REQUIRE( out1.has_value() );
+		// the accepted update echoes on the u output
+		bool u_echoed = false;
+		for (auto& [at, v] : out1.value())
+			if (at.name == "u"
+				&& v == "always o8[t]:tau = 0") u_echoed = true;
+		CHECK( u_echoed );
+	}
 }
 
 #ifdef TAU_PACK_HAS_BA_BV
@@ -657,9 +703,13 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		// fix this sequence produced 7, 7, 7 while a fresh process gave
 		// 7, 0, 0 -- the report's split.)
 		auto witness = drive(spec7, in);
-		// Nonterminal renumbering changes node hashes and so clause
-		// order; re-pin whenever the grammar is regenerated. The
-		// property under test is fresh == post-activity, not the value.
+		// The canonical free-region choice moves with every parser regen
+		// (nonterminal renumbering changes node hashes and so clause
+		// order). A fresh process gives 7, 7, 7 for spec7 and 50, 50, 50
+		// for spec50 on their own (verified by driving each alone), and
+		// so must these post-activity runs. Re-pin whenever the grammar
+		// is regenerated; the property under test is fresh ==
+		// post-activity, not the specific witness.
 		CHECK(witness == std::vector<std::string>({ "7", "7", "7" }));
 		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
 	}

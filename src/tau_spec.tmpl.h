@@ -154,6 +154,26 @@ bool tau_spec<node>::add(tref expr) {
 	case tau::input_def:
 	case tau::output_def:
 	case tau::rec_relation: add_def(expr); break;
+	case tau::type_def: {
+		// Recorded into this spec's own context (not defs_/spec_defs: a
+		// type_def carries no wff/bf content for infer_ba_types to see),
+		// so get_options()'s prior_type_defs hands it to adt_flatten on
+		// every later part() of this same spec.
+		//
+		// A later declaration replaces an earlier one of the same name
+		// (see adt_registry::build) -- keep one stored type_def per
+		// name, or the warning it raises would fire again on every
+		// later part().
+		size_t name_sid = tt(expr) | tau::new_type_name | tt::data;
+		htrefs& defs = type_defs_;
+		size_t idx = defs.size();
+		for (size_t i = 0; i < defs.size(); ++i)
+			if ((tt(defs[i]->get()) | tau::new_type_name | tt::data)
+				== name_sid) { idx = i; break; }
+		if (idx == defs.size()) defs.push_back(tau::geth(expr));
+		else defs[idx] = tau::geth(expr);
+		break;
+	}
 	default:
 		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
 		DBG(assert(false);)
@@ -173,13 +193,14 @@ template <NodeType node>
 typename tree<node>::get_options tau_spec<node>::get_options() const {
 	auto& defs = definitions<node>::instance();
 	return typename tau::get_options{
-		.parse = { .start = tau::spec_multiline },
+		.parse = { .start = tau::spec_multiline, .dynamic_ctx = &names_ },
 		.infer_ba_types = true,
 		.use_default_types = false,
 		.reget_with_hooks = false,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
-		.context = defs.get_io_context()
+		.context = defs.get_io_context(),
+		.prior_type_defs = &type_defs_
 	};
 }
 template <NodeType node>
@@ -195,9 +216,8 @@ template <NodeType node>
 std::pair<bool, std::string> tau_spec<node>::parse_(
 	const std::string& input, size_t part)
 {
-	auto result = tau_parser::instance().parse(
-		input.c_str(), input.size(),
-		{ .start = tau_parser::spec_multiline });
+	auto result = tau_parser::instance().parse(input.c_str(), input.size(),
+		{ .start = tau_parser::spec_multiline, .dynamic_ctx = &names_ });
 	if (result.found) {
 		DBG(TAU_LOG_TRACE << "parse OK";)
 		eof_msg_ = {}; // clear eof

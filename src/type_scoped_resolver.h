@@ -178,20 +178,22 @@ template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 /**
- * @brief Assign @p default_type to every ref in @p refs IN THE CURRENT scope.
+ * @brief Assign @p inferred_type to every ref in @p refs IN THE CURRENT scope.
  *
  * LS-19: despite the name, this overload never opens a scope (the map and
  * list overloads delegate here after unifying); it inserts each ref and
  * assigns the type where it stands.
  * @tparam node Tree node type.
- * @return Unified type id, or `inference_error` on conflict.
+ * @return The assigned type id, or `inference_error` on conflict.
  */
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const subtree_set<node>& refs,
 		size_t inferred_type);
 
 /**
- * @brief Open a scope and unify all nodes in @p types to @p inferred_type (map variant).
+ * @brief Unify @p inferred_type with every type listed in @p types, then
+ * assign the unified result to all listed nodes via the set variant (in
+ * the current scope; no new scope is opened).
  * @tparam node Tree node type.
  * @return Unified type id, or `inference_error` on conflict.
  */
@@ -200,9 +202,11 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 		size_t inferred_type);
 
 /**
- * @brief Open a scope and unify all nodes in @p types to @p inferred_type (list variant).
+ * @brief Check @p inferred_type unifies with every type listed in
+ * @p types, then open a new scope registering each listed node with the
+ * given @p inferred_type itself (not the unified result).
  * @tparam node Tree node type.
- * @return Unified type id, or `inference_error` on conflict.
+ * @return @p inferred_type, or `inference_error` on conflict.
  */
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,

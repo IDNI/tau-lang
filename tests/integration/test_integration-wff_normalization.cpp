@@ -455,6 +455,7 @@ TEST_SUITE("Normalizer bv mixed-type") {
 
 	// Several independent conjuncts must all be lifted, not just the first.
 	TEST_CASE("bv_arith_with_two_sbf_conjuncts") {
+		// verified: valid ((r = 0 && s = 0) <-> (s = 0 && r = 0)) => T
 		CHECK( normalize_and_check("ex x ex y (x:bv[8] + y:bv[8] ="
 			" { 0 }:bv[8]) && s = 0 && r = 0.",
 			// Conjunct order flips under parser regeneration.
@@ -483,7 +484,7 @@ TEST_SUITE("Normalizer bv mixed-type") {
 		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "x+y = 0 && s = 0", "s = 0 && x+y = 0" }) );
+			" && s = 0.", strings{ "s = 0 && x+y = 0", "x+y = 0 && s = 0" }) );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf

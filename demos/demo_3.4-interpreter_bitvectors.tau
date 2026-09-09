@@ -1,0 +1,57 @@
+# Executing specifications over bitvector streams.
+#
+# See demos/README.md for how to run this script.
+
+# demo_2.3 solved bitvector equations; this demo runs them. Streams may carry
+# bitvectors like any other Boolean algebra value: declare the stream with a
+# bv[n] type. A bitvector value on a file or console stream is written as a
+# plain number, one per line, with no braces and no trailing period --
+# fixture/bv8-length_3.in holds the three values 200, 100 and 7.
+
+# Widths never mix silently (demo_2.3), and that holds across streams too: an
+# 8-bit input can only meet a 16-bit output through an explicit cast. This
+# program widens each input into a larger register, exactly the shape that
+# GitHub issues #86-#88 were about. As in demo_3.1, the run stops asking for
+# input once the file is exhausted, and q at the continue prompt ends it:
+
+i1:bv[8] := in file("fixture/bv8-length_3.in").
+o1:bv[16] := out console.
+r o1[t] = (bv[16]) i1[t]
+q
+
+# Arithmetic in a specification is modular, wrapping at the stream's width. The
+# accumulator below sums its inputs in 8 bits: 200, then 200+100 = 300, which
+# wraps to 44, then 44+7 = 51. Note the initial condition pinning o2[0]; the
+# recurrence with its t-1 lookback only binds from step 1 onwards. A file
+# stream is not rewound, so reading the same file again takes a fresh stream:
+
+i2:bv[8] := in file("fixture/bv8-length_3.in").
+o2:bv[8] := out console.
+r o2[0] = i2[0] && o2[t] = o2[t-1] + i2[t]
+q
+
+# When wrapping is not wanted, compute wide and narrow the result: the
+# widen-multiply-divide-narrow idiom. Taking 5% of an 8-bit value by
+# multiplying first would wrap (200 * 5 = 1000, far beyond 255); casting up to
+# 16 bits first keeps the product exact, and the quotient fits back into 8
+# bits. The outputs below are 5% of 200, 100 and 7 -- 10, 5 and 0:
+
+i3:bv[8] := in file("fixture/bv8-length_3.in").
+o3:bv[8] := out console.
+r o3[t] = (bv[8]) ( ((bv[16]) i3[t] * {5}:bv[16]) / {100}:bv[16] )
+q
+
+# Bitvector streams can also read from the console. The prompt names the
+# stream, the time point and the expected type, and the value is again a bare
+# number. This program halves its input. It is constrained at time point 0
+# only, so after the supplied value is consumed, step 1 needs no input and
+# emits an unconstrained default 0; q then ends the run at the continue
+# prompt:
+
+i4:bv[8] := in console.
+o4:bv[8] := out console.
+r o4[0] = i4[0] / {2}:bv[8]
+90
+q
+
+quit

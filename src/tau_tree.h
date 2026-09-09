@@ -66,6 +66,10 @@ template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 template <NodeType node> struct io_context;
 template <NodeType node> struct tau_spec;
 
+/// Container for names a parse grows into type_name, keyed by whatever
+/// alphabet tau_parser uses. One instance must span all parses of a spec.
+using tau_dynamic_context = idni::dynamic_context<tau_parser::char_type>;
+
 // -----------------------------------------------------------------------------
 // htref-keyed containers
 
@@ -76,6 +80,7 @@ template <NodeType node> struct tau_spec;
 template <NodeType node>
 struct subtree_htref_less {
 	using is_transparent = void;
+	/// Normalize either key form to the `tref` that `subtree_less` orders.
 	static tref to_tref(const htref& h) { return h->get(); }
 	static tref to_tref(tref t) { return t; }
 	bool operator()(const auto& a, const auto& b) const {
@@ -526,11 +531,17 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	struct get_options {
 		tau_parser::parse_options parse{};          ///< Underlying parser options.
 		bool infer_ba_types = true;                 ///< Run BA type inference.
+		bool flatten_adts = true;                   ///< Flatten ADT type_defs before inference.
 		bool use_default_types = true;              ///< Fall back to tau type for unknowns.
 		bool reget_with_hooks = true;               ///< Re-register nodes through hooks.
 		const std::vector<htref>* definition_heads = nullptr; ///< Known definition heads.
 		subtree_map<node, size_t>* global_scope = nullptr;    ///< Pre-known global types.
 		io_context<node>* context = nullptr;        ///< I/O stream context.
+		// `type_def` trees accepted by earlier, separate parses, so a later
+		// part of the same spec (or a later REPL line) can still resolve an
+		// earlier `type` statement's name via adt_flatten's registry. The
+		// parser's own resolution of that name is parse.dynamic_ctx's job.
+		const htrefs* prior_type_defs = nullptr;
 	};
 
 	/** @brief Convert parser @p result to a tree using @p options. */
@@ -658,6 +669,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		template <typename result_type>
 		result_type operator||(const extractor<result_type>&) const;
 	private:
+		/** @brief Keep the non-null refs of @p n; no value if none. */
 		void set_values(const trefs& n);
 		bool has_value_ = true;
 		trefs values_{};

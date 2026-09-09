@@ -1,0 +1,66 @@
+# Self-amending specifications: pointwise revision through the update stream u.
+#
+# See demos/README.md for how to run this script.
+
+# A running Tau specification can accept changes to itself. Whatever is written
+# into the special output stream u is treated as a proposed update: if the
+# proposal is a satisfiable specification, pointwise revision merges it into
+# the one currently running; if not, no update happens. That is how software
+# whose requirements change while it runs is expressed in Tau -- the update
+# rules themselves are part of the specification.
+
+# The program below takes an update proposal from the console at the first
+# three steps and routes it into u. The streams are tau-typed by default, so
+# each input value is a whole Tau specification ended by a period, as in
+# demo_3.2. The run is constrained at fixed time points only, so from step 3
+# on it needs no input and advances at the continue prompt (on a `# step`
+# comment, q ending the run, as in the other interpreter demos).
+#
+# While the run is asking for input, every line goes to the stream, so the
+# three proposals follow the run command back to back. What to watch:
+#
+# Step 0 feeds o1[t] = 1. It is satisfiable, so the run prints the merged
+# specification: the constraints still pending for u conjoined with the
+# accepted update (shown normalized, as o1[t]' = 0).
+#
+# Step 1 feeds o2[t] = 0 && o2[t] = 1, which is unsatisfiable -- o2 cannot be
+# 0 and 1 at once. The revision rejects it: u reports F and no "Updated
+# specification" line appears. Note that o1 answers T here, which is the
+# accepted update of step 0 at work (1 of type tau displays as T).
+#
+# Step 2 feeds o1[t] = 0: satisfiable on its own, but contradicting the
+# running specification, which requires o1[t] = 1 since step 0. Pointwise
+# revision resolves the conflict in favor of the update: the o1[t] = 1
+# requirement is dropped and the updated specification becomes just
+# always o1[t] = 0.
+#
+# Step 3 then shows the new law in force: o1 answers F from here on.
+
+run u[0] = i1[0] && u[1] = i1[1] && u[2] = i1[2]
+o1[t] = 1.
+o2[t] = 0 && o2[t] = 1.
+o1[t] = 0.
+# step
+q
+
+# Two guard options exist for updatable runs: specsizewarn warns when an
+# updated specification grows beyond a chosen printed size, and revisionalts
+# caps the alternatives the revision considers per specification part. Both
+# are covered in demo_5.1.
+
+# Alongside u there is a special input stream named this. It is never asked
+# from the user: at each step, the specification currently running is written
+# into it. The program below copies this into o1, so each output is the
+# running specification itself -- after the update fed at step 0 is accepted,
+# the specification printed at step 1 carries the update too:
+
+run u[0] = i2[0] && o1[t] = this[t]
+o2[t] = 0.
+# step
+q
+
+# A specification that reads itself and rewrites itself stays a specification:
+# the reasoning above is ordinary Boolean algebra over tau-typed values, which
+# is what makes mechanized self-amendment safe to decide before it is applied.
+
+quit

@@ -19,17 +19,28 @@ void tau_init() {
 	registered = true;
 	std::vector<std::string> names{ "nat", "untyped", "bool" };
 	for (auto n : node::ba::type_names()) names.emplace_back(n);
-	tau_parser::instance().get_grammar().add_dynamic("type_name", names);
+	auto& g = tau_parser::instance().get_grammar();
+	g.add_dynamic("type_name", names);
+	// lets a declared type name parse as type_name for the rest of the spec
+	auto type_name_l = g.nt("type_name");
+	tau_parser::instance().set_dynamic_grow(
+		[type_name_l](tau_parser::input& in, size_t, size_t from,
+			size_t to)
+		{
+			tau_parser::instance().get_grammar()
+				.add_dynamic_production_from(type_name_l,
+					in.get_terminals(from, to));
+		},
+		{ { tau_parser::type_def, tau_parser::new_type_name } });
 }
 
 // Helper functions
 // ------------------------------------------------------------
 
-/// Extract the update specification from the interpreter's output assignment.
-/// Looks for a stream variable named "u" at time_point-1 with tau type.
-/// If the output for that variable is non-zero, unpacks and returns it
-/// as a tref that can be fed back into interpreter::update().
-/// @return The unpacked update formula, or nullptr if no update is present.
+// Extracts the spec update carried by the step's outputs: the tau
+// constant assigned to the `u` output stream at the just-finished time
+// point. Returns nullptr when the context types `u` as anything but tau
+// or the assignment is absent or 0 (i.e. no update requested).
 template <NodeType node>
 tref get_update(interpreter<node>& i, const assignment<node>& output) {
 	auto update_stream = build_out_var_at_n<node>(

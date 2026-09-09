@@ -48,11 +48,30 @@ struct tau_decision_cache {
 
 } // namespace detail
 
+// Main formula of `fm` with its temporal quantifiers normalized;
+// normalize_scopes=false leaves the formulas below the temporal
+// quantifiers as they are. Used by ~, &, |, ^ below so newly combined
+// mains stay in a comparable form; the rec relations are left untouched.
 template <typename... BAs>
 requires BAsPack<BAs...>
 static tref normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
-	return normalize_temporal_quantifiers<node, false>(fm.nso_rr.main->get());
+	// Memoised per main tree: every Boolean operation on constants
+	// (~, &, |, +) normalises the temporal layer of its operands, and the
+	// same constants are operands over and over. Same key discipline as
+	// cached_tau_ba_predicate: the main tree identifies the element only
+	// when it carries no recurrence relations.
+	if (!fm.nso_rr.rec_relations.empty())
+		return normalize_temporal_quantifiers<node, false>(
+			fm.nso_rr.main->get());
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	tref key = fm.nso_rr.main->get();
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	// compute before emplace: normalisation can create new trees, and a
+	// rehash of `cache` must not happen with a half-built entry in it.
+	tref res = normalize_temporal_quantifiers<node, false>(key);
+	return cache.insert_or_assign(key, res).first->second;
 }
 
 template <typename... BAs>
@@ -236,6 +255,11 @@ static int factored_tau_units(tref fm, trefs& units) {
 	return 0;
 }
 
+// Whether component factoring of is_zero/is_one is on: true if the
+// `ba_component_factoring` API flag (tau_ba.h) is set, or the environment
+// variable TAU_BA_COMPONENT_FACTORING is set to a non-empty value other
+// than exactly "0". The environment is read once and latched for the
+// lifetime of the process; the API flag is re-read on every call.
 inline bool ba_component_factoring_enabled() {
 	static const bool env = [] {
 		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
@@ -405,6 +429,10 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+// Normalizes a tau_ba constant: applies its rec relations to the main
+// formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
+// result carries the normalized main only — the rec relations, already
+// applied, are not copied into the returned tau_ba.
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
@@ -450,12 +478,18 @@ tref normalize_for_splitter(const rr<node>& nso_rr) {
 	return result;
 }
 
+// Purely syntactic check: the main formula is literally T. No rec
+// relations are applied and no satisfiability check runs — a semantically
+// valid but non-literal main returns false (use is_one() for that).
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_syntactic_one(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
+// Purely syntactic check: the main formula is literally F. No rec
+// relations are applied and no satisfiability check runs — a semantically
+// unsat but non-literal main returns false (use is_zero() for that).
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {

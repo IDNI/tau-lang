@@ -31,6 +31,11 @@ n all x ex y (x y = 0 && x' y != 0)
 valid all x (x x' = 0)
 sat all x (x = 0)
 
+# unsat asks the complementary question, so it answers T exactly where sat
+# answers F -- not every element of an atomless Boolean algebra is 0:
+
+unsat all x (x = 0)
+
 # Applied to a term, normalize minimizes it, dropping the parts that the rest
 # already covers. Everything below is subsumed by x:
 

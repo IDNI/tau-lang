@@ -10,7 +10,10 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
-inline size_t get_Term_size(const Term& b) {
+// Bit width of the sort of bitvector value `b` (declared in cvc5.h).
+// Precondition (DBG-asserted): b.isBitVectorValue() — in release builds a
+// non-bitvector sort makes getBitVectorSize() throw.
+inline size_t get_cvc5_size(const Term& b) {
 	DBG( assert(b.isBitVectorValue()); )
 	return b.getSort().getBitVectorSize();
 }

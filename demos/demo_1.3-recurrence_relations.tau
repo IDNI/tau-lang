@@ -31,6 +31,34 @@ n h[7](x)
 
 n all x h[7](x) != 0
 
+# A recurrence can also be called with the offset omitted entirely. That asks
+# for its fixpoint: successive steps are enumerated until two consecutive ones
+# are equivalent, and that step is the result. Here k[1] is x = 0 && x != 1,
+# which is equivalent to k[0], so the fixpoint is x = 0:
+
+k[0](x) := x = 0
+k[n](x) := k[n-1](x) && x != 1
+n k(y)
+
+# Not every recurrence settles. This one alternates between two formulas
+# forever, and the enumeration detects the loop. With no instructions for that
+# case, a looping predicate falls back to F (a looping function to 0):
+
+w[0](x) := x = 0
+w[n](x) := !w[n-1](x)
+n w(y)
+
+# A fallback clause picks the answer for the looping case instead: first
+# returns the step at which the loop was detected, last the step just before
+# it, and any term or formula of the right type is returned verbatim:
+
+n w(y) fallback first
+n w(y) fallback last
+n w(y) fallback T
+
+# The enumeration is unbounded by default. demo_5.1 shows the enumsteps
+# budget that bounds it before a fixpoint or loop is found.
+
 # The head of a definition may carry a type, which fixes the Boolean algebra the
 # definition works over. This pair alternates between 0 and 1 with the parity of
 # the offset, in the sbf Boolean algebra:

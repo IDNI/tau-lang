@@ -59,6 +59,7 @@
 #include "api.h"
 #include "io_context.h"
 #include "tau_spec.h"
+#include "utility/diagnostics.h"
 #include "utility/repl.h"
 #include "parse_error_hint.h"
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -153,9 +154,9 @@ struct repl_evaluator {
 	/**
 	 * @brief Parse and evaluate the REPL source string @p src.
 	 * @param src Command string entered by the user.
-	 * @return Exit code (0 = success, non-zero = error/quit).
+	 * @return Exit code (0 = success, 1 = quit, 2 = incomplete input).
 	 */
-	int eval(const std::string& src);
+	idni::diagnostics::result<int> eval(const std::string& src);
 	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
 	void reprompt();
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -253,9 +254,8 @@ private:
 	void def_input_cmd(const tt& n);
 	/// @brief Define an output stream from @p n.
 	void def_output_cmd(const tt& n);
-
-	/// @brief Print a "not implemented yet" message.
-	void not_implemented_yet();
+	/// @brief Define an ADT type from @p n.
+	void def_type_cmd(const tt& n);
 
 	// session management
 	void reset_cmd();
@@ -378,6 +378,13 @@ private:
 	// definitions this session keeps reading afterwards.
 	htrefs rr_defs;
 	htrefs io_defs;
+	// ADT type_def statements accepted via def_type_cmd, kept so they can be
+	// prepended (before rr_defs/io_defs) wherever a spec is assembled from
+	// stored definitions -- see get_applied() -- and, via names, so a `type`
+	// statement typed at the REPL still parses as a type_name on every
+	// later line.
+	htrefs type_defs;
+	tau_dynamic_context names;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 #ifdef TAU_PARSER_HAS_FTXUI

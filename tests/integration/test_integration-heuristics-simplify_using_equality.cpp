@@ -329,8 +329,8 @@ TEST_SUITE("simplify_using_equality") {
 		// Order flipped by the 8f1a74c1 parser regen (Debug's
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		CHECK( matches_to_str_to_any_of(res, {
-			"xy|zx = 0",
 			"yx|xz = 0",
+			"xy|zx = 0",
 			"xy|xz = 0",
 			"yx|zx = 0",
 		}) );
@@ -368,6 +368,7 @@ TEST_SUITE("simplify_using_equality") {
 		// (8f1a74c1 did). Accept every orientation combination of the
 		// four kept atoms; the conjunct order itself is stable.
 		CHECK( matches_to_str_to_any_of(res, {
+			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
 			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
@@ -460,10 +461,10 @@ TEST_SUITE("simplify_using_equality") {
 		// Disjunct order is wff_or commutativity, and each equality's own
 		// operand orientation is a content-hash tie-break too (both sides
 		// are plain variables, so term_comp falls through to
-		// tau::subtree_less) -- matches_wff_mod_and_or absorbs both
-		// (.local/build-emscripten.md §4i). An equality between operands
-		// of different term_comp categories (e.g. an io variable against a
-		// plain one) would still have to match exactly.
+		// tau::subtree_less) -- matches_wff_mod_and_or absorbs both. An
+		// equality between operands of different term_comp categories
+		// (e.g. an io variable against a plain one) would still have to
+		// match exactly.
 		CHECK(matches_wff_mod_and_or(res, "x = 0 || x = y || x = z"));
 	}
 

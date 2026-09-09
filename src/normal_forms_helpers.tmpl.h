@@ -270,6 +270,16 @@ tref onf_wff<node>::operator()(tref n) const {
 	return rewriter::replace<node>(n, changes);
 }
 
+/**
+ * @internal
+ * @copydoc onf_wff::onf_subformula
+ *
+ * Only the bottom-most `bf_eq` is rewritten, and only if it mentions `var`,
+ * while every `bf_neq` mentioning `var` is; `norm_trimmed_equation` first
+ * puts each (in)equality into `g = 0` / `g != 0` form, and both interval
+ * bounds are canonically reduced after substituting for `var`.
+ * @endinternal
+ */
 template <NodeType node>
 tref onf_wff<node>::onf_subformula(tref n) const {
 	using tau = tree<node>;

@@ -16,30 +16,80 @@ template <NodeType node> struct get_hook;
 
 // -----------------------------------------------------------------------------
 
+/**
+ * @brief Extract the signature of the recurrence-relation reference @p n:
+ * its name interned via `rr_dict`, offset arity and argument arity.
+ * @param n A `ref` node or a `bf_ref`/`wff_ref` wrapping one.
+ */
 template <NodeType node>
 rr_sig get_rr_sig(tref n);
 
+/**
+ * @brief Collect the `rec_relation` definitions under @p r as rewriter
+ * rules, one (head, body) pair per definition in tree order, with each
+ * body's I/O variables classified against @p ctx (see resolve_io_vars,
+ * tau_tree_extractors.tmpl.h); heads are kept verbatim. Accepts a single
+ * `rec_relation` or a `start`/`spec` tree whose definitions section is
+ * scanned; a null @p r yields an empty rule set.
+ */
 template <NodeType node>
 rewriter::rules get_rec_relations(io_context<node>& ctx, tref r);
+/** @brief Overload using the global `definitions` singleton's I/O context. */
 template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 
+/**
+ * @brief Split parsed input @p ref into recurrence rules plus a main
+ * formula (an `rr`), classifying I/O variables in the main and the rule
+ * bodies against @p ctx. A bare `bf`/`ref` becomes a rule-free main taken
+ * verbatim; a single `rec_relation` yields rules with a null main.
+ * @return nullopt when @p ref is null, no main formula is found, or an
+ * I/O variable remains unclassified after resolve_io_vars (neither a
+ * declared stream nor named like one).
+ */
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
+/** @brief Overload using the global `definitions` singleton's I/O context. */
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref ref);
 
+/**
+ * @brief Append to @p leaves the maximal subtrees of @p n that are not
+ * themselves headed by @p branch, flattening the (arbitrarily deep)
+ * @p branch spine left to right. A subtree occurring several times is
+ * appended once per occurrence; a null @p n appends nothing. Runs with
+ * time and memory linear in the output size (see the note at the
+ * definition in tau_tree_extractors.tmpl.h).
+ */
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves);
+/** @brief As above, returning the leaves as a fresh vector. */
 template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch);
 
+/**
+ * @brief Return the disjuncts of formula @p n: the leaves of its `wff_or`
+ * spine, i.e. the clauses when @p n is in DNF. A disjunction-free @p n
+ * comes back as the single element.
+ */
 template <NodeType node>
 trefs get_dnf_wff_clauses(tref n);
+/**
+ * @brief Return the conjuncts of formula @p n: the leaves of its
+ * `wff_and` spine, i.e. the clauses when @p n is in CNF.
+ */
 template <NodeType node>
 trefs get_cnf_wff_clauses(tref n);
+/**
+ * @brief Return the disjuncts of term @p n: the leaves of its `bf_or`
+ * spine, i.e. the clauses when @p n is in DNF.
+ */
 template <NodeType node>
 trefs get_dnf_bf_clauses(tref n);
+/**
+ * @brief Return the conjuncts of term @p n: the leaves of its `bf_and`
+ * spine, i.e. the clauses when @p n is in CNF.
+ */
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n);
 
@@ -63,6 +113,8 @@ template <NodeType node>
 struct expression_paths {
 	using tau = tree<node>;
 	explicit expression_paths(tref expr) : _expr(expr) {}
+	// Forward iterator materializing one path per dereference, steered by
+	// a stack of left/right decisions, one per disjunction fork met so far.
 	struct iterator {
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = tref;
@@ -113,31 +165,83 @@ private:
 	tref _expr;
 };
 
+/** @brief Return the BA type id stored in @p n's node value. */
 template <NodeType node>
 size_t get_ba_type(tref n);
 
+/**
+ * @brief Descend from @p var to its naming leaf, unwrapping `bf`,
+ * `variable` and `io_var` layers until a `var_name` or `uconst_name`
+ * node is found; a `ba_constant` or `var_name` argument is returned
+ * itself.
+ * @return The naming node, or nullptr when none exists.
+ */
 template <NodeType node>
 tref get_var_name_node(tref var);
+/**
+ * @brief Return the name string of @p var's naming leaf (see
+ * get_var_name_node), or a reference to a static empty string when
+ * there is none.
+ */
 template <NodeType node>
 const std::string& get_var_name(tref var);
+/**
+ * @brief Return the dict string id of @p var's naming leaf, or 0 when
+ * there is none.
+ */
 template <NodeType node>
 size_t get_var_name_sid(tref var);
 
+// The io_var helpers below expect the enclosing `variable` node whose
+// first child is an `io_var` carrying an offset: x[3] addresses an
+// absolute time point ("initial position"), x[t] the current step and
+// x[t-N] a lookback of N steps ("shift").
+/** @brief True iff @p io_var addresses an absolute (integer) time point. */
 template <NodeType node>
 bool is_io_initial(tref io_var);
+/** @brief True iff @p io_var's offset is a shift of the form t-N. */
 template <NodeType node>
 bool is_io_shift(tref io_var);
+/**
+ * @brief Return the absolute time point of an initial-position variable.
+ * Only valid when is_io_initial holds.
+ */
 template <NodeType node>
 int_t get_io_time_point(tref io_var);
+/**
+ * @brief Return the lookback N of a shifted offset t-N. Only valid when
+ * is_io_shift holds.
+ */
 template <NodeType node>
 int_t get_io_shift(tref io_var);
+/**
+ * @brief Return the lookback N for an offset of the form t-N, and 0 for
+ * any other offset form (current step or absolute time point).
+ */
 template <NodeType node>
 int_t get_io_var_shift(tref io_var);
+/**
+ * @brief Return the largest lookback (get_io_var_shift) over @p io_vars,
+ * 0 when none is shifted. With @p ignore_temps, streams whose name
+ * begins with '_' (interpreter temporaries) are skipped.
+ */
 template <NodeType node>
 int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
+/**
+ * @brief Return the largest absolute time point among the
+ * initial-position variables of @p io_vars, or -1 when there is none.
+ */
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
 
+/**
+ * @brief Return the free variables and captures of @p n, deduplicated
+ * and sorted by `subtree_less`, excluding bound occurrences and the
+ * offset variables inside io_vars; entries are stored without right
+ * siblings. The result lives in a per-tree cache, so the reference
+ * stays valid until that cache is cleared. A null @p n, or one that is
+ * neither `bf` nor `wff`, yields a static empty vector.
+ */
 template <NodeType node>
 const trefs& get_free_vars(tref n);
 
@@ -147,21 +251,47 @@ std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars);
 template <NodeType node>
 bool has_temp_var(tref n);
 
+/**
+ * @brief Report (with an error log) a Tau-formula BA constant in @p fm
+ * that is not closed, i.e. still has free variables. Returns false
+ * without checking further constants when one is met that has not been
+ * converted yet (BA constant id 0).
+ */
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm);
 
+/**
+ * @brief Report (with an error log) a temporal quantifier nested inside
+ * the scope of another temporal quantifier in @p fm.
+ */
 template <NodeType node>
 bool invalid_nesting_of_temp_quants(tref fm);
 
 template <NodeType node>
 bool missing_temp_quants(tref fm);
 
+/**
+ * @brief Report (with an error log) a non-temporal quantifier in @p fm
+ * whose bound variable occurs free inside a temporal quantifier in its
+ * scope: a plain binding may not reach across a temporal quantifier.
+ */
 template <NodeType node>
 bool invalid_nesting_of_quants(tref fm);
 
+/**
+ * @brief Report (with an error log) a recurrence-relation reference in
+ * @p fm carrying a negative integer offset.
+ */
 template <NodeType node>
 bool has_negative_offset(tref fm);
 
+/**
+ * @brief Aggregate front-end validity gate: true when any of
+ * invalid_nesting_of_quants, has_open_tau_fm_in_constant,
+ * invalid_nesting_of_temp_quants, missing_temp_quants,
+ * has_negative_offset or has_missplaced_fallback rejects @p fm; each
+ * check logs its own error message.
+ */
 template <NodeType node>
 bool has_semantic_error(tref fm);
 
@@ -181,6 +311,14 @@ tref unnest_nested_always(tref fm);
 
 #include "io_context.h"
 
+// ADT type registry declarations. adt_types.tmpl.h (which needs the
+// traverser and select_all, not yet defined here) is included further below,
+// next to tau_tree_from_parser.tmpl.h -- see adt_types.h's file header.
+#include "adt/adt_types.h"
+// ADT flattener declarations; same split as adt_types.h/.tmpl.h, for the
+// same reason -- see adt_flatten.h's file header.
+#include "adt/adt_flatten.h"
+
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
@@ -194,6 +332,17 @@ namespace idni::tau_lang {
 
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
 #include "tau_tree_from_parser.tmpl.h"
+
+// Must come after tau_tree_from_parser.tmpl.h: adt_types.tmpl.h uses the
+// traverser (`tt`) and `select_all`, defined earlier in this same block
+// (tau_tree_traverser.tmpl.h, tau_tree_queries.tmpl.h). See adt_types.h's
+// file header for why this is split from its own include.
+#include "adt/adt_types.tmpl.h"
+// adt_flatten.tmpl.h uses adt_registry (just included above), the traverser,
+// is<node,...>, and tree<node>::build_* (declared in tau_tree.h, included at
+// the top of this file, with tau_tree_builders.h/.tmpl.h already pulled in
+// via tau_tree_builders.h above) -- see adt_flatten.h's file header.
+#include "adt/adt_flatten.tmpl.h"
 
 #include "hooks.h"
 
@@ -656,8 +805,9 @@ tref tree<node>::reget(tref n) {
 template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
-		sym, type, type_name, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value,
+		sym, type, type_name, new_type_name, source, capture,
+		var_name, uconst_name, file_name,
+		ctnvar, option_name, option_value, member_name,
 	};
 	return string_nts.contains(nt);
 }

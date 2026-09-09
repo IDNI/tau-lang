@@ -652,10 +652,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		// Product order flipped by the 8f1a74c1 parser regen on Release
-		// (NDEBUG subtree interning order changed); actual is "ab".
-		CHECK((tau::get(result).to_str() == "ab"
-			|| tau::get(result).to_str() == "ba"));
+		// "ab"/"ba": pure AND-commutative permutation, order is a
+		// hash/nt-id-order-dependent tie-break.
+		auto result_str = tau::get(result).to_str();
+		CHECK((result_str == "ab" || result_str == "ba"));
 	}
 }
 

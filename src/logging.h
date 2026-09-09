@@ -382,6 +382,15 @@ struct logging {
 
 	// initialize logging
 	inline static bool initialized = false;
+	/**
+	 * @brief One-time Boost.Log setup (subsequent constructions no-op).
+	 *
+	 * Adds the common attributes, applies the default info-level filter
+	 * (see set_filter) and installs a single console sink on std::cout
+	 * whose formatter prefixes records by severity: colored "(Error)" /
+	 * "(Warning)" tags, a "(Trace)"/"(Debug)" tag plus a padded
+	 * [channel] label, and no prefix for info.
+	 */
 	logging() {
 		using namespace boost::log;
 

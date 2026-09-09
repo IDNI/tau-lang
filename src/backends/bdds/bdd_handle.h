@@ -14,6 +14,13 @@ template<typename B, auto o = bdd_options<>::create()>
 using hbdd = sp<bdd_handle<B, o>>;
 
 // --- Custom operators for hbdd ---
+// hbdd is a shared_ptr, so these give it value semantics: the
+// comparisons dereference and compare the wrapped handles (i.e. their
+// bdd_ref contents); operator== also asserts the interning invariant
+// that equal contents implies the very same handle object. Comparison
+// against bool tests for the constant one/zero. The logical operators
+// &, | and ~ forward to the handle members below, and both + and ^
+// denote symmetric difference (xor), built from &, | and ~.
 template<typename B, auto o = bdd_options<>::create()>
 auto operator<=> (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return *x <=> *y;
@@ -73,6 +80,15 @@ hbdd<B, o> operator^(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
+/* Shared-pointer handle over the static bdd<B, o> engine -- the public
+ * BDD interface used by sbf_ba and the solver. A handle wraps one
+ * bdd_ref; handles are hash-consed in the static maps Mn (nodes) and
+ * Mb (leaf constants), so each distinct decoded node or constant has
+ * exactly one live handle and pointer equality coincides with value
+ * equality (see the operator== assert above). The maps hold owning
+ * shared_ptrs, so handles live for the whole process. htrue/hfalse
+ * are the interned constant handles, set up by bdd_init().
+ */
 template<typename B, auto o = bdd_options<>::create()>
 struct bdd_handle {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
@@ -89,6 +105,11 @@ struct bdd_handle {
 //	bdd_handle();
 	auto operator<=>(const bdd_handle&) const = default;
 
+	// Hash-consing factories: return THE handle for a function,
+	// creating and interning it (and its bdd universe entry) on
+	// first sight.
+
+	// Handle for a decoded decision node, keyed in Mn
 	static hbdd<B, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
@@ -96,6 +117,7 @@ struct bdd_handle {
 		return h->b = bdd<B, o>::add(x), Mn.emplace(x, h), h;
 	}
 
+	// Handle for a leaf constant of B, keyed in Mb
 	static hbdd<B, o> get(const B& x) {
 		if (auto it = Mb.find(x); it != Mb.end())
 			return it->second;//.lock();
@@ -103,16 +125,19 @@ struct bdd_handle {
 		return h->b = bdd<B, o>::add(x), Mb.emplace(x, h), h;
 	}
 
+	// Handle for a bdd value: dispatch on leaf vs node
 	static hbdd<B, o>
 	        get(const bdd<B, o>& x) {
 		return	x.leaf() ? get(std::get<B>(x))
 			: get(std::get<bdd_node_t>(x));
 	}
 
+	// Handle for an engine reference: decode, then dispatch
 	static hbdd<B, o> get(bdd_ref t) {
 		return get(bdd<B, o>::get(t));
 	}
 
+	// Decode this handle's reference into its bdd value
 	bdd<B, o> get() const {
 		return bdd<B, o>::get(b);
 	}
@@ -135,9 +160,16 @@ struct bdd_handle {
 		return r;
 	}
 
+	// Constant of B this function collapses to when universally
+	// (resp. existentially) quantified over all its variables: the
+	// conjunction (resp. disjunction) of its leaf constants
 	B get_uelim() const { return bdd<B, o>::get_uelim(b); }
 	B get_eelim() const { return bdd<B, o>::get_eelim(b); }
 
+	// Conjunction. Leaf shortcuts: a true/false operand returns the
+	// other operand/hfalse without touching the engine; two leaves
+	// meet directly in B; a single leaf operand is pushed into the
+	// other's leaves via bdd_and(ref, B)
 	hbdd<B, o> operator&(const hbdd<B, o>& x) const {
 		const bdd<B, o> &xx = x->get();
 		const bdd<B, o> &yy = get();
@@ -156,6 +188,8 @@ struct bdd_handle {
 		return get(bdd<B, o>::bdd_and(x->b, b));
 	}
 
+	// Disjunction: De Morgan over & when output inverters make
+	// complement free; otherwise dual leaf shortcuts to operator&
 	hbdd<B, o> operator|(const hbdd<B, o>& x) const {
 		if constexpr (o.has_inv_out()) return ~((~x) & (~*this));
 
@@ -176,38 +210,51 @@ struct bdd_handle {
 		return get(bdd<B, o>::bdd_or(x->b, b));
 	}
 
+	// Complement (the conjunction with T is an identity wrapper)
 	hbdd<B, o> operator~() const {
 		return get( bdd<B, o>::bdd_and(
 			bdd<B, o>::T,
 			bdd<B, o>::bdd_not(b)));
 	}
 
+	// Existential quantification of variable v
 	hbdd<B, o> ex(int_t v) const {
 		return get(bdd<B, o>::ex(b, v));
 	}
 
+	// Universal quantification of variable v
 	hbdd<B, o> all(int_t v) const {
 		return get(bdd<B, o>::all(b, v));
 	}
 
+	// Substitute the function x for variable v
 	hbdd<B, o>
 	subst(size_t v, const hbdd<B, o>& x) const {
 		return get(bdd<B, o>::subst(b, v, x->b));
 	}
 
+	// Restrict v := 0 (low cofactor)
 	hbdd<B, o> sub0(size_t v) const {
 		return get(bdd<B, o>::sub0(b, v));
 	}
 
+	// Restrict v := 1 (high cofactor)
 	hbdd<B, o> sub1(size_t v) const {
 		return get(bdd<B, o>::sub1(b, v));
 	}
 
+	// Computes exactly
+	//   this[v := f|v=0] | this[v := ~(f|v=1)],
+	// i.e. this evaluated at the least (f|v=0) and greatest
+	// (~(f|v=1)) solutions for v of the equation f = 0
 	hbdd<B, o>
 	condition(size_t v, const hbdd<B, o>& f) const {
 		return subst(v, f->sub0(v)) | subst(v, ~(f->sub1(v)));
 	}
 
+	// Enumerate the DNF: f is called once per nonzero clause with its
+	// leaf constant and signed literals; returning false stops the
+	// enumeration (see bdd::dnf)
 	void dnf(std::function<bool(const std::pair<B, std::vector<int_t>>&)> f)
 		const
 	{
@@ -219,6 +266,7 @@ struct bdd_handle {
 		});
 	}
 
+	// The full DNF as a set of (leaf constant, literals) clauses
 	std::set<std::pair<B, std::vector<int_t>>> dnf() const {
 		std::set<std::pair<B, std::vector<int_t>>> r;
 		dnf([&r](auto& x) { r.insert(x); return true; });
@@ -230,20 +278,36 @@ struct bdd_handle {
 		return bdd<B, o>::get_vars(b, r), r;
 	}
 
+	// Witness zero: an assignment of constants of B to variables
+	// under which this function evaluates to zero (see
+	// bdd::get_one_zero); this must have a zero
 	std::map<int_t, B> get_one_zero() const {
 		std::map<int_t, B> m;
 		bdd<B, o>::get_one_zero(b, m);
 		return m;
 	}
 
+	// Simultaneously substitute the mapped functions for the mapped
+	// variables; unmapped variables are kept
 	hbdd<B, o> compose(const std::map<int_t, hbdd<B, o>>& m) const {
 		std::map<int_t, bdd_ref> p;
 		for (auto& x : m) p.emplace(x.first, x.second->b);
 		return get(bdd<B, o>::compose(b, p));
 	}
 
+	// Evaluate under the total assignment m (must cover all vars)
 	B eval(std::map<int_t, B>& m) const { return bdd<B, o>::eval(b, m); }
 
+	/* Loewenheim's General Reproductive Solution of f = 0, f being
+	 * this function (Taba book, Theorem 1.8): with Z the witness zero
+	 * from get_one_zero(), returns phi with
+	 *   phi_i = z_i * f + x_i * f'
+	 * per variable x_i. Substituting X by phi(X) satisfies f = 0 for
+	 * every X, and the image of phi is exactly the solution set
+	 * {X | f(X) = 0} (phi fixes every solution). Returns the empty
+	 * map when f is zero (any X solves, no substitution needed);
+	 * f must not be one (no solution exists).
+	 */
 	std::map<int_t, hbdd<B, o>> lgrs() const {
 		std::map<int_t, hbdd<B, o>> r;
 		if (b == bdd<B, o>::F) return r;
@@ -254,6 +318,12 @@ struct bdd_handle {
 		return r;
 	}
 
+	// A splitter of this function: some s with 0 < s < this.
+	// lower/middle/upper try to keep one clause / about half the
+	// clauses / all but one clause (rm_all_except_one_clause,
+	// rm_half_clauses, rm_clause); when the candidate degenerates
+	// (F, or equal to this) -- and always for `bad` -- falls back to
+	// split_clause, conjoining a variable not present in this
 	hbdd<B, o> splitter (splitter_type st) {
 		switch(st) {
 			case splitter_type::lower: {
@@ -285,7 +355,13 @@ private:
 	bdd_ref b;
 };
 
-// Specialization for type Bool
+/* Handle specialization for the two-element algebra Bool, wrapping the
+ * bdd<Bool, o> engine specialization. Members not commented here
+ * follow the contracts documented on the primary template above; the
+ * leaf shortcuts of & and | are unnecessary (the only leaves are the
+ * constants the engine already handles) and and_many() is added on
+ * top of the engine's n-ary conjunction.
+ */
 
 template<bdd_options o>
 struct bdd_handle<Bool, o> {
@@ -314,6 +390,7 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::get(t));
 	}
 
+	// The only Bool constants are the interned true/false handles
 	static hbdd<Bool, o> get(Bool b) {
 		return b == true ? htrue : hfalse;
 	}
@@ -356,6 +433,7 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::bdd_or(x->b, b));
 	}
 
+	// n-ary conjunction of all handles in v (see bdd::bdd_and_many)
 	static hbdd<Bool, o> and_many(const std::vector<hbdd<Bool, o>>& v) {
 		std::vector<bdd_ref> x;
 		for (const auto& e : v) x.push_back(e->b);
@@ -466,9 +544,12 @@ struct bdd_handle<Bool, o> {
 	bdd_ref b;
 };
 
+// Trait: true for shared_ptr types (i.e. for hbdd handles)
 template<typename T> constexpr bool is_sp{};
 template<typename T> constexpr bool is_sp<sp<T>>{true};
 
+// Overloads of babdd.h's get_one/get_zero for handle types: return
+// the interned constant handles instead of constants of B
 template<typename B> B get_one() requires is_sp<B> {
 	return B::element_type::one();
 }
@@ -477,6 +558,12 @@ template<typename B> B get_zero() requires is_sp<B> {
 	return B::element_type::zero();
 }
 
+// Idempotent per-(B, o) engine setup, run at static-init time via
+// bdd<B, o>::initializer: fixes the T/F references (with output
+// inverters both point at universe entry 0, F carrying the out bit;
+// otherwise F is entry 0 and T entry 1), seeds the universe with the
+// constant entries (create_universe) and interns the htrue/hfalse
+// handles
 template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 
@@ -493,6 +580,9 @@ template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::T);
 }
 
+// Seed the universe with the leaf constants of B: zero at entry 0 and
+// one at entry 1, or -- with output inverters -- only one at entry 0,
+// zero being its out-inverted alias
 template<typename B, bdd_options o> void create_universe(B) {
 	auto one = get_one<B>();
 	if constexpr (!o.has_inv_out()) {
@@ -507,6 +597,10 @@ template<typename B, bdd_options o> void create_universe(B) {
 	}
 }
 
+// Bool overload: the universe stores degenerate sentinel node entries
+// (children pointing at the constants themselves) in place of leaf
+// values, so constant references decode to a node like any other; one
+// shared entry with output inverters, separate F/T entries without
 template<typename B, bdd_options o> void create_universe(Bool) {
 	const auto &T = bdd<Bool, o>::T;
 	const auto &F = bdd<Bool, o>::F;

@@ -9,6 +9,11 @@ namespace cvc5 {
 
 using namespace idni::tau_lang;
 
+// Boolean-algebra operators over cvc5::Term, declared in cvc5.h. Each one
+// delegates to the matching make_bitvector_* builder (cvc5_builders.tmpl.h);
+// see the kind mapping in cvc5.h. Note the unsigned/logical choices there:
+// `/` UDIV, `%` UREM, `>>` LSHR.
+
 Term operator|(const Term& lhs, const Term& rhs) {
 	return make_bitvector_or(lhs, rhs);
 }

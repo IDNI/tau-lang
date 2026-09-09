@@ -387,6 +387,8 @@ result_type tree<node>::traverser::operator||(
 	return e(*this);
 }
 
+// Appends the non-null refs to the traverser's value list and refreshes
+// has_value_ accordingly (empty result means "no match").
 template <NodeType node>
 void tree<node>::traverser::set_values(const trefs& refs) {
 	for (tref t : refs) if (t != nullptr) values_.push_back(t);
