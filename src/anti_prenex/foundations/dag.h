@@ -15,7 +15,9 @@
  * Cached facets (`formula_size`, `neg_of`, `is_negative_tree`) live in
  * ctx.h's unconditional structural tables and are filled LAZILY: the
  * accessor computes on the first query and stores; nothing is written at
- * construction, and the accessor is the table's only writer. After the first
+ * construction. `formula_size` and `is_negative_tree` are the only writers of
+ * their tables; `neg_memo` is the exception — nothing here derives it, layer 1
+ * fills it through `set_neg`. After the first
  * query a facet is O(1) in every build type (§10: "never recomputed"). A
  * reference into a table — including `fv`'s, which points into
  * `get_free_vars`' table — is invalidated by a `bintree<node>::gc()` sweep,
@@ -53,6 +55,11 @@ namespace idni::tau_lang::anti_prenexing {
  * hash-consed DAG: a shared subtree counts once per place it appears. The
  * sort convention of 2d, the case witness and EXPAND, and the metric of
  * §5's size acceptance.
+ *
+ * Not `node_count` (tau_tree_queries.tmpl.h): that counts every LCRS node —
+ * wrapper and operator separately, and an atom's whole term subtree with them
+ * — and it is `TAU_CACHE`-gated; a different number under a different gating
+ * rule (ground rule 9).
  *
  * Lazy: computed on the first query from the children's (cached) sizes and
  * stored in `size_memo`; O(1) after that. The first query on an unmeasured
@@ -150,8 +157,9 @@ bool is_member(tref n, tref m);
  * than the input list, or be a single member, or a constant. Nothing is
  * published: sizes and FV are computed lazily on first query, from the
  * RETURNED node. One member returns it (right sibling trimmed); `members`
- * must not be empty (the empty join is the joins' business) — an empty list
- * returns the neutral constant. Substitution rebuilds through these.
+ * must not be empty (the empty join is the joins' business) — in Debug an
+ * empty list asserts, in Release it returns the neutral constant.
+ * Substitution rebuilds through these.
  */
 template <NodeType node>
 tref canonical_and(trefs members);

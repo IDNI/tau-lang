@@ -28,18 +28,18 @@ namespace idni::tau_lang::anti_prenexing {
 
 namespace detail {
 
-/// The nodes `formula_size` walks through: a `wff` wrapper, and the operator
-/// nodes whose formula children carry their own `|·|` — the two connectives,
-/// the negation and the two binders. Everything below anything else (an
-/// atom's operator node and its terms, `wff_ref`, the temporal operators, the
-/// constants, a binder's variable) is opaque and is never entered, so the
-/// wrapper above it counts 1.
+/// The OPERATOR nodes `formula_size` walks through — the two connectives, the
+/// negation and the two binders — the ones whose formula children carry their
+/// own `|·|`. Anything else below a wrapper (an atom's operator node and its
+/// terms, `wff_ref`, the temporal operators, the constants, a binder's
+/// variable) is opaque and is never entered, so the wrapper above it counts 1.
+/// Wrappers themselves are decided before this is reached.
 template <NodeType node>
 bool size_structural(tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	return t.is(tau::wff) || t.is(tau::wff_and) || t.is(tau::wff_or)
-		|| t.is(tau::wff_neg) || t.is(tau::wff_ex) || t.is(tau::wff_all);
+	return t.is(tau::wff_and) || t.is(tau::wff_or) || t.is(tau::wff_neg)
+		|| t.is(tau::wff_ex) || t.is(tau::wff_all);
 }
 
 /// A `wff` wrapper whose formula children count towards `|·|`: an ∧-node, an
@@ -67,8 +67,10 @@ size_t formula_size(tref n) {
 	// computed. `local` holds this walk's results; a wrapper pruned
 	// because an earlier query already measured it is read back from
 	// `size_memo`, and anything opaque (a term, a variable) contributes
-	// nothing. The traversal is iterative, which a chain needs: a spine
-	// is as deep as it is long.
+	// nothing. `local` is not a duplicate of the table for its own sake:
+	// the walk must reach the right answer without depending on a lookup
+	// succeeding (ground rule 2). The traversal is iterative, which a
+	// chain needs: a spine is as deep as it is long.
 	subtree_unordered_map<node, size_t> local;
 	auto measured = [&local](tref m) -> size_t {
 		if (auto it = local.find(m); it != local.end()) return it->second;
@@ -181,8 +183,12 @@ tref canonical_chain(trefs& ms, Build&& build, tref neutral) {
 	ms.erase(std::unique(ms.begin(), ms.end(), [](tref a, tref b) {
 		return tau::subtree_equals(a, b);
 	}), ms.end());
-	tref result = tau::get(ms.front()).has_right_sibling()
+	// A single member is returned as it stands, so a right sibling it
+	// carries as somebody's operand has to go; from two members on, the
+	// builder re-links every child anyway (`get_raw`).
+	if (ms.size() == 1) return tau::get(ms.front()).has_right_sibling()
 		? tau::trim_right_sibling(ms.front()) : ms.front();
+	tref result = ms.front();
 	for (size_t i = 1; i < ms.size(); ++i) result = build(result, ms[i]);
 	return result;
 }
@@ -307,7 +313,11 @@ bool is_negative_tree(tref n) {
 		return t.is(tau::wff) || t.is(tau::wff_and) || t.is(tau::wff_or);
 	};
 	auto up = [](tref) {};
-	pre_order<node>(n).search(check, skeleton, up);
+	// `search_unique`: a sub-skeleton reachable twice is checked once. The
+	// test is universal over the leaves, so skipping a repeat cannot change
+	// the answer, and a shared negative sub-tree is not re-walked per
+	// occurrence.
+	pre_order<node>(n).search_unique(check, skeleton, up);
 	store<node, table::negative_tree_memo>(n, negative);
 	return negative;
 }

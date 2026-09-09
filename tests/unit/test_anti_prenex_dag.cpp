@@ -34,6 +34,18 @@ tref neg(tref n)          { return tau::build_wff_neg(n); }
 tref conj(tref l, tref r) { return tau::build_wff_and(l, r); }
 tref disj(tref l, tref r) { return tau::build_wff_or(l, r); }
 
+/// A real order atom `x <= y`. With the construction hooks on and a
+/// non-bitvector type, `<=` does not survive construction at all: the hook
+/// rewrites it into the equation `x·y' = 0` (src/hooks.tmpl.h), and `<`
+/// into a conjunction. An order atom therefore reaches this module only
+/// from bitvector-typed content (the bitvector router's solver path, §1) —
+/// or, as here, from a build with the hooks off.
+tref order_atom(const char* l, const char* r) {
+	use_hooks_guard<node_t> g(false);
+	return tau::build_bf_lteq(tau::build_bf_variable(l, 0),
+		tau::build_bf_variable(r, 0));
+}
+
 bool same(tref a, tref b) { return tau::subtree_equals(a, b); }
 
 /// Content-comparison of two member views, order significant.
@@ -69,7 +81,7 @@ TEST_CASE("T1: sizes by hand count") {
 	// Nesting: ¬(a ∧ b) is the negation node over a three-node conjunction.
 	CHECK(ap::formula_size<node_t>(neg(conj(a, b))) == 4);
 	// A shared subtree counts once per place it appears (a tree count over
-	// the DAG): both operands of the disjunction are the same node.
+	// the DAG): `a` sits in both operands and is counted twice.
 	CHECK(ap::formula_size<node_t>(disj(conj(a, b), conj(a, c))) == 7);
 }
 
@@ -79,7 +91,7 @@ TEST_CASE("T2: an atom counts 1 whatever its terms, an opaque operator too") {
 	// Terms are not formula children: the atom counts 1 however big they are.
 	CHECK(ap::formula_size<node_t>(tau::build_bf_eq(x, y)) == 1);
 	CHECK(ap::formula_size<node_t>(tau::build_bf_eq_0(x)) == 1);
-	CHECK(ap::formula_size<node_t>(tau::build_bf_lteq(x, y)) == 1);
+	CHECK(ap::formula_size<node_t>(order_atom("x", "y")) == 1);
 	// A temporal operator is opaque like an atom (dag.h): its body is not
 	// descended into, so a big body does not change the count.
 	tref big = conj(atom("a"), conj(atom("b"), atom("c")));
@@ -242,6 +254,15 @@ TEST_CASE("T9: the hooks collapse but never reorder (D4)") {
 	CHECK(conj(a, b) != conj(b, a));
 	CHECK(ap::canonical_and<node_t>(trefs{ a, b })
 		== ap::canonical_and<node_t>(trefs{ b, a }));
+	// The same over three members, where association could differ as well
+	// as order: every spelling reaches the one canonical node, and none of
+	// the raw spellings is reordered into another.
+	tref c = atom("c");
+	CHECK(conj(conj(a, b), c) != conj(conj(b, a), c));
+	CHECK(conj(conj(a, b), c) != conj(a, conj(b, c)));
+	tref canonical = ap::canonical_and<node_t>(trefs{ a, b, c });
+	CHECK(canonical == ap::canonical_and<node_t>(trefs{ c, b, a }));
+	CHECK(canonical == ap::canonical_and<node_t>(trefs{ b, a, c }));
 }
 
 TEST_CASE("T10: complement_of strips a negation rather than doubling it") {
@@ -262,7 +283,7 @@ TEST_CASE("T11: the §1 node classification") {
 	tref y = tau::build_bf_variable("y", 0);
 	tref a = atom("a"), b = atom("b");
 	tref eq = tau::build_bf_eq(x, y);
-	tref order = tau::build_bf_lteq(x, y);
+	tref order = order_atom("x", "y");
 
 	CHECK(ap::is_atom<node_t>(eq));
 	CHECK(ap::is_equation<node_t>(eq));
@@ -332,9 +353,7 @@ TEST_CASE("T12: negative trees, flat and nested") {
 	CHECK(!ap::is_negative_tree<node_t>(disj(na, atom("b"))));
 	CHECK(!ap::is_negative_tree<node_t>(disj(conj(na, atom("b")), nc)));
 	// So does a leaf that is not an equation at all.
-	tref order = tau::build_bf_lteq(tau::build_bf_variable("x", 0),
-		tau::build_bf_variable("y", 0));
-	CHECK(!ap::is_negative_tree<node_t>(disj(na, neg(order))));
+	CHECK(!ap::is_negative_tree<node_t>(disj(na, neg(order_atom("x", "y")))));
 	// The top node must be the ∨: a conjunction of negated equations is a
 	// plain conjunct, not a negative tree.
 	CHECK(!ap::is_negative_tree<node_t>(conj(na, nb)));
