@@ -1924,14 +1924,23 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 			c = tau::_T();
 		}
 	}
-	// B6: fold via always_conjunction instead of a verbatim
-	// build_wff_and of the bodies -- clauses with different lookbacks
-	// must be shifted to a common frame before they share one always,
-	// exactly as always_conjunction (used by the normalizer and by
-	// pointwise_revision) does.
+	// Fold the bodies VERBATIM, without re-aligning their lookbacks. The
+	// clauses of one part come from a single always body that
+	// create_spec_partition split per conjunct, so they already share
+	// one time frame: `always (A(t) && B(t))` means A and B from the same
+	// start point. Folding them through always_conjunction instead (as
+	// 76a69031 did) shifts the clause with the smaller lookback into the
+	// past, `always (A(t-1) && B(t))`, which asserts A one step BEFORE the
+	// run starts and, with an initial condition on the state, constrains
+	// an input the run never reads: a guarded latch such as
+	// `(o1[0] = 0) && (i1[t] = 1 ? o1[t] = 1 : o1[t] = o1[t-1])` was
+	// reported unsat (GitHub #100). always_conjunction is only right for
+	// two SEPARATELY written always statements, each with its own start;
+	// that case is merged by the normalizer before the spec reaches the
+	// interpreter and never arrives here as clauses of one always.
 	tref aw_body = nullptr;
 	for (tref b : aw_clauses)
-		aw_body = aw_body ? always_conjunction<node>(aw_body, b) : b;
+		aw_body = aw_body ? tau::build_wff_and(aw_body, b) : b;
 	return tau::build_wff_and(
 		tau::build_wff_always(aw_body ? aw_body : tau::_T()),
 		tau::build_wff_and(clauses));

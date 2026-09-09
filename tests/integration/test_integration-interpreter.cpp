@@ -1117,6 +1117,28 @@ TEST_SUITE("only outputs") {
 }
 
 
+namespace {
+// Runs `sample` for `steps` steps, feeding the input stream i1 (of BA type
+// `i1_type`) from `i1_values`, and returns the values written to the
+// sbf-typed output o1 -- or nullopt when the interpreter rejects the spec as
+// unsat. `o2` optionally collects a second sbf-typed output.
+std::optional<strings> run_latch(const char* sample, const strings& i1_values,
+	size_t i1_type, size_t steps,
+	std::shared_ptr<vector_output_stream> o2 = nullptr)
+{
+	io_context<node_t> ctx;
+	ctx.add_input("i1", i1_type,
+		std::make_shared<vector_input_stream>(i1_values));
+	auto o1 = std::make_shared<vector_output_stream>();
+	ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+	if (o2) ctx.add_output("o2", sbf_type_id<node_t>(), o2);
+	tref spec = create_spec(ctx, sample);
+	auto maybe_i = run<node_t>(spec, ctx, steps);
+	if (!maybe_i.has_value()) return std::nullopt;
+	return o1->get_values();
+}
+} // namespace
+
 TEST_SUITE("with inputs and outputs") {
 
 	TEST_CASE("i1[t] = o1[t]") {
@@ -1154,6 +1176,159 @@ TEST_SUITE("with inputs and outputs") {
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 2);
 		CHECK ( !memory.value().empty() );
+	}
+
+	// Regression tests for GitHub #100: a guarded update with an initial
+	// condition was reported unsat. create_spec_partition splits the single
+	// always body into one always per clause and unsqueeze_always re-folded
+	// them through always_conjunction, which shifted the clause with the
+	// smaller lookback (the set branch, lookback 0) one step into the past.
+	// Instantiated at the start point, that clause constrained the input at
+	// time 0 -- an input the run never reads -- and for-all-inputs collapsed
+	// to F (or, with an init the shifted clause happened to satisfy, the
+	// solver assigned the unread input and step 1 failed). unsqueeze_always
+	// now folds the bodies verbatim. Every "(#100)" case below was wrong on
+	// main before the fix; the "stays unsat" cases guard against
+	// over-correcting. Each case checks the exact output sequence, so a
+	// spurious verdict at any step is caught, not only the initial unsat.
+	TEST_CASE("guarded latch with init 0 is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1" } );
+	}
+
+	// With init 1 the same spec used to pass the fixpoint but fail at step 1
+	// with "Failed to find output stream for stream 'i1'".
+	TEST_CASE("guarded latch with init 1 is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "1", "1", "1", "1" } );
+	}
+
+	// The equation form of the same latch never had the problem (a single
+	// clause has nothing to re-align); it is the control for the two above.
+	TEST_CASE("equation form of the guarded latch runs (#100 control)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0)"
+			" && (o1[t]:sbf = o1[t-1]:sbf | i1[t]:sbf).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1" } );
+	}
+
+	// Nested conditionals: a set/hold/clear update selected by the input.
+	TEST_CASE("three-way guarded update with init is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:sbf = 0)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf) : (o1[t]:sbf = 0))).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1" } );
+	}
+
+	// Three levels of nesting, the innermost guard on the previous state.
+	TEST_CASE("three-level guarded update with init is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:sbf = 0)"
+			" ? ((o1[t-1]:sbf = 1) ? (o1[t]:sbf = 0)"
+			" : (o1[t]:sbf = o1[t-1]:sbf)) : (o1[t]:sbf = 0))).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "0", "1" } );
+	}
+
+	// A nested update on o1 next to a second output that reads the previous
+	// state (a result register). The fixpoint-side filter proposed in PR 103
+	// did not cover this shape; the verbatim fold does.
+	TEST_CASE("guarded update coupled with a previous-state register (#100)") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[0]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? (o1[t]:sbf = o1[t-1]:sbf | 1)"
+			" : ((i1[t]:sbf = 0) ? (o1[t]:sbf = o1[t-1]:sbf)"
+			" : (o1[t]:sbf = o2[t-1]:sbf))) && (o2[t]:sbf = o1[t-1]:sbf).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "1" } );
+		CHECK ( o2->get_values() == strings{ "1", "0", "0", "1", "1" } );
+	}
+
+	// A set branch that also asserts the previous state. With init 1 every
+	// input has a run (o1 is 1 at all times); with init 0 an input of 1 at
+	// t = 1 demands o1[0] = 1, so the spec is genuinely unsat.
+	TEST_CASE("set branch asserting the previous state, init 1 runs (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t-1]:sbf = 1 && o1[t]:sbf = 1) : (o1[t]:sbf = 1)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "1", "1", "1", "1", "1" } );
+	}
+	TEST_CASE("set branch asserting the previous state, init 0 stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t-1]:sbf = 1 && o1[t]:sbf = 1) : (o1[t]:sbf = 1)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Lookback 2 with two initial conditions: the guarded update reads two
+	// steps back, so the fixpoint still takes a step after the fix.
+	TEST_CASE("guarded latch with lookback 2 and two inits (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? (o1[t]:sbf = o1[t-2]:sbf | 1)"
+			" : (o1[t]:sbf = o1[t-2]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "0", "1", "0" } );
+	}
+
+	// A toggle in the else branch.
+	TEST_CASE("guarded set with toggle-else and init is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : (o1[t]:sbf = o1[t-1]:sbf')).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "1", "0", "1" } );
+	}
+
+	// A bitvector command selecting the update of an sbf-typed state.
+	TEST_CASE("bitvector command three-way update with init (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:bv[2] = { 1 }:bv[2])"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:bv[2] = { 2 }:bv[2])"
+			" ? (o1[t]:sbf = o1[t-1]:sbf) : (o1[t]:sbf = 0))).",
+			{ "0", "1", "2", "3" }, bv_type_id<node_t>(2), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0" } );
+	}
+
+	// Guards against over-correcting: an EXPLICITLY written shifted clause
+	// next to its original deliberately governs one step below the start;
+	// with the init contradicting it at time 0 the spec is unsat and must
+	// stay so (only the interpreter's own re-alignment was wrong).
+	TEST_CASE("deliberate shifted twin with init stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[t]:sbf = i1[t]:sbf)"
+			" && (o1[t-1]:sbf = i1[t-1]:sbf).",
+			{ "1", "0" }, sbf_type_id<node_t>(), 3);
+		CHECK ( !o1.has_value() );
+	}
+
+	// An init at time 1 on the guarded latch: an input of 1 at t = 1 forces
+	// o1[1] = 1, contradicting the init, so for-all-inputs is unsat.
+	TEST_CASE("guarded latch with init at time 1 stays unsat") {
+		auto o1 = run_latch("(o1[1]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Two inits that contradict a pure hold stay unsat.
+	TEST_CASE("inits contradicting a guarded hold stay unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? (o1[t]:sbf = o1[t-1]:sbf)"
+			" : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		CHECK ( !o1.has_value() );
 	}
 
 	// Regression test: nested conditionals over a mix of `:tau` and `:bv[N]`

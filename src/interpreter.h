@@ -274,7 +274,14 @@ private:
 	/// @brief Return those variables in @p vars that appear within the lookback.
 	trefs appear_within_lookback(const trefs& vars);
 
-	/// @brief Unsqueeze `always` statements without adjusting time points.
+	/// @brief Re-fold the per-clause `always` wrappers of one partition
+	/// part into a single `always`, conjoining the bodies verbatim.
+	///
+	/// The clauses were split from one `always` body by
+	/// create_spec_partition, so they share a time frame and must not be
+	/// re-aligned to a common lookback (that shift asserts the shorter
+	/// clause one step before the start and makes guarded latches with an
+	/// initial condition read as unsat, GitHub #100).
 	static tref unsqueeze_always(tref cnf_expression);
 
 	/// @brief Dump interpreter state to @p os.
