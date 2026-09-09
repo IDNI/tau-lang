@@ -150,7 +150,7 @@ TEST_SUITE("BDD creation terms") {
 		// the order is a hash/nt-id-order-dependent tie-break that drifts
 		// with every parser regen (Debug and Release differ too).
 		INFO("result: " << result);
-		CHECK((result == "xzrqeywt" || result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
+		CHECK((result == "wetyzrxq" || result == "xzrqeywt" || result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
 			|| result == "xyzqwert"
 			|| result == "ewytrxzq"
 			|| result == "zrwyexqt"
@@ -201,7 +201,7 @@ TEST_SUITE("BDD and many") {
 		// bdd_and_many's merge order is a hash/nt-id-order-dependent
 		// tie-break that drifts with every parser regen.
 		INFO("result: " << result);
-		CHECK((result == "xydcefab" || result == "xydcabfe" || result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
+		CHECK((result == "xycdefba" || result == "xydcefab" || result == "xydcabfe" || result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
 			|| result == "xycdabfe"
 			|| result == "xycdabef"
 			|| result == "xyfedcab"
@@ -241,7 +241,7 @@ TEST_SUITE("BDD and many") {
 		// is accepted; the order is a hash/nt-id-order-dependent tie-break
 		// that drifts with every parser regen (Debug and Release differ too).
 		INFO("result: " << result);
-		CHECK((result == "abbd&(f'e')'cc" || result == "d&(e'f')'bbcca" || result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
+		CHECK((result == "baccd&(f'e')'" || result == "abbd&(f'e')'cc" || result == "d&(e'f')'bbcca" || result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
 			|| result == "c&(e'f')'bbda"
 			|| result == "ab&(f'e')'bccd"
 			|| result == "cabb&(e'f')'d"

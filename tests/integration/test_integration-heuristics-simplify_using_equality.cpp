@@ -365,6 +365,7 @@ TEST_SUITE("simplify_using_equality") {
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
+			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
 			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
 			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
 			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
@@ -372,7 +373,6 @@ TEST_SUITE("simplify_using_equality") {
 			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
 			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
 			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
-			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
 			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
 			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
 			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
@@ -491,8 +491,8 @@ TEST_SUITE("simplify_using_equality") {
 		// Equality orientation is a subtree_less tie-break that drifts
 		// with parser regens; both forms carry the o1 -> i1 substitution.
 		CHECK( matches_to_str_to_any_of(res, {
-			"o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau",
 			"o1[t]:tau = i1[t]:tau && o2[t]:tau = i1[t]:tau",
+			"o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau",
 		}) );
 	}
 
@@ -507,8 +507,8 @@ TEST_SUITE("simplify_using_equality") {
 		// subtree_less tie-break that drifts with parser regens; both
 		// forms are the same chain in representative form.
 		CHECK( matches_to_str_to_any_of(res, {
-			"o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau",
 			"o2[t]:tau = o1[t]:tau && o1[t]:tau = i1[t]:tau",
+			"o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau",
 		}) );
 	}
 

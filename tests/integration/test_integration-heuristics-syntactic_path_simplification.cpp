@@ -171,8 +171,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
-			"x = 0 && (z != 0 || k = 0 && y = 0) || y = 0 && x = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
+			"x = 0 && (z != 0 || k = 0 && y = 0) || y = 0 && x = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 		}) );

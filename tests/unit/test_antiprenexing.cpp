@@ -406,7 +406,7 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
 		// Step 2 (subs_elim): ex x (x=w && xy=0) → (xy=0)[x:=w] = wy=0
 		tref res = run_apb0("ex x (xy = 0 && x = w).");
-		CHECK( matches_to_str_to_any_of(res, {"wy = 0", "yw = 0"}) );
+		CHECK( matches_to_str_to_any_of(res, {"yw = 0", "wy = 0"}) );
 	}
 
 	TEST_CASE("subs_elim: ex x (x=w) → T") {

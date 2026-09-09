@@ -56,6 +56,8 @@ TEST_SUITE("anti_prenex") {
 			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
 			// pre-deletion shape below. Canonical (produced) shape FIRST:
 			// Debug's matches_to_any_of only checks expected[0].
+			// Re-pinned after 2f7c3ce9 (nonterminals hashed by name).
+			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || f(b1) || w = 0)",
 			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || f(b1) || w = 0)",
 			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))",
 			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
@@ -96,7 +98,10 @@ TEST_SUITE("anti_prenex") {
 			// shape is, by construction, independent of what shape the
 			// wrapped ex-elimination happens to return. Canonical
 			// (produced) shape FIRST: Debug's matches_to_any_of only
-			// checks expected[0].
+			// checks expected[0]. Re-pinned after 2f7c3ce9 (nonterminals
+			// hashed by name).
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (w != 0 || y'w = 0)",
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
 			"&& (w != 0 || wy' = 0)",
 			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
@@ -158,8 +163,8 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		// conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
-			"y != 0 && z != 0",
 			"z != 0 && y != 0",
+			"y != 0 && z != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -169,8 +174,8 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		// disjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
-			"y = 0 || z = 0",
 			"z = 0 || y = 0",
+			"y = 0 || z = 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -180,8 +185,8 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		// clause/conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
-			"y != 0 && z != 0 || w != 0 && u != 0",
 			"z != 0 && y != 0 || u != 0 && w != 0",
+			"y != 0 && z != 0 || w != 0 && u != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -236,8 +241,8 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		// conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
-			"y != 0 && z != 0",
 			"z != 0 && y != 0",
+			"y != 0 && z != 0",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -250,6 +255,8 @@ TEST_SUITE("anti_prenex") {
 		tref fm = tau::build_wff_all_many(fv, spec);
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// re-pinned after 2f7c3ce9 (nonterminals hashed by name)
+			"all b2, b1 (always b2 b1 != 0)",
 			"all b2, b1 (always b1 b2 != 0)",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
@@ -342,7 +349,7 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
 		// Step 2 of anti_prenex_block substitutes x:=w giving wy=0.
 		CHECK( normalize_and_check("ex x (xy = 0 && x = w).",
-			strings{"wy = 0", "yw = 0"}) );
+			strings{"yw = 0", "wy = 0"}) );
 	}
 	TEST_CASE("subs_elim: ex x (x=w) → T") {
 		// After substitution the body reduces to T.

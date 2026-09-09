@@ -129,11 +129,12 @@ TEST_SUITE("Execution") {
 		// any-of behavior in non-Debug builds. See the 8f1a74c1
 		// order-insensitivity note at the top of this suite.
 		// Re-pinned 2026-09-07 after the ba_constant regen (parser ids
-		// shifted, so the hash-driven conjunct order moved).
+		// shifted, so the hash-driven conjunct order moved), and again
+		// after 2f7c3ce9 (nonterminals hashed by name).
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
+				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
@@ -141,13 +142,13 @@ TEST_SUITE("Execution") {
 		std::vector<strings> o1_expected = {
 			{ "T" }, { "<:x> = 0" },
 			{
-				"<:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:x> = 0",
+				"<:x> = 0 && <:y> = 0",
 			},
 			{
+				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 				"<:z> = 0 && <:x> = 0 && <:y> = 0",
 				"<:x> = 0 && <:z> = 0 && <:y> = 0",
-				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 				"<:x> = 0 && <:y> = 0 && <:z> = 0",
 				"<:y> = 0 && <:x> = 0 && <:z> = 0",
 			}
@@ -184,11 +185,11 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> o3_expected = {
 			{
-				"<:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:x> = 0",
+				"<:x> = 0 && <:y> = 0",
 			}, {
-				"<:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:x> = 0",
+				"<:x> = 0 && <:y> = 0",
 			}
 		};
 		io_context<node_t> ctx;
@@ -319,8 +320,8 @@ TEST_SUITE("Execution") {
 		// Re-pinned 2026-09-07 after the ba_constant regen.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o2[t]:tau = 0 && o3[t]:tau = 0",
 				"always o3[t]:tau = 0 && o2[t]:tau = 0",
+				"always o2[t]:tau = 0 && o3[t]:tau = 0",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -458,31 +459,31 @@ TEST_SUITE("Execution") {
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
 			// Re-pinned 2026-09-07 after the ba_constant regen.
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
 			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
