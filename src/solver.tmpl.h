@@ -386,7 +386,7 @@ struct minterm_iterator {
 	}
 
 	minterm operator*() const {
-		return current;
+		return exhausted ? nullptr : current;
 	}
 
 private:
@@ -401,7 +401,7 @@ private:
 	};
 
 	std::vector<choice> choices;
-	tref current;
+	tref current = nullptr;
 	bool exhausted = false;
 
 	// Minterm selected by the current polarity vector: the last choice's
