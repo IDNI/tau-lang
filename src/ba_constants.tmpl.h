@@ -31,6 +31,17 @@ typename ba_constants<node>::pool_index& ba_constants<node>::index_() {
 
 template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
+	// cvc5 requires every Term to be destroyed before its process-wide node
+	// manager is torn down. Empty the pool from an exit handler registered on
+	// first use, so the static destructors only see empty containers.
+	static const bool cleanup_registered = [] {
+		if (std::atexit([] { ba_constants<node>::cleanup(); }) != 0)
+			throw std::runtime_error(
+				"ba_constants: unable to register process cleanup");
+		return true;
+	}();
+	(void)cleanup_registered;
+
 	// No tracing here: this runs for every constant the bv evaluation
 	// hooks fold during a step, and the pool lookup is index-backed.
 	auto p = std::make_pair(constant, type_id);
