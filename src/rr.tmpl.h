@@ -96,7 +96,7 @@ std::size_t std::hash<idni::tau_lang::rr<node>>::operator()(
 	auto h = [](const idni::htref& p) -> size_t {
 		return p ? idni::hash_htree<node>{}(*p) : 0;
 	};
-	size_t seed = 0;
+	std::uint64_t seed = 0;
 	for (const auto& [l, r] : rr.rec_relations)
 		idni::hash_combine(seed, h(l), h(r));
 	idni::hash_combine(seed, h(rr.main));

@@ -97,7 +97,7 @@ private:
 	// three pools share one lifetime.
 	struct pooled_key_hash {
 		size_t operator()(const std::pair<constant, size_t>& p) const {
-			size_t seed = std::hash<constant>{}(p.first);
+			std::uint64_t seed = std::hash<constant>{}(p.first);
 			hash_combine(seed, p.second);
 			return seed;
 		}

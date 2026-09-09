@@ -220,7 +220,7 @@ static size_t nt_name_hash(size_t nt) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 size_t node<BAs...>::hashit() const {
-	std::size_t seed = 0;
+	std::uint64_t seed = 0;
 	hash_combine(seed, nt_name_hash<BAs...>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
