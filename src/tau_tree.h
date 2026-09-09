@@ -152,7 +152,7 @@ struct node {
 	const T term : 1         = 0; ///< 1 = is term (bf), 0 = is formula (wff).
 	const T ext  : 1         = 0; ///< 1 = data stored in child (not yet used).
 	const T data : data_bits = 0; ///< Inline data (meaning depends on `nt`).
-	const unsigned short ba_type; ///< Boolean-algebra type id.
+	const uint32_t ba_type;       ///< Boolean-algebra type id.
 	const uint64_t hash;          ///< Pre-computed hash for fast equality checks.
 
 	/**

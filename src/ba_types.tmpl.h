@@ -170,6 +170,9 @@ size_t ba_types<node>::id(tref ba_type) {
 	using tau = tree<node>;
 	if (auto it = type_tree_to_idx().find(ba_type);
 		it != type_tree_to_idx().end()) return it->second;
+	// node::ba_type stores this id, so it must not outgrow that field.
+	DBG(assert(type_trees().size()
+		< std::numeric_limits<decltype(node::ba_type)>::max());)
 	return type_tree_to_idx().emplace(ba_type, type_trees().size()),
 		type_trees().push_back(tau::geth(ba_type)), type_trees().size() - 1;
 }

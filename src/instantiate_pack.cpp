@@ -33,6 +33,10 @@ namespace idni::tau_lang {
 // The configured pack; mirrored by tests/test_tau_helpers.h's bas_pack.
 using test_node_t = tau_pack::node_t;
 
+// node<BAs...> has no BA-dependent storage, so this holds for every pack;
+// catches an accidental widening of the bit-field word or ba_type/hash.
+static_assert(sizeof(test_node_t) == 24);
+
 #define TAU_PACK_FN(ret, name, args) \
 	template ret name<test_node_t> args;
 #define TAU_PACK_CLASS(name) \
