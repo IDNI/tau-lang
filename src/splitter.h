@@ -42,7 +42,9 @@ tref tau_bad_splitter(tref fm = tree<node<BAs...>>::_T());
  * @tparam BAs Boolean-algebra type pack.
  * @param fm Formula normalized in DNF.
  * @param st Splitter type selector.
- * @return Splitter formula, or `nullptr` if none found.
+ * @return Splitter formula; never `nullptr`. Internally falls back to
+ *         `tau_bad_splitter(fm)` when no real splitter is found, tagged
+ *         there as `splitter_type::bad`.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
