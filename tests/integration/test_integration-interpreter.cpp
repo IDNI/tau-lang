@@ -1122,14 +1122,19 @@ namespace {
 // Runs `sample` for `steps` steps, feeding the input stream i1 (of BA type
 // `i1_type`) from `i1_values`, and returns the values written to the
 // sbf-typed output o1 -- or nullopt when the interpreter rejects the spec as
-// unsat. `o2` optionally collects a second sbf-typed output.
+// unsat. `o2` optionally collects a second sbf-typed output and `i2_values`
+// optionally feeds a second, sbf-typed input stream i2.
 std::optional<strings> run_latch(const char* sample, const strings& i1_values,
 	size_t i1_type, size_t steps,
-	std::shared_ptr<vector_output_stream> o2 = nullptr)
+	std::shared_ptr<vector_output_stream> o2 = nullptr,
+	const strings* i2_values = nullptr)
 {
+	bdd_init<Bool>(); // every case of this file initialises the BDD library itself
 	io_context<node_t> ctx;
 	ctx.add_input("i1", i1_type,
 		std::make_shared<vector_input_stream>(i1_values));
+	if (i2_values) ctx.add_input("i2", sbf_type_id<node_t>(),
+		std::make_shared<vector_input_stream>(*i2_values));
 	auto o1 = std::make_shared<vector_output_stream>();
 	ctx.add_output("o1", sbf_type_id<node_t>(), o1);
 	if (o2) ctx.add_output("o2", sbf_type_id<node_t>(), o2);
@@ -1330,6 +1335,151 @@ TEST_SUITE("with inputs and outputs") {
 			" : (o1[t]:sbf = o1[t-1]:sbf)).",
 			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
 		CHECK ( !o1.has_value() );
+	}
+
+	// Deeper shapes for the same defect: more levels of `?:` and initial
+	// conditions at positions other than 0. The "(#100)" cases were wrong
+	// on main before the fix (unsat, or the solver assigning the unread
+	// input); the others pin behaviour that was already right.
+
+	// Depth 3 on two inputs.
+	TEST_CASE("depth-3 conditional on two inputs with init") {
+		strings i2_values = { "1", "1", "0", "0" };
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? ((i2[t]:sbf = 1) ? (o1[t]:sbf = 1) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" : ((i2[t]:sbf = 1) ? ((o1[t-1]:sbf = 1) ? (o1[t]:sbf = 0)"
+			" : (o1[t]:sbf = 1)) : (o1[t]:sbf = o1[t-1]:sbf))).",
+			{ "0", "1", "1", "0" }, sbf_type_id<node_t>(), 5, nullptr, &i2_values);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "1", "1", "1" } );
+	}
+
+	// Depth 5: a five-way chain on a bv[3] command (set, hold, clear,
+	// toggle, otherwise hold).
+	TEST_CASE("depth-5 command chain with init (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:bv[3] = { 0 }:bv[3])"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:bv[3] = { 1 }:bv[3])"
+			" ? (o1[t]:sbf = o1[t-1]:sbf) : ((i1[t]:bv[3] = { 2 }:bv[3])"
+			" ? (o1[t]:sbf = 0) : ((i1[t]:bv[3] = { 3 }:bv[3])"
+			" ? (o1[t]:sbf = o1[t-1]:sbf') : (o1[t]:sbf = o1[t-1]:sbf))))).",
+			{ "1", "0", "3", "2", "4", "3" }, bv_type_id<node_t>(3), 7);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "0", "0", "0", "1" } );
+	}
+
+	// Depth 3 on the state history with lookback 3 and inits at 0, 1, 2.
+	// Five steps only: from step 5 on this shape's per-step solve time
+	// grows sharply (tens of seconds at step 5 in Release, minutes at
+	// step 6), which is a performance issue independent of #100 and is
+	// tracked separately; the boundary this case guards is at steps 3-4.
+	TEST_CASE("depth-3 guard on the history, lookback 3, three inits (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 0) && (o1[2]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? ((o1[t-1]:sbf = 1) ? ((o1[t-2]:sbf = 1)"
+			" ? (o1[t]:sbf = 0) : (o1[t]:sbf = 1)) : (o1[t]:sbf = o1[t-3]:sbf))"
+			" : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0" } );
+	}
+
+	// An init at position 2 only: the run must pick o1[0] = o1[1] = 1 so
+	// that o1[2] = 1 holds for every input at t = 2.
+	TEST_CASE("guarded latch with an init at position 2 only (#100)") {
+		auto o1 = run_latch("(o1[2]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "1", "1", "1", "1", "1" } );
+	}
+
+	// Inits at 0 and 2 with a gap: inputs (0, 0) at t = 1, 2 would force
+	// o1[2] = o1[0] = 0 against the init, so for-all-inputs is unsat.
+	TEST_CASE("guarded latch with inits at 0 and 2 stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[2]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		CHECK ( !o1.has_value() );
+	}
+
+	// A constant position on an INPUT stream is an assumption on the
+	// input and stays unsat (same convention as "i1[t] = o1[t] && o1[0] = 0"
+	// above).
+	TEST_CASE("guarded latch with a constant on the input stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (i1[1]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Two outputs initialised at different positions: o2[1] = o1[0] is
+	// forced by the register clause, so o2[1] = 1 contradicts o1[0] = 0
+	// and o2[1] = 0 agrees with it.
+	TEST_CASE("register init at position 1 contradicting o1[0] stays unsat") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[1]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" && (o2[t]:sbf = o1[t-1]:sbf).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		CHECK ( !o1.has_value() );
+	}
+	TEST_CASE("register init at position 1 agreeing with o1[0] runs (#100)") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[1]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" && (o2[t]:sbf = o1[t-1]:sbf).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "1" } );
+		// o2[0] lies before the register clause's first governed point and
+		// is the solver's choice; from position 1 on it mirrors o1[t-1].
+		strings o2_values = o2->get_values();
+		REQUIRE ( o2_values.size() == 5 );
+		CHECK ( strings(o2_values.begin() + 1, o2_values.end())
+			== strings{ "0", "0", "1", "1" } );
+	}
+
+	// Depth 4 on a bv[2] command plus a lookback-2 register, inits on both
+	// outputs at positions 0 and 1.
+	TEST_CASE("depth-4 command with a lookback-2 register and four inits (#100)") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1) && (o2[0]:sbf = 0)"
+			" && (o2[1]:sbf = 0) && ((i1[t]:bv[2] = { 1 }:bv[2]) ? (o1[t]:sbf = 1)"
+			" : ((i1[t]:bv[2] = { 0 }:bv[2]) ? (o1[t]:sbf = o1[t-1]:sbf)"
+			" : ((i1[t]:bv[2] = { 2 }:bv[2]) ? (o1[t]:sbf = o1[t-2]:sbf)"
+			" : (o1[t]:sbf = 0)))) && (o2[t]:sbf = o1[t-2]:sbf).",
+			{ "2", "1", "0", "3" }, bv_type_id<node_t>(2), 6, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "0", "1", "1", "0" } );
+		CHECK ( o2->get_values() == strings{ "0", "0", "0", "1", "0", "1" } );
+	}
+
+	// A conditional nested in the else branch whose innermost guard reads
+	// two steps back; the third branch is reached by a non-constant sbf
+	// input.
+	TEST_CASE("nested else branch with a lookback-2 guard, two inits (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:sbf = 0) ? ((o1[t-2]:sbf = 1)"
+			" ? (o1[t]:sbf = 0) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" : (o1[t]:sbf = o1[t-2]:sbf))).",
+			{ "0", "1", "x", "1", "0" }, sbf_type_id<node_t>(), 7);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "0", "1", "0", "1", "1" } );
+	}
+
+	// A two-bit state machine: depth 4 over the input and both state bits,
+	// both bits initialised.
+	TEST_CASE("two-bit state machine with depth-4 transitions") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? ((o1[t-1]:sbf = 0) ? ((o2[t-1]:sbf = 0)"
+			" ? ((o1[t]:sbf = 0) && (o2[t]:sbf = 1))"
+			" : ((o1[t]:sbf = 1) && (o2[t]:sbf = 0)))"
+			" : ((o1[t]:sbf = 1) && (o2[t]:sbf = 1)))"
+			" : ((o1[t]:sbf = o1[t-1]:sbf) && (o2[t]:sbf = o2[t-1]:sbf))).",
+			{ "1", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "1" } );
+		CHECK ( o2->get_values() == strings{ "0", "1", "0", "0", "1" } );
 	}
 
 	// Regression test: nested conditionals over a mix of `:tau` and `:bv[N]`
