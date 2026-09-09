@@ -173,6 +173,10 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	auto root = rep.open_if(benchmarks, "run");
 	string src;
 	auto finish = [&](int code) -> int {
+		// The root scope must be closed before the report is printed:
+		// report::print() rejects a report with open scopes, whose elapsed
+		// time is not yet written.
+		root.close();
 		// Benchmarks stay plain text: the parser's global TC colorizes
 		// report::print() output unconditionally, which would corrupt a
 		// piped or logged benchmark stream.
