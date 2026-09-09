@@ -34,12 +34,13 @@ tref neg(tref n)          { return tau::build_wff_neg(n); }
 tref conj(tref l, tref r) { return tau::build_wff_and(l, r); }
 tref disj(tref l, tref r) { return tau::build_wff_or(l, r); }
 
-/// A real order atom `x <= y`. With the construction hooks on and a
-/// non-bitvector type, `<=` does not survive construction at all: the hook
-/// rewrites it into the equation `x·y' = 0` (src/hooks.tmpl.h), and `<`
-/// into a conjunction. An order atom therefore reaches this module only
-/// from bitvector-typed content (the bitvector router's solver path, §1) —
-/// or, as here, from a build with the hooks off.
+/// A real order atom `x <= y`. On a non-bitvector type the construction
+/// hooks rewrite `<=` into the equation `x·y' = 0` (src/hooks.tmpl.h:1323)
+/// and `<` into a conjunction (:1194), so neither survives construction
+/// here. That never reaches the algorithm, which does not CONSTRUCT order
+/// atoms (D4 amendment): `is_order_atom` classifies what the input holds,
+/// and the parser builds with the hooks disabled. This helper reproduces
+/// that shape the same way.
 tref order_atom(const char* l, const char* r) {
 	use_hooks_guard<node_t> g(false);
 	return tau::build_bf_lteq(tau::build_bf_variable(l, 0),
