@@ -314,6 +314,14 @@ result<interpreter<node>>
 		return r;
 	}
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
+	// Every io_var must carry its input/output classification before the
+	// spec is stepped: transform_io_var refuses an unclassified one. The
+	// spec entry points resolve against ctx before reaching here, but the
+	// public run(tref, ctx) hands a bare-parsed formula straight in, so
+	// classify here, where both paths meet. A tree the spec path already
+	// resolved gets the same answer again: a registered stream still wins,
+	// and the name heuristic is deterministic.
+	spec = resolve_io_vars<node>(ctx, spec);
 	// IN-M9 (found by the IN-RT4 api-level execution tests): CTL* specs
 	// reached this point unreduced.  A/E are not full-LTL operators, so
 	// `A (always phi)` was classified as a plain G spec, normalised as

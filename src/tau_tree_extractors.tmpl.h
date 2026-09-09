@@ -25,7 +25,7 @@ rr_sig get_rr_sig(tref n) {
 }
 
 template <NodeType node>
-tref resolve_io_vars(io_context<node>& ctx, tref fm) {
+tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
 	// Classification (TT2-21, public contract): a stream registered in
 	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
 	// first char 'i' or the name "this" -> input; first char 'o' or the
