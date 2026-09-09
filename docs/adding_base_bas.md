@@ -172,6 +172,8 @@ set(TAU_BA_HEADER boolean_algebras/<id>/<id>.h)
 # set(TAU_BA_REQUIRES_PACKAGES <package>)              # found only for packs
                                                        # holding this BA
 # set(TAU_BA_TESTS tests/test_<id>.cpp …)              # registered with the BA
+# set(TAU_BA_HOSTS_BOOL TRUE)                          # iff the descriptor
+                                                       # declares can_host_bool
 ```
 
 Paths are relative to the manifest, so a plugin is one directory:
@@ -201,8 +203,12 @@ tau_register_ba(<id>
     HEADER  <id>.h
     TYPE    <value type>
     GRAMMAR parser/<id>.tgf
-    TESTS   tests/test_<id>.cpp)
+    TESTS   tests/test_<id>.cpp
+    HOSTS_BOOL)          # iff the descriptor declares can_host_bool
 ```
+
+A pack in which no BA hosts a Boolean is refused at configure time: core needs
+one to build a plain 0 or 1.
 
 Pass that file to the configure as `-DTAU_EXTERNAL_BAS=/abs/path/register.cmake`.
 `tests/external_ba/` is a complete working example, built and run in one command

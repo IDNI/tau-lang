@@ -33,6 +33,7 @@ register a phantom BA in every build. Write one when you copy the directory.
    # set(TAU_BA_TESTS tests/test_<id>.cpp)
    # set(TAU_BA_LINK_LIBS <target>)
    # set(TAU_BA_REQUIRES_PACKAGES <package>)
+   # set(TAU_BA_HOSTS_BOOL TRUE)      # iff the descriptor declares can_host_bool
    ```
 
    Sources, grammar and suites are all the plugin's own: `<id>/parser/<id>.tgf`

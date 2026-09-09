@@ -32,7 +32,8 @@ set(TAU_BA_INCLUDE_DIRS "")
 macro(tau_register_ba NAME)
 	set(_one_value PATH HEADER TYPE GRAMMAR)
 	set(_multi_value LINK_LIBS REQUIRES_PACKAGES TESTS)
-	cmake_parse_arguments(_reg "" "${_one_value}" "${_multi_value}" ${ARGN})
+	cmake_parse_arguments(_reg "HOSTS_BOOL" "${_one_value}" "${_multi_value}"
+		${ARGN})
 	if(NOT _reg_PATH OR NOT _reg_HEADER OR NOT _reg_TYPE)
 		message(FATAL_ERROR
 			"tau_register_ba(${NAME}) requires PATH, HEADER, and TYPE")
@@ -47,6 +48,12 @@ macro(tau_register_ba NAME)
 	list(APPEND _TAU_BA_REGISTERED_IDS "${NAME}")
 	set(TAU_BA_${NAME}_LINK_LIBS "${_reg_LINK_LIBS}")
 	set(TAU_BA_${NAME}_REQUIRES_PACKAGES "${_reg_REQUIRES_PACKAGES}")
+	# TRUE when the descriptor declares can_host_bool (see the resolver)
+	if(_reg_HOSTS_BOOL)
+		set(TAU_BA_${NAME}_HOSTS_BOOL TRUE)
+	else()
+		set(TAU_BA_${NAME}_HOSTS_BOOL FALSE)
+	endif()
 	list(APPEND TAU_BA_INCLUDE_DIRS "${_reg_PATH}")
 endmacro()
 
@@ -66,6 +73,7 @@ macro(_tau_load_ba_registry)
 			unset(TAU_BA_TESTS)
 			unset(TAU_BA_LINK_LIBS)
 			unset(TAU_BA_REQUIRES_PACKAGES)
+			unset(TAU_BA_HOSTS_BOOL)
 			include(${_mf})
 			if(NOT TAU_BA_ID)
 				message(FATAL_ERROR "ba.cmake missing TAU_BA_ID: ${_mf}")
@@ -84,6 +92,13 @@ macro(_tau_load_ba_registry)
 				unset(TAU_BA_TEST_REQUIRES_${_tn})
 			endforeach()
 			set(TAU_BA_${TAU_BA_ID}_HEADER "${TAU_BA_HEADER}")
+			# TRUE when the descriptor declares can_host_bool; the resolver
+			# refuses a pack in which no BA can carry a plain 0/1
+			if(TAU_BA_HOSTS_BOOL)
+				set(TAU_BA_${TAU_BA_ID}_HOSTS_BOOL TRUE)
+			else()
+				set(TAU_BA_${TAU_BA_ID}_HOSTS_BOOL FALSE)
+			endif()
 			if(TAU_BA_TYPE)
 				set(TAU_BA_${TAU_BA_ID}_TYPE "${TAU_BA_TYPE}")
 			endif()
@@ -157,6 +172,19 @@ function(tau_resolve_ba_pack)
 
 	if(_base_types STREQUAL "")
 		message(FATAL_ERROR "TAU_BAS must enable at least one base BA")
+	endif()
+	# pack_bool_carrier_type static_asserts that some BA of the pack declares
+	# can_host_bool; refuse here, naming the pack, instead of deep in core
+	set(_host_in_pack FALSE)
+	foreach(_id ${_ba_ids})
+		if(TAU_BA_${_id}_HOSTS_BOOL)
+			set(_host_in_pack TRUE)
+		endif()
+	endforeach()
+	if(NOT _host_in_pack)
+		message(FATAL_ERROR
+			"no BA in TAU_BAS='${TAU_BAS}' can host a Boolean (declares "
+			"can_host_bool: bv, sbf); core needs one to build a plain 0 or 1")
 	endif()
 
 	list(JOIN _base_types ", " _base_types_str)
@@ -274,7 +302,7 @@ function(tau_generate_pack_header)
 	if(NOT _carrier_in_pack)
 		message(WARNING
 			"none of TAU_BOOL_CARRIERS='${TAU_BOOL_CARRIERS}' is in "
-			"TAU_BAS='${TAU_BAS}'; each pack falls back to its first BA "
+			"TAU_BAS='${TAU_BAS}'; the carrier is the first BA of the pack "
 			"declaring can_host_bool")
 	endif()
 

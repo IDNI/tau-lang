@@ -19,3 +19,5 @@ set(TAU_BA_TEST_REQUIRES_test_integration-solver-sbf bv)
 set(TAU_BA_TEST_REQUIRES_test_sbf bv)
 set(TAU_BA_TEST_REQUIRES_test_sbf_ba_parsing bv)
 set(TAU_BA_TEST_REQUIRES_test_sbf_ba_splitter bv)
+# the descriptor declares can_host_bool
+set(TAU_BA_HOSTS_BOOL TRUE)

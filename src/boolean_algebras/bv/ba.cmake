@@ -26,3 +26,5 @@ set(TAU_BA_TESTS
 	tests/test_ltl_qlt_bv.cpp
 )
 set(TAU_BA_TEST_REQUIRES_test_ltl_qlt_bv qlt sbf)
+# the descriptor declares can_host_bool
+set(TAU_BA_HOSTS_BOOL TRUE)
