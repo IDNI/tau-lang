@@ -876,6 +876,23 @@ pack_type_family_param(tref type_tree) {
  * flag. It lets a pure-output formula take existential feasibility instead of
  * the safety fixpoint.
  */
+/**
+ * @brief `true` when @p BA declares its outputs always satisfiable by the system.
+ *
+ * A named trait rather than a `requires` written inline in the fold below:
+ * gcc 13.3 ICEs (cp/pt.cc:1747) on a requires-expression nested in a fold's
+ * per-element lambda, and the name is what the conformance test enumerates.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_output_always_satisfiable_v = [] {
+	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+		{ ba_descriptor<BA, Node>::output_always_satisfiable_by_system }
+			-> std::convertible_to<bool>; })
+		return static_cast<bool>(
+			ba_descriptor<BA, Node>::output_always_satisfiable_by_system);
+	else return false;
+}();
+
 template <typename Node>
 bool pack_type_output_always_satisfiable(size_t ba_type) {
 	if (!ba_type) return false;
@@ -884,9 +901,7 @@ bool pack_type_output_always_satisfiable(size_t ba_type) {
 		([&] {
 			using BA = std::tuple_element_t<Is,
 				typename Node::bas_tuple>;
-			if constexpr (ba_has_descriptor_v<Node, BA>
-				&& requires { requires ba_descriptor<BA, Node>
-					::output_always_satisfiable_by_system; })
+			if constexpr (ba_output_always_satisfiable_v<Node, BA>)
 				if (!out && ba_descriptor<BA, Node>
 					::owns_type(ba_type))
 						out = true;
