@@ -414,11 +414,11 @@ private:
 	struct memo_key { tref orig; relevant_t relevant; };
 	struct memo_hash {
 		size_t operator()(const memo_key& k) const {
-			size_t h = hash_lcrs_tref<node>{}(k.orig);
+			std::uint64_t seed = 0;
+			hash_combine(seed, hash_lcrs_tref<node>{}(k.orig));
 			for (const auto& [key, v] : k.relevant)
-				h ^= (hash_lcrs_tref<node>{}(key) + (v ? 0x9e3779b97f4a7c15ULL : 0))
-					+ 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-			return h;
+				hash_combine(seed, hash_lcrs_tref<node>{}(key), v);
+			return static_cast<size_t>(seed);
 		}
 	};
 	struct memo_equal {
