@@ -234,10 +234,25 @@ TEST_CASE("prepare_terms slides a functional quantifier onto the leaves, innermo
 	CHECK(tau::subtree_equals(hi, bf("fall y y")));
 	CHECK(tau::subtree_equals(lo, bf("z")));
 	CHECK(ap::carries_functional_quantifier<node_t>(l));
-	// nested: ∀_y ∃_w (x·y·w ∪ x′·z) → x·∀_y ∃_w (y·w) ∪ x′·z
+	// nested: ∀_y ∃_w (x·y·w ∪ x′·z) → x·∀_y ∃_w (y·w) ∪ x′·z. The chain
+	// keeps the parser's canonical ids and the leaf is rebuilt in content
+	// order of those ids, which no parse string reproduces (the parser
+	// orders operands under the source names and canonicalises afterwards),
+	// so the chain is compared binder by binder and the leaf as a function.
 	tref n = sides(ap::prepare_terms<node_t>(wff("fall y fex w (x & y & w | x' & z) = 0"), P, o)).first;
 	REQUIRE(ap::is_bdd_backed<node_t>(n));
-	CHECK(tau::subtree_equals(ap::cofactor<node_t>(n, x, true, o), bf("fall y fex w (y & w)")));
+	{
+		tref got = ap::cofactor<node_t>(n, x, true, o);
+		tref want = bf("fall y fex w (y & w)");
+		auto var  = [](tref q) { return tau::trim_right_sibling(tau::get(q)[0].first()); };
+		auto body = [](tref q) { return tau::trim_right_sibling(tau::get(q)[0].second()); };
+		REQUIRE(tau::get(got).child_is(tau::bf_fall));
+		CHECK(tau::subtree_equals(var(got), var(want)));
+		tref got_in = body(got), want_in = body(want);
+		REQUIRE(tau::get(got_in).child_is(tau::bf_fex));
+		CHECK(tau::subtree_equals(var(got_in), var(want_in)));
+		CHECK(same_function(body(got_in), body(want_in), { var(got), var(got_in) }));
+	}
 	CHECK(tau::subtree_equals(ap::cofactor<node_t>(n, x, false, o), bf("z")));
 	// a quantifier whose body is P-free is a leaf as it stands
 	tref m = sides(ap::prepare_terms<node_t>(wff("x & fall y (y | z) = 0"), P, o)).first;
@@ -251,11 +266,15 @@ TEST_CASE("functional_quantifier: one node per permutation, absent variables dro
 	tref b = ap::functional_quantifier<node_t>(ap::binder::all, { z, y }, f);
 	CHECK(a == b);
 	CHECK(tau::get(a).child_is(tau::bf_fall));
-	// a nested single-variable chain, as the parser builds it
-	CHECK((tau::subtree_equals(a, bf("fall y fall z (y & z)"))
-		|| tau::subtree_equals(a, bf("fall z fall y (y & z)"))));
-	CHECK((tau::subtree_equals(a, bf("fall y, z (y & z)"))
-		|| tau::subtree_equals(a, bf("fall z, y (y & z)"))));
+	// a nested single-variable chain, as the parser builds it. The module
+	// keeps the source names (it never renames, ground rule 4) while the
+	// parser canonicalises functional subscripts, so the built chain is
+	// canonicalised before the comparison.
+	tref ca = canonize_quantifier_ids<node_t>(a);
+	CHECK((tau::subtree_equals(ca, bf("fall y fall z (y & z)"))
+		|| tau::subtree_equals(ca, bf("fall z fall y (y & z)"))));
+	CHECK((tau::subtree_equals(ca, bf("fall y, z (y & z)"))
+		|| tau::subtree_equals(ca, bf("fall z, y (y & z)"))));
 	// w ∉ FV(f): dropped
 	CHECK(ap::functional_quantifier<node_t>(ap::binder::ex, { w }, f) == f);
 	CHECK(ap::functional_quantifier<node_t>(ap::binder::ex, { w, y }, f)
