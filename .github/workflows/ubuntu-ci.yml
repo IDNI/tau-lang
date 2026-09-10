@@ -17,11 +17,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pack: ["", "sbf,tau,qint"]
+        include:
+          - name: default
+            pack: ""
+          - name: nobv
+            pack: "sbf,tau,qint"
 
     env:
       CC: gcc-13
       CXX: g++-13
+      # the compiler `tau compile` gives the emitted project; without it the
+      # verb prefers the runner's clang++, which cannot build the tree
+      TAU_CXX: g++-13
       CVC5_DIR: ${{ github.workspace }}/.cvc5-dist/lib/cmake/cvc5
 
     steps:
@@ -48,7 +55,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: ccache-ubuntu-24.04-gcc13-${{ matrix.pack }}
+          key: ccache-ubuntu-24.04-gcc13-${{ matrix.name }}
           max-size: 200M
 
       # ── cvc5 (prebuilt binary — no more building from source) ───────────────
@@ -177,7 +184,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build-ci/benchmark_baseline.json
-          key: benchmark-baseline-${{ github.base_ref || github.ref_name }}
+          key: benchmark-baseline-${{ matrix.name }}-${{ github.base_ref || github.ref_name }}
         id: bench-cache
 
       - name: Check for performance regressions
@@ -194,13 +201,13 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: build-ci/benchmark_baseline.json
-          key: benchmark-baseline-${{ github.ref_name }}-${{ github.sha }}
+          key: benchmark-baseline-${{ matrix.name }}-${{ github.ref_name }}-${{ github.sha }}
 
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-timing
+          name: benchmark-timing-${{ matrix.name }}
           path: |
             build-ci/benchmark_current.json
             build-ci/benchmark_regressions.json
