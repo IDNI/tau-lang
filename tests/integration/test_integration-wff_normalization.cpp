@@ -39,7 +39,9 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau");
+		// disjunction blocks sorted equalities first by the unified path
+		// sweep (2026-09-10)
+		CHECK(tau::get(res).to_str() == "u[0]:tau = { always o5[t]:tau = <:y> || i5[t]:tau != <:x> }:tau");
 	}
 	// Block-driver tests: exercise anti_prenex_block through normalize
 	TEST_CASE("ex_block_both_zero") {
@@ -130,10 +132,11 @@ TEST_SUITE("boole_normal_form") {
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		// Order flipped again by the 2026-08-27 regen (left-assoc
 		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
-		// First entry since the environment path sweep (2026-09-10): a
-		// literal that a disjunct folds into is sorted into the enclosing
-		// block instead of trailing it.
+		// First entry since the unified path sweep (2026-09-10): a literal
+		// that a disjunct folds into is sorted into the enclosing block
+		// instead of trailing it, and term disjunctions are sorted too.
 		CHECK( matches_to_str_to_any_of(res, {
+			"x'b'a|a'bx = 0 || a&(b|x)|x'a'b != 0",
 			"x'b'a|a'bx = 0 || a&(x|b)|x'a'b != 0",
 			"ab'x'|a'bx = 0 || a&(b|x)|a'bx' != 0",
 			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",

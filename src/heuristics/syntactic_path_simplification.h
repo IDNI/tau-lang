@@ -22,11 +22,15 @@
 namespace idni::tau_lang {
 
 /**
- * @brief Simplify contradictions along paths, then resolve tautologies.
+ * @brief Simplify contradictions and tautologies along every path.
  *
- * Converts @p fm to NNF, traverses every conjunction path, and replaces
- * syntactically contradictory sub-formulas with `F`/`0` or tautological ones
- * with `T`/`1`. Handles both wff (formulas) and bf (boolean terms).
+ * Converts @p fm to NNF (and normalises its atoms, so a negated equality is
+ * spelled `!(l = r)`), then sweeps it once with both kinds of assumption in
+ * force along every path: a conjunct is true in its siblings, a disjunct
+ * false in its siblings. A syntactically contradictory conjunction collapses
+ * to `F`/`0`, a tautological disjunction to `T`/`1`. Negated equalities are
+ * spelled `l != r` in the output, as before. Handles both wff (formulas) and
+ * bf (boolean terms).
  *
  * @tparam node Tree node type.
  * @param fm Formula or boolean term to simplify.

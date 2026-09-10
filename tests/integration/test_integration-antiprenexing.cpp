@@ -43,6 +43,9 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
 		CHECK( matches_to_str_to_any_of(res, {
+			// unified path sweep (2026-09-10): disjunction blocks are
+			// sorted like conjunction blocks, equalities first
+			"ex b1 b1 w = 0 && b1 y = 0 && (w = 0 || f(b1) || b1 yz != 0)",
 			// complete_quantifier_elimination (the residual-quantifier
 			// fallback added when this variable occurs only in a
 			// non-negated pivot-less shape): a single disjunct, folding
@@ -88,6 +91,10 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// unified path sweep (2026-09-10): disjunction blocks are
+			// sorted like conjunction blocks, equalities first
+			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && !f(b1) && w != 0) "
+			"&& (wy' = 0 || w != 0)",
 			// environment path sweep (2026-09-10): the literal !f(b1)
 			// that a disjunct folds into is sorted into its block
 			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && !f(b1) && w != 0) "

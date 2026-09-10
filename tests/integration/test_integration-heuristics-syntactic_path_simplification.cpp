@@ -198,6 +198,37 @@ tref syntactic_path_simplification_simplify_bf(tref root) {
 		apply_unique<idni::tau_lang::synt_path_simp_m>(down, visit);
 }
 
+
+// The main entry before stage 2, over the legacy sweeps above.
+template <NodeType node>
+tref syntactic_path_simplification(tref fm) {
+	using tau = tree<node>;
+	auto memo = [](tref r) { return r; };
+	tref res = nullptr;
+	if (tau::get(fm).is_term()) {
+		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
+			return memo(fm);
+		// Resolve contradictions
+		fm = push_negation_in<node, false>(fm);
+		fm = syntactic_path_simplification_simplify_bf<node>(fm);
+		// Resolve tautologies
+		fm = push_negation_in<node, false>(tau::build_bf_neg(fm));
+		fm = syntactic_path_simplification_simplify_bf<node>(fm);
+		res = push_negation_in<node, false>(tau::build_bf_neg(fm));
+	} else {
+		if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
+			return memo(fm);
+		// Resolve contradictions
+		fm = normalize_atomic_formula_operators<node>(to_nnf<node>(fm));
+		fm = syntactic_path_simplification_simplify_wff<node>(fm);
+		// Resolve tautologies
+		fm = normalize_atomic_formula_operators<node>(to_nnf<node>(tau::build_wff_neg(fm)));
+		fm = syntactic_path_simplification_simplify_wff<node>(fm);
+		res = to_nnf<node>(tau::build_wff_neg(fm));
+	}
+	return memo(res);
+}
+
 } // namespace legacy
 
 // ── stage 1: the environment sweep against the eager substitution ────────────
@@ -217,6 +248,10 @@ tref nnf_normalised(tref fm) {
 // newly exposed literal in its own block while the environment sweep sorts
 // it into the enclosing one; both are the same formula.
 tref canonical(tref n) {
+	// Same spelling on both sides: the entry keeps `!(l = r)` where a parsed
+	// expectation reads `l != r`.
+	if (tau::get(n).is(tau::wff))
+		n = normalize_atomic_formula_operators<node_t>(n);
 	auto f = [](tref m) -> tref {
 		const auto& t = tau::get(m);
 		if (!t.has_child()) return m;
@@ -599,5 +634,79 @@ TEST_SUITE("syntactic_path_simplification_stage1") {
 		path_sweep_options opts; opts.units_opaque = true;
 		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm, opts);
 		CHECK(tau::get(res) == tau::get(fm));
+	}
+}
+
+// ── stage 2: one unified pass ────────────────────────────────────────────────
+
+TEST_SUITE("syntactic_path_simplification_stage2") {
+
+	// The unified pass is equivalent to the former two-pass entry on every
+	// sample, and at least as simplified (it may fold more, so this is an
+	// equivalence, not a syntactic comparison).
+	TEST_CASE("main entry is equivalent to the legacy entry on formulas") {
+		for (const char* sample : wff_samples) {
+			tref fm = get_nso_rr(sample).value().main->get();
+			tref legacy_res = legacy::syntactic_path_simplification<node_t>(fm);
+			tref res = syntactic_path_simplification<node_t>(fm);
+			CAPTURE(sample);
+			CHECK(are_nso_equivalent<node_t>(res, legacy_res));
+		}
+	}
+
+	TEST_CASE("main entry is equivalent to the legacy entry on terms") {
+		for (const char* sample : bf_samples) {
+			tref fm = get_bf_nso_rr("", sample).value().main->get();
+			tref legacy_res = legacy::syntactic_path_simplification<node_t>(fm);
+			tref res = syntactic_path_simplification<node_t>(fm);
+			CAPTURE(sample);
+			// Two terms are one function exactly when `t1 = t2` is valid.
+			CHECK(are_nso_equivalent<node_t>(
+				tau::build_bf_eq(res, legacy_res), _T<node_t>()));
+		}
+	}
+
+	// With one pass there is no negated second sweep to reorder literals:
+	// the entry itself is a fixpoint.
+	TEST_CASE("main entry is idempotent") {
+		for (const char* sample : wff_samples) {
+			tref fm = get_nso_rr(sample).value().main->get();
+			tref once = syntactic_path_simplification<node_t>(fm);
+			tref twice = syntactic_path_simplification<node_t>(once);
+			CAPTURE(sample);
+			CHECK(tau::get(once) == tau::get(twice));
+		}
+		for (const char* sample : bf_samples) {
+			tref fm = get_bf_nso_rr("", sample).value().main->get();
+			tref once = syntactic_path_simplification<node_t>(fm);
+			tref twice = syntactic_path_simplification<node_t>(once);
+			CAPTURE(sample);
+			CHECK(tau::get(once) == tau::get(twice));
+		}
+	}
+
+	TEST_CASE("a disjunct is assumed false in its siblings") {
+		tref fm = get_nso_rr("x = 0 || (y = 0 && x != 0).").value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		tref expected = get_nso_rr("x = 0 || y = 0.").value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
+
+	TEST_CASE("both kinds of assumption are in force along a path") {
+		// Under x = 0 (conjunct) and y != 0 assumed false (disjunct), the
+		// inner conjunction folds to z = 0.
+		tref fm = get_nso_rr("x = 0 && (y != 0 || (z = 0 && x = 0 && y = 0)).")
+			.value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		tref expected = get_nso_rr("x = 0 && (y != 0 || z = 0).").value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
+
+	TEST_CASE("unchanged-negations entry still has no tautology pass") {
+		tref fm = get_bf_nso_rr("", "x | x'").value().main->get();
+		tref res = syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm);
+		// Folded by the construction hooks at parse time, or left alone:
+		// never turned into 1 by this entry.
+		CHECK((tau::get(res) == tau::get(fm)));
 	}
 }

@@ -565,6 +565,30 @@ tref syntactic_path_simplification_simplify_bf(tref root,
 	return path_sweep<node, false>(opts).run(root);
 }
 
+/**
+ * @internal
+ * @brief Spell every negated equality `!(l = r)` as `l != r` again. The atom
+ * normalisation at the entry spells it the other way so the sweep sees one
+ * key per equality; consumers of the entry expect `!=` (squeeze_absorb
+ * unions on `bf_neq` in disjunctions, the normalizer prints it), and the
+ * final NNF conversion of the two-pass entry used to restore it. One
+ * traversal, memoised across calls in the `synt_path_simp_m` slot.
+ * @endinternal
+ */
+template <NodeType node>
+tref respell_negated_equalities(tref fm) {
+	using tau = tree<node>;
+	auto respell = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		if (!c.is(tau::wff_neg) || !c[0].child_is(tau::bf_eq)) return n;
+		const tau& eq = c[0][0];
+		return tau::build_bf_neq(eq.first(), eq.second());
+	};
+	return pre_order<node>(fm).template apply_unique<synt_path_simp_m>(
+					respell, while_is_formula<node>);
+}
+
 // ── Public functions ──────────────────────────────────────────────────────────
 
 template <NodeType node>
@@ -573,36 +597,33 @@ tref syntactic_path_simplification(tref fm) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	// fm is reassigned below, so the cache key must be captured before any
-	// mutation -- key is always the untouched argument.
-	const tref key = fm;
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
-	auto memo = [&](tref r) { return cache.emplace(key, r).first->second; };
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	auto memo = [&](tref r) { return cache.emplace(fm, r).first->second; };
 #else
 	auto memo = [](tref r) { return r; };
 #endif // TAU_CACHE
 	DBG(LOG_DEBUG << "Syntactic_path_simplification on " << LOG_FM(fm) << "\n";)
+	// One sweep with both kinds of assumption in force along every path: a
+	// conjunct is true in its siblings, a disjunct false in its siblings. A
+	// contradictory conjunction folds to F/0, a tautological disjunction to
+	// T/1. It replaces the former contradiction sweep, negation, second
+	// sweep and negation, and simplifies at least as much: every path saw
+	// only one kind of assumption before.
+	path_sweep_options opts;
+	opts.tautologies = true;
 	tref res = nullptr;
 	if (tau::get(fm).is_term()) {
 		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
 			return memo(fm);
-		// Resolve contradictions
-		fm = push_negation_in<node, false>(fm);
-		fm = syntactic_path_simplification_simplify_bf<node>(fm);
-		// Resolve tautologies
-		fm = push_negation_in<node, false>(tau::build_bf_neg(fm));
-		fm = syntactic_path_simplification_simplify_bf<node>(fm);
-		res = push_negation_in<node, false>(tau::build_bf_neg(fm));
+		res = syntactic_path_simplification_simplify_bf<node>(
+			push_negation_in<node, false>(fm), opts);
 	} else {
 		if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
 			return memo(fm);
-		// Resolve contradictions
-		fm = normalize_atomic_formula_operators<node>(to_nnf<node>(fm));
-		fm = syntactic_path_simplification_simplify_wff<node>(fm);
-		// Resolve tautologies
-		fm = normalize_atomic_formula_operators<node>(to_nnf<node>(tau::build_wff_neg(fm)));
-		fm = syntactic_path_simplification_simplify_wff<node>(fm);
-		res = to_nnf<node>(tau::build_wff_neg(fm));
+		res = respell_negated_equalities<node>(
+			syntactic_path_simplification_simplify_wff<node>(
+				normalize_atomic_formula_operators<node>(to_nnf<node>(fm)),
+				opts));
 	}
 	DBG(LOG_DEBUG << "Syntactic_path_simplification result: " << LOG_FM(res) << "\n";)
 	return memo(res);
