@@ -93,7 +93,7 @@ TEST_CASE("prepare_terms: decision variables are exactly P, leaves hold the rest
 	CHECK(tau::subtree_equals(tb::get_var(f), y));
 	CHECK(tau::subtree_equals(tb::get_var(tb::get_high(f)), x));
 	// z is not a decision variable anywhere: it sits in a leaf
-	const trefs& lfv = ap::leaf_fv<node_t>(l);
+	trefs lfv = ap::leaf_fv<node_t>(l);
 	CHECK(std::binary_search(lfv.begin(), lfv.end(), z, tau::subtree_less));
 	CHECK(!std::binary_search(lfv.begin(), lfv.end(), x, tau::subtree_less));
 	// the same function as the input
@@ -279,7 +279,7 @@ TEST_CASE("subst_term: reaches a reference argument and re-simplifies it") {
 	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(t), P, o)).first;
 	REQUIRE(ap::is_bdd_backed<node_t>(l));
 	// the leaf hazard: x is hidden in the reference argument
-	const trefs& lfv = ap::leaf_fv<node_t>(l);
+	trefs lfv = ap::leaf_fv<node_t>(l);
 	CHECK(std::binary_search(lfv.begin(), lfv.end(), x, tau::subtree_less));
 	// x ← z′: the decision node composes, the argument becomes r(z′·z),
 	// which the re-simplification folds to r(0)
@@ -508,16 +508,15 @@ TEST_CASE("leaf_fv: the leaves' contribution alone") {
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y = 0"), P, o)).first;
 	CHECK(ap::leaf_fv<node_t>(l).empty());
 	tref m = sides(ap::prepare_terms<node_t>(wff("x & y & z = 0"), P, o)).first;
-	const trefs& mfv = ap::leaf_fv<node_t>(m);
+	trefs mfv = ap::leaf_fv<node_t>(m);
 	CHECK(mfv.size() == 1);
 	CHECK(tau::subtree_equals(mfv[0], z));
 	// the §1 example: a block variable inside a reference argument
 	tref h = sides(ap::prepare_terms<node_t>(wff("x & r(y) = 0"), P, o)).first;
-	const trefs& hfv = ap::leaf_fv<node_t>(h);
+	trefs hfv = ap::leaf_fv<node_t>(h);
 	CHECK(std::binary_search(hfv.begin(), hfv.end(), y, tau::subtree_less));
 	CHECK(!std::binary_search(hfv.begin(), hfv.end(), x, tau::subtree_less));
-	// a reference return in every build type: the same storage twice
-	CHECK(&ap::leaf_fv<node_t>(h) == &ap::leaf_fv<node_t>(h));
+	CHECK(std::is_sorted(hfv.begin(), hfv.end(), tau::subtree_less));
 	// fv of the whole term holds both
 	const trefs& fv = get_free_vars<node_t>(h);
 	CHECK(std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));

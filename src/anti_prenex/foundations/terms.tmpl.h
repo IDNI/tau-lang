@@ -637,20 +637,17 @@ size_t mem_size(tref t) {
 }
 
 template <NodeType node>
-const trefs& leaf_fv(tref f) {
+trefs leaf_fv(tref f) {
 	using namespace terms_detail;
 	using tau = tree<node>;
 	f = tau::trim_right_sibling(f);
 	if (!is_bdd_backed<node>(f)) return get_free_vars<node>(f);
 	// NEW over `get_free_tau_vars` (ground rule 9): that worker merges the
 	// FV of EVERY node's variable, decision variables included, which is
-	// `fv(term)`; the leaf hazard wants the leaves alone.
-	// The unconditional structural table of ctx.h (`leaf_fv_memo`, value
-	// `tref_set`), held here as a function-local gc-registered cache until
-	// package E's `find`/`store` exist; same key, value and gc behaviour.
-	using cache_t = subtree_unordered_map<node, tref_set>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(f); it != cache.end()) return it->second.items;
+	// `fv(term)`; the leaf hazard wants the leaves alone. Not stored: the
+	// per-leaf sets are `get_free_vars`' cached entries (each leaf is the
+	// root of its own query), and their union is one walk of the BDD's
+	// distinct nodes per call (Lucca, Sep 10: no `leaf_fv_memo`).
 	subtree_set<node> merged;
 	auto collect = [&](bref<node> x, bool leaf) {
 		if (leaf) {
@@ -660,8 +657,7 @@ const trefs& leaf_fv(tref f) {
 		return true;
 	};
 	visit_nodes<node>(handle_of<node>(f).get(), collect);
-	tref_set out{ trefs(merged.begin(), merged.end()) };
-	return cache.emplace(f, std::move(out)).first->second.items;
+	return trefs(merged.begin(), merged.end());
 }
 
 } // namespace idni::tau_lang::anti_prenexing

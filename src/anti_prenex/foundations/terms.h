@@ -238,16 +238,20 @@ tref norm_equation(tref atom, const var_order<node>& order);
 template <NodeType node>
 size_t mem_size(tref t);
 
-/// §1 LEAF HAZARD: the free variables contributed by the LEAVES of a
-/// BDD-backed term alone (a block variable here is hidden from cofactoring:
-/// inside a reference argument or a foreign-typed subterm, including one
-/// inside a functional quantifier's body); for a plain term, its `FV`.
-/// Sorted like `fv`. Stored in ctx.h's UNCONDITIONAL structural table
-/// `leaf_fv_memo`, hence the reference return in every build type (held as
-/// a function-local gc-registered cache of that table's type until package
-/// E's `find`/`store` land).
+/**
+ * @brief §1 LEAF HAZARD: the free variables contributed by the LEAVES of a
+ * BDD-backed term alone (a block variable here is hidden from cofactoring:
+ * inside a reference argument or a foreign-typed subterm, including one
+ * inside a functional quantifier's body); for a plain term, its `FV`.
+ * Sorted like `fv`. It differs from `fv` exactly in the hazard case, a
+ * block variable that is both a decision variable and hidden in a leaf,
+ * which is what ELIMINATE_BLOCK's `opaque?` test (§7) asks before any
+ * quantification. Returned BY VALUE, not stored: the per-leaf sets are
+ * `get_free_vars`' own cached entries and their union is one walk over the
+ * BDD's distinct nodes per call.
+ */
 template <NodeType node>
-const trefs& leaf_fv(tref f);
+trefs leaf_fv(tref f);
 
 } // namespace idni::tau_lang::anti_prenexing
 
