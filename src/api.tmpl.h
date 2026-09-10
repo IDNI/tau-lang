@@ -563,7 +563,14 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 template <NodeType node>
 bool api<node>::realizable(tref fm) {
 	fm = simplify(fm);
-	return fm && is_formula(fm)
+	if (!fm) return false;
+	// A spec whose main is a formula is as decidable as the formula itself
+	// (normalize_formula unwraps it); the string overloads always arrive
+	// here with a spec root.
+	using tt = tau::traverser;
+	const bool is_fm = is_formula(fm) || (tau::get(fm).is(tau::spec)
+		&& (tt(fm) | tau::main | tau::wff | tt::ref));
+	return is_fm
 		&& is_tau_formula_sat<node>(normalize_formula(fm), 0, true);
 }
 
@@ -735,18 +742,20 @@ template <NodeType node>
 std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 	rr<node> nso_rr;
 	auto ctx = *definitions<node>::instance().get_io_context();
-	if (contains(expr, tau::ref)) {
-		typename node::type type = tau::get(expr).get_type();
-		if (type == tau::spec) {
-			if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
-				ctx, expr); mayb_nso_rr)
-					nso_rr = mayb_nso_rr.value();
-			else return {};
-		} else {
-			nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
-			if (!nso_rr.main) return {};
-		}
-	} else nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
+	// A spec root is always unwrapped to its main formula and definitions,
+	// whether or not it contains a ref: get_spec_or_term yields a spec for
+	// any formula, and a spec node handed whole to the normalizer as its
+	// main formula is negated as if it were a wff by the syntactic
+	// simplifier (a Debug abort in build_wff_neg, a malformed tree in
+	// Release).
+	if (tau::get(expr).is(tau::spec)) {
+		if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(ctx, expr);
+			mayb_nso_rr) nso_rr = mayb_nso_rr.value();
+		else return {};
+	} else {
+		nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
+		if (!nso_rr.main) return {};
+	}
 	return nso_rr;
 }
 
