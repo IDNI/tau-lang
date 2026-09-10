@@ -49,17 +49,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   macos:
-    name: macOS bus error (targeted)
+    name: macOS debug tests
     runs-on: macos-15
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
       # bump to force a rebuild of the cached ~/.tau dependency tree
       TAU_DEPS_EPOCH: 1
-      TARGETS: >-
-        test_integration-blasting_correctness_check2
-        test_integration-blasting_correctness_check4
-        test_integration-blasting_correctness_check5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,55 +86,8 @@ jobs:
           path: ~/.tau
           key: ${{ steps.cache-tau.outputs.cache-primary-key }}
 
-      # cmake directly rather than ./dev: only ./dev preset can pick the
-      # preset, and it takes a single --target, but we want three
-      - name: Configure (Debug)
-        run: cmake --preset debug-all
+      - name: Build tau and tests, run tests (Debug)
+        run: ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
-      - name: Build only the bus error targets
-        run: cmake --build build/debug -j ${{ env.TAU_BUILD_JOBS }} --target ${{ env.TARGETS }}
-
-      - name: Stack limits (the leading SIGBUS hypothesis)
-        run: |
-          echo "main thread stack soft/hard (KiB): $(ulimit -s) / $(ulimit -Hs)"
-          # a std::thread stack on Darwin defaults to 512 KiB, vs 8 MiB on glibc
-          echo "PTHREAD_STACK_MIN: $(getconf PTHREAD_STACK_MIN)"
-
-      - name: Run the bus error tests
-        id: run
-        continue-on-error: true
-        run: |
-          ctest --test-dir build/debug --output-on-failure --timeout 600 \
-            -R 'test_integration-blasting_correctness_check[245]'
-
-      # .ips carries the exception type and a per-thread backtrace, which
-      # separates a stack overflow from every other SIGBUS cause
-      - name: Dump macOS crash reports
-        if: always()
-        run: |
-          sleep 15 # ReportCrash writes asynchronously
-          found=0
-          for d in ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports; do
-            [ -d "$d" ] || continue
-            for f in "$d"/*.ips; do
-              [ -e "$f" ] || continue
-              found=1
-              echo "===================== $f"
-              cat "$f"
-            done
-          done
-          [ "$found" = 1 ] || echo "no crash reports found"
-
-      - name: Backtrace under lldb
-        if: always()
-        run: |
-          for t in ${{ env.TARGETS }}; do
-            b="build/debug/$t"
-            [ -x "$b" ] || continue
-            echo "===================== lldb $t"
-            lldb -b -o run -o 'bt all' -o 'thread info' -o quit -- "$b" 2>&1 | tail -150
-          done
-
-      - name: Fail if the bus error tests failed
-        if: steps.run.outcome == 'failure'
-        run: exit 1
+      - name: Run tau
+        run: ./build/debug/tau -v
