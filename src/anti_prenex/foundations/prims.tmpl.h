@@ -10,27 +10,15 @@
 
 namespace idni::tau_lang::anti_prenexing {
 
-/**
- * Reuse (plan ground rule 9): `canonize_quantifier_ids`
- * (tau_tree_builders.tmpl.h) IS this primitive. It was extended in place --
- * one shared id space and one depth count over formula binders and
- * functional quantifiers, both of its traversals walking the same nodes --
- * rather than copied here, so that the module, the parser, `tree::substitute`
- * and the api layer all number binders the same way. A second numbering
- * would defeat the point: ids are part of every memo key.
- */
+// Reuse: `canonize_quantifier_ids` is this primitive, extended in place
+// (plan §3 D) -- a second numbering would break every memo key.
 template <NodeType node>
 tref canonicalise_binder_ids(tref phi) {
 	return canonize_quantifier_ids<node>(phi);
 }
 
-/**
- * No existing helper wraps an ordered variable list without renaming:
- * `build_wff_ex_many` / `build_wff_all_many` always rename
- * (tau_tree_builders.tmpl.h), which ground rule 4 forbids here, and the
- * same-shape loops in interpreter.tmpl.h and normalizer.tmpl.h are local to
- * their passes.
- */
+// New: no existing helper wraps an ordered list without renaming -- the
+// `_many` builders always rename, which ground rule 4 forbids here.
 template <NodeType node>
 tref rewrap(tref phi, const block& X, binder kind) {
 	using tau = tree<node>;
@@ -56,14 +44,10 @@ tref rewrap(tref phi, const block& X, binder kind) {
 	return phi;
 }
 
-/**
- * Modelled on the vacuous-binder drop inside `scope_out_independent_conjuncts`
- * (normalizer.tmpl.h), which is welded into a push-like pass in a header this
- * module must not depend on; the construction hooks fold no binder at all
- * (hooks.tmpl.h's wff dispatch has no `wff_ex`/`wff_all` case), so this has to
- * be its own pass. Post-order, so a cascade collapses in one go, and
- * `apply_unique` memoises per node (§10).
- */
+// New, after the vacuous drop in normalizer.tmpl.h's
+// `scope_out_independent_conjuncts`: that one is welded into a push pass this
+// module must not depend on, and the hooks fold no binder. Post-order, so a
+// cascade collapses in one go; `apply_unique` memoises per node (§10).
 template <NodeType node>
 tref fold_degenerate_binders(tref phi) {
 	using tau = tree<node>;

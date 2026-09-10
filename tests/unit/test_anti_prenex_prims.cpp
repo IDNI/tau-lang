@@ -116,15 +116,22 @@ TEST_SUITE("anti_prenex/foundations/prims: canonicalise_binder_ids") {
 	}
 
 	TEST_CASE("siblings may share an id; a path may not") {
-		// (ex a. a = 0) & (ex b. b = 0): both binders are at depth 1, so
-		// both become 1. Sharing across siblings is fine -- only strict
-		// decrease ALONG A PATH is load-bearing.
+		// (ex a. a = 0 & y = 0) & (ex b. b = 0 & z = 0): both binders are
+		// at depth 1, so both become 1. Sharing across siblings is fine --
+		// only strict decrease ALONG A PATH is load-bearing. The bodies
+		// differ so the conjunction survives the `$X && $X ::= $X` hook
+		// and the two binders are really both there to look at.
 		tref raw = tau::build_wff_and(
-			tau::build_wff_ex(qvar("a"), eq0("a"), false),
-			tau::build_wff_ex(qvar("b"), eq0("b"), false));
-		tref expected = tau::build_wff_ex(qvar("1"), eq0("1"), false);
-		CHECK(ap::canonicalise_binder_ids<node_t>(raw)
-			== tau::build_wff_and(expected, expected));
+			tau::build_wff_ex(qvar("a"),
+				tau::build_wff_and(eq0("a"), eq0("y")), false),
+			tau::build_wff_ex(qvar("b"),
+				tau::build_wff_and(eq0("b"), eq0("z")), false));
+		tref expected = tau::build_wff_and(
+			tau::build_wff_ex(qvar("1"),
+				tau::build_wff_and(eq0("1"), eq0("y")), false),
+			tau::build_wff_ex(qvar("1"),
+				tau::build_wff_and(eq0("1"), eq0("z")), false));
+		CHECK(ap::canonicalise_binder_ids<node_t>(raw) == expected);
 	}
 }
 

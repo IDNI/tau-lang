@@ -583,6 +583,8 @@ tref build_bf_fex(tref l, tref r, bool calculate_quant_id) {
 	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
 	tref res = tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
 	if (calculate_quant_id) {
+		// Find the biggest quantifier id in r and rename the subscript
+		// to id + 1
 		const int_t id = find_biggest_quant_id<node>(r);
 		return tau::get(res).replace(l,
 			tau::build_variable(std::to_string(id + 1),

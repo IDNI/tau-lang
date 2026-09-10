@@ -7,26 +7,21 @@
  * `FOLD_DEGENERATE_BINDERS`.
  *
  * Reuse: `canonize_quantifier_ids` (tau_tree_builders.tmpl.h) numbers binders
- * by depth (id = max quantifier depth below + 1) and handles shadowing. It
- * covered only FORMULA binders and did not descend into terms, so
- * `bf_fall`/`bf_fex` subscripts were never renamed; it was EXTENDED IN PLACE
- * (ruling, Lucca, Sep 9 2026) to cover both kinds over ONE shared id space
- * and one depth count, rather than duplicated here — a second numbering
- * would defeat the purpose, since ids are part of every memo key and the
- * parser, `tree::substitute` and the api layer all run that pass.
+ * by depth (id = max quantifier depth below + 1) and handles shadowing. It is
+ * extended in place, not duplicated, to cover functional quantifiers over ONE
+ * id space shared with the formula binders (plan §3 D): the parser,
+ * `tree::substitute`, the api layer and this module then number alike, and
+ * ids are part of every memo key.
  *
  * What the ids buy: an outer binder's id is strictly greater than the id of
  * any binder below it, whatever the kinds, so `FV(t)` meets no binder on the
- * path and `[x ← t]` is capture-safe inside a bound scope (subst.h). Ids
- * are NOT unique — siblings share — and need not be; strict decrease along a
- * path is the whole property.
- *
- * Numbering starts at 1 and takes no account of free variables that are
- * themselves numerically named. It does not need to: numeric names arise
- * only from this pass (a source name must start with a letter, tau.tgf), the
- * module never introduces a binder that was not already there, and strict
- * decrease puts every enclosing binder's id above every id inside a
- * fragment, so re-canonicalising a fragment cannot collide with one.
+ * path and `[x ← t]` is capture-safe inside a bound scope (subst.h). Ids are
+ * not unique — siblings share — and need not be; strict decrease along a
+ * path is the whole property. Numbering starts at 1 and ignores free
+ * variables that are themselves numerically named: those arise only from
+ * this pass, the module never introduces a binder that was not already
+ * there, and strict decrease keeps a fragment's ids below every enclosing
+ * one (plan §3 D).
  *
  * Never rename a bound variable (plan, ground rule 4): `build_wff_ex` /
  * `build_wff_all` rename by default (`calculate_quant_id = true`); every
@@ -47,9 +42,8 @@ namespace idni::tau_lang::anti_prenexing {
  * @brief §3 `CANONICALISE_BINDER_IDS(φ)`: renames every binder — formula
  * binders AND functional-quantifier subscripts alike — to canonical ids by
  * position, so alpha-variants are one node: phase 0's normaliser, phase 5's
- * last step, and the key of `ASK` and `DECIDE_FINITE` (§7). This IS
- * `canonize_quantifier_ids`, whose extension to terms this package made; the
- * wrapper exists to give the primitive its spec name.
+ * last step, and the key of `ASK` and `DECIDE_FINITE` (§7). This is
+ * `canonize_quantifier_ids` under its spec name.
  */
 template <NodeType node>
 tref canonicalise_binder_ids(tref phi);

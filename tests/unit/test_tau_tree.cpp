@@ -182,6 +182,39 @@ TEST_SUITE("canonize_quantifier_ids") {
 
 		CHECK(canonize_quantifier_ids<node_t>(raw) == expected);
 	}
+
+	TEST_CASE("a fresh formula binder id clears the functional subscripts below") {
+		// build_wff_ex(..., true) mints find_biggest_quant_id + 1. The
+		// scan has to see the `fex 1` inside the term: minting 1 again
+		// would put the new binder on the subscript's name.
+		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
+		tref one = tau::build_variable(std::string("1"), tau_type_id<node_t>());
+		tref term = tau::build_bf_eq_0(
+			tau::build_bf_fex(one, x_eq_0_bf("1"), false));
+		tref got = tau::build_wff_ex(x,
+			tau::build_wff_and(x_eq_0("x"), term), true);
+		CHECK(get_var_name<node_t>(tau::trim2(got)) == "2");
+	}
+
+	TEST_CASE("substitute re-canonicalizes across the two kinds") {
+		// tree::substitute re-runs the pass whenever the replacement
+		// holds a functional quantifier; the pass now handles one, so
+		// the enclosing formula binder is renumbered over the shared
+		// depth count instead of colliding with the subscript.
+		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
+		tref z = tau::build_variable(std::string("z"), tau_type_id<node_t>());
+		tref fm = tau::build_wff_ex(x,
+			tau::build_wff_and(x_eq_0("x"), x_eq_0("y")), true);
+		tref with = tau::build_bf_fex(z, x_eq_0_bf("z"), false);
+		tref got = tau::get(fm).substitute(x_eq_0_bf("y"), with);
+
+		tref one = tau::build_variable(std::string("1"), tau_type_id<node_t>());
+		tref two = tau::build_variable(std::string("2"), tau_type_id<node_t>());
+		tref expected = tau::build_wff_ex(two, tau::build_wff_and(x_eq_0("2"),
+			tau::build_bf_eq_0(tau::build_bf_fex(one, x_eq_0_bf("1"), false))),
+			false);
+		CHECK(got == expected);
+	}
 }
 
 // ── build_wff_all_many / build_rr_ref (TT-4) ────────────────────────────────
@@ -840,7 +873,8 @@ TEST_SUITE("get_free_vars edge inputs") {
 		tref body = tau::build_bf_and(
 			build_bf_variable<node_t>("x", tau_type_id<node_t>()),
 			build_bf_variable<node_t>("y", tau_type_id<node_t>()));
-		const trefs& fv = get_free_vars<node_t>(tau::build_bf_fall(x, body));
+		const trefs& fv = get_free_vars<node_t>(
+			tau::build_bf_fall(x, body, false));
 		REQUIRE(fv.size() == 1);
 		CHECK(get_var_name<node_t>(fv[0]) == "y");
 	}
@@ -850,7 +884,8 @@ TEST_SUITE("get_free_vars edge inputs") {
 		tref body = tau::build_bf_and(
 			build_bf_variable<node_t>("x", tau_type_id<node_t>()),
 			build_bf_variable<node_t>("y", tau_type_id<node_t>()));
-		const trefs& fv = get_free_vars<node_t>(tau::build_bf_fex(x, body));
+		const trefs& fv = get_free_vars<node_t>(
+			tau::build_bf_fex(x, body, false));
 		REQUIRE(fv.size() == 1);
 		CHECK(get_var_name<node_t>(fv[0]) == "y");
 	}
