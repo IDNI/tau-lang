@@ -560,6 +560,10 @@ tref build_bf_nlt(tref l, tref r) {
 // If calculate_quant_id is false no variable renaming in r is performed,
 // and it is assumed that l has correct representation -- the same contract
 // build_wff_all/ex carry, over the one shared quantifier id space.
+// TODO (HIGH) after the anti-prenex layer-0 merge: terms.h's
+// `functional_quantifier` (package B) must build through here and through
+// build_bf_fex with calculate_quant_id = false -- the default renames, which
+// the module's ground rule 4 forbids (the layer-0 plan (kept outside the repository) §1).
 template <NodeType node>
 tref build_bf_fall(tref l, tref r, bool calculate_quant_id) {
 	using tau = tree<node>;
