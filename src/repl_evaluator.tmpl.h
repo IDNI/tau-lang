@@ -26,10 +26,7 @@ std::optional<bool> try_literal_incomplete(tref type_tree,
 		using pack = typename node_t::bas_tuple;
 		([&] {
 			using BA = std::tuple_element_t<Is, pack>;
-			if constexpr (ba_has_descriptor_v<node_t, BA>
-				&& requires(const std::string& s) {
-					{ ba_descriptor<BA, node_t>::literal_incomplete(s) }
-						-> std::convertible_to<bool>; })
+			if constexpr (ba_has_literal_incomplete<node_t, BA>)
 				if (!out && ba_descriptor<BA, node_t>::owns_type(type_tree))
 					out = ba_descriptor<BA, node_t>::literal_incomplete(src);
 		}(), ...);

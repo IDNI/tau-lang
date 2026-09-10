@@ -138,8 +138,8 @@ void check_boolean_laws() {
 
 // ── Optional capabilities ────────────────────────────────────────────────────
 //
-// Every block below is probed with `if constexpr (requires { … })` and never by
-// name, the way ba_pack_traits.h dispatches. A block that no algebra of the
+// Every block below is probed with the capability concepts of ba_descriptor.h
+// and never by name, the way ba_pack_traits.h dispatches. A block that no algebra of the
 // configured pack implements compiles to nothing, which is the point: the empty
 // case is what a reduced pack exercises.
 
@@ -160,7 +160,7 @@ void check_classification() {
 	const bool omcat_fold = pack_type_is_non_aba_omcat<node_t>(ba_type);
 	CHECK(omcat_fold == desc::non_aba_omcat);
 
-	constexpr bool declares_arith = requires { requires desc::arith_ops; };
+	constexpr bool declares_arith = ba_arith_ops_v<node_t, BA>;
 	const bool arith_fold = pack_type_has_arith_ops<node_t>(ba_type);
 	CHECK(arith_fold == declares_arith);
 }
@@ -252,7 +252,7 @@ void check_constant_builders() {
 	tref type = desc::type_tree();
 	const size_t ba_type = ba_types<node_t>::id(type);
 
-	if constexpr (requires { desc::zero_constant(ba_type); }) {
+	if constexpr (ba_has_zero_constant<node_t, BA>) {
 		tref zt = desc::zero_constant(ba_type);
 		REQUIRE(zt != nullptr);
 		CHECK(is<node_t>(zt, tau::bf));
@@ -260,7 +260,7 @@ void check_constant_builders() {
 		check_term_round_trip<BA>(zt, ba_type, type);
 	}
 
-	if constexpr (requires { desc::value_constant(ba_type, size_t{0}); }) {
+	if constexpr (ba_has_value_constant<node_t, BA>) {
 		tref vt = desc::value_constant(ba_type, 0);
 		REQUIRE(vt != nullptr);
 		CHECK(is<node_t>(vt, tau::bf));
@@ -276,9 +276,7 @@ void check_rendering() {
 	using desc = ba_descriptor<BA, node_t>;
 	tref type = desc::type_tree();
 
-	if constexpr (requires(std::ostream& os, const BA& x) {
-		{ desc::print_constant(os, x) } -> std::same_as<std::ostream&>; })
-	{
+	if constexpr (ba_has_print_constant<node_t, BA>) {
 		auto one = parsed_literal<BA>(desc::literal_one(type), type);
 		auto zero = parsed_literal<BA>(desc::literal_zero(type), type);
 		REQUIRE(one.has_value());
@@ -291,14 +289,14 @@ void check_rendering() {
 		CHECK(po.str() != pz.str());
 	}
 
-	if constexpr (requires { requires desc::can_host_bool; }) {
+	if constexpr (ba_can_host_bool_v<node_t, BA>) {
 		// a carrier must offer value_constant, the capability core's flag
 		// output path resolves through
 		CHECK(ba_has_value_constant<node_t, BA>);
 
 		// the carrier's own type, which need not be type_tree()
 		tref carrier = type;
-		if constexpr (requires { desc::bool_carrier_type(); })
+		if constexpr (ba_has_bool_carrier_type<node_t, BA>)
 			carrier = desc::bool_carrier_type();
 		REQUIRE(carrier != nullptr);
 		// a carrier must render and parse back a plain 1 and 0
@@ -320,7 +318,7 @@ void check_ba() {
 		check_classification<BA>();
 		check_constant_builders<BA>();
 		check_rendering<BA>();
-		if constexpr (!requires { requires desc::uses_oracle; }) {
+		if constexpr (!ba_uses_oracle_v<node_t, BA>) {
 			check_boolean_laws<BA>();
 			check_splitter<BA>();
 		}
