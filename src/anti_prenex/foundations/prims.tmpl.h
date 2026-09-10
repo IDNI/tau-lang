@@ -8,6 +8,8 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__PRIMS_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__PRIMS_TMPL_H__
 
+#include "dag.h"
+
 namespace idni::tau_lang::anti_prenexing {
 
 // Reuse: `canonize_quantifier_ids` is this primitive, extended in place
@@ -61,10 +63,10 @@ tref fold_degenerate_binders(tref phi) {
 		// variables, so the test below already drops the binder. Dropping
 		// it at all assumes a non-empty domain, as the normalizer does.
 		// `var` comes from trim2 and still carries its right sibling,
-		// while get_free_vars stores trimmed nodes; comparing the two is
-		// safe because subtree_less ignores a node's right sibling.
-		const trefs& fv = get_free_vars<node>(body);
-		if (std::binary_search(fv.begin(), fv.end(), var,
+		// while `fv` stores trimmed nodes; comparing the two is safe
+		// because subtree_less ignores a node's right sibling.
+		const trefs& vars = fv<node>(body);
+		if (std::binary_search(vars.begin(), vars.end(), var,
 			tau::subtree_less)) return n;
 		return body;
 	};
