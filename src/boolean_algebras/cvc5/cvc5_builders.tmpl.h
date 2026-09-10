@@ -81,7 +81,7 @@ inline Term make_term_less(const Term& l, const Term& r) {
 }
 
 // Bound variable of sort `s`: only usable inside a quantifier body.
-inline Term make_bitvector_var(const Sort s, const std::string& name) {
+inline Term make_bitvector_var(const Sort& s, const std::string& name) {
 	return cvc5_term_manager.mkVar(s, name.c_str());
 }
 
