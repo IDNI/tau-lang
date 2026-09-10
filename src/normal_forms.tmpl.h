@@ -100,10 +100,11 @@ tref not_equal_to_unequal(tref fm) {
  * removed or narrowed without a broader rewrite of those consumers.
  * @endinternal
  */
-template<NodeType node>
+template<NodeType node, bool rewrite_neq>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
+	// One cache per instantiation: the two flag values give different trees.
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	// Unlike ex_subs_based_elimination's cache (ex_subs_based_elimination.tmpl.h),
@@ -121,6 +122,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 		const tau& c = tau::get(n)[0];
 		switch (c.value.nt) {
 			case tau::bf_neq:
+				if constexpr (!rewrite_neq) return n;
 				return tau::build_wff_neg(
 					tau::build_bf_eq(c.first(), c.second()));
 			case tau::bf_nlteq:

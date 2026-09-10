@@ -5,8 +5,12 @@
 
 namespace idni::tau_lang {
 
-// Forward declaration: defined in normal_forms.tmpl.h, included after this file.
-template <NodeType node>
+// Forward declaration: defined in normal_forms.tmpl.h, included after this
+// file. This is the first declaration the compiler sees, so the default of
+// `rewrite_neq` lives here. The main entry passes `false`: the sweep files a
+// negated equality under its equality's key in every spelling, so `!=`
+// needs no rewrite on the way in and nothing to restore on the way out.
+template <NodeType node, bool rewrite_neq = true>
 tref normalize_atomic_formula_operators(tref fm);
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -82,6 +86,10 @@ struct path_sweep_options {
  * @brief Level traits of the sweep: the formula level (`wff`) and the term
  * level (`bf`) differ only in node kinds, constants, builders and order.
  */
+/// A literal's canonical positive key and whether the literal is its
+/// complement.
+struct canon_t { tref key; bool flipped; };
+
 template <NodeType node, bool is_wff> struct path_sweep_level;
 
 template <NodeType node>
@@ -116,6 +124,39 @@ struct path_sweep_level<node, true> {
 	static bool visit(tref n) { return is_formula<node>(n); }
 	static bool less(tref l, tref r) {
 		return syntactic_path_simplification_wff_comp<node>(l, r);
+	}
+	/// The key a literal is filed under and whether the literal is that
+	/// key's complement: `!(l)` toggles; `l != r` is the complement of
+	/// `l = r`; every ordering spelling is a `<` atom or its complement,
+	/// by the total-order identities the atom normalisation already
+	/// relies on (`a <= b` is `!(b < a)`, `a > b` is `b < a`, ...).
+	static canon_t canon(tref n) {
+		const tau& t = tau::get(n);
+		if (!t.is(tau::wff)) return {n, false};
+		const tau& c = t[0];
+		switch (c.value.nt) {
+		case tau::wff_neg: {
+			const canon_t in = canon(c.first());
+			return {in.key, !in.flipped};
+		}
+		case tau::bf_neq:
+			return {tau::build_bf_eq(c.first(), c.second()), true};
+		case tau::bf_lteq:
+			return {tau::build_bf_lt(c.second(), c.first()), true};
+		case tau::bf_nlt:
+			return {tau::build_bf_lt(c.first(), c.second()), true};
+		case tau::bf_nlteq:
+			return {tau::build_bf_lt(c.second(), c.first()), false};
+		case tau::bf_gt:
+			return {tau::build_bf_lt(c.second(), c.first()), false};
+		case tau::bf_gteq:
+			return {tau::build_bf_lt(c.first(), c.second()), true};
+		case tau::bf_ngt:
+			return {tau::build_bf_lt(c.second(), c.first()), true};
+		case tau::bf_ngteq:
+			return {tau::build_bf_lt(c.first(), c.second()), false};
+		default: return {n, false};
+		}
 	}
 };
 
@@ -153,6 +194,13 @@ struct path_sweep_level<node, false> {
 		return is_boolean_operation<node>(n) || is<node, tau::bf>(n);
 	}
 	static bool less(tref l, tref r) { return tau::subtree_less(l, r); }
+	/// A term literal has one negative spelling, `t'`.
+	static canon_t canon(tref n) {
+		const tau& t = tau::get(n);
+		if (!t.is(tau::bf) || !t[0].is(tau::bf_neg)) return {n, false};
+		const canon_t in = canon(t[0].first());
+		return {in.key, !in.flipped};
+	}
 };
 
 /**
@@ -330,9 +378,9 @@ private:
 			const tau& lc = lt[0];
 			if (lc.is(L::land) || L::is_or_like(lc)) continue;
 			if (L::is_true(l) || L::is_false(l)) continue;
-			tref key; bool value;
-			if (lc.is(L::lneg)) key = tau::trim2(l), value = !fr.conj;
-			else key = l, value = fr.conj;
+			const canon_t k = L::canon(l);
+			const tref key = k.key;
+			const bool value = fr.conj != k.flipped;
 			if (auto it = fr.pushed.find(key);
 				it != fr.pushed.end() && it->second == value) continue;
 			if (const entry* e = find_active(key); e && e->value == value)
@@ -355,8 +403,8 @@ private:
 				return markers.push_back(m), n;
 			}
 		}
-		if (const entry* e = find_active(n))
-			return finish(m, L::constant(e->value, n));
+		if (const canon_t k = L::canon(n); const entry* e = find_active(k.key))
+			return finish(m, L::constant(e->value != k.flipped, n));
 		if (auto it = memo.find({n, version}); it != memo.end())
 			return finish(m, it->second);
 		const tau& c = t[0];
@@ -381,9 +429,9 @@ private:
 			const tau& lc = lt[0];
 			if (lc.is(L::land) || L::is_or_like(lc)) continue;
 			if (L::is_true(l) || L::is_false(l)) continue;
-			tref key; bool value;
-			if (lc.is(L::lneg)) key = tau::trim2(l), value = !conj;
-			else key = l, value = conj;
+			const canon_t k = L::canon(l);
+			const tref key = k.key;
+			const bool value = conj != k.flipped;
 			if (const entry* e = find_active(key)) {
 				if (e->value == value) continue; // redundant
 				// A contradiction (conjunction) or a tautology
@@ -427,7 +475,7 @@ private:
 		// Compound literal: enter under the keys in force, its own key
 		// suspended so it cannot fire on its own subtree; a binder also
 		// gets the capture guard.
-		trefs suspended{negated ? tau::trim2(n) : n};
+		trefs suspended{L::canon(n).key};
 		if (L::is_binder(inner))
 			for (tref k : captured_by(inner.first()))
 				if (!tau::subtree_equals(k, suspended[0]))
@@ -506,7 +554,8 @@ private:
 	/// was rewritten still takes the key's value.
 	tref post_check(tref r, const marker& m) const {
 		if (r == m.orig) return r;
-		if (const entry* e = find_active(r)) return L::constant(e->value, r);
+		if (const canon_t k = L::canon(r); const entry* e = find_active(k.key))
+			return L::constant(e->value != k.flipped, r);
 		return r;
 	}
 };
@@ -565,30 +614,6 @@ tref syntactic_path_simplification_simplify_bf(tref root,
 	return path_sweep<node, false>(opts).run(root);
 }
 
-/**
- * @internal
- * @brief Spell every negated equality `!(l = r)` as `l != r` again. The atom
- * normalisation at the entry spells it the other way so the sweep sees one
- * key per equality; consumers of the entry expect `!=` (squeeze_absorb
- * unions on `bf_neq` in disjunctions, the normalizer prints it), and the
- * final NNF conversion of the two-pass entry used to restore it. One
- * traversal, memoised across calls in the `synt_path_simp_m` slot.
- * @endinternal
- */
-template <NodeType node>
-tref respell_negated_equalities(tref fm) {
-	using tau = tree<node>;
-	auto respell = [](tref n) {
-		if (!tau::get(n).is(tau::wff)) return n;
-		const tau& c = tau::get(n)[0];
-		if (!c.is(tau::wff_neg) || !c[0].child_is(tau::bf_eq)) return n;
-		const tau& eq = c[0][0];
-		return tau::build_bf_neq(eq.first(), eq.second());
-	};
-	return pre_order<node>(fm).template apply_unique<synt_path_simp_m>(
-					respell, while_is_formula<node>);
-}
-
 // ── Public functions ──────────────────────────────────────────────────────────
 
 template <NodeType node>
@@ -620,10 +645,9 @@ tref syntactic_path_simplification(tref fm) {
 	} else {
 		if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
 			return memo(fm);
-		res = respell_negated_equalities<node>(
-			syntactic_path_simplification_simplify_wff<node>(
-				normalize_atomic_formula_operators<node>(to_nnf<node>(fm)),
-				opts));
+		res = syntactic_path_simplification_simplify_wff<node>(
+			normalize_atomic_formula_operators<node, false>(to_nnf<node>(fm)),
+			opts);
 	}
 	DBG(LOG_DEBUG << "Syntactic_path_simplification result: " << LOG_FM(res) << "\n";)
 	return memo(res);

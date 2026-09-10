@@ -24,13 +24,14 @@ namespace idni::tau_lang {
 /**
  * @brief Simplify contradictions and tautologies along every path.
  *
- * Converts @p fm to NNF (and normalises its atoms, so a negated equality is
- * spelled `!(l = r)`), then sweeps it once with both kinds of assumption in
- * force along every path: a conjunct is true in its siblings, a disjunct
- * false in its siblings. A syntactically contradictory conjunction collapses
- * to `F`/`0`, a tautological disjunction to `T`/`1`. Negated equalities are
- * spelled `l != r` in the output, as before. Handles both wff (formulas) and
- * bf (boolean terms).
+ * Converts @p fm to NNF, normalises the ordering atoms, then sweeps it once
+ * with both kinds of assumption in force along every path: a conjunct is
+ * true in its siblings, a disjunct false in its siblings. A syntactically
+ * contradictory conjunction collapses to `F`/`0`, a tautological disjunction
+ * to `T`/`1`. Every spelling of a literal is filed under its atom's key with
+ * the right polarity, so `l != r` is read as the complement of `l = r`
+ * without being rewritten, and the NNF spelling `l != r` is what the output
+ * carries. Handles both wff (formulas) and bf (boolean terms).
  *
  * @tparam node Tree node type.
  * @param fm Formula or boolean term to simplify.
@@ -52,8 +53,12 @@ tref syntactic_path_simplification(tref fm);
 /**
  * @brief Simplify contradictions along paths without manipulating existing negations.
  *
- * Like `syntactic_path_simplification` but skips the tautology-resolution pass
- * and does not push negations inward. Useful when negations must be preserved.
+ * Like `syntactic_path_simplification` but with conjunction assumptions only
+ * (no tautology folding), no NNF conversion and no atom normalisation: the
+ * input's negations are left exactly where they are. A literal is still
+ * recognised as the complement of its atom in every spelling (`!(x = 0)`,
+ * `x != 0`, `a <= b` against `b < a`), so a contradiction between them is
+ * found without rewriting either.
  *
  * @tparam node Tree node type.
  * @param fm Formula or boolean term to simplify.
@@ -61,15 +66,14 @@ tref syntactic_path_simplification(tref fm);
  *
  * @par Example
  * @code{.cpp}
- * // An explicit negation collapses the contradiction; the equivalent NNF
- * // form ("x = 0 && x != 0", no wff_neg) does NOT collapse, since this
- * // variant never pushes negations in to expose it (see
- * // tests/integration/test_integration-heuristics-syntactic_path_simplification.cpp:128-140).
+ * // Both spellings of the contradiction collapse, and neither is rewritten
+ * // on the way (see
+ * // tests/integration/test_integration-heuristics-syntactic_path_simplification.cpp).
  * tref fm1 = get_nso_rr("x = 0 && !(x = 0).").value().main->get();
  * CHECK( tau::get(syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm1)).equals_F() );
  *
  * tref fm2 = get_nso_rr("x = 0 && x != 0.").value().main->get();
- * CHECK( !tau::get(syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm2)).equals_F() );
+ * CHECK( tau::get(syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm2)).equals_F() );
  * @endcode
  */
 template <NodeType node>

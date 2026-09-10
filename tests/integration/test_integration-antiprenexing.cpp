@@ -191,6 +191,9 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		// clause/conjunct order drifts with parser regens; canonical first
 		CHECK( matches_to_str_to_any_of(res, {
+			// complement-aware path sweep (2026-09-10): literals are
+			// ordered as the `!=` atoms they are, not as negations
+			"y != 0 && z != 0 || u != 0 && w != 0",
 			"y != 0 && z != 0 || w != 0 && u != 0",
 			"z != 0 && y != 0 || u != 0 && w != 0",
 		}) );

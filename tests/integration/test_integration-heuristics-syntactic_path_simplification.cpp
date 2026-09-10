@@ -426,12 +426,13 @@ TEST_SUITE("syntactic_path_simplification_unsat_on_unchanged_negations") {
 		CHECK(tau::get(res).equals_F());
 	}
 
-	TEST_CASE("wff: NNF contradiction x = 0 && x != 0 not collapsed") {
-		// In NNF form there is no explicit wff_neg, so no syntactic contradiction
-		// is detectable by simplify_wff alone.
+	TEST_CASE("wff: NNF contradiction x = 0 && x != 0 collapses to F") {
+		// `x != 0` is filed under the key of `x = 0` with the opposite
+		// polarity (stage 3), so the contradiction is seen without any
+		// negation being rewritten.
 		tref fm  = get_nso_rr("x = 0 && x != 0.").value().main->get();
 		tref res = syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm);
-		CHECK(!tau::get(res).equals_F());
+		CHECK(tau::get(res).equals_F());
 	}
 
 	TEST_CASE("bf: x & x' collapses to 0") {
@@ -708,5 +709,49 @@ TEST_SUITE("syntactic_path_simplification_stage2") {
 		// Folded by the construction hooks at parse time, or left alone:
 		// never turned into 1 by this entry.
 		CHECK((tau::get(res) == tau::get(fm)));
+	}
+}
+
+// ── stage 3: complement-aware keys ───────────────────────────────────────────
+
+TEST_SUITE("syntactic_path_simplification_stage3") {
+
+	// A negated equality is the complement of its equality whatever its
+	// spelling, so the entry that never rewrites negations sees it too.
+	TEST_CASE("unchanged-negations entry: x = 0 && x != 0 collapses to F") {
+		tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
+		tref res = syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
+	}
+
+	TEST_CASE("unchanged-negations entry: x != 0 && (y = 0 || x = 0) drops the dead disjunct") {
+		tref fm = get_nso_rr("x != 0 && (y = 0 || x = 0).").value().main->get();
+		tref res = syntactic_path_simplification_unsat_on_unchanged_negations<node_t>(fm);
+		tref expected = get_nso_rr("x != 0 && y = 0.").value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
+
+	// Ordering atoms are total-order comparisons on bitvectors; `a <= b` is
+	// the complement of `b < a`, which the atom normalisation leaves as two
+	// distinct positive atoms.
+	TEST_CASE("ordering contradiction collapses to F") {
+		tref fm = get_nso_rr("x < { 3 }:bv[4] && { 3 }:bv[4] <= x.").value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
+	}
+
+	TEST_CASE("ordering tautology collapses to T") {
+		tref fm = get_nso_rr("x <= { 3 }:bv[4] || { 3 }:bv[4] < x.").value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		CHECK(tau::get(res).equals_T());
+	}
+
+	TEST_CASE("ordering key reaches a sibling in another spelling") {
+		// Under x < 3 the disjunct 3 <= x is dead.
+		tref fm = get_nso_rr("x < { 3 }:bv[4] && (y = { 1 }:bv[4] || { 3 }:bv[4] <= x).")
+			.value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		tref expected = get_nso_rr("x < { 3 }:bv[4] && y = { 1 }:bv[4].").value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
 	}
 }
