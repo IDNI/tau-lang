@@ -1134,11 +1134,16 @@ size_t std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto& n) const {
 	return seed;
 }
 
+// `r.b` is a node of bintree<tau_bdd_node<T>>, and `hash_tref<T>` would
+// read the hash field at bintree<T>'s offset — past the end of the BDD
+// node, into whatever the store keeps next to it — so a ref's hash could
+// change after a memo entry was made and the entry go unreachable.
 /** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
 	size_t seed = 0;
-	idni::hash_combine(seed, idni::hash_tref<T>()(r.b), r.inv);
+	idni::hash_combine(seed, idni::tau_lang::tau_term_bdd<T>::get(r.b).hash,
+		r.inv);
 	return seed;
 }
 
