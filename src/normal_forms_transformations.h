@@ -33,8 +33,7 @@ enum MemorySlotPre {
 	to_dnf_m,                ///< Cache slot for to_dnf traversals.
 	to_cnf_m,                ///< Cache slot for to_cnf traversals.
 	eliminate_quantifiers_m, ///< Cache slot for quantifier elimination traversals.
-	anti_prenex_step_m,      ///< Cache slot for anti-prenex step traversals.
-	synt_path_simp_m         ///< Cache slot for syntactic path simplification traversals.
+	anti_prenex_step_m       ///< Cache slot for anti-prenex step traversals.
 };
 
 /**

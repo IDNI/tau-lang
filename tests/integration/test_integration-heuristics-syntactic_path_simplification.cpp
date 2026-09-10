@@ -113,7 +113,7 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 		return is_formula<node>(n);
 	};
 	return pre_order<node>(root).template
-		apply_unique<idni::tau_lang::synt_path_simp_m>(down, visit);
+		apply_unique(down, visit);
 }
 
 /**
@@ -195,7 +195,7 @@ tref syntactic_path_simplification_simplify_bf(tref root) {
 		return is_boolean_operation<node>(n) || is<node, tau::bf>(n);
 	};
 	return pre_order<node>(root).template
-		apply_unique<idni::tau_lang::synt_path_simp_m>(down, visit);
+		apply_unique(down, visit);
 }
 
 

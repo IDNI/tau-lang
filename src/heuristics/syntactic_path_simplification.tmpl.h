@@ -463,7 +463,10 @@ private:
 	}
 	void memo_store(const marker& m, tref res) {
 		if (m.relevant.empty()) {
-			if (auto* g = global_memo(opts)) g->emplace(m.orig, res);
+			// Stored trimmed: a value shared across calls must not carry
+			// the sibling of the position that first produced it.
+			if (auto* g = global_memo(opts))
+				g->emplace(m.orig, tau::trim_right_sibling(res));
 			return;
 		}
 		memo.emplace(memo_key{m.orig, m.relevant}, res);
@@ -751,14 +754,9 @@ tref syntactic_path_simplification_simplify_bf(tref root,
 template <NodeType node>
 tref syntactic_path_simplification(tref fm) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, tref>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-	auto memo = [&](tref r) { return cache.emplace(fm, r).first->second; };
-#else
-	auto memo = [](tref r) { return r; };
-#endif // TAU_CACHE
+	// No entry cache: the sweep's cross-call memo answers at the root
+	// (empty key signature) with one lookup, and the passes before it
+	// carry their own caches.
 	DBG(LOG_DEBUG << "Syntactic_path_simplification on " << LOG_FM(fm) << "\n";)
 	// One sweep with both kinds of assumption in force along every path: a
 	// conjunct is true in its siblings, a disjunct false in its siblings. A
@@ -770,45 +768,32 @@ tref syntactic_path_simplification(tref fm) {
 	opts.tautologies = true;
 	tref res = nullptr;
 	if (tau::get(fm).is_term()) {
-		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
-			return memo(fm);
+		if (tau::get(fm).equals_0() || tau::get(fm).equals_1()) return fm;
 		res = syntactic_path_simplification_simplify_bf<node>(
 			push_negation_in<node, false>(fm), opts);
 	} else {
-		if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
-			return memo(fm);
+		if (tau::get(fm).equals_F() || tau::get(fm).equals_T()) return fm;
 		res = syntactic_path_simplification_simplify_wff<node>(
 			normalize_atomic_formula_operators<node, false>(to_nnf<node>(fm)),
 			opts);
 	}
 	DBG(LOG_DEBUG << "Syntactic_path_simplification result: " << LOG_FM(res) << "\n";)
-	return memo(res);
+	return res;
 }
 
 template <NodeType node>
 tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	// -- measured 2026-08-15, same-window A/B on satisfiability2's
-	// mixed_lookback cases: medians 11.23/12.88 s with the cache vs
-	// 11.51/16.09 s without (>=2% better on both) -> kept; details in
-	// private/eliminability-measurements.md, "Caching pass (2026-08-15)"
-	using cache_t = subtree_unordered_map<node, tref>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-	auto memo = [&](tref r) { return cache.emplace(fm, r).first->second; };
-#else
-	auto memo = [](tref r) { return r; };
-#endif // TAU_CACHE
+	// The entry cache measured on 2026-08-15 (satisfiability2's
+	// mixed_lookback medians 11.23/12.88 s with it vs 11.51/16.09 s
+	// without) is now the sweep's cross-call memo at the root: same one
+	// lookup on a repeat, and every untouched subtree of a near-repeat
+	// answers the same way.
 	if (tau::get(fm).is_term()) {
-		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
-			return memo(fm);
-		// Resolve contradictions
-		return memo(syntactic_path_simplification_simplify_bf<node>(fm));
-	} else {
-		// Resolve contradiction
-		return memo(syntactic_path_simplification_simplify_wff<node>(fm));
+		if (tau::get(fm).equals_0() || tau::get(fm).equals_1()) return fm;
+		return syntactic_path_simplification_simplify_bf<node>(fm);
 	}
+	return syntactic_path_simplification_simplify_wff<node>(fm);
 }
 
 } // namespace idni::tau_lang
