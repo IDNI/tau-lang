@@ -414,22 +414,9 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	using tau = tree<node>;
 
 	if (vars.empty()) return subformula;
-	int_t id = find_biggest_quant_id<node>(subformula);
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (const unsigned char c : s)
-			if (!std::isdigit(c)) return false;
-		return true;
-	};
-	auto f = [&](tref n) {
-		if (is<node, tau::variable>(n)) {
-			if (const auto& name = get_var_name<node>(n);
-				is_number(name))
-				id = std::max(id, (int_t)std::stoi(name));
-		}
-		return true;
-	};
-	pre_order<node>(subformula).visit_unique(f);
+	// Free numeric names count too: subformula is a fragment of the
+	// formula being blasted, whose other binders' ids are free here.
+	int_t id = find_biggest_var_id<node>(subformula);
 	subtree_map<node, tref> changes;
 	tref res = subformula;
 	for (tref v : vars | std::views::reverse) {

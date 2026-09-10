@@ -184,7 +184,7 @@ TEST_SUITE("canonize_quantifier_ids") {
 	}
 
 	TEST_CASE("a fresh formula binder id clears the functional subscripts below") {
-		// build_wff_ex(..., true) mints find_biggest_quant_id + 1. The
+		// build_wff_ex(..., true) mints find_biggest_var_id + 1. The
 		// scan has to see the `fex 1` inside the term: minting 1 again
 		// would put the new binder on the subscript's name.
 		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
@@ -214,6 +214,92 @@ TEST_SUITE("canonize_quantifier_ids") {
 			tau::build_bf_eq_0(tau::build_bf_fex(one, x_eq_0_bf("1"), false))),
 			false);
 		CHECK(got == expected);
+	}
+}
+
+// ── build_binder: fresh ids ──────────────────────────────────────────────────
+//
+// The four binder builders share build_binder. With calculate_quant_id the
+// fresh id is one above every purely numeric variable name in the body,
+// bound or free, and only the free occurrences of the bound variable are
+// renamed -- the rename stops at an inner binder of the same variable.
+
+TEST_SUITE("build_binder: fresh ids") {
+
+	namespace {
+	tref v(const char* name) {
+		return tau::build_variable(std::string(name), tau_type_id<node_t>());
+	}
+	std::string bound_name(tref n) {
+		return get_var_name<node_t>(tau::trim2(n));
+	}
+	}
+
+	TEST_CASE("wff: an inner binder of the same name keeps it") {
+		// ex x. (x = 0 & ex x. x = 0): the outer x becomes 1, the inner
+		// binder and its occurrence stay x.
+		tref inner = tau::build_wff_ex(v("x"), x_eq_0("x"), false);
+		tref got = tau::build_wff_ex(v("x"),
+			tau::build_wff_and(x_eq_0("x"), inner), true);
+		tref expected = tau::build_wff_ex(v("1"),
+			tau::build_wff_and(x_eq_0("1"), inner), false);
+		CHECK(got == expected);
+	}
+
+	TEST_CASE("bf: an inner functional quantifier of the same name keeps it") {
+		tref inner = tau::build_bf_fex(v("x"), x_eq_0_bf("x"), false);
+		tref got = tau::build_bf_fex(v("x"),
+			tau::build_bf_or(x_eq_0_bf("x"), inner), true);
+		tref expected = tau::build_bf_fex(v("1"),
+			tau::build_bf_or(x_eq_0_bf("1"), inner), false);
+		CHECK(got == expected);
+	}
+
+	TEST_CASE("wff: the fresh id clears a free numeric variable") {
+		// (ex 1. 1 = 0) & 2 = 0, with 2 free -- a fragment of some
+		// `ex 2. ...`. The fresh id must skip past 2, not take it.
+		tref body = tau::build_wff_and(
+			tau::build_wff_ex(v("1"), x_eq_0("1"), false), x_eq_0("2"));
+		CHECK(bound_name(tau::build_wff_all(v("y"), body, true)) == "3");
+	}
+
+	TEST_CASE("bf: the fresh id clears a free numeric variable") {
+		tref body = tau::build_bf_or(
+			tau::build_bf_fex(v("1"), x_eq_0_bf("1"), false), x_eq_0_bf("2"));
+		CHECK(bound_name(tau::build_bf_fall(v("y"), body, true)) == "3");
+	}
+
+	TEST_CASE("wff: a free numeric variable below a numeric binder is seen") {
+		// ex 1. (1 = 0 & 2 = 0), 2 free: the scan must not stop at the
+		// numeric binder on the way to it.
+		tref body = tau::build_wff_ex(v("1"),
+			tau::build_wff_and(x_eq_0("1"), x_eq_0("2")), false);
+		CHECK(bound_name(tau::build_wff_ex(v("y"), body, true)) == "3");
+	}
+
+	TEST_CASE("bf: a free numeric variable below a numeric binder is seen") {
+		tref body = tau::build_bf_fex(v("1"),
+			tau::build_bf_or(x_eq_0_bf("1"), x_eq_0_bf("2")), false);
+		CHECK(bound_name(tau::build_bf_fex(v("y"), body, true)) == "3");
+	}
+
+	TEST_CASE("the block form renames only the free occurrences too") {
+		tref inner = tau::build_wff_ex(v("x"), x_eq_0("x"), false);
+		tref got = tau::build_wff_all_many({ v("x") },
+			tau::build_wff_and(x_eq_0("x"), inner));
+		tref expected = tau::build_wff_all(v("1"),
+			tau::build_wff_and(x_eq_0("1"), inner), false);
+		CHECK(got == expected);
+	}
+
+	TEST_CASE("the block form numbers the last variable innermost, above the body") {
+		// body binds 1 and has 2 free: x, y become 4, 3 -- y innermost.
+		tref body = tau::build_wff_and(
+			tau::build_wff_ex(v("1"), x_eq_0("1"), false), x_eq_0("2"));
+		tref got = tau::build_wff_ex_many({ v("x"), v("y") },
+			tau::build_wff_and(body, tau::build_wff_and(x_eq_0("x"), x_eq_0("y"))));
+		CHECK(bound_name(got) == "4");
+		CHECK(bound_name(tau::get(got)[0].second()) == "3");
 	}
 }
 

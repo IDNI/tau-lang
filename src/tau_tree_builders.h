@@ -69,6 +69,10 @@ template <NodeType node> tref build_wff_always(tref n);
 /** @brief Build `x ? y : z`. */
 template <NodeType node> tref build_wff_conditional(tref x, tref y, tref z);
 /** @brief Build `all bound_var. subformula`. */
+/** @brief Build the binder `nt` (wff_all/wff_ex/bf_fall/bf_fex) over `bound_var` and `body`, in its wrapper. */
+template <NodeType node> tref build_binder(const typename node::type& nt, tref bound_var, tref body, bool calculate_quant_id = true);
+/** @brief Build the binder `nt` over every variable of `bound_vars`, the last innermost, always renaming. */
+template <NodeType node> tref build_binder_many(const typename node::type& nt, const trefs& bound_vars, tref body);
 template <NodeType node> tref build_wff_all(tref bound_var, tref subformula, bool calculate_quant_id = true);
 /** @brief Build `all bound_vars. subformula`. */
 template <NodeType node> tref build_wff_all_many(const trefs& bound_vars, tref subformula);

@@ -194,16 +194,17 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 		build_wff_imply<node>(build_wff_neg<node>(x), z)));
 }
 
-// Largest purely-numeric bound-variable name over all quantifiers in fm --
-// formula binders and functional quantifiers alike, since they share one id
-// space; build_wff_all/ex and build_bf_fall/fex use id + 1 as a fresh name
-// (0 when there is none). Names too big for int_t saturate to the int_t
-// maximum. Descending below a numerically named quantifier is unnecessary:
-// canonical ids strictly decrease along a path.
+// Largest purely numeric variable name in fm, bound or free (0 when there is
+// none). The bound ones are the quantifier ids -- formula binders and
+// functional quantifiers alike, one shared space -- and the free ones are
+// the ids of binders enclosing fm when fm is a fragment. A fresh binder over
+// fm takes id + 1: above every binder inside fm (ids strictly decrease along
+// a path) and on no free variable of it. Every variable node is visited -- a
+// free numeric name can sit below a numeric quantifier. Names too big for
+// int_t saturate to the int_t maximum.
 template <NodeType node>
-int_t find_biggest_quant_id(tref fm) {
+int_t find_biggest_var_id(tref fm) {
 	using tau = tree<node>;
-	// Find the biggest quantifier id in fm
 	int_t id = 0;
 	auto is_number = [](const std::string& s) static {
 		if (s.empty()) return false;
@@ -211,16 +212,14 @@ int_t find_biggest_quant_id(tref fm) {
 		return true;
 	};
 	auto f = [&](tref n) {
-		if (is_logical_or_functional_quant<node>(n)) {
-			if (auto name = get_var_name<node>(tau::trim(n));
-				is_number(name)) {
+		if (is<node, tau::variable>(n)) {
+			if (auto name = get_var_name<node>(n); is_number(name)) {
 				try {
 					id = std::max(id, static_cast<int_t>(std::stoll(name)));
 				} catch (const std::out_of_range&) {
 					// Variable name exceeds range; use max id
 					id = std::numeric_limits<int_t>::max();
 				}
-				return false;
 			}
 		}
 		return true;
@@ -229,88 +228,97 @@ int_t find_biggest_quant_id(tref fm) {
 	return id;
 }
 
+// The one binder builder behind build_wff_all/ex and build_bf_fall/fex: `nt`
+// over `bound_var` and `body`, in the wff or bf wrapper `nt` calls for. With
+// calculate_quant_id the bound variable becomes a fresh canonical id,
+// find_biggest_var_id + 1, and only the FREE occurrences of `bound_var` in
+// `body` are renamed: the rename stops at an inner binder of either kind over
+// the same variable, so a shadowing binder keeps its own name. Without it
+// nothing is renamed and `bound_var` is assumed to have its correct
+// representation already; nothing but the two node constructions runs.
+template <NodeType node>
+tref build_binder(const typename node::type& nt, tref bound_var, tref body,
+	bool calculate_quant_id)
+{
+	using tau = tree<node>;
+	DBG(assert(bound_var != nullptr && body != nullptr);)
+	const bool term = nt == tau::bf_fall || nt == tau::bf_fex;
+	DBG(assert(term || nt == tau::wff_all || nt == tau::wff_ex);)
+	DBG(assert(tau::get(bound_var).is(tau::variable));)
+	DBG(assert(tau::get(body).is(term ? tau::bf : tau::wff));)
+	if (calculate_quant_id) {
+		tref fresh = tau::build_variable(
+			std::to_string(find_biggest_var_id<node>(body) + 1),
+			tau::get(bound_var).get_ba_type());
+		auto shadows = [&bound_var](tref n) {
+			return is_logical_or_functional_quant<node>(n)
+				&& tau::subtree_equals(tau::trim(n), bound_var);
+		};
+		subtree_map<node, tref> changes{ { bound_var, fresh } };
+		body = rewriter::replace_until<node, decltype(shadows)>(
+			body, changes, shadows);
+		bound_var = fresh;
+	}
+	return tau::get(term ? tau::bf : tau::wff, tau::get(nt, bound_var, body));
+}
+
+// The block form of build_binder: one scan and one rename for the whole
+// block, always renaming. The last bound variable is innermost and takes
+// the smallest fresh id.
+template <NodeType node>
+tref build_binder_many(const typename node::type& nt, const trefs& bound_vars,
+	tref body)
+{
+	using tau = tree<node>;
+#ifdef DEBUG
+	for (tref bv : bound_vars)
+		assert(bv != nullptr && tau::get(bv).is(tau::variable));
+	assert(body != nullptr);
+#endif
+	int_t id = find_biggest_var_id<node>(body);
+	subtree_map<node, tref> changes;
+	for (tref bv : bound_vars | std::views::reverse)
+		changes.emplace(bv, tau::build_variable(std::to_string(++id),
+			tau::get(bv).get_ba_type()));
+	auto shadows = [&changes](tref n) {
+		return is_logical_or_functional_quant<node>(n)
+			&& changes.contains(tau::trim(n));
+	};
+	body = rewriter::replace_until<node, decltype(shadows)>(
+		body, changes, shadows);
+	for (tref bv : bound_vars | std::views::reverse)
+		body = build_binder<node>(nt, changes.find(bv)->second, body, false);
+	return body;
+}
+
 // If calculate_quant_id is false no variable renaming in subformula
 // is performed, and it is assumed that bound_var has correct representation
 template <NodeType node>
 tref build_wff_all(tref bound_var, tref subformula, bool calculate_quant_id) {
-	DBG(assert(bound_var != nullptr && subformula != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
-	tref res = tau::get(tau::wff, tau::get(tau::wff_all, bound_var, subformula));
-	if (calculate_quant_id) {
-		// Find the biggest quantifier id in subformula and rename
-		// bound var to id + 1
-		const int_t id = find_biggest_quant_id<node>(subformula);
-		return tau::get(res).replace(bound_var,
-			tau::build_variable(std::to_string(id + 1),
-				tau::get(bound_var).get_ba_type()));
-	} else return res;
+	return build_binder<node>(tree<node>::wff_all, bound_var, subformula,
+		calculate_quant_id);
 }
 
 // Quantification pattern is build such that the last bound variable in
 // bound_vars is innermost
 template <NodeType node>
 tref build_wff_all_many(const trefs& bound_vars, tref subformula) {
-	using tau = tree<node>;
-#ifdef DEBUG
-	for (tref bv : bound_vars)
-		assert(bv != nullptr && tau::get(bv).is(tau::variable));
-	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
-#endif
-	// Find the biggest quantifier id in subformula and rename
-	// first bound variable to id + 1
-	int_t id = find_biggest_quant_id<node>(subformula);
-	// Prepare renaming changes and build formula
-	subtree_map<node, tref> changes;
-	for (tref bv : bound_vars | std::views::reverse) {
-		changes.emplace(bv, tau::build_variable(std::to_string(++id),
-			tau::get(bv).get_ba_type()));
-		subformula = build_wff_all<node>(bv, subformula, false);
-	}
-	// Rename bound variables
-	return rewriter::replace(subformula, changes);
+	return build_binder_many<node>(tree<node>::wff_all, bound_vars, subformula);
 }
 
 // If calculate_quant_id is false no variable renaming in subformula
 // is performed, and it is assumed that bound_var has correct representation
 template <NodeType node>
 tref build_wff_ex(tref bound_var, tref subformula, bool calculate_quant_id) {
-	DBG(assert(bound_var != nullptr && subformula != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
-	tref res = tau::get(tau::wff, tau::get(tau::wff_ex, bound_var, subformula));
-	if (calculate_quant_id) {
-		// Find the biggest quantifier id in subformula and rename
-		// bound var to id + 1
-		const int_t id = find_biggest_quant_id<node>(subformula);
-		return tau::get(res).replace(bound_var,
-			tau::build_variable(std::to_string(id + 1),
-				tau::get(bound_var).get_ba_type()));
-	} else return res;
+	return build_binder<node>(tree<node>::wff_ex, bound_var, subformula,
+		calculate_quant_id);
 }
 
 // Quantification pattern is build such that the last bound variable in
 // bound_vars is innermost
 template <NodeType node>
 tref build_wff_ex_many(const trefs& bound_vars, tref subformula) {
-	using tau = tree<node>;
-#ifdef DEBUG
-	for (tref bv : bound_vars)
-		assert(bv != nullptr && tau::get(bv).is(tau::variable));
-	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
-#endif
-	// Find the biggest quantifier id in subformula and rename
-	// first bound variable to id + 1
-	int_t id = find_biggest_quant_id<node>(subformula);
-	// Prepare renaming changes and build formula
-	subtree_map<node, tref> changes;
-	for (tref bv : bound_vars | std::views::reverse) {
-		changes.emplace(bv, tau::build_variable(std::to_string(++id),
-			tau::get(bv).get_ba_type()));
-		subformula = build_wff_ex<node>(bv, subformula, false);
-	}
-	// Rename bound variables
-	return rewriter::replace(subformula, changes);
+	return build_binder_many<node>(tree<node>::wff_ex, bound_vars, subformula);
 }
 
 template <NodeType node>
@@ -566,34 +574,12 @@ tref build_bf_nlt(tref l, tref r) {
 // the module's ground rule 4 forbids (the layer-0 plan (kept outside the repository) §1).
 template <NodeType node>
 tref build_bf_fall(tref l, tref r, bool calculate_quant_id) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
-	tref res = tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
-	if (calculate_quant_id) {
-		// Find the biggest quantifier id in r and rename the subscript
-		// to id + 1
-		const int_t id = find_biggest_quant_id<node>(r);
-		return tau::get(res).replace(l,
-			tau::build_variable(std::to_string(id + 1),
-				tau::get(l).get_ba_type()));
-	} else return res;
+	return build_binder<node>(tree<node>::bf_fall, l, r, calculate_quant_id);
 }
 
 template <NodeType node>
 tref build_bf_fex(tref l, tref r, bool calculate_quant_id) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
-	tref res = tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
-	if (calculate_quant_id) {
-		// Find the biggest quantifier id in r and rename the subscript
-		// to id + 1
-		const int_t id = find_biggest_quant_id<node>(r);
-		return tau::get(res).replace(l,
-			tau::build_variable(std::to_string(id + 1),
-				tau::get(l).get_ba_type()));
-	} else return res;
+	return build_binder<node>(tree<node>::bf_fex, l, r, calculate_quant_id);
 }
 
 template <NodeType node>

@@ -1103,7 +1103,7 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 }
 // Quantifier ids are canonicalised once at pipeline entry and once at exit, and
 // every binder the pass builds runs with calculate_quant_id = false -- which
-// also stops find_biggest_quant_id, a full pre_order walk, from running once per
+// also stops find_biggest_var_id, a full pre_order walk, from running once per
 // binder built.
 //
 // These pin that the renaming is invisible from outside: a block that mixes a
