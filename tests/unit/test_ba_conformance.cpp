@@ -163,6 +163,22 @@ void check_classification() {
 	constexpr bool declares_arith = ba_arith_ops_v<node_t, BA>;
 	const bool arith_fold = pack_type_has_arith_ops<node_t>(ba_type);
 	CHECK(arith_fold == declares_arith);
+
+	// every other owner-gated fold answers exactly what the descriptor
+	// declares, so an algebra cannot declare a capability core never sees
+	const bool atomless_fold = pack_type_is_atomless<node_t>(ba_type);
+	CHECK(atomless_fold == desc::atomless);
+	const bool oas_fold = pack_type_output_always_satisfiable<node_t>(ba_type);
+	CHECK(oas_fold == ba_output_always_satisfiable_v<node_t, BA>);
+	const bool witness_fold = pack_type_has_codegen_witness<node_t>(ba_type);
+	CHECK(witness_fold == ba_has_codegen_witness<node_t, BA>);
+	const bool zero_fold = pack_zero_constant<node_t>(ba_type) != nullptr;
+	CHECK(zero_fold == ba_has_zero_constant<node_t, BA>);
+	const bool value_fold = pack_value_constant<node_t>(ba_type, 0) != nullptr;
+	CHECK(value_fold == ba_has_value_constant<node_t, BA>);
+	const bool literal_fold =
+		pack_literal_incomplete<node_t>(desc::type_tree(), "").has_value();
+	CHECK(literal_fold == ba_has_literal_incomplete<node_t, BA>);
 }
 
 // Atomlessness is the claim that between any two distinct elements a third
