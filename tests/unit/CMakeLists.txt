@@ -8,6 +8,7 @@ set(TESTS
 	anti_prenex_subst
 	anti_prenex_prims
 	anti_prenex_ctx
+	anti_prenex_layer0
 	adt_flatten
 	adt_parsing
 	adt_types
