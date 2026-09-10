@@ -197,7 +197,7 @@ template <NodeType node> bool is_equation(tref n);
 /// `f ≤ g` or `f < g` — never split by the push, consumed only by the
 /// bitvector router's solver path (§1). Classifies what the input holds:
 /// the module never CONSTRUCTS one, which is what keeps it clear of the
-/// order-operator hooks (D4 amendment, plan §2).
+/// order-operator hooks (D4 amendment, ruling of Sep 8 2026).
 template <NodeType node> bool is_order_atom(tref n);
 /// One `¬` over an atom.
 template <NodeType node> bool is_negated_atom(tref n);

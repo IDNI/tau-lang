@@ -12,7 +12,7 @@
  * substitution's own reach (unit-opaque, §4). One memo per rewrite, shared
  * across every conjunct of the site: the copies overlap."
  *
- * REACH (§4; rulings of Sep 10 2026, plan §10). `[x ← t]` is the ONE rewrite
+ * REACH (§4; rulings of Sep 10 2026). `[x ← t]` is the ONE rewrite
  * that reaches inside a unit's body and inside a reference's arguments (§1):
  * it descends into binders — capture-safe by phase-0 canonicalisation, whose
  * depth-derived ids put an enclosing binder strictly above every id inside,
@@ -23,9 +23,10 @@
  * (inv. 6). `[atm ↦ T/F]` reaches through ∧, ∨ and ¬ only: a unit and a
  * reference are opaque leaves. A TEMPORAL operator (`always`/`sometimes`) is
  * opaque to BOTH substitutions, and its body is not in `atoms`' vocabulary
- * (ruling 1; the recorded caveat is in the plan). Any other `wff` shape
- * (pre-NNF connectives) is rebuilt generically, its formula children
- * substituted, its term children through `subst_term` (ruling 3).
+ * (ruling 1; the caveat: an `x` inside a temporal body is not rewritten,
+ * a site the spec's callers never form). Any other `wff` shape (pre-NNF
+ * connectives) is rebuilt generically, its formula children substituted,
+ * its term children through `subst_term` (ruling 3).
  *
  * REBUILD. Neither substitution runs `SIMPLIFY`: the caller does (§3
  * `TRY_WITNESS`, §6 arm edges), invariant 6. A chain top is rebuilt from its
@@ -39,8 +40,7 @@
  * whose members changed is returned as it stands. An atom is rebuilt
  * exactly as `simplify_atom` rebuilds one, so on a non-bitvector type a
  * rebuilt order atom is the hooks' equation — the one place the module
- * constructs an order atom (ruling 2: the exception to the D4 amendment,
- * plan §10).
+ * constructs an order atom (ruling 2, the exception to the D4 amendment).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_H__

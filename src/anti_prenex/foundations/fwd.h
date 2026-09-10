@@ -6,13 +6,13 @@
  * types. Every file of `src/anti_prenex/` includes this one first.
  *
  * Spec references (`§n`) point into `anti_prenex.md`, the sole source of
- * truth. The design rulings D1–D5 and the cache-gating rule are recorded in
- * the layer-0 plan (kept outside the repository) §2 and §1; the headers cite them by name and
- * state only what the C++ adds: ownership, nullability, build-type
- * behaviour, GC.
+ * truth. The design rulings D1–D5 and the cache-gating rule (Sep 7 2026)
+ * are recorded in the layer-0 implementation plan, a working document kept
+ * outside the repository; the headers cite them by name and state only what
+ * the C++ adds: ownership, nullability, build-type behaviour, GC.
  *
- * Cache gating, in one paragraph (plan §1 rule 2): every table is an entry
- * of ctx.h's `enum class table`. The six §1 result tables are caches and
+ * Cache gating, in one paragraph (ruling, Sep 7 2026): every table is an
+ * entry of ctx.h's `enum class table`. The six §1 result tables are caches and
  * exist under `#ifdef TAU_CACHE` only (OFF in Debug; no result may depend on
  * a hit). The structural per-node tables (`atoms_memo`, `size_memo`,
  * `neg_memo`, `negative_tree_memo`) are unconditional, like

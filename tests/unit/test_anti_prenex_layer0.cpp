@@ -1,11 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Layer-0 INTEGRATION test of src/anti_prenex/foundations/ — packages A (dag),
-// B (terms), C (subst), D (prims) and E (ctx) working together. Plan:
-// the layer-0 plan (kept outside the repository) §4 "Integration"; spec: anti_prenex.md §1 (|·|,
-// FV, the term representation), §3 (primitives, phase 0), §5 (PUSH_EX_BLOCK's
-// ctx fill), §10 (per-node caching). Every case crosses at least two packages;
-// the five package tests are complemented, never duplicated.
+// B (terms), C (subst), D (prims) and E (ctx) working together, the layer-0
+// milestone. Spec: anti_prenex.md §1 (|·|, FV, the term representation), §3
+// (primitives, phase 0), §5 (PUSH_EX_BLOCK's ctx fill), §10 (per-node
+// caching). Every case crosses at least two packages; the five package tests
+// are complemented, never duplicated.
 //
 // The milestone's four claims and how each is observed — through table state
 // (ctx.h's `find` on the unconditional tables), node identity and a counting
@@ -25,7 +25,7 @@
 //     2026). Both build types.
 //  4. every pass caches per node: table state after one query, and the
 //     `simplify_formula_fn` count on a shared subtree — one memo per
-//     rewrite, per call, unconditional (plan §1 rule 2). Both build types.
+//     rewrite, per call, unconditional (cache-gating ruling). Both build types.
 //     No layer-0 function writes a gated table, so the milestone's
 //     `#ifdef TAU_CACHE` clause applies from layer 3's `cof_memo` on; the one
 //     Release-only case here pins that table's key identity on a real
@@ -205,7 +205,7 @@ TEST_CASE("|·|: nothing published at construction, everything measured by one q
 	tref a = atom2("l0_p1x", "l0_p1a"), b = atom2("l0_p1y", "l0_p1b");
 	tref c = atom2("l0_p1x", "l0_p1c");
 	tref x = fvar("l0_p1x"), y = fvar("l0_p1y");
-	// A's raw constructor and D's rewrap publish nothing (plan §3 A, D).
+	// A's raw constructor and D's rewrap publish nothing (ruled Sep 8 2026).
 	tref chain   = ap::canonical_and<node_t>(trefs{ a, b, c });
 	tref wrapped = ap::rewrap<node_t>(chain, { x, y });
 	tref inner   = ap::binder_body<node_t>(wrapped);
@@ -416,7 +416,7 @@ TEST_CASE("cofactors under ctx's order are children; a P-free cofactor is plain 
 
 #ifdef TAU_CACHE
 TEST_CASE("cof_memo: one row for the trimmed and the untrimmed spelling of a BDD-backed key (Release)") {
-	// The gated table exists here alone (plan §1 rule 2). Its key is
+	// The gated table exists here alone (cache-gating ruling). Its key is
 	// (settled term, x) with the term a `BDD_ID` node minted by B: both
 	// halves are hashed by content (ctx.h `tref_pair_hash`), so the spelling
 	// a caller reads off an atom or a binder — carrying a right sibling —
@@ -627,7 +627,7 @@ TEST_CASE("subst_var: capture-safe on the parser's canonical ids, and the ids st
 }
 
 TEST_CASE("subst_var with a witness carrying a functional quantifier: the F5 shadowing pair, repaired by phase 5") {
-	// Ruling 5 (Sep 10 2026) and plan §4: a `t` carrying a functional
+	// Ruling 5 (Sep 10 2026): a `t` carrying a functional
 	// quantifier may leave a SHADOWING PAIR of ids on one path — the unit's
 	// binder and the quantifier's subscript are both "1" — until phase 5's
 	// CANONICALISE_BINDER_IDS. Recorded as EXPECTED, not as an error:

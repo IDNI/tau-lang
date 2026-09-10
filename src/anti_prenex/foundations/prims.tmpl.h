@@ -13,7 +13,7 @@
 namespace idni::tau_lang::anti_prenexing {
 
 // Reuse: `canonize_quantifier_ids` is this primitive, extended in place
-// (plan §3 D) -- a second numbering would break every memo key.
+// (ruling, Sep 9 2026) -- a second numbering would break every memo key.
 template <NodeType node>
 tref canonicalise_binder_ids(tref phi) {
 	return canonize_quantifier_ids<node>(phi);

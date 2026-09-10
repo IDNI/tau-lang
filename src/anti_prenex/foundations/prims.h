@@ -9,7 +9,7 @@
  * Reuse: `canonize_quantifier_ids` (tau_tree_builders.tmpl.h) numbers binders
  * by depth (id = max quantifier depth below + 1) and handles shadowing. It is
  * extended in place, not duplicated, to cover functional quantifiers over ONE
- * id space shared with the formula binders (plan §3 D): the parser,
+ * id space shared with the formula binders (ruling, Sep 9 2026): the parser,
  * `tree::substitute`, the api layer and this module then number alike, and
  * ids are part of every memo key.
  *
@@ -21,9 +21,9 @@
  * variables that are themselves numerically named: those arise only from
  * this pass, the module never introduces a binder that was not already
  * there, and strict decrease keeps a fragment's ids below every enclosing
- * one (plan §3 D).
+ * one (ruling 1b, Sep 9 2026).
  *
- * Never rename a bound variable (plan, ground rule 4): `build_wff_ex` /
+ * Never rename a bound variable (ground rule 4 of the module): `build_wff_ex` /
  * `build_wff_all` rename by default (`calculate_quant_id = true`); every
  * builder call in this module passes `false`. The `_many` builders always
  * rename and are never used.

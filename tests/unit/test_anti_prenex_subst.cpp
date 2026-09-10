@@ -3,8 +3,8 @@
 // Layer 0 unit tests for src/anti_prenex/foundations/subst.h (package C).
 // Spec: anti_prenex.md §1 (substitution consequences, atoms_memo), §3 (the two
 // primitives, TRY_WITNESS_DEEP's capture conditions), §4 (what may touch a
-// unit), §10 (occurrence guards, one memo per rewrite); plan:
-// the layer-0 plan (kept outside the repository) §3-C and §10 (the rulings).
+// unit), §10 (occurrence guards, one memo per rewrite); the rulings of
+// Sep 10 2026 are cited in subst.h.
 //
 // Conventions. Every substitution takes the `wff` WRAPPER. A member of a chain
 // that is not the last child of its operator node carries a right sibling, so

@@ -9,8 +9,9 @@
  * The spec is the sole source of truth; every function carries a comment
  * naming the spec section it implements, and names mirror the spec one to
  * one in snake case (`PUSH_BLOCK` → `push_block`). The module map — every
- * directory and file of all nine layers — and the ground rules are in
- * the layer-0 plan (kept outside the repository) (§1 rules, §2 skeleton, §7 module map).
+ * directory and file of all nine layers — and the ground rules are kept in
+ * the layer-0 implementation plan, a working document outside the
+ * repository.
  *
  * Namespace `idni::tau_lang::anti_prenexing`: the spelling differs from the
  * old module's entry function `anti_prenex` (`src/antiprenexing/`), which

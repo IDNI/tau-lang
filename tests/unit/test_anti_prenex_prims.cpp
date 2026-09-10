@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Layer 0 unit tests for src/anti_prenex/foundations/prims.h.
-// Spec: anti_prenex.md; plan: the layer-0 plan (kept outside the repository) (package tests list).
+// Spec: anti_prenex.md.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"

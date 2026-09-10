@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Layer 0 unit tests for src/anti_prenex/foundations/dag.h.
-// Spec: anti_prenex.md; plan: the layer-0 plan (kept outside the repository) (package tests list).
+// Spec: anti_prenex.md.
 //
 // The three cached facets (formula_size, neg_of/set_neg, is_negative_tree)
 // reach their tables through ctx.h's find/store, which package E defines, so

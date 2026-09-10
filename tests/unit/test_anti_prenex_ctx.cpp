@@ -2,7 +2,7 @@
 
 // Layer 0 unit tests for src/anti_prenex/foundations/ctx.h (package E).
 // Spec: anti_prenex.md §1 (ctx table, "Cache scope"), §5 (PUSH_EX_BLOCK's
-// setup), §6/§7 (the wrapper's consumers); plan: the layer-0 plan (kept outside the repository).
+// setup), §6/§7 (the wrapper's consumers).
 //
 // The structural tables are UNCONDITIONAL, so their behaviour — key identity,
 // lazy fill, GC survival — is checked in BOTH build types. Everything that
