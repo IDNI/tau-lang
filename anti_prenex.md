@@ -48,9 +48,12 @@ f′       complement             ∪ · +    join, meet, ring sum
          tree count over the hash-consed DAG (the sort convention of 2d, the
          case witness, and EXPAND, and the metric of §5's size acceptance),
          O(1) to maintain
-‖·‖      the count IN MEMORY (§10): for a formula, its shared nodes counted
-         once each; for a term, the node count of its BDD — TRY_WITNESS's
-         tie-break among a variable's pins reads the latter
+‖·‖      the count IN MEMORY (§10) of a TERM: the node count of its BDD, of
+         its DAG when plain — TRY_WITNESS's tie-break among a variable's
+         pins reads it, the cost every later compose or replace of the
+         witness pays. No procedure reads a formula's in-memory count (the
+         decomposition licence, §6, uses |·|); §10 names it only in the
+         cost argument
 neg(φ)   the NNF of ¬φ — TO_NNF's NEG (§3), factored — a pure function of
          the node: computed on first demand and cached on it
 h(φ)     cached structural hash, set at construction from the node's kind and
@@ -110,6 +113,13 @@ term representation, per component (PREPARE_TERMS):
     foreign-typed sub-terms, and functional quantifiers over block-free bodies.
     This is thm:mnf over X only,
     f(x⃗,y⃗) = ⋃_{a ∈ 2^|X|} f(a,y⃗) · x⃗^a, with arbitrary BA coefficients.
+    Only the sides of EQUATIONS are backed: an order atom is never cofactored
+    (cof_memo keys are TERM_OF of equations) and the solver path consumes it
+    as written, so it stays plain whatever it touches. BDD-backed means "has
+    a decision variable": a term that stops touching the block — a cofactor,
+    a quantification over all of it — is plain again, and a block-free term
+    never carries a BDD. One BDD is one term node (interned), so the D2 round
+    trip through a component boundary returns the node it started from.
     Consequences:
       - cofactoring on x ∈ X is CHILD SELECTION; nothing else is ever cofactored on
       - ∀_X f = meet of the leaves,  ∃_X f = join of the leaves — one traversal
@@ -162,7 +172,7 @@ term representation, per component (PREPARE_TERMS):
 | `quant_memo` | functional-quantifier term → term, GLOBAL — the key IS the query (`ASK`'s convention) and names term, kind, and quantified set in one node; entries are pure functions of it. `SETTLE_FUNCTIONAL`'s discharges may share it (see `DISCHARGE`) |
 | `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`; consumers: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `SETTLE_FUNCTIONAL(TERM_OF(·), ctx)`, before calling `COF`. Pure functions of the key — the settled term already reflects `keep_functional` |
 | `atoms_memo` | `formula node → the atoms occurring in it`, units opaque (§4), GLOBAL — purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
-| `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
+| `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query built on plain (converted) terms — a BDD-backed term is a node of one order (§3 `PREPARE_TERMS`). GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
 
 Every constant above (`K`, `K′`, `K″`, `K‴`, `γ`, the floor) is provisional
@@ -550,7 +560,14 @@ invariant 6:
   what stops nested Boole normal forms from compounding as substitutions stack
   terms inside terms.
 - `SIMPLIFY_ATOM(a)` — `SIMPLIFY_TERM` on both sides, then fold a constant-only
-  atom to `T`/`F`.
+  atom to `T`/`F`. With no BDD-backed side — the initial phase-1 effort,
+  phases 2 and 5, and every plain atom of the push, order atoms included —
+  it also normalises the joint `l + r` and runs the per-variable `0`/`1`
+  pass (a side identically constant, or independent of a variable): the
+  strongest syntactic effort before any BDD exists, and an early detection
+  that spares a BDD later. With a BDD-backed side it is side-wise and never
+  reshapes the atom; the joint fold there is `TERM_OF`'s (`FOLD_DECIDED`).
+  Idempotent, so an atom's shape as written is its simplified shape.
 
 The remaining primitives are defined by their contracts alone:
 
@@ -568,10 +585,16 @@ The remaining primitives are defined by their contracts alone:
   connectivity, descending into nested binders, references connecting
   nothing (§5); each component in `X`'s order.
 - `PREPARE_TERMS(body, P, order)` — §1's term representation over `P`:
-  both sides of every atom touching `P` backed by a BDD whose decision
+  both sides of every EQUATION touching `P` backed by a BDD whose decision
   variables are `P` in the given order, everything else in the leaves,
-  functional quantifiers slid onto the leaves, binder units transported
-  opaque.
+  functional quantifiers slid onto the leaves; order atoms left plain;
+  binder units, references and temporal operators transported opaque. The
+  caller owns `order` and passes it to every later term operation. Its
+  inverse at the component's close converts every backed term anywhere in
+  the result — under a REWRAPped binder, inside a symbolic functional
+  quantifier, inside a reference argument — and a SOLVER QUERY is built on
+  converted terms, since a backed term is a node of one order and a
+  `solver_memo` key holding one would never hit across components.
 - `SQUEEZE_POSITIVES(φ)` — for an ∧/∨ skeleton whose leaves are positive
   equations, terms `t₁ … t_k` with `φ ≡ t₁ = 0 ∨ … ∨ t_k = 0`, obtained by
   distributing ∧ over ∨ on terms, a conjunction squeezing to the union
@@ -655,9 +678,10 @@ failure falls through to a more general path.
 
 `NORM_EQUATION` rewrites an atom and is called in exactly one place:
 `SQUEEZE` step 1, whose squeeze needs zero form. Everywhere
-else equations stay as written — `TERM_OF` reads a term off an atom without
-touching it, and every substitution keyed on an atom uses the atom as it occurs
-in the formula.
+else equations stay as written — as `SIMPLIFY_ATOM` left them at construction,
+which is idempotent, so no key drifts — `TERM_OF` reads a term off an atom
+without touching it, and every substitution keyed on an atom uses the atom as
+it occurs in the formula.
 
 ---
 
@@ -771,7 +795,7 @@ PUSH_EX_BLOCK(body, X, kf):
             ← the global tables                   // cross-run, never reset (§1)
         ctx.taint_count ← the global counter      // likewise (§1, cache scope)
         body ← PREPARE_TERMS(body, P, ctx.order)  // BDD-back both sides of every
-                                                  //   atom touching P (§1). A
+                                                  //   EQUATION touching P (§1). A
                                                   //   FORMULA-level binder unit
                                                   //   is transported opaque (§7
                                                   //   translates it at query
