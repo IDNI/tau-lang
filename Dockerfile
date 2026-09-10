@@ -49,6 +49,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
 	bash wget git nsis rpm python3-pip python3-venv bison nanobind-dev \
+	ninja-build \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
@@ -141,9 +142,9 @@ RUN echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && 
 # Set TEST_GCC_BUILD=no to skip the gcc compilation check
 ARG TEST_GCC_BUILD=yes
 
-# Presets build with clang; devel (-O0 -g0) checks the tree still builds with gcc
+# Check also make and gcc compilation since ninja and clang is used by default
 RUN if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
-	./dev preset devel-ninja-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
 	rm -rf build/devel; \
 fi
 
