@@ -332,10 +332,25 @@ tref term_div(tref symbol) {
 			break;
 		}
 		// 0 / X
-		case tau::bf_f:
+		case tau::bf_f: {
 			// 0 / 0 is top (cvc5: bvudiv(0,0) = all_ones)
 			if (c2.is(tau::bf_f)) return tau::_1(c1.get_ba_type());
-			return tau::_0(c2.get_ba_type());
+			// 0 / 1 is 0 (the divisor is all ones, never zero)
+			if (c2.is(tau::bf_t)) return tau::_0(c2.get_ba_type());
+			// 0 / { ... }: let cvc5 apply the division-by-zero rule
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return div_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 0 / X for a symbolic X is 0 only when X != 0 and all ones
+			// when X = 0 (bvudiv(0, 0) = all_ones), so it is not folded.
+			break;
+		}
 		default: break;
 	}
 	switch (c2.value.nt) {
@@ -358,11 +373,9 @@ tref term_div(tref symbol) {
 		}
 		default: break;
 	}
-	// X / X
-	if (c1 == c2) {
-		const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-		return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c2.get_ba_type());
-	}
+	// X / X is not folded for a symbolic X: it is 1 only when X != 0 and
+	// all ones when X = 0 (bvudiv(0, 0) = all_ones). Two equal constants
+	// are folded below through cvc5, which applies the same rule.
 	// { ... } / { ... }
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
@@ -407,11 +420,8 @@ tref term_mod(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				return tau::_0(c2.get_ba_type());
 			}
-			// 1 % 0 is top
-			if (c2.is(tau::bf_f)) {
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c2.get_ba_type());
-			}
+			// 1 % 0 is top (bvurem(x, 0) = x, and 1 is all ones)
+			if (c2.is(tau::bf_f)) return tau::_1(c2.get_ba_type());
 			break;
 		}
 		// 0 % X

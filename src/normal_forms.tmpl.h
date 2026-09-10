@@ -828,8 +828,11 @@ auto lex_var_comp = [](tref x, tref y) {
  * @brief Predicate that classifies a wff node as a BDD variable.
  *
  * In BDD-based DNF/CNF reductions of well-formed formulas the following node
- * types are treated as atomic BDD variables: `bf_eq`, `wff_ref`, `wff_ex`,
- * `wff_sometimes`, `wff_always`, `wff_all`, and `constraint`.
+ * types are treated as atomic BDD variables: `bf_eq`, `bf_lt`, `bf_lteq`,
+ * `wff_ref`, `wff_ex`, `wff_sometimes`, `wff_always`, `wff_all`, and
+ * `constraint`. The order atoms count because a reduction that does not see
+ * them drops them: `b < 4 && 2 < b && (!b = 3 || a = 0)` would otherwise
+ * reduce to `!b = 3 || a = 0`.
  * @tparam node Tree node type.
  * @todo Extend for the full grammar.
  *
@@ -845,11 +848,14 @@ inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
 	// `n` is a wff wrapper, so the invariant to check is on its child: the
-	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal.
-	// Asserting `t.is(bf_neq)` instead would be vacuously true and check
-	// nothing.
+	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal
+	// and order_atoms_to_literals. Asserting `t.is(bf_neq)` instead would be
+	// vacuously true and check nothing.
 	DBG(assert(!t.child_is(tau::bf_neq));)
+	DBG(assert(!t.child_is(tau::bf_nlt) && !t.child_is(tau::bf_nlteq));)
 	return t.child_is(tau::bf_eq)
+		|| t.child_is(tau::bf_lt)
+		|| t.child_is(tau::bf_lteq)
 		|| t.child_is(tau::wff_ref)
 		|| t.child_is(tau::wff_ex)
 		|| t.child_is(tau::wff_sometimes)
@@ -1339,6 +1345,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 		// Substitute all sometimes by !always! and push inner equality in
 		fm = pre_order<node>(fm).apply_unique(smt_replace);
 		fm = unequal_to_not_equal<node>(fm);
+		fm = order_atoms_to_literals<node>(fm);
 	} else fm = apply_all_xor_def<node>(fm); // term case
 	trefs vars = is_wff ? tau::get(fm).select_top(is_wff_bdd_var<node>)
 			 : tau::get(fm).select_top(is_bf_bdd_var<node>);

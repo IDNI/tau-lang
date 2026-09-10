@@ -101,6 +101,23 @@ TEST_SUITE("pretty printer") {
 		};
 		for (auto& [sample, expected] : different)
 			CHECK( check(sample, expected) );
+		// Operators of one precedence level chain left to right in the
+		// grammar (`a + b - c` is `(a + b) - c`), so a right operand of
+		// the same level must keep its parentheses and a left one must
+		// not; the printed text must re-parse to the same tree.
+		vector<std::pair<string, string>> chained = {
+			{ "(x:bv[8] + y:bv[8]) - z:bv[8] = 0.", "x+y-z = 0." },
+			{ "x:bv[8] + (y:bv[8] - z:bv[8]) = 0.", "x+(y-z) = 0." },
+			{ "x:bv[8] - (y:bv[8] - z:bv[8]) = 0.", "x-(y-z) = 0." },
+			{ "(x:bv[8] - y:bv[8]) - z:bv[8] = 0.", "x-y-z = 0." },
+			{ "x:bv[8] * (y:bv[8] / z:bv[8]) = 0.", "x*(y/z) = 0." },
+			{ "(x:bv[8] * y:bv[8]) / z:bv[8] = 0.", "x*y/z = 0." },
+			{ "x:bv[8] / (y:bv[8] % z:bv[8]) = 0.", "x/(y%z) = 0." },
+			{ "x:bv[8] >> (y:bv[8] << z:bv[8]) = 0.", "x>>(y<<z) = 0." },
+			{ "(x:bv[8] >> y:bv[8]) << z:bv[8] = 0.", "x>>y<<z = 0." },
+		};
+		for (auto& [sample, expected] : chained)
+			CHECK( check(sample, expected) );
 		// nested bf quantifiers merge into a comma list, like all/ex
 		CHECK( check("fall p fall q pqx = 0.", "fall p, q pqx = 0.") );
 		CHECK( check("fex p fex q pqx = 0.", "fex p, q pqx = 0.") );

@@ -111,7 +111,7 @@ struct repl_evaluator {
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
-		bool blasting            = true;  ///< Enable bitvector predicate blasting.
+		bool blasting            = bv_blasting; ///< Bitvector predicate blasting; follows the library default.
 		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options deliberately have no mirror fields

@@ -640,3 +640,34 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		CHECK(other == other_after);
 	}
 }
+
+// SAT-1 regression: the string overloads of sat/unsat/valid/realizable parse
+// through get_spec_or_term, which yields a `spec` root for any formula. The
+// tref overloads then either rejected that root (realizable required a bare
+// wff, so sat() answered false for every satisfiable formula) or handed it
+// whole to the normalizer (get_nso_rr only unwrapped a spec containing a
+// ref), where the syntactic simplifier negated a non-wff and aborted Debug.
+// Every case below is decided through the REPL with the same answers.
+TEST_SUITE("Tau API - string - sat/valid decide plain formulas") {
+
+	TEST_CASE_FIXTURE(api_fixture, "SAT-1: sat and unsat decide") {
+		CHECK( tau_api::sat("x = 0 || x != 0") );
+		CHECK( !tau_api::sat("x = 0 && x != 0") );
+		CHECK( tau_api::unsat("x = 0 && x != 0") );
+		CHECK( tau_api::sat("ex x:bv[8] x = {0}:bv[8]") );
+		CHECK( tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])") );
+		CHECK( !tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])") );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "SAT-1: valid decides, quantified bv included") {
+		CHECK( tau_api::valid("x = 0 || x != 0") );
+		CHECK( !tau_api::valid("x = 0") );
+		CHECK( tau_api::valid("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])") );
+		CHECK( !tau_api::valid("all x:bv[8] x / x = {1}:bv[8]") );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "SAT-1: realizable decides") {
+		CHECK( tau_api::realizable("x = 0 || x != 0") );
+		CHECK( tau_api::unrealizable("x = 0 && x != 0") );
+	}
+}

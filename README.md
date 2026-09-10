@@ -581,7 +581,9 @@ for details),
 stream. The type of a stream also determines the type of the Boolean function
 (see also subsection [Streams](#streams)) and
 * `0` and `1` stand for the bottom and top element in the fixed Boolean
-algebra.
+algebra. For a bitvector type they are the all-zeros and the **all-ones**
+vector, so `1:bv[8]` is `255`, not the number one (see
+[`0` and `1` in bitvectors](#0-and-1-in-bitvectors)).
 
 The order of the operations is the following (from higher precedence
 to lower): `'` > `&` > `^` > `|` > `fex ... ...` > `fall ... ...`.
@@ -634,6 +636,29 @@ the new operators meaning is given in the following table:
 | `min(x, y)`       | unsigned minimum of two bitvectors                     |
 | `max(x, y)`       | unsigned maximum of two bitvectors                     |
 
+### `0` and `1` in bitvectors
+
+As in every Boolean algebra, `0` and `1` denote the bottom and the top
+element. For `bv[n]` the bottom is the all-zeros vector and the top is the
+**all-ones** vector `2^n - 1`, so `1:bv[8]` is `255`. The number one is a
+constant, `{1}:bv[8]`. This holds everywhere a bare `1` meets a bitvector,
+in input and in output:
+
+| written                    | meaning for `bv[8]`                                   |
+|----------------------------|-------------------------------------------------------|
+| `1:bv[8]`, `x + 1`         | `255`; `x + 255`, i.e. `x - 1` modulo 256             |
+| `{1}:bv[8]`, `x + {1}:bv[8]` | the number one; the successor of `x`                |
+| `x <= 1`                   | always true                                           |
+| `1 <= x`                   | `x = 255`, i.e. `x' = 0`                              |
+| `x'`                       | `255 - x`, the bitwise complement                     |
+| `(bv[8]) 1:bv[4]`          | `{15}:bv[8]`: the cast widens `1111` with zeros       |
+| `n {255}:bv[8]`            | prints `1`: an all-ones constant is shown as the top  |
+
+Prefer braced constants (`{ #x01 }`, `{1}:bv[8]`) whenever a number is
+intended, and read a bare `1` in bitvector output as "all ones". The
+saturating idioms below rely on this: `i1'` is `2^w - 1 - i1` because the
+complement is taken against the all-ones top.
+
 `min` and `max` are call-style builtins, defined only for bitvectors: using
 them on operands of any other Boolean algebra is a type-resolution error. Like
 the comparison operators they compare unsigned, so e.g.
@@ -670,7 +695,10 @@ x % 0  =  x
 
 In particular `x / 0` yields the *maximum* of the type — the least safe
 default for anything metering, pricing or otherwise accumulating — so never
-rely on it implicitly. When a divisor can be zero, guard it in the
+rely on it implicitly. The same rule reaches `x / x` and `0 / x`: both are
+`{1}` and `0` only for `x != 0`, and the maximum at `x = 0`, so the
+normalizer leaves them unfolded while `x` is symbolic; `1 / 0` and `1 % 0`
+are the all-ones top element again. When a divisor can be zero, guard it in the
 specification and pick the zero-case value explicitly:
 
 ```
@@ -1195,7 +1223,7 @@ Here are some small examples to illustrate the type inference system:
       - the outer `x` is inferred to be of the default type `tau`,
       - no type mismatch occurs as both `x` are in different scopes.
 6. `ex x x = 1 : bv[8]`:
-      - the constant `1` is typed as `bv[8]`,
+      - the constant `1` is typed as `bv[8]` (it is the all-ones vector `{255}:bv[8]`, see [`0` and `1` in bitvectors](#0-and-1-in-bitvectors)),
       - `x` is inferred to be of the same type as the constant `1`, i.e. `bv[8]`,
       - no type mismatch occurs.
 7. `x:bv[8] = {1}:bv[16]`:

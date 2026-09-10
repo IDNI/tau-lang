@@ -26,6 +26,34 @@ tref unequal_to_not_equal(tref fm) {
 	return result;
 }
 
+/** @internal @copydoc order_atoms_to_literals @endinternal */
+template <NodeType node>
+tref order_atoms_to_literals(tref fm) {
+	using tau = tree<node>;
+	DBG(LOG_TRACE << "order_atoms_to_literals/fm: " << LOG_FM(fm);)
+	auto to_literal = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+		case tau::bf_nlt: return tau::build_wff_neg(
+			tau::build_bf_lt(c.first(), c.second()));
+		case tau::bf_nlteq: return tau::build_wff_neg(
+			tau::build_bf_lteq(c.first(), c.second()));
+		case tau::bf_gt: return tau::build_bf_lt(c.second(), c.first());
+		case tau::bf_gteq: return tau::build_bf_lteq(c.second(), c.first());
+		case tau::bf_ngt: return tau::build_wff_neg(
+			tau::build_bf_lt(c.second(), c.first()));
+		case tau::bf_ngteq: return tau::build_wff_neg(
+			tau::build_bf_lteq(c.second(), c.first()));
+		default: return n;
+		}
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(to_literal, while_is_formula<node>);
+	DBG(LOG_TRACE << "order_atoms_to_literals/result: " << LOG_FM(result);)
+	return result;
+}
+
 // Convert X =(!=) Y to X + Y =(!=) 0
 /** @internal @copydoc norm_equation @endinternal */
 template<NodeType node>

@@ -29,15 +29,21 @@ typename node::type inverse_of(size_t operation) {
 	return tau::nul; // null is not allowed in a term
 }
 
-// The identity element for an associative @p operation: 0 for bf_add, 1 for
-// bf_mul. Only these two are ever passed as the direct (non-inverse)
-// operator of a block (see the DBG asserts in combine_diff/build_simplification).
+// The identity element for an associative @p operation: 0 for bf_add, the
+// numeric one for bf_mul. Only these two are ever passed as the direct
+// (non-inverse) operator of a block (see the DBG asserts in
+// combine_diff/build_simplification). Note that `1` (bf_t) is the all-ones
+// top element of a bitvector type, not its multiplicative identity, so the
+// bf_mul identity is built as the constant value 1 of the type's width.
 template<NodeType node>
 tref identity_of(size_t operation, size_t type) {
 	using tau = tree<node>;
 
 	if (operation == tau::bf_add) return _0<node>(type);
-	if (operation == tau::bf_mul) return _1<node>(type);
+	if (operation == tau::bf_mul) {
+		const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type));
+		return tau::build_bf_ba_constant(make_bitvector_value(width, 1), type);
+	}
 	DBG(assert(false && "identity_of: operation must be bf_add or bf_mul");)
 	LOG_ERROR << "identity_of: unsupported operation " << LOG_NT(operation);
 	return _0<node>(type);
