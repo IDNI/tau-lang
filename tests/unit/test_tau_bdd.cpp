@@ -740,10 +740,6 @@ TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
 }
 
 TEST_SUITE("BDD handle creation") {
-	// Runs BEFORE "creation and gc": that case sweeps with a bare tau::gc()
-	// and no collect_live_refs, after which the BDD universe's variable
-	// trefs dangle (a BDD node's hash and equality read them), so nothing
-	// may build or sweep BDDs after it in this process.
 	TEST_CASE("gc: the key is the BDD_ID node, shared by every spelling of the wrapper") {
 		using bdd = tau_term_bdd<node_t>;
 		using hbdd = term_handle<node_t>;
@@ -853,7 +849,13 @@ TEST_SUITE("BDD handle creation") {
 		res = res.bdd_and(hbdd::U.find(hbdd::key_of(node3))->second, o);
 		htref tau_res = tau::geth(res.to_tau_term(1));
 
-		tau::gc();
+		// The interpreter's protocol: the BDD universe holds its variable
+		// trefs raw (a BDD node's hash and equality read them), so they are
+		// pinned before the sweep; a bare tau::gc() would leave them
+		// dangling for every later BDD lookup in the process.
+		std::unordered_set<tref> keep;
+		bdd::collect_live_refs(keep);
+		tau::gc(keep);
 
 		// std::cout << "U size after gc: " << hbdd::U.size() << "\n";
 		CHECK(hbdd::U.size() == 1);
