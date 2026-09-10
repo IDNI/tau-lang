@@ -675,6 +675,28 @@ pack_type_family_param(tref type_tree) {
 }
 
 /**
+ * @brief Whether @p src is a truncated literal of the BA owning @p type_tree.
+ *
+ * nullopt when no BA owns the type or the owner does not classify
+ * truncation; a definite `false` means the owner looked and found the
+ * literal complete, which is not the same answer. By tree, not id: the REPL
+ * asks while a literal is still being typed, before any id exists.
+ */
+template <typename Node>
+std::optional<bool> pack_literal_incomplete(tref type_tree,
+	const std::string& src)
+{
+	if (!type_tree) return std::nullopt;
+	std::optional<bool> out;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_literal_incomplete<Node, BA>)
+			if (!out && ba_descriptor<BA, Node>::owns_type(type_tree))
+				out = ba_descriptor<BA, Node>::literal_incomplete(src);
+	});
+	return out;
+}
+
+/**
  * @brief `true` when the BA owning @p ba_type is one whose outputs a system
  *        can always satisfy on its own.
  *

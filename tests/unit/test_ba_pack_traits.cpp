@@ -100,6 +100,16 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		CHECK_FALSE(pack_codegen_witness<node_t>(size_t{0}, nullptr, nullptr).has_value());
 		CHECK_FALSE(pack_codegen_constant_expr<node_t>(size_t{0}, nullptr).has_value());
 	}
+	TEST_CASE("pack_literal_incomplete: nullopt without an owner, an answer from one") {
+		CHECK_FALSE(pack_literal_incomplete<node_t>(nullptr, "1").has_value());
+		CHECK_FALSE(pack_literal_incomplete<node_t>(untyped_type<node_t>(), "1").has_value());
+#ifdef TAU_PACK_HAS_BA_SBF
+		tref sbf_t = ba_descriptor<sbf_ba, node_t>::type_tree();
+		auto complete = pack_literal_incomplete<node_t>(sbf_t, "1");
+		REQUIRE(complete.has_value());
+		CHECK_FALSE(*complete);
+#endif
+	}
 	TEST_CASE("pack_type_tree round-trips every family through pack_type_family_param") {
 		pack_visit_all<node_t>([]<typename BA>() {
 			using desc = ba_descriptor<BA, node_t>;
