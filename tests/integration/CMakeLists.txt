@@ -51,6 +51,7 @@ set(TESTS
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise
 	order_atoms_reduce
+	bv_quantifier_free_decision
 )
 
 foreach(X IN LISTS TESTS)

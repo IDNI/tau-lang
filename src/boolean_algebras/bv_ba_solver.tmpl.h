@@ -521,6 +521,70 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 #endif // TAU_CACHE
 
 	subtree_map<node, bv> vars, free_vars;
+	// Opt-in quantifier-free decision (bv_quantifier_free_decision). A closed
+	// formula whose binders are all existential, all in positive polarity and
+	// each variable bound once, is satisfiable exactly when its matrix is, so
+	// the binders are dropped and the variables become free constants; one
+	// whose binders are all universal is satisfiable exactly when the negated
+	// matrix is unsatisfiable, so it is negated as well and the verdict
+	// inverted. Either way cvc5 then sees a QF_BV problem and bitblasts it
+	// eagerly, instead of running its quantifier instantiation on a formula
+	// that has no alternation to instantiate. Anything else -- both kinds,
+	// a binder under a negation, a variable bound twice -- takes the path
+	// below unchanged.
+	if (bv_quantifier_free_decision_enabled()) {
+		const bool has_ex = tau::get(form).find_top(is<node, tau::wff_ex>) != nullptr;
+		const bool has_all = tau::get(form).find_top(is<node, tau::wff_all>) != nullptr;
+		if (has_ex != has_all) {
+			const auto kind = has_ex ? tau::wff_ex : tau::wff_all;
+			bool eligible = true;
+			subtree_map<node, int> bound;
+			std::vector<std::pair<tref, bool>> stack{{form, false}};
+			while (!stack.empty() && eligible) {
+				auto [n, under_neg] = stack.back(); stack.pop_back();
+				if (!n) continue;
+				const tau& t = tau::get(n);
+				if (t.is(tau::wff_neg)) under_neg = true;
+				if (t.is(kind)) {
+					if (under_neg || !is<node>(t.first(), tau::variable)
+						|| ++bound[t.first()] > 1) eligible = false;
+				}
+				for (tref c : t.children()) stack.push_back({c, under_neg});
+			}
+			if (eligible) {
+				auto drop_binder = [kind](tref n) -> tref {
+					const tau& t = tau::get(n);
+					if (t.is(tau::wff) && t.child_is(kind)) return t[0].second();
+					return n;
+				};
+				tref matrix = form;
+				for (;;) { // binders nest; peel until none is left
+					tref next = pre_order<node>(matrix).apply_unique(drop_binder, while_is_formula<node>);
+					if (next == matrix) break;
+					matrix = next;
+				}
+				const bool invert = !has_ex;
+				if (invert) matrix = tau::build_wff_neg(matrix);
+				LOG_DEBUG << "bv_formula_sat_status: quantifier-free decision"
+					<< (invert ? " (universal, inverted)" : "") << ": " << LOG_FM(matrix);
+				cvc5::Solver qf_solver(cvc5_term_manager);
+				config_cvc5_solver_quantifier_free(qf_solver);
+				auto qf_expr = bv_eval_node<node>(tt(matrix), vars, free_vars);
+				if (!qf_expr) {
+					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
+					return memo(std::nullopt);
+				}
+				qf_solver.assertFormula(qf_expr.value());
+				auto qf_result = qf_solver.checkSat();
+				if (qf_result.isSat()) return memo(invert ? bv_sat_status::unsat : bv_sat_status::sat);
+				if (qf_result.isUnknown()) {
+					LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << qf_expr.value();
+					return memo(bv_sat_status::unknown);
+				}
+				return memo(invert ? bv_sat_status::sat : bv_sat_status::unsat);
+			}
+		}
+	}
 	// A fresh solver per query is deliberate, do NOT share one like
 	// normalize_bv's (B12): cvc5 forbids a second checkSat without
 	// incremental mode ("cannot make multiple queries unless incremental
