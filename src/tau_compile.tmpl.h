@@ -10,6 +10,7 @@
 #include <map>
 #include <optional>
 #include <sstream>
+#include <vector>
 
 #include "cpp_codegen.h"
 #include "definitions.h"
@@ -43,6 +44,19 @@ inline bool compiler_available(const std::string& cxx) {
 	return std::system(cmd.c_str()) == 0;
 }
 
+// The last lines of a cmake log, for an error message a reader sees where
+// the log file is not at hand (a CI job's output).
+inline std::string log_tail(const std::string& path, size_t lines = 20) {
+	std::ifstream f(path);
+	if (!f) return "";
+	std::vector<std::string> all;
+	for (std::string line; std::getline(f, line);) all.push_back(line);
+	std::string out;
+	for (size_t i = all.size() > lines ? all.size() - lines : 0;
+		i < all.size(); ++i) out += "\n  " + all[i];
+	return out;
+}
+
 // The compiler the emitted project is configured with: an explicit
 // request first (`tau compile --cxx`, then TAU_CXX), else clang++ when it
 // is on PATH, else cmake's own default.
@@ -67,6 +81,7 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 		"set(TAU_SDK_BUILD_DIR \"" << TAU_CODEGEN_BUILD_DIR << "\")\n"
 		"set(TAU_SDK_SHARED_PREFIX \"" << TAU_CODEGEN_SHARED_PREFIX << "\")\n"
 		"set(TAU_BA_LINK_LIBS \"" << TAU_CODEGEN_BA_LINK_LIBS << "\")\n"
+		"set(TAU_BA_PACKAGE_DIRS \"" << TAU_CODEGEN_BA_PACKAGE_DIRS << "\")\n"
 		"set(TAU_COMPILE_DEFINITIONS \"" << TAU_CODEGEN_COMPILE_DEFINITIONS << "\")\n"
 		"\n"
 		"list(APPEND CMAKE_MODULE_PATH \"${TAU_SDK_ROOT}/cmake\")\n"
@@ -78,8 +93,13 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 		"set(TAU_BUILD_EXECUTABLE OFF)\n"
 		"include(\"${TAU_SDK_ROOT}/cmake/tau-common.cmake\")\n"
 		"\n"
-		"# Resolve the packages TAU_BA_LINK_LIBS' imported targets need, the\n"
-		"# same way the emitting build's own CMakeLists.txt does.\n"
+		"# Resolve the packages TAU_BA_LINK_LIBS' imported targets need, at\n"
+		"# the place the emitting build found each of them.\n"
+		"foreach(_tau_pkg_dir ${TAU_BA_PACKAGE_DIRS})\n"
+		"\tif(_tau_pkg_dir MATCHES \"^([^=]+)=(.+)$\")\n"
+		"\t\tset(${CMAKE_MATCH_1} \"${CMAKE_MATCH_2}\")\n"
+		"\tendif()\n"
+		"endforeach()\n"
 		"foreach(_tau_ba_lnk ${TAU_BA_LINK_LIBS})\n"
 		"\tif(_tau_ba_lnk MATCHES \"^([A-Za-z0-9_]+)::.+$\")\n"
 		"\t\tset(_tau_ba_lnk_pkg \"${CMAKE_MATCH_1}\")\n"
@@ -472,7 +492,8 @@ codegen_result compile_spec(
 		+ " -DCMAKE_BUILD_TYPE=Release" + cxx_flag
 		+ " > \"" + config_log + "\" 2>&1";
 	if (std::system(config_cmd.c_str()) != 0) {
-		res.error = "compile: cmake configure failed, see " + config_log;
+		res.error = "compile: cmake configure failed, see " + config_log
+			+ compile_detail::log_tail(config_log);
 		return res;
 	}
 
@@ -480,7 +501,8 @@ codegen_result compile_spec(
 	std::string build_cmd = "cmake --build \"" + bin_dir.string() + "\""
 		+ " > \"" + build_log + "\" 2>&1";
 	if (std::system(build_cmd.c_str()) != 0) {
-		res.error = "compile: cmake build failed, see " + build_log;
+		res.error = "compile: cmake build failed, see " + build_log
+			+ compile_detail::log_tail(build_log);
 		return res;
 	}
 

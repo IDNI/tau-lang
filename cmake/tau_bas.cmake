@@ -256,8 +256,10 @@ function(tau_generate_pack_header)
 	set(TAU_SDK_ROOT_PATH "${TAU_SDK_ROOT_PATH}" PARENT_SCOPE)
 
 	# Filled in for real by tau_finalize_pack_compile_definitions() once
-	# tauparser exists; empty here just keeps this first write well-formed.
+	# tauparser exists and the packages are found; empty here just keeps
+	# this first write well-formed.
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "")
+	set(TAU_CODEGEN_BA_PACKAGE_DIRS "")
 
 	file(MAKE_DIRECTORY "${TAU_PACK_INCLUDE_DIR}")
 
@@ -363,6 +365,15 @@ function(tau_finalize_pack_compile_definitions)
 		list(REMOVE_DUPLICATES _resolved)
 	endif()
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}")
+	# find_package(<pkg> CONFIG) records where it found the package in
+	# <pkg>_DIR; the emitted project is pointed at the same place
+	set(_pkg_dirs "")
+	foreach(_pkg IN LISTS TAU_BA_REQUIRED_PACKAGES)
+		if(DEFINED ${_pkg}_DIR AND NOT "${${_pkg}_DIR}" MATCHES "NOTFOUND$")
+			list(APPEND _pkg_dirs "${_pkg}_DIR=${${_pkg}_DIR}")
+		endif()
+	endforeach()
+	set(TAU_CODEGEN_BA_PACKAGE_DIRS "${_pkg_dirs}")
 	configure_file(
 		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
 		"${TAU_PACK_INCLUDE_DIR}/tau_pack.h"

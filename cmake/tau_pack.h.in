@@ -31,6 +31,14 @@
 #  define TAU_CODEGEN_SHARED_PREFIX "@TAU_SHARED_PREFIX_RESOLVED@"
 #endif
 
+// Where find_package resolved each package a pack BA requires, as
+// "<pkg>_DIR=<dir>" entries (semicolon-joined), so the emitted project finds
+// the same one even when it lives outside TAU_SHARED_PREFIX (a caller-provided
+// CVC5_DIR).
+#ifndef TAU_CODEGEN_BA_PACKAGE_DIRS
+#  define TAU_CODEGEN_BA_PACKAGE_DIRS "@TAU_CODEGEN_BA_PACKAGE_DIRS@"
+#endif
+
 // Compile definitions resolved active on this build (e.g. TAU_PARSER_MEASURE*),
 // so a witness-bearing emitted project's own TU sees the same header-only
 // template layout as the libTAU.a/libtauparser.a it links prebuilt.
