@@ -611,6 +611,10 @@
 			"configurePreset": "devel-ninja-gcc"
 		},
 		{
+			"name": "devel-make-gcc",
+			"configurePreset": "devel-make-gcc"
+		},
+		{
 			"name": "release-clang",
 			"configurePreset": "release-clang"
 		},
