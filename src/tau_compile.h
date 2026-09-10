@@ -28,11 +28,13 @@ struct codegen_result {
 // executable, copied (or built directly) to `out_exe`.
 // out_exe empty  → the executable is left at build_dir/program.
 // build_dir empty → defaults to <current dir>/spec.build.
+// cxx empty       → TAU_CXX, else clang++ when on PATH, else cmake's default.
 template <NodeType Node>
 codegen_result compile_spec(
 	const std::string& spec_src,
 	const std::string& out_exe = "",
-	const std::string& build_dir = "");
+	const std::string& build_dir = "",
+	const std::string& cxx = "");
 
 } // namespace idni::tau_lang
 

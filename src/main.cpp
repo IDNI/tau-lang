@@ -161,6 +161,9 @@ cli::commands tau_commands() {
 	compile.add_option(cli::option("output", 'o', "")
 		.set_description("output executable path (default: spec "
 			"file path without extension)"));
+	compile.add_option(cli::option("cxx", 'c', "")
+		.set_description("C++ compiler for the emitted project (default: "
+			"TAU_CXX, else clang++ when on PATH, else cmake's default)"));
 	cs[compile.name()] = compile;
 	return cs;
 }
@@ -262,7 +265,8 @@ int main(int argc, char** argv) {
 
 		std::string build_dir = spec_file + ".build";
 		TAU_LOG_INFO << "tau compile: " << spec_file;
-		auto res = compile_spec<node_t>(src, out_exe, build_dir);
+		auto res = compile_spec<node_t>(src, out_exe, build_dir,
+			cmd.get<std::string>("cxx"));
 		if (!res.ok()) {
 			TAU_LOG_ERROR << "compile failed: " << res.error;
 			return 1;

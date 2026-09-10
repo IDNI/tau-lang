@@ -43,9 +43,14 @@ inline bool compiler_available(const std::string& cxx) {
 	return std::system(cmd.c_str()) == 0;
 }
 
-// clang++ preferred: GCC 16 ICEs on heavy TUs in this environment; falls
-// back to letting cmake pick its own default when clang++ is not found.
-inline std::string preferred_cxx_flag() {
+// The compiler the emitted project is configured with: an explicit
+// request first (`tau compile --cxx`, then TAU_CXX), else clang++ when it
+// is on PATH, else cmake's own default.
+inline std::string preferred_cxx_flag(const std::string& requested) {
+	if (!requested.empty())
+		return " -DCMAKE_CXX_COMPILER=" + requested;
+	if (const char* env = std::getenv("TAU_CXX"); env && *env)
+		return std::string(" -DCMAKE_CXX_COMPILER=") + env;
 	return compiler_available("clang++") ? " -DCMAKE_CXX_COMPILER=clang++" : "";
 }
 
@@ -338,7 +343,8 @@ template <NodeType Node>
 codegen_result compile_spec(
 	const std::string& spec_src,
 	const std::string& out_exe,
-	const std::string& build_dir)
+	const std::string& build_dir,
+	const std::string& cxx)
 {
 	namespace fs = std::filesystem;
 	compile_detail::scoped_clean_definitions<Node> clean_defs;
@@ -458,7 +464,7 @@ codegen_result compile_spec(
 
 	// 6. Drive cmake configure + build.
 	fs::path bin_dir = bdir / "build";
-	std::string cxx_flag = compile_detail::preferred_cxx_flag();
+	std::string cxx_flag = compile_detail::preferred_cxx_flag(cxx);
 
 	std::string config_log = (bdir / "configure.log").string();
 	std::string config_cmd = "cmake -S \"" + bdir.string() + "\""
