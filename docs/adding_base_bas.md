@@ -110,7 +110,7 @@ Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
 
 | member | what core asks it for |
 |---|---|
-| `solve`, `is_sat` | your own decision procedure for a whole formula |
+| `solve` | your own decision procedure for a whole formula |
 | `can_solve` | whether a formula is one you can decide at all |
 | `sat_status` | a *definite* answer — `optional<bool>`, so "unknown" stays distinct from "unsat" |
 | `preprocess`, `set_preprocessing` | a rewriting pass to run before solving |

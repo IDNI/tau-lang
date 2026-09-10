@@ -147,9 +147,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	/** @brief Solve @p form with bv's own solver. */
 	static auto solve(tref form) { return solve_bv<node_t>(form); }
 
-	/** @brief Decide satisfiability of @p form with bv's own solver. */
-	static bool is_sat(tref form) { return is_bv_formula_sat<node_t>(form); }
-
 	/**
 	 * @brief `true` when bv can solve @p form at all.
 	 *

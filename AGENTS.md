@@ -201,7 +201,7 @@ hand-written per-pack dispatchers left** — one generic descriptor-driven
 
 Beyond the mandatory surface, a BA may declare **optional capabilities**, which
 core probes with `requires` and never by BA name. Those in use today live in
-`ba_pack_traits.h` as `pack_*` folds: `solve`, `is_sat`, `can_solve`,
+`ba_pack_traits.h` as `pack_*` folds: `solve`, `can_solve`,
 `sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`,
 `value_constant`, `arith_ops`, `non_aba_omcat`, `literal_incomplete`,
 `can_host_bool`/`bool_carrier_type`, `print_constant`, `uses_oracle`. The last

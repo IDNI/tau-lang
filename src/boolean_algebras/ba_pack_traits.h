@@ -105,11 +105,6 @@ template <typename Node, typename BA, typename Form>
 concept ba_solves = ba_has_descriptor_v<Node, BA>
 	&& requires(Form f) { ba_descriptor<BA, Node>::solve(f); };
 
-/** @brief `true` when @p BA's descriptor answers satisfiability itself. */
-template <typename Node, typename BA, typename Form>
-concept ba_checks_sat = ba_has_descriptor_v<Node, BA>
-	&& requires(Form f) { ba_descriptor<BA, Node>::is_sat(f); };
-
 namespace detail {
 
 template <typename Node, typename Form, typename First, typename... Rest>
@@ -120,16 +115,6 @@ auto pack_solve_impl(Form form) {
 		return pack_solve_impl<Node, Form, Rest...>(form);
 	else static_assert(sizeof...(Rest) > 0,
 		"pack_solve: no BA in this pack provides solve()");
-}
-
-template <typename Node, typename Form, typename First, typename... Rest>
-bool pack_is_sat_impl(Form form) {
-	if constexpr (ba_checks_sat<Node, First, Form>)
-		return ba_descriptor<First, Node>::is_sat(form);
-	else if constexpr (sizeof...(Rest) > 0)
-		return pack_is_sat_impl<Node, Form, Rest...>(form);
-	else static_assert(sizeof...(Rest) > 0,
-		"pack_is_sat: no BA in this pack provides is_sat()");
 }
 
 } // namespace detail
@@ -144,16 +129,6 @@ template <typename Node, typename Form>
 auto pack_solve(Form form) {
 	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		return detail::pack_solve_impl<Node, Form,
-			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-}
-
-/** @brief Ask the first BA whose descriptor offers it whether @p form is sat. */
-template <typename Node, typename Form>
-bool pack_is_sat(Form form) {
-	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		return detail::pack_is_sat_impl<Node, Form,
 			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
 	}(std::make_index_sequence<
 		std::tuple_size_v<typename Node::bas_tuple>>{});
@@ -782,23 +757,6 @@ std::optional<std::string> pack_codegen_constant_expr(size_t ba_type_id, tref cs
 						::codegen_constant_expr(cst);
 			return std::nullopt;
 		});
-}
-
-/** @brief `true` when the BA owning @p ba_type_id declares @c codegen_constant_expr -- same shape as @c pack_type_has_codegen_witness. */
-template <typename Node>
-bool pack_type_has_codegen_constant_expr(size_t ba_type_id) {
-	if (!ba_type_id) return false;
-	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_codegen_constant_expr<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type_id))
-					out = true;
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
 }
 
 /** @brief `true` when @p BA's family is parameterized (declares @c type_tree_for). */
