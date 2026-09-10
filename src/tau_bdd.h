@@ -296,9 +296,26 @@ struct tau_term_bdd_handle {
 	using tbdd         = tau_term_bdd<node>;                 ///< @brief Underlying BDD type.
 	using quants       = std::vector<std::pair<tref, typename tbdd::Quantifier>>; ///< @brief Quantifier list.
 	using universe_t   = std::unordered_map<tref, term_handle>; ///< @brief Universe type.
+	/** @brief Interning key of a converted node: the handle and the BA type
+	 * the `BDD_ID` node was minted with (the type is part of the node). */
+	using intern_key_t = std::pair<term_handle, size_t>;
+	using intern_t     = std::unordered_map<intern_key_t, tref>; ///< @brief Interning map type.
 
-	/** @brief Universe map: Tau tree ref → BDD handle (non-unique). */
+	/**
+	 * @brief Universe map: Tau tree ref → BDD handle. A bijection with `I`:
+	 * `convert_to_tau_node` interns, so one BDD (per type) has exactly one
+	 * `BDD_ID` node, and equal BDDs give the same hash-consed Tau node.
+	 */
 	static universe_t& U;
+	/**
+	 * @brief Interning map: (handle, type) → the `BDD_ID` node minted for
+	 * it, the inverse of `U`. Swept with the tree: an entry whose node did
+	 * not survive a `bintree<node>::gc()` is dropped, as `U`'s is, so a
+	 * node nothing references is collectable and a later conversion of the
+	 * same BDD mints afresh. Interning holds among live nodes, which is all
+	 * hash-consed identity needs.
+	 */
+	static intern_t& I;
 
 	/** @brief Construct a handle directly from a BDD @p ref. */
 	explicit tau_term_bdd_handle(ref x);
@@ -309,9 +326,14 @@ struct tau_term_bdd_handle {
 
 	/** @brief Build a BDD handle from Tau formula @p term using variable order @p o. */
 	static term_handle build(tref term, const order& o);
-	/** @brief Convert a handle back to a Tau tree node with type @p term_type; result cached in @p U. */
+	/**
+	 * @brief The `BDD_ID` node of @p handle with type @p term_type: the
+	 * node already minted for this (handle, type) in @p I, else a fresh
+	 * one recorded in @p U and @p I. Two calls with equal handles return
+	 * the same node.
+	 */
 	static tref convert_to_tau_node(term_handle handle, size_t term_type);
-	/** @brief Build a Tau node from @p term using @p o; result cached in @p U. */
+	/** @brief Build a BDD from @p term using @p o and return its interned `BDD_ID` node. */
 	static tref convert_to_tau_node(tref term, const order& o);
 	/** @brief Retrieve the BDD handle for an existing Tau BDD node @p tau_node. */
 	static term_handle convert_to_handle(tref tau_node);
@@ -413,6 +435,12 @@ struct std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>> {
 template<typename T>
 struct std::hash<idni::tau_lang::term_handle<T>> {
 	size_t operator()(auto& th) const;
+};
+
+/// @brief `std::hash` specialisation for the interning key (handle, type).
+template<typename T>
+struct std::hash<std::pair<idni::tau_lang::term_handle<T>, size_t>> {
+	size_t operator()(auto& k) const;
 };
 
 #include "tau_bdd.tmpl.h"

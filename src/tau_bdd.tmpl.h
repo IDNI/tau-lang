@@ -873,6 +873,25 @@ template<NodeType node>
 tau_term_bdd_handle<node>::universe_t& tau_term_bdd_handle<node>::U =
 	bintree<node>::template create_cache<universe_t>();
 
+// Not a create_cache: that machinery promotes an entry's value trefs to
+// reachable whenever the key's trefs are (vacuously, for a key without any),
+// which would pin every minted node for the process lifetime. Interning
+// only has to hold among LIVE nodes, so the map gets the post-sweep
+// callback alone: an entry dies with its node, together with U's.
+template<NodeType node>
+tau_term_bdd_handle<node>::intern_t& tau_term_bdd_handle<node>::I =
+	[]() -> intern_t& {
+		static intern_t cache;
+		std::unique_lock lock(bintree<node>::mtx_);
+		bintree<node>::gc_callbacks.push_back(
+			[](const std::unordered_set<tref>& kept) {
+				for (auto it = cache.begin(); it != cache.end();)
+					if (!kept.contains(it->second)) it = cache.erase(it);
+					else ++it;
+			});
+		return cache;
+	}();
+
 /** @internal @copydoc tau_term_bdd_handle::tau_term_bdd_handle(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::tau_term_bdd_handle(ref x) {
@@ -891,13 +910,19 @@ template<NodeType node>
 tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t term_type) {
 	using tau = tree<node>;
 
+	// Interned: the same BDD under the same type is the same Tau node, so
+	// a round trip through to_tau_term and build gives back the node it
+	// started from and hash-consed identity holds across conversions.
+	const intern_key_t key{handle, term_type};
+	if (auto it = I.find(key); it != I.end()) return it->second;
 	static size_t bdd_id = 0;
 	tref tau_node = tau::get_typed(tau::bf, tau::get_typed(tau::BDD_ID,
 		tau::get_num(bdd_id), term_type), term_type);
 	// Increment id for unique node creation
 	++bdd_id;
-	// Save connection in U
+	// Save the connection both ways
 	U.emplace(tau_node, handle);
+	I.emplace(key, tau_node);
 	return tau_node;
 }
 
@@ -912,8 +937,8 @@ template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 convert_to_handle(tref tau_node) {
 	auto it = U.find(tau_node);
-	DBG(assert(it != U.end));
-	if (it != U.end) return it->second;
+	DBG(assert(it != U.end()));
+	if (it != U.end()) return it->second;
 	else return term_handle(tbdd::T);
 }
 
@@ -1133,11 +1158,25 @@ size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto
 	return seed;
 }
 
+// The handle's BDD node lives in bintree<tau_bdd_node<T>>, so its hash is
+// read through tau_term_bdd<T>::get — not through hash_htree<T>, which
+// dereferences the tref as a bintree<T> of the OUTER node type (this
+// specialisation was uninstantiable before the interning map keyed on it).
 /** @internal @copydoc std::hash<idni::tau_lang::term_handle<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::term_handle<T>>::operator()(auto& th) const {
 	size_t seed = 0;
-	idni::hash_combine(seed, idni::hash_htree<T>()(th.h), th.inv);
+	idni::hash_combine(seed,
+		idni::tau_lang::tau_term_bdd<T>::get(th.h->get()).hash, th.inv);
+	return seed;
+}
+
+/** @internal @copydoc std::hash<std::pair<idni::tau_lang::term_handle<T>, size_t>>::operator()(auto&) const @endinternal */
+template<typename T>
+size_t std::hash<std::pair<idni::tau_lang::term_handle<T>, size_t>>::operator()(auto& k) const {
+	size_t seed = 0;
+	idni::hash_combine(seed, std::hash<idni::tau_lang::term_handle<T>>()(k.first),
+		k.second);
 	return seed;
 }
 
