@@ -451,11 +451,13 @@ tref functional_quantifier(binder kind, const block& Y, tref f) {
 	std::sort(ys.begin(), ys.end(), tau::subtree_less);
 	ys.erase(std::unique(ys.begin(), ys.end(),
 		[](tref a, tref b) { return tau::subtree_equals(a, b); }), ys.end());
-	// Outermost first in `ys`, so the chain is folded from the back.
+	// Outermost first in `ys`, so the chain is folded from the back. The
+	// builders rename the bound variable by default; the module never does
+	// (ground rule 4), so every call passes `false`.
 	tref r = f;
 	for (auto it = ys.rbegin(); it != ys.rend(); ++it)
-		r = kind == binder::all ? build_bf_fall<node>(*it, r)
-			: build_bf_fex<node>(*it, r);
+		r = kind == binder::all ? build_bf_fall<node>(*it, r, false)
+			: build_bf_fex<node>(*it, r, false);
 	return r;
 }
 
