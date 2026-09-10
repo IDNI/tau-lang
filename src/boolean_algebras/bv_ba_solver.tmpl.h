@@ -537,7 +537,15 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 		const bool has_all = tau::get(form).find_top(is<node, tau::wff_all>) != nullptr;
 		if (has_ex != has_all) {
 			const auto kind = has_ex ? tau::wff_ex : tau::wff_all;
-			bool eligible = true;
+			// The universal identity sat(all x phi) == !sat(!phi) holds
+			// only for a closed formula: with a free y, sat(all x phi(x, y))
+			// asks for some y that works for every x, whereas !sat(!phi)
+			// asks that phi hold for every x and every y. Every caller
+			// closes the formula before asking, but the pass must not
+			// depend on that, so a universal with a free variable takes
+			// the quantified path. The existential identity has no such
+			// condition: the free variables simply stay free.
+			bool eligible = has_ex || get_free_vars<node>(form).empty();
 			subtree_map<node, int> bound;
 			std::vector<std::pair<tref, bool>> stack{{form, false}};
 			while (!stack.empty() && eligible) {

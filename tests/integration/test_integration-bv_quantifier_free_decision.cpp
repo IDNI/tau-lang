@@ -93,6 +93,32 @@ TEST_SUITE("quantifier-free bitvector decision") {
 		CHECK(norm(subset_sum(14, "all", 255), true) == "F");
 	}
 
+	// The universal identity needs a closed formula: all x (x = 0 || y = 1)
+	// is satisfiable (y = 1), while the inverted matrix x != 0 && y != 1 is
+	// satisfiable too, so the peel would answer unsat. The pass must decline
+	// and leave the verdict to the quantified path. Called directly, because
+	// the normalizer closes every formula before it asks; the switch is on
+	// for the first query so a cached verdict cannot mask the peel, and the
+	// switch-off check uses a fresh variable name for the same reason.
+	TEST_CASE("left alone: a universal with a free variable") {
+		{
+			qf_config c(true);
+			auto fm = parse_wff("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || y:bv[2] = { 1 }:bv[2])");
+			REQUIRE(fm);
+			auto r = bv_formula_sat_status<node_t>(fm);
+			REQUIRE(r.has_value());
+			CHECK(r.value() == bv_sat_status::sat);
+		}
+		{
+			qf_config c(false);
+			auto fm = parse_wff("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || z:bv[2] = { 1 }:bv[2])");
+			REQUIRE(fm);
+			auto r = bv_formula_sat_status<node_t>(fm);
+			REQUIRE(r.has_value());
+			CHECK(r.value() == bv_sat_status::sat);
+		}
+	}
+
 	TEST_CASE("left alone: both kinds, or a binder under a negation") {
 		// Alternation: the quantified path, with and without the switch.
 		CHECK(norm("all x:bv[2] ex y:bv[2] (y:bv[2] > x:bv[2])", true) == "F");
