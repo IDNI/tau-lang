@@ -15,7 +15,7 @@
  * of ctx.h's `enum class table`. The six §1 result tables are caches and
  * exist under `#ifdef TAU_CACHE` only (OFF in Debug; no result may depend on
  * a hit). The structural per-node tables (`atoms_memo`, `size_memo`,
- * `neg_memo`, `negative_tree_memo`, `leaf_fv_memo`) are unconditional, like
+ * `neg_memo`, `negative_tree_memo`) are unconditional, like
  * `get_free_vars`' table, so their accessors may return references. The
  * member view is not cached at all. The `#ifdef` lives in ctx.tmpl.h's
  * `table_ptr` alone.
@@ -69,7 +69,7 @@ inline const simplify_formula_fn identity_formula = [](tref t) { return t; };
  * `for_each_tref` opts the type into GC introspection (`HasForEachTref`), so
  * the collector pins and checks the members whether or not they are
  * subtrees of the key — a plain `trefs` value is deliberately NOT walked by
- * the tree's caches. The value type of `atoms_memo` and `leaf_fv_memo`.
+ * the tree's caches. The value type of `atoms_memo`.
  */
 struct tref_set {
 	trefs items;

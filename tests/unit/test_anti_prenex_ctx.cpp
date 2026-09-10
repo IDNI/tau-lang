@@ -158,12 +158,12 @@ TEST_CASE("memoised on an unconditional table: a recursive fill is safe") {
 	CHECK(top_size == 3);                 // still the live entry
 }
 
-TEST_CASE("tref_set values: what an atoms/leaf_fv row looks like") {
+TEST_CASE("tref_set values: what an atoms row looks like") {
 	tref k = mk_atom("v1"), a = mk_atom("v2"), b = mk_atom("v3");
 	const auto& s = ap::store<node_t, ap::table::atoms_memo>(k,
 		ap::tref_set{ trefs{ a, b } });
 	CHECK(s.items.size() == 2);
-	// The accessors of packages B and C hand out `const trefs&` from here.
+	// Package C's `atoms` hands out `const trefs&` from here.
 	const trefs& items = ap::find<node_t, ap::table::atoms_memo>(k)->items;
 	CHECK(items[0] == a);
 	CHECK(items[1] == b);

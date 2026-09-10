@@ -133,7 +133,6 @@ enum class table {
 	size_memo,     ///< §1 `|φ|` (dag.h `formula_size`, its only writer)
 	neg_memo,      ///< §1 `neg(φ)` (dag.h `neg_of`/`set_neg`; filled by layer 1)
 	negative_tree_memo, ///< §1 NEGATIVE TREE flag (dag.h `is_negative_tree`)
-	leaf_fv_memo,  ///< §1 leaf hazard: FV contributed by a BDD-backed term's leaves (terms.h `leaf_fv`)
 	count_         ///< NOT a table: the enumerator count, so `all_tables` sizes itself
 };
 
@@ -147,8 +146,7 @@ inline constexpr std::array<table, static_cast<size_t>(table::count_)>
 all_tables = {
 	table::push_memo, table::elim_memo, table::quant_memo, table::cof_memo,
 	table::solver_memo, table::qbf_memo, table::atoms_memo,
-	table::size_memo, table::neg_memo, table::negative_tree_memo,
-	table::leaf_fv_memo
+	table::size_memo, table::neg_memo, table::negative_tree_memo
 };
 static_assert([] {
 		for (size_t i = 0; i < all_tables.size(); ++i)
@@ -289,16 +287,6 @@ template <NodeType node>
 struct table_traits<node, table::negative_tree_memo> {
 	using key_t   = tref;
 	using value_t = bool;
-	using map_t   = subtree_unordered_map<node, value_t>;
-	static constexpr bool gated          = false;
-	static constexpr bool taint_aware    = false;
-	static constexpr bool solver_flushed = false;
-};
-
-template <NodeType node>
-struct table_traits<node, table::leaf_fv_memo> {
-	using key_t   = tref;
-	using value_t = tref_set; ///< sorted like `fv`
 	using map_t   = subtree_unordered_map<node, value_t>;
 	static constexpr bool gated          = false;
 	static constexpr bool taint_aware    = false;
