@@ -57,7 +57,6 @@ bool size_has_formula_children(tref n) {
 
 template <NodeType node>
 size_t formula_size(tref n) {
-	using tau = tree<node>;
 	if (n == nullptr) return 0;
 	if (const size_t* cached = find<node, table::size_memo>(n); cached)
 		return *cached;
