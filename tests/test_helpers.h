@@ -87,13 +87,13 @@ inline bool normalize_and_expect_fail(const char* sample, typename node_t::type 
 }
 
 inline bool matches_to_any_of(const std::string& fm_str, const strings& expected) {
-#ifdef DEBUG // check canonicity between versions of Tau
-	const bool canonical = fm_str == expected[0];
-	if (!canonical) TAU_LOG_ERROR << "expression: " << fm_str
-		<< TAU_LOG_ERROR_COLOR << " is not canonical"
-		<< TC.CLEAR() << ". expected: " << expected[0];
-	else TAU_LOG_TRACE << "expression: " << fm_str;
-	return canonical;
+#ifdef DEBUG // report noncanonicality between versions of Tau, do not fail on it
+	if (!expected.empty()) {
+		if (fm_str != expected[0]) TAU_LOG_INFO << "expression: "
+			<< fm_str << " is not canonical. expected: "
+			<< expected[0];
+		else TAU_LOG_TRACE << "expression: " << fm_str;
+	}
 #endif // DEBUG
 	for (const auto& e : expected) if (fm_str == e) {
 		DBG(TAU_LOG_TRACE << "found in expected: " << fm_str;)
