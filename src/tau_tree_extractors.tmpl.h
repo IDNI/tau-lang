@@ -861,12 +861,10 @@ const trefs& get_free_vars(tref n) {
 			// Deliberately not descending into m's children.
 		} else {
 			if (t.is(tau::BDD_ID)) {
-				// Keys in U were stored without right siblings (via
-				// trim/get_typed), so trim before constructing the
-				// lookup key.
-				const tref trimmed = tau::trim_right_sibling(m);
+				// `U` is keyed by the `BDD_ID` node itself (tau_bdd.h).
 				const auto& bdd_u = tau_term_bdd_handle<node>::U;
-				if (auto jt = bdd_u.find(tau::get(tau::bf, trimmed));
+				if (auto jt = bdd_u.find(
+						tau_term_bdd_handle<node>::key_of(m));
 					jt != bdd_u.end())
 					for (tref v :
 						tau_term_bdd_handle<node>::get_free_tau_vars(

@@ -302,7 +302,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID
 			const auto& m = term_handle<node>::U;
-			auto it = m.find(tau::get(tau::bf, tau::trim_right_sibling(f)));
+			auto it = m.find(term_handle<node>::key_of(f));
 			if (it != m.end()) {
 				return it->second.get();
 			} else {
@@ -910,20 +910,26 @@ template<NodeType node>
 tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t term_type) {
 	using tau = tree<node>;
 
-	// Interned: the same BDD under the same type is the same Tau node, so
-	// a round trip through to_tau_term and build gives back the node it
-	// started from and hash-consed identity holds across conversions.
+	// Interned: the same BDD under the same type is the same `BDD_ID` node,
+	// so a round trip through to_tau_term and build gives back the node it
+	// started from and hash-consed identity holds across conversions. The
+	// store holds the `BDD_ID` node (the key, see `U`); the `bf` wrapper is
+	// re-derived through the hash-consed typed constructor: the same node
+	// while it lives, a fresh content-equal one otherwise.
 	const intern_key_t key{handle, term_type};
-	if (auto it = I.find(key); it != I.end()) return it->second;
-	static size_t bdd_id = 0;
-	tref tau_node = tau::get_typed(tau::bf, tau::get_typed(tau::BDD_ID,
-		tau::get_num(bdd_id), term_type), term_type);
-	// Increment id for unique node creation
-	++bdd_id;
-	// Save the connection both ways
-	U.emplace(tau_node, handle);
-	I.emplace(key, tau_node);
-	return tau_node;
+	tref id_node;
+	if (auto it = I.find(key); it != I.end()) id_node = it->second;
+	else {
+		static size_t bdd_id = 0;
+		id_node = tau::get_typed(tau::BDD_ID, tau::get_num(bdd_id),
+			term_type);
+		// Increment id for unique node creation
+		++bdd_id;
+		// Save the connection both ways
+		U.emplace(id_node, handle);
+		I.emplace(key, id_node);
+	}
+	return tau::get_typed(tau::bf, id_node, term_type);
 }
 
 /** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(tref, const order&) @endinternal */
@@ -936,10 +942,25 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term, const order& o) {
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 convert_to_handle(tref tau_node) {
-	auto it = U.find(tau_node);
+	auto it = U.find(key_of(tau_node));
 	DBG(assert(it != U.end()));
 	if (it != U.end()) return it->second;
 	else return term_handle(tbdd::T);
+}
+
+/** @internal @copydoc tau_term_bdd_handle::key_of(tref) @endinternal */
+template<NodeType node>
+tref tau_term_bdd_handle<node>::key_of(tref tau_node) {
+	using tau = tree<node>;
+	const tau& t = tau::get(tau_node);
+	if (t.is(tau::BDD_ID))
+		return t.has_right_sibling() ? tau::trim_right_sibling(tau_node)
+			: tau_node;
+	DBG(assert(t.is(tau::bf) && t.child_is(tau::BDD_ID)));
+	// The wrapper's one child carries no right sibling, so it is the
+	// stored node itself, whatever the wrapper's own sibling.
+	DBG(assert(!tau::get(t.first()).has_right_sibling()));
+	return t.first();
 }
 
 /** @internal @copydoc tau_term_bdd_handle::to_tau_term(size_t) const @endinternal */
@@ -1039,8 +1060,10 @@ tref tau_term_bdd_handle<node>::substitute(tref formula, tref var,
 	term_handle with, const order& o) {
 	using tau = tree<node>;
 	auto subst = [&](tref n) -> tref {
-		if (!tau::get(n).is(tau::bf)) return n;
-		auto it = U.find(n);
+		const tau& tn = tau::get(n);
+		if (!tn.is(tau::bf) || !tn.child_is(tau::BDD_ID)) return n;
+		auto it = U.find(key_of(n));
+		DBG(assert(it != U.end()));
 		if (it == U.end()) return n;
 		term_handle result = it->second.bdd_compose(var, with, o);
 		return convert_to_tau_node(result, find_ba_type<node>(n));

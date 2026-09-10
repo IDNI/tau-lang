@@ -44,7 +44,7 @@ order_t order_of(const ap::block& P) {
 /// The BDD ref of a term under `o` (a BDD-backed term's own ref).
 tb::ref ref_of(tref t, const order_t& o) {
 	if (ap::is_bdd_backed<node_t>(t))
-		return th::U.find(tau::trim_right_sibling(t))->second.get();
+		return th::U.find(th::key_of(t))->second.get();
 	return tb::build_bdd(t, o);
 }
 
@@ -514,8 +514,8 @@ TEST_CASE("finish_terms: no BDD_ID remains, and prepare ∘ finish is the identi
 	tref l1 = sides(ap::prepare_terms<node_t>(wff("x & y = 0"), P, o)).first;
 	tref l2 = sides(ap::prepare_terms<node_t>(wff("y & x = 0"), P, o)).first;
 	CHECK(l1 == l2);
-	CHECK(th::convert_to_tau_node(th::U.find(l1)->second, find_ba_type<node_t>(l1)) == l1);
-	CHECK(th::convert_to_handle(l1) == th::U.find(l1)->second);
+	CHECK(th::convert_to_tau_node(th::U.find(th::key_of(l1))->second, find_ba_type<node_t>(l1)) == l1);
+	CHECK(th::convert_to_handle(l1) == th::U.find(th::key_of(l1))->second);
 }
 
 // 11. leaf hazard ------------------------------------------------------------

@@ -83,7 +83,7 @@ order_t order_for(const ap::block& P) {
 /// The BDD ref of a term under `o` (a BDD-backed term's own ref).
 tb::ref ref_of(tref t, const order_t& o) {
 	if (ap::is_bdd_backed<node_t>(t))
-		return th::U.find(tau::trim_right_sibling(t))->second.get();
+		return th::U.find(th::key_of(t))->second.get();
 	return tb::build_bdd(t, o);
 }
 
@@ -856,14 +856,16 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	// A sweep as the interpreter runs one (interpreter.tmpl.h:964-968): the
 	// BDD store holds its decision variables and leaf terms as raw trefs and
 	// is never swept, so they are pinned through collect_live_refs; the
-	// formula through its handle. The TRIMMED bf(BDD_ID) wrapper is U's key
-	// and I's value and no subtree of `r` — the atom's side carries `0` as
-	// its right sibling — so it is pinned by a handle of its own (the hazard
-	// is recorded in the plan's §4 bullet). The kept node then keeps its rows
-	// and its interned terms; the churn dies.
+	// formula through its handle. Nothing else: the atom's side carries `0`
+	// as its right sibling, so the TRIMMED bf(BDD_ID) wrapper `l_before` is
+	// no subtree of `r` and dies — the store is keyed by the BDD_ID node the
+	// two spellings share (tau_bdd.h, `key_of`), so the term keeps its BDD.
+	// The kept node then keeps its rows and its interned terms; the churn
+	// dies.
 	tref l_before = sides(member_touching(prepared, P, {})).first;
 	REQUIRE(ap::is_bdd_backed<node_t>(l_before));
-	htref keep = tau::geth(r), keep_l = tau::geth(l_before);
+	const tref key_before = th::key_of(l_before);
+	htref keep = tau::geth(r);
 	std::unordered_set<tref> ks{ r };
 	tb::collect_live_refs(ks);
 	tau::gc(ks);
@@ -873,11 +875,10 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	CHECK(ap::formula_size<node_t>(r) == sz);
 	CHECK(ap::fv<node_t>(r) == fv_copy);
 	tref l = sides(member_touching(ap::binder_body<node_t>(ap::binder_body<node_t>(r)), P, {})).first;
-	CHECK(l == l_before);
+	CHECK(th::key_of(l) == key_before);      // the same BDD_ID node, so the same entry
 	CHECK(ap::is_bdd_backed<node_t>(l));
 	CHECK(ap::prepare_terms<node_t>(ap::finish_terms<node_t>(prepared), P, o) == prepared);
 	CHECK(keep.get() != nullptr);
-	CHECK(keep_l.get() != nullptr);
 }
 
 } // TEST_SUITE

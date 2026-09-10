@@ -5,9 +5,10 @@
  * @brief Template implementations for terms.h (package B). Included by terms.h.
  *
  * Conventions of the BDD library this file rides on (tau_bdd.h):
- *  - `U` is keyed by the `bf(BDD_ID)` node WITHOUT a right sibling, so every
- *    lookup trims first; `convert_to_tau_node` interns (tau_bdd.tmpl.h), so
- *    one BDD per type is one Tau node.
+ *  - `U` is keyed by the `BDD_ID` node under the `bf` wrapper (`key_of`),
+ *    the same tref in every spelling of the wrapper, so a lookup steps to
+ *    the child and never trims; `convert_to_tau_node` interns
+ *    (tau_bdd.tmpl.h), so one BDD per type is one Tau node.
  *  - a BDD leaf's variable (`get_var`) is the TRIMMED Tau node under `bf`
  *    (a `bf_neg` node for an inverted leaf); `add(leaf)` takes the trimmed
  *    node and maps `bf_t`/`bf_f` to the terminals.
@@ -47,12 +48,11 @@ bool touches(tref t, const var_order<node>& order) {
 	return false;
 }
 
-/// The handle behind a BDD-backed term (`U`, keys without right sibling).
+/// The handle behind a BDD-backed term (`U`, keyed by its `BDD_ID` node).
 template <NodeType node>
 thandle<node> handle_of(tref term) {
-	using tau = tree<node>;
 	const auto& U = thandle<node>::U;
-	auto it = U.find(tau::trim_right_sibling(term));
+	auto it = U.find(thandle<node>::key_of(term));
 	DBG(assert(it != U.end());)
 	return it->second;
 }

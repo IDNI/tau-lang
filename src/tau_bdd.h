@@ -281,8 +281,9 @@ private:
  *
  * Acts as the user-facing view of a BDD node.  Holds an `htref` (hash-consed
  * tree reference) to the underlying `tau_term_bdd` node plus an output
- * inverter flag.  A global universe map `U` links Tau tree refs to handles,
- * enabling GC of BDD nodes when the originating Tau term is collected.
+ * inverter flag.  A global universe map `U` links the `BDD_ID` node of a
+ * converted Tau term to its handle, enabling GC of BDD nodes when the
+ * originating Tau term is collected.
  *
  * @tparam node Tree node type.
  */
@@ -302,18 +303,27 @@ struct tau_term_bdd_handle {
 	using intern_t     = std::unordered_map<intern_key_t, tref>; ///< @brief Interning map type.
 
 	/**
-	 * @brief Universe map: Tau tree ref → BDD handle. A bijection with `I`:
-	 * `convert_to_tau_node` interns, so one BDD (per type) has exactly one
-	 * `BDD_ID` node, and equal BDDs give the same hash-consed Tau node.
+	 * @brief Universe map: the `BDD_ID` node of a converted term → its BDD
+	 * handle. A bijection with `I`: `convert_to_tau_node` interns, so one
+	 * BDD (per type) has exactly one `BDD_ID` node, and equal BDDs give the
+	 * same hash-consed Tau node.
+	 *
+	 * KEY: the inner `BDD_ID` node, never the `bf` wrapper around it. In
+	 * the LCRS tree the wrapper has one spelling per right sibling (alone,
+	 * or followed by the other side inside an equation) and the tree's gc
+	 * marks by pointer, so a key on the wrapper would die with the one
+	 * spelling nothing holds while the term lives on in another; the
+	 * `BDD_ID` child is the same node in every spelling. `key_of` takes a
+	 * term to its key.
 	 */
 	static universe_t& U;
 	/**
 	 * @brief Interning map: (handle, type) → the `BDD_ID` node minted for
-	 * it, the inverse of `U`. Swept with the tree: an entry whose node did
-	 * not survive a `bintree<node>::gc()` is dropped, as `U`'s is, so a
-	 * node nothing references is collectable and a later conversion of the
-	 * same BDD mints afresh. Interning holds among live nodes, which is all
-	 * hash-consed identity needs.
+	 * it, the inverse of `U` (the same node as `U`'s key). Swept with the
+	 * tree: an entry whose node did not survive a `bintree<node>::gc()` is
+	 * dropped, as `U`'s is, so a node nothing references is collectable
+	 * and a later conversion of the same BDD mints afresh. Interning holds
+	 * among live nodes, which is all hash-consed identity needs.
 	 */
 	static intern_t& I;
 
@@ -327,16 +337,27 @@ struct tau_term_bdd_handle {
 	/** @brief Build a BDD handle from Tau formula @p term using variable order @p o. */
 	static term_handle build(tref term, const order& o);
 	/**
-	 * @brief The `BDD_ID` node of @p handle with type @p term_type: the
-	 * node already minted for this (handle, type) in @p I, else a fresh
-	 * one recorded in @p U and @p I. Two calls with equal handles return
-	 * the same node.
+	 * @brief The `bf(BDD_ID)` term of @p handle with type @p term_type,
+	 * without a right sibling: the `bf` wrapper, re-derived through the
+	 * hash-consed typed constructor, of the `BDD_ID` node already minted
+	 * for this (handle, type) in @p I, else of a fresh one recorded in
+	 * @p U and @p I. Two calls with equal handles return the same node.
 	 */
 	static tref convert_to_tau_node(term_handle handle, size_t term_type);
-	/** @brief Build a BDD from @p term using @p o and return its interned `BDD_ID` node. */
+	/** @brief Build a BDD from @p term using @p o and return its interned `bf(BDD_ID)` term. */
 	static tref convert_to_tau_node(tref term, const order& o);
-	/** @brief Retrieve the BDD handle for an existing Tau BDD node @p tau_node. */
+	/**
+	 * @brief Retrieve the BDD handle behind a BDD-backed term @p tau_node:
+	 * a `bf(BDD_ID)` wrapper in any spelling, or the `BDD_ID` node itself.
+	 */
 	static term_handle convert_to_handle(tref tau_node);
+	/**
+	 * @brief The store key of a BDD-backed term: its `BDD_ID` node, the
+	 * same tref whatever the right sibling of the `bf` wrapper (see `U`).
+	 * Accepts the `bf(BDD_ID)` wrapper in any spelling, or the `BDD_ID`
+	 * node itself.
+	 */
+	static tref key_of(tref tau_node);
 	/** @brief Convert this handle to a Tau term of type @p term_type. */
 	tref to_tau_term(size_t term_type) const;
 

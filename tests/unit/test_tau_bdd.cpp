@@ -363,7 +363,7 @@ TEST_SUITE("BDD get_free_tau_vars") {
 		const trefs& via_extractor = get_free_vars<node_t>(bdd_node);
 		// Traverse the BDD directly
 		const trefs& direct = hbdd::get_free_tau_vars(
-			hbdd::U.find(bdd_node)->second.get().b);
+			hbdd::U.find(hbdd::key_of(bdd_node))->second.get().b);
 		CHECK(via_extractor == direct);
 	}
 }
@@ -693,7 +693,8 @@ TEST_SUITE("BDD term_handle substitute") {
 		// Substitute x → z across the formula containing the BDD node
 		tref result_node = hbdd::substitute(node_xy, tx, with_z, o);
 		// Retrieve the tau term for the resulting BDD (z has rank 2 > y rank 1, so y is above z)
-		tref result_term = hbdd::U.find(result_node)->second.to_tau_term(1);
+		tref result_term = hbdd::U.find(hbdd::key_of(result_node))
+			->second.to_tau_term(1);
 		CHECK(tau::get(result_term).to_str() == "yz");
 	}
 }
@@ -739,6 +740,71 @@ TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
 }
 
 TEST_SUITE("BDD handle creation") {
+	// Runs BEFORE "creation and gc": that case sweeps with a bare tau::gc()
+	// and no collect_live_refs, after which the BDD universe's variable
+	// trefs dangle (a BDD node's hash and equality read them), so nothing
+	// may build or sweep BDDs after it in this process.
+	TEST_CASE("gc: the key is the BDD_ID node, shared by every spelling of the wrapper") {
+		using bdd = tau_term_bdd<node_t>;
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o = {{tx, 0}, {ty, 1}};
+		// A BDD-backed term as an equation's left side: inside the atom the
+		// bf(BDD_ID) wrapper carries `0` as its right sibling, a different
+		// tree node from the trimmed wrapper `l` that convert_to_tau_node
+		// returned; the two share the BDD_ID child, the store's key.
+		tref l = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
+		tref atom = tau::build_bf_eq_0(l);
+		tref l_in_atom = tau::get(atom)[0].first();
+		REQUIRE(l_in_atom != l);
+		REQUIRE(tau::get(l_in_atom).has_right_sibling());
+		const tref key = hbdd::key_of(l);
+		CHECK(hbdd::key_of(l_in_atom) == key);
+		CHECK(tau::get(key).is(tau::BDD_ID));
+		REQUIRE(hbdd::U.contains(key));
+		const hbdd::intern_key_t ikey{ hbdd::convert_to_handle(l),
+			find_ba_type<node_t>(l) };
+		REQUIRE(hbdd::I.contains(ikey));
+		size_t live = 0;
+		{
+			// Pin the atom alone — `l` has no handle and dies — and sweep
+			// as the interpreter does (interpreter.tmpl.h): the BDD store's
+			// own trefs first, then gc.
+			htref keep_atom = tau::geth(atom);
+			std::unordered_set<tref> keep;
+			bdd::collect_live_refs(keep);
+			tau::gc(keep);
+			// Every lookup hits through the sibling-carrying spelling.
+			REQUIRE(hbdd::U.contains(key));
+			REQUIRE(hbdd::I.contains(ikey));
+			CHECK(hbdd::I.find(ikey)->second == key);
+			hbdd h = hbdd::convert_to_handle(l_in_atom);
+			CHECK(tau::get(h.to_tau_term(find_ba_type<node_t>(l_in_atom)))
+				.to_str() == "xy");
+			CHECK(bdd::build_bdd(l_in_atom, o) == h.get());
+			const trefs fv = get_free_vars<node_t>(atom);
+			CHECK(fv.size() == 2);
+			// Interning: the same BDD converts to the same trimmed wrapper,
+			// re-derived from the kept BDD_ID node.
+			CHECK(hbdd::convert_to_tau_node(tau::get("xy", opts), o)
+				== tau::trim_right_sibling(l_in_atom));
+			live = hbdd::U.size();
+		}
+		// Nothing holds the atom any more: the entry dies with its node.
+		std::unordered_set<tref> keep;
+		bdd::collect_live_refs(keep);
+		tau::gc(keep);
+		CHECK(hbdd::U.size() == live - 1);
+		CHECK(!hbdd::I.contains(ikey));
+	}
+
 	TEST_CASE("creation and gc") {
 		using bdd = tau_term_bdd<node_t>;
 		using hbdd = term_handle<node_t>;
@@ -782,9 +848,9 @@ TEST_SUITE("BDD handle creation") {
 		// tau::get(node3).print_tree(std::cout << "node3 tree: ") << "\n";
 		// std::cout << "U size before gc: " << hbdd::U.size() << "\n";
 
-		auto res = hbdd::U.find(node1)->second.bdd_and(
-			hbdd::U.find(node2)->second, o);
-		res = res.bdd_and(hbdd::U.find(node3)->second, o);
+		auto res = hbdd::U.find(hbdd::key_of(node1))->second.bdd_and(
+			hbdd::U.find(hbdd::key_of(node2))->second, o);
+		res = res.bdd_and(hbdd::U.find(hbdd::key_of(node3))->second, o);
 		htref tau_res = tau::geth(res.to_tau_term(1));
 
 		tau::gc();
@@ -796,4 +862,5 @@ TEST_SUITE("BDD handle creation") {
 		CHECK(tau::get(tau_res->get()).to_str() ==
 			"sv&(wx&(yz|y'z')|w'x'&(yz|y'z'))|s'v'&(wx&(yz|y'z')|w'x'&(yz|y'z'))");
 	}
+
 }
