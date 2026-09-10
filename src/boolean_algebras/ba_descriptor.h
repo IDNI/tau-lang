@@ -14,7 +14,6 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_DESCRIPTOR_H__
 
 #include <concepts>
-#include <cstdint>
 #include <functional>
 #include <optional>
 #include <ostream>
@@ -283,12 +282,6 @@ constexpr bool ba_output_always_satisfiable_v = [] {
 			ba_descriptor<BA, Node>::output_always_satisfiable_by_system);
 	else return false;
 }();
-
-/** @brief constexpr C-string equality, for comparing descriptor type names. */
-constexpr bool ba_name_eq(const char* a, const char* b) {
-	for (; *a || *b; ++a, ++b) if (*a != *b) return false;
-	return true;
-}
 
 /**
  * @brief The surface every descriptor must provide.
