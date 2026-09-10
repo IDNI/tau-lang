@@ -128,6 +128,111 @@ inline bool values_matches_any_of(const strings& values,
 	return true;
 }
 
+// Tree comparison modulo AND/OR commutativity. Unlike
+// canonical_conjunct_order above, this reaches any nesting depth and
+// printed forms with no delimiter.
+
+// The associative-commutative connectives; every other operator, notably
+// bf_eq, keeps its operand order.
+inline bool is_and_or_nt(size_t nt) {
+	return nt == tau::wff_and || nt == tau::wff_or
+		|| nt == tau::bf_and  || nt == tau::bf_or;
+}
+
+// A bf_eq operand that is a plain variable; only these fall through to
+// tau::subtree_less, a content-hash tie-break.
+inline bool is_bare_variable_operand(tref op) {
+	const auto& o = tau::get(op);
+	if (o.children_size() != 1) return false;
+	const auto& v = o[0];
+	if (!v.is(tau::variable)) return false;
+	if (v.is_input_variable() || v.is_output_variable()) return false;
+	if (v.children_size() && v[0].is(tau::uconst_name)) return false;
+	return true;
+}
+
+// The single-child nonterminal wrapping each operand of nt.
+inline size_t and_or_wrapper_nt(size_t nt) {
+	return (nt == tau::wff_and || nt == tau::wff_or) ? tau::wff : tau::bf;
+}
+
+// Structural key for t, with and/or operands sorted at every level so
+// operand order stops mattering. All other nodes keep their child order.
+// Post-order, so every child key is ready when its parent is visited.
+inline std::string canonicalize_tref(tref t) {
+	if (!t) return "-";
+	std::unordered_map<tref, std::string> key;
+	std::unordered_map<tref, strings> chain;
+	auto join = [](const strings& v, const char* open, const char* close) {
+		std::string r = open;
+		for (size_t i = 0; i < v.size(); i++) {
+			if (i) r += ",";
+			r += v[i];
+		}
+		return r + close;
+	};
+	auto visit = [&](tref n) {
+		const auto& nd = tau::get(n);
+		const size_t nt = nd.value.nt;
+		const size_t cs = nd.children_size();
+		const std::string tag = std::to_string(nt);
+		if (is_and_or_nt(nt)) {
+			const size_t wrapper = and_or_wrapper_nt(nt);
+			strings ops;
+			for (size_t i = 0; i < cs; i++) {
+				tref c = nd[i].get();
+				const auto& cd = tau::get(c);
+				// operands sit under a single-child
+				// wrapper; a nested chain of the same
+				// connective splices in
+				if (cd.value.nt == wrapper
+					&& cd.children_size() == 1)
+						c = cd.only_child();
+				if (auto it = chain.find(c); it != chain.end())
+					ops.insert(ops.end(),
+						it->second.begin(),
+						it->second.end());
+				else ops.push_back(key[c]);
+			}
+			std::sort(ops.begin(), ops.end());
+			chain[n] = ops;
+			key[n] = tag + join(ops, "[", "]");
+			return true;
+		}
+		if (cs == 0) { key[n] = tag + ":" + nd.to_str(); return true; }
+		strings ch;
+		for (size_t i = 0; i < cs; i++) ch.push_back(key[nd[i].get()]);
+		key[n] = tag + join(ch, "(", ")");
+		return true;
+	};
+	post_order<node_t>(t).search(visit);
+	return key[t];
+}
+
+inline bool matches_tree_mod_and_or(tref result, tref expected) {
+	return canonicalize_tref(result) == canonicalize_tref(expected);
+}
+
+inline bool matches_bf_mod_and_or(tref result, const char* expected_bf) {
+	tref expected = tau::get(expected_bf, parse_bf());
+	if (!expected) {
+		TAU_LOG_ERROR << "expected bf does not parse: "
+			<< expected_bf;
+		return false;
+	}
+	return matches_tree_mod_and_or(result, expected);
+}
+
+inline bool matches_wff_mod_and_or(tref result, const char* expected_wff) {
+	tref expected = tau::get(expected_wff, parse_wff());
+	if (!expected) {
+		TAU_LOG_ERROR << "expected wff does not parse: "
+			<< expected_wff;
+		return false;
+	}
+	return matches_tree_mod_and_or(result, expected);
+}
+
 inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
@@ -140,6 +245,50 @@ inline bool normalize_and_check(const char* sample, const strings& expected) {
 
 inline bool normalize_and_check(const char* sample, const std::string& expected) {
 	return normalize_and_check(sample, strings{ expected });
+}
+
+// normalize_and_check, but modulo AND/OR order.
+// matches_to_str_to_any_of, but modulo AND/OR order.
+inline bool matches_mod_and_or_any_of(tref fm, const strings& expected) {
+	for (const auto& e : expected)
+		if (matches_wff_mod_and_or(fm, e.c_str())) return true;
+	return false;
+}
+
+inline bool matches_bf_mod_and_or_any_of(tref fm, const strings& expected) {
+	for (const auto& e : expected)
+		if (matches_bf_mod_and_or(fm, e.c_str())) return true;
+	return false;
+}
+
+// values_matches_any_of, but comparing trees modulo AND/OR order rather
+// than printed strings. The per-position candidate list is kept: it also
+// holds genuinely different results, not just reorderings. The values
+// arrive printed, so each is parsed back before comparing.
+inline bool values_match_mod_and_or(const strings& values,
+	const std::vector<strings>& expected)
+{
+	if (values.size() != expected.size()) return false;
+	for (size_t i = 0; i < values.size(); i++) {
+		tref v = tau::get(values[i].c_str(), parse_wff());
+		if (!v) {
+			TAU_LOG_ERROR << "value does not parse: "
+				<< values[i];
+			return false;
+		}
+		if (!matches_mod_and_or_any_of(v, expected[i])) return false;
+	}
+	return true;
+}
+
+inline bool normalize_and_check_mod_and_or(const char* sample,
+	const char* expected_wff)
+{
+	auto nso_rr = get_nso_rr(sample);
+	if (!nso_rr.has_value()) return false;
+	tref result = normalizer<node_t>(nso_rr.value());
+	if (!result) return false;
+	return matches_wff_mod_and_or(result, expected_wff);
 }
 
 } // namespace idni::tau_lang

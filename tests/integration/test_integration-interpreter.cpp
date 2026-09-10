@@ -84,8 +84,8 @@ TEST_SUITE("Execution: revision stream continuity") {
 TEST_SUITE("Execution") {
 
 	// Pins on printed formulas must be order-insensitive
-	// (values_matches_any_of / an explicit list of accepted conjunct
-	// orderings), never a single exact string, whenever the printed
+	// (values_match_mod_and_or compares trees modulo AND/OR order),
+	// never a single exact string, whenever the printed
 	// formula conjoins two or more commutative parts. Parser
 	// regeneration (`./dev regen`) renumbers grammar nonterminals
 	// globally, which can change subtree interning order and flip which
@@ -120,16 +120,8 @@ TEST_SUITE("Execution") {
 		strings i2_values = {
 			"<:x> = 0", "<:y> = 0", "<:z> = 0"
 		};
-		// values_matches_any_of's #ifdef DEBUG branch (test_helpers.h)
-		// only compares against expected[0] -- a "canonicity" check that
-		// is active for every Debug build (-DDEBUG, cmake/tau-common.cmake)
-		// -- so the current parser's actual printed ordering must be
-		// listed FIRST in each position below; the remaining entries are
-		// kept as fallback orderings for values_matches_any_of's full
-		// any-of behavior in non-Debug builds. See the 8f1a74c1
-		// order-insensitivity note at the top of this suite.
-		// Re-pinned 2026-09-07 after the ba_constant regen (parser ids
-		// shifted, so the hash-driven conjunct order moved).
+		// Order within a candidate no longer matters; the remaining
+		// entries are the structurally different results.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
 				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
@@ -164,9 +156,9 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		CHECK( values_matches_any_of(o1_values, o1_expected) );
+		CHECK( values_match_mod_and_or(o1_values, o1_expected) );
 		auto u_values = u->get_values();
-		CHECK( values_matches_any_of(u_values, u_expected) );
+		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
@@ -202,9 +194,9 @@ TEST_SUITE("Execution") {
 		CHECK( maybe_i.has_value() );
 		DBG(TAU_LOG_TRACE << "o3 get values";)
 		auto o3_values = o3->get_values();
-		CHECK( values_matches_any_of(o3_values, o3_expected) );
+		CHECK( values_match_mod_and_or(o3_values, o3_expected) );
 		auto u_values = u->get_values();
-		CHECK( values_matches_any_of(u_values, u_expected) );
+		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
@@ -302,8 +294,8 @@ TEST_SUITE("Execution") {
 	//
 	// u's printed conjunct order ("o2 && o3" vs "o3 && o2") depends on
 	// parser subtree interning order -- see the order-insensitivity note
-	// at the top of this suite (8f1a74c1 bisection) -- so both orders are
-	// accepted here via values_matches_any_of instead of an exact match.
+	// at the top of this suite (8f1a74c1 bisection) -- so order is
+	// absorbed by values_match_mod_and_or instead of pinned.
 	TEST_CASE("u[t] = i1[t]: merge_parts") {
 		bdd_init<Bool>();
 		auto spec = create_spec(
@@ -311,12 +303,6 @@ TEST_SUITE("Execution") {
 		strings i1_values = {
 			"F", "o2[t] = 0 && o3[t] = 0", "F", "F"
 		};
-		// The Debug-only "canonicity" branch of values_matches_any_of
-		// (test_helpers.h, #ifdef DEBUG) only compares against
-		// expected[0], so the actual ordering must be listed first; see
-		// the dec_seq case above and the 8f1a74c1 note at the top of
-		// this suite.
-		// Re-pinned 2026-09-07 after the ba_constant regen.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
 				"always o2[t]:tau = 0 && o3[t]:tau = 0",
@@ -339,7 +325,7 @@ TEST_SUITE("Execution") {
 		CHECK( o2->get_values() == o2_expected );
 		CHECK( o3->get_values() == o3_expected );
 		auto u_values = u->get_values();
-		CHECK( values_matches_any_of(u_values, u_expected) );
+		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
 	// An update already implied by the running spec must leave the spec
@@ -448,11 +434,6 @@ TEST_SUITE("Execution") {
 		strings u_expected = {
 			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
-		// Actual orderings must be listed first per position -- the
-		// Debug-only "canonicity" branch of values_matches_any_of
-		// (test_helpers.h, #ifdef DEBUG) only compares against
-		// expected[0]; see the dec_seq case above and the 8f1a74c1
-		// note at the top of this suite.
 		std::vector<strings> o1_expected = {
 		{
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
@@ -510,7 +491,7 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		CHECK( values_matches_any_of(o1_values, o1_expected) );
+		CHECK( values_match_mod_and_or(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
 	}

@@ -111,13 +111,8 @@ TEST_SUITE("AntiPrenexBlock") {
 		// level further in. Previously:
 		//   "z = 0 && (ex b1 b1 y != 0 || b1 w != 0)"
 		auto [res, used] = run_apb("ex x (z = 0 && (xy != 0 || xw != 0)).");
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		// Order flipped again by the 2026-08-27 regen (left-assoc
-		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
-		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))",
-			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))"
 		}) );
 		CHECK( used == 0 );
 	}
@@ -171,10 +166,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		auto [res, used] = run_apb_norm("ex x (xy != 0 || xw != 0).");
 		CHECK( used == 0 );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
-		CHECK( matches_to_str_to_any_of(res, {
-			"!y = 0 || !w = 0",
-			"!w = 0 || !y = 0",
-		}) );
+		CHECK( matches_mod_and_or_any_of(res, { "!y = 0 || !w = 0" }) );
 	}
 
 	TEST_CASE("paper 2a: distributes over a conjunction too") {
@@ -406,7 +398,7 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
 		// Step 2 (subs_elim): ex x (x=w && xy=0) → (xy=0)[x:=w] = wy=0
 		tref res = run_apb0("ex x (xy = 0 && x = w).");
-		CHECK( matches_to_str_to_any_of(res, {"wy = 0", "yw = 0"}) );
+		CHECK( matches_mod_and_or_any_of(res, { "wy = 0" }) );
 	}
 
 	TEST_CASE("subs_elim: ex x (x=w) → T") {
@@ -432,9 +424,7 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 		// ∃x. (xy=0 ∧ wz=0): wz=0 is independent of x → factor out;
 		// ∃x. xy=0 → T (pick x=0).  Result: T ∧ wz=0 = wz=0.
 		tref res = run_apb0("ex x (xy = 0 && wz = 0).");
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( matches_to_str_to_any_of(res, {"wz = 0", "zw = 0"}) );
+		CHECK( matches_mod_and_or_any_of(res, { "wz = 0" }) );
 	}
 
 	TEST_CASE("trivial_skolem wiring: ex x (x=w || z=0) resolves via the block hook") {

@@ -18,6 +18,7 @@ set(TESTS
 	bv_ba-solver1
 	bv_ba-solver2
 	bv_ba-cast
+	canonicalize_tref
 	cvc5
 	eliminability
 	execution

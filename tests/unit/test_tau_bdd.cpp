@@ -127,10 +127,7 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		// Order flipped by the 8f1a74c1 parser regen (subtree interning
-		// order for the "yz" conjunct changed): actual is now "x&(zy)'|x'".
-		CHECK((tau::get(t).to_str() == "x&(zy)'|x'"
-			|| tau::get(t).to_str() == "x&(yz)'|x'"));
+		CHECK( matches_bf_mod_and_or_any_of(t, strings{"x&(zy)'|x'"}) );
 	}
 	TEST_CASE("xyzqwert no var") {
 		using bdd = tau_term_bdd<node_t>;
@@ -146,18 +143,8 @@ TEST_SUITE("BDD creation terms") {
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
 		auto result = tau::get(t).to_str();
-		// Any AND-commutative permutation of the same 8 literals is accepted;
-		// the order is a hash/nt-id-order-dependent tie-break that drifts
-		// with every parser regen (Debug and Release differ too).
 		INFO("result: " << result);
-		CHECK((result == "xzrqeywt" || result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
-			|| result == "xyzqwert"
-			|| result == "ewytrxzq"
-			|| result == "zrwyexqt"
-			|| result == "xtzqrewy"
-			|| result == "qxywrezt"
-			|| result == "qyrtxwze"
-			|| result == "wetyzrxq"));
+		CHECK( matches_bf_mod_and_or_any_of(t, strings{ "xzrqeywt" }) );
 	}
 }
 
@@ -198,16 +185,8 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// Any AND-commutative permutation of {a,b,c,d,e,f} is accepted;
-		// bdd_and_many's merge order is a hash/nt-id-order-dependent
-		// tie-break that drifts with every parser regen.
 		INFO("result: " << result);
-		CHECK((result == "xydcefab" || result == "xydcabfe" || result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
-			|| result == "xycdabfe"
-			|| result == "xycdabef"
-			|| result == "xyfedcab"
-			|| result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab" ));
+		CHECK( matches_bf_mod_and_or_any_of(ct, strings{"xydcefab"}) );
 	}
 
 	TEST_CASE("2") {
@@ -238,19 +217,12 @@ TEST_SUITE("BDD and many") {
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
 		auto result = tau::get(xx).to_str();
-		// Any AND-commutative permutation of {a:1, b:2, c:2, d:1, (e'f')':1}
-		// is accepted; the order is a hash/nt-id-order-dependent tie-break
-		// that drifts with every parser regen (Debug and Release differ too).
 		INFO("result: " << result);
-		CHECK((result == "abbd&(f'e')'cc" || result == "d&(e'f')'bbcca" || result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
-			|| result == "c&(e'f')'bbda"
-			|| result == "ab&(f'e')'bccd"
-			|| result == "cabb&(e'f')'d"
-			|| result == "adbb&(e'f')'cc"
-			|| result == "abbccd&(f'e')'"
-			|| result == "(f'e')'adbbcc"
-			|| result == "bccda&(f'e')'"
-			|| result == "baccd&(f'e')'"));
+		CHECK( matches_bf_mod_and_or_any_of(xx, strings{
+			"abbd&(f'e')'cc",
+			"cbb&(f'e')'da",
+			"bccda&(f'e')'"
+		}) );
 	}
 }
 
