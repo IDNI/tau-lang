@@ -105,6 +105,13 @@ bool is_ordered(bref<node> x, const var_order<node>& order) {
 }
 #endif // DEBUG
 
+/// The Tau term of a leaf, as a `bf` (the inverter folded in as `bf_neg`).
+template <NodeType node>
+tref leaf_term(bref<node> x) {
+	using tau = tree<node>;
+	return tau::get(tau::bf, tbdd<node>::get_var(x));
+}
+
 /**
  * @brief The shared leaf walk: rebuild `x` with every non-terminal leaf `ℓ`
  * replaced by `fn(ℓ)` (both as `bf` terms), the decision structure kept.
@@ -115,9 +122,10 @@ bool is_ordered(bref<node> x, const var_order<node>& order) {
  * A changed leaf that is still `P`-free is re-interned through `add`, so
  * leaves that became equal are one node and `h == l` folds; a changed leaf
  * that came to touch `P` (a substitution put block variables into it) is
- * built as a BDD and the rebuild goes through `bdd_ite`, which is `add`
- * when the children are ordered below the node and re-canonicalises
- * otherwise. Memoised per call over the BDD's nodes.
+ * built as a BDD. A node is rebuilt through `add` while both children stay
+ * ordered below it, and through `bdd_ite` once a rebuilt leaf brought a
+ * variable of equal or higher rank up, which re-canonicalises. Memoised
+ * per call over the BDD's nodes.
  */
 template <NodeType node, typename F>
 bref<node> map_leaves(bref<node> x, F& fn, const var_order<node>& order,
@@ -129,7 +137,7 @@ bref<node> map_leaves(bref<node> x, F& fn, const var_order<node>& order,
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	bref<node> r;
 	if (bdd::leaf(x)) {
-		tref in  = tau::get(tau::bf, bdd::get_var(x));
+		tref in  = leaf_term<node>(x);
 		tref out = fn(in);
 		if (out == in) r = x;
 		else if (touches<node>(out, order)) r = bdd::build_bdd(out, order);
@@ -137,8 +145,13 @@ bref<node> map_leaves(bref<node> x, F& fn, const var_order<node>& order,
 	} else {
 		bref<node> h = map_leaves<node>(bdd::get_high(x), fn, order, memo);
 		bref<node> l = map_leaves<node>(bdd::get_low(x),  fn, order, memo);
+		tref var = bdd::get_var(x);
+		auto below = [&](bref<node> c) {
+			return bdd::leaf(c) || bdd::less_then(var, bdd::get_var(c), order);
+		};
 		if (h == bdd::get_high(x) && l == bdd::get_low(x)) r = x;
-		else r = bdd::bdd_ite(bdd::from_bit(bdd::get_var(x)), h, l, order);
+		else if (below(h) && below(l)) r = bdd::add(var, h, l);
+		else r = bdd::bdd_ite(bdd::from_bit(var), h, l, order);
 	}
 	return memo.emplace(x, r).first->second;
 }
@@ -149,17 +162,29 @@ bref<node> map_leaves(bref<node> x, F& fn, const var_order<node>& order) {
 	return map_leaves<node>(x, fn, order, memo);
 }
 
-/// `pred(ℓ)` holds for some non-terminal leaf `ℓ` (as a `bf` term).
-template <NodeType node, typename Pred>
-bool any_leaf(bref<node> x, Pred& pred, std::unordered_set<tref>& seen) {
-	using tau = tree<node>;
+/**
+ * @brief Visit every non-terminal node of a BDD once (by node, whatever the
+ * inverter it is reached with): `fn(x, is_leaf)` returns false to stop the
+ * walk. The one walk behind `carries_functional_quantifier`, `mem_size`
+ * and `leaf_fv`. Returns false iff `fn` stopped it.
+ */
+template <NodeType node, typename F>
+bool visit_nodes(bref<node> x, F& fn, std::unordered_set<tref>& seen) {
 	using bdd = tbdd<node>;
-	if (x == bdd::T || x == bdd::F) return false;
-	if (!seen.insert(x.b).second) return false;
-	if (bdd::leaf(x)) return pred(tau::get(tau::bf, bdd::get_var(x)));
-	return any_leaf<node>(bdd::get_high(x), pred, seen)
-		|| any_leaf<node>(bdd::get_low(x), pred, seen);
+	if (x == bdd::T || x == bdd::F) return true;
+	if (!seen.insert(x.b).second) return true;
+	if (bdd::leaf(x)) return fn(x, true);
+	return fn(x, false)
+		&& visit_nodes<node>(bdd::get_high(x), fn, seen)
+		&& visit_nodes<node>(bdd::get_low(x), fn, seen);
 }
+
+template <NodeType node, typename F>
+bool visit_nodes(bref<node> x, F& fn) {
+	std::unordered_set<tref> seen;
+	return visit_nodes<node>(x, fn, seen);
+}
+
 
 /**
  * @brief §1 cofactor by child selection at any depth, as a restrict
@@ -240,9 +265,10 @@ bref<node> to_ref(tref t, const var_order<node>& order) {
  * reference argument that held `x` is re-emitted through `simplify_term`
  * (a formula argument through `simplify_formula`) after its own rewrite,
  * invariant 6. NEW over `rewriter::replace` (ground rule 9) for that
- * re-simplification alone, which needs the parent of the argument node. Capture-safe by the canonical binder ids of phase 0 (a
- * term-level binder inside `f` never binds `x`; Debug asserts it). One
- * `pre_order` walk, memoised per node.
+ * re-simplification alone, which needs the parent of the argument node.
+ * Capture-safe by the canonical binder ids of phase 0 (a term-level binder
+ * inside `f` never binds `x`; Debug asserts it). One `pre_order` walk,
+ * memoised per node.
  */
 template <NodeType node>
 tref subst_plain(tref f, tref x, tref t,
@@ -279,6 +305,20 @@ std::pair<tref, bool> unwrap_neg(tref a) {
 	return { a, false };
 }
 
+/// The operator node of an atom: an equation, or an order atom in any of
+/// the shapes the grammar admits before phase 3.
+template <NodeType node>
+bool is_atom_node(const tree<node>& t) {
+	using tau = tree<node>;
+	switch (t.value.nt) {
+		case tau::bf_eq: case tau::bf_neq:
+		case tau::bf_lt: case tau::bf_nlt: case tau::bf_lteq:
+		case tau::bf_nlteq: case tau::bf_gt: case tau::bf_ngt:
+		case tau::bf_gteq: case tau::bf_ngteq: return true;
+		default: return false;
+	}
+}
+
 } // namespace terms_detail
 
 // --- the representation boundary (PREPARE_TERMS, D2) -----------------------------
@@ -302,7 +342,11 @@ tref prepare_terms(tref body, const block& P, const var_order<node>& order) {
 	subtree_unordered_map<node, tref> term_memo;
 	auto prep = [&](tref t) -> tref {
 		t = tau::trim_right_sibling(t);
-		if (is_bdd_backed<node>(t) || !touches<node>(t, order)) return t;
+		if (is_bdd_backed<node>(t)) { // a prepared input (D2 idempotence)
+			DBG(assert(is_ordered<node>(handle_of<node>(t).get(), order));)
+			return t;
+		}
+		if (!touches<node>(t, order)) return t;
 		if (auto it = term_memo.find(t); it != term_memo.end())
 			return it->second;
 		tref r = intern<node>(to_ref<node>(t, order), find_ba_type<node>(t));
@@ -313,9 +357,10 @@ tref prepare_terms(tref body, const block& P, const var_order<node>& order) {
 	auto f = [&](tref n) -> tref {
 		const tau& tn = tau::get(n);
 		if (!tn.is(tau::wff) || !tn.child_is(tau::bf_eq)) return n;
-		tref l = tn[0].first(), r = tn[0].second();
+		tref l = tau::trim_right_sibling(tn[0].first());
+		tref r = tau::trim_right_sibling(tn[0].second());
 		tref l2 = prep(l), r2 = prep(r);
-		if (l2 == tau::trim_right_sibling(l) && r2 == r) return n;
+		if (l2 == l && r2 == r) return n;
 		return build_bf_eq<node>(l2, r2);
 	};
 	// Descend through connectives and negation only: a binder, a
@@ -333,11 +378,16 @@ tref finish_terms(tref phi) {
 	using namespace terms_detail;
 	auto f = [](tref n) -> tref {
 		if (!is_bdd_backed<node>(n)) return n;
-		return handle_of<node>(n).to_tau_term(find_ba_type<node>(n));
+		tref plain = handle_of<node>(n).to_tau_term(find_ba_type<node>(n));
+		// No BDD_ID nests inside a leaf (subst_term, the slide), so the
+		// converted term needs no second look.
+		DBG(assert(tree<node>::get(plain).find_top([](tref m) {
+			return tree<node>::get(m).is(tree<node>::BDD_ID); }) == nullptr);)
+		return plain;
 	};
 	// Every node kind is entered (binders, functional-quantifier bodies,
 	// reference arguments, temporal scopes); a replaced term is not
-	// re-entered — no BDD_ID nests inside a leaf (subst_term).
+	// re-entered.
 	return pre_order<node>(phi).apply_unique_until_change(f);
 }
 
@@ -349,6 +399,7 @@ tref cofactor(tref f, tref x, bool bit, const var_order<node>& order) {
 	using namespace terms_detail;
 	if (!is_bdd_backed<node>(f)) return f; // no decision variables at all
 	x = tau::trim_right_sibling(x);
+	DBG(assert(tau::get(x).is(tau::variable));)
 	if (!order.contains(x)) return f;      // not a decision variable
 	bref<node> r = handle_of<node>(f).get();
 	DBG(assert(is_ordered<node>(r, order));)
@@ -417,8 +468,10 @@ bool carries_functional_quantifier(tref f) {
 			(bool(*)(tref)) is_functional_quantifier<node>) != nullptr;
 	};
 	if (!is_bdd_backed<node>(f)) return has_fq(f);
-	std::unordered_set<tref> seen;
-	return any_leaf<node>(handle_of<node>(f).get(), has_fq, seen);
+	auto at_node = [&](bref<node> x, bool leaf) {
+		return !(leaf && has_fq(leaf_term<node>(x)));
+	};
+	return !visit_nodes<node>(handle_of<node>(f).get(), at_node);
 }
 
 // --- substitution inside a term -----------------------------------------------
@@ -430,6 +483,7 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 	using tau = tree<node>;
 	using namespace terms_detail;
 	x = tau::trim_right_sibling(x);
+	DBG(assert(tau::get(x).is(tau::variable));)
 	{
 		const trefs& fv = get_free_vars<node>(f);
 		if (!std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less))
@@ -488,7 +542,7 @@ tref simplify_atom(tref a, const var_order<node>& order) {
 	const tau& t = tau::get(atom);
 	if (t.equals_T() || t.equals_F())
 		return negated ? build_wff_neg<node>(atom) : a;
-	DBG(assert(t.is(tau::wff) && t[0].has_child());)
+	DBG(assert(t.is(tau::wff) && is_atom_node<node>(t[0]));)
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
 	tref res;
@@ -528,9 +582,11 @@ tref term_of(tref atom, const var_order<node>& order) {
 	// The ring sum of two BDD-backed sides is a BDD operation; a plain side
 	// (a constant, a P-free term) is a leaf under the same order.
 	bref<node> a = to_ref<node>(l, order), b = to_ref<node>(r, order);
+	DBG(assert(is_ordered<node>(a, order) && is_ordered<node>(b, order));)
 	bref<node> x = bdd::bdd_or(bdd::bdd_and(a, bdd::bdd_not(b), order),
 		bdd::bdd_and(bdd::bdd_not(a), b, order), order);
-	return intern<node>(x, find_ba_type<node>(l));
+	return intern<node>(x,
+		find_ba_type<node>(is_bdd_backed<node>(l) ? l : r));
 }
 
 template <NodeType node>
@@ -548,7 +604,6 @@ tref norm_equation(tref atom, const var_order<node>& order) {
 template <NodeType node>
 size_t mem_size(tref t) {
 	using namespace terms_detail;
-	using bdd = tbdd<node>;
 	if (!is_bdd_backed<node>(t)) {
 		size_t n = 0;
 		auto count = [&n](tref) { ++n; return true; };
@@ -558,21 +613,16 @@ size_t mem_size(tref t) {
 	// The visited-set scheme of heuristics/bv_predicate_blasting.tmpl.h's
 	// bdd_node_count, plus the leaf guard it does not need (its BDDs have
 	// only T/F terminals; ours have Tau-term leaves without children).
-	std::unordered_set<tref> seen;
-	auto walk = [&](auto& self, bref<node> x) -> size_t {
-		if (x == bdd::T || x == bdd::F) return 0;
-		if (!seen.insert(x.b).second) return 0;
-		if (bdd::leaf(x)) return 1;
-		return 1 + self(self, bdd::get_high(x)) + self(self, bdd::get_low(x));
-	};
-	return walk(walk, handle_of<node>(t).get());
+	size_t n = 0;
+	auto count = [&n](bref<node>, bool) { return ++n, true; };
+	visit_nodes<node>(handle_of<node>(t).get(), count);
+	return n;
 }
 
 template <NodeType node>
 const trefs& leaf_fv(tref f) {
 	using namespace terms_detail;
 	using tau = tree<node>;
-	using bdd = tbdd<node>;
 	f = tau::trim_right_sibling(f);
 	if (!is_bdd_backed<node>(f)) return get_free_vars<node>(f);
 	// NEW over `get_free_tau_vars` (ground rule 9): that worker merges the
@@ -585,20 +635,14 @@ const trefs& leaf_fv(tref f) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(f); it != cache.end()) return it->second.items;
 	subtree_set<node> merged;
-	std::unordered_set<tref> seen;
-	auto walk = [&](auto& self, bref<node> x) -> void {
-		if (x == bdd::T || x == bdd::F) return;
-		if (!seen.insert(x.b).second) return;
-		if (bdd::leaf(x)) {
-			const trefs& fv = get_free_vars<node>(
-				tau::get(tau::bf, bdd::get(x.b).value.v));
+	auto collect = [&](bref<node> x, bool leaf) {
+		if (leaf) {
+			const trefs& fv = get_free_vars<node>(leaf_term<node>(x));
 			merged.insert(fv.begin(), fv.end());
-			return;
 		}
-		self(self, bdd::get_high(x));
-		self(self, bdd::get_low(x));
+		return true;
 	};
-	walk(walk, handle_of<node>(f).get());
+	visit_nodes<node>(handle_of<node>(f).get(), collect);
 	tref_set out{ trefs(merged.begin(), merged.end()) };
 	return cache.emplace(f, std::move(out)).first->second.items;
 }

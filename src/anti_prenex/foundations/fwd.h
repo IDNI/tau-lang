@@ -45,12 +45,6 @@ using ba_type_id = size_t;
 /// quantifier (`bf_fex`/`bf_fall`, §1).
 enum class binder { ex, all };
 
-/// The one conversion to the BDD library's own quantifier enum.
-template <NodeType node>
-constexpr typename tau_term_bdd<node>::Quantifier bdd_quantifier(binder k) {
-	return k == binder::ex ? tau_term_bdd<node>::ex : tau_term_bdd<node>::all;
-}
-
 /// The three answers of `ASK` (§7); the value type of §1 `solver_memo`.
 enum class answer { sat, unsat, unknown };
 

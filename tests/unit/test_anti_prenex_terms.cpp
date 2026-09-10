@@ -87,11 +87,11 @@ TEST_CASE("prepare_terms: decision variables are exactly P, leaves hold the rest
 	CHECK(ap::is_bdd_backed<node_t>(l));
 	CHECK(!ap::is_bdd_backed<node_t>(r)); // the constant side stays a constant
 	tb::ref f = ref_of(l, o);
-	// the inner variable y has the LOWER rank and sits on top; both x and
-	// y are decision nodes, z is a leaf
-	CHECK(!tb::leaf(f));
-	tref top = tb::get_var(f);
-	CHECK((tau::subtree_equals(top, x) || tau::subtree_equals(top, y)));
+	// the inner variable y has the LOWER rank and sits on top, x below it;
+	// z is a leaf
+	REQUIRE(!tb::leaf(f));
+	CHECK(tau::subtree_equals(tb::get_var(f), y));
+	CHECK(tau::subtree_equals(tb::get_var(tb::get_high(f)), x));
 	// z is not a decision variable anywhere: it sits in a leaf
 	const trefs& lfv = ap::leaf_fv<node_t>(l);
 	CHECK(std::binary_search(lfv.begin(), lfv.end(), z, tau::subtree_less));
@@ -110,10 +110,10 @@ TEST_CASE("prepare_terms: an atom not touching P is the same tref") {
 	tref prepared = ap::prepare_terms<node_t>(both, P, o);
 	CHECK(prepared != both);
 	// the untouched conjunct is the same node inside the result
-	CHECK(tau::get(prepared).find_top([](tref m) {
-		return tree<node_t>::get(m) == tree<node_t>::get(wff("y & z = 0")); })
-		!= nullptr);
-	CHECK(!has_bdd_id(wff("y & z = 0")));
+	tref yz = wff("y & z = 0");
+	CHECK(tau::get(prepared).find_top([yz](tref m) {
+		return tree<node_t>::get(m) == tree<node_t>::get(yz); }) != nullptr);
+	CHECK(!has_bdd_id(yz));
 }
 
 TEST_CASE("prepare_terms: an order atom stays plain, a binder is opaque") {
@@ -207,6 +207,17 @@ TEST_CASE("forall_over / exists_over over all of P: meet / join of the leaves") 
 	// over an empty block, or on a plain term: identity
 	CHECK(ap::forall_over<node_t>(l, {}, o) == l);
 	CHECK(ap::exists_over<node_t>(bf("a"), P, o) == bf("a"));
+	// over PART of the decision set: the library's quantification, and the
+	// result stays BDD-backed on the rest
+	tref y = vr("y");
+	ap::block Q{ x, y };
+	order_t oq = order_of(Q);
+	tref g = sides(ap::prepare_terms<node_t>(wff("x & y & a | x' & b = 0"), Q, oq)).first;
+	tref exx = ap::exists_over<node_t>(g, { x }, oq);
+	CHECK(ap::is_bdd_backed<node_t>(exx));
+	trefs vx{ x };
+	CHECK(ref_of(exx, oq) == tb::bdd_ex(ref_of(g, oq), vx, oq));
+	CHECK(same_function(exx, bf("y & a | b"), { y, a, b }));
 }
 
 // 4. the slide ----------------------------------------------------------------
@@ -291,6 +302,21 @@ TEST_CASE("subst_term: reaches a reference argument and re-simplifies it") {
 		bf("z & y")));
 }
 
+TEST_CASE("subst_term: a leaf that gains a block variable is re-canonicalised") {
+	tref p = vr("p"), a = vr("a"), b = vr("b"), c = vr("c");
+	ap::block P{ p };
+	order_t o = order_of(P);
+	// p·a ∪ p′·b with the OUTER variable a in a leaf; a ← p·c puts the
+	// decision variable into that leaf, which the rebuild must lift:
+	// p·(p·c) ∪ p′·b = p·c ∪ p′·b
+	tref f = sides(ap::prepare_terms<node_t>(wff("p & a | p' & b = 0"), P, o)).first;
+	REQUIRE(ap::is_bdd_backed<node_t>(f));
+	tref s = ap::subst_term<node_t>(f, a, bf("p & c"), o);
+	CHECK(ap::is_bdd_backed<node_t>(s));
+	CHECK(same_function(s, bf("p & c | p' & b"), { p, b, c }));
+	CHECK(ap::leaf_fv<node_t>(s).size() == 2); // b and c, p is a decision node again
+}
+
 TEST_CASE("subst_term: a BDD-backed t composes on the decision variable and enters no leaf as BDD_ID") {
 	tref x = vr("x"), y = vr("y"), z = vr("z");
 	ap::block P{ x, y };
@@ -351,8 +377,10 @@ TEST_CASE("simplify_atom: plain regime folds and is idempotent") {
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & y = x & y"))).equals_T());
 	// the joint l + r catches what side-wise cannot: x·y = x·(y ∪ x′)
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & y = x & (y | x')"))).equals_T());
+	// (a Boolean order atom is not in the list: the hooks decompose it into
+	// a compound formula at parse, which is not an atom — Debug asserts)
 	for (const char* s : { "x = 1", "x = y", "x & y = x", "x' = 0", "x = y'",
-		"x | y = 1", "x & y = 0", "!(x = y)", "x & y <= x", "x < y & z",
+		"x | y = 1", "x & y = 0", "!(x = y)",
 		"x:bv[8] <= y:bv[8]", "x:bv[8] & y:bv[8] < x:bv[8]",
 		"{ 1 }:bv[8] <= { 2 }:bv[8]" })
 	{
