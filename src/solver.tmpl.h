@@ -1499,28 +1499,17 @@ bool is_ordering_atom(tref n) {
 // omcat_solve_inequality_system dispatcher: asks the BA owning ba_type_id to
 // solve a pure ordering system itself. Distinct from pack_solve, which answers
 // with the pack's first solver regardless of type.
-template <typename Node, typename BA>
-static std::optional<solution<Node>> ba_omcat_solve_for(size_t ba_type_id,
-	const inequality_system<Node>& sys, const solver_options& opts)
-{
-	if constexpr (ba_has_descriptor_v<Node, BA>
-		&& requires { ba_descriptor<BA, Node>
-			::omcat_solve_inequality_system(sys, opts); })
-	{
-		if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
-			return ba_descriptor<BA, Node>
-				::omcat_solve_inequality_system(sys, opts);
-	}
-	return std::nullopt;
-}
-
 template <typename Node>
 static std::optional<solution<Node>> pack_omcat_solve(size_t ba_type_id,
 	const inequality_system<Node>& sys, const solver_options& opts)
 {
-	return pack_first_owner<Node>([&]<typename BA>()
+	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
 		-> std::optional<solution<Node>> {
-			return ba_omcat_solve_for<Node, BA>(ba_type_id, sys, opts);
+			if constexpr (requires { ba_descriptor<BA, Node>
+				::omcat_solve_inequality_system(sys, opts); })
+				return ba_descriptor<BA, Node>
+					::omcat_solve_inequality_system(sys, opts);
+			return std::nullopt;
 		});
 }
 

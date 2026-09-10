@@ -100,6 +100,39 @@ void pack_visit_all(Visit&& visit) {
 	}(std::make_index_sequence<std::tuple_size_v<pack>>{});
 }
 
+/**
+ * @brief Apply @p f to the first BA of @p Node's pack that owns @p ba_type.
+ *
+ * @p f is invoked as `f.template operator()<BA>()` and returns a
+ * `std::optional`; the fold stops at the owner whether or not its result is
+ * engaged, and answers nullopt when no BA owns the type -- the ordinary
+ * "type nothing in the pack owns" outcome, which the null id shares. A BA
+ * lacking the capability the caller wants is skipped by the caller's own
+ * `if constexpr`, so the fold never instantiates a member for a BA without
+ * it.
+ */
+template <typename Node, typename F>
+auto pack_owner_apply(size_t ba_type, F&& f) {
+	using pack = typename Node::bas_tuple;
+	using result_t = decltype(f.template operator()<
+		std::tuple_element_t<0, pack>>());
+	result_t out = std::nullopt;
+	if (!ba_type) return out;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		bool done = false;
+		([&] {
+			using BA = std::tuple_element_t<Is, pack>;
+			if (done) return;
+			if constexpr (ba_has_descriptor_v<Node, BA>)
+				if (ba_descriptor<BA, Node>::owns_type(ba_type)) {
+					done = true;
+					out = f.template operator()<BA>();
+				}
+		}(), ...);
+	}(std::make_index_sequence<std::tuple_size_v<pack>>{});
+	return out;
+}
+
 namespace detail {
 
 template <typename Node, typename Form, typename First, typename... Rest>
@@ -133,14 +166,10 @@ auto pack_solve(Form form) {
 template <typename Node, typename Form>
 bool pack_can_solve(Form form) {
 	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_can_solve<Node, BA>)
-				if (!out) out = ba_descriptor<BA, Node>::can_solve(form);
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_can_solve<Node, BA>)
+			if (!out) out = ba_descriptor<BA, Node>::can_solve(form);
+	});
 	return out;
 }
 
@@ -288,16 +317,13 @@ bool pack_ba_component_factoring_enabled() {
 /** @internal @brief Shared body of the two @ref pack_type_has_arith_ops. */
 template <typename Node, typename Type>
 bool pack_type_has_arith_ops_impl(Type type) {
+	if constexpr (std::is_same_v<Type, size_t>) if (!type) return false;
 	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_arith_ops_v<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::owns_type(type))
-					out = true;
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_arith_ops_v<Node, BA>)
+			if (!out && ba_descriptor<BA, Node>::owns_type(type))
+				out = true;
+	});
 	return out;
 }
 
@@ -329,17 +355,12 @@ bool pack_type_has_arith_ops(tref type) {
  */
 template <typename Node>
 bool pack_term_is_blasteable(size_t ba_type, tref term) {
-	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
 			if constexpr (ba_has_term_is_blasteable<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type))
-					out = ba_descriptor<BA, Node>::term_is_blasteable(term);
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
+				return ba_descriptor<BA, Node>::term_is_blasteable(term);
+			return std::nullopt;
+		}).value_or(false);
 }
 
 /**
@@ -352,18 +373,10 @@ bool pack_term_is_blasteable(size_t ba_type, tref term) {
  */
 template <typename Node>
 bool pack_type_is_atomless(size_t ba_type) {
-	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_descriptor_v<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::atomless
-					&& ba_descriptor<BA, Node>::owns_type(ba_type))
-						out = true;
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			return ba_descriptor<BA, Node>::atomless;
+		}).value_or(false);
 }
 
 
@@ -377,12 +390,12 @@ bool pack_type_is_atomless(size_t ba_type) {
  */
 template <typename Node>
 tref pack_zero_constant(size_t ba_type) {
-	return pack_first_owner<Node>([&]<typename BA>() -> std::optional<tref> {
-		if constexpr (ba_has_zero_constant<Node, BA>)
-			if (ba_descriptor<BA, Node>::owns_type(ba_type))
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<tref> {
+			if constexpr (ba_has_zero_constant<Node, BA>)
 				return ba_descriptor<BA, Node>::zero_constant(ba_type);
-		return std::nullopt;
-	}).value_or(nullptr);
+			return std::nullopt;
+		}).value_or(nullptr);
 }
 
 /**
@@ -394,13 +407,13 @@ tref pack_zero_constant(size_t ba_type) {
  */
 template <typename Node>
 tref pack_value_constant(size_t ba_type, size_t value) {
-	return pack_first_owner<Node>([&]<typename BA>() -> std::optional<tref> {
-		if constexpr (ba_has_value_constant<Node, BA>)
-			if (ba_descriptor<BA, Node>::owns_type(ba_type))
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<tref> {
+			if constexpr (ba_has_value_constant<Node, BA>)
 				return ba_descriptor<BA, Node>::value_constant(
 					ba_type, value);
-		return std::nullopt;
-	}).value_or(nullptr);
+			return std::nullopt;
+		}).value_or(nullptr);
 }
 
 /**
@@ -412,19 +425,10 @@ tref pack_value_constant(size_t ba_type, size_t value) {
  */
 template <typename Node>
 bool pack_type_is_non_aba_omcat(size_t ba_type) {
-	if (!ba_type) return false;
-	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_descriptor_v<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::non_aba_omcat
-					&& ba_descriptor<BA, Node>::owns_type(ba_type))
-						out = true;
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			return ba_descriptor<BA, Node>::non_aba_omcat;
+		}).value_or(false);
 }
 
 /**
@@ -444,21 +448,12 @@ bool pack_type_is_non_aba_omcat(size_t ba_type) {
 		const tref* ch, tref r) { \
 		ba_wff_hooks<BA, Node>::mem(ch, r); \
 	}; \
-	template <typename Node, typename BA> \
-	bool ba_owns_##mem##_hook_type(size_t ba_type) { \
-		if constexpr (!ba_has_descriptor_v<Node, BA>) return false; \
-		else if constexpr (!ba_has_##mem##_hook_v<Node, BA>) return false; \
-		else return ba_descriptor<BA, Node>::owns_type(ba_type); \
-	} \
 	template <typename Node> \
 	bool pack_ba_type_has_##mem##_hook(size_t ba_type) { \
-		if (!ba_type) return false; \
-		return [&]<std::size_t... Is>(std::index_sequence<Is...>) { \
-			using pack = typename Node::bas_tuple; \
-			return (ba_owns_##mem##_hook_type<Node, \
-				std::tuple_element_t<Is, pack>>(ba_type) || ...); \
-		}(std::make_index_sequence< \
-			std::tuple_size_v<typename Node::bas_tuple>>{}); \
+		return pack_owner_apply<Node>(ba_type, []<typename BA>() \
+			-> std::optional<bool> { \
+				return ba_has_##mem##_hook_v<Node, BA>; \
+			}).value_or(false); \
 	}
 
 TAU_PACK_TRAITS_WFF_HOOK(wff_lt)
@@ -556,13 +551,12 @@ tref pack_bool_carrier_type() {
  */
 template <typename Node>
 std::optional<bool> pack_omcat_qe(size_t ba_type_id, tref var, tref body) {
-	return pack_first_owner<Node>([&]<typename BA>() -> std::optional<bool> {
-		if constexpr (ba_has_omcat_qe<Node, BA>)
-			if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
-				return ba_descriptor<BA, Node>::omcat_qe(
-					var, body);
-		return std::nullopt;
-	});
+	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_omcat_qe<Node, BA>)
+				return ba_descriptor<BA, Node>::omcat_qe(var, body);
+			return std::nullopt;
+		});
 }
 
 /**
@@ -592,12 +586,11 @@ template <typename Node>
 std::optional<std::string> pack_codegen_witness(size_t ba_type_id, tref var,
 	tref conj)
 {
-	return pack_first_owner<Node>([&]<typename BA>()
+	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
 		-> std::optional<std::string> {
 			if constexpr (ba_has_codegen_witness<Node, BA>)
-				if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
-					return ba_descriptor<BA, Node>
-						::codegen_witness(var, conj);
+				return ba_descriptor<BA, Node>
+					::codegen_witness(var, conj);
 			return std::nullopt;
 		});
 }
@@ -612,29 +605,20 @@ std::optional<std::string> pack_codegen_witness(size_t ba_type_id, tref var,
  */
 template <typename Node>
 bool pack_type_has_codegen_witness(size_t ba_type_id) {
-	if (!ba_type_id) return false;
-	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_codegen_witness<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type_id))
-					out = true;
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
+	return pack_owner_apply<Node>(ba_type_id, []<typename BA>()
+		-> std::optional<bool> {
+			return ba_has_codegen_witness<Node, BA>;
+		}).value_or(false);
 }
 
 /** @brief A self-contained C++ expression of type `tref` rebuilding the already-trimmed constant @p cst, from the BA owning @p ba_type_id; `nullopt` means no owner contributes one (a build-time error, never a lossy re-parsed fallback). */
 template <typename Node>
 std::optional<std::string> pack_codegen_constant_expr(size_t ba_type_id, tref cst) {
-	return pack_first_owner<Node>([&]<typename BA>()
+	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
 		-> std::optional<std::string> {
 			if constexpr (ba_has_codegen_constant_expr<Node, BA>)
-				if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
-					return ba_descriptor<BA, Node>
-						::codegen_constant_expr(cst);
+				return ba_descriptor<BA, Node>
+					::codegen_constant_expr(cst);
 			return std::nullopt;
 		});
 }
@@ -652,21 +636,17 @@ tref pack_type_tree(const std::string& family,
 	std::optional<unsigned short> param = std::nullopt)
 {
 	tref out = nullptr;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_descriptor_v<Node, BA>) {
-				if (out || family != ba_descriptor<BA, Node>::type_name)
-					return;
-				if constexpr (ba_has_type_tree_for<Node, BA>) {
-					out = param
-						? ba_descriptor<BA, Node>::type_tree_for(*param)
-						: ba_descriptor<BA, Node>::type_tree();
-				} else out = ba_descriptor<BA, Node>::type_tree();
-			}
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_descriptor_v<Node, BA>) {
+			if (out || family != ba_descriptor<BA, Node>::type_name)
+				return;
+			if constexpr (ba_has_type_tree_for<Node, BA>) {
+				out = param
+					? ba_descriptor<BA, Node>::type_tree_for(*param)
+					: ba_descriptor<BA, Node>::type_tree();
+			} else out = ba_descriptor<BA, Node>::type_tree();
+		}
+	});
 	return out;
 }
 
@@ -681,20 +661,16 @@ template <typename Node>
 std::optional<std::pair<std::string, std::optional<unsigned short>>>
 pack_type_family_param(tref type_tree) {
 	std::optional<std::pair<std::string, std::optional<unsigned short>>> out;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_descriptor_v<Node, BA>) {
-				if (out || !ba_descriptor<BA, Node>::owns_type(type_tree))
-					return;
-				std::optional<unsigned short> param;
-				if constexpr (ba_has_type_tree_for<Node, BA>)
-					param = ba_descriptor<BA, Node>::type_param(type_tree);
-				out = {{ba_descriptor<BA, Node>::type_name, param}};
-			}
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_descriptor_v<Node, BA>) {
+			if (out || !ba_descriptor<BA, Node>::owns_type(type_tree))
+				return;
+			std::optional<unsigned short> param;
+			if constexpr (ba_has_type_tree_for<Node, BA>)
+				param = ba_descriptor<BA, Node>::type_param(type_tree);
+			out = {{ba_descriptor<BA, Node>::type_name, param}};
+		}
+	});
 	return out;
 }
 
@@ -709,20 +685,10 @@ pack_type_family_param(tref type_tree) {
  */
 template <typename Node>
 bool pack_type_output_always_satisfiable(size_t ba_type) {
-	if (!ba_type) return false;
-	bool out = false;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is,
-				typename Node::bas_tuple>;
-			if constexpr (ba_output_always_satisfiable_v<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>
-					::owns_type(ba_type))
-						out = true;
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
+	return pack_owner_apply<Node>(ba_type, []<typename BA>()
+		-> std::optional<bool> {
+			return ba_output_always_satisfiable_v<Node, BA>;
+		}).value_or(false);
 }
 
 /**

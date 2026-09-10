@@ -16,40 +16,17 @@ namespace hooks_detail {
  * the third asks `pack_ba_type_has_<mem>_hook` as well.
  */
 #define TAU_HOOKS_DEFINE_WFF_TRY(name, mem) \
-	template <typename node_t, typename BA> \
-	std::optional<tref> try_ba_wff_##name(const tref* ch, tref r, \
-		size_t ba_type) \
-	{ \
-		if (!ba_type) return {}; \
-		if constexpr (!ba_has_descriptor_v<node_t, BA>) return {}; \
-		else { \
-			if (!ba_descriptor<BA, node_t>::owns_type(ba_type)) \
-				return {}; \
-			if constexpr (requires { \
-				ba_wff_hooks<BA, node_t>::mem(ch, r); }) \
-			{ \
-				if (tref out = ba_wff_hooks<BA, node_t>::mem( \
-					ch, r)) return out; \
-			} \
-			return {}; \
-		} \
-	} \
 	template <typename node_t> \
 	std::optional<tref> try_wff_##name(const tref* ch, tref r, \
 		size_t ba_type) \
 	{ \
-		std::optional<tref> out; \
-		[&]<std::size_t... Is>(std::index_sequence<Is...>) { \
-			using pack = typename node_t::bas_tuple; \
-			([&] { \
-				if (out) return; \
-				if (auto x = try_ba_wff_##name<node_t, \
-					std::tuple_element_t<Is, pack>>( \
-					ch, r, ba_type)) out = x; \
-			}(), ...); \
-		}(std::make_index_sequence<std::tuple_size_v< \
-			typename node_t::bas_tuple>>{}); \
-		return out; \
+		return pack_owner_apply<node_t>(ba_type, [&]<typename BA>() \
+			-> std::optional<tref> { \
+				if constexpr (ba_has_##mem##_hook_v<node_t, BA>) \
+					if (tref out = ba_wff_hooks<BA, node_t>::mem( \
+						ch, r)) return out; \
+				return std::nullopt; \
+			}); \
 	}
 
 TAU_HOOKS_DEFINE_WFF_TRY(lt, wff_lt)
