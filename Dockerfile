@@ -41,7 +41,9 @@ ARG BUILD_JOBS=5
 
 # ------------------------------------------------------------
 # base image with system dependencies
-FROM ubuntu:24.04 AS base
+# pinned by digest: an upstream retag of the floating tag invalidates
+# this layer and every one after it, wiping the cvc5/boost deps cache
+FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 AS base
 
 # Install dependencies
 RUN echo "(BUILD) -- Installing dependencies" && \
