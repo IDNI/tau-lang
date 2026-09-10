@@ -118,14 +118,14 @@ TEST_CASE("T4: FV excludes every binder's own variable, functional ones too") {
 	tref x = tau::build_bf_variable("x", 0);
 	tref y = tau::build_bf_variable("y", 0);
 	tref fm = conj(tau::build_bf_eq_0(x), tau::build_bf_eq_0(y));
-	CHECK(ap::fv<node_t>(fm).size() == 2);
+	CHECK(get_free_vars<node_t>(fm).size() == 2);
 	// A formula binder removes its own subscript.
 	tref bound = tau::build_wff_ex(fvar("x"), tau::build_bf_eq_0(x), false);
-	for (tref v : ap::fv<node_t>(bound)) CHECK(!same(v, fvar("x")));
+	for (tref v : get_free_vars<node_t>(bound)) CHECK(!same(v, fvar("x")));
 	// A functional quantifier is a binder too (§1: transparent to the push,
 	// still a binder for FV).
 	tref fex = tau::build_bf_eq_0(tau::build_bf_fex(fvar("x"), x));
-	for (tref v : ap::fv<node_t>(fex)) CHECK(!same(v, fvar("x")));
+	for (tref v : get_free_vars<node_t>(fex)) CHECK(!same(v, fvar("x")));
 	// fv_meets is the same question against a block.
 	CHECK(ap::fv_meets<node_t>(fm, ap::block{ fvar("x") }));
 	CHECK(!ap::fv_meets<node_t>(fm, ap::block{ fvar("z") }));
@@ -138,7 +138,7 @@ TEST_CASE("T5: fv_intersect keeps X's order, not the FV order") {
 	tref y = tau::build_bf_variable("y", 0);
 	tref fm = conj(tau::build_bf_eq_0(x), tau::build_bf_eq_0(y));
 	// The block is ordered outermost first and the narrowing must not
-	// re-order it (§6 key narrowing), whichever way `fv` sorts.
+	// re-order it (§6 key narrowing), whichever way `get_free_vars` sorts.
 	ap::block yx{ fvar("y"), fvar("x") };
 	ap::block got = ap::fv_intersect<node_t>(fm, yx);
 	REQUIRE(got.size() == 2);
@@ -158,31 +158,31 @@ TEST_CASE("T6: the content order is a strict total order on content") {
 	tref a = atom("a"), b = atom("b"), c = atom("c");
 	trefs ns{ a, b, c, neg(a), conj(a, b), tau::_T(), tau::_F() };
 	for (tref x : ns) {
-		CHECK(!ap::content_less<node_t>(x, x));          // irreflexive
+		CHECK(!tau::subtree_less(x, x));          // irreflexive
 		// A node compares equal to itself under any spelling: content
 		// hash and order both ignore the right sibling.
-		CHECK(ap::content_hash<node_t>(x) == ap::content_hash<node_t>(x));
+		CHECK(hash_lcrs_tref<node_t>{}(x) == hash_lcrs_tref<node_t>{}(x));
 	}
 	for (tref x : ns) for (tref y : ns) {
 		if (same(x, y)) {
-			CHECK(!ap::content_less<node_t>(x, y));
-			CHECK(!ap::content_less<node_t>(y, x));
+			CHECK(!tau::subtree_less(x, y));
+			CHECK(!tau::subtree_less(y, x));
 		} else {   // exactly one way round
-			CHECK(ap::content_less<node_t>(x, y)
-				!= ap::content_less<node_t>(y, x));
+			CHECK(tau::subtree_less(x, y)
+				!= tau::subtree_less(y, x));
 		}
 	}
 	for (tref x : ns) for (tref y : ns) for (tref z : ns)
-		if (ap::content_less<node_t>(x, y)
-			&& ap::content_less<node_t>(y, z))
-				CHECK(ap::content_less<node_t>(x, z));
+		if (tau::subtree_less(x, y)
+			&& tau::subtree_less(y, z))
+				CHECK(tau::subtree_less(x, z));
 	// Equal content, different spelling: a member carrying a right sibling
 	// and the same formula standing alone are one element of the order.
 	trefs ms = ap::members<node_t>(conj(a, b));
 	REQUIRE(ms.size() == 2);
-	CHECK(!ap::content_less<node_t>(ms[0], a));
-	CHECK(!ap::content_less<node_t>(a, ms[0]));
-	CHECK(ap::content_hash<node_t>(ms[0]) == ap::content_hash<node_t>(a));
+	CHECK(!tau::subtree_less(ms[0], a));
+	CHECK(!tau::subtree_less(a, ms[0]));
+	CHECK(hash_lcrs_tref<node_t>{}(ms[0]) == hash_lcrs_tref<node_t>{}(a));
 }
 
 // --- the member view and the raw constructors ----------------------------------
@@ -207,7 +207,7 @@ TEST_CASE("T7: canonical_and is order-independent and deduplicates") {
 	trefs ms = ap::members<node_t>(abc);
 	REQUIRE(ms.size() == 3);
 	for (size_t i = 1; i < ms.size(); ++i)
-		CHECK(ap::content_less<node_t>(ms[i - 1], ms[i]));
+		CHECK(tau::subtree_less(ms[i - 1], ms[i]));
 }
 
 TEST_CASE("T8: members flattens both nesting sides and keeps multiplicity") {
@@ -246,8 +246,8 @@ TEST_CASE("T9: the hooks collapse but never reorder (D4)") {
 	// nothing of its own.
 	CHECK(conj(a, tau::_T()) == a);
 	CHECK(disj(a, tau::_F()) == a);
-	CHECK(ap::is_false<node_t>(conj(a, neg(a))));
-	CHECK(ap::is_true<node_t>(disj(a, neg(a))));
+	CHECK(tau::get(conj(a, neg(a))).equals_F());
+	CHECK(tau::get(disj(a, neg(a))).equals_T());
 	CHECK(ap::canonical_and<node_t>(trefs{ a, tau::_T() }) == a);
 	// What they do NOT do: re-order or re-associate. Two spellings of the
 	// same conjunction stay two nodes — which is exactly why canonical_and
@@ -273,8 +273,8 @@ TEST_CASE("T10: complement_of strips a negation rather than doubling it") {
 	// Two calls are the identity, so the joins' unit-elimination test is
 	// symmetric.
 	CHECK(same(ap::complement_of<node_t>(ap::complement_of<node_t>(a)), a));
-	CHECK(ap::is_false<node_t>(ap::complement_of<node_t>(tau::_T())));
-	CHECK(ap::is_true<node_t>(ap::complement_of<node_t>(tau::_F())));
+	CHECK(tau::get(ap::complement_of<node_t>(tau::_T())).equals_F());
+	CHECK(tau::get(ap::complement_of<node_t>(tau::_F())).equals_T());
 }
 
 // --- classification -----------------------------------------------------------
@@ -286,12 +286,11 @@ TEST_CASE("T11: the §1 node classification") {
 	tref eq = tau::build_bf_eq(x, y);
 	tref order = order_atom("x", "y");
 
-	CHECK(ap::is_atom<node_t>(eq));
-	CHECK(ap::is_equation<node_t>(eq));
+	// Atom, equation, ∧/∨-node, binder, reference, temporal operator, T/F
+	// and plain/disjunctive conjunct are library calls (dag.h's vocabulary
+	// block), not tested here; the module's own shapes are.
 	CHECK(!ap::is_order_atom<node_t>(eq));
-	CHECK(ap::is_atom<node_t>(order));
 	CHECK(ap::is_order_atom<node_t>(order));
-	CHECK(!ap::is_equation<node_t>(order));
 
 	CHECK(ap::is_literal<node_t>(a));
 	CHECK(ap::is_literal<node_t>(neg(a)));
@@ -302,40 +301,19 @@ TEST_CASE("T11: the §1 node classification") {
 	CHECK(!ap::is_literal<node_t>(conj(a, b)));
 	CHECK(same(ap::atom_of<node_t>(neg(a)), a));
 	CHECK(same(ap::atom_of<node_t>(a), a));
-
-	CHECK(ap::is_true<node_t>(tau::_T()));
-	CHECK(ap::is_false<node_t>(tau::_F()));
-	CHECK(!ap::is_true<node_t>(a));
-
-	CHECK(ap::is_conjunction<node_t>(conj(a, b)));
-	CHECK(!ap::is_conjunction<node_t>(disj(a, b)));
-	CHECK(ap::is_disjunction<node_t>(disj(a, b)));
-	CHECK(!ap::is_disjunction<node_t>(a));
-
-	CHECK(ap::is_binder<node_t>(tau::build_wff_ex(fvar("x"), a, false)));
-	CHECK(ap::is_binder<node_t>(tau::build_wff_all(fvar("x"), a, false)));
-	CHECK(!ap::is_binder<node_t>(a));
-	CHECK(ap::is_temporal<node_t>(tau::build_wff_always(a)));
-	CHECK(ap::is_temporal<node_t>(tau::build_wff_sometimes(a)));
-	CHECK(!ap::is_temporal<node_t>(a));
-
-	// PLAIN is "not an ∨-node"; DISJUNCTIVE is the complement of that.
-	CHECK(ap::is_plain_conjunct<node_t>(a));
-	CHECK(ap::is_plain_conjunct<node_t>(neg(a)));
-	CHECK(ap::is_plain_conjunct<node_t>(conj(a, b)));
-	CHECK(!ap::is_plain_conjunct<node_t>(disj(a, b)));
-	CHECK(ap::is_disjunctive_conjunct<node_t>(disj(a, b)));
-	CHECK(!ap::is_disjunctive_conjunct<node_t>(a));
+	// Post phase 3 a negative leaf is `¬(f = g)`, a `wff_neg` node, so a
+	// literal is NOT `is_atomic_fm` (inv. 4).
+	CHECK(!is_atomic_fm<node_t>(neg(a)));
 }
 
 TEST_CASE("T11b: a reference is opaque and classifies as one") {
 	// The one shape the builders do not construct directly; parse it.
 	tref ref = tau::get("f(x)", parse_wff());
 	REQUIRE(ref != nullptr);
-	CHECK(ap::is_reference<node_t>(ref));
-	CHECK(!ap::is_atom<node_t>(ref));
+	CHECK(is_child<node_t>(ref, tau::wff_ref));
+	CHECK(!is_atomic_fm<node_t>(ref));
 	CHECK(!ap::is_literal<node_t>(ref));
-	CHECK(ap::is_plain_conjunct<node_t>(ref));
+	CHECK(!is_child<node_t>(ref, tau::wff_or));
 	// Opaque like an atom, whatever its arguments (dag.h).
 	CHECK(ap::formula_size<node_t>(ref) == 1);
 }

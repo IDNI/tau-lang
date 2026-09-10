@@ -243,7 +243,7 @@ size_t mem_size(tref t);
  * BDD-backed term alone (a block variable here is hidden from cofactoring:
  * inside a reference argument or a foreign-typed subterm, including one
  * inside a functional quantifier's body); for a plain term, its `FV`.
- * Sorted like `fv`. It differs from `fv` exactly in the hazard case, a
+ * Sorted like `get_free_vars`. It differs from it exactly in the hazard case, a
  * block variable that is both a decision variable and hidden in a leaf,
  * which is what ELIMINATE_BLOCK's `opaque?` test (§7) asks before any
  * quantification. Returned BY VALUE, not stored: the per-leaf sets are

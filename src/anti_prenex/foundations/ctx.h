@@ -315,7 +315,7 @@ typename table_traits<node, T>::map_t* table_ptr();
 // `bintree<node>::gc()` sweep, which REBUILDS every registered table. Nothing
 // in this module sweeps (the callers are the interpreter's `maybe_gc` and the
 // tests), so a facet reference is good for the length of a run; copy it
-// before any call that can sweep. dag.h states the same rule for `fv`.
+// before any call that can sweep. dag.h states the same rule for `get_free_vars`.
 //
 // `store` and `memoised` come in two forms, chosen by the table's `gated`
 // flag: an unconditional table always has storage and hands out a REFERENCE;

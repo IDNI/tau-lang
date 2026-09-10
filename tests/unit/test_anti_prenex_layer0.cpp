@@ -13,13 +13,13 @@
 //  1. sizes and FV lazily filled, never recomputed: nothing is published at
 //     construction, one query measures every wrapper, a facet is stable
 //     across queries and agrees with the value that fed the enclosing
-//     formula; `fv` is right on module-built nodes and its reference is
+//     formula; `get_free_vars` is right on module-built nodes and its reference is
 //     stable. Both build types: the structural tables are unconditional.
 //  2. cofactors are children: the BDD child at the top, the compose oracle
 //     below it, commutation as nodes, a P-free cofactor plain and out of the
 //     P-touching set. Both build types.
 //  3. substitution capture-safe and untouched-by-one-FV-test: on the
-//     parser's canonical ids, with the reach `atoms` and `fv` promise; the
+//     parser's canonical ids, with the reach `atoms` and `get_free_vars` promise; the
 //     F5 shape (a witness carrying a functional quantifier) pinned as
 //     EXPECTED, repaired by phase 5's canonicalisation (ruling 5, Sep 10
 //     2026). Both build types.
@@ -32,7 +32,7 @@
 //     (BDD_ID term, x) pair (Lucca, Sep 10 2026).
 //
 // Conventions (the brief): a chain member carries a right sibling, so every
-// comparison against a separately built node is by CONTENT; `fv` stores
+// comparison against a separately built node is by CONTENT; `get_free_vars` stores
 // trimmed nodes; a "no row yet" check runs on FRESH content only (hash
 // consing would otherwise find the row an earlier case filled); prepared
 // chains are compared as member SETS, since the content order among
@@ -149,7 +149,7 @@ tref atom2(const char* v, const char* w) {
 		tau::build_bf_variable(v, 0), tau::build_bf_variable(w, 0)));
 }
 
-/// Membership in a set `fv` hands out (sorted by `subtree_less`).
+/// Membership in a set `get_free_vars` hands out (sorted by `subtree_less`).
 bool has(const trefs& sorted, tref v) {
 	return std::binary_search(sorted.begin(), sorted.end(), v,
 		tau::subtree_less);
@@ -166,7 +166,7 @@ tref member_touching(tref chain, const ap::block& yes, const ap::block& no) {
 /// The equation member of `spine` holding `x` — a pin's shape.
 tref pin_on(tref spine, tref x) {
 	return member_where(spine, [x](tref m) {
-		return ap::is_equation<node_t>(m) && ap::fv_meets<node_t>(m, { x });
+		return is_child<node_t>(m, tau::bf_eq) && ap::fv_meets<node_t>(m, { x });
 	});
 }
 
@@ -189,7 +189,7 @@ void churn(const char* prefix, int n) {
 	for (int i = 0; i < n; ++i) {
 		tref a = mk_atom(prefix + std::to_string(i));
 		(void) ap::formula_size<node_t>(a);
-		(void) ap::fv<node_t>(a);
+		(void) get_free_vars<node_t>(a);
 	}
 }
 
@@ -250,27 +250,27 @@ TEST_CASE("FV: right on module-built nodes, by reference, stable across construc
 	tref a = vr("a"), b = vr("b"), c = vr("c");
 	tref phi = ap::canonical_and<node_t>(trefs{
 		wff("x & a = 0"), wff("y & b = 0"), wff("c = 0") });
-	const trefs& fv1 = ap::fv<node_t>(phi);
+	const trefs& fv1 = get_free_vars<node_t>(phi);
 	CHECK(fv1.size() == 5);
 	CHECK(std::is_sorted(fv1.begin(), fv1.end(), tau::subtree_less));
 	for (tref v : { x, y, a, b, c }) CHECK(has(fv1, v));
-	CHECK(&ap::fv<node_t>(phi) == &fv1);             // one row, handed out by reference
+	CHECK(&get_free_vars<node_t>(phi) == &fv1);             // one row, handed out by reference
 	// The chain's set is the union of its members' sets (each its own row).
 	subtree_set<node_t> u;
 	for (tref m : ap::members<node_t>(phi)) {
-		const trefs& mv = ap::fv<node_t>(m);
+		const trefs& mv = get_free_vars<node_t>(m);
 		u.insert(mv.begin(), mv.end());
 	}
 	CHECK(u.size() == 5);
 	for (tref v : fv1) CHECK(u.contains(v));
 	// rewrap removes exactly X, and the rewrapped node's set is its own.
 	tref r = ap::rewrap<node_t>(phi, { x, y });
-	const trefs& fvr = ap::fv<node_t>(r);
+	const trefs& fvr = get_free_vars<node_t>(r);
 	CHECK(fvr.size() == 3);
 	CHECK(!ap::fv_meets<node_t>(r, { x, y }));
 	CHECK(ap::fv_meets<node_t>(r, { z, c }));
 	CHECK(!ap::fv_meets<node_t>(r, { z }));
-	CHECK(ap::fv<node_t>(ap::binder_body<node_t>(r)).size() == 4);   // ∃y φ: x is free again
+	CHECK(get_free_vars<node_t>(ap::binder_body<node_t>(r)).size() == 4);   // ∃y φ: x is free again
 	// fv_intersect keeps X's order (the key narrowing of §6/§7) and returns
 	// trimmed nodes — the same nodes `vr` gives.
 	ap::block got = ap::fv_intersect<node_t>(phi, { y, z, x });
@@ -281,16 +281,16 @@ TEST_CASE("FV: right on module-built nodes, by reference, stable across construc
 	// LIFETIME (ctx.h): filling rows for unrelated nodes in both tables
 	// (rehashes) moves no row.
 	churn("fv_churn_", 300);
-	CHECK(&ap::fv<node_t>(phi) == &fv1);
+	CHECK(&get_free_vars<node_t>(phi) == &fv1);
 	CHECK(fv1.size() == 5);
-	CHECK(&ap::fv<node_t>(r) == &fvr);
+	CHECK(&get_free_vars<node_t>(r) == &fvr);
 }
 
 // --- §5's setup across packages: parsed binders → ctx → prepare_terms ---------------
 
 TEST_CASE("a parsed block through ctx into prepare_terms: inner on top, |·| and FV across D2, ids kept") {
 	tref outer = wff("ex x ex y (x & y & a = 0 && x & b = 0 && c = 0)");
-	REQUIRE(ap::is_binder<node_t>(outer));
+	REQUIRE(is_child_quantifier<node_t>(outer));
 	// The block read off the binders, outermost first (§1), in the spelling
 	// the binder holds: the variable carrying the body as its right sibling.
 	tref x = ap::binder_var<node_t>(outer);
@@ -330,12 +330,12 @@ TEST_CASE("a parsed block through ctx into prepare_terms: inner on top, |·| and
 	CHECK(same(free, wff("c = 0")));
 	CHECK(!has_bdd_id(free));
 	// |·| and FV are invariant across D2's boundary: an atom counts 1
-	// whatever its terms, and `fv` reads the BDD leaves and decision
+	// whatever its terms, and `get_free_vars` reads the BDD leaves and decision
 	// variables alike.
 	CHECK(ap::formula_size<node_t>(body) == 5);
 	CHECK(ap::formula_size<node_t>(prepared) == 5);
-	const trefs& fvp = ap::fv<node_t>(prepared);
-	const trefs& fvb = ap::fv<node_t>(body);
+	const trefs& fvp = get_free_vars<node_t>(prepared);
+	const trefs& fvb = get_free_vars<node_t>(body);
 	REQUIRE(fvp.size() == fvb.size());
 	for (size_t i = 0; i < fvp.size(); ++i) CHECK(same(fvp[i], fvb[i]));
 	CHECK(ap::fv_meets<node_t>(prepared, P));
@@ -389,7 +389,7 @@ TEST_CASE("cofactors under ctx's order are children; a P-free cofactor is plain 
 	tref ga = build_bf_eq_0<node_t>(g);
 	CHECK(ap::formula_size<node_t>(ga) == 1);
 	CHECK(!ap::fv_meets<node_t>(ga, P));
-	CHECK(ap::fv<node_t>(ga).size() == 1);
+	CHECK(get_free_vars<node_t>(ga).size() == 1);
 	// Partially cofactored: still backed on x, in the set, y gone.
 	CHECK(ap::is_bdd_backed<node_t>(fy1));
 	tref hb = build_bf_eq_0<node_t>(fy1);
@@ -399,18 +399,18 @@ TEST_CASE("cofactors under ctx's order are children; a P-free cofactor is plain 
 	CHECK(!ap::fv_meets<node_t>(hb, { y }));
 	CHECK(same_function(fy1, bf("x & a | x' & b"), { x, a, b }));
 	// The §1 classification is invariant across D2's boundary.
-	CHECK(ap::is_atom<node_t>(atom));
-	CHECK(ap::is_equation<node_t>(atom));
+	CHECK(is_atomic_fm<node_t>(atom));
+	CHECK(is_child<node_t>(atom, tau::bf_eq));
 	CHECK(ap::is_literal<node_t>(atom));
 	CHECK(!ap::is_order_atom<node_t>(atom));
-	CHECK(ap::is_plain_conjunct<node_t>(atom));
+	CHECK(!is_child<node_t>(atom, tau::wff_or));
 	CHECK(ap::is_negated_equation<node_t>(neg(atom)));
 	CHECK(ap::is_literal<node_t>(neg(atom)));
 	tref other = ap::prepare_terms<node_t>(wff("x & b = 0"), P, o);
 	tref tree = ap::canonical_or<node_t>(trefs{ neg(atom), neg(other) });
 	CHECK(ap::is_negative_tree<node_t>(tree));
 	CHECK(ap::is_flat_tree<node_t>(tree));
-	CHECK(ap::is_disjunctive_conjunct<node_t>(tree));
+	CHECK(is_child<node_t>(tree, tau::wff_or));
 	CHECK(!ap::is_negative_tree<node_t>(ap::canonical_or<node_t>(trefs{ neg(atom), other })));
 }
 
@@ -466,12 +466,12 @@ TEST_CASE("rewrap over fv_intersect is the D3 key; fold cleans a re-wrapped lost
 	CHECK(ap::rewrap<node_t>(phi, ap::block{ x, y }) == xy);
 	CHECK(ap::formula_size<node_t>(xy) == 5);
 	CHECK(ap::formula_size<node_t>(yx) == 5);
-	CHECK(ap::fv<node_t>(xy).size() == 2);
+	CHECK(get_free_vars<node_t>(xy).size() == 2);
 	CHECK(!ap::fv_meets<node_t>(xy, { x, y }));
 	CHECK(!ap::fv_meets<node_t>(yx, { x, y }));
 	// Inv. 3 may re-wrap a variable the body has since lost; the callers
 	// narrow through fv_intersect first (§6/§7), and phase 5's fold drops
-	// what a re-wrap without narrowing left — through A's `fv`, keeping the
+	// what a re-wrap without narrowing left — through A's `get_free_vars`, keeping the
 	// order of the rest.
 	ap::block X{ x, z, y };
 	tref lost = ap::rewrap<node_t>(phi, X);
@@ -502,7 +502,7 @@ TEST_CASE("canonical chains over prepared atoms and a unit: one node, members as
 	CHECK(ap::members<node_t>(chain).size() == 4);
 	for (tref m : { A, U, C, B }) CHECK(ap::is_member<node_t>(chain, m));
 	CHECK(ap::formula_size<node_t>(chain) == 3 + (1 + 2 + 1 + 1));   // the unit is 2
-	CHECK(ap::fv<node_t>(chain).size() == 4);              // a, b, c, x — the unit's y is bound
+	CHECK(get_free_vars<node_t>(chain).size() == 4);              // a, b, c, x — the unit's y is bound
 	CHECK(ap::fv_meets<node_t>(chain, P));
 	CHECK(!ap::fv_meets<node_t>(chain, { ap::binder_var<node_t>(U) }));
 	// Negative trees over prepared literals, flat and nested.
@@ -566,7 +566,7 @@ TEST_CASE("subst_var: capture-safe on the parser's canonical ids, and the ids st
 	// (prims.h), so a witness that is free at the spine meets no binder on
 	// the path into it — the property the descent into units rides on.
 	tref phi = wff("ex x ex y (x = y && a = 0 && ex z (x & z = 0))");   // a binder's body runs to the right end
-	REQUIRE(ap::is_binder<node_t>(phi));
+	REQUIRE(is_child_quantifier<node_t>(phi));
 	tref x = ap::binder_var<node_t>(phi);
 	tref ex_y = ap::binder_body<node_t>(phi);
 	tref y = ap::binder_var<node_t>(ex_y);
@@ -575,7 +575,7 @@ TEST_CASE("subst_var: capture-safe on the parser's canonical ids, and the ids st
 	CHECK(get_var_name<node_t>(y) == "2");
 	REQUIRE(ap::members<node_t>(S).size() == 3);
 	tref pin = pin_on(S, x);
-	tref unit = member_where(S, ap::is_binder<node_t>);
+	tref unit = member_where(S, is_child_quantifier<node_t>);
 	REQUIRE(pin != nullptr);
 	REQUIRE(unit != nullptr);
 	tref z = ap::binder_var<node_t>(unit);
@@ -585,14 +585,14 @@ TEST_CASE("subst_var: capture-safe on the parser's canonical ids, and the ids st
 	CHECK(ap::fv_meets<node_t>(t, { y }));
 	tref res = ap::subst_var<node_t>(S, x, t, {});
 	CHECK(res != S);
-	const trefs& fvr = ap::fv<node_t>(res);
+	const trefs& fvr = get_free_vars<node_t>(res);
 	CHECK(!has(fvr, x));
 	CHECK(has(fvr, y));
 	CHECK(has(fvr, vr("a")));
 	// The pinning conjunct became y = y and folded through the hooks; the
 	// unit was DESCENDED, its binder kept, its body now holding y.
 	CHECK(ap::members<node_t>(res).size() == 2);
-	tref unit2 = member_where(res, ap::is_binder<node_t>);
+	tref unit2 = member_where(res, is_child_quantifier<node_t>);
 	REQUIRE(unit2 != nullptr);
 	CHECK(same(ap::binder_var<node_t>(unit2), z));
 	CHECK(ap::fv_meets<node_t>(ap::binder_body<node_t>(unit2), { y }));
@@ -641,12 +641,12 @@ TEST_CASE("subst_var with a witness carrying a functional quantifier: the F5 sha
 	REQUIRE(tq != nullptr);
 	REQUIRE(get_var_name<node_t>(tau::get(tq).first()) == "1");
 	tref res = ap::subst_var<node_t>(unit, x, t, {});
-	REQUIRE(ap::is_binder<node_t>(res));
+	REQUIRE(is_child_quantifier<node_t>(res));
 	CHECK(get_var_name<node_t>(ap::binder_var<node_t>(res)) == "1");
 	tref rq = find_kind(res, tau::bf_fall);
 	REQUIRE(rq != nullptr);
 	CHECK(get_var_name<node_t>(tau::get(rq).first()) == "1");
-	CHECK(ap::fv<node_t>(res).size() == 1);
+	CHECK(get_free_vars<node_t>(res).size() == 1);
 	CHECK(ap::fv_meets<node_t>(res, { vr("q5") }));
 	CHECK(!ap::fv_meets<node_t>(res, { x }));
 	tref canon = ap::canonicalise_binder_ids<node_t>(res);
@@ -654,7 +654,7 @@ TEST_CASE("subst_var with a witness carrying a functional quantifier: the F5 sha
 	CHECK(get_var_name<node_t>(ap::binder_var<node_t>(canon)) == "2");
 	CHECK(get_var_name<node_t>(tau::get(find_kind(canon, tau::bf_fall)).first()) == "1");
 	CHECK(ap::canonicalise_binder_ids<node_t>(canon) == canon);
-	CHECK(ap::fv<node_t>(canon).size() == 1);
+	CHECK(get_free_vars<node_t>(canon).size() == 1);
 }
 
 TEST_CASE("subst_var: a node without the variable is returned untouched, spelling and all") {
@@ -689,7 +689,7 @@ TEST_CASE("atoms vs fv on a unit: [atm ↦ T/F] is unit-opaque, [x ← t] descen
 	tref phi = ap::canonical_and<node_t>(trefs{ A, U, B });
 	REQUIRE(ap::members<node_t>(phi).size() == 3);
 	// A's reach: through the unit, minus its own variable.
-	CHECK(ap::fv<node_t>(phi).size() == 3);
+	CHECK(get_free_vars<node_t>(phi).size() == 3);
 	CHECK(ap::fv_meets<node_t>(phi, { x }));
 	CHECK(!ap::fv_meets<node_t>(phi, { ap::binder_var<node_t>(U) }));
 	// C's reach: the unit is opaque (§4).
@@ -714,13 +714,13 @@ TEST_CASE("atoms vs fv on a unit: [atm ↦ T/F] is unit-opaque, [x ← t] descen
 	CHECK(!ap::is_member<node_t>(dropped, A));
 	CHECK(ap::is_member<node_t>(dropped, U));
 	CHECK(ap::is_member<node_t>(dropped, B));
-	CHECK(ap::is_false<node_t>(ap::subst_atom<node_t>(phi, A, false)));
+	CHECK(tau::get(ap::subst_atom<node_t>(phi, A, false)).equals_F());
 	// The variable substitution descends into the unit and leaves the
 	// vocabulary as it was.
 	tref res = ap::subst_var<node_t>(phi, x, bf("z"), {});
 	CHECK(res != phi);
 	CHECK(!ap::fv_meets<node_t>(res, { x }));
-	tref unit2 = member_where(res, ap::is_binder<node_t>);
+	tref unit2 = member_where(res, is_child_quantifier<node_t>);
 	REQUIRE(unit2 != nullptr);
 	CHECK(ap::fv_meets<node_t>(ap::binder_body<node_t>(unit2), { vr("z") }));
 	CHECK(ap::atoms<node_t>(res).size() == 2);
@@ -744,7 +744,7 @@ TEST_CASE("subst_var reaches a reference's arguments and re-simplifies them") {
 	// u1), the function u1·u2, the symbol untouched.
 	tref t2 = bf("u1 & (u1' | u2)");
 	tref res2 = ap::subst_var<node_t>(phi, x, t2, {});
-	tref ref2 = member_where(res2, ap::is_reference<node_t>);
+	tref ref2 = member_where(res2, is_child<node_t, tau::wff_ref>);
 	REQUIRE(ref2 != nullptr);
 	tref arg2 = find_kind(ref2, tau::ref_arg);
 	REQUIRE(arg2 != nullptr);
@@ -774,12 +774,12 @@ TEST_CASE("subst_var under the live order: compose on the block variable, the sa
 	REQUIRE(mb.size() == 3);
 	REQUIRE(mp.size() == 3);
 	for (tref m : mb) {
-		if (ap::is_binder<node_t>(m)) {
+		if (is_child_quantifier<node_t>(m)) {
 			// The unit is opaque to prepare_terms, so its atom is plain
 			// on both sides; compare the rewritten bodies as functions.
 			tref w = ap::binder_var<node_t>(m);
 			bool found = false;
-			for (tref n : mp) if (ap::is_binder<node_t>(n))
+			for (tref n : mp) if (is_child_quantifier<node_t>(n))
 				found = same_function(
 					ap::term_of<node_t>(ap::binder_body<node_t>(m), {}),
 					ap::term_of<node_t>(ap::binder_body<node_t>(n), {}),
@@ -787,10 +787,10 @@ TEST_CASE("subst_var under the live order: compose on the block variable, the sa
 			CHECK(found);
 			continue;
 		}
-		REQUIRE(ap::is_atom<node_t>(m));
+		REQUIRE(is_atomic_fm<node_t>(m));
 		CHECK(ap::is_bdd_backed<node_t>(sides(m).first));      // y is still a decision variable
 		bool found = false;
-		for (tref n : mp) if (ap::is_atom<node_t>(n))
+		for (tref n : mp) if (is_atomic_fm<node_t>(n))
 			found = found || same_function(ap::term_of<node_t>(m, o),
 				ap::term_of<node_t>(n, {}), { y, z, a, b });
 		CHECK(found);
@@ -807,7 +807,7 @@ TEST_CASE("subst_var rewrites a shared subtree once: the formula-argument count 
 	tref x = vr("x"), z = vr("z");
 	tref psi = wff("x & w1 = 0");
 	tref R = tau::get(tau::wff, tau::get(tau::wff_ref, ref_with_formula_arg(bf("x"), psi)));
-	REQUIRE(ap::is_reference<node_t>(R));
+	REQUIRE(is_child<node_t>(R, tau::wff_ref));
 	tref S = ap::canonical_and<node_t>(trefs{ wff("x & w2 = 0"), R });
 	tref phi = ap::canonical_or<node_t>(trefs{
 		ap::canonical_and<node_t>(trefs{ S, wff("w3 = 0") }),
@@ -824,7 +824,7 @@ TEST_CASE("subst_var rewrites a shared subtree once: the formula-argument count 
 	for (tref d : ap::members<node_t>(res)) {
 		bool found = false;
 		for (tref m : ap::members<node_t>(d))
-			if (ap::is_reference<node_t>(m) && ap::fv_meets<node_t>(m, { z }))
+			if (is_child<node_t>(m, tau::wff_ref) && ap::fv_meets<node_t>(m, { z }))
 				found = true;
 		CHECK(found);
 	}
@@ -843,7 +843,7 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	CHECK(sz == 5);
 	const size_t* row = size_row(r);
 	REQUIRE(row != nullptr);
-	const trefs& fvr = ap::fv<node_t>(r);
+	const trefs& fvr = get_free_vars<node_t>(r);
 	const trefs fv_copy = fvr;
 	CHECK(fv_copy.size() == 2);
 	// Filling many rows in both tables (rehashes) moves nothing (ctx.h,
@@ -851,7 +851,7 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	churn("gc_churn_", 600);
 	CHECK(size_row(r) == row);
 	CHECK(*row == sz);
-	CHECK(&ap::fv<node_t>(r) == &fvr);
+	CHECK(&get_free_vars<node_t>(r) == &fvr);
 	CHECK(fvr == fv_copy);
 	// A sweep as the interpreter runs one (interpreter.tmpl.h:964-968): the
 	// BDD store holds its decision variables and leaf terms as raw trefs and
@@ -873,7 +873,7 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	REQUIRE(row2 != nullptr);
 	CHECK(*row2 == sz);
 	CHECK(ap::formula_size<node_t>(r) == sz);
-	CHECK(ap::fv<node_t>(r) == fv_copy);
+	CHECK(get_free_vars<node_t>(r) == fv_copy);
 	tref l = sides(member_touching(ap::binder_body<node_t>(ap::binder_body<node_t>(r)), P, {})).first;
 	CHECK(th::key_of(l) == key_before);      // the same BDD_ID node, so the same entry
 	CHECK(ap::is_bdd_backed<node_t>(l));

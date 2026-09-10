@@ -30,7 +30,6 @@
 // heuristics header must be included through normal_forms.h, which
 // declares what its body uses before the body.
 #include "normal_forms.h"
-#include "dag.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -44,7 +43,7 @@ template <NodeType node> using thandle = term_handle<node>;
 template <NodeType node>
 bool touches(tref t, const var_order<node>& order) {
 	if (order.empty()) return false;
-	for (tref v : fv<node>(t)) if (order.contains(v)) return true;
+	for (tref v : get_free_vars<node>(t)) if (order.contains(v)) return true;
 	return false;
 }
 
@@ -285,7 +284,7 @@ tref subst_plain(tref f, tref x, tref t,
 		if (parent && tau::get(parent).is(tau::ref_arg)
 			&& (tn.is(tau::bf) || tn.is(tau::wff)))
 		{
-			const trefs& vars = fv<node>(n);
+			const trefs& vars = get_free_vars<node>(n);
 			if (!std::binary_search(vars.begin(), vars.end(), x, tau::subtree_less))
 				return n;
 			tref arg = rewriter::replace<node>(n, bx, t);
@@ -443,7 +442,7 @@ tref functional_quantifier(binder kind, const block& Y, tref f) {
 	if (tau::get(f).equals_0() || tau::get(f).equals_1()) return f;
 	// Only the variables actually free in `f` (a binder over an absent
 	// variable is degenerate), in content order, deduplicated.
-	const trefs& vars = fv<node>(f);
+	const trefs& vars = get_free_vars<node>(f);
 	trefs ys;
 	for (tref y : Y) {
 		y = tau::trim_right_sibling(y);
@@ -490,7 +489,7 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 	x = tau::trim_right_sibling(x);
 	DBG(assert(tau::get(x).is(tau::variable));)
 	{
-		const trefs& vars = fv<node>(f);
+		const trefs& vars = get_free_vars<node>(f);
 		if (!std::binary_search(vars.begin(), vars.end(), x, tau::subtree_less))
 			return f;
 	}
@@ -504,7 +503,7 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 	// 1. the hidden occurrences, inside the leaves — on the ORIGINAL
 	//    leaves, so an `x` inside `t` is not substituted again;
 	auto leaf_subst = [&](tref leaf) -> tref {
-		const trefs& vars = fv<node>(leaf);
+		const trefs& vars = get_free_vars<node>(leaf);
 		if (!std::binary_search(vars.begin(), vars.end(), x, tau::subtree_less))
 			return leaf;
 		return subst_plain<node>(leaf, x, t_plain, simplify_formula);
@@ -646,7 +645,7 @@ trefs leaf_fv(tref f) {
 	using namespace terms_detail;
 	using tau = tree<node>;
 	f = tau::trim_right_sibling(f);
-	if (!is_bdd_backed<node>(f)) return fv<node>(f);
+	if (!is_bdd_backed<node>(f)) return get_free_vars<node>(f);
 	// NEW over `get_free_tau_vars` (ground rule 9): that worker merges the
 	// FV of EVERY node's variable, decision variables included, which is
 	// `fv(term)`; the leaf hazard wants the leaves alone. Not stored: the
@@ -656,7 +655,7 @@ trefs leaf_fv(tref f) {
 	subtree_set<node> merged;
 	auto collect = [&](bref<node> x, bool leaf) {
 		if (leaf) {
-			const trefs& vars = fv<node>(leaf_term<node>(x));
+			const trefs& vars = get_free_vars<node>(leaf_term<node>(x));
 			merged.insert(vars.begin(), vars.end());
 		}
 		return true;

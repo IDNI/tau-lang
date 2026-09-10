@@ -23,7 +23,7 @@
  *
  * SPINE nodes — a `wff` wrapping the same connective as its parent operator
  * node, either nesting side — are transparent: entered unconditionally,
- * never asked for a facet (`fv` and `atoms` publish every root they are
+ * never asked for a facet (`get_free_vars` and `atoms` publish every root they are
  * asked about, and a k-chain has k spine nodes with O(k) sets each), never
  * given a memo entry or an `atoms_memo` row; the chain top folds them
  * through `members`. A spine node met later STANDALONE is entered again
@@ -61,15 +61,15 @@ bool is_spine(tref n, tref parent) {
 	using tau = tree<node>;
 	if (!parent) return false;
 	const auto& p = tau::get(parent);
-	if (p.is(tau::wff_and)) return is_conjunction<node>(n);
-	if (p.is(tau::wff_or))  return is_disjunction<node>(n);
+	if (p.is(tau::wff_and)) return is_child<node>(n, tau::wff_and);
+	if (p.is(tau::wff_or))  return is_child<node>(n, tau::wff_or);
 	return false;
 }
 
 /// `x ∈ FV(n)`: the occurrence guard of `[x ← t]`, one cached test (§10).
 template <NodeType node>
 bool has_free(tref n, tref x) {
-	const trefs& vars = fv<node>(n);
+	const trefs& vars = get_free_vars<node>(n);
 	return std::binary_search(vars.begin(), vars.end(), x,
 		tree<node>::subtree_less);
 }
@@ -83,13 +83,14 @@ bool has_free(tref n, tref x) {
 /// identity; nothing is re-shaped for its own sake).
 template <NodeType node, typename Result>
 tref rebuild_chain(tref n, Result& result) {
-	const bool conj = is_conjunction<node>(n);
+	using tau = tree<node>;
+	const bool conj = is_child<node>(n, tau::wff_and);
 	trefs out;
 	bool changed = false;
 	for (tref m : members<node>(n)) {
 		tref r = result(m);
 		changed |= r != m;
-		if (conj ? is_conjunction<node>(r) : is_disjunction<node>(r))
+		if (conj ? is_child<node>(r, tau::wff_and) : is_child<node>(r, tau::wff_or))
 			for (tref mm : members<node>(r)) out.push_back(mm);
 		else out.push_back(r);
 	}
@@ -155,8 +156,8 @@ tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
 	DBG(assert(tau::get(phi).is(tau::wff));)
 	if (!has_free<node>(phi, x)) return phi;
 #ifdef DEBUG
-	// A COPY: `fv` hands out a reference into get_free_vars' table.
-	const trefs t_vars = fv<node>(t);
+	// A COPY: `get_free_vars` hands out a reference into its table.
+	const trefs t_vars = get_free_vars<node>(t);
 	auto binds_t_var = [&t_vars](tref v) {
 		return std::binary_search(t_vars.begin(), t_vars.end(),
 			tau::trim_right_sibling(v), tau::subtree_less);
@@ -208,13 +209,13 @@ tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
 			return false;
 		}
 		if (!tm.is(tau::wff)) return true;
-		if (is_atom<node>(m)) {
+		if (is_atomic_fm<node>(m)) {
 			tref r = rewrite_atom(m);
 			if (r != m) memo.emplace(m, r);
 			return false;
 		}
-		if (is_temporal<node>(m)) return false;
-		DBG(if (is_binder<node>(m))
+		if (is_child_temporal_quantifier<node>(m)) return false;
+		DBG(if (is_child_quantifier<node>(m))
 			assert(!binds_t_var(binder_var<node>(m)));)
 		return true;
 	};
@@ -226,7 +227,7 @@ tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
 		const tau& tm = tau::get(m);
 		if (tm.is(tau::wff)) {
 			if (memo.contains(m) || is_spine<node>(m, parent)) return;
-			tref r = (is_conjunction<node>(m) || is_disjunction<node>(m))
+			tref r = (is_child<node>(m, tau::wff_and) || is_child<node>(m, tau::wff_or))
 				? rebuild_chain<node>(m, result)
 				: rebuild_generic<node>(m, result);
 			if (r != m) memo.emplace(m, r);
@@ -259,7 +260,7 @@ tref subst_atom(tref phi, tref atm, bool value) {
 	using namespace subst_detail;
 	DBG(assert(phi != nullptr && atm != nullptr);)
 	atm = tau::trim_right_sibling(atm);
-	DBG(assert(is_atom<node>(atm));)
+	DBG(assert(is_atomic_fm<node>(atm));)
 	DBG(assert(tau::get(phi).is(tau::wff));)
 	// The guard's first call fills atoms_memo for every non-spine wrapper in
 	// the reach below `phi`, so every later guard is a lookup and a binary
@@ -280,7 +281,7 @@ tref subst_atom(tref phi, tref atm, bool value) {
 	// An admitted atom's vocabulary is itself, so it IS `atm` — compared by
 	// content: the atom as it occurs, never re-spelled (§3).
 	auto visitor = [&](tref m) -> bool {
-		if (!tau::get(m).is(tau::wff) || !is_atom<node>(m)) return true;
+		if (!tau::get(m).is(tau::wff) || !is_atomic_fm<node>(m)) return true;
 		if (tau::subtree_equals(m, atm)) memo.emplace(m, cst);
 		return false;
 	};
@@ -290,7 +291,7 @@ tref subst_atom(tref phi, tref atm, bool value) {
 		const tau& tm = tau::get(m);
 		if (tm.is(tau::wff)) {
 			if (memo.contains(m) || is_spine<node>(m, parent)) return;
-			tref r = (is_conjunction<node>(m) || is_disjunction<node>(m))
+			tref r = (is_child<node>(m, tau::wff_and) || is_child<node>(m, tau::wff_or))
 				? rebuild_chain<node>(m, result)
 				: rebuild_generic<node>(m, result);
 			if (r != m) memo.emplace(m, r);
@@ -329,8 +330,8 @@ const trefs& atoms(tref n) {
 		if (!tm.is(tau::wff) || is_spine<node>(m, parent)) return;
 		if (find<node, table::atoms_memo>(m)) return;
 		trefs items;
-		if (is_atom<node>(m)) items.push_back(tau::trim_right_sibling(m));
-		else if (is_conjunction<node>(m) || is_disjunction<node>(m)) {
+		if (is_atomic_fm<node>(m)) items.push_back(tau::trim_right_sibling(m));
+		else if (is_child<node>(m, tau::wff_and) || is_child<node>(m, tau::wff_or)) {
 			// Every member is a non-spine wrapper of the reach, filled
 			// before its chain top.
 			subtree_set<node> merged;

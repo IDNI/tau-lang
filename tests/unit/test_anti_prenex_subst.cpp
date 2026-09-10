@@ -91,7 +91,7 @@ tref reference(const char* name, tref arg) {
 }
 
 bool in_fv(tref n, tref v) {
-	const trefs& vars = ap::fv<node_t>(n);
+	const trefs& vars = get_free_vars<node_t>(n);
 	return std::binary_search(vars.begin(), vars.end(), v, tau::subtree_less);
 }
 
@@ -107,13 +107,13 @@ TEST_CASE("subst_var: an x-free formula is the same tref, and so is an x-free me
 	CHECK(ap::subst_var<node_t>(phi, x, bf("y"), {}) == phi);
 
 	tref psi = wff("x = 0 && (a = 0 || b = 0)");
-	tref d = member_where(psi, ap::is_disjunction<node_t>);
+	tref d = member_where(psi, is_child<node_t, tau::wff_or>);
 	REQUIRE(d != nullptr);
 	tref r = ap::subst_var<node_t>(psi, x, bf("y"), {});
 	CHECK(r != psi);
 	// The untouched member is reused, not rebuilt: pointer identity.
-	CHECK(member_where(r, ap::is_disjunction<node_t>) == d);
-	CHECK(same(member_where(r, ap::is_atom<node_t>), wff("y = 0")));
+	CHECK(member_where(r, is_child<node_t, tau::wff_or>) == d);
+	CHECK(same(member_where(r, is_atomic_fm<node_t>), wff("y = 0")));
 	CHECK(!in_fv(r, x));
 }
 
@@ -125,7 +125,7 @@ TEST_CASE("subst_atom: an atom that is not reachable leaves the formula untouche
 	CHECK(ap::subst_atom<node_t>(only, wff("a = 0"), false) == only);
 	// An x-free member of a rewritten chain keeps its tref too.
 	tref psi = wff("a = 0 && (b = 0 || c = 0)");
-	tref d = member_where(psi, ap::is_disjunction<node_t>);
+	tref d = member_where(psi, is_child<node_t, tau::wff_or>);
 	tref r = ap::subst_atom<node_t>(psi, wff("a = 0"), true);
 	CHECK(r == d); // T ∧ d → d: the whole result IS the untouched member
 }
@@ -138,15 +138,15 @@ TEST_CASE("subst_var: descends into a unit on the TRY_WITNESS_DEEP shape, no ren
 	// witness (a variable bound ABOVE the site) is what condition (c) of
 	// TRY_WITNESS_DEEP licenses: FV(t) = {2, a} meets no binder on the path.
 	tref phi = wff("ex x ex y (x = y & a && all z (x & z = 0))");
-	REQUIRE(ap::is_binder<node_t>(phi));
+	REQUIRE(is_child_quantifier<node_t>(phi));
 	tref x3 = tau::trim_right_sibling(ap::binder_var<node_t>(phi));
 	tref inner = ap::binder_body<node_t>(phi);
-	REQUIRE(ap::is_binder<node_t>(inner));
+	REQUIRE(is_child_quantifier<node_t>(inner));
 	tref y2 = tau::trim_right_sibling(ap::binder_var<node_t>(inner));
 	tref spine = ap::binder_body<node_t>(inner);
-	REQUIRE(ap::is_conjunction<node_t>(spine));
-	tref pin  = member_where(spine, ap::is_atom<node_t>);
-	tref unit = member_where(spine, ap::is_binder<node_t>);
+	REQUIRE(is_child<node_t>(spine, tau::wff_and));
+	tref pin  = member_where(spine, is_atomic_fm<node_t>);
+	tref unit = member_where(spine, is_child_quantifier<node_t>);
 	REQUIRE(pin != nullptr);
 	REQUIRE(unit != nullptr);
 	tref z1 = tau::trim_right_sibling(ap::binder_var<node_t>(unit));
@@ -155,11 +155,11 @@ TEST_CASE("subst_var: descends into a unit on the TRY_WITNESS_DEEP shape, no ren
 	tref r = ap::subst_var<node_t>(spine, x3, t, {});
 	// The pin became 2·a = 2·a, folded to T by the hooks and left the chain;
 	// the unit was entered and rebuilt with the SAME bound variable.
-	REQUIRE(ap::is_binder<node_t>(r));
+	REQUIRE(is_child_quantifier<node_t>(r));
 	CHECK(ap::binder_kind<node_t>(r) == ap::binder::all);
 	CHECK(same(ap::binder_var<node_t>(r), z1));
 	tref body = ap::binder_body<node_t>(r);
-	REQUIRE(ap::is_atom<node_t>(body));
+	REQUIRE(is_atomic_fm<node_t>(body));
 	CHECK(same_function(sides(body).first,
 		build_bf_and<node_t>(t, tau::get(tau::bf, z1)), { y2, vr("a"), z1 }));
 	// x is gone, the inner variable is still bound, the outer one is free here.
@@ -190,7 +190,7 @@ TEST_CASE("subst_var: enters a unit whose body holds x; a free t under a nested 
 TEST_CASE("[atm ↦ T/F] treats a unit as an opaque leaf") {
 	tref a = wff("a = 0");
 	tref phi = wff("a = 0 && ex z (a = 0 && z = 0)");
-	tref u = member_where(phi, ap::is_binder<node_t>);
+	tref u = member_where(phi, is_child_quantifier<node_t>);
 	REQUIRE(u != nullptr);
 	tref s = ap::subst_atom<node_t>(phi, a, true);
 	CHECK(s == u);                    // T ∧ unit → the unit, the SAME tref
@@ -199,7 +199,7 @@ TEST_CASE("[atm ↦ T/F] treats a unit as an opaque leaf") {
 	// The same unit under [x ← t] IS entered (the one licensed rewrite).
 	tref z1 = tau::trim_right_sibling(ap::binder_var<node_t>(u));
 	tref r = ap::subst_var<node_t>(phi, vr("a"), bf("b"), {});
-	tref ru = member_where(r, ap::is_binder<node_t>);
+	tref ru = member_where(r, is_child_quantifier<node_t>);
 	REQUIRE(ru != nullptr);
 	CHECK(ru != u);
 	CHECK(same(ap::binder_var<node_t>(ru), z1));
@@ -213,7 +213,7 @@ TEST_CASE("subst_var: a shared reference argument is re-simplified exactly once"
 	tref x = vr("x");
 	tref psi = wff("x = 0 && b = 0");
 	tref R = reference("f", psi);
-	REQUIRE(ap::is_reference<node_t>(R));
+	REQUIRE(is_child<node_t>(R, tau::wff_ref));
 	REQUIRE(in_fv(R, x));
 	tref p = wff("p = 0"), q = wff("q = 0");
 	tref phi = tau::build_wff_or(tau::build_wff_and(R, p), tau::build_wff_and(R, q));
@@ -256,18 +256,18 @@ TEST_CASE("subst_var: a reference's term argument goes through subst_term and si
 	tref x = vr("x");
 	tref phi = wff("f(x & z) && x = 0");
 	tref r = ap::subst_var<node_t>(phi, x, bf("z'"), {});
-	tref ref = member_where(r, ap::is_reference<node_t>);
+	tref ref = member_where(r, is_child<node_t, tau::wff_ref>);
 	REQUIRE(ref != nullptr);
 	tref arg = find_kind(ref, tau::ref_arg);
 	REQUIRE(arg != nullptr);
 	CHECK(tau::get(arg)[0].equals_0());          // z′·z → 0, re-simplified
 	CHECK(same(find_kind(ref, tau::sym), find_kind(phi, tau::sym)));
-	CHECK(same(member_where(r, ap::is_atom<node_t>), wff("z' = 0")));
+	CHECK(same(member_where(r, is_atomic_fm<node_t>), wff("z' = 0")));
 	// An argument without x: the reference is the same tref.
 	tref g = wff("g(y) && x = 0");
-	tref gm = member_where(g, ap::is_reference<node_t>);
+	tref gm = member_where(g, is_child<node_t, tau::wff_ref>);
 	CHECK(member_where(ap::subst_var<node_t>(g, x, bf("z"), {}),
-		ap::is_reference<node_t>) == gm);
+		is_child<node_t, tau::wff_ref>) == gm);
 	// A reference inside an ATOM's term is package B's business and folds too.
 	tref s = ap::subst_var<node_t>(wff("x & r(x & z) = 0"), x, bf("z'"), {});
 	tref sa = find_kind(s, tau::ref_arg);
@@ -288,7 +288,7 @@ TEST_CASE("the result of a rewrite is a canonical chain: sorted, deduplicated, l
 	CHECK(std::is_sorted(ms.begin(), ms.end(), tau::subtree_less));
 	// Left-nested: the right operand of the top node is a member.
 	tref right = tau::get(tau::get(r).first()).second();
-	CHECK(!ap::is_conjunction<node_t>(right));
+	CHECK(!is_child<node_t>(right, tau::wff_and));
 	// Two members that become equal collapse to one.
 	CHECK(same(ap::subst_var<node_t>(wff("x = 0 && y = 0"), x, bf("y"), {}),
 		wff("y = 0")));
@@ -315,7 +315,7 @@ TEST_CASE("subst_var: atoms are rewritten through subst_term, constants fold, no
 	// What no hook folds stays: the deep folding is the caller's SIMPLIFY.
 	tref z = vr("z");
 	tref r = ap::subst_var<node_t>(wff("x & y = 0"), x, bf("z'"), {});
-	REQUIRE(ap::is_atom<node_t>(r));
+	REQUIRE(is_atomic_fm<node_t>(r));
 	CHECK(find_kind(sides(r).first, tau::bf_neg) != nullptr);
 	CHECK(same_function(sides(r).first, bf("z' & y"), { y, z }));
 	// A negated atom keeps its negation; a negated decided atom folds.
@@ -337,7 +337,7 @@ TEST_CASE("subst_var: phase 4 — BDD-backed sides compose under the live order"
 	CHECK(member_where(r, is_z) == plain);        // the x-free atom: same tref
 	tref e = member_where(r, not_z);
 	REQUIRE(e != nullptr);
-	REQUIRE(ap::is_atom<node_t>(e));
+	REQUIRE(is_atomic_fm<node_t>(e));
 	CHECK(!ap::is_bdd_backed<node_t>(sides(e).first)); // no decision variable left
 	CHECK(same_function(sides(e).first, bf("z' & y"), { y, z }));
 	// A BDD-backed witness composes on the decision variable.
@@ -347,7 +347,7 @@ TEST_CASE("subst_var: phase 4 — BDD-backed sides compose under the live order"
 	tref t = sides(ap::prepare_terms<node_t>(wff("w & y = 0"), Q, oq)).first;
 	REQUIRE(ap::is_bdd_backed<node_t>(t));
 	tref s = ap::subst_var<node_t>(f, x, t, oq);
-	REQUIRE(ap::is_atom<node_t>(s));
+	REQUIRE(is_atomic_fm<node_t>(s));
 	CHECK(ap::is_bdd_backed<node_t>(sides(s).first));
 	CHECK(same_function(sides(s).first, bf("w & y & z"), { x, w, y, z }));
 	CHECK(!has_bdd_id(ap::finish_terms<node_t>(s)));
@@ -373,7 +373,7 @@ TEST_CASE("an order atom is rebuilt through the hooks (ruling 2)") {
 	}
 	REQUIRE(ap::is_order_atom<node_t>(bl));
 	tref rb = ap::subst_var<node_t>(bl, tau::trim(bx), bz, {});
-	CHECK(ap::is_equation<node_t>(rb));
+	CHECK(is_child<node_t>(rb, tau::bf_eq));
 	CHECK(same(rb, tau::build_bf_eq_0(build_bf_and<node_t>(bz, build_bf_neg<node_t>(by)))));
 }
 
@@ -382,7 +382,7 @@ TEST_CASE("a pre-NNF shape is rebuilt generically through the hooks (ruling 3)")
 	// The parser desugars `<->` and `->` into ∧/∨ before anything reaches the
 	// module; the chains then come back canonical.
 	tref eq = wff("x = 0 <-> b = 0");
-	REQUIRE(ap::is_conjunction<node_t>(eq));
+	REQUIRE(is_child<node_t>(eq, tau::wff_and));
 	tref r = ap::subst_var<node_t>(eq, x, bf("y"), {});
 	CHECK(same(r, ap::canonical_and<node_t>({
 		ap::canonical_or<node_t>({ wff("!(y = 0)"), wff("b = 0") }),
@@ -409,13 +409,13 @@ TEST_CASE("temporal operators are opaque to both substitutions (ruling 1)") {
 	tref x = vr("x");
 	tref a = wff("x = 0");
 	tref alw = tau::build_wff_always(a);
-	REQUIRE(ap::is_temporal<node_t>(alw));
+	REQUIRE(is_child_temporal_quantifier<node_t>(alw));
 	REQUIRE(in_fv(alw, x));
 	CHECK(ap::subst_var<node_t>(alw, x, bf("y"), {}) == alw);
 	tref phi = tau::build_wff_and(alw, wff("x = 0 && b = 0"));
 	tref r = ap::subst_var<node_t>(phi, x, bf("y"), {});
-	CHECK(member_where(r, ap::is_temporal<node_t>) == alw);
-	CHECK(same(member_where(r, ap::is_atom<node_t>), wff("y = 0")));
+	CHECK(member_where(r, is_child_temporal_quantifier<node_t>) == alw);
+	CHECK(same(member_where(r, is_atomic_fm<node_t>), wff("y = 0")));
 	CHECK(ap::atoms<node_t>(alw).empty());
 	tref psi = tau::build_wff_and(alw, wff("c = 0"));
 	CHECK(ap::subst_atom<node_t>(psi, a, true) == psi);

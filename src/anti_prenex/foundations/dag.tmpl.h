@@ -4,15 +4,15 @@
  * @file dag.tmpl.h
  * @brief Template implementations for dag.h (package A). Included by dag.h.
  *
- * Everything here is a facet of the existing hash-consed tree, so the
- * implementations are wrappers over what the codebase already has:
- * `get_free_vars` for FV, `hash_lcrs_tref` and `subtree_less` for the content
- * hash and the content order, `get_leaves` for the D1 member view,
- * `subtree_vec_contains` for the membership scan, `build_wff_*` for the raw
- * constructors, the `is_child_*` family for the wrapper-form classification,
- * and `pre_order` (whose `up` callback is the post-order visit) for the two
- * walks that fill a table. The three cached facets reach their tables through
- * ctx.h's `find`/`store` and never spell `#ifdef TAU_CACHE`.
+ * Everything here is a facet of the existing hash-consed tree, built from
+ * what the codebase already has: `get_free_vars` for FV, `get_leaves` for the
+ * D1 member view, `subtree_vec_contains` for the membership scan,
+ * `build_wff_*` for the raw constructors, the `is_child_*` family for the
+ * wrapper-form classification, and `pre_order` (whose `up` callback is the
+ * post-order visit) for the two walks that fill a table. A §1 term that IS
+ * one library call is not re-declared (dag.h's VOCABULARY block lists them).
+ * The three cached facets reach their tables through ctx.h's `find`/`store`
+ * and never spell `#ifdef TAU_CACHE`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__DAG_TMPL_H__
@@ -24,7 +24,7 @@
 
 namespace idni::tau_lang::anti_prenexing {
 
-// --- sizes, free variables, hash ---------------------------------------------
+// --- size and free-variable intersections ---------------------------------------
 
 namespace detail {
 
@@ -49,8 +49,8 @@ bool size_structural(tref n) {
 template <NodeType node>
 bool size_has_formula_children(tref n) {
 	using tau = tree<node>;
-	return is_conjunction<node>(n) || is_disjunction<node>(n)
-		|| is_binder<node>(n) || is_child<node>(n, tau::wff_neg);
+	return is_child<node>(n, tau::wff_and) || is_child<node>(n, tau::wff_or)
+		|| is_child_quantifier<node>(n) || is_child<node>(n, tau::wff_neg);
 }
 
 } // namespace detail
@@ -103,14 +103,9 @@ size_t formula_size(tref n) {
 }
 
 template <NodeType node>
-const trefs& fv(tref n) {
-	return get_free_vars<node>(n);
-}
-
-template <NodeType node>
 bool fv_meets(tref n, const block& X) {
 	using tau = tree<node>;
-	const trefs& vars = fv<node>(n);
+	const trefs& vars = get_free_vars<node>(n);
 	if (vars.empty()) return false;
 	for (tref x : X)
 		if (std::binary_search(vars.begin(), vars.end(), x,
@@ -126,7 +121,7 @@ block fv_intersect(tref n, const block& X) {
 		// `vars` points into `get_free_vars`' table, which a GC sweep
 		// rebuilds, so nothing that can construct a node runs while it
 		// is held: the trim below comes after.
-		const trefs& vars = fv<node>(n);
+		const trefs& vars = get_free_vars<node>(n);
 		if (vars.empty()) return out;
 		out.reserve(std::min(X.size(), vars.size()));
 		for (tref x : X)
@@ -134,21 +129,9 @@ block fv_intersect(tref n, const block& X) {
 				tau::subtree_less)) out.push_back(x);
 	}
 	// A block variable read off a binder carries the body as its right
-	// sibling; `fv` hands out trimmed refs, so trim to match.
+	// sibling; `get_free_vars` hands out trimmed refs, so trim to match.
 	for (tref& x : out) x = tau::trim_right_sibling(x);
 	return out;
-}
-
-template <NodeType node>
-size_t content_hash(tref n) {
-	return hash_lcrs_tref<node>{}(n);
-}
-
-// --- content order --------------------------------------------------------------
-
-template <NodeType node>
-bool content_less(tref a, tref b) {
-	return tree<node>::subtree_less(a, b);
 }
 
 // --- member view and raw canonical chains (D1) ---------------------------------
@@ -156,8 +139,8 @@ bool content_less(tref a, tref b) {
 template <NodeType node>
 trefs members(tref n) {
 	using tau = tree<node>;
-	if (is_conjunction<node>(n)) return get_leaves<node>(n, tau::wff_and);
-	if (is_disjunction<node>(n)) return get_leaves<node>(n, tau::wff_or);
+	if (is_child<node>(n, tau::wff_and)) return get_leaves<node>(n, tau::wff_and);
+	if (is_child<node>(n, tau::wff_or))  return get_leaves<node>(n, tau::wff_or);
 	return trefs{ n };
 }
 
@@ -231,13 +214,7 @@ void set_neg(tref n, tref negated) {
 	store<node, table::neg_memo>(n, negated);
 }
 
-// --- classification (§1 atom shapes, literals, binders, trees) -------------------
-
-template <NodeType node>
-bool is_atom(tref n) { return is_atomic_fm<node>(n); }
-
-template <NodeType node>
-bool is_equation(tref n) { return is_child<node>(n, tree<node>::bf_eq); }
+// --- classification (§1 literals and trees) -------------------------------------
 
 template <NodeType node>
 bool is_order_atom(tref n) {
@@ -248,17 +225,20 @@ bool is_order_atom(tref n) {
 template <NodeType node>
 bool is_negated_atom(tref n) {
 	using tau = tree<node>;
-	return is_child<node>(n, tau::wff_neg) && is_atom<node>(tau::trim2(n));
+	return is_child<node>(n, tau::wff_neg)
+		&& is_atomic_fm<node>(tau::trim2(n));
 }
 
 template <NodeType node>
-bool is_literal(tref n) { return is_atom<node>(n) || is_negated_atom<node>(n); }
+bool is_literal(tref n) {
+	return is_atomic_fm<node>(n) || is_negated_atom<node>(n);
+}
 
 template <NodeType node>
 bool is_negated_equation(tref n) {
 	using tau = tree<node>;
 	return is_child<node>(n, tau::wff_neg)
-		&& is_equation<node>(tau::trim2(n));
+		&& is_child<node>(tau::trim2(n), tau::bf_eq);
 }
 
 template <NodeType node>
@@ -268,29 +248,9 @@ tref atom_of(tref literal) {
 }
 
 template <NodeType node>
-bool is_true(tref n) { return tree<node>::get(n).equals_T(); }
-
-template <NodeType node>
-bool is_false(tref n) { return tree<node>::get(n).equals_F(); }
-
-template <NodeType node>
-bool is_conjunction(tref n) { return is_child<node>(n, tree<node>::wff_and); }
-
-template <NodeType node>
-bool is_disjunction(tref n) { return is_child<node>(n, tree<node>::wff_or); }
-
-template <NodeType node>
-bool is_binder(tref n) { return is_child_quantifier<node>(n); }
-
-template <NodeType node>
-bool is_reference(tref n) { return is_child<node>(n, tree<node>::wff_ref); }
-
-template <NodeType node>
-bool is_temporal(tref n) { return is_child_temporal_quantifier<node>(n); }
-
-template <NodeType node>
 bool is_negative_tree(tref n) {
-	if (!is_disjunction<node>(n)) return false;
+	using tau = tree<node>;
+	if (!is_child<node>(n, tau::wff_or)) return false;
 	if (const bool* cached = find<node, table::negative_tree_memo>(n);
 		cached) return *cached;
 	bool negative = true;
@@ -299,15 +259,13 @@ bool is_negative_tree(tref n) {
 	// on top of every leaf, and `check` decides there. A leaf that is not
 	// a negated equation returns false, which ends the search.
 	auto check = [&negative](tref m) {
-		using tau = tree<node>;
 		if (!tau::get(m).is(tau::wff)) return true;
-		if (is_conjunction<node>(m) || is_disjunction<node>(m))
+		if (is_child<node>(m, tau::wff_and) || is_child<node>(m, tau::wff_or))
 			return true;
 		if (is_negated_equation<node>(m)) return true;
 		return negative = false;
 	};
 	auto skeleton = [](tref m) {
-		using tau = tree<node>;
 		const auto& t = tau::get(m);
 		return t.is(tau::wff) || t.is(tau::wff_and) || t.is(tau::wff_or);
 	};
@@ -329,29 +287,23 @@ bool is_flat_tree(tref n) {
 	return true;
 }
 
-template <NodeType node>
-bool is_plain_conjunct(tref n) { return !is_disjunction<node>(n); }
-
-template <NodeType node>
-bool is_disjunctive_conjunct(tref n) { return is_disjunction<node>(n); }
-
 // --- binder accessors -----------------------------------------------------------
 
 template <NodeType node>
 binder binder_kind(tref n) {
-	DBG(assert(is_binder<node>(n));)
+	DBG(assert(is_child_quantifier<node>(n));)
 	return is_child<node>(n, tree<node>::wff_ex) ? binder::ex : binder::all;
 }
 
 template <NodeType node>
 tref binder_var(tref n) {
-	DBG(assert(is_binder<node>(n));)
+	DBG(assert(is_child_quantifier<node>(n));)
 	return tree<node>::trim2(n);
 }
 
 template <NodeType node>
 tref binder_body(tref n) {
-	DBG(assert(is_binder<node>(n));)
+	DBG(assert(is_child_quantifier<node>(n));)
 	return tree<node>::get(n)[0].second();
 }
 
