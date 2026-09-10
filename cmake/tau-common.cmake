@@ -31,9 +31,12 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-# AppleClang rejects -ffat-lto-objects; plain -flto=auto works without it.
+# AppleClang rejects -ffat-lto-objects under LTO; plain -flto=auto works.
+# The probe needs -flto=auto: without it the flag is accepted everywhere.
 include(CheckCXXCompilerFlag)
+set(CMAKE_REQUIRED_FLAGS "-flto=auto")
 check_cxx_compiler_flag("-ffat-lto-objects" TAU_HAVE_FAT_LTO_OBJECTS)
+unset(CMAKE_REQUIRED_FLAGS)
 if(TAU_HAVE_FAT_LTO_OBJECTS)
 	set(TAU_FAT_LTO ";-ffat-lto-objects")
 else()
