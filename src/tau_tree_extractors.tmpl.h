@@ -358,7 +358,9 @@ std::optional<rr<node>> get_nso_rr(tref r) {
 // -----------------------------------------------------------------------------
 
 template <NodeType node>
-void get_leaves(tref n, typename node::type branch, trefs& leaves) {
+void get_leaves(tref n, typename node::type branch, trefs& leaves,
+	trefs* inner)
+{
 	using tau = tree<node>;
 	if (!n) return;
 
@@ -377,6 +379,9 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 		stack.pop_back();
 		const auto& t = tau::get(m);
 		if (t.is(branch) || t.child_is(branch)) {
+			// The inner spine nodes, for a caller that must recognise
+			// them later (the path sweep marks them handled).
+			if (inner && m != n) inner->push_back(m);
 			const auto children = t.get_children();
 			for (auto it = children.rbegin(); it != children.rend(); ++it)
 				stack.push_back(*it);

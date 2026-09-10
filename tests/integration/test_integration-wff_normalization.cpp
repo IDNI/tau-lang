@@ -130,7 +130,11 @@ TEST_SUITE("boole_normal_form") {
 		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
 		// Order flipped again by the 2026-08-27 regen (left-assoc
 		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf).
+		// First entry since the environment path sweep (2026-09-10): a
+		// literal that a disjunct folds into is sorted into the enclosing
+		// block instead of trailing it.
 		CHECK( matches_to_str_to_any_of(res, {
+			"x'b'a|a'bx = 0 || a&(x|b)|x'a'b != 0",
 			"ab'x'|a'bx = 0 || a&(b|x)|a'bx' != 0",
 			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
 			"a'bx|ab'x' = 0 || a&(b|x)|a'bx' != 0",

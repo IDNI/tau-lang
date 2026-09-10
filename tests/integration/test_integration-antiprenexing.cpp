@@ -88,6 +88,10 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// environment path sweep (2026-09-10): the literal !f(b1)
+			// that a disjunct folds into is sorted into its block
+			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && !f(b1) && w != 0) "
+			"&& (w != 0 || wy' = 0)",
 			// complete_quantifier_elimination's shape, dual of the ex
 			// case above: process_quantifier_block dualises an all-block
 			// by resolving the negated scope as an ex-block and negating

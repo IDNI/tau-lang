@@ -13,7 +13,11 @@
 #ifndef __IDNI__TAU__SYNTACTIC_PATH_SIMPLIFICATION_H__
 #define __IDNI__TAU__SYNTACTIC_PATH_SIMPLIFICATION_H__
 
+#include <algorithm>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace idni::tau_lang {
 

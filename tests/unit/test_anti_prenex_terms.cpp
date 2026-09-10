@@ -353,8 +353,10 @@ TEST_CASE("simplify_term: the four laws on a plain term") {
 	CHECK(tau::get(ap::simplify_term<node_t>(bf("1 | x"))).equals_1());
 	CHECK(tau::get(ap::simplify_term<node_t>(bf("x & x'"))).equals_0());
 	CHECK(tau::get(ap::simplify_term<node_t>(bf("x | x'"))).equals_1());
-	// per-path: x·f(x) = x·f(1)
-	CHECK(tau::subtree_equals(ap::simplify_term<node_t>(bf("x & (x' | y)")), bf("x & y")));
+	// per-path: x·f(x) = x·f(1) (the factor order is the path sweep's
+	// canonical one, not pinned here)
+	CHECK(same_function(ap::simplify_term<node_t>(bf("x & (x' | y)")), bf("x & y"),
+		{ vr("x"), vr("y") }));
 	// absorption through the dual pass
 	CHECK(tau::subtree_equals(ap::simplify_term<node_t>(bf("x | x & y")), bf("x")));
 }

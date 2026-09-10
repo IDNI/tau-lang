@@ -61,7 +61,8 @@ std::optional<rr<node>> get_nso_rr(tref ref);
  * definition in tau_tree_extractors.tmpl.h).
  */
 template <NodeType node>
-void get_leaves(tref n, typename node::type branch, trefs& leaves);
+void get_leaves(tref n, typename node::type branch, trefs& leaves,
+	trefs* inner = nullptr);
 /** @brief As above, returning the leaves as a fresh vector. */
 template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch);
