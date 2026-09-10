@@ -460,9 +460,13 @@ TEST_CASE("mem_size: shared BDD nodes counted once, terminals zero, leaves one")
 	order_t oq = order_of(Q);
 	tref m = sides(ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"), Q, oq)).first;
 	CHECK(ap::mem_size<node_t>(m) == 3);
-	// a plain term: its DAG, monotone in the tree
-	CHECK(ap::mem_size<node_t>(bf("x")) < ap::mem_size<node_t>(bf("x & y")));
-	CHECK(ap::mem_size<node_t>(bf("x & y")) < ap::mem_size<node_t>(bf("x & (y & z)")));
+	// a plain term: operators and leaves once, no wrappers, a variable's
+	// own nodes not counted, a reference opaque
+	CHECK(ap::mem_size<node_t>(bf("x")) == 1);
+	CHECK(ap::mem_size<node_t>(bf("x & y")) == 3);
+	CHECK(ap::mem_size<node_t>(bf("x & (y & z)")) == 5);
+	CHECK(ap::mem_size<node_t>(bf("x'")) == 2);
+	CHECK(ap::mem_size<node_t>(bf("x & r(y & z)")) == 3);
 }
 
 // 10. D2 round trip ------------------------------------------------------------

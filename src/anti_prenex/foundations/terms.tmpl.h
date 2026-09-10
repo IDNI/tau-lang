@@ -605,9 +605,26 @@ template <NodeType node>
 size_t mem_size(tref t) {
 	using namespace terms_detail;
 	if (!is_bdd_backed<node>(t)) {
+		// Term-structure nodes only, each distinct one once: every child of
+		// a `bf` wrapper — an operator, a functional quantifier, a leaf
+		// (variable, constant, reference) — counts 1; the wrappers are not
+		// counted, and the walk does not enter a leaf's own nodes (a
+		// variable's name, a reference's arguments) or a quantifier's
+		// subscript. `visit_subtree` gates a node's own visit, so a leaf is
+		// admitted by its parent and its children are not.
+		using tau = tree<node>;
 		size_t n = 0;
-		auto count = [&n](tref) { ++n; return true; };
-		pre_order<node>(t).visit_unique(count);
+		auto count = [&n](tref m) {
+			if (!tau::get(m).is(tau::bf)) ++n;
+			return true;
+		};
+		// (the traversal calls the predicate on the root without a parent)
+		auto admit = [](tref m, tref parent = nullptr) {
+			return while_is_boolean_operation<node>(m)
+				|| (parent && tau::get(parent).is(tau::bf));
+		};
+		auto up = [](tref) {};
+		pre_order<node>(t).visit_unique(count, admit, up);
 		return n;
 	}
 	// The visited-set scheme of heuristics/bv_predicate_blasting.tmpl.h's

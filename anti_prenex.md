@@ -547,7 +547,11 @@ also descends into reference arguments, recursively, running each through
 `SIMPLIFY_TERM` — formula arguments through `SIMPLIFY`. Only phase 1 sets it:
 elsewhere arguments are already simplified (§1), and descending would
 re-traverse them for nothing), `FOLD_DEGENERATE_BINDERS` (drop a binder over a constant
-scope or an absent variable), `NORM_EQUATION` (`l = r ↦ l + r = 0`, descending
+scope or an absent variable — for formula binders, and likewise when the
+symbolic `∀_Y f`/`∃_Y f` term is formed: a subscript not free in `f` is
+dropped, a constant `f` is returned as it is, and the remaining subscripts sit
+in content order outermost first, one node per permutation of `Y` — the
+`quant_memo` key), `NORM_EQUATION` (`l = r ↦ l + r = 0`, descending
 through one `¬`), `TERM_OF` (for an atom `l = r`, the term `l + r`) and
 `REWRAP(φ, X)` (re-attach `∃X` around `φ`, in `X`'s order — every graceful
 exit of invariant 3) are primitives. So are the two aggressive normalisers of

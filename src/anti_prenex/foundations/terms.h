@@ -223,8 +223,11 @@ tref norm_equation(tref atom, const var_order<node>& order);
 /**
  * @brief §1 `‖t‖`, the count IN MEMORY (§10) of a TERM: the unique node
  * count of its BDD, leaves included and the terminals as zero, when
- * BDD-backed; its unique DAG node count when plain (phase 2's spelled
- * witnesses are plain). The one consumer is `TRY_WITNESS`'s tie-break among
+ * BDD-backed; when plain (phase 2's spelled witnesses are plain), its
+ * distinct term-structure nodes — each operator, functional quantifier and
+ * leaf (a variable, constant or reference) once, the `bf` wrappers not
+ * counted and a leaf's own nodes not entered. The one consumer is
+ * `TRY_WITNESS`'s tie-break among
  * a variable's pins, the smallest `‖f₁′‖`, which is the cost every later
  * compose or replace of the witness pays. No formula overload: nothing in
  * the spec reads `‖φ‖` (the decomposition licence uses `|·|`,
