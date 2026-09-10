@@ -31,10 +31,19 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
+# AppleClang rejects -ffat-lto-objects; plain -flto=auto works without it.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-ffat-lto-objects" TAU_HAVE_FAT_LTO_OBJECTS)
+if(TAU_HAVE_FAT_LTO_OBJECTS)
+	set(TAU_FAT_LTO ";-ffat-lto-objects")
+else()
+	set(TAU_FAT_LTO "")
+endif()
+
 # LTO only pays off when something LTO-links it; test targets are all -fno-lto
 if (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
-	set(TAU_LTO_COMPILE_FLAGS "-flto=auto;-ffat-lto-objects")
+	set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
 	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 	set(TAU_LTO_LINK "-flto=auto")
 else()
