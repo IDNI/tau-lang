@@ -1362,14 +1362,17 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0" } );
 	}
 
-	// An init at position 2 only: the run must pick o1[0] = o1[1] = 1 so
-	// that o1[2] = 1 holds for every input at t = 2.
+	// An init at position 2 only. i1[1] = 1 makes o1[1] = o1[0] | 1 = 1
+	// whatever o1[0] is, and t >= 2 follows from it, so 1..4 are forced.
+	// o1[0] is free: i1[0] = 0 takes the else branch, leaving it o1[-1].
 	TEST_CASE("guarded latch with an init at position 2 only (#100)") {
 		auto o1 = run_latch("(o1[2]:sbf = 1) && ((i1[t]:sbf = 1)"
 			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
 			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
 		REQUIRE ( o1.has_value() );
-		CHECK ( o1.value() == strings{ "1", "1", "1", "1", "1" } );
+		REQUIRE ( o1.value().size() == 5 );
+		CHECK ( strings(o1.value().begin() + 1, o1.value().end())
+			== strings{ "1", "1", "1", "1" } );
 	}
 
 	// Inits at 0 and 2 with a gap: inputs (0, 0) at t = 1, 2 would force
