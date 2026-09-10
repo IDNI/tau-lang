@@ -592,32 +592,51 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		const char* spec50 = "always i1[t]:bv[24] > { #x0003e8 }:bv[24]"
 			" -> o9[t]:bv[24] = { #x000032 }:bv[24].";
 		const std::vector<std::string> in{ "2000", "500", "0" };
-		// Another bv spec runs first, so its constants get their cvc5
-		// term ids before spec7's `7` does -- the report's driver
-		// difference in miniature.
+		// Only t=0 is constrained (2000 > 1000). At t=1 and t=2 the
+		// implication is vacuous, o9 is free, and every satisfying
+		// value is equally legal -- so the witness itself is not
+		// pinned. Pinning it meant re-pinning on every parser regen,
+		// since nonterminal renumbering moves node hashes and so
+		// clause order, and it differed per platform as well.
+		// What must hold is that the witness is a function of the spec
+		// alone: the same spec, with a different bv spec driven in
+		// between, must answer the same. That is the #89 regression --
+		// it produced 7, 7, 7 after other activity where the spec on
+		// its own gave 7, 0, 0.
+		auto before = drive(spec7, in);
 		auto other = drive(spec50, in);
+		auto after = drive(spec7, in);
+		REQUIRE(before.size() == 3);
 		REQUIRE(other.size() == 3);
+		REQUIRE(after.size() == 3);
+		INFO("before: " << before[0] << "," << before[1] << ","
+			<< before[2] << " after: " << after[0] << ","
+			<< after[1] << "," << after[2] << " other: "
+			<< other[0] << "," << other[1] << "," << other[2]);
+		// the constrained step is the spec's own constant, not a choice
+		CHECK(before[0] == "7");
+		CHECK(after[0] == "7");
 		CHECK(other[0] == "50");
-		// The free-region witness must be what a fresh process gives
-		// for this spec on its own. With content-hashed constants the
-		// `o9 = 7` clause sorts first, and being satisfiable for every
-		// input it is the path taken in the free region too. (Before the
-		// fix this sequence produced 7, 7, 7 while a fresh process gave
-		// 7, 0, 0 -- the report's split.)
-		auto witness = drive(spec7, in);
-		// The canonical free-region choice moves with every parser regen
-		// (nonterminal renumbering changes node hashes and so clause
-		// order). Re-pinned after nonterminals became name-hashed: a
-		// fresh process gives 7, 0, 0 for spec7 and 50, 50, 50 for spec50
-		// on their own (verified by driving each alone through the
-		// spec-file runner), and so must these post-activity runs.
-		// Re-pin whenever the grammar is regenerated; the property
-		// under test is fresh == post-activity, not the specific
-		// witness.
-		INFO("witness: " << witness[0] << "," << witness[1] << ","
-			<< witness[2] << " other: " << other[0] << ","
-			<< other[1] << "," << other[2]);
-		CHECK(witness == std::vector<std::string>({ "7", "0", "0" }));
-		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
+		// a free step may be any bv[24], so that whole range is the
+		// witness's legal set -- checked rather than pinned
+		auto in_bv24 = [](const std::string& v) {
+			if (v.empty() || v.size() > 8) return false;
+			if (v.find_first_not_of("0123456789") != std::string::npos)
+				return false;
+			return std::stoul(v) <= ((1UL << 24) - 1);
+		};
+		for (size_t t = 1; t < 3; ++t) {
+			CAPTURE(t);
+			CHECK(in_bv24(before[t]));
+			CHECK(in_bv24(after[t]));
+			CHECK(in_bv24(other[t]));
+		}
+		// same spec, different prior activity, same free region --
+		// checked both ways round, so neither spec is the only one
+		// whose stability is tested
+		auto other_after = drive(spec50, in);
+		REQUIRE(other_after.size() == 3);
+		CHECK(before == after);
+		CHECK(other == other_after);
 	}
 }
