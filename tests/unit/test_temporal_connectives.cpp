@@ -70,6 +70,20 @@ bool unsat_str(const char* spec) {
 	return r.value();
 }
 
+// Like sat_str, but for a spec introducing an io_var this file has not used
+// before: plain tau::get() only resolves io_vars against a context, and
+// parse_spec never supplies one, so a fresh output_def needs its own.
+bool sat_str_with_io_def(const char* spec) {
+	tref t = tau::get(spec,
+		{ .context = definitions<node_t>::instance().get_io_context() });
+	REQUIRE(t != nullptr);
+	auto nso_rr = get_nso_rr<node_t>(t);
+	REQUIRE(nso_rr.has_value());
+	auto r = api<node_t>::sat(nso_rr.value().main->get());
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
 } // namespace
 
 TEST_SUITE("temporal connectives — original bug repro") {
@@ -228,5 +242,72 @@ TEST_SUITE("temporal connectives — unsat negative cases stay unsat") {
 	TEST_CASE("triple-G with internal contradiction") {
 		CHECK(unsat_str(
 		    "(G (o1[t] = 0)) && (G (o2[t] = 1)) && (G (o1[t] = 1))."));
+	}
+}
+
+TEST_SUITE("temporal connectives — word synonyms for binary operators") {
+	// Each letter/word pair must parse to the identical tree, not merely
+	// an equivalent one.
+
+	TEST_CASE("until is U") {
+		tref a = parse_spec("(o1[t] = 1) U (o2[t] = 1).");
+		tref b = parse_spec("(o1[t] = 1) until (o2[t] = 1).");
+		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
+		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	}
+
+	TEST_CASE("release is R") {
+		tref a = parse_spec("(o1[t] = 1) R (o2[t] = 1).");
+		tref b = parse_spec("(o1[t] = 1) release (o2[t] = 1).");
+		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
+		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	}
+
+	TEST_CASE("weak_until is W") {
+		tref a = parse_spec("(o1[t] = 1) W (o2[t] = 1).");
+		tref b = parse_spec("(o1[t] = 1) weak_until (o2[t] = 1).");
+		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
+		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	}
+
+	TEST_CASE("since is S") {
+		tref a = parse_spec("(o1[t] = 1) S (o2[t] = 1).");
+		tref b = parse_spec("(o1[t] = 1) since (o2[t] = 1).");
+		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
+		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	}
+
+	TEST_CASE("trigger is T") {
+		tref a = parse_spec("(o1[t] = 1) T (o2[t] = 1).");
+		tref b = parse_spec("(o1[t] = 1) trigger (o2[t] = 1).");
+		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
+		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	}
+
+	TEST_CASE("word forms nest and mix with letter forms") {
+		tref a = parse_spec(
+		    "G ((o1[t] = 1) U ((o2[t] = 1) S (o3[t] = 1))).");
+		tref b = parse_spec(
+		    "G ((o1[t] = 1) until ((o2[t] = 1) since (o3[t] = 1))).");
+		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
+		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	}
+
+	TEST_CASE("an identifier starting with a synonym word still parses "
+	          "as one variable") {
+		// "_x" can't start an identifier of its own, so the parser has
+		// no valid reading of e.g. "until_x" other than as one whole
+		// variable name -- it never gets split as the "until" operator
+		// plus a dangling remainder.
+		CHECK(sat_str_with_io_def(
+		    "until_x := out console. until_x[t] = 1 U (o1[t] = 1)."));
+		CHECK(sat_str_with_io_def(
+		    "release_x := out console. release_x[t] = 1 R (o1[t] = 1)."));
+		CHECK(sat_str_with_io_def(
+		    "weak_until_x := out console. weak_until_x[t] = 1 W (o1[t] = 1)."));
+		CHECK(sat_str_with_io_def(
+		    "since_x := out console. since_x[t] = 1 S (o1[t] = 1)."));
+		CHECK(sat_str_with_io_def(
+		    "trigger_x := out console. trigger_x[t] = 1 T (o1[t] = 1)."));
 	}
 }
