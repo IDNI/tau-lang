@@ -642,12 +642,19 @@ tref term_shl(tref symbol) {
 
 // Three-way UNSIGNED comparison of two concrete bitvector values:
 // -1 if c1 < c2, 0 if equal, 1 if c1 > c2. Compares the width-padded
-// base-2 strings lexicographically, so both terms must satisfy
-// isBitVectorValue() and have the same width (the callers below only
-// pass constants of the same BA type).
-inline int compare_bv_consts(const bv& c1, const bv& c2) {
-	const std::string s1 = c1.getBitVectorValue(2);
-	const std::string s2 = c2.getBitVectorValue(2);
+// base-2 strings lexicographically, so both terms must have the same
+// width (the callers below only pass constants of the same BA type).
+// A bv BA constant need not be a bitvector *value*: it may still be an
+// unfolded term over literals, which cvc5 only folds once routed
+// through normalize_bv. Returns nullopt when either side is not a value
+// even after that, so the caller skips the fold rather than letting
+// getBitVectorValue() throw.
+inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2) {
+	const bv v1 = c1.isBitVectorValue() ? c1 : normalize_bv(c1);
+	const bv v2 = c2.isBitVectorValue() ? c2 : normalize_bv(c2);
+	if (!v1.isBitVectorValue() || !v2.isBitVectorValue()) return {};
+	const std::string s1 = v1.getBitVectorValue(2);
+	const std::string s2 = v2.getBitVectorValue(2);
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
 }
 
@@ -672,10 +679,11 @@ tref wff_bv_lt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) < 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp < 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -689,10 +697,11 @@ tref wff_bv_nlt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) >= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp >= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -706,10 +715,11 @@ tref wff_bv_lteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) <= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp <= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -723,10 +733,11 @@ tref wff_bv_nlteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) > 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp > 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -740,10 +751,11 @@ tref wff_bv_gt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) > 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp > 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -757,10 +769,11 @@ tref wff_bv_ngt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) <= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp <= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -774,10 +787,11 @@ tref wff_bv_gteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) >= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp >= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -791,10 +805,11 @@ tref wff_bv_ngteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) < 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp < 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -936,9 +951,11 @@ tref term_min(tref symbol) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		return compare_bv_consts(std::get<bv>(c1.get_ba_constant()),
-				std::get<bv>(c2.get_ba_constant())) <= 0
-			? first() : second();
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return symbol;
+		return *cmp <= 0 ? first() : second();
 	}
 	return symbol;
 }
@@ -971,9 +988,11 @@ tref term_max(tref symbol) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		return compare_bv_consts(std::get<bv>(c1.get_ba_constant()),
-				std::get<bv>(c2.get_ba_constant())) >= 0
-			? first() : second();
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return symbol;
+		return *cmp >= 0 ? first() : second();
 	}
 	return symbol;
 }
