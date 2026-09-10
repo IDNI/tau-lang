@@ -755,3 +755,51 @@ TEST_SUITE("syntactic_path_simplification_stage3") {
 		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
 	}
 }
+
+// ── stage 4: atom fingerprints and the relevant-key memo ─────────────────────
+
+TEST_SUITE("syntactic_path_simplification_stage4") {
+
+	TEST_CASE("a subtree's fingerprint is covered by its parent's") {
+		tref fm = get_nso_rr("x = 0 && (y != 0 || (z = 0 && ex w (w = 0 || x = 0))).")
+			.value().main->get();
+		const path_bits& whole = path_bits_of<node_t, true>(fm);
+		bool ok = true;
+		auto check = [&](tref n) {
+			if (tau::get(n).is(tau::wff))
+				ok = ok && whole.covers(path_bits_of<node_t, true>(n));
+		};
+		pre_order<node_t>(fm).visit(check);
+		CHECK(ok);
+		CHECK(whole.any());
+	}
+
+	TEST_CASE("both spellings of an equality share one bit") {
+		tref eq  = get_nso_rr("x = 0.").value().main->get();
+		tref neq = get_nso_rr("x != 0.").value().main->get();
+		tref neg = get_nso_rr("!(x = 0).").value().main->get();
+		const path_bits& a = path_bits_of<node_t, true>(eq);
+		CHECK(a.covers(path_bits_of<node_t, true>(neq)));
+		CHECK(path_bits_of<node_t, true>(neq).covers(a));
+		CHECK(a.covers(path_bits_of<node_t, true>(neg)));
+		CHECK(path_bits_of<node_t, true>(neg).covers(a));
+	}
+
+	TEST_CASE("a constant has no atoms") {
+		CHECK(!path_bits_of<node_t, true>(_T<node_t>()).any());
+		CHECK(!path_bits_of<node_t, true>(_F<node_t>()).any());
+	}
+
+	// A key that cannot occur in a subtree leaves that subtree's result a
+	// property of the subtree alone: the same simplified subtree comes back
+	// whatever the enclosing conjunction asserts about other atoms.
+	TEST_CASE("an unreachable key does not change a subtree's result") {
+		tref inner = get_nso_rr("y = 0 || (z = 0 && !(z = 0)).").value().main->get();
+		tref alone = syntactic_path_simplification<node_t>(inner);
+		tref under = syntactic_path_simplification<node_t>(
+			tau::build_wff_and(get_nso_rr("x = 0.").value().main->get(), inner));
+		// under x = 0 the inner disjunction is the same simplified node
+		CHECK(tau::get(under).find_top([&](tref n) {
+			return tau::subtree_equals(n, alone); }) != nullptr);
+	}
+}
