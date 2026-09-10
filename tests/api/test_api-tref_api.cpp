@@ -569,6 +569,34 @@ TEST_SUITE("Tau API - tref - procedures") {
 		CHECK(unsat_f.value());
 		CHECK(!unsat_t.value());
 	}
+	TEST_CASE_FIXTURE(api_fixture, "realizable implies sat") {
+		// realizable(fm) => sat(fm), never the converse: whenever
+		// realizable finds a winning program, sat must agree the
+		// formula has a satisfying trace. Battery covers a
+		// non-temporal formula, G, sometimes, F, and one U shape.
+		const char* formulas[] = {
+			"x = 0",
+			"always o1[t] = 0",
+			"sometimes o1[t] = 0",
+			"F (o1[t] = 1)",
+			"(o1[t] = 0) U (o1[t] = 1)",
+		};
+		for (const char* fm_str : formulas) {
+			auto fm_r = tau_api::get_formula(fm_str);
+			REQUIRE(fm_r.has_value());
+			auto real = tau_api::realizable(fm_r.value());
+			REQUIRE(real.has_value());
+			auto s = tau_api::sat(fm_r.value());
+			if (real.value()) {
+				REQUIRE(s.has_value());
+				CHECK(s.value());
+			} else
+				// The implication holds vacuously here: assert
+				// the false antecedent explicitly instead of
+				// silently skipping the case.
+				CHECK(!real.value());
+		}
+	}
 	TEST_CASE_FIXTURE(api_fixture, "valid") {
 		auto t_r = tau_api::get_formula("T");
 		auto x_r = tau_api::get_formula("x = 0");

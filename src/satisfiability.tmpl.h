@@ -1965,11 +1965,21 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
+	auto mark_undecided = [&]() {
+		r.error(code::unsupported_operation,
+			"satisfiability of this formula is not supported "
+			"yet: LTL satisfiability is not implemented; the "
+			"formula is not realizable");
+	};
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, bool,
 				subtree_pair_less<node, int_t>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (!output)
+	// Full-LTL formulas the realizability shortcut leaves undecided (see
+	// below) are undecided on every call, not just the first -- cache
+	// that verdict too, or a repeated query re-runs ltlsynt for nothing.
+	static cache_t& undecided = tree<node>::template create_cache<cache_t>();
+	if (!output) {
 		if (auto it = cache.find(std::make_pair(fm, start_time));
 			it != cache.end())
 		{
@@ -1977,6 +1987,12 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
+		if (undecided.contains(std::make_pair(fm, start_time))) {
+			mark_undecided();
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+	}
 #endif // TAU_CACHE
 	auto memoize = [&](bool value) {
 #ifdef TAU_CACHE
@@ -2017,7 +2033,20 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// constraints.
 	if (has_ltl_operators<node>(fm)) {
 		auto _s = r.open("ltl_realizability");
-		memoize(is_ltl_aba_realizable<node>(fm, start_time, output));
+		// realizable(fm) => sat(fm): a program satisfying fm against
+		// every environment gives a trace that satisfies fm. There is
+		// no satisfiability procedure for full-LTL here, so this
+		// realizability check is a sound one-way shortcut: realizable
+		// decides sat true, but unrealizable must not decide sat
+		// false -- it leaves sat undecided instead.
+		if (is_ltl_aba_realizable<node>(fm, start_time, output))
+			memoize(true);
+		else {
+#ifdef TAU_CACHE
+			undecided.emplace(std::make_pair(fm, start_time), true);
+#endif // TAU_CACHE
+			mark_undecided();
+		}
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}

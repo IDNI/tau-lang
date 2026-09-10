@@ -18,12 +18,17 @@ set_tests_properties("test_repl-ctl_star-normalize_U_not_sometimes" PROPERTIES
 	PASS_REGULAR_EXPRESSION "%1"
 	FAIL_REGULAR_EXPRESSION "sometimes")
 
-# U with a contradictory target is UNSAT (was T: the target was dropped)
+# U's target is a contradiction, so the formula is unrealizable; sat has no
+# satisfiability procedure for full-LTL content, so the verdict is undecided
+# (was T: the target was dropped), not a decided F.
 add_repl_test(ctl_star-sat_U_contradictory_target
-	"sat (o1[t] = 1) U (o1[t] = 0 && o1[t] = 1)" ": F")
+	"sat (o1[t] = 1) U (o1[t] = 0 && o1[t] = 1)"
+	"satisfiability of this formula is not supported")
 
-# F over an input is realizability, not existential-trace semantics
-add_repl_test(ctl_star-sat_F_input_unrealizable "sat F i1[t] = 1" ": F")
+# F over an input is unrealizable; sat has no satisfiability procedure for
+# full-LTL content, so the verdict is undecided, not a decided F.
+add_repl_test(ctl_star-sat_F_input_unrealizable "sat F i1[t] = 1"
+	"satisfiability of this formula is not supported")
 add_repl_test(ctl_star-sat_F_output_realizable "sat F o1[t] = 1" ": T")
 
 # crash regressions: these aborted the Debug REPL (normalizer

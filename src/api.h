@@ -574,8 +574,10 @@ struct api {
 	static result<htref> eliminate_quantifiers(htref fm);
 
 	/// Check if a specification is realizable (∃ winning system strategy).
-	/// Merges top-level G-conjuncts before normalization, then runs the
-	/// LTL realizability pipeline.
+	/// Merges top-level G-conjuncts before normalization; unsat(fm)
+	/// implies unrealizable(fm), so a non-full-LTL formula sat() decides
+	/// unsatisfiable is rejected without running the LTL realizability
+	/// pipeline.
 	static result<bool> realizable(const std::string& spec);
 	/// @copydoc realizable(const std::string&)
 	static result<bool> realizable(tref spec);
@@ -590,8 +592,12 @@ struct api {
 	/// @copydoc unrealizable(const std::string&)
 	static result<bool> unrealizable(htref spec);
 
-	/// Check satisfiability: true iff the formula is realizable.
-	/// Merges top-level G-conjuncts before checking.
+	/// Check satisfiability: does some trace satisfy the formula?
+	/// realizable(fm) implies sat(fm), never the converse, so this is a
+	/// weaker question than realizable() and can answer true where
+	/// realizable() answers false. Merges top-level G-conjuncts before
+	/// checking; for genuinely full-LTL content with no realizable
+	/// program, the verdict is undecided (an error result), not false.
 	static result<bool> sat(const std::string& formula);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(tref formula);

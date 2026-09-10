@@ -103,7 +103,11 @@ result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
  * @param fm Tau formula to test.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return `true` if the formula is satisfiable.
+ * @return `true` if the formula is satisfiable; an error result when the
+ * formula is genuinely full-LTL (U/R/W/S/T) and synthesis found no
+ * realizable program -- realizable(fm) implies sat(fm), never the converse,
+ * and this codebase has no satisfiability procedure for that fragment, so
+ * an unrealizable verdict leaves sat undecided rather than `false`.
  *
  * @par Example
  * @code{.cpp}

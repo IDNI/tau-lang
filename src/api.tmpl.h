@@ -923,10 +923,24 @@ result<bool> api<node>::realizable(tref fm) {
 		tref target = (has_ltl_operators<node>(fm)
 			&& tau::get(nf).find_top(is_quantifier<node>))
 			? fm : nf;
-		TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
-			code::internal_error,
-			"is_tau_formula_sat returned neither a value nor an "
-			"error while checking realizability");
+		if (has_ltl_operators<node>(fm)) {
+			// is_tau_formula_sat now answers satisfiability only,
+			// where an unrealizable full-LTL formula is undecided
+			// rather than false; realizable() needs the real
+			// verdict, so ask the realizability procedure directly
+			// instead of going through it.
+			r = is_ltl_aba_realizable<node>(target, 0, true);
+		} else if (auto s = sat(fm); s.has_value() && !s.value()) {
+			// unsat(fm) => unrealizable(fm): reject without running
+			// synthesis. An undecided sat (error) is not a decided
+			// false, so it falls through to the real check below.
+			r = false;
+		} else {
+			TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
+				code::internal_error,
+				"is_tau_formula_sat returned neither a value nor an "
+				"error while checking realizability");
+		}
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
 			<< e.what() << "); realizability could not be decided";
@@ -963,13 +977,41 @@ result<bool> api<node>::sat(tref fm) {
 	// pipeline by is_tau_formula_sat itself — there's no longer a
 	// pre-check that rejects them at this layer.
 	fm = flatten_always_conjuncts<node>(simplified);
-	if (!fm) {
+	if (!fm || !is_formula(fm)) {
 		r.error(code::invalid_argument, "Invalid formula");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	TAU_TRY(auto real, realizable(fm));
-	r = real;
+	// whole-query BA fast path; falls through when undecided.
+	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
+		r = fast.value();
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	// Same contract as realizable() above: a normalization failure
+	// decides unsatisfiable rather than propagating an error.
+	TAU_TRY_OR(tref nf, normalize_formula(fm),
+		code::internal_error,
+		"Could not normalize the formula; "
+		"its satisfiability cannot be decided");
+	// Same synthesis-backend gate as realizable() -- see the note there.
+	try {
+		// A data quantifier under a full-LTL operator survives normalization;
+		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
+		// invariant, so route the RAW formula to the LTL-ABA solver instead.
+		tref target = (has_ltl_operators<node>(fm)
+			&& tau::get(nf).find_top(is_quantifier<node>))
+			? fm : nf;
+		TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
+			code::internal_error,
+			"is_tau_formula_sat returned neither a value nor an "
+			"error while checking satisfiability");
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); satisfiability could not be decided";
+		r.error(code::solver_error,
+			"the synthesis backend failed or timed out");
+	}
 	DBG(assert(r.is_well_formed());)
 	return r;
 }

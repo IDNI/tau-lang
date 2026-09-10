@@ -30,9 +30,11 @@ static bool alg_d_realizable(const char* s) {
 	tref fm = spec(s);
 	bool result = false;
 	if (fm != nullptr) {
-		auto r = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(r.has_value());
-		result = r.value();
+		// This asks realizability directly: is_tau_formula_sat now
+		// answers satisfiability only, and leaves an unrealizable
+		// full-LTL formula undecided rather than false.
+		fm = flatten_always_conjuncts<node_t>(fm);
+		result = is_ltl_aba_realizable<node_t>(fm, 0, false);
 	}
 	unsetenv("TAU_LTL_ALG");
 	return result;
