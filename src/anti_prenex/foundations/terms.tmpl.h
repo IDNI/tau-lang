@@ -332,7 +332,9 @@ bool is_bdd_backed(tref term) {
 }
 
 template <NodeType node>
-tref prepare_terms(tref body, const block& P, const var_order<node>& order) {
+tref prepare_terms(tref body, [[maybe_unused]] const block& P,
+	const var_order<node>& order)
+{
 	using tau = tree<node>;
 	using namespace terms_detail;
 #ifdef DEBUG
