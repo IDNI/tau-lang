@@ -27,6 +27,21 @@
 
 namespace idni::tau_lang {
 
+/// Opt-in for the test-point elimination of quantified bitvector variables
+/// that occur only in comparisons against constants (see
+/// `bv_case_split_quantifiers` in normalizer.tmpl.h). Off by default; enabled via
+/// `api::set_bv_case_split(true)` or the environment variable
+/// TAU_BV_CASE_SPLIT (a value of "0" disables).
+inline bool bv_case_split = false;
+
+inline bool bv_case_split_enabled() {
+	static const bool env = [] {
+		const char* v = std::getenv("TAU_BV_CASE_SPLIT");
+		return v && *v && !(v[0] == '0' && v[1] == '\0');
+	}();
+	return bv_case_split || env;
+}
+
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *

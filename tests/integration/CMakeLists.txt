@@ -52,6 +52,7 @@ set(TESTS
 	simp_tau_unsat_valid_unitwise
 	order_atoms_reduce
 	bv_quantifier_free_decision
+	bv_case_split
 )
 
 foreach(X IN LISTS TESTS)
