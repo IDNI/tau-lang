@@ -148,17 +148,39 @@ TEST_SUITE("canonize_quantifier_ids") {
 		CHECK(canonize_quantifier_ids<node_t>(raw) == expected);
 	}
 
-	TEST_CASE("functional quantifiers are left untouched") {
-		// canonize_quantifier_ids only recognizes is_quantifier (wff_all/
-		// wff_ex); bf_fall/bf_fex are functional quantifiers and are not
-		// covered by it, so a formula built only from them must come back
-		// unchanged.
+	TEST_CASE("functional quantifiers are numbered like formula binders") {
+		// bf_fall/bf_fex share ONE id space and ONE depth count with
+		// wff_all/wff_ex, so a chain of functional quantifiers is numbered
+		// by depth exactly as a chain of formula binders is, and
+		// build_bf_fex(..., calculate_quant_id=true) is the same
+		// self-checking ground truth used above.
 		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
 		tref y = tau::build_variable(std::string("y"), tau_type_id<node_t>());
 		tref body = tau::build_bf_or(x_eq_0_bf("x"), x_eq_0_bf("y"));
-		tref raw = tau::build_bf_fex(x, tau::build_bf_fex(y, body));
+		tref raw = tau::build_bf_fex(x,
+			tau::build_bf_fex(y, body, false), false);
 
-		CHECK(canonize_quantifier_ids<node_t>(raw) == raw);
+		tref expected = tau::build_bf_fex(x,
+			tau::build_bf_fex(y, body, true), true);
+
+		CHECK(canonize_quantifier_ids<node_t>(raw) == expected);
+	}
+
+	TEST_CASE("a functional quantifier lowers an enclosing binder's id") {
+		// The depth count spans the two kinds, so the formula binder over
+		// a functional one is 2, not the 1 a formula-only count gives.
+		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
+		tref y = tau::build_variable(std::string("y"), tau_type_id<node_t>());
+		tref inner = tau::build_bf_eq_0(
+			tau::build_bf_fex(y, x_eq_0_bf("y"), false));
+		tref raw = tau::build_wff_ex(x, inner, false);
+
+		tref one = tau::build_variable(std::string("1"), tau_type_id<node_t>());
+		tref two = tau::build_variable(std::string("2"), tau_type_id<node_t>());
+		tref expected = tau::build_wff_ex(two, tau::build_bf_eq_0(
+			tau::build_bf_fex(one, x_eq_0_bf("1"), false)), false);
+
+		CHECK(canonize_quantifier_ids<node_t>(raw) == expected);
 	}
 }
 

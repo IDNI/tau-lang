@@ -454,8 +454,8 @@ std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 		switch (nt) {
 		case tau::wff_all: subformula = tau::build_wff_all(*it, subformula, false); break;
 		case tau::wff_ex:  subformula = tau::build_wff_ex(*it, subformula, false); break;
-		case tau::bf_fall: subformula = tau::build_bf_fall(*it, subformula); break;
-		default:           subformula = tau::build_bf_fex(*it, subformula); break;
+		case tau::bf_fall: subformula = tau::build_bf_fall(*it, subformula, false); break;
+		default:           subformula = tau::build_bf_fex(*it, subformula, false); break;
 		}
 	}
 	return tau::get(subformula).first(); // unwrap: caller rewraps

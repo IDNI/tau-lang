@@ -834,9 +834,11 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 
 	// Term (bf) builders
 	/** @brief Build `fall l r`. */
-	static tref build_bf_fall(tref l, tref r);
+	static tref build_bf_fall(tref l, tref r,
+		bool calculate_quant_id = true);
 	/** @brief Build `fex l r`. */
-	static tref build_bf_fex(tref l, tref r);
+	static tref build_bf_fex(tref l, tref r,
+		bool calculate_quant_id = true);
 	/** @brief Build `l | r`. */
 	static tref build_bf_or(tref l, tref r);
 	/** @brief Build disjunction of all terms in @p bfs with type @p type_id. */

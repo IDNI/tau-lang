@@ -26,20 +26,29 @@ tref canonize_quantifier_ids(tref fm) {
 	// depth below the current quantifier + 1
 	// Going down fm again, replace found bound variables with corresponding
 	// quantifier id variable
+	// Formula binders (wff_all/wff_ex) and functional quantifiers
+	// (bf_fall/bf_fex) share ONE id space and ONE depth count, so an outer
+	// binder's id is strictly greater than the id of any binder below it,
+	// whatever the two kinds are. That strict decrease along a path is what
+	// makes substitution into a bound scope capture-safe, and it is why the
+	// numbering may never restart inside a term.
+	// Both traversals must walk the same nodes: pre_order calls `up` only on
+	// nodes whose visitor returned true, so populate_scope must not prune --
+	// a pruned quantifier would push a scope that populate_ids never pops.
 	subtree_map<node, size_t> scope_to_id;
 	std::vector<size_t> scope_id;
 	auto populate_scope = [&](tref n) {
-		if (is_quantifier<node>(n)) {
+		if (is_logical_or_functional_quant<node>(n)) {
 			scope_id.push_back(1);
 			for (size_t i = scope_id.size(); i > 1; --i) {
 				if (scope_id[i-2] == scope_id[i-1])
 					++scope_id[i-2];
 			}
 		}
-		return !tree<node>::get(n).is_term();
+		return true;
 	};
 	auto populate_ids = [&](tref n) {
-		if (is_quantifier<node>(n)) {
+		if (is_logical_or_functional_quant<node>(n)) {
 			scope_to_id.emplace(n, scope_id.back());
 			scope_id.pop_back();
 		}
@@ -49,7 +58,7 @@ tref canonize_quantifier_ids(tref fm) {
 	subtree_map<node, std::vector<size_t>> var_to_id;
 	subtree_map<node, tref> old_name;
 	auto update_var = [&](tref n) {
-		if (is_quantifier<node>(n)) {
+		if (is_logical_or_functional_quant<node>(n)) {
 			DBG(assert(scope_to_id.contains(n));)
 			if (auto it = var_to_id.find(tau::trim(n)); it != var_to_id.end()) {
 				it->second.push_back(scope_to_id.find(n)->second);
@@ -66,7 +75,7 @@ tref canonize_quantifier_ids(tref fm) {
 		return n;
 	};
 	auto update_var_up = [&](tref n) {
-		if (is_quantifier<node>(n)) {
+		if (is_logical_or_functional_quant<node>(n)) {
 			DBG(assert(old_name.contains(tau::trim(n)));)
 			DBG(assert(var_to_id.contains(
 				old_name.find(tau::trim(n))->second));)
@@ -185,10 +194,12 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 		build_wff_imply<node>(build_wff_neg<node>(x), z)));
 }
 
-// Largest purely-numeric bound-variable name over all quantifiers in fm
-// (0 when there is none); build_wff_all/ex use id + 1 as a fresh name.
-// Names too big for int_t saturate to the int_t maximum. Term subtrees
-// are not descended into.
+// Largest purely-numeric bound-variable name over all quantifiers in fm --
+// formula binders and functional quantifiers alike, since they share one id
+// space; build_wff_all/ex and build_bf_fall/fex use id + 1 as a fresh name
+// (0 when there is none). Names too big for int_t saturate to the int_t
+// maximum. Descending below a numerically named quantifier is unnecessary:
+// canonical ids strictly decrease along a path.
 template <NodeType node>
 int_t find_biggest_quant_id(tref fm) {
 	using tau = tree<node>;
@@ -200,7 +211,7 @@ int_t find_biggest_quant_id(tref fm) {
 		return true;
 	};
 	auto f = [&](tref n) {
-		if (is_quantifier<node>(n)) {
+		if (is_logical_or_functional_quant<node>(n)) {
 			if (auto name = get_var_name<node>(tau::trim(n));
 				is_number(name)) {
 				try {
@@ -212,7 +223,7 @@ int_t find_biggest_quant_id(tref fm) {
 				return false;
 			}
 		}
-		return !tau::get(n).is_term();
+		return true;
 	};
 	pre_order<node>(fm).visit_unique(f);
 	return id;
@@ -546,20 +557,37 @@ tref build_bf_nlt(tref l, tref r) {
 // -----------------------------------------------------------------------------
 // term builders
 
+// If calculate_quant_id is false no variable renaming in r is performed,
+// and it is assumed that l has correct representation -- the same contract
+// build_wff_all/ex carry, over the one shared quantifier id space.
 template <NodeType node>
-tref build_bf_fall(tref l, tref r) {
+tref build_bf_fall(tref l, tref r, bool calculate_quant_id) {
 	using tau = tree<node>;
 	DBG(assert(l != nullptr && r != nullptr);)
 	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
+	tref res = tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
+	if (calculate_quant_id) {
+		// Find the biggest quantifier id in r and rename the subscript
+		// to id + 1
+		const int_t id = find_biggest_quant_id<node>(r);
+		return tau::get(res).replace(l,
+			tau::build_variable(std::to_string(id + 1),
+				tau::get(l).get_ba_type()));
+	} else return res;
 }
 
 template <NodeType node>
-tref build_bf_fex(tref l, tref r) {
+tref build_bf_fex(tref l, tref r, bool calculate_quant_id) {
 	using tau = tree<node>;
 	DBG(assert(l != nullptr && r != nullptr);)
 	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
+	tref res = tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
+	if (calculate_quant_id) {
+		const int_t id = find_biggest_quant_id<node>(r);
+		return tau::get(res).replace(l,
+			tau::build_variable(std::to_string(id + 1),
+				tau::get(l).get_ba_type()));
+	} else return res;
 }
 
 template <NodeType node>
@@ -1373,13 +1401,13 @@ tref tree<node>::build_bf_nlt(tref l, tref r) {
 // term builders
 
 template <NodeType node>
-tref tree<node>::build_bf_fall(tref l, tref r) {
-	return tau_lang::build_bf_fall<node>(l, r);
+tref tree<node>::build_bf_fall(tref l, tref r, bool calculate_quant_id) {
+	return tau_lang::build_bf_fall<node>(l, r, calculate_quant_id);
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_fex(tref l, tref r) {
-	return tau_lang::build_bf_fex<node>(l, r);
+tref tree<node>::build_bf_fex(tref l, tref r, bool calculate_quant_id) {
+	return tau_lang::build_bf_fex<node>(l, r, calculate_quant_id);
 }
 
 template <NodeType node>

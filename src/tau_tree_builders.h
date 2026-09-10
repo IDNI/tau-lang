@@ -150,9 +150,9 @@ template <NodeType node> tref build_bf_nlt(tref l, tref r);
 // ---------------------------------------------------------------------------
 
 /** @brief Build `fall l r`. */
-template <NodeType node> tref build_bf_fall(tref l, tref r);
+template <NodeType node> tref build_bf_fall(tref l, tref r, bool calculate_quant_id = true);
 /** @brief Build `fex l r`. */
-template <NodeType node> tref build_bf_fex(tref l, tref r);
+template <NodeType node> tref build_bf_fex(tref l, tref r, bool calculate_quant_id = true);
 /** @brief Build `l | r`. */
 template <NodeType node> tref build_bf_or(tref l, tref r);
 /** @brief Build disjunction of @p bfs with type @p type_id. */

@@ -64,15 +64,18 @@ TEST_SUITE("pretty printer") {
 			"x !>= y.",
 			"x < y.",
 			"x !< y.",
-			"fall p px = 0.",
-			"fex p px = 0.",
 		};
 		for (auto& sample : identical)
 			CHECK( check(sample) );
 		// the printer drops variable type annotations and operator
-		// whitespace on bv terms, keeps the cast, and re-annotates io
-		// variables with their inferred :tau type
+		// whitespace on bv terms, keeps the cast, re-annotates io
+		// variables with their inferred :tau type, and prints the
+		// canonical numeric id of every bound variable -- functional
+		// quantifiers included, since they share one id space with
+		// all/ex (canonize_quantifier_ids)
 		vector<std::pair<string, string>> different = {
+			{ "fall p px = 0.", "fall b1 b1 x = 0." },
+			{ "fex p px = 0.",  "fex b1 b1 x = 0." },
 			{ "x:bv[8] + y:bv[8] = 0.",  "x+y = 0." },
 			{ "x:bv[8] - y:bv[8] = 0.",  "x-y = 0." },
 			{ "x:bv[8] * y:bv[8] = 0.",  "x*y = 0." },
@@ -102,7 +105,7 @@ TEST_SUITE("pretty printer") {
 		for (auto& [sample, expected] : different)
 			CHECK( check(sample, expected) );
 		// nested bf quantifiers merge into a comma list, like all/ex
-		CHECK( check("fall p fall q pqx = 0.", "fall p, q pqx = 0.") );
-		CHECK( check("fex p fex q pqx = 0.", "fex p, q pqx = 0.") );
+		CHECK( check("fall p fall q pqx = 0.", "fall b2, b1 b2 b1 x = 0.") );
+		CHECK( check("fex p fex q pqx = 0.", "fex b2, b1 b2 b1 x = 0.") );
 	}
 }
