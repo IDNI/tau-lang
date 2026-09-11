@@ -212,43 +212,43 @@ tref build_wff_semantic_neg(tref l) {
 // LTL(ABA) operators: U (until), R (release), W (weak until), S, T
 // (F/finally is wff_sometimes -- build_wff_sometimes above.)
 template <NodeType node>
-tref build_wff_U(tref l, tref r) {
+tref build_wff_until(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_U, l, r));
+	return tau::get(tau::wff, tau::get(tau::wff_until, l, r));
 }
 
 template <NodeType node>
-tref build_wff_R(tref l, tref r) {
+tref build_wff_release(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_R, l, r));
+	return tau::get(tau::wff, tau::get(tau::wff_release, l, r));
 }
 
 template <NodeType node>
-tref build_wff_W(tref l, tref r) {
+tref build_wff_weak_until(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_W, l, r));
+	return tau::get(tau::wff, tau::get(tau::wff_weak_until, l, r));
 }
 
 template <NodeType node>
-tref build_wff_S(tref l, tref r) {
+tref build_wff_since(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_S, l, r));
+	return tau::get(tau::wff, tau::get(tau::wff_since, l, r));
 }
 
 template <NodeType node>
-tref build_wff_T(tref l, tref r) {
+tref build_wff_trigger(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_T, l, r));
+	return tau::get(tau::wff, tau::get(tau::wff_trigger, l, r));
 }
 
 template <NodeType node>
@@ -1290,28 +1290,28 @@ tref tree<node>::build_wff_semantic_neg(tref l) {
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_U(tref l, tref r) {
-	return tau_lang::build_wff_U<node>(l, r);
+tref tree<node>::build_wff_until(tref l, tref r) {
+	return tau_lang::build_wff_until<node>(l, r);
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_R(tref l, tref r) {
-	return tau_lang::build_wff_R<node>(l, r);
+tref tree<node>::build_wff_release(tref l, tref r) {
+	return tau_lang::build_wff_release<node>(l, r);
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_W(tref l, tref r) {
-	return tau_lang::build_wff_W<node>(l, r);
+tref tree<node>::build_wff_weak_until(tref l, tref r) {
+	return tau_lang::build_wff_weak_until<node>(l, r);
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_S(tref l, tref r) {
-	return tau_lang::build_wff_S<node>(l, r);
+tref tree<node>::build_wff_since(tref l, tref r) {
+	return tau_lang::build_wff_since<node>(l, r);
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_T(tref l, tref r) {
-	return tau_lang::build_wff_T<node>(l, r);
+tref tree<node>::build_wff_trigger(tref l, tref r) {
+	return tau_lang::build_wff_trigger<node>(l, r);
 }
 
 template <NodeType node>

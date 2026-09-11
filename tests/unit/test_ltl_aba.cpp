@@ -86,22 +86,22 @@ TEST_SUITE("LTL parser") {
 		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
-	TEST_CASE("U operator parses as wff_U") {
+	TEST_CASE("U operator parses as wff_until") {
 		tref fm = wff("(o1[t] = 0) U (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_U));
+		CHECK(tau::get(fm)[0].is(tau::wff_until));
 	}
 
-	TEST_CASE("R operator parses as wff_R") {
+	TEST_CASE("R operator parses as wff_release") {
 		tref fm = wff("(o1[t] = 0) R (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_R));
+		CHECK(tau::get(fm)[0].is(tau::wff_release));
 	}
 
-	TEST_CASE("W operator parses as wff_W") {
+	TEST_CASE("W operator parses as wff_weak_until") {
 		tref fm = wff("(o1[t] = 0) W (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_W));
+		CHECK(tau::get(fm)[0].is(tau::wff_weak_until));
 	}
 
 	TEST_CASE("G is an alias for wff_always") {
@@ -418,22 +418,22 @@ TEST_SUITE("LTL NNF rules") {
 		CHECK(tau::get(nnf)[0].is(tau::wff_always));
 	}
 
-	// ¬(φ U ψ) = (¬φ) R (¬ψ)  →  wff_R outermost
+	// ¬(φ U ψ) = (¬φ) R (¬ψ)  →  wff_release outermost
 	TEST_CASE("push_negation_in: !(phi U psi) = (!phi) R (!psi)") {
 		tref fm = wff("!((o1[t] = 0) U (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
-		CHECK(tau::get(nnf)[0].is(tau::wff_R));
+		CHECK(tau::get(nnf)[0].is(tau::wff_release));
 	}
 
-	// ¬(φ R ψ) = (¬φ) U (¬ψ)  →  wff_U outermost
+	// ¬(φ R ψ) = (¬φ) U (¬ψ)  →  wff_until outermost
 	TEST_CASE("push_negation_in: !(phi R psi) = (!phi) U (!psi)") {
 		tref fm = wff("!((o1[t] = 0) R (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
-		CHECK(tau::get(nnf)[0].is(tau::wff_U));
+		CHECK(tau::get(nnf)[0].is(tau::wff_until));
 	}
 
 	// ¬(φ W ψ) = (¬φ R ¬ψ) ∧ F(¬φ)  →  wff_and outermost
@@ -537,7 +537,7 @@ TEST_SUITE("LTL normalization correctness") {
 		CHECK(sat(fm));
 	}
 
-	TEST_CASE("normalizer preserves wff_U node") {
+	TEST_CASE("normalizer preserves wff_until node") {
 		tref fm = spec("(o1[t] = 0) U (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -3637,7 +3637,7 @@ TEST_SUITE("Adversarial: parser and errors") {
 	TEST_CASE("W operator with boolean true right operand") {
 		tref fm = spec("(o1[t] = 0) W T.");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_W));
+		CHECK(tau::get(fm)[0].is(tau::wff_weak_until));
 	}
 
 	TEST_CASE("Trailing garbage before dot returns nullptr") {

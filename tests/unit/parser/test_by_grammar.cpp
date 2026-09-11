@@ -8,7 +8,7 @@
 // Grammar productions covered (tau.tgf):
 //
 //   WFF unary:       wff_sometimes, wff_always (G), wff_neg (!)
-//   WFF binary temporal: wff_U, wff_R, wff_W, wff_S, wff_T
+//   WFF binary temporal: wff_until, wff_release, wff_weak_until, wff_since, wff_trigger
 //   WFF binary boolean:  wff_and(&&), wff_or(||), wff_xor(^^),
 //                        wff_imply(->), wff_rimply(<-), wff_equiv(<->)
 //   WFF ternary:     wff_conditional(? :)
@@ -102,7 +102,7 @@ TEST_CASE("[SHAPE-A-27] !(!(!A1))") { tref fm = spec("! (! (! (o1[t]:qlt > {0}:q
 } // SHAPE-A
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SHAPE-B: Binary temporal operators (wff_U/R/W/S/T) — atomic operands
+// SHAPE-B: Binary temporal operators (wff_until/release/weak_until/since/trigger) — atomic operands
 // ═══════════════════════════════════════════════════════════════════════════
 
 TEST_SUITE("SHAPE-B: Binary temporal with atomic operands") {
@@ -484,7 +484,7 @@ TEST_CASE("[SHAPE-P-12] F(F(F(A1))) && G(G(G(A2))) && F(G(F(A3)))") { tref fm = 
 
 TEST_SUITE("SHAPE-Q: Boolean combos of temporals as temporal operands") {
 
-// ─── wff_U with boolean-combo operands ───────────────────────────────────
+// ─── wff_until with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-01] ((F A1) || (A1 U A2)) U (A2 S A3) — || of unary+U as U-left") {
 	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) U ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt)).");
@@ -516,7 +516,7 @@ TEST_CASE("[SHAPE-Q-06] (F A1 <-> A1 U A2) U (G A2 || A2 S A3) — <-> and || as
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
-// ─── wff_R with boolean-combo operands ───────────────────────────────────
+// ─── wff_release with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-07] ((F A1) || (A2 U A3)) R ((G A1) && (A2 W A3))") {
 	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))) R ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) W (o3[t]:qlt > {0}:qlt))).");
@@ -528,7 +528,7 @@ TEST_CASE("[SHAPE-Q-08] (G A1 ^^ A1 U A2) R (F A3 -> A2 R A3) — ^^ and -> as R
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
-// ─── wff_W with boolean-combo operands ───────────────────────────────────
+// ─── wff_weak_until with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-09] ((F A1) && (A2 S A3)) W ((G A2) || (A1 T A3))") {
 	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))) W ((G (o2[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) T (o3[t]:qlt > {0}:qlt))).");
@@ -540,7 +540,7 @@ TEST_CASE("[SHAPE-Q-10] (F A1 <- A1 R A2) W (G A3 <-> A2 U A3) — <- and <-> as
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
-// ─── wff_S with boolean-combo operands ───────────────────────────────────
+// ─── wff_since with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-11] ((A1 U A2) || F A3) S ((G A1) && (A2 R A3)) — || and && as S operands") {
 	tref fm = spec("(((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) || (F (o3[t]:qlt > {0}:qlt))) S ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))).");
@@ -552,7 +552,7 @@ TEST_CASE("[SHAPE-Q-12] (F A1 ^^ G A2) S (A1 W A2 -> F A3) — ^^ and -> as S op
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
-// ─── wff_T with boolean-combo operands ───────────────────────────────────
+// ─── wff_trigger with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-13] ((F A1) || (A2 W A3)) T ((G A2) && (A1 U A3))") {
 	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) W (o3[t]:qlt > {0}:qlt))) T ((G (o2[t]:qlt > {0}:qlt)) && ((o1[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))).");

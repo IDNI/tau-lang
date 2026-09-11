@@ -1902,9 +1902,9 @@ result<solution<node>> solve(tref form, solver_options options) {
 	{
 		auto is_unsupported_temporal = [](tref n) {
 			const auto& t = tree<node>::get(n);
-			return t.is(tau::wff_U)
-				|| t.is(tau::wff_R) || t.is(tau::wff_W)
-				|| t.is(tau::wff_S) || t.is(tau::wff_T);
+			return t.is(tau::wff_until)
+				|| t.is(tau::wff_release) || t.is(tau::wff_weak_until)
+				|| t.is(tau::wff_since) || t.is(tau::wff_trigger);
 		};
 		assert(!tau::get(form).find_top(is_unsupported_temporal));
 	}

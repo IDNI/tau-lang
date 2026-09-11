@@ -731,15 +731,15 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_wff_semantic_neg(tref n);
 	// LTL(ABA) operators (F/finally is build_wff_sometimes above)
 	/** @brief Build `l U r` — strong until (r must eventually hold). */
-	static tref build_wff_U(tref l, tref r);
+	static tref build_wff_until(tref l, tref r);
 	/** @brief Build `l R r` — release (r holds up to and incl. first l). */
-	static tref build_wff_R(tref l, tref r);
+	static tref build_wff_release(tref l, tref r);
 	/** @brief Build `l W r` — weak until (like U, but r may never hold). */
-	static tref build_wff_W(tref l, tref r);
+	static tref build_wff_weak_until(tref l, tref r);
 	/** @brief Build `l S r` — since (past: r held once, l ever since). */
-	static tref build_wff_S(tref l, tref r);
+	static tref build_wff_since(tref l, tref r);
 	/** @brief Build `l T r` — trigger (past dual of S). */
-	static tref build_wff_T(tref l, tref r);
+	static tref build_wff_trigger(tref l, tref r);
 	/** @brief Build `x ? y : z` conditional. */
 	static tref build_wff_conditional(tref x, tref y, tref z);
 	/** @brief Build `all bound_var. subformula`. */

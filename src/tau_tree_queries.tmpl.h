@@ -63,11 +63,11 @@ template <NodeType node>
 bool is_temporal_quantifier(tref n) {
 	return tree<node>::get(n).is(node::type::wff_always)
 		|| tree<node>::get(n).is(node::type::wff_sometimes)
-		|| tree<node>::get(n).is(node::type::wff_U)
-		|| tree<node>::get(n).is(node::type::wff_R)
-		|| tree<node>::get(n).is(node::type::wff_W)
-		|| tree<node>::get(n).is(node::type::wff_S)
-		|| tree<node>::get(n).is(node::type::wff_T)
+		|| tree<node>::get(n).is(node::type::wff_until)
+		|| tree<node>::get(n).is(node::type::wff_release)
+		|| tree<node>::get(n).is(node::type::wff_weak_until)
+		|| tree<node>::get(n).is(node::type::wff_since)
+		|| tree<node>::get(n).is(node::type::wff_trigger)
 		|| tree<node>::get(n).is(node::type::wff_A)
 		|| tree<node>::get(n).is(node::type::wff_E)
 		|| tree<node>::get(n).is(node::type::wff_semantic_neg);

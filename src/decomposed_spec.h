@@ -53,7 +53,7 @@ struct decomposed_spec {
 //   - wff_always(φ)       → invariant component if φ is non-temporal,
 //                           else reactive (G(F(...)) etc.).
 //   - wff_sometimes / U / R / W → reactive.
-//   - wff_S / T           → reactive (past-LTL, compiled via S/T pass).
+//   - wff_since / T           → reactive (past-LTL, compiled via S/T pass).
 //   - non-temporal        → transient (hold at t=0; their G-lift, if any,
 //                           is handled by the caller's initial-conditions
 //                           logic).
@@ -108,9 +108,9 @@ inline decomposed_spec<node> decompose_spec(tref main_fm) {
 			return;
 		}
 		if (nt == tau::wff_sometimes
-		 || nt == tau::wff_U
-		 || nt == tau::wff_R || nt == tau::wff_W
-		 || nt == tau::wff_S || nt == tau::wff_T
+		 || nt == tau::wff_until
+		 || nt == tau::wff_release || nt == tau::wff_weak_until
+		 || nt == tau::wff_since || nt == tau::wff_trigger
 		 || nt == tau::wff_A || nt == tau::wff_E
 		 || nt == tau::wff_semantic_neg) {
 			// A top-level `sometimes phi` is a liveness

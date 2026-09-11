@@ -1023,11 +1023,11 @@ static tref translate_ctl_star(tref fm,
 		case tau::wff_imply: return tau::build_wff_imply(new_children[0], new_children[1]);
 		case tau::wff_equiv: return tau::build_wff_equiv(new_children[0], new_children[1]);
 		case tau::wff_xor:   return tau::build_wff_xor(new_children[0], new_children[1]);
-		case tau::wff_U:     return tau::build_wff_U(new_children[0], new_children[1]);
-		case tau::wff_R:     return tau::build_wff_R(new_children[0], new_children[1]);
-		case tau::wff_W:     return tau::build_wff_W(new_children[0], new_children[1]);
-		case tau::wff_S:     return tau::build_wff_S(new_children[0], new_children[1]);
-		case tau::wff_T:     return tau::build_wff_T(new_children[0], new_children[1]);
+		case tau::wff_until:      return tau::build_wff_until(new_children[0], new_children[1]);
+		case tau::wff_release:    return tau::build_wff_release(new_children[0], new_children[1]);
+		case tau::wff_weak_until: return tau::build_wff_weak_until(new_children[0], new_children[1]);
+		case tau::wff_since:      return tau::build_wff_since(new_children[0], new_children[1]);
+		case tau::wff_trigger:    return tau::build_wff_trigger(new_children[0], new_children[1]);
 		// LT-13: rimply was missing -- `phi <- E psi` kept its E
 		// untranslated and later collapsed to "1" in the skeleton
 		case tau::wff_rimply: return tau::build_wff_rimply(

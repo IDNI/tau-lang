@@ -402,9 +402,9 @@ tref normalize_temporal_quantifiers(tref fm) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tree<node>::wff_U
-		    || nt == tree<node>::wff_R || nt == tree<node>::wff_W
-		    || nt == tree<node>::wff_S || nt == tree<node>::wff_T
+		return nt == tree<node>::wff_until
+		    || nt == tree<node>::wff_release || nt == tree<node>::wff_weak_until
+		    || nt == tree<node>::wff_since || nt == tree<node>::wff_trigger
 		    || nt == tree<node>::wff_A || nt == tree<node>::wff_E
 		    || nt == tree<node>::wff_semantic_neg;
 	};

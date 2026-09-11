@@ -40,25 +40,25 @@ tref push_negation_one_in(tref fm) {
 			//   ¬(φ U ψ) = (¬φ) R (¬ψ)
 			//   ¬(φ R ψ) = (¬φ) U (¬ψ)
 			//   ¬(φ W ψ) = (¬φ R ¬ψ) ∧ F(¬φ)  [dual is strong-release M]
-			case tau::wff_U: return tau::build_wff_R(
+			case tau::wff_until: return tau::build_wff_release(
 						tau::build_wff_neg(ct[0].first()),
 						tau::build_wff_neg(ct[0].second()));
-			case tau::wff_R: return tau::build_wff_U(
+			case tau::wff_release: return tau::build_wff_until(
 						tau::build_wff_neg(ct[0].first()),
 						tau::build_wff_neg(ct[0].second()));
-			case tau::wff_W: {
+			case tau::wff_weak_until: {
 				tref neg_l = tau::build_wff_neg(ct[0].first());
 				tref neg_r = tau::build_wff_neg(ct[0].second());
 				// ¬(φ W ψ) = (¬φ R ¬ψ) ∧ F(¬φ)
 				return tau::build_wff_and(
-					tau::build_wff_R(neg_l, neg_r),
+					tau::build_wff_release(neg_l, neg_r),
 					tau::build_wff_sometimes(neg_l));
 			}
 			// ¬(φ S ψ) = ¬φ T ¬ψ  (past duals)
-			case tau::wff_S: return tau::build_wff_T(
+			case tau::wff_since: return tau::build_wff_trigger(
 						tau::build_wff_neg(ct[0].first()),
 						tau::build_wff_neg(ct[0].second()));
-			case tau::wff_T: return tau::build_wff_S(
+			case tau::wff_trigger: return tau::build_wff_since(
 						tau::build_wff_neg(ct[0].first()),
 						tau::build_wff_neg(ct[0].second()));
 			// CTL* NNF duals: ¬A χ = E ¬χ,  ¬E χ = A ¬χ

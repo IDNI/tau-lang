@@ -97,15 +97,15 @@ template <NodeType node> tref build_wff_neg(tref n);
 // LTL(ABA) operator wrappers (TT2-16: previously defined in the tmpl with
 // no header declaration). F/finally is build_wff_sometimes above.
 /** @brief Build `l U r` — strong until. */
-template <NodeType node> tref build_wff_U(tref l, tref r);
+template <NodeType node> tref build_wff_until(tref l, tref r);
 /** @brief Build `l R r` — release. */
-template <NodeType node> tref build_wff_R(tref l, tref r);
+template <NodeType node> tref build_wff_release(tref l, tref r);
 /** @brief Build `l W r` — weak until. */
-template <NodeType node> tref build_wff_W(tref l, tref r);
+template <NodeType node> tref build_wff_weak_until(tref l, tref r);
 /** @brief Build `l S r` — since (past). */
-template <NodeType node> tref build_wff_S(tref l, tref r);
+template <NodeType node> tref build_wff_since(tref l, tref r);
 /** @brief Build `l T r` — trigger (past dual of S). */
-template <NodeType node> tref build_wff_T(tref l, tref r);
+template <NodeType node> tref build_wff_trigger(tref l, tref r);
 /** @brief Largest canonical quantifier id in @p fm (0 when none). */
 template <NodeType node> int_t find_biggest_quant_id(tref fm);
 

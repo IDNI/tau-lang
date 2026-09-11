@@ -56,8 +56,8 @@ inline size_t max_cover_products = 256;
 // ── Detection ────────────────────────────────────────────────────────────────
 
 // True iff the formula has an operator the safety pipeline cannot decide
-// satisfiability for: wff_U, wff_R, wff_W, and the past operators wff_S,
-// wff_T (past formulas must route to the LTL pipeline's temporal testers).
+// satisfiability for: wff_until, wff_release, wff_weak_until, and the past operators wff_since,
+// wff_trigger (past formulas must route to the LTL pipeline's temporal testers).
 template <NodeType node>
 bool sat_has_ltl_operators(tref fm);
 
@@ -71,7 +71,7 @@ bool realizability_has_game_operators(tref fm);
 // ── Data-atom extraction ──────────────────────────────────────────────────────
 
 // A "data atom" is a maximal subtree that contains no temporal operators
-// (wff_always, wff_sometimes, wff_U, wff_R, wff_W) but does contain at least
+// (wff_always, wff_sometimes, wff_until, wff_release, wff_weak_until) but does contain at least
 // one io_var.  Each distinct atom is assigned a fresh proposition name "p0","p1"...
 //
 // Returns a vector of {tref, proposition_name} in discovery order.

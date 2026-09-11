@@ -430,11 +430,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ wff_sometimes,      380 },
 			{ wff_A,              377 },
 			{ wff_E,              378 },
-			{ wff_U,              382 },
-			{ wff_R,              383 },
-			{ wff_W,              384 },
-			{ wff_S,              385 },
-			{ wff_T,              386 },
+			{ wff_until,          382 },
+			{ wff_release,        383 },
+			{ wff_weak_until,     384 },
+			{ wff_since,          385 },
+			{ wff_trigger,        386 },
 			{ wff_always,         390 },
 			{ wff_conditional,    400 },
 			{ wff_ex,             430 },
@@ -859,15 +859,15 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 						last_quant_nt = nul;  break;
 			case wff_equiv:         out(" <-> ");
 						last_quant_nt = nul; break;
-			case wff_U:             out(" U ");
+			case wff_until:         out(" U ");
 						last_quant_nt = nul; break;
-			case wff_R:             out(" R ");
+			case wff_release:       out(" R ");
 						last_quant_nt = nul; break;
-			case wff_W:             out(" W ");
+			case wff_weak_until:    out(" W ");
 						last_quant_nt = nul; break;
-			case wff_S:             out(" S ");
+			case wff_since:         out(" S ");
 						last_quant_nt = nul; break;
-			case wff_T:             out(" T ");
+			case wff_trigger:       out(" T ");
 						last_quant_nt = nul; break;
 
 			case bf_interval:       out(" <= "); last_quant_nt = nul; break;

@@ -9,9 +9,9 @@ namespace idni::tau_lang {
 
 // Operators the safety pipeline cannot decide satisfiability for.
 static inline bool sat_needs_ltl_pipeline(size_t nt) {
-	return nt == tau_parser::wff_U || nt == tau_parser::wff_R
-	    || nt == tau_parser::wff_W || nt == tau_parser::wff_S
-	    || nt == tau_parser::wff_T;
+	return nt == tau_parser::wff_until || nt == tau_parser::wff_release
+	    || nt == tau_parser::wff_weak_until || nt == tau_parser::wff_since
+	    || nt == tau_parser::wff_trigger;
 }
 
 // Operators whose realizability needs the game. The safety pipeline
@@ -30,11 +30,11 @@ static bool is_temporal_op(tref n) {
 	auto nt = t[0].value.nt;
 	return nt == tau::wff_always
 	    || nt == tau::wff_sometimes
-	    || nt == tau::wff_U
-	    || nt == tau::wff_R
-	    || nt == tau::wff_W
-	    || nt == tau::wff_S
-	    || nt == tau::wff_T
+	    || nt == tau::wff_until
+	    || nt == tau::wff_release
+	    || nt == tau::wff_weak_until
+	    || nt == tau::wff_since
+	    || nt == tau::wff_trigger
 	    || nt == tau::wff_A
 	    || nt == tau::wff_E;
 }
@@ -69,7 +69,7 @@ static bool has_past_operators(tref fm) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tau::wff_S || nt == tau::wff_T;
+		return nt == tau::wff_since || nt == tau::wff_trigger;
 	}) != nullptr;
 }
 
@@ -476,13 +476,13 @@ static std::string skeleton_wff_with_testers(
 		return "G(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
 	case tau::wff_sometimes:
 		return "F(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
-	case tau::wff_U:
+	case tau::wff_until:
 		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
 		     + " U " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
-	case tau::wff_R:
+	case tau::wff_release:
 		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
 		     + " R " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
-	case tau::wff_W:
+	case tau::wff_weak_until:
 		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
 		     + " W " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
 
@@ -498,7 +498,7 @@ static std::string skeleton_wff_with_testers(
 	//
 	// The G(X(s) <-> ...) constraint updates the state variable for
 	// the next step.  !s at t=0 encodes (φ S ψ)(−1) = false.
-	case tau::wff_S: {
+	case tau::wff_since: {
 		std::string phi_skel = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
 		std::string psi_skel = skeleton_str_with_testers<node>(inner.second(), atoms, testers);
 		std::string svar = "__past_s" + std::to_string(testers.size());
@@ -508,7 +508,7 @@ static std::string skeleton_wff_with_testers(
 		// Return the CURRENT-step evaluation (not the state variable)
 		return eval;
 	}
-	case tau::wff_T: {
+	case tau::wff_trigger: {
 		// φ T ψ = ¬(¬φ S ¬ψ)
 		std::string phi_skel = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
 		std::string psi_skel = skeleton_str_with_testers<node>(inner.second(), atoms, testers);

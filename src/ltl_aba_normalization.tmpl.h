@@ -1775,14 +1775,14 @@ struct ltl_aba_solution {
 //
 // φ S ψ  ("φ Since ψ"): introduce auxiliary output o__ltl_s{k}__ with:
 //   G(o__ltl_s{k}__[t]:bv = {1}  ↔  (ψ[t]  ∨  (φ[t]  ∧  o__ltl_s{k}__[t-1]:bv = {1})))
-// and replace wff_S(φ,ψ) with the atom  o__ltl_s{k}__[t]:bv = {1}.
+// and replace wff_since(φ,ψ) with the atom  o__ltl_s{k}__[t]:bv = {1}.
 //
 // φ T ψ  ("φ Trigger ψ") = ¬(¬φ S ¬ψ): rewrite and apply S.
 //
-// After the pass the formula no longer contains wff_S or wff_T, so it can
+// After the pass the formula no longer contains wff_since or wff_trigger, so it can
 // be sent to ltlsynt.
 
-// Return true if the tree rooted at fm contains any wff_S or wff_T node.
+// Return true if the tree rooted at fm contains any wff_since or wff_trigger node.
 template <NodeType node>
 static bool has_since_trigger(tref fm) {
 	using tau = tree<node>;
@@ -1790,7 +1790,7 @@ static bool has_since_trigger(tref fm) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tree<node>::wff_S || nt == tree<node>::wff_T;
+		return nt == tree<node>::wff_since || nt == tree<node>::wff_trigger;
 	}) != nullptr;
 }
 
@@ -1820,7 +1820,7 @@ static tref build_carrier_eq_aux(const std::string& name, int shift, int value) 
 		*definitions<node>::instance().get_io_context(), fm);
 }
 
-// Recursively rewrite all wff_S / wff_T nodes.
+// Recursively rewrite all wff_since / wff_trigger nodes.
 // Uses `counter` for fresh auxiliary names.
 // `aux_pairs` collects (curr, prev) atom refs for each S operator.
 // LT-14 STATUS: no caller consumes `aux_pairs` today -- the described
@@ -1870,13 +1870,13 @@ static tref compile_since_trigger_rec(
 	const bool is_outer = (spine_pol > 0);
 	auto nt = t[0].value.nt;
 
-	// wff_T: φ T ψ = ¬(¬φ S ¬ψ)
+	// wff_trigger: φ T ψ = ¬(¬φ S ¬ψ)
 	//
 	// Trigger semantics (past dual of Release):
 	//   π,i ⊨ φ T ψ  iff  ∀ j ≤ i : ψ@j  ∨  ∃ k ∈ (j,i] : φ@k
 	// j = i is in range and its excuse window (i,i] is empty, so φ T ψ at i
 	// requires ψ at i unconditionally.
-	if (nt == tau::wff_T) {
+	if (nt == tau::wff_trigger) {
 		tref phi = t[0].first();
 		tref psi = t[0].second();
 
@@ -1888,7 +1888,7 @@ static tref compile_since_trigger_rec(
 
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
-		tref s_node  = tau::build_wff_S(neg_phi, neg_psi);
+		tref s_node  = tau::build_wff_since(neg_phi, neg_psi);
 
 		// The rewritten S must NOT inherit is_outer: the outer obligation
 		// belongs to ¬(the S), not to the S.  Funnelling is_outer through
@@ -1919,8 +1919,8 @@ static tref compile_since_trigger_rec(
 		return compiled;
 	}
 
-	// wff_S: φ S ψ
-	if (nt == tau::wff_S) {
+	// wff_since: φ S ψ
+	if (nt == tau::wff_since) {
 		tref phi = t[0].first();
 		tref psi = t[0].second();
 
@@ -2012,7 +2012,7 @@ static tref compile_since_trigger_rec(
 	}
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
-	// wff_sometimes, wff_U, wff_R, wff_W, wff_always, etc.)
+	// wff_sometimes, wff_until, wff_release, wff_weak_until, wff_always, etc.)
 	//
 	// The spine polarity is propagated, NOT the old boolean is_outer:
 	//   wff_and  keeps a positive spine (asserting A ∧ B asserts both);

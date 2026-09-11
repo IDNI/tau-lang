@@ -2518,11 +2518,11 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			if (!t.is(tree<node>::wff) || !t.has_child())
 				return false;
 			const auto nt = t[0].value.nt;
-			return nt == tree<node>::wff_U
-			    || nt == tree<node>::wff_R
-			    || nt == tree<node>::wff_W
-			    || nt == tree<node>::wff_S
-			    || nt == tree<node>::wff_T;
+			return nt == tree<node>::wff_until
+			    || nt == tree<node>::wff_release
+			    || nt == tree<node>::wff_weak_until
+			    || nt == tree<node>::wff_since
+			    || nt == tree<node>::wff_trigger;
 		}) != nullptr;
 	};
 	{

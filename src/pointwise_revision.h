@@ -47,11 +47,11 @@ temporal_op get_temporal_op(tref fm) {
 	auto nt = t[0].value.nt;
 	if (nt == tau::wff_always)    return temporal_op::ALWAYS;
 	if (nt == tau::wff_sometimes) return temporal_op::SOMETIMES;
-	if (nt == tau::wff_U)         return temporal_op::U;
-	if (nt == tau::wff_R)         return temporal_op::R;
-	if (nt == tau::wff_W)         return temporal_op::W;
-	if (nt == tau::wff_S)         return temporal_op::S;
-	if (nt == tau::wff_T)         return temporal_op::T;
+	if (nt == tau::wff_until)         return temporal_op::U;
+	if (nt == tau::wff_release)         return temporal_op::R;
+	if (nt == tau::wff_weak_until)         return temporal_op::W;
+	if (nt == tau::wff_since)         return temporal_op::S;
+	if (nt == tau::wff_trigger)         return temporal_op::T;
 	return temporal_op::NONE;
 }
 
@@ -146,11 +146,11 @@ template <NodeType node>
 tref rebuild_from_roles(temporal_op op, tref inv, tref commit) {
 	using tau = tree<node>;
 	switch (op) {
-		case temporal_op::U: return tau::build_wff_U(inv, commit);
-		case temporal_op::W: return tau::build_wff_W(inv, commit);
-		case temporal_op::R: return tau::build_wff_R(commit, inv);
-		case temporal_op::S: return tau::build_wff_S(inv, commit);
-		case temporal_op::T: return tau::build_wff_T(commit, inv);
+		case temporal_op::U: return tau::build_wff_until(inv, commit);
+		case temporal_op::W: return tau::build_wff_weak_until(inv, commit);
+		case temporal_op::R: return tau::build_wff_release(commit, inv);
+		case temporal_op::S: return tau::build_wff_since(inv, commit);
+		case temporal_op::T: return tau::build_wff_trigger(commit, inv);
 		default: return nullptr;
 	}
 }

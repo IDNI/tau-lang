@@ -39,9 +39,9 @@ inline bool is_temporal_operator_node(tref n) {
 	if (!t.has_child()) return false;
 	auto nt = t[0].value.nt;
 	return nt == tau::wff_always  || nt == tau::wff_sometimes
-	    || nt == tau::wff_U       || nt == tau::wff_R
-	    || nt == tau::wff_W       || nt == tau::wff_S
-	    || nt == tau::wff_T       || nt == tau::wff_A
+	    || nt == tau::wff_until       || nt == tau::wff_release
+	    || nt == tau::wff_weak_until       || nt == tau::wff_since
+	    || nt == tau::wff_trigger       || nt == tau::wff_A
 	    || nt == tau::wff_E       || nt == tau::wff_semantic_neg;
 }
 
