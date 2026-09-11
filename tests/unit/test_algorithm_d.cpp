@@ -34,7 +34,8 @@ static bool alg_d_realizable(const char* s) {
 		// answers satisfiability only, and leaves an unrealizable
 		// full-LTL formula undecided rather than false.
 		fm = flatten_always_conjuncts<node_t>(fm);
-		result = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		::result<bool> r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		result = r.has_value() && r.value();
 	}
 	unsetenv("TAU_LTL_ALG");
 	return result;

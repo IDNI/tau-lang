@@ -2013,8 +2013,9 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	if (has_ctl_star_operators<node>(fm)) {
 		auto _s = r.open("ctl_star_reduction");
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
-		memoize(is_ltl_aba_realizable<node>(
-			reduction.ltl_formula, start_time, output));
+		auto realizable = is_ltl_aba_realizable<node>(
+			reduction.ltl_formula, start_time, output);
+		memoize(realizable.has_value() && realizable.value());
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
@@ -2039,7 +2040,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// realizability check is a sound one-way shortcut: realizable
 		// decides sat true, but unrealizable must not decide sat
 		// false -- it leaves sat undecided instead.
-		if (is_ltl_aba_realizable<node>(fm, start_time, output))
+		auto realizable = is_ltl_aba_realizable<node>(fm, start_time, output);
+		if (realizable.has_value() && realizable.value())
 			memoize(true);
 		else {
 #ifdef TAU_CACHE

@@ -270,7 +270,7 @@ bool ltl_explain(tref fm, std::ostream& out);
 // tau-lang normaliser).  `start_time` and `output` follow the same convention
 // as `is_tau_formula_sat`.
 template <NodeType node>
-bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
+result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 
 // Strategy-automaton solution returned by `solve_ltl_aba` and (via
 // `ltl_to_safety_formula_full`) cached on the interpreter for runtime

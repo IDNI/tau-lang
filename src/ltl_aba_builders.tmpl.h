@@ -196,7 +196,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 // ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
 
 template <NodeType node>
-bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+	result<bool> r;
 	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
 
 	// LT-5 / IN-1 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
@@ -233,7 +234,8 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		LOG_DEBUG << "[ltl_aba] safety fast-path "
 		             "(no full-LTL operators, single G)";
 		auto sat = is_tau_formula_sat<node>(fm, start_time, output);
-		return sat.has_value() && sat.value();
+		r = sat.has_value() && sat.value();
+		return r;
 	}
 
 	auto maybe = solve_ltl_aba<node>(fm);
@@ -241,7 +243,8 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 
 	if (!maybe) {
 		if (output) LOG_DEBUG << "[ltl_aba] UNREALIZABLE (propositional)";
-		return false;
+		r = false;
+		return r;
 	}
 
 	auto& sol = *maybe;
@@ -254,13 +257,15 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	// constant-output fast path) reach this branch.
 	if (sol.aut.num_states == 0) {
 		if (output) LOG_INFO << "[ltl_aba] REALIZABLE";
-		return true;
+		r = true;
+		return r;
 	}
 
 	// Purely propositional (no data atoms) — ltlsynt verdict is final.
 	if (sol.atoms.empty()) {
 		if (output) LOG_INFO << "[ltl_aba] REALIZABLE (propositional)";
-		return true;
+		r = true;
+		return r;
 	}
 
 	LOG_DEBUG << "[ltl_aba] strategy has " << sol.aut.num_states << " state(s)";
@@ -280,13 +285,15 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 				if (output)
 					LOG_INFO << "[ltl_aba] UNREALIZABLE "
 					            "(propositionally realizable but ABA-infeasible)";
-				return false;
+				r = false;
+				return r;
 			}
 		}
 	}
 
 	if (output) LOG_INFO << "[ltl_aba] REALIZABLE";
-	return true;
+	r = true;
+	return r;
 }
 
 // ── Multi-state Mealy → safety formula ───────────────────────────────────────

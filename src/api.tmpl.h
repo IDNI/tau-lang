@@ -936,10 +936,10 @@ result<bool> api<node>::realizable(tref fm) {
 			// false, so it falls through to the real check below.
 			r = false;
 		} else {
-			TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
-				code::internal_error,
-				"is_tau_formula_sat returned neither a value nor an "
-				"error while checking realizability");
+			// realizable() needs the real verdict, and only
+			// is_ltl_aba_realizable can report a fragment it has no
+			// game construction for.
+			r = is_ltl_aba_realizable<node>(target, 0, true);
 		}
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("

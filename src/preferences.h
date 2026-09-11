@@ -81,7 +81,8 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		// let the exception end the process.
 		bool ok = false;
 		try {
-			ok = is_ltl_aba_realizable<node>(candidate, 0, false);
+			auto r = is_ltl_aba_realizable<node>(candidate, 0, false);
+			ok = r.has_value() && r.value();
 		} catch (const ltl_synthesis_error& e) {
 			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
 				<< entry.var_name << "' -- realizability could not "

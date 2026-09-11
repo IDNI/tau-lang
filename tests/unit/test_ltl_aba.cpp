@@ -4189,7 +4189,9 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
 		REQUIRE(fm != nullptr);
-		CHECK(is_ltl_aba_realizable<node_t>(fm, 0, false));
+		result<bool> r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK(r.has_value());
+		CHECK(r.value());
 	}
 
 } // TEST_SUITE("Positional atoms: X-encoding")
