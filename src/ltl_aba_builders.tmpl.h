@@ -230,7 +230,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		auto nbc = has_no_boolean_combs_of_models<node>(fm);
 		return nbc.has_value() && nbc.value();
 	};
-	if (!has_ltl_operators<node>(fm) && no_bool_combs()) {
+	if (!realizability_has_game_operators<node>(fm) && no_bool_combs()) {
 		LOG_DEBUG << "[ltl_aba] safety fast-path "
 		             "(no full-LTL operators, single G)";
 		auto sat = is_tau_formula_sat<node>(fm, start_time, output);
@@ -513,7 +513,7 @@ ltl_to_safety_formula_full(tref fm) {
 	{
 		auto [compiled_fast, safety_fm, init_fm, _aux, unanchored_aux] =
 			compile_since_trigger<node>(fm);
-		if (!has_ltl_operators<node>(compiled_fast)) {
+		if (!realizability_has_game_operators<node>(compiled_fast)) {
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: "
 			          << "pure past-LTL, returning safety formula";
 			// LT-2: the compiled formula used to be DISCARDED here, so the
@@ -676,7 +676,7 @@ bool ltl_explain(tref fm, std::ostream& out) {
 		fm = reduction.ltl_formula;
 	}
 
-	if (!has_ltl_operators<node>(fm)) {
+	if (!realizability_has_game_operators<node>(fm)) {
 		out << "Formula has no LTL operators (treated as G(phi))\n";
 		// Fall through to the existing safety pipeline.
 		auto sat_r = is_tau_formula_sat<node>(fm, 0, false);
@@ -897,23 +897,6 @@ static tref translate_ctl_star(tref fm,
 		// but no longer a universal context: w marks SOME state).
 		tref translated_inner = translate_ctl_star<node>(
 			inner, constraints, witnesses, true, false);
-		// IN-R6: rewrite every `sometimes` inside the witness
-		// constraint to its full-LTL twin `F`.  The two operators are
-		// the same eventuality (LS-3), but `sometimes` is not a
-		// full-LTL operator, so a constraint like
-		// `G(w=1 → sometimes χ)` would route the whole reduced
-		// formula into the safety pipeline, whose eventual-variable
-		// transform cannot handle sometimes-under-G — while as
-		// `G(w=1 → F χ)` the formula self-routes to ltlsynt, which
-		// handles it natively (the sat path already ends up there).
-		for (;;) {
-			tref st = tau::get(translated_inner).find_top(
-				is_child<node, tau::wff_sometimes>);
-			if (!st) break;
-			translated_inner = rewriter::replace<node>(
-				translated_inner, st,
-				build_wff_F<node>(tau::trim2(st)));
-		}
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
 		witnesses.push_back(wname);
@@ -1025,12 +1008,11 @@ static tref translate_ctl_star(tref fm,
 
 	// Rebuild node with same operator but new children
 	if (nch == 1) {
-		// Unary operators: neg, sometimes, always, F
+		// Unary operators: neg, sometimes, always
 		switch (nt) {
 		case tau::wff_neg:      return tau::build_wff_neg(new_children[0]);
 		case tau::wff_sometimes:return tau::build_wff_sometimes(new_children[0]);
 		case tau::wff_always:   return tau::build_wff_always(new_children[0]);
-		case tau::wff_F:        return tau::build_wff_F(new_children[0]);
 		default:                break; // falls to the LT-13 LOG_ERROR
 		}
 	} else if (nch == 2) {

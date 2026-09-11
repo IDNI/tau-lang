@@ -19,8 +19,8 @@
 //
 //   2. has_no_boolean_combs_of_models was used as a hard pre-check in
 //      api::sat / api::valid that returned UNSAT for any formula
-//      containing wff_always or wff_F at multiple positions — even
-//      cases like `(G A) || (G B)` that the LTL pipeline can decide.
+//      containing wff_always or wff_sometimes at multiple positions —
+//      even cases like `(G A) || (G B)` that the LTL pipeline can decide.
 //      api::sat now drops the pre-check and lets is_tau_formula_sat
 //      route to is_ltl_aba_realizable when Boolean combs of models
 //      are present.
@@ -168,7 +168,7 @@ TEST_SUITE("temporal connectives — Boolean combinations of G") {
 }
 
 TEST_SUITE("temporal connectives — F (eventually) at top level") {
-	// F was already routed correctly via has_ltl_operators, but the
+	// F was already routed correctly via sat_has_ltl_operators, but the
 	// flatten + Boolean-combs route can affect nested-F cases.
 
 	TEST_CASE("F && F — disjoint variables sat" * doctest::skip(!ltlsynt_available())) {

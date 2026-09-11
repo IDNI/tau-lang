@@ -52,7 +52,7 @@ struct decomposed_spec {
 // Classification rules (conservative):
 //   - wff_always(φ)       → invariant component if φ is non-temporal,
 //                           else reactive (G(F(...)) etc.).
-//   - wff_F / U / R / W   → reactive.
+//   - wff_sometimes / U / R / W → reactive.
 //   - wff_S / T           → reactive (past-LTL, compiled via S/T pass).
 //   - non-temporal        → transient (hold at t=0; their G-lift, if any,
 //                           is handled by the caller's initial-conditions
@@ -86,17 +86,10 @@ inline decomposed_spec<node> decompose_spec(tref main_fm) {
 			// G(body).  If body has no temporal, it's an invariant; else
 			// it's reactive (e.g., G(F(...))).
 			tref body = t[0].first();
-			if (!has_ltl_operators<node>(body)) {
-				// Pure-safety G.  Also filter out G(F(...)) = GF pattern:
-				// F inside G is a reactive liveness, not invariant.
-				// RR-10: wff_sometimes is F's canonical spelling
-				// (the normalizer rewrites wff_F to it), so
-				// G(sometimes phi) is the same GF reactive shape.
-				// RR-11: only wff_sometimes can appear here --
-				// the enclosing !has_ltl_operators(body) gate
-				// already guarantees no wff_F exists, so the
-				// old wff_F half of this scan was dead (the
-				// sometimes half became live with RR-10).
+			if (!realizability_has_game_operators<node>(body)) {
+				// Pure-safety G.  Also filter out G(sometimes(...)) =
+				// GF pattern: an eventuality inside G is a reactive
+				// liveness, not invariant.
 				// GR-4 / GR-R1: A/E/`-phi` nest a path formula
 				// and are not invariants either; the shared
 				// predicate keeps the three classifiers in step.
@@ -114,15 +107,14 @@ inline decomposed_spec<node> decompose_spec(tref main_fm) {
 			}
 			return;
 		}
-		if (nt == tau::wff_F || nt == tau::wff_sometimes
+		if (nt == tau::wff_sometimes
 		 || nt == tau::wff_U
 		 || nt == tau::wff_R || nt == tau::wff_W
 		 || nt == tau::wff_S || nt == tau::wff_T
 		 || nt == tau::wff_A || nt == tau::wff_E
 		 || nt == tau::wff_semantic_neg) {
-			// RR-10: wff_sometimes included -- a top-level
-			// `sometimes phi` is a liveness obligation, not
-			// transient.
+			// A top-level `sometimes phi` is a liveness
+			// obligation, not transient.
 			append(s.reactive);
 			return;
 		}

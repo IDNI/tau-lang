@@ -80,10 +80,10 @@ static bool sat(tref fm) {
 
 TEST_SUITE("LTL parser") {
 
-	TEST_CASE("F operator parses as wff_F") {
+	TEST_CASE("F operator parses as wff_sometimes") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_F));
+		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
 	TEST_CASE("U operator parses as wff_U") {
@@ -117,22 +117,28 @@ TEST_SUITE("LTL parser") {
 		CHECK(tau::get(fm)[0].is(tau::wff_f));
 	}
 
-	TEST_CASE("has_ltl_operators: true for F") {
+	TEST_CASE("sat_has_ltl_operators: false for F (decided by the safety pipeline)") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
-		CHECK(has_ltl_operators<node_t>(fm));
+		CHECK_FALSE(sat_has_ltl_operators<node_t>(fm));
 	}
 
-	TEST_CASE("has_ltl_operators: false for G/always only") {
+	TEST_CASE("realizability_has_game_operators: true for F (needs the game)") {
+		tref fm = wff("F (o1[t] = 0)");
+		REQUIRE(fm != nullptr);
+		CHECK(realizability_has_game_operators<node_t>(fm));
+	}
+
+	TEST_CASE("sat_has_ltl_operators: false for G/always only") {
 		tref fm = wff("G (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(has_ltl_operators<node_t>(fm));
+		CHECK_FALSE(sat_has_ltl_operators<node_t>(fm));
 	}
 
-	TEST_CASE("has_ltl_operators: true for nested U") {
+	TEST_CASE("sat_has_ltl_operators: true for nested U") {
 		tref fm = wff("G ((o1[t] = 0) U (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
-		CHECK(has_ltl_operators<node_t>(fm));
+		CHECK(sat_has_ltl_operators<node_t>(fm));
 	}
 }
 
@@ -176,11 +182,12 @@ TEST_SUITE("LTL(ABA) realizability") {
 		CHECK(sat(fm));
 	}
 
-	TEST_CASE("F(input = 0) is unrealizable") {
-		// System cannot force an input variable; environment can always send 1.
+	TEST_CASE("F(input = 0) is satisfiable") {
+		// A trace exists where the input reaches 0, even though the
+		// system cannot force it (that is a realizability question).
 		tref fm = spec("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(sat(fm));
+		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(output = 0) is realizable (safety pipeline)") {
@@ -439,7 +446,7 @@ TEST_SUITE("LTL NNF rules") {
 		CHECK(tau::get(nnf)[0].is(tau::wff_and));
 	}
 
-	// ¬(G φ) should ideally give wff_F(¬φ), but wff_always is shared between
+	// ¬(G φ) should ideally give wff_sometimes(¬φ), but wff_always is shared between
 	// LTL G and safety "always" — changing the NNF dual breaks the safety
 	// fragment (see TODO #9/#13 for AST split).  Until then, ¬(always φ) → wff_sometimes.
 	TEST_CASE("push_negation_in: !(G phi) = sometimes(!phi) — shared-AST limitation") {
@@ -553,7 +560,7 @@ TEST_SUITE("LTL normalization correctness") {
 		// pure-safety fragment (always/sometimes). Confirm it parses.
 		tref fm = wff("G (F (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
-		CHECK(has_ltl_operators<node_t>(fm));
+		CHECK(realizability_has_game_operators<node_t>(fm));
 	}
 
 	TEST_CASE("F(phi) not wrapped in G by normalizer") {
@@ -568,8 +575,8 @@ TEST_SUITE("LTL normalization correctness") {
 		// structurally wrapped by checking the outermost node.
 		tref fm = spec("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		// The raw parsed formula should have wff_F at the top (not wff_always).
-		CHECK(tau::get(fm)[0].is(tau::wff_F));
+		// The raw parsed formula should have wff_sometimes at the top (not wff_always).
+		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 }
 
@@ -879,8 +886,9 @@ TEST_SUITE("Multi-state Mealy strategy") {
 
 // ── 16. Interpreter (run) dispatch ───────────────────────────────────────────
 //
-// Verifies that the full CLI `run` path — normalizer → has_ltl_operators →
-// ltl_to_safety_formula → make_interpreter — succeeds for LTL formulas.
+// Verifies that the full CLI `run` path — normalizer →
+// realizability_has_game_operators → ltl_to_safety_formula →
+// make_interpreter — succeeds for LTL formulas.
 // Prior to the normalize_with_temp_simp guard, anti_prenex inside normalize()
 // would silently convert wff_sometimes → wff_sometimes, causing the LTL guard in
 // make_interpreter to never fire and the interpreter to return empty.
@@ -3589,7 +3597,7 @@ TEST_SUITE("Adversarial: parser and errors") {
 	TEST_CASE("Deep nesting of F operators") {
 		tref fm = spec("F(F(F(F(o1[t] = 0)))).");
 		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_F));
+		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
 	TEST_CASE("F applied to boolean true") {

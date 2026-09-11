@@ -36,8 +36,6 @@ tref push_negation_one_in(tref fm) {
 						tau::build_wff_neg(ct[0].first()));
 			case tau::wff_sometimes: return tau::build_wff_always(
 						tau::build_wff_neg(ct[0].first()));
-			case tau::wff_F: return tau::build_wff_always(
-						tau::build_wff_neg(ct[0].first()));
 			// LTL(ABA) NNF duals:
 			//   ¬(φ U ψ) = (¬φ) R (¬ψ)
 			//   ¬(φ R ψ) = (¬φ) U (¬ψ)
@@ -54,7 +52,7 @@ tref push_negation_one_in(tref fm) {
 				// ¬(φ W ψ) = (¬φ R ¬ψ) ∧ F(¬φ)
 				return tau::build_wff_and(
 					tau::build_wff_R(neg_l, neg_r),
-					tau::build_wff_F(neg_l));
+					tau::build_wff_sometimes(neg_l));
 			}
 			// ¬(φ S ψ) = ¬φ T ¬ψ  (past duals)
 			case tau::wff_S: return tau::build_wff_T(

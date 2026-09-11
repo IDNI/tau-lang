@@ -729,9 +729,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Build `-n` — strategy-level semantic negation (role swap
 	 * at the synthesis layer, not Boolean negation). */
 	static tref build_wff_semantic_neg(tref n);
-	// LTL(ABA) operators
-	/** @brief Build `F n` — finally/eventually. */
-	static tref build_wff_F(tref n);
+	// LTL(ABA) operators (F/finally is build_wff_sometimes above)
 	/** @brief Build `l U r` — strong until (r must eventually hold). */
 	static tref build_wff_U(tref l, tref r);
 	/** @brief Build `l R r` — release (r holds up to and incl. first l). */

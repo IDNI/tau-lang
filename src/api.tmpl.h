@@ -920,10 +920,10 @@ result<bool> api<node>::realizable(tref fm) {
 		// A data quantifier under a full-LTL operator survives normalization;
 		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
 		// invariant, so route the RAW formula to the LTL-ABA solver instead.
-		tref target = (has_ltl_operators<node>(fm)
+		tref target = (realizability_has_game_operators<node>(fm)
 			&& tau::get(nf).find_top(is_quantifier<node>))
 			? fm : nf;
-		if (has_ltl_operators<node>(fm)) {
+		if (realizability_has_game_operators<node>(fm)) {
 			// is_tau_formula_sat now answers satisfiability only,
 			// where an unrealizable full-LTL formula is undecided
 			// rather than false; realizable() needs the real
@@ -999,7 +999,7 @@ result<bool> api<node>::sat(tref fm) {
 		// A data quantifier under a full-LTL operator survives normalization;
 		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
 		// invariant, so route the RAW formula to the LTL-ABA solver instead.
-		tref target = (has_ltl_operators<node>(fm)
+		tref target = (sat_has_ltl_operators<node>(fm)
 			&& tau::get(nf).find_top(is_quantifier<node>))
 			? fm : nf;
 		TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),

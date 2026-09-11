@@ -583,9 +583,9 @@ tref get_ref(tref n) {
 }
 
 // Check that the Tau formula does not use Boolean combinations of models.
-// LTL formulas (containing wff_F / wff_U / wff_R / wff_W) are handled by the
-// LTL(ABA) pipeline and bypass the safety pipeline entirely, so they are
-// exempt from this check.
+// LTL formulas (containing wff_sometimes / wff_U / wff_R / wff_W) are handled
+// by the LTL(ABA) pipeline and bypass the safety pipeline entirely, so they
+// are exempt from this check.
 template <NodeType node>
 result<bool> has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
@@ -600,7 +600,7 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
 		const auto& t = tau::get(x);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tau::wff_F || nt == tau::wff_U
+		return nt == tau::wff_sometimes || nt == tau::wff_U
 		    || nt == tau::wff_R || nt == tau::wff_W
 		    || nt == tau::wff_A || nt == tau::wff_E
 		    || nt == tau::wff_semantic_neg;
@@ -609,15 +609,15 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
 	if (!tau::get(n).find_top(is_ltl_op)) {
 		const auto& fm = tau::get(n);
 		if (is<node>(fm.first(), tau::wff_always)) {
-			// check that there is no wff_always or wff_F in the subtree
+			// check that there is no wff_always or wff_sometimes in the subtree
 			if (fm[0][0].find_top(is<node, tau::wff_always>))
 				ok = false;
-			else if (fm[0][0].find_top(is<node, tau::wff_F>))
+			else if (fm[0][0].find_top(is<node, tau::wff_sometimes>))
 				ok = false;
 		} else {
 			if (fm.find_top(is<node, tau::wff_always>))
 				ok = false;
-			else if (fm.find_top(is<node, tau::wff_F>))
+			else if (fm.find_top(is<node, tau::wff_sometimes>))
 				ok = false;
 		}
 	}
@@ -747,7 +747,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
-	DBG(assert(!fm.find_top(is<node, tau::wff_F>));)
+	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	auto lean = lean_capture_conjunction_sat<node>(n);
 	if (lean && !lean_decide_crosscheck_enabled()) {
@@ -806,7 +806,7 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 		return r;
 	}
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
-	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_F>));)
+	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
@@ -1483,13 +1483,14 @@ inline tref flatten_always_conjuncts(tref fm) {
 	// Nothing to merge.
 	if (always_bodies.size() <= 1) return fm;
 
-	// Guard: if any G body itself contains a nested G or F, merging would
-	// produce G(...G(...)...) which the safety pipeline cannot handle.
-	// Leave the formula unchanged; the downstream normalizer will split it.
+	// Guard: if any G body itself contains a nested G or sometimes,
+	// merging would produce G(...G(...)...) which the safety pipeline
+	// cannot handle. Leave the formula unchanged; the downstream
+	// normalizer will split it.
 	auto has_nested_temporal = [](tref body) {
 		const auto& bt = tau::get(body);
 		return bt.find_top(is_child<node, tau::wff_always>)
-			|| bt.find_top(is_child<node, tau::wff_F>);
+			|| bt.find_top(is_child<node, tau::wff_sometimes>);
 	};
 	for (tref b : always_bodies)
 		if (has_nested_temporal(b)) return fm;

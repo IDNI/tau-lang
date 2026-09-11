@@ -7,17 +7,6 @@ namespace idni::tau_lang {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-// True if `nt` is one of the full-LTL operators we add (not G/always).
-// G is aliased to wff_always and handled by the existing safety pipeline.
-static inline bool is_full_ltl_nt(size_t nt) {
-	return nt == tau_parser::wff_F
-	    || nt == tau_parser::wff_U
-	    || nt == tau_parser::wff_R
-	    || nt == tau_parser::wff_W
-	    || nt == tau_parser::wff_S
-	    || nt == tau_parser::wff_T;
-}
-
 // Operators the safety pipeline cannot decide satisfiability for.
 static inline bool sat_needs_ltl_pipeline(size_t nt) {
 	return nt == tau_parser::wff_U || nt == tau_parser::wff_R
@@ -41,7 +30,6 @@ static bool is_temporal_op(tref n) {
 	auto nt = t[0].value.nt;
 	return nt == tau::wff_always
 	    || nt == tau::wff_sometimes
-	    || nt == tau::wff_F
 	    || nt == tau::wff_U
 	    || nt == tau::wff_R
 	    || nt == tau::wff_W
@@ -85,26 +73,7 @@ static bool has_past_operators(tref fm) {
 	}) != nullptr;
 }
 
-// ── has_ltl_operators ─────────────────────────────────────────────────────────
-
-template <NodeType node>
-bool has_ltl_operators(tref fm) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		return is_full_ltl_nt(t[0].value.nt);
-	}) != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(fm, result);
-#endif // TAU_CACHE
-	return result;
-}
+// ── sat_has_ltl_operators / realizability_has_game_operators ──────────────────
 
 // True if the formula has an operator the safety pipeline cannot decide
 // satisfiability for.
@@ -119,7 +88,21 @@ bool sat_has_ltl_operators(tref fm) {
 	bool result = tau::get(fm).find_top([](tref n) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
-		return sat_needs_ltl_pipeline(t[0].value.nt);
+		auto nt = t[0].value.nt;
+		if (sat_needs_ltl_pipeline(nt)) return true;
+		// A nested eventuality -- G(sometimes ...), sometimes(G ...),
+		// sometimes(sometimes ...) -- is beyond the safety pipeline's
+		// clause simplifier, which expects G and sometimes as separate
+		// top-level conjuncts. Route it like U, R, W, S and T.
+		if (nt == tau::wff_always)
+			return t[0][0].find_top(
+				is<node, tau::wff_sometimes>) != nullptr;
+		if (nt == tau::wff_sometimes)
+			return t[0][0].find_top(
+				is<node, tau::wff_sometimes>) != nullptr
+			    || t[0][0].find_top(
+				is<node, tau::wff_always>) != nullptr;
+		return false;
 	}) != nullptr;
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
@@ -492,7 +475,6 @@ static std::string skeleton_wff_with_testers(
 	case tau::wff_always:
 		return "G(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
 	case tau::wff_sometimes:
-	case tau::wff_F:
 		return "F(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
 	case tau::wff_U:
 		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)

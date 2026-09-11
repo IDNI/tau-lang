@@ -162,13 +162,13 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 /**
  * @brief Check that a formula does not use Boolean combinations of models.
  *
- * What is actually checked (NF-9): nested `wff_always` and nested `wff_F`
- * only — nested `wff_sometimes` is NOT detected, so e.g.
- * `(sometimes a) && (sometimes b)` passes the predicate; and any formula
- * containing a full-LTL / CTL* operator (F/U/R/W/A/E/semantic_neg) is
- * exempted and returns `true` unconditionally (those manage their own
- * temporal scope). Callers use this only in DBG asserts, so the gap
- * weakens a debug guard rather than a runtime result.
+ * What is actually checked (NF-9): nested `wff_always` only — any formula
+ * containing `wff_sometimes` or another full-LTL / CTL* operator
+ * (U/R/W/A/E/semantic_neg) anywhere is exempted by the outer scan and
+ * returns `true` unconditionally (those manage their own temporal scope),
+ * so e.g. `(sometimes a) && (sometimes b)` passes the predicate. Callers
+ * use this only in DBG asserts, so the gap weakens a debug guard rather
+ * than a runtime result.
  * @tparam node Tree node type.
  * @param n Formula to inspect.
  * @return `true` if no Boolean combination of models is present.

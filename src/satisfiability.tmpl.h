@@ -2032,7 +2032,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// These should NOT be routed to ltlsynt, which cannot faithfully
 	// encode lookback-atom initial-value semantics as propositional
 	// constraints.
-	if (has_ltl_operators<node>(fm)) {
+	if (sat_has_ltl_operators<node>(fm)) {
 		auto _s = r.open("ltl_realizability");
 		// realizable(fm) => sat(fm): a program satisfying fm against
 		// every environment gives a trace that satisfies fm. There is

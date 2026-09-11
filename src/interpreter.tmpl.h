@@ -692,7 +692,7 @@ result<interpreter<node>>
 	// Handle G(phi_A) && G(phi_B) with different BA types:
 	// the normalizer merges them into G(phi_A && phi_B) which breaks on mixed
 	// types.  Normalize each G formula independently then combine.
-	if (!has_ltl_operators<node>(spec) && !witness_ltl_route) {
+	if (!realizability_has_game_operators<node>(spec) && !witness_ltl_route) {
 		auto get_g_body = [](tref c) -> tref {
 			const auto& ct = tree<node>::get(c);
 			if (!ct.has_child()) return nullptr;
@@ -743,9 +743,10 @@ result<interpreter<node>>
 		}
 	}
 	// Find a satisfiable unbound continuation from spec.
-	// Skip normalizer for LTL formulas — it converts wff_F → wff_sometimes,
-	// which would make has_ltl_operators return false and bypass ltl_to_safety_formula.
-	if (!has_ltl_operators<node>(spec) && !witness_ltl_route) {
+	// Skip the safety-pipeline normalizer for a formula the game will
+	// handle: ltl_to_safety_formula_full below applies its own LTL-specific
+	// transform, so the general normalizer must not touch spec first.
+	if (!realizability_has_game_operators<node>(spec) && !witness_ltl_route) {
 		TAU_TRY(tref nr, normalizer<node>(spec));
 		spec = nr;
 	}
@@ -760,7 +761,7 @@ post_normalization:
 	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
 	std::optional<ltl_aba_solution<node>> ltl_sol;
 	std::vector<std::string> since_aux_anchor;
-	if (has_ltl_operators<node>(spec) || witness_ltl_route) {
+	if (realizability_has_game_operators<node>(spec) || witness_ltl_route) {
 		tref safety_spec;
 		std::optional<ltl_aba_solution<node>> sol_opt;
 		std::vector<std::string> unanchored_aux;
@@ -2504,7 +2505,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 	// otherwise), while the temporal normalizer decides universal
 	// executability over all inputs and would collapse exactly the
 	// conditional alternatives the factored revision exists to keep.
-	// Nested-temporal content (U/R/W/S/T/F operators) lies outside the
+	// Nested-temporal content (U/R/W/S/T operators) lies outside the
 	// always/sometimes decomposition this factored revision performs --
 	// feeding it through anyway made the U-of-U revision diverge (the
 	// clause loop can neither classify nor discharge the nested untils).
@@ -2521,8 +2522,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			    || nt == tree<node>::wff_R
 			    || nt == tree<node>::wff_W
 			    || nt == tree<node>::wff_S
-			    || nt == tree<node>::wff_T
-			    || nt == tree<node>::wff_F;
+			    || nt == tree<node>::wff_T;
 		}) != nullptr;
 	};
 	{

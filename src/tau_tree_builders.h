@@ -95,9 +95,7 @@ template <NodeType node> tref build_wff_and(const auto& wffs);
 /** @brief Build `! n`. */
 template <NodeType node> tref build_wff_neg(tref n);
 // LTL(ABA) operator wrappers (TT2-16: previously defined in the tmpl with
-// no header declaration).
-/** @brief Build `F n` — finally/eventually. */
-template <NodeType node> tref build_wff_F(tref n);
+// no header declaration). F/finally is build_wff_sometimes above.
 /** @brief Build `l U r` — strong until. */
 template <NodeType node> tref build_wff_U(tref l, tref r);
 /** @brief Build `l R r` — release. */

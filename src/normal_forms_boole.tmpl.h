@@ -391,7 +391,9 @@ tref normalize_temporal_quantifiers(tref fm) {
 		return n;
 	};
 	// Full LTL / CTL* operators manage their own temporal scope; do not
-	// wrap them in wff_always — pass through unchanged. NF-6: A/E and
+	// wrap them in wff_always — pass through unchanged. wff_sometimes is
+	// NOT here: like wff_always, it is decided by the safety pipeline and
+	// goes through the always/sometimes machinery below. NF-6: A/E and
 	// wff_semantic_neg belong here too (kept in sync with
 	// is_temporal_quantifier) — without them a formula whose only
 	// branching-time ops are A/E would fall into the always/sometimes
@@ -400,7 +402,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
-		return nt == tree<node>::wff_F || nt == tree<node>::wff_U
+		return nt == tree<node>::wff_U
 		    || nt == tree<node>::wff_R || nt == tree<node>::wff_W
 		    || nt == tree<node>::wff_S || nt == tree<node>::wff_T
 		    || nt == tree<node>::wff_A || nt == tree<node>::wff_E

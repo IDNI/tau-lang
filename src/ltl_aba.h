@@ -55,18 +55,24 @@ inline size_t max_cover_products = 256;
 
 // ── Detection ────────────────────────────────────────────────────────────────
 
-// True iff the formula contains any full-LTL operator: wff_F, wff_U, wff_R,
-// wff_W, and the past operators wff_S, wff_T (past formulas must route to
-// the LTL pipeline's temporal testers).  wff_always (G) is already handled
-// by the safety pipeline.
+// True iff the formula has an operator the safety pipeline cannot decide
+// satisfiability for: wff_U, wff_R, wff_W, and the past operators wff_S,
+// wff_T (past formulas must route to the LTL pipeline's temporal testers).
 template <NodeType node>
-bool has_ltl_operators(tref fm);
+bool sat_has_ltl_operators(tref fm);
+
+// True iff the formula has an operator whose realizability needs the game:
+// sat_has_ltl_operators's set, plus wff_sometimes -- the safety pipeline
+// answers satisfiability, and that is a different question once the
+// environment can control an eventuality.
+template <NodeType node>
+bool realizability_has_game_operators(tref fm);
 
 // ── Data-atom extraction ──────────────────────────────────────────────────────
 
 // A "data atom" is a maximal subtree that contains no temporal operators
-// (wff_always, wff_F, wff_U, wff_R, wff_W) but does contain at least one
-// io_var.  Each distinct atom is assigned a fresh proposition name "p0","p1"...
+// (wff_always, wff_sometimes, wff_U, wff_R, wff_W) but does contain at least
+// one io_var.  Each distinct atom is assigned a fresh proposition name "p0","p1"...
 //
 // Returns a vector of {tref, proposition_name} in discovery order.
 // The map from tref → name is built using structural equality (subtree_equals).

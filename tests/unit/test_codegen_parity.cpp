@@ -305,16 +305,15 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 		// (nested U/S/R/T, e.g. ltl_past_since_trigger) silently
 		// produces a WRONG bool rather than throwing, so it must
 		// never reach is_tau_formula_sat un-desugared. Mirror
-		// interpreter.tmpl.h's own routing: has_ltl_operators is
-		// checked before any normalization (normalizer folds wff_F
-		// into wff_sometimes and would hide the check), and a
+		// interpreter.tmpl.h's own routing: realizability_has_game_
+		// operators is checked before any normalization, and a
 		// full-LTL spec is run through ltl_to_safety_formula_full --
 		// the exact desugaring compile_spec/the interpreter use to
 		// build both sides under comparison -- before being
 		// normalized and handed to the solver. Unrealizable, or any
 		// desugaring failure, is "can't decide" (std::nullopt), never
 		// a verdict.
-		if (has_ltl_operators<node_t>(spec_fm)) {
+		if (realizability_has_game_operators<node_t>(spec_fm)) {
 			auto [safety_spec, ltl_sol, _aux] =
 				ltl_to_safety_formula_full<node_t>(spec_fm);
 			(void)ltl_sol;

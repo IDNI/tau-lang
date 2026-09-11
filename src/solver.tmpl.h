@@ -1898,11 +1898,11 @@ result<solution<node>> solve(tref form, solver_options options) {
 	}
 	// Temporal quantifiers (always/sometimes) may wrap atomic equations
 	// and are unwrapped per-conjunct after path splitting (lines 1226+).
-	// Only flag truly unsupported temporal operators (U, F, R, W, S, T).
+	// Only flag truly unsupported temporal operators (U, R, W, S, T).
 	{
 		auto is_unsupported_temporal = [](tref n) {
 			const auto& t = tree<node>::get(n);
-			return t.is(tau::wff_F) || t.is(tau::wff_U)
+			return t.is(tau::wff_U)
 				|| t.is(tau::wff_R) || t.is(tau::wff_W)
 				|| t.is(tau::wff_S) || t.is(tau::wff_T);
 		};

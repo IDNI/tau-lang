@@ -2012,7 +2012,7 @@ static tref compile_since_trigger_rec(
 	}
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
-	// wff_F, wff_U, wff_R, wff_W, wff_always, etc.)
+	// wff_sometimes, wff_U, wff_R, wff_W, wff_always, etc.)
 	//
 	// The spine polarity is propagated, NOT the old boolean is_outer:
 	//   wff_and  keeps a positive spine (asserting A ∧ B asserts both);
@@ -2058,9 +2058,10 @@ static tref compile_since_trigger_rec(
 	}
 	// Arity > 3.  This used to `return fm` unchanged, silently leaving any
 	// S/T below a wider node uncompiled — the pure-past fast path then just
-	// declines itself (the S survives, so has_ltl_operators stays true and
-	// solve_ltl_aba's ppLTLTT encoding takes over), but a silent arity limit
-	// in a rewriting pass is a trap.  Handle it generically.
+	// declines itself (the S survives, so realizability_has_game_operators
+	// stays true and solve_ltl_aba's ppLTLTT encoding takes over), but a
+	// silent arity limit in a rewriting pass is a trap.  Handle it
+	// generically.
 	trefs kids;
 	kids.reserve(nc);
 	for (size_t i = 0; i < nc; ++i) kids.push_back(op.child(i));

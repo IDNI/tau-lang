@@ -31,7 +31,7 @@ namespace gr1_detect_internal {
 // (gr1_detect, liveness_decomp, spec.h).  GR-R1/GR-4: the CTL* quantifiers
 // A/E and the semantic negation `-phi` are temporal in every sense that
 // matters here (they nest a path formula), so G(A phi) is NOT a safety
-// invariant; GR-3: `sometimes` is the normalizer's canonical spelling of F.
+// invariant.
 template <NodeType node>
 inline bool is_temporal_operator_node(tref n) {
 	using tau = tree<node>;
@@ -39,21 +39,20 @@ inline bool is_temporal_operator_node(tref n) {
 	if (!t.has_child()) return false;
 	auto nt = t[0].value.nt;
 	return nt == tau::wff_always  || nt == tau::wff_sometimes
-	    || nt == tau::wff_F       || nt == tau::wff_U
-	    || nt == tau::wff_R       || nt == tau::wff_W
-	    || nt == tau::wff_S       || nt == tau::wff_T
-	    || nt == tau::wff_A       || nt == tau::wff_E
-	    || nt == tau::wff_semantic_neg;
+	    || nt == tau::wff_U       || nt == tau::wff_R
+	    || nt == tau::wff_W       || nt == tau::wff_S
+	    || nt == tau::wff_T       || nt == tau::wff_A
+	    || nt == tau::wff_E       || nt == tau::wff_semantic_neg;
 }
 
-// True iff `n` is F in either spelling (GR-3).
+// True iff `n` is the eventually operator.
 template <NodeType node>
 inline bool is_eventually_node(tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
 	if (!t.has_child()) return false;
 	auto nt = t[0].value.nt;
-	return nt == tau::wff_F || nt == tau::wff_sometimes;
+	return nt == tau::wff_sometimes;
 }
 
 template <NodeType node>

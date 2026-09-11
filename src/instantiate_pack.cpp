@@ -10,7 +10,8 @@
 //
 // Without explicit instantiations, every consumer TU re-instantiates
 // the heaviest pipeline templates (is_ltl_aba_realizable,
-// is_tau_formula_sat, has_ltl_operators) from scratch, paying the
+// is_tau_formula_sat, sat_has_ltl_operators,
+// realizability_has_game_operators) from scratch, paying the
 // cost of expanding ~250 KB of .tmpl.h once per binary.
 //
 // With the matching `extern template` declarations in

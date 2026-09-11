@@ -343,7 +343,7 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	// Helper: check a formula via the safety path (no LTL operators).
 	// In tau-lang, "always" is the default when no temporal operator is present.
 	// A formula without G/F/U/R/W goes through the original safety synthesis
-	// pipeline in is_tau_formula_sat (has_ltl_operators returns false).
+	// pipeline in is_tau_formula_sat (sat_has_ltl_operators returns false).
 	static bool safety_realizable(const char* fm_str) {
 		auto nso = get_nso_rr<node_t>(tau::get(fm_str));
 		if (!nso.has_value()) return false;
