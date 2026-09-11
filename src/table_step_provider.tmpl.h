@@ -361,6 +361,7 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 	// excludes them from real streams); data-typed output atoms instead
 	// become per-edge templates below.
 	std::vector<int> flag_out_ap_idx;
+	std::vector<bool> flag_out_negated;
 	std::vector<std::string> flag_outputs;
 	std::set<std::string> template_props;
 	for (auto& p : sol.output_props) {
@@ -374,6 +375,14 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 		}
 		trefs fvars = get_free_vars<node>(atom_ref);
 		if (fvars.size() != 1) return {nullptr, {0, 0}};
+		// a carrier atom whose prop truth does not decide the variable's
+		// value is solved per edge like a data atom
+		auto negated = carrier_flag_negated<node>(atom_ref, fvars[0]);
+		if (!negated) {
+			template_props.insert(p);
+			continue;
+		}
+		flag_out_negated.push_back(*negated);
 		flag_out_ap_idx.push_back(prop_to_ap.count(p) ? prop_to_ap.at(p) : -1);
 		flag_outputs.push_back(get_var_name<node>(fvars[0]));
 	}
@@ -396,7 +405,7 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 				codegen::edge ed;
 				ed.dst = e.dst;
 				ed.guard = guard_from_cube(cube,
-					in_ap_idx, flag_out_ap_idx);
+					in_ap_idx, flag_out_ap_idx, flag_out_negated);
 				trefs tmpls;
 				std::vector<bool> is_counter;
 				for (auto& [ap_idx, positive] : cube) {
