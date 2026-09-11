@@ -534,7 +534,7 @@ post_normalization:
 		// is not handled by solution_with_max_update the way an ordered
 		// theory's constraints are, and memory pre-population achieves the
 		// same goal safely.
-		if constexpr (pack_has_arithmetic_theory_v<node>)
+		if constexpr (pack_can_host_bool<node>())
 		if (ltl_sol && ltl_sol->aut.num_states > 1
 				&& i.formula_time_point >= 1) {
 			const int k      = ltl_sol->aut.num_states;
