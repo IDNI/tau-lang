@@ -13,7 +13,9 @@ tref sbf_type() {
 
 template <NodeType node>
 size_t sbf_type_id() {
-	return ba_descriptor<sbf_ba, node>::type_id_for(0);
+	static const size_t id = ba_types<node>::id(
+		ba_descriptor<sbf_ba, node>::type_tree());
+	return id;
 }
 
 } // namespace idni::tau_lang

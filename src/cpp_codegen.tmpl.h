@@ -147,19 +147,54 @@ struct atom_field_info {
 };
 
 // Classify an OUTPUT atom's field kind purely from what owns @p io_var_ref's
-// type: flag when it's the pack's resolved bool carrier, witness otherwise.
-// @p atom_ref is reserved for the witness-expression query. A spec reaching
-// codegen has already passed type inference, so ba_type 0 (no type at all,
-// distinct from the real "untyped" BA type) means inference did not run for
-// this variable -- an invariant violation, not an ordinary case.
+// A flag output's guard slot is written into the variable as-is
+// (table_step_provider, emit_program), so a carrier-typed output atom is a
+// flag only when its prop's truth decides the variable's value: `var = 1`
+// (false: the slot is the value), `var = 0` (true: the slot is the value's
+// complement, and guard_from_cube flips it so writers never see the
+// difference), or a synthesis-internal state bit (o__ltl_ms*, o__ltl_s*),
+// whose atoms are built as `var = 1`. nullopt for any other carrier atom
+// (`var = x`), which takes the witness path. The atom reaches here
+// canonicalised: bf_eq over two bf children, a constant one being a typed
+// bf_t or bf_f.
 template <NodeType node>
-field_kind classify_output_field(tref /*atom_ref*/, tref io_var_ref) {
+std::optional<bool> carrier_flag_negated(tref atom_ref, tref io_var_ref) {
+	using tau = tree<node>;
+	const std::string& name = get_var_name<node>(io_var_ref);
+	if ((name.size() > 9 && name.compare(0, 9, "o__ltl_ms") == 0)
+		|| (name.size() > 8 && name.compare(0, 8, "o__ltl_s") == 0))
+		return false;
+	const auto& atom = tau::get(atom_ref);
+	if (!atom.has_child()) return std::nullopt;
+	const auto& eq = tau::get(atom.child(0));
+	if (!eq.is(tau::bf_eq) || eq.children_size() != 2) return std::nullopt;
+	auto child_is = [&](tref b, size_t nt) {
+		const auto& n = tau::get(b);
+		return n.has_child() && tau::get(n.child(0)).is(nt);
+	};
+	for (auto [v, c] : { std::pair{ eq.child(0), eq.child(1) },
+			std::pair{ eq.child(1), eq.child(0) } }) {
+		if (!child_is(v, tau::variable)) continue;
+		if (child_is(c, tau::bf_t)) return false;
+		if (child_is(c, tau::bf_f)) return true;
+	}
+	return std::nullopt;
+}
+
+// type: flag when it's the pack's resolved bool carrier and the atom is
+// flag-shaped, witness otherwise. A spec reaching codegen has already passed
+// type inference, so ba_type 0 (no type at all, distinct from the real
+// "untyped" BA type) means inference did not run for this variable -- an
+// invariant violation, not an ordinary case.
+template <NodeType node>
+field_kind classify_output_field(tref atom_ref, tref io_var_ref) {
 	const size_t vtype = tree<node>::get(io_var_ref).get_ba_type();
 	if (vtype == 0)
 		throw std::runtime_error("untyped variable '"
 			+ get_var_name<node>(io_var_ref)
 			+ "' reached codegen; spec did not go through type inference");
-	if (vtype == ba_types<node>::id(pack_bool_carrier_type<node>()))
+	if (vtype == ba_types<node>::id(pack_bool_carrier_type<node>())
+		&& carrier_flag_negated<node>(atom_ref, io_var_ref).has_value())
 		return field_kind::flag;
 	return field_kind::witness;
 }
@@ -224,10 +259,11 @@ bool atom_is_data_typed(tref atom_ref, bool revisable) {
 // Inputs are always flag. A multi-variable output atom is always
 // witness_template (no BA type can bake a constant for it), solved at
 // runtime by table_step_provider. A single-variable output atom is flag
-// over the bool carrier, or over the reserved tau type in a PWR revision
-// (@p revisable); every other reserved core type is flag too. Over a real
-// data BA otherwise, it yields a witness when the owner bakes constants
-// (codegen_witness), else witness_template.
+// over the bool carrier when it is flag-shaped (carrier_flag_negated), or
+// over the reserved tau type in a PWR revision (@p revisable); every other
+// reserved core type is flag too. Over a real data BA otherwise, or over the
+// carrier in any other shape, it yields a witness when the owner bakes
+// constants (codegen_witness), else witness_template.
 template <NodeType node>
 atom_field_info classify_atom_field(
 	tref atom_ref, bool is_output, bool revisable) {
@@ -255,7 +291,12 @@ atom_field_info classify_atom_field(
 		m.kind = field_kind::witness_template;
 		return m;
 	}
-	if (!atom_is_data_typed<node>(atom_ref, revisable)) return m;
+	const bool carrier_not_flag = !atom_is_data_typed<node>(atom_ref, revisable)
+		&& tree<node>::get(io_ref).get_ba_type()
+			== ba_types<node>::id(pack_bool_carrier_type<node>())
+		&& !carrier_flag_negated<node>(atom_ref, io_ref).has_value();
+	if (!atom_is_data_typed<node>(atom_ref, revisable) && !carrier_not_flag)
+		return m;
 	if (classify_output_field<node>(atom_ref, io_ref) != field_kind::witness)
 		return m;
 	if (pack_type_has_codegen_witness<node>(
@@ -526,16 +567,22 @@ inline std::int8_t cube_lit_at(const guard_cube& cube, int ap) {
 // Build one edge_desc's guard vector from a single cube: the first
 // `in_ap_idx` entries mirror `in_ap_idx`'s APs (matching literals), the
 // rest mirror `flag_out_ap_idx`'s APs (assignment literals) — see
-// codegen_strategy.h's guard convention.
+// codegen_strategy.h's guard convention. An assignment slot holds the
+// variable's value, so a flag whose atom is `var = 0` (flag_out_negated)
+// takes the complement of its prop's literal.
 inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
-    const std::vector<int>& in_ap_idx, const std::vector<int>& flag_out_ap_idx)
+    const std::vector<int>& in_ap_idx, const std::vector<int>& flag_out_ap_idx,
+    const std::vector<bool>& flag_out_negated = {})
 {
 	std::vector<std::int8_t> guard(
 		in_ap_idx.size() + flag_out_ap_idx.size(), 0);
 	for (size_t k = 0; k < in_ap_idx.size(); ++k)
 		guard[k] = cube_lit_at(cube, in_ap_idx[k]);
-	for (size_t k = 0; k < flag_out_ap_idx.size(); ++k)
-		guard[in_ap_idx.size() + k] = cube_lit_at(cube, flag_out_ap_idx[k]);
+	for (size_t k = 0; k < flag_out_ap_idx.size(); ++k) {
+		std::int8_t g = cube_lit_at(cube, flag_out_ap_idx[k]);
+		if (k < flag_out_negated.size() && flag_out_negated[k]) g = -g;
+		guard[in_ap_idx.size() + k] = g;
+	}
 	return guard;
 }
 
@@ -824,10 +871,19 @@ std::optional<program_desc> build_program_desc(
 	d.ba_type_table = snapshot_ba_type_registry<node>();
 
 	std::vector<int> in_ap_idx, flag_out_ap_idx;
+	std::vector<bool> flag_out_negated;
 	for (auto& f : d.inputs) in_ap_idx.push_back(prop_to_ap.at(f.prop));
 	for (auto& f : d.outputs) {
 		if (f.kind != field_kind::flag) break;
 		flag_out_ap_idx.push_back(prop_to_ap.at(f.prop));
+		bool negated = false;
+		if (auto ai = prop_to_atom.find(f.prop); ai != prop_to_atom.end()) {
+			const trefs& fv = get_free_vars<node>(ai->second);
+			if (fv.size() == 1)
+				negated = carrier_flag_negated<node>(ai->second, fv[0])
+					.value_or(false);
+		}
+		flag_out_negated.push_back(negated);
 	}
 
 	d.edges.resize(sol.aut.num_states);
@@ -842,7 +898,8 @@ std::optional<program_desc> build_program_desc(
 			for (auto& cube : *cubes) {
 				edge_desc ed;
 				ed.dst = e.dst;
-				ed.guard = guard_from_cube(cube, in_ap_idx, flag_out_ap_idx);
+				ed.guard = guard_from_cube(cube, in_ap_idx,
+					flag_out_ap_idx, flag_out_negated);
 
 				// A negative-signed literal enters the conjunction negated,
 				// so the witness the BA picks still satisfies the cube.

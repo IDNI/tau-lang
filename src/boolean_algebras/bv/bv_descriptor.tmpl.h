@@ -69,8 +69,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	static tref type_tree() { return bv_type<node_t>(default_bv_size); }
 
-	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
-
 	static bool owns_type(size_t ba_type_id) {
 		return is_bv_type_family<node_t>(ba_type_id);
 	}
@@ -287,9 +285,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static bool literal_incomplete(const std::string& src) {
 		auto result = bitvector_parser::instance()
 			.parse(src.c_str(), src.size());
-		return !result.found && result.parse_error
-			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC)
-			.find("Unexpected end of file") != std::string::npos;
+		return !result.found && result.parse_error.at_eof();
 	}
 
 	/**

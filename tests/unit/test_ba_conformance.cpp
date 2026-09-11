@@ -47,14 +47,15 @@ void check_type_system() {
 	REQUIRE(type != nullptr);
 	CHECK(std::string(desc::type_name).size() > 0);
 	CHECK(desc::matches_type(type));
-	CHECK(desc::owns_type(type));
+	CHECK(desc::matches_type(type));
 	// the name inside the type tree is the descriptor's own
 	CHECK(tau::get(type)[0].get_string() == std::string(desc::type_name));
 
 	// a parameterized algebra round-trips its parameter; an unparameterized
-	// one answers nullopt and type_tree() is its only type
-	if (auto param = desc::type_param(type); param)
-		CHECK(desc::type_tree_for(param.value()) == type);
+	// one declares none of the trio and type_tree() is its only type
+	if constexpr (ba_has_type_tree_for<node_t, BA>)
+		if (auto param = desc::type_param(type); param)
+			CHECK(desc::type_tree_for(param.value()) == type);
 	CHECK(desc::owns_type(ba_types<node_t>::id(type)));
 }
 

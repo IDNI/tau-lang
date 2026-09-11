@@ -44,24 +44,11 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 			type_name);
 	}
 
-	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
-
 	static bool owns_type(size_t ba_type_id) {
 		return ba_types_detail::type_tree_name_is<Bool, node_t>(
 			ba_type_id, type_name);
 	}
 
-	/** @brief Bool takes no subtype, so a type never carries a parameter. */
-	static std::optional<unsigned short> type_param(tref) {
-		return std::nullopt;
-	}
-
-	static size_t type_id_for(unsigned short) {
-		static const size_t id = ba_types<node_t>::id(type_tree());
-		return id;
-	}
-
-	static tref type_tree_for(unsigned short) { return type_tree(); }
 
 	static bool is_syntactic_one(const Bool& x) { return x.is_one(); }
 

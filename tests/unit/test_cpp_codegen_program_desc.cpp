@@ -566,8 +566,14 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		    "  std::printf(\"\\n\");\n"
 		    "  return 0;\n"
 		    "}\n";
+		// One field per atom, all over the same variable o, each holding
+		// o's value as its own atom decides it: at step 1 the spec pins
+		// o = 0, so the o = 0 field reads 0 there and 1 elsewhere, the two
+		// o = 1 fields the other way round. (A field is never its prop's
+		// truth -- that would print 100 010 001 and write 1 into a stream
+		// the spec constrains to 0.)
 		auto result = compile_and_run(os.str(), main_src, "posflag");
-		CHECK(result == "100 010 001 ");
+		CHECK(result == "110 000 011 ");
 	}
 
 	// Both positional atoms sit inside an implication -- an implication of
