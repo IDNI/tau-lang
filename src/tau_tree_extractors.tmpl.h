@@ -812,9 +812,10 @@ const trefs& get_free_vars(tref n) {
 	// once per variable. Trimming happens where a variable enters, so it is
 	// paid once per occurrence rather than once per ancestor.
 	subtree_unordered_map<node, trefs> memo;
-	// A connective's answer is already available and costs a lookup rather
-	// than a descent. Only the cache is consulted: a cacheable node is
-	// published there and so never reaches the memo.
+	// A chain link's answer is already available and costs a lookup rather
+	// than a descent. Only the cache is consulted: a link is a connective,
+	// hence cacheable, and a cacheable node is published there and so never
+	// reaches the memo.
 	auto answered = [](tref m) { return free_vars_map.contains(m); };
 	// A set only joins the operands if it has something to contribute; a
 	// closed subformula is dropped where it is found rather than carried
@@ -891,9 +892,17 @@ const trefs& get_free_vars(tref n) {
 		// out keeps the cost of an extra lookup per node and of a cache
 		// entry per node (an insertion here, a visit in every
 		// garbage-collection sweep) off the paths made of small formulas.
-		const bool connective = t.is(tau::wff_and) || t.is(tau::wff_or);
+		// Formula and term connectives alike: both chain, both merge, and
+		// both are published. Publishing term connectives is what keeps a
+		// term grown one factor at a time from being taken apart again at
+		// every step, and it is affordable because only the head of a
+		// chain is ever walked -- the links inside one are flattened away
+		// and so never become entries of their own, which is what used to
+		// make an entry per connective expensive.
+		const bool chain = t.is(tau::wff_and) || t.is(tau::wff_or)
+			|| t.is(tau::bf_and) || t.is(tau::bf_or);
 		const bool binder = is_logical_or_functional_quant<node>(m);
-		const bool cacheable = connective || binder;
+		const bool cacheable = chain || binder;
 		// A subtree's free-var set is intrinsic to it (see above), so a
 		// result already held -- from an earlier call on this or on an
 		// enclosing formula, or from earlier in this one -- is valid here
@@ -953,7 +962,7 @@ const trefs& get_free_vars(tref n) {
 						tau_term_bdd_handle<node>::get_free_tau_vars(
 							jt->second.get().b));
 			}
-			if (!connective) {
+			if (!chain) {
 				for (tref c : t.children()) contribute(parts, self(c));
 			} else {
 				// A chain of one connective -- `a && (b && (c && ...))`,
@@ -965,8 +974,7 @@ const trefs& get_free_vars(tref n) {
 				// answer is already available, so a conjunction grown one
 				// clause at a time still meets its predecessor whole rather
 				// than taking it apart again.
-				const size_t nt = t.is(tau::wff_and) ? tau::wff_and
-					: tau::wff_or;
+				const size_t nt = t.get_type();
 				const size_t lmark = links.size();
 				links.push_back(m);
 				while (links.size() > lmark) {
