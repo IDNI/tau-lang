@@ -293,7 +293,13 @@ private:
 	struct undo_record { tref key; bool had_previous; entry previous; };
 	subtree_unordered_map<node, entry> keys;
 	std::vector<undo_record> undo;
-	uint64_t var_bits = 0;      // variables mentioned by keys in force
+	/// Every key in force filed under each of its free variables, so the
+	/// capture guard asks for one variable's keys instead of testing all
+	/// of them. A fresh push appends (an override is the same tref, so
+	/// the index does not change) and the erase branch of `pop_keys_to`
+	/// removes it again; the stack discipline of `undo` makes the key the
+	/// back of each of its variables' lists.
+	subtree_unordered_map<node, trefs> keys_by_var;
 
 	const entry* find_active(tref n) const {
 		auto it = keys.find(n);
@@ -305,23 +311,24 @@ private:
 		auto [it, fresh] = keys.try_emplace(key, e);
 		undo.push_back({key, !fresh, fresh ? entry{} : it->second});
 		if (!fresh) it->second = e;
-		for (tref v : get_free_vars<node>(key)) var_bits |= var_bit(v);
+		else for (tref v : get_free_vars<node>(key))
+			keys_by_var[v].push_back(key);
 	}
 	void pop_keys_to(size_t mark) {
 		while (undo.size() > mark) {
 			const undo_record& u = undo.back();
 			if (u.had_previous) keys[u.key] = u.previous;
-			else keys.erase(u.key);
+			else {
+				keys.erase(u.key);
+				for (tref v : get_free_vars<node>(u.key)) {
+					trefs& ks = keys_by_var[v];
+					DBG(assert(!ks.empty() && tau::subtree_equals(
+						ks.back(), u.key));)
+					ks.pop_back();
+				}
+			}
 			undo.pop_back();
 		}
-	}
-	static uint64_t var_bit(tref v) {
-		return uint64_t(1) << (hash_lcrs_tref<node>{}(v) & 63);
-	}
-	static bool mentions(tref key, tref var) {
-		const trefs& fv = get_free_vars<node>(key);
-		return std::binary_search(fv.begin(), fv.end(), var,
-						tau::subtree_less);
 	}
 
 	// ── frames ────────────────────────────────────────────────────────
@@ -330,7 +337,6 @@ private:
 		explicit frame(kind_t k) : kind(k) {}
 		bool conj = true;               // join: conjunction or disjunction
 		size_t undo_mark = 0;
-		uint64_t var_bits_before = 0;
 		std::unordered_set<tref> literal_positions; // join
 		std::unordered_set<tref> spine;             // join: inner wrappers
 		subtree_unordered_map<node, bool> pushed;   // join: its keys
@@ -356,12 +362,18 @@ private:
 		frames.pop_back();
 	}
 	/// Keys in force whose free variables contain `var` (a binder's
-	/// variable): they must not reach into the binder's body.
+	/// variable): they must not reach into the binder's body. One index
+	/// lookup, so a binder costs the keys over its own variable and not
+	/// every key in force.
 	trefs captured_by(tref var) {
 		trefs out;
-		if (!(var_bits & var_bit(var))) return out;
-		for (const auto& [k, e] : keys)
-			if (!e.suspended && mentions(k, var)) out.push_back(k);
+		const auto vit = keys_by_var.find(var);
+		if (vit == keys_by_var.end()) return out;
+		for (tref k : vit->second) {
+			const auto it = keys.find(k);
+			DBG(assert(it != keys.end());)
+			if (!it->second.suspended) out.push_back(k);
+		}
 		return out;
 	}
 
@@ -558,7 +570,6 @@ private:
 		frame fr(frame::join);
 		fr.conj = conj;
 		fr.undo_mark = undo.size();
-		fr.var_bits_before = var_bits;
 		trefs leaves, inner;
 		get_leaves<node>(n, conj ? L::land : L::lor, leaves, &inner);
 		for (tref l : leaves) {
@@ -575,7 +586,6 @@ private:
 				// A contradiction (conjunction) or a tautology
 				// (disjunction): the join is decided here.
 				pop_keys_to(fr.undo_mark);
-				var_bits = fr.var_bits_before;
 				return finish(m, L::constant(!conj, n));
 			}
 			push_key(key, value);
@@ -665,7 +675,6 @@ private:
 			frame fr = std::move(frames.back());
 			frames.pop_back();
 			pop_keys_to(fr.undo_mark);
-			var_bits = fr.var_bits_before;
 			const bool conj = fr.conj;
 			tref res = r;
 			if (!(conj ? L::is_false(r) : L::is_true(r))) {
