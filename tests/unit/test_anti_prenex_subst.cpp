@@ -24,6 +24,7 @@ namespace ap = idni::tau_lang::anti_prenexing;
 namespace {
 
 using tb      = tau_term_bdd<node_t>;
+using th      = term_handle<node_t>;
 using order_t = ap::var_order<node_t>;
 
 tref bf(const char* s) {
@@ -53,8 +54,8 @@ order_t order_of(const ap::block& P) {
 /// both finished first (a BDD-backed term's own ref belongs to its order).
 bool same_function(tref a, tref b, const ap::block& vs) {
 	order_t o = order_of(vs);
-	return tb::build_bdd(ap::finish_terms<node_t>(a), o)
-		== tb::build_bdd(ap::finish_terms<node_t>(b), o);
+	return tb::build_bdd(th::convert_to_tau_terms(a), o)
+		== tb::build_bdd(th::convert_to_tau_terms(b), o);
 }
 
 /// Both sides of an atom (through no negation), trimmed.
@@ -346,19 +347,19 @@ TEST_CASE("subst_var: phase 4 — BDD-backed sides compose under the live order"
 	tref e = member_where(r, not_z);
 	REQUIRE(e != nullptr);
 	REQUIRE(is_atomic_fm<node_t>(e));
-	CHECK(!ap::is_bdd_backed<node_t>(sides(e).first)); // no decision variable left
+	CHECK(!th::is_bdd_backed(sides(e).first)); // no decision variable left
 	CHECK(same_function(sides(e).first, bf("z' & y"), { y, z }));
 	// A BDD-backed witness composes on the decision variable.
 	ap::block Q{ x, w };
 	order_t oq = order_of(Q);
 	tref f = ap::prepare_terms<node_t>(wff("x & z = 0"), Q, oq);
 	tref t = sides(ap::prepare_terms<node_t>(wff("w & y = 0"), Q, oq)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(t));
+	REQUIRE(th::is_bdd_backed(t));
 	tref s = ap::subst_var<node_t>(f, x, t, oq);
 	REQUIRE(is_atomic_fm<node_t>(s));
-	CHECK(ap::is_bdd_backed<node_t>(sides(s).first));
+	CHECK(th::is_bdd_backed(sides(s).first));
 	CHECK(same_function(sides(s).first, bf("w & y & z"), { x, w, y, z }));
-	CHECK(!has_bdd_id(ap::finish_terms<node_t>(s)));
+	CHECK(!has_bdd_id(th::convert_to_tau_terms(s)));
 }
 
 TEST_CASE("an order atom is rebuilt through the hooks (ruling 2)") {

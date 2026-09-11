@@ -10,31 +10,42 @@
  * primitives of §3 (`SIMPLIFY_TERM`, `SIMPLIFY_ATOM`, `TERM_OF`,
  * `NORM_EQUATION`, `PREPARE_TERMS`) plus `‖·‖` (§1, §10).
  *
- * Built on the existing `tau_term_bdd_handle<node>` (`term_handle`): its
- * `build(term, order)` treats exactly the order's keys as decision variables
- * and everything else as a leaf, which IS this representation; `bdd_ex` /
- * `bdd_all` quantify over a set, `bdd_compose` substitutes, `to_tau_term`
- * converts back to a plain `bf`, `convert_to_tau_node` mints the `BDD_ID`
- * node a BDD-backed term is stored as. The library's operation memos are
- * keyed by BDD refs and valid under ONE order (`sync_order_cache`).
+ * Built on the existing `tau_term_bdd_handle<node>` (`term_handle`) and the
+ * `tau_term_bdd<node>` under it: `build(term, order)` treats exactly the
+ * order's keys as decision variables and everything else as a leaf, which IS
+ * this representation; `has_bdd_var` asks whether a term touches the order at
+ * all; `bdd_ex` / `bdd_all` quantify over a set, `bdd_compose` substitutes a
+ * decision variable, `bdd_cofactor` selects a child at any depth, `bdd_xor`
+ * is the ring sum, `map_leaves` rewrites the leaves, `visit_nodes` and
+ * `node_count` walk the distinct nodes, `is_ordered` checks a ref against an
+ * order and `get_free_leaf_vars` reads the leaves' free variables;
+ * `to_tau_term` converts back to a plain `bf`,
+ * `convert_to_tau_node_or_term` mints the `BDD_ID` node a BDD-backed term is
+ * stored as (and hands back a plain term when the BDD does not branch),
+ * `convert_to_tau_terms` is the formula-wide inverse and `is_bdd_backed` the
+ * test for one. The library's operation memos are keyed by BDD refs and
+ * valid under ONE order (`sync_order_cache`).
  *
  * THE LIVE ORDER IS THE CALLER'S: every BDD primitive here takes the order
  * as an explicit parameter (the component's `ctx.order`, §5); nothing in
  * this file stores one. Only one order may be live at a time, so a
- * component's `finish_terms` (D2) runs before the next `prepare_terms`.
+ * component's D2 finish (`convert_to_tau_terms`) runs before the next
+ * `prepare_terms`.
  * The two simplifiers default to the empty order — phases 1, 2 and 5, where
  * nothing is BDD-backed (§3). Debug builds check, at every BDD primitive's
  * entry, that the ref passed in is a reduced ordered BDD under `order`
- * (every decision variable a key, ranks strictly increasing down every
- * path): a mixed-order operand or a stale ref breaks canonicity silently
- * otherwise.
+ * (`tau_term_bdd::is_ordered`: every decision variable a key, ranks strictly
+ * increasing down every path): a mixed-order operand or a stale ref breaks
+ * canonicity silently otherwise.
  *
  * A term is BDD-backed exactly when it has a decision variable, i.e. when
  * it touches `P`: a BDD that became a single leaf or a terminal (a cofactor,
  * a quantification over all of `P`) comes back as its plain term, so a
- * `P`-free term never carries a `BDD_ID`. `convert_to_tau_node` interns
- * (tau_bdd.tmpl.h), so the same BDD under the same type is the same node in
- * every component: the D2 round trip and hash-consed identity hold.
+ * `P`-free term never carries a `BDD_ID` — which is what
+ * `convert_to_tau_node_or_term`, the one way a term is emitted here, does.
+ * It interns (tau_bdd.tmpl.h), so the same BDD under the same type is the
+ * same node in every component: the D2 round trip and hash-consed identity
+ * hold.
  *
  * `term_of` and `norm_equation` live here because both are term operations
  * (`l + r` is a ring sum). Inside this namespace `norm_equation` hides
@@ -50,6 +61,36 @@
 #include "fwd.h"
 
 namespace idni::tau_lang::anti_prenexing {
+
+// --- §1 vocabulary with a library counterpart -----------------------------------
+//
+// Not declared here — used directly, on a `bf` term `t`, a formula `phi`:
+//
+//   BDD-backed term        term_handle<node>::is_bdd_backed(t)
+//   D2 finish              term_handle<node>::convert_to_tau_terms(phi)
+//   ∀_X f  /  ∃_X f        quantify_over(binder::all / binder::ex, f, X, order)
+//   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
+//
+// BDD-BACKED: the term is a `bf(BDD_ID)` node, i.e. BDD-backed under the
+// live order with at least one decision variable. The `bf` WRAPPER is the
+// form (the bare `BDD_ID` node is not one); it holds in any spelling of the
+// wrapper, with or without a right sibling.
+//
+// D2 FINISH (the old `finish_terms`): every `BDD_ID` term of `phi` back to a
+// plain `bf`, wherever it sits — under a binder REWRAP re-attached, inside a
+// symbolic functional quantifier's body, inside a reference argument, under a
+// temporal operator — one memoised walk with no node kind special-cased; the
+// inverse of `prepare_terms` up to term normal form. Round trip requirement:
+// `prepare_terms(convert_to_tau_terms(prepared))` yields the same BDD, hence
+// (by interning) the same `BDD_ID` node. A SOLVER QUERY is built on finished
+// terms: a `BDD_ID` is a node of one order, and a query keyed on it in
+// `solver_memo` would never hit across components. Layer 3's query builders
+// call it on the query formula.
+//
+// ∀_X / ∃_X: `quantify_over` is the one entry point — a block is
+// kind-homogeneous, so the library's mixed-prefix `bdd_quant` is never
+// needed, and callers that hold a `binder` (SETTLE_FUNCTIONAL, DISCHARGE)
+// pass it through.
 
 // --- the representation boundary (PREPARE_TERMS, D2) -----------------------------
 
@@ -75,57 +116,29 @@ namespace idni::tau_lang::anti_prenexing {
 template <NodeType node>
 tref prepare_terms(tref body, const block& P, const var_order<node>& order);
 
-/**
- * @brief D2: every `BDD_ID` term in `phi` back to a plain `bf`, wherever it
- * sits — under a binder REWRAP re-attached, inside a symbolic functional
- * quantifier's body, inside a reference argument, under a temporal
- * operator — one memoised walk with no node kind special-cased; the inverse
- * of `prepare_terms` up to term normal form. Round trip requirement:
- * `prepare_terms(finish_terms(prepared))` yields the same BDD, hence (by
- * interning) the same `BDD_ID` node.
- *
- * A SOLVER QUERY is built on finished terms: a `BDD_ID` is a node of one
- * order, and a query keyed on it in `solver_memo` would never hit across
- * components. Layer 3's query builders call this on the query formula.
- */
-template <NodeType node>
-tref finish_terms(tref phi);
-
-/// The term is a `BDD_ID` node: BDD-backed under the live order, with at
-/// least one decision variable.
-template <NodeType node>
-bool is_bdd_backed(tref term);
-
 // --- cofactors and quantification -----------------------------------------------
 
 /**
  * @brief §1 cofactor by CHILD SELECTION: `f[x ← bit]` for a BDD-backed `f`
- * and a DECISION variable `x` at any depth — a memoised restrict traversal
- * (the node of `x` is its child by `bit`, everything else rebuilt as it is;
- * `bdd_compose(x ↦ T/F)` is the tests' oracle). Result canonical over the
- * decision variables; NOT run through `simplify_term` — `COF` (layer 3)
+ * and a DECISION variable `x` at any depth — the library's `bdd_cofactor`,
+ * its result emitted through `convert_to_tau_node_or_term`. Canonical over
+ * the decision variables; NOT run through `simplify_term` — `COF` (layer 3)
  * does that. `f` itself when `x` is not one of its decision variables, or
  * `f` is plain. Nothing else is ever cofactored on.
  */
 template <NodeType node>
 tref cofactor(tref f, tref x, bool bit, const var_order<node>& order);
 
-/// `forall_over` or `exists_over` by `kind` — for the callers that hold a
-/// `binder` (SETTLE_FUNCTIONAL, DISCHARGE). A block is kind-homogeneous, so
-/// the library's mixed-prefix `bdd_quant` is never needed.
+/**
+ * @brief §1 `∀_X f = f₀·f₁` (`kind == binder::all`) and `∃_X f = f₀ ∪ f₁`
+ * (`binder::ex`) over a block: ONE BDD quantification, never expanded to
+ * 2^|X| terms; when `X` covers all decision variables this is the meet (the
+ * join) of the leaves in one traversal. `order` is the live order; `f`
+ * itself for a plain `f` or an empty `X`.
+ */
 template <NodeType node>
 tref quantify_over(binder kind, tref f, const block& X,
 	const var_order<node>& order);
-
-/// §1 `∀_X f = f₀·f₁` over a block: ONE BDD quantification, never expanded
-/// to 2^|X| terms; when `X` covers all decision variables this is the meet of
-/// the leaves in one traversal. `order` is the live order.
-template <NodeType node>
-tref forall_over(tref f, const block& X, const var_order<node>& order);
-
-/// §1 `∃_X f = f₀ ∪ f₁` over a block; dual of `forall_over` (join of the leaves).
-template <NodeType node>
-tref exists_over(tref f, const block& X, const var_order<node>& order);
 
 /**
  * @brief The SYMBOLIC functional-quantifier term `∀_Y f` / `∃_Y f`: a nested
@@ -231,9 +244,7 @@ tref norm_equation(tref atom, const var_order<node>& order);
  * a variable's pins, the smallest `‖f₁′‖`, which is the cost every later
  * compose or replace of the witness pays. No formula overload: nothing in
  * the spec reads `‖φ‖` (the decomposition licence uses `|·|`,
- * `formula_size`). The visited-set scheme of
- * `heuristics/bv_predicate_blasting.tmpl.h`'s `bdd_node_count`, with the
- * leaf guard its own BDDs do not need.
+ * `formula_size`). The BDD case is the library's `node_count`.
  */
 template <NodeType node>
 size_t mem_size(tref t);
@@ -246,7 +257,8 @@ size_t mem_size(tref t);
  * Sorted like `get_free_vars`. It differs from it exactly in the hazard case, a
  * block variable that is both a decision variable and hidden in a leaf,
  * which is what ELIMINATE_BLOCK's `opaque?` test (§7) asks before any
- * quantification. Returned BY VALUE, not stored: the per-leaf sets are
+ * quantification. The BDD case is the library's `get_free_leaf_vars`:
+ * returned BY VALUE, not stored, since the per-leaf sets are
  * `get_free_vars`' own cached entries and their union is one walk over the
  * BDD's distinct nodes per call.
  */

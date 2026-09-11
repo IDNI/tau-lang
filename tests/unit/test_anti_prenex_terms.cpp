@@ -43,7 +43,7 @@ order_t order_of(const ap::block& P) {
 
 /// The BDD ref of a term under `o` (a BDD-backed term's own ref).
 tb::ref ref_of(tref t, const order_t& o) {
-	if (ap::is_bdd_backed<node_t>(t))
+	if (th::is_bdd_backed(t))
 		return th::U.find(th::key_of(t))->second.get();
 	return tb::build_bdd(t, o);
 }
@@ -53,8 +53,8 @@ tb::ref ref_of(tref t, const order_t& o) {
 /// first, since a BDD-backed term's own ref belongs to its own order.
 bool same_function(tref a, tref b, const ap::block& vs) {
 	order_t o = order_of(vs);
-	return tb::build_bdd(ap::finish_terms<node_t>(a), o)
-		== tb::build_bdd(ap::finish_terms<node_t>(b), o);
+	return tb::build_bdd(th::convert_to_tau_terms(a), o)
+		== tb::build_bdd(th::convert_to_tau_terms(b), o);
 }
 
 /// The `l = r` atom of a prepared body (the body IS the atom here).
@@ -84,8 +84,8 @@ TEST_CASE("prepare_terms: decision variables are exactly P, leaves hold the rest
 	tref body = wff("x & y & z = 0");
 	tref prepared = ap::prepare_terms<node_t>(body, P, o);
 	auto [l, r] = sides(prepared);
-	CHECK(ap::is_bdd_backed<node_t>(l));
-	CHECK(!ap::is_bdd_backed<node_t>(r)); // the constant side stays a constant
+	CHECK(th::is_bdd_backed(l));
+	CHECK(!th::is_bdd_backed(r)); // the constant side stays a constant
 	tb::ref f = ref_of(l, o);
 	// the inner variable y has the LOWER rank and sits on top, x below it;
 	// z is a leaf
@@ -152,19 +152,19 @@ TEST_CASE("prepare_terms: equal sides fold through the hooks on BDD_ID operands 
 	CHECK(tau::get(prepared).equals_T());
 	// BDD_ID operands through the term hooks: X & X ::= X
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
+	REQUIRE(th::is_bdd_backed(l));
 	CHECK(build_bf_and<node_t>(l, l) == l);
 	CHECK(tau::get(build_bf_eq<node_t>(l, l)).equals_T());
 }
 
 // 2. cofactor -----------------------------------------------------------------
 
-TEST_CASE("cofactor: the child when x is on top, bdd_compose at any depth") {
+TEST_CASE("cofactor: the child when x is on top, a rebuild at any depth") {
 	tref x = vr("x"), y = vr("y"), z = vr("z");
 	ap::block P{ x, y };           // y inner → rank 1 → y on top
 	order_t o = order_of(P);
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
+	REQUIRE(th::is_bdd_backed(l));
 	tb::ref f = ref_of(l, o);
 	tref top = tb::get_var(f);
 	CHECK(tau::subtree_equals(top, y));
@@ -173,14 +173,12 @@ TEST_CASE("cofactor: the child when x is on top, bdd_compose at any depth") {
 	tref f0 = ap::cofactor<node_t>(l, y, false, o);
 	CHECK(ref_of(f1, o) == tb::get_high(f));
 	CHECK(ref_of(f0, o) == tb::get_low(f));
-	// deeper variable: equals the compose oracle
+	// a deeper variable: the nodes above it are rebuilt
 	tref g1 = ap::cofactor<node_t>(l, x, true, o);
 	tref g0 = ap::cofactor<node_t>(l, x, false, o);
-	CHECK(ref_of(g1, o) == tb::bdd_compose(f, x, tb::T, o));
-	CHECK(ref_of(g0, o) == tb::bdd_compose(f, x, tb::F, o));
 	// x ← 1 leaves y; x ← 0 leaves the leaf z, which comes back PLAIN
 	CHECK(same_function(g1, bf("y"), { y }));
-	CHECK(!ap::is_bdd_backed<node_t>(g0));
+	CHECK(!th::is_bdd_backed(g0));
 	CHECK(tau::subtree_equals(g0, bf("z")));
 	// identity on a variable that is not a decision variable
 	CHECK(ap::cofactor<node_t>(l, z, true, o) == l);
@@ -190,31 +188,29 @@ TEST_CASE("cofactor: the child when x is on top, bdd_compose at any depth") {
 
 // 3. quantification -----------------------------------------------------------
 
-TEST_CASE("forall_over / exists_over over all of P: meet / join of the leaves") {
+TEST_CASE("quantify_over over all of P: meet / join of the leaves") {
 	tref x = vr("x"), a = vr("a"), b = vr("b");
 	ap::block P{ x };
 	order_t o = order_of(P);
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & a | x' & b = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
-	tref all = ap::forall_over<node_t>(l, P, o);
-	tref ex  = ap::exists_over<node_t>(l, P, o);
-	CHECK(!ap::is_bdd_backed<node_t>(all));
-	CHECK(!ap::is_bdd_backed<node_t>(ex));
+	REQUIRE(th::is_bdd_backed(l));
+	tref all = ap::quantify_over<node_t>(ap::binder::all, l, P, o);
+	tref ex  = ap::quantify_over<node_t>(ap::binder::ex,  l, P, o);
+	CHECK(!th::is_bdd_backed(all));
+	CHECK(!th::is_bdd_backed(ex));
 	CHECK(same_function(all, bf("a & b"), { a, b }));
 	CHECK(same_function(ex,  bf("a | b"), { a, b }));
-	CHECK(ap::quantify_over<node_t>(ap::binder::all, l, P, o) == all);
-	CHECK(ap::quantify_over<node_t>(ap::binder::ex,  l, P, o) == ex);
 	// over an empty block, or on a plain term: identity
-	CHECK(ap::forall_over<node_t>(l, {}, o) == l);
-	CHECK(ap::exists_over<node_t>(bf("a"), P, o) == bf("a"));
+	CHECK(ap::quantify_over<node_t>(ap::binder::all, l, {}, o) == l);
+	CHECK(ap::quantify_over<node_t>(ap::binder::ex, bf("a"), P, o) == bf("a"));
 	// over PART of the decision set: the library's quantification, and the
 	// result stays BDD-backed on the rest
 	tref y = vr("y");
 	ap::block Q{ x, y };
 	order_t oq = order_of(Q);
 	tref g = sides(ap::prepare_terms<node_t>(wff("x & y & a | x' & b = 0"), Q, oq)).first;
-	tref exx = ap::exists_over<node_t>(g, { x }, oq);
-	CHECK(ap::is_bdd_backed<node_t>(exx));
+	tref exx = ap::quantify_over<node_t>(ap::binder::ex, g, { x }, oq);
+	CHECK(th::is_bdd_backed(exx));
 	trefs vx{ x };
 	CHECK(ref_of(exx, oq) == tb::bdd_ex(ref_of(g, oq), vx, oq));
 	CHECK(same_function(exx, bf("y & a | b"), { y, a, b }));
@@ -228,7 +224,7 @@ TEST_CASE("prepare_terms slides a functional quantifier onto the leaves, innermo
 	order_t o = order_of(P);
 	// ∀_y (x·y ∪ x′·z) = x·∀_y y ∪ x′·∀_y z = x·(fall y y) ∪ x′·z
 	tref l = sides(ap::prepare_terms<node_t>(wff("fall y (x & y | x' & z) = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
+	REQUIRE(th::is_bdd_backed(l));
 	tref hi = ap::cofactor<node_t>(l, x, true, o);
 	tref lo = ap::cofactor<node_t>(l, x, false, o);
 	CHECK(tau::subtree_equals(hi, bf("fall y y")));
@@ -240,7 +236,7 @@ TEST_CASE("prepare_terms slides a functional quantifier onto the leaves, innermo
 	// orders operands under the source names and canonicalises afterwards),
 	// so the chain is compared binder by binder and the leaf as a function.
 	tref n = sides(ap::prepare_terms<node_t>(wff("fall y fex w (x & y & w | x' & z) = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(n));
+	REQUIRE(th::is_bdd_backed(n));
 	{
 		tref got = ap::cofactor<node_t>(n, x, true, o);
 		tref want = bf("fall y fex w (y & w)");
@@ -296,7 +292,7 @@ TEST_CASE("subst_term: reaches a reference argument and re-simplifies it") {
 	order_t o = order_of(P);
 	tref t = bf("x & r(x & z)");
 	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(t), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
+	REQUIRE(th::is_bdd_backed(l));
 	// the leaf hazard: x is hidden in the reference argument
 	trefs lfv = ap::leaf_fv<node_t>(l);
 	CHECK(std::binary_search(lfv.begin(), lfv.end(), x, tau::subtree_less));
@@ -306,7 +302,7 @@ TEST_CASE("subst_term: reaches a reference argument and re-simplifies it") {
 	const trefs& fv = get_free_vars<node_t>(s);
 	CHECK(!std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));
 	CHECK(std::binary_search(fv.begin(), fv.end(), z, tau::subtree_less));
-	CHECK(!ap::is_bdd_backed<node_t>(s)); // no decision variable is left
+	CHECK(!th::is_bdd_backed(s)); // no decision variable is left
 	CHECK(tau::get(s).find_top([](tref m) {
 		return tree<node_t>::get(m).is(tau::bf_ref); }) != nullptr);
 	// the argument folded to 0
@@ -329,9 +325,9 @@ TEST_CASE("subst_term: a leaf that gains a block variable is re-canonicalised") 
 	// decision variable into that leaf, which the rebuild must lift:
 	// p·(p·c) ∪ p′·b = p·c ∪ p′·b
 	tref f = sides(ap::prepare_terms<node_t>(wff("p & a | p' & b = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(f));
+	REQUIRE(th::is_bdd_backed(f));
 	tref s = ap::subst_term<node_t>(f, a, bf("p & c"), o);
-	CHECK(ap::is_bdd_backed<node_t>(s));
+	CHECK(th::is_bdd_backed(s));
 	CHECK(same_function(s, bf("p & c | p' & b"), { p, b, c }));
 	CHECK(ap::leaf_fv<node_t>(s).size() == 2); // b and c, p is a decision node again
 }
@@ -342,12 +338,12 @@ TEST_CASE("subst_term: a BDD-backed t composes on the decision variable and ente
 	order_t o = order_of(P);
 	tref f = sides(ap::prepare_terms<node_t>(wff("x & r(x) = 0"), P, o)).first;
 	tref t = sides(ap::prepare_terms<node_t>(wff("y & z = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(f));
-	REQUIRE(ap::is_bdd_backed<node_t>(t));
+	REQUIRE(th::is_bdd_backed(f));
+	REQUIRE(th::is_bdd_backed(t));
 	tref s = ap::subst_term<node_t>(f, x, t, o);
 	CHECK(same_function(s, bf("y & z & r(y & z)"), { x, y, z }));
 	// finish: nothing BDD-backed remains anywhere
-	CHECK(!has_bdd_id(ap::finish_terms<node_t>(s)));
+	CHECK(!has_bdd_id(th::convert_to_tau_terms(s)));
 }
 
 // 6. simplify_term ------------------------------------------------------------
@@ -371,15 +367,15 @@ TEST_CASE("simplify_term: leaves simplified and merged in the BDD regime") {
 	// path), merges with the low leaf, the decision node folds, and the
 	// result is the plain y·z
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & (y & (y' | z)) | x' & (y & z) = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
+	REQUIRE(th::is_bdd_backed(l));
 	tref s = ap::simplify_term<node_t>(l, o);
-	CHECK(!ap::is_bdd_backed<node_t>(s));
+	CHECK(!th::is_bdd_backed(s));
 	CHECK(same_function(s, bf("y & z"), { y, z }));
 	// a plain combination of BDD-backed subterms is re-established over P
 	tref f1 = ap::cofactor<node_t>(l, x, true, o);   // plain, P-free
 	tref g  = sides(ap::prepare_terms<node_t>(wff("x & z = 0"), P, o)).first;
 	tref prod = ap::simplify_term<node_t>(build_bf_and<node_t>(g, f1), o);
-	CHECK(ap::is_bdd_backed<node_t>(prod));
+	CHECK(th::is_bdd_backed(prod));
 	CHECK(same_function(prod, bf("x & z & y"), { x, y, z }));
 	tref comp = ap::simplify_term<node_t>(build_bf_neg<node_t>(g), o);
 	CHECK(same_function(comp, bf("(x & z)'"), { x, z }));
@@ -415,7 +411,7 @@ TEST_CASE("simplify_atom: BDD regime is side-wise and folds through the hooks") 
 	order_t o = order_of(P);
 	// sides differ as written, are equal once the leaf simplifies: T
 	tref a = ap::prepare_terms<node_t>(wff("x & (y & (y' | z)) = x & (y & z)"), P, o);
-	REQUIRE(ap::is_bdd_backed<node_t>(sides(a).first));
+	REQUIRE(th::is_bdd_backed(sides(a).first));
 	CHECK(tau::get(ap::simplify_atom<node_t>(a, o)).equals_T());
 	// through one ¬
 	CHECK(tau::get(ap::simplify_atom<node_t>(build_wff_neg<node_t>(a), o)).equals_F());
@@ -440,7 +436,7 @@ TEST_CASE("term_of reads l + r without touching the atom; norm_equation descends
 	tref prepared = ap::prepare_terms<node_t>(wff("x & y = x"), P, o);
 	tref tb = ap::term_of<node_t>(prepared, o);
 	CHECK(same_function(tb, bf("(x & y) ^ x"), { x, y }));
-	CHECK(ap::is_bdd_backed<node_t>(tb));
+	CHECK(th::is_bdd_backed(tb));
 	// one BDD-backed side and a constant: the side itself
 	tref eq0 = ap::prepare_terms<node_t>(wff("x & y = 0"), P, o);
 	CHECK(ap::term_of<node_t>(eq0, o) == sides(eq0).first);
@@ -472,7 +468,7 @@ TEST_CASE("mem_size: shared BDD nodes counted once, terminals zero, leaves one")
 	order_t o = order_of(P);
 	// x·y ∪ x′·y′: the two y-nodes are one node with an inverter — 2 nodes
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y | x' & y' = 0"), P, o)).first;
-	REQUIRE(ap::is_bdd_backed<node_t>(l));
+	REQUIRE(th::is_bdd_backed(l));
 	CHECK(ap::mem_size<node_t>(l) == 2);
 	// x·y ∪ x′·z with x on top: x, y and the leaf z — 3
 	ap::block Q{ y, x };
@@ -490,7 +486,7 @@ TEST_CASE("mem_size: shared BDD nodes counted once, terminals zero, leaves one")
 
 // 10. D2 round trip ------------------------------------------------------------
 
-TEST_CASE("finish_terms: no BDD_ID remains, and prepare ∘ finish is the identity node (D2)") {
+TEST_CASE("convert_to_tau_terms: no BDD_ID remains, and prepare ∘ finish is the identity node (D2)") {
 	tref x = vr("x"), y = vr("y"), z = vr("z");
 	(void) z;
 	ap::block P{ x, y };
@@ -498,18 +494,18 @@ TEST_CASE("finish_terms: no BDD_ID remains, and prepare ∘ finish is the identi
 	tref body = wff("(x & y | x' & z = 0) && (y & z = x)");
 	tref prepared = ap::prepare_terms<node_t>(body, P, o);
 	REQUIRE(has_bdd_id(prepared));
-	tref finished = ap::finish_terms<node_t>(prepared);
+	tref finished = th::convert_to_tau_terms(prepared);
 	CHECK(!has_bdd_id(finished));
 	// the round trip: the same BDD, hence the same interned node
 	tref again = ap::prepare_terms<node_t>(finished, P, o);
 	CHECK(again == prepared);
 	// and a second round trip is stable too
-	CHECK(ap::finish_terms<node_t>(again) == finished);
+	CHECK(th::convert_to_tau_terms(again) == finished);
 	// a prepared atom REWRAPped under a binder is finished through it
 	tref under = build_wff_ex<node_t>(z, prepared, false);
-	CHECK(!has_bdd_id(ap::finish_terms<node_t>(under)));
+	CHECK(!has_bdd_id(th::convert_to_tau_terms(under)));
 	// nothing to finish: the same tref
-	CHECK(ap::finish_terms<node_t>(body) == body);
+	CHECK(th::convert_to_tau_terms(body) == body);
 	// interning: the same BDD built twice is one node
 	tref l1 = sides(ap::prepare_terms<node_t>(wff("x & y = 0"), P, o)).first;
 	tref l2 = sides(ap::prepare_terms<node_t>(wff("y & x = 0"), P, o)).first;
@@ -542,19 +538,5 @@ TEST_CASE("leaf_fv: the leaves' contribution alone") {
 	// a plain term: its FV
 	CHECK(ap::leaf_fv<node_t>(bf("y & z")).size() == 2);
 }
-
-// 12. the Debug order check ----------------------------------------------------
-
-#ifdef DEBUG
-TEST_CASE("is_ordered: a ref of another order is caught") {
-	tref x = vr("x"), y = vr("y");
-	order_t o1 = order_of({ x, y }), o2 = order_of({ y, x });
-	tb::ref f = tb::build_bdd(bf("x & y"), o1);
-	CHECK(ap::terms_detail::is_ordered<node_t>(f, o1));
-	CHECK(!ap::terms_detail::is_ordered<node_t>(f, o2));
-	order_t o3 = order_of({ x });
-	CHECK(!ap::terms_detail::is_ordered<node_t>(f, o3)); // y is not a key
-}
-#endif
 
 } // TEST_SUITE
