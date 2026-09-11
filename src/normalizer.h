@@ -27,19 +27,23 @@
 
 namespace idni::tau_lang {
 
-/// Opt-in for the test-point elimination of quantified bitvector variables
-/// that occur only in comparisons against constants (see
-/// `bv_case_split_quantifiers` in normalizer.tmpl.h). Off by default; enabled via
-/// `api::set_bv_case_split(true)` or the environment variable
-/// TAU_BV_CASE_SPLIT (a value of "0" disables).
-inline bool bv_case_split = false;
+/// Test-point elimination of quantified bitvector variables that occur only
+/// in comparisons against constants (see `bv_case_split_quantifiers` in
+/// normalizer.tmpl.h). On by default: it is an identity on the formula, and
+/// it is what keeps a conditional controller over a bitvector command
+/// independent of the Boole split budget (GitHub #107). Disabled via
+/// `api::set_bv_case_split(false)`, `--bv-case-split=false`, the REPL option
+/// `casesplit`, or the environment variable TAU_BV_CASE_SPLIT=0 (any other
+/// value enables; the variable overrides the flag in both directions).
+inline bool bv_case_split = true;
 
 inline bool bv_case_split_enabled() {
-	static const bool env = [] {
+	static const std::optional<bool> env = []() -> std::optional<bool> {
 		const char* v = std::getenv("TAU_BV_CASE_SPLIT");
-		return v && *v && !(v[0] == '0' && v[1] == '\0');
+		if (!v || !*v) return std::nullopt;
+		return !(v[0] == '0' && v[1] == '\0');
 	}();
-	return bv_case_split || env;
+	return env ? *env : bv_case_split;
 }
 
 /// Cap on the number of distinct constants a quantified bitvector variable

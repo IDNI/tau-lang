@@ -1472,41 +1472,13 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( o2->get_values() == strings{ "0", "1", "0", "0", "1" } );
 	}
 
-	// Regression test: nested conditionals over a mix of `:tau` and `:bv[N]`
-	// streams reported "Internal error: Tau specification is unexpectedly
-	// unsat" at step 0 instead of producing a solution.
-	//
-	// Nested conditionals compile to a conjunction of disjunctions in which
-	// the bitvector and Tau atoms sit in the same clauses, so no lift can
-	// separate them. eliminate_bv_and_quantifiers used to skip all bv-typed
-	// content in its second anti-prenex pass on the grounds that the solver
-	// had already decided whatever was closeable -- which does not hold for a
-	// scope the bv translator cannot read at all (it holds a `:tau`
-	// constant). The `all i2[1]:bv[8] (...)` block was then left standing with
-	// nothing able to resolve it, the step system became unsolvable, and the
-	// run declared the spec unsat.
-	//
-	// REVIEW (HIGH): bisect-proven 2026-08-18 that 8f1a74c1's parser
-	// regeneration (nonterminal renumbering -> term-order change ->
-	// different pivot-atom order in anti_prenex_block's Boole
-	// decomposition, per gdb stack sampling: the spin is the Shannon
-	// split recursion, not cvc5) regressed this case from <600s (old
-	// parser) to >1500s hang (4/4 attempts, up to 3h+); previously
-	// 12-271s nondeterministic (GitHub #70 family).
-	//
-	// SKIPPED 2026-08-19 after bounding attempts failed: runtime caps
-	// block_boole_max_splits/block_max_rounds at 100000/-, 2000/20 and
-	// 500/200 all leave the run above 7 minutes (the capped give-up
-	// re-wraps the block and the pipeline re-enters on the grown
-	// formula). The durable fix is #70's decomposition-order work —
-	// pivot selection must not be sensitive to grammar renumbering.
-	// 2026-08-19: pivot tie-breaking is now regeneration-stable
-	// (printed-form ties, normal_forms.tmpl.h) — cost no longer
-	// re-rolls on regen — but the stable order is still slow for THIS
-	// case (>600s measured), so the skip stands. Un-skip when this
-	// case completes within the ctest timeout again.
-	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat"
-		* doctest::skip())
+	// GitHub #107 shape: a `?:` controller over a bitvector command, with
+	// :tau state and a bitvector result code. Skipped from 2026-08-19 (over
+	// 600 s at every split budget then); re-enabled 2026-09-11 when it was
+	// found to complete in milliseconds with the bitvector case split on or
+	// off. The reporter's four-line script is pinned as a REPL test, where
+	// the split is what makes the first step budget-independent.
+	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat")
 	{
 		const char* sample =
 			"o0seal[0]:tau = 1 && o0law[0]:tau = 1 && "
