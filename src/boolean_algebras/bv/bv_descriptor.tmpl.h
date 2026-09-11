@@ -287,9 +287,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static bool literal_incomplete(const std::string& src) {
 		auto result = bitvector_parser::instance()
 			.parse(src.c_str(), src.size());
-		return !result.found && result.parse_error
-			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC)
-			.find("Unexpected end of file") != std::string::npos;
+		return !result.found && result.parse_error.at_eof();
 	}
 
 	/**

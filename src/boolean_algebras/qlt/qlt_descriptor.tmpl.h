@@ -124,9 +124,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static bool literal_incomplete(const std::string& src) {
 		auto result = qlt_parser::instance()
 			.parse(src.c_str(), src.size());
-		return !result.found && result.parse_error
-			.to_str(qlt_parser::error::info_lvl::INFO_BASIC)
-			.find("Unexpected end of file") != std::string::npos;
+		return !result.found && result.parse_error.at_eof();
 	}
 
 	/**

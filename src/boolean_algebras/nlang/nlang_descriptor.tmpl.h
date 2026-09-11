@@ -115,9 +115,7 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	static bool literal_incomplete(const std::string& src) {
 		auto result = nlang_parser::instance()
 			.parse(src.c_str(), src.size());
-		return !result.found && result.parse_error
-			.to_str(nlang_parser::error::info_lvl::INFO_BASIC)
-			.find("Unexpected end of file") != std::string::npos;
+		return !result.found && result.parse_error.at_eof();
 	}
 };
 
