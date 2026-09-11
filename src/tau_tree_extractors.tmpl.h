@@ -779,6 +779,16 @@ int_t get_max_initial(const trefs& io_vars) {
 	return max_init;
 }
 
+/**
+ * @brief The free variables of @p n, which must be a `bf` or `wff` node.
+ *
+ * A variable bound by an enclosing quantifier is not free, and an offset
+ * inside an io_var (`x[t]`, `x[t-1]`) is not an occurrence at all.
+ *
+ * The answer is sorted by `subtree_less`, deduplicated and right-sibling
+ * trimmed. It is a reference into a cache swept with the tree, so it stays
+ * valid for as long as @p n does.
+ */
 template <NodeType node>
 const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
@@ -792,10 +802,7 @@ const trefs& get_free_vars(tref n) {
 	using cache_t = subtree_unordered_map<node, trefs>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
 	// A `bf`/`wff` wrapper has exactly the free variables of what it wraps,
-	// so the two are one question and are asked under one key. Keying on
-	// the inner node stores one entry where the wrapper's and the
-	// connective's own used to be two, and makes a query about a formula
-	// meet the answer the walk published while visiting it from above.
+	// so both are answered under one key: the wrapped node.
 	const tau& root = tau::get(n);
 	const tref key = root.has_child()
 		&& !tau::get(root.first()).has_right_sibling() ? root.first() : n;
@@ -803,62 +810,41 @@ const trefs& get_free_vars(tref n) {
 		return it->second;
 
 	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
-	// DAG-aware, scope-correct free-variable collection, cached per node: a
-	// binder subtracts its own bound variable before anything it is nested
-	// in sees the result, so a subtree's free-var set is intrinsic to it and
-	// safe to cache -- unlike a naive node-identity dedup (e.g.
-	// search_unique), which would still need to merge a memoized subtree's
-	// contribution into every scope reaching it.
+	// A binder removes its bound variable before any enclosing scope sees
+	// the result, so a subtree's free variables depend on nothing outside it
+	// and every subtree can be cached on its own.
 	//
-	// Offset variables inside io_vars (x[t], x[t-1]) are not free
-	// occurrences; excluded by not descending into variable nodes at all.
-	//
-	// Every set here -- a cached one, one being built, the answer -- carries
-	// the shape the result is contracted to deliver: right-sibling-trimmed,
-	// sorted by subtree_less, deduplicated. Holding that shape throughout is
-	// what lets a cached entry be handed straight back and two sets be
-	// combined by a linear merge. Trimming happens where a variable enters,
-	// so it is paid once per occurrence rather than once per ancestor.
+	// Every set below -- cached, under construction, or returned -- carries
+	// the shape of the answer: trimmed, sorted by `subtree_less` and
+	// deduplicated. That one shape lets a cached set be returned as it is
+	// and two sets be combined by a linear merge.
 
-	// What a subtree contributes to the node being computed, collected in
-	// two shared stacks: single variables, and whole sets that are already
-	// in the delivered shape. A node records where its own entries begin and
-	// drops back to that mark when it is done, so nothing allocates a
-	// container of its own. Keeping loose variables loose is what makes an
-	// atom free: only a node that owns a cache entry ever builds a vector.
+	// What the subtrees of the node being computed contribute: single
+	// variables in `loose`, whole sets in `parts`. Both are stacks shared by
+	// the walk -- a node notes where its own entries start and truncates
+	// back to there when done -- so only a node that owns a cache entry
+	// allocates.
 	trefs loose;
 	std::vector<const trefs*> parts;
-	// Chain links already taken apart here (see `collect`). A link reached
-	// a second time is computed as a node of its own instead, which is what
-	// keeps a subformula that several branches of the DAG reach from being
-	// taken apart once per branch.
+	// Chain links already taken apart (see `collect`). A link reached again
+	// is computed as a node of its own, so a subformula that several
+	// branches of the DAG reach is taken apart only once.
 	subtree_unordered_set<node> opened;
-	// Handed to the algorithms below as lambdas rather than as
-	// `tau::subtree_less` itself, which would reach their inner loops as a
-	// function pointer and so never inline.
+	// Lambdas rather than `tau::subtree_less` itself, which would reach the
+	// algorithms below as a function pointer and never inline.
 	auto less = [](tref a, tref b) { return tau::subtree_less(a, b); };
 	auto equal = [](tref a, tref b) { return tau::subtree_equals(a, b); };
-	// The nodes the cache keys on: the connectives, where the walk fans out
-	// and a chain forms, and the binders, where a scope closes. Term
-	// connectives count as much as formula ones -- caching them is what
-	// keeps a term grown one factor at a time from being taken apart again
-	// at every step, and only the head of a chain is ever computed, the
-	// links inside one being taken apart rather than given entries.
+	// The nodes that own a cache entry: connectives, which form the chains
+	// below, and binders, which close a scope. Term connectives (`bf_and`,
+	// `bf_or`) count like the formula ones.
 	auto is_cacheable = [](const tau& t) {
 		return t.is(tau::wff_and) || t.is(tau::wff_or)
 			|| t.is(tau::bf_and) || t.is(tau::bf_or)
 			|| is_logical_or_functional_quant<node>(t.get());
 	};
-	// Not a node type, so no chain is open.
+	// No node carries this type, so it stands for "no chain open".
 	static constexpr size_t no_chain = static_cast<size_t>(-1);
-	// Everything collected since the two marks, as one set in the delivered
-	// shape. The largest set is merged in rather than re-sorted: a
-	// conjunction grown one clause at a time, where that set is the whole
-	// previous answer and the rest is one clause, then costs a single pass
-	// over it, while a chain taken apart into many small pieces costs one
-	// sort over the variable occurrences rather than a pass over the running
-	// union per piece.
-	// The union of two sets that already carry the delivered shape.
+	// The union of two sets that already carry the shape above.
 	auto merged = [less](const trefs& a, const trefs& b) {
 		trefs out;
 		out.reserve(a.size() + b.size());
@@ -866,21 +852,23 @@ const trefs& get_free_vars(tref n) {
 			std::back_inserter(out), less);
 		return out;
 	};
+	// Everything collected since the two marks, as one set in the shape
+	// above. The largest set is merged in rather than sorted with the rest,
+	// so one big set meeting a few variables costs a single pass over the
+	// big one.
 	auto combine = [&](size_t lmark, size_t mark) -> trefs {
-		// Two sets and nothing loose: a connective one level above the
-		// atoms, which is most of them. Merge the two and skip the rest,
-		// which is there for the flattened chains.
+		// Two sets and nothing loose: a connective just above the atoms,
+		// which is most of them. The rest of this serves the chains.
 		if (lmark == loose.size() && mark + 2 == parts.size())
 			return merged(*parts[mark], *parts[mark + 1]);
-		// Sets that are the same set -- one shared subformula reached
-		// through several branches of the DAG is one cached vector -- are
-		// merged once. Sharing makes that common, and the pass is over
-		// pointers, not variables.
+		// One subformula reached through several branches of the DAG is
+		// one cached vector, so identical sets are merged once. The pass
+		// is over pointers, not variables.
 		std::sort(parts.begin() + mark, parts.end());
 		parts.erase(std::unique(parts.begin() + mark, parts.end()),
 			parts.end());
-		// Everything but the largest set is sorted together with the loose
-		// variables; the largest is merged into that afterwards.
+		// The loose variables and every set but the largest are sorted
+		// together, and the largest is then merged into them.
 		size_t big = mark;
 		for (size_t i = mark + 1; i < parts.size(); ++i)
 			if (parts[i]->size() > parts[big]->size()) big = i;
@@ -901,15 +889,15 @@ const trefs& get_free_vars(tref n) {
 		const tau& t = tau::get(m);
 		if (is_var_or_capture<node>(m)) {
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
-			// Deliberately not descending into m's children.
+			// Not descending: an offset under a variable (`x[t-1]`) is
+			// not a free occurrence.
 			loose.push_back(tau::trim_right_sibling(m));
 			return;
 		}
 		if (t.is(tau::BDD_ID)) {
-			// A BDD-backed term keeps its variables in the BDD rather than
-			// in the tree. `U` is keyed by the `BDD_ID` node itself
-			// (tau_bdd.h), and get_free_tau_vars already delivers the
-			// shape this collects, being a union of answers from here.
+			// A BDD-backed term holds its variables in the BDD, not in
+			// the tree. `U` is keyed by the `BDD_ID` node (tau_bdd.h),
+			// and get_free_tau_vars returns them in the shape above.
 			const auto& bdd_u = tau_term_bdd_handle<node>::U;
 			if (auto it = bdd_u.find(tau_term_bdd_handle<node>::key_of(m));
 				it != bdd_u.end())
@@ -925,14 +913,9 @@ const trefs& get_free_vars(tref n) {
 				if (!it->second.empty()) parts.push_back(&it->second);
 				return;
 			}
-			// A link of the chain being taken apart contributes its own
-			// operands rather than a set: `a && (b && (c && ...))`, and a
-			// balanced tree of it just as much, is taken apart in one go
-			// and merged once. Merging link by link instead passes over
-			// the whole suffix at every link, which is what made a long
-			// conjunction cost its clause count squared. A link several
-			// branches reach is taken apart once and then computed as a
-			// node of its own, so every occurrence after that is a lookup.
+			// A link of the chain contributes its operands instead of a
+			// set of its own, so the whole of `a && (b && (c && ...))` --
+			// or any tree of `&&` -- is merged in one go, not per link.
 			if (t.is(chain) && opened.insert(m).second) {
 				for (tref c : t.children()) self(c, chain);
 				return;
@@ -940,11 +923,11 @@ const trefs& get_free_vars(tref n) {
 			const size_t lmark = loose.size(), mark = parts.size();
 			trefs result;
 			if (is_logical_or_functional_quant<node>(m)) {
-				// Fresh scope: only this binder's own subtree feeds it.
-				// Its children are the bound variable and the body, in
-				// that order (build_binder, tau_tree_builders.tmpl.h), so
-				// the variable is skipped on the way down rather than
-				// collected and taken out again afterwards.
+				// A fresh scope, fed only by this binder's subtree. Its
+				// children are the bound variable and the body, in that
+				// order (build_binder, tau_tree_builders.tmpl.h): the
+				// variable is skipped here, and the occurrences of it the
+				// body contributes are removed below.
 				const tref bound = t.first();
 				DBG(assert(is_var_or_capture<node>(bound));)
 				for (tref c : t.children())
@@ -968,20 +951,18 @@ const trefs& get_free_vars(tref n) {
 			if (!published.empty()) parts.push_back(&published);
 			return;
 		}
-		// Anything else contributes exactly what its children do. A node
-		// with a single child -- every `bf`/`wff` wrapper between two
-		// connectives is one -- passes the open chain through to it;
-		// anything else closes the chain.
+		// Any other node contributes what its children do. One with a
+		// single child -- every `bf`/`wff` wrapper between two connectives
+		// -- passes an open chain through; anything else ends it.
 		const size_t inner = t.has_child()
 			&& !tau::get(t.first()).has_right_sibling() ? chain : no_chain;
 		for (tref c : t.children()) self(c, inner);
 	};
 	collect(key, no_chain);
-	// A cacheable key published itself on the way. A key that collected one
-	// whole set and no loose variable -- an equation over a single term is
-	// one -- already has its answer stored under that set's own node, and
-	// is handed it rather than a copy of it under a second key. Otherwise
-	// the answer is the union of what was collected, and is stored.
+	// A cacheable key has already stored its own answer above. A key that
+	// collected one whole set and no loose variable -- an equation over a
+	// single term, say -- is that set. Anything else is the union of what
+	// was collected, which is stored under the key.
 	const trefs& fv = [&]() -> const trefs& {
 		if (auto it = free_vars_map.find(key); it != free_vars_map.end())
 			return it->second;

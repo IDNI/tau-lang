@@ -1052,9 +1052,8 @@ TEST_SUITE("get_free_vars cache") {
 	TEST_CASE("a chain is taken apart without losing a nested chain of another"
 		" connective")
 	{
-		// (a=0 || b=0) && ((c=0 && d=0) || e=0) && f=0: the `||` inside the
-		// `&&` chain is an operand of it, not a link, and keeps its own
-		// answer.
+		// The `||` inside the `&&` chain is an operand of it, not a link,
+		// and keeps an answer of its own.
 		tref nested = tau::build_wff_or(
 			tau::build_wff_and(x_eq_0("c"), x_eq_0("d")), x_eq_0("e"));
 		tref F = tau::build_wff_and(

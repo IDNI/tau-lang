@@ -533,11 +533,11 @@ struct tau_term_bdd_handle {
 	/** @brief Return the free Tau variables referenced by BDD node @p bdd_tref. */
 	static const trefs& get_free_tau_vars(tref bdd_tref);
 	/**
-	 * @brief The union of the free Tau variables of the variables of the
-	 * BDD nodes under @p bdd_tref, the leaves alone if @p leaves_only,
-	 * sorted by `subtree_less` and deduplicated.
+	 * @brief The free Tau variables of the BDD nodes under @p bdd_tref --
+	 * of the leaves alone if @p leaves_only -- sorted by `subtree_less` and
+	 * deduplicated.
 	 *
-	 * Shared by `get_free_tau_vars` and `get_free_leaf_vars`, which differ
+	 * The body of `get_free_tau_vars` and `get_free_leaf_vars`, which differ
 	 * only in that flag and in whether they cache the answer.
 	 */
 	static trefs collect_free_tau_vars(tref bdd_tref, bool leaves_only);

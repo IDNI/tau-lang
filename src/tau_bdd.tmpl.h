@@ -1454,16 +1454,10 @@ template<NodeType node>
 trefs tau_term_bdd_handle<node>::collect_free_tau_vars(tref bdd_tref,
 	bool leaves_only)
 {
-	// One walk over the DISTINCT nodes (visit_nodes), gathering the free
-	// variables of every node's variable, so a shared sub-BDD is entered
-	// once and not once per path.
-	//
-	// Gathered into one vector and sorted once at the end rather than
-	// inserted variable by variable into an ordered set, which would
-	// allocate a node per variable per BDD node. Every contribution is
-	// already trimmed and sorted, being an answer from get_free_vars, so
-	// sorting and deduplicating the concatenation delivers exactly the
-	// shape that function's own results carry.
+	// One walk over the DISTINCT nodes (visit_nodes), so a shared sub-BDD
+	// is entered once and not once per path. Each node's variables are
+	// appended and the whole is sorted once, which costs one allocation
+	// instead of one per variable.
 	trefs merged;
 	auto collect = [&merged, leaves_only](ref x, bool is_leaf) {
 		if (leaves_only && !is_leaf) return true;
