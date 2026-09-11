@@ -77,6 +77,12 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 
 	static std::string literal_zero(tref) { return "0"; }
 
+	/** @brief The constant of this type holding @p value's truth, as a bf. */
+	static tref value_constant(size_t, size_t value) {
+		return tau::get(tau::bf, tau::get_ba_constant(
+			typename tau::constant(Bool(value != 0)), type_tree()));
+	}
+
 	static Bool normalize(const Bool& x) { return normalize_bool(x); }
 
 	static tref simplify_symbol(tref sym) { return sym; }

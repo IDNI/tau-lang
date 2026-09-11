@@ -525,6 +525,10 @@ tref pack_bool_carrier_type() {
 	int best = -1;
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_can_host_bool_v<Node, BA>) {
+			static_assert(ba_has_value_constant<Node, BA>,
+				"a BA declaring can_host_bool must also build a plain "
+				"value with value_constant: core writes carrier bits "
+				"with it");
 #ifdef TAU_PACK_BOOL_CARRIERS
 			constexpr int rank = ba_carrier_rank(
 				TAU_PACK_BOOL_CARRIERS,

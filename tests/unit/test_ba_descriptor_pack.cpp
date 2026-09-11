@@ -209,3 +209,17 @@ TEST_SUITE("capability concepts name what each descriptor declares") {
 		CHECK(true);
 	}
 }
+
+TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
+
+	TEST_CASE("a Boolean carrier builds a plain value: Bool's value_constant") {
+		using N = node<bv, Bool>;
+		static_assert(ba_has_value_constant<N, Bool>);
+		const size_t bid = ba_types<N>::id(ba_descriptor<Bool, N>::type_tree());
+		tref one = pack_value_constant<N>(bid, 1);
+		tref zero = pack_value_constant<N>(bid, 0);
+		REQUIRE(one != nullptr);
+		REQUIRE(zero != nullptr);
+		CHECK(one != zero);
+	}
+}
