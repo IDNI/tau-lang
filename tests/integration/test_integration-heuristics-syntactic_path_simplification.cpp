@@ -829,4 +829,21 @@ TEST_SUITE("syntactic_path_simplification_stage5") {
 			.value().main->get();
 		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
 	}
+
+	// The trigger is where a literal came from, not its shape: a
+	// disjunction that folds to a binder exposes that binder as a key
+	// for its siblings, exactly as the eager substitution's re-descent
+	// did. (A binder conjunct whose own body was rewritten is not a
+	// trigger; its original key already folded every sibling copy.)
+	TEST_CASE("a binder exposed by a folded conjunct simplifies its sibling") {
+		// (a quantifier's body runs to the right end, hence the brackets)
+		tref fm = get_nso_rr("x != 0 && (x = 0 || (ex v (v = 0 && z = 0)))"
+			" && ((ex v (v = 0 && z = 0)) || y = 0).").value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		// x != 0 kills x = 0, exposing the binder, which makes the last
+		// conjunct a tautology.
+		tref expected = get_nso_rr("x != 0 && (ex v (v = 0 && z = 0)).")
+			.value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
 }

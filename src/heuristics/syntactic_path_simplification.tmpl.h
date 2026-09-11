@@ -458,17 +458,25 @@ private:
 		return r;
 	}
 
-	/// Whether the rebuilt join `res` has a top-level literal that was not
-	/// a key of the frame that produced it: a disjunctive member that
-	/// folded to a literal under the keys, or a compound literal whose
-	/// processed form is a new literal. Such a literal is a key for its
-	/// siblings, which were processed without it -- the eager substitution
-	/// found it by re-descending into the substituted rest; the sweep
-	/// re-sweeps the join, which pushes it and terminates since keys
-	/// only grow along the chain.
-	bool exposes_new_literal(tref res, const frame& fr) const {
+	/// Whether `rest` -- the join rebuilt by the traversal, in which every
+	/// literal position has folded away -- has a top-level literal that
+	/// was not a key of the frame that produced it: a non-literal member
+	/// (a disjunction, say) that folded to a literal under the keys. Such
+	/// a literal is a key for its siblings, which were processed without
+	/// it -- the eager substitution found it by re-descending into the
+	/// substituted rest; the sweep re-sweeps the join, which pushes it and
+	/// terminates since keys only grow along the chain.
+	///
+	/// A literal position whose processed form differs from its original
+	/// (a binder whose body was simplified) is deliberately not a trigger:
+	/// its original key was pushed before any sibling was traversed and
+	/// folded every sibling occurrence on the way down, so the rewritten
+	/// form could only match a sibling that spelled it out to begin with.
+	/// Re-sweeping for it would traverse the whole join once per rewritten
+	/// binder, which is quadratic on nested quantifiers.
+	bool exposes_new_literal(tref rest, const frame& fr) const {
 		trefs leaves;
-		get_leaves<node>(res, fr.conj ? L::land : L::lor, leaves);
+		get_leaves<node>(rest, fr.conj ? L::land : L::lor, leaves);
 		for (tref l : leaves) {
 			const tau& lt = tau::get(l);
 			if (!lt.is(L::top)) continue;
@@ -629,7 +637,7 @@ private:
 					tau::subtree_equals), lits.end());
 				tref block = L::join_all(conj, lits, m.orig);
 				res = L::join(conj, block, r);
-				if (exposes_new_literal(res, fr)) res = sweep(res);
+				if (exposes_new_literal(r, fr)) res = sweep(res);
 			}
 			res = post_check(res, m);
 			memo_store(m, res);
