@@ -781,19 +781,6 @@ int_t get_max_initial(const trefs& io_vars) {
 template <NodeType node>
 const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
-	// Cache/result shape: right-sibling-trimmed, sorted by subtree_less.
-	// No sort is needed: `vars` already iterates in subtree_less order, and
-	// subtree_less reads only a node's value and its left child, so trimming
-	// the right sibling cannot reorder two elements or make two of them
-	// equal.
-	auto sorted_trimmed = [](const subtree_set<node>& vars) {
-		trefs out(vars.size());
-		size_t i = 0;
-		for (tref v : vars) out[i++] = tau::trim_right_sibling(v);
-		DBG(assert(std::is_sorted(out.begin(), out.end(),
-			tau::subtree_less));)
-		return out;
-	};
 
 	static const trefs no_free_vars{};
 
@@ -820,15 +807,23 @@ const trefs& get_free_vars(tref n) {
 		return t.is(tau::wff_all) || t.is(tau::wff_ex) ||
 			t.is(tau::bf_fall) || t.is(tau::bf_fex);
 	};
-	subtree_unordered_map<node, subtree_set<node>> memo;
+	// Every set the walk handles -- a child's, a cached one, the one being
+	// built -- carries the shape the answer is contracted to deliver:
+	// right-sibling-trimmed, sorted by subtree_less, deduplicated. Holding
+	// that shape throughout is what lets a cached entry be handed straight
+	// back, a published one be a copy rather than a rebuild, and two sets be
+	// combined by a linear merge that allocates once per node instead of
+	// once per variable. Trimming happens where a variable enters, so it is
+	// paid once per occurrence rather than once per ancestor.
+	subtree_unordered_map<node, trefs> memo;
 	// `spine`: m continues a chain of the same connective as its parent
 	// (the right operand of `a && (b && (c && ...))`). Its free-variable
 	// set is a suffix of the parent's; publishing it at every spine node
 	// would store k sets of size O(k) for a k-chain. Such nodes still
 	// read the cache (a chain that was a whole constant one step earlier
 	// is cached as the top-level result) but do not publish.
-	std::function<const subtree_set<node>&(tref, bool)> walk =
-		[&](tref m, bool spine) -> const subtree_set<node>& {
+	std::function<const trefs&(tref, bool)> walk =
+		[&](tref m, bool spine) -> const trefs& {
 		if (auto it = memo.find(m); it != memo.end()) return it->second;
 		const auto& t = tau::get(m);
 		// Connective and binder nodes are the only ones consulted in and
@@ -844,12 +839,7 @@ const trefs& get_free_vars(tref n) {
 		// on this or on an enclosing formula -- is valid here as well:
 		// seed the walk from it instead of descending again.
 		if (cacheable) if (auto cached = free_vars_map.find(m);
-			cached != free_vars_map.end())
-		{
-			return memo.emplace(m, subtree_set<node>(
-				cached->second.begin(), cached->second.end()))
-					.first->second;
-		}
+			cached != free_vars_map.end()) return cached->second;
 		// A node whose only child carries all of its free variables -- every
 		// `wff`/`bf` wrapper between two connectives is one -- has exactly
 		// its child's set. Handing that set back instead of copying it into
@@ -859,7 +849,21 @@ const trefs& get_free_vars(tref n) {
 			&& t.has_child() && !tau::get(t.first()).has_right_sibling())
 			return walk(t.first(), spine);
 
-		subtree_set<node> result;
+		trefs result;
+		// Folds one child's set into `result`, keeping it sorted and
+		// deduplicated. The first contributing child is taken as it is, so
+		// a node with a single one -- a binder over its body, a connective
+		// with a closed side -- costs a copy and no merge.
+		auto add = [&result](const trefs& vars) {
+			if (vars.empty()) return;
+			if (result.empty()) { result = vars; return; }
+			trefs merged;
+			merged.reserve(result.size() + vars.size());
+			std::set_union(result.begin(), result.end(),
+				vars.begin(), vars.end(), std::back_inserter(merged),
+				tau::subtree_less);
+			result.swap(merged);
+		};
 		if (is_binder(t)) {
 			// Fresh scope: only this binder's own subtree feeds it,
 			// mirroring the original push-scope-then-pop-and-merge.
@@ -869,28 +873,30 @@ const trefs& get_free_vars(tref n) {
 			// and erased again afterwards.
 			const tref bound = t.first();
 			DBG(assert(is_var_or_capture<node>(bound));)
-			for (tref c : t.children()) if (c != bound)
-				for (tref v : walk(c, false)) result.insert(v);
-			if (auto it2 = result.find(bound); it2 != result.end()) {
+			for (tref c : t.children()) if (c != bound) add(walk(c, false));
+			if (auto it2 = std::lower_bound(result.begin(), result.end(),
+					bound, tau::subtree_less);
+				it2 != result.end() && tau::subtree_equals(*it2, bound))
+			{
 				DBG(LOG_TRACE << "removing quantified var: "
 								<< LOG_FM(bound);)
 				result.erase(it2);
 			}
 		} else if (is_var_or_capture<node>(m)) {
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
-			result.insert(m);
+			result.push_back(tau::trim_right_sibling(m));
 			// Deliberately not descending into m's children.
 		} else {
 			if (t.is(tau::BDD_ID)) {
 				// `U` is keyed by the `BDD_ID` node itself (tau_bdd.h).
+				// get_free_tau_vars already delivers the shape `add`
+				// expects, being a union of get_free_vars' own answers.
 				const auto& bdd_u = tau_term_bdd_handle<node>::U;
 				if (auto jt = bdd_u.find(
 						tau_term_bdd_handle<node>::key_of(m));
 					jt != bdd_u.end())
-					for (tref v :
-						tau_term_bdd_handle<node>::get_free_tau_vars(
-							jt->second.get().b))
-						result.insert(v);
+					add(tau_term_bdd_handle<node>::get_free_tau_vars(
+						jt->second.get().b));
 			}
 			for (tref c : t.children()) {
 				// A wrapper (e.g. `wff`) between two connectives passes
@@ -900,28 +906,28 @@ const trefs& get_free_vars(tref n) {
 					? tau::get(c).child_is(t.is(tau::wff_and)
 						? tau::wff_and : tau::wff_or)
 					: spine;
-				for (tref v : walk(c, s)) result.insert(v);
+				add(walk(c, s));
 			}
 		}
 		// Publish the result of a connective or binder node to the per-node
-		// cache, in the same shape the top-level result takes below, so a
-		// later call -- on this subtree or on any formula containing it --
-		// does not walk it again. Before this, only the top-level result was
-		// cached and each miss re-walked every unchanged subtree; on an
-		// accumulating run that made the per-step cost superlinear in the
-		// number of accumulated clauses.
-		if (cacheable && !spine
-			&& free_vars_map.find(m) == free_vars_map.end())
-			free_vars_map.emplace(m, sorted_trimmed(result));
+		// cache, so a later call -- on this subtree or on any formula
+		// containing it -- does not walk it again. Before this, only the
+		// top-level result was cached and each miss re-walked every
+		// unchanged subtree; on an accumulating run that made the per-step
+		// cost superlinear in the number of accumulated clauses. A
+		// published node needs no memo entry of its own: the cache it lands
+		// in is consulted first and outlives the call.
+		if (cacheable && !spine)
+			return free_vars_map.emplace(m, std::move(result)).first->second;
 		return memo.emplace(m, std::move(result)).first->second;
 	};
-	const subtree_set<node>& free_vars = walk(n, false);
-	trefs fv = sorted_trimmed(free_vars);
+	const trefs& fv = walk(n, false);
 #ifdef DEBUG
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
 	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
+	assert(std::is_sorted(fv.begin(), fv.end(), tau::subtree_less));
 #endif
-	auto [it, _] = free_vars_map.emplace(n, std::move(fv));
+	auto [it, _] = free_vars_map.emplace(n, fv);
 	return it->second;
 }
 
