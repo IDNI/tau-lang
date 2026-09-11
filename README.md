@@ -1553,6 +1553,8 @@ The general options are the following:
 |--------------------|-------------------------------------------------------|
 | -V, --charvar      | charvar (enabled by default)                          |
 | -B, --blasting     | bitvector predicate blasting (disabled by default)    |
+| -C, --bv-case-split | bitvector case split of quantified variables tested against constants (enabled by default) |
+| -K, --ba-component-factoring | decide tau-algebra constants per support component (enabled by default) |
 | -S, --severity     | severity level (trace/debug/info/error)               |
 | -I, --indenting    | indenting of the formulas                             |
 | -H, --highlighting | syntax highlighting                                   |
@@ -1581,6 +1583,8 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part (0 = unlimited)              |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
+| -k, --bv-case-split-max-tests | cap the constants a quantified bitvector variable may be tested against for the case split (0 = unlimited) |
+| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (0 = unlimited) |
@@ -1665,6 +1669,18 @@ whether bitvector predicates are expanded into their bit-level encoding. It's
 off by default (the REPL starts with the value of the `-B, --blasting` command
 line option, which defaults to off).
 
+* `casesplit`: Can be on/off. Controls the bitvector case split: a quantified
+bitvector variable that occurs only in comparisons against constants of its
+type is eliminated by one witness per cell those constants cut the domain
+into, before any quantifier block forms. It's on by default (the REPL starts
+with the value of the `-C, --bv-case-split` command line option).
+
+* `factoring`: Can be on/off. Controls support-component factoring of the
+tau-algebra constant tests: a constant whose clauses share no variables is
+decided per component, each decision remembered across steps, instead of as a
+whole. It's on by default (the REPL starts with the value of the
+`-K, --ba-component-factoring` command line option).
+
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
 
@@ -1682,6 +1698,15 @@ anti-prenexing (`--block-max-splits`). Unlimited by default.
 
 * `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
 (`--block-max-rounds`). Unlimited by default.
+
+* `casesplitmaxtests|maxcasetests`: cap on the constants a quantified
+bitvector variable may be tested against for the case split to apply
+(`--bv-case-split-max-tests`). Unlimited by default.
+
+* `decisionpins`: how many decided tau-algebra rows keep their key tree alive
+across the interpreter's step sweep, oldest released first
+(`--ba-decision-pins`). 4096 by default; `0` disables the pinning (a raw
+count, not "unlimited").
 
 * `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
 elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
@@ -1892,8 +1917,11 @@ static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
 (`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
-`set_charvar`, `set_blasting`, `set_indenting`, `set_highlighting`, `set_json` and
-`set_severity` mirror the command line options.
+`set_charvar`, `set_blasting`, `set_bv_case_split`, `set_ba_component_factoring`,
+`set_indenting`, `set_highlighting`, `set_json` and `set_severity` mirror the
+command line options, and every runtime limit has a setter of the same name as
+its option (`set_block_max_splits`, `set_bv_case_split_max_tests`,
+`set_ba_decision_pins`, ...).
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and

@@ -24,12 +24,18 @@
 
 namespace idni::tau_lang {
 
-/// Opt-in for support-component factoring of the Tau-BA constant/valid
-/// tests (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h). Off by
-/// default; enabled via `api::set_ba_component_factoring(true)` or the
-/// environment variable TAU_BA_COMPONENT_FACTORING (a value of "0"
-/// disables).
-inline bool ba_component_factoring = false;
+/// Support-component factoring of the Tau-BA constant/valid tests
+/// (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h): a conjunction whose
+/// conjuncts share no variables is satisfiable exactly when every component
+/// is, and validity distributes over conjunction, so the whole-constant
+/// decision of an accumulating spec is replaced by one decision per
+/// component, each remembered across steps. On by default (GitHub #92: the
+/// accumulating run of #90 goes from 42 s to 5 s with identical output);
+/// disabled via `api::set_ba_component_factoring(false)`,
+/// `--ba-component-factoring=false`, the REPL option `factoring`, or the
+/// environment variable TAU_BA_COMPONENT_FACTORING=0 (any other value
+/// enables; the variable overrides the flag in both directions).
+inline bool ba_component_factoring = true;
 
 /// How many decided rows of the Tau-BA decision caches (`is_zero`/`is_one`
 /// and the per-component factoring) keep their key tree pinned across the

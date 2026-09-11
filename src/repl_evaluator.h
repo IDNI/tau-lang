@@ -66,7 +66,8 @@ namespace idni::tau_lang {
 
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, blasting_opt, case_split_opt, highlighting_opt,
+	colors_opt, charvar_opt, blasting_opt, case_split_opt, factoring_opt,
+	highlighting_opt,
 	indenting_opt,
 	print_benchmarks_opt, debug_opt,
 	// Numeric, unlike every option above: they take a count, not a flag, so
@@ -115,6 +116,7 @@ struct repl_evaluator {
 		bool charvar             = true;  ///< Use character-variable notation.
 		bool blasting            = bv_blasting; ///< Bitvector predicate blasting; follows the library default.
 		bool case_split          = bv_case_split; ///< Bitvector case split; follows the library default.
+		bool factoring           = ba_component_factoring; ///< Tau-BA component factoring; follows the library default.
 		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options deliberately have no mirror fields
@@ -279,6 +281,9 @@ private:
 
 	/// @brief Update the case-split option to @p value and return the old value.
 	bool update_case_split(bool value);
+
+	/// @brief Update the factoring option to @p value and return the old value.
+	bool update_factoring(bool value);
 
 	// history
 	/// @brief Retrieve the history entry referenced by @p n.

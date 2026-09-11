@@ -1086,6 +1086,7 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "V" || x == "charvar")      return charvar_opt;
 	if (x == "B" || x == "blasting")     return blasting_opt;
 	if (x == "casesplit")                return case_split_opt;
+	if (x == "factoring")                return factoring_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1193,6 +1194,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "blasting:            " << pbool[opt.blasting] << "\n"; } },
 	{ case_split_opt,    [this]() {
 		std::cout << "casesplit:           " << pbool[opt.case_split] << "\n"; } },
+	{ factoring_opt,     [this]() {
+		std::cout << "factoring:           " << pbool[opt.factoring] << "\n"; } },
 	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    []() {
@@ -1343,6 +1346,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		update_blasting(update_bool_value(opt.blasting)); } },
 	{ case_split_opt,   [&]() {
 		update_case_split(update_bool_value(opt.case_split)); } },
+	{ factoring_opt,   [&]() {
+		update_factoring(update_bool_value(opt.factoring)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1426,6 +1431,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
 	case blasting_opt:     	   update_blasting(update_fn(opt.blasting)); break;
 	case case_split_opt:       update_case_split(update_fn(opt.case_split)); break;
+	case factoring_opt:        update_factoring(update_fn(opt.factoring)); break;
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -1472,6 +1478,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_case_split(bool value) {
 	api<node>::set_bv_case_split(opt.case_split = value);
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_factoring(bool value) {
+	api<node>::set_ba_component_factoring(opt.factoring = value);
 	return value;
 }
 

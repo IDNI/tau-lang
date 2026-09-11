@@ -47,6 +47,12 @@ cli::options tau_options() {
 		.set_description(std::string("blasting (")
 			+ (bv_blasting ? "enabled" : "disabled")
 			+ " by default)");
+	opts["ba-component-factoring"] = cli::option("ba-component-factoring",
+		'K', ba_component_factoring)
+		.set_description(std::string("decide tau-algebra constants per "
+			"support component (")
+			+ (ba_component_factoring ? "enabled" : "disabled")
+			+ " by default)");
 	opts["bv-case-split"] = cli::option("bv-case-split", 'C', bv_case_split)
 		.set_description(std::string("bitvector case split of quantified "
 			"variables tested against constants (")
@@ -233,6 +239,8 @@ int main(int argc, char** argv) {
 	bool charvar = opts["charvar"].get<bool>();
 	bool blasting = opts["blasting"].get<bool>();
 	tau_api::set_bv_case_split(opts["bv-case-split"].get<bool>());
+	tau_api::set_ba_component_factoring(
+		opts["ba-component-factoring"].get<bool>());
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by

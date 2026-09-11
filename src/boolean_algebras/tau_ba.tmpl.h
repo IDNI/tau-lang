@@ -235,11 +235,12 @@ static int factored_tau_units(tref fm, trefs& units) {
 // than exactly "0". The environment is read once and latched for the
 // lifetime of the process; the API flag is re-read on every call.
 inline bool ba_component_factoring_enabled() {
-	static const bool env = [] {
+	static const std::optional<bool> env = []() -> std::optional<bool> {
 		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
-		return v && *v && !(v[0] == '0' && v[1] == '\0');
+		if (!v || !*v) return std::nullopt;
+		return !(v[0] == '0' && v[1] == '\0');
 	}();
-	return ba_component_factoring || env;
+	return env ? *env : ba_component_factoring;
 }
 
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
