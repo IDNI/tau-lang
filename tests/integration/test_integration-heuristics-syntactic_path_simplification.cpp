@@ -846,4 +846,36 @@ TEST_SUITE("syntactic_path_simplification_stage5") {
 			.value().main->get();
 		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
 	}
+
+	// Capture is decided at the match: a key applies unless a binder
+	// entered AFTER its push binds one of its free variables. A key
+	// pushed inside a binder over its own variable therefore still fires
+	// inside that binder.
+	TEST_CASE("a key pushed inside a binder over its variable fires there") {
+		tref fm = get_nso_rr("ex v (v = 0 && (v = 0 || y = 0)).")
+			.value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		tref expected = get_nso_rr("ex v (v = 0).").value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
+
+	// Entering a binder changes which keys apply, so the memo must not
+	// answer a subtree inside it with the result of the same subtree
+	// outside it: the disjunction folds under `a = 0` outside the binder
+	// and must stay inside `ex a`, where `a` is a different variable.
+	TEST_CASE("a subtree shared across a binder boundary is not answered from outside") {
+		tref a0 = get_nso_rr("a = 0.").value().main->get();
+		tref s = get_nso_rr("a = 0 || b = 0.").value().main->get();
+		tref c0 = get_nso_rr("c = 0.").value().main->get();
+		tref a = tau::get(a0).find_top(is<node_t, tau::variable>);
+		REQUIRE(a != nullptr);
+		// `ex a ((a = 0 || b = 0) && c = 0)`, built by hand so the bound
+		// variable is the outer key's variable.
+		tref binder = tau::build_wff_ex(a, tau::build_wff_and(s, c0), false);
+		trefs cs{ a0, s, binder };
+		tref res = syntactic_path_simplification_simplify_wff<node_t>(
+			tau::build_wff_and(cs));
+		tref expected = tau::build_wff_and(a0, binder);
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
 }

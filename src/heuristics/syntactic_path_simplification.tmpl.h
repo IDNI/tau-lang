@@ -76,6 +76,17 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
 // a property of the node alone and lives in a cache shared across calls: the
 // root of every call, and every subtree a near-repeat call left untouched,
 // cost one lookup.
+//
+// Variable capture is decided at a match, not at binder entry: the sweep
+// keeps the variables of the binders open along its path, every key records
+// the depth of that stack when it was pushed, and a key applies to a node
+// only if none of its free variables is bound by a binder entered since. A
+// key pushed inside a binder over its own variable keeps firing there; the
+// same key met inside a nested binder over that variable does not. Free
+// variables are therefore collected only for keys that match something,
+// never for a binder pushed as a compound key that no sibling repeats.
+// Entering a binder advances the environment version, since it changes
+// which keys apply.
 
 /**
  * @brief Modes of the path sweep.
@@ -226,13 +237,16 @@ struct path_sweep {
 	tref run(tref root) {
 		DBG(assert(tau::use_hooks);) // every fold below is a construction hook
 		tref res = sweep(root);
-		DBG(assert(markers.empty() && frames.empty() && undo.empty());)
+		DBG(assert(markers.empty() && frames.empty() && undo.empty()
+			&& bound.empty());)
 		return res;
 	}
 
 private:
 	// ── environment ───────────────────────────────────────────────────
-	struct entry { bool value; unsigned suspended; };
+	/// `bound_mark`: the bound stack's depth when the key was pushed;
+	/// only binders entered since can capture the key.
+	struct entry { bool value; unsigned suspended; size_t bound_mark; };
 	/// The record that undoes one `push_key`, down to the version the
 	/// environment had before it.
 	struct undo_record {
@@ -241,13 +255,17 @@ private:
 	};
 	subtree_unordered_map<node, entry> keys;
 	std::vector<undo_record> undo;
-	/// Every key in force filed under each of its free variables, so the
-	/// capture guard asks for one variable's keys instead of testing all
-	/// of them. A fresh push appends (an override is the same tref, so
-	/// the index does not change) and the erase branch of `pop_keys_to`
-	/// removes it again; the stack discipline of `undo` makes the key the
-	/// back of each of its variables' lists.
-	subtree_unordered_map<node, trefs> keys_by_var;
+	/// The variables of the binders open along the traversal path, and
+	/// each variable's positions on that stack (innermost last). A key
+	/// applies to a node only if none of its free variables is bound by
+	/// a binder entered since the key was pushed -- a binder entered
+	/// before it binds the very variable the key talks about. The test
+	/// runs at a match, so a key's free variables are asked for (once;
+	/// `get_free_vars` caches them) only when the key matches something:
+	/// a binder pushed as a compound key never has its body's variables
+	/// collected unless an identical binder occurs among its siblings.
+	trefs bound;
+	subtree_unordered_map<node, std::vector<size_t>> bound_at;
 	/// The id of the environment's current state and the source of the
 	/// next one. Every change mints a fresh id and every undo restores
 	/// the id the change found, so equal ids mean the same keys in force
@@ -256,34 +274,47 @@ private:
 	uint64_t version = 0;
 	uint64_t next_version = 0;
 
+	/// The key's entry if it applies here: in force, not suspended, and
+	/// not captured by a binder entered since its push.
 	const entry* find_active(tref n) const {
 		auto it = keys.find(n);
 		if (it == keys.end() || it->second.suspended) return nullptr;
+		if (captured(n, it->second)) return nullptr;
 		return &it->second;
 	}
+	bool captured(tref key, const entry& e) const {
+		if (bound.size() <= e.bound_mark) return false; // no binder since
+		for (tref v : get_free_vars<node>(key)) {
+			const auto it = bound_at.find(v);
+			if (it != bound_at.end() && !it->second.empty()
+				&& it->second.back() >= e.bound_mark) return true;
+		}
+		return false;
+	}
+	void push_bound(tref v) {
+		bound_at[v].push_back(bound.size());
+		bound.push_back(v);
+		version = ++next_version; // which keys apply has changed
+	}
+	void pop_bound() {
+		const auto it = bound_at.find(bound.back());
+		DBG(assert(it != bound_at.end() && !it->second.empty());)
+		it->second.pop_back();
+		bound.pop_back();
+	}
 	void push_key(tref key, bool value) {
-		const entry e{value, 0};
+		const entry e{value, 0, bound.size()};
 		auto [it, fresh] = keys.try_emplace(key, e);
 		undo.push_back({key, !fresh, fresh ? entry{} : it->second,
 				version});
 		version = ++next_version;
 		if (!fresh) it->second = e;
-		else for (tref v : get_free_vars<node>(key))
-			keys_by_var[v].push_back(key);
 	}
 	void pop_keys_to(size_t mark) {
 		while (undo.size() > mark) {
 			const undo_record& u = undo.back();
 			if (u.had_previous) keys[u.key] = u.previous;
-			else {
-				keys.erase(u.key);
-				for (tref v : get_free_vars<node>(u.key)) {
-					trefs& ks = keys_by_var[v];
-					DBG(assert(!ks.empty() && tau::subtree_equals(
-						ks.back(), u.key));)
-					ks.pop_back();
-				}
-			}
+			else keys.erase(u.key);
 			version = u.version_before;
 			undo.pop_back();
 		}
@@ -323,36 +354,21 @@ private:
 		version = fr.version_before;
 		frames.pop_back();
 	}
-	/// Keys in force whose free variables contain `var` (a binder's
-	/// variable): they must not reach into the binder's body. One index
-	/// lookup, so a binder costs the keys over its own variable and not
-	/// every key in force.
-	trefs captured_by(tref var) {
-		trefs out;
-		const auto vit = keys_by_var.find(var);
-		if (vit == keys_by_var.end()) return out;
-		for (tref k : vit->second) {
-			const auto it = keys.find(k);
-			DBG(assert(it != keys.end());)
-			if (!it->second.suspended) out.push_back(k);
-		}
-		return out;
-	}
-
 	// ── per-node markers ──────────────────────────────────────────────
 	enum kind_t : uint8_t {
 		plain,       // descend; rebuild; post-check; memo
 		final_,      // no descent, result is final
 		spine,       // inner spine wrapper of the innermost join
 		join_top,    // opened a join frame
-		binder_,     // opened a scope frame (capture guard)
-		literal_pos, // a literal conjunct's position; may have opened a scope
+		binder_,     // put its variable on the bound stack
+		literal_pos, // a literal conjunct's position; may hold a scope / a bound variable
 	};
 	struct marker {
 		tref orig; kind_t kind; bool scoped;
 		/// The environment's version when the node was entered. `up`
 		/// is back at that state by the time it memoises.
 		uint64_t version;
+		bool bound; // the node's binder variable is on the bound stack
 	};
 	std::vector<marker> markers;
 	bool no_descend = false;
@@ -499,7 +515,7 @@ private:
 	tref down(tref n) {
 		DBG(assert(!no_descend);)
 		const tau& t = tau::get(n);
-		marker m{n, plain, false, version};
+		marker m{n, plain, false, version, false};
 		if (!t.is(L::top)) return markers.push_back(m), n;
 		if (frame* fr = innermost_join()) {
 			if (fr->literal_positions.contains(n)) return enter_literal(n, m);
@@ -554,10 +570,8 @@ private:
 
 	tref enter_binder(tref n, marker m) {
 		if (opts.units_opaque) return finish(m, n);
-		trefs captured = captured_by(tau::get(n)[0].first());
-		if (captured.empty()) return markers.push_back(m), n;
-		open_scope(std::move(captured));
-		m.kind = binder_; m.scoped = true;
+		push_bound(tau::get(n)[0].first());
+		m.kind = binder_; m.bound = true;
 		return markers.push_back(m), n;
 	}
 
@@ -573,14 +587,14 @@ private:
 		if (!L::is_connective(inner)) return finish_literal(m, n);
 		if (L::is_binder(inner) && opts.units_opaque) return finish_literal(m, n);
 		// Compound literal: enter under the keys in force, its own key
-		// suspended so it cannot fire on its own subtree; a binder also
-		// gets the capture guard.
-		trefs suspended{L::canon(n).key};
-		if (L::is_binder(inner))
-			for (tref k : captured_by(inner.first()))
-				if (!tau::subtree_equals(k, suspended[0]))
-					suspended.push_back(k);
-		open_scope(std::move(suspended));
+		// suspended so it cannot fire on its own subtree (`!(ex v B)`
+		// holds its own atom); a binder's variable goes on the bound
+		// stack first, so the scope records the version after it.
+		if (L::is_binder(inner)) {
+			push_bound(inner.first());
+			m.bound = true;
+		}
+		open_scope(trefs{L::canon(n).key});
 		m.scoped = true;
 		return markers.push_back(m), n;
 	}
@@ -608,13 +622,15 @@ private:
 			return res;
 		}
 		case binder_: {
-			close_scope();
+			pop_bound();
+			version = m.version;
 			tref res = post_check(fold_binder(r), m);
 			memo_store(m, res);
 			return res;
 		}
 		case literal_pos: {
 			if (m.scoped) close_scope();
+			if (m.bound) { pop_bound(); version = m.version; }
 			r = fold_binder(r);
 			frame& fr = frames.back();
 			DBG(assert(fr.kind == frame::join);)
