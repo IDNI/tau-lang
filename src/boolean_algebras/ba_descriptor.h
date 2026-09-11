@@ -334,13 +334,6 @@ concept ba_descriptor_complete =
  && requires(size_t n) {
         { ba_descriptor<BA, Node>::owns_type(n) }
             -> std::convertible_to<bool>;                            }
- && requires(tref t) {
-        ba_descriptor<BA, Node>::type_param(t);                      }
- && requires(unsigned short s) {
-        { ba_descriptor<BA, Node>::type_id_for(s) }
-            -> std::convertible_to<size_t>;                          }
- && requires(unsigned short s) {
-        ba_descriptor<BA, Node>::type_tree_for(s);                   }
 	// constants and closedness
  && requires(const BA& x) {
         { ba_descriptor<BA, Node>::is_syntactic_one(x) }

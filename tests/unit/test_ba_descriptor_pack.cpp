@@ -118,9 +118,9 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 			== std::optional<unsigned short>(8) );
 		CHECK( ba_descriptor<bv, conv_node>::type_param(t16)
 			== std::optional<unsigned short>(16) );
-		// every other BA is unparameterized and yields nullopt
-		CHECK( ba_descriptor<qint, conv_node>::type_param(qint_type<conv_node>())
-			== std::nullopt );
+		// every other BA is unparameterized and declares none of the trio
+		static_assert(!ba_has_type_tree_for<conv_node, qint>);
+		static_assert(!ba_has_type_tree_for<conv_node, sbf_ba>);
 	}
 
 	TEST_CASE("bv literals are width-dependent, unlike every other BA's") {

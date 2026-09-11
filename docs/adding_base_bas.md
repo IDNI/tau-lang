@@ -71,9 +71,7 @@ against the line naming it:
 - **identity and classification** — `type_name`, `default_type_priority`,
   `atomless`, `non_aba_omcat`
 - **type system** — `matches_type`, `type_tree`, `owns_type` (by tree and by
-  id), `type_param`, `type_id_for`, `type_tree_for` (`type_param` also lets
-  inference default a type an atomic expression leaves under-specified, e.g.
-  a widthless `:bv`, to the owning BA's own parameterized type)
+  id)
 - **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
   `is_closed`, `literal_one`, `literal_zero`
 - **normalization** — `normalize`, `splitter`, `splitter_one`
@@ -110,6 +108,7 @@ Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
 
 | member | what core asks it for |
 |---|---|
+| `type_param(tree)`, `type_id_for(param)`, `type_tree_for(param)` | declare all three iff your family is parameterised (`bv[8]`); `pack_type_tree` then accepts a parameter for your family and refuses one for every other, and inference defaults an under-specified type (a widthless `:bv`) to your own parameterised type |
 | `solve` | your own decision procedure for a whole formula |
 | `can_solve` | whether a formula is one you can decide at all |
 | `sat_status` | a *definite* answer — `optional<bool>`, so "unknown" stays distinct from "unsat" |

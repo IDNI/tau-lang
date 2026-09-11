@@ -40,14 +40,6 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 		return is_tau_type<node_t>(ba_type_id);
 	}
 
-	/** @brief tau takes no subtype, so a type never carries a parameter. */
-	static std::optional<unsigned short> type_param(tref) {
-		return std::nullopt;
-	}
-
-	static size_t type_id_for(unsigned short) { return tau_type_id<node_t>(); }
-
-	static tref type_tree_for(unsigned short) { return type_tree(); }
 
 	static bool is_syntactic_one(const ba_t& x) { return x.is_one(); }
 

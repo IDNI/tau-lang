@@ -648,7 +648,8 @@ std::optional<std::string> pack_codegen_constant_expr(size_t ba_type_id, tref cs
 /**
  * @brief The type tree of the pack BA named @p family: its default tree, or
  *        `type_tree_for(*param)` when @p param names a parameterized
- *        instance. nullptr when no pack member answers to the name.
+ *        instance. nullptr when no pack member answers to the name, or when
+ *        a parameter is given for a family that declares none.
  *
  * An emitted artifact's main resolves its baked ba-type table through this,
  * so a reduced pack works as long as it contains the families the spec uses.
@@ -662,11 +663,11 @@ tref pack_type_tree(const std::string& family,
 		if constexpr (ba_has_descriptor_v<Node, BA>) {
 			if (out || family != ba_descriptor<BA, Node>::type_name)
 				return;
-			if constexpr (ba_has_type_tree_for<Node, BA>) {
+			if constexpr (ba_has_type_tree_for<Node, BA>)
 				out = param
 					? ba_descriptor<BA, Node>::type_tree_for(*param)
 					: ba_descriptor<BA, Node>::type_tree();
-			} else out = ba_descriptor<BA, Node>::type_tree();
+			else if (!param) out = ba_descriptor<BA, Node>::type_tree();
 		}
 	});
 	return out;

@@ -43,17 +43,6 @@ struct ba_descriptor<hsb, node<PackBAs...>> {
 			ba_type_id, type_name);
 	}
 
-	/** @brief hsb takes no subtype, so a type never carries a parameter. */
-	static std::optional<unsigned short> type_param(tref) {
-		return std::nullopt;
-	}
-
-	static size_t type_id_for(unsigned short) {
-		static const size_t id = ba_types<node_t>::id(type_tree());
-		return id;
-	}
-
-	static tref type_tree_for(unsigned short) { return type_tree(); }
 
 	static bool is_syntactic_one(const hsb& x) { return is_hsb_one(x); }
 

@@ -13,7 +13,9 @@ tref bool_type() {
 
 template <NodeType node>
 size_t bool_type_id() {
-	return ba_descriptor<Bool, node>::type_id_for(0);
+	static const size_t id = ba_types<node>::id(
+		ba_descriptor<Bool, node>::type_tree());
+	return id;
 }
 
 } // namespace idni::tau_lang

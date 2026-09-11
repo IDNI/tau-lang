@@ -130,6 +130,15 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		CHECK(fp->second == std::optional<unsigned short>(8));
 #endif
 	}
+	TEST_CASE("pack_type_tree refuses a parameter for an unparameterised family") {
+#ifdef TAU_PACK_HAS_BA_SBF
+		CHECK(pack_type_tree<node_t>("sbf") != nullptr);
+		CHECK(pack_type_tree<node_t>("sbf", 8) == nullptr);
+#endif
+#ifdef TAU_PACK_HAS_BA_BV
+		CHECK(pack_type_tree<node_t>("bv", 8) != nullptr);
+#endif
+	}
 	TEST_CASE("the eight comparison-hook existence folds") {
 		const size_t none = tid(untyped_type<node_t>());
 		CHECK_FALSE(pack_ba_type_has_wff_lt_hook<node_t>(none));
