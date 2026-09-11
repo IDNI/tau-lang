@@ -77,7 +77,7 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	// reads the global back, so the REPL and the CLI options stay two views
 	// of the same knob.
 	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
-	case_split_max_tests_opt,
+	case_split_max_tests_opt, decision_pins_opt,
 	fixpoint_steps_opt,
 	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,

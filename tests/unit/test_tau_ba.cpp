@@ -90,3 +90,67 @@ TEST_SUITE("is_tau_closed") {
 		CHECK_FALSE( is_tau_closed(spec) );
 	}
 }
+
+// GitHub #92 (residue b): the decision caches of is_zero/is_one are keyed on
+// tree identity and filtered after every sweep, so a decided row whose key
+// tree nothing held was dropped and the constant re-decided at the next
+// step. The keys of decided rows are now pinned with a handle, bounded by
+// ba_decision_pins; with the cap at 0 the old behaviour is back.
+TEST_SUITE("tau_ba decision rows survive the sweep") {
+
+	tref parse_wff(const char* sample) {
+		static tree<node_t>::get_options opts{
+			.parse = { .start = tree<node_t>::wff } };
+		tref r = tree<node_t>::get(sample, opts);
+		REQUIRE( r != nullptr );
+		return r;
+	}
+
+	// Plain (non-stream) variables: the mains go through the same predicate
+	// cache, and stream variables would need an io context to classify them.
+	// The interpreter's per-step sweep (interpreter::maybe_gc): everything
+	// not reachable from the definitions, the term-BDD store or a handle
+	// goes; GC-registered caches drop the rows whose key did not survive.
+	void sweep() {
+		std::unordered_set<tref> keep;
+		definitions<node_t>::instance().collect_live_refs(keep);
+		tau_term_bdd<node_t>::collect_live_refs(keep);
+		tree<node_t>::gc(keep);
+	}
+
+	TEST_CASE("a pinned key is found again after a sweep") {
+		const size_t saved = ba_decision_pins;
+		ba_decision_pins = 4096;
+		const size_t m0 = tau_ba_predicate_misses;
+		{
+			tau_ba<bv, sbf_ba> a(parse_wff("(x:sbf = 0) && (y:sbf = 1)"));
+			CHECK_FALSE( a.is_zero() );
+		}
+		CHECK( tau_ba_predicate_misses == m0 + 1 );
+		sweep();
+		{
+			tau_ba<bv, sbf_ba> b(parse_wff("(x:sbf = 0) && (y:sbf = 1)"));
+			CHECK_FALSE( b.is_zero() );
+		}
+		CHECK( tau_ba_predicate_misses == m0 + 1 );
+		ba_decision_pins = saved;
+	}
+
+	TEST_CASE("with the cap at 0 the row is lost at the sweep") {
+		const size_t saved = ba_decision_pins;
+		ba_decision_pins = 0;
+		const size_t m0 = tau_ba_predicate_misses;
+		{
+			tau_ba<bv, sbf_ba> a(parse_wff("(z:sbf = 0) && (w:sbf = 1)"));
+			CHECK_FALSE( a.is_zero() );
+		}
+		CHECK( tau_ba_predicate_misses == m0 + 1 );
+		sweep();
+		{
+			tau_ba<bv, sbf_ba> b(parse_wff("(z:sbf = 0) && (w:sbf = 1)"));
+			CHECK_FALSE( b.is_zero() );
+		}
+		CHECK( tau_ba_predicate_misses == m0 + 2 );
+		ba_decision_pins = saved;
+	}
+}

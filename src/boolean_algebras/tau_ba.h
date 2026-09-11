@@ -31,6 +31,19 @@ namespace idni::tau_lang {
 /// disables).
 inline bool ba_component_factoring = false;
 
+/// How many decided rows of the Tau-BA decision caches (`is_zero`/`is_one`
+/// and the per-component factoring) keep their key tree pinned across the
+/// interpreter's per-step sweep, oldest released first. Rows whose key tree
+/// nothing else holds were dropped at every sweep and their constant
+/// re-decided at the next step (GitHub #92). 0 disables the pinning; set via
+/// api::set_ba_decision_pins, --ba-decision-pins, or the REPL option
+/// decisionpins.
+inline size_t ba_decision_pins = 4096;
+
+/// Misses of the cached is_zero/is_one predicate (decisions computed rather
+/// than found), for tests and diagnostics.
+inline size_t tau_ba_predicate_misses = 0;
+
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.
 // See also (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html)

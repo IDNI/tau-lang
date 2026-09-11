@@ -5,6 +5,7 @@
 #include "tau_spec.h"
 
 #include <cstdlib>
+#include <deque>
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_ba"
@@ -146,6 +147,20 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
  * computed uncached (correct, just as slow as before).
  * @endinternal
  */
+// Keeps the trees behind the most recent decided rows alive across the
+// interpreter's per-step sweep, so a decision made for a constant at one
+// step is found again at the next (GitHub #92). The caches themselves are
+// registered with the GC and drop any row whose key does not survive; a
+// pinned key survives. Bounded: the oldest pin is released first once
+// `ba_decision_pins` handles are held, and 0 disables the pinning.
+template <typename node>
+static void pin_decided_key(tref key) {
+	static std::deque<htref> pins;
+	if (ba_decision_pins == 0) return;
+	pins.push_back(tree<node>::geth(key));
+	while (pins.size() > ba_decision_pins) pins.pop_front();
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
@@ -159,7 +174,9 @@ static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
+	++tau_ba_predicate_misses;
 	bool res = compute(normalizer<node>(fm.nso_rr));
+	pin_decided_key<node>(key);
 	return cache.insert_or_assign(key, res).first->second;
 }
 
@@ -289,6 +306,7 @@ static int factored_tau_sat(tref fm) {
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
 		bool sres = is_tau_formula_sat<node>(f);
+		pin_decided_key<node>(f);
 		cache.insert_or_assign(f, sres);
 		all_sat = sres;
 	}
@@ -311,6 +329,7 @@ static int factored_tau_valid(tref fm) {
 			continue;
 		}
 		bool vres = is_tau_impl<node>(tau::_T(), units[i]);
+		pin_decided_key<node>(units[i]);
 		cache.insert_or_assign(units[i], vres);
 		all = vres;
 	}

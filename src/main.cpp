@@ -90,6 +90,9 @@ cli::options tau_options() {
 		'k', "0")
 		.set_description("cap the constants a quantified bitvector variable "
 			"may be tested against for the case split (0 = unlimited)");
+	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
+		.set_description("decided tau-algebra rows whose key tree is kept "
+			"alive across the step sweep (0 = none)");
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
@@ -241,6 +244,7 @@ int main(int argc, char** argv) {
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
 	tau_api::set_bv_case_split_max_tests(optnum("bv-case-split-max-tests"));
+	tau_api::set_ba_decision_pins(optnum("ba-decision-pins"));
 	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));

@@ -175,6 +175,11 @@ void api<node>::set_ba_component_factoring(bool state) {
 }
 
 template <NodeType node>
+void api<node>::set_ba_decision_pins(size_t n) {
+	ba_decision_pins = n;
+}
+
+template <NodeType node>
 void api<node>::set_bv_case_split(bool state) {
 	bv_case_split = state;
 }

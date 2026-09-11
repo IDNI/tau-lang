@@ -21,6 +21,7 @@ TEST_SUITE("Tau API - runtime limits") {
 			{ &tau_api::set_max_enum_steps,      &max_enum_steps },
 			{ &tau_api::set_max_rewrite_rounds,  &max_rewrite_rounds },
 			{ &tau_api::set_max_simplify_rounds, &max_simplify_rounds },
+			{ &tau_api::set_ba_decision_pins,    &ba_decision_pins },
 		};
 		for (const row& r : rows) {
 			const size_t saved = *r.global;

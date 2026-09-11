@@ -267,6 +267,9 @@ struct api {
 	/// Enable/disable support-component factoring of the Tau-BA
 	/// constant/valid tests (tau_ba.tmpl.h). Off by default.
 	static void set_ba_component_factoring(bool state);
+	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
+	/// interpreter's sweep (0 = no pinning; tau_ba.h).
+	static void set_ba_decision_pins(size_t n);
 	/// Enable/disable the test-point elimination of quantified bitvector
 	/// variables compared only against constants (normalizer.tmpl.h). Off by
 	/// default.

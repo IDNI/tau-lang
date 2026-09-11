@@ -60,6 +60,10 @@ add_repl_test(set_cmd-maxsplits_zero_unlimited
 	"maxsplits: *unlimited")
 add_repl_test(set_cmd-maxrounds_roundtrip
 	"set maxrounds 1000. get maxrounds" "maxrounds: *1000")
+add_repl_test(set_cmd-decisionpins_roundtrip
+	"set decisionpins 12. get decisionpins" "decisionpins: *12")
+add_repl_test(set_cmd-decisionpins_zero_is_none
+	"set decisionpins 0. get decisionpins" "decisionpins: *0")
 add_repl_test(set_cmd-casesplitmaxtests_roundtrip
 	"set casesplitmaxtests 7. get casesplitmaxtests" "casesplitmaxtests: *7")
 add_repl_test(set_cmd-casesplitmaxtests_zero_unlimited

@@ -1113,6 +1113,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
 	if (x == "casesplitmaxtests"
 		|| x == "maxcasetests")      return case_split_max_tests_opt;
+	if (x == "decisionpins")         return decision_pins_opt;
 	if (x == "fixpointsteps"
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
@@ -1216,6 +1217,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
 	{ case_split_max_tests_opt, [climit]() {
 		std::cout << "casesplitmaxtests:   " << climit(bv_case_split_max_tests) << "\n"; } },
+	{ decision_pins_opt, []() { // a raw count: 0 means none, not unlimited
+		std::cout << "decisionpins:        " << ba_decision_pins << "\n"; } },
 	{ cqe_max_clauses_opt, [climit]() {
 		std::cout << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
 	{ fixpoint_steps_opt, [climit]() {
@@ -1360,6 +1363,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_block_max_rounds(*n); } },
 	{ case_split_max_tests_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_bv_case_split_max_tests(*n); } },
+	{ decision_pins_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ba_decision_pins(*n); } },
 	{ cqe_max_clauses_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_cqe_max_clauses(*n); } },
 	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
@@ -1429,6 +1434,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case block_max_rounds_opt:
 	case cqe_max_clauses_opt:
 	case case_split_max_tests_opt:
+	case decision_pins_opt:
 	case fixpoint_steps_opt:
 	case flag_search_steps_opt:
 	case blast_depth_opt:
