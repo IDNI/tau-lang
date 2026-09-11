@@ -1324,6 +1324,9 @@ tref fold_trivial_quantifiers(tref fm) {
 	return post_order<node>(fm).apply_unique(f);
 }
 
+template <NodeType node>
+static void collect_top_and_conjuncts(tref fm, trefs& out);
+
 /**
  * @internal
  * @brief Simplifies a single clause from the outer DNF of a normalized temporal formula.
@@ -1360,9 +1363,24 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 		return ir.has_value() && ir.value();
 	};
 
-	const auto& t = tau::get(clause);
-	trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
-	trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
+	// Only the flat fragment `always φ && sometimes ψ && ...` with
+	// temporal-free bodies is simplified here. A nested temporal operator
+	// makes the clause full LTL, which the LTL pipeline owns untouched.
+	trefs conjuncts;
+	collect_top_and_conjuncts<node>(clause, conjuncts);
+	trefs aw_parts, st_parts;
+	for (tref c : conjuncts) {
+		const bool aw = is_child<node, tau::wff_always>(c);
+		const bool st = is_child<node, tau::wff_sometimes>(c);
+		if (aw || st) {
+			tref body = tau::get(c)[0].first();
+			if (tau::get(body).find_top(is_temporal_quantifier<node>))
+				return clause;
+			(aw ? aw_parts : st_parts).push_back(c);
+		} else if (tau::get(c).find_top(is_temporal_quantifier<node>)) {
+			return clause;
+		}
+	}
 	if ((aw_parts.size() == 1 && st_parts.empty()) ||
 		(aw_parts.empty() && st_parts.size() == 1))
 		return clause;
