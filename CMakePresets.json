@@ -121,7 +121,8 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_TESTS": "ON",
-				"TAU_BUILD_EXECUTABLE": "ON"
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_BINDING_PYTHON": "ON"
 			}
 		},
 		{
@@ -567,6 +568,18 @@
 			"inherits": ["release", "_build-binding-python"]
 		},
 		{
+			"name": "release-binding-python-tests",
+			"inherits": ["release", "_build-binding-python"]
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"inherits": ["debug", "_build-binding-python", "_build-type-debug"]
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"inherits": ["devel", "_build-binding-python"]
+		},
+		{
 			"name": "release-mingw-packages",
 			"inherits": [
 				"release-mingw",
@@ -775,6 +788,18 @@
 			"configurePreset": "release-binding-python"
 		},
 		{
+			"name": "release-binding-python-tests",
+			"configurePreset": "release-binding-python-tests"
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"configurePreset": "debug-binding-python-tests"
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"configurePreset": "devel-binding-python-tests"
+		},
+		{
 			"name": "release-mingw-packages",
 			"configurePreset": "release-mingw-packages"
 		},
@@ -851,6 +876,33 @@
 		{
 			"name": "devel-repl-tests",
 			"configurePreset": "devel-repl-tests"
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"configurePreset": "debug-binding-python-tests",
+			"filter": {
+				"include": {
+					"name": "binding-python"
+				}
+			}
+		},
+		{
+			"name": "release-binding-python-tests",
+			"configurePreset": "release-binding-python-tests",
+			"filter": {
+				"include": {
+					"name": "binding-python"
+				}
+			}
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"configurePreset": "devel-binding-python-tests",
+			"filter": {
+				"include": {
+					"name": "binding-python"
+				}
+			}
 		},
 		{
 			"name": "release-all",

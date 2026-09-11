@@ -86,17 +86,11 @@ jobs:
           path: ~/.tau
           key: ${{ steps.cache-tau.outputs.cache-primary-key }}
 
+      - name: Install nanobind
+        run: brew install nanobind
+
       - name: Build tau and tests, run tests (Release)
         run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       - name: Run tau
         run: ./build/release/tau -v
-
-      - name: Install nanobind
-        run: brew install nanobind
-
-      - name: Build Python bindings
-        run: ./dev preset release-binding-python -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      - name: Run Python test
-        run: python3 ./tests/bindings/python/test_direct_api_update.py

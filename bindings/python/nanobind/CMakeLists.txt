@@ -47,3 +47,17 @@ set_source_files_properties(tau_nanobind.cpp PROPERTIES
 	COMPILE_OPTIONS "-Wno-error")
 
 # target_compile_options(${TAU_PYTHON_BINDING_MODULE} PRIVATE -Wfatal-errors)
+
+# BUILD_TESTING mirrors the include(CTest) gate the root CMakeLists.txt
+# uses, so these register only when ctest infra is actually active.
+if(BUILD_TESTING)
+	file(GLOB TAU_PYTHON_BINDING_TEST_SCRIPTS
+		"${CMAKE_SOURCE_DIR}/tests/bindings/python/test_*.py")
+	foreach(test_script ${TAU_PYTHON_BINDING_TEST_SCRIPTS})
+		get_filename_component(test_stem "${test_script}" NAME_WE)
+		add_test(NAME "binding-python-${test_stem}"
+			COMMAND ${Python_EXECUTABLE} "${test_script}")
+		set_tests_properties("binding-python-${test_stem}" PROPERTIES
+			ENVIRONMENT "TAU_PYTHON_MODULE_DIR=$<TARGET_FILE_DIR:${TAU_PYTHON_BINDING_MODULE}>")
+	endforeach()
+endif()

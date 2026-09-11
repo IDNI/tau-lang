@@ -86,6 +86,9 @@ jobs:
           path: ~/.tau
           key: ${{ steps.cache-tau.outputs.cache-primary-key }}
 
+      - name: Install nanobind
+        run: brew install nanobind
+
       - name: Build tau and tests, run tests (Debug)
         run: ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 

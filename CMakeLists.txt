@@ -427,10 +427,17 @@ add_subdirectory("src")
 #
 # Testing
 #
+# include(CTest) also defines BUILD_TESTING, which the binding's own
+# ctest entries gate on, so it must run for that family too even when
+# no C++ test family is on.
+if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS OR TAU_BUILD_BINDING_PYTHON)
+	include(CTest)
+endif ()
+
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS)
 	message(STATUS "Building tests")
-	include(CTest)
 	add_subdirectory(tests)
 endif ()
 
