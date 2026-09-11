@@ -295,9 +295,17 @@ TEST_CASE("the result of a rewrite is a canonical chain: sorted, deduplicated, l
 	// The dual.
 	CHECK(same(ap::subst_var<node_t>(wff("x = 0 || (a = 0 || b = 0)"), x, bf("y"), {}),
 		ap::canonical_or<node_t>({ wff("y = 0"), wff("a = 0"), wff("b = 0") })));
-	// And for [atm ↦ T/F].
-	CHECK(same(ap::subst_atom<node_t>(wff("a = 0 && (b = 0 && c = 0)"), wff("a = 0"), true),
-		ap::canonical_and<node_t>({ wff("b = 0"), wff("c = 0") })));
+	// [atm ↦ T/F] erases in place: members only vanish, so a canonical
+	// chain stays canonical — the left fold of the remaining members,
+	// whichever member goes. (A non-canonical input is not re-shaped.)
+	tref abc = ap::canonical_and<node_t>({ wff("a = 0"), wff("b = 0"), wff("c = 0") });
+	for (const char* gone : { "a = 0", "b = 0", "c = 0" }) {
+		trefs rest;
+		for (tref m : ap::members<node_t>(abc))
+			if (!same(m, wff(gone))) rest.push_back(tau::trim_right_sibling(m));
+		CHECK(same(ap::subst_atom<node_t>(abc, wff(gone), true),
+			ap::canonical_and<node_t>(rest)));
+	}
 }
 
 // --- atoms through package B; the hooks fold, SIMPLIFY does not run --------------------

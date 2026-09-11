@@ -4,32 +4,50 @@
  * @file subst.tmpl.h
  * @brief Template implementations for subst.h (package C). Included by subst.h.
  *
- * Each substitution, and the `atoms` fill, is ONE `pre_order::visit` (tree.h;
+ * `[x ← t]` and the `atoms` fill are ONE `pre_order::visit` each (tree.h;
  * the `up` callback is the post-order visit) over the ORIGINAL formula, with
  * a call-local structural memo `node → result` — §10's "one memo per
  * rewrite" — that also prunes: a node the memo holds, or one the occurrence
  * guard clears, is not entered, and a lookup miss means "unchanged". Nothing
- * is rebuilt by the traversal itself. NEW over the `apply_*` family and
- * `rewriter::replace` (ground rule 9): those rebuild a changed parent as the
- * binary node it was — a rewritten chain is never re-canonicalised (D1) —
- * run a pre-order `f` once per OCCURRENCE, and offer no per-node facet
- * guard; here every node is rebuilt in `up` from its children's results, a
- * chain top through the raw canonical constructors from its FULL member view
- * (D1), everything else through the hooked `tau::get` (D4), which re-links
- * every child from its value and left child, so a child carrying a right
- * sibling is fine. (The traversals' own rebuilds are hooked too —
- * `lcrs_tree::get` applies the process-wide hook — so a term rewritten by
- * B's `subst_plain` already folds `X & X′` before its atom is rebuilt here.)
+ * is rebuilt by the traversal itself; every node is rebuilt in `up` from its
+ * children's results, a chain top through the raw canonical constructors
+ * from its FULL member view (D1), everything else through the hooked
+ * `tau::get` (D4), which re-links every child from its value and left child,
+ * so a child carrying a right sibling is fine.
+ *
+ * `[x ← t]` is NEW over `rewriter::replace` / `tree::substitute` (ground
+ * rule 9) for four reasons, none of which is hooks — the traversals' own
+ * rebuilds are hooked too (`lcrs_tree::get` applies the process-wide hook),
+ * so a term rewritten by B's `subst_plain` already folds `X & X′` before its
+ * atom is rebuilt here. (1) A BDD-backed atom holds `x` as a decision
+ * variable and inside its leaves, not as a tree node: a tree replace finds
+ * nothing, `subst_term` composes. (2) A member's CONTENT changes, so a
+ * changed chain has to be re-canonicalised (D1); `replace` rebuilds it as the
+ * binary node it was. (3) A touched reference argument is re-simplified once
+ * (inv. 6). (4) `tree::substitute` renumbers every binder id of the whole
+ * formula when `t` carries a functional quantifier, against the module's id
+ * policy (phase-0 ids are memo keys; phase 5 restores canonicity). Not among
+ * the reasons: `replace` IS unique-cached, and `replace_if` DOES take a
+ * descent predicate, so the occurrence guard alone would not have justified
+ * a new walk.
+ *
+ * `[atm ↦ T/F]` needs none of the four — its replacement is a constant, so
+ * members only VANISH and the hooks fold them out of a chain in place — and
+ * IS the library's `rewriter::replace_if`: content match, the `atoms` guard
+ * as its descent predicate, hooked rebuild (see `subst_atom`).
  *
  * SPINE nodes — a `wff` wrapping the same connective as its parent operator
  * node, either nesting side — are transparent: entered unconditionally,
- * never asked for a facet (`get_free_vars` and `atoms` publish every root they are
- * asked about, and a k-chain has k spine nodes with O(k) sets each), never
- * given a memo entry or an `atoms_memo` row; the chain top folds them
- * through `members`. A spine node met later STANDALONE is entered again
- * (its members are hits) and rebuilt there — which is why the walks are
- * `visit` with memo-based pruning, not `visit_unique`: the traversal's own
- * set would skip that occurrence and leave the parent's lookup dangling.
+ * never asked for a facet (`get_free_vars` and `atoms` publish every root
+ * they are asked about, and a k-chain has k spine nodes with O(k) sets
+ * each), never given a memo entry or an `atoms_memo` row; the chain top
+ * folds them through `members`. A spine node met later STANDALONE is entered
+ * again (its members are hits) and rebuilt there — which is why `[x ← t]` and
+ * the fill are `visit` with memo-based pruning, not `visit_unique`: the
+ * traversal's own set would skip that occurrence and leave the parent's
+ * lookup dangling. `[atm ↦ T/F]` has no parent at hand and recognises a
+ * spine node by the ABSENCE of a row: the guard's fill gave every other
+ * wrapper in the reach one.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_TMPL_H__
@@ -267,42 +285,29 @@ tref subst_atom(tref phi, tref atm, bool value) {
 	// search.
 	if (!has_atom<node>(phi, atm)) return phi;
 	const tref cst = value ? tau::_T() : tau::_F();
-	subtree_unordered_map<node, tref> memo;
-	auto result = [&memo](tref m) -> tref {
-		auto it = memo.find(m);
-		return it == memo.end() ? m : it->second;
+	// Descent. A wrapper with a row is entered iff its vocabulary holds
+	// `atm` — one lookup, never a walk (§10); a wrapper WITHOUT a row is a
+	// spine node of the chain being walked (the fill gave every other
+	// wrapper in the reach one) and is entered unconditionally. Below a
+	// wrapper only the reach is entered: ∧, ∨ and ¬ (§4, ruling 1) — a
+	// unit, a reference and a temporal operator have the empty vocabulary
+	// and stop at their wrapper.
+	auto reach = [&](tref m) -> bool {
+		if (!tau::get(m).is(tau::wff)) return reach_structural<node>(m);
+		const tref_set* row = find<node, table::atoms_memo>(m);
+		return row == nullptr || std::binary_search(row->items.begin(),
+			row->items.end(), atm, tau::subtree_less);
 	};
-	auto descend = [&](tref m, tref parent = nullptr) -> bool {
-		if (tau::get(m).is(tau::wff))
-			return !memo.contains(m)
-				&& (is_spine<node>(m, parent) || has_atom<node>(m, atm));
-		return reach_structural<node>(m);
-	};
-	// An admitted atom's vocabulary is itself, so it IS `atm` — compared by
-	// content: the atom as it occurs, never re-spelled (§3).
-	auto visitor = [&](tref m) -> bool {
-		if (!tau::get(m).is(tau::wff) || !is_atomic_fm<node>(m)) return true;
-		if (tau::subtree_equals(m, atm)) memo.emplace(m, cst);
-		return false;
-	};
-	// A negated occurrence receives the complement here: the `¬` wrapper is
-	// rebuilt over `T`/`F` and the hook folds it.
-	auto up = [&](tref m, tref parent) {
-		const tau& tm = tau::get(m);
-		if (tm.is(tau::wff)) {
-			if (memo.contains(m) || is_spine<node>(m, parent)) return;
-			tref r = (is_child<node>(m, tau::wff_and) || is_child<node>(m, tau::wff_or))
-				? rebuild_chain<node>(m, result)
-				: rebuild_generic<node>(m, result);
-			if (r != m) memo.emplace(m, r);
-			return;
-		}
-		if (!tm.is(tau::wff_neg)) return; // wff_and/wff_or: the wrapper's
-		tref r = rebuild_generic<node>(m, result);
-		if (r != m) memo.emplace(m, r);
-	};
-	pre_order<node>(phi).visit(visitor, descend, up);
-	return result(phi);
+	// `replace_if`: an occurrence — compared by CONTENT, the atom as it
+	// occurs, never re-spelled (§3) — becomes the constant and nothing
+	// below it is entered; every changed parent is rebuilt through the
+	// hooked constructor, so `T`/`F` fold out of a chain (`X ∧ T`, `X ∨ F`)
+	// or collapse it (`X ∧ F`, `X ∨ T`) and `¬T`/`¬F` fold, which is how a
+	// negated occurrence receives the complement. Members only vanish, so a
+	// canonical D1 chain stays sorted, deduplicated and left-nested (the
+	// left fold of the remaining members) with nothing re-canonicalised;
+	// a shared subtree is rewritten once (the traversal's cache).
+	return rewriter::replace_if<node>(phi, atm, cst, reach);
 }
 
 // --- atoms_memo ----------------------------------------------------------------------

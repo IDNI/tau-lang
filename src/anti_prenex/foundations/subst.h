@@ -29,10 +29,12 @@
  * its term children through `subst_term` (ruling 3).
  *
  * REBUILD. Neither substitution runs `SIMPLIFY`: the caller does (§3
- * `TRY_WITNESS`, §6 arm edges), invariant 6. A chain top is rebuilt from its
- * FULL member view through the raw canonical constructors (dag.h), so the
- * result is a canonical D1 chain whatever the input's nesting; everything
- * else through the hooked constructors (D4): `T`/`F` fold along a chain,
+ * `TRY_WITNESS`, §6 arm edges), invariant 6. `[x ← t]` rebuilds a chain top
+ * from its FULL member view through the raw canonical constructors (dag.h),
+ * so the result is a canonical D1 chain whatever the input's nesting;
+ * `[atm ↦ T/F]` erases members in place, so a canonical chain stays
+ * canonical and any other input keeps its shape; everything else goes
+ * through the hooked constructors (D4): `T`/`F` fold along a chain,
  * `¬T`/`¬F`/`¬¬ψ` fold, a constant-only atom folds, and the TERM hooks fold
  * what they fold inside a rewritten side (`y′·y` is `0` before its atom is
  * rebuilt). No hook exists for a binder, so `∃x.T` stands until
@@ -83,7 +85,11 @@ tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
  * puts `T`, `false` puts `F`; a negated occurrence `¬atm` receives the
  * complement (the `¬` folds through the hooks). The constants fold through
  * the hooks; the deep folding is the caller's `SIMPLIFY` (§6, the
- * decomposition arms).
+ * decomposition arms). The library's `rewriter::replace_if` with `atoms`
+ * as its descent predicate: members only vanish, so a canonical D1 chain
+ * stays canonical (sorted, deduplicated, left-nested) with nothing
+ * re-canonicalised, and a non-canonical input keeps its nesting minus the
+ * erased occurrences.
  */
 template <NodeType node>
 tref subst_atom(tref phi, tref atm, bool value);
