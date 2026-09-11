@@ -782,11 +782,16 @@ template <NodeType node>
 const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
 	// Cache/result shape: right-sibling-trimmed, sorted by subtree_less.
+	// No sort is needed: `vars` already iterates in subtree_less order, and
+	// subtree_less reads only a node's value and its left child, so trimming
+	// the right sibling cannot reorder two elements or make two of them
+	// equal.
 	auto sorted_trimmed = [](const subtree_set<node>& vars) {
 		trefs out(vars.size());
 		size_t i = 0;
 		for (tref v : vars) out[i++] = tau::trim_right_sibling(v);
-		std::sort(out.begin(), out.end(), tau::subtree_less);
+		DBG(assert(std::is_sorted(out.begin(), out.end(),
+			tau::subtree_less));)
 		return out;
 	};
 
@@ -845,20 +850,31 @@ const trefs& get_free_vars(tref n) {
 				cached->second.begin(), cached->second.end()))
 					.first->second;
 		}
+		// A node whose only child carries all of its free variables -- every
+		// `wff`/`bf` wrapper between two connectives is one -- has exactly
+		// its child's set. Handing that set back instead of copying it into
+		// a fresh one halves the merging along an and/or chain, which
+		// carries one wrapper per connective.
+		if (!cacheable && !is_var_or_capture<node>(m) && !t.is(tau::BDD_ID)
+			&& t.has_child() && !tau::get(t.first()).has_right_sibling())
+			return walk(t.first(), spine);
+
 		subtree_set<node> result;
 		if (is_binder(t)) {
 			// Fresh scope: only this binder's own subtree feeds it,
 			// mirroring the original push-scope-then-pop-and-merge.
-			for (tref c : t.children())
+			// A binder's children are its bound variable and its body, in
+			// that order (build_binder, tau_tree_builders.tmpl.h), so the
+			// variable is skipped on the way down rather than walked into
+			// and erased again afterwards.
+			const tref bound = t.first();
+			DBG(assert(is_var_or_capture<node>(bound));)
+			for (tref c : t.children()) if (c != bound)
 				for (tref v : walk(c, false)) result.insert(v);
-			if (tref var = t.find_top(
-				(bool(*)(tref)) is_var_or_capture<node>); var)
-			{
-				if (auto it2 = result.find(var); it2 != result.end()) {
-					DBG(LOG_TRACE << "removing quantified var: "
-									<< LOG_FM(var);)
-					result.erase(it2);
-				}
+			if (auto it2 = result.find(bound); it2 != result.end()) {
+				DBG(LOG_TRACE << "removing quantified var: "
+								<< LOG_FM(bound);)
+				result.erase(it2);
 			}
 		} else if (is_var_or_capture<node>(m)) {
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
