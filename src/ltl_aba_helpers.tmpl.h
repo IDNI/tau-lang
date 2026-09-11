@@ -18,6 +18,20 @@ static inline bool is_full_ltl_nt(size_t nt) {
 	    || nt == tau_parser::wff_T;
 }
 
+// Operators the safety pipeline cannot decide satisfiability for.
+static inline bool sat_needs_ltl_pipeline(size_t nt) {
+	return nt == tau_parser::wff_U || nt == tau_parser::wff_R
+	    || nt == tau_parser::wff_W || nt == tau_parser::wff_S
+	    || nt == tau_parser::wff_T;
+}
+
+// Operators whose realizability needs the game. The safety pipeline
+// answers satisfiability, and that is a different question once the
+// environment can control an eventuality.
+static inline bool realizability_needs_game(size_t nt) {
+	return nt == tau_parser::wff_sometimes || sat_needs_ltl_pipeline(nt);
+}
+
 // True if `n` is ANY temporal operator (including safety-fragment ones).
 template <NodeType node>
 static bool is_temporal_op(tref n) {
@@ -85,6 +99,47 @@ bool has_ltl_operators(tref fm) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		return is_full_ltl_nt(t[0].value.nt);
+	}) != nullptr;
+#ifdef TAU_CACHE
+	cache.emplace(fm, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+// True if the formula has an operator the safety pipeline cannot decide
+// satisfiability for.
+template <NodeType node>
+bool sat_has_ltl_operators(tref fm) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(fm).find_top([](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		return sat_needs_ltl_pipeline(t[0].value.nt);
+	}) != nullptr;
+#ifdef TAU_CACHE
+	cache.emplace(fm, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+// True if the formula has an operator whose realizability needs the game.
+template <NodeType node>
+bool realizability_has_game_operators(tref fm) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(fm).find_top([](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		return realizability_needs_game(t[0].value.nt);
 	}) != nullptr;
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
