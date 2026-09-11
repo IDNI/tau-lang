@@ -789,6 +789,11 @@ std::pair<std::optional<assignment<node>>, bool>
 		// rewrite dominated a replay profile of the load test).
 		tref part_at_t = update_to_time_point(spec_part,
 							formula_time_point);
+		// Substitute memory and simplify before enumerating paths: the
+		// read set in appear_within_lookback comes from this same tree,
+		// so no path here can carry an input the solver must bind.
+		part_at_t = syntactic_formula_simplification<node>(
+				rewriter::replace<node>(part_at_t, memory));
 		for (tref path : expression_paths<node>(part_at_t)) {
 			// rewriting the inputs and inserting them into memory
 			// TODO: Check why constant time positions are not being replaced
@@ -1912,22 +1917,32 @@ bool interpreter<node>::is_excluded_output(tref var) {
 template <NodeType node>
 trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
+	auto check = [&](tref fm, size_t t) {
+		tref step_ubt_ctn = update_to_time_point(fm,
+			t < formula_time_point ? formula_time_point : t);
+		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
+		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
+		// Try to find var in step_ubt_ctn
+		for (tref v : vars) {
+			if (contains<node>(step_ubt_ctn, v))
+				if (std::ranges::find_if(
+					appeared, [&v](const auto& n) {
+						return tau::get(n) == tau::get(v);
+					}) == appeared.end())
+					appeared.emplace_back(v);
+		}
+	};
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		for (const htrefs& part : ubt_ctn) for (const auto& h : part) {
-			tref step_ubt_ctn = update_to_time_point(h->get(),
-				t < formula_time_point ? formula_time_point : t);
-			step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-			// We only apply a heuristic in order to decide if the variable still appears
-			step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
-			// Try to find var in step_ubt_ctn
-			for (tref v : vars) {
-				if (contains<node>(step_ubt_ctn, v))
-					if (std::ranges::find_if(
-						appeared, [&v](const auto& n) {
-							return tau::get(n) == tau::get(v);
-						}) == appeared.end())
-						appeared.emplace_back(v);
-			}
+		// This step's read set must come from the same tree, substituted
+		// and simplified the same way, that step(values) hands the solver.
+		// Lookahead steps keep the raw alternatives: no step formula yet.
+		if (t == time_point) {
+			for (const trefs& part_alts : step_spec)
+				for (tref spec_part : part_alts)
+					check(spec_part, t);
+		} else {
+			for (const htrefs& part : ubt_ctn) for (const auto& h : part)
+				check(h->get(), t);
 		}
 	}
 	return appeared;
