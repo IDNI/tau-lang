@@ -33,25 +33,20 @@ template <typename T>
 inline constexpr bool is_tau_ba_v = is_tau_ba<T>::value;
 
 /**
- * @brief `true` for a BA with arithmetic terms and its own decision procedure.
- *
- * The primary sits in core so the normalizer can ask whether the configured
- * pack needs the arithmetic machinery (predicate blasting, the arithmetic
- * skip, the theory solver) at all; a BA that has it specializes this in its
- * own header.
+ * @brief `true` when @p BA brings arithmetic terms and its own decision
+ *        procedure: exactly the two capabilities the arithmetic pipeline
+ *        (predicate blasting, the arithmetic skip, the theory solver)
+ *        dispatches on, so the gate and the dispatch cannot disagree.
  */
-template <typename BA>
-struct ba_has_arithmetic_theory : std::false_type {};
-
-template <typename BA>
+template <typename Node, typename BA>
 inline constexpr bool ba_has_arithmetic_theory_v =
-	ba_has_arithmetic_theory<BA>::value;
+	ba_arith_ops_v<Node, BA> && ba_has_solve<Node, BA>;
 
-/** @internal @brief Fold of @ref ba_has_arithmetic_theory over a pack. */
+/** @internal @brief Fold of @ref ba_has_arithmetic_theory_v over a pack. */
 template <typename Node, std::size_t... Is>
 constexpr bool pack_has_arithmetic_theory_impl(std::index_sequence<Is...>) {
 	using pack = typename Node::bas_tuple;
-	return (ba_has_arithmetic_theory_v<std::tuple_element_t<Is, pack>>
+	return (ba_has_arithmetic_theory_v<Node, std::tuple_element_t<Is, pack>>
 		|| ...);
 }
 

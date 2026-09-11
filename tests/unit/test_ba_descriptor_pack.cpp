@@ -222,4 +222,13 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		REQUIRE(zero != nullptr);
 		CHECK(one != zero);
 	}
+
+	TEST_CASE("the arithmetic pipeline is on exactly when a BA has arith_ops and solve") {
+		static_assert(pack_has_arithmetic_theory_v<conv_node>);
+		static_assert(!pack_has_arithmetic_theory_v<mini_node>);
+		static_assert(ba_has_arithmetic_theory_v<conv_node, bv>);
+		static_assert(!ba_has_arithmetic_theory_v<conv_node, qlt>);
+		static_assert(!ba_has_arithmetic_theory_v<conv_node, sbf_ba>);
+		CHECK(true);
+	}
 }

@@ -52,10 +52,6 @@ using bvs = std::vector<bv>;
 using solver = cvc5::Solver;
 using term_manager = cvc5::TermManager;
 
-/** @brief bv carries bitvector arithmetic and its own decision procedure. */
-template <>
-struct ba_has_arithmetic_theory<bv> : std::true_type {};
-
 template<NodeType node>
 using solution = subtree_map<node, tref>;
 

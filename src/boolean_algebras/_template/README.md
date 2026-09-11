@@ -75,6 +75,6 @@ static_assert(assert_pack_descriptors_complete<my_node_t>());
 
 Capabilities beyond that surface are optional and probed with `requires`, never
 by BA name — declare `can_host_bool` if one of your types can hold a plain 0 or
-1 (add `bool_carrier_type()` when that is not your `type_tree()`), or
-`ba_has_arithmetic_theory<my_ba>` (in `ba_pack_traits.h`) if the algebra brings
-arithmetic terms and its own decision procedure.
+1 (add `bool_carrier_type()` when that is not your `type_tree()`), or both
+`arith_ops` and `solve` if the algebra brings arithmetic terms and its own
+decision procedure — that pair alone turns the arithmetic pipeline on.
