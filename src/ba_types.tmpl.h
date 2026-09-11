@@ -494,21 +494,14 @@ bool pack_owns_ba_type(size_t ba_type_id) {
 template <NodeType node>
 size_t pack_default_ba_type(size_t type_id) {
 	tref type_tree = ba_types<node>::type_tree(type_id);
-	size_t result = type_id;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename node::bas_tuple>;
-			if constexpr (ba_has_descriptor_v<node, BA>) {
-				if (ba_descriptor<BA, node>::matches_type(type_tree))
-					if (auto param = ba_descriptor<BA, node>::type_param(
-							type_tree))
-						result = ba_descriptor<BA, node>::type_id_for(
-							*param);
-			}
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename node::bas_tuple>>{});
-	return result;
+	return pack_owner_apply<node>(type_id, [&]<typename BA>()
+		-> std::optional<size_t> {
+			if constexpr (ba_has_type_tree_for<node, BA>)
+				if (auto param = ba_descriptor<BA, node>::type_param(
+						type_tree))
+					return ba_descriptor<BA, node>::type_id_for(*param);
+			return std::nullopt;
+		}).value_or(type_id);
 }
 
 template <NodeType node>

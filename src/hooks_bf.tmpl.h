@@ -16,22 +16,14 @@ namespace hooks_detail {
  */
 template <typename node_t>
 tref try_term_cast(tref symbol, size_t ba_type) {
-	if (!ba_type) return nullptr;
-	tref out = nullptr;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		using pack = typename node_t::bas_tuple;
-		([&] {
-			using BA = std::tuple_element_t<Is, pack>;
-			if constexpr (ba_has_descriptor_v<node_t, BA>
-				&& requires(tref s, size_t t) {
-					ba_term_hooks<BA, node_t>::term_cast(s, t); })
-				if (!out && ba_descriptor<BA, node_t>::owns_type(ba_type))
-					out = ba_term_hooks<BA, node_t>::term_cast(
-						symbol, ba_type);
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename node_t::bas_tuple>>{});
-	return out;
+	return pack_owner_apply<node_t>(ba_type, [&]<typename BA>()
+		-> std::optional<tref> {
+			if constexpr (requires(tref s, size_t t) {
+				ba_term_hooks<BA, node_t>::term_cast(s, t); })
+				return ba_term_hooks<BA, node_t>::term_cast(
+					symbol, ba_type);
+			return std::nullopt;
+		}).value_or(nullptr);
 }
 
 } // namespace hooks_detail

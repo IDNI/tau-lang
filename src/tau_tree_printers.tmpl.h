@@ -18,10 +18,8 @@ std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v) {
 	// says so with a print_constant arm; everyone else just streams.
 	std::visit([&os](const auto& a) {
 		using BA = std::decay_t<decltype(a)>;
-		if constexpr (requires { ba_descriptor<BA,
-			node<BAs...>>::print_constant(os, a); })
-				ba_descriptor<BA, node<BAs...>>
-					::print_constant(os, a);
+		if constexpr (ba_has_print_constant<node<BAs...>, BA>)
+			ba_descriptor<BA, node<BAs...>>::print_constant(os, a);
 		else os << a;
 	}, v);
 	return os;
