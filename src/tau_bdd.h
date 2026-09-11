@@ -159,11 +159,47 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	static ref get_low(ref x);
 	/** @brief Return `true` if @p l is a leaf reference. */
 	static bool leaf(ref l);
+	/**
+	 * @brief The variable of reference @p x as a `bf` term: the node's
+	 * variable under a `bf` wrapper; for a leaf that is its Tau term, with
+	 * the output inverter folded in as `bf_neg` (see `get_var`).
+	 */
+	static tref get_var_term(ref x);
+
+	/**
+	 * @brief Visit every NON-terminal node of @p x once, BY NODE: a node
+	 * reached under both inverters is visited once, `T` and `F` never.
+	 *
+	 * @param fn Called as `fn(ref, bool is_leaf)`; returning `false` stops
+	 * the walk.
+	 * @return `false` iff @p fn stopped the walk.
+	 */
+	template <typename Fn>
+	static bool visit_nodes(ref x, Fn& fn);
+	/**
+	 * @brief The number of distinct non-terminal nodes reachable from @p x,
+	 * leaves included; zero for a terminal, and a node shared through an
+	 * inverter counted once.
+	 */
+	static size_t node_count(ref x);
+	/**
+	 * @brief `true` iff @p x is a reduced ordered BDD under @p o: every
+	 * decision variable is a key of @p o and ranks strictly increase down
+	 * every path. Catches a mixed-order operand and a ref built under
+	 * another order. Linear in the BDD.
+	 */
+	static bool is_ordered(ref x, const order& o);
 
 	/** @brief Build a BDD for Tau formula @p f using variable order @p o. */
 	static ref build_bdd(tref f, const order& o);
 	/** @brief Build a single-bit BDD for variable @p v. */
 	static ref from_bit(tref v);
+	/**
+	 * @brief `true` iff some free variable of the Tau term @p term is a key
+	 * of @p o, i.e. @p term would have a decision variable under it. Always
+	 * `false` for an empty order.
+	 */
+	static bool has_bdd_var(tref term, const order& o);
 
 	/** @brief AND of @p x and a leaf (Tau formula) @p y. */
 	static ref bdd_and(ref x, tref y);
@@ -173,6 +209,8 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	static ref bdd_or(ref x, ref y, const order& o);
 	/** @brief NOT of @p x (flips the output inverter). */
 	static ref bdd_not(ref x);
+	/** @brief XOR of @p x and @p y under @p o. */
+	static ref bdd_xor(ref x, ref y, const order& o);
 
 	/** @brief Existentially quantify variables @p v from @p x under @p o. */
 	static ref bdd_ex(ref x, trefs& v, const order& o);
@@ -193,6 +231,30 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	static ref bdd_compose(ref x, tref xi, ref g, const order& o);
 	/** @brief Apply multiple simultaneous variable substitutions @p subs. */
 	static ref bdd_compose(ref x, subs_t subs, const order& o);
+	/**
+	 * @brief Cofactor `x[xi ← bit]` by CHILD SELECTION, at any depth: the
+	 * node of @p xi is its child by @p bit, everything else rebuilt as it
+	 * is. @p x itself when @p xi is not a key of @p o. Cheaper than
+	 * `bdd_compose(x, xi, T/F, o)`, which routes every node through
+	 * `bdd_ite`; that entry point delegates here for a terminal @p g.
+	 * @p xi is taken as the caller spells it, untrimmed (as in
+	 * `bdd_compose`).
+	 */
+	static ref bdd_cofactor(ref x, tref xi, bool bit, const order& o);
+	/**
+	 * @brief Rebuild @p x with every non-terminal leaf `ℓ` replaced by
+	 * `fn(ℓ)` (both as `bf` terms), the decision structure kept.
+	 *
+	 * A changed leaf with no decision variable of @p o is re-interned
+	 * through `add`, so leaves that became equal are one node and `h == l`
+	 * folds; a changed leaf that came to hold one is built as a BDD. A
+	 * decision node is rebuilt through `add` while both children stay
+	 * ordered below it, and through `bdd_ite` once a rebuilt leaf brought a
+	 * variable of equal or higher rank up, which re-canonicalises.
+	 * Memoised per call over the BDD's nodes.
+	 */
+	template <typename Fn>
+	static ref map_leaves(ref x, Fn& fn, const order& o);
 
 	/** @brief Convert BDD reference @p x to a Tau term of type @p term_type. */
 	static tref to_tau_term(ref x, size_t term_type);
@@ -269,6 +331,17 @@ private:
 		std::unordered_map<ref, ref>& memo);
 	static ref bdd_compose_impl(ref x, const subs_t& subs, size_t i,
 		const order& o, std::unordered_map<ref, ref>& memo);
+	static ref bdd_cofactor_impl(ref x, tref xi, bool bit, const order& o,
+		std::unordered_map<ref, ref>& memo);
+	// Workers of the walks above, carrying the per-call visited set / memo:
+	// recursive over BDD refs, the shape of bdd_compose_impl.
+	template <typename Fn>
+	static bool visit_nodes(ref x, Fn& fn, std::unordered_set<tref>& seen);
+	static bool is_ordered(ref x, const order& o,
+		std::unordered_set<tref>& seen);
+	template <typename Fn>
+	static ref map_leaves(ref x, Fn& fn, const order& o,
+		std::unordered_map<ref, ref>& memo);
 	// Memoised worker for to_tau_term(ref, size_t): shared BDD nodes are
 	// rebuilt once per top-level call instead of once per path.
 	static tref to_tau_term(ref x, size_t term_type,
@@ -347,10 +420,24 @@ struct tau_term_bdd_handle {
 	/** @brief Build a BDD from @p term using @p o and return its interned `bf(BDD_ID)` term. */
 	static tref convert_to_tau_node(tref term, const order& o);
 	/**
+	 * @brief The term of @p handle with type @p term_type, minting a
+	 * `BDD_ID` only for a BDD that actually BRANCHES: a BDD with no
+	 * decision node (a terminal or a single leaf) comes back as its plain
+	 * term through `to_tau_term` — `_1`/`_0` of the type for a terminal.
+	 */
+	static tref convert_to_tau_node_or_term(term_handle handle,
+		size_t term_type);
+	/**
 	 * @brief Retrieve the BDD handle behind a BDD-backed term @p tau_node:
 	 * a `bf(BDD_ID)` wrapper in any spelling, or the `BDD_ID` node itself.
 	 */
 	static term_handle convert_to_handle(tref tau_node);
+	/**
+	 * @brief @p term is a BDD-backed term: the `bf(BDD_ID)` wrapper, the
+	 * form `convert_to_tau_node` returns (the bare `BDD_ID` node is not
+	 * one). `false` for `nullptr`.
+	 */
+	static bool is_bdd_backed(tref term);
 	/**
 	 * @brief The store key of a BDD-backed term: its `BDD_ID` node, the
 	 * same tref whatever the right sibling of the `bf` wrapper (see `U`).
@@ -360,6 +447,17 @@ struct tau_term_bdd_handle {
 	static tref key_of(tref tau_node);
 	/** @brief Convert this handle to a Tau term of type @p term_type. */
 	tref to_tau_term(size_t term_type) const;
+	/**
+	 * @brief The formula-wide inverse of `convert_to_tau_node`: every
+	 * `bf(BDD_ID)` node of @p formula, wherever it sits — under a binder,
+	 * inside a reference argument, in a functional quantifier's body, under
+	 * a temporal operator — replaced by the plain term of its BDD.
+	 *
+	 * TOTAL: a `BDD_ID` nested inside a produced term (a leaf may hold one,
+	 * and `build_bdd` absorbs it again) is converted too, so no `BDD_ID`
+	 * remains anywhere in the result.
+	 */
+	static tref convert_to_tau_terms(tref formula);
 
 	/** @brief AND with @p other under @p o. */
 	term_handle bdd_and(term_handle other, const order& o) const;
@@ -371,8 +469,9 @@ struct tau_term_bdd_handle {
 	static term_handle bdd_and_many(const term_handles& bdds, const order& o);
 	/** @brief OR of all @p bdds under @p o. */
 	static term_handle bdd_or_many(const term_handles& bdds, const order& o);
-	/** @brief Existentially quantify @p v from this handle under @p o. */
-	term_handle bdd_ex(const trefs& v, const order& o) const;
+	/** @brief Existentially quantify @p v from this handle under @p o.
+	 * @p v comes back sorted by @p o, as the static `tbdd::bdd_ex` leaves it. */
+	term_handle bdd_ex(trefs& v, const order& o) const;
 	/** @brief Universally quantify @p v from this handle under @p o. */
 	term_handle bdd_all(const trefs& v, const order& o) const;
 	/** @brief Apply quantifier sequence @p q from this handle under @p o. */
@@ -393,6 +492,17 @@ struct tau_term_bdd_handle {
 
 	/** @brief Return the free Tau variables referenced by BDD node @p bdd_tref. */
 	static const trefs& get_free_tau_vars(tref bdd_tref);
+	/**
+	 * @brief The free Tau variables contributed by the LEAVES alone of the
+	 * BDD rooted at @p bdd_tref (the decision variables left out), sorted
+	 * as its sibling `get_free_tau_vars` sorts.
+	 *
+	 * BY VALUE, and not cached, where the sibling returns a cached
+	 * reference: the per-leaf sets are `get_free_vars`' own cached entries,
+	 * so their union is one linear walk over the BDD's distinct nodes per
+	 * call.
+	 */
+	static trefs get_free_leaf_vars(tref bdd_tref);
 
 	/** @brief Equality comparison. */
 	bool operator==(const tau_term_bdd_handle& other) const;
@@ -404,23 +514,6 @@ struct tau_term_bdd_handle {
 
 private:
 	using bdd_fv_cache_t = std::unordered_map<tref, trefs>;
-#ifdef TAU_CACHE
-	/**
-	 * @brief Worker for get_free_tau_vars: inserts into @p merged the
-	 * free variables of every decision variable in the BDD rooted at
-	 * @p bdd_tref, reusing (but not filling) per-node results already
-	 * present in @p cache.
-	 */
-	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged,
-		bdd_fv_cache_t& cache);
-#else
-	/**
-	 * @brief Worker for get_free_tau_vars: inserts into @p merged the
-	 * free variables of every decision variable in the BDD rooted at
-	 * @p bdd_tref.
-	 */
-	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged);
-#endif
 };
 
 template<NodeType node>
