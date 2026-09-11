@@ -176,6 +176,8 @@ private:
 	/// Per spec part, the alternatives' continuations at the current step.
 	std::vector<trefs> step_spec;
 	bool final_system = false;
+	/// Time point step_spec was last (re)computed for; -1 means stale.
+	int_t step_spec_time_point_ = -1;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;

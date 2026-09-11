@@ -1070,6 +1070,10 @@ template <NodeType node>
 bool interpreter<node>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_systems begin \n";
 	if (final_system) return true;
+	// Idempotent per time point: appear_within_lookback and step() both
+	// call this for the same time_point, and it must not redo the
+	// quantifier elimination in the initial segment twice.
+	if (step_spec_time_point_ == (int_t)time_point) return true;
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
 	LOG_TRACE << "calculate_initial_systems[initial_segment]: " << initial_segment << "\n";
@@ -1077,6 +1081,7 @@ bool interpreter<node>::calculate_initial_spec() {
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		step_spec = get_ubt_ctn_at(time_point);
+		step_spec_time_point_ = (int_t)time_point;
 	} else if (time_point == initial_segment) {
 		// TODO: update constant time positions with values from memory to simplify step_spec
 		step_spec.clear();
@@ -1088,6 +1093,7 @@ bool interpreter<node>::calculate_initial_spec() {
 			step_spec.push_back(std::move(part_alts));
 		}
 		final_system = true;
+		step_spec_time_point_ = (int_t)time_point;
 	}
 	LOG_TRACE << "calculate_initial_systems[result]: true";
 	LOG_TRACE << "calculate_initial_systems end";
@@ -1585,6 +1591,7 @@ void interpreter<node>::update(tref update) {
 		output_partition = std::move(uf);
 		// The systems for solver need to be recomputed at beginning of next step
 		final_system = false;
+		step_spec_time_point_ = -1;
 		compute_lookback_and_initial();
 		LOG_TRACE << "interpreter::update/rebuild_outputs";
 		if (!rebuild_outputs(output_streams)) return;
@@ -1917,6 +1924,9 @@ bool interpreter<node>::is_excluded_output(tref var) {
 template <NodeType node>
 trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
+	// step_spec is read below for t == time_point; keep it current here too,
+	// since callers (e.g. get_inputs_for_step) may reach this before step().
+	if (!calculate_initial_spec()) return appeared;
 	auto check = [&](tref fm, size_t t) {
 		tref step_ubt_ctn = update_to_time_point(fm,
 			t < formula_time_point ? formula_time_point : t);
