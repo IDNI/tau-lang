@@ -122,7 +122,9 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 	// There is no tau_ba
 	static tref unpack_tau_ba(const std::variant<bv, sbf_ba, Bool>&) { return nullptr; }
 
-	static std::variant<bv, sbf_ba, Bool> pack_tau_ba(tref) { return {}; }
+	static std::optional<std::variant<bv, sbf_ba, Bool>> pack_tau_ba(tref) {
+		return std::nullopt;
+	}
 
 	static tref simplify_symbol(tref symbol) {
 		auto ba_type = tau::get(symbol).get_ba_type();

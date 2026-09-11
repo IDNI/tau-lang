@@ -123,9 +123,9 @@ Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
 | `print_constant(os, x)` | how to render a constant, when your own `operator<<` formats it in a way Tau should not show |
 | `uses_oracle` | that deciding a question can leave the process — comparing two constants asks a service, and need not be reproducible. Absent means decided here, which is what nearly every algebra declares by saying nothing |
 
-Also specialize `ba_has_arithmetic_theory<your_ba>` (in `ba_pack_traits.h`) when
-the algebra brings arithmetic terms *and* its own decision procedure — that is
-what makes core instantiate the arithmetic pipeline for packs containing you.
+Declaring both `arith_ops` and `solve` is what makes core instantiate the
+arithmetic pipeline (predicate blasting, the arithmetic skip, the theory
+solver) for packs containing you; there is nothing else to switch on.
 
 Every fold's empty case is deliberate. `pack_zero_constant` and
 `pack_value_constant` return `nullptr`, and `pack_type_has_arith_ops` returns

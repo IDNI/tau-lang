@@ -151,7 +151,7 @@ struct base_ba_dispatcher {
 	 * @param t The tref to pack.
 	 * @return The packed variant.
 	 */
-	static std::variant<BAs...> pack_tau_ba(tref t);
+	static std::optional<std::variant<BAs...>> pack_tau_ba(tref t);
 
 	/**
 	 * @brief Normalizes the Boolean algebra element.

@@ -209,3 +209,46 @@ TEST_SUITE("capability concepts name what each descriptor declares") {
 		CHECK(true);
 	}
 }
+
+TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
+
+	TEST_CASE("a Boolean carrier builds a plain value: Bool's value_constant") {
+		using N = node<bv, Bool>;
+		static_assert(ba_has_value_constant<N, Bool>);
+		const size_t bid = ba_types<N>::id(ba_descriptor<Bool, N>::type_tree());
+		tref one = pack_value_constant<N>(bid, 1);
+		tref zero = pack_value_constant<N>(bid, 0);
+		REQUIRE(one != nullptr);
+		REQUIRE(zero != nullptr);
+		CHECK(one != zero);
+	}
+
+	TEST_CASE("the arithmetic pipeline is on exactly when a BA has arith_ops and solve") {
+		static_assert(pack_has_arithmetic_theory_v<conv_node>);
+		static_assert(!pack_has_arithmetic_theory_v<mini_node>);
+		static_assert(ba_has_arithmetic_theory_v<conv_node, bv>);
+		static_assert(!ba_has_arithmetic_theory_v<conv_node, qlt>);
+		static_assert(!ba_has_arithmetic_theory_v<conv_node, sbf_ba>);
+		CHECK(true);
+	}
+
+	TEST_CASE("pack_solver_count counts the BAs declaring solve") {
+		static_assert(pack_solver_count<conv_node>() == 1);
+		static_assert(pack_solver_count<mini_node>() == 0);
+		CHECK(true);
+	}
+
+	TEST_CASE("exactly one BA may claim propositional synthesis") {
+		static_assert(pack_propositional_synthesizer_count<conv_node>() <= 1);
+		static_assert(pack_propositional_synthesizer_count<mini_node>() == 0);
+		CHECK(true);
+	}
+
+	TEST_CASE("pack_tau_ba is empty in a pack without the wrapper") {
+		using N = node<bv, Bool>;
+		static_assert(!pack_has_tau_ba_v<N>);
+		static_assert(pack_has_tau_ba_v<conv_node>);
+		static_assert(pack_has_tau_ba_v<mini_node>);
+		CHECK_FALSE(N::ba::pack_tau_ba(nullptr).has_value());
+	}
+}
