@@ -138,6 +138,25 @@ TEST_SUITE("bv case split") {
 		CHECK(norm("ex x (x:bv[1] != { 0 }:bv[1] && x:bv[1] != { 1 }:bv[1])", true) == "F");
 	}
 
+	// The runtime cap on tested constants declines the split above it: the
+	// binder survives at cap 2 for a variable tested against three constants
+	// and is eliminated when the cap is lifted.
+	TEST_CASE("the cap on tested constants declines the split") {
+		split_config on(true);
+		const std::string fm = "ex x:bv[4] (x:bv[4] = { 1 }:bv[4]"
+			" || x:bv[4] = { 2 }:bv[4] || x:bv[4] = { 3 }:bv[4])";
+		const size_t saved = bv_case_split_max_tests;
+		bv_case_split_max_tests = 2;
+		tref declined = bv_case_split_quantifiers<node_t>(parse_wff(fm));
+		bv_case_split_max_tests = std::numeric_limits<size_t>::max();
+		tref split = bv_case_split_quantifiers<node_t>(parse_wff(fm));
+		bv_case_split_max_tests = saved;
+		REQUIRE( declined != nullptr );
+		REQUIRE( split != nullptr );
+		CHECK( tau::get(declined).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) == nullptr );
+	}
+
 	TEST_CASE("run outputs are unchanged with the split enabled") {
 		auto off = run_command_spec(false);
 		auto on = run_command_spec(true);

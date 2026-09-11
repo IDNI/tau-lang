@@ -60,6 +60,11 @@ add_repl_test(set_cmd-maxsplits_zero_unlimited
 	"maxsplits: *unlimited")
 add_repl_test(set_cmd-maxrounds_roundtrip
 	"set maxrounds 1000. get maxrounds" "maxrounds: *1000")
+add_repl_test(set_cmd-casesplitmaxtests_roundtrip
+	"set casesplitmaxtests 7. get casesplitmaxtests" "casesplitmaxtests: *7")
+add_repl_test(set_cmd-casesplitmaxtests_zero_unlimited
+	"set casesplitmaxtests 7. set casesplitmaxtests 0. get casesplitmaxtests"
+	"casesplitmaxtests: *unlimited")
 # Numeric options reject flag values and non-numbers.
 add_repl_test_fail(set_cmd-fixpointsteps_flag_value_rejected
 	"set fixpointsteps on" "Invalid value")

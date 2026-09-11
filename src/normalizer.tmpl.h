@@ -271,7 +271,8 @@ tref bv_case_split_quantifiers(tref formula) {
 			if (tau::get(x) == tau::get(var)) { ok = false; break; }
 			for (tref c : tx.children()) st.push_back(c);
 		}
-		if (!ok || occ.empty()) return n;
+		if (!ok || occ.empty()
+			|| tests.size() > bv_case_split_max_tests) return n;
 		auto constant_of = [&](const std::string& bits) -> tref {
 			typename node::constant cte = {make_bitvector_value(width, bits)};
 			return tau::get_ba_constant(cte, vtype);
@@ -345,7 +346,17 @@ tref bv_case_split_quantifiers(tref formula) {
 template <NodeType node>
 tref eliminate_bv_and_quantifiers(tref form) {
 	using tau = tree<node>;
-	if (bv_case_split_enabled()) form = bv_case_split_quantifiers<node>(form);
+	// The split only applies to a bitvector-typed binder: skip the walk
+	// when there is none. find_top_until, not find_top: tau_ba constants
+	// carry their own binders and are not formula nodes.
+	if (bv_case_split_enabled() && tau::get(form).find_top_until(
+		[](tref k) {
+			if (!is_child_quantifier<node>(k)) return false;
+			const size_t vt = tau::get(tau::get(k)[0].first()).get_ba_type();
+			return vt != 0 && is_bv_type_family<node>(vt);
+		},
+		[](tref k) { return !while_is_formula<node>(k); }) != nullptr)
+		form = bv_case_split_quantifiers<node>(form);
 
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
 	// inside a bitvector quantifier's scope makes the whole scope fail

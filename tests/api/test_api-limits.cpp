@@ -49,6 +49,17 @@ TEST_SUITE("Tau API - runtime limits") {
 		block_max_rounds = s2;
 	}
 
+	// The case-split cap follows the block budgets: 0 = unlimited = SIZE_MAX.
+	TEST_CASE("bv case split cap maps 0 to SIZE_MAX") {
+		const size_t saved = bv_case_split_max_tests;
+		tau_api::set_bv_case_split_max_tests(3);
+		CHECK( bv_case_split_max_tests == 3 );
+		tau_api::set_bv_case_split_max_tests(0);
+		CHECK( bv_case_split_max_tests
+			== std::numeric_limits<size_t>::max() );
+		bv_case_split_max_tests = saved;
+	}
+
 	TEST_CASE("interpreter statics") {
 		const size_t sw = interpreter<node_t>::spec_size_warn_threshold;
 		const size_t ra = interpreter<node_t>::max_revision_alts;

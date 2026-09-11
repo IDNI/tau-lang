@@ -9,3 +9,4 @@ include(add_repl_test)
 
 add_repl_test(disable_cmd-status "disable status" "status: *off")
 add_repl_test(disable_cmd-colors "disable colors" "colors: *off")
+add_repl_test(disable_cmd-casesplit "enable casesplit. disable casesplit. get casesplit" "casesplit: *off")

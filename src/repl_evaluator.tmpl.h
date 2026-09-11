@@ -1085,6 +1085,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
 	if (x == "B" || x == "blasting")     return blasting_opt;
+	if (x == "casesplit")                return case_split_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1110,6 +1111,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "blockmaxrounds")    return block_max_rounds_opt;
 	if (x == "maxclauses"
 		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
+	if (x == "casesplitmaxtests"
+		|| x == "maxcasetests")      return case_split_max_tests_opt;
 	if (x == "fixpointsteps"
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
@@ -1187,6 +1190,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ blasting_opt,      [this]() {
 		std::cout << "blasting:            " << pbool[opt.blasting] << "\n"; } },
+	{ case_split_opt,    [this]() {
+		std::cout << "casesplit:           " << pbool[opt.case_split] << "\n"; } },
 	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    []() {
@@ -1209,6 +1214,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
 	{ block_max_rounds_opt, [climit]() {
 		std::cout << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ case_split_max_tests_opt, [climit]() {
+		std::cout << "casesplitmaxtests:   " << climit(bv_case_split_max_tests) << "\n"; } },
 	{ cqe_max_clauses_opt, [climit]() {
 		std::cout << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
 	{ fixpoint_steps_opt, [climit]() {
@@ -1331,6 +1338,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		update_charvar(update_bool_value(opt.charvar)); } },
 	{ blasting_opt,   [&]() {
 		update_blasting(update_bool_value(opt.blasting)); } },
+	{ case_split_opt,   [&]() {
+		update_case_split(update_bool_value(opt.case_split)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1349,6 +1358,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_block_max_splits(*n); } },
 	{ block_max_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_block_max_rounds(*n); } },
+	{ case_split_max_tests_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_bv_case_split_max_tests(*n); } },
 	{ cqe_max_clauses_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_cqe_max_clauses(*n); } },
 	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
@@ -1409,6 +1420,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case colors_opt:           TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
 	case blasting_opt:     	   update_blasting(update_fn(opt.blasting)); break;
+	case case_split_opt:       update_case_split(update_fn(opt.case_split)); break;
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -1416,6 +1428,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case block_max_splits_opt:
 	case block_max_rounds_opt:
 	case cqe_max_clauses_opt:
+	case case_split_max_tests_opt:
 	case fixpoint_steps_opt:
 	case flag_search_steps_opt:
 	case blast_depth_opt:
@@ -1446,6 +1459,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_blasting(bool value) {
 	api<node>::set_blasting(opt.blasting = value);
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_case_split(bool value) {
+	api<node>::set_bv_case_split(opt.case_split = value);
 	return value;
 }
 

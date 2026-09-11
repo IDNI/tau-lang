@@ -47,6 +47,10 @@ cli::options tau_options() {
 		.set_description(std::string("blasting (")
 			+ (bv_blasting ? "enabled" : "disabled")
 			+ " by default)");
+	opts["bv-case-split"] = cli::option("bv-case-split", 'C', bv_case_split)
+		.set_description(std::string("bitvector case split of quantified "
+			"variables tested against constants (")
+			+ (bv_case_split ? "enabled" : "disabled") + " by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
@@ -82,6 +86,10 @@ cli::options tau_options() {
 	opts["block-max-splits"] = cli::option("block-max-splits", 'p', "0")
 		.set_description("cap per-block Boole-decomposition splits in "
 			"anti-prenexing (0 = unlimited)");
+	opts["bv-case-split-max-tests"] = cli::option("bv-case-split-max-tests",
+		'k', "0")
+		.set_description("cap the constants a quantified bitvector variable "
+			"may be tested against for the case split (0 = unlimited)");
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
@@ -221,6 +229,7 @@ int main(int argc, char** argv) {
 	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
 	bool blasting = opts["blasting"].get<bool>();
+	tau_api::set_bv_case_split(opts["bv-case-split"].get<bool>());
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by
@@ -231,6 +240,7 @@ int main(int argc, char** argv) {
 	tau_api::set_max_revision_alts(optnum("max-revision-alts"));
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
+	tau_api::set_bv_case_split_max_tests(optnum("bv-case-split-max-tests"));
 	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));

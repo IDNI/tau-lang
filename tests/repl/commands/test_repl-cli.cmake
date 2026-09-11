@@ -146,6 +146,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_revision_alts|max-revision-alts|a|4|revisionalts|4"
 	"block_max_splits|block-max-splits|p|512|maxsplits|512"
 	"block_max_rounds|block-max-rounds|r|33|maxrounds|33"
+	"bv_case_split_max_tests|bv-case-split-max-tests|k|5|casesplitmaxtests|5"
 	"max_fixpoint_steps|max-fixpoint-steps|f|9|fixpointsteps|9"
 	"max_flag_search_steps|max-flag-search-steps|F|12|flagsteps|12"
 	"max_blast_reentry_depth|max-blast-reentry-depth|D|8|blastdepth|8"

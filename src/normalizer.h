@@ -42,6 +42,15 @@ inline bool bv_case_split_enabled() {
 	return bv_case_split || env;
 }
 
+/// Cap on the number of distinct constants a quantified bitvector variable
+/// may be tested against for the case split to apply; above it the binder is
+/// left to the pipeline. The split builds one instance per cell (2k+1 for k
+/// order-tested constants, k+1 with equalities only), so this bounds the
+/// instance count. SIZE_MAX = unlimited (0 through the api setter); set via
+/// api::set_bv_case_split_max_tests, --bv-case-split-max-tests, or the REPL
+/// option casesplitmaxtests.
+inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
+
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *
