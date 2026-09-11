@@ -1348,18 +1348,25 @@ TEST_SUITE("with inputs and outputs") {
 	}
 
 	// Depth 3 on the state history with lookback 3 and inits at 0, 1, 2.
-	// Five steps only: from step 5 on this shape's per-step solve time
-	// grows sharply (tens of seconds at step 5 in Release, minutes at
-	// step 6), which is a performance issue independent of #100 and is
-	// tracked separately; the boundary this case guards is at steps 3-4.
-	TEST_CASE("depth-3 guard on the history, lookback 3, three inits (#100)") {
+	// Twelve steps: GitHub #115 -- the step after the initial segment used
+	// to enumerate the DNF paths of the raw continuation (with its absolute
+	// run prefix) before substituting memory, and took tens of seconds at
+	// step 5 and minutes at step 6. The inputs are consumed from step 3 on
+	// (steps 0-2 are fixed by the inits), alternating 0, 1: input 0 holds;
+	// input 1 clears when the two previous values are 1, sets when only the
+	// previous one is, and copies o1[t-3] when the previous is 0. Hence
+	// 3: hold 1; 4: 1,1 -> 0; 5: hold 0; 6: prev 0 -> o1[3] = 1; 7: hold 1;
+	// 8: 1,1 -> 0; 9: hold 0; 10: prev 0 -> o1[7] = 1; 11: hold 1.
+	TEST_CASE("depth-3 guard on the history, lookback 3, three inits (#100, #115)") {
 		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 0) && (o1[2]:sbf = 1)"
 			" && ((i1[t]:sbf = 1) ? ((o1[t-1]:sbf = 1) ? ((o1[t-2]:sbf = 1)"
 			" ? (o1[t]:sbf = 0) : (o1[t]:sbf = 1)) : (o1[t]:sbf = o1[t-3]:sbf))"
 			" : (o1[t]:sbf = o1[t-1]:sbf)).",
-			{ "0", "1" }, sbf_type_id<node_t>(), 5);
+			{ "0", "1", "0", "1", "0", "1", "0", "1", "0", "1", "0", "1" },
+			sbf_type_id<node_t>(), 12);
 		REQUIRE ( o1.has_value() );
-		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0" } );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0", "0",
+			"1", "1", "0", "0", "1", "1" } );
 	}
 
 	// An init at position 2 only. i1[1] = 1 makes o1[1] = o1[0] | 1 = 1

@@ -791,16 +791,20 @@ std::pair<std::optional<assignment<node>>, bool>
 							formula_time_point);
 		// Substitute memory and simplify before enumerating paths: the
 		// read set in appear_within_lookback comes from this same tree,
-		// so no path here can carry an input the solver must bind.
+		// so no path here can carry an input the solver must bind. The
+		// substitution also commutes with the enumeration, and it is what
+		// keeps the step after the initial segment cheap (GitHub #115):
+		// the continuation carries an absolute run prefix whose atoms
+		// memory already decides, and enumerating the paths of the raw
+		// formula first multiplied the path count by that prefix (over
+		// 100 s and gigabytes at step 5 of a lookback-3 spec with three
+		// inits).
 		part_at_t = syntactic_formula_simplification<node>(
 				rewriter::replace<node>(part_at_t, memory));
 		for (tref path : expression_paths<node>(part_at_t)) {
-			// rewriting the inputs and inserting them into memory
-			// TODO: Check why constant time positions are not being replaced
-			tref current = rewriter::replace<node>(path, memory);
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
-			current = normalize_non_temp<node>(current);
+			tref current = normalize_non_temp<node>(path);
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
@@ -1083,13 +1087,18 @@ bool interpreter<node>::calculate_initial_spec() {
 		step_spec = get_ubt_ctn_at(time_point);
 		step_spec_time_point_ = (int_t)time_point;
 	} else if (time_point == initial_segment) {
-		// TODO: update constant time positions with values from memory to simplify step_spec
+		// The continuation is used verbatim from here on. Its constant
+		// time positions (the initial conditions and the run prefix that
+		// bridges them to the relative body) are already fixed by memory,
+		// so fold them now: every later step then enumerates the paths of
+		// the relative body only (GitHub #115).
 		step_spec.clear();
 		step_spec.reserve(ubt_ctn.size());
 		for (const htrefs& part : ubt_ctn) {
 			trefs part_alts;
 			part_alts.reserve(part.size());
-			for (const auto& h : part) part_alts.push_back(h->get());
+			for (const auto& h : part) part_alts.push_back(
+				rewriter::replace<node>(h->get(), memory));
 			step_spec.push_back(std::move(part_alts));
 		}
 		final_system = true;
