@@ -69,8 +69,9 @@ TEST_SUITE("tau_ba dispatcher helpers") {
 		REQUIRE(nso.has_value());
 		tref fm = nso->main->get();
 		auto packed = dispatcher::pack_tau_ba(fm);
-		CHECK(std::holds_alternative<tau_ba<bv, sbf_ba>>(packed));
-		tref unpacked = dispatcher::unpack_tau_ba(packed);
+		REQUIRE(packed.has_value());
+		CHECK(std::holds_alternative<tau_ba<bv, sbf_ba>>(*packed));
+		tref unpacked = dispatcher::unpack_tau_ba(*packed);
 		REQUIRE(unpacked != nullptr);
 		CHECK(small_tau::get(unpacked) == small_tau::get(fm));
 	}

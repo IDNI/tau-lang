@@ -995,7 +995,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		size_t tau_tid = ba_types<node_t>::id(tau_type<node_t>());
 		tref io = build_in_var_at_t<node_t>(
 			build_var_name<node_t>("i1"), tau_tid, "t");
-		tref leaf = tau::get_ba_constant(node_t::ba::pack_tau_ba(io), tau_tid);
+		auto packed = node_t::ba::pack_tau_ba(io);
+		REQUIRE(packed.has_value());
+		tref leaf = tau::get_ba_constant(*packed, tau_tid);
 		REQUIRE(tau::get(leaf).is_ba_constant());
 		tref cst = tau::get_raw(node_t(tau::bf), &leaf, 1);
 		REQUIRE(tree<node_t>::get(tree<node_t>::trim(cst)).is_ba_constant());

@@ -243,4 +243,12 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		static_assert(pack_propositional_synthesizer_count<mini_node>() == 0);
 		CHECK(true);
 	}
+
+	TEST_CASE("pack_tau_ba is empty in a pack without the wrapper") {
+		using N = node<bv, Bool>;
+		static_assert(!pack_has_tau_ba_v<N>);
+		static_assert(pack_has_tau_ba_v<conv_node>);
+		static_assert(pack_has_tau_ba_v<mini_node>);
+		CHECK_FALSE(N::ba::pack_tau_ba(nullptr).has_value());
+	}
 }

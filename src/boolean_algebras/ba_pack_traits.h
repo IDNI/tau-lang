@@ -32,6 +32,14 @@ struct is_tau_ba : std::false_type {};
 template <typename T>
 inline constexpr bool is_tau_ba_v = is_tau_ba<T>::value;
 
+/** @brief `true` when some BA of @p Node's pack is the wrapper. */
+template <typename Node>
+inline constexpr bool pack_has_tau_ba_v =
+	[]<std::size_t... Is>(std::index_sequence<Is...>) {
+		return (is_tau_ba_v<std::tuple_element_t<Is,
+			typename Node::bas_tuple>> || ...);
+	}(std::make_index_sequence<std::tuple_size_v<typename Node::bas_tuple>>{});
+
 /**
  * @brief `true` when @p BA brings arithmetic terms and its own decision
  *        procedure: exactly the two capabilities the arithmetic pipeline
