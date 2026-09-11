@@ -2,7 +2,8 @@
 
 //#include <cvc5/cvc5.h>
 
-#include <functional>
+#include <algorithm>
+#include <iterator>
 
 #include "tau_tree.h"
 #include "definitions.h"
@@ -827,13 +828,11 @@ const trefs& get_free_vars(tref n) {
 	// atom free: only a node that owns a cache entry ever builds a vector.
 	trefs loose;
 	std::vector<const trefs*> parts;
-	// Chain links already taken apart here (see `collect`). Keyed by
-	// identity rather than by structure: a link is the sole child of its
-	// wrapper, so it carries no right sibling and interning makes the two
-	// the same question, at the price of a pointer hash instead of a tree
-	// one. Flat, because a long chain inserts once per link and a
-	// node-based set would allocate once per link with it.
-	ankerl::unordered_dense::set<tref> opened;
+	// Chain links already taken apart here (see `collect`). A link reached
+	// a second time is computed as a node of its own instead, which is what
+	// keeps a subformula that several branches of the DAG reach from being
+	// taken apart once per branch.
+	subtree_unordered_set<node> opened;
 	// Handed to the algorithms below as lambdas rather than as
 	// `tau::subtree_less` itself, which would reach their inner loops as a
 	// function pointer and so never inline.

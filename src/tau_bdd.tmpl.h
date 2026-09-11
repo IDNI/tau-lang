@@ -3,6 +3,8 @@
 #ifndef TAU_TAU_BDD_TMPL_H
 #define TAU_TAU_BDD_TMPL_H
 
+#include <algorithm>
+
 #include "tau_bdd.h"
 
 #undef LOG_CHANNEL_NAME
