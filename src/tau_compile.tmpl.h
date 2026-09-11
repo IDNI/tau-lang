@@ -157,7 +157,17 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 		"# share libTAU.a/libtauparser.a's layout; kept last so nothing above can\n"
 		"# undo it.\n"
 		"target_compile_definitions(" << exe_name <<
-			" PRIVATE ${TAU_COMPILE_DEFINITIONS})\n";
+			" PRIVATE ${TAU_COMPILE_DEFINITIONS})\n"
+#ifdef TAU_PACK_BOOL_CARRIERS
+		"# The Boolean-carrier preference this binary resolved its pack\n"
+		"# with; the artifact's own instantiation of pack_bool_carrier_type\n"
+		"# must rank the same way, or it and libTAU.a disagree on the\n"
+		"# carrier type.\n"
+		"target_compile_definitions(" << exe_name <<
+			" PRIVATE TAU_PACK_BOOL_CARRIERS=\\\"" TAU_PACK_BOOL_CARRIERS
+			"\\\")\n"
+#endif
+		;
 	return os.str();
 }
 

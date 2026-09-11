@@ -136,6 +136,15 @@ captured_run run_capture_ec(const std::string& cmd) {
 
 TEST_SUITE("cpp_codegen_program_desc") {
 
+#ifdef TAU_PACK_BOOL_CARRIERS
+	TEST_CASE("the emitted CMakeLists pins TAU_PACK_BOOL_CARRIERS to the "
+	          "emitting build's order") {
+		const std::string cm = compile_detail::emit_cmake_sdk_linked("probe");
+		CHECK(cm.find("TAU_PACK_BOOL_CARRIERS=\\\"" TAU_PACK_BOOL_CARRIERS
+			"\\\"") != std::string::npos);
+	}
+#endif
+
 	// ── (a) build_program_desc_prop + emit_program ──────────────────────────
 
 	TEST_CASE("build_program_desc_prop: structural shape") {
