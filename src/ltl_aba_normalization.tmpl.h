@@ -1196,10 +1196,9 @@ static void extend_consistency_positive_k_ary(
 }
 
 // Ties shifted instances of one signal together (group_shift_families).
-// lo is aligned to hi's step; pp/pn/np/nn = SAT(lo'&hi/lo'&!hi/!lo'&hi/!lo'&!hi)
-// select: pp&&nn -> equivalent, pn&&np -> complementary, pp&&np&&nn -> lo=>hi,
-// pp&&pn&&nn -> hi=>lo, pn&&np&&nn -> exclusion, else -> none.
-// Input-only pairs go to input_assumptions; everything else to `skeleton`.
+// hi (deeper lookback) is advanced by X^delta to lo's instant; pp/pn/np/nn =
+// SAT(lo&hi/lo&!hi/!lo&hi/!lo&!hi) pick equivalent/complementary/lo=>hi/
+// hi=>lo/exclusion. Input-only pairs go to input_assumptions, else skeleton.
 template <NodeType node>
 static void add_shift_chain_constraints(
     const std::vector<std::pair<tref, std::string>>& atoms,
@@ -1250,20 +1249,20 @@ static void add_shift_chain_constraints(
 				bool nn = aba_existential_feasible<node>(tau::build_wff_and(not_lo, not_hi));
 				solver_calls += 4;
 
-				std::string x_lo = lo_prop;
-				for (int_t k = 0; k < delta; ++k) x_lo = "X(" + x_lo + ")";
+				std::string x_hi = hi_prop;
+				for (int_t k = 0; k < delta; ++k) x_hi = "X(" + x_hi + ")";
 
 				std::string constraint;
 				if (pp && nn && !pn && !np)
-					constraint = "G(" + x_lo + " <-> " + hi_prop + ")";
+					constraint = "G(" + lo_prop + " <-> " + x_hi + ")";
 				else if (!pp && !nn && pn && np)
-					constraint = "G(" + x_lo + " <-> !" + hi_prop + ")";
+					constraint = "G(" + lo_prop + " <-> !" + x_hi + ")";
 				else if (pp && np && nn && !pn)
-					constraint = "G(" + x_lo + " -> " + hi_prop + ")";
+					constraint = "G(" + lo_prop + " -> " + x_hi + ")";
 				else if (pp && pn && nn && !np)
-					constraint = "G(" + hi_prop + " -> " + x_lo + ")";
+					constraint = "G(" + x_hi + " -> " + lo_prop + ")";
 				else if (!pp && pn && np && nn)
-					constraint = "G(" + x_lo + " -> !" + hi_prop + ")";
+					constraint = "G(" + lo_prop + " -> !" + x_hi + ")";
 				else
 					continue; // e.g. all four satisfiable -- instances stay independent
 

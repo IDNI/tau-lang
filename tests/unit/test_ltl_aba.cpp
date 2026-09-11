@@ -4398,7 +4398,7 @@ TEST_SUITE("Since (S) operator: executed safety path") {
 // solve_ltl_aba abstracts each data atom to an independent proposition, so
 // o1[t] and o1[t-1] are unrelated props to the propositional skeleton.
 // Atoms sharing an io_var name set and BA type but differing in relative
-// shift get a G(X^d(p_lo) <-> ...) family constraint tying them together.
+// shift get a G(p_lo <-> X^d(p_hi)) family constraint tying them together.
 TEST_SUITE("Cross-step shift-chain constraints") {
 
 	// o1[t]=1 && o1[t-1]!=1 is a complementary pair one step apart: without
@@ -4422,7 +4422,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl_aba<node_t>(fm);
 		REQUIRE(sol.has_value());
-		CHECK(sol->skeleton.find("G(X(p0) <-> p1)") != std::string::npos);
+		CHECK(sol->skeleton.find("G(p0 <-> X(p1))") != std::string::npos);
 	}
 
 	// Direct check of the classification: the same atom shape at shifts 0
@@ -4438,7 +4438,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		std::vector<std::string> emitted;
 		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
 		REQUIRE(emitted.size() == 1);
-		CHECK(emitted[0] == "G(X(p0) <-> p1)");
+		CHECK(emitted[0] == "G(p0 <-> X(p1))");
 		CHECK(skeleton.find(emitted[0]) != std::string::npos);
 		CHECK(input_assumptions.empty());
 	}
@@ -4456,7 +4456,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		std::vector<std::string> emitted;
 		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
 		REQUIRE(emitted.size() == 1);
-		CHECK(emitted[0] == "G(X(p0) -> !p1)");
+		CHECK(emitted[0] == "G(p0 -> !X(p1))");
 		CHECK(skeleton.find(emitted[0]) != std::string::npos);
 		CHECK(input_assumptions.empty());
 	}
@@ -4474,7 +4474,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		std::vector<std::string> emitted;
 		add_shift_chain_constraints<node_t>(atoms, skeleton, input_assumptions, &emitted);
 		REQUIRE(emitted.size() == 1);
-		CHECK(emitted[0] == "G(X(p0) <-> !p1)");
+		CHECK(emitted[0] == "G(p0 <-> !X(p1))");
 		CHECK(input_assumptions.find(emitted[0]) != std::string::npos);
 		CHECK(skeleton.empty());
 	}
