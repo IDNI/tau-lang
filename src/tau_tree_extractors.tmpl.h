@@ -803,10 +803,6 @@ const trefs& get_free_vars(tref n) {
 	//
 	// Offset variables inside io_vars (x[t], x[t-1]) are not free
 	// occurrences; excluded by not descending into variable nodes at all.
-	auto is_binder = [](const tau& t) {
-		return t.is(tau::wff_all) || t.is(tau::wff_ex) ||
-			t.is(tau::bf_fall) || t.is(tau::bf_fex);
-	};
 	// Every set the walk handles -- a child's, a cached one, the one being
 	// built -- carries the shape the answer is contracted to deliver:
 	// right-sibling-trimmed, sorted by subtree_less, deduplicated. Holding
@@ -816,15 +812,78 @@ const trefs& get_free_vars(tref n) {
 	// once per variable. Trimming happens where a variable enters, so it is
 	// paid once per occurrence rather than once per ancestor.
 	subtree_unordered_map<node, trefs> memo;
-	// `spine`: m continues a chain of the same connective as its parent
-	// (the right operand of `a && (b && (c && ...))`). Its free-variable
-	// set is a suffix of the parent's; publishing it at every spine node
-	// would store k sets of size O(k) for a k-chain. Such nodes still
-	// read the cache (a chain that was a whole constant one step earlier
-	// is cached as the top-level result) but do not publish.
-	std::function<const trefs&(tref, bool)> walk =
-		[&](tref m, bool spine) -> const trefs& {
-		if (auto it = memo.find(m); it != memo.end()) return it->second;
+	// A connective's answer is already available and costs a lookup rather
+	// than a descent. Only the cache is consulted: a cacheable node is
+	// published there and so never reaches the memo.
+	auto answered = [](tref m) { return free_vars_map.contains(m); };
+	// A set only joins the operands if it has something to contribute; a
+	// closed subformula is dropped where it is found rather than carried
+	// through the dedup, the size scan and the merge.
+	auto contribute = [](std::vector<const trefs*>& into, const trefs& vars) {
+		if (!vars.empty()) into.push_back(&vars);
+	};
+	// Both vectors are used as stacks shared by the whole walk: a node
+	// records where its own entries begin and drops back to that mark when
+	// it is done, so no node allocates a container of its own.
+	std::vector<const trefs*> parts;  // operand sets awaiting combination
+	trefs links;                      // chain nodes still to be expanded
+	// Chain links already taken apart in this call. Keyed by identity
+	// rather than by structure: a link is the sole child of its wrapper, so
+	// it carries no right sibling and interning makes the two the same
+	// question, at the price of a pointer hash instead of a tree one. Flat,
+	// because a long chain inserts once per link and a node-based set would
+	// allocate once per link with it.
+	ankerl::unordered_dense::set<tref> flattened;
+	// Combines `parts` from `mark` on into one sorted, deduplicated set.
+	// The largest part is merged in rather than re-sorted, which keeps both
+	// extremes linear: a conjunction grown one clause at a time, where one
+	// part is the whole previous answer and the other a single clause,
+	// costs one pass over that answer; a chain flattened into many small
+	// parts costs one sort over the variable occurrences rather than a pass
+	// over the running union per part.
+	// Handed to the algorithms below as lambdas rather than as
+	// `tau::subtree_less` itself, which would reach their inner loops as a
+	// function pointer and so never inline.
+	auto less = [](tref a, tref b) { return tau::subtree_less(a, b); };
+	auto equal = [](tref a, tref b) { return tau::subtree_equals(a, b); };
+	auto combine = [&parts, less, equal](size_t mark) {
+		// Two operands is what a connective, and so most of the tree,
+		// actually has: merge them and skip the machinery below, which
+		// exists for the flattened chains.
+		if (parts.size() == mark + 2) {
+			const trefs& a = *parts[mark];
+			const trefs& b = *parts[mark + 1];
+			trefs out;
+			out.reserve(a.size() + b.size());
+			std::set_union(a.begin(), a.end(), b.begin(), b.end(),
+				std::back_inserter(out), less);
+			return out;
+		}
+		// Operands that are the same set -- one shared subformula reached
+		// through several branches of the DAG is one cached vector -- are
+		// merged once. Sharing makes that the common case, and the pass is
+		// over pointers, not variables.
+		std::sort(parts.begin() + mark, parts.end());
+		parts.erase(std::unique(parts.begin() + mark, parts.end()),
+			parts.end());
+		size_t big = mark;
+		for (size_t i = mark; i < parts.size(); ++i)
+			if (parts[i]->size() > parts[big]->size()) big = i;
+		trefs rest;
+		for (size_t i = mark; i < parts.size(); ++i)
+			if (i != big) rest.insert(rest.end(), parts[i]->begin(),
+				parts[i]->end());
+		std::sort(rest.begin(), rest.end(), less);
+		rest.erase(std::unique(rest.begin(), rest.end(), equal), rest.end());
+		if (mark == parts.size()) return rest;
+		if (rest.empty()) return trefs(*parts[big]);
+		trefs out;
+		out.reserve(rest.size() + parts[big]->size());
+		std::set_union(rest.begin(), rest.end(), parts[big]->begin(),
+			parts[big]->end(), std::back_inserter(out), less);
+		return out;
+	};
+	auto walk = [&](this auto&& self, tref m) -> const trefs& {
 		const auto& t = tau::get(m);
 		// Connective and binder nodes are the only ones consulted in and
 		// published to the per-node cache: the walk fans out there, so that
@@ -833,13 +892,19 @@ const trefs& get_free_vars(tref n) {
 		// entry per node (an insertion here, a visit in every
 		// garbage-collection sweep) off the paths made of small formulas.
 		const bool connective = t.is(tau::wff_and) || t.is(tau::wff_or);
-		const bool cacheable = connective || is_binder(t);
+		const bool binder = is_logical_or_functional_quant<node>(m);
+		const bool cacheable = connective || binder;
 		// A subtree's free-var set is intrinsic to it (see above), so a
-		// result the per-node cache already holds -- from an earlier call
-		// on this or on an enclosing formula -- is valid here as well:
-		// seed the walk from it instead of descending again.
-		if (cacheable) if (auto cached = free_vars_map.find(m);
-			cached != free_vars_map.end()) return cached->second;
+		// result already held -- from an earlier call on this or on an
+		// enclosing formula, or from earlier in this one -- is valid here
+		// as well and is returned instead of descending again. One lookup
+		// answers: a cacheable node is published to the cache and so never
+		// reaches the memo, and a node the memo holds was never published.
+		if (cacheable) {
+			if (auto it = free_vars_map.find(m); it != free_vars_map.end())
+				return it->second;
+		} else if (auto it = memo.find(m); it != memo.end())
+			return it->second;
 		// A node whose only child carries all of its free variables -- every
 		// `wff`/`bf` wrapper between two connectives is one -- has exactly
 		// its child's set. Handing that set back instead of copying it into
@@ -847,24 +912,11 @@ const trefs& get_free_vars(tref n) {
 		// carries one wrapper per connective.
 		if (!cacheable && !is_var_or_capture<node>(m) && !t.is(tau::BDD_ID)
 			&& t.has_child() && !tau::get(t.first()).has_right_sibling())
-			return walk(t.first(), spine);
+			return self(t.first());
 
+		const size_t mark = parts.size();
 		trefs result;
-		// Folds one child's set into `result`, keeping it sorted and
-		// deduplicated. The first contributing child is taken as it is, so
-		// a node with a single one -- a binder over its body, a connective
-		// with a closed side -- costs a copy and no merge.
-		auto add = [&result](const trefs& vars) {
-			if (vars.empty()) return;
-			if (result.empty()) { result = vars; return; }
-			trefs merged;
-			merged.reserve(result.size() + vars.size());
-			std::set_union(result.begin(), result.end(),
-				vars.begin(), vars.end(), std::back_inserter(merged),
-				tau::subtree_less);
-			result.swap(merged);
-		};
-		if (is_binder(t)) {
+		if (binder) {
 			// Fresh scope: only this binder's own subtree feeds it,
 			// mirroring the original push-scope-then-pop-and-merge.
 			// A binder's children are its bound variable and its body, in
@@ -873,9 +925,11 @@ const trefs& get_free_vars(tref n) {
 			// and erased again afterwards.
 			const tref bound = t.first();
 			DBG(assert(is_var_or_capture<node>(bound));)
-			for (tref c : t.children()) if (c != bound) add(walk(c, false));
+			for (tref c : t.children())
+				if (c != bound) contribute(parts, self(c));
+			result = combine(mark);
 			if (auto it2 = std::lower_bound(result.begin(), result.end(),
-					bound, tau::subtree_less);
+					bound, less);
 				it2 != result.end() && tau::subtree_equals(*it2, bound))
 			{
 				DBG(LOG_TRACE << "removing quantified var: "
@@ -889,26 +943,67 @@ const trefs& get_free_vars(tref n) {
 		} else {
 			if (t.is(tau::BDD_ID)) {
 				// `U` is keyed by the `BDD_ID` node itself (tau_bdd.h).
-				// get_free_tau_vars already delivers the shape `add`
+				// get_free_tau_vars already delivers the shape the merge
 				// expects, being a union of get_free_vars' own answers.
 				const auto& bdd_u = tau_term_bdd_handle<node>::U;
 				if (auto jt = bdd_u.find(
 						tau_term_bdd_handle<node>::key_of(m));
 					jt != bdd_u.end())
-					add(tau_term_bdd_handle<node>::get_free_tau_vars(
-						jt->second.get().b));
+					contribute(parts,
+						tau_term_bdd_handle<node>::get_free_tau_vars(
+							jt->second.get().b));
 			}
-			for (tref c : t.children()) {
-				// A wrapper (e.g. `wff`) between two connectives passes
-				// the spine flag through; a connective marks a child
-				// that wraps the same connective as its continuation.
-				const bool s = connective
-					? tau::get(c).child_is(t.is(tau::wff_and)
-						? tau::wff_and : tau::wff_or)
-					: spine;
-				add(walk(c, s));
+			if (!connective) {
+				for (tref c : t.children()) contribute(parts, self(c));
+			} else {
+				// A chain of one connective -- `a && (b && (c && ...))`,
+				// and a balanced tree of it just as much -- is taken apart
+				// in one go and merged once over all of its operands.
+				// Merging link by link instead passes over the whole suffix
+				// at every link, which is what made a long conjunction cost
+				// its clause count squared. The descent stops wherever an
+				// answer is already available, so a conjunction grown one
+				// clause at a time still meets its predecessor whole rather
+				// than taking it apart again.
+				const size_t nt = t.is(tau::wff_and) ? tau::wff_and
+					: tau::wff_or;
+				const size_t lmark = links.size();
+				links.push_back(m);
+				while (links.size() > lmark) {
+					const tref link = links.back();
+					links.pop_back();
+					for (tref c : tau::get(link).children()) {
+						// `c` wraps the operand. It continues the chain
+						// when what it wraps is the same connective, has
+						// no answer yet, and has not already been taken
+						// apart here: a subformula that several branches
+						// of the DAG reach is taken apart once and then
+						// walked as a node of its own, which computes its
+						// set and publishes it, so every occurrence after
+						// that is a lookup rather than a second descent.
+						const tau& ct = tau::get(c);
+						const tref inner = ct.has_child() ? ct.first()
+							: nullptr;
+						if (inner && tau::get(inner).is(nt)
+							&& !answered(inner)
+							&& flattened.insert(inner).second)
+							links.push_back(inner);
+						else contribute(parts, self(c));
+					}
+				}
 			}
+			if (!cacheable && parts.size() <= mark + 1) {
+				// Nothing of this node's own enters the answer, so with a
+				// single operand the answer is that operand and with none
+				// it is empty: neither needs a vector or a memo entry.
+				const trefs& only = parts.size() == mark
+					? no_free_vars : *parts[mark];
+				parts.resize(mark);
+				return only;
+			}
+			result = combine(mark);
 		}
+		parts.resize(mark);
 		// Publish the result of a connective or binder node to the per-node
 		// cache, so a later call -- on this subtree or on any formula
 		// containing it -- does not walk it again. Before this, only the
@@ -917,11 +1012,11 @@ const trefs& get_free_vars(tref n) {
 		// cost superlinear in the number of accumulated clauses. A
 		// published node needs no memo entry of its own: the cache it lands
 		// in is consulted first and outlives the call.
-		if (cacheable && !spine)
+		if (cacheable)
 			return free_vars_map.emplace(m, std::move(result)).first->second;
 		return memo.emplace(m, std::move(result)).first->second;
 	};
-	const trefs& fv = walk(n, false);
+	const trefs& fv = walk(n);
 #ifdef DEBUG
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
 	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
