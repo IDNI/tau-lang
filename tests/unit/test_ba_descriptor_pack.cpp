@@ -231,4 +231,10 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		static_assert(!ba_has_arithmetic_theory_v<conv_node, sbf_ba>);
 		CHECK(true);
 	}
+
+	TEST_CASE("pack_solver_count counts the BAs declaring solve") {
+		static_assert(pack_solver_count<conv_node>() == 1);
+		static_assert(pack_solver_count<mini_node>() == 0);
+		CHECK(true);
+	}
 }

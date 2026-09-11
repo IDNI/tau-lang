@@ -142,14 +142,29 @@ auto pack_solve_impl(Form form) {
 
 } // namespace detail
 
+/** @brief How many BAs of @p Node's pack declare `solve`. */
+template <typename Node>
+constexpr std::size_t pack_solver_count() {
+	return []<std::size_t... Is>(std::index_sequence<Is...>) {
+		return (std::size_t{0} + ... + std::size_t{ba_has_solve<Node,
+			std::tuple_element_t<Is, typename Node::bas_tuple>>});
+	}(std::make_index_sequence<std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
 /**
- * @brief Solve @p form with the first BA whose descriptor offers a solver.
+ * @brief Solve @p form with the single BA whose descriptor offers a solver.
  *
+ * Resolution: the one BA declaring `solve`; two are refused at compile time,
+ * since this takes no type id and would otherwise pick by pack order.
  * Templated on @p Form and returning `auto` so core need not name the solution
  * type, which would pull solver headers into these traits.
  */
 template <typename Node, typename Form>
 auto pack_solve(Form form) {
+	static_assert(pack_solver_count<Node>() <= 1,
+		"pack_solve routes to the first BA declaring solve; a pack with "
+		"two solvers needs owner-gated routing (pass the partition's type "
+		"id and use pack_owner_apply) before it can be built");
 	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		return detail::pack_solve_impl<Node, Form,
 			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
