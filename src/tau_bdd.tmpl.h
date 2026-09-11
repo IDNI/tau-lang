@@ -1442,34 +1442,47 @@ const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 		tbdd::template create_cache<bdd_fv_cache_t>();
 	if (auto it = cache.find(bdd_tref); it != cache.end())
 		return it->second;
-	// One walk over the DISTINCT nodes (visit_nodes), merging the free
-	// variables of every node's variable — decision variables and leaves
-	// alike — so a shared sub-BDD is entered once, not once per path.
-	subtree_set<node> merged;
-	auto collect = [&merged](ref x, bool) {
+	auto [it, _] = cache.emplace(bdd_tref,
+		collect_free_tau_vars(bdd_tref, false));
+	return it->second;
+}
+
+/** @internal @copydoc tau_term_bdd_handle::collect_free_tau_vars @endinternal */
+template<NodeType node>
+trefs tau_term_bdd_handle<node>::collect_free_tau_vars(tref bdd_tref,
+	bool leaves_only)
+{
+	// One walk over the DISTINCT nodes (visit_nodes), gathering the free
+	// variables of every node's variable, so a shared sub-BDD is entered
+	// once and not once per path.
+	//
+	// Gathered into one vector and sorted once at the end rather than
+	// inserted variable by variable into an ordered set, which would
+	// allocate a node per variable per BDD node. Every contribution is
+	// already trimmed and sorted, being an answer from get_free_vars, so
+	// sorting and deduplicating the concatenation delivers exactly the
+	// shape that function's own results carry.
+	trefs merged;
+	auto collect = [&merged, leaves_only](ref x, bool is_leaf) {
+		if (leaves_only && !is_leaf) return true;
 		const trefs& v_fvs = get_free_vars<node>(tbdd::get_var_term(x));
-		merged.insert(v_fvs.begin(), v_fvs.end());
+		merged.insert(merged.end(), v_fvs.begin(), v_fvs.end());
 		return true;
 	};
 	tbdd::visit_nodes(ref(bdd_tref, false), collect);
-	trefs fv(merged.begin(), merged.end());
-	auto [it, _] = cache.emplace(bdd_tref, std::move(fv));
-	return it->second;
+	std::sort(merged.begin(), merged.end(),
+		[](tref a, tref b) { return tree<node>::subtree_less(a, b); });
+	merged.erase(std::unique(merged.begin(), merged.end(),
+		[](tref a, tref b) { return tree<node>::subtree_equals(a, b); }),
+		merged.end());
+	return merged;
 }
 
 /** @internal @copydoc tau_term_bdd_handle::get_free_leaf_vars(tref) @endinternal */
 template<NodeType node>
 trefs tau_term_bdd_handle<node>::get_free_leaf_vars(tref bdd_tref) {
 	if (!bdd_tref) return {};
-	subtree_set<node> merged;
-	auto collect = [&merged](ref x, bool is_leaf) {
-		if (!is_leaf) return true;
-		const trefs& v_fvs = get_free_vars<node>(tbdd::get_var_term(x));
-		merged.insert(v_fvs.begin(), v_fvs.end());
-		return true;
-	};
-	tbdd::visit_nodes(ref(bdd_tref, false), collect);
-	return trefs(merged.begin(), merged.end());
+	return collect_free_tau_vars(bdd_tref, true);
 }
 
 } // namespace idni::tau_lang
