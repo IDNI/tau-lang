@@ -859,19 +859,20 @@ const trefs& get_free_vars(tref n) {
 	// over it, while a chain taken apart into many small pieces costs one
 	// sort over the variable occurrences rather than a pass over the running
 	// union per piece.
+	// The union of two sets that already carry the delivered shape.
+	auto merged = [less](const trefs& a, const trefs& b) {
+		trefs out;
+		out.reserve(a.size() + b.size());
+		std::set_union(a.begin(), a.end(), b.begin(), b.end(),
+			std::back_inserter(out), less);
+		return out;
+	};
 	auto combine = [&](size_t lmark, size_t mark) -> trefs {
 		// Two sets and nothing loose: a connective one level above the
 		// atoms, which is most of them. Merge the two and skip the rest,
 		// which is there for the flattened chains.
-		if (lmark == loose.size() && mark + 2 == parts.size()) {
-			const trefs& a = *parts[mark];
-			const trefs& b = *parts[mark + 1];
-			trefs out;
-			out.reserve(a.size() + b.size());
-			std::set_union(a.begin(), a.end(), b.begin(), b.end(),
-				std::back_inserter(out), less);
-			return out;
-		}
+		if (lmark == loose.size() && mark + 2 == parts.size())
+			return merged(*parts[mark], *parts[mark + 1]);
 		// Sets that are the same set -- one shared subformula reached
 		// through several branches of the DAG is one cached vector -- are
 		// merged once. Sharing makes that common, and the pass is over
@@ -879,23 +880,20 @@ const trefs& get_free_vars(tref n) {
 		std::sort(parts.begin() + mark, parts.end());
 		parts.erase(std::unique(parts.begin() + mark, parts.end()),
 			parts.end());
-		size_t big = parts.size();
-		for (size_t i = mark; i < parts.size(); ++i)
-			if (big == parts.size() || parts[i]->size() > parts[big]->size())
-				big = i;
+		// Everything but the largest set is sorted together with the loose
+		// variables; the largest is merged into that afterwards.
+		size_t big = mark;
+		for (size_t i = mark + 1; i < parts.size(); ++i)
+			if (parts[i]->size() > parts[big]->size()) big = i;
 		trefs rest(loose.begin() + lmark, loose.end());
 		for (size_t i = mark; i < parts.size(); ++i)
 			if (i != big) rest.insert(rest.end(), parts[i]->begin(),
 				parts[i]->end());
 		std::sort(rest.begin(), rest.end(), less);
 		rest.erase(std::unique(rest.begin(), rest.end(), equal), rest.end());
-		if (big == parts.size()) return rest;
+		if (mark == parts.size()) return rest;
 		if (rest.empty()) return *parts[big];
-		trefs out;
-		out.reserve(rest.size() + parts[big]->size());
-		std::set_union(rest.begin(), rest.end(), parts[big]->begin(),
-			parts[big]->end(), std::back_inserter(out), less);
-		return out;
+		return merged(rest, *parts[big]);
 	};
 	// Appends everything @p m contributes to the node being computed.
 	// @p chain is the node type of the connective chain being taken apart,
@@ -905,7 +903,8 @@ const trefs& get_free_vars(tref n) {
 		if (is_var_or_capture<node>(m)) {
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
 			// Deliberately not descending into m's children.
-			return loose.push_back(tau::trim_right_sibling(m));
+			loose.push_back(tau::trim_right_sibling(m));
+			return;
 		}
 		if (t.is(tau::BDD_ID)) {
 			// A BDD-backed term keeps its variables in the BDD rather than
