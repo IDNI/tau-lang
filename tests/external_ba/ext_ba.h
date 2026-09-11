@@ -82,8 +82,6 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 			type_name);
 	}
 
-	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
-
 	static bool owns_type(size_t ba_type_id) {
 		return ba_types_detail::type_tree_name_is<ext_ba, node_t>(
 			ba_type_id, type_name);

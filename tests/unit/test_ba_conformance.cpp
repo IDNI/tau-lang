@@ -47,7 +47,7 @@ void check_type_system() {
 	REQUIRE(type != nullptr);
 	CHECK(std::string(desc::type_name).size() > 0);
 	CHECK(desc::matches_type(type));
-	CHECK(desc::owns_type(type));
+	CHECK(desc::matches_type(type));
 	// the name inside the type tree is the descriptor's own
 	CHECK(tau::get(type)[0].get_string() == std::string(desc::type_name));
 

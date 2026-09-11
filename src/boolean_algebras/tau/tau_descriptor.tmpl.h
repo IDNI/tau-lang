@@ -34,8 +34,6 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 
 	static tref type_tree() { return tau_type<node_t>(); }
 
-	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
-
 	static bool owns_type(size_t ba_type_id) {
 		return is_tau_type<node_t>(ba_type_id);
 	}

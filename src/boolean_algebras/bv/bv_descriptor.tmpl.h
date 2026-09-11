@@ -69,8 +69,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	static tref type_tree() { return bv_type<node_t>(default_bv_size); }
 
-	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
-
 	static bool owns_type(size_t ba_type_id) {
 		return is_bv_type_family<node_t>(ba_type_id);
 	}

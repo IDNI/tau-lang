@@ -242,7 +242,7 @@ TEST_SUITE("carrier ranking") {
 		bool owned_by_a_host = false;
 		pack_visit_all<node_t>([&]<typename BA>() {
 			if constexpr (ba_can_host_bool_v<node_t, BA>)
-				if (ba_descriptor<BA, node_t>::owns_type(carrier))
+				if (ba_descriptor<BA, node_t>::matches_type(carrier))
 					owned_by_a_host = true;
 		});
 		CHECK(owned_by_a_host);

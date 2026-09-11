@@ -70,7 +70,7 @@ against the line naming it:
 
 - **identity and classification** — `type_name`, `default_type_priority`,
   `atomless`, `non_aba_omcat`
-- **type system** — `matches_type`, `type_tree`, `owns_type` (by tree and by
+- **type system** — `matches_type` (by tree), `type_tree`, `owns_type` (by
   id)
 - **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
   `is_closed`, `literal_one`, `literal_zero`

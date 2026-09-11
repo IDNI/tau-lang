@@ -338,9 +338,12 @@ bool pack_type_has_arith_ops_impl(Type type) {
 	if constexpr (std::is_same_v<Type, size_t>) if (!type) return false;
 	bool out = false;
 	pack_visit_all<Node>([&]<typename BA>() {
-		if constexpr (ba_arith_ops_v<Node, BA>)
-			if (!out && ba_descriptor<BA, Node>::owns_type(type))
-				out = true;
+		if constexpr (ba_arith_ops_v<Node, BA>) {
+			if (out) return;
+			if constexpr (std::is_same_v<Type, size_t>)
+				out = ba_descriptor<BA, Node>::owns_type(type);
+			else out = ba_descriptor<BA, Node>::matches_type(type);
+		}
 	});
 	return out;
 }
@@ -686,7 +689,7 @@ pack_type_family_param(tref type_tree) {
 	std::optional<std::pair<std::string, std::optional<unsigned short>>> out;
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_descriptor_v<Node, BA>) {
-			if (out || !ba_descriptor<BA, Node>::owns_type(type_tree))
+			if (out || !ba_descriptor<BA, Node>::matches_type(type_tree))
 				return;
 			std::optional<unsigned short> param;
 			if constexpr (ba_has_type_tree_for<Node, BA>)
@@ -713,7 +716,7 @@ std::optional<bool> pack_literal_incomplete(tref type_tree,
 	std::optional<bool> out;
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_literal_incomplete<Node, BA>)
-			if (!out && ba_descriptor<BA, Node>::owns_type(type_tree))
+			if (!out && ba_descriptor<BA, Node>::matches_type(type_tree))
 				out = ba_descriptor<BA, Node>::literal_incomplete(src);
 	});
 	return out;

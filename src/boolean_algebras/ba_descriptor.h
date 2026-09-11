@@ -328,9 +328,6 @@ concept ba_descriptor_complete =
         { ba_descriptor<BA, Node>::matches_type(t) }
             -> std::convertible_to<bool>;                            }
  && requires { ba_descriptor<BA, Node>::type_tree();                 }
- && requires(tref t) {
-        { ba_descriptor<BA, Node>::owns_type(t) }
-            -> std::convertible_to<bool>;                            }
  && requires(size_t n) {
         { ba_descriptor<BA, Node>::owns_type(n) }
             -> std::convertible_to<bool>;                            }
