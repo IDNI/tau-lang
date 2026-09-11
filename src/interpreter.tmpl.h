@@ -245,7 +245,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
 			LOG_ERROR << "Failed to find output stream for stream '"
-				<< get_var_name<node>(vn) << "'";
+				<< TAU_TO_STR(io_var) << "'";
 			DBG(LOG_TRACE << ctx;)
 			DBG(LOG_TRACE << dump_to_str());
 			return false;
@@ -805,6 +805,26 @@ std::pair<std::optional<assignment<node>>, bool>
 					<< "\t\t" << LOG_FM_DUMP(k) << "\n"
 					<< "\t\t" << LOG_FM_DUMP(v) << "\n";
 #endif // DEBUG
+			// The solver must never bind an input variable directly; a
+			// leftover free input here means memory substitution or
+			// future-time elimination in get_ubt_ctn_at missed it.
+			auto step_io_vars = tau::get(current).select_top(
+						is_child<node, tau::io_var>);
+			for (tref v : step_io_vars) {
+				bool bad = !is_io_initial<node>(v)
+					|| tau::get(v).is_input_variable()
+					|| get_io_time_point<node>(v) > (int_t)time_point;
+				if (!bad) continue;
+				LOG_ERROR << "Unsolved stream variable '" << TAU_TO_STR(v)
+					<< "' in the step formula at time point " << time_point
+					<< ": " << LOG_FM(current) << "\n";
+				std::stringstream keys_ss;
+				keys_ss << "memory keys:";
+				for (const auto& [k, mval] : memory)
+					keys_ss << " " << TAU_TO_STR(k);
+				LOG_ERROR << keys_ss.str() << "\n";
+				return {};
+			}
 			auto path_solution = solution_with_max_update(current);
 #ifdef DEBUG
 			if (path_solution) {
