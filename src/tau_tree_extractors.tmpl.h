@@ -790,7 +790,15 @@ const trefs& get_free_vars(tref n) {
 
 	using cache_t = subtree_unordered_map<node, trefs>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
-	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
+	// A `bf`/`wff` wrapper has exactly the free variables of what it wraps,
+	// so the two are one question and are asked under one key. Keying on
+	// the inner node stores one entry where the wrapper's and the
+	// connective's own used to be two, and makes a query about a formula
+	// meet the answer the walk published while visiting it from above.
+	const tau& root = tau::get(n);
+	const tref key = root.has_child()
+		&& !tau::get(root.first()).has_right_sibling() ? root.first() : n;
+	if (auto it = free_vars_map.find(key); it != free_vars_map.end())
 		return it->second;
 
 	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
@@ -1024,13 +1032,13 @@ const trefs& get_free_vars(tref n) {
 			return free_vars_map.emplace(m, std::move(result)).first->second;
 		return memo.emplace(m, std::move(result)).first->second;
 	};
-	const trefs& fv = walk(n);
+	const trefs& fv = walk(key);
 #ifdef DEBUG
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
 	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
 	assert(std::is_sorted(fv.begin(), fv.end(), tau::subtree_less));
 #endif
-	auto [it, _] = free_vars_map.emplace(n, fv);
+	auto [it, _] = free_vars_map.emplace(key, fv);
 	return it->second;
 }
 
