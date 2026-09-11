@@ -1048,6 +1048,82 @@ TEST_SUITE("get_free_vars cache") {
 		std::set<std::string> minus = expect; minus.erase("u7");
 		CHECK(names(get_free_vars<node_t>(F)) == minus);
 	}
+
+	TEST_CASE("a chain is taken apart without losing a nested chain of another"
+		" connective")
+	{
+		// (a=0 || b=0) && ((c=0 && d=0) || e=0) && f=0: the `||` inside the
+		// `&&` chain is an operand of it, not a link, and keeps its own
+		// answer.
+		tref nested = tau::build_wff_or(
+			tau::build_wff_and(x_eq_0("c"), x_eq_0("d")), x_eq_0("e"));
+		tref F = tau::build_wff_and(
+			tau::build_wff_and(tau::build_wff_or(x_eq_0("a"), x_eq_0("b")),
+				nested), x_eq_0("f"));
+		CHECK(names(get_free_vars<node_t>(F))
+			== std::set<std::string>{ "a", "b", "c", "d", "e", "f" });
+		CHECK(names(get_free_vars<node_t>(nested))
+			== std::set<std::string>{ "c", "d", "e" });
+	}
+
+	TEST_CASE("a subformula several branches reach is answered once and"
+		" consistently")
+	{
+		// shared appears under both sides of the conjunction, and as a
+		// whole formula of its own.
+		tref shared = tau::build_wff_and(x_eq_0("s1"),
+			tau::build_wff_and(x_eq_0("s2"), x_eq_0("s3")));
+		tref F = tau::build_wff_and(tau::build_wff_and(x_eq_0("p"), shared),
+			tau::build_wff_and(x_eq_0("q"), shared));
+		CHECK(names(get_free_vars<node_t>(F))
+			== std::set<std::string>{ "p", "q", "s1", "s2", "s3" });
+		CHECK(names(get_free_vars<node_t>(shared))
+			== std::set<std::string>{ "s1", "s2", "s3" });
+		// And the other way round: the shared answer first, the whole
+		// formula after it.
+		tref other = tau::build_wff_or(x_eq_0("t1"), x_eq_0("t2"));
+		CHECK(names(get_free_vars<node_t>(other))
+			== std::set<std::string>{ "t1", "t2" });
+		CHECK(names(get_free_vars<node_t>(tau::build_wff_and(other, F)))
+			== std::set<std::string>{ "p", "q", "s1", "s2", "s3",
+				"t1", "t2" });
+	}
+
+	TEST_CASE("a Boolean term grown one factor at a time") {
+		// Term structure carries free variables as formula structure does,
+		// and is asked about through the equation that wraps it.
+		tref acc = nullptr;
+		std::set<std::string> expect;
+		for (int i = 0; i < 40; ++i) {
+			std::string w = "w" + std::to_string(i);
+			tref v = build_bf_variable<node_t>(w, tau_type_id<node_t>());
+			acc = acc ? tau::build_bf_and(acc, v) : v;
+			expect.insert(w);
+			CHECK(names(get_free_vars<node_t>(tau::build_bf_eq_0(acc)))
+				== expect);
+		}
+	}
+
+	TEST_CASE("a binder over a term chain subtracts its own variable") {
+		// fall x ((x & y) = 0): the bound variable is taken out of a set
+		// the term chain produced.
+		tref x = build_bf_variable<node_t>(std::string("x"),
+			tau_type_id<node_t>());
+		tref y = build_bf_variable<node_t>(std::string("y"),
+			tau_type_id<node_t>());
+		tref body = tau::build_bf_eq_0(tau::build_bf_and(x, y));
+		CHECK(names(get_free_vars<node_t>(body))
+			== std::set<std::string>{ "x", "y" });
+		tref F = tau::build_wff_all(var("x"), body, false);
+		CHECK(names(get_free_vars<node_t>(F)) == std::set<std::string>{ "y" });
+	}
+
+	TEST_CASE("a closed formula has no free variables and says so twice") {
+		tref F = tau::build_wff_ex(var("z"),
+			tau::build_wff_and(x_eq_0("z"), x_eq_0("z")), false);
+		CHECK(get_free_vars<node_t>(F).empty());
+		CHECK(get_free_vars<node_t>(F).empty());
+	}
 }
 
 // ── tree::substitute (tau_tree_substitute.tmpl.h) ───────────────────────
