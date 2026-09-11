@@ -237,4 +237,10 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		static_assert(pack_solver_count<mini_node>() == 0);
 		CHECK(true);
 	}
+
+	TEST_CASE("exactly one BA may claim propositional synthesis") {
+		static_assert(pack_propositional_synthesizer_count<conv_node>() <= 1);
+		static_assert(pack_propositional_synthesizer_count<mini_node>() == 0);
+		CHECK(true);
+	}
 }
