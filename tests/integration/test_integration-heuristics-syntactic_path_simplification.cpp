@@ -756,39 +756,9 @@ TEST_SUITE("syntactic_path_simplification_stage3") {
 	}
 }
 
-// ── stage 4: atom fingerprints and the relevant-key memo ─────────────────────
+// ── stage 4: the memo of already simplified subtrees ─────────────────────────
 
 TEST_SUITE("syntactic_path_simplification_stage4") {
-
-	TEST_CASE("a subtree's fingerprint is covered by its parent's") {
-		tref fm = get_nso_rr("x = 0 && (y != 0 || (z = 0 && ex w (w = 0 || x = 0))).")
-			.value().main->get();
-		const path_bits& whole = path_bits_of<node_t, true>(fm);
-		bool ok = true;
-		auto check = [&](tref n) {
-			if (tau::get(n).is(tau::wff))
-				ok = ok && whole.covers(path_bits_of<node_t, true>(n));
-		};
-		pre_order<node_t>(fm).visit(check);
-		CHECK(ok);
-		CHECK(whole.any());
-	}
-
-	TEST_CASE("both spellings of an equality share one bit") {
-		tref eq  = get_nso_rr("x = 0.").value().main->get();
-		tref neq = get_nso_rr("x != 0.").value().main->get();
-		tref neg = get_nso_rr("!(x = 0).").value().main->get();
-		const path_bits& a = path_bits_of<node_t, true>(eq);
-		CHECK(a.covers(path_bits_of<node_t, true>(neq)));
-		CHECK(path_bits_of<node_t, true>(neq).covers(a));
-		CHECK(a.covers(path_bits_of<node_t, true>(neg)));
-		CHECK(path_bits_of<node_t, true>(neg).covers(a));
-	}
-
-	TEST_CASE("a constant has no atoms") {
-		CHECK(!path_bits_of<node_t, true>(_T<node_t>()).any());
-		CHECK(!path_bits_of<node_t, true>(_F<node_t>()).any());
-	}
 
 	// A key that cannot occur in a subtree leaves that subtree's result a
 	// property of the subtree alone: the same simplified subtree comes back
@@ -801,5 +771,62 @@ TEST_SUITE("syntactic_path_simplification_stage4") {
 		// under x = 0 the inner disjunction is the same simplified node
 		CHECK(tau::get(under).find_top([&](tref n) {
 			return tau::subtree_equals(n, alone); }) != nullptr);
+	}
+}
+
+// ── stage 5: the version memo and the capture guard's index ──────────────────
+
+TEST_SUITE("syntactic_path_simplification_stage5") {
+
+	// The memo is keyed by the environment's version, so one subtree
+	// reached under two different sets of keys is simplified twice and
+	// answered separately. A memo that hit across environments would
+	// return the first branch's T for the second branch too, leaving
+	// `a = 0 || a != 0`.
+	TEST_CASE("the same subtree under two environments simplifies differently") {
+		tref fm = nnf_normalised(get_nso_rr(
+			"(a = 0 && (a = 0 || y = 0)) || (a != 0 && (a = 0 || y = 0)).")
+			.value().main->get());
+		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
+		// under a = 0 the disjunction is T and the conjunct is a = 0;
+		// under a != 0 it is y = 0.
+		tref expected = get_nso_rr("a = 0 || (a != 0 && y = 0).")
+			.value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
+	}
+
+	// The capture guard is an index from a variable to the keys that
+	// mention it, so it is exact however many variables are in force.
+	// (The 64-bit Bloom it replaced was exact too, and saturated here.)
+	TEST_CASE("capture guard: a binder shadows an outer key past 64 variables") {
+		trefs cs;
+		for (int i = 0; i < 70; ++i)
+			cs.push_back(get_nso_rr(
+				("x" + std::to_string(i) + " = 0.").c_str())
+				.value().main->get());
+		tref x0 = tau::get(cs[0]).find_top(is<node_t, tau::variable>);
+		REQUIRE(x0 != nullptr);
+		// `ex x0 (x0 != 0 || z = 0)`, built by hand so the bound variable
+		// keeps the name of the outer key's variable.
+		tref body = get_nso_rr("x0 != 0 || z = 0.").value().main->get();
+		cs.push_back(tau::build_wff_ex(x0, body, false));
+		tref res = syntactic_path_simplification_simplify_wff<node_t>(
+			tau::build_wff_and(cs));
+		// the bound x0 is not the outer key's x0: the body is untouched
+		CHECK(tau::get(res).find_top([&](tref n) {
+			return tau::subtree_equals(n, body); }) != nullptr);
+	}
+
+	// The re-sweep of a rebuilt join: a disjunctive conjunct folds to a
+	// literal that its siblings were processed without, so the join is
+	// swept again with that literal as a key.
+	TEST_CASE("a literal exposed by a folded conjunct simplifies its sibling") {
+		tref fm = get_nso_rr("b != 0 && (a = 0 || b = 0) && (a != 0 || c = 0).")
+			.value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		// b != 0 kills b = 0, exposing a = 0, which kills a != 0.
+		tref expected = get_nso_rr("a = 0 && b != 0 && c = 0.")
+			.value().main->get();
+		CHECK(tau::get(canonical(res)) == tau::get(canonical(expected)));
 	}
 }

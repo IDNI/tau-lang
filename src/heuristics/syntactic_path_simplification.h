@@ -14,7 +14,6 @@
 #define __IDNI__TAU__SYNTACTIC_PATH_SIMPLIFICATION_H__
 
 #include <algorithm>
-#include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>

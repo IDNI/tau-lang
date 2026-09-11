@@ -68,11 +68,14 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
 // `visit` call -- the convention the former `skip` used, without its
 // structural matching.
 //
-// Results are memoised on (node, the keys in force that can occur in it),
-// the occurrence test being a 256-bit atom fingerprint cached per node
-// (`path_bits_of`). A node no key can reach has an empty signature, and its
-// result lives in a cache shared across calls: the root of every call, and
-// every subtree a near-repeat call left untouched, cost one lookup.
+// Results are memoised on (node, environment version). The version is a
+// counter the environment advances whenever it changes and restores exactly
+// when it is undone, so siblings under one join share it and a re-entered
+// state gets its old id back; a lookup is one hash of the node and that
+// number, whatever the environment holds. With no key in force the result is
+// a property of the node alone and lives in a cache shared across calls: the
+// root of every call, and every subtree a near-repeat call left untouched,
+// cost one lookup.
 
 /**
  * @brief Modes of the path sweep.
@@ -95,21 +98,6 @@ struct path_sweep_options {
 /// A literal's canonical positive key and whether the literal is its
 /// complement.
 struct canon_t { tref key; bool flipped; };
-
-/// A 256-bit Bloom fingerprint of the atoms under a node: one bit per
-/// canonical atom key. A key can occur in a subtree only if its bits are a
-/// subset of the subtree's; the converse may fail (a false positive costs a
-/// descent, never a wrong result).
-struct path_bits {
-	std::array<uint64_t, 4> w{};
-	void set(size_t h) { w[(h >> 6) & 3] |= uint64_t(1) << (h & 63); }
-	void merge(const path_bits& o) { for (size_t i = 0; i < 4; ++i) w[i] |= o.w[i]; }
-	bool covers(const path_bits& k) const {
-		for (size_t i = 0; i < 4; ++i) if (k.w[i] & ~w[i]) return false;
-		return true;
-	}
-	bool any() const { return w[0] | w[1] | w[2] | w[3]; }
-};
 
 template <NodeType node, bool is_wff> struct path_sweep_level;
 
@@ -145,11 +133,6 @@ struct path_sweep_level<node, true> {
 	static bool visit(tref n) { return is_formula<node>(n); }
 	static bool less(tref l, tref r) {
 		return syntactic_path_simplification_wff_comp<node>(l, r);
-	}
-	/// A wrapper the fingerprint counts as one atom: any leaf the sweep
-	/// does not descend through.
-	static bool is_atom_shaped(const tau& t) {
-		return t.is(top) && t.has_child() && !is_connective(t[0]);
 	}
 	/// The key a literal is filed under and whether the literal is that
 	/// key's complement: `!(l)` toggles; `l != r` is the complement of
@@ -220,9 +203,6 @@ struct path_sweep_level<node, false> {
 		return is_boolean_operation<node>(n) || is<node, tau::bf>(n);
 	}
 	static bool less(tref l, tref r) { return tau::subtree_less(l, r); }
-	static bool is_atom_shaped(const tau& t) {
-		return t.is(top) && t.has_child() && !is_connective(t[0]);
-	}
 	/// A term literal has one negative spelling, `t'`.
 	static canon_t canon(tref n) {
 		const tau& t = tau::get(n);
@@ -231,43 +211,6 @@ struct path_sweep_level<node, false> {
 		return {in.key, !in.flipped};
 	}
 };
-
-/**
- * @internal
- * @brief The fingerprint of a subtree, cached per node across calls (GC-swept).
- * Computed bottom-up: an atom-shaped wrapper contributes the bit of its
- * canonical key, an inner node the union of its children. The walk prunes at
- * every node already cached, so a formula is fingerprinted once and each new
- * node built later costs its own subtree once.
- * @endinternal
- */
-template <NodeType node, bool is_wff>
-const path_bits& path_bits_of(tref n) {
-	using tau = tree<node>;
-	using L = path_sweep_level<node, is_wff>;
-	using cache_t = subtree_unordered_map<node, path_bits>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(n); it != cache.end()) return it->second;
-	auto visit_subtree = [](tref m) {
-		if (cache.contains(m)) return false;           // prune: known
-		const tau& t = tau::get(m);
-		return t.is(L::top) || is_boolean_operation<node>(m)
-			|| !t.is_term() || L::is_atom_shaped(t);
-	};
-	auto visit = [](tref) { return true; };
-	auto up = [](tref m) {
-		const tau& t = tau::get(m);
-		path_bits b;
-		// A constant is never a key, so it contributes no bit.
-		if (L::is_atom_shaped(t) && !L::is_true(m) && !L::is_false(m))
-			b.set(hash_lcrs_tref<node>{}(L::canon(m).key));
-		else for (tref c : t.children())
-			if (auto it = cache.find(c); it != cache.end()) b.merge(it->second);
-		cache.emplace(m, b);
-	};
-	pre_order<node>(n).visit(visit, visit_subtree, up);
-	return cache.find(n)->second;
-}
 
 /**
  * @internal
@@ -289,8 +232,13 @@ struct path_sweep {
 
 private:
 	// ── environment ───────────────────────────────────────────────────
-	struct entry { bool value; unsigned suspended; path_bits bits; };
-	struct undo_record { tref key; bool had_previous; entry previous; };
+	struct entry { bool value; unsigned suspended; };
+	/// The record that undoes one `push_key`, down to the version the
+	/// environment had before it.
+	struct undo_record {
+		tref key; bool had_previous; entry previous;
+		uint64_t version_before;
+	};
 	subtree_unordered_map<node, entry> keys;
 	std::vector<undo_record> undo;
 	/// Every key in force filed under each of its free variables, so the
@@ -300,6 +248,13 @@ private:
 	/// removes it again; the stack discipline of `undo` makes the key the
 	/// back of each of its variables' lists.
 	subtree_unordered_map<node, trefs> keys_by_var;
+	/// The id of the environment's current state and the source of the
+	/// next one. Every change mints a fresh id and every undo restores
+	/// the id the change found, so equal ids mean the same keys in force
+	/// with the same values and the same suspensions -- which is all the
+	/// memo needs to know about the environment.
+	uint64_t version = 0;
+	uint64_t next_version = 0;
 
 	const entry* find_active(tref n) const {
 		auto it = keys.find(n);
@@ -307,9 +262,11 @@ private:
 		return &it->second;
 	}
 	void push_key(tref key, bool value) {
-		const entry e{value, 0, path_bits_of<node, is_wff>(key)};
+		const entry e{value, 0};
 		auto [it, fresh] = keys.try_emplace(key, e);
-		undo.push_back({key, !fresh, fresh ? entry{} : it->second});
+		undo.push_back({key, !fresh, fresh ? entry{} : it->second,
+				version});
+		version = ++next_version;
 		if (!fresh) it->second = e;
 		else for (tref v : get_free_vars<node>(key))
 			keys_by_var[v].push_back(key);
@@ -327,6 +284,7 @@ private:
 					ks.pop_back();
 				}
 			}
+			version = u.version_before;
 			undo.pop_back();
 		}
 	}
@@ -337,6 +295,7 @@ private:
 		explicit frame(kind_t k) : kind(k) {}
 		bool conj = true;               // join: conjunction or disjunction
 		size_t undo_mark = 0;
+		uint64_t version_before = 0;                // scope
 		std::unordered_set<tref> literal_positions; // join
 		std::unordered_set<tref> spine;             // join: inner wrappers
 		subtree_unordered_map<node, bool> pushed;   // join: its keys
@@ -353,12 +312,15 @@ private:
 		frame fr(frame::scope);
 		fr.suspended = std::move(suspended);
 		for (tref k : fr.suspended) ++keys.find(k)->second.suspended;
+		fr.version_before = version;
+		version = ++next_version;
 		frames.push_back(std::move(fr));
 	}
 	void close_scope() {
 		frame& fr = frames.back();
 		DBG(assert(fr.kind == frame::scope);)
 		for (tref k : fr.suspended) --keys.find(k)->second.suspended;
+		version = fr.version_before;
 		frames.pop_back();
 	}
 	/// Keys in force whose free variables contain `var` (a binder's
@@ -386,29 +348,14 @@ private:
 		binder_,     // opened a scope frame (capture guard)
 		literal_pos, // a literal conjunct's position; may have opened a scope
 	};
-	/// The keys in force that can occur in a node: those whose fingerprint
-	/// the node's covers, sorted so equal sets compare equal. Empty means
-	/// the node's result is a property of the node alone.
-	using relevant_t = std::vector<std::pair<tref, bool>>;
 	struct marker {
 		tref orig; kind_t kind; bool scoped;
-		relevant_t relevant;   // set for kinds that memoise
+		/// The environment's version when the node was entered. `up`
+		/// is back at that state by the time it memoises.
+		uint64_t version;
 	};
 	std::vector<marker> markers;
 	bool no_descend = false;
-
-	relevant_t relevant_keys(tref n) const {
-		relevant_t out;
-		if (undo.empty()) return out;
-		const path_bits& nb = path_bits_of<node, is_wff>(n);
-		if (!nb.any()) return out;
-		for (const auto& [k, e] : keys)
-			if (!e.suspended && nb.covers(e.bits)) out.emplace_back(k, e.value);
-		std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) {
-			return tau::subtree_less(a.first, b.first);
-		});
-		return out;
-	}
 
 	tref finish(marker m, tref result) {
 		m.kind = final_;
@@ -417,32 +364,27 @@ private:
 		return result;
 	}
 
-	// ── memo: (node, relevant keys) -> result ─────────────────────────
-	// Per call for a non-empty relevant set; across calls (GC-swept,
-	// TAU_CACHE-gated) for the empty one, where the result depends on the
-	// node alone -- at the root of every call this is the entry cache, and
-	// at any subtree none of the keys in force can reach it is what makes
-	// a near-repeat call cost only its touched paths.
-	struct memo_key { tref orig; relevant_t relevant; };
+	// ── memo: (node, environment version) -> result ───────────────────
+	// Per call while any key is in force; across calls (GC-swept,
+	// TAU_CACHE-gated) when none is, where the result depends on the node
+	// alone -- at the root of every call this is the entry cache, and at
+	// every subtree outside any conjunction's reach it is what makes a
+	// near-repeat call cost only its touched paths. A suspended key still
+	// counts as in force: the gate is `undo.empty()`, which is the cheap
+	// and conservative side.
+	struct memo_key { tref orig; uint64_t version; };
 	struct memo_hash {
 		size_t operator()(const memo_key& k) const {
 			std::uint64_t seed = 0;
-			hash_combine(seed, hash_lcrs_tref<node>{}(k.orig));
-			for (const auto& [key, v] : k.relevant)
-				hash_combine(seed, hash_lcrs_tref<node>{}(key), v);
+			hash_combine(seed, hash_lcrs_tref<node>{}(k.orig),
+					k.version);
 			return static_cast<size_t>(seed);
 		}
 	};
 	struct memo_equal {
 		bool operator()(const memo_key& a, const memo_key& b) const {
-			if (!tau::subtree_equals(a.orig, b.orig)) return false;
-			if (a.relevant.size() != b.relevant.size()) return false;
-			for (size_t i = 0; i < a.relevant.size(); ++i)
-				if (a.relevant[i].second != b.relevant[i].second
-					|| !tau::subtree_equals(a.relevant[i].first,
-								b.relevant[i].first))
-					return false;
-			return true;
+			return a.version == b.version
+				&& tau::subtree_equals(a.orig, b.orig);
 		}
 	};
 	std::unordered_map<memo_key, tref, memo_hash, memo_equal> memo;
@@ -464,24 +406,28 @@ private:
 	}
 
 	const tref* memo_find(const marker& m) const {
-		if (m.relevant.empty()) {
+		if (undo.empty()) {
 			if (auto* g = global_memo(opts)) if (auto it = g->find(m.orig); it != g->end())
 				return &it->second;
 			return nullptr;
 		}
-		if (auto it = memo.find(memo_key{m.orig, m.relevant}); it != memo.end())
+		if (auto it = memo.find(memo_key{m.orig, m.version}); it != memo.end())
 			return &it->second;
 		return nullptr;
 	}
 	void memo_store(const marker& m, tref res) {
-		if (m.relevant.empty()) {
+		// `up` has undone whatever the node's own descent pushed, so the
+		// environment is the one `down` saw -- the state the marker's
+		// version names.
+		DBG(assert(m.version == version);)
+		if (undo.empty()) {
 			// Stored trimmed: a value shared across calls must not carry
 			// the sibling of the position that first produced it.
 			if (auto* g = global_memo(opts))
 				g->emplace(m.orig, tau::trim_right_sibling(res));
 			return;
 		}
-		memo.emplace(memo_key{m.orig, m.relevant}, res);
+		memo.emplace(memo_key{m.orig, m.version}, res);
 	}
 
 	const path_sweep_options opts;
@@ -545,7 +491,7 @@ private:
 	tref down(tref n) {
 		DBG(assert(!no_descend);)
 		const tau& t = tau::get(n);
-		marker m{n, plain, false, {}};
+		marker m{n, plain, false, version};
 		if (!t.is(L::top)) return markers.push_back(m), n;
 		if (frame* fr = innermost_join()) {
 			if (fr->literal_positions.contains(n)) return enter_literal(n, m);
@@ -556,7 +502,6 @@ private:
 		}
 		if (const canon_t k = L::canon(n); const entry* e = find_active(k.key))
 			return finish(m, L::constant(e->value != k.flipped, n));
-		m.relevant = relevant_keys(n);
 		if (const tref* hit = memo_find(m)) return finish(m, *hit);
 		const tau& c = t[0];
 		if (c.is(L::land)) return open_join(n, m, true);
