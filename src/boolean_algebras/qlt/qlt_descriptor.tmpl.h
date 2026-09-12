@@ -11,6 +11,9 @@
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
+// Reaches nothing beyond the standard library itself, unlike normalizer.h,
+// so it is safe here; needed for `result<...>` before ltl_aba_result.h.
+#include "tau_diagnostics.h"
 #include "ltl_aba_result.h"
 #include "solver_types.h"
 
@@ -32,8 +35,8 @@ template <NodeType node>
 static std::optional<std::string> qlt_codegen_constant_expr(tref cst);
 
 template <NodeType node>
-static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
-	const std::vector<std::pair<tref, std::string>>& atoms);
+static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
+	tref fm, const std::vector<std::pair<tref, std::string>>& atoms);
 
 template <NodeType node>
 tref qlt_semantic_pwr_optimal(tref clause, tref update);
@@ -173,11 +176,9 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 * oracle is needed when they apply. Declining and proving unrealizable
 	 * are separate answers -- see @ref propositional_synthesis.
 	 */
-	static propositional_synthesis<node_t> try_propositional_synthesis(
+	static result<propositional_synthesis<node_t>> try_propositional_synthesis(
 		tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
-	{
-		return qlt_try_propositional_synthesis<node_t>(fm, atoms);
-	}
+	{ return qlt_try_propositional_synthesis<node_t>(fm, atoms); }
 
 	/** @brief Revise @p clause by the winning region of its product game. */
 	static tref semantic_pwr_optimal(tref clause, tref update) {

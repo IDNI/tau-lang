@@ -39,7 +39,9 @@ bool has(const std::string& s, const std::string& pat) {
 std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
 	auto fm = api<node_t>::get_formula(spec);
 	if (!fm.has_value()) return std::nullopt;
-	return solve_ltl_aba<node_t>(fm.value());
+	auto r = solve_ltl_aba<node_t>(fm.value());
+	REQUIRE(r.has_value()); // undecided is not "unrealizable"
+	return r.value();
 }
 
 } // namespace

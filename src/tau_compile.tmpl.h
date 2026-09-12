@@ -399,7 +399,14 @@ codegen_result compile_spec(
 	// not a crash.
 	std::optional<ltl_aba_solution<Node>> sol;
 	try {
-		sol = solve_ltl_aba<Node>(fm);
+		auto sol_r = solve_ltl_aba<Node>(fm);
+		if (!sol_r.has_value()) {
+			std::ostringstream oss;
+			sol_r.print(oss);
+			res.error = "compile: " + oss.str();
+			return res;
+		}
+		sol = std::move(sol_r.value());
 	} catch (const std::exception& e) {
 		res.error = std::string("compile: ") + e.what();
 		return res;

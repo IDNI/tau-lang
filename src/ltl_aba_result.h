@@ -39,7 +39,11 @@ struct hoa_automaton {
 	std::vector<bool> state_accepting;  // true if state has acceptance mark
 };
 
-hoa_automaton parse_hoa(const std::string& hoa_text);
+// `result` (the idni::tau_lang alias for idni::diagnostics::result) must
+// already be visible wherever this header is included -- tau_diagnostics.h
+// is safe to include ahead of this file (it reaches nothing beyond the
+// standard library itself), unlike normalizer.h.
+result<hoa_automaton> parse_hoa(const std::string& hoa_text);
 
 /** @brief Defined in ltl_aba_normalization.tmpl.h; incomplete is enough here. */
 template <NodeType node>

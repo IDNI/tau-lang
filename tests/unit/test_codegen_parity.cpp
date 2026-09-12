@@ -767,7 +767,9 @@ TEST_SUITE("codegen_parity") {
 			auto t0 = std::chrono::steady_clock::now();
 			tref fm = parse_like_compile_spec_step1(src);
 			REQUIRE_MESSAGE(fm != nullptr, name << ": parse+normalize failed");
-			auto sol = solve_ltl_aba<node_t>(fm);
+			auto r = solve_ltl_aba<node_t>(fm);
+			REQUIRE(r.has_value()); // undecided is not "unrealizable"
+			auto sol = r.value();
 			auto ms = elapsed_ms(t0);
 
 			size_t total = stats.total_calls - total0,

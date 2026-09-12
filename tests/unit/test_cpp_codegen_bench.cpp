@@ -333,7 +333,9 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		tref fm = parse_formula(CONST_FLAG_FORMULA);
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value()); // undecided is not "unrealizable"
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol, "BenchCorr");
 		REQUIRE(d.has_value());

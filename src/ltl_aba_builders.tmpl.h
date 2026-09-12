@@ -11,8 +11,8 @@ namespace idni::tau_lang {
 // two BAs claiming one formula, which is a self-gating bug rather than a pack
 // configuration error.
 template <typename Node, typename BA>
-static propositional_synthesis<Node> ba_try_propositional_synthesis(tref fm,
-	const std::vector<std::pair<tref, std::string>>& atoms)
+static result<propositional_synthesis<Node>> ba_try_propositional_synthesis(
+	tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	if constexpr (ba_has_descriptor_v<Node, BA>
 		&& requires { ba_descriptor<BA, Node>
@@ -21,31 +21,34 @@ static propositional_synthesis<Node> ba_try_propositional_synthesis(tref fm,
 		return ba_descriptor<BA, Node>
 			::try_propositional_synthesis(fm, atoms);
 	}
-	return synthesis_declined<Node>();
+	// result's value constructor is explicit
+	return result<propositional_synthesis<Node>>{synthesis_declined<Node>()};
 }
 
 template <typename Node>
-static propositional_synthesis<Node> pack_try_propositional_synthesis(tref fm,
-	const std::vector<std::pair<tref, std::string>>& atoms)
+static result<propositional_synthesis<Node>> pack_try_propositional_synthesis(
+	tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 {
+	result<propositional_synthesis<Node>> r;
 	propositional_synthesis<Node> out;
 	[[maybe_unused]] int claimants = 0;
 	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		([&] {
 			using BA = std::tuple_element_t<Is,
 				typename Node::bas_tuple>;
-			if (auto r = ba_try_propositional_synthesis<Node, BA>(
-				fm, atoms))
-			{
-				++claimants;
-				if (!out) out = std::move(r);
-			}
+			// an undecided BA is not a claimant: its report is the answer
+			auto got = r.merge_take(ba_try_propositional_synthesis<Node, BA>(
+				fm, atoms));
+			if (!got) return;
+			if (*got) { ++claimants; if (!out) out = std::move(*got); }
 		}(), ...);
 	}(std::make_index_sequence<
 		std::tuple_size_v<typename Node::bas_tuple>>{});
 	assert(claimants <= 1 && "pack_try_propositional_synthesis: two BAs claim "
 		"the same formula");
-	return out;
+	if (r.has_error()) return r;
+	r = std::move(out);
+	return r;
 }
 
 
@@ -75,10 +78,11 @@ static void append_step_guard_drivers(ltl_aba_solution<node>& sol,
 
 // partial_out, when non-null, stays populated even when the return value ends up std::nullopt.
 template <NodeType node>
-static std::optional<ltl_aba_solution<node>>
+static result<std::optional<ltl_aba_solution<node>>>
 solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 {
 	using tau = tree<node>;
+	result<std::optional<ltl_aba_solution<node>>> r;
 
 	// Past operators (S, T) are handled at skeleton level via DFA temporal
 	// testers (ppLTLTT approach), not by AST-level compile-away.  The
@@ -108,12 +112,15 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// which those fast paths do not have, so they are not offered the formula.
 	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
 	// fast paths use, never drives one.
-	if (!has_past && collect_step_guards<node>(fm).empty())
-		if (auto claim = pack_try_propositional_synthesis<node>(
-			fm, sol.atoms); claim) {
-				if (!*claim && partial_out) *partial_out = sol;
-				return *claim;
+	if (!has_past && collect_step_guards<node>(fm).empty()) {
+		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
+			fm, sol.atoms));
+		if (claim) {
+			if (!*claim && partial_out) *partial_out = sol;
+			r = std::move(*claim);
+			return r;
 		}
+	}
 
 
 	if (sol.atoms.empty()) {
@@ -126,15 +133,25 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 				sol.output_props.push_back(t.state_var);
 			append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm));
 			auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, sol.output_props);
-			if (!real) { if (partial_out) *partial_out = sol; return std::nullopt; }
-			sol.aut = parse_hoa(hoa);
-			return sol;
+			if (!real) {
+				if (partial_out) *partial_out = sol;
+				r = std::nullopt;
+				return r;
+			}
+			TAU_TRY(sol.aut, parse_hoa(hoa));
+			r = std::move(sol);
+			return r;
 		}
 		sol.skeleton = ltl_skeleton<node>(fm, sol.atoms);
 		auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, {});
-		if (!real) { if (partial_out) *partial_out = sol; return std::nullopt; }
-		sol.aut = parse_hoa(hoa);
-		return sol;
+		if (!real) {
+			if (partial_out) *partial_out = sol;
+			r = std::nullopt;
+			return r;
+		}
+		TAU_TRY(sol.aut, parse_hoa(hoa));
+		r = std::move(sol);
+		return r;
 	}
 
 	for (auto& [f, name] : sol.atoms) {
@@ -215,10 +232,15 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 
 	auto [realizable, hoa_text] =
 	    call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props);
-	if (!realizable) { if (partial_out) *partial_out = sol; return std::nullopt; }
+	if (!realizable) {
+		if (partial_out) *partial_out = sol;
+		r = std::nullopt;
+		return r;
+	}
 
-	sol.aut = parse_hoa(hoa_text);
-	return sol;
+	TAU_TRY(sol.aut, parse_hoa(hoa_text));
+	r = std::move(sol);
+	return r;
 }
 
 // ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
@@ -266,7 +288,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return r;
 	}
 
-	auto maybe = solve_ltl_aba<node>(fm);
+	TAU_TRY(auto maybe, solve_ltl_aba<node>(fm));
 	LOG_DEBUG << "[ltl_aba] solve_ltl_aba returned: " << maybe.has_value();
 
 	if (!maybe) {
@@ -371,7 +393,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			r = false;
 			return r;
 		}
-		sol.aut = parse_hoa(hoa);
+		TAU_TRY(sol.aut, parse_hoa(hoa));
 	}
 }
 
@@ -645,7 +667,16 @@ ltl_to_safety_formula_full(tref fm) {
 		}
 	}
 
-	auto maybe = solve_ltl_aba<node>(fm);
+	auto maybe_r = solve_ltl_aba<node>(fm);
+	if (!maybe_r.has_value()) {
+		// This function's tuple return has no report channel of its
+		// own, and every other internal failure below already answers
+		// with the same {nullptr, nullopt, {}} shape -- print so the
+		// undecided reason is not silently dropped.
+		maybe_r.print();
+		return {nullptr, std::nullopt, {}};
+	}
+	auto& maybe = maybe_r.value();
 	if (!maybe) {
 		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";
 		return {nullptr, std::nullopt, {}};
@@ -768,7 +799,13 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	ltl_aba_solution<node> sol;
 	std::optional<ltl_aba_solution<node>> maybe;
 	try {
-		maybe = solve_ltl_aba<node>(fm, &sol);
+		auto maybe_r = solve_ltl_aba<node>(fm, &sol);
+		if (!maybe_r.has_value()) {
+			out << "REFUSED: ";
+			maybe_r.print(out);
+			return false;
+		}
+		maybe = std::move(maybe_r.value());
 	} catch (const std::runtime_error& e) {
 		out << "REFUSED: " << e.what() << "\n";
 		return false;

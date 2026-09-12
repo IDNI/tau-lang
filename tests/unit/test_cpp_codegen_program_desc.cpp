@@ -41,7 +41,9 @@ hoa_automaton echo_spec() {
 std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
 	auto fm = api<node_t>::get_formula(spec);
 	if (!fm.has_value()) return std::nullopt;
-	return solve_ltl_aba<node_t>(fm.value());
+	auto r = solve_ltl_aba<node_t>(fm.value());
+	REQUIRE(r.has_value()); // undecided is not "unrealizable"
+	return r.value();
 }
 
 // Parse a raw wff string.
@@ -388,7 +390,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol, "positional");
 		REQUIRE(d.has_value());
@@ -409,7 +413,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		auto d = build_program_desc<node_t>(*sol, "positional_dup");
@@ -429,7 +435,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("emit_program: emits lookback/highest_initial_pos as baked static constexpr constants") {
 		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol, "positional_emit");
 		REQUIRE(d.has_value());
@@ -459,7 +467,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol, "positional_run");
 		REQUIRE(d.has_value());
@@ -500,7 +510,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "one witness per prefix edge and none on the final self-loop") {
 		tref fm = wff("(o[0]:bv[8] = {5}) && (o[1]:bv[8] = {6}) && (o[2]:bv[8] = {7})");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		CHECK(sol->aut.num_states == 4);
 		auto d = build_program_desc<node_t>(*sol, "pos_witness_chain");
@@ -523,7 +535,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol, "pos_flag_run");
 		REQUIRE(d.has_value());
@@ -572,7 +586,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
 		              "&& (!(i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {2}))");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		MESSAGE("branching example automaton state count: ", sol->aut.num_states);
 		// No X-placement, ever; the counter's own bits carry the schedule.
@@ -642,7 +658,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
 		              "&& (!(i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {2}))");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol, "branch_match");
 		REQUIRE(d.has_value());
@@ -694,7 +712,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "offsets, not a flattened [t]") {
 		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		std::string atom_str = tau::get(sol->atoms[0].first).to_str();
@@ -728,10 +748,12 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE(fm != nullptr);
 
 		auto t0 = std::chrono::steady_clock::now();
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::steady_clock::now() - t0).count();
 		MESSAGE("hello_world solve_ltl_aba: ", ms, " ms");
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 
 		// No X-placement, ever; the counter's own bits carry the schedule.
@@ -899,7 +921,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "with per-variable shifts as a witness template") {
 		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		auto d = build_program_desc<node_t>(*sol, "atom_shift");
@@ -924,7 +948,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "operand via build_bf_neg") {
 		tref fm = wff("o1[t]:tau' = o2[t]:tau");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		auto d = build_program_desc<node_t>(*sol, "atom_complement");
@@ -945,7 +971,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "positional atom's constant side") {
 		tref fm = wff("o[0]:bv[8] = {5}:bv[8]");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		auto d = build_program_desc<node_t>(*sol, "atom_pos");
@@ -966,7 +994,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "codegen_constant_expr is a hard emission error") {
 		tref fm = wff("o1[t]:qint = {[0, 1)}:qint");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		CHECK_THROWS_WITH_AS(
 			build_program_desc<node_t>(*sol, "qint_refused"),
@@ -1050,7 +1080,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "as its owner's typed bf_t/bf_f constant") {
 		tref fm = wff("G(i1[t]:bv[8] = 1 -> o1[t] = 1)");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(!sol->atoms.empty());
 		auto d = build_program_desc<node_t>(*sol, "bare_literal");
@@ -1098,7 +1130,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "standalone emitter") {
 		tref fm = wff("!(o2[t]:tau = o2[t-1]:tau)");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		REQUIRE(get_free_vars<node_t>(sol->atoms[0].first).size() == 2);
@@ -1126,7 +1160,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          "refused") {
 		tref fm = wff("!(o2[t]:tau = o2[t-1]:tau)");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		REQUIRE(get_free_vars<node_t>(sol->atoms[0].first).size() == 2);
@@ -1163,7 +1199,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		tref fm = wff(
 			"(o1[t]:bv[1] = {1}:bv[1]) S (o2[t]:bv[1] = {1}:bv[1])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 
 		bool has_tester_prop = false;
@@ -1201,7 +1239,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			"G(o1[t]:tau = i1[t]:tau).";
 		tref fm = parse_like_compile_spec(src);
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 
 		auto d = build_program_desc<node_t>(*sol, "file_stream_test",

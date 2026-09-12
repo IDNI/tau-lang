@@ -58,7 +58,9 @@ static std::optional<std::string> emit_revised_cpp(
 	if (!revised) return std::nullopt;
 	auto sat_r = is_tau_formula_sat<node_t>(revised);
 	if (!sat_r.has_value() || !sat_r.value()) return std::nullopt;
-	auto sol = solve_ltl_aba<node_t>(revised);
+	auto r = solve_ltl_aba<node_t>(revised);
+	REQUIRE(r.has_value()); // undecided is not "unrealizable"
+	auto sol = r.value();
 	if (!sol) return std::nullopt;
 	// revisable=true: this desc's formula came out of pointwise revision,
 	// the PWR pipeline's own positive marker (see build_program_desc's own
@@ -80,7 +82,9 @@ static std::optional<std::string> emit_pwr_class(
 {
 	tref fm = parse_spec(spec_src);
 	if (!fm) return std::nullopt;
-	auto sol = solve_ltl_aba<node_t>(fm);
+	auto r = solve_ltl_aba<node_t>(fm);
+	REQUIRE(r.has_value());
+	auto sol = r.value();
 	if (!sol) return std::nullopt;
 	auto d = build_program_desc_prop(sol->aut, sol->input_props,
 		sol->output_props, class_name, /*revisable=*/true);
@@ -208,7 +212,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 	TEST_CASE("PWR emitter handles input+output spec" * doctest::skip(!ltlsynt_available())) {
 		tref fm = parse_spec("G(i1[t] = 0 -> o1[t] = 0).");
 		REQUIRE(fm);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc_prop(sol->aut, sol->input_props,
 			sol->output_props, "pwr_io", /*revisable=*/true);
@@ -284,7 +290,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		// program_desc's edges (no standalone initializer-emitter exists).
 		tref fm2 = parse_spec("G(o1[t] = 1).");
 		REQUIRE(fm2);
-		auto sol2 = solve_ltl_aba<node_t>(fm2);
+		auto r2 = solve_ltl_aba<node_t>(fm2);
+		REQUIRE(r2.has_value());
+		auto sol2 = r2.value();
 		REQUIRE(sol2.has_value());
 		auto d2 = build_program_desc_prop(sol2->aut, sol2->input_props,
 			sol2->output_props);

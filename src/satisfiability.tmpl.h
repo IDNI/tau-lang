@@ -2015,7 +2015,16 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
 		auto realizable = is_ltl_aba_realizable<node>(
 			reduction.ltl_formula, start_time, output);
-		memoize(realizable.has_value() && realizable.value());
+		// a backend that gave no verdict leaves satisfiability unknown,
+		// which is not the "not implemented" case mark_undecided states
+		if (realizable.has_value()) memoize(realizable.value());
+		else {
+			r.merge_take(std::move(realizable));
+			r.error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed or "
+				"produced no verdict; satisfiability could not "
+				"be decided");
+		}
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}

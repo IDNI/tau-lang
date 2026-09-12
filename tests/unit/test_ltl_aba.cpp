@@ -84,6 +84,15 @@ static bool realizable(tref fm) {
 	return r.value();
 }
 
+// Unwraps solve_ltl_aba's result. An undecided verdict (a parse-error report,
+// e.g. a malformed HOA strategy) fails the test rather than reading as
+// nullopt/UNREALIZABLE.
+static std::optional<ltl_aba_solution<node_t>> solve_ltl(tref fm) {
+	auto r = solve_ltl_aba<node_t>(fm);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
 // ── 1. Parser tests ───────────────────────────────────────────────────────────
 
 TEST_SUITE("LTL parser") {
@@ -4031,7 +4040,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		tref fm = wff("((i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {1})) "
 		              "&& (!(i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {2}))");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("X(p") == std::string::npos);
 		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
@@ -4043,7 +4052,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	TEST_CASE("skeleton for a positional spec carries counter bits, no X-placement") {
 		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2})");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("X(p") == std::string::npos);
 		CHECK(sol->skeleton.find("o__ltl_ctr0__") != std::string::npos);
@@ -4062,7 +4071,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(g_echo != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, g_echo);
 		std::optional<ltl_aba_solution<node_t>> sol;
-		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		CHECK_NOTHROW(sol = solve_ltl(fm));
 		REQUIRE(sol.has_value());
 		// o[0] is a top-level conjunct of the whole formula (no G wraps it),
 		// so it is legal scope; the relative atom under its own explicit G
@@ -4078,7 +4087,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		tref fm = wff("G(o[3]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		std::optional<ltl_aba_solution<node_t>> sol;
-		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		CHECK_NOTHROW(sol = solve_ltl(fm));
 		REQUIRE(sol.has_value());
 	}
 
@@ -4114,7 +4123,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		tref fm = tau::build_wff_always(tau::build_wff_and(p0, rel));
 		REQUIRE(fm != nullptr);
 		std::optional<ltl_aba_solution<node_t>> sol;
-		CHECK_NOTHROW(sol = solve_ltl_aba<node_t>(fm));
+		CHECK_NOTHROW(sol = solve_ltl(fm));
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
 	}
@@ -4125,7 +4134,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	          "shape acceptance)") {
 		tref fm = wff("(o[0]:bv[2] = {1}) || (o[1]:bv[2] = {2})");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
 	}
@@ -4134,7 +4143,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	          "acceptance)") {
 		tref fm = wff("!(o[0]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
 	}
@@ -4147,7 +4156,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	          "spurious forbid after the fast-path tightening") {
 		tref fm = wff("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 2); // stay separate, one prop per position
 		CHECK(sol->consistency_constraints.empty());
@@ -4161,7 +4170,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	TEST_CASE("skeleton for a 3-position spec carries counter guards, no uniqueness negation block") {
 		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("X(p") == std::string::npos);
 		CHECK(sol->skeleton.find("!p0 & !p1") == std::string::npos);
@@ -4177,7 +4186,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	TEST_CASE("skeleton for a relative-only spec gains no counter block") {
 		tref fm = wff("F (o1[t]:bv[8] = i1[t-2]:bv[8])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("o__ltl_ctr") == std::string::npos);
 	}
@@ -4194,7 +4203,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		REQUIRE(sol->atoms.size() == 1);
 		CHECK(sol->consistency_constraints.empty());
@@ -4410,7 +4419,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		tref fm = wff("G((o1[t]:bv[2] = {1}:bv[2]) && (o1[t-1]:bv[2] != {1}:bv[2])) "
 		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(solve_ltl_aba<node_t>(fm).has_value());
+		CHECK_FALSE(solve_ltl(fm).has_value());
 	}
 
 	// Same signal, same disjunct, one step apart: the chain constraint ties
@@ -4421,7 +4430,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		tref fm = wff("G((o1[t]:bv[2] = {1}:bv[2]) || (o1[t-1]:bv[2] = {1}:bv[2])) "
 		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("G(p0 <-> X(p1))") != std::string::npos);
 	}

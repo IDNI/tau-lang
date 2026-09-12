@@ -310,14 +310,16 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 //     by NAME, so a mismatch makes both vacuous (LT-8).
 
 // Run the whole LTL(ABA) pipeline on a (normalised) formula and return the
-// strategy solution, or nullopt when the formula is UNREALIZABLE.  Throws
-// ltl_synthesis_error when no verdict could be obtained.
+// strategy solution, or nullopt when the formula is UNREALIZABLE. An error on
+// the returned result means no verdict could be obtained (e.g. a malformed
+// HOA strategy out of ltlsynt) -- distinct from, and never collapsed into,
+// the UNREALIZABLE nullopt.
 // partial_out, when non-null, stays populated even when the return value
 // ends up std::nullopt. The default lives here: a function template cannot
 // gain a default argument in a later declaration, so the definition in
 // ltl_aba_builders.tmpl.h declares the parameter without one.
 template <NodeType node>
-static std::optional<ltl_aba_solution<node>> solve_ltl_aba(tref fm,
+static result<std::optional<ltl_aba_solution<node>>> solve_ltl_aba(tref fm,
 	ltl_aba_solution<node>* partial_out = nullptr);
 
 // Existential / synthesis feasibility dispatch for a data conjunction:

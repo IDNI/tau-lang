@@ -108,7 +108,9 @@ TEST_SUITE("table_step_provider") {
 		tref fm = parse_against(solve_ctx, spec);
 		REQUIRE(fm != nullptr);
 
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value()); // undecided is not "unrealizable"
+		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		auto [provider, bounds] = make_table_provider<node_t>(*sol);
 		REQUIRE(provider != nullptr);
@@ -146,7 +148,9 @@ TEST_SUITE("table_step_provider") {
 		tref fm = parse_against(solve_ctx, spec);
 		REQUIRE(fm != nullptr);
 
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		auto [provider, bounds] = make_table_provider<node_t>(*sol);
 		REQUIRE(provider != nullptr);
@@ -184,7 +188,9 @@ TEST_SUITE("table_step_provider") {
 		tref fm = parse_against(solve_ctx, spec);
 		REQUIRE(fm != nullptr);
 
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		REQUIRE(sol->atoms.size() == 1);
 		auto [provider, bounds] = make_table_provider<node_t>(*sol);
@@ -232,7 +238,9 @@ TEST_SUITE("table_step_provider") {
 		tref fm = parse_against(solve_ctx, spec);
 		REQUIRE(fm != nullptr);
 
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		auto [provider, bounds] = make_table_provider<node_t>(*sol);
 		REQUIRE(provider != nullptr);
@@ -274,7 +282,9 @@ TEST_SUITE("table_step_provider") {
 		tref fm = parse_against(solve_ctx, spec);
 		REQUIRE(fm != nullptr);
 
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		auto [provider, bounds] = make_table_provider<node_t>(*sol);
 		REQUIRE(provider != nullptr);
@@ -309,7 +319,9 @@ TEST_SUITE("table_step_provider") {
 		tref fm = parse_against(solve_ctx, spec);
 		REQUIRE(fm != nullptr);
 
-		auto sol = solve_ltl_aba<node_t>(fm);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
 		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
 		REQUIRE(sol->atoms.size() == 1);
 		REQUIRE(sol->aut.num_states >= 1);
