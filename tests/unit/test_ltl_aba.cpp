@@ -3729,19 +3729,10 @@ TEST_SUITE("Adversarial: negation and NNF") {
 
     // !(o1[t]=0 U o1[t]!=0): formula IS REALIZABLE (strategy: always output o1=0,
     // so o1!=0 never holds, making (o1=0 U o1!=0) false).
-    // Default mode: ltlsynt finds the (p0=false,p1=false) empty-guard strategy
-    // which the oracle rejects — false UNREALIZABLE (known incomplete default).
-    // Algorithm B mode: adds G(p0|p1) so ltlsynt finds (p0=true,p1=false) which
-    // passes the oracle → correctly REALIZABLE.
-    TEST_CASE("!(o1[t]=0 U o1[t]!=0) realizable (p0=T,p1=F always); Alg-B correct") {
+    TEST_CASE("!(o1[t]=0 U o1[t]!=0) realizable (p0=T,p1=F always)") {
         tref fm = spec("!(o1[t] = 0 U o1[t] != 0).");
         REQUIRE(fm != nullptr);
-        const char* alg = std::getenv("TAU_LTL_ALG");
-        bool alg_b = alg && std::string_view(alg) == "B";
-        if (alg_b)
-            CHECK(sat(fm));     // Algorithm B: correct REALIZABLE
-        else
-            CHECK_FALSE(sat(fm)); // default: known false UNREALIZABLE
+        CHECK(realizable(fm));
     }
 
     // !!F(o1[t]=0) — double negation elimination; equivalent to F(o1[t]=0); realizable.
@@ -4009,6 +4000,16 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
         tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
+    }
+
+    // The polarity-complete pass alone makes this negated-U shape realizable
+    // for ltlsynt's first strategy, without an oracle refinement round.
+    TEST_CASE("[ALG-B-07] !(o1[t]=0 U o1[t]!=0) is REALIZABLE (p0=T,p1=F always)") {
+        alg_b_guard guard;
+        bdd_init<Bool>();
+        tref fm = spec("!(o1[t] = 0 U o1[t] != 0).");
+        REQUIRE(fm != nullptr);
+        CHECK(realizable(fm));
     }
 
 } // TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]")
@@ -4493,6 +4494,33 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 		CHECK(emitted.size() == 0);
 		CHECK(skeleton.empty());
 		CHECK(input_assumptions.empty());
+	}
+}
+
+
+// ── 32. Cross-step window oracle ─────────────────────────────────────────────
+//
+// a = o1[t]=o1[t-1] and b = o1[t]!=o1[t-2] each mix two shifts, so
+// atom_uniform_shift skips them and the pairwise shift-chain constraint says
+// nothing about either -- the real infeasibility is three-way
+// (a@t & a@t-1 & b@t), which only a window of consecutive strategy edges
+// can see.
+TEST_SUITE("Cross-step window oracle") {
+
+	TEST_CASE("(always o1=o1[t-1]) && (sometimes o1!=o1[t-2]) is UNREALIZABLE") {
+		tref fm = wff("G((o1[t]:bv[2] = o1[t-1]:bv[2])) "
+		              "&& F((o1[t]:bv[2] != o1[t-2]:bv[2]))");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(realizable(fm));
+	}
+
+	// Control: the second conjunct restates the first signal's own
+	// recurrence instead of contradicting it, so no window is infeasible.
+	TEST_CASE("(always o1=o1[t-1]) && (sometimes o1=o1[t-2]) is REALIZABLE") {
+		tref fm = wff("G((o1[t]:bv[2] = o1[t-1]:bv[2])) "
+		              "&& F((o1[t]:bv[2] = o1[t-2]:bv[2]))");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
 	}
 }
 

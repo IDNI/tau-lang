@@ -302,26 +302,77 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	// ABA inconsistency between proposition pairs has already been handled
 	// by the consistency constraints added to the skeleton (see solve_ltl_aba).
 	// Here we only check individual guards via existential satisfiability.
-	for (int s = 0; s < sol.aut.num_states; ++s) {
-		for (auto& e : sol.aut.edges[s]) {
-			LOG_DEBUG << "[ltl_aba] checking edge " << s << "->[" << e.guard_label << "]->" << e.dst;
-			if (!guard_is_aba_feasible<node>(
-			        e.guard_label, sol.aut.aps, sol.atoms)) {
-				LOG_DEBUG << "[ltl_aba] ABA infeasible edge "
-				          << s << "→" << e.dst
-				          << " guard=[" << e.guard_label << "]";
-				if (output)
-					LOG_INFO << "[ltl_aba] UNREALIZABLE "
-					            "(propositionally realizable but ABA-infeasible)";
-				r = false;
-				return r;
+	//
+	// A rejection means only THIS strategy is bad, not that none exists:
+	// block the edge's infeasible atom combinations as system-side
+	// conjuncts (sound -- the ABA rules them out) and re-synthesize, bounded.
+	auto check_edges = [&]() -> std::optional<std::pair<int, size_t>> {
+		for (int s = 0; s < sol.aut.num_states; ++s)
+			for (size_t ei = 0; ei < sol.aut.edges[s].size(); ++ei) {
+				auto& e = sol.aut.edges[s][ei];
+				LOG_DEBUG << "[ltl_aba] checking edge " << s << "->[" << e.guard_label << "]->" << e.dst;
+				if (!guard_is_aba_feasible<node>(
+				        e.guard_label, sol.aut.aps, sol.atoms))
+					return std::make_pair(s, ei);
 			}
-		}
-	}
+		return std::nullopt;
+	};
 
-	if (output) LOG_INFO << "[ltl_aba] REALIZABLE";
-	r = true;
-	return r;
+	// r stays unassigned -- undecided must never be read as a false verdict.
+	auto undecided = [&](const char* why) {
+		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << why << ")";
+		return std::move(r);
+	};
+
+	auto realizable_now = [&]() {
+		if (output) LOG_INFO << "[ltl_aba] REALIZABLE";
+		r = true;
+		return std::move(r);
+	};
+
+	constexpr int max_refinement_rounds = 64;
+	for (int round = 0; ; ++round) {
+		std::vector<std::string> clauses;
+		if (auto rejected = check_edges()) {
+			auto& e = sol.aut.edges[rejected->first][rejected->second];
+			LOG_DEBUG << "[ltl_aba] ABA infeasible edge " << rejected->first
+			          << "→" << e.dst << " guard=[" << e.guard_label << "]";
+			for (auto& product : guard_infeasible_products<node>(
+					e.guard_label, sol.aut.aps, sol.atoms))
+				if (!product.empty())
+					clauses.push_back("G(!(" + product_clause_text(product) + "))");
+		} else {
+			// Single edges all pass; a relation spanning >= 3 consecutive
+			// steps is invisible to the per-edge check, so ask the window
+			// oracle before declaring victory.
+			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
+			if (W <= 1) return realizable_now();
+			auto wres = window_infeasible_paths<node>(sol, W, 4096);
+			if (wres.path_cap_reached) return undecided("window oracle path cap");
+			if (wres.blocking_clauses.empty()) return realizable_now();
+			clauses = std::move(wres.blocking_clauses);
+		}
+
+		if (round >= max_refinement_rounds)
+			return undecided("ABA refinement bound reached");
+		bool added_new = false;
+		for (auto& clause : clauses) {
+			if (sol.skeleton.find(clause) != std::string::npos) continue;
+			LOG_DEBUG << "[ltl_aba] ABA refinement round " << round << ": " << clause;
+			sol.skeleton += " && " + clause;
+			sol.consistency_constraints.push_back(clause);
+			added_new = true;
+		}
+		if (!added_new) return undecided("ABA refinement bound reached");
+
+		auto [ok, hoa] = call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props);
+		if (!ok) {
+			if (output) LOG_INFO << "[ltl_aba] UNREALIZABLE (ABA-refined)";
+			r = false;
+			return r;
+		}
+		sol.aut = parse_hoa(hoa);
+	}
 }
 
 // ── Multi-state Mealy → safety formula ───────────────────────────────────────

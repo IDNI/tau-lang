@@ -75,17 +75,13 @@ add_test(NAME "test_repl-limit_effect-maxsubsets_giveup"
 set_tests_properties("test_repl-limit_effect-maxsubsets_giveup" PROPERTIES
 	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")
 
-# D3 pin, degradation direction: on THAT spec the capped run really does
-# hit the documented worst case (ltlsynt's strategy uses the unforbidden
-# triple on an edge, the per-edge oracle refuses it) -- UNREALIZABLE, never
-# a false REALIZABLE. sat has no satisfiability procedure for full-LTL
-# content, so an unrealizable verdict here is undecided, not a false F.
-# The uncapped twin (maxsubsets_default_completes below) proves the true
-# verdict is T.
-add_test(NAME "test_repl-limit_effect-maxsubsets_capped_false_unreal_at_worst"
+# The cap only skips eager forbids; the per-edge oracle still refines the
+# chosen strategy afterward, so the verdict stays the true T even on the
+# spec that used to hit the capped-walk worst case.
+add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_recovered"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) U (o3[t] = 1)) && ((o1[t] & o2[t] = 0) U (o3[t] = 1)) && ((o1[t] = o2[t]) U (o3[t] = 1))\" 2>&1")
-set_tests_properties("test_repl-limit_effect-maxsubsets_capped_false_unreal_at_worst" PROPERTIES
-	PASS_REGULAR_EXPRESSION "satisfiability of this formula is not supported")
+set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_recovered" PROPERTIES
+	PASS_REGULAR_EXPRESSION ": T")
 
 # Correctness pin: when the skipped subsets are all feasible there was no
 # forbid to miss, so the capped verdict is provably unchanged -- the warning

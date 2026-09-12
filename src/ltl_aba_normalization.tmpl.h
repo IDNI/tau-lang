@@ -524,6 +524,203 @@ static void collect_guard_and(tref fm, trefs& out) {
 	out.push_back(fm);
 }
 
+// Per-product literal record.  `atom` is the underlying comparison,
+// recovered from the parsed literal so that the BA type and the
+// pure-input classification are read off the atom rather than off its
+// negation.
+template <NodeType node>
+struct guard_lit { tref lit; tref atom; bool pure_input; };
+
+template <NodeType node>
+struct guard_product {
+	std::vector<guard_lit<node>> lits;
+	trefs input_lits;     // pure-input literals (sorted for subset tests)
+	bool feasible = false;
+};
+
+// Conjunction of plain formulas (no guard_lit/pick indirection), partitioned
+// by BA type unless every formula shares one type -- different types are
+// independent, so each gets its own solver call. Used directly where the
+// caller already has bare position formulas (window_infeasible_paths); the
+// guard_lit overload below handles the pick-and-classify-by-atom shape most
+// other callers have.
+template <NodeType node>
+static bool guard_conj_feasible(const trefs& fs, bool single_type)
+{
+	using tau = tree<node>;
+	if (single_type) {
+		tref conj = tau::_T();
+		for (tref f : fs) conj = tau::build_wff_and(conj, f);
+		return aba_existential_feasible<node>(conj);
+	}
+	std::map<size_t, tref> per_type;
+	for (tref f : fs) {
+		auto [it, ins] = per_type.try_emplace(
+			find_ba_type<node>(f), tau::_T());
+		it->second = tau::build_wff_and(it->second, f);
+	}
+	for (auto& [tid, conj] : per_type)
+		if (!aba_existential_feasible<node>(conj)) return false;
+	return true;
+}
+
+// Conjunction of literals, partitioned by BA type unless the whole atom
+// set is single-typed.  `pick` selects which literals participate.
+template <NodeType node, typename Pick>
+static bool guard_conj_feasible(const std::vector<guard_lit<node>>& lits,
+    Pick&& pick, bool single_type)
+{
+	using tau = tree<node>;
+	if (single_type) {
+		tref conj = tau::_T();
+		for (auto& gl : lits)
+			if (pick(gl)) conj = tau::build_wff_and(conj, gl.lit);
+		return aba_existential_feasible<node>(conj);
+	}
+	std::map<size_t, tref> per_type;
+	for (auto& gl : lits) {
+		if (!pick(gl)) continue;
+		auto [it, ins] = per_type.try_emplace(
+			find_ba_type<node>(gl.atom), tau::_T());
+		it->second = tau::build_wff_and(it->second, gl.lit);
+	}
+	for (auto& [tid, conj] : per_type)
+		if (!aba_existential_feasible<node>(conj)) return false;
+	return true;
+}
+
+// LT-3: this used to hand-lex the label, accepting only '!', digits and
+// '&' and `break`ing on '|' or '('.  Spot prints strategy edge labels as
+// sums of products (e.g. `[0&1 | !0&!1]`), so that lexer
+//   (a) truncated a disjunctive label to its FIRST product — if that
+//       product was infeasible the oracle returned a spurious
+//       UNREALIZABLE for the whole specification; and
+//   (b) produced an EMPTY literal list for a label starting with '(' —
+//       which the per-type check then read as the empty conjunction ⊤,
+//       declaring the edge feasible without checking anything.
+//
+// The production parser (`parse_guard_expr` / `guard_to_aba`) already
+// implements the full grammar, including '|' and parentheses, precisely
+// because ltlsynt emits them.  Reuse it and split the result into its
+// top-level disjuncts (products); callers decide how the products combine.
+//
+// Parses `guard_label` into its live products and marks each one's
+// full-literal feasibility. `dead_guard`, when given, reports a guard that
+// parsed to FALSE outright -- a vacuously feasible edge, not a product.
+template <NodeType node>
+static std::vector<guard_product<node>> build_guard_live_products(
+    const std::string& guard_label,
+    const std::vector<std::string>& aps,
+    const std::vector<std::pair<tref, std::string>>& atoms,
+    bool single_type,
+    bool* dead_guard = nullptr)
+{
+	using tau = tree<node>;
+	tref guard_fm = guard_to_aba<node>(guard_label, aps, atoms);
+
+	if (tau::get(guard_fm).equals_F()) {
+		if (dead_guard) *dead_guard = true;
+		return {};
+	}
+	if (dead_guard) *dead_guard = false;
+
+	trefs disjuncts;
+	collect_guard_or<node>(guard_fm, disjuncts);
+
+	std::vector<guard_product<node>> live;
+	for (tref d : disjuncts) {
+		if (tau::get(d).equals_F()) continue;   // dead product
+
+		trefs raw_lits;
+		collect_guard_and<node>(d, raw_lits);
+
+		guard_product<node> p;
+		bool product_is_false = false;
+		for (tref l : raw_lits) {
+			const auto& lt = tau::get(l);
+			if (lt.equals_T()) continue;        // bookkeeping AP
+			if (lt.equals_F()) { product_is_false = true; break; }
+			tref atom = l;
+			if (lt.has_child() && lt[0].value.nt == tau::wff_neg)
+				atom = lt[0].first();
+			const bool pure_input = is_pure_input_atom<node>(atom);
+			p.lits.push_back({l, atom, pure_input});
+			if (pure_input) p.input_lits.push_back(l);
+		}
+		if (product_is_false) continue;         // dead product
+
+		// Input-dead product: the environment can never trigger it.
+		if (!p.input_lits.empty()
+		    && !guard_conj_feasible<node>(p.lits, [](const guard_lit<node>& gl) {
+		           return gl.pure_input; }, single_type))
+			continue;
+
+		p.feasible = guard_conj_feasible<node>(p.lits, [](const guard_lit<node>&) {
+			return true; }, single_type);
+		std::sort(p.input_lits.begin(), p.input_lits.end());
+		live.push_back(std::move(p));
+	}
+	return live;
+}
+
+// Maps a guard literal to its user-facing (proposition name, positive?) pair,
+// looked up by its underlying atom; nullopt if the atom has no such name.
+// Shared by guard_infeasible_products and the window oracle's check_path.
+template <NodeType node>
+static std::optional<std::pair<std::string, bool>> name_literal(
+    const guard_lit<node>& gl,
+    const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	using tau = tree<node>;
+	const auto& lt = tau::get(gl.lit);
+	const bool positive = !(lt.has_child() && lt[0].value.nt == tau::wff_neg);
+	auto it = std::find_if(atoms.begin(), atoms.end(),
+		[&](const std::pair<tref, std::string>& a) {
+			return tau::subtree_equals(a.first, gl.atom);
+		});
+	if (it == atoms.end()) return std::nullopt; // no user-facing name
+	return std::make_pair(it->second, positive);
+}
+
+// ltlsynt text of one product, e.g. `(p1 && !p3)`; "" for an empty product.
+static std::string product_clause_text(
+    const std::vector<std::pair<std::string, bool>>& product)
+{
+	std::string ptxt;
+	for (size_t i = 0; i < product.size(); ++i) {
+		if (i) ptxt += " && ";
+		if (!product[i].second) ptxt += "!";
+		ptxt += product[i].first;
+	}
+	return product.size() > 1 ? "(" + ptxt + ")" : ptxt;
+}
+
+// Each entry is one live, infeasible product of `guard_label`: its data-atom
+// literals as (proposition name, positive?) pairs. Empty means the edge passes.
+template <NodeType node>
+static std::vector<std::vector<std::pair<std::string, bool>>>
+guard_infeasible_products(const std::string& guard_label,
+    const std::vector<std::string>& aps,
+    const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	auto types_seen = formula_type_set<node>::from_atoms(atoms);
+	const bool single_type = types_seen.single_type();
+
+	std::vector<guard_product<node>> live = build_guard_live_products<node>(
+		guard_label, aps, atoms, single_type);
+
+	std::vector<std::vector<std::pair<std::string, bool>>> out;
+	for (auto& p : live) {
+		if (p.feasible) continue;
+		std::vector<std::pair<std::string, bool>> lits;
+		for (auto& gl : p.lits)
+			if (auto named = name_literal<node>(gl, atoms))
+				lits.push_back(std::move(*named));
+		out.push_back(std::move(lits));
+	}
+	return out;
+}
+
 template <NodeType node>
 static bool guard_is_aba_feasible(
     const std::string& guard_label,
@@ -531,32 +728,6 @@ static bool guard_is_aba_feasible(
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	using tau = tree<node>;
-
-	// LT-3: this used to hand-lex the label, accepting only '!', digits and
-	// '&' and `break`ing on '|' or '('.  Spot prints strategy edge labels as
-	// sums of products (e.g. `[0&1 | !0&!1]`), so that lexer
-	//   (a) truncated a disjunctive label to its FIRST product — if that
-	//       product was infeasible the oracle returned a spurious
-	//       UNREALIZABLE for the whole specification; and
-	//   (b) produced an EMPTY literal list for a label starting with '(' —
-	//       which the per-type check then read as the empty conjunction ⊤,
-	//       declaring the edge feasible without checking anything.
-	//
-	// The production parser (`parse_guard_expr` / `guard_to_aba`) already
-	// implements the full grammar, including '|' and parentheses, precisely
-	// because ltlsynt emits them.  Reuse it, split the result into top-level
-	// disjuncts, and accept the edge iff SOME disjunct passes — which is
-	// exactly what "the edge fires when the label holds" means.
-	tref guard_fm = guard_to_aba<node>(guard_label, aps, atoms);
-
-	// A label that parses to FALSE ('f', or a product containing both an atom
-	// and its negation after bookkeeping APs drop out) is a DEAD edge: the
-	// environment can never trigger it, so it is not evidence of
-	// infeasibility.  Same convention as the input-only dead-edge check below.
-	if (tau::get(guard_fm).equals_F()) return true;
-
-	trefs disjuncts;
-	collect_guard_or<node>(guard_fm, disjuncts);
 
 	auto types_seen = formula_type_set<node>::from_atoms(atoms);
 	const bool single_type = types_seen.single_type();
@@ -582,73 +753,15 @@ static bool guard_is_aba_feasible(
 	// produces overlapping cubes), or, when all atoms share one BA type,
 	// semantically: I_k ∧ ¬(∨_{j feasible} I_j) is infeasible.  No live
 	// product at all (every product input-dead) is a vacuous edge.
+	bool dead_guard = false;
+	std::vector<guard_product<node>> live = build_guard_live_products<node>(
+		guard_label, aps, atoms, single_type, &dead_guard);
 
-	// Per-product literal record.  `atom` is the underlying comparison,
-	// recovered from the parsed literal so that the BA type and the
-	// pure-input classification are read off the atom rather than off its
-	// negation.
-	struct GuardLit { tref lit; tref atom; bool pure_input; };
-	struct Product {
-		std::vector<GuardLit> lits;
-		trefs input_lits;     // pure-input literals (sorted for subset tests)
-		bool feasible = false;
-	};
-
-	// Conjunction of literals, partitioned by BA type unless the whole atom
-	// set is single-typed.  `pick` selects which literals participate.
-	auto conj_feasible = [&](const std::vector<GuardLit>& lits,
-	                         auto&& pick) -> bool {
-		if (single_type) {
-			tref conj = tau::_T();
-			for (auto& gl : lits)
-				if (pick(gl)) conj = tau::build_wff_and(conj, gl.lit);
-			return aba_existential_feasible<node>(conj);
-		}
-		std::map<size_t, tref> per_type;
-		for (auto& gl : lits) {
-			if (!pick(gl)) continue;
-			auto [it, ins] = per_type.try_emplace(
-				find_ba_type<node>(gl.atom), tau::_T());
-			it->second = tau::build_wff_and(it->second, gl.lit);
-		}
-		for (auto& [tid, conj] : per_type)
-			if (!aba_existential_feasible<node>(conj)) return false;
-		return true;
-	};
-
-	std::vector<Product> live;
-	for (tref d : disjuncts) {
-		if (tau::get(d).equals_F()) continue;   // dead product
-
-		trefs raw_lits;
-		collect_guard_and<node>(d, raw_lits);
-
-		Product p;
-		bool product_is_false = false;
-		for (tref l : raw_lits) {
-			const auto& lt = tau::get(l);
-			if (lt.equals_T()) continue;        // bookkeeping AP
-			if (lt.equals_F()) { product_is_false = true; break; }
-			tref atom = l;
-			if (lt.has_child() && lt[0].value.nt == tau::wff_neg)
-				atom = lt[0].first();
-			const bool pure_input = is_pure_input_atom<node>(atom);
-			p.lits.push_back({l, atom, pure_input});
-			if (pure_input) p.input_lits.push_back(l);
-		}
-		if (product_is_false) continue;         // dead product
-
-		// Input-dead product: the environment can never trigger it.
-		if (!p.input_lits.empty()
-		    && !conj_feasible(p.lits, [](const GuardLit& gl) {
-		           return gl.pure_input; }))
-			continue;
-
-		p.feasible = conj_feasible(p.lits, [](const GuardLit&) {
-			return true; });
-		std::sort(p.input_lits.begin(), p.input_lits.end());
-		live.push_back(std::move(p));
-	}
+	// A label that parses to FALSE ('f', or a product containing both an atom
+	// and its negation after bookkeeping APs drop out) is a DEAD edge: the
+	// environment can never trigger it, so it is not evidence of
+	// infeasibility.  Same convention as the input-dead-product check.
+	if (dead_guard) return true;
 
 	// Every product input-dead (or the label was `f`): vacuous edge.
 	if (live.empty()) return true;
@@ -744,7 +857,7 @@ static bool guard_is_aba_feasible(
 			} else {
 				bool some_feasible = false;
 				for (auto& prod : products) {
-					std::vector<GuardLit> lits;
+					std::vector<guard_lit<node>> lits;
 					lits.reserve(prod.size());
 					for (tref l : prod) {
 						tref atom = l;
@@ -755,9 +868,9 @@ static bool guard_is_aba_feasible(
 							atom = lt[0].first();
 						lits.push_back({l, atom, true});
 					}
-					if (conj_feasible(lits,
-						[](const GuardLit&) {
-							return true; })) {
+					if (guard_conj_feasible<node>(lits,
+						[](const guard_lit<node>&) {
+							return true; }, single_type)) {
 						some_feasible = true;
 						break;
 					}
@@ -799,6 +912,17 @@ static bool atom_has_lookback(tref atom) {
 	cache.emplace(atom, result);
 #endif // TAU_CACHE
 	return result;
+}
+
+// The window oracle needs one edge per step the deepest lookback among
+// `atoms` reaches into the past, plus the step it is read at.
+template <NodeType node>
+static int_t max_atom_lookback(
+    const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	int_t m = 0;
+	for (auto& [a, _] : atoms) m = std::max(m, body_max_lookback<node>(a));
+	return m;
 }
 
 // True if `atom` is a ground equality (bf_eq) over exactly one io_var: the
@@ -1770,6 +1894,179 @@ struct ltl_aba_solution {
 	std::vector<std::pair<std::string, std::string>> const_outputs;
 	tref const_formula = nullptr;
 };
+
+// ── Window oracle (cross-step ABA feasibility) ───────────────────────────────
+//
+// guard_is_aba_feasible checks one strategy edge in isolation, so a relation
+// spanning three or more consecutive steps -- an atom whose own io_vars
+// already mix two shifts, related to a second atom at a third -- is
+// invisible to it. This walks every window of W consecutive strategy edges
+// and asks the ABA oracle about the whole window's joint guard instead.
+
+// Re-indexes every relative io_var of `fm` to the window's shared
+// reference frame, anchored at the window's LAST position: an io_var
+// `x[t-j]` at window position `s` denotes instant `s-j`, which becomes
+// `x[t-((W-1-s)+j)]` once every position's "t" is the window's final
+// instant. Positional io_vars (x[N]) are absolute and untouched.
+template <NodeType node>
+static tref reindex_to_window_frame(tref fm, int_t shift_add) {
+	using tau = tree<node>;
+	auto io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
+	subtree_map<node, tref> reindex;
+	for (tref v : io_vars) {
+		if (is_io_initial<node>(v)) continue;
+		int_t new_shift = shift_add + get_io_var_shift<node>(v);
+		size_t type_id = find_ba_type<node>(v);
+		const std::string& name = get_var_name<node>(v);
+		reindex[v] = is_input_var<node>(v)
+			? tau::trim(tau::build_in_var_at_t_minus(name, (size_t)new_shift, type_id))
+			: tau::trim(tau::build_out_var_at_t_minus(name, (size_t)new_shift, type_id));
+	}
+	if (reindex.empty()) return fm;
+	return rewriter::replace<node>(fm, reindex);
+}
+
+struct window_oracle_result {
+	std::vector<std::string> blocking_clauses;
+	bool path_cap_reached = false;
+};
+
+// Walks every path of W consecutive edges in sol.aut (from every state) and
+// checks whether its joint guard -- literals re-indexed to a shared window
+// frame -- is ABA-feasible. A jointly infeasible path the environment can
+// still reach (its pure-input part alone stays feasible) is reported as a
+// `G(!(...))` blocking clause for the caller to add and re-synthesize with.
+template <NodeType node>
+static window_oracle_result window_infeasible_paths(
+    const ltl_aba_solution<node>& sol, int_t W, size_t cap)
+{
+	using tau = tree<node>;
+	window_oracle_result result;
+	if (W <= 1) return result;
+
+	auto types_seen = formula_type_set<node>::from_atoms(sol.atoms);
+	const bool single_type = types_seen.single_type();
+
+	// Conjoin a set of position formulas, partitioned per BA type unless
+	// every atom shares one type (see guard_conj_feasible's trefs overload).
+	auto conj_feasible = [&](const trefs& fs) -> bool {
+		return guard_conj_feasible<node>(fs, single_type);
+	};
+
+	// One product = a conjunction of kept literals; an empty product means
+	// that branch is unconstrained, which absorbs the whole disjunction.
+	auto build_or = [&](const std::vector<trefs>& prods) -> tref {
+		for (auto& p : prods) if (p.empty()) return tau::_T();
+		if (prods.empty()) return tau::_F();
+		tref res = nullptr;
+		for (auto& p : prods) {
+			tref conj = tau::_T();
+			for (tref l : p) conj = tau::build_wff_and(conj, l);
+			res = res ? tau::build_wff_or(res, conj) : conj;
+		}
+		return res;
+	};
+
+	size_t examined = 0;
+	bool cap_hit = false;
+	std::vector<const hoa_edge*> path;
+
+	auto check_path = [&](const std::vector<const hoa_edge*>& edges) {
+		trefs feasibility_terms, input_only_terms;
+		std::vector<std::string> label_terms(edges.size());
+		bool any_data = false;
+
+		for (size_t s = 0; s < edges.size(); ++s) {
+			bool dead_guard = false;
+			auto live = build_guard_live_products<node>(
+				edges[s]->guard_label, sol.aut.aps, sol.atoms,
+				single_type, &dead_guard);
+			if (dead_guard) return; // guard parses to F -- whole path is dead
+
+			std::vector<trefs> kept, kept_input;
+			std::vector<std::string> product_strs;
+			bool position_vacuous = live.empty();
+			for (auto& p : live) {
+				trefs lits, input_lits;
+				std::vector<std::pair<std::string, bool>> named;
+				for (auto& gl : p.lits) {
+					// A literal over a not-yet-existing instant re-indexes
+					// below to a free variable -- harmless, not a conflict.
+					lits.push_back(gl.lit);
+					if (gl.pure_input) input_lits.push_back(gl.lit);
+					if (auto nl = name_literal<node>(gl, sol.atoms))
+						named.push_back(std::move(*nl));
+				}
+				if (lits.empty()) position_vacuous = true;
+				kept.push_back(std::move(lits));
+				kept_input.push_back(std::move(input_lits));
+				if (!named.empty())
+					product_strs.push_back(product_clause_text(named));
+			}
+			if (position_vacuous) continue; // guard is T here -- no constraint
+
+			any_data = true;
+			int_t shift_add = (int_t)edges.size() - 1 - (int_t)s;
+			feasibility_terms.push_back(
+				reindex_to_window_frame<node>(build_or(kept), shift_add));
+			input_only_terms.push_back(
+				reindex_to_window_frame<node>(build_or(kept_input), shift_add));
+
+			if (product_strs.empty()) continue; // no user-facing name here
+			if (product_strs.size() == 1) label_terms[s] = product_strs[0];
+			else {
+				std::string joined = product_strs[0];
+				for (size_t i = 1; i < product_strs.size(); ++i)
+					joined += " || " + product_strs[i];
+				label_terms[s] = "(" + joined + ")";
+			}
+		}
+
+		if (!any_data) return; // no data constraint anywhere in this window
+		if (conj_feasible(feasibility_terms)) return; // window is fine
+
+		// Jointly infeasible; but if the environment itself can never
+		// drive the path (its pure-input part is already infeasible),
+		// the path is dead, not evidence against the strategy.
+		if (!conj_feasible(input_only_terms)) return;
+
+		std::string body;
+		for (size_t s = 0; s < label_terms.size(); ++s) {
+			if (label_terms[s].empty()) continue;
+			std::string term = label_terms[s];
+			for (size_t k = 0; k < s; ++k) term = "X(" + term + ")";
+			body += body.empty() ? term : " && " + term;
+		}
+		if (body.empty()) return;
+		result.blocking_clauses.push_back("G(!(" + body + "))");
+	};
+
+	std::function<void(int, size_t)> dfs = [&](int state, size_t depth) {
+		if (cap_hit) return;
+		if (depth == (size_t)W) {
+			if (examined >= cap) { cap_hit = true; return; }
+			++examined;
+			check_path(path);
+			return;
+		}
+		for (auto& e : sol.aut.edges[state]) {
+			if (cap_hit) return;
+			path.push_back(&e);
+			dfs(e.dst, depth + 1);
+			path.pop_back();
+			if (cap_hit) return;
+		}
+	};
+	for (int s0 = 0; s0 < sol.aut.num_states && !cap_hit; ++s0)
+		dfs(s0, 0);
+
+	if (cap_hit) {
+		LOG_DEBUG << "[ltl_aba] window oracle: path cap reached";
+		result.blocking_clauses.clear();
+		result.path_cap_reached = true;
+	}
+	return result;
+}
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────
 //
