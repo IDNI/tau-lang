@@ -1732,6 +1732,7 @@ struct ltl_aba_solution {
 	std::vector<std::pair<tref, std::string>> atoms;
 	std::vector<std::string> input_props;
 	std::vector<std::string> output_props;
+	std::vector<int_t> step_guard_ks; // thresholds append_step_guard_drivers drove, ascending k
 	std::string skeleton;         // skeleton sent to ltlsynt
 	std::vector<std::string> shift_chain_constraints;
 	std::vector<std::string> consistency_constraints;

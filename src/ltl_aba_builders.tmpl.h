@@ -49,6 +49,30 @@ static propositional_synthesis<Node> pack_try_propositional_synthesis(tref fm,
 }
 
 
+// X^n(inner), used by append_step_guard_drivers.
+static std::string nest_x(std::string inner, int_t n) {
+	for (int_t i = 0; i < n; ++i) inner = "X(" + inner + ")";
+	return inner;
+}
+
+// Drives each step_guard_prop(k) low for steps [0, k) and G-true from k
+// on, !g & X(!g) & ... & X^k(G(g)), registered as an output the way
+// apply_step_counter_encoding drives its own bits.
+template <NodeType node>
+static void append_step_guard_drivers(ltl_aba_solution<node>& sol,
+	const std::set<int_t>& step_guards)
+{
+	for (int_t k : step_guards) {
+		std::string g = step_guard_prop(k);
+		sol.output_props.push_back(g);
+		sol.step_guard_ks.push_back(k);
+		for (int_t i = 0; i < k; ++i)
+			sol.skeleton += " & " + nest_x("!" + g, i);
+		sol.skeleton += " & " + nest_x("G(" + g + ")", k);
+		LOG_DEBUG << "[ltl_aba] step guard " << g << " from step " << k;
+	}
+}
+
 // partial_out, when non-null, stays populated even when the return value ends up std::nullopt.
 template <NodeType node>
 static std::optional<ltl_aba_solution<node>>
@@ -82,7 +106,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// Ask whichever BA owns these atoms to synthesise propositionally. Past
 	// operators need the ppLTLTT temporal-tester encoding of the default path,
 	// which those fast paths do not have, so they are not offered the formula.
-	if (!has_past)
+	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
+	// fast paths use, never drives one.
+	if (!has_past && collect_step_guards<node>(fm).empty())
 		if (auto claim = pack_try_propositional_synthesis<node>(
 			fm, sol.atoms); claim) {
 				if (!*claim && partial_out) *partial_out = sol;
@@ -98,6 +124,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 			append_tester_constraints(sol.skeleton, testers);
 			for (const auto& t : testers)
 				sol.output_props.push_back(t.state_var);
+			append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm));
 			auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, sol.output_props);
 			if (!real) { if (partial_out) *partial_out = sol; return std::nullopt; }
 			sol.aut = parse_hoa(hoa);
@@ -178,6 +205,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		          << " trans=" << t.transition
 		          << " negate=" << t.negate_output;
 	}
+	append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm_for_skeleton));
 
 	LOG_DEBUG << "[ltl_aba] LTL skeleton: " << sol.skeleton;
 	LOG_DEBUG << "[ltl_aba] inputs:  " << [&]{

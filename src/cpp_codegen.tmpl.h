@@ -183,16 +183,21 @@ std::optional<std::string> atom_single_var_name(tref atom_ref) {
 }
 
 // True for a synthesis-internal output prop with no backing atom/io_var at
-// all: the step-counter's o__ltl_ctr bits (apply_step_counter_encoding) and
+// all: the step-counter's o__ltl_ctr bits (apply_step_counter_encoding),
 // the ppLTLTT past-operator DFA testers (__past_s*/__past_t*,
-// ltl_aba_helpers.tmpl.h's skeleton_wff_with_testers) are automaton
-// bookkeeping registered straight into sol.output_props with no entry in
-// sol.atoms -- unlike an ordinary flag atom, there is no io stream to key
-// them on, so they must never reach the emitted Outputs surface.
+// ltl_aba_helpers.tmpl.h's skeleton_wff_with_testers), and the __step_ge<k>
+// lookback guards (append_step_guard_drivers) are automaton bookkeeping
+// registered straight into sol.output_props with no entry in sol.atoms --
+// unlike an ordinary flag atom, there is no io stream to key them on, so
+// they must never reach the emitted Outputs surface.
+// __step_ge<k> alone is carried forward, though: build_program_desc pulls
+// its threshold into step_guard_ks and matches it like an extra input
+// rather than dropping it.
 inline bool is_internal_ltl_output_prop(const std::string& p) {
 	return (p.size() > 10 && p.compare(0, 10, "o__ltl_ctr") == 0)
 		|| (p.size() > 8 && p.compare(0, 8, "__past_s") == 0)
-		|| (p.size() > 8 && p.compare(0, 8, "__past_t") == 0);
+		|| (p.size() > 8 && p.compare(0, 8, "__past_t") == 0)
+		|| (p.size() > 9 && p.compare(0, 9, "__step_ge") == 0);
 }
 
 // True when `atom_ref` has a free io_var typed by a real, pack-registered data
@@ -763,6 +768,15 @@ std::optional<program_desc> build_program_desc(
 	for (int i = 0; i < (int)sol.aut.aps.size(); ++i) prop_to_ap[sol.aut.aps[i]] = i;
 	for (auto& [atom_ref, prop] : sol.atoms) prop_to_atom[prop] = atom_ref;
 
+	// __step_ge<k> props (see is_internal_ltl_output_prop) carry no atom,
+	// so they're pulled out of the same skip rather than joining d.outputs;
+	// their thresholds come straight from sol.step_guard_ks, ascending,
+	// each resolved to the AP index matched_ap_idx appends below.
+	std::vector<int> step_guard_ap_idx;
+	for (int_t k : sol.step_guard_ks) {
+		const std::string& g = step_guard_prop(k);
+		step_guard_ap_idx.push_back(prop_to_ap.count(g) ? prop_to_ap.at(g) : -1);
+	}
 	for (auto& p : sol.output_props) {
 		if (is_internal_ltl_output_prop(p)) continue;
 		auto it = ameta.find(p);
@@ -822,6 +836,7 @@ std::optional<program_desc> build_program_desc(
 			}
 	}
 	d.ba_type_table = snapshot_ba_type_registry<node>();
+	d.step_guard_ks = sol.step_guard_ks;
 
 	std::vector<int> in_ap_idx, flag_out_ap_idx;
 	for (auto& f : d.inputs) in_ap_idx.push_back(prop_to_ap.at(f.prop));
@@ -829,6 +844,12 @@ std::optional<program_desc> build_program_desc(
 		if (f.kind != field_kind::flag) break;
 		flag_out_ap_idx.push_back(prop_to_ap.at(f.prop));
 	}
+	// Step guards are matched like inputs (mirroring make_table_provider's
+	// matched_ap_idx): appended after the real inputs, before flag outputs,
+	// in both the guard layout and num_inputs.
+	std::vector<int> matched_ap_idx = in_ap_idx;
+	matched_ap_idx.insert(matched_ap_idx.end(),
+		step_guard_ap_idx.begin(), step_guard_ap_idx.end());
 
 	d.edges.resize(sol.aut.num_states);
 	for (int s = 0; s < sol.aut.num_states; ++s) {
@@ -842,7 +863,7 @@ std::optional<program_desc> build_program_desc(
 			for (auto& cube : *cubes) {
 				edge_desc ed;
 				ed.dst = e.dst;
-				ed.guard = guard_from_cube(cube, in_ap_idx, flag_out_ap_idx);
+				ed.guard = guard_from_cube(cube, matched_ap_idx, flag_out_ap_idx);
 
 				// A negative-signed literal enters the conjunction negated,
 				// so the witness the BA picks still satisfies the cube.
@@ -926,6 +947,7 @@ std::optional<program_desc> build_program_desc(
 inline void emit_open_streams_appendix(
     const program_desc& d, size_t nflag, std::ostream& out)
 {
+	const size_t nstepg = d.step_guard_ks.size();
 	out << "\npublic:\n";
 	out << "\tusing oracle_callback = const char* (*)(\n";
 	out << "\t    const char* formula, void* user_data);\n\n";
@@ -972,7 +994,7 @@ inline void emit_open_streams_appendix(
 			const auto& edges = (size_t)s < d.edges.size()
 			                   ? d.edges[s] : std::vector<edge_desc>{};
 			for (auto& e : edges) {
-				std::int8_t g = e.guard[d.inputs.size() + k];
+				std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
 				if (g == 0) mask |= 0x3;
 				else if (g == 1) mask |= 0x2;
 				else mask |= 0x1;
@@ -984,7 +1006,8 @@ inline void emit_open_streams_appendix(
 	}
 	out << "\t\treturn 0x0;  // unknown stream\n\t}\n\n";
 
-	// ap[] uses inputs-then-flag-outputs order, matching edge_desc::guard.
+	// ap[] uses inputs-then-step-guards-then-flag-outputs order, matching
+	// edge_desc::guard.
 	{
 		std::map<std::string, size_t> stream_to_field;
 		for (size_t k = 0; k < nflag; ++k)
@@ -995,21 +1018,27 @@ inline void emit_open_streams_appendix(
 		std::set<size_t> declared_fields;
 		for (auto& kv : stream_to_field) declared_fields.insert(kv.second);
 
-		const size_t nbits = d.inputs.size() + nflag;
+		const size_t nbits = d.inputs.size() + nstepg + nflag;
 		out << "\toutputs step_with_oracle_dispatch(const inputs& in) noexcept {\n";
 		out << "\t\toutputs o;\n";
+		if (d.inputs.empty()) out << "\t\t(void)in;\n";
 		if (nbits) {
 			out << "\t\tbool ap[" << nbits << "] = {};\n";
 			for (size_t i = 0; i < d.inputs.size(); ++i)
 				out << "\t\tap[" << i << "] = in." << d.inputs[i].cpp_name
 				    << ";\n";
-		} else out << "\t\t(void)in;\n";
+			// Same deterministic step-count computation as step()'s own
+			// __step_ge<k> slots (program_desc::step_guard_ks).
+			for (size_t k = 0; k < nstepg; ++k)
+				out << "\t\tap[" << d.inputs.size() + k << "] = step_ >= "
+				    << d.step_guard_ks[k] << ";\n";
+		}
 		out << "\n";
 
 		for (auto& s : d.open_streams) {
 			auto it = stream_to_field.find(s);
 			if (it == stream_to_field.end()) continue;
-			size_t k = it->second, idx = d.inputs.size() + k;
+			size_t k = it->second, idx = d.inputs.size() + nstepg + k;
 			out << "\t\t{\n";
 			out << "\t\t\tauto mask = admissible_values_mask(state_, \""
 			    << s << "\");\n";
@@ -1049,19 +1078,26 @@ inline void emit_open_streams_appendix(
 					if (e.guard[i] == -1) cond += "!";
 					cond += "ap[" + std::to_string(i) + "]";
 				}
-				for (size_t k = 0; k < nflag; ++k) {
-					if (!declared_fields.count(k)) continue;
+				for (size_t k = 0; k < nstepg; ++k) {
 					std::int8_t g = e.guard[d.inputs.size() + k];
 					if (g == 0) continue;
 					if (!cond.empty()) cond += " && ";
 					if (g == -1) cond += "!";
 					cond += "ap[" + std::to_string(d.inputs.size() + k) + "]";
 				}
+				for (size_t k = 0; k < nflag; ++k) {
+					if (!declared_fields.count(k)) continue;
+					std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
+					if (g == 0) continue;
+					if (!cond.empty()) cond += " && ";
+					if (g == -1) cond += "!";
+					cond += "ap[" + std::to_string(d.inputs.size() + nstepg + k) + "]";
+				}
 				if (cond.empty()) cond = "true";
 				out << "\t\t\tif (" << cond << ") {\n";
 				for (size_t k = 0; k < nflag; ++k) {
 					if (declared_fields.count(k)) continue;
-					std::int8_t g = e.guard[d.inputs.size() + k];
+					std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
 					if (g == 0) continue;
 					out << "\t\t\t\to." << d.outputs[k].cpp_name << " = "
 					    << (g == 1 ? "true" : "false") << ";\n";
@@ -1074,6 +1110,7 @@ inline void emit_open_streams_appendix(
 					out << "\t\t\t\to." << cpp_name << " = " << sv << ";\n";
 				}
 				out << "\t\t\t\tstate_ = " << e.dst << ";\n";
+				if (nstepg) out << "\t\t\t\t++step_;\n";
 				out << "\t\t\t\treturn o;\n";
 				out << "\t\t\t}\n";
 				++edge_idx;
@@ -1114,6 +1151,9 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 
 	const size_t nflag = num_flag_outputs(d);
 	const bool has_witness = nflag != d.outputs.size();
+	// Guard layout is [inputs][step guards][flag outputs] (edge_desc's own
+	// doc comment) -- nstepg is every offset below's addend between the two.
+	const size_t nstepg = d.step_guard_ks.size();
 
 	// A witness-template output's value is solved at runtime from the atom
 	// templates; this standalone step() has no solver, so such programs run
@@ -1219,37 +1259,47 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 		out << "\t" << d.class_name << "() { load_initial_strategy(); }\n\n";
 		out << "\tint state() const noexcept { return state_; }\n\n";
 
-		// Order (inputs, then flag outputs) must match codegen_strategy.h's
-		// edge::guard -- revise() checks a strategy's aps against it.
+		// Order (inputs, then step guards, then flag outputs) must match
+		// codegen_strategy.h's edge::guard -- revise() checks a strategy's
+		// aps against it.
 		out << "\tstatic const std::vector<std::string>& program_aps() noexcept {\n";
 		out << "\t\tstatic const std::vector<std::string> v = {\n";
 		for (auto& f : d.inputs)
 			out << "\t\t\t\"" << f.prop << "\",\n";
+		for (int_t k : d.step_guard_ks)
+			out << "\t\t\t\"__step_ge" << k << "\",\n";
 		for (size_t k = 0; k < nflag; ++k)
 			out << "\t\t\t\"" << d.outputs[k].prop << "\",\n";
 		out << "\t\t};\n";
 		out << "\t\treturn v;\n";
 		out << "\t}\n\n";
 
+		const size_t nmatched = d.inputs.size() + nstepg;
 		out << "\toutputs step(const inputs& in) noexcept {\n";
 		out << "\t\toutputs o;\n";
-		if (!d.inputs.empty()) {
-			out << "\t\tbool ap[" << d.inputs.size() << "] = {};\n";
+		if (d.inputs.empty()) out << "\t\t(void)in;\n";
+		if (nmatched) {
+			out << "\t\tbool ap[" << nmatched << "] = {};\n";
 			for (size_t k = 0; k < d.inputs.size(); ++k)
 				out << "\t\tap[" << k << "] = in." << d.inputs[k].cpp_name << ";\n";
-		} else {
-			out << "\t\t(void)in;\n";
+			// Each __step_ge<k> slot is a deterministic function of the
+			// artifact's own step count, never a caller choice -- computed
+			// here rather than read off `in`, then matched like an input.
+			for (size_t k = 0; k < nstepg; ++k)
+				out << "\t\tap[" << d.inputs.size() + k << "] = step_ >= "
+				    << d.step_guard_ks[k] << ";\n";
 		}
 		out << "\t\tconst auto* e = tau_codegen_detail::strategy_step(\n";
-		out << "\t\t    strat_, state_, " << (d.inputs.empty() ? "nullptr" : "ap") << ");\n";
+		out << "\t\t    strat_, state_, " << (nmatched ? "ap" : "nullptr") << ");\n";
 		out << "\t\tif (!e) { o.ok = false; return o; }\n";
 		for (size_t k = 0; k < nflag; ++k) {
-			out << "\t\tif (e->guard[" << d.inputs.size() + k << "] == 1) o."
+			out << "\t\tif (e->guard[" << d.inputs.size() + nstepg + k << "] == 1) o."
 			    << d.outputs[k].cpp_name << " = true;\n";
-			out << "\t\telse if (e->guard[" << d.inputs.size() + k << "] == -1) o."
+			out << "\t\telse if (e->guard[" << d.inputs.size() + nstepg + k << "] == -1) o."
 			    << d.outputs[k].cpp_name << " = false;\n";
 		}
 		out << "\t\tstate_ = e->dst;\n";
+		if (nstepg) out << "\t\t++step_;\n";
 		out << "\t\treturn o;\n";
 		out << "\t}\n\n";
 
@@ -1269,7 +1319,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 			out << "\t\tbool valid = new_strat.num_states > 0\n";
 			out << "\t\t\t&& new_strat.initial_state >= 0\n";
 			out << "\t\t\t&& new_strat.initial_state < new_strat.num_states\n";
-			out << "\t\t\t&& new_strat.num_inputs == " << d.inputs.size() << "\n";
+			out << "\t\t\t&& new_strat.num_inputs == " << d.inputs.size() + nstepg << "\n";
 			out << "\t\t\t&& (int)new_strat.edges.size() == new_strat.num_states\n";
 			out << "\t\t\t// Empty aps means \"unset\"; only a non-empty, mismatching\n";
 			out << "\t\t\t// list is refused.\n";
@@ -1279,7 +1329,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 			out << "\t\t\t\tfor (const auto& e : sv)\n";
 			out << "\t\t\t\t\tvalid = valid\n";
 			out << "\t\t\t\t\t\t&& (int)e.guard.size() == "
-			    << d.inputs.size() + nflag << "\n";
+			    << d.inputs.size() + nstepg + nflag << "\n";
 			out << "\t\t\t\t\t\t&& e.dst >= 0\n";
 			out << "\t\t\t\t\t\t&& e.dst < new_strat.num_states;\n";
 			out << "\t\tassert(valid && \"revise(): malformed strategy refused\");\n";
@@ -1298,12 +1348,13 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 
 		out << "\nprivate:\n";
 		out << "\tint state_ = " << d.initial_state << ";\n";
+		if (nstepg) out << "\tstd::size_t step_ = 0;\n";
 		if (d.revisable) out << "\tint revision_count_ = 0;\n";
 		out << "\ttau_codegen_detail::strategy strat_;\n\n";
 		out << "\tvoid load_initial_strategy() {\n";
 		out << "\t\tstrat_.num_states = " << d.num_states << ";\n";
 		out << "\t\tstrat_.initial_state = " << d.initial_state << ";\n";
-		out << "\t\tstrat_.num_inputs = " << d.inputs.size() << ";\n";
+		out << "\t\tstrat_.num_inputs = " << d.inputs.size() + nstepg << ";\n";
 		out << "\t\tstrat_.aps = program_aps();\n";
 		out << "\t\tstrat_.edges.resize(" << d.num_states << ");\n";
 		for (int s = 0; s < d.num_states; ++s) {
@@ -1346,10 +1397,21 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 					ig << "in." << d.inputs[k].cpp_name;
 					any = true;
 				}
+				// Each __step_ge<k> slot matches like an input (see
+				// program_desc::step_guard_ks) even though its value comes
+				// from the artifact's own step count, never from `in`.
+				for (size_t k = 0; k < nstepg; ++k) {
+					std::int8_t g = e.guard[d.inputs.size() + k];
+					if (g == 0) continue;
+					if (any) ig << " && ";
+					if (g == -1) ig << "!";
+					ig << "(step_ >= " << d.step_guard_ks[k] << ")";
+					any = true;
+				}
 				out << "\t\t\t" << (first ? "if (" : "else if (")
 				    << (any ? ig.str() : "true") << ") {\n";
 				for (size_t k = 0; k < nflag; ++k) {
-					std::int8_t g = e.guard[d.inputs.size() + k];
+					std::int8_t g = e.guard[d.inputs.size() + nstepg + k];
 					if (g == 0) continue;
 					out << "\t\t\t\to." << d.outputs[k].cpp_name << " = "
 					    << (g == 1 ? "true" : "false") << ";\n";
@@ -1365,6 +1427,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 					out << "\t\t\t\to." << cpp_name << " = " << sv << ";\n";
 				}
 				out << "\t\t\t\tstate_ = " << e.dst << ";\n";
+				if (nstepg) out << "\t\t\t\t++step_;\n";
 				out << "\t\t\t\treturn o;\n";
 				out << "\t\t\t}\n";
 				first = false;
@@ -1381,6 +1444,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 
 		out << "\nprivate:\n";
 		out << "\tint state_ = " << d.initial_state << ";\n";
+		if (nstepg) out << "\tstd::size_t step_ = 0;\n";
 	}
 
 	out << "};\n";

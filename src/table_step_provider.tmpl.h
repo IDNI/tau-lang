@@ -179,9 +179,11 @@ table_step_provider<node>::table_step_provider(
 	std::vector<std::string> flag_outputs,
 	std::vector<std::vector<std::vector<std::pair<std::string, tref>>>> edge_witnesses,
 	std::vector<std::vector<trefs>> edge_witness_templates,
-	std::vector<std::vector<std::vector<bool>>> edge_witness_template_is_counter)
+	std::vector<std::vector<std::vector<bool>>> edge_witness_template_is_counter,
+	std::vector<int_t> step_guard_ks)
 	: strat_(std::move(strat)), flag_outputs_(std::move(flag_outputs)),
 	  edge_witness_template_is_counter_(std::move(edge_witness_template_is_counter)),
+	  step_guard_ks_(std::move(step_guard_ks)),
 	  state_(strat_.initial_state)
 {
 	using tau = tree<node>;
@@ -243,12 +245,18 @@ std::optional<solution<node>> table_step_provider<node>::produce(
 	using tau = tree<node>;
 
 	// Guard bits: one per baked input atom, evaluated fresh against the
-	// memory the interpreter just committed this step's raw inputs into.
+	// memory the interpreter just committed this step's raw inputs into,
+	// followed by one per step guard -- a deterministic time_point >= k
+	// check, not a free choice, but matched the same way since the strategy
+	// never gets to pick it (see step_guard_ks_'s doc comment).
 	const size_t n = input_atoms_.size();
-	auto ap = std::make_unique<bool[]>(n ? n : 1);
+	const size_t m = step_guard_ks_.size();
+	auto ap = std::make_unique<bool[]>(n + m ? n + m : 1);
 	for (size_t k = 0; k < n; ++k)
 		ap[k] = evaluate_atom<node>(input_atoms_[k].second->get(), memory,
 			formula_time_point);
+	for (size_t k = 0; k < m; ++k)
+		ap[n + k] = time_point >= (size_t)step_guard_ks_[k];
 	const codegen::edge* e = codegen::strategy_step(strat_, state_, ap.get());
 	if (!e) return std::nullopt;
 
@@ -258,7 +266,7 @@ std::optional<solution<node>> table_step_provider<node>::produce(
 	// Flag outputs: read straight off the matched edge's guard, materialized
 	// the same way the interpreter's own solve path fills a state bit.
 	for (size_t k = 0; k < flag_outputs_.size(); ++k) {
-		std::int8_t g = e->guard[n + k];
+		std::int8_t g = e->guard[n + m + k];
 		if (g == 0) continue;  // don't-care: interpreter default-zeros it
 		tref val = pack_value_constant<node>(carrier_tid, g == 1 ? 1 : 0);
 		tref key = build_out_var_at_n<node>(
@@ -356,15 +364,21 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 		input_atoms.emplace_back(p, prop_to_atom.at(p));
 	}
 
-	// Flag outputs keep a guard slot (their bit is the value; the counter's
-	// own o__ltl_ctr bits stay too -- the interpreter's write path already
-	// excludes them from real streams); data-typed output atoms instead
-	// become per-edge templates below.
+	// Flag outputs keep a guard slot; a prop with no atom is synthesis
+	// bookkeeping and is skipped, except __step_ge<k> (sol.step_guard_ks):
+	// a deterministic time_point >= k check, matched as an extra input slot.
 	std::vector<int> flag_out_ap_idx;
 	std::vector<std::string> flag_outputs;
 	std::set<std::string> template_props;
+	std::vector<int> step_guard_ap_idx;
+	for (int_t k : sol.step_guard_ks) {
+		const std::string& g = step_guard_prop(k);
+		step_guard_ap_idx.push_back(prop_to_ap.count(g) ? prop_to_ap.at(g) : -1);
+	}
 	for (auto& p : sol.output_props) {
-		tref atom_ref = prop_to_atom.at(p);
+		auto it = prop_to_atom.find(p);
+		if (it == prop_to_atom.end()) continue;
+		tref atom_ref = it->second;
 		// This strategy stepper carries no PWR concept of its own -- ordinary
 		// classification throughout, same as build_program_desc's non-PWR
 		// (revisable=false) path.
@@ -378,10 +392,17 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 		flag_outputs.push_back(get_var_name<node>(fvars[0]));
 	}
 
+	// Step guards are matched like inputs (see the loop above): appended
+	// after the real inputs, before the flag-output slots, in both the
+	// guard layout (guard_from_cube's in_ap_idx) and num_inputs.
+	std::vector<int> matched_ap_idx = in_ap_idx;
+	matched_ap_idx.insert(matched_ap_idx.end(),
+		step_guard_ap_idx.begin(), step_guard_ap_idx.end());
+
 	codegen::strategy strat;
 	strat.num_states = sol.aut.num_states;
 	strat.initial_state = sol.aut.initial_state;
-	strat.num_inputs = (int)in_ap_idx.size();
+	strat.num_inputs = (int)matched_ap_idx.size();
 	strat.edges.resize(sol.aut.num_states);
 	std::vector<std::vector<trefs>> templates(sol.aut.num_states);
 	std::vector<std::vector<std::vector<bool>>> template_is_counter(sol.aut.num_states);
@@ -396,7 +417,7 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 				codegen::edge ed;
 				ed.dst = e.dst;
 				ed.guard = guard_from_cube(cube,
-					in_ap_idx, flag_out_ap_idx);
+					matched_ap_idx, flag_out_ap_idx);
 				trefs tmpls;
 				std::vector<bool> is_counter;
 				for (auto& [ap_idx, positive] : cube) {
@@ -426,7 +447,8 @@ make_table_provider(const ltl_aba_solution<node>& sol)
 	auto provider = std::make_shared<table_step_provider<node>>(
 		std::move(strat), std::move(input_atoms), std::move(flag_outputs),
 		std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>{},
-		std::move(templates), std::move(template_is_counter));
+		std::move(templates), std::move(template_is_counter),
+		sol.step_guard_ks);
 	return {provider, {lookback, hip}};
 }
 

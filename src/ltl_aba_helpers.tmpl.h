@@ -242,6 +242,44 @@ static std::optional<int_t> atom_uniform_shift(tref atom) {
 	return shift;
 }
 
+// A rule whose body reads a past that does not exist yet is inactive, so
+// the guard depth is the deepest lookback anywhere in the body, nested
+// operators included -- see step_guard_prop.
+template <NodeType node>
+static int_t body_max_lookback(tref body) {
+	using tau = tree<node>;
+	auto io_vars = tau::get(body).select_top(is_child<node, tau::io_var>);
+	return get_max_shift<node>(io_vars, false);
+}
+
+// Each lookback depth k some G/F/U/R/W operand in `fm` reads; a rule is
+// inactive before the past it reads exists, so each k gets a step guard.
+template <NodeType node>
+static std::set<int_t> collect_step_guards(tref fm) {
+	using tau = tree<node>;
+	std::set<int_t> ks;
+	for (tref n : tau::get(fm).select_all(is_temporal_op<node>)) {
+		const auto& inner = tau::get(n)[0];
+		switch (inner.value.nt) {
+		case tau::wff_always:
+		case tau::wff_sometimes:
+			if (int_t k = body_max_lookback<node>(inner.first()); k > 0)
+				ks.insert(k);
+			break;
+		case tau::wff_until:
+		case tau::wff_release:
+		case tau::wff_weak_until:
+			if (int_t k = body_max_lookback<node>(inner.first()); k > 0)
+				ks.insert(k);
+			if (int_t k = body_max_lookback<node>(inner.second()); k > 0)
+				ks.insert(k);
+			break;
+		default: break;
+		}
+	}
+	return ks;
+}
+
 // Groups relative-time atoms by (io_var name set, BA type) -- the family a
 // shift-chain constraint can relate. Positional atoms and atoms mixing
 // io_vars at different shifts are excluded (see atom_uniform_shift).
@@ -378,6 +416,14 @@ static std::string skeleton_str(
 			"non-tester LTL skeleton";
 		return "0";
 	}
+	// ltl_skeleton's callers never drive a __step_ge prop: an undriven one
+	// left in the string is an unbound atomic proposition ltlsynt cannot
+	// parse, so refuse the same way the tester case does.
+	if (!collect_step_guards<node>(n).empty()) {
+		LOG_ERROR << "skeleton_str: a lookback needing a step guard "
+			"reached the non-driving LTL skeleton";
+		return "0";
+	}
 	return s;
 }
 
@@ -413,6 +459,21 @@ std::string ltl_skeleton(
 //   Output:     !__past_t{k}  (negation because T = ¬S(¬,¬))
 
 // past_temporal_tester is declared in ltl_aba.h.
+
+// The proposition "step >= k", driven by append_step_guard_drivers; it
+// keeps a lookback-k rule from witnessing or being enforced before the
+// past it reads exists (see step_guarded).
+static std::string step_guard_prop(int_t k) {
+	return "__step_ge" + std::to_string(k);
+}
+
+// A lookback-k operand is inactive before step k: an obligation holds
+// vacuously there, a witness cannot fire there.
+static std::string step_guarded(int_t k, const std::string& s, bool witness) {
+	if (k <= 0) return s;
+	std::string g = step_guard_prop(k);
+	return "(" + g + (witness ? " & " : " -> ") + s + ")";
+}
 
 // Skeleton generation with temporal tester collection.
 // When encountering S/T nodes, creates a DFA tester entry and returns
@@ -452,6 +513,9 @@ static std::string skeleton_wff_with_testers(
 	auto prop = find_prop<node>(n, atoms);
 	if (!prop.empty()) return prop;
 
+	// A rule reading a lookback-k body has no fact to read before step k:
+	// under G it must not be enforced there (vacuous), under F it cannot
+	// witness there (excluded) -- see step_guard_prop / body_max_lookback.
 	switch (nt) {
 	case tau::wff_t: return "1";
 	case tau::wff_f: return "0";
@@ -472,19 +536,35 @@ static std::string skeleton_wff_with_testers(
 	case tau::wff_equiv:
 		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
 		     + " <-> " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
-	case tau::wff_always:
-		return "G(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
-	case tau::wff_sometimes:
-		return "F(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers) + ")";
-	case tau::wff_until:
-		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
-		     + " U " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
-	case tau::wff_release:
-		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
-		     + " R " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
-	case tau::wff_weak_until:
-		return "(" + skeleton_str_with_testers<node>(inner.first(), atoms, testers)
-		     + " W " + skeleton_str_with_testers<node>(inner.second(), atoms, testers) + ")";
+	case tau::wff_always: {
+		std::string phi = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
+		return "G(" + step_guarded(body_max_lookback<node>(inner.first()), phi, false) + ")";
+	}
+	case tau::wff_sometimes: {
+		std::string phi = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
+		return "F(" + step_guarded(body_max_lookback<node>(inner.first()), phi, true) + ")";
+	}
+	case tau::wff_until: {
+		std::string phi = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
+		std::string psi = skeleton_str_with_testers<node>(inner.second(), atoms, testers);
+		phi = step_guarded(body_max_lookback<node>(inner.first()), phi, false);
+		psi = step_guarded(body_max_lookback<node>(inner.second()), psi, true);
+		return "(" + phi + " U " + psi + ")";
+	}
+	case tau::wff_release: {
+		std::string phi = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
+		std::string psi = skeleton_str_with_testers<node>(inner.second(), atoms, testers);
+		phi = step_guarded(body_max_lookback<node>(inner.first()), phi, true);
+		psi = step_guarded(body_max_lookback<node>(inner.second()), psi, false);
+		return "(" + phi + " R " + psi + ")";
+	}
+	case tau::wff_weak_until: {
+		std::string phi = skeleton_str_with_testers<node>(inner.first(), atoms, testers);
+		std::string psi = skeleton_str_with_testers<node>(inner.second(), atoms, testers);
+		phi = step_guarded(body_max_lookback<node>(inner.first()), phi, false);
+		psi = step_guarded(body_max_lookback<node>(inner.second()), psi, true);
+		return "(" + phi + " W " + psi + ")";
+	}
 
 	// ── ppLTLTT temporal testers for past operators ──────────────────
 	//
@@ -560,10 +640,10 @@ static std::string skeleton_wff_with_testers(
 }
 
 // Build the LTL skeleton with temporal testers for past operators.
-// Returns the skeleton string and the list of testers.
-// The caller must:
+// Returns the skeleton string and the list of testers. The caller must:
 //   1. Append the tester constraints to the skeleton
 //   2. Add the tester state variables to the output props
+//   3. Drive collect_step_guards(fm) via append_step_guard_drivers
 template <NodeType node>
 std::pair<std::string, std::vector<past_temporal_tester>>
 ltl_skeleton_with_testers(

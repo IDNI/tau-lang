@@ -984,30 +984,12 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		CHECK(alg_d::initial_memory({rational(-1, 1)}) == 2);
 	}
 
-	// The end-to-end reproducer for the unsound (E) reading.  The F
-	// conjunct routes the spec through the LTL(ABA) pipeline (a G-only
-	// spec takes the safety pipeline and never reaches this gate); the G
-	// conjunct forces the LOOKBACK atom o1[t-1] > 0 at every step,
-	// including t = 0, where the previous output is the interpreter's
-	// defaulted 0.  Under the fixed ρ₀ = type_of(0) = {0} the correct
-	// verdict is UNREALIZABLE (the run's first enforced step already
-	// fails at execution).
-	//
-	// skip(): still blocked by §14 (the product game's environment
-	// over-approximation / refused opponent attractor, Batch O7).  With
-	// the convention fixed, the system's only strategy edge ([d_0 & d_1]
-	// in the ltlsynt-solved game) is data-infeasible from ρ₀ = {0}, so
-	// the SYS state is a dead end and correctly marked lost — and since
-	// Batch O7 the sys dead end is awarded to env TOGETHER WITH env's
-	// attractor (textbook), so the loss propagates through the env-owned
-	// initial state whose only move leads there, and the end-to-end flip
-	// finally shows.  (O7 also passes --polarity=no to ltlsynt so the
-	// game is the genuine arena, not the polarity-reduced strategy.)  The
-	// convention itself — one fixed initial state — is proven without the
-	// env mediation by [ALG-D-74] below.
-	TEST_CASE("[ALG-D-71] phantom initial memory cannot win end-to-end: "
-	          "G(o1[t-1]>0) && F(o1>1) UNREALIZABLE") {
-		CHECK_FALSE(alg_d_realizable(
+	// A rule reading the past binds only once that past exists: G(o1[t-1]>0)
+	// is vacuous at t = 0 and enforced from t = 1 on, so no initial memory
+	// value can defeat it -- the spec is realizable (output 2 forever).
+	TEST_CASE("[ALG-D-71] G(o1[t-1]>0) && F(o1>1) REALIZABLE: the rule is "
+	          "inactive before its past exists") {
+		CHECK(alg_d_realizable(
 			"(G (o1[t-1]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {1}:qlt))."));
 	}
 

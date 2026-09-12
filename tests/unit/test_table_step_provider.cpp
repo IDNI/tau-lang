@@ -253,6 +253,47 @@ TEST_SUITE("table_step_provider") {
 			CHECK(table_vals[k] == solve_vals[k]);
 	}
 
+	// Regression: an edge whose guard carries a __step_ge<k> literal (no
+	// atom of its own, see make_table_provider) used to throw out of
+	// make_table_provider's atom lookup, and, once that's skipped, would
+	// still risk matching the wrong edge unless __step_ge<k> is tracked
+	// like an extra input (time_point >= k). o1's own past value is the
+	// lookback here, not an input's.
+	TEST_CASE("output-lookback spec: table provider matches the solve "
+	          "provider from step `lookback` onward (__step_ge guard)")
+	{
+		bdd_init<Bool>();
+		std::string ct = carrier_type_str();
+		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		const size_t steps = 5;
+		std::string spec = "G(o1[t-1]" + ct + " = {1}" + ct + ").";
+
+		io_context<node_t> solve_ctx;
+		auto solve_o1 = std::make_shared<vector_output_stream>();
+		solve_ctx.add_output("o1", carrier_tid, solve_o1);
+		tref fm = parse_against(solve_ctx, spec);
+		REQUIRE(fm != nullptr);
+
+		auto sol = solve_ltl_aba<node_t>(fm);
+		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
+		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		REQUIRE(provider != nullptr);
+		REQUIRE(bounds.first == 1);  // one step of lookback baked
+
+		auto solve_vals = run_solve_o1(fm, solve_ctx, solve_o1, steps);
+
+		io_context<node_t> table_ctx;
+		auto table_o1 = std::make_shared<vector_output_stream>();
+		table_ctx.add_output("o1", carrier_tid, table_o1);
+		auto table_vals = run_table_o1(provider, table_ctx, table_o1, steps,
+			bounds.first, bounds.second);
+
+		REQUIRE(solve_vals.size() == steps);
+		REQUIRE(table_vals.size() == steps);
+		for (size_t k = (size_t)bounds.first; k < steps; ++k)
+			CHECK(table_vals[k] == solve_vals[k]);
+	}
+
 #ifdef TAU_PACK_HAS_BA_QLT
 	// Exercises the witness/tref-factory path: edge_witnesses supplies a
 	// precomputed value tref directly (the same ground constant the atom

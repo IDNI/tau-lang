@@ -229,14 +229,18 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 	f << "\n\tcodegen::strategy strat;\n"
 	  << "\tstrat.num_states = " << d.num_states << ";\n"
 	  << "\tstrat.initial_state = " << d.initial_state << ";\n"
-	  << "\tstrat.num_inputs = " << d.inputs.size() << ";\n"
+	  << "\tstrat.num_inputs = " << d.inputs.size() + d.step_guard_ks.size() << ";\n"
 	  << "\tstrat.edges.resize(" << d.num_states << ");\n"
 	  << "\tvector<vector<vector<tref>>> templates("
 	  << d.num_states << ");\n"
 	  << "\tvector<vector<vector<bool>>> template_is_counter("
 	  << d.num_states << ");\n"
 	  << "\tvector<vector<vector<pair<string, tref>>>> "
-	     "edge_witnesses(" << d.num_states << ");\n";
+	     "edge_witnesses(" << d.num_states << ");\n"
+	  << "\tvector<int_t> step_guard_ks{";
+	for (size_t k = 0; k < d.step_guard_ks.size(); ++k)
+		f << (k ? ", " : "") << d.step_guard_ks[k];
+	f << "};\n";
 	// witness_ctors keys by the field's sanitized cpp_name; edge_witnesses
 	// keys by the real output variable name (table_step_provider's own doc
 	// comment, matching flag_outputs and the output streams) -- map one to
@@ -304,7 +308,8 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\n\tauto provider = make_shared<table_step_provider<node_t>>(\n"
 		"\t\tstd::move(strat), std::move(input_atoms), std::move(flag_outputs),\n"
 		"\t\tstd::move(edge_witnesses), std::move(templates), "
-		"std::move(template_is_counter));\n"
+		"std::move(template_is_counter),\n"
+		"\t\tstd::move(step_guard_ks));\n"
 		// Captured before the move below: step()'s input filter needs this
 		// to tell which declared inputs a given step actually consults,
 		// the same way the general solve path uses ubt_ctn.

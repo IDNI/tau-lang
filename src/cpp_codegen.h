@@ -55,10 +55,11 @@ struct field_desc {
 };
 
 // One outgoing transition, in program_desc terms rather than raw HOA text.
-// `guard` has one entry per input field, then one per FLAG output field
-// (codegen_strategy.h's matching convention); a witness output field has
-// no slot there -- its value is `witness_ctors`' own tref-typed C++
-// expression, or the default if absent from `witness_ctors` on this edge.
+// `guard` has one entry per input field, then one per program_desc::
+// step_guard_ks entry, then one per FLAG output field (codegen_strategy.h's
+// matching convention); a witness output field has no slot there -- its
+// value is `witness_ctors`' own tref-typed C++ expression, or the default
+// if absent from `witness_ctors` on this edge.
 struct edge_desc {
 	std::vector<std::int8_t> guard;
 	int dst = 0;
@@ -119,6 +120,10 @@ struct program_desc {
 	int lookback = 0;            // max relative shift across non-positional atoms
 	int highest_initial_pos = 0; // highest constant position across positional atoms
 	std::vector<atom_desc> atoms; // ground trefs the artifact needs: every input guard atom plus every witness_template output atom, whatever their BA type
+	// One threshold k per "__step_ge<k>" guard prop (ltl_aba_helpers.tmpl.h's
+	// step_guard_prop), matched like an extra input, never an output --
+	// its value (step >= k) is the artifact's own to compute.
+	std::vector<int_t> step_guard_ks;
 	// Artifact surface: numeric ba-type ids are the emitting process's own,
 	// made valid in the artifact by replaying ba_type_table (the full
 	// registry snapshot) before anything else.

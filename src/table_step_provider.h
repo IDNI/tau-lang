@@ -39,6 +39,9 @@ struct table_step_provider : step_provider<node> {
 	// the lookback-shifted formula_time_point every other template atom
 	// uses. Empty (the default) means none are -- every atom grounds at
 	// formula_time_point as before.
+	// step_guard_ks: one threshold k per "__step_ge<k>" guard prop, matched
+	// like an extra input since its value (time_point >= k) is a function
+	// of the step, never a free choice.
 	table_step_provider(
 		codegen::strategy strat,
 		std::vector<std::pair<std::string, tref>> input_atoms,
@@ -47,7 +50,8 @@ struct table_step_provider : step_provider<node> {
 			edge_witnesses = {},
 		std::vector<std::vector<trefs>> edge_witness_templates = {},
 		std::vector<std::vector<std::vector<bool>>>
-			edge_witness_template_is_counter = {});
+			edge_witness_template_is_counter = {},
+		std::vector<int_t> step_guard_ks = {});
 
 	std::optional<solution<node>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
@@ -86,6 +90,10 @@ private:
 	// atomless decode instead of a full solve. Structural, so computed
 	// once at construction and reused every step.
 	std::vector<std::vector<bool>> edge_direct_decode_eligible_;
+	// Parallel to the guard's step-guard slots (see the constructor's doc
+	// comment): step_guard_ks_[j] is the k that slot's live truth value
+	// (time_point >= k) is computed against, every produce() call.
+	std::vector<int_t> step_guard_ks_;
 	// Fresh-element ledger for this run, scoped to one table_step_provider
 	// execution -- not reset between produce() calls, so a committed
 	// witness from an earlier step keeps its ledger identity later.
