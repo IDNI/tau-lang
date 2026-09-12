@@ -602,3 +602,15 @@ add_test(NAME "test_repl-run_cmd-sbf_multiline_value"
 	COMMAND bash -c "printf 'run always o1[t]:sbf = i1[t]\\nx |\\ny\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-run_cmd-sbf_multiline_value" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o1\\[0\\] := x \\| x' y")
+
+# ── MIRROR: F and sometimes are one operator, so both spellings mirror ───────
+# The input alternates F and T, so a mirroring program outputs F, T, F.
+add_repl_test(run_cmd-mirror_01_f_alt
+	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps F (o1[t] = i1[t])."
+	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+add_repl_test(run_cmd-mirror_02_sometimes_alt
+	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps sometimes (o1[t] = i1[t])."
+	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+add_repl_test(run_cmd-mirror_03_always_alt
+	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps always o1[t] = i1[t]."
+	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
