@@ -55,9 +55,19 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_4.3-adt_recurrence_relations.tau` | Recurrence relations over tuple members: indexed and fixpoint calls, loops and `fallback`, bitvector members |
 | `demo_4.4-adts_as_arguments.tau` | Whole tuple values as definition arguments: one parameter per flattened member, sub-tuples, mixed algebras, recurrences |
 | `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, and the resource budgets with their give-ups |
+| `demo_6.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`G`, `F`, `U`, `R`, `W`, `S`, `T`), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment |
+| `demo_6.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
+| `demo_6.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
+| `demo_6.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.
+
+The section 6 demos decide formulas that contain `U`, `R`, `W`, `S` or `T`,
+or nested liveness such as `G (F ...)`. They call `ltlsynt` from
+[Spot](https://spot.lre.epita.fr/) to do it. Without `ltlsynt` on the `PATH`
+those verdicts come back `UNKNOWN`. A wrong answer never occurs. The
+strategy-executing run in `demo_6.3` cannot start.
 
 ## Writing a demo
 

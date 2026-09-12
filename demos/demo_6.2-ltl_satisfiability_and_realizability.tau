@@ -1,0 +1,91 @@
+# Satisfiability and realizability of temporal formulas.
+#
+# See demos/README.md for how to run this script.
+## Formulas using U/R/W/S/T or nested liveness (G (F ...)) are decided by
+## calling ltlsynt (from Spot). Without ltlsynt on the PATH those verdicts
+## come back UNKNOWN.
+
+# A temporal formula describes a reactive system: at each time point the
+# environment picks the input streams i1, i2, ..., and the system answers
+# with the output streams o1, o2, ...
+
+# Two pipelines decide temporal formulas. Boolean combinations of top-level
+# always/sometimes statements over non-temporal bodies are the safety
+# fragment, decided by Tau's own safety pipeline; the binary operators
+# U/R/W/S/T and nested liveness such as G (F phi) are decided by reactive
+# synthesis through ltlsynt.
+
+# In the safety fragment, sat asks for the existence of a satisfying
+# execution. Both of these hold on some trace -- the second one on any
+# trace where the environment happens to send a 1:
+
+sat F (o1[t] = 1)
+sat F (i1[t] = 1)
+
+# Realizability is the reactive question: is there a strategy for the
+# outputs that keeps the formula true against EVERY input behaviour? The
+# nested forms below route through synthesis, and there who controls the
+# stream decides the verdict. The system can grant o1 infinitely often:
+
+realizable G (F (o1[t] = 1))
+
+# But no output strategy can force the environment to send 1s, so the same
+# shape over an input is unrealizable:
+
+unrealizable G (F (i1[t] = 1))
+
+# valid holds when the formula cannot be escaped at all:
+
+valid G (o1[t] | o1[t]' = 1)
+
+# What follows are classic synthesis benchmarks, each answered in
+# milliseconds.
+
+# Request/grant: every request is eventually granted:
+
+realizable G ((i1[t] = 1) -> F ((o1[t] = 1)))
+
+# Echo: the output mirrors the input at every step:
+
+realizable G ((o1[t] = 1) <-> (i1[t] = 1))
+
+# Response with delay: what came in at t-1 constrains the output at t:
+
+realizable G ((i1[t-1] = 1) -> (o1[t] = 1))
+
+# An impossibility: always 1 and eventually 0 cannot both hold:
+
+realizable (G ((o1[t] = 1))) && (F ((o1[t] = 0)))
+
+# Mutual exclusion:
+
+realizable G (!((o1[t] = 1) && (o2[t] = 1)))
+
+# A two-client arbiter: every request is eventually granted and the grants
+# never overlap:
+
+realizable (G ((i1[t] = 1) -> F ((o1[t] = 1)))) && (G ((i2[t] = 1) -> F ((o2[t] = 1)))) && (G (!((o1[t] = 1) && (o2[t] = 1))))
+
+# Weak until and persistence:
+
+realizable ((o1[t] = 1) W (i1[t] = 1))
+realizable F (G ((o1[t] = 1)))
+
+# First-order quantifiers compose with the temporal operators. Whatever
+# value the quantifier picks, the system can eventually output it:
+
+realizable G (all x ex y F ((o3[t]:bv[8] = x:bv[8]) && (o4[t]:bv[8] = y:bv[8])))
+
+# The ltl command shows the whole decision pipeline for one formula: the
+# data atoms it abstracts, the propositional LTL skeleton handed to
+# ltlsynt, the strategy automaton that comes back, the ABA oracle checks on
+# its transitions, the equivalent safety formula, and the verdict:
+
+ltl G (F (o1[t] = 0))
+
+# A formula inside the safety fragment short-circuits to the safety
+# pipeline instead -- including a top-level F, which is just sometimes:
+
+ltl F (o1[t] = 1)
+
+quit
