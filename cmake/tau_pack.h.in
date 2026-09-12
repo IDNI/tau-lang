@@ -39,6 +39,13 @@
 #  define TAU_CODEGEN_BA_PACKAGE_DIRS "@TAU_CODEGEN_BA_PACKAGE_DIRS@"
 #endif
 
+// Directories of the out-of-tree BAs registered with tau_register_ba()
+// (semicolon-joined), so the emitted project can include the headers this
+// header names; tau-common.cmake's target_setup() adds them.
+#ifndef TAU_CODEGEN_BA_INCLUDE_DIRS
+#  define TAU_CODEGEN_BA_INCLUDE_DIRS "@TAU_BA_INCLUDE_DIRS@"
+#endif
+
 // Compile definitions resolved active on this build (e.g. TAU_PARSER_MEASURE*),
 // so a witness-bearing emitted project's own TU sees the same header-only
 // template layout as the libTAU.a/libtauparser.a it links prebuilt.
