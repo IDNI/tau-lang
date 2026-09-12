@@ -27,14 +27,17 @@ using namespace idni::tau_lang;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
+// rather than reading as unrealizable.
 static bool realizable(const char* s) {
 	tref fm = [&]{
 		auto nso = get_nso_rr<node_t>(tau::get(s));
 		return nso.has_value() ? nso.value().main->get() : nullptr;
 	}();
 	if (!fm) return false;
-	auto r = is_tau_formula_sat<node_t>(fm);
-	return r.has_value() && r.value();
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 // Run formula with given i1 stream for N steps, return o1 values.

@@ -57,6 +57,14 @@ static tref spec(const char* s) {
 	return nso_rr.value().main->get();
 }
 
+// Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
+// rather than reading as unrealizable.
+static bool realizable(tref fm) {
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
 static bool sat(tref fm) {
 	auto r = is_tau_formula_sat<node_t>(fm);
 	REQUIRE(r.has_value());
@@ -439,12 +447,12 @@ TEST_CASE("[SHAPE-N-10] G(F(o1[t-1]={#b10110101}:bv[8])) — bv+lookback") { tre
 
 TEST_SUITE("SHAPE-O: UNREALIZABLE depth-3") {
 
-TEST_CASE("[SHAPE-O-01] F(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
-TEST_CASE("[SHAPE-O-02] G(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
-TEST_CASE("[SHAPE-O-03] F(F(G(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (G (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
-TEST_CASE("[SHAPE-O-04] F((i1>{0}) U (F(i2>{0}))) UNREALIZABLE") { tref fm = spec("F ((i1[t]:qlt > {0}:qlt) U (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
-TEST_CASE("[SHAPE-O-05] G(F(F(i1={#b10110101}:bv[8]))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
-TEST_CASE("[SHAPE-O-06] (i1>{0}) U (F(F(i2>{0}))) UNREALIZABLE") { tref fm = spec("(i1[t]:qlt > {0}:qlt) U (F (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
+TEST_CASE("[SHAPE-O-01] F(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-02] G(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-03] F(F(G(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (G (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-04] F((i1>{0}) U (F(i2>{0}))) UNREALIZABLE") { tref fm = spec("F ((i1[t]:qlt > {0}:qlt) U (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-05] G(F(F(i1={#b10110101}:bv[8]))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-06] (i1>{0}) U (F(F(i2>{0}))) UNREALIZABLE") { tref fm = spec("(i1[t]:qlt > {0}:qlt) U (F (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
 
 } // SHAPE-O
 
@@ -750,91 +758,91 @@ TEST_SUITE("SHAPE-U: unrealizable formulas") {
 TEST_CASE("[SHAPE-U-01] Contradiction: G(o1=0) && G(o1=1)") {
 	tref fm = spec("G (o1[t] = 0) && G (o1[t] = 1).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-02] Contradiction: G(o1=0) && F(o1=1)") {
 	tref fm = spec("G (o1[t] = 0) && F (o1[t] = 1).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-03] Boolean false spec") {
 	tref fm = spec("G (o1[t] = 0 && o1[t] = 1).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-04] Explicit F: always false") {
 	tref fm = spec("G (F).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-05] Output must equal two different constants simultaneously") {
 	tref fm = spec("G (o1[t]:sbf = {1}:sbf && o1[t]:sbf = {0}:sbf).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-06] Output must change but also stay the same") {
 	tref fm = spec("G (o1[t] = o1[t-1]) && F (o1[t] != o1[t-1]).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-07] Disjunction of contradictions") {
 	tref fm = spec("G ((o1[t] = 0 && o1[t] = 1) || (o2[t] = 0 && o2[t] = 1)).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-08] qlt contradiction: o1 > top") {
 	tref fm = spec("G (o1[t]:qlt > {top}:qlt).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-09] qlt contradiction: o1 < bot") {
 	tref fm = spec("G (o1[t]:qlt < {bot}:qlt).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-10] G(o1 = 0) && G(o1 != 0)") {
 	tref fm = spec("G (o1[t] = 0) && G (o1[t] != 0).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-11] Implication contradiction: G(T -> F)") {
 	tref fm = spec("G (T -> F).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-12] Two outputs with cross-dependency cycle") {
 	tref fm = spec("G (o1[t] = o2[t]) && G (o1[t] != o2[t]).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-13] bv contradiction: o1:bv[8] = 0 and o1:bv[8] != 0") {
 	tref fm = spec("G (o1[t]:bv[8] = {0}:bv[8] && o1[t]:bv[8] != {0}:bv[8]).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-14] Contradictory eventually and globally") {
 	tref fm = spec("F (o1[t] = 1) && G (o1[t] = 0).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SHAPE-U-15] F(F) always unrealizable") {
 	tref fm = spec("F (F).");
 	REQUIRE(fm != nullptr);
-	CHECK_FALSE(sat(fm));
+	CHECK_FALSE(realizable(fm));
 }
 
 } // SHAPE-U

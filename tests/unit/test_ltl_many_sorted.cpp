@@ -21,14 +21,17 @@ static tref spec(const char* s) {
 	return nso_rr.value().main->get();
 }
 
+// Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
+// rather than reading as unrealizable.
 static bool realizable(const char* s) {
 	do_gc();
 	auto nso = get_nso_rr<node_t>(tau::get(s));
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;
-	auto r = is_tau_formula_sat<node_t>(fm);
-	return r.has_value() && r.value();
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 // ltlsynt (Spot >= 2.10) is a required dependency for LTL realizability tests.

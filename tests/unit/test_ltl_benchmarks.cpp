@@ -25,13 +25,16 @@ static bool skip_benchmarks() {
 	return s && *s && std::string(s) != "0";
 }
 
+// Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
+// rather than reading as unrealizable.
 static bool realizable(const char* s) {
 	auto nso = get_nso_rr<node_t>(tau::get(s));
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;
-	auto r = is_tau_formula_sat<node_t>(fm);
-	return r.has_value() && r.value();
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 TEST_SUITE("LTL literature benchmarks") {
