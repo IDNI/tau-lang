@@ -14,9 +14,9 @@ its `README.md` is the short version of this page.
 The BAs of a build are its *pack*, resolved at configure time:
 
 ```bash
-./dev preset debug                           # the default pack
-./dev preset debug -DTAU_BAS=tau,sbf,bv      # a smaller one
-./dev preset debug -DTAU_BAS=sbf,tau         # smallest useful pack
+./dev preset devel                           # the default pack
+./dev preset devel -DTAU_BAS=tau,sbf,bv      # a smaller one
+./dev preset devel -DTAU_BAS=sbf,tau         # smallest useful pack
 ```
 
 `cmake/tau_bas.cmake` globs `src/boolean_algebras/*/ba.cmake`, resolves the
@@ -47,7 +47,7 @@ parameterized one, matched by family name, so `:bv[8]` needs `bv` in the pack.
 
 ### The value type
 
-Any type with the Boolean operators (`operator~`, `&`, `|`, `^`, `+`), plus
+Any type with the Boolean operators (`operator~`, `&`, `|`, `^`), plus
 three things generic core requires of every alternative in the constants
 variant:
 
@@ -74,7 +74,8 @@ against the line naming it:
   id)
 - **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
   `is_closed`, `literal_one`, `literal_zero`
-- **normalization** — `normalize`, `splitter`, `splitter_one`
+- **normalization** — `normalize` (`splitter` and `splitter_one` join it when
+  `atomless`; see the optional table)
 - **rewriting** — `simplify_symbol`, `simplify_term`
 - **parsing** — `parse`
 
@@ -259,5 +260,5 @@ grammar under `parser/`, compiled ahead of time and regenerated with
 
 Core reaches a BA only through its descriptor: `base_ba_dispatcher` folds over
 the pack's descriptors, and constant parsing walks them until one owns the type.
-Packs whose BAs are not all described yet keep hand-written specializations in
-`base_ba_dispatcher_*.cpp`; those disappear as each BA gains a descriptor.
+There are no hand-written per-pack dispatchers: the one generic dispatcher
+serves every pack, default or reduced.
