@@ -238,8 +238,9 @@ To add a BA, copy `src/boolean_algebras/_template/` and follow
 `docs/adding_base_bas.md`. A manifest declares everything the plugin owns —
 sources, its grammar (`TAU_BA_GRAMMAR`) and its suites (`TAU_BA_TESTS`, with
 `TAU_BA_TEST_REQUIRES_<target>` for a suite needing another algebra) — so no
-central list names an algebra. `tests/unit/test_ba_descriptor_pack.cpp` is where
-each BA joins a pack so its descriptor is type-checked, and
+central list names an algebra. `tests/unit/test_ba_descriptor_pack_full.cpp` is
+where each BA joins a pack so its descriptor is type-checked (its twin without
+the `_full` suffix covers the smallest pack, sbf and tau, in every build), and
 `tests/unit/test_ba_conformance.cpp` runs one battery against every algebra of
 the configured pack, checking that the descriptor behaves rather than merely
 compiles. `scripts/test-external-ba.sh` proves the out-of-tree path end to end:

@@ -82,6 +82,7 @@ inline std::string emit_cmake_sdk_linked(const std::string& exe_name) {
 		"set(TAU_SDK_SHARED_PREFIX \"" << TAU_CODEGEN_SHARED_PREFIX << "\")\n"
 		"set(TAU_BA_LINK_LIBS \"" << TAU_CODEGEN_BA_LINK_LIBS << "\")\n"
 		"set(TAU_BA_PACKAGE_DIRS \"" << TAU_CODEGEN_BA_PACKAGE_DIRS << "\")\n"
+		"set(TAU_BA_INCLUDE_DIRS \"" << TAU_CODEGEN_BA_INCLUDE_DIRS << "\")\n"
 		"set(TAU_COMPILE_DEFINITIONS \"" << TAU_CODEGEN_COMPILE_DEFINITIONS << "\")\n"
 		"\n"
 		"list(APPEND CMAKE_MODULE_PATH \"${TAU_SDK_ROOT}/cmake\")\n"
