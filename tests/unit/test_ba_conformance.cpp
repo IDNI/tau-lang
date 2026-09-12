@@ -362,3 +362,31 @@ TEST_SUITE("every algebra of the configured pack") {
 		check_pack(static_cast<typename node_t::bas_tuple*>(nullptr));
 	}
 }
+
+// What a pack WITHOUT a solver-bearing algebra must answer: the empty case
+// of every fold whose non-empty case bv exercises. Built only in such a
+// pack, so the default build never sees it and the nobv presets do.
+#ifndef TAU_PACK_HAS_BA_BV
+TEST_SUITE("fold empty cases without bv") {
+	TEST_CASE("nothing in this pack solves, preprocesses or blasts") {
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("x = 0", opts);
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(pack_can_solve<node_t>(fm));
+		CHECK(pack_preprocess<node_t>(fm) == fm);
+		CHECK_FALSE(pack_formula_is_preprocessable<node_t>(fm));
+		CHECK_FALSE(pack_has_preprocessing_residue<node_t>(fm));
+		static_assert(!pack_has_arithmetic_theory_v<node_t>);
+		static_assert(pack_solver_count<node_t>() == 0);
+		pack_visit_all<node_t>([]<typename BA>() {
+			const size_t id = ba_types<node_t>::id(
+				ba_descriptor<BA, node_t>::type_tree());
+			CHECK_FALSE(pack_type_has_arith_ops<node_t>(id));
+			CHECK_FALSE(pack_term_is_blasteable<node_t>(id, nullptr));
+		});
+		CHECK_FALSE(pack_type_has_codegen_witness<node_t>(
+			ba_types<node_t>::id(pack_bool_carrier_type<node_t>())));
+	}
+}
+#endif
