@@ -20,6 +20,7 @@
 # use --build-arg BUILD_TYPE="Debug" for building of the debugging version (build stage)
 # use --build-arg TESTS="no" to skip running tests (build stage)
 # use --build-arg TEST_CLANG_BUILD="no" to skip checking compilation with clang (build stage)
+#   (clang 19: clang 18 crashes while instantiating the tree pack, src/instantiate_pack.cpp)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
 # Use BUILD_KIT=1 (install docker-buildx) to avoid rebuilds of unnecessary stages
@@ -46,7 +47,7 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
 	libboost-all-dev=1.83.0.1ubuntu2 \
-	clang=1:18.0-59~exp2
+	clang-19=1:19.1.1-1ubuntu1~24.04.2
 
 # create tau-lang directory and set it as the working directory
 RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \
@@ -139,8 +140,8 @@ ARG TEST_CLANG_BUILD=yes
 RUN if [ "$TESTS" = "yes" -a "$TEST_CLANG_BUILD" = "yes" ]; then \
 	mkdir -p build-${BUILD_TYPE}-clang && \
 	cd build-${BUILD_TYPE}-clang && \
-	cmake -DCMAKE_CXX_COMPILER=$(which clang++) \
-		-DCMAKE_C_COMPILER=$(which clang) .. && \
+	cmake -DCMAKE_CXX_COMPILER=$(which clang++-19) \
+		-DCMAKE_C_COMPILER=$(which clang-19) .. && \
 	cmake --build . --config ${BUILD_TYPE} --target all -j ${BUILD_JOBS} && \
 	cd .. && \
 	rm -rf build-${BUILD_TYPE}-clang; \

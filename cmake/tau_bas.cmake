@@ -104,6 +104,14 @@ function(tau_resolve_ba_pack)
 
 	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
 	string(REPLACE "," ";" _ba_ids "${_bas_nospace}")
+	# a repeated id would reach node<...> as a duplicate variant alternative
+	# and fail inside std::variant instead of here
+	set(_ba_ids_unique ${_ba_ids})
+	list(REMOVE_DUPLICATES _ba_ids_unique)
+	if(NOT "${_ba_ids_unique}" STREQUAL "${_ba_ids}")
+		message(FATAL_ERROR
+			"TAU_BAS names a BA more than once: ${TAU_BAS}")
+	endif()
 
 	set(_headers "")
 	set(_sources_extra "")
@@ -183,6 +191,21 @@ function(tau_resolve_ba_pack)
 	set(TAU_BA_TESTS_RESOLVED "${_ba_tests}" PARENT_SCOPE)
 	set(TAU_BA_LINK_LIBS "${_link_libs}" PARENT_SCOPE)
 	set(TAU_BA_REQUIRED_PACKAGES "${_required_packages}" PARENT_SCOPE)
+	# one static_assert per BA of the pack: a concept-id in a static_assert
+	# makes the compiler name the requirement a descriptor fails, which a
+	# fold into one bool cannot
+	set(_descriptor_asserts "")
+	foreach(_t ${_base_types})
+		string(APPEND _descriptor_asserts
+			"static_assert(ba_descriptor_complete<${_t}, node_t>,\n"
+			"\t\"${_t}: incomplete descriptor\");\n")
+	endforeach()
+	if(_has_tau)
+		string(APPEND _descriptor_asserts
+			"static_assert(ba_descriptor_complete<tau_ba<${_base_types_str}>, node_t>,\n"
+			"\t\"tau_ba: incomplete descriptor\");\n")
+	endif()
+	set(TAU_PACK_DESCRIPTOR_ASSERTS "${_descriptor_asserts}" PARENT_SCOPE)
 	set(TAU_PACK_NODE_ARGS "${_node_args}" PARENT_SCOPE)
 	set(TAU_PACK_HAS_TAU "${_has_tau}" PARENT_SCOPE)
 	set(TAU_PACK_BASE_BAS "${_base_types_str}" PARENT_SCOPE)
@@ -205,8 +228,10 @@ function(tau_generate_pack_header)
 	set(TAU_SDK_ROOT_PATH "${TAU_SDK_ROOT_PATH}" PARENT_SCOPE)
 
 	# Filled in for real by tau_finalize_pack_compile_definitions() once
-	# tauparser exists; empty here just keeps this first write well-formed.
+	# tauparser exists and the packages are found; empty here just keeps
+	# this first write well-formed.
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "")
+	set(TAU_CODEGEN_BA_PACKAGE_DIRS "")
 
 	file(MAKE_DIRECTORY "${TAU_PACK_INCLUDE_DIR}")
 
@@ -266,7 +291,7 @@ function(tau_generate_pack_header)
 	if(NOT _carrier_in_pack)
 		message(WARNING
 			"none of TAU_BOOL_CARRIERS='${TAU_BOOL_CARRIERS}' is in "
-			"TAU_BAS='${TAU_BAS}'; each pack falls back to its first BA "
+			"TAU_BAS='${TAU_BAS}'; the carrier is the first BA of the pack "
 			"declaring can_host_bool")
 	endif()
 
@@ -312,6 +337,15 @@ function(tau_finalize_pack_compile_definitions)
 		list(REMOVE_DUPLICATES _resolved)
 	endif()
 	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}")
+	# find_package(<pkg> CONFIG) records where it found the package in
+	# <pkg>_DIR; the emitted project is pointed at the same place
+	set(_pkg_dirs "")
+	foreach(_pkg IN LISTS TAU_BA_REQUIRED_PACKAGES)
+		if(DEFINED ${_pkg}_DIR AND NOT "${${_pkg}_DIR}" MATCHES "NOTFOUND$")
+			list(APPEND _pkg_dirs "${_pkg}_DIR=${${_pkg}_DIR}")
+		endif()
+	endforeach()
+	set(TAU_CODEGEN_BA_PACKAGE_DIRS "${_pkg_dirs}")
 	configure_file(
 		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
 		"${TAU_PACK_INCLUDE_DIR}/tau_pack.h"

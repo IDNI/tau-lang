@@ -161,6 +161,9 @@ cli::commands tau_commands() {
 	compile.add_option(cli::option("output", 'o', "")
 		.set_description("output executable path (default: spec "
 			"file path without extension)"));
+	compile.add_option(cli::option("cxx", 'c', "")
+		.set_description("C++ compiler for the emitted project (default: "
+			"TAU_CXX, else clang++ when on PATH, else cmake's default)"));
 	cs[compile.name()] = compile;
 	return cs;
 }
@@ -173,6 +176,9 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	auto root = rep.open_if(benchmarks, "run");
 	string src;
 	auto finish = [&](int code) -> int {
+		// The root scope must be closed before the report is printed:
+		// report::print() rejects a report with open scopes, whose elapsed
+		// time is not yet written.
 		root.close();
 		// Benchmarks stay plain text: the parser's global TC colorizes
 		// report::print() output unconditionally, which would corrupt a
@@ -259,7 +265,8 @@ int main(int argc, char** argv) {
 
 		std::string build_dir = spec_file + ".build";
 		TAU_LOG_INFO << "tau compile: " << spec_file;
-		auto res = compile_spec<node_t>(src, out_exe, build_dir);
+		auto res = compile_spec<node_t>(src, out_exe, build_dir,
+			cmd.get<std::string>("cxx"));
 		if (!res.ok()) {
 			TAU_LOG_ERROR << "compile failed: " << res.error;
 			return 1;

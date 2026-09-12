@@ -492,7 +492,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 // DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
 // `write_tempfile` + `spawn_capture`, which live in that header and are
 // included after this one; the callers below need only this declaration.
-inline const synth_game& call_ltlsynt_game(
+// Not spelled inline here: a unit that includes this header without the
+// definition (the qlt plugin's own) would declare an inline function it
+// never defines, which gcc rejects; the definition is inline and is
+// emitted by every unit that includes it.
+const synth_game& call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs);
@@ -1095,8 +1099,8 @@ inline bool solve_algorithm_d(
 struct alg_d_result {
 	bool realizable = false;
 	std::set<int> winning_region;     // W1 state indices in product game
-	product_game product_game;
-	synth_game synth_game;
+	struct product_game product_game;
+	struct synth_game synth_game;
 	int T1_size = 0;
 	int K = 0;                        // number of D propositions
 	// The FIXED initial memory type (LG-12 convention (F), equal to the

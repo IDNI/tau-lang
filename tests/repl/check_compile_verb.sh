@@ -30,7 +30,10 @@ if [ ! -x "${EXE}" ]; then
 	exit 1
 fi
 
-timeout 30 "${EXE}" >/dev/null 2>&1
+# stdin closed: a spec with no inputs must terminate on its own, and an
+# inherited stdin that never closes (an IDE, a tool socket) would hold the
+# executable at its input prompt until the timeout
+timeout 30 "${EXE}" </dev/null >/dev/null 2>&1
 rc=$?
 if [ "${rc}" -ne 0 ]; then
 	echo "FAIL: compiled executable exited ${rc}" >&2

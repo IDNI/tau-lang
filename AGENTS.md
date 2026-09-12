@@ -201,7 +201,7 @@ hand-written per-pack dispatchers left** — one generic descriptor-driven
 
 Beyond the mandatory surface, a BA may declare **optional capabilities**, which
 core probes with `requires` and never by BA name. Those in use today live in
-`ba_pack_traits.h` as `pack_*` folds: `solve`, `is_sat`, `can_solve`,
+`ba_pack_traits.h` as `pack_*` folds: `solve`, `can_solve`,
 `sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`,
 `value_constant`, `arith_ops`, `non_aba_omcat`, `literal_incomplete`,
 `can_host_bool`/`bool_carrier_type`, `print_constant`, `uses_oracle`. The last
@@ -247,9 +247,10 @@ it builds every suite that pack can run and checks the registered algebra
 against the same contract.
 
 Verify BA work against three configurations, not one: the default pack
-(`build/devel`, `build/release`), a reduced pack containing bv
-(`-DTAU_BAS=sbf,tau,bv`), and one *without* it (`-DTAU_BAS=sbf,tau,qint`) —
-the last is the only thing exercising a capability fold's empty case.
+(`release-tests`), `release-tests-bvonly` (`-DTAU_BAS=sbf,tau,bv`) and
+`release-tests-nobv` (`-DTAU_BAS=sbf,tau,qint`) — the last is the only thing
+exercising a capability fold's empty case. The `devel-tests-*` twins exist
+for iterating.
 
 ### Tree Representation (`src/tau_tree*.h`)
 

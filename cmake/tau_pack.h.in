@@ -31,6 +31,14 @@
 #  define TAU_CODEGEN_SHARED_PREFIX "@TAU_SHARED_PREFIX_RESOLVED@"
 #endif
 
+// Where find_package resolved each package a pack BA requires, as
+// "<pkg>_DIR=<dir>" entries (semicolon-joined), so the emitted project finds
+// the same one even when it lives outside TAU_SHARED_PREFIX (a caller-provided
+// CVC5_DIR).
+#ifndef TAU_CODEGEN_BA_PACKAGE_DIRS
+#  define TAU_CODEGEN_BA_PACKAGE_DIRS "@TAU_CODEGEN_BA_PACKAGE_DIRS@"
+#endif
+
 // Compile definitions resolved active on this build (e.g. TAU_PARSER_MEASURE*),
 // so a witness-bearing emitted project's own TU sees the same header-only
 // template layout as the libTAU.a/libtauparser.a it links prebuilt.
@@ -50,6 +58,16 @@ namespace idni::tau_lang::tau_pack {
 
 /** @brief Node type of the configured pack. */
 using node_t = node<@TAU_PACK_NODE_ARGS@>;
+
+// Every BA of the pack must satisfy ba_descriptor_complete; a missing
+// member is reported here, with the BA and the line of ba_descriptor.h
+// naming the requirement.
+@TAU_PACK_DESCRIPTOR_ASSERTS@
+
+// Core builds a plain 0 or 1 in some BA's type. Name the pack here, because
+// the fold's own static_assert cannot.
+static_assert(pack_can_host_bool<node_t>(),
+	"TAU_BAS=@TAU_BAS@: no BA of this pack declares can_host_bool");
 
 /** @brief Whether the tau wrapper BA is part of the configured pack. */
 inline constexpr bool has_tau_ba = @TAU_PACK_HAS_TAU_CPP@;

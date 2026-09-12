@@ -2,7 +2,7 @@ name: Ubuntu CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, 'feature/**', 'issue/**']
   pull_request:
     branches: [main, master, develop]
   workflow_dispatch:
@@ -12,9 +12,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
+    # the default pack, and the pack without bv: the only configuration
+    # that exercises a capability fold's empty case
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            pack: ""
+          - name: nobv
+            pack: "sbf,tau,qint"
+
     env:
       CC: gcc-13
       CXX: g++-13
+      # the compiler `tau compile` gives the emitted project; without it the
+      # verb prefers the runner's clang++, which cannot build the tree
+      TAU_CXX: g++-13
       CVC5_DIR: ${{ github.workspace }}/.cvc5-dist/lib/cmake/cvc5
 
     steps:
@@ -41,7 +55,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: ccache-ubuntu-24.04-gcc13
+          key: ccache-ubuntu-24.04-gcc13-${{ matrix.name }}
           max-size: 200M
 
       # ── cvc5 (prebuilt binary — no more building from source) ───────────────
@@ -88,7 +102,10 @@ jobs:
             -DTAU_BUILD_API_TESTS=ON \
             -DTAU_BUILD_REPL_TESTS=ON \
             -DCVC5_DIR="${CVC5_DIR}" \
+            ${TAU_BAS_ARG} \
             -G Ninja
+        env:
+          TAU_BAS_ARG: ${{ matrix.pack != '' && format('-DTAU_BAS={0}', matrix.pack) || '' }}
 
       - name: Build all targets
         run: cmake --build build-ci -j$(nproc)
@@ -167,7 +184,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build-ci/benchmark_baseline.json
-          key: benchmark-baseline-${{ github.base_ref || github.ref_name }}
+          key: benchmark-baseline-${{ matrix.name }}-${{ github.base_ref || github.ref_name }}
         id: bench-cache
 
       - name: Check for performance regressions
@@ -184,13 +201,13 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: build-ci/benchmark_baseline.json
-          key: benchmark-baseline-${{ github.ref_name }}-${{ github.sha }}
+          key: benchmark-baseline-${{ matrix.name }}-${{ github.ref_name }}-${{ github.sha }}
 
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-timing
+          name: benchmark-timing-${{ matrix.name }}
           path: |
             build-ci/benchmark_current.json
             build-ci/benchmark_regressions.json

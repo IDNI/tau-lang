@@ -566,6 +566,30 @@
 			"inherits": ["release", "_build-tests"]
 		},
 		{
+			"name": "release-tests-nobv",
+			"inherits": ["release-tests"],
+			"binaryDir": "${sourceDir}/build/release-nobv",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,qint" }
+		},
+		{
+			"name": "release-tests-bvonly",
+			"inherits": ["release-tests"],
+			"binaryDir": "${sourceDir}/build/release-bvonly",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,bv" }
+		},
+		{
+			"name": "devel-tests-nobv",
+			"inherits": ["devel-tests"],
+			"binaryDir": "${sourceDir}/build/devel-nobv",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,qint" }
+		},
+		{
+			"name": "devel-tests-bvonly",
+			"inherits": ["devel-tests"],
+			"binaryDir": "${sourceDir}/build/devel-bvonly",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,bv" }
+		},
+		{
 			"name": "debug-tests",
 			"inherits": ["debug", "_build-tests", "_build-type-debug"]
 		},
@@ -750,6 +774,22 @@
 			"configurePreset": "release-tests"
 		},
 		{
+			"name": "release-tests-nobv",
+			"configurePreset": "release-tests-nobv"
+		},
+		{
+			"name": "release-tests-bvonly",
+			"configurePreset": "release-tests-bvonly"
+		},
+		{
+			"name": "devel-tests-nobv",
+			"configurePreset": "devel-tests-nobv"
+		},
+		{
+			"name": "devel-tests-bvonly",
+			"configurePreset": "devel-tests-bvonly"
+		},
+		{
 			"name": "debug-repl-tests",
 			"configurePreset": "debug-repl-tests"
 		},
@@ -914,6 +954,22 @@
 		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-tests-nobv",
+			"configurePreset": "release-tests-nobv"
+		},
+		{
+			"name": "release-tests-bvonly",
+			"configurePreset": "release-tests-bvonly"
+		},
+		{
+			"name": "devel-tests-nobv",
+			"configurePreset": "devel-tests-nobv"
+		},
+		{
+			"name": "devel-tests-bvonly",
+			"configurePreset": "devel-tests-bvonly"
 		},
 		{
 			"name": "debug-repl-tests",

@@ -112,8 +112,12 @@ A macOS installer will be available in the future.
 
 ## **Compiling the source code**
 
-To compile the source code you need a recent C++ compiler supporting C++23, e.g.
-GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
+To compile the source code you need a C++ compiler supporting C++23: GCC 13.3
+or newer, or Clang 19 or newer (Clang 18 crashes while instantiating the tree
+pack in `src/instantiate_pack.cpp`). You also need at least cmake version 3.22.1
+installed in your system. `tau compile` builds the emitted project with the
+compiler given by `--cxx` or `TAU_CXX`, else with `clang++` when it is on
+PATH, else with cmake's default.
 The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
 libcurl, and Spot (`ltlsynt`/`ltl2tgba`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
