@@ -27,7 +27,7 @@ listed ids, and generates `tau_pack.h` into the build tree:
 | `tau_pack::node_t` | the node type of the configured pack |
 | `TAU_PACK_BASE_BAS` | the base BAs, for templates that build `tau_ba<BAs...>` |
 | `TAU_PACK_FULL_BAS` | the full variant list, wrapper included; use for `node<...>` |
-| `TAU_PACK_HAS_BA_<ID>` | one define per enabled BA |
+| `TAU_PACK_HAS_BA_<ID>` | one define per enabled BA, for tests and the pre-instantiation lists only; core never branches on it |
 
 `tau` is a reserved id: the wrapper BA embedding a whole Tau spec. When listed,
 the resolver emits `node<tau_ba<base...>, base...>`. Only `tau_ba` implements
@@ -134,7 +134,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |
 | `type_param(tree)`, `type_id_for(param)`, `type_tree_for(param)` | declare all three iff your family is parameterised (`bv[8]`); `pack_type_tree` then accepts a parameter for your family and refuses one for every other, and inference defaults an under-specified type (a widthless `:bv`) to your own parameterised type | owner |
 | `uses_oracle` | deciding a question leaves the process, so comparison-based checks (the conformance laws) skip you; absent means decided here | per BA |
-| `splitter(x, kind)`, `splitter_one(tree)` | a proper sub-element of a constant / of the type's one; required only when `atomless` | the constant's own alternative / owner |
+| `splitter(x, kind)`, `splitter_one(tree)` | a proper sub-element of a constant / of the type's one; required only when `atomless`, though a BA that is not may still provide them (qlt does). For a BA without them the dispatcher returns the element itself / `nullptr`, so a caller checks `pack_type_is_atomless` before relying on a proper sub-element | the constant's own alternative / owner |
 
 **Pack order is semantic** wherever the rule above says *first*, *any* or
 *chained*: `-DTAU_BAS=a,b` and `-DTAU_BAS=b,a` can differ there. Owner-gated
