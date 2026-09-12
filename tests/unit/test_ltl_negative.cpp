@@ -42,8 +42,9 @@ static bool realizable(const char* s) {
 	do_gc();
 	tref fm = spec_parse(s);
 	if (!fm) return false;
-	auto r = is_tau_formula_sat<node_t>(fm);
-	return r.has_value() && r.value();
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 // ── NEG-PARSE tests ────────────────────────────────────────────────────────────

@@ -486,10 +486,10 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
-			"F", "sometimes o1[t] = 1", "F", "F"
+			"F", "F o1[t] = 1", "F", "F"
 		};
 		strings u_expected = {
-			"F", "sometimes o1[t]:tau' = 0", "F", "F"
+			"F", "F o1[t]:tau' = 0", "F", "F"
 		};
 		// The sometimes clause is discharged at step 2 (o1 = T), after
 		// which o1 is unconstrained and solves to 0.
@@ -866,10 +866,10 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
-			"F", "sometimes o1[t] = 1", "F", "o1[t] = 1", "F"
+			"F", "F o1[t] = 1", "F", "o1[t] = 1", "F"
 		};
 		strings u_expected = {
-			"F", "sometimes o1[t]:tau' = 0", "F",
+			"F", "F o1[t]:tau' = 0", "F",
 			"always o1[t]:tau' = 0", "F"
 		};
 		// Steps 0-2 replay "sometimes_update": the sometimes clause

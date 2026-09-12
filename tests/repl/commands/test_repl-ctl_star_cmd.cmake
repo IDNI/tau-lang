@@ -25,10 +25,8 @@ add_repl_test(ctl_star-sat_U_contradictory_target
 	"sat (o1[t] = 1) U (o1[t] = 0 && o1[t] = 1)"
 	"satisfiability of this formula is not supported")
 
-# F over an input is unrealizable; sat has no satisfiability procedure for
-# full-LTL content, so the verdict is undecided, not a decided F.
-add_repl_test(ctl_star-sat_F_input_unrealizable "sat F i1[t] = 1"
-	"satisfiability of this formula is not supported")
+# F over an input is unrealizable: the environment can keep i1 at 0.
+add_repl_test(ctl_star-realizable_F_input_unrealizable "realizable F i1[t] = 1" ": F")
 add_repl_test(ctl_star-sat_F_output_realizable "sat F o1[t] = 1" ": T")
 
 # crash regressions: these aborted the Debug REPL (normalizer
@@ -118,14 +116,14 @@ set_tests_properties("test_repl-ltl_cmd-garbage_output_is_unknown" PROPERTIES
 	FAIL_REGULAR_EXPRESSION "UNREALIZABLE|Aborted|core dumped")
 
 # SY-R1: the Algorithm-D game path classifies backend failures too
-tau_repl_unsupported(_tau_skip "sat F o1[t]:qlt = {1/2}:qlt")
+tau_repl_unsupported(_tau_skip "realizable F o1[t]:qlt = {1/2}:qlt")
 if(_tau_skip)
-	tau_repl_record_skip("test_repl-sat-alg_d_no_verdict_is_unknown")
+	tau_repl_record_skip("test_repl-realizable-alg_d_no_verdict_is_unknown")
 else()
-	add_test(NAME "test_repl-sat-alg_d_no_verdict_is_unknown"
-		COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat F o1[t]:qlt = {1/2}:qlt\""
+	add_test(NAME "test_repl-realizable-alg_d_no_verdict_is_unknown"
+		COMMAND bash -c "TAU_LTL_ALG=D PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs:$PATH $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"realizable F o1[t]:qlt = {1/2}:qlt\""
 	)
-	set_tests_properties("test_repl-sat-alg_d_no_verdict_is_unknown" PROPERTIES
+	set_tests_properties("test_repl-realizable-alg_d_no_verdict_is_unknown" PROPERTIES
 		PASS_REGULAR_EXPRESSION "UNKNOWN"
 		FAIL_REGULAR_EXPRESSION "Aborted|core dumped")
 endif()
