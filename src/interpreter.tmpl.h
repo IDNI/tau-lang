@@ -848,7 +848,7 @@ post_normalization:
 		// is not handled by solution_with_max_update the way an ordered
 		// theory's constraints are, and memory pre-population achieves the
 		// same goal safely.
-		if constexpr (pack_has_arithmetic_theory_v<node>)
+		if constexpr (pack_can_host_bool<node>())
 		if (ltl_sol && ltl_sol->aut.num_states > 1
 				&& i.formula_time_point >= 1) {
 			const int k      = ltl_sol->aut.num_states;
@@ -1331,15 +1331,25 @@ interpreter<node>::step(const assignment<node>& values)
 	DBG(LOG_TRACE << "step/has_this_stream: " << has_this_stream << "\n";)
 	// If the "this" input stream is present, write the current spec into it
 	if (has_this_stream) {
-		tref current_this_stream = build_in_var_at_n<node>(
-			"this", time_point, get_ba_type_id<node>(tau_type<node>()));
-		// IN-M2: feed back the spec this step will actually follow
-		// (first solvable alternative per part), not the disjunction.
-		tref wrapped_spec = build_bf_ba_constant<node>(
-			node::ba::pack_tau_ba(unsqueeze_always(
-				executed_spec_fm(true))),
-				get_ba_type_id<node>(tau_type<node>()));
-		memory[current_this_stream] = wrapped_spec;
+		if constexpr (!pack_has_tau_ba_v<node>) {
+			LOG_ERROR << "the `this` stream needs the tau wrapper BA, "
+				"which this pack does not contain";
+		} else {
+			// IN-M2: feed back the spec this step will actually follow
+			// (first solvable alternative per part), not the disjunction.
+			auto packed = node::ba::pack_tau_ba(unsqueeze_always(
+				executed_spec_fm(true)));
+			if (!packed) LOG_ERROR
+				<< "could not pack the executed spec for `this`";
+			else {
+				tref current_this_stream = build_in_var_at_n<node>(
+					"this", time_point,
+					get_ba_type_id<node>(tau_type<node>()));
+				memory[current_this_stream] =
+					build_bf_ba_constant<node>(*packed,
+						get_ba_type_id<node>(tau_type<node>()));
+			}
+		}
 	}
 
 	solution<node> global;

@@ -129,6 +129,41 @@ TEST_SUITE("table_step_provider") {
 		CHECK(table_vals == solve_vals);
 	}
 
+	// The flag path writes value_constant(carrier, prop ? 1 : 0), so it
+	// assumes a carrier atom's prop truth IS the variable's value. A carrier
+	// output constrained to 0 is the case where that assumption would show.
+	TEST_CASE("a carrier-typed output constrained to 0 is emitted as 0 by "
+	          "the table provider") {
+		bdd_init<Bool>();
+		std::string ct = carrier_type_str();
+		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		std::string spec = "G(o1[t]" + ct + " = {0}" + ct + ").";
+
+		io_context<node_t> solve_ctx;
+		auto solve_o1 = std::make_shared<vector_output_stream>();
+		solve_ctx.add_output("o1", carrier_tid, solve_o1);
+		tref fm = parse_against(solve_ctx, spec);
+		REQUIRE(fm != nullptr);
+
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		auto [provider, bounds] = make_table_provider<node_t>(*sol);
+		REQUIRE(provider != nullptr);
+
+		auto solve_vals = run_solve_o1(fm, solve_ctx, solve_o1, 3);
+
+		io_context<node_t> table_ctx;
+		auto table_o1 = std::make_shared<vector_output_stream>();
+		table_ctx.add_output("o1", carrier_tid, table_o1);
+		auto table_vals = run_table_o1(provider, table_ctx, table_o1, 3,
+			bounds.first, bounds.second);
+
+		REQUIRE(solve_vals.size() == 3);
+		for (auto& v : solve_vals) CHECK(v == "0");
+		REQUIRE(table_vals.size() == 3);
+		for (auto& v : table_vals) CHECK(v == "0");
+	}
+
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("data-atom spec (bv): table provider matches the solve provider "
 	          "on a real (non-carrier) guard atom")

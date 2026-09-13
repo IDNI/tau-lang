@@ -6,46 +6,56 @@
 namespace idni::tau_lang {
 
 
-// try_propositional_synthesis dispatcher. The capability takes only the formula,
-// so a BA must recognise its own and decline everything else; the assert catches
-// two BAs claiming one formula, which is a self-gating bug rather than a pack
-// configuration error.
+/**
+ * @brief `true` when @p BA synthesises a strategy for its own propositional
+ *        formulas. Declared here rather than in ba_descriptor.h because the
+ *        result type is the LTL solution's.
+ */
+template <typename Node, typename BA>
+concept ba_has_propositional_synthesis = ba_has_descriptor_v<Node, BA>
+	&& requires(tref fm,
+		const std::vector<std::pair<tref, std::string>>& atoms) {
+		{ ba_descriptor<BA, Node>::try_propositional_synthesis(fm, atoms) }
+			-> std::convertible_to<result<propositional_synthesis<Node>>>; };
+
+/** @brief How many BAs of @p Node's pack declare the capability. */
+template <typename Node>
+constexpr std::size_t pack_propositional_synthesizer_count() {
+	return []<std::size_t... Is>(std::index_sequence<Is...>) {
+		return (std::size_t{0} + ... + std::size_t{
+			ba_has_propositional_synthesis<Node,
+				std::tuple_element_t<Is, typename Node::bas_tuple>>});
+	}(std::make_index_sequence<std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
 template <typename Node, typename BA>
 static result<propositional_synthesis<Node>> ba_try_propositional_synthesis(
 	tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 {
-	if constexpr (ba_has_descriptor_v<Node, BA>
-		&& requires { ba_descriptor<BA, Node>
-			::try_propositional_synthesis(fm, atoms); })
-	{
-		return ba_descriptor<BA, Node>
-			::try_propositional_synthesis(fm, atoms);
-	}
+	if constexpr (ba_has_propositional_synthesis<Node, BA>)
+		return ba_descriptor<BA, Node>::try_propositional_synthesis(fm, atoms);
 	// result's value constructor is explicit
 	return result<propositional_synthesis<Node>>{synthesis_declined<Node>()};
 }
 
+// Resolution: the single BA declaring the capability, which takes only the
+// formula and so must recognise its own; a second declarer is refused at
+// compile time, so no build can resolve two claimants by pack order.
 template <typename Node>
 static result<propositional_synthesis<Node>> pack_try_propositional_synthesis(
 	tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 {
+	static_assert(pack_propositional_synthesizer_count<Node>() <= 1,
+		"two BAs declare try_propositional_synthesis");
 	result<propositional_synthesis<Node>> r;
 	propositional_synthesis<Node> out;
-	[[maybe_unused]] int claimants = 0;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is,
-				typename Node::bas_tuple>;
-			// an undecided BA is not a claimant: its report is the answer
-			auto got = r.merge_take(ba_try_propositional_synthesis<Node, BA>(
-				fm, atoms));
-			if (!got) return;
-			if (*got) { ++claimants; if (!out) out = std::move(*got); }
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	assert(claimants <= 1 && "pack_try_propositional_synthesis: two BAs claim "
-		"the same formula");
+	pack_visit_all<Node>([&]<typename BA>() {
+		// an undecided BA is not a claimant: its report is the answer
+		auto got = r.merge_take(
+			ba_try_propositional_synthesis<Node, BA>(fm, atoms));
+		if (!got) return;
+		if (*got && !out) out = std::move(*got);
+	});
 	if (r.has_error()) return r;
 	r = std::move(out);
 	return r;

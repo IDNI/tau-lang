@@ -48,24 +48,11 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 			type_name);
 	}
 
-	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
-
 	static bool owns_type(size_t ba_type_id) {
 		return ba_types_detail::type_tree_name_is<my_ba, node_t>(
 			ba_type_id, type_name);
 	}
 
-	/** @brief Return the subtype for a parameterized type (`bv[8]`). */
-	static std::optional<unsigned short> type_param(tref) {
-		return std::nullopt;
-	}
-
-	static size_t type_id_for(unsigned short) {
-		static const size_t id = ba_types<node_t>::id(type_tree());
-		return id;
-	}
-
-	static tref type_tree_for(unsigned short) { return type_tree(); }
 
 	// ── constants ───────────────────────────────────────────────────────
 	static bool is_syntactic_one(const my_ba& x) { return x.value; }

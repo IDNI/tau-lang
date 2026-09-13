@@ -122,23 +122,17 @@ TEST_SUITE("sbf_codegen") {
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
-		// When sbf is the pack's bool carrier, the free vars in this atom
-		// carry the carrier type, so atom_is_data_typed sees only flags and
-		// the atom never reaches the atoms table.
-		if (ba_types<node_t>::id(pack_bool_carrier_type<node_t>())
-		    == sbf_type_id<node_t>()) {
-			CHECK(d->atoms.empty());
-			REQUIRE(d->outputs.size() == 1);
-			CHECK(d->outputs[0].kind == field_kind::flag);
-			REQUIRE(d->flag_output_vars.size() == 1);
-			CHECK(d->flag_output_vars[0] == "o1");
-		} else {
-			REQUIRE(d->atoms.size() == 1);
-			const std::string& e = d->atoms[0].ground_expr;
-			CHECK(has(e, "build_bf_eq<"));
-			CHECK(has(e, "var_dict(std::string(\"X\"))"));
-			CHECK(has(e, "var_dict(std::string(\"Y\"))"));
-		}
+		// The same whether or not sbf is the pack's bool carrier: the prop's
+		// truth does not decide o1's value (X & Y is neither 0 nor 1), so
+		// the atom is solved for o1 as a template rather than written as a
+		// flag, which would put the carrier's 1 into o1 instead of X & Y.
+		REQUIRE(d->atoms.size() == 1);
+		REQUIRE(d->outputs.size() == 1);
+		CHECK(d->outputs[0].kind == field_kind::witness_template);
+		const std::string& e = d->atoms[0].ground_expr;
+		CHECK(has(e, "build_bf_eq<"));
+		CHECK(has(e, "var_dict(std::string(\"X\"))"));
+		CHECK(has(e, "var_dict(std::string(\"Y\"))"));
 	}
 }
 

@@ -118,9 +118,9 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 			== std::optional<unsigned short>(8) );
 		CHECK( ba_descriptor<bv, conv_node>::type_param(t16)
 			== std::optional<unsigned short>(16) );
-		// every other BA is unparameterized and yields nullopt
-		CHECK( ba_descriptor<qint, conv_node>::type_param(qint_type<conv_node>())
-			== std::nullopt );
+		// every other BA is unparameterized and declares none of the trio
+		static_assert(!ba_has_type_tree_for<conv_node, qint>);
+		static_assert(!ba_has_type_tree_for<conv_node, sbf_ba>);
 	}
 
 	TEST_CASE("bv literals are width-dependent, unlike every other BA's") {
@@ -207,5 +207,48 @@ TEST_SUITE("capability concepts name what each descriptor declares") {
 		static_assert(!ba_uses_oracle_v<N, int>);
 		static_assert(!ba_output_always_satisfiable_v<N, int>);
 		CHECK(true);
+	}
+}
+
+TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
+
+	TEST_CASE("a Boolean carrier builds a plain value: Bool's value_constant") {
+		using N = node<bv, Bool>;
+		static_assert(ba_has_value_constant<N, Bool>);
+		const size_t bid = ba_types<N>::id(ba_descriptor<Bool, N>::type_tree());
+		tref one = pack_value_constant<N>(bid, 1);
+		tref zero = pack_value_constant<N>(bid, 0);
+		REQUIRE(one != nullptr);
+		REQUIRE(zero != nullptr);
+		CHECK(one != zero);
+	}
+
+	TEST_CASE("the arithmetic pipeline is on exactly when a BA has arith_ops and solve") {
+		static_assert(pack_has_arithmetic_theory_v<conv_node>);
+		static_assert(!pack_has_arithmetic_theory_v<mini_node>);
+		static_assert(ba_has_arithmetic_theory_v<conv_node, bv>);
+		static_assert(!ba_has_arithmetic_theory_v<conv_node, qlt>);
+		static_assert(!ba_has_arithmetic_theory_v<conv_node, sbf_ba>);
+		CHECK(true);
+	}
+
+	TEST_CASE("pack_solver_count counts the BAs declaring solve") {
+		static_assert(pack_solver_count<conv_node>() == 1);
+		static_assert(pack_solver_count<mini_node>() == 0);
+		CHECK(true);
+	}
+
+	TEST_CASE("exactly one BA may claim propositional synthesis") {
+		static_assert(pack_propositional_synthesizer_count<conv_node>() <= 1);
+		static_assert(pack_propositional_synthesizer_count<mini_node>() == 0);
+		CHECK(true);
+	}
+
+	TEST_CASE("pack_tau_ba is empty in a pack without the wrapper") {
+		using N = node<bv, Bool>;
+		static_assert(!pack_has_tau_ba_v<N>);
+		static_assert(pack_has_tau_ba_v<conv_node>);
+		static_assert(pack_has_tau_ba_v<mini_node>);
+		CHECK_FALSE(N::ba::pack_tau_ba(nullptr).has_value());
 	}
 }

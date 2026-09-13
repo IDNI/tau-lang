@@ -14,6 +14,8 @@
 // for the AP2-1 gc-pinning regression at the end of this file
 #include "repl_evaluator.h"
 
+#include <algorithm>
+
 using tau_api = api<node_t>;
 
 TEST_SUITE("interpreter") {
@@ -114,6 +116,38 @@ TEST_SUITE("interpreter") {
 		auto vals = o->get_values();
 		REQUIRE(vals.size() == 3);
 		for (auto& v : vals) CHECK(matches_to_any_of(v, strings{ "T" }));
+	}
+
+	TEST_CASE("a multi-state Mealy strategy emits a valid initial output at "
+		  "step 0 in every pack with a Boolean carrier")
+	{
+		// o[0] = 1 pins the first output and F(o[t] = 0) obliges a later
+		// change, so the strategy has two states and step 0 must emit
+		// something other than the default zero; the carrier is whatever
+		// this pack resolves it to
+		const size_t cid = get_ba_type_id<node_t>(
+			pack_bool_carrier_type<node_t>());
+		const std::string ct = get_ba_type_name<node_t>(cid);
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", cid, o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("G(o[0]" + ct + " = {1}" + ct
+			+ ") && F(o[t]" + ct + " = {0}" + ct + ")", opts);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		REQUIRE(ran.value().cached_solution.has_value());
+		REQUIRE(ran.value().cached_solution->aut.num_states > 1);
+		auto vals = o->get_values();
+		REQUIRE(vals.size() == 3);
+		// the pinned first output, not the default zero, and the
+		// eventual obligation met inside the run
+		CHECK(vals[0] == "1");
+		CHECK(std::find(vals.begin(), vals.end(), "0") != vals.end());
 	}
 }
 

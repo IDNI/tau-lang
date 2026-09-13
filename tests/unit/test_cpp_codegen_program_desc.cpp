@@ -138,6 +138,15 @@ captured_run run_capture_ec(const std::string& cmd) {
 
 TEST_SUITE("cpp_codegen_program_desc") {
 
+#ifdef TAU_PACK_BOOL_CARRIERS
+	TEST_CASE("the emitted CMakeLists pins TAU_PACK_BOOL_CARRIERS to the "
+	          "emitting build's order") {
+		const std::string cm = compile_detail::emit_cmake_sdk_linked("probe");
+		CHECK(cm.find("TAU_PACK_BOOL_CARRIERS=\\\"" TAU_PACK_BOOL_CARRIERS
+			"\\\"") != std::string::npos);
+	}
+#endif
+
 	// ── (a) build_program_desc_prop + emit_program ──────────────────────────
 
 	TEST_CASE("build_program_desc_prop: structural shape") {
@@ -571,8 +580,14 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		    "  std::printf(\"\\n\");\n"
 		    "  return 0;\n"
 		    "}\n";
+		// One field per atom, all over the same variable o, each holding
+		// o's value as its own atom decides it: at step 1 the spec pins
+		// o = 0, so the o = 0 field reads 0 there and 1 elsewhere, the two
+		// o = 1 fields the other way round. (A field is never its prop's
+		// truth -- that would print 100 010 001 and write 1 into a stream
+		// the spec constrains to 0.)
 		auto result = compile_and_run(os.str(), main_src, "posflag");
-		CHECK(result == "100 010 001 ");
+		CHECK(result == "110 000 011 ");
 	}
 
 	// Both positional atoms sit inside an implication -- an implication of
@@ -1016,7 +1031,9 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		size_t tau_tid = ba_types<node_t>::id(tau_type<node_t>());
 		tref io = build_in_var_at_t<node_t>(
 			build_var_name<node_t>("i1"), tau_tid, "t");
-		tref leaf = tau::get_ba_constant(node_t::ba::pack_tau_ba(io), tau_tid);
+		auto packed = node_t::ba::pack_tau_ba(io);
+		REQUIRE(packed.has_value());
+		tref leaf = tau::get_ba_constant(*packed, tau_tid);
 		REQUIRE(tau::get(leaf).is_ba_constant());
 		tref cst = tau::get_raw(node_t(tau::bf), &leaf, 1);
 		REQUIRE(tree<node_t>::get(tree<node_t>::trim(cst)).is_ba_constant());

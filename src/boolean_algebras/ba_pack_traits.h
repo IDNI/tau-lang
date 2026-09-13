@@ -32,26 +32,29 @@ struct is_tau_ba : std::false_type {};
 template <typename T>
 inline constexpr bool is_tau_ba_v = is_tau_ba<T>::value;
 
+/** @brief `true` when some BA of @p Node's pack is the wrapper. */
+template <typename Node>
+inline constexpr bool pack_has_tau_ba_v =
+	[]<std::size_t... Is>(std::index_sequence<Is...>) {
+		return (is_tau_ba_v<std::tuple_element_t<Is,
+			typename Node::bas_tuple>> || ...);
+	}(std::make_index_sequence<std::tuple_size_v<typename Node::bas_tuple>>{});
+
 /**
- * @brief `true` for a BA with arithmetic terms and its own decision procedure.
- *
- * The primary sits in core so the normalizer can ask whether the configured
- * pack needs the arithmetic machinery (predicate blasting, the arithmetic
- * skip, the theory solver) at all; a BA that has it specializes this in its
- * own header.
+ * @brief `true` when @p BA brings arithmetic terms and its own decision
+ *        procedure: exactly the two capabilities the arithmetic pipeline
+ *        (predicate blasting, the arithmetic skip, the theory solver)
+ *        dispatches on, so the gate and the dispatch cannot disagree.
  */
-template <typename BA>
-struct ba_has_arithmetic_theory : std::false_type {};
-
-template <typename BA>
+template <typename Node, typename BA>
 inline constexpr bool ba_has_arithmetic_theory_v =
-	ba_has_arithmetic_theory<BA>::value;
+	ba_arith_ops_v<Node, BA> && ba_has_solve<Node, BA>;
 
-/** @internal @brief Fold of @ref ba_has_arithmetic_theory over a pack. */
+/** @internal @brief Fold of @ref ba_has_arithmetic_theory_v over a pack. */
 template <typename Node, std::size_t... Is>
 constexpr bool pack_has_arithmetic_theory_impl(std::index_sequence<Is...>) {
 	using pack = typename Node::bas_tuple;
-	return (ba_has_arithmetic_theory_v<std::tuple_element_t<Is, pack>>
+	return (ba_has_arithmetic_theory_v<Node, std::tuple_element_t<Is, pack>>
 		|| ...);
 }
 
@@ -147,14 +150,29 @@ auto pack_solve_impl(Form form) {
 
 } // namespace detail
 
+/** @brief How many BAs of @p Node's pack declare `solve`. */
+template <typename Node>
+constexpr std::size_t pack_solver_count() {
+	return []<std::size_t... Is>(std::index_sequence<Is...>) {
+		return (std::size_t{0} + ... + std::size_t{ba_has_solve<Node,
+			std::tuple_element_t<Is, typename Node::bas_tuple>>});
+	}(std::make_index_sequence<std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
 /**
- * @brief Solve @p form with the first BA whose descriptor offers a solver.
+ * @brief Solve @p form with the single BA whose descriptor offers a solver.
  *
+ * Resolution: the one BA declaring `solve`; two are refused at compile time,
+ * since this takes no type id and would otherwise pick by pack order.
  * Templated on @p Form and returning `auto` so core need not name the solution
  * type, which would pull solver headers into these traits.
  */
 template <typename Node, typename Form>
 auto pack_solve(Form form) {
+	static_assert(pack_solver_count<Node>() <= 1,
+		"pack_solve routes to the first BA declaring solve; a pack with "
+		"two solvers needs owner-gated routing (pass the partition's type "
+		"id and use pack_owner_apply) before it can be built");
 	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		return detail::pack_solve_impl<Node, Form,
 			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
@@ -320,9 +338,12 @@ bool pack_type_has_arith_ops_impl(Type type) {
 	if constexpr (std::is_same_v<Type, size_t>) if (!type) return false;
 	bool out = false;
 	pack_visit_all<Node>([&]<typename BA>() {
-		if constexpr (ba_arith_ops_v<Node, BA>)
-			if (!out && ba_descriptor<BA, Node>::owns_type(type))
-				out = true;
+		if constexpr (ba_arith_ops_v<Node, BA>) {
+			if (out) return;
+			if constexpr (std::is_same_v<Type, size_t>)
+				out = ba_descriptor<BA, Node>::owns_type(type);
+			else out = ba_descriptor<BA, Node>::matches_type(type);
+		}
 	});
 	return out;
 }
@@ -525,6 +546,10 @@ tref pack_bool_carrier_type() {
 	int best = -1;
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_can_host_bool_v<Node, BA>) {
+			static_assert(ba_has_value_constant<Node, BA>,
+				"a BA declaring can_host_bool must also build a plain "
+				"value with value_constant: core writes carrier bits "
+				"with it");
 #ifdef TAU_PACK_BOOL_CARRIERS
 			constexpr int rank = ba_carrier_rank(
 				TAU_PACK_BOOL_CARRIERS,
@@ -626,7 +651,8 @@ std::optional<std::string> pack_codegen_constant_expr(size_t ba_type_id, tref cs
 /**
  * @brief The type tree of the pack BA named @p family: its default tree, or
  *        `type_tree_for(*param)` when @p param names a parameterized
- *        instance. nullptr when no pack member answers to the name.
+ *        instance. nullptr when no pack member answers to the name, or when
+ *        a parameter is given for a family that declares none.
  *
  * An emitted artifact's main resolves its baked ba-type table through this,
  * so a reduced pack works as long as it contains the families the spec uses.
@@ -640,11 +666,11 @@ tref pack_type_tree(const std::string& family,
 		if constexpr (ba_has_descriptor_v<Node, BA>) {
 			if (out || family != ba_descriptor<BA, Node>::type_name)
 				return;
-			if constexpr (ba_has_type_tree_for<Node, BA>) {
+			if constexpr (ba_has_type_tree_for<Node, BA>)
 				out = param
 					? ba_descriptor<BA, Node>::type_tree_for(*param)
 					: ba_descriptor<BA, Node>::type_tree();
-			} else out = ba_descriptor<BA, Node>::type_tree();
+			else if (!param) out = ba_descriptor<BA, Node>::type_tree();
 		}
 	});
 	return out;
@@ -663,7 +689,7 @@ pack_type_family_param(tref type_tree) {
 	std::optional<std::pair<std::string, std::optional<unsigned short>>> out;
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_descriptor_v<Node, BA>) {
-			if (out || !ba_descriptor<BA, Node>::owns_type(type_tree))
+			if (out || !ba_descriptor<BA, Node>::matches_type(type_tree))
 				return;
 			std::optional<unsigned short> param;
 			if constexpr (ba_has_type_tree_for<Node, BA>)
@@ -690,7 +716,7 @@ std::optional<bool> pack_literal_incomplete(tref type_tree,
 	std::optional<bool> out;
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_literal_incomplete<Node, BA>)
-			if (!out && ba_descriptor<BA, Node>::owns_type(type_tree))
+			if (!out && ba_descriptor<BA, Node>::matches_type(type_tree))
 				out = ba_descriptor<BA, Node>::literal_incomplete(src);
 	});
 	return out;

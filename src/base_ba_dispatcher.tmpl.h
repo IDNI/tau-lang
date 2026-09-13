@@ -235,11 +235,12 @@ tref base_ba_dispatcher<BAs...>::unpack_tau_ba(
 }
 
 // Only the wrapper BA packs a tree back into a constant; the first one that
-// declares itself the wrapper and accepts the tree wins.
+// declares itself the wrapper and accepts the tree wins, and nullopt says no
+// BA of the pack is the wrapper, or the wrapper declined.
 template <typename node_t, typename First, typename... Rest>
 struct pack_tau_ba_one {
 	template <typename... PackBAs>
-	static std::variant<PackBAs...> go(tref t) {
+	static std::optional<std::variant<PackBAs...>> go(tref t) {
 		if constexpr (is_tau_ba_v<First>) {
 			if (auto packed = ba_descriptor<First, node_t>::pack(t))
 				return std::variant<PackBAs...>(
@@ -248,13 +249,15 @@ struct pack_tau_ba_one {
 		if constexpr (sizeof...(Rest) > 0)
 			return pack_tau_ba_one<node_t, Rest...>
 				::template go<PackBAs...>(t);
-		return std::variant<PackBAs...>{};
+		return std::nullopt;
 	}
 };
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::variant<BAs...> base_ba_dispatcher<BAs...>::pack_tau_ba(tref t) {
+std::optional<std::variant<BAs...>> base_ba_dispatcher<BAs...>::pack_tau_ba(
+	tref t)
+{
 	return pack_tau_ba_one<node_t, BAs...>::template go<BAs...>(t);
 }
 
