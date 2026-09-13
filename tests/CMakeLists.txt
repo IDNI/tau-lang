@@ -102,7 +102,8 @@ set(TAU_TEST_REQUIRES_test_algorithm_b qlt)
 set(TAU_TEST_REQUIRES_test_algorithm_d qlt sbf)
 set(TAU_TEST_REQUIRES_test_antiprenexing bv sbf)
 set(TAU_TEST_REQUIRES_test_ba_constants bv sbf)
-set(TAU_TEST_REQUIRES_test_ba_descriptor_pack bv hsb nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ba_descriptor_pack sbf)
+set(TAU_TEST_REQUIRES_test_ba_descriptor_pack_full bv hsb nlang qint qlt sbf)
 set(TAU_TEST_REQUIRES_test_ba_types bv sbf)
 set(TAU_TEST_REQUIRES_test_ba_types_inference sbf)
 set(TAU_TEST_REQUIRES_test_base_ba_dispatcher bv sbf)
@@ -233,8 +234,10 @@ function(_tau_add_test_target N src work_dir)
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
-	# on the CI hardware.  Everything else gets the default.
-	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression)$")
+	# on the CI hardware, and test_ltl_fuzz's three property runs take
+	# 400-550 s alone in a -O0 build, so any parallel load tips it over.
+	# Everything else gets the default.
+	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression|ltl_fuzz)$")
 		set(_TAU_TEST_TIMEOUT 1500)
 	else()
 		set(_TAU_TEST_TIMEOUT 600)

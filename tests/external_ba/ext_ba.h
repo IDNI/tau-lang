@@ -12,6 +12,7 @@
 #ifndef __IDNI__TAU__TESTS__EXTERNAL_BA__EXT_BA_H__
 #define __IDNI__TAU__TESTS__EXTERNAL_BA__EXT_BA_H__
 
+#include <array>
 #include <functional>
 #include <optional>
 #include <ostream>
@@ -109,6 +110,36 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	{
 		return parse_ext_ba<PackBAs...>(src);
 	}
+
+	// Optional capabilities, one of each resolution kind, so the
+	// out-of-tree path proves every way core reaches a plugin.
+
+	/** @brief Owner-gated: the zero of this type as a bf constant. */
+	static tref zero_constant(size_t) {
+		return tau::get(tau::bf, tau::get_ba_constant(
+			typename tau::constant(ext_ba{ false }), type_tree()));
+	}
+
+	/** @brief Accumulated: a preprocessing pass that is the identity. */
+	static tref preprocess(tref n) { return n; }
+	static void set_preprocessing(bool) {}
+
+	/** @brief Declared: an option of its own, addressed as `ext-probe`. */
+	static bool get_probe() { return probe_; }
+	static void set_probe(bool b) { probe_ = b; }
+	static std::array<ba_option, 1> options() {
+		return {{ { "probe", ba_option_kind::flag, get_probe, set_probe,
+			nullptr, nullptr,
+			"a switch with no effect, proving options cross the plugin "
+			"boundary" } }};
+	}
+	static inline bool probe_ = false;
+};
+
+/** @brief Hooked: declines every comparison, so the atom must survive. */
+template <typename... PackBAs>
+struct ba_wff_hooks<ext_ba, node<PackBAs...>> {
+	static tref wff_lt(const tref*, tref) { return nullptr; }
 };
 
 } // namespace idni::tau_lang

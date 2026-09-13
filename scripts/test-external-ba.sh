@@ -20,8 +20,11 @@ if command -v ninja > /dev/null 2>&1 \
 	generator="Ninja"
 fi
 
+# CC/CXX in the environment win; otherwise clang when it is on PATH.
 compiler_args=()
-if command -v clang++ > /dev/null 2>&1 \
+if [ -n "${CXX:-}" ]; then
+	compiler_args=(-DCMAKE_C_COMPILER="${CC:-gcc}" -DCMAKE_CXX_COMPILER="$CXX")
+elif command -v clang++ > /dev/null 2>&1 \
 		&& command -v clang > /dev/null 2>&1; then
 	compiler_args=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++)
 fi
@@ -45,6 +48,10 @@ grep -q 'ext_ba' "$pack_header" \
 echo "== building the tau CLI and every suite the pack can run"
 cmake --build "$build" -j"$jobs"
 
+echo "== checking the contract suites are among what the pack runs"
+n="$(ctest --test-dir "$build" -N | grep -c 'test_ba_conformance\|test_ba_pack_traits\|test_ba_descriptor_pack$')"
+[ "$n" -eq 3 ] || { echo "FAIL: expected the 3 contract suites, ctest lists $n"; exit 1; }
+
 echo "== running every suite the pack can run"
 # each suite gates itself on the algebras it declares, so a three-BA pack runs
 # what is pack-agnostic plus what names only sbf, tau or ext -- including the
@@ -57,5 +64,10 @@ echo "== smoke-running the binary"
 out="$(printf 'sat {1}:ext = {1}:ext.\nq\n' | "$build/tau" 2>&1)"
 echo "$out" | sed 's/\x1b\[[0-9;]*m//g' | grep -q ': T' \
 	|| { echo "FAIL: external BA constant did not evaluate"; echo "$out"; exit 1; }
+
+echo "== smoke-testing the external BA's own option"
+out="$("$build/tau" -e 'set ext-probe on. get ext-probe' -S trace 2>&1)"
+echo "$out" | sed 's/\x1b\[[0-9;]*m//g' | grep -q 'ext-probe: on' \
+	|| { echo "FAIL: external BA option did not round-trip"; echo "$out"; exit 1; }
 
 echo "PASS: out-of-tree BA 'ext' built into the pack and answered a query"

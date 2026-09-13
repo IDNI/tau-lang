@@ -40,7 +40,7 @@ register a phantom BA in every build. Write one when you copy the directory.
    is registered then too, and a suite needing another algebra says so with
    `set(TAU_BA_TEST_REQUIRES_test_<name> bv qlt)`.
 
-3. Configure with the id in the pack: `./dev preset debug -DTAU_BAS=tau,sbf,<id>`.
+3. Configure with the id in the pack: `./dev preset devel -DTAU_BAS=tau,sbf,<id>`.
 
 Nothing else in the tree needs editing — the manifest is discovered by glob and
 the descriptor is found by specialization.
@@ -72,8 +72,10 @@ against the line that names it. Assert it for your pack with:
 static_assert(assert_pack_descriptors_complete<my_node_t>());
 ```
 
-Capabilities beyond that surface are optional and probed with `requires`, never
-by BA name — declare `can_host_bool` if one of your types can hold a plain 0 or
-1 (add `bool_carrier_type()` when that is not your `type_tree()`), or both
-`arith_ops` and `solve` if the algebra brings arithmetic terms and its own
-decision procedure — that pair alone turns the arithmetic pipeline on.
+Capabilities beyond that surface are optional and probed by named concept,
+never by BA name. The two most common: `can_host_bool` if one of your types can
+hold a plain 0 or 1 (add `bool_carrier_type()` when that is not your
+`type_tree()`), and both `arith_ops` and `solve` if the algebra brings
+arithmetic terms and its own decision procedure — that pair alone turns the
+arithmetic pipeline on. The whole surface, each member with the rule the pack
+resolves it by, is the table in `docs/adding_base_bas.md`.

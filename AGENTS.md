@@ -200,15 +200,18 @@ hand-written per-pack dispatchers left** — one generic descriptor-driven
 `base_ba_dispatcher` serves every pack, default or reduced.
 
 Beyond the mandatory surface, a BA may declare **optional capabilities**, which
-core probes with `requires` and never by BA name. Those in use today live in
-`ba_pack_traits.h` as `pack_*` folds: `solve`, `can_solve`,
-`sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`,
-`value_constant`, `arith_ops`, `non_aba_omcat`, `literal_incomplete`,
-`can_host_bool`/`bool_carrier_type`, `print_constant`, `uses_oracle`. The last
-is declared by nlang alone — deciding a question there leaves the process, so
-generic checks that compare two constants sit it out; absent means decided
-in-process, which is what every other algebra says by saying nothing. The
-carrier pair feeds
+core probes by named concept (`ba_has_<capability>` in `ba_descriptor.h`) and
+never by BA name. The full table, each member with its resolution rule, is in
+`docs/adding_base_bas.md`. The folds live in `ba_pack_traits.h` as `pack_*`
+(`literal_incomplete` included, as `pack_literal_incomplete`), with three
+exceptions: `print_constant` and `hash_constant` are read at the point of use,
+since a variant visit already names the one BA to ask; `uses_oracle` is read by
+the conformance test only (nlang declares it — deciding a question there leaves
+the process, so checks that compare two constants sit it out); and the folds
+needing solver or LTL types sit beside their consumer:
+`omcat_solve_inequality_system` in `solver.tmpl.h`,
+`try_propositional_synthesis` in `ltl_aba_builders.tmpl.h`, and the comparison
+hooks in `hooks_wff.tmpl.h`. The carrier pair feeds
 `pack_bool_carrier_type`, the type core builds a plain 0/1 in (an LTL state bit,
 a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
 `bool_carrier_type` names *which* of its types when that is not `type_tree()`
@@ -220,8 +223,13 @@ own `operator<<` formats a constant unhelpfully (bv prints SMT-LIB) says how Tau
 should render it. Each fold's empty case is chosen deliberately — `pack_solve`
 static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
 and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
-type" is ordinary. When writing a fold, use `if constexpr` inside a per-element
-lambda: a `?:` in a fold expression instantiates both arms for every BA.
+type" is ordinary. When writing a fold, name the capability as a concept in
+`ba_descriptor.h` and test the name with `if constexpr` inside `pack_visit_all`
+or `pack_owner_apply`; never nest a `requires`-expression inside the fold's
+lambda (gcc 13 crashes on it), and never use `?:` in a fold expression (it
+instantiates both arms for every BA). `default_type_priority`: lower wins the
+pack's default type; tau 0, sbf and Bool 1, every other in-tree BA 50, ties by
+pack order.
 
 **Rewrite hooks are a second, separate mechanism.** `ba_descriptor.h` also
 declares `ba_wff_hooks<BA, Node>` and `ba_term_hooks<BA, Node>` — *defined and
@@ -238,8 +246,9 @@ To add a BA, copy `src/boolean_algebras/_template/` and follow
 `docs/adding_base_bas.md`. A manifest declares everything the plugin owns —
 sources, its grammar (`TAU_BA_GRAMMAR`) and its suites (`TAU_BA_TESTS`, with
 `TAU_BA_TEST_REQUIRES_<target>` for a suite needing another algebra) — so no
-central list names an algebra. `tests/unit/test_ba_descriptor_pack.cpp` is where
-each BA joins a pack so its descriptor is type-checked, and
+central list names an algebra. `tests/unit/test_ba_descriptor_pack_full.cpp` is
+where each BA joins a pack so its descriptor is type-checked (its twin without
+the `_full` suffix covers the smallest pack, sbf and tau, in every build), and
 `tests/unit/test_ba_conformance.cpp` runs one battery against every algebra of
 the configured pack, checking that the descriptor behaves rather than merely
 compiles. `scripts/test-external-ba.sh` proves the out-of-tree path end to end:

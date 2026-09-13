@@ -14,9 +14,9 @@ its `README.md` is the short version of this page.
 The BAs of a build are its *pack*, resolved at configure time:
 
 ```bash
-./dev preset debug                           # the default pack
-./dev preset debug -DTAU_BAS=tau,sbf,bv      # a smaller one
-./dev preset debug -DTAU_BAS=sbf,tau         # smallest useful pack
+./dev preset devel                           # the default pack
+./dev preset devel -DTAU_BAS=tau,sbf,bv      # a smaller one
+./dev preset devel -DTAU_BAS=sbf,tau         # smallest useful pack
 ```
 
 `cmake/tau_bas.cmake` globs `src/boolean_algebras/*/ba.cmake`, resolves the
@@ -27,7 +27,7 @@ listed ids, and generates `tau_pack.h` into the build tree:
 | `tau_pack::node_t` | the node type of the configured pack |
 | `TAU_PACK_BASE_BAS` | the base BAs, for templates that build `tau_ba<BAs...>` |
 | `TAU_PACK_FULL_BAS` | the full variant list, wrapper included; use for `node<...>` |
-| `TAU_PACK_HAS_BA_<ID>` | one define per enabled BA |
+| `TAU_PACK_HAS_BA_<ID>` | one define per enabled BA, for tests and the pre-instantiation lists only; core never branches on it |
 
 `tau` is a reserved id: the wrapper BA embedding a whole Tau spec. When listed,
 the resolver emits `node<tau_ba<base...>, base...>`. Only `tau_ba` implements
@@ -47,7 +47,7 @@ parameterized one, matched by family name, so `:bv[8]` needs `bv` in the pack.
 
 ### The value type
 
-Any type with the Boolean operators (`operator~`, `&`, `|`, `^`, `+`), plus
+Any type with the Boolean operators (`operator~`, `&`, `|`, `^`), plus
 three things generic core requires of every alternative in the constants
 variant:
 
@@ -74,7 +74,8 @@ against the line naming it:
   id)
 - **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
   `is_closed`, `literal_one`, `literal_zero`
-- **normalization** — `normalize`, `splitter`, `splitter_one`
+- **normalization** — `normalize` (`splitter` and `splitter_one` join it when
+  `atomless`; see the optional table)
 - **rewriting** — `simplify_symbol`, `simplify_term`
 - **parsing** — `parse`
 
@@ -103,24 +104,42 @@ whose alias names a template with an `idni::tau_lang` argument, is unaffected.
 ### Optional capabilities
 
 Anything beyond the mandatory surface is an **optional capability**: core probes
-for it with `requires` and never by BA name, so declaring one is how you opt in.
-Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
+for it with a named concept (`ba_has_<capability>` in `ba_descriptor.h`) and
+never by BA name, so declaring one is how you opt in. Omit any that does not
+apply. The folds live in `ba_pack_traits.h` as `pack_*`, except the three that
+need solver or LTL types, which sit beside their single consumer:
+`omcat_solve_inequality_system` (`solver.tmpl.h`), `try_propositional_synthesis`
+(`ltl_aba_builders.tmpl.h`) and the comparison hooks (`hooks_wff.tmpl.h`).
 
-| member | what core asks it for |
-|---|---|
-| `type_param(tree)`, `type_id_for(param)`, `type_tree_for(param)` | declare all three iff your family is parameterised (`bv[8]`); `pack_type_tree` then accepts a parameter for your family and refuses one for every other, and inference defaults an under-specified type (a widthless `:bv`) to your own parameterised type |
-| `solve` | your own decision procedure for a whole formula |
-| `can_solve` | whether a formula is one you can decide at all |
-| `sat_status` | a *definite* answer — `optional<bool>`, so "unknown" stays distinct from "unsat" |
-| `preprocess`, `set_preprocessing` | a rewriting pass to run before solving |
-| `zero_constant(ba_type)` | the type's default zero, when it is not `bf_f` |
-| `value_constant(ba_type, value)` | a constant of that type holding a plain integer value |
-| `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading |
-| `arith_ops` | that the grammar's arithmetic term operators apply to your type |
-| `can_host_bool` | that one of your types can hold a plain 0 or 1, making you a candidate Boolean carrier |
-| `bool_carrier_type()` | *which* of your types that is, when it is not your `type_tree()` — bv answers `bv[1]`, not its default `bv[16]` |
-| `print_constant(os, x)` | how to render a constant, when your own `operator<<` formats it in a way Tau should not show |
-| `uses_oracle` | that deciding a question can leave the process — comparing two constants asks a service, and need not be reproducible. Absent means decided here, which is what nearly every algebra declares by saying nothing |
+| member | what core asks it for | resolution |
+|---|---|---|
+| `solve(fm)` | your own decision procedure for a whole formula | the single declarer (two are refused at compile time) |
+| `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
+| `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch | every declarer, chained in pack order |
+| `formula_is_preprocessable(fm)`, `has_preprocessing_residue(fm)` | whether your pass can still make progress / left a shape closing would make expensive | any declarer |
+| `term_is_blasteable(term)` | whether a term with an arithmetic operator can be blasted | owner of the term's type |
+| `arith_ops` | that the grammar's arithmetic term operators apply to your type | owner |
+| `zero_constant(ba_type)`, `value_constant(ba_type, v)` | the type's default zero, when it is not `bf_f`; a constant holding a plain integer | owner |
+| `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
+| `omcat_qe(var, body)` | eliminate a quantifier over your own theory; `nullopt` falls through to the atomless path | owner |
+| `omcat_solve_inequality_system(sys, opts)` | solve a pure ordering system over your theory | owner |
+| `try_propositional_synthesis(fm, atoms)` | synthesise a propositional strategy for your own atoms | the single declarer |
+| `semantic_pwr_optimal(clause, update)` | revise a clause through your winning region | first declarer that answers |
+| `codegen_witness(var, conj)`, `codegen_constant_expr(cst)` | C++ spellings of a witness / a constant for generated code | owner |
+| `output_always_satisfiable_by_system` | that a system can always meet an output constraint by choosing its output | owner |
+| `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading | owner, by type tree |
+| `print_constant(os, x)`, `hash_constant(x)` | how to render / hash a constant when your own `operator<<` / `std::hash` are not what Tau should use (bv prints SMT-LIB and hashes by creation id) | the constant's own alternative, at the point of use |
+| `options()` | your CLI/REPL options, addressed as `<family>-<name>` (see below) | per family |
+| `set_charvar(bool)` | keep your grammar in step with core's var/charvar mode | every declarer |
+| `set_ba_component_factoring(bool)`, `ba_component_factoring_enabled()` | your own component-factoring switch; today only the wrapper declares one | every declarer / any |
+| `type_param(tree)`, `type_id_for(param)`, `type_tree_for(param)` | declare all three iff your family is parameterised (`bv[8]`); `pack_type_tree` then accepts a parameter for your family and refuses one for every other, and inference defaults an under-specified type (a widthless `:bv`) to your own parameterised type | owner |
+| `uses_oracle` | deciding a question leaves the process, so comparison-based checks (the conformance laws) skip you; absent means decided here | per BA |
+| `splitter(x, kind)`, `splitter_one(tree)` | a proper sub-element of a constant / of the type's one; required only when `atomless`, though a BA that is not may still provide them (qlt does). For a BA without them the dispatcher returns the element itself / `nullptr`, so a caller checks `pack_type_is_atomless` before relying on a proper sub-element | the constant's own alternative / owner |
+
+**Pack order is semantic** wherever the rule above says *first*, *any* or
+*chained*: `-DTAU_BAS=a,b` and `-DTAU_BAS=b,a` can differ there. Owner-gated
+members never depend on it, and the two single-declarer members refuse a second
+claimant at compile time so no build resolves them by order.
 
 Declaring both `arith_ops` and `solve` is what makes core instantiate the
 arithmetic pipeline (predicate blasting, the arithmetic skip, the theory
@@ -130,8 +149,23 @@ Every fold's empty case is deliberate. `pack_zero_constant` and
 `pack_value_constant` return `nullptr`, and `pack_type_has_arith_ops` returns
 `false`, because "no BA owns this type" is an ordinary runtime outcome;
 `pack_solve` `static_assert`s, because its call sites are gated and reaching it
-means a gate drifted. When writing one, put `if constexpr` inside a per-element
-lambda: a `?:` in a fold expression instantiates both arms for every BA.
+means a gate drifted. When writing one, test the capability's concept with
+`if constexpr` inside `pack_visit_all` or `pack_owner_apply`: a `?:` in a fold
+expression instantiates both arms for every BA, and a `requires`-expression
+nested in the fold's lambda crashes gcc 13.
+
+### Options
+
+`options()` returns a range of `ba_option` (`ba_descriptor.h`): a bare `name`,
+a `kind` -- `flag`, which the REPL's `set` also accepts as enable/disable/toggle,
+or `count`, which takes a number -- a getter and a setter, and a help string.
+The REPL and CLI address it as `<family>-<name>` (`bv-blasting`), `<family>`
+being your `type_name`, so every width of a parameterised family shares one
+option set; `pack_find_ba_option` tells "no such family" from "no such option"
+so each gets its own message. The getter and setter are function pointers to
+process-wide storage of your own, so every pack in one process shares the
+value. A switch that gates a preprocessing pass also needs core's master
+`preprocessing` switch on: `bv-blasting` is the example.
 
 ### Rewrite hooks
 
@@ -220,5 +254,5 @@ grammar under `parser/`, compiled ahead of time and regenerated with
 
 Core reaches a BA only through its descriptor: `base_ba_dispatcher` folds over
 the pack's descriptors, and constant parsing walks them until one owns the type.
-Packs whose BAs are not all described yet keep hand-written specializations in
-`base_ba_dispatcher_*.cpp`; those disappear as each BA gains a descriptor.
+There are no hand-written per-pack dispatchers: the one generic dispatcher
+serves every pack, default or reduced.
