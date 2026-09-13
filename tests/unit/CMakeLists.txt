@@ -12,6 +12,7 @@ set(TESTS
 	ba_constants
 	ba_conformance
 	ba_descriptor_pack
+	ba_pack_traits
 	ba_types
 	ba_types_inference
 	bounded_cache

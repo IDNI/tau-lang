@@ -14,8 +14,8 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_DESCRIPTOR_H__
 
 #include <concepts>
-#include <cstdint>
 #include <functional>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <tuple>
@@ -112,11 +112,176 @@ constexpr bool ba_has_options_v = requires {
 	{ ba_descriptor<BA, Node>::options().end() };
 };
 
-/** @brief constexpr C-string equality, for comparing descriptor type names. */
-constexpr bool ba_name_eq(const char* a, const char* b) {
-	for (; *a || *b; ++a, ++b) if (*a != *b) return false;
-	return true;
-}
+/**
+ * @brief One concept per optional capability, all `<Node, BA>`.
+ *
+ * A fold, a consumer and the conformance test ask the same name, so a
+ * capability's spelling lives in exactly one place. A member-function
+ * capability is present when the call is well-formed with the argument
+ * types core passes; a flag capability is read through its `_v` variable,
+ * so a declared `false` is honoured rather than taken as "present".
+ */
+template <typename Node, typename BA>
+concept ba_has_solve = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) { ba_descriptor<BA, Node>::solve(f); };
+
+template <typename Node, typename BA>
+concept ba_has_can_solve = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::can_solve(f) }
+			-> std::convertible_to<bool>; };
+
+template <typename Node, typename BA>
+concept ba_has_sat_status = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::sat_status(f) }
+			-> std::convertible_to<std::optional<bool>>; };
+
+template <typename Node, typename BA>
+concept ba_has_preprocess = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::preprocess(f) }
+			-> std::convertible_to<tref>; };
+
+template <typename Node, typename BA>
+concept ba_has_set_preprocessing = ba_has_descriptor_v<Node, BA>
+	&& requires(bool b) { ba_descriptor<BA, Node>::set_preprocessing(b); };
+
+template <typename Node, typename BA>
+concept ba_has_formula_is_preprocessable = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::formula_is_preprocessable(f) }
+			-> std::convertible_to<bool>; };
+
+template <typename Node, typename BA>
+concept ba_has_preprocessing_residue = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::has_preprocessing_residue(f) }
+			-> std::convertible_to<bool>; };
+
+template <typename Node, typename BA>
+concept ba_has_term_is_blasteable = ba_has_descriptor_v<Node, BA>
+	&& requires(tref t) {
+		{ ba_descriptor<BA, Node>::term_is_blasteable(t) }
+			-> std::convertible_to<bool>; };
+
+template <typename Node, typename BA>
+concept ba_has_set_charvar = ba_has_descriptor_v<Node, BA>
+	&& requires(bool b) { ba_descriptor<BA, Node>::set_charvar(b); };
+
+template <typename Node, typename BA>
+concept ba_has_component_factoring = ba_has_descriptor_v<Node, BA>
+	&& requires(bool b) {
+		ba_descriptor<BA, Node>::set_ba_component_factoring(b);
+		{ ba_descriptor<BA, Node>::ba_component_factoring_enabled() }
+			-> std::convertible_to<bool>; };
+
+template <typename Node, typename BA>
+concept ba_has_zero_constant = ba_has_descriptor_v<Node, BA>
+	&& requires(size_t t) {
+		{ ba_descriptor<BA, Node>::zero_constant(t) }
+			-> std::convertible_to<tref>; };
+
+template <typename Node, typename BA>
+concept ba_has_value_constant = ba_has_descriptor_v<Node, BA>
+	&& requires(size_t t, size_t v) {
+		{ ba_descriptor<BA, Node>::value_constant(t, v) }
+			-> std::convertible_to<tref>; };
+
+template <typename Node, typename BA>
+concept ba_has_bool_carrier_type = ba_has_descriptor_v<Node, BA>
+	&& requires {
+		{ ba_descriptor<BA, Node>::bool_carrier_type() }
+			-> std::convertible_to<tref>; };
+
+template <typename Node, typename BA>
+concept ba_has_omcat_qe = ba_has_descriptor_v<Node, BA>
+	&& requires(tref v, tref b) {
+		{ ba_descriptor<BA, Node>::omcat_qe(v, b) }
+			-> std::convertible_to<std::optional<bool>>; };
+
+template <typename Node, typename BA>
+concept ba_has_semantic_pwr = ba_has_descriptor_v<Node, BA>
+	&& requires(tref c, tref u) {
+		{ ba_descriptor<BA, Node>::semantic_pwr_optimal(c, u) }
+			-> std::convertible_to<tref>; };
+
+template <typename Node, typename BA>
+concept ba_has_codegen_witness = ba_has_descriptor_v<Node, BA>
+	&& requires(tref v, tref c) {
+		{ ba_descriptor<BA, Node>::codegen_witness(v, c) }
+			-> std::convertible_to<std::optional<std::string>>; };
+
+template <typename Node, typename BA>
+concept ba_has_codegen_constant_expr = ba_has_descriptor_v<Node, BA>
+	&& requires(tref c) {
+		{ ba_descriptor<BA, Node>::codegen_constant_expr(c) }
+			-> std::convertible_to<std::optional<std::string>>; };
+
+template <typename Node, typename BA>
+concept ba_has_literal_incomplete = ba_has_descriptor_v<Node, BA>
+	&& requires(const std::string& s) {
+		{ ba_descriptor<BA, Node>::literal_incomplete(s) }
+			-> std::convertible_to<bool>; };
+
+template <typename Node, typename BA>
+concept ba_has_print_constant = ba_has_descriptor_v<Node, BA>
+	&& requires(std::ostream& os, const BA& x) {
+		{ ba_descriptor<BA, Node>::print_constant(os, x) }
+			-> std::same_as<std::ostream&>; };
+
+template <typename Node, typename BA>
+concept ba_has_type_tree_for = ba_has_descriptor_v<Node, BA>
+	&& requires(unsigned short p, tref t) {
+		{ ba_descriptor<BA, Node>::type_tree_for(p) }
+			-> std::convertible_to<tref>;
+		{ ba_descriptor<BA, Node>::type_id_for(p) }
+			-> std::convertible_to<size_t>;
+		{ ba_descriptor<BA, Node>::type_param(t) }
+			-> std::convertible_to<std::optional<unsigned short>>; };
+
+/**
+ * @brief The flag capabilities, read as values: `false` when absent.
+ *
+ * Variables rather than `requires` written inline at the point of use:
+ * gcc 13.3 ICEs (cp/pt.cc:1747) on a requires-expression nested in a fold's
+ * per-element lambda, and a name is what the conformance test enumerates.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_arith_ops_v = [] {
+	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+		{ ba_descriptor<BA, Node>::arith_ops } -> std::convertible_to<bool>; })
+		return static_cast<bool>(ba_descriptor<BA, Node>::arith_ops);
+	else return false;
+}();
+
+template <typename Node, typename BA>
+constexpr bool ba_can_host_bool_v = [] {
+	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+		{ ba_descriptor<BA, Node>::can_host_bool }
+			-> std::convertible_to<bool>; })
+		return static_cast<bool>(ba_descriptor<BA, Node>::can_host_bool);
+	else return false;
+}();
+
+template <typename Node, typename BA>
+constexpr bool ba_uses_oracle_v = [] {
+	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+		{ ba_descriptor<BA, Node>::uses_oracle }
+			-> std::convertible_to<bool>; })
+		return static_cast<bool>(ba_descriptor<BA, Node>::uses_oracle);
+	else return false;
+}();
+
+template <typename Node, typename BA>
+constexpr bool ba_output_always_satisfiable_v = [] {
+	if constexpr (ba_has_descriptor_v<Node, BA> && requires {
+		{ ba_descriptor<BA, Node>::output_always_satisfiable_by_system }
+			-> std::convertible_to<bool>; })
+		return static_cast<bool>(
+			ba_descriptor<BA, Node>::output_always_satisfiable_by_system);
+	else return false;
+}();
 
 /**
  * @brief The surface every descriptor must provide.
