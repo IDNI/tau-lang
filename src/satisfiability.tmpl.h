@@ -2019,7 +2019,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// which is not the "not implemented" case mark_undecided states
 		if (realizable.has_value()) memoize(realizable.value());
 		else {
-			r.merge_take(std::move(realizable));
+			r.merge(std::move(realizable));
 			r.error(code::solver_error,
 				"UNKNOWN: the synthesis backend failed or "
 				"produced no verdict; satisfiability could not "
