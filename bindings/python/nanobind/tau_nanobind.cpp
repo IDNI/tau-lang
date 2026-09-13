@@ -140,7 +140,15 @@ NB_MODULE(tau, m) {
 	// Interpreter
 	nb::class_<interpreter_t>(m, "interpreter")
 		.def(nb::init<interpreter_t&&>())
-		.def_ro("time_point", &interpreter_t::time_point);
+		.def_ro("time_point", &interpreter_t::time_point)
+		.def_prop_ro("spec_revision", [](const interpreter_t& self) {
+			return tau_api::spec_revision(self);
+		})
+		.def("current_spec", [](const interpreter_t& self) {
+			return tau_api::current_spec(self);
+		}, "The interpreter's current specification as a string. "
+		"Follows every applied update; not the `u` stream, which "
+		"carries the incoming revision rather than the merged result.");
 
 	// API functions
 	m.def("get_interpreter",

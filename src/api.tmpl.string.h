@@ -281,6 +281,16 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 }
 
 template <NodeType node>
+std::string api<node>::current_spec(const interpreter<node>& i) {
+	return TAU_TO_STR(i.current_spec_fm());
+}
+
+template <NodeType node>
+size_t api<node>::spec_revision(const interpreter<node>& i) {
+	return i.spec_revision();
+}
+
+template <NodeType node>
 std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 	auto [step_inputs, _] = i.build_inputs_for_step(i.time_point);
 	std::vector<stream_at> inputs;

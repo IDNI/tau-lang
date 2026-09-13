@@ -608,6 +608,24 @@ struct api {
 	/** @brief Advance interpreter @p i one step with no explicit inputs. */
 	static std::optional<std::map<stream_at, std::string>> step(interpreter<node>& i);
 
+	/**
+	 * @brief Return @p i's current specification, serialized.
+	 *
+	 * Follows every update the interpreter has applied, so a caller that
+	 * has to rebuild an interpreter can read this instead of scraping the
+	 * "Updated specification" log line. Not the `u` output stream, which
+	 * carries the incoming revision rather than the merged result.
+	 */
+	static std::string current_spec(const interpreter<node>& i);
+
+	/**
+	 * @brief Return @p i's spec revision counter.
+	 *
+	 * Bumped once per applied update, never on a rejected one, so a caller
+	 * can tell that `current_spec` changed without diffing the string.
+	 */
+	static size_t spec_revision(const interpreter<node>& i);
+
 	// -----------------------------------------------------------------------
 	// Simplification and inference
 	// -----------------------------------------------------------------------

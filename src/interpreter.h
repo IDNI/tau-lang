@@ -159,6 +159,9 @@ struct interpreter {
 	io_context<node> ctx;
 
 private:
+	/// Counts applied updates; see spec_revision().
+	size_t spec_revision_ = 0;
+
 	/// Per io var, the file stream id its current stream object was opened
 	/// from (entries exist for file-backed streams only). Lets
 	/// `rebuild_inputs`/`rebuild_outputs` keep a file stream's object --
@@ -285,6 +288,28 @@ private:
 	/// clause one step before the start and makes guarded latches with an
 	/// initial condition read as unsat, GitHub #100).
 	static tref unsqueeze_always(tref cnf_expression);
+
+	/// @brief Combine a spec partition into the single formula it denotes.
+	static tref spec_partition_fm(
+		const std::vector<std::pair<htrefs, htref>>& parts);
+
+	/// @brief This interpreter's current specification, as a formula.
+	///
+	/// Recomputed from `original_spec`, so it follows every `update()`
+	/// rather than being a snapshot taken at construction. This is the
+	/// value the "Updated specification" log line stringifies -- both go
+	/// through spec_partition_fm, so the two cannot drift apart.
+	///
+	/// Not the `u` output stream: `u` carries the incoming revision that
+	/// `update()` merges in, this is the merged result.
+	tref current_spec_fm() const;
+
+	/// @brief Number of updates this interpreter has applied.
+	///
+	/// Maintained by `update()`: bumped once per applied update, never on
+	/// a rejected one. Lets a caller detect that `current_spec_fm()`
+	/// changed without diffing it.
+	size_t spec_revision() const { return spec_revision_; }
 
 	/// @brief Dump interpreter state to @p os.
 	std::ostream& dump(std::ostream& os) const;

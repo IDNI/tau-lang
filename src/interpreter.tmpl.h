@@ -707,6 +707,21 @@ static tref combined_spec_fm(
 	return tau::build_wff_and(part_fms);
 }
 
+// Defined here rather than beside the other interpreter members: the call to
+// combined_spec_fm is not found by ADL, so it has to be declared above this
+// point for two-phase lookup.
+template <NodeType node>
+tref interpreter<node>::spec_partition_fm(
+	const std::vector<std::pair<htrefs, htref>>& parts)
+{
+	return unsqueeze_always(combined_spec_fm<node>(parts));
+}
+
+template <NodeType node>
+tref interpreter<node>::current_spec_fm() const {
+	return spec_partition_fm(original_spec);
+}
+
 template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool>
 	interpreter<node>::step()
@@ -1580,8 +1595,7 @@ void interpreter<node>::update(tref update) {
 			continue;
 		}
 
-		tref updated_spec = unsqueeze_always(
-			combined_spec_fm<node>(current_spec));
+		tref updated_spec = spec_partition_fm(current_spec);
 		// I7: growth telemetry -- the only prior symptom of the
 		// revision doubling was the interpreter getting slower.
 		const std::string spec_str = TAU_TO_STR(updated_spec);
@@ -1597,6 +1611,7 @@ void interpreter<node>::update(tref update) {
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
 		original_spec = std::move(current_spec);
+		++spec_revision_;
 		output_partition = std::move(uf);
 		// The systems for solver need to be recomputed at beginning of next step
 		final_system = false;
