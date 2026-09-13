@@ -80,6 +80,7 @@ tests/benchmark/data/*
 logs/*
 .gdbinit
 external/boost
+/tau-testnet/
 libboost-mingw-w64
 private/*
 .clangd
