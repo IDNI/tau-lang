@@ -264,11 +264,16 @@ set_tests_properties("test_repl-adt-run_prompt_hint" PROPERTIES
 # def's typed rewrites to bv[8], run prompts per-value (`i[0] : bv[8] :=`,
 # no tuple hint) and the output prints as a single bv value (canonical
 # decimal), all verified live 2026-08-17.
-add_test(NAME "test_repl-adt-run_alias_stream"
-	COMMAND bash -c "printf 'type byte = bv[8]. i:byte := in console. o:byte := out console. run o[0] = i[0].\\n#b00000001\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
-set_tests_properties("test_repl-adt-run_alias_stream" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[0\\] := 1"
-	FAIL_REGULAR_EXPRESSION "Error")
+tau_repl_unsupported(_tau_skip "type byte = bv[8]")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-adt-run_alias_stream")
+else()
+	add_test(NAME "test_repl-adt-run_alias_stream"
+		COMMAND bash -c "printf 'type byte = bv[8]. i:byte := in console. o:byte := out console. run o[0] = i[0].\\n#b00000001\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	set_tests_properties("test_repl-adt-run_alias_stream" PROPERTIES
+		PASS_REGULAR_EXPRESSION "o\\[0\\] := 1"
+		FAIL_REGULAR_EXPRESSION "Error")
+endif()
 
 # R3: type_def echo with parents exercises the printer's type_parents
 # on_enter/on_between/on_leave (" of (" + ", "-separated + ")") -- canonical

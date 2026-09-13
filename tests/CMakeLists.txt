@@ -94,6 +94,9 @@ endif()
 # suite truly needs -- a mention in a comment reads the same as a use. Dropping
 # one is a matter of proving it in a pack without that algebra.
 #
+set(TAU_TEST_REQUIRES_test_adt_flatten bv sbf)
+set(TAU_TEST_REQUIRES_test_adt_parsing bv sbf)
+set(TAU_TEST_REQUIRES_test_adt_types bv sbf)
 set(TAU_TEST_REQUIRES_test_algorithm_a qlt)
 set(TAU_TEST_REQUIRES_test_algorithm_b qlt)
 set(TAU_TEST_REQUIRES_test_algorithm_d qlt sbf)
@@ -111,6 +114,7 @@ set(TAU_TEST_REQUIRES_test_cpp_codegen_data_atoms bv qlt)
 set(TAU_TEST_REQUIRES_test_cpp_codegen_program_desc qlt)
 set(TAU_TEST_REQUIRES_test_hbdd sbf)
 set(TAU_TEST_REQUIRES_test_hooks bv)
+set(TAU_TEST_REQUIRES_test_integration-adt bv sbf)
 set(TAU_TEST_REQUIRES_test_integration-ba_types_inference bv sbf)
 set(TAU_TEST_REQUIRES_test_integration-bf_hooks sbf)
 set(TAU_TEST_REQUIRES_test_integration-bf_normalization sbf)
