@@ -48,13 +48,21 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 # Install dependencies
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
-	bash wget git nsis rpm python3-pip python3-venv bison nanobind-dev \
-	ninja-build \
+	bash wget git gnupg nsis rpm ninja-build bison \
+	python3-pip python3-venv python3-dev nanobind-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
 	libboost-all-dev=1.83.0.1ubuntu2 \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2
+
+# spot gives ltlsynt and ltl2tgba to the LTL suites
+RUN echo "(BUILD) -- Installing spot" && \
+	wget -q -O - 'https://build.opensuse.org/projects/home:adl/signing_keys/download?kind=gpg' \
+		| gpg --dearmor -o /usr/share/keyrings/home-adl-obs.gpg && \
+	echo 'deb [signed-by=/usr/share/keyrings/home-adl-obs.gpg] https://download.opensuse.org/repositories/home:/adl/xUbuntu_24.04/ ./' \
+		> /etc/apt/sources.list.d/home-adl-obs.list && \
+	apt-get update && apt-get install -y --no-install-recommends spot
 
 # create tau-lang directory and set it as the working directory
 RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \
@@ -90,9 +98,10 @@ FROM base AS deps
 ARG BUILD_JOBS=5
 
 COPY ./dev 			/tau-lang/
-# ./dev needs devrc; copy only it so parser changes do not rebuild the deps
 COPY ./external/parser/scripts/devrc 	/tau-lang/external/parser/scripts/
+COPY ./external/parser/cmake/tau-resolve.cmake 	/tau-lang/external/parser/cmake/
 COPY ./scripts/with-gh-token	/tau-lang/scripts/
+COPY ./scripts/env		/tau-lang/scripts/
 COPY ./scripts/dep-cvc5.sh	/tau-lang/scripts/
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building dependencies: cvc5" && \
@@ -130,11 +139,15 @@ ARG BUILD_PRESET=release
 # Argument TESTS=no is used to skip building and running tests
 ARG TESTS=yes
 
+# Argument TAU_BAS=<ids> picks the pack; empty keeps the default pack
+ARG TAU_BAS=
+
 # *-all enables the executable and the tests in one configure
 RUN echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Running tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		./dev preset ${BUILD_PRESET}-all run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		./dev preset ${BUILD_PRESET}-all run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}}; \
 	else \
 		./dev preset ${BUILD_PRESET}-tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
@@ -217,9 +230,12 @@ FROM base AS w64-deps
 ARG BUILD_JOBS=5
 
 COPY ./dev			/tau-lang/
-# ./dev needs devrc; copy only it so parser changes do not rebuild the deps
+# ./dev needs devrc, and devrc resolves the prefix and the job count through
+# tau-resolve.cmake; copy only those two so parser changes do not rebuild deps
 COPY ./external/parser/scripts/devrc 	/tau-lang/external/parser/scripts/
+COPY ./external/parser/cmake/tau-resolve.cmake 	/tau-lang/external/parser/cmake/
 COPY ./scripts/with-gh-token	/tau-lang/scripts/
+COPY ./scripts/env		/tau-lang/scripts/
 COPY ./scripts/dep-cvc5.sh	/tau-lang/scripts/
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building w64 dependencies: cvc5" && \

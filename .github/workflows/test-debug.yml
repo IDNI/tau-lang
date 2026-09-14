@@ -2,10 +2,14 @@ name: Test Debug
 
 on:
   push:
-    branches: [ "devel", "devel/**" ]
+    branches: [ "devel", "devel-*" ]
   pull_request:
-    branches: [ "devel", "devel/**" ]
+    branches: [ "devel", "devel-*" ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   linux:
