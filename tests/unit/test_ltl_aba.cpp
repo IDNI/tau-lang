@@ -807,7 +807,9 @@ TEST_SUITE("LTL skeleton builder") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
-		std::string skel = ltl_skeleton<node_t>(fm, atoms);
+		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
+		REQUIRE(skel_r.has_value());
+		std::string skel = skel_r.value();
 		CHECK(skel.find("F(") != std::string::npos);
 		CHECK(skel.find("p0") != std::string::npos);
 	}
@@ -816,7 +818,9 @@ TEST_SUITE("LTL skeleton builder") {
 		tref fm = wff("(o1[t] = 0) U (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
-		std::string skel = ltl_skeleton<node_t>(fm, atoms);
+		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
+		REQUIRE(skel_r.has_value());
+		std::string skel = skel_r.value();
 		CHECK(skel.find(" U ") != std::string::npos);
 	}
 
@@ -824,7 +828,9 @@ TEST_SUITE("LTL skeleton builder") {
 		tref fm = wff("G (F (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
-		std::string skel = ltl_skeleton<node_t>(fm, atoms);
+		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
+		REQUIRE(skel_r.has_value());
+		std::string skel = skel_r.value();
 		CHECK(skel.find("G(") != std::string::npos);
 		CHECK(skel.find("F(") != std::string::npos);
 		CHECK(skel.find("p0") != std::string::npos);
@@ -834,7 +840,9 @@ TEST_SUITE("LTL skeleton builder") {
 		tref fm = wff("(o1[t] = 0) W (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
-		std::string skel = ltl_skeleton<node_t>(fm, atoms);
+		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
+		REQUIRE(skel_r.has_value());
+		std::string skel = skel_r.value();
 		CHECK(skel.find(" W ") != std::string::npos);
 	}
 
@@ -842,7 +850,9 @@ TEST_SUITE("LTL skeleton builder") {
 		tref fm = wff("(o1[t] = 0) R (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
-		std::string skel = ltl_skeleton<node_t>(fm, atoms);
+		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
+		REQUIRE(skel_r.has_value());
+		std::string skel = skel_r.value();
 		CHECK(skel.find(" R ") != std::string::npos);
 	}
 }
@@ -4236,9 +4246,10 @@ TEST_SUITE("ltl_explain diagnostics") {
 		tref fm = wff("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
-		bool ok = ltl_explain<node_t>(fm, oss);
+		auto ok_r = ltl_explain<node_t>(fm, oss);
 		std::string out = oss.str();
-		CHECK(ok);
+		REQUIRE(ok_r.has_value());
+		CHECK(ok_r.value());
 		CHECK(out.find("REALIZABLE") != std::string::npos);
 		CHECK(out.find("Safety formula:") != std::string::npos);
 		MESSAGE(out);
@@ -4248,9 +4259,10 @@ TEST_SUITE("ltl_explain diagnostics") {
 		tref fm = wff("F (i1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
-		bool ok = ltl_explain<node_t>(fm, oss);
+		auto ok_r = ltl_explain<node_t>(fm, oss);
 		std::string out = oss.str();
-		CHECK_FALSE(ok);
+		REQUIRE(ok_r.has_value());
+		CHECK_FALSE(ok_r.value());
 		CHECK(out.find("Data atoms") != std::string::npos);
 		CHECK(out.find("LTL skeleton:") != std::string::npos);
 		CHECK(out.find("UNREALIZABLE") != std::string::npos);
@@ -4265,9 +4277,10 @@ TEST_SUITE("ltl_explain diagnostics") {
 		tref fm = tau::build_wff_and(p0, f_atom);
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
-		bool ok = ltl_explain<node_t>(fm, oss);
+		auto ok_r = ltl_explain<node_t>(fm, oss);
 		std::string out = oss.str();
-		CHECK(ok);
+		REQUIRE(ok_r.has_value());
+		CHECK(ok_r.value());
 		CHECK(out.find("o__ltl_ctr") != std::string::npos);
 		CHECK(out.find("REALIZABLE") != std::string::npos);
 		MESSAGE(out);
@@ -4277,10 +4290,11 @@ TEST_SUITE("ltl_explain diagnostics") {
 		tref fm = wff("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
-		bool ok = true;
-		CHECK_NOTHROW(ok = ltl_explain<node_t>(fm, oss));
+		result<bool> ok_r;
+		CHECK_NOTHROW(ok_r = ltl_explain<node_t>(fm, oss));
 		std::string out = oss.str();
-		CHECK_FALSE(ok);
+		REQUIRE(ok_r.has_value());
+		CHECK_FALSE(ok_r.value());
 		CHECK(out.find("REFUSED:") != std::string::npos);
 		MESSAGE(out);
 	}
@@ -5084,27 +5098,6 @@ TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 
 	TEST_CASE("[LX-04] a failed spawn is a failure") {
 		CHECK(classify_spot_exit(-1, "") == spot_exit_kind::failed);
-	}
-
-	// The API boundary (api<node>::realizable / valid_spec / get_interpreter)
-	// converts this into a logged UNKNOWN verdict instead of letting it
-	// terminate the process.  That handler cannot be driven deterministically
-	// from a test — it needs ltlsynt to hang or misbehave on demand — so what
-	// is pinned here is the contract the handler depends on: the exception is
-	// catchable as a std::runtime_error and carries the failure text.  If
-	// someone re-bases it on something else, the catch clauses silently stop
-	// matching and a slow spec goes back to terminating the session.
-	TEST_CASE("[LX-06] ltl_synthesis_error is catchable at the API boundary") {
-		bool caught = false;
-		std::string what;
-		try {
-			throw ltl_synthesis_error("ltlsynt produced no verdict (exit 143)");
-		} catch (const std::runtime_error& e) {
-			caught = true;
-			what = e.what();
-		} catch (...) {}
-		CHECK(caught);
-		CHECK(what.find("exit 143") != std::string::npos);
 	}
 
 	TEST_CASE("[LX-05] a missing binary keeps its own classification") {

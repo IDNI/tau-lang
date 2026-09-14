@@ -757,7 +757,9 @@ TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE") {
 	TEST_CASE("[CTLS-SEM-01] -(always o1=1) is rejected, not REALIZABLE") {
 		tref fm = create_spec("-(always o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK_THROWS(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		CHECK(!sat.has_value());
+		CHECK(sat.has_error());
 	}
 
 	// Same for a semantic negation buried inside a Boolean context: the node
@@ -765,14 +767,18 @@ TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE") {
 	TEST_CASE("[CTLS-SEM-02] -(F o1=1) && G(o1=0) is rejected") {
 		tref fm = create_spec("-(F o1[t] = 1) && G (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		CHECK_THROWS(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		CHECK(!sat.has_value());
+		CHECK(sat.has_error());
 	}
 
 	// Double semantic negation is still a semantic negation.
 	TEST_CASE("[CTLS-SEM-03] --(o1=1) is rejected") {
 		tref fm = create_spec("--(o1[t] = 1).");
 		REQUIRE(fm != nullptr);
-		CHECK_THROWS(is_tau_formula_sat<node_t>(fm));
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		CHECK(!sat.has_value());
+		CHECK(sat.has_error());
 	}
 
 	// Constant folding happens in the hooks, BEFORE any of this, so the
@@ -802,8 +808,8 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 	// The A / E reduction (translate_ctl_star): positive `E χ` becomes a
 	// fresh witness output w plus G(w → χ) -- sound for synthesis, possibly
 	// over-strict; positive `A χ` in a universal context (root, ∧, G)
-	// reduces to χ itself; every other placement is REFUSED with
-	// ltl_synthesis_error (LA-N2: the old `A χ ≡ ¬E¬χ` rewrite was vacuous,
+	// reduces to χ itself; every other placement is REFUSED with a
+	// result<T> error (LA-N2: the old `A χ ≡ ¬E¬χ` rewrite was vacuous,
 	// any strategy satisfied `¬w ∧ G(w → ¬χ)` by holding w false, so
 	// `A (F i1 = 1)` came out REALIZABLE).  Both directions are pinned.
 	TEST_CASE("[CTLS-AE-01] E(always o1=1) is REALIZABLE") {
@@ -875,23 +881,27 @@ TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
 	TEST_CASE("[CTLS-AE-09] A under F / || is refused") {
 		tref fm = create_spec("F (A (o1[t] = 1)).");
 		REQUIRE(fm != nullptr);
-		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm),
-			ltl_synthesis_error);
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		CHECK(!sat.has_value());
+		CHECK(sat.has_error());
 		tref fm2 = create_spec("(A (o1[t] = 1)) || (always o1[t] = 0).");
 		REQUIRE(fm2 != nullptr);
-		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm2),
-			ltl_synthesis_error);
+		auto sat2 = is_tau_formula_sat<node_t>(fm2);
+		CHECK(!sat2.has_value());
+		CHECK(sat2.has_error());
 	}
 
 	TEST_CASE("[CTLS-AE-10] E in negative polarity is refused") {
 		tref fm = create_spec("(E (always o1[t] = 1)) -> (always o1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm),
-			ltl_synthesis_error);
+		auto sat = is_tau_formula_sat<node_t>(fm);
+		CHECK(!sat.has_value());
+		CHECK(sat.has_error());
 		tref fm2 = create_spec("(E (always o1[t] = 1)) <-> (always o1[t] = 1).");
 		REQUIRE(fm2 != nullptr);
-		CHECK_THROWS_AS(is_tau_formula_sat<node_t>(fm2),
-			ltl_synthesis_error);
+		auto sat2 = is_tau_formula_sat<node_t>(fm2);
+		CHECK(!sat2.has_value());
+		CHECK(sat2.has_error());
 	}
 
 	// A / E must not make an outright contradictory conjunct disappear: the

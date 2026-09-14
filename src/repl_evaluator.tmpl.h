@@ -816,15 +816,15 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	report rep;
 	{
 		auto s = rep.open_if(opt.print_benchmarks, "ltl");
-		// IN-R4: the synthesis backend reports "no verdict" by throwing;
-		// nothing above this frame catches it, so a slow or missing ltlsynt
-		// (or a refused CTL* placement) used to terminate the REPL.
-		try {
-			ltl_explain<node>(value, out);
-		} catch (const ltl_synthesis_error& e) {
-			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, timed "
-				"out or refused the formula (" << e.what()
-				<< "); realizability could not be decided";
+		// IN-R4: the synthesis backend reports "no verdict" as a
+		// result<T> error, not an exception; nothing above this frame
+		// would catch a throw, so a slow or missing ltlsynt (or a
+		// refused CTL* placement) used to terminate the REPL. Print the
+		// whole report -- UNKNOWN summary plus the refusal detail --
+		// exactly once here instead.
+		auto explain_r = ltl_explain<node>(value, out);
+		if (!explain_r.has_value()) {
+			explain_r.print(err);
 			error = true;
 		}
 	}
@@ -854,22 +854,11 @@ void repl_evaluator<BAs...>::continue_running(
 		// an error both when it needs input and when auto_continue is false.
 		const size_t tp_before = running->interp.time_point;
 		// IN-R4: a mid-run pointwise-revision update can reach ltlsynt
-		// (through update() -> pointwise_revision), whose failures are
-		// thrown; end the session with a diagnostic instead of the
-		// process.
+		// (through update() -> pointwise_revision); a backend failure
+		// there is a result<T> error on `st`, ended below by the same
+		// genuine-step-failure path as any other step error.
 		result<std::map<stream_at, std::string>> st;
-		try {
-			st = tau_api::step(running->interp);
-		} catch (const ltl_synthesis_error& e) {
-			TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed, "
-				"timed out or refused the formula during this step ("
-				<< e.what() << "); ending the run";
-			// close before the session (and its report) is destroyed
-			s.close();
-			running.reset();
-			error = true;
-			return;
-		}
+		st = tau_api::step(running->interp);
 
 		if (!st.has_value()) {
 			const bool produced =
@@ -889,9 +878,9 @@ void repl_evaluator<BAs...>::continue_running(
 				continue;
 			}
 			if (!step_awaiting_input(st.report())) {
-				// A genuine step failure, not a wait for input: report
-				// it and end the run, mirroring the ltl_synthesis_error
-				// handler above.
+				// A genuine step failure, not a wait for input
+				// (including a synthesis backend failure mid-run):
+				// report it and end the run.
 				bool was_enabled = idni::TC.enabled;
 				idni::TC.disable();
 				st.print(err);

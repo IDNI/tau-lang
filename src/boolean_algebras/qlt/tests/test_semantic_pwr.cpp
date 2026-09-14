@@ -225,21 +225,23 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 		auto result = alg_d::solve_algorithm_d_full(phi_star, T1_size,
 			T3, type_A, K, /*init_rho=*/0);
 
-		if (result.realizable) {
-			CHECK(!result.winning_region.empty());
-			CHECK(result.init_rho >= 0);
-			CHECK(result.T1_size == T1_size);
-			CHECK(result.K == K);
+		if (result.has_value() && result->realizable) {
+			CHECK(!result->winning_region.empty());
+			CHECK(result->init_rho >= 0);
+			CHECK(result->T1_size == T1_size);
+			CHECK(result->K == K);
 		}
-		// If unrealizable due to ltlsynt not installed, that's OK — skip.
+		// If unrealizable, or undecided because ltlsynt is not
+		// installed, that's OK — skip.
 	}
 
 	TEST_CASE("[SPWR-A-02] solve_algorithm_d_full empty input returns unrealizable") {
 		auto result = alg_d::solve_algorithm_d_full("", 0, {}, {}, 0,
 			/*init_rho=*/0);
-		CHECK_FALSE(result.realizable);
-		CHECK(result.winning_region.empty());
-		CHECK(result.init_rho == -1);
+		REQUIRE(result.has_value());
+		CHECK_FALSE(result->realizable);
+		CHECK(result->winning_region.empty());
+		CHECK(result->init_rho == -1);
 	}
 
 }

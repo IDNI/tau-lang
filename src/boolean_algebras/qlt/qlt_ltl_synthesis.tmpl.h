@@ -54,7 +54,7 @@ std::pair<std::string, int> run_cmd(const std::string& cmd);
 std::pair<std::string, int> spawn_capture(
 	const std::vector<std::string>& argv, int timeout_sec);
 
-std::pair<bool, std::string> call_ltlsynt(const std::string& formula,
+result<std::pair<bool, std::string>> call_ltlsynt(const std::string& formula,
 	const std::vector<std::string>& input_props,
 	const std::vector<std::string>& output_props);
 
@@ -62,7 +62,7 @@ template <NodeType node>
 std::vector<std::pair<tref, std::string>> extract_data_atoms(tref fm);
 
 template <NodeType node>
-std::string ltl_skeleton(tref fm,
+result<std::string> ltl_skeleton(tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms);
 
 template <NodeType node>
@@ -460,7 +460,12 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 	}
 	long long total = (long long)total_u;
 
-	std::string phi_star_base = ltl_skeleton<node>(fm, atoms);
+	auto phi_star_base_r = ltl_skeleton<node>(fm, atoms);
+	// A CTL* node with no sound propositional encoding reached the skeleton
+	// walk: decline, since the caller always runs Algorithm B on the same
+	// fm/atoms next, which rebuilds this skeleton and reports the refusal.
+	if (!phi_star_base_r.has_value()) return std::nullopt;
+	std::string phi_star_base = std::move(phi_star_base_r.value());
 
 	for (long long combo = 0; combo < total; ++combo) {
 		std::map<std::string, int> var_pos;
@@ -597,8 +602,9 @@ solve_ltl_aba_algorithm_a(
 		feasible_set.emplace_back(T3[t].pos_m, T3[t].pos_y, type_A[t]);
 
 	// Build phi* skeleton and rename p_i → D_i.
+	TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, atoms));
 	std::string phi_star = rename_skeleton_props_to_d(
-		ltl_skeleton<node>(fm, atoms), K);
+		std::move(phi_star_skel), K);
 
 	auto bundle = alg_a::build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star);
 	LOG_DEBUG << "[ltl_aba:algA] skeleton: " << bundle.formula;
@@ -607,7 +613,8 @@ solve_ltl_aba_algorithm_a(
 	std::vector<std::string> input_props;
 	std::vector<std::string> output_props(bundle.outs.begin(), bundle.outs.end());
 
-	auto [realizable, hoa_text] = call_ltlsynt(bundle.formula, input_props, output_props);
+	TAU_TRY(auto ltlsynt_out, call_ltlsynt(bundle.formula, input_props, output_props));
+	auto& [realizable, hoa_text] = ltlsynt_out;
 	if (!realizable) { r = std::nullopt; return r; }
 
 	ltl_aba_solution<node> sol;
@@ -686,8 +693,9 @@ solve_ltl_aba_algorithm_b(
 	for (int s = 0; s < T2_size; ++s) t2_pos_m[s] = T2[s].pos_m;
 
 	// Build phi* skeleton and rename p_i → d_i (LT-16: shared helper).
+	TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, atoms));
 	std::string phi_star = rename_skeleton_props_to_d(
-		ltl_skeleton<node>(fm, atoms), K);
+		std::move(phi_star_skel), K);
 
 	auto bundle = alg_b::build_algorithm_b_skeleton(
 		T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star);
@@ -695,7 +703,8 @@ solve_ltl_aba_algorithm_b(
 	          << " K=" << K << " n_pbits=" << bundle.n_pbits
 	          << " n_rbits=" << bundle.n_rbits;
 
-	auto [realizable, hoa_text] = call_ltlsynt(bundle.formula, bundle.ins, bundle.outs);
+	TAU_TRY(auto ltlsynt_out, call_ltlsynt(bundle.formula, bundle.ins, bundle.outs));
+	auto& [realizable, hoa_text] = ltlsynt_out;
 	if (!realizable) { r = std::nullopt; return r; }
 
 	ltl_aba_solution<node> sol;
@@ -742,17 +751,18 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		std::vector<int> type_A = qlt_type_A_bitmasks<node>(sol.atoms, T3, constants);
 
 		// Build φ*(D_i) (LT-16: shared rename helper).
+		TAU_TRY(auto phi_star_skel, ltl_skeleton<node>(fm, sol.atoms));
 		std::string phi_star = rename_skeleton_props_to_d(
-			ltl_skeleton<node>(fm, sol.atoms), K);
+			std::move(phi_star_skel), K);
 
 		LOG_DEBUG << "[ltl_aba:algD] T3=" << T3.size() << " T1=" << T1_size
 		          << " K=" << K << " phi_star=" << phi_star;
 
 		// LG-12: fixed initial memory ρ₀ = type_of(0) — the
 		// interpreter's own lookback-at-t=0 convention.
-		bool realizable = alg_d::solve_algorithm_d(phi_star,
+		TAU_TRY(auto realizable, alg_d::solve_algorithm_d(phi_star,
 			T1_size, T3, type_A, K,
-			alg_d::initial_memory(constants));
+			alg_d::initial_memory(constants)));
 		LOG_DEBUG << "[ltl_aba:algD] result=" << (realizable ? "REALIZABLE" : "UNREALIZABLE");
 
 		if (!realizable) { r = synthesis_unrealizable<node>(); return r; }
@@ -781,7 +791,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			/*seed_input_assumptions=*/"");
 		std::vector<std::string> D_outs;
 		for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
-		auto [real2, hoa_text] = call_ltlsynt(strategy_skeleton, {}, D_outs);
+		TAU_TRY(auto ltlsynt_out, call_ltlsynt(strategy_skeleton, {}, D_outs));
+		auto& [real2, hoa_text] = ltlsynt_out;
 		if (!real2) {
 			// Propositional call disagrees — fall through to default path
 			LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";

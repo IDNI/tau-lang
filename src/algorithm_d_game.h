@@ -18,6 +18,7 @@
 #define __IDNI__TAU__ALGORITHM_D_GAME_H__
 
 #include "omcat_types.h"
+#include "tau_diagnostics.h"
 
 #include <algorithm>
 #include <cassert>
@@ -496,7 +497,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 // definition (the qlt plugin's own) would declare an inline function it
 // never defines, which gcc rejects; the definition is inline and is
 // emitted by every unit that includes it.
-const synth_game& call_ltlsynt_game(
+//
+// An error result means the subprocess produced no verdict (see
+// classify_spot_exit); the caller merges it into its own result rather
+// than reading it as an empty, definitively unrealizable game.
+result<synth_game> call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs);
@@ -1055,7 +1060,9 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
 // input atoms would silently produce garbage (the env branch never models
 // input choice). Callers must check atom_has_any_input first, as both
 // current callers (solve_ltl_aba, semantic_pwr_optimal) do.
-// Returns true if the formula is REALIZABLE via Algorithm D.
+// Returns REALIZABLE/UNREALIZABLE via Algorithm D, or an error result when
+// the ltlsynt subprocess gave no verdict -- that case is undecided, not
+// UNREALIZABLE, and the caller must not read it as one.
 // phi_star: propositional LTL with D_0,...,D_{K-1} as output propositions.
 // T1_size: |T_1|.
 // T3: enumerated 3-types.
@@ -1064,7 +1071,7 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
 // init_rho: the fixed initial memory type — pass initial_memory(constants)
 //   (LG-12: the ∃ρ₀ loop this replaces let the system win by asserting a
 //   phantom previous output; see the convention block at initial_memory).
-inline bool solve_algorithm_d(
+inline result<bool> solve_algorithm_d(
 	const std::string& phi_star,
 	int T1_size,
 	const std::vector<omcat::qlt_type3>& T3,
@@ -1072,26 +1079,28 @@ inline bool solve_algorithm_d(
 	int K,
 	int init_rho)
 {
-	if (phi_star.empty() || T1_size <= 0) return false;
+	result<bool> r;
+	if (phi_star.empty() || T1_size <= 0) { r = false; return r; }
 
 	// Build list of D propositions as output
 	std::vector<std::string> D_outs;
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 
 	// Get synthesis parity game for φ*(D_i)
-	synth_game G = call_ltlsynt_game(phi_star, {}, D_outs);
-	if (G.num_states == 0) return false;
+	TAU_TRY(auto G, call_ltlsynt_game(phi_star, {}, D_outs));
+	if (G.num_states == 0) { r = false; return r; }
 
 	// Build product game (G × T_1)
 	product_game pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
-	if (pg.n_states == 0) return false;
+	if (pg.n_states == 0) { r = false; return r; }
 
 	// Solve parity game with Zielonka
 	auto W1 = zielonka_win_player1(pg);
 
 	// REALIZABLE iff player 1 wins from the ONE initial state
 	// (G.init, init_rho) — convention (F), see initial_memory.
-	return W1.count(pg.init) != 0;
+	r = W1.count(pg.init) != 0;
+	return r;
 }
 
 // ── Extended Algorithm D: returns winning region for semantic PWR ──────────
@@ -1112,7 +1121,9 @@ struct alg_d_result {
 
 // PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
 // init_rho: the fixed initial memory type — pass initial_memory(constants).
-inline alg_d_result solve_algorithm_d_full(
+// An error result means the ltlsynt subprocess gave no verdict (undecided,
+// not unrealizable); see solve_algorithm_d above.
+inline result<alg_d_result> solve_algorithm_d_full(
 	const std::string& phi_star,
 	int T1_size,
 	const std::vector<omcat::qlt_type3>& T3,
@@ -1120,21 +1131,22 @@ inline alg_d_result solve_algorithm_d_full(
 	int K,
 	int init_rho)
 {
+	result<alg_d_result> r;
 	alg_d_result result;
 	result.T1_size = T1_size;
 	result.K = K;
 
-	if (phi_star.empty() || T1_size <= 0) return result;
+	if (phi_star.empty() || T1_size <= 0) { r = std::move(result); return r; }
 
 	std::vector<std::string> D_outs;
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 
-	result.synth_game = call_ltlsynt_game(phi_star, {}, D_outs);
-	if (result.synth_game.num_states == 0) return result;
+	TAU_TRY(result.synth_game, call_ltlsynt_game(phi_star, {}, D_outs));
+	if (result.synth_game.num_states == 0) { r = std::move(result); return r; }
 
 	result.product_game = build_product_game(
 		result.synth_game, T1_size, T3, type_A, K, init_rho);
-	if (result.product_game.n_states == 0) return result;
+	if (result.product_game.n_states == 0) { r = std::move(result); return r; }
 
 	result.winning_region = zielonka_win_player1(result.product_game);
 
@@ -1144,7 +1156,8 @@ inline alg_d_result solve_algorithm_d_full(
 		result.realizable = true;
 		result.init_rho = init_rho;
 	}
-	return result;
+	r = std::move(result);
+	return r;
 }
 
 } // namespace idni::tau_lang::alg_d

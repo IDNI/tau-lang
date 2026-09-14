@@ -224,17 +224,26 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	// Compute D-bitmask for each T3 type and build the propositional
 	// skeleton φ*(D_i) (LS-12: shared helpers in qlt_ltl_synthesis.tmpl.h).
 	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
+	auto phi_star_skel_r = ltl_skeleton<node>(clause_and_update, atoms);
+	// A CTL* node with no sound propositional encoding reached the skeleton
+	// walk: fall back to fast mode, same as every other not-applicable or
+	// backend-failure exit in this function (see the Algorithm D check below).
+	if (!phi_star_skel_r.has_value()) return nullptr;
 	std::string phi_star = rename_skeleton_props_to_d(
-		ltl_skeleton<node>(clause_and_update, atoms), K);
+		std::move(phi_star_skel_r.value()), K);
 
 	LOG_DEBUG << "[semantic_pwr] trying optimal mode: K=" << K
 	          << " T1=" << T1_size << " phi_star=" << phi_star;
 
 	// Run Algorithm D (full) to get winning region.  LG-12: fixed initial
 	// memory ρ₀ = type_of(0), the interpreter's lookback-at-t=0 convention.
-	auto alg_result = alg_d::solve_algorithm_d_full(
+	auto alg_result_r = alg_d::solve_algorithm_d_full(
 		phi_star, T1_size, T3, type_A, K,
 		alg_d::initial_memory(constants));
+	// A backend failure here is undecided, not unrealizable; fall back
+	// to fast mode the same way any other not-applicable case does.
+	if (!alg_result_r) return nullptr;
+	auto& alg_result = *alg_result_r;
 
 	if (!alg_result.realizable) {
 		LOG_DEBUG << "[semantic_pwr] unrealizable via Algorithm D";

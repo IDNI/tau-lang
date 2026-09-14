@@ -75,20 +75,18 @@ tref apply_preferences(tref spec, const preference_order& po) {
 			continue;
 		}
 		tref candidate = tau::build_wff_and(result, pref_clause);
-		// IN-2 / IN-R4: the realizability check can throw (backend
+		// IN-2 / IN-R4: the realizability check can be undecided (backend
 		// failure, or a CTL* / semantic-negation spec that has no sound
 		// encoding); a preference is optional, so drop it rather than
-		// let the exception end the process.
-		bool ok = false;
-		try {
-			auto r = is_ltl_aba_realizable<node>(candidate, 0, false);
-			ok = r.has_value() && r.value();
-		} catch (const ltl_synthesis_error& e) {
+		// treat an undecided verdict as a decided one.
+		auto r = is_ltl_aba_realizable<node>(candidate, 0, false);
+		if (!r.has_value()) {
 			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
 				<< entry.var_name << "' -- realizability could not "
-				"be decided: " << e.what();
+				"be decided: " << r.report();
 			continue;
 		}
+		bool ok = r.value();
 		if (ok) result = candidate;
 		else TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
 			<< entry.var_name

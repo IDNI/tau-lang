@@ -172,10 +172,12 @@ TEST_SUITE("spawn_capture") {
 	}
 
 	// IN-N1 / Batch 3: a missing backend is no verdict -- call_ltlsynt
-	// throws instead of answering {false, ""} (= UNREALIZABLE).
-	TEST_CASE("[SPAWN-03] call_ltlsynt without Spot throws ltl_synthesis_error") {
+	// returns a result<T> error instead of answering {false, ""} (= UNREALIZABLE).
+	TEST_CASE("[SPAWN-03] call_ltlsynt without Spot returns an error result") {
 		EnvGuard g("PATH", "/nonexistent");
-		CHECK_THROWS_AS(call_ltlsynt("F(p0)", {}, {"p0"}), ltl_synthesis_error);
+		auto r = call_ltlsynt("F(p0)", {}, {"p0"});
+		CHECK(r.has_error());
+		CHECK(!r.has_value());
 	}
 
 	TEST_CASE("[SPAWN-04] 70KB of child output round-trips through the pipe") {

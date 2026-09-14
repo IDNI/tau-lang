@@ -205,11 +205,13 @@ static std::string write_tempfile(const std::string& prefix,
 	return std::string(buf.data());
 }
 
-inline std::pair<bool, std::string> call_ltlsynt(
+inline result<std::pair<bool, std::string>> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props)
 {
+	result<std::pair<bool, std::string>> r;
+
 	// Build --ins and --outs CSV lists.
 	std::string ins_str, outs_str;
 	for (size_t i = 0; i < input_props.size(); ++i) {
@@ -234,7 +236,8 @@ inline std::pair<bool, std::string> call_ltlsynt(
 	std::string tmpfile_path = write_tempfile("tau_lang", ltl_formula + "\n");
 	if (tmpfile_path.empty()) {
 		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		return {false, ""};
+		r = std::make_pair(false, std::string());
+		return r;
 	}
 
 	auto build_argv = [&](const std::string& formula_path) {
@@ -269,8 +272,9 @@ inline std::pair<bool, std::string> call_ltlsynt(
 		// {false, ""} here made every caller print "UNREALIZABLE".
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		throw ltl_synthesis_error("ltlsynt not found on PATH; install "
+		r.error(code::solver_error, "ltlsynt not found on PATH; install "
 			"Spot (>= 2.10) -- realizability is UNKNOWN");
+		return r;
 	case spot_exit_kind::failed: {
 		std::string msg = "ltlsynt produced no verdict (exit "
 		                + std::to_string(exit_code) + ")";
@@ -279,7 +283,8 @@ inline std::pair<bool, std::string> call_ltlsynt(
 			     + std::to_string(timeout_sec) + "s)";
 		LOG_ERROR << "[ltl_aba] " << msg
 		          << "; the realizability of this specification is UNKNOWN\n";
-		throw ltl_synthesis_error(msg);
+		r.error(code::solver_error, msg);
+		return r;
 	}
 	case spot_exit_kind::ok:
 		break;
@@ -313,7 +318,8 @@ inline std::pair<bool, std::string> call_ltlsynt(
 				}
 			}
 		}
-		return {false, ""};
+		r = std::make_pair(false, std::string());
+		return r;
 	}
 	if (out.substr(0, 10) == "REALIZABLE") {
 		std::string hoa = out.substr(out.find('\n') + 1);
@@ -357,14 +363,16 @@ inline std::pair<bool, std::string> call_ltlsynt(
 				LOG_INFO << "[ltl_aba] strategy " << line;
 			}
 		}
-		return {true, hoa};
+		r = std::make_pair(true, std::move(hoa));
+		return r;
 	}
 	// SY-R4: output that starts with neither verdict line is no verdict
 	// (a crashed or foreign binary on PATH printing something else with
 	// exit 0); it used to fall through as UNREALIZABLE.
 	LOG_ERROR << "[ltl_aba] ltlsynt output carried no verdict line; the "
 	             "realizability of this specification is UNKNOWN\n";
-	throw ltl_synthesis_error("ltlsynt output carried no verdict line");
+	r.error(code::solver_error, "ltlsynt output carried no verdict line");
+	return r;
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
@@ -508,29 +516,30 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 
 namespace alg_d {
 
-inline const synth_game& call_ltlsynt_game(
+inline result<synth_game> call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs)
 {
+	result<synth_game> r;
+
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
 	// TT2-13 / LG-27: a bounded_cache in runtime-bound mode (`set
 	// cachebound`, 0 = unbounded, FIFO eviction) instead of the previous
 	// unbounded unordered_map of full synth_game copies — this cache holds
 	// no trefs, so the tree GC never pruned it and the bound is its only
-	// control. The returned reference is valid until a later call inserts
-	// (and possibly evicts); callers copy on assignment.
+	// control. Callers get their own copy of the cached entry.
 	auto csv = [](const std::vector<std::string>& v) {
-		std::string r;
-		for (size_t i = 0; i < v.size(); ++i) { if (i) r += ","; r += v[i]; }
-		return r;
+		std::string s;
+		for (size_t i = 0; i < v.size(); ++i) { if (i) s += ","; s += v[i]; }
+		return s;
 	};
 	static bounded_cache<std::string, synth_game> cache{&cache_bound};
 	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
 	// name, so the concatenation is injective.
 	const std::string key =
 		phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	if (auto it = cache.find(key); it != cache.end()) { r = it->second; return r; }
 
 	// Configurable timeout (same env var as call_ltlsynt).
 	int timeout_sec = ltl_timeout_sec();
@@ -538,8 +547,8 @@ inline const synth_game& call_ltlsynt_game(
 	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
 	if (tmpfile_path.empty()) {
 		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		static const synth_game empty_game{};
-		return empty_game;  // transient — don't cache
+		r = synth_game{};  // transient — don't cache
+		return r;
 	}
 
 	// §14 / Batch O7: --polarity=no.  ltlsynt's polarity optimization
@@ -569,14 +578,15 @@ inline const synth_game& call_ltlsynt_game(
 	// SY-R1: a timeout, a missing binary or a usage error used to come
 	// back as the EMPTY game, which every caller (Algorithm D, the
 	// semantic-PWR fallback) reads as a definitive UNREALIZABLE. Classify
-	// like call_ltlsynt and throw: no verdict is not a verdict. Nothing
-	// transient is cached.
+	// like call_ltlsynt: no verdict is not a verdict, so this reports an
+	// error instead of an empty game. Nothing transient is cached.
 	switch (classify_spot_exit(exit_code, hoa)) {
 	case spot_exit_kind::not_found:
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		throw ltl_synthesis_error("ltlsynt not found on PATH; install "
+		r.error(code::solver_error, "ltlsynt not found on PATH; install "
 			"Spot (>= 2.10) -- the parity game could not be built");
+		return r;
 	case spot_exit_kind::failed: {
 		std::string msg = "ltlsynt --print-game-hoa produced no game "
 			"(exit " + std::to_string(exit_code) + ")";
@@ -584,17 +594,19 @@ inline const synth_game& call_ltlsynt_game(
 			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
 			     + std::to_string(timeout_sec) + "s)";
 		LOG_ERROR << "[ltl_aba] " << msg << "\n";
-		throw ltl_synthesis_error(msg);
+		r.error(code::solver_error, msg);
+		return r;
 	}
 	case spot_exit_kind::ok:
 		break;
 	}
-	// Insert-then-return-reference: the freshly inserted entry is the
-	// newest in FIFO order, so an eviction triggered by this insert can
-	// only remove OLDER entries (bound >= 1) — the reference is safe.
+	// Insert-then-copy: the freshly inserted entry is the newest in FIFO
+	// order, so an eviction triggered by this insert can only remove
+	// OLDER entries (bound >= 1) — reading it back right after is safe.
 	auto [it, inserted] = cache.emplace(key, parse_synth_game_hoa(hoa));
 	(void) inserted;  // the find above missed, so this always inserts
-	return it->second;
+	r = it->second;
+	return r;
 }
 
 } // namespace alg_d

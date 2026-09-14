@@ -137,12 +137,13 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		// Purely propositional: no io_var atoms.
 		if (has_past) {
 			std::vector<past_temporal_tester> testers;
-			sol.skeleton = skeleton_str_with_testers<node>(fm, sol.atoms, testers);
+			TAU_TRY(sol.skeleton, skeleton_str_with_testers<node>(fm, sol.atoms, testers));
 			append_tester_constraints(sol.skeleton, testers);
 			for (const auto& t : testers)
 				sol.output_props.push_back(t.state_var);
 			append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm));
-			auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, sol.output_props);
+			TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {}, sol.output_props));
+			auto& [real, hoa] = ltlsynt_out;
 			if (!real) {
 				if (partial_out) *partial_out = sol;
 				r = std::nullopt;
@@ -152,8 +153,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 			r = std::move(sol);
 			return r;
 		}
-		sol.skeleton = ltl_skeleton<node>(fm, sol.atoms);
-		auto [real, hoa] = call_ltlsynt(sol.skeleton, {}, {});
+		TAU_TRY(sol.skeleton, ltl_skeleton<node>(fm, sol.atoms));
+		TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {}, {}));
+		auto& [real, hoa] = ltlsynt_out;
 		if (!real) {
 			if (partial_out) *partial_out = sol;
 			r = std::nullopt;
@@ -208,7 +210,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// subformula with a fresh propositional state variable and encodes
 	// the DFA transition + initial condition as pure future-LTL constraints
 	// (G, X, propositional) that ltlsynt handles natively.
-	auto [skel, testers] = ltl_skeleton_with_testers<node>(fm_for_skeleton, sol.atoms);
+	TAU_TRY(auto skel_and_testers, ltl_skeleton_with_testers<node>(fm_for_skeleton, sol.atoms));
+	auto& [skel, testers] = skel_and_testers;
 	sol.skeleton = std::move(skel) + step_counter_extra;
 
 	// Cross-step shift-chain constraints: tie shifted instances of the same
@@ -240,8 +243,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	LOG_DEBUG << "[ltl_aba] outputs: " << [&]{
 		std::string s; for (auto& p : sol.output_props) s += p + " "; return s; }();
 
-	auto [realizable, hoa_text] =
-	    call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props);
+	TAU_TRY(auto ltlsynt_out,
+	    call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
+	auto& [realizable, hoa_text] = ltlsynt_out;
 	if (!realizable) {
 		if (partial_out) *partial_out = sol;
 		r = std::nullopt;
@@ -260,17 +264,30 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	result<bool> r;
 	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
 
+	// This function is called directly by api::realizable as well as by
+	// is_tau_formula_sat, so -- like is_tau_formula_sat does for its own
+	// callers -- it brands every undecided exit UNKNOWN itself rather than
+	// leaving it to whichever caller happens to print the report.
+	auto backend_failed = [&]() -> result<bool> {
+		r.error(code::solver_error,
+			"UNKNOWN: the synthesis backend failed or produced no "
+			"verdict; realizability could not be decided");
+		return std::move(r);
+	};
+
 	// LT-5 / IN-1 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
 	// here was not handled by reduce_ctl_star_to_ltl (direct callers such
 	// as preferences.h skip the reduction entirely). None has a
 	// propositional encoding -- the skeleton would flatten it to "1" --
 	// and A/E left in place could bounce back into is_tau_formula_sat's
 	// CTL* branch forever. Refuse rather than answer wrongly.
-	if (has_ctl_star_operators<node>(fm))
-		throw ltl_synthesis_error(
+	if (has_ctl_star_operators<node>(fm)) {
+		r.error(code::solver_error,
 		    "CTL* operators (A / E / semantic negation) reached the LTL "
 		    "realizability check without a CTL* reduction; route the "
 		    "formula through is_tau_formula_sat");
+		return r;
+	}
 
 	// Safety fast-path: if the formula has no full-LTL operators AND
 	// no Boolean combinations of models, it is a pure G/safety formula
@@ -293,12 +310,18 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	if (!realizability_has_game_operators<node>(fm) && no_bool_combs()) {
 		LOG_DEBUG << "[ltl_aba] safety fast-path "
 		             "(no full-LTL operators, single G)";
-		auto sat = is_tau_formula_sat<node>(fm, start_time, output);
-		r = sat.has_value() && sat.value();
+		// An error here (e.g. transform_to_execution's multiple-sometimes
+		// refusal) is undecided, not a decided "not realizable" -- do not
+		// let has_value()==false collapse silently into `false`.
+		auto sat_opt = r.merge_take(is_tau_formula_sat<node>(fm, start_time, output));
+		if (!sat_opt) return backend_failed();
+		r = *sat_opt;
 		return r;
 	}
 
-	TAU_TRY(auto maybe, solve_ltl_aba<node>(fm));
+	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm));
+	if (!maybe_opt) return backend_failed();
+	auto maybe = std::move(*maybe_opt);
 	LOG_DEBUG << "[ltl_aba] solve_ltl_aba returned: " << maybe.has_value();
 
 	if (!maybe) {
@@ -350,9 +373,11 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return std::nullopt;
 	};
 
-	// r stays unassigned -- undecided must never be read as a false verdict.
+	// r carries an UNKNOWN-branded error, not a value -- undecided must
+	// never be read as a false verdict, nor be printed as an empty report.
 	auto undecided = [&](const char* why) {
 		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << why << ")";
+		r.error(code::solver_error, std::string("UNKNOWN: ") + why);
 		return std::move(r);
 	};
 
@@ -397,13 +422,18 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		}
 		if (!added_new) return undecided("ABA refinement bound reached");
 
-		auto [ok, hoa] = call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props);
+		auto ltlsynt_opt = r.merge_take(
+			call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
+		if (!ltlsynt_opt) return backend_failed();
+		auto& [ok, hoa] = *ltlsynt_opt;
 		if (!ok) {
 			if (output) LOG_INFO << "[ltl_aba] UNREALIZABLE (ABA-refined)";
 			r = false;
 			return r;
 		}
-		TAU_TRY(sol.aut, parse_hoa(hoa));
+		auto aut_opt = r.merge_take(parse_hoa(hoa));
+		if (!aut_opt) return backend_failed();
+		sol.aut = std::move(*aut_opt);
 	}
 }
 
@@ -781,16 +811,34 @@ tref ltl_to_safety_formula(tref fm) {
 // ── ltl_explain ───────────────────────────────────────────────────────────────
 
 template <NodeType node>
-bool ltl_explain(tref fm, std::ostream& out) {
+result<bool> ltl_explain(tref fm, std::ostream& out) {
 	using tau = tree<node>;
+	result<bool> r;
 
 	// IN-R3: `ltl` used to hand A/E/- straight to the skeleton, where the
 	// tester variant flattened them to "1". Reduce like is_tau_formula_sat
-	// does (or refuse, via ltl_synthesis_error, where no sound encoding
+	// does (or refuse, via a result<T> error, where no sound encoding
 	// exists) before explaining anything.
 	// TODO: unlike is_ltl_aba_realizable's fast path, this does not also require has_no_boolean_combs_of_models
+	//
+	// A refusal here is undecided, not a decided verdict.  Nothing is
+	// printed to `out` for it (mirroring the days this was an exception
+	// that unwound out of this function before anything was printed);
+	// the detail text is merged into `r`'s report alongside a fresh
+	// UNKNOWN-branded summary (same shape as is_tau_formula_sat's CTL*
+	// branch, satisfiability.tmpl.h), and the caller (ltl_cmd) prints the
+	// whole report exactly once.
 	if (has_ctl_star_operators<node>(fm)) {
-		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
+		auto reduction_r = reduce_ctl_star_to_ltl<node>(fm);
+		if (!reduction_r.has_value()) {
+			r.merge(std::move(reduction_r));
+			r.error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed, timed out or "
+				"refused the formula; realizability could not be "
+				"decided");
+			return r;
+		}
+		auto& reduction = *reduction_r;
 		out << "CTL* reduced to LTL: "
 			<< tau::get(reduction.ltl_formula).to_str() << "\n";
 		fm = reduction.ltl_formula;
@@ -798,11 +846,21 @@ bool ltl_explain(tref fm, std::ostream& out) {
 
 	if (!realizability_has_game_operators<node>(fm)) {
 		out << "Formula has no LTL operators (treated as G(phi))\n";
-		// Fall through to the existing safety pipeline.
+		// Fall through to the existing safety pipeline. An error here
+		// (e.g. transform_to_execution's multiple-sometimes refusal) is
+		// undecided, not a decided UNREALIZABLE.
 		auto sat_r = is_tau_formula_sat<node>(fm, 0, false);
-		bool sat = sat_r.has_value() && sat_r.value();
+		if (!sat_r.has_value()) {
+			r.merge(std::move(sat_r));
+			r.error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed or produced no "
+				"verdict; realizability could not be decided");
+			return r;
+		}
+		bool sat = sat_r.value();
 		out << (sat ? "REALIZABLE" : "UNREALIZABLE") << "\n";
-		return sat;
+		r = sat;
+		return r;
 	}
 
 	// sol stays populated even when solve_ltl_aba returns std::nullopt.
@@ -811,14 +869,18 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	try {
 		auto maybe_r = solve_ltl_aba<node>(fm, &sol);
 		if (!maybe_r.has_value()) {
-			out << "REFUSED: ";
-			maybe_r.print(out);
-			return false;
+			r.merge(std::move(maybe_r));
+			r.error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed, timed out or "
+				"refused the formula; realizability could not be "
+				"decided");
+			return r;
 		}
 		maybe = std::move(maybe_r.value());
 	} catch (const std::runtime_error& e) {
 		out << "REFUSED: " << e.what() << "\n";
-		return false;
+		r = false;
+		return r;
 	}
 	if (maybe) sol = std::move(*maybe);
 
@@ -858,7 +920,8 @@ bool ltl_explain(tref fm, std::ostream& out) {
 
 	if (!maybe) {
 		out << "\nUNREALIZABLE\n";
-		return false;
+		r = false;
+		return r;
 	}
 
 	const hoa_automaton& aut = sol.aut;
@@ -913,7 +976,8 @@ bool ltl_explain(tref fm, std::ostream& out) {
 		}
 		if (!all_feasible) {
 			out << "\nUNREALIZABLE (ABA-infeasible transition)\n";
-			return false;
+			r = false;
+			return r;
 		}
 	}
 
@@ -922,7 +986,8 @@ bool ltl_explain(tref fm, std::ostream& out) {
 	out << "\nSafety formula: " << tau::get(safety).to_str() << "\n";
 
 	out << "\nREALIZABLE\n";
-	return true;
+	r = true;
+	return r;
 }
 
 // ── CTL* operators detection ─────────────────────────────────────────────────
@@ -970,7 +1035,7 @@ bool has_ctl_star_operators(tref fm) {
 //   4. Everything else -- A or E in negative polarity (under ¬, on the left
 //      of →, either side of ↔/⊕, in a conditional's guard), A under an
 //      existential/eventual context (∨, F, sometimes, U, ...), and `-φ` --
-//      has no sound encoding here and is REFUSED with ltl_synthesis_error.
+//      has no sound encoding here and is REFUSED with a result<T> error.
 //      LA-N2: the previous `A χ ≡ ¬E¬χ` rewrite produced `¬w ∧ G(w → ¬χ)`,
 //      which every strategy satisfies by holding w false, so `A` imposed
 //      nothing and `A (F i1 = 1)` came out REALIZABLE.
@@ -1002,27 +1067,31 @@ inline void reset_witness_counter() {
 // reachable from the root only through ∧ / always / A (see the header
 // comment above for why both matter).
 template <NodeType node>
-static tref translate_ctl_star(tref fm,
+static result<tref> translate_ctl_star(tref fm,
 		std::vector<std::pair<std::string, tref>>& constraints,
 		std::vector<std::string>& witnesses,
 		bool positive = true, bool universal = true) {
 	using tau = tree<node>;
+	result<tref> r;
 	const auto& t = tau::get(fm);
-	if (!t.has_child()) return fm;
+	if (!t.has_child()) { r = fm; return r; }
 
 	auto nt = t[0].value.nt;
 
 	// Handle E χ: introduce witness output
 	if (nt == tau::wff_E) {
-		if (!positive) throw ltl_synthesis_error(
-			"E in negative polarity has no sound LTL encoding here: "
-			"the witness constraint G(w -> chi) only bounds w from "
-			"above, so a negated witness would be vacuous");
+		if (!positive) {
+			r.error(code::solver_error,
+				"E in negative polarity has no sound LTL encoding here: "
+				"the witness constraint G(w -> chi) only bounds w from "
+				"above, so a negated witness would be vacuous");
+			return r;
+		}
 		tref inner = t[0].child(0);
 		// Recursively translate the inner path formula (positive,
 		// but no longer a universal context: w marks SOME state).
-		tref translated_inner = translate_ctl_star<node>(
-			inner, constraints, witnesses, true, false);
+		TAU_TRY(auto translated_inner, translate_ctl_star<node>(
+			inner, constraints, witnesses, true, false));
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
 		witnesses.push_back(wname);
@@ -1039,19 +1108,26 @@ static tref translate_ctl_star(tref fm,
 		tref implication = tau::build_wff_imply(witness_wff, translated_inner);
 		tref always_constraint = tau::build_wff_always(implication);
 		constraints.emplace_back(wname, always_constraint);
-		return witness_wff;
+		r = witness_wff;
+		return r;
 	}
 
 	// Handle A χ: only where "all paths from here" coincides with the
 	// all-paths synthesis semantics of the enclosing formula (LA-N2).
 	if (nt == tau::wff_A) {
-		if (!positive) throw ltl_synthesis_error(
-			"A in negative polarity has no sound LTL encoding here");
-		if (!universal) throw ltl_synthesis_error(
-			"A under an existential or eventual context (||, F, "
-			"sometimes, U, R, W, S, T, E, conditional) is not "
-			"soundly encodable without CTL* direction outputs; "
-			"refusing rather than answering vacuously");
+		if (!positive) {
+			r.error(code::solver_error,
+				"A in negative polarity has no sound LTL encoding here");
+			return r;
+		}
+		if (!universal) {
+			r.error(code::solver_error,
+				"A under an existential or eventual context (||, F, "
+				"sometimes, U, R, W, S, T, E, conditional) is not "
+				"soundly encodable without CTL* direction outputs; "
+				"refusing rather than answering vacuously");
+			return r;
+		}
 		return translate_ctl_star<node>(t[0].child(0), constraints,
 			witnesses, true, true);
 	}
@@ -1070,17 +1146,18 @@ static tref translate_ctl_star(tref fm,
 	// Refuse rather than answer wrongly.  The hooks fold `-T`/`-F` before
 	// anything gets here, so constant semantic negations still work.
 	if (nt == tau::wff_semantic_neg) {
-		throw ltl_synthesis_error(
+		r.error(code::solver_error,
 		    "semantic negation (-) over data formulas is not implemented: "
 		    "the input/output role swap it requires has no implementation, "
 		    "and answering it as propositional TRUE would be unsound");
+		return r;
 	}
 
 	// For all other nodes, recursively translate children
 	// Reconstruct the node with translated children
 	auto& op = t[0];
 	size_t nch = op.children_size();
-	if (nch == 0) return fm;
+	if (nch == 0) { r = fm; return r; }
 
 	// Check if any child has CTL* operators
 	bool has_ctl = false;
@@ -1090,16 +1167,13 @@ static tref translate_ctl_star(tref fm,
 			break;
 		}
 	}
-	if (!has_ctl) return fm;
+	if (!has_ctl) { r = fm; return r; }
 
 	// Polarity / context of each child. Both-polarity connectives (↔, ⊕,
 	// a conditional's guard) cannot host A/E soundly at all.
-	auto both = [&](size_t i) {
-		if (has_ctl_star_operators<node>(op.child(i)))
-			throw ltl_synthesis_error("A/E under a both-polarity "
-				"connective (<->, ^, conditional guard) has no "
-				"sound LTL encoding here");
-	};
+	static constexpr const char* both_polarity_msg =
+		"A/E under a both-polarity connective (<->, ^, conditional "
+		"guard) has no sound LTL encoding here";
 	std::vector<std::pair<bool,bool>> ctx(nch, {positive, false});
 	switch (nt) {
 	case tau::wff_and:
@@ -1115,10 +1189,18 @@ static tref translate_ctl_star(tref fm,
 		break;
 	case tau::wff_equiv:
 	case tau::wff_xor:
-		for (size_t i = 0; i < nch; ++i) both(i);
+		for (size_t i = 0; i < nch; ++i) {
+			if (has_ctl_star_operators<node>(op.child(i))) {
+				r.error(code::solver_error, both_polarity_msg);
+				return r;
+			}
+		}
 		break;
 	case tau::wff_conditional:
-		both(0);
+		if (has_ctl_star_operators<node>(op.child(0))) {
+			r.error(code::solver_error, both_polarity_msg);
+			return r;
+		}
 		break;
 	default: // or, sometimes, F, U, R, W, S, T: positive, not universal
 		break;
@@ -1128,41 +1210,43 @@ static tref translate_ctl_star(tref fm,
 	std::vector<tref> new_children;
 	new_children.reserve(nch);
 	for (size_t i = 0; i < nch; ++i) {
-		new_children.push_back(translate_ctl_star<node>(op.child(i),
+		TAU_TRY(auto child, translate_ctl_star<node>(op.child(i),
 			constraints, witnesses, ctx[i].first, ctx[i].second));
+		new_children.push_back(child);
 	}
 
 	// Rebuild node with same operator but new children
 	if (nch == 1) {
 		// Unary operators: neg, sometimes, always
 		switch (nt) {
-		case tau::wff_neg:      return tau::build_wff_neg(new_children[0]);
-		case tau::wff_sometimes:return tau::build_wff_sometimes(new_children[0]);
-		case tau::wff_always:   return tau::build_wff_always(new_children[0]);
-		default:                break; // falls to the LT-13 LOG_ERROR
+		case tau::wff_neg:       r = tau::build_wff_neg(new_children[0]); return r;
+		case tau::wff_sometimes: r = tau::build_wff_sometimes(new_children[0]); return r;
+		case tau::wff_always:    r = tau::build_wff_always(new_children[0]); return r;
+		default:                 break; // falls to the LT-13 LOG_ERROR
 		}
 	} else if (nch == 2) {
 		// Binary operators
 		switch (nt) {
-		case tau::wff_and:   return tau::build_wff_and(new_children[0], new_children[1]);
-		case tau::wff_or:    return tau::build_wff_or(new_children[0], new_children[1]);
-		case tau::wff_imply: return tau::build_wff_imply(new_children[0], new_children[1]);
-		case tau::wff_equiv: return tau::build_wff_equiv(new_children[0], new_children[1]);
-		case tau::wff_xor:   return tau::build_wff_xor(new_children[0], new_children[1]);
-		case tau::wff_until:      return tau::build_wff_until(new_children[0], new_children[1]);
-		case tau::wff_release:    return tau::build_wff_release(new_children[0], new_children[1]);
-		case tau::wff_weak_until: return tau::build_wff_weak_until(new_children[0], new_children[1]);
-		case tau::wff_since:      return tau::build_wff_since(new_children[0], new_children[1]);
-		case tau::wff_trigger:    return tau::build_wff_trigger(new_children[0], new_children[1]);
+		case tau::wff_and:   r = tau::build_wff_and(new_children[0], new_children[1]); return r;
+		case tau::wff_or:    r = tau::build_wff_or(new_children[0], new_children[1]); return r;
+		case tau::wff_imply: r = tau::build_wff_imply(new_children[0], new_children[1]); return r;
+		case tau::wff_equiv: r = tau::build_wff_equiv(new_children[0], new_children[1]); return r;
+		case tau::wff_xor:   r = tau::build_wff_xor(new_children[0], new_children[1]); return r;
+		case tau::wff_until:      r = tau::build_wff_until(new_children[0], new_children[1]); return r;
+		case tau::wff_release:    r = tau::build_wff_release(new_children[0], new_children[1]); return r;
+		case tau::wff_weak_until: r = tau::build_wff_weak_until(new_children[0], new_children[1]); return r;
+		case tau::wff_since:      r = tau::build_wff_since(new_children[0], new_children[1]); return r;
+		case tau::wff_trigger:    r = tau::build_wff_trigger(new_children[0], new_children[1]); return r;
 		// LT-13: rimply was missing -- `phi <- E psi` kept its E
 		// untranslated and later collapsed to "1" in the skeleton
-		case tau::wff_rimply: return tau::build_wff_rimply(
-					new_children[0], new_children[1]);
+		case tau::wff_rimply: r = tau::build_wff_rimply(
+					new_children[0], new_children[1]); return r;
 		default:             break;
 		}
 	} else if (nch == 3 && nt == tau::wff_conditional) {
-		return tau::build_wff_conditional(
+		r = tau::build_wff_conditional(
 			new_children[0], new_children[1], new_children[2]);
+		return r;
 	}
 	// LT-13 / IN-1: a silent identity here left embedded A/E/- untranslated
 	// in any connective missing from the switches above; the survivor then
@@ -1170,9 +1254,11 @@ static tref translate_ctl_star(tref fm,
 	// is_tau_formula_sat and is_ltl_aba_realizable. Refuse instead.
 	LOG_ERROR << "translate_ctl_star: unhandled connective "
 		<< node::name(nt) << " with CTL* content in its subtree";
-	throw ltl_synthesis_error(std::string("translate_ctl_star: unhandled "
-		"connective ") + node::name(nt) + " with CTL* content in its "
-		"subtree; the formula cannot be reduced to LTL");
+	r.error(code::solver_error,
+		std::string("translate_ctl_star: unhandled connective ")
+		+ node::name(nt) + " with CTL* content in its subtree; the "
+		"formula cannot be reduced to LTL");
+	return r;
 }
 
 // True iff the formula contains a `wff_semantic_neg` node.
@@ -1187,14 +1273,15 @@ bool has_semantic_negation(tref fm) {
 }
 
 template <NodeType node>
-ctl_star_reduction<node> reduce_ctl_star_to_ltl(tref fm) {
+result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 	using tau = tree<node>;
+	result<ctl_star_reduction<node>> r;
 	ctl_star_detail::reset_witness_counter();
 
 	std::vector<std::pair<std::string, tref>> constraints;
 	std::vector<std::string> witnesses;
 
-	tref translated = translate_ctl_star<node>(fm, constraints, witnesses);
+	TAU_TRY(auto translated, translate_ctl_star<node>(fm, constraints, witnesses));
 
 	// Build the conjunction: translated_root ∧ constraint_1 ∧ ... ∧ constraint_n
 	tref result = translated;
@@ -1209,8 +1296,9 @@ ctl_star_reduction<node> reduce_ctl_star_to_ltl(tref fm) {
 	std::vector<size_t> witness_types(witnesses.size(),
 		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
 
-	return ctl_star_reduction<node>{result, witnesses,
+	r = ctl_star_reduction<node>{result, witnesses,
 		std::move(witness_types)};
+	return r;
 }
 
 // ── Semantic negation implementation ─────────────────────────────────────────

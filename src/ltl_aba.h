@@ -83,8 +83,12 @@ std::vector<std::pair<tref, std::string>> extract_data_atoms(tref fm);
 
 // Produce a Spot-parseable LTL formula string by replacing every data atom
 // with its assigned proposition name.  Non-atom Boolean subformulas are kept.
+//
+// A CTL* node (A / E / semantic negation) with no sound propositional
+// encoding reaching the skeleton walk is a `result<T>` error; the caller
+// must check has_value() before using the skeleton.
 template <NodeType node>
-std::string ltl_skeleton(tref fm,
+result<std::string> ltl_skeleton(tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms);
 
 // ── DFA temporal testers (ppLTLTT approach) ──────────────────────────────────
@@ -108,8 +112,11 @@ struct past_temporal_tester {
 
 // Build skeleton with temporal testers.  Returns {skeleton, testers}.
 // Caller must call append_tester_constraints() and add state vars to outputs.
+// A CTL* node with no sound propositional encoding reaching the skeleton
+// walk is a `result<T>` error; the caller must check has_value() before
+// using the returned skeleton.
 template <NodeType node>
-std::pair<std::string, std::vector<past_temporal_tester>>
+result<std::pair<std::string, std::vector<past_temporal_tester>>>
 ltl_skeleton_with_testers(
     tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms);
@@ -132,12 +139,10 @@ bool is_pure_input_atom(tref atom);
 
 // ── Spot interface ────────────────────────────────────────────────────────────
 
-// Raised when a Spot subprocess could not deliver a verdict (LT-7).  A failed
-// or killed ltlsynt is NOT an UNREALIZABLE answer, and reporting it as one
-// turns a slow-but-realizable specification into a silently wrong result.
-struct ltl_synthesis_error : std::runtime_error {
-	using std::runtime_error::runtime_error;
-};
+// A failed or killed ltlsynt is NOT an UNREALIZABLE answer (LT-7): every
+// backend failure is a `result<T>` error, merged into the caller's own `r`.
+// Every skeleton/translation walker reports the same way, via its own
+// `result<T>` return.
 
 // How to read a (exit_code, stdout) pair from a Spot subprocess.
 //
@@ -169,12 +174,13 @@ inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) 
 // Invoke ltlsynt as a subprocess and return {realizable, hoa_strategy_text}.
 // hoa_strategy_text is non-empty only when realizable == true.
 //
-// Throws ltl_synthesis_error when the subprocess produced no verdict (see
-// classify_spot_exit) -- including when ltlsynt is not on PATH (IN-N1: the
-// old {false, ""} degradation made a missing Spot install print
-// "UNREALIZABLE (propositional)" for every specification). The api layer
-// converts the exception into a logged UNKNOWN verdict.
-std::pair<bool, std::string> call_ltlsynt(
+// The result carries an error (code::solver_error) when the subprocess
+// produced no verdict (see classify_spot_exit) -- including when ltlsynt is
+// not on PATH (IN-N1: the old {false, ""} degradation made a missing Spot
+// install print "UNREALIZABLE (propositional)" for every specification).
+// Every caller merges that error into its own result rather than reading it
+// as a definite UNREALIZABLE.
+result<std::pair<bool, std::string>> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props);
@@ -230,8 +236,10 @@ struct ctl_star_reduction {
     std::vector<size_t> witness_types;
 };
 
+// An error result means the CTL* formula has no sound LTL reduction; see
+// translate_ctl_star's refusal cases.
 template <NodeType node>
-ctl_star_reduction<node> reduce_ctl_star_to_ltl(tref fm);
+result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm);
 
 // Check if a formula contains CTL* path quantifiers (A or E)
 template <NodeType node>
@@ -251,7 +259,7 @@ bool has_ctl_star_operators(tref fm);
 // every non-constant `-φ` was silently decided REALIZABLE regardless of φ.
 //
 // Until the swap exists, a `wff_semantic_neg` that survives constant folding
-// is REJECTED with `ltl_synthesis_error` rather than answered wrongly.  The
+// is REJECTED (a `result<T>` error) rather than answered wrongly.  The
 // hook-level folding of `-T` → F and `-F` → T is unaffected and keeps working.
 
 // True iff the formula contains a `wff_semantic_neg` node.
@@ -264,9 +272,12 @@ tref apply_semantic_negation(tref fm);
 // ── Explain pipeline ─────────────────────────────────────────────────────────
 
 // Print a human-readable trace of the LTL(ABA) translation pipeline.
-// Returns true if realizable.
+// The value is true if realizable, false if unrealizable; an error means
+// the verdict is undecided (backend failure, timeout, or a CTL* / semantic
+// negation placement with no sound reduction) -- the caller must check
+// has_value() and must not read an error as a decided false.
 template <NodeType node>
-bool ltl_explain(tref fm, std::ostream& out);
+result<bool> ltl_explain(tref fm, std::ostream& out);
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 

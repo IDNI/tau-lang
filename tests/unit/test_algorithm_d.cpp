@@ -758,7 +758,7 @@ State: 1
 	TEST_CASE("[ALG-D-48] a formula past MAX_ARG_STRLEN still produces a game") {
 		// Skip when ltlsynt is not on PATH: nothing to compare against.
 		auto small = alg_d::call_ltlsynt_game("d_0", {}, {"d_0"});
-		if (small.num_states == 0) return;
+		if (!small.has_value() || small->num_states == 0) return;
 
 		// 140000 characters — just past the 131072-byte single-argument cap.
 		// The conjunction is trivially reducible, so ltlsynt itself is cheap;
@@ -767,7 +767,8 @@ State: 1
 		big.reserve(150000);
 		while (big.size() < 140000) big += " & d_0";
 		auto g = alg_d::call_ltlsynt_game(big, {}, {"d_0"});
-		CHECK(g.num_states > 0);
+		REQUIRE(g.has_value());
+		CHECK(g->num_states > 0);
 	}
 
 	TEST_CASE("[ALG-D-22] G(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
@@ -1054,7 +1055,7 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 	TEST_CASE("[ALG-D-73] pg.init, verdict and init_rho are one state") {
 		// Skip when ltlsynt is not on PATH (same guard as ALG-D-48).
 		auto small = alg_d::call_ltlsynt_game("d_0", {}, {"d_0"});
-		if (small.num_states == 0) return;
+		if (!small.has_value() || small->num_states == 0) return;
 
 		using omcat::rational;
 		const std::vector<rational> constants = {rational(0, 1)};
@@ -1069,11 +1070,12 @@ TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]") {
 		const int rho0 = alg_d::initial_memory(constants);
 		auto r = alg_d::solve_algorithm_d_full(
 			"G(d_0)", T1_size, T3, type_A, 1, rho0);
-		REQUIRE(r.realizable);
-		CHECK(r.init_rho == rho0);
-		CHECK(r.product_game.init
-			== r.synth_game.init * T1_size + rho0);
-		CHECK(r.winning_region.count(r.product_game.init) == 1);
+		REQUIRE(r.has_value());
+		CHECK(r->realizable);
+		CHECK(r->init_rho == rho0);
+		CHECK(r->product_game.init
+			== r->synth_game.init * T1_size + rho0);
+		CHECK(r->winning_region.count(r->product_game.init) == 1);
 	}
 
 } // TEST_SUITE("[Algorithm D: initial memory convention (LG-12/AL-N4)]")

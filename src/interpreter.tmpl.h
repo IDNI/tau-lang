@@ -641,8 +641,8 @@ result<interpreter<node>>
 	// such and handed to the solver, which refused the A node ("Found
 	// clause containing non-equation") and reported a false "unsat".
 	// is_tau_formula_sat reduces first; so must execution.  The reducer
-	// throws ltl_synthesis_error for placements it cannot encode soundly
-	// (LA-N2); the api/REPL callers already catch it.
+	// returns a result<T> error for placements it cannot encode soundly
+	// (LA-N2); the caller here converts it into a compile failure.
 	//
 	// IN-R6: an E reduction introduces witness outputs w_<n>.  They are
 	// registered below as internal output streams (reserved prefix `w_`,
@@ -657,15 +657,17 @@ result<interpreter<node>>
 	bool witness_ltl_route = false;
 	io_context<node> ctx_with_witnesses;
 	if (has_ctl_star_operators<node>(spec)) {
-		auto reduction = reduce_ctl_star_to_ltl<node>(spec);
-		if (!reduction.ltl_formula) {
+		auto reduction_r = reduce_ctl_star_to_ltl<node>(spec);
+		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
 			LOG_ERROR << "Tau specification is not executable (CTL* reduction failed)\n";
+			r.merge(std::move(reduction_r));
 			r.error(code::internal_error,
 				"Tau specification is not executable "
 				"(CTL* reduction failed)");
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
+		auto& reduction = *reduction_r;
 		spec = reduction.ltl_formula;
 		if (!reduction.witnesses.empty()) {
 			witness_ltl_route = true;

@@ -921,41 +921,32 @@ result<bool> api<node>::realizable(tref fm) {
 		code::internal_error,
 		"Could not normalize the formula; "
 		"its satisfiability cannot be decided");
-	// LT-7: the synthesis backend reports "no verdict" by throwing
-	// ltl_synthesis_error -- a timed-out, killed or misused ltlsynt is NOT an
-	// UNREALIZABLE answer.  Nothing below this layer catches it, so without a
-	// handler here a slow specification would terminate the process instead of
-	// answering.  Convert it into a logged error verdict.
-	try {
-		// A data quantifier under a full-LTL operator survives normalization;
-		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
-		// invariant, so route the RAW formula to the LTL-ABA solver instead.
-		tref target = (realizability_has_game_operators<node>(fm)
-			&& tau::get(nf).find_top(is_quantifier<node>))
-			? fm : nf;
-		if (realizability_has_game_operators<node>(fm)) {
-			// is_tau_formula_sat now answers satisfiability only,
-			// where an unrealizable full-LTL formula is undecided
-			// rather than false; realizable() needs the real
-			// verdict, so ask the realizability procedure directly
-			// instead of going through it.
-			r = is_ltl_aba_realizable<node>(target, 0, true);
-		} else if (auto s = sat(fm); s.has_value() && !s.value()) {
-			// unsat(fm) => unrealizable(fm): reject without running
-			// synthesis. An undecided sat (error) is not a decided
-			// false, so it falls through to the real check below.
-			r = false;
-		} else {
-			// realizable() needs the real verdict, and only
-			// is_ltl_aba_realizable can report a fragment it has no
-			// game construction for.
-			r = is_ltl_aba_realizable<node>(target, 0, true);
-		}
-	} catch (const ltl_synthesis_error& e) {
-		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
-			<< e.what() << "); realizability could not be decided";
-		r.error(code::solver_error,
-			"the synthesis backend failed or timed out");
+	// LT-7: the synthesis backend reports "no verdict" as a result<T>
+	// error, not an UNREALIZABLE answer; is_ltl_aba_realizable propagates
+	// it through r below, same as any other error.
+	// A data quantifier under a full-LTL operator survives normalization;
+	// feeding that residue to is_tau_formula_sat breaks its no-quantifier
+	// invariant, so route the RAW formula to the LTL-ABA solver instead.
+	tref target = (realizability_has_game_operators<node>(fm)
+		&& tau::get(nf).find_top(is_quantifier<node>))
+		? fm : nf;
+	if (realizability_has_game_operators<node>(fm)) {
+		// is_tau_formula_sat now answers satisfiability only,
+		// where an unrealizable full-LTL formula is undecided
+		// rather than false; realizable() needs the real
+		// verdict, so ask the realizability procedure directly
+		// instead of going through it.
+		r = is_ltl_aba_realizable<node>(target, 0, true);
+	} else if (auto s = sat(fm); s.has_value() && !s.value()) {
+		// unsat(fm) => unrealizable(fm): reject without running
+		// synthesis. An undecided sat (error) is not a decided
+		// false, so it falls through to the real check below.
+		r = false;
+	} else {
+		// realizable() needs the real verdict, and only
+		// is_ltl_aba_realizable can report a fragment it has no
+		// game construction for.
+		r = is_ltl_aba_realizable<node>(target, 0, true);
 	}
 	DBG(assert(r.is_well_formed());)
 	return r;
@@ -1004,24 +995,18 @@ result<bool> api<node>::sat(tref fm) {
 		code::internal_error,
 		"Could not normalize the formula; "
 		"its satisfiability cannot be decided");
-	// Same synthesis-backend gate as realizable() -- see the note there.
-	try {
-		// A data quantifier under a full-LTL operator survives normalization;
-		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
-		// invariant, so route the RAW formula to the LTL-ABA solver instead.
-		tref target = (sat_has_ltl_operators<node>(fm)
-			&& tau::get(nf).find_top(is_quantifier<node>))
-			? fm : nf;
-		TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
-			code::internal_error,
-			"is_tau_formula_sat returned neither a value nor an "
-			"error while checking satisfiability");
-	} catch (const ltl_synthesis_error& e) {
-		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
-			<< e.what() << "); satisfiability could not be decided";
-		r.error(code::solver_error,
-			"the synthesis backend failed or timed out");
-	}
+	// Same synthesis-backend gate as realizable() -- see the note there:
+	// is_tau_formula_sat's own result<T> error propagates through r.
+	// A data quantifier under a full-LTL operator survives normalization;
+	// feeding that residue to is_tau_formula_sat breaks its no-quantifier
+	// invariant, so route the RAW formula to the LTL-ABA solver instead.
+	tref target = (sat_has_ltl_operators<node>(fm)
+		&& tau::get(nf).find_top(is_quantifier<node>))
+		? fm : nf;
+	TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
+		code::internal_error,
+		"is_tau_formula_sat returned neither a value nor an "
+		"error while checking satisfiability");
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1077,18 +1062,12 @@ result<bool> api<node>::valid_spec(tref fm) {
 		"Could not normalize the formula; "
 		"its validity cannot be decided");
 	// Valid iff T (tautology) implies the normalized formula.
-	// Same synthesis-failure gate as realizable() -- see the note there.
-	try {
-		TAU_TRY_OR(r, is_tau_impl<node>(tau::_T(), nfm),
-			code::internal_error,
-			"is_tau_impl returned neither a value nor an error "
-			"while checking validity");
-	} catch (const ltl_synthesis_error& e) {
-		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
-			<< e.what() << "); validity could not be decided";
-		r.error(code::solver_error,
-			"the synthesis backend failed or timed out");
-	}
+	// Same synthesis-failure gate as realizable() -- see the note there:
+	// is_tau_impl's own result<T> error propagates through r.
+	TAU_TRY_OR(r, is_tau_impl<node>(tau::_T(), nfm),
+		code::internal_error,
+		"is_tau_impl returned neither a value nor an error "
+		"while checking validity");
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1218,17 +1197,11 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 	ctx.output_remaps = options.output_remaps;
 	// LT-7: make_interpreter reaches ltlsynt through
 	// ltl_to_safety_formula_full; a backend failure must not terminate the
-	// caller.  No interpreter is the honest answer here.
-	try {
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
-			code::solver_error,
-			"the specification could not be compiled");
-	} catch (const ltl_synthesis_error& e) {
-		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
-			<< e.what() << "); the specification could not be compiled";
-		r.error(code::solver_error,
-			"the synthesis backend failed or timed out");
-	}
+	// caller.  No interpreter is the honest answer here, and
+	// make_interpreter's own result<T> error propagates through r.
+	TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		code::solver_error,
+		"the specification could not be compiled");
 	DBG(assert(r.is_well_formed());)
 	return r;
 }
@@ -1272,18 +1245,11 @@ result<interpreter<node>> api<node>::get_interpreter(
 	}
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	// See the tref overload: synthesis-backend failures are answered, not
-	// propagated.
-	try {
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
-			code::solver_error,
-			"the specification could not be compiled");
-	} catch (const ltl_synthesis_error& e) {
-		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
-			<< e.what() << "); the specification could not be compiled";
-		r.error(code::solver_error,
-			"the synthesis backend failed or timed out");
-	}
+	// See the tref overload: make_interpreter's own result<T> error
+	// propagates through r rather than terminating the caller.
+	TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		code::solver_error,
+		"the specification could not be compiled");
 	DBG(assert(r.is_well_formed());)
 	return r;
 }

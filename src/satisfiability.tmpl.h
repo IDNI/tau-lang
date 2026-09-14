@@ -1907,15 +1907,17 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	// one flag-carrying clause, so at most one may survive here; a second
 	// one means a nested `sometimes` leaked through the fragment
 	// reduction. Refuse loudly rather than silently dropping the rest:
-	// api::realizable/valid_spec/get_interpreter convert this into a
-	// logged UNKNOWN.
+	// the error propagates to api::realizable/valid_spec/get_interpreter
+	// as a solver_error verdict.
 	if (st.size() >= 2) {
 		LOG_ERROR << "transform_to_execution: " << st.size()
 			<< " sometimes clauses survived the eventual-variable "
 			"transform; the formula cannot be decided by the "
 			"safety pipeline";
-		throw ltl_synthesis_error("nested or multiple `sometimes` "
+		r.error(code::solver_error, "nested or multiple `sometimes` "
 			"clauses survived the eventual-variable transform");
+		DBG(assert(r.is_well_formed());)
+		return r;
 	}
 
 	tref res;
@@ -2013,10 +2015,19 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	if (has_ctl_star_operators<node>(fm)) {
 		auto _s = r.open("ctl_star_reduction");
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
-		auto realizable = is_ltl_aba_realizable<node>(
-			reduction.ltl_formula, start_time, output);
 		// a backend that gave no verdict leaves satisfiability unknown,
 		// which is not the "not implemented" case mark_undecided states
+		if (!reduction.has_value()) {
+			r.merge(std::move(reduction));
+			r.error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed or "
+				"produced no verdict; satisfiability could not "
+				"be decided");
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		auto realizable = is_ltl_aba_realizable<node>(
+			reduction->ltl_formula, start_time, output);
 		if (realizable.has_value()) memoize(realizable.value());
 		else {
 			r.merge(std::move(realizable));
