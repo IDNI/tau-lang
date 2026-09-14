@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
 
@@ -140,6 +140,11 @@ void api<node>::set_max_def_passes(size_t n) {
 template <NodeType node>
 void api<node>::set_max_enum_steps(size_t n) {
 	max_enum_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_probe_steps(size_t n) {
+	max_probe_steps = n;
 }
 
 template <NodeType node>

@@ -44,7 +44,7 @@ cli::options tau_options() {
 	// hung every plain `tau` run of a bv accumulator that the API
 	// completed instantly.
 	opts["blasting"] = cli::option("blasting", 'B', bv_blasting)
-		.set_description(std::string("blasting (")
+		.set_description(std::string("bitvector predicate blasting (")
 			+ (bv_blasting ? "enabled" : "disabled")
 			+ " by default)");
 	opts["ba-component-factoring"] = cli::option("ba-component-factoring",
@@ -81,9 +81,9 @@ cli::options tau_options() {
 	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
 		.set_description("use legacy terminal REPL instead of FTXUI");
 	opts["status"] = cli::option("status", 's', true)
-		.set_description("display status");
+		.set_description("display status (enabled by default)");
 	opts["color"] = cli::option("color", 'c', true)
-		.set_description("use colors");
+		.set_description("use colors (enabled by default)");
 	DBG(opts["debug"] = cli::option("debug", 'd', true)
 		.set_description("debug mode");)
 	opts["experimental"] = cli::option("experimental", 'x', false)
@@ -104,7 +104,7 @@ cli::options tau_options() {
 			"may be tested against for the case split (0 = unlimited)");
 	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
 		.set_description("decided tau-algebra rows whose key tree is kept "
-			"alive across the step sweep (0 = none)");
+			"alive across the step sweep (default 4096, 0 = none)");
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
@@ -133,6 +133,9 @@ cli::options tau_options() {
 	opts["max-def-passes"] = cli::option("max-def-passes", 'P', "0")
 		.set_description("cap definition-expansion passes "
 			"(0 = unlimited)");
+	opts["max-probe-steps"] = cli::option("max-probe-steps", 'M', "10000")
+		.set_description("cap the untyped saturation probe over a residual "
+			"recurrence reference (default 10000, 0 = unlimited)");
 	opts["max-enum-steps"] = cli::option("max-enum-steps", 'E', "0")
 		.set_description("cap recurrence-relation enumeration steps "
 			"(0 = unlimited)");
@@ -140,10 +143,11 @@ cli::options tau_options() {
 		.set_description("cap rewrite-to-fixpoint rounds "
 			"(0 = unlimited)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
-		.set_description("tree-node count floor before gc may trigger");
+		.set_description("tree-node count floor before gc may trigger "
+			"(default 256)");
 	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
 		.set_description("gc triggers when node count grows by this "
-			"factor since last sweep (<= 0 disables gc)");
+			"factor since last sweep (default 1.5; <= 0 disables gc)");
 	return opts;
 }
 
@@ -268,14 +272,17 @@ int main(int argc, char** argv) {
 	tau_api::set_max_simplify_rounds(optnum("max-simplify-rounds"));
 	tau_api::set_max_def_passes(optnum("max-def-passes"));
 	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
+	tau_api::set_max_probe_steps(optnum("max-probe-steps"));
 	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
-	// Unlike `--blasting` (only propagated on the REPL path via the
-	// options struct below, never on the spec-file path -- see the
-	// GitHub #74 comment above), bv-widening/bv-max-width are applied
-	// here unconditionally so they take effect in spec-file mode too.
+	// Applied here unconditionally, like bv-widening/bv-max-width below,
+	// so the flags take effect in spec-file mode too; the REPL options
+	// struct then starts from the same values. The option's default is the
+	// library's own (see the GitHub #74 comment above), so this is a no-op
+	// unless the flag was given.
+	tau_api::set_blasting(blasting);
 	tau_api::set_bv_widening(bv_widening_opt);
 	tau_api::set_bv_max_width(optnum("bv-max-width"));
 

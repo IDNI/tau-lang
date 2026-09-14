@@ -81,7 +81,7 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	case_split_max_tests_opt, decision_pins_opt,
 	fixpoint_steps_opt,
 	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
-	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
+	simplify_rounds_opt, def_passes_opt, enum_steps_opt, probe_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
 	spec_size_warn_opt, revision_alts_opt, bv_max_width_opt };
 

@@ -95,6 +95,17 @@ add_repl_test(option_alias-maxdefpasses
 	"get maxdefpasses"        "defpasses:")
 add_repl_test(option_alias-maxenumsteps
 	"get maxenumsteps"        "enumsteps:")
+add_repl_test(option_alias-maxprobesteps
+	"get maxprobesteps"       "probesteps:")
+# CLI-mirroring aliases (the CLI long name with the dashes stripped).
+add_repl_test(option_alias-bvcasesplit
+	"get bvcasesplit"         "casesplit:")
+add_repl_test(option_alias-bacomponentfactoring
+	"get bacomponentfactoring" "factoring:")
+add_repl_test(option_alias-bvcasesplitmaxtests
+	"get bvcasesplitmaxtests" "casesplitmaxtests:")
+add_repl_test(option_alias-badecisionpins
+	"get badecisionpins"      "decisionpins:")
 add_repl_test(option_alias-maxrewriterounds
 	"get maxrewriterounds"    "rewriterounds:")
 add_repl_test(option_alias-gcgrowthfactor

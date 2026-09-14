@@ -811,8 +811,9 @@ with:
 
 * the command line options `-y`, `--bv-widening` (enable the mode; disabled
   by default) and `-Y`, `--bv-max-width <n>` (cap the width the mode is
-  allowed to compute at; `0` means the default, 1024). Both apply whether
-  Tau is run as a REPL or given a specification file directly.
+  allowed to compute at; `0` leaves the current cap unchanged, 1024 unless
+  already set). Both apply whether Tau is run as a REPL or given a
+  specification file directly.
 * the matching REPL options `y|bvwidening` (on/off) and `bvmaxwidth`
   (numeric, `set bvmaxwidth <n>`; `0` leaves the current cap unchanged).
 * the API setters `api::set_bv_widening(bool)` and
@@ -822,9 +823,9 @@ with:
 comparison, an interval), the mode computes, bottom-up, the minimum width
 `W` at which none of the atom's arithmetic can overflow:
 
-| Node                                    | Needed width                                              |
+| Node                                     | Needed width                                               |
 |------------------------------------------|------------------------------------------------------------|
-| variable, io_var, constant               | its own declared width `w`                                 |
+| variable, io_var, constant               | the atom's own declared or inferred width `w` (a leaf's own type is not consulted separately) |
 | `a + b`                                  | `max(width(a), width(b)) + 1`                               |
 | `a - b`                                  | `max(width(a), width(b))`                                   |
 | `a * b`                                  | `width(a) + width(b)`                                       |
@@ -951,6 +952,12 @@ The second pattern is the one this section opened by ruling out: with the
 mode on, the multiplication itself never wraps, so `min` sees the real
 product and the previously-impossible checked multiply becomes an ordinary
 guard-free expression.
+
+**Opaque subterms.** An atom containing a subterm the width computation
+does not understand — a function or predicate call, a capture — is left
+exactly as written, in modular semantics, with no diagnostic: the mode
+widens only atoms whose arithmetic it can see through completely. Expand
+such calls (or rewrite the atom without them) if it must be exact.
 
 **Cap.** `W` is bounded by `--bv-max-width`/`bvmaxwidth` (default 1024); a
 formula that would need a wider computation fails cleanly instead of
@@ -1779,13 +1786,15 @@ whereas the REPL specific options are:
 | -d, --debug        | debug mode (Debug builds only)                         |
 
 and the limit options, which bound the engine's iterative searches. Every
-cap defaults to unlimited (`0`); the two gc knobs keep their tuned defaults.
-Each has a matching REPL option (see [REPL options](#repl-options)):
+cap defaults to unlimited (`0`) except `--ba-decision-pins` (4096, 0 = none)
+and `--max-probe-steps` (10000); `--spec-size-warn`'s `0` means off, and the
+two gc knobs keep their tuned defaults. Each has a matching REPL option (see
+[REPL options](#repl-options)):
 
 | Option                        | Description                                                                            |
 |-------------------------------|----------------------------------------------------------------------------------------|
 | -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
-| -a, --max-revision-alts       | cap the revision alternatives kept per specification part (0 = unlimited)              |
+| -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (0 = unlimited) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -k, --bv-case-split-max-tests | cap the constants a quantified bitvector variable may be tested against for the case split (0 = unlimited) |
@@ -1798,6 +1807,7 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
 | -P, --max-def-passes          | cap definition-expansion passes (0 = unlimited)                                        |
 | -E, --max-enum-steps          | cap recurrence-relation enumeration steps (0 = unlimited)                              |
+| -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default 10000, 0 = unlimited) |
 | -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (0 = unlimited)                                         |
 | -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)                              |
 | -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
@@ -1874,17 +1884,18 @@ whether bitvector predicates are expanded into their bit-level encoding. It's
 off by default (the REPL starts with the value of the `-B, --blasting` command
 line option, which defaults to off).
 
-* `casesplit`: Can be on/off. Controls the bitvector case split: a quantified
+* `casesplit|bvcasesplit`: Can be on/off. Controls the bitvector case split: a quantified
 bitvector variable that occurs only in comparisons against constants of its
 type is eliminated by one witness per cell those constants cut the domain
 into, before any quantifier block forms. It's on by default (the REPL starts
 with the value of the `-C, --bv-case-split` command line option).
 
-* `factoring`: Can be on/off. Controls support-component factoring of the
+* `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
 tau-algebra constant tests: a constant whose clauses share no variables is
 decided per component, each decision remembered across steps, instead of as a
 whole. It's on by default (the REPL starts with the value of the
 `-K, --ba-component-factoring` command line option).
+
 * `y|bvwidening`: Can be on/off. Controls the
 [exact (widened) bitvector arithmetic mode](#exact-widened-arithmetic-mode).
 It's off by default (the REPL starts with the value of the `-y, --bv-widening`
@@ -1908,11 +1919,11 @@ anti-prenexing (`--block-max-splits`). Unlimited by default.
 * `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
 (`--block-max-rounds`). Unlimited by default.
 
-* `casesplitmaxtests|maxcasetests`: cap on the constants a quantified
+* `casesplitmaxtests|bvcasesplitmaxtests|maxcasetests`: cap on the constants a quantified
 bitvector variable may be tested against for the case split to apply
 (`--bv-case-split-max-tests`). Unlimited by default.
 
-* `decisionpins`: how many decided tau-algebra rows keep their key tree alive
+* `decisionpins|badecisionpins`: how many decided tau-algebra rows keep their key tree alive
 across the interpreter's step sweep, oldest released first
 (`--ba-decision-pins`). 4096 by default; `0` disables the pinning (a raw
 count, not "unlimited").
@@ -1942,6 +1953,12 @@ cap (`--max-simplify-rounds`). Unlimited by default.
 
 * `enumsteps|maxenumsteps`: recurrence-relation enumeration step cap
 (`--max-enum-steps`). Unlimited by default.
+
+* `probesteps|maxprobesteps`: cap on the untyped saturation probe that
+`calculate_fixed_point` runs over a residual recurrence reference to tell a
+type-blocked rule from a legitimately uninterpreted one (`--max-probe-steps`).
+10000 by default, since a diverging probe never stabilizes; a finite
+`enumsteps` tightens it further; 0 = unlimited.
 
 * `rewriterounds|maxrewriterounds`: rewrite-to-fixpoint round cap
 (`--max-rewrite-rounds`). Unlimited by default.

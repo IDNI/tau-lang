@@ -41,6 +41,10 @@ add_repl_test(set_cmd-defpasses
 	"set defpasses 40. get defpasses" "defpasses: *40")
 add_repl_test(set_cmd-enumsteps
 	"set enumsteps 33. get enumsteps" "enumsteps: *33")
+add_repl_test(set_cmd-probesteps
+	"set probesteps 44. get probesteps" "probesteps: *44")
+add_repl_test(set_cmd-probesteps_unlimited
+	"set probesteps 0. get probesteps" "probesteps: *unlimited")
 add_repl_test(set_cmd-rewriterounds
 	"set rewriterounds 21. get rewriterounds" "rewriterounds: *21")
 add_repl_test(set_cmd-gcminsize

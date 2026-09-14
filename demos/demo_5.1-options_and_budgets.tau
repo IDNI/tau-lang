@@ -37,6 +37,21 @@ n xyzvw
 n count' | count
 set charvar on
 
+# Three options steer how bitvector and tau-algebra atoms are decided without
+# changing what they mean. blasting (off by default) rewrites bitvector
+# predicates into quantified bit formulas before the solver sees them;
+# casesplit (on) eliminates a quantified bitvector variable that is only ever
+# compared against constants by one witness per cell those constants cut its
+# domain into; factoring (on) decides a tau-algebra constant whose clauses
+# share no variables one support component at a time, remembering each
+# decision across steps. All three have command line twins (--blasting,
+# --bv-case-split, --ba-component-factoring) that apply in both REPL and
+# specification-file mode:
+
+get blasting
+get casesplit
+get factoring
+
 # bvwidening is the other option that changes what the input MEANS, this time
 # for bitvector arithmetic. Off (the default), arithmetic is modular and every
 # intermediate result wraps at the width of its type; on, each atom computes
@@ -94,7 +109,8 @@ get bvmaxwidth
 
 # The remaining numeric options in the get listing are budgets. Each caps one
 # of the engine's iterative searches; 0 means unlimited, which is the default
-# for all but the two gc knobs. They exist because several procedures search rather
+# for all but the two gc knobs, decisionpins (4096; 0 = no pinning) and
+# probesteps (10000). They exist because several procedures search rather
 # than compute: a search that does not converge is better cut off loudly than
 # left running. Reaching a budget is a bound on the search, never an answer
 # about the input. Every budget has a command line twin (--max-fixpoint-steps,
@@ -141,7 +157,10 @@ set defpasses 0
 # The remaining budgets follow the same pattern on other searches: maxsplits,
 # maxrounds, blastdepth and squeezecap bound anti-prenexing, maxclauses bounds
 # complete quantifier elimination, simplifyrounds and rewriterounds bound
-# rewriting, flagsteps bounds the eventual-flag search of satisfiability, and
+# rewriting, flagsteps bounds the eventual-flag search of satisfiability,
+# probesteps bounds the untyped probe that tells a type-blocked recurrence
+# rule from an uninterpreted one, casesplitmaxtests bounds the bitvector case
+# split, decisionpins pins decided tau-algebra rows across the step sweep, and
 # specsizewarn / revisionalts guard the updatable runs of demo_3.5. gcminsize
 # and gcgrowth tune the interpreter's tree garbage collector and keep their
 # defaults unless set.

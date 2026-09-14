@@ -155,6 +155,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_simplify_rounds|max-simplify-rounds|m|1000|simplifyrounds|1000"
 	"max_def_passes|max-def-passes|P|40|defpasses|40"
 	"max_enum_steps|max-enum-steps|E|33|enumsteps|33"
+	"max_probe_steps|max-probe-steps|M|44|probesteps|44"
 	"max_rewrite_rounds|max-rewrite-rounds|R|21|rewriterounds|21"
 	"gc_min_size|gc-min-size|G|512|gcminsize|512"
 	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"

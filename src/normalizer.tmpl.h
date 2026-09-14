@@ -25,6 +25,16 @@ inline size_t max_def_passes = 0;
 /// REPL `enumsteps`, or `api::set_max_enum_steps`.
 inline size_t max_enum_steps = 0;
 
+/// Cap on the untyped saturation probe `calculate_fixed_point` runs over a
+/// residual recurrence reference to tell a type-blocked rule from a
+/// legitimately uninterpreted one; 0 = unlimited. A diverging probe (e.g.
+/// cross-family type-blocked mutual recursion) never stabilizes, so the
+/// default is a finite 10000 rather than unlimited; the effective cap is the
+/// smaller of this and a finite `max_enum_steps`. Runtime parameter by
+/// policy: set via `--max-probe-steps`, REPL `probesteps`, or
+/// `api::set_max_probe_steps`.
+inline size_t max_probe_steps = 10000;
+
 /**
  * @internal
  * @brief Descriptor of a single reference offset.
@@ -2011,13 +2021,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// each family is internally consistent on its own, so
 	// validate_rr_case_types passes both, the typed loop leaves a
 	// residual, and the untyped probe would rewrite a->b->a->b... with
-	// no fixed point, forever). Reuse max_enum_steps when the caller set
-	// a finite bound (0 means unlimited); otherwise fall back to a
-	// generous but finite constant so the guard that exists to turn a
-	// hang into a fast error cannot itself hang.
-	static constexpr size_t probe_saturation_fallback_cap = 10000;
-	const size_t probe_cap = max_enum_steps
-		? max_enum_steps : probe_saturation_fallback_cap;
+	// no fixed point, forever). The cap is the runtime `max_probe_steps`
+	// (finite by default, so the guard that exists to turn a hang into a
+	// fast error cannot itself hang), tightened by `max_enum_steps` when
+	// the caller bounded the enumeration itself; 0 means unlimited for
+	// either.
+	const size_t unlimited = std::numeric_limits<size_t>::max();
+	const size_t probe_cap = std::min(
+		max_probe_steps ? max_probe_steps : unlimited,
+		max_enum_steps ? max_enum_steps : unlimited);
 	subtree_unordered_set<node> legit_uninterpreted;
 
 	// Whether any rule application has ever rewritten an enumerated step.

@@ -15,7 +15,7 @@ add_repl_test(get_cmd-lists_specsizewarn_off "get" "specsizewarn: *off")
 
 # --- bare `get` prints every limit option (covers the limit_printers map) ----
 foreach(opt maxsplits maxrounds casesplitmaxtests decisionpins fixpointsteps flagsteps blastdepth squeezecap
-		simplifyrounds defpasses enumsteps rewriterounds gcminsize
+		simplifyrounds defpasses enumsteps probesteps rewriterounds gcminsize
 		gcgrowth specsizewarn revisionalts)
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
 endforeach()

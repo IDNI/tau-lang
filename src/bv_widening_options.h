@@ -6,8 +6,9 @@
  * api setters (`api::set_bv_widening`, `api::set_bv_max_width`) must see
  * these knobs' declarations wherever `api.h` is included, and
  * `tests/test_init.h` defines every test binary's `main()` and is included
- * before any tau header, so it applies the `TAU_*` environment overrides
- * from this file directly, before the first test runs.
+ * before any tau header, so it applies the `TAU_BV_WIDENING` and
+ * `TAU_BV_MAX_WIDTH` environment overrides to these knobs directly, before
+ * the first test runs.
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md

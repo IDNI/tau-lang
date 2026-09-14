@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 /**
  * @file api.h
@@ -238,6 +238,13 @@ struct api {
 	 * is a bound on the search, not a proof that no fixed point exists.
 	 */
 	static void set_max_enum_steps(size_t n);
+	/**
+	 * @brief Cap the untyped saturation probe `calculate_fixed_point` runs
+	 * over a residual recurrence reference; 0 = unlimited. Defaults to
+	 * 10000, since a diverging probe never stabilizes; a finite
+	 * `max_enum_steps` tightens it further.
+	 */
+	static void set_max_probe_steps(size_t n);
 	/**
 	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
 	 * (default). Oscillation is detected regardless; this bounds only
