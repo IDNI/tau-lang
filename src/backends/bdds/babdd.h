@@ -555,7 +555,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// into the reference's out bit -- so a function and its
 	// complement share one stored node.
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-		if (V.size() >= (size_t{1} << o.idW)) return universe_full();
+		if (V.size() >= (uint64_t{1} << o.idW)) return universe_full();
 #ifdef DEBUG
 		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
@@ -613,7 +613,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// true map to F and T, and with output inverters an already
 	// interned ~b is reused via the out bit
 	static bdd_ref add(const B& b) {
-		if (V.size() >= (size_t{1} << o.idW)) return universe_full();
+		if (V.size() >= (uint64_t{1} << o.idW)) return universe_full();
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return bdd_ref(0,0,it->second);
@@ -1218,7 +1218,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-		if (V.size() >= (size_t{1} << o.idW)) return universe_full();
+		if (V.size() >= (uint64_t{1} << o.idW)) return universe_full();
 #ifdef DEBUG
 		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
