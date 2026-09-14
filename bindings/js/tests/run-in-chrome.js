@@ -30,6 +30,10 @@ const {
 } = require('./browser-harness');
 const path = require('path');
 
+// Chrome refuses to start as root without --no-sandbox, which is how the
+// container stages run it. The sandbox stays on everywhere else.
+const CHROME_ARGS = (process.env.TAU_CHROME_ARGS || '').split(' ').filter(Boolean);
+
 // Same rationale as run-suite-in-chrome.js's `liveResources`: a signal
 // arriving mid-run skips the `finally` block below, so Ctrl-C would
 // otherwise leave the launched Chrome process behind.
@@ -64,7 +68,8 @@ async function main() {
 	let browser;
 	let exitCode = 1;
 	try {
-		browser = await puppeteer.launch({ executablePath: chromePath, headless: true });
+		browser = await puppeteer.launch({ executablePath: chromePath, headless: true,
+			args: CHROME_ARGS });
 		liveBrowser = browser;
 		const result = await runTest(browser, { baseUrl, name, timeoutMs: DEFAULT_TIMEOUT_MS });
 		for (const line of result.stdout) process.stdout.write(`${line}\n`);

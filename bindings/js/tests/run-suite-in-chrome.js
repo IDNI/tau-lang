@@ -38,6 +38,10 @@ const {
 	resolveChromePath, runTest,
 } = require('./browser-harness');
 
+// Chrome refuses to start as root without --no-sandbox, which is how the
+// container stages run it. The sandbox stays on everywhere else.
+const CHROME_ARGS = (process.env.TAU_CHROME_ARGS || '').split(' ').filter(Boolean);
+
 // Four concurrent wasm heaps lose renderers on a 20 GB machine, and buy
 // nothing: the wall time is set by a few long tests, so 2 measured 311s
 // against 4's 322s.
@@ -185,7 +189,8 @@ async function main() {
 	const start = Date.now();
 	let results;
 	try {
-		browser = await puppeteer.launch({ executablePath: chromePath, headless: true });
+		browser = await puppeteer.launch({ executablePath: chromePath, headless: true,
+			args: CHROME_ARGS });
 		liveResources.browser = browser;
 		browser.on('disconnected', () => { browserCrashed = true; });
 
