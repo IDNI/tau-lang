@@ -58,6 +58,8 @@
 // extern-declare them instead of an emitted artifact instantiating its own.
 @TAU_CODEGEN_ARTIFACT_PREINST_DEFINE@
 
+#include <string_view>
+
 #include "tau_tree.h"
 @TAU_PACK_INCLUDES@
 

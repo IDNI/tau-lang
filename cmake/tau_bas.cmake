@@ -97,6 +97,19 @@ macro(_tau_load_ba_registry)
 endmacro()
 
 #
+# A macro, not a function: it appends to the caller's OUT variable, like
+# _tau_load_ba_registry.
+#
+macro(_tau_append_ba_asserts OUT TYPE ID)
+	string(APPEND ${OUT}
+		"static_assert(ba_descriptor_complete<${TYPE}, node_t>,\n"
+		"\t\"${ID} (${TYPE}): incomplete descriptor\");\n"
+		"static_assert(std::string_view(\n"
+		"\t\tba_descriptor<${TYPE}, node_t>::type_name) == \"${ID}\",\n"
+		"\t\"${ID}: ba.cmake id and ba_descriptor::type_name disagree\");\n")
+endmacro()
+
+#
 # Resolve TAU_BAS into the node<> arguments and the per-pack data.
 #
 function(tau_resolve_ba_pack)
@@ -191,19 +204,20 @@ function(tau_resolve_ba_pack)
 	set(TAU_BA_TESTS_RESOLVED "${_ba_tests}" PARENT_SCOPE)
 	set(TAU_BA_LINK_LIBS "${_link_libs}" PARENT_SCOPE)
 	set(TAU_BA_REQUIRED_PACKAGES "${_required_packages}" PARENT_SCOPE)
-	# one static_assert per BA of the pack: a concept-id in a static_assert
-	# makes the compiler name the requirement a descriptor fails, which a
-	# fold into one bool cannot
+	# two static_asserts per BA of the pack: a concept-id makes the compiler
+	# name the requirement a descriptor fails, which a fold into one bool
+	# cannot, and only the generated header sees both spellings of the id
 	set(_descriptor_asserts "")
-	foreach(_t ${_base_types})
-		string(APPEND _descriptor_asserts
-			"static_assert(ba_descriptor_complete<${_t}, node_t>,\n"
-			"\t\"${_t}: incomplete descriptor\");\n")
+	foreach(_id ${_ba_ids})
+		if(_id STREQUAL "" OR _id STREQUAL "tau")
+			continue()
+		endif()
+		_tau_append_ba_asserts(_descriptor_asserts
+			"${TAU_BA_${_id}_TYPE}" "${_id}")
 	endforeach()
 	if(_has_tau)
-		string(APPEND _descriptor_asserts
-			"static_assert(ba_descriptor_complete<tau_ba<${_base_types_str}>, node_t>,\n"
-			"\t\"tau_ba: incomplete descriptor\");\n")
+		_tau_append_ba_asserts(_descriptor_asserts
+			"tau_ba<${_base_types_str}>" "tau")
 	endif()
 	set(TAU_PACK_DESCRIPTOR_ASSERTS "${_descriptor_asserts}" PARENT_SCOPE)
 	set(TAU_PACK_NODE_ARGS "${_node_args}" PARENT_SCOPE)
