@@ -28,6 +28,10 @@ namespace idni::tau_lang {
  * already-visited sub-trees within a single traversal pass.
  */
 enum MemorySlotPre {
+	/// Not a slot. `apply_unique<0>` means "no persistent memo", so the
+	/// first named slot must not be zero, or it silently gets a per-call
+	/// cache instead of the one it asked for.
+	no_pre_slot = 0,
 	normalize_ba_m,          ///< Cache slot for normalize_ba traversals.
 	push_negation_in_m,      ///< Cache slot for push_negation_in traversals.
 	to_dnf_m,                ///< Cache slot for to_dnf traversals.
@@ -43,6 +47,10 @@ enum MemorySlotPre {
  * to select a specific static cache.
  */
 enum MemorySlotPost {
+	/// Not a slot. `apply_unique<0>` means "no persistent memo", so the
+	/// first named slot must not be zero, or it silently gets a per-call
+	/// cache instead of the one it asked for.
+	no_post_slot = 0,
 	anti_prenex_m ///< Cache slot for anti-prenex post-order traversals.
 };
 
