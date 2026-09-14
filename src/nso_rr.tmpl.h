@@ -335,10 +335,8 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 		return calculate_all_fixed_points<node>(rr_);
 	});
 	if (!main) {
-		r.error(code::internal_error,
+		return r.with_assert_check_error(code::internal_error,
 			"fixed point calculation did not terminate");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	// Substitute function and recurrence relation definitions. Called
 	// directly rather than through the traverser pipe so that the
@@ -348,17 +346,13 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 		return repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
 	});
 	if (!new_main) {
-		r.error(code::internal_error,
+		return r.with_assert_check_error(code::internal_error,
 			"recurrence relation rewriting did not reach a fixed point");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	LOG_DEBUG << "End nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	LOG_DEBUG << "New main: " << LOG_FM(new_main);
-	r = new_main;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(new_main);
 }
 
 } // namespace idni::tau_lang

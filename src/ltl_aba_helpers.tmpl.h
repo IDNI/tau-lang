@@ -415,8 +415,7 @@ static result<std::string> skeleton_str(
 	if (!testers.empty()) {
 		LOG_ERROR << "skeleton_str: past operator (S/T) reached the "
 			"non-tester LTL skeleton";
-		r = "0";
-		return r;
+		return r.with_value("0");
 	}
 	// ltl_skeleton's callers never drive a __step_ge prop: an undriven one
 	// left in the string is an unbound atomic proposition ltlsynt cannot
@@ -424,11 +423,9 @@ static result<std::string> skeleton_str(
 	if (!collect_step_guards<node>(n).empty()) {
 		LOG_ERROR << "skeleton_str: a lookback needing a step guard "
 			"reached the non-driving LTL skeleton";
-		r = "0";
-		return r;
+		return r.with_value("0");
 	}
-	r = std::move(s);
-	return r;
+	return r.with_value(std::move(s));
 }
 
 template <NodeType node>
@@ -500,8 +497,7 @@ static result<std::string> skeleton_str_with_testers(
 	if (t.is(tau::wff)) return skeleton_wff_with_testers<node>(n, atoms, testers);
 	result<std::string> r;
 	auto prop = find_prop<node>(n, atoms);
-	r = prop.empty() ? "1" : prop; // LT-11
-	return r;
+	return r.with_value(prop.empty() ? "1" : prop); // LT-11
 }
 
 template <NodeType node>
@@ -513,87 +509,76 @@ static result<std::string> skeleton_wff_with_testers(
 	using tau = tree<node>;
 	result<std::string> r;
 	const auto& t = tau::get(n);
-	if (!t.has_child()) { r = "1"; return r; } // LT-11
+	if (!t.has_child()) { return r.with_value("1"); } // LT-11
 	auto nt = t[0].value.nt;
 	const auto& inner = t[0];
 
 	auto prop = find_prop<node>(n, atoms);
-	if (!prop.empty()) { r = prop; return r; }
+	if (!prop.empty()) { return r.with_value(prop); }
 
 	// A rule reading a lookback-k body has no fact to read before step k:
 	// under G it must not be enforced there (vacuous), under F it cannot
 	// witness there (excluded) -- see step_guard_prop / body_max_lookback.
 	switch (nt) {
-	case tau::wff_t: r = "1"; return r;
-	case tau::wff_f: r = "0"; return r;
+	case tau::wff_t: return r.with_value("1");
+	case tau::wff_f: return r.with_value("0");
 	case tau::wff_neg: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		r = "!" + phi;
-		return r;
+		return r.with_value("!" + phi);
 	}
 	case tau::wff_and: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		r = "(" + phi + " & " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " & " + psi + ")");
 	}
 	case tau::wff_or: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		r = "(" + phi + " | " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " | " + psi + ")");
 	}
 	case tau::wff_xor: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		r = "(" + phi + " ^ " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " ^ " + psi + ")");
 	}
 	case tau::wff_imply: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		r = "(" + phi + " -> " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " -> " + psi + ")");
 	}
 	case tau::wff_equiv: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		r = "(" + phi + " <-> " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " <-> " + psi + ")");
 	}
 	case tau::wff_always: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		r = "G(" + step_guarded(body_max_lookback<node>(inner.first()), phi, false) + ")";
-		return r;
+		return r.with_value("G(" + step_guarded(body_max_lookback<node>(inner.first()), phi, false) + ")");
 	}
 	case tau::wff_sometimes: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		r = "F(" + step_guarded(body_max_lookback<node>(inner.first()), phi, true) + ")";
-		return r;
+		return r.with_value("F(" + step_guarded(body_max_lookback<node>(inner.first()), phi, true) + ")");
 	}
 	case tau::wff_until: {
 		TAU_TRY(auto phi0, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi0, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
 		std::string phi = step_guarded(body_max_lookback<node>(inner.first()), phi0, false);
 		std::string psi = step_guarded(body_max_lookback<node>(inner.second()), psi0, true);
-		r = "(" + phi + " U " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " U " + psi + ")");
 	}
 	case tau::wff_release: {
 		TAU_TRY(auto phi0, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi0, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
 		std::string phi = step_guarded(body_max_lookback<node>(inner.first()), phi0, true);
 		std::string psi = step_guarded(body_max_lookback<node>(inner.second()), psi0, false);
-		r = "(" + phi + " R " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " R " + psi + ")");
 	}
 	case tau::wff_weak_until: {
 		TAU_TRY(auto phi0, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto psi0, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
 		std::string phi = step_guarded(body_max_lookback<node>(inner.first()), phi0, false);
 		std::string psi = step_guarded(body_max_lookback<node>(inner.second()), psi0, true);
-		r = "(" + phi + " W " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " W " + psi + ")");
 	}
 
 	// ── ppLTLTT temporal testers for past operators ──────────────────
@@ -616,8 +601,7 @@ static result<std::string> skeleton_wff_with_testers(
 		std::string eval = "(" + psi_skel + " | (" + phi_skel + " & " + svar + "))";
 		testers.push_back({svar, false, eval, false});
 		// Return the CURRENT-step evaluation (not the state variable)
-		r = eval;
-		return r;
+		return r.with_value(eval);
 	}
 	case tau::wff_trigger: {
 		// φ T ψ = ¬(¬φ S ¬ψ)
@@ -628,22 +612,19 @@ static result<std::string> skeleton_wff_with_testers(
 		std::string neg_eval = "(!" + psi_skel + " | (!" + phi_skel + " & " + svar + "))";
 		testers.push_back({svar, false, neg_eval, true});
 		// T = ¬S(¬,¬): negate the current evaluation of the inner S
-		r = "(!" + neg_eval + ")";
-		return r;
+		return r.with_value("(!" + neg_eval + ")");
 	}
 
 	case tau::wff_rimply: {
 		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
 		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		r = "(" + phi + " -> " + psi + ")";
-		return r;
+		return r.with_value("(" + phi + " -> " + psi + ")");
 	}
 	case tau::wff_conditional: {
 		TAU_TRY(auto cond, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
 		TAU_TRY(auto then_s, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
 		TAU_TRY(auto else_s, skeleton_str_with_testers<node>(inner.third(), atoms, testers));
-		r = "((" + cond + " -> " + then_s + ") & (!" + cond + " -> " + else_s + "))";
-		return r;
+		return r.with_value("((" + cond + " -> " + then_s + ") & (!" + cond + " -> " + else_s + "))");
 	}
 	case tau::wff_A:
 	case tau::wff_E:
@@ -654,25 +635,21 @@ static result<std::string> skeleton_wff_with_testers(
 		// CTL* reduction still fell into the default case and became the
 		// propositional constant "1" (`ltl A (F o1 = 1)` printed
 		// "skeleton: 1" REALIZABLE). Same refusal as skeleton_str.
-		r.error(code::solver_error,
+		return r.with_error(code::solver_error,
 		    "CTL* node (A / E / semantic negation) survived the CTL* "
 		    "reduction and reached the propositional skeleton; it has no "
 		    "sound propositional encoding");
-		return r;
 	default: {
 		if (has_io_var<node>(n)) {
 			auto p2 = find_prop<node>(n, atoms);
-			r = p2.empty() ? "1" : p2;
-			return r;
+			return r.with_value(p2.empty() ? "1" : p2);
 		}
 		auto normalized = normalize_non_temp<node>(n);
 		if (!normalized.has_value()) {
 			LOG_ERROR << "skeleton_wff_with_testers: normalization failed";
-			r = "0";
-			return r;
+			return r.with_value("0");
 		}
-		r = tree<node>::get(normalized.value()).equals_F() ? "0" : "1";
-		return r;
+		return r.with_value(tree<node>::get(normalized.value()).equals_F() ? "0" : "1");
 	}
 	}
 }
@@ -691,8 +668,7 @@ ltl_skeleton_with_testers(
 	result<std::pair<std::string, std::vector<past_temporal_tester>>> r;
 	std::vector<past_temporal_tester> testers;
 	TAU_TRY(auto skel, skeleton_str_with_testers<node>(fm, atoms, testers));
-	r = std::make_pair(std::move(skel), std::move(testers));
-	return r;
+	return r.with_value(std::make_pair(std::move(skel), std::move(testers)));
 }
 
 // Append temporal tester DFA constraints to a skeleton string.

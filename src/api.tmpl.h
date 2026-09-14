@@ -270,9 +270,7 @@ result<tref> api<node>::get_formula(const std::string& input, bool simplified) {
 	result<tref> r;
 	tref fm = tau::get(input, get_options<node>(tau::wff, simplified));
 	if (!fm) {
-		r.error(code::parse_error, "Failed to parse formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::parse_error, "Failed to parse formula");
 	}
 	// An io_var's input/output bit is set while parsing a *spec*, so parsing
 	// a bare wff leaves every io_var classified as neither -- and consumers
@@ -282,10 +280,8 @@ result<tref> api<node>::get_formula(const std::string& input, bool simplified) {
 	// the same text yields the same classification whether it arrives as a
 	// formula or inside a spec; this mirrors what get_nso_rr already does for
 	// a bare wff/bf.
-	r = resolve_io_vars<node>(
-		*definitions<node>::instance().get_io_context(), fm);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(resolve_io_vars<node>(
+		*definitions<node>::instance().get_io_context(), fm));
 }
 
 template <NodeType node>
@@ -298,9 +294,7 @@ result<tref> api<node>::get_function_def(const std::string& function_def, [[mayb
 	tref def = tau::get(function_def,
 		get_options<node>(tau::rec_relation, true));
 	if (!def) {
-		r.error(code::parse_error, "Failed to parse function definition");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::parse_error, "Failed to parse function definition");
 	}
 	// The second child of a rec_relation is the body;
 	// accept bf or ref (a ref body may resolve to a bf later --
@@ -308,9 +302,7 @@ result<tref> api<node>::get_function_def(const std::string& function_def, [[mayb
 	// sibling accepted them)
 	auto nt = tau::get(def)[1].get_type();
 	if (nt != tau::bf && nt != tau::ref) {
-		r.error(code::invalid_argument, "Not a function definition");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Not a function definition");
 	}
 	auto added = add_definition(tau::get(def).first(), tau::get(def).second());
 	r.merge(std::move(added));
@@ -318,9 +310,7 @@ result<tref> api<node>::get_function_def(const std::string& function_def, [[mayb
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	r = def;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(def);
 }
 
 template <NodeType node>
@@ -330,16 +320,12 @@ result<tref> api<node>::get_predicate_def(const std::string& predicate_def, [[ma
 	tref def = tau::get(predicate_def,
 		get_options<node>(tau::rec_relation, true));
 	if (!def) {
-		r.error(code::parse_error, "Failed to parse predicate definition");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::parse_error, "Failed to parse predicate definition");
 	}
 	// TODO we could pre resolve all refs to wff
 	auto nt = tau::get(def)[1].get_type();
 	if (nt != tau::wff && nt != tau::ref) {
-		r.error(code::invalid_argument, "Not a predicate definition");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Not a predicate definition");
 	}
 	auto added = add_definition(tau::get(def).first(), tau::get(def).second());
 	r.merge(std::move(added));
@@ -347,9 +333,7 @@ result<tref> api<node>::get_predicate_def(const std::string& predicate_def, [[ma
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	r = def;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(def);
 }
 
 template <NodeType node>
@@ -393,18 +377,14 @@ result<size_t> api<node>::add_definition(tref head, tref body) {
 		if (!body) {
 			DBG(TAU_LOG_TRACE << "add_definition/body is nullptr";)
 		}
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	DBG(TAU_LOG_TRACE << "add_definition/adding head: " << LOG_FM_DUMP(head);)
 	DBG(TAU_LOG_TRACE << "add_definition/adding body: " << LOG_FM_DUMP(body);)
 	// AP1-6: 1-based -- the store's 0-based index made the very first
 	// definition return 0, the documented failure value.
-	r = definitions<node>::instance().add(
-		tau::geth(head), tau::geth(body)) + 1;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(definitions<node>::instance().add(
+		tau::geth(head), tau::geth(body)) + 1);
 }
 
 template <NodeType node>
@@ -414,9 +394,7 @@ result<tref> api<node>::get_definition(const std::string& definition, bool simpl
 	tref def = tau::get(definition, get_options<node>(tau::rec_relation, simplified));
 	DBG(TAU_LOG_TRACE << "get_definition/def: " << LOG_FM_DUMP(def);)
 	if (!def) {
-		r.error(code::parse_error, "Failed to parse definition");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::parse_error, "Failed to parse definition");
 	}
 	auto added = add_definition(tau::get(def).first(), tau::get(def).second());
 	r.merge(std::move(added));
@@ -424,9 +402,7 @@ result<tref> api<node>::get_definition(const std::string& definition, bool simpl
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	r = def;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(def);
 }
 
 template <NodeType node>
@@ -440,9 +416,7 @@ result<tref> api<node>::get_spec_or_term(const std::string& expression, bool sim
 	tau_spec<node> spec;
 	tref expr = spec.parse(expression) ? spec.get() : nullptr;
 	if (expr) {
-		r = expr;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(expr);
 	}
 	auto term_val = r.merge_take(get_term(expression, simplified));
 	if (!term_val) {
@@ -450,9 +424,7 @@ result<tref> api<node>::get_spec_or_term(const std::string& expression, bool sim
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	r = std::move(*term_val);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(std::move(*term_val));
 }
 
 template <NodeType node>
@@ -460,9 +432,7 @@ result<tref> api<node>::get_formula_or_term(const std::string& expr, bool simpli
 	result<tref> r;
 	tref e = tau::get(expr, get_options<node>(tau::fm_or_term, simplified));
 	if (!e) {
-		r.error(code::parse_error, "Failed to parse formula or term");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::parse_error, "Failed to parse formula or term");
 	}
 	e = tau::trim(e);
 	// AP1-32: classify io_vars like get_formula does, so the same text
@@ -516,9 +486,7 @@ template <NodeType node>
 result<tref> api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 	result<tref> r;
 	if (!expr) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto nso_rr, get_nso_rr(expr));
 	io_context<node>& ctx = *definitions<node>::instance().get_io_context();
@@ -545,9 +513,7 @@ result<tref> api<node>::apply_all_defs(tref expr) {
 	// the normalizer's apply_defs_to_spec.
 	result<tref> r;
 	if (!expr) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto nso_rr, get_nso_rr(expr));
 	const auto& defs = definitions<node>::instance().get_sym_defs();
@@ -583,9 +549,7 @@ result<tref> api<node>::substitute(tref expr, tref that, tref with) {
 	result<tref> r;
 	if (!expr || !that || !with) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	DBG(TAU_LOG_TRACE << "substitute: \n" << LOG_FM_DUMP(expr) << "\n" << LOG_FM_DUMP(that) << "\n" << LOG_FM_DUMP(with);)
 	// Enforce that all three are consistently terms or formulas.
@@ -593,9 +557,7 @@ result<tref> api<node>::substitute(tref expr, tref that, tref with) {
 	bool e = is_term(expr), t = is_term(that), w = is_term(with);
 	if ((e && e != t) || (e && e != w) || (!e && t != w)) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	tref s = tau::get(expr).substitute(that, with);
 	if (!s) r.error(code::internal_error, "Substitution failed");
@@ -609,9 +571,7 @@ result<tref> api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 	result<tref> r;
 	if (!expr) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Validate every pair the way the single-pair overload does and
 	// collect the pairs into a structurally keyed map (matching compares
@@ -624,23 +584,17 @@ result<tref> api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 	for (auto [that, with] : that_with) {
 		if (!that || !with) {
 			TAU_LOG_ERROR << "Invalid argument(s)";
-			r.error(code::invalid_argument, "Invalid argument(s)");
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 		}
 		bool t = is_term(that), w = is_term(with);
 		if ((e && e != t) || (e && e != w) || (!e && t != w)) {
 			TAU_LOG_ERROR << "Invalid argument(s)";
-			r.error(code::invalid_argument, "Invalid argument(s)");
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 		}
 		// two structurally equal match patterns are ambiguous
 		if (!changes.emplace(that, with).second) {
 			TAU_LOG_ERROR << "Invalid argument(s)";
-			r.error(code::invalid_argument, "Invalid argument(s)");
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 		}
 	}
 	tref s = tau::get(expr).substitute(changes);
@@ -755,9 +709,7 @@ template <NodeType node>
 result<tref> api<node>::normalize_formula(tref fm) {
 	result<tref> r;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	DBG(TAU_LOG_TRACE << "normalize_formula(): " << LOG_FM_DUMP(fm);)
 #ifdef DEBUG
@@ -775,9 +727,7 @@ result<tref> api<node>::normalize_formula(tref fm) {
 	TAU_TRY(fm, simplify(fm));
 	TAU_TRY(auto nso_rr, get_nso_rr(fm));
 	if (!nso_rr.main || tau::get(nso_rr.main).is(tau::bf)) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY_OR(r, normalizer<node>(nso_rr),
 		code::internal_error, "Normalization failed");
@@ -789,9 +739,7 @@ template <NodeType node>
 result<tref> api<node>::normalize_term(tref term) {
 	result<tref> r;
 	if (!term) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	DBG(TAU_LOG_TRACE << "normalize_term(): " << LOG_FM_DUMP(term);)
 	TAU_TRY(term, simplify(term));
@@ -799,9 +747,7 @@ result<tref> api<node>::normalize_term(tref term) {
 	TAU_TRY(auto nso_rr, get_nso_rr(term));
 	tref main = nso_rr.main->get();
 	if (!main || !tau::get(main).is(tau::bf)) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	tref n = contains(main, tau::ref)
 		? bf_normalizer_with_rec_relation<node>(nso_rr)
@@ -816,9 +762,7 @@ template <NodeType node>
 result<tref> api<node>::anti_prenex(tref fm) {
 	result<tref> r;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto simplified, simplify(fm));
 	tref a = tau_lang::anti_prenex<node>(simplified);
@@ -832,9 +776,7 @@ template <NodeType node>
 result<tref> api<node>::eliminate_quantifiers(tref fm) {
 	result<tref> r;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto simplified, simplify(fm));
 	TAU_TRY(auto applied, apply_all_defs(simplified));
@@ -900,15 +842,11 @@ result<bool> api<node>::realizable(tref fm) {
 	const bool is_fm = is_formula(fm) || (tau::get(fm).is(tau::spec)
 		&& (tt(fm) | tau::main | tau::wff | tt::ref));
 	if (!fm || !is_fm) {
-		r.error(code::invalid_argument, "Invalid formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 	}
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
-		r = fast.value();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(fast.value());
 	}
 	// normalize_formula() fails on failures that are reachable from user
 	// input: a non-well-founded recurrence, a definition set whose
@@ -957,14 +895,10 @@ result<bool> api<node>::unrealizable(tref fm) {
 	result<bool> r;
 	// AP1-11: null input is invalid, not "unrealizable".
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto real, realizable(fm));
-	r = !real;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(!real);
 }
 
 template <NodeType node>
@@ -979,15 +913,11 @@ result<bool> api<node>::sat(tref fm) {
 	// pre-check that rejects them at this layer.
 	fm = flatten_always_conjuncts<node>(simplified);
 	if (!fm || !is_formula(fm)) {
-		r.error(code::invalid_argument, "Invalid formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 	}
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
-		r = fast.value();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(fast.value());
 	}
 	// Same contract as realizable() above: a normalization failure
 	// decides unsatisfiable rather than propagating an error.
@@ -1017,14 +947,10 @@ result<bool> api<node>::unsat(tref fm) {
 	// AP1-11: null input is invalid, not "unsatisfiable" (see
 	// unrealizable above).
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto s, sat(fm));
-	r = !s;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(!s);
 }
 
 template <NodeType node>
@@ -1033,14 +959,10 @@ result<bool> api<node>::valid(tref fm) {
 	TAU_TRY(auto simplified, simplify(fm));
 	fm = flatten_always_conjuncts<node>(simplified);
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 	}
 	TAU_TRY(auto vs, valid_spec(fm));
-	r = vs;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(vs);
 }
 
 template <NodeType node>
@@ -1049,9 +971,7 @@ result<bool> api<node>::valid_spec(tref fm) {
 	TAU_TRY(fm, simplify(fm));
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value()) {
-		r = fast.value();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(fast.value());
 	}
 	// Same contract as realizable(): is_tau_impl() normalizes both
 	// arguments straight away and cannot be handed a null formula, so a
@@ -1099,10 +1019,8 @@ result<subtree_map<node, tref>> api<node>::solve(
 	if (tau::get(a).find_top(is_temporal_quantifier<node>)) {
 		TAU_LOG_ERROR << "Found temporal quantifier in formula: "
 			<< TAU_TO_STR(fm);
-		r.error(code::invalid_argument,
+		return r.with_assert_check_error(code::invalid_argument,
 			"Found temporal quantifier in formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	DBG(TAU_LOG_TRACE << "solve: " << LOG_FM(a);)
 	// setting solver options
@@ -1136,9 +1054,7 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	tref equality = tt(eq) | tau::bf_eq | tt::ref;
 	if (!eq || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Exclude non-Boolean operations from equation. The two sides live under
 	// the bf_eq, not under `eq`: `eq` is the wff wrapping it and has a
@@ -1148,10 +1064,8 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
 		tau::get(equality)[1].find_top(is_non_boolean_term<node>)) {
 		TAU_LOG_ERROR << "Found non-Boolean operation in equation";
-		r.error(code::invalid_argument,
+		return r.with_assert_check_error(code::invalid_argument,
 			"Found non-Boolean operation in equation");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 
 	DBG(TAU_LOG_TRACE << "lgrs/applied: " << LOG_FM(eq);)
@@ -1189,9 +1103,7 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		code::internal_error, "Normalization failed");
 	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
 	if (has_free_vars<node>(normalized)) {
-		r.error(code::invalid_argument, "Spec contains free variables");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Spec contains free variables");
 	}
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
@@ -1239,9 +1151,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 		code::internal_error, "Normalization failed");
 	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
 	if (has_free_vars<node>(normalized)) {
-		r.error(code::invalid_argument, "Spec contains free variables");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Spec contains free variables");
 	}
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
@@ -1264,9 +1174,7 @@ template <NodeType node>
 result<rr<node>> api<node>::get_nso_rr(tref expr) {
 	result<rr<node>> r;
 	if (!expr) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	rr<node> nso_rr;
 	// AP1-16: by reference -- copying the io_context (three subtree maps
@@ -1280,23 +1188,17 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 			ctx, expr); mayb_nso_rr)
 				nso_rr = mayb_nso_rr.value();
 		else {
-			r.error(code::internal_error,
+			return r.with_assert_check_error(code::internal_error,
 				"Failed to resolve recurrence relations");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 	} else {
 		nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
 		if (!nso_rr.main) {
-			r.error(code::internal_error,
+			return r.with_assert_check_error(code::internal_error,
 				"Failed to resolve I/O variables");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 	}
-	r = std::move(nso_rr);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(std::move(nso_rr));
 }
 
 // Type inference pipeline: infer BA types → canonize quantifier IDs
@@ -1305,9 +1207,7 @@ template <NodeType node>
 result<tref> api<node>::infer(tref expr, bool use_defaults) {
 	result<tref> r;
 	if (!expr) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 
 	auto& defs = definitions<node>::instance();
@@ -1318,9 +1218,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 	tref inferred = canonize_quantifier_ids<node>(infer_result.first);
 	if (!inferred) {
 		DBG(LOG_TRACE << "inferred is nullptr";)
-		r.error(code::internal_error, "Type inference failed");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::internal_error, "Type inference failed");
 	}
 	defs.get_io_context()->update_types(infer_result.second);
 	defs.set_global_scope(std::move(infer_result.second));
@@ -1336,9 +1234,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(inferred)) {
 		DBG(LOG_TRACE << "transformed has semantic error";)
-		r.error(code::invalid_argument, "Expression has semantic error");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Expression has semantic error");
 	}
 	DBG(TAU_LOG_TRACE << "inferred: " << LOG_FM_DUMP(inferred);)
 	#ifdef DEBUG
@@ -1351,18 +1247,14 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 			<< "\n";
 	std::cout << *defs.get_io_context();
 #endif
-	r = inferred;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(inferred);
 }
 
 template <NodeType node>
 result<tref> api<node>::simplify(tref expr, bool use_defaults) {
 	result<tref> r;
 	if (!expr) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(auto inferred, infer(expr, use_defaults));
 	tref e = canonize_quantifier_ids<node>(tau::reget(inferred));

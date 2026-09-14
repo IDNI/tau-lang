@@ -589,7 +589,7 @@ solve_ltl_aba_algorithm_a(
 	int n_types = (int)T3.size();
 	LOG_DEBUG << "[ltl_aba:algA] T3 count=" << n_types
 	          << " constants=" << constants.size();
-	if (n_types == 0) { r = std::nullopt; return r; }
+	if (n_types == 0) { return r.with_value(std::nullopt); }
 
 	int K = (int)atoms.size();
 	// Per-T₃-type D-bitmask, then extract feasible (sigma, rho, A) triples.
@@ -615,7 +615,7 @@ solve_ltl_aba_algorithm_a(
 
 	TAU_TRY(auto ltlsynt_out, call_ltlsynt(bundle.formula, input_props, output_props));
 	auto& [realizable, hoa_text] = ltlsynt_out;
-	if (!realizable) { r = std::nullopt; return r; }
+	if (!realizable) { return r.with_value(std::nullopt); }
 
 	ltl_aba_solution<node> sol;
 	// Populate sol.atoms with the d_i propositions phi_star uses, so
@@ -639,8 +639,7 @@ solve_ltl_aba_algorithm_a(
 		sol.output_props.push_back(name);
 	}
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
-	r = std::move(sol);
-	return r;
+	return r.with_value(std::move(sol));
 }
 
 // Algorithm B: P_σ binary encoding — adds ⌈log₂|T₂|⌉ input propositions for
@@ -660,7 +659,7 @@ solve_ltl_aba_algorithm_b(
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int T2_size = (int)T2.size();
 	int n_types = (int)T3.size();
-	if (n_types == 0 || T2_size == 0) { r = std::nullopt; return r; }
+	if (n_types == 0 || T2_size == 0) { return r.with_value(std::nullopt); }
 
 	int K       = (int)atoms.size();
 	int T1_size = 2 * (int)constants.size() + 1;
@@ -705,7 +704,7 @@ solve_ltl_aba_algorithm_b(
 
 	TAU_TRY(auto ltlsynt_out, call_ltlsynt(bundle.formula, bundle.ins, bundle.outs));
 	auto& [realizable, hoa_text] = ltlsynt_out;
-	if (!realizable) { r = std::nullopt; return r; }
+	if (!realizable) { return r.with_value(std::nullopt); }
 
 	ltl_aba_solution<node> sol;
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
@@ -713,8 +712,7 @@ solve_ltl_aba_algorithm_b(
 	// data atoms (`sol.atoms` is intentionally left empty), so it cannot be
 	// re-encoded as a safety formula.  See ltl_aba_solution::executable (LT-6).
 	sol.executable = false;
-	r = std::move(sol);
-	return r;
+	return r.with_value(std::move(sol));
 }
 
 /**
@@ -765,7 +763,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			alg_d::initial_memory(constants)));
 		LOG_DEBUG << "[ltl_aba:algD] result=" << (realizable ? "REALIZABLE" : "UNREALIZABLE");
 
-		if (!realizable) { r = synthesis_unrealizable<node>(); return r; }
+		if (!realizable) { return r.with_value(synthesis_unrealizable<node>()); }
 
 		// Realizable: call ltlsynt for the strategy automaton.
 		//
@@ -802,8 +800,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			sol.skeleton = strategy_skeleton;
 			sol.output_props = D_outs;
 			TAU_TRY(sol.aut, parse_hoa(hoa_text));
-			r = synthesis_solved(sol);
-			return r;
+			return r.with_value(synthesis_solved(sol));
 		}
 	} else if (alg_d_mode) {
 		LOG_DEBUG << "[ltl_aba:algD] not applicable (input variables, non-qlt, or large lookback);"
@@ -887,8 +884,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			LOG_DEBUG << "[ltl_aba] using Algorithm A (pure-output)";
 			TAU_TRY(auto alg_a_sol,
 				solve_ltl_aba_algorithm_a<node>(fm, sol.atoms));
-			r = propositional_synthesis<node>{alg_a_sol};
-			return r;
+			return r.with_value(propositional_synthesis<node>{alg_a_sol});
 		}
 		if (alg_a_mode)
 			LOG_DEBUG << "[ltl_aba] TAU_LTL_ALG=A ignored because input variables are present";
@@ -973,15 +969,13 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 					trivial.const_outputs.clear();
 					trivial.executable = false;
 				}
-				r = synthesis_solved(trivial);
-				return r;
+				return r.with_value(synthesis_solved(trivial));
 			}
 			// Has input vars: Algorithm B required for soundness.
 			LOG_DEBUG << "[ltl_aba] using Algorithm B (P_σ binary encoding)";
 			TAU_TRY(auto alg_b_sol,
 				solve_ltl_aba_algorithm_b<node>(fm, sol.atoms));
-			r = propositional_synthesis<node>{alg_b_sol};
-			return r;
+			return r.with_value(propositional_synthesis<node>{alg_b_sol});
 		}
 		if (!alg_a_can_classify_ok)
 			LOG_DEBUG << "[ltl_aba] T_3 cannot classify atoms — "
@@ -990,8 +984,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		LOG_DEBUG << "[ltl_aba] Alg B not applicable; using default path";
 	}
 
-	r = synthesis_declined<node>();
-	return r;
+	return r.with_value(synthesis_declined<node>());
 }
 
 } // namespace idni::tau_lang

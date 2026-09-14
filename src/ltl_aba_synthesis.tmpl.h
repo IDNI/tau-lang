@@ -236,8 +236,7 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 	std::string tmpfile_path = write_tempfile("tau_lang", ltl_formula + "\n");
 	if (tmpfile_path.empty()) {
 		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		r = std::make_pair(false, std::string());
-		return r;
+		return r.with_value(std::make_pair(false, std::string()));
 	}
 
 	auto build_argv = [&](const std::string& formula_path) {
@@ -272,9 +271,8 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 		// {false, ""} here made every caller print "UNREALIZABLE".
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		r.error(code::solver_error, "ltlsynt not found on PATH; install "
+		return r.with_error(code::solver_error, "ltlsynt not found on PATH; install "
 			"Spot (>= 2.10) -- realizability is UNKNOWN");
-		return r;
 	case spot_exit_kind::failed: {
 		std::string msg = "ltlsynt produced no verdict (exit "
 		                + std::to_string(exit_code) + ")";
@@ -283,8 +281,7 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 			     + std::to_string(timeout_sec) + "s)";
 		LOG_ERROR << "[ltl_aba] " << msg
 		          << "; the realizability of this specification is UNKNOWN\n";
-		r.error(code::solver_error, msg);
-		return r;
+		return r.with_error(code::solver_error, msg);
 	}
 	case spot_exit_kind::ok:
 		break;
@@ -318,8 +315,7 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 				}
 			}
 		}
-		r = std::make_pair(false, std::string());
-		return r;
+		return r.with_value(std::make_pair(false, std::string()));
 	}
 	if (out.substr(0, 10) == "REALIZABLE") {
 		std::string hoa = out.substr(out.find('\n') + 1);
@@ -363,16 +359,14 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 				LOG_INFO << "[ltl_aba] strategy " << line;
 			}
 		}
-		r = std::make_pair(true, std::move(hoa));
-		return r;
+		return r.with_value(std::make_pair(true, std::move(hoa)));
 	}
 	// SY-R4: output that starts with neither verdict line is no verdict
 	// (a crashed or foreign binary on PATH printing something else with
 	// exit 0); it used to fall through as UNREALIZABLE.
 	LOG_ERROR << "[ltl_aba] ltlsynt output carried no verdict line; the "
 	             "realizability of this specification is UNKNOWN\n";
-	r.error(code::solver_error, "ltlsynt output carried no verdict line");
-	return r;
+	return r.with_error(code::solver_error, "ltlsynt output carried no verdict line");
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
@@ -400,9 +394,8 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	auto parsed = hoa_parser::instance().parse(
 					hoa_text.c_str(), hoa_text.size());
 	if (!parsed.found) {
-		r.error(code::parse_error, "malformed HOA strategy: not a HOA "
+		return r.with_error(code::parse_error, "malformed HOA strategy: not a HOA "
 			"automaton (truncated, or no `--BODY--`)");
-		return r;
 	}
 	auto root = tt(parsed.get_shaped_tree2());
 
@@ -429,11 +422,10 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 			// state; refuse a garbled or absurd count.
 			long n = num_of(st);
 			if (n < 1 || n > max_states) {
-				r.error(code::parse_error,
+				return r.with_error(code::parse_error,
 					"malformed HOA strategy: bad state "
 					"count '" + (st | hoa::num
 						| tt::terminals) + "'");
-				return r;
 			}
 			aut.num_states = (int) n;
 			seen_states = true;
@@ -460,9 +452,8 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	}
 
 	if (!seen_states) {
-		r.error(code::parse_error, "malformed HOA strategy: "
+		return r.with_error(code::parse_error, "malformed HOA strategy: "
 			"no `States:` header");
-		return r;
 	}
 
 	int cur_state = -1;
@@ -498,8 +489,7 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 			if (aut.state_accepting[e.dst])
 				e.accepting = true;
 
-	r = std::move(aut);
-	return r;
+	return r.with_value(std::move(aut));
 }
 
 // ── Algorithm D: ltlsynt → parity game ───────────────────────────────────────
@@ -539,7 +529,7 @@ inline result<synth_game> call_ltlsynt_game(
 	// name, so the concatenation is injective.
 	const std::string key =
 		phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
-	if (auto it = cache.find(key); it != cache.end()) { r = it->second; return r; }
+	if (auto it = cache.find(key); it != cache.end()) { return r.with_value(it->second); }
 
 	// Configurable timeout (same env var as call_ltlsynt).
 	int timeout_sec = ltl_timeout_sec();
@@ -547,8 +537,7 @@ inline result<synth_game> call_ltlsynt_game(
 	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
 	if (tmpfile_path.empty()) {
 		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		r = synth_game{};  // transient — don't cache
-		return r;
+		return r.with_value(synth_game{});  // transient — don't cache
 	}
 
 	// §14 / Batch O7: --polarity=no.  ltlsynt's polarity optimization
@@ -584,9 +573,8 @@ inline result<synth_game> call_ltlsynt_game(
 	case spot_exit_kind::not_found:
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		r.error(code::solver_error, "ltlsynt not found on PATH; install "
+		return r.with_error(code::solver_error, "ltlsynt not found on PATH; install "
 			"Spot (>= 2.10) -- the parity game could not be built");
-		return r;
 	case spot_exit_kind::failed: {
 		std::string msg = "ltlsynt --print-game-hoa produced no game "
 			"(exit " + std::to_string(exit_code) + ")";
@@ -594,8 +582,7 @@ inline result<synth_game> call_ltlsynt_game(
 			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
 			     + std::to_string(timeout_sec) + "s)";
 		LOG_ERROR << "[ltl_aba] " << msg << "\n";
-		r.error(code::solver_error, msg);
-		return r;
+		return r.with_error(code::solver_error, msg);
 	}
 	case spot_exit_kind::ok:
 		break;
@@ -605,8 +592,7 @@ inline result<synth_game> call_ltlsynt_game(
 	// OLDER entries (bound >= 1) — reading it back right after is safe.
 	auto [it, inserted] = cache.emplace(key, parse_synth_game_hoa(hoa));
 	(void) inserted;  // the find above missed, so this always inserts
-	r = it->second;
-	return r;
+	return r.with_value(it->second);
 }
 
 } // namespace alg_d

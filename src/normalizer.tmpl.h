@@ -302,9 +302,7 @@ result<tref> normalize(tref form) {
 	using tau = tree<node>;
 	result<tref> r;
 	if (!form) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Caching architecture (see private/2026-08-15-normalizer-caching-plan.md,
 	// "Explicitly NOT cacheable as-is", for the full rationale):
@@ -322,9 +320,7 @@ result<tref> normalize(tref form) {
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) {
-		r = it->second;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(it->second);
 	}
 	// NF-3: key the memo on the ORIGINAL input -- `form` is reassigned
 	// below, so caching under the intermediate never hits for a repeated
@@ -375,18 +371,14 @@ result<tref> normalize(tref form) {
 		result = normalize_temporal_quantifiers<node>(form);
 	}
 	if (!result) {
-		r.error(code::internal_error,
+		return r.with_assert_check_error(code::internal_error,
 			"temporal layer normalization produced no formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 #ifdef TAU_CACHE
 	cache.emplace(cache_key, result);
 	cache.emplace(form, result); // the intermediate is a valid key too
 #endif // TAU_CACHE
-	r = result;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(result);
 }
 
 // Assumes that the formula passed does not have temporal quantifiers
@@ -396,9 +388,7 @@ template <NodeType node>
 result<tref> normalize_non_temp(tref fm) {
 	result<tref> r;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
@@ -408,9 +398,7 @@ result<tref> normalize_non_temp(tref fm) {
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) {
-		r = it->second;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(it->second);
 	}
 #endif // TAU_CACHE
 	tref result;
@@ -423,10 +411,8 @@ result<tref> normalize_non_temp(tref fm) {
 		result = term_boole_normal_form<node>(result);
 	}
 	if (!result) {
-		r.error(code::internal_error,
+		return r.with_assert_check_error(code::internal_error,
 			"Boole normal form reduction produced no formula");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	// NOTE: Do NOT add `tau::reget` here. It strips the explicit bitwidth
 	// subtype from BV-typed nodes (io_vars and BV constants), causing
@@ -449,9 +435,7 @@ result<tref> normalize_non_temp(tref fm) {
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
-	r = result;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(result);
 }
 
 /**
@@ -595,9 +579,7 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// LTL formulas are routed to is_ltl_aba_realizable; don't reject them here.
 	auto is_ltl_op = [](tref x) {
@@ -625,9 +607,7 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
 				ok = false;
 		}
 	}
-	r = ok;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(ok);
 }
 
 /**
@@ -744,9 +724,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 
 	const auto& fm = tau::get(n);
@@ -755,9 +733,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 
 	auto lean = lean_capture_conjunction_sat<node>(n);
 	if (lean && !lean_decide_crosscheck_enabled()) {
-		r = *lean;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(*lean);
 	}
 
 	tref nn = n;
@@ -778,9 +754,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 			<< "\n";
 		std::abort();
 	}
-	r = full;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(full);
 }
 
 /**
@@ -805,9 +779,7 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	result<bool> r;
 	using tau = tree<node>;
 	if (!n) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
@@ -818,9 +790,7 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	TAU_TRY_OR(tref normalized, normalize_non_temp<node>(nn),
 		code::internal_error, "non-temporal normalization failed");
 	check_decided<node>("is_non_temp_nso_unsat", normalized);
-	r = tau::get(normalized).equals_F();
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(tau::get(normalized).equals_F());
 }
 
 // Stays bool: called directly (not as result<T>) by splitter and by many
@@ -935,9 +905,7 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n1 || !n2) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 
 	LOG_DEBUG << "Begin is_nso_impl";
@@ -959,9 +927,7 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 
 	if (tau::get(n1) == tau::get(n2)) {
 		LOG_DEBUG << "End is_nso_impl: true (n1 implies n2)";
-		r = true;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(true);
 	}
 
 	// Decides `all vars (f -> g)` by closing over f's and g's free
@@ -1013,9 +979,7 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 	if (cons.empty()) {
 		LOG_DEBUG << "End is_nso_impl: true (consequent is syntactically"
 			" contained in the antecedent)";
-		r = true;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(true);
 	}
 	if (ante.size() + cons.size() <= 2) {
 		auto holds = closed_impl_holds(n1, n2);
@@ -1024,9 +988,7 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 			return r;
 		}
 		LOG_DEBUG << "End is_nso_impl: " << *holds;
-		r = *holds;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(*holds);
 	}
 	// Antecedent conjuncts first, so each group's members split into a
 	// leading antecedent part and a trailing consequent part.
@@ -1081,20 +1043,14 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 		if (found_unsat) {
 			LOG_DEBUG << "End is_nso_impl: true (antecedent"
 				" unsatisfiable)";
-			r = true;
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_value(true);
 		}
 		LOG_DEBUG << "End is_nso_impl: false (component not implied: "
 			<< LOG_FM(tau::build_wff_and(group_cons[gi])) << ")";
-		r = false;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(false);
 	}
 	LOG_DEBUG << "End is_nso_impl: true";
-	r = true;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(true);
 }
 
 /**
@@ -1537,9 +1493,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Merge top-level (G A) && (G B) → G(A && B) before any further
 	// processing.  G is universal, so G(A) ∧ G(B) ≡ G(A ∧ B), and the
@@ -1644,25 +1598,19 @@ result<tref> normalize_with_temp_simp(tref fm) {
 			});
 	}
 	if (!expanded_fm) {
-		r.error(code::internal_error,
+		return r.with_assert_check_error(code::internal_error,
 			"definition expansion did not settle");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	fm = expanded_fm;
 
 	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F()) {
-		r = fm;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(fm);
 	}
 	// If after normalization no temporal quantifier is present, the formula
 	// is non-temporal
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>)) {
-		r = fm;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(fm);
 	}
 	tref nn = tau::_F();
 	// The temporal layer of a formula is in DNF
@@ -1677,9 +1625,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	}
 	DBG(assert(nn != nullptr);)
 	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
-	r = nn;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(nn);
 }
 
 /**
@@ -2468,9 +2414,7 @@ template <NodeType node>
 result<tref> normalizer(tref fm) {
 	result<tref> r;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	auto res = r.take_or_error(normalize_with_temp_simp<node>(fm),
 		code::internal_error, "Normalization failed");

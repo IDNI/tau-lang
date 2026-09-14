@@ -641,14 +641,12 @@ result<bool> is_run_satisfiable(tref fm) {
 		<< "is_run_satisfiable[fm]: " << LOG_FM(fm);)
 
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 
 	const auto& t = tau::get(fm);
-	if (t.equals_F()) { r = false; DBG(assert(r.is_well_formed());) return r; }
-	if (t.equals_T()) { r = true; DBG(assert(r.is_well_formed());) return r; }
+	if (t.equals_F()) { return r.with_assert_check_value(false); }
+	if (t.equals_T()) { return r.with_assert_check_value(true); }
 
 	const trefs& free_io_vars = t.get_free_vars();
 	// TODO: filter free_io_vars instead of searching whole formula again
@@ -1799,9 +1797,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	result<tref> r;
 	using tau = tree<node>;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
 	// Make sure that no function/predicate symbol is still present
@@ -1809,9 +1805,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		LOG_ERROR << "transform_to_execution: unresolved function or "
 			"predicate symbol " << LOG_FM(ref) << " found; "
 			"treating the formula as unsatisfiable";
-		r = _F<node>();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(_F<node>());
 	}
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
@@ -1820,9 +1814,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	if (auto it = cache.find(std::make_pair(fm, start_time));
 		it != cache.end())
 	{
-		r = it->second;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(it->second);
 	}
 #endif // TAU_CACHE
 	auto elim_aw = [](tref f) {
@@ -1914,10 +1906,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			<< " sometimes clauses survived the eventual-variable "
 			"transform; the formula cannot be decided by the "
 			"safety pipeline";
-		r.error(code::solver_error, "nested or multiple `sometimes` "
+		return r.with_assert_check_error(code::solver_error, "nested or multiple `sometimes` "
 			"clauses survived the eventual-variable transform");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 
 	tref res;
@@ -1963,9 +1953,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	result<bool> r;
 	using tau = tree<node>;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	auto mark_undecided = [&]() {
 		r.error(code::unsupported_operation,
@@ -1985,9 +1973,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		if (auto it = cache.find(std::make_pair(fm, start_time));
 			it != cache.end())
 		{
-			r = it->second;
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_value(it->second);
 		}
 		if (undecided.contains(std::make_pair(fm, start_time))) {
 			mark_undecided();
@@ -2019,12 +2005,10 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// which is not the "not implemented" case mark_undecided states
 		if (!reduction.has_value()) {
 			r.merge(std::move(reduction));
-			r.error(code::solver_error,
+			return r.with_assert_check_error(code::solver_error,
 				"UNKNOWN: the synthesis backend failed or "
 				"produced no verdict; satisfiability could not "
 				"be decided");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		auto realizable = is_ltl_aba_realizable<node>(
 			reduction->ltl_formula, start_time, output);
@@ -2112,9 +2096,7 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	result<bool> r;
 	using tau = tree<node>;
 	if (!f1 || !f2) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	TAU_TRY(tref f1n, normalize<node>(f1));
 	TAU_TRY(tref f2n, normalize<node>(f2));
@@ -2125,14 +2107,10 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	for (tref c : expression_paths<node>(imp_check)) {
 		TAU_TRY(tref val, transform_to_execution<node>(c));
 		if (!tau::get(val).equals_F()) {
-			r = false;
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_value(false);
 		}
 	}
-	r = true;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(true);
 }
 
 // The formulas need to be closed
@@ -2141,9 +2119,7 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	result<bool> r;
 	using tau = tree<node>;
 	if (!f1 || !f2) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Negate equivalence for unsat check
 	TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
@@ -2161,14 +2137,10 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 			"transform_to_execution returned neither a value nor "
 			"an error while checking equivalence");
 		if (!tau::get(val).equals_F()) {
-			r = false;
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_value(false);
 		}
 	}
-	r = true;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(true);
 }
 
 template <NodeType node>
@@ -2178,9 +2150,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	result<tref> r;
 	using tau = tree<node>;
 	if (!fm) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	LOG_DEBUG << "Start simp_tau_unsat_valid: " << LOG_FM(fm);
 	// Check if formula is valid. Validity distributes over conjunction, so
@@ -2195,9 +2165,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		&& start_time == 0;
 	int fv = factor ? factored_tau_valid<node>(fm) : -1;
 	if (fv == 1) {
-		r = tau::_T();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(tau::_T());
 	}
 	if (fv < 0) {
 		TAU_TRY_OR(bool v, is_tau_impl<node>(tau::_T(), fm),
@@ -2205,9 +2173,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 			"is_tau_impl returned neither a value nor an error "
 			"while checking validity");
 		if (v) {
-			r = tau::_T();
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_value(tau::_T());
 		}
 	}
 	TAU_TRY_OR(tref normalized_fm, normalize_with_temp_simp<node>(fm),

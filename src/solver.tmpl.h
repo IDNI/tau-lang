@@ -250,15 +250,11 @@ result<solution<node>> lgrs(equality eq) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	if (!eq) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	if (tau::get(eq).equals_T()) {
 		DBG(LOG_TRACE << "lgrs/solution: {}";)
-		r = solution<node>();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(solution<node>());
 	}
 
 	DBG(LOG_TRACE << "lgrs/eq: " << LOG_FM(eq) << "\n";)
@@ -266,9 +262,7 @@ result<solution<node>> lgrs(equality eq) {
 	auto s = find_solution<node>(eq);
 	if (!s.has_value()) {
 		DBG(LOG_TRACE << "lgrs/no solution";)
-		r.error(code::unsat, "No solution found");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::unsat, "No solution found");
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
@@ -286,9 +280,7 @@ result<solution<node>> lgrs(equality eq) {
 		LOG_TRACE << "lgrs/check: " << LOG_FM(nr.value()) << "\n";
 #endif // DEBUG
 
-	r = std::move(phi);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(std::move(phi));
 }
 
 // Input iterator enumerating the non-zero minterms of a BF f: every
@@ -1879,19 +1871,13 @@ result<solution<node>> solve(tref form, solver_options options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	if (!form) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	if (tau::get(form).equals_T()) {
-		r = solution<node>();
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(solution<node>());
 	}
 	if (tau::get(form).equals_F()) {
-		r.error(code::unsat, "No solution found");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::unsat, "No solution found");
 	}
 
 #ifdef DEBUG
@@ -2027,11 +2013,9 @@ result<solution<node>> solve(tref form, solver_options options) {
 			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
 		if (clause_error) {
-			r.error(code::solver_error,
+			return r.with_assert_check_error(code::solver_error,
 				"Found a clause containing a non-equation "
 				"term the solver cannot handle");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 
 		bool theory_sat = false, skip = false;
@@ -2109,14 +2093,10 @@ result<solution<node>> solve(tref form, solver_options options) {
 				a = bf_reduced_dnf<node>(a);
 				clause_solution.emplace(v, a);
 			}
-			r = std::move(clause_solution);
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_value(std::move(clause_solution));
 		}
 	}
-	r.error(code::unsat, "No solution found");
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_error(code::unsat, "No solution found");
 }
 
 // (SO-7: the trefs overload of solve() was deleted -- zero callers.)
@@ -2130,9 +2110,7 @@ result<solution<node>> solve(const trefs& forms, solver_options options) {
 	result<solution<node>> r;
 	using tau = tree<node>;
 	if (forms.empty()) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return solve<node>(tau::build_wff_and(forms), options);
 }

@@ -1080,7 +1080,7 @@ inline result<bool> solve_algorithm_d(
 	int init_rho)
 {
 	result<bool> r;
-	if (phi_star.empty() || T1_size <= 0) { r = false; return r; }
+	if (phi_star.empty() || T1_size <= 0) { return r.with_value(false); }
 
 	// Build list of D propositions as output
 	std::vector<std::string> D_outs;
@@ -1088,19 +1088,18 @@ inline result<bool> solve_algorithm_d(
 
 	// Get synthesis parity game for φ*(D_i)
 	TAU_TRY(auto G, call_ltlsynt_game(phi_star, {}, D_outs));
-	if (G.num_states == 0) { r = false; return r; }
+	if (G.num_states == 0) { return r.with_value(false); }
 
 	// Build product game (G × T_1)
 	product_game pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
-	if (pg.n_states == 0) { r = false; return r; }
+	if (pg.n_states == 0) { return r.with_value(false); }
 
 	// Solve parity game with Zielonka
 	auto W1 = zielonka_win_player1(pg);
 
 	// REALIZABLE iff player 1 wins from the ONE initial state
 	// (G.init, init_rho) — convention (F), see initial_memory.
-	r = W1.count(pg.init) != 0;
-	return r;
+	return r.with_value(W1.count(pg.init) != 0);
 }
 
 // ── Extended Algorithm D: returns winning region for semantic PWR ──────────
@@ -1136,17 +1135,17 @@ inline result<alg_d_result> solve_algorithm_d_full(
 	result.T1_size = T1_size;
 	result.K = K;
 
-	if (phi_star.empty() || T1_size <= 0) { r = std::move(result); return r; }
+	if (phi_star.empty() || T1_size <= 0) { return r.with_value(std::move(result)); }
 
 	std::vector<std::string> D_outs;
 	for (int i = 0; i < K; ++i) D_outs.push_back("d_" + std::to_string(i));
 
 	TAU_TRY(result.synth_game, call_ltlsynt_game(phi_star, {}, D_outs));
-	if (result.synth_game.num_states == 0) { r = std::move(result); return r; }
+	if (result.synth_game.num_states == 0) { return r.with_value(std::move(result)); }
 
 	result.product_game = build_product_game(
 		result.synth_game, T1_size, T3, type_A, K, init_rho);
-	if (result.product_game.n_states == 0) { r = std::move(result); return r; }
+	if (result.product_game.n_states == 0) { return r.with_value(std::move(result)); }
 
 	result.winning_region = zielonka_win_player1(result.product_game);
 
@@ -1156,8 +1155,7 @@ inline result<alg_d_result> solve_algorithm_d_full(
 		result.realizable = true;
 		result.init_rho = init_rho;
 	}
-	r = std::move(result);
-	return r;
+	return r.with_value(std::move(result));
 }
 
 } // namespace idni::tau_lang::alg_d

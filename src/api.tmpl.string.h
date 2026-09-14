@@ -85,9 +85,7 @@ result<std::string> api<node>::apply_defs(
 		if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
 		if (main) a = main;
 	}
-	r = to_str(a);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(to_str(a));
 }
 
 template <NodeType node>
@@ -109,9 +107,7 @@ result<std::string> api<node>::substitute(
 	TAU_TRY(tref t, get_formula_or_term(that));
 	TAU_TRY(tref w, get_formula_or_term(with));
 	TAU_TRY(tref s, substitute(e, t, w));
-	r = to_str(s);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(to_str(s));
 }
 
 template <NodeType node>
@@ -130,9 +126,7 @@ result<std::string> api<node>::substitute(
 		parsed.emplace(t, w);
 	}
 	TAU_TRY(cur, substitute(cur, parsed));
-	r = to_str(cur);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(to_str(cur));
 }
 
 
@@ -392,9 +386,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	auto& ctx = i.ctx;
 
 	if (!i.calculate_initial_spec()) {
-		r.error(code::internal_error, "Failed to calculate initial spec");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
 	}
 
 	// Build inputs for the step
@@ -412,10 +404,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (it == ctx.inputs.end()) {
 			TAU_LOG_ERROR << "Input stream " << in.name
 						<< " not found in context";
-			r.error(code::invalid_input_stream,
+			return r.with_assert_check_error(code::invalid_input_stream,
 				"Input stream not found in context");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
 		step_inputs.emplace_back(
@@ -439,18 +429,14 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (!cnst) {
 			TAU_LOG_ERROR << "Failed to parse input value "
 								<< input_value;
-			r.error(code::parse_error, "Failed to parse input value");
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_error(code::parse_error, "Failed to parse input value");
 		}
 		tref c = build_bf_ba_constant<node>(cnst.value().first, type_id);
 		if (has_open_tau_fm_in_constant<node>(c)) {
 			TAU_LOG_ERROR <<"Constant contains an open tau formula: "
 								<< input_value;
-			r.error(code::invalid_argument,
+			return r.with_assert_check_error(code::invalid_argument,
 				"Constant contains an open tau formula");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		values[step_input] = c;
 		DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
@@ -471,9 +457,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	// Write output values so they are recorded for subsequent steps
 	if (!i.write(output.value())) {
 		TAU_LOG_ERROR << "Failed to write outputs";
-		r.error(code::io_error, "Failed to write outputs");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::io_error, "Failed to write outputs");
 	}
 
 	// Build outputs for the step
@@ -486,10 +470,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
 			TAU_LOG_ERROR << "No Boolean algebra element assigned "
 				"to output '" << TAU_TO_STR(out) << "'";
-			r.error(code::invalid_output_stream,
+			return r.with_assert_check_error(code::invalid_output_stream,
 				"No Boolean algebra element assigned to output");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
@@ -501,14 +483,10 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 	if (interactive && !auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
-		r.error(code::invalid_state, "Auto continue is false");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
 	}
 
-	r = std::move(outputs);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(std::move(outputs));
 }
 
 template <NodeType node>
@@ -521,9 +499,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 	result<std::map<stream_at, std::string>> r;
 	if (!i.calculate_initial_spec()) {
-		r.error(code::internal_error, "Failed to calculate initial spec");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
 	}
 
 	// Step the interpreter
@@ -540,9 +516,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	// Write output values
 	if (!i.write(output.value())) {
 		TAU_LOG_ERROR << "Failed to write outputs";
-		r.error(code::io_error, "Failed to write outputs");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::io_error, "Failed to write outputs");
 	}
 
 	// Build outputs for the step. AP1-12: serialize via
@@ -559,10 +533,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
 			TAU_LOG_ERROR << "No Boolean algebra element assigned "
 				"to output '" << TAU_TO_STR(out) << "'";
-			r.error(code::invalid_output_stream,
+			return r.with_assert_check_error(code::invalid_output_stream,
 				"No Boolean algebra element assigned to output");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
@@ -574,14 +546,10 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
-		r.error(code::invalid_state, "Auto continue is false");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
 	}
 
-	r = std::move(outputs);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(std::move(outputs));
 }
 
 template <NodeType node>

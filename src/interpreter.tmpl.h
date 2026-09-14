@@ -622,9 +622,7 @@ result<interpreter<node>>
 {
 	result<interpreter<node>> r;
 	if (!spec) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Every io_var must carry its input/output classification before the
 	// spec is stepped: transform_io_var refuses an unclassified one. The
@@ -661,11 +659,9 @@ result<interpreter<node>>
 		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
 			LOG_ERROR << "Tau specification is not executable (CTL* reduction failed)\n";
 			r.merge(std::move(reduction_r));
-			r.error(code::internal_error,
+			return r.with_assert_check_error(code::internal_error,
 				"Tau specification is not executable "
 				"(CTL* reduction failed)");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		auto& reduction = *reduction_r;
 		spec = reduction.ltl_formula;
@@ -777,16 +773,12 @@ post_normalization:
 				ltl_to_safety_formula_full<node>(spec);
 		} catch (const std::exception& e) {
 			LOG_ERROR << "Tau specification refused: " << e.what() << "\n";
-			r.error(code::internal_error, e.what());
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_error(code::internal_error, e.what());
 		}
 		if (!safety_spec) {
 			LOG_ERROR << "Tau specification is unsat (not LTL-realizable)\n";
-			r.error(code::unsat,
+			return r.with_assert_check_error(code::unsat,
 				"Tau specification is unsat (not LTL-realizable)");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		ltl_sol = std::move(sol_opt);
 		since_aux_anchor = std::move(unanchored_aux);
@@ -899,31 +891,23 @@ post_normalization:
 		// rejected clauses. update() already collects per chosen spec.
 		subtree_map<node, size_t> output_streams;
 		if (!i.collect_output_streams(clause, output_streams)) {
-			r.error(code::invalid_output_stream,
+			return r.with_assert_check_error(code::invalid_output_stream,
 				"Failed to collect output streams");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_outputs";
 		if (!i.rebuild_outputs(output_streams)) {
-			r.error(code::invalid_output_stream,
+			return r.with_assert_check_error(code::invalid_output_stream,
 				"Failed to rebuild output streams");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		subtree_map<node, size_t> input_streams;
 		if (!i.collect_input_streams(clause, input_streams)) {
-			r.error(code::invalid_input_stream,
+			return r.with_assert_check_error(code::invalid_input_stream,
 				"Failed to collect input streams");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_inputs";
 		if (!i.rebuild_inputs(input_streams)) {
-			r.error(code::invalid_input_stream,
+			return r.with_assert_check_error(code::invalid_input_stream,
 				"Failed to rebuild input streams");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 
 		i.provider_ = std::make_shared<solve_step_provider<node>>();
@@ -932,15 +916,11 @@ post_normalization:
 		DBG(LOG_TRACE << i.dump_to_str();)
 		// DBG(LOG_TRACE << ctx;)
 
-		r = std::move(i);
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(std::move(i));
 	}
 	// Given specification is not realizable
 	LOG_ERROR << "Tau specification is unsat\n";
-	r.error(code::unsat, "Tau specification is unsat");
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_error(code::unsat, "Tau specification is unsat");
 }
 
 template <NodeType node>
@@ -1329,9 +1309,7 @@ interpreter<node>::step(const assignment<node>& values)
 {
 	result<step_result> r;
 	if (!calculate_initial_spec()) {
-		r.error(code::internal_error, "Failed to calculate initial spec");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
 	}
 	// Deferred from the previous step's tail -- see the note above its
 	// return: sweeping there frees the just-returned output map's nodes.
@@ -1413,10 +1391,8 @@ interpreter<node>::step(const assignment<node>& values)
 			const trefs& part_alts = step_spec[part_idx];
 			auto pick = first_solvable_alternative(part_idx);
 			if (!pick) {
-				r.error(code::unsat, "Specification part has no "
+				return r.with_assert_check_error(code::unsat, "Specification part has no "
 					"solvable alternative under the current memory");
-				DBG(assert(r.is_well_formed());)
-				return r;
 			}
 			chosen_alt_[part_idx] = *pick;
 			flat_step_spec.push_back(part_alts[*pick]);
@@ -1430,10 +1406,8 @@ interpreter<node>::step(const assignment<node>& values)
 			time_point, formula_time_point);
 	}
 	if (!produced) {
-		r.error(code::unsat, "Step provider found no solution for "
+		return r.with_assert_check_error(code::unsat, "Step provider found no solution for "
 			"the current step specification");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	for (const auto& [var, raw_value] : produced.value()) {
 		tref value = canonicalize_committed_value<node>(raw_value);
@@ -1598,10 +1572,8 @@ interpreter<node>::step(const assignment<node>& values)
 	}
 	for (tref ot : zero_default_missing) {
 		if (global.contains(ot)) continue;
-		r.error(code::unsat, "No valid witness for an output stream "
+		return r.with_assert_check_error(code::unsat, "No valid witness for an output stream "
 			"under the step's own constraints");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	if (global.empty()) LOG_INFO << "currently no output is specified";
 	DBG(LOG_TRACE << dump_to_str();)
@@ -1629,9 +1601,7 @@ interpreter<node>::step(const assignment<node>& values)
 	// through that sweep via last_outputs_ (IN-M1), so a host may keep
 	// reading it while it feeds the next step.
 	last_outputs_ = global;
-	r = step_result{ global, auto_continue };
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(step_result{ global, auto_continue });
 }
 
 template <NodeType node>
@@ -1640,9 +1610,7 @@ interpreter<node>::step()
 {
 	result<step_result> r;
 	if (!calculate_initial_spec()) {
-		r.error(code::internal_error, "Failed to calculate initial spec");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
 	}
 	if (announced_step_ != (int_t)time_point) { // announce only once
 		LOG_INFO << "Execution step: " << time_point << "\n";
@@ -1665,9 +1633,7 @@ interpreter<node>::step()
 				LOG_DEBUG << "Input: " << LOG_FM_DUMP(k) << " = " << LOG_FM_TREE(v) << "\n";)
 	// Empty input: clean end-of-inputs/quit signal
 	if (is_quit) {
-		r.error(code::invalid_state, "No more input: end of stream");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_state, "No more input: end of stream");
 	}
 	// Hard error reading/parsing an input (read() already logged it):
 	// stop like the quit case above, not a "successful", auto-continuing
@@ -1677,9 +1643,7 @@ interpreter<node>::step()
 	// the same "awaiting a valid value" state as the quit case, and lets
 	// continue_running() re-prompt for it instead of ending the run.
 	if (!values.has_value()) {
-		r.error(code::invalid_state, "Failed to read step input");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_state, "Failed to read step input");
 	}
 
 	TAU_TRY_OR(r, step(values.value()), code::internal_error,
@@ -2037,9 +2001,7 @@ result<tref> interpreter<node>::get_executable_spec(
 {
 	result<tref> r;
 	if (!clause) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	LOG_TRACE << "get_executable_spec begin\n";
 	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
@@ -2054,9 +2016,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	}
 	DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
 	if (tau::get(executable).equals_F()) {
-		r.error(code::unsat, "Specification part reduces to false");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::unsat, "Specification part reduces to false");
 	}
 	// Make sure that no constant time position is smaller than 0
 	trefs io_vars = tau::get(executable).select_top(
@@ -2065,20 +2025,16 @@ result<tref> interpreter<node>::get_executable_spec(
 		if (is_io_initial<node>(io_var)
 			&& get_io_time_point<node>(io_var) < 0)
 		{
-			r.error(code::invalid_argument,
+			return r.with_assert_check_error(code::invalid_argument,
 				"Constant time position is smaller than 0");
-			DBG(assert(r.is_well_formed());)
-			return r;
 		}
 	}
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
 		executable, io_vars, start_time);
 	if (tau::get(constraints).equals_F()) {
-		r.error(code::unsat,
+		return r.with_assert_check_error(code::unsat,
 			"Uninterpreted-constant constraints are unsatisfiable");
-		DBG(assert(r.is_well_formed());)
-		return r;
 	}
 	DBG(LOG_TRACE << "compute_systems/constraints: " << constraints;)
 	if (!tau::get(constraints).equals_T()) {
@@ -2103,9 +2059,7 @@ result<tref> interpreter<node>::get_executable_spec(
 	}
 	LOG_TRACE << "get_executable_spec[spec]: " << LOG_FM(executable);
 	LOG_TRACE << "get_executable_spec end\n";
-	r = executable;
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(executable);
 }
 
 template <NodeType node>
@@ -3458,9 +3412,7 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 	using tau = tree<node>;
 	result<assignment<node>> r;
 	if (!spec) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	solver_options options = {
 		.splitter_one = node::ba::splitter_one(tau_type<node>()),
@@ -3509,9 +3461,7 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 			replace_free_vars_by<node>(max_u,
 			tau::_0_trimmed(find_ba_type<node>(max_u))));
 		sol.emplace(u, max_u);
-		r = std::move(sol);
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_value(std::move(sol));
 	}
 	// In case there is no maximal solution for u on any path of spec
 	TAU_TRY_OR(r, solve<node>(spec, options),
@@ -3718,14 +3668,10 @@ result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	TAU_TRY(interpreter<node> intrprtr,
 		interpreter<node>::make_interpreter(form, ctx));
 	if (!intrprtr.run_loop(steps)) {
-		r.error(code::runtime_error, "Execution stopped on a failed step");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::runtime_error, "Execution stopped on a failed step");
 	}
 	DBG(LOG_TRACE << "run end\n";)
-	r = std::move(intrprtr);
-	DBG(assert(r.is_well_formed());)
-	return r;
+	return r.with_assert_check_value(std::move(intrprtr));
 }
 
 template <NodeType node>

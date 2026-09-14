@@ -110,9 +110,7 @@ template <NodeType node>
 result<htref> api<node>::apply_def(htref def, htref expression) {
 	if (!def || !expression) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return apply_def(def->get(), expression->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -122,9 +120,7 @@ template <NodeType node>
 result<htref> api<node>::apply_defs(const std::set<htref>& defs, htref expression) {
 	if (!expression) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	subtree_set<node> tdefs;
 	for (htref def : defs) if (def) tdefs.insert(def->get());
@@ -136,9 +132,7 @@ template <NodeType node>
 result<htref> api<node>::apply_all_defs(htref expr) {
 	if (!expr) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return apply_all_defs(expr->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -168,9 +162,7 @@ template <NodeType node>
 result<htref> api<node>::substitute(htref expr, htref that, htref with) {
 	if (!expr || !that || !with) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return substitute(expr->get(), that->get(), with->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -180,18 +172,14 @@ template <NodeType node>
 result<htref> api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
 	result<htref> r;
 	if (!expr) {
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Unwrap htref to tref, then apply all pairs in one simultaneous
 	// pass -- matches the tref overload's semantics (see api.tmpl.h).
 	std::map<tref, tref> unwrapped;
 	for (auto [that, with] : that_with) {
 		if (!that || !with) {
-			r.error(code::invalid_argument, "Invalid argument(s)");
-			DBG(assert(r.is_well_formed());)
-			return r;
+			return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 		}
 		unwrapped.emplace(that->get(), with->get());
 	}
@@ -206,9 +194,7 @@ template <NodeType node>
 result<htref> api<node>::boole_normal_form(htref expr) {
 	if (!expr) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return boole_normal_form(expr->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -218,9 +204,7 @@ template <NodeType node>
 result<htref> api<node>::dnf(htref expr) {
 	if (!expr) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return dnf(expr->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -230,9 +214,7 @@ template <NodeType node>
 result<htref> api<node>::cnf(htref expr) {
 	if (!expr) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return cnf(expr->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -242,9 +224,7 @@ template <NodeType node>
 result<htref> api<node>::nnf(htref expr) {
 	if (!expr) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return nnf(expr->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -257,9 +237,7 @@ template <NodeType node>
 result<htref> api<node>::syntactic_term_simplification(htref term) {
 	if (!term) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return syntactic_term_simplification(term->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -269,9 +247,7 @@ template <NodeType node>
 result<htref> api<node>::syntactic_formula_simplification(htref fm) {
 	if (!fm) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return syntactic_formula_simplification(fm->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -281,9 +257,7 @@ template <NodeType node>
 result<htref> api<node>::normalize_formula(htref fm) {
 	if (!fm) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return normalize_formula(fm->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -293,9 +267,7 @@ template <NodeType node>
 result<htref> api<node>::normalize_term(htref term) {
 	if (!term) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return normalize_term(term->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -305,9 +277,7 @@ template <NodeType node>
 result<htref> api<node>::anti_prenex(htref fm) {
 	if (!fm) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return anti_prenex(fm->get()).transform(
 		[](tref v) { return tau::geth(v); });
@@ -317,9 +287,7 @@ template <NodeType node>
 result<htref> api<node>::eliminate_quantifiers(htref fm) {
 	if (!fm) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	// Apply defs at the tref level before eliminating quantifiers
 	// (the tref overload also calls apply_all_defs internally)
@@ -332,9 +300,7 @@ template <NodeType node>
 result<bool> api<node>::realizable(htref fm) {
 	if (!fm) {
 		result<bool> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return realizable(fm->get());
 }
@@ -343,9 +309,7 @@ template <NodeType node>
 result<bool> api<node>::unrealizable(htref fm) {
 	if (!fm) {
 		result<bool> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return unrealizable(fm->get());
 }
@@ -354,9 +318,7 @@ template <NodeType node>
 result<bool> api<node>::sat(htref fm) {
 	if (!fm) {
 		result<bool> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return sat(fm->get());
 }
@@ -365,9 +327,7 @@ template <NodeType node>
 result<bool> api<node>::unsat(htref fm) {
 	if (!fm) {
 		result<bool> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return unsat(fm->get());
 }
@@ -376,9 +336,7 @@ template <NodeType node>
 result<bool> api<node>::valid(htref fm) {
 	if (!fm) {
 		result<bool> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return valid(fm->get());
 }
@@ -387,9 +345,7 @@ template <NodeType node>
 result<bool> api<node>::valid_spec(htref fm) {
 	if (!fm) {
 		result<bool> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return valid_spec(fm->get());
 }
@@ -403,9 +359,7 @@ result<std::map<htref, htref>> api<node>::solve(htref fm,
 {
 	if (!fm) {
 		result<std::map<htref, htref>> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return solve(fm->get(), mode).transform(
 		[](const subtree_map<node, tref>& m) { return geth<node>(m); });
@@ -415,9 +369,7 @@ template <NodeType node>
 result<std::map<htref, htref>> api<node>::lgrs(htref equation) {
 	if (!equation) {
 		result<std::map<htref, htref>> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return lgrs(equation->get()).transform(
 		[](const subtree_map<node, tref>& m) { return geth<node>(m); });
@@ -427,9 +379,7 @@ template <NodeType node>
 result<htref> api<node>::simplify(htref expr, bool use_defaults) {
 	if (!expr) {
 		result<htref> r;
-		r.error(code::invalid_argument, "Invalid argument(s)");
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
 	return simplify(expr->get(), use_defaults).transform(
 		[](tref v) { return tau::geth(v); });
