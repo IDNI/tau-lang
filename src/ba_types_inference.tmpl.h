@@ -367,25 +367,26 @@ tref update_ba_symbol(tref n) {
 	return new_n;
 }
 
-// Retypes a bv-only operator (add/sub/..., shifts, nand/nor/xnor) from
+// Retypes an arithmetic operator (add/sub/..., shifts, nand/nor/xnor) from
 // its children like update_ba_symbol, but only when the first child's
-// type is in the bv type family. Otherwise: returns @p n unchanged when
+// type declares arith_ops. Otherwise: returns @p n unchanged when
 // defaults are off (it may still be typed later), an inference_error
 // when they are on.
 template<NodeType node>
-std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
+std::variant<tref, inference_error, parse_error> update_arith_symbol(tref n,
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
 	// We have one child at least and we know that the types of the
 	// children have already been updated and they are consistent.
-	// We only need to check that the type is bv type family.
+	// We only need to check that the type declares arith_ops.
 	auto t = tau::get(n)[0].get_ba_type();
 	if (pack_type_has_arith_ops<node>(t))
 		return update_ba_symbol<node>(n);
 	else if (!options.use_defaults) return n;
-	// BA2-16: expected = a bv-family type (report as untyped-expected slot
-	// per the error's rendering order: found first), found = t.
+	// BA2-16: expected = a type declaring arith_ops (report as
+	// untyped-expected slot per the error's rendering order: found first),
+	// found = t.
 	return inference_error{n, untyped_type_id<node>(), t};
 }
 
@@ -850,7 +851,7 @@ tref type_annotated_operands(tref n) {
 // - bf operators always absorb their children's replacements and, when
 //   selected (their own kind, or tau::typeable_symbol as a wildcard, is
 //   listed), take their type from a child (update_ba_symbol; the
-//   bv-only operators insist on a bv-family type via update_bv_symbol);
+//   arithmetic operators require arith_ops via update_arith_symbol);
 // - bf_ref wrappers, when listed, hoist the subtree type onto
 //   themselves (update_bf_ref);
 // - every other node just absorbs child replacements (update_default);
@@ -958,12 +959,12 @@ std::variant<tref, inference_error, parse_error> update(
 			case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 			case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
 			case tau::bf_nor: case tau::bf_min: case tau::bf_max: {
-				// only bv types allowed
+				// requires a type that declares arith_ops
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
 					if (nn != n) changes.insert_or_assign(n, nn);
 				} else {
-					auto updated = update_bv_symbol<node>(nn, options);
+					auto updated = update_arith_symbol<node>(nn, options);
 					if (std::holds_alternative<inference_error>(updated)) {
 						error = std::get<inference_error>(updated);
 						break;
