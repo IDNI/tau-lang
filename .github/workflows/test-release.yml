@@ -86,6 +86,22 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v3
 
+      # A buildkit cache mount lives on the builder, and a runner is
+      # discarded after the job, so the ccache directory needs a round trip
+      # through the actions cache.
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ccache
+          key: ccache-ubuntu-24.04-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-24.04-${{ matrix.name }}-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
       # Each pack writes its own tau_pack.h, so each entry is a full build
       # on top of the deps layer the deps job cached.
       - name: Build release tests and run them
@@ -144,3 +160,4 @@ jobs:
 
       - name: Run tau
         run: ./build/release/tau -v
+

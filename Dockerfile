@@ -48,7 +48,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 # Install dependencies
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
-	bash wget git gnupg nsis rpm ninja-build bison \
+	bash wget git gnupg nsis rpm ninja-build bison ccache \
 	python3-pip python3-venv python3-dev nanobind-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
@@ -142,22 +142,35 @@ ARG TESTS=yes
 # Argument TAU_BAS=<ids> picks the pack; empty keeps the default pack
 ARG TAU_BAS=
 
+# The source COPY above changes on every commit, so no layer cache can hold
+# the objects. A ccache mount survives it, and it outlives the build.
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
 # *-all enables the executable and the tests in one configure
-RUN echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
 	echo " (BUILD) -- Running tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
 		./dev preset ${BUILD_PRESET}-all run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}}; \
+			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
-		./dev preset ${BUILD_PRESET}-tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
-	fi
+		./dev preset ${BUILD_PRESET}-tau -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+	fi && \
+	ccache --show-stats
 
 # Set TEST_GCC_BUILD=no to skip the gcc compilation check
 ARG TEST_GCC_BUILD=yes
 
 # Check also make and gcc compilation since ninja and clang is used by default
-RUN if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
-	./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
+	./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	rm -rf build/devel; \
 fi
 
