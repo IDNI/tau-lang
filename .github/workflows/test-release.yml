@@ -32,13 +32,11 @@ jobs:
             echo "matrix={\"include\":[$default]}" >> "$GITHUB_OUTPUT"
           fi
 
-  linux:
-    name: Linux release tests (${{ matrix.name }})
-    needs: probe
+  # One job builds cvc5 and boost, so the pack matrix imports the layer
+  # instead of each entry building it. Change the scope to force a rebuild.
+  deps:
+    name: Build deps image (cvc5 + boost)
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -55,9 +53,7 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v3
 
-      # cvc5 and boost are built from source and cached under the shared
-      # 'tau-deps' scope. Change the scope name to force a rebuild.
-      - name: Build deps stage (cvc5 + boost, cached)
+      - name: Build deps stage
         run: |
           ./dev docker deps \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
@@ -67,8 +63,31 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  linux:
+    name: Linux release tests (${{ matrix.name }})
+    needs: [probe, deps]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # ./dev and the image build both need the parser submodule
+          submodules: recursive
+
+      # container-driver builder; required for type=gha cache
+      - uses: docker/setup-buildx-action@v3
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v3
+
       # Each pack writes its own tau_pack.h, so each entry is a full build
-      # on top of the shared deps layer.
+      # on top of the deps layer the deps job cached.
       - name: Build release tests and run them
         run: |
           ./dev docker build-release \
