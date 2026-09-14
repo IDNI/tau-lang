@@ -1456,8 +1456,8 @@ trefs tau_term_bdd_handle<node>::collect_free_tau_vars(tref bdd_tref,
 {
 	// One walk over the DISTINCT nodes (visit_nodes), so a shared sub-BDD
 	// is entered once and not once per path. Each node's variables are
-	// appended and the whole is sorted once, which costs one allocation
-	// instead of one per variable.
+	// appended to one vector that is sorted at the end, which keeps the
+	// allocations to that vector's growth rather than one per variable.
 	trefs merged;
 	auto collect = [&merged, leaves_only](ref x, bool is_leaf) {
 		if (leaves_only && !is_leaf) return true;

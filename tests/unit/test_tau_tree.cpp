@@ -1104,7 +1104,7 @@ TEST_SUITE("get_free_vars cache") {
 	}
 
 	TEST_CASE("a binder over a term chain subtracts its own variable") {
-		// fall x ((x & y) = 0): the bound variable is taken out of a set
+		// all x ((x & y) = 0): the bound variable is taken out of a set
 		// the term chain produced.
 		tref x = build_bf_variable<node_t>(std::string("x"),
 			tau_type_id<node_t>());

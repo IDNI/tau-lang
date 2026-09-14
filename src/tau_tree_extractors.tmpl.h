@@ -3,6 +3,7 @@
 //#include <cvc5/cvc5.h>
 
 #include <algorithm>
+#include <functional>
 #include <iterator>
 
 #include "tau_tree.h"
@@ -786,8 +787,8 @@ int_t get_max_initial(const trefs& io_vars) {
  * inside an io_var (`x[t]`, `x[t-1]`) is not an occurrence at all.
  *
  * The answer is sorted by `subtree_less`, deduplicated and right-sibling
- * trimmed. It is a reference into a cache swept with the tree, so it stays
- * valid for as long as @p n does.
+ * trimmed. It is a reference into a cache that `bintree<node>::gc()` rebuilds,
+ * so it must not be held across a collection.
  */
 template <NodeType node>
 const trefs& get_free_vars(tref n) {
@@ -864,7 +865,7 @@ const trefs& get_free_vars(tref n) {
 		// One subformula reached through several branches of the DAG is
 		// one cached vector, so identical sets are merged once. The pass
 		// is over pointers, not variables.
-		std::sort(parts.begin() + mark, parts.end());
+		std::sort(parts.begin() + mark, parts.end(), std::less<>{});
 		parts.erase(std::unique(parts.begin() + mark, parts.end()),
 			parts.end());
 		// The loose variables and every set but the largest are sorted
@@ -951,9 +952,10 @@ const trefs& get_free_vars(tref n) {
 			if (!published.empty()) parts.push_back(&published);
 			return;
 		}
-		// Any other node contributes what its children do. One with a
-		// single child -- every `bf`/`wff` wrapper between two connectives
-		// -- passes an open chain through; anything else ends it.
+		// Any other node contributes what its children do. Any node with
+		// a single child passes an open chain through -- a wrapper, but a
+		// negation or a temporal operator too, none of which change which
+		// variables are free. A node with several children ends the chain.
 		const size_t inner = t.has_child()
 			&& !tau::get(t.first()).has_right_sibling() ? chain : no_chain;
 		for (tref c : t.children()) self(c, inner);
