@@ -15,10 +15,13 @@
 #   - w64-deps: dependencies built with mingw-w64 (cvc5 and boost)
 #   - w64-build: builds tau executable for Windows
 #   - w64-packages: creates a release packages (installer and zip file)
+# - WebAssembly branch is (see AGENTS.md's WebAssembly section for the constraints):
+#   - wasm-deps: extends the native dependencies with emsdk and boost for emscripten
+#   - wasm-build: builds tau.js/tau.wasm/tau.esm.mjs, and (TESTS=yes) the wasm suite
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
-# use --build-arg TESTS="no" to skip running tests (build stage)
+# use --build-arg TESTS="no" to skip running tests (build, wasm-build)
 # use --build-arg TEST_GCC_BUILD="no" to skip checking compilation with gcc (build stage)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
@@ -48,7 +51,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 # Install dependencies
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
-	bash wget git gnupg nsis rpm ninja-build bison ccache \
+	bash wget git gnupg nsis rpm ninja-build bison ccache curl unzip \
 	python3-pip python3-venv python3-dev nanobind-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
@@ -316,3 +319,85 @@ RUN echo "(BUILD) -- Building Windows packages" && \
 	./dev preset release-mingw-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 
+# ============================================================
+
+# ------------------------------------------------------------
+# WebAssembly dependencies image (emsdk and boost, no cvc5: the wasm pack
+# is sbf,tau,qint,qlt)
+
+FROM deps AS wasm-deps
+
+ARG BUILD_JOBS=5
+
+# ./dev, devrc, tau-resolve.cmake, with-gh-token, env and dep-boost.sh are
+# already in place from the deps stage; only emsdk is new here.
+COPY ./external/parser/scripts/dep-emsdk.sh 	/tau-lang/external/parser/scripts/
+COPY ./scripts/dep-emsdk.sh	/tau-lang/scripts/
+RUN echo "(BUILD) -- Building wasm dependencies: emsdk" && \
+	cd /tau-lang && \
+	./dev dep-emsdk.sh -DTAU_BUILD_JOBS=${BUILD_JOBS}
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building wasm dependencies: boost" && \
+	cd /tau-lang && \
+	scripts/with-gh-token ./dev dep-boost -DTAU_BUILD_JOBS=${BUILD_JOBS} --emscripten
+
+# emsdk ships the only node in the image, under a version directory whose name
+# is not fixed. tests/CMakeLists.txt requires node on the path under Emscripten.
+RUN ln -s "$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)/node" /usr/local/bin/node
+
+
+# ------------------------------------------------------------
+# WebAssembly build image: tau.js / tau.wasm / tau.esm.mjs, and (if TESTS=yes)
+# builds and runs the wasm test suite, the browser suite and the parity check
+
+FROM wasm-deps AS wasm-build
+
+COPY --from=source /tau-lang /tau-lang
+
+WORKDIR /tau-lang
+
+ARG BUILD_JOBS=5
+
+# Argument BUILD_PRESET=debug-emscripten picks the debugging preset family
+ARG BUILD_PRESET=emscripten
+
+# Argument TESTS=no builds only the library, skipping the suite entirely
+ARG TESTS=yes
+
+# The -all preset builds the library and the suite from one configure, so the
+# fetched dependencies compile once. It also registers the browser_suite entry.
+RUN echo "(BUILD) -- Building wasm: tau.js/tau.wasm/tau.esm.mjs" && \
+	echo " (BUILD) -- Running tests: $TESTS" && \
+	if [ "$TESTS" = "yes" ]; then \
+		./dev preset ${BUILD_PRESET}-all -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_BUILD_BROWSER_TESTS=ON; \
+	else \
+		./dev preset ${BUILD_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+ENV TAU_NATIVE_BIN=/tau-lang/build/release/tau
+
+# Chrome refuses to start as root, which is the only user in this image
+ENV TAU_CHROME_ARGS=--no-sandbox
+
+RUN if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Smoke-testing tau.node.js" && \
+	node build/${BUILD_PRESET}/tau.node.js; \
+fi
+
+RUN if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Running wasm tests: ${BUILD_PRESET}-all" && \
+	ctest --preset ${BUILD_PRESET}-all -j ${BUILD_JOBS} --output-on-failure; \
+fi
+
+# parity.js compares the wasm module against a native tau built from the
+# identical pack. sbf,tau is the wasm pack's own base.
+RUN if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Building native tau (sbf,tau pack) for parity" && \
+	./dev preset release-tau -DTAU_BAS=sbf,tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+fi
+
+RUN if [ "$TESTS" = "yes" ]; then \
+	echo "(BUILD) -- Running wasm vs native parity check" && \
+	node bindings/js/tests/parity.js; \
+fi

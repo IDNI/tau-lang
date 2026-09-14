@@ -41,6 +41,8 @@ case "${CMD}" in
                 echo "  w64-build     - build w64-build image"
                 echo "  w64-packages  - release packages (Windows)"
                 echo "  w64-nightly   - nightly release packages (Windows)"
+                echo "  wasm-deps     - build wasm-deps image"
+                echo "  wasm-build    - build wasm-build image, and (TESTS=yes) run the wasm suite"
                 ;;
         "build")
                 build "${@:2}"
@@ -97,6 +99,12 @@ case "${CMD}" in
         "w64-nightly")
                 build --target w64-packages --build-arg NIGHTLY="yes" -t tau:w64-packages "${@:2}" && \
                 extract-packages tau:w64-packages
+                ;;
+        "wasm-deps")
+                build --target wasm-deps -t tau:wasm-deps "${@:2}"
+                ;;
+        "wasm-build")
+                build --target wasm-build -t tau:wasm-build "${@:2}"
                 ;;
         *)
                 echo "Unknown docker action: ${CMD}"
