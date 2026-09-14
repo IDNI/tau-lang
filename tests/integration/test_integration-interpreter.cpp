@@ -94,6 +94,15 @@ struct bv_widening_scope {
 	~bv_widening_scope() { bv_widening = prev; }
 };
 
+// Same RAII shape for bv_max_width (the widening cap).
+struct bv_max_width_scope {
+	size_t prev;
+	explicit bv_max_width_scope(size_t w) : prev(bv_max_width) {
+		bv_max_width = w;
+	}
+	~bv_max_width_scope() { bv_max_width = prev; }
+};
+
 TEST_SUITE("Execution") {
 
 	// Pins on printed formulas must be order-insensitive
@@ -1552,6 +1561,56 @@ TEST_SUITE("with inputs and outputs") {
 		auto maybe_i = run<node_t>(spec, ctx, 2);
 		CHECK( maybe_i.has_value() );
 		CHECK ( o1->get_values() == strings{ "10", "2" } );
+	}
+
+	// A specification whose widened arithmetic would exceed bv_max_width
+	// fails its first normalization (nullptr, with the pass's own error
+	// line) and make_interpreter must report "cannot run" instead of
+	// enumerating the paths of a null spec: i1*i1 at bv[8] needs W = 16.
+	TEST_CASE("spec exceeding the widening cap cannot be run") {
+		bdd_init<Bool>();
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12);
+		auto spec = create_spec("o1[t]:bv[8] = i1[t]:bv[8] * i1[t]:bv[8].");
+		io_context<node_t> ctx;
+		strings i1_values = { "3", "4" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( !maybe_i.has_value() );
+		CHECK( o1->get_values().empty() );
+	}
+
+	// An update proposal whose widened arithmetic would exceed the cap is
+	// rejected ("No update performed") and the running spec stays as it
+	// was: o7 keeps echoing i9 after the rejected step exactly as before
+	// it, and the run itself does not fail. The stream names are fresh
+	// (o7/i8/i9): the tau-typed o1/i1 of the update cases above linger in
+	// the process-wide stream type registry and make a bv-typed o1 update
+	// proposal unparseable when the suite runs in file order.
+	TEST_CASE("update exceeding the widening cap is rejected, spec kept") {
+		bdd_init<Bool>();
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12);
+		auto spec = create_spec("u[t] = i8[t] && o7[t]:bv[8] = i9[t]:bv[8].");
+		strings i1_values = {
+			"F", "o7[t]:bv[8] = i9[t]:bv[8] * i9[t]:bv[8]", "F"
+		};
+		strings i2_values = { "1", "2", "3" };
+		io_context<node_t> ctx;
+		ctx.add_input("i8", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i9", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_output("o7", bv_type_id<node_t>(8), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == strings{ "1", "2", "3" } );
 	}
 
 	// Task 8 (bv-widening): prove the widened semantics through a live

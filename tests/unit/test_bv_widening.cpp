@@ -151,6 +151,24 @@ TEST_SUITE("bv widening - needed_width") {
 		size_t m; CHECK(widths("y + $X", 8, m) == 0); CHECK(m == 8);
 		CHECK(widths("y * $X", 8, m) == 0); CHECK(m == 8);
 	}
+	TEST_CASE("an opaque operand on either side makes every binary operator opaque") {
+		// Each binary case short-circuits on `l == 0 || r == 0`; drive both
+		// arms for every operator the width table lists (the add/mul/min
+		// cases above only exercise the left arm).
+		size_t m;
+		for (const char* op : { "+", "-", "*", "/", "%", "&", "|", "^",
+				"!&", "!|", "!^", "<<", ">>" }) {
+			const std::string opaque_left  = std::string("$X ") + op + " y";
+			const std::string opaque_right = std::string("x ") + op + " $X";
+			INFO(opaque_left);  CHECK(widths(opaque_left,  8, m) == 0);
+			INFO(opaque_right); CHECK(widths(opaque_right, 8, m) == 0);
+		}
+		CHECK(widths("min($X, y)", 8, m) == 0);
+		CHECK(widths("min(x, $X)", 8, m) == 0);
+		CHECK(widths("max($X, y)", 8, m) == 0);
+		CHECK(widths("max(x, $X)", 8, m) == 0);
+		CHECK(widths("$X'", 8, m) == 0);
+	}
 	TEST_CASE("opaque child under a parenthesis propagates as 0") {
 		// bf_parenthesis is transparent to opacity as well as to width:
 		// an opaque inner term makes the wrapper, and everything above
