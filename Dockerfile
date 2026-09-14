@@ -13,7 +13,7 @@
 #   - rpm-runner: provides an rpm based image with installed tau package
 # - Windows branch is:
 #   - w64-deps: dependencies built with mingw-w64 (cvc5 and boost)
-#   - w64-build: builds tau executable for Windows
+#   - w64-build: builds tau executable for Windows, and (TESTS=yes) runs its suite under wine
 #   - w64-packages: creates a release packages (installer and zip file)
 # - WebAssembly branch is (see AGENTS.md's WebAssembly section for the constraints):
 #   - wasm-deps: extends the native dependencies with emsdk and boost for emscripten
@@ -21,7 +21,7 @@
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
-# use --build-arg TESTS="no" to skip running tests (build, wasm-build)
+# use --build-arg TESTS="no" to skip running tests (build, w64-build, wasm-build)
 # use --build-arg TEST_GCC_BUILD="no" to skip checking compilation with gcc (build stage)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
@@ -287,22 +287,27 @@ ARG BUILD_JOBS=5
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
 
-# Build tau executable
+# Argument TESTS=no is used to skip building and running tests
+ARG TESTS=yes
+
+# WINEPREFIX keeps the wine configuration out of the home directory.
+# WINEDEBUG drops wine's own noise, and not the output of a test.
+ENV WINEPREFIX=/root/.wine-tau WINEDEBUG=-all
+
+# Build tau executable, and run its suite under wine if TESTS = "yes"
+# wine, not wine64: Ubuntu's wine package runs 64-bit PE executables on its
+# own, with no i386 multiarch needed for these mingw-w64-x86_64 binaries
 RUN echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
+	echo " (BUILD) -- Running tests: $TESTS" && \
 	./dev preset ${BUILD_PRESET}-mingw -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_BUILD_EXECUTABLE=ON
-
-# TODO add tests for Windows build
-
-# # Argument TESTS=no is used to skip running tests
-# ARG TESTS=yes
-
-# # Build tests and run them if TESTS="yes". Stop the build if they fail
-# RUN echo " (BUILD) -- Running tests: $TESTS"
-# RUN if [ "$TESTS" = "yes" ]; then \
-# 	./dev preset ${BUILD_PRESET}-mingw run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-# 		-DTAU_BUILD_TESTS=ON; \
-# fi
+		-DTAU_BUILD_EXECUTABLE=ON && \
+	if [ "$TESTS" = "yes" ]; then \
+		apt-get update && apt-get install -y --no-install-recommends wine && \
+		./dev preset ${BUILD_PRESET}-mingw -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_BUILD_TESTS=ON -DCMAKE_CROSSCOMPILING_EMULATOR=wine && \
+		ctest --test-dir build/${BUILD_PRESET}-mingw -j ${BUILD_JOBS} \
+			--output-on-failure; \
+	fi
 
 
 # ------------------------------------------------------------
