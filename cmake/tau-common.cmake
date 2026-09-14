@@ -31,10 +31,22 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
+# AppleClang rejects -ffat-lto-objects under LTO; plain -flto=auto works.
+# The probe needs -flto=auto: without it the flag is accepted everywhere.
+include(CheckCXXCompilerFlag)
+set(CMAKE_REQUIRED_FLAGS "-flto=auto")
+check_cxx_compiler_flag("-ffat-lto-objects" TAU_HAVE_FAT_LTO_OBJECTS)
+unset(CMAKE_REQUIRED_FLAGS)
+if(TAU_HAVE_FAT_LTO_OBJECTS)
+	set(TAU_FAT_LTO ";-ffat-lto-objects")
+else()
+	set(TAU_FAT_LTO "")
+endif()
+
 # LTO only pays off when something LTO-links it; test targets are all -fno-lto
 if (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
-	set(TAU_LTO_COMPILE_FLAGS "-flto=auto;-ffat-lto-objects")
+	set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
 	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 	set(TAU_LTO_LINK "-flto=auto")
 else()
@@ -44,7 +56,7 @@ else()
 	message(STATUS "LTO off: nothing links with LTO here (tests are -fno-lto)")
 endif()
 
-set(TAU_DEVEL_OPTIONS "-O0;-DNDEBUG;-g0")
+set(TAU_DEVEL_OPTIONS "-O0;-DDEBUG;-g0")
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE}")
 set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG${TAU_LTO_COMPILE};-g")

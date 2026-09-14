@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
 
@@ -287,6 +287,16 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 		return {};
 	}
 	return get_interpreter(spec, options);
+}
+
+template <NodeType node>
+std::string api<node>::current_spec(const interpreter<node>& i) {
+	return TAU_TO_STR(i.current_spec_fm());
+}
+
+template <NodeType node>
+size_t api<node>::spec_revision(const interpreter<node>& i) {
+	return i.spec_revision();
 }
 
 template <NodeType node>

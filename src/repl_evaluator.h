@@ -56,6 +56,7 @@
 #include "api.h"
 #include "io_context.h"
 #include "tau_spec.h"
+#include "utility/diagnostics.h"
 #include "utility/repl.h"
 #include "parse_error_hint.h"
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -66,7 +67,9 @@ namespace idni::tau_lang {
 
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
+	colors_opt, charvar_opt, blasting_opt, case_split_opt, factoring_opt,
+	bvwidening_opt, highlighting_opt,
+	indenting_opt,
 	print_benchmarks_opt, debug_opt,
 	// Numeric, unlike every option above: they take a count, not a flag, so
 	// enable/disable/toggle do not apply to them. Full names only -- the
@@ -76,12 +79,13 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	// reads the global back, so the REPL and the CLI options stay two views
 	// of the same knob.
 	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
+	case_split_max_tests_opt, decision_pins_opt,
 	fixpoint_steps_opt,
 	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
-	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
+	simplify_rounds_opt, def_passes_opt, enum_steps_opt, probe_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
 	spec_size_warn_opt, revision_alts_opt, consistency_subsets_opt,
-	cache_bound_opt, cover_products_opt };
+	cache_bound_opt, cover_products_opt, bv_max_width_opt };
 
 // Logic fragment: determines which operators are available
 enum logic_fragment { fragment_ltl, fragment_ctl_star };
@@ -115,7 +119,11 @@ struct repl_evaluator {
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
-		bool blasting            = true;  ///< Enable bitvector predicate blasting.
+		bool blasting            = bv_blasting; ///< Bitvector predicate blasting; follows the library default.
+		bool case_split          = bv_case_split; ///< Bitvector case split; follows the library default.
+		bool factoring           = ba_component_factoring; ///< Tau-BA component factoring; follows the library default.
+		bool bv_widening         = idni::tau_lang::bv_widening; ///< Exact (widened) bitvector arithmetic; follows the library default.
+		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options deliberately have no mirror fields
 		// here: `set` writes the library globals through the api setters
@@ -143,9 +151,9 @@ struct repl_evaluator {
 	/**
 	 * @brief Parse and evaluate the REPL source string @p src.
 	 * @param src Command string entered by the user.
-	 * @return Exit code (0 = success, non-zero = error/quit).
+	 * @return Exit code (0 = success, 1 = quit, 2 = incomplete input).
 	 */
-	int eval(const std::string& src);
+	idni::diagnostics::result<int> eval(const std::string& src);
 	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
 	void reprompt();
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -305,6 +313,14 @@ private:
 
 	// fragment command
 	void fragment_cmd(const tt& n);
+	/// @brief Update the case-split option to @p value and return the old value.
+	bool update_case_split(bool value);
+
+	/// @brief Update the factoring option to @p value and return the old value.
+	bool update_factoring(bool value);
+
+	/// @brief Update the bv-widening option to @p value and return the old value.
+	bool update_bv_widening(bool value);
 
 	// history
 	/// @brief Retrieve the history entry referenced by @p n.
@@ -335,6 +351,10 @@ private:
 	/// @brief Infer @p n's BA types so it can be matched against an
 	/// already inferred expression. Returns @p n if inference fails.
 	tref infer_for_match(tref n) const;
+
+	/// @brief Structural equality of @p a and @p b ignoring type
+	/// annotations and resolved BA type ids.
+	bool equal_modulo_types(tref a, tref b) const;
 
 	/// @brief Print benchmark measurements from @p m.
 	std::ostream& benchmarks(measuring& m) const;

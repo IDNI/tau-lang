@@ -11,10 +11,12 @@
 // Only the blasting/solver placement/cvc5-option parameters, not the
 // machinery behind them: this header defines main() and is included before
 // any tau header in every test TU, so it must not pull the tau tree in ahead
-// of them. That is exactly why heuristics/blast_placement.h and
-// boolean_algebras/cvc5/cvc5_options.h are dependency-free.
+// of them. That is exactly why heuristics/blast_placement.h,
+// boolean_algebras/cvc5/cvc5_options.h and bv_widening_options.h are
+// dependency-free.
 #include "heuristics/blast_placement.h"
 #include "boolean_algebras/cvc5/cvc5_options.h"
+#include "bv_widening_options.h"
 
 using namespace std;
 
@@ -44,6 +46,13 @@ inline void apply_tau_experiment_env() {
 	};
 	if (const char* v = std::getenv("TAU_BV_BLASTING"))
 		bv_blasting = std::atoi(v) != 0;
+	if (const char* v = std::getenv("TAU_BV_WIDENING"))
+		bv_widening = std::atoi(v) != 0;
+	// Same contract as api::set_bv_max_width: a non-positive value leaves
+	// the shipped cap unchanged.
+	if (const char* v = std::getenv("TAU_BV_MAX_WIDTH"))
+		if (const long w = std::atol(v); w > 0)
+			bv_max_width = static_cast<size_t>(w);
 	blast_placement = static_cast<blast_site>(
 		env_int("TAU_BLAST_PLACEMENT", 0, 2,
 			static_cast<int>(blast_placement)));

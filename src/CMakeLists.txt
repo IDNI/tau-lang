@@ -38,6 +38,7 @@ set(TAU_HEADERS
 	normal_forms.h     # normal form transformations
 	normal_forms_transformations.h
 	normalizer.h
+	bv_widening.h      # bottom-up bitvector width computation (opt-in exact bv arithmetic)
 	satisfiability.h
 	splitter_types.h
 	splitter.h

@@ -129,13 +129,7 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		// y and z are not in the explicit order, so they are combined as
-		// opaque leaf terms; their relative print order is decided by a
-		// content-hash tie-break (see tau_bdd.tmpl.h am_cmp/subtree_less)
-		// that is not a guaranteed canonical order and can flip whenever
-		// the parser grammar changes (nonterminal ids feed the hash).
-		CHECK((tau::get(t).to_str() == "x&(yz)'|x'"
-			|| tau::get(t).to_str() == "x&(zy)'|x'"));
+		CHECK( matches_bf_mod_and_or_any_of(t, strings{"x&(zy)'|x'"}) );
 	}
 	TEST_CASE("xyzqwert no var") {
 		using bdd = tau_term_bdd<node_t>;
@@ -150,17 +144,9 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		// None of x,y,z,q,w,e,r,t are in the explicit order, so they are
-		// combined as opaque leaf terms whose relative print order is a
-		// deterministic (see tau_bdd.tmpl.h operator<'s content-string
-		// tie-break), but not alphabetical, function of how the pairwise
-		// merges are structured -- not a property worth pinning down to a
-		// single "canonical" permutation. Check content instead of order:
-		// every one of the 8 variables must appear exactly once.
-		std::string res = tau::get(t).to_str();
-		CHECK(res.size() == 8);
-		for (char c : std::string("xyzqwert"))
-			CHECK(std::count(res.begin(), res.end(), c) == 1);
+		auto result = tau::get(t).to_str();
+		INFO("result: " << result);
+		CHECK( matches_bf_mod_and_or_any_of(t, strings{ "xzrqeywt" }) );
 	}
 }
 
@@ -201,17 +187,8 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// x and y sit in the explicit order and lead; the remaining six
-		// literals are opaque leaf terms whose relative print order is a
-		// hash/nt-id tie-break that drifts with every parser regen (Debug
-		// and Release differ too) -- not worth pinning as one canonical
-		// permutation. Check content instead: an "xy" prefix and each of
-		// a..f exactly once.
-		REQUIRE(result.size() == 8);
-		CHECK(result.substr(0, 2) == "xy");
-		std::string rest = result.substr(2);
-		std::sort(rest.begin(), rest.end());
-		CHECK(rest == "abcdef");
+		INFO("result: " << result);
+		CHECK( matches_bf_mod_and_or_any_of(ct, strings{"xydcefab"}) );
 	}
 
 	TEST_CASE("2") {
@@ -241,29 +218,13 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		// The product's factor order and duplicate-literal spelling are
-		// a subtree_less / NDEBUG-dependent artifact that shifts with
-		// every parser regeneration (three regens produced five distinct
-		// spellings, differing even in duplicate counts -- idempotent in
-		// a product, so harmless). Pin the content instead: the negated
-		// factor in either orientation, the variables {a, b, c, d}, and
-		// nothing else.
-		std::string res = tau::get(xx).to_str();
-		// The factor prints with or without an explicit `&` (Release
-		// spells the product by juxtaposition: "(f'e')'dccbba").
-		bool factor_found = false;
-		for (const char* f : {"&(e'f')'", "&(f'e')'",
-			"(e'f')'", "(f'e')'"}) {
-			auto pos = res.find(f);
-			if (pos == std::string::npos) continue;
-			factor_found = true;
-			res.erase(pos, std::string(f).size());
-			break;
-		}
-		CHECK( factor_found );
-		std::sort(res.begin(), res.end());
-		res.erase(std::unique(res.begin(), res.end()), res.end());
-		CHECK( res == "abcd" );
+		auto result = tau::get(xx).to_str();
+		INFO("result: " << result);
+		CHECK( matches_bf_mod_and_or_any_of(xx, strings{
+			"abbd&(f'e')'cc",
+			"cbb&(f'e')'da",
+			"bccda&(f'e')'"
+		}) );
 	}
 }
 

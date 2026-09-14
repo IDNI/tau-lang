@@ -5,6 +5,7 @@
 #include "tau_spec.h"
 
 #include <cstdlib>
+#include <deque>
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_ba"
@@ -19,7 +20,22 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 static tref normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
-	return normalize_temporal_quantifiers<node, false>(fm.nso_rr.main->get());
+	// Memoised per main tree: every Boolean operation on constants
+	// (~, &, |, +) normalises the temporal layer of its operands, and the
+	// same constants are operands over and over. Same key discipline as
+	// cached_tau_ba_predicate: the main tree identifies the element only
+	// when it carries no recurrence relations.
+	if (!fm.nso_rr.rec_relations.empty())
+		return normalize_temporal_quantifiers<node, false>(
+			fm.nso_rr.main->get());
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	tref key = fm.nso_rr.main->get();
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	// compute before emplace: normalisation can create new trees, and a
+	// rehash of `cache` must not happen with a half-built entry in it.
+	tref res = normalize_temporal_quantifiers<node, false>(key);
+	return cache.insert_or_assign(key, res).first->second;
 }
 
 template <typename... BAs>
@@ -131,6 +147,20 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
  * computed uncached (correct, just as slow as before).
  * @endinternal
  */
+// Keeps the trees behind the most recent decided rows alive across the
+// interpreter's per-step sweep, so a decision made for a constant at one
+// step is found again at the next (GitHub #92). The caches themselves are
+// registered with the GC and drop any row whose key does not survive; a
+// pinned key survives. Bounded: the oldest pin is released first once
+// `ba_decision_pins` handles are held, and 0 disables the pinning.
+template <typename node>
+static void pin_decided_key(tref key) {
+	static std::deque<htref> pins;
+	if (ba_decision_pins == 0) return;
+	pins.push_back(tree<node>::geth(key));
+	while (pins.size() > ba_decision_pins) pins.pop_front();
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
@@ -138,13 +168,31 @@ static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	auto&& compute)
 {
 	using node = typename tau_ba<BAs...>::node;
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; `compute` (is_tau_formula_sat/is_tau_impl
+	// et al., neither of which guards a nullptr ARGUMENT) would
+	// dereference it. Skip `compute` entirely and answer conservatively
+	// with `false` -- for the two current callers, is_zero()/is_one(),
+	// this means "cannot decide zero" and "cannot decide one", the least
+	// likely default to cause a wrong simplification either way.
+	auto safe_compute = [&](tref normalized) {
+		if (!normalized) {
+			LOG_ERROR << "cached_tau_ba_predicate: normalization failed "
+				"(bv-widening cap exceeded); answering false. This is a "
+				"conservative fallback, not a proof.";
+			return false;
+		}
+		return compute(normalized);
+	};
 	if (!fm.nso_rr.rec_relations.empty())
-		return compute(normalizer<node>(fm.nso_rr));
+		return safe_compute(normalizer<node>(fm.nso_rr));
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
-	bool res = compute(normalizer<node>(fm.nso_rr));
+	++tau_ba_predicate_misses;
+	bool res = safe_compute(normalizer<node>(fm.nso_rr));
+	pin_decided_key<node>(key);
 	return cache.insert_or_assign(key, res).first->second;
 }
 
@@ -203,11 +251,12 @@ static int factored_tau_units(tref fm, trefs& units) {
 // than exactly "0". The environment is read once and latched for the
 // lifetime of the process; the API flag is re-read on every call.
 inline bool ba_component_factoring_enabled() {
-	static const bool env = [] {
+	static const std::optional<bool> env = []() -> std::optional<bool> {
 		const char* v = std::getenv("TAU_BA_COMPONENT_FACTORING");
-		return v && *v && !(v[0] == '0' && v[1] == '\0');
+		if (!v || !*v) return std::nullopt;
+		return !(v[0] == '0' && v[1] == '\0');
 	}();
-	return ba_component_factoring || env;
+	return env ? *env : ba_component_factoring;
 }
 
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
@@ -274,6 +323,7 @@ static int factored_tau_sat(tref fm) {
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
 		bool sres = is_tau_formula_sat<node>(f);
+		pin_decided_key<node>(f);
 		cache.insert_or_assign(f, sres);
 		all_sat = sres;
 	}
@@ -296,6 +346,7 @@ static int factored_tau_valid(tref fm) {
 			continue;
 		}
 		bool vres = is_tau_impl<node>(tau::_T(), units[i]);
+		pin_decided_key<node>(units[i]);
 		cache.insert_or_assign(units[i], vres);
 		all = vres;
 	}
@@ -371,6 +422,11 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	tref result =
 		nso_rr_apply<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
 	result = simp_tau_unsat_valid<node<tau_ba<BAs...>, BAs...>>(result);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; returning the input unchanged rather than
+	// constructing a tau_ba from a null main formula, which would poison
+	// it (a null nso_rr.main) for whatever consumes this tau_ba next.
+	if (!result) return fm;
 	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(result));
 }
 
@@ -395,9 +451,14 @@ bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
-	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(
-		normalizer<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr), st);
-	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(s));
+	using node = node<tau_ba<BAs...>, BAs...>;
+	tref normalized = normalizer<node>(fm.nso_rr);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; returning the input unchanged rather than
+	// feeding it to tau_splitter, same convention as normalize_tau above.
+	if (!normalized) return fm;
+	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(normalized, st);
+	return tau_ba<BAs...>(tree<node>::geth(s));
 }
 
 template <typename... BAs>

@@ -849,19 +849,10 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 	tref predicate = nullptr;
 	bool error = false;
-	auto type_id = tau::get(term).get_ba_type();
 
-	// The result variable of an operation must carry that operation's own BA
-	// type, not the atomic's. Under a width-changing cast the two differ:
-	// for `(bv[4]) (a + b) = c` with `a, b : bv[8]` the atomic is bv[4], so
-	// the addend's result variable would be 4 bits wide while `bvadd`
-	// derives its bit count from the 8-bit augend, and the constraint mixes
-	// two widths (cvc5 raises "Subexpressions must have the same type").
-	// The atomic's type stays as the fallback for an untyped operation node.
-	auto result_type_of = [type_id](tref t) {
-		size_t t_id = tau::get(t).get_ba_type();
-		return t_id ? t_id : type_id;
-	};
+	// The atomic's own type is only the fallback for an untyped operation
+	// node: each hoisted intermediate is typed from its own subterm below.
+	const size_t atomic_type_id = tau::get(term).get_ba_type();
 
 	// Operands may have been replaced by fresh variables already (post-order
 	// traversal blasts inner operations first), so resolve them through the
@@ -890,10 +881,28 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
+		// Each hoisted intermediate must be typed from ITS OWN subterm's
+		// width, not a single width shared across the whole atom: a
+		// widened "truncating assignment" atom (o = ...) resets its own
+		// ba_type back to base_w via the outer cast while everything
+		// inside that cast still runs at the wider, per-subterm W (the
+		// amended D2/D3 widening rule) -- t is exactly that subterm here,
+		// already retyped to its own correct width by widen_bv_arithmetic.
+		//
+		// For a tree the widening pass never touched, the per-subterm type
+		// usually IS the atom's own type (type inference unifies every
+		// operand of an atom to one width), so this reads as an identity
+		// change there -- but not universally: a user-written cast around
+		// arithmetic is a type boundary, so subterms on either side of it
+		// genuinely differ in width, and taking the width from the subterm
+		// fixes a latent width bug in exactly those atoms, widening mode
+		// or not.
+		auto type_id = tau::get(t).get_ba_type();
+		if (!type_id) type_id = atomic_type_id;
 
 		switch (nt) {
 			case tau::bf_add: case tau::bf_sub: {
-				auto result = build_variable<node>(result_type_of(t));
+				auto result = build_variable<node>(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				auto left = lookup(tau::get(t).child(0));
 				auto right = lookup(tau::get(t).child(1));
@@ -908,7 +917,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [shiftand_raw, count] = get_arguments<node>(t);
 				if (!count) { error = true; break; }
 				auto shiftand = lookup(shiftand_raw);
-				auto shifted = tau::build_variable(result_type_of(t));
+				auto shifted = tau::build_variable(type_id);
 				auto bf_shifted = tau::get(tau::bf, shifted);
 				vars.push_back(shifted);
 				changes[t] = shifted;
@@ -921,7 +930,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [factor_raw, constant] = get_bvmul_arguments<node>(t);
 				if (!constant) { error = true; break; }
 				auto factor = lookup(factor_raw);
-				auto product = tau::build_variable(result_type_of(t));
+				auto product = tau::build_variable(type_id);
 				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
 				changes[t] = product;
@@ -932,7 +941,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [dividend_raw, divisor] = get_arguments<node>(t);
 				if (!divisor) { error = true; break; }
 				auto dividend = lookup(dividend_raw);
-				auto result = tau::build_variable(result_type_of(t));
+				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
 				changes[t] = result;
@@ -944,8 +953,10 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			case tau::bf_cast: {
 				auto child = tau::get(t).child(0);
 				auto src = lookup(child);
-				auto target_type_id = tau::get(t).get_ba_type();
-				auto result = tau::build_variable(target_type_id);
+				// The cast's target width IS this subterm's own width,
+				// i.e. exactly the type_id computed above -- no separate
+				// lookup needed.
+				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				auto src_width = get_bv_type_bitwidth<node>(src);
 				auto target_width = get_bv_type_bitwidth<node>(result);
@@ -960,6 +971,18 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				vars.push_back(result);
 				changes[t] = result;
 				conjoin(bvcast<node>(src, bf_result));
+				break;
+			}
+			case tau::bf_min: case tau::bf_max: {
+				auto left = lookup(tau::get(t).child(0));
+				auto right = lookup(tau::get(t).child(1));
+				auto result = tau::build_variable(type_id);
+				auto bf_result = tau::get(tau::bf, result);
+				vars.push_back(result);
+				changes[t] = result;
+				conjoin((nt == tau::bf_min)
+					? bvmin<node>(left, right, bf_result)
+					: bvmax<node>(left, right, bf_result));
 				break;
 			}
 			// Nand, nor and xnor are treated in the hooks so we never get those

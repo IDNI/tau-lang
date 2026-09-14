@@ -81,7 +81,7 @@ inline Term make_term_less(const Term& l, const Term& r) {
 }
 
 // Bound variable of sort `s`: only usable inside a quantifier body.
-inline Term make_bitvector_var(const Sort s, const std::string& name) {
+inline Term make_bitvector_var(const Sort& s, const std::string& name) {
 	return cvc5_term_manager.mkVar(s, name.c_str());
 }
 
@@ -144,6 +144,18 @@ inline Term make_bitvector_shl(const Term& l, const Term& r) {
 // Logical (zero-filling) right shift (BITVECTOR_LSHR), not ASHR.
 inline Term make_bitvector_shr(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
+}
+
+// Unsigned minimum/maximum. SMT-LIB has no bvmin/bvmax kind: both lower
+// to ITE over BITVECTOR_ULE (unsigned, like every comparison here).
+inline Term make_bitvector_min(const Term& l, const Term& r) {
+	return cvc5_term_manager.mkTerm(Kind::ITE,
+		{cvc5_term_manager.mkTerm(Kind::BITVECTOR_ULE, {l, r}), l, r});
+}
+
+inline Term make_bitvector_max(const Term& l, const Term& r) {
+	return cvc5_term_manager.mkTerm(Kind::ITE,
+		{cvc5_term_manager.mkTerm(Kind::BITVECTOR_ULE, {l, r}), r, l});
 }
 
 // Widen `t` by `extra_bits` leading zero bits.

@@ -105,7 +105,9 @@ struct interpreter {
 	 * @brief Build an interpreter from a normalized Tau specification.
 	 * @param spec Normalized Tau formula.
 	 * @param ctx I/O context.
-	 * @return Initialized interpreter, or `std::nullopt` if the spec is unsatisfiable.
+	 * @return Initialized interpreter, or `std::nullopt` if the spec is
+	 * unsatisfiable or fails to normalize (a `bv_widening` width-cap
+	 * violation, already logged by the widening pass).
 	 */
 	static std::optional<interpreter> make_interpreter(tref spec,
 		const io_context<node>& ctx);
@@ -429,6 +431,9 @@ struct interpreter {
 	bool in_oracle_handler_ = false;
 
 private:
+	/// Counts applied updates; see spec_revision().
+	size_t spec_revision_ = 0;
+
 	/// Per io var, the file stream id its current stream object was opened
 	/// from (entries exist for file-backed streams only). Lets
 	/// `rebuild_inputs`/`rebuild_outputs` keep a file stream's object --
@@ -446,6 +451,8 @@ private:
 	/// Per spec part, the alternatives' continuations at the current step.
 	std::vector<trefs> step_spec;
 	bool final_system = false;
+	/// Time point step_spec was last (re)computed for; -1 means stale.
+	int_t step_spec_time_point_ = -1;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
@@ -625,8 +632,37 @@ private:
 	/// @brief Return those variables in @p vars that appear within the lookback.
 	trefs appear_within_lookback(const trefs& vars);
 
-	/// @brief Unsqueeze `always` statements without adjusting time points.
+	/// @brief Re-fold the per-clause `always` wrappers of one partition
+	/// part into a single `always`, conjoining the bodies verbatim.
+	///
+	/// The clauses were split from one `always` body by
+	/// create_spec_partition, so they share a time frame and must not be
+	/// re-aligned to a common lookback (that shift asserts the shorter
+	/// clause one step before the start and makes guarded latches with an
+	/// initial condition read as unsat, GitHub #100).
 	static tref unsqueeze_always(tref cnf_expression);
+
+	/// @brief Combine a spec partition into the single formula it denotes.
+	static tref spec_partition_fm(
+		const std::vector<std::pair<htrefs, htref>>& parts);
+
+	/// @brief This interpreter's current specification, as a formula.
+	///
+	/// Recomputed from `original_spec`, so it follows every `update()`
+	/// rather than being a snapshot taken at construction. This is the
+	/// value the "Updated specification" log line stringifies -- both go
+	/// through spec_partition_fm, so the two cannot drift apart.
+	///
+	/// Not the `u` output stream: `u` carries the incoming revision that
+	/// `update()` merges in, this is the merged result.
+	tref current_spec_fm() const;
+
+	/// @brief Number of updates this interpreter has applied.
+	///
+	/// Maintained by `update()`: bumped once per applied update, never on
+	/// a rejected one. Lets a caller detect that `current_spec_fm()`
+	/// changed without diffing it.
+	size_t spec_revision() const { return spec_revision_; }
 
 	/// @brief Dump interpreter state to @p os.
 	std::ostream& dump(std::ostream& os) const;

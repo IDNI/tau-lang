@@ -36,6 +36,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__
 
+#include <cstdlib>
 #include <cvc5/cvc5.h>
 
 #include "boolean_algebras/cvc5/cvc5.h"
@@ -66,6 +67,42 @@ using solution = subtree_map<node, tref>;
  */
 template<NodeType node>
 size_t get_bv_size(const tref t);
+
+/// Opt-in: decide a closed bitvector formula whose binders are all of one
+/// kind quantifier-free (see `bv_formula_sat_status`). A formula with only
+/// existential binders in positive polarity is satisfiable exactly when its
+/// matrix is (`sat(ex x phi) == sat(phi)` with `x` free); one with only
+/// universal binders is satisfiable exactly when the negated matrix is not
+/// (`sat(all x phi) == !sat(!phi)`). Such a formula is then handed to cvc5 in
+/// `QF_BV` with eager bitblasting instead of the quantified `BV` logic.
+/// Off by default; enabled via `api::set_bv_quantifier_free_decision(true)`
+/// or the environment variable TAU_BV_QF_DECISION (a value of "0" disables).
+inline bool bv_quantifier_free_decision = false;
+
+inline bool bv_quantifier_free_decision_enabled() {
+	static const bool env = [] {
+		const char* v = std::getenv("TAU_BV_QF_DECISION");
+		return v && *v && !(v[0] == '0' && v[1] == '\0');
+	}();
+	return bv_quantifier_free_decision || env;
+}
+
+/**
+ * @brief Configure a solver for a quantifier-free decision-only query.
+ *
+ * `QF_BV` with eager bitblasting: the whole formula goes to the SAT solver
+ * at once, which is what a closed, binder-free bitvector query wants. Models
+ * and proofs are never read by the callers of `bv_formula_sat_status`, and
+ * every instance performs exactly one checkSat, so incrementality is off as
+ * well. Only reachable through `bv_quantifier_free_decision`.
+ */
+inline void config_cvc5_solver_quantifier_free(cvc5::Solver& solver) {
+	solver.setOption("incremental", "false");
+	solver.setOption("produce-models", "false");
+	solver.setOption("produce-proofs", "false");
+	solver.setOption("bitblast", "eager");
+	solver.setLogic("QF_BV");
+}
 
 /**
  * @brief Configures the given cvc5 solver instance for bit-vector logic.
@@ -495,11 +532,17 @@ inline bool operator!=(const cvc5::Term& lhs, const bool& rhs);
 inline bool operator!=(const bool& lhs, const cvc5::Term& rhs);
 
 // Bitvector specific symbol simplification
-/** @brief Simplify an `add` bitvector symbol node @p symbol. */
+// term_add, term_sub, term_mul and term_shl fold a constant pair at the
+// operands' width; under the opt-in `bv_widening` mode (bv_widening_options.h)
+// they decline the fold -- leaving the node symbolic -- whenever the exact
+// result would not fit, so the later widening pass can compute it at a wider
+// width instead of wrapping it here. div, mod and shr cannot overflow and
+// always fold.
+/** @brief Simplify an `add` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_add(tref symbol);
-/** @brief Simplify a `sub` bitvector symbol node @p symbol. */
+/** @brief Simplify a `sub` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_sub(tref symbol);
-/** @brief Simplify a `mul` bitvector symbol node @p symbol. */
+/** @brief Simplify a `mul` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_mul(tref symbol);
 /** @brief Simplify a `div` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_div(tref symbol);
@@ -507,7 +550,7 @@ template<NodeType node> tref term_div(tref symbol);
 template<NodeType node> tref term_mod(tref symbol);
 /** @brief Simplify a `shr` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_shr(tref symbol);
-/** @brief Simplify a `shl` bitvector symbol node @p symbol. */
+/** @brief Simplify a `shl` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_shl(tref symbol);
 /** @brief Simplify a `nor` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_nor(tref symbol);
@@ -515,6 +558,10 @@ template<NodeType node> tref term_nor(tref symbol);
 template<NodeType node> tref term_xnor(tref symbol);
 /** @brief Simplify a `nand` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_nand(tref symbol);
+/** @brief Simplify a `min` bitvector symbol node @p symbol (unsigned). */
+template<NodeType node> tref term_min(tref symbol);
+/** @brief Simplify a `max` bitvector symbol node @p symbol (unsigned). */
+template<NodeType node> tref term_max(tref symbol);
 
 /** @brief Apply all BV symbol-level simplifications to @p symbol. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);

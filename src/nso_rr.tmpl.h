@@ -19,9 +19,23 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	};
 
 #ifdef TAU_CACHE
-	using cache_t = std::map<std::pair<rewriter::rule, tref>, tref>;
+	// The key includes `bv_widening`: apply_rule below rebuilds nodes via
+	// ordinary construction, which runs the SAME BA construction hooks
+	// (term_add/sub/mul/shl's fit-gated folding, bv_ba_hooks.tmpl.h) that
+	// read this global flag -- e.g. a definition's `x * x` body, substituted
+	// with a constant argument, folds an overflowing product away when the
+	// flag is off but leaves it symbolic when it is on. Without the flag in
+	// the key, re-running with the flag flipped (same rule(s), same input
+	// tref -- get_nso_rr re-parses a spec string to an identical hash-consed
+	// tree either way when the call site itself has no bv_widening-sensitive
+	// fold) silently replayed the FIRST run's folded-or-not result: two
+	// `normalize_and_check` calls with `bv_widening` toggled between them
+	// both saw the stale first answer. Reproduced end-to-end by the "defs
+	// probe" case in test_bv_widening.cpp.
+	using cache_t = std::map<std::tuple<rewriter::rule, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
+	if (auto it = cache.find({r, n, bv_widening}); it != cache.end())
+		return it->second;
 #endif // TAU_CACHE
 
 #ifdef TAU_MEASURE
@@ -49,7 +63,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // TAU_MEASURE
 
 #ifdef TAU_CACHE
-		cache[{r, n}] = nn;
+		cache[{r, n, bv_widening}] = nn;
 #endif // TAU_CACHE
 
 		return nn;
@@ -67,9 +81,12 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #ifdef TAU_CACHE
-	using cache_t = std::map<std::pair<rewriter::rules, tref>, tref>;
+	// See the single-rule overload above: the key must include
+	// `bv_widening` for the same reason.
+	using cache_t = std::map<std::tuple<rewriter::rules, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
+	if (auto it = cache.find({rs, n, bv_widening}); it != cache.end())
+		return it->second;
 #endif // TAU_CACHE
 
 	if (rs.empty()) return n;
@@ -77,7 +94,7 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 	for (auto& r : rs) nn = nso_rr_apply<node>(r, nn);
 
 #ifdef TAU_CACHE
-	cache[{rs, n}] = nn;
+	cache[{rs, n, bv_widening}] = nn;
 #endif // TAU_CACHE
 	return nn;
 }

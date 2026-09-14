@@ -195,8 +195,13 @@ NB_MODULE(tau, m) {
 		.def_ro("time_point", &interpreter_t::time_point)
 
 		// ── Inspection (plan §14) ────────────────────────────────────
+		.def_prop_ro("spec_revision", [](const interpreter_t& self) {
+			return tau_api::spec_revision(self);
+		}, "Count of applied updates; a rejected update leaves it alone.")
 		.def("current_spec", &interpreter_t::current_spec,
-			"Return the current running spec as a tau-syntax string.")
+			"Return the current running spec as a tau-syntax string. "
+			"Follows every applied update; not the `u` stream, which "
+			"carries the incoming revision rather than the merged result.")
 		.def("reset", &interpreter_t::reset,
 			"Reset the interpreter to time t=0 (preserving spec / streams / cached_solution).")
 		.def("current_state", &interpreter_t::current_state,

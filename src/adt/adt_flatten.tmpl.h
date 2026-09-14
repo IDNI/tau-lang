@@ -1072,9 +1072,10 @@ bool adt_flatten_check_io_def_file_name(tref n) {
 // Top-level entry point.
 
 template <NodeType node>
-tref adt_flatten(tref spec, io_context<node>* ctx) {
+tref adt_flatten(tref spec, io_context<node>* ctx,
+	const std::vector<htref>* session_type_defs) {
 	using tau = tree<node>;
-	auto reg_opt = adt_registry<node>::build(spec);
+	auto reg_opt = adt_registry<node>::build(spec, session_type_defs);
 	if (!reg_opt) return nullptr; // adt_registry::build already LOG_ERROR'd
 
 	// Reject every input_def/output_def whose own head carries a

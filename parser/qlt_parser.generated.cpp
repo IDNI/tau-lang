@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "qlt_parser.generated.h"
 
 namespace qlt_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -60,14 +62,14 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(14), (T(11)+NT(4)+NT(5)+NT(4)+T(9)+NT(4)+NT(5)+NT(4)+NT(20)));
 //G22:  __E_singleton_1(21)  => ep_char(6).
 	p(NT(21), (NT(6)));
-//G23:  __E_singleton_1(21)  => ep_char(6) __E_singleton_1(21).
-	p(NT(21), (NT(6)+NT(21)));
+//G23:  __E_singleton_1(21)  => __E_singleton_1(21) ep_char(6).
+	p(NT(21), (NT(21)+NT(6)));
 //G24:  singleton(7)         => __E_singleton_1(21).
 	p(NT(7), (NT(21)));
 //G25:  __E_endpoint_2(22)   => ep_char(6).
 	p(NT(22), (NT(6)));
-//G26:  __E_endpoint_2(22)   => ep_char(6) __E_endpoint_2(22).
-	p(NT(22), (NT(6)+NT(22)));
+//G26:  __E_endpoint_2(22)   => __E_endpoint_2(22) ep_char(6).
+	p(NT(22), (NT(22)+NT(6)));
 //G27:  endpoint(5)          => __E_endpoint_2(22).
 	p(NT(5), (NT(22)));
 //G28:  ep_char(6)           => digit(2).
@@ -94,5 +96,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace qlt_parser_data

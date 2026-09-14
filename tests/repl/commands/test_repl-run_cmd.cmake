@@ -587,6 +587,23 @@ set_tests_properties("test_repl-run_cmd-issue82_accumulated_tau_constant" PROPER
 	PASS_REGULAR_EXPRESSION "Execution step: 1"
 	TIMEOUT 300)
 
+# --- GitHub #107: a ?: controller over a bitvector command --------------------
+# The reporter's script: a run with :tau initial conditions whose step spec
+# tests a bv[8] command against constants inside nested conditionals and
+# assigns a bv[8] result code. The first step closes the spec over the future
+# command (universally) and outputs (existentially); the bv guards cannot be
+# Boole pivots, were copied into every branch, and the universal block
+# distributed the residue: 9.8 s here at defaults, 90 s+ for the reporter,
+# and only the split budget kept it bounded. With the bitvector case split
+# (the default since this test) the command is eliminated by cells before any
+# block forms: 9 ms. The outputs are the ones --block-max-splits 1 gives.
+add_test(NAME "test_repl-run_cmd-issue107_bv_command_controller"
+	COMMAND bash -c "printf 'set charvar off\\n%s\\n(o9[t]=0)\\n0\\nq\\n' 'run ( (o2[0]:tau = { o5[t]=1 -> o6[t]=1 }) && (o1[0]:tau = { o5[t]=1 -> o6[t]=1 }) && ( (i2[t]:bv[8] = { #x01 }:bv[8]) ? ((o2[t]:tau = o1[t-1]:tau) && (o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x05 }:bv[8])) : ( (o2[t]:tau = o2[t-1]:tau) && ( (i2[t]:bv[8] = { #x02 }:bv[8]) ? ( ((o2[t-1]:tau & i1[t]:tau) != 0) ? ((o1[t]:tau = o2[t-1]:tau & i1[t]:tau) && (o3[t]:bv[8] = { #x03 }:bv[8])) : ((o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x08 }:bv[8])) ) : ( ((o1[t-1]:tau & i1[t]:tau) != 0) ? ((o1[t]:tau = o1[t-1]:tau & i1[t]:tau) && (o3[t]:bv[8] = { #x09 }:bv[8])) : ((o1[t]:tau = o1[t-1]:tau) && (o3[t]:bv[8] = { #x08 }:bv[8])) ) ) ) ) )' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-issue107_bv_command_controller" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o3\\[0\\] := 0.*o3\\[1\\] := 9"
+	FAIL_REGULAR_EXPRESSION "unsat|Error"
+	TIMEOUT 120)
+
 # --- sbf multiline value continuation ---------------------------------------
 # An incomplete sbf value ("x |") keeps the prompt open (the sbf-parser
 # unexpected-end check in awaiting_more_input); the next line completes it.

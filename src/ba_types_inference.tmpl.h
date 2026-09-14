@@ -64,6 +64,11 @@ tref canonize(tref t) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	// A bf_cast is keyed as itself: its target type IS its identity (two
+	// casts of one operand to different widths are different members of a
+	// scope), and stripping it would also make a conflict report print the
+	// cast as "(bv[0]) x" instead of what the user wrote.
+	if (tau::get(t).is(tau::bf_cast)) return t;
 	tref new_t = untype<node>(t);
 	if (tau::get(new_t).is(tau::bf)) new_t = tau::trim(new_t);
 	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name)
@@ -143,7 +148,7 @@ bool is_top_level_bf(tref parent) {
 		case tau::bf_nor: case tau::bf_nand: case tau::bf_xnor:
 		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
-		case tau::bf_shl:
+		case tau::bf_shl: case tau::bf_min: case tau::bf_max:
 		// bf quantifiers
 		case tau::bf_fall: case tau::bf_fex:
 		// bf atomic formulas
@@ -621,7 +626,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 // annotations and any parser-given wff_ref wrapper (see below), wraps
 // ref-shaped sides in the relation's typed bf > bf_ref, records the
 // head signature with that type in @p function_symbols, and rebuilds
-// the rec_relation. Returns nullptr when the body turns out to be a
+// the rec_relation. Returns a parse_error when the body turns out to be a
 // formula (a wff cannot define a function); when the relation's type is
 // still untyped, returns the leaf-updated relation without rewrapping
 // or recording it.
@@ -655,8 +660,17 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	};
 	head = unwrap_wff_ref(head);
 	body = unwrap_wff_ref(body);
-	// If the body is a formula and not a term, reject
-	if (tau::get(body).is(tau::wff)) return nullptr;
+	// If the body is a formula and not a term, reject with a proper error:
+	// a null tref returned here used to flow into the caller's transformed
+	// map unchecked and crash the parent rebuild (update_default) on a null
+	// child. The head's type is what classified this relation as functional,
+	// so say exactly that.
+	if (tau::get(body).is(tau::wff)) {
+		LOG_ERROR << "a formula cannot define a function: the head of `"
+			<< LOG_FM(head) << "` carries a type, so its body must be"
+			" a term; remove the head type to define a predicate";
+		return parse_error{ body, find_ba_type<node>(std::get<tref>(updated)) };
+	}
 	size_t type = find_ba_type<node>(std::get<tref>(updated));
 	// DBG(assert(!is_untyped<node>(type)));
 	if (is_untyped<node>(type)) return updated;
@@ -756,8 +770,10 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 
 	trefs ch;
 	for (tref c : tau::get(n).children()) {
-		if (changes.find(c) != changes.end())
-			ch.push_back(changes[c]);
+		if (auto it = changes.find(c); it != changes.end()) {
+			DBG(assert(it->second != nullptr);)
+			ch.push_back(it->second);
+		}
 		else ch.push_back(c);
 	}
 
@@ -930,7 +946,7 @@ std::variant<tref, inference_error, parse_error> update(
 			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 			case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 			case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
-			case tau::bf_nor: {
+			case tau::bf_nor: case tau::bf_min: case tau::bf_max: {
 				// only bv types allowed
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
@@ -1348,9 +1364,16 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// bf_cast is a type boundary: its operand is typed directly
 				// from annotations in on_leave, not via the resolver.
 				if (parent && tau::get(parent).is(tau::bf_cast)) break;
-				// Otherwise we have to treat it as a global scope
+				// Otherwise we have to treat it as a global scope. An
+				// outermost bf_cast is a member of this scope too, through
+				// its own target type (select_all_until tests the query
+				// before the stop, so the cast node itself is collected
+				// while nothing below it is): its RESULT must agree with
+				// the surrounding term, even though its operand is typed
+				// on its own -- see the atomic-formula case below.
 				auto typeables = get_typeable_type_ids_by_type<node>(n,
-					is<node>({tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f}),
+					is<node>({tau::ref, tau::variable, tau::ba_constant,
+						tau::bf_t, tau::bf_f, tau::bf_cast}),
 					is<node>({tau::offset, tau::bf_cast}));
 				if (std::holds_alternative<inference_error>(typeables)) {
 					error = std::get<inference_error>(typeables);
@@ -1362,7 +1385,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						typeables_map[tau::variable],
 						typeables_map[tau::ba_constant],
 						typeables_map[tau::bf_t],
-						typeables_map[tau::bf_f] }); inserted) {
+						typeables_map[tau::bf_f],
+						typeables_map[tau::bf_cast] }); inserted) {
 					error = inserted.value(); break;
 				}
 				auto merged_type = merge<node>(resolver, typeables_map);
@@ -1516,8 +1540,19 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
+				// A bf_cast is a type boundary for its OPERAND (typed on
+				// its own in the bf on_leave case, never from this scope),
+				// but its RESULT is an ordinary member of the atom: the
+				// cast node carries its target width from the parser, and
+				// is collected here as a typeable of its own (the query is
+				// tested before the stop, so the outermost cast is taken
+				// and nothing under it is walked). That is what makes
+				// `((bv[8]) x:bv[4]) & y:sbf = 0` an incompatible-type
+				// error and `(bv[8]) x:bv[4] = y` type y as bv[8], instead
+				// of letting a bv/sbf mix through to the solver.
 				auto typeables = get_typeable_type_ids_by_type<node>(n,
-					is<node>({tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f}),
+					is<node>({tau::ref, tau::variable, tau::ba_constant,
+						tau::bf_t, tau::bf_f, tau::bf_cast}),
 					is<node>({tau::offset, tau::bf_cast}));
 				if (std::holds_alternative<inference_error>(typeables)) {
 					error = std::get<inference_error>(typeables);
@@ -1528,7 +1563,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						typeables_map[tau::ref],
 						typeables_map[tau::ba_constant],
 						typeables_map[tau::bf_t],
-						typeables_map[tau::bf_f] });
+						typeables_map[tau::bf_f],
+						typeables_map[tau::bf_cast] });
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 				if (auto inserted = insert<node>(resolver, {
 						typeables_map[tau::variable]
@@ -1609,21 +1645,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					error = std::get<inference_error>(updated);
 					break;
 				}
-				// update_functional_rr rejects a function
-				// definition whose body is a formula (e.g.
-				// `p(x):sbf := x = 0.`) by returning a null tref
-				// rather than an inference_error. Storing that
-				// null gives the parent rec_relations node a null
-				// child, which the final update pass then
-				// dereferences -- report the rejection as an
-				// inference failure instead. The type ids are
-				// left at 0: the rejection is about the body's
-				// wff/bf shape, not about two conflicting types.
-				if (std::get<tref>(updated) == nullptr) {
-					error = inference_error{ new_n, 0, 0 };
+				if (tref u = std::get<tref>(updated); !u) {
+					// Never insert a null replacement: the parent's
+					// update_default would rebuild with a null child.
+					error = parse_error{ n, 0 };
 					break;
-				}
-				if (std::get<tref>(updated) != new_n) transformed.insert_or_assign(n, std::get<tref>(updated));
+				} else if (u != new_n) transformed.insert_or_assign(n, u);
 				if (resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = scope_error{n};
@@ -1821,6 +1848,33 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						if (!retyped.empty())
 							updated = type_annotated_operands<node>(
 								rewriter::replace<node>(updated, retyped));
+						// A cast only ever targets a bitvector width (the
+						// grammar spells it "(bv[n])"), so its operand must
+						// be a bitvector too: `(bv[8]) x:sbf`, `:tau`, a
+						// tau-typed uninterpreted constant or stream is a
+						// type error HERE, not a "bv type must have explicit
+						// bitwidth" assertion for the solver's cast
+						// translation to abort on. Leaves under a nested
+						// cast belong to that cast's own operand and were
+						// checked when its bf was left; a still-untyped
+						// ref is left to the definition machinery.
+						const size_t target_type = tau::get(parent).get_ba_type();
+						tref foreign = nullptr;
+						size_t foreign_type = 0;
+						for (tref x : tau::get(updated).select_all_until(
+								is<node>({tau::variable, tau::ba_constant,
+									tau::bf_t, tau::bf_f, tau::ref}),
+								is<node>({tau::offset, tau::bf_cast}))) {
+							const size_t t = get_effective_ba_type<node>(x);
+							if (t == 0 || is_bv_type_family<node>(t)) continue;
+							foreign = x, foreign_type = t;
+							break;
+						}
+						if (foreign) {
+							error = inference_error{foreign, target_type,
+								foreign_type};
+							break;
+						}
 						if (updated != new_n) transformed.insert_or_assign(n, updated);
 					} else {
 						auto updated = update<node>(resolver, new_n,

@@ -41,84 +41,29 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
-		CHECK( matches_to_str_to_any_of(res, {
-			// complete_quantifier_elimination (the residual-quantifier
-			// fallback added when this variable occurs only in a
-			// non-negated pivot-less shape): a single disjunct, folding
-			// `w = 0` into the kept scope instead of factoring it out.
-			// Equivalent by hand: under `b1 y = 0`, `b1 yz != 0` is
-			// unsatisfiable (b1 yz = (b1 y) z = 0), so the scope reduces
-			// to `b1 w = 0 && (w = 0 || f(b1))`, i.e.
-			// `(w = 0 && ex b1 (b1 y = 0 && b1 w = 0)) || ex b1 (b1 y = 0
-			// && b1 w = 0 && f(b1))`; the first disjunct's existential is
-			// a tautology (b1 = 0), so it collapses to
-			// `w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))` -- the
-			// pre-deletion shape below.
-			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1))",
-			// 2026-09-02 (binary temporal word-synonym regen): the same
-			// disjunct with `f(b1)` and `w = 0` swapped; equivalent.
-			"ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || f(b1) || w = 0)",
-			// 2026-08-28 (ADT + left-assoc grammar regen): the same
-			// single disjunct with conjuncts and disjuncts permuted.
-			"ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))",
-			// 2026-08-20 (bare-atom leaf routing; canonical shape
-			// FIRST): same two disjuncts as the 2026-08-04 shape below,
-			// with disjunct and conjunct order flipped by the regen
-			// tie-breaks; equivalent by the same hand-check.
-			"(ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0)) "
-			"|| (ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 || w = 0 || f(b1)))",
-			// block pipeline, 2026-08-04: carries a redundant second
-			// disjunct (its two conjuncts force w = 0 and w != 0, so
-			// it is F) and an unabsorbed b1 yz != 0 literal (dead
-			// under b1 y = 0); verified equivalent by hand.
-			"(ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))) "
-			"|| (ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0))",
-			// pre-deletion shapes, equivalent; a future simplification
-			// improvement may legitimately return to them.
-			"w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))",
-			"w = 0 || (ex b1 b1 y = 0 && b1 w = 0 && f(b1))",
-			"(ex b1 b1 w = 0 && b1 y = 0 && f(b1)) || w = 0",
-			"(ex b1 b1 y = 0 && b1 w = 0 && f(b1)) || w = 0",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"ex b1 b1 w = 0 && b1 y = 0 "
+			"&& (b1 yz != 0 || f(b1) || w = 0)",
+			"(ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 "
+			"|| w = 0)) "
+			"|| (ex b1 b1 y = 0 && b1 w = 0 && (b1 yz != 0 "
+			"|| w = 0 || f(b1)))",
+			"w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))"
 		}) );
 	}
 	TEST_CASE("b4 squeeze_absorb below all") {
 		const char* sample = "all x !((((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0)).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		CHECK( matches_to_str_to_any_of(res, {
-			// complete_quantifier_elimination's shape, dual of the ex
-			// case above: process_quantifier_block dualises an all-block
-			// by resolving the negated scope as an ex-block and negating
-			// back (`to_nnf(neg(pushed))`), so this is exactly `!(ex-case
-			// result)` renamed to NNF -- sound for the same reason the ex
-			// shape is, by construction, independent of what shape the
-			// wrapped ex-elimination happens to return.
-			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+		CHECK( matches_mod_and_or_any_of(res, {
+			"(all b1 b1 w != 0 || b1 y != 0 "
+			"|| b1 yz = 0 && w != 0 && !f(b1)) "
 			"&& (w != 0 || wy' = 0)",
-			// 2026-09-02 (binary temporal word-synonym regen): the same
-			// shape with the commutative product written y'w; equivalent.
-			"(all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (w != 0 || y'w = 0)",
-			// 2026-08-28 (ADT + left-assoc grammar regen): disjuncts and
-			// the commutative product y'w permuted; equivalent.
-			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (w != 0 || y'w = 0)",
-			// 2026-08-20 (bare-atom leaf routing; canonical first):
-			// dual of the ex case, conjunct/disjunct order flipped by
-			// the regen tie-breaks; equivalent by the same hand-check.
-			"(all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0) "
-			"&& (all b1 b1 y != 0 || b1 w != 0 || b1 yz = 0 && w != 0 && !f(b1))",
-			// block pipeline, 2026-08-04: the dual, second conjunct is
-			// identically T, and the first folds to the old shape
-			// (b1 = 0 forces w != 0); verified equivalent by hand.
-			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
-			"&& (all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0)",
-			// pre-deletion shapes, equivalent.
-			"w != 0 && (all b1 b1 w != 0 || b1 y != 0 || !f(b1))",
-			"w != 0 && (all b1 b1 y != 0 || b1 w != 0 || !f(b1))",
-			"(all b1 b1 w != 0 || b1 y != 0 || !f(b1)) && w != 0",
-			"(all b1 b1 y != 0 || b1 w != 0 || !f(b1)) && w != 0",
+			"(all b1 b1 y != 0 || b1 w = 0 "
+			"|| b1 yz = 0 && w != 0) "
+			"&& (all b1 b1 y != 0 || b1 w != 0 "
+			"|| b1 yz = 0 && w != 0 && !f(b1))",
+			"w != 0 && (all b1 b1 w != 0 || b1 y != 0 || !f(b1))"
 		}) );
 	}
 	TEST_CASE("b4 squeeze_absorb below all, fully eliminated") {
@@ -127,22 +72,11 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "all x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
-		CHECK( matches_to_str_to_any_of(res, {
-			// disjunct order flipped by the 8f1a74c1 parser regen
-			// (Debug's matches_to_any_of only checks expected[0] --
-			// see test_helpers.h); actual current shape first.
-			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
-			"y = 0 && (w = 0 || (all b1 b1 yz != 0 || b1 w = 0 && f(b1)))",
-			// block pipeline, 2026-08-04 (canonical shape first):
-			// under y = 0 the kept universal reduces to
-			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
-			// is w = 0 -- so this is y = 0 && w = 0 in a bulkier
-			// spelling; verified equivalent by hand.
-			
-			// pre-deletion shapes, equivalent.
-			"y = 0 && w = 0",
-			"w = 0 && y = 0",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"y = 0 "
+			"&& (w = 0 || (all b1 b1 yz != 0 "
+			"|| b1 w = 0 && f(b1)))",
+			"y = 0 && w = 0"
 		}) );
 	}
 
@@ -156,35 +90,22 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (by != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// conjunct order moves with parser regens (last: 2026-09-02
-		// word-synonym regen); both orders are the same formula
-		CHECK( matches_to_str_to_any_of(res, {
-			"z != 0 && y != 0",
-			"y != 0 && z != 0",
-		}) );
+		CHECK( matches_mod_and_or_any_of(res, { "y != 0 && z != 0" }) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 	TEST_CASE("cqe: neq-starved all block is eliminated via dualization") {
 		const char* sample = "all b (by = 0 || bz = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// disjunct order moves with parser regens (last: 2026-09-02)
-		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 || y = 0",
-			"y = 0 || z = 0",
-		}) );
+		CHECK( matches_mod_and_or_any_of(res, { "y = 0 || z = 0" }) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 	TEST_CASE("cqe: disjunctive scope distributes per clause") {
 		const char* sample = "ex b (by != 0 && bz != 0 || bw != 0 && bu != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// conjunct order moves with parser regens (last: 2026-09-02)
-		CHECK( matches_to_str_to_any_of(res, {
-			"z != 0 && y != 0 || u != 0 && w != 0",
-			"z != 0 && y != 0 || w != 0 && u != 0",
-			"y != 0 && z != 0 || u != 0 && w != 0",
-			"y != 0 && z != 0 || w != 0 && u != 0",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"y != 0 && z != 0 || w != 0 && u != 0"
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -237,11 +158,7 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// conjunct order moves with parser regens (last: 2026-09-02)
-		CHECK( matches_to_str_to_any_of(res, {
-			"z != 0 && y != 0",
-			"y != 0 && z != 0",
-		}) );
+		CHECK( matches_mod_and_or_any_of(res, { "y != 0 && z != 0" }) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 	TEST_CASE("cqe: NZ-1 temporal scope keeps its quantifier") {
@@ -252,8 +169,11 @@ TEST_SUITE("anti_prenex") {
 		REQUIRE( !fv.empty() );
 		tref fm = tau::build_wff_all_many(fv, spec);
 		tref res = anti_prenex<node_t>(fm);
+		// no grammar position for this shape, so it cannot be parsed
+		// back for a structural compare
 		CHECK( matches_to_str_to_any_of(res, {
 			"all b2, b1 (always b1 b2 != 0)",
+			"all b2, b1 (always b2 b1 != 0)",
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( tau::get(res).find_top(
@@ -263,10 +183,8 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (bw != 0 && q(b)).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		// conjunct order moves with parser regens (last: 2026-09-02)
-		CHECK( matches_to_str_to_any_of(res, {
-			"ex b1 b1 w != 0 && q(b1)",
-			"ex b1 q(b1) && b1 w != 0",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"ex b1 q(b1) && b1 w != 0"
 		}) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) != nullptr );
@@ -344,8 +262,8 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 	// subs_elim path: ex x (x=t && phi(x)) → phi(t)
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
 		// Step 2 of anti_prenex_block substitutes x:=w giving wy=0.
-		CHECK( normalize_and_check("ex x (xy = 0 && x = w).",
-			strings{"wy = 0", "yw = 0"}) );
+		CHECK( normalize_and_check_mod_and_or(
+			"ex x (xy = 0 && x = w).", "wy = 0") );
 	}
 	TEST_CASE("subs_elim: ex x (x=w) → T") {
 		// After substitution the body reduces to T.

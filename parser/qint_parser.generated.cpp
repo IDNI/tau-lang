@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "qint_parser.generated.h"
 
 namespace qint_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -46,8 +48,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(14), (T(7)+NT(4)+NT(5)+NT(4)+T(8)+NT(4)+NT(5)+NT(4)+T(9)));
 //G15:  __E_endpoint_1(17)   => ep_char(6).
 	p(NT(17), (NT(6)));
-//G16:  __E_endpoint_1(17)   => ep_char(6) __E_endpoint_1(17).
-	p(NT(17), (NT(6)+NT(17)));
+//G16:  __E_endpoint_1(17)   => __E_endpoint_1(17) ep_char(6).
+	p(NT(17), (NT(17)+NT(6)));
 //G17:  endpoint(5)          => __E_endpoint_1(17).
 	p(NT(5), (NT(17)));
 //G18:  ep_char(6)           => digit(2).
@@ -68,8 +70,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(18), (nul));
 //G26:  __E_integer_3(19)    => digit(2).
 	p(NT(19), (NT(2)));
-//G27:  __E_integer_3(19)    => digit(2) __E_integer_3(19).
-	p(NT(19), (NT(2)+NT(19)));
+//G27:  __E_integer_3(19)    => __E_integer_3(19) digit(2).
+	p(NT(19), (NT(19)+NT(2)));
 //G28:  integer(7)           => __E_integer_2(18) __E_integer_3(19).
 	p(NT(7), (NT(18)+NT(19)));
 //G29:  __E___4(20)          => space(1) _(4).
@@ -82,5 +84,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace qint_parser_data

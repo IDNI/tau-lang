@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "nlang_parser.generated.h"
 
 namespace nlang_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -48,8 +50,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(7), (NT(16)));
 //G16:  __E_atom_3(17)       => atom_char(5).
 	p(NT(17), (NT(5)));
-//G17:  __E_atom_3(17)       => atom_char(5) __E_atom_3(17).
-	p(NT(17), (NT(5)+NT(17)));
+//G17:  __E_atom_3(17)       => __E_atom_3(17) atom_char(5).
+	p(NT(17), (NT(17)+NT(5)));
 //G18:  atom(4)              => __E_atom_3(17).
 	p(NT(4), (NT(17)));
 //G19:  __N_0(19)            => '('.
@@ -68,5 +70,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace nlang_parser_data

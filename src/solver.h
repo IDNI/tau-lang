@@ -212,8 +212,10 @@ tref var, tref term);
  * @tparam node Tree node type.
  * @param form The tau form to solve.
  * @param options The solver options.
- * @param error Reports if a clause is found that is not supported within solving
- * @return An optional solution.
+ * @param error Reports if a clause is found that is not supported within
+ * solving, or if normalizing @p form failed on a `bv_widening` width-cap
+ * violation (already logged by the widening pass).
+ * @return An optional solution (`nullopt` whenever @p error is set).
  */
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, solver_options options, bool& error);

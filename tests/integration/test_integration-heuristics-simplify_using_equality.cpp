@@ -147,7 +147,7 @@ TEST_SUITE("simplify_using_equality_direct_atm") {
 		tref zero_t = tau::get(orig)[0].second();
 		tref rev    = tau::build_bf_eq(zero_t, x_t);
 		tref result = simplify_using_equality_direct_atm<node_t>(rev);
-		CHECK(matches_to_str_to_any_of(result, { "x = 0" }));
+		CHECK(matches_mod_and_or_any_of(result, { "x = 0" }));
 	}
 
 	TEST_CASE("reversed inequality 0 != x is reoriented to x != 0") {
@@ -156,7 +156,7 @@ TEST_SUITE("simplify_using_equality_direct_atm") {
 		tref zero_t = tau::get(orig)[0].second();
 		tref rev    = tau::build_bf_neq(zero_t, x_t);
 		tref result = simplify_using_equality_direct_atm<node_t>(rev);
-		CHECK(matches_to_str_to_any_of(result, { "x != 0" }));
+		CHECK(matches_mod_and_or_any_of(result, { "x != 0" }));
 	}
 
 	TEST_CASE("idempotent for equality atom") {
@@ -324,14 +324,7 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( matches_to_str_to_any_of(res, {
-			"yx|xz = 0",
-			"xy|zx = 0",
-			"xy|xz = 0",
-			"yx|zx = 0",
-		}) );
+		CHECK( matches_mod_and_or_any_of(res, { "yx|zx = 0" }) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "(o1[1]' = 0 && s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 && o1[0]' = 0 || o1[0]o1[1]'|o1[0]' = 0 && s = 0 && (s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 || z|z's != 0 && s != 0 && y|y'w != 0 && w != 0 && (z != 0 || y = 0 || o1[1]' = 0) && (y != 0 || z = 0) || z|z's != 0 && y|y'w != 0 && y != 0 && w != 0 && (s != 0 || o1[1] = 0) && (z != 0 || o1[1]' = 0)) && o1[0]' != 0) && v != 0 && x != 0 && o1[0] != 0.";
@@ -361,29 +354,8 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// Each atom is a commutative product whose printed orientation is
-		// a subtree_less tie-break that flips under parser regeneration
-		// (8f1a74c1 did). Accept every orientation combination of the
-		// four kept atoms; the conjunct order itself is stable.
-		CHECK( matches_to_str_to_any_of(res, {
-			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
-			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
-			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
-			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
-			"xy = 0 && vw = 0 && yw = 0 && vx = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
-			"xy = 0 && wv = 0 && wy = 0 && vx = 0",
-			"xy = 0 && wv = 0 && yw = 0 && xv = 0",
-			"xy = 0 && wv = 0 && yw = 0 && vx = 0",
-			"yx = 0 && vw = 0 && wy = 0 && xv = 0",
-			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
-			"yx = 0 && vw = 0 && yw = 0 && xv = 0",
-			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
-			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
-			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
-			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
-			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"yx = 0 && wv = 0 && wy = 0 && vx = 0"
 		}) );
 	}
 	TEST_CASE("8") {
@@ -455,18 +427,13 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "(x = 0) || (y = x || z = x).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0.
-		// Which side an atom's variable prints on is decided by
-		// simplify_using_equality_term_comp's tau::subtree_less fallback for
-		// two plain variables, a content-hash tie-break that is not a
-		// guaranteed canonical order and can flip on a parser regeneration
-		// (the 8f1a74c1 regen did; see tau_bdd.tmpl.h for the analogous
-		// issue), so accept any orientation of the two kept atoms.
-		CHECK( matches_to_str_to_any_of(res, {
-			"x = 0 || x = y || z = x",
+		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0
+		// Equality operand order flipped by the 8f1a74c1 parser regen
+		CHECK( matches_mod_and_or_any_of(res, {
 			"x = 0 || x = y || x = z",
-			"x = 0 || y = x || z = x",
+			"x = 0 || x = y || z = x",
 			"x = 0 || y = x || x = z",
+			"x = 0 || y = x || z = x"
 		}) );
 	}
 
@@ -500,9 +467,9 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = simplify_using_equality<node_t>(fm);
 		// Equality orientation is a subtree_less tie-break that drifts
 		// with parser regens; both forms carry the o1 -> i1 substitution.
-		CHECK( matches_to_str_to_any_of(res, {
-			"o1[t]:tau = i1[t]:tau && o2[t]:tau = i1[t]:tau",
+		CHECK( matches_mod_and_or_any_of(res, {
 			"o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau",
+			"o1[t]:tau = i1[t]:tau && o2[t]:tau = i1[t]:tau"
 		}) );
 	}
 
@@ -516,9 +483,9 @@ TEST_SUITE("simplify_using_equality") {
 		// Which of o1/o2 is the union-find representative is a
 		// subtree_less tie-break that drifts with parser regens; both
 		// forms are the same chain in representative form.
-		CHECK( matches_to_str_to_any_of(res, {
-			"o2[t]:tau = o1[t]:tau && o1[t]:tau = i1[t]:tau",
+		CHECK( matches_mod_and_or_any_of(res, {
 			"o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau",
+			"o2[t]:tau = o1[t]:tau && o1[t]:tau = i1[t]:tau"
 		}) );
 	}
 

@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "sbf_parser.generated.h"
 
 namespace sbf_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -102,8 +104,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(4), (NT(28)));
 //G43:  __E_variable_11(29)  => null.
 	p(NT(29), (nul));
-//G44:  __E_variable_11(29)  => digit(3) __E_variable_11(29).
-	p(NT(29), (NT(3)+NT(29)));
+//G44:  __E_variable_11(29)  => __E_variable_11(29) digit(3).
+	p(NT(29), (NT(29)+NT(3)));
 //G45:  variable(5)          => alpha(2) __E_variable_11(29).	 # guarded: charvar
 	p(NT(5), (NT(2)+NT(29)));
 	p.back().guard = "charvar";
@@ -113,8 +115,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(30), (T(10)));
 //G48:  __E_variable_13(32)  => null.
 	p(NT(32), (nul));
-//G49:  __E_variable_13(32)  => __E_variable_12(30) __E_variable_13(32).
-	p(NT(32), (NT(30)+NT(32)));
+//G49:  __E_variable_13(32)  => __E_variable_13(32) __E_variable_12(30).
+	p(NT(32), (NT(32)+NT(30)));
 //G50:  variable(5)          => alpha(2) __E_variable_13(32).	 # guarded: var
 	p(NT(5), (NT(2)+NT(32)));
 	p.back().guard = "var";
@@ -122,5 +124,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace sbf_parser_data

@@ -17,12 +17,17 @@
 #   - w64-packages: creates a release packages (installer and zip file)
 
 # use --build-arg BUILD_JOBS=N to set the number of build jobs (default is 5, 0 is for half of the available logical CPU cores)
-# use --build-arg BUILD_TYPE="Debug" for building of the debugging version (build stage)
+# use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
 # use --build-arg TESTS="no" to skip running tests (build stage)
-# use --build-arg TEST_CLANG_BUILD="no" to skip checking compilation with clang (build stage)
+# use --build-arg TEST_GCC_BUILD="no" to skip checking compilation with gcc (build stage)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
 # Use BUILD_KIT=1 (install docker-buildx) to avoid rebuilds of unnecessary stages
+
+# Anonymous clones of the cvc5/boost repos can be rate limited by GitHub.
+# Pass an optional token to authenticate:
+#   --secret id=gh_token,env=GH_TOKEN
+# Without the secret the clones run anonymously.
 
 # To run tau using the created image in interactive mode:
 #   docker run --rm -it tau [<tau options>]
@@ -36,12 +41,15 @@ ARG BUILD_JOBS=5
 
 # ------------------------------------------------------------
 # base image with system dependencies
-FROM ubuntu:24.04 AS base
+# pinned by digest: an upstream retag of the floating tag invalidates
+# this layer and every one after it, wiping the cvc5/boost deps cache
+FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 AS base
 
 # Install dependencies
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
 	bash wget git nsis rpm python3-pip python3-venv bison nanobind-dev \
+	ninja-build \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
@@ -67,9 +75,9 @@ COPY ./licenses  /tau-lang/licenses
 COPY ./scripts   /tau-lang/scripts
 COPY ./src       /tau-lang/src
 COPY ./tests     /tau-lang/tests
-COPY ./.gitignore ./.gitmodules ./CMakeLists.txt ./dev \
+COPY ./.gitignore ./.gitmodules ./CMakeLists.txt ./CMakePresets.json ./dev \
 	./README.md ./LICENSE.md ./VERSION      /tau-lang/
-COPY ./parser/*.generated.h                     /tau-lang/parser/
+COPY ./parser/*.generated.h ./parser/*.generated.cpp   /tau-lang/parser/
 
 
 # ============================================================
@@ -82,14 +90,19 @@ FROM base AS deps
 ARG BUILD_JOBS=5
 
 COPY ./dev 			/tau-lang/
+# ./dev needs devrc; copy only it so parser changes do not rebuild the deps
+COPY ./external/parser/scripts/devrc 	/tau-lang/external/parser/scripts/
+COPY ./scripts/with-gh-token	/tau-lang/scripts/
 COPY ./scripts/dep-cvc5.sh	/tau-lang/scripts/
-RUN echo "(BUILD) -- Building dependencies: cvc5" && \
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building dependencies: cvc5" && \
 	cd /tau-lang && \
-	./dev dep-cvc5.sh -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	scripts/with-gh-token ./dev dep-cvc5.sh -DTAU_BUILD_JOBS=${BUILD_JOBS}
 COPY ./scripts/dep-boost.sh	/tau-lang/scripts/
-RUN echo "(BUILD) -- Building dependencies: boost" && \
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building dependencies: boost" && \
 	cd /tau-lang && \
-	./dev dep-boost -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	scripts/with-gh-token ./dev dep-boost -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 
 # ------------------------------------------------------------
@@ -111,43 +124,32 @@ fi
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_TYPE=Debug/Release
-ARG BUILD_TYPE=Release
+# Argument BUILD_PRESET=release/debug picks the CMake preset family
+ARG BUILD_PRESET=release
 
-# Build tau executable
-RUN echo "(BUILD) -- Building ${BUILD_TYPE} version: $(head -n 1 VERSION)" && \
-	./dev build "${BUILD_TYPE}" -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_BUILD_EXECUTABLE=ON
-
-# Argument TESTS=no is used to skip running tests
+# Argument TESTS=no is used to skip building and running tests
 ARG TESTS=yes
 
-# Build tests and run them if TESTS="yes". Stop the build if they fail
-RUN echo " (BUILD) -- Running tests: $TESTS"
-RUN if [ "$TESTS" = "yes" ]; then \
-	./dev build "${BUILD_TYPE}" -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_BUILD_TESTS=ON && \
-	cd tests && \
-	ctest -j 8 --test-dir "../build-${BUILD_TYPE}" --output-on-failure \
-		|| exit 1; \
-fi
+# *-all enables the executable and the tests in one configure
+RUN echo "(BUILD) -- Building ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
+	echo " (BUILD) -- Running tests: $TESTS" && \
+	if [ "$TESTS" = "yes" ]; then \
+		./dev preset ${BUILD_PRESET}-all run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	else \
+		./dev preset ${BUILD_PRESET}-tau -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
 
-# Set TEST_CLANG_BUILD=no to skip compilation check with clang
-ARG TEST_CLANG_BUILD=yes
+# Set TEST_GCC_BUILD=no to skip the gcc compilation check
+ARG TEST_GCC_BUILD=yes
 
-# Check compilation with clang
-RUN if [ "$TESTS" = "yes" -a "$TEST_CLANG_BUILD" = "yes" ]; then \
-	mkdir -p build-${BUILD_TYPE}-clang && \
-	cd build-${BUILD_TYPE}-clang && \
-	cmake -DCMAKE_CXX_COMPILER=$(which clang++) \
-		-DCMAKE_C_COMPILER=$(which clang) .. && \
-	cmake --build . --config ${BUILD_TYPE} --target all -j ${BUILD_JOBS} && \
-	cd .. && \
-	rm -rf build-${BUILD_TYPE}-clang; \
+# Check also make and gcc compilation since ninja and clang is used by default
+RUN if [ "$TESTS" = "yes" -a "$TEST_GCC_BUILD" = "yes" ]; then \
+	./dev preset devel-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	rm -rf build/devel; \
 fi
 
 # Set the entrypoint to the tau executable
-WORKDIR /tau-lang/build-${BUILD_TYPE}
+WORKDIR /tau-lang/build/${BUILD_PRESET}
 ENTRYPOINT [ "./tau" ]
 CMD []
 
@@ -164,7 +166,8 @@ ARG TESTS=yes
 WORKDIR /tau-lang
 
 RUN echo "(BUILD) -- Building packages" && \
-	./dev packages -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	./dev preset release-packages-deb -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	./dev preset release-packages-rpm -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 
 # ============================================================
@@ -214,15 +217,20 @@ FROM base AS w64-deps
 ARG BUILD_JOBS=5
 
 COPY ./dev			/tau-lang/
+# ./dev needs devrc; copy only it so parser changes do not rebuild the deps
+COPY ./external/parser/scripts/devrc 	/tau-lang/external/parser/scripts/
+COPY ./scripts/with-gh-token	/tau-lang/scripts/
 COPY ./scripts/dep-cvc5.sh	/tau-lang/scripts/
-RUN echo "(BUILD) -- Building w64 dependencies: cvc5" && \
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building w64 dependencies: cvc5" && \
 	cd /tau-lang && \
-	./dev dep-cvc5 -DTAU_BUILD_JOBS=${BUILD_JOBS} --w64
+	scripts/with-gh-token ./dev dep-cvc5 -DTAU_BUILD_JOBS=${BUILD_JOBS} --w64
 
 COPY ./scripts/dep-boost.sh	/tau-lang/scripts/
-RUN echo "(BUILD) -- Building w64 dependencies: boost" && \
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building w64 dependencies: boost" && \
 	cd /tau-lang && \
-	./dev dep-boost -DTAU_BUILD_JOBS=${BUILD_JOBS} --w64
+	scripts/with-gh-token ./dev dep-boost -DTAU_BUILD_JOBS=${BUILD_JOBS} --w64
 
 
 # ------------------------------------------------------------
@@ -244,12 +252,12 @@ fi
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_TYPE=Debug/Release
-ARG BUILD_TYPE=Release
+# Argument BUILD_PRESET=release/debug picks the CMake preset family
+ARG BUILD_PRESET=release
 
 # Build tau executable
-RUN echo "(BUILD) -- Building w64 ${BUILD_TYPE} version: $(head -n 1 VERSION)" && \
-	./dev w64-build "${BUILD_TYPE}" -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+RUN echo "(BUILD) -- Building w64 ${BUILD_PRESET} version: $(head -n 1 VERSION)" && \
+	./dev preset ${BUILD_PRESET}-mingw -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_EXECUTABLE=ON
 
 # TODO add tests for Windows build
@@ -260,11 +268,8 @@ RUN echo "(BUILD) -- Building w64 ${BUILD_TYPE} version: $(head -n 1 VERSION)" &
 # # Build tests and run them if TESTS="yes". Stop the build if they fail
 # RUN echo " (BUILD) -- Running tests: $TESTS"
 # RUN if [ "$TESTS" = "yes" ]; then \
-# 	./dev w64-build "${BUILD_TYPE}" -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-# 		-DTAU_BUILD_TESTS=ON && \
-# 	cd tests && \
-# 	ctest -j 8 --test-dir "../build-${BUILD_TYPE}" --output-on-failure \
-# 		|| exit 1; \
+# 	./dev preset ${BUILD_PRESET}-mingw run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+# 		-DTAU_BUILD_TESTS=ON; \
 # fi
 
 
@@ -278,6 +283,7 @@ ARG BUILD_JOBS=5
 WORKDIR /tau-lang
 
 RUN echo "(BUILD) -- Building Windows packages" && \
-	./dev w64-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	./dev preset release-mingw-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	./dev preset release-mingw-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 

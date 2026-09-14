@@ -167,27 +167,17 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		// Order flipped again by the 2026-08-27 parser regen (left-assoc arithmetic + cast disambiguation).
-		CHECK( matches_to_str_to_any_of(res, {
-			"x = 0 && (z != 0 || k = 0 && y = 0) || y = 0 && x = 0 || z = 0 && k = 0",
-			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
-			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
-			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"x = 0 && (z != 0 || k = 0 && y = 0) "
+			"|| y = 0 && x = 0 || z = 0 && k = 0"
 		}) );
 	}
 	TEST_CASE("3") {
 		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z";
 		tref fm = get_bf_nso_rr("", sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( matches_to_str_to_any_of(res, {
-			"x&(z'|ky)|yx|zk",
-			"x&(z'|ky)|xy|zk",
-			"x&(z'|yk)|xy|zk",
-			"x&(z'|yk)|yx|zk",
+		CHECK( matches_bf_mod_and_or_any_of(res, {
+			"x&(z'|yk)|yx|zk"
 		}) );
 	}
 	TEST_CASE("4") {
@@ -200,9 +190,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "(ex x x = 0) && (ex x x != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
-		CHECK( matches_to_str_to_any_of(res, {
-			"(ex b1 b1 != 0) && (ex b1 b1 = 0)",
-			"(ex b1 b1 = 0) && (ex b1 b1 != 0)",
+		CHECK( matches_mod_and_or_any_of(res, {
+			"(ex b1 b1 != 0) && (ex b1 b1 = 0)"
 		}) );
 	}
 	// syntactic_path_simplification_simplify_wff (the internal helper used

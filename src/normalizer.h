@@ -19,6 +19,7 @@
 #define __IDNI__TAU__NORMALIZER_H__
 
 #include "nso_rr.h"
+#include "bv_widening.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -26,6 +27,34 @@
 // bindings, etc... instead of sp_tau_node,...
 
 namespace idni::tau_lang {
+
+/// Test-point elimination of quantified bitvector variables that occur only
+/// in comparisons against constants (see `bv_case_split_quantifiers` in
+/// normalizer.tmpl.h). On by default: it is an identity on the formula, and
+/// it is what keeps a conditional controller over a bitvector command
+/// independent of the Boole split budget (GitHub #107). Disabled via
+/// `api::set_bv_case_split(false)`, `--bv-case-split=false`, the REPL option
+/// `casesplit`, or the environment variable TAU_BV_CASE_SPLIT=0 (any other
+/// value enables; the variable overrides the flag in both directions).
+inline bool bv_case_split = true;
+
+inline bool bv_case_split_enabled() {
+	static const std::optional<bool> env = []() -> std::optional<bool> {
+		const char* v = std::getenv("TAU_BV_CASE_SPLIT");
+		if (!v || !*v) return std::nullopt;
+		return !(v[0] == '0' && v[1] == '\0');
+	}();
+	return env ? *env : bv_case_split;
+}
+
+/// Cap on the number of distinct constants a quantified bitvector variable
+/// may be tested against for the case split to apply; above it the binder is
+/// left to the pipeline. The split builds one instance per cell (2k+1 for k
+/// order-tested constants, k+1 with equalities only), so this bounds the
+/// instance count. SIZE_MAX = unlimited (0 through the api setter); set via
+/// api::set_bv_case_split_max_tests, --bv-case-split-max-tests, or the REPL
+/// option casesplitmaxtests.
+inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
 
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
@@ -111,9 +140,17 @@ tref fold_trivial_quantifiers(tref fm);
  * subtypes (see NOTE in implementation); residual trivial quantifiers are folded
  * later by `normalize_with_temp_simp`.
  *
+ * When the `bv_widening` mode is on (see bv_widening_options.h), the
+ * formula's bitvector atoms are first elaborated by `widen_bv_arithmetic`,
+ * so the cache is keyed on the already-widened formula.
+ *
  * @tparam node Tree node type.
- * @param fm Non-temporal formula to normalize.
- * @return Normalized formula.
+ * @param fm Non-temporal formula to normalize; a `nullptr` is passed
+ * through unchanged, so a failed upstream normalization can be chained.
+ * @return Normalized formula, or `nullptr` when the `bv_widening` width cap
+ * (`bv_max_width`) is exceeded by some atom -- the violation has already
+ * been logged by the widening pass; callers treat it as a failed
+ * normalization.
  *
  * @par Example
  * @code{.cpp}
@@ -192,7 +229,9 @@ bool has_no_boolean_combs_of_models(tref n);
  * `normalize_non_temp`, and returns `true` if the result is `T`.
  * @tparam node Tree node type.
  * @param n Non-temporal formula to test (must not contain `always`/`sometimes`).
- * @return `true` if satisfiable.
+ * @return `true` if satisfiable; `false` also when normalization fails on
+ * a `bv_widening` width-cap violation (a logged, conservative fallback,
+ * not a proof of unsatisfiability).
  *
  * @par Example
  * @code{.cpp}
@@ -253,7 +292,9 @@ tref get_unbindable_relative_offset(tref head, tref body);
  * @tparam node Tree node type.
  * @param n1 First formula.
  * @param n2 Second formula.
- * @return `true` if `n1` and `n2` are equivalent.
+ * @return `true` if `n1` and `n2` are equivalent; `false` also when
+ * normalization fails on a `bv_widening` width-cap violation (a logged,
+ * conservative fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -278,7 +319,9 @@ bool are_nso_equivalent(tref n1, tref n2);
  * @tparam node Tree node type.
  * @param n1 Antecedent formula.
  * @param n2 Consequent formula.
- * @return `true` if `n1 => n2` is valid.
+ * @return `true` if `n1 => n2` is valid; `false` also when normalization
+ * fails on a `bv_widening` width-cap violation (a logged, conservative
+ * fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -307,9 +350,14 @@ bool is_nso_impl(tref n1, tref n2);
  *      a fixed point).
  *   5. Temporal layer simplification: removes implied `always`/`sometimes` parts.
  *
+ * When the `bv_widening` mode is on (see bv_widening_options.h), the
+ * bitvector atoms are elaborated by `widen_bv_arithmetic` before step 1.
+ *
  * @tparam node Tree node type.
- * @param fm Formula to normalize.
- * @return Fully normalized formula.
+ * @param fm Formula to normalize; a `nullptr` is passed through unchanged.
+ * @return Fully normalized formula, or `nullptr` when the `bv_widening`
+ * width cap (`bv_max_width`) is exceeded by some atom -- already logged by
+ * the widening pass; callers treat it as a failed normalization.
  *
  * @par Example
  * @code{.cpp}

@@ -2,6 +2,7 @@
 
 #include "boolean_algebras/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "../parser/bitvector_parser.generated.h"
+#include "bv_widening_options.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_hooks"
@@ -11,7 +12,15 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
-bool is_bv_syntactic_zero(const cvc5::Term& fm);
+// Forward declaration: defined below (near the comparison hooks), but the
+// fit-gated folding in term_add/term_sub/term_mul/term_shl -- all defined
+// earlier in this file -- needs it. Their calls to compare_bv_consts are
+// non-dependent (bv is not a template parameter), so ordinary two-phase
+// lookup requires a declaration visible at this point. It answers nullopt
+// when either side is not a bitvector value; the widening guards below
+// then leave the node symbolic, since a fold they cannot prove
+// overflow-free would silently wrap.
+inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2);
 
 template<NodeType node>
 tref term_add(tref symbol) {
@@ -19,9 +28,16 @@ tref term_add(tref symbol) {
 
 	DBG(LOG_TRACE << "term_add/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto add_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto add_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_add(c1, c2);
 		res = normalize_bv(res); // Normalize result
+		// Unsigned add overflow iff the wrapped result is less than either
+		// operand (here c1). Under bv_widening, leave the node symbolic so
+		// the later elaboration pass can widen it instead of wrapping now.
+		if (bv_widening) {
+			auto cmp = compare_bv_consts(res, c1);
+			if (!cmp || *cmp < 0) return symbol;
+		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
@@ -93,7 +109,14 @@ tref term_sub(tref symbol) {
 
 	DBG(LOG_TRACE << "term_sub/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto sub_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto sub_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
+		// Unsigned sub underflow iff c1 < c2. Under bv_widening, leave the
+		// node symbolic so the later elaboration pass can widen it instead
+		// of wrapping now.
+		if (bv_widening) {
+			auto cmp = compare_bv_consts(c1, c2);
+			if (!cmp || *cmp < 0) return symbol;
+		}
 		bv res = make_bitvector_sub(c1, c2);
 		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
@@ -208,9 +231,23 @@ tref term_mul(tref symbol) {
 
 	DBG(LOG_TRACE << "term_mul/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto mul_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto mul_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_mul(c1, c2);
 		res = normalize_bv(res); // Normalize result
+		// Wrapped iff the product does not round-trip through division by
+		// c2 (c2 == 0 never overflows: the product is trivially 0). Under
+		// bv_widening, leave the node symbolic for the later elaboration
+		// pass instead of wrapping now.
+		if (bv_widening) {
+			const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+			auto nz = compare_bv_consts(c2, make_bitvector_bottom_elem(width));
+			if (!nz) return symbol;
+			if (*nz != 0) {
+				bv back = normalize_bv(make_bitvector_div(res, c2));
+				auto cmp = compare_bv_consts(back, c1);
+				if (!cmp || *cmp != 0) return symbol;
+			}
+		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
@@ -305,18 +342,6 @@ tref term_div(tref symbol) {
 		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// A divisor that is provably nonzero: the top element (all ones) or a
-	// bitvector constant with at least one bit set. Anything else -- a
-	// variable, a compound term, the bottom element -- may be zero.
-	auto is_nonzero_divisor = [](const tau& c) {
-		if (c.is(tau::bf_t)) return true;
-		if (!c.is_ba_constant()) return false;
-		const size_t t = c.get_ba_type();
-		if (t == 0 || !is_bv_type_family<node>(t)) return false;
-		auto value = std::get<bv>(c.get_ba_constant());
-		if (!value.isBitVectorValue()) return false;
-		return value.getBitVectorValue().find('1') != std::string::npos;
-	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
 	const tau& c2 = tau::get(symbol)[0][1][0];
@@ -346,15 +371,25 @@ tref term_div(tref symbol) {
 			break;
 		}
 		// 0 / X
-		case tau::bf_f:
+		case tau::bf_f: {
 			// 0 / 0 is top (cvc5: bvudiv(0,0) = all_ones)
 			if (c2.is(tau::bf_f)) return tau::_1(c1.get_ba_type());
-			// `0 / X -> 0` holds only for a divisor known to be nonzero:
-			// SMT-LIB defines bvudiv(0, 0) as all ones, so with a divisor
-			// that may be zero the quotient is not determined. Same class
-			// as the `X / X -> 1` rule removed below.
-			if (is_nonzero_divisor(c2)) return tau::_0(c2.get_ba_type());
+			// 0 / 1 is 0 (the divisor is all ones, never zero)
+			if (c2.is(tau::bf_t)) return tau::_0(c2.get_ba_type());
+			// 0 / { ... }: let cvc5 apply the division-by-zero rule
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return div_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 0 / X for a symbolic X is 0 only when X != 0 and all ones
+			// when X = 0 (bvudiv(0, 0) = all_ones), so it is not folded.
 			break;
+		}
 		default: break;
 	}
 	switch (c2.value.nt) {
@@ -377,21 +412,9 @@ tref term_div(tref symbol) {
 		}
 		default: break;
 	}
-	// {c} / {c} is 1 for a non-zero constant c (cvc5: bvudiv(0,0) = all_ones).
-	// `c1 == c2` alone is plain subtree equality and matches variables too,
-	// so this is gated on c1 actually being a known nonzero constant --
-	// folding `x / x` to 1 regardless of x would be wrong for x = 0. Equal
-	// but unknown-value operands fall through to div_consts below, where
-	// cvc5 computes bvudiv exactly, 0/0 included.
-	if (c1 == c2 && c1.is_ba_constant() && c1.get_ba_type() > 0) {
-		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		if (const bv cc = std::get<bv>(c1.get_ba_constant());
-			cc.isBitVectorValue() && !is_bv_syntactic_zero(cc))
-		{
-			const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c1.get_ba_type()));
-			return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c1.get_ba_type());
-		}
-	}
+	// X / X is not folded for a symbolic X: it is 1 only when X != 0 and
+	// all ones when X = 0 (bvudiv(0, 0) = all_ones). Two equal constants
+	// are folded below through cvc5, which applies the same rule.
 	// { ... } / { ... }
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
@@ -579,9 +602,17 @@ tref term_shl(tref symbol) {
 
 	DBG(LOG_TRACE << "term_shl/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	auto shl_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+	auto shl_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_shl(c1, c2);
 		res = normalize_bv(res); // Normalize result
+		// Wrapped iff the shift does not round-trip through the same shift
+		// right. Under bv_widening, leave the node symbolic for the later
+		// elaboration pass instead of wrapping now.
+		if (bv_widening) {
+			bv back = normalize_bv(make_bitvector_shr(res, c2));
+			auto cmp = compare_bv_consts(back, c1);
+			if (!cmp || *cmp != 0) return symbol;
+		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
@@ -671,17 +702,17 @@ tref term_shl(tref symbol) {
 
 // Three-way UNSIGNED comparison of two concrete bitvector values:
 // -1 if c1 < c2, 0 if equal, 1 if c1 > c2. Compares the width-padded
-// base-2 strings lexicographically, so both terms must satisfy
-// isBitVectorValue() and have the same width (the callers below only
-// pass constants of the same BA type).
-inline int compare_bv_consts(const bv& c1, const bv& c2) {
-	// A ba_constant can hold a constant EXPRESSION rather than a value:
-	// the generic BA fold combines two constants with the raw Term
-	// operators (cvc5.tmpl.h operator|/&/^/~ build unsimplified bvor/...),
-	// and nothing between that fold and this comparison normalizes.
-	// getBitVectorValue on such a term throws, so fold it here first.
+// base-2 strings lexicographically, so both terms must have the same
+// width (the callers below only pass constants of the same BA type).
+// A bv BA constant need not be a bitvector *value*: it may still be an
+// unfolded term over literals, which cvc5 only folds once routed
+// through normalize_bv. Returns nullopt when either side is not a value
+// even after that, so the caller skips the fold rather than letting
+// getBitVectorValue() throw.
+inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2) {
 	const bv v1 = c1.isBitVectorValue() ? c1 : normalize_bv(c1);
 	const bv v2 = c2.isBitVectorValue() ? c2 : normalize_bv(c2);
+	if (!v1.isBitVectorValue() || !v2.isBitVectorValue()) return {};
 	const std::string s1 = v1.getBitVectorValue(2);
 	const std::string s2 = v2.getBitVectorValue(2);
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
@@ -708,10 +739,11 @@ tref wff_bv_lt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) < 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp < 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -725,10 +757,11 @@ tref wff_bv_nlt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) >= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp >= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -742,10 +775,11 @@ tref wff_bv_lteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) <= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp <= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -759,10 +793,11 @@ tref wff_bv_nlteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) > 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp > 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -776,10 +811,11 @@ tref wff_bv_gt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) > 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp > 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -793,10 +829,11 @@ tref wff_bv_ngt(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) <= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp <= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -810,10 +847,11 @@ tref wff_bv_gteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) >= 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp >= 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -827,10 +865,11 @@ tref wff_bv_ngteq(const tref* ch, tref r) {
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
-		bool result = compare_bv_consts(
+		auto cmp = compare_bv_consts(
 			std::get<bv>(c1.get_ba_constant()),
-			std::get<bv>(c2.get_ba_constant())) < 0;
-		return tau::get(result ? tau::_T() : tau::_F(), r);
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp < 0 ? tau::_T() : tau::_F(), r);
 	}
 	return nullptr;
 }
@@ -942,6 +981,82 @@ tref bv_term_cast(tref symbol, size_t target_type_id) {
 	return new_symbol;
 }
 
+// min(a, b), unsigned. Every fold returns one of the two operands: 0 (the
+// bottom element) is absorbing and 1 (the all-ones top element) neutral,
+// and of two constants the smaller is kept, so no new constant is built.
+template<NodeType node>
+tref term_min(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_min/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	auto first = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].first());
+	};
+	auto second = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].second());
+	};
+	// min(0, X) and min(X, 0) are 0
+	if (c1.is(tau::bf_f)) return first();
+	if (c2.is(tau::bf_f)) return second();
+	// min(1, X) is X and min(X, 1) is X
+	if (c1.is(tau::bf_t)) return second();
+	if (c2.is(tau::bf_t)) return first();
+	// min(X, X) is X
+	if (c1 == c2) return first();
+	// min({ ... }, { ... })
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return symbol;
+		return *cmp <= 0 ? first() : second();
+	}
+	return symbol;
+}
+
+// max(a, b), unsigned: the dual of term_min above (1 absorbing, 0 neutral).
+template<NodeType node>
+tref term_max(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_max/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	auto first = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].first());
+	};
+	auto second = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].second());
+	};
+	// max(1, X) and max(X, 1) are 1
+	if (c1.is(tau::bf_t)) return first();
+	if (c2.is(tau::bf_t)) return second();
+	// max(0, X) is X and max(X, 0) is X
+	if (c1.is(tau::bf_f)) return second();
+	if (c2.is(tau::bf_f)) return first();
+	// max(X, X) is X
+	if (c1 == c2) return first();
+	// max({ ... }, { ... })
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return symbol;
+		return *cmp >= 0 ? first() : second();
+	}
+	return symbol;
+}
+
 template <NodeType node_t>
 tref simplify_bv_symbol(tref symbol) {
 	using tau = tree<node_t>;
@@ -957,6 +1072,8 @@ tref simplify_bv_symbol(tref symbol) {
 		case tau::bf_nor: return term_nor<node_t>(symbol);
 		case tau::bf_xnor: return term_xnor<node_t>(symbol);
 		case tau::bf_nand: return term_nand<node_t>(symbol);
+		case tau::bf_min: return term_min<node_t>(symbol);
+		case tau::bf_max: return term_max<node_t>(symbol);
 		default: return symbol;
 	}
 }

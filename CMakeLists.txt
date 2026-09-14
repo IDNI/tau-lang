@@ -420,9 +420,6 @@ message("Building parser")
 set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
 set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
 set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
-if (CMAKE_BUILD_TYPE STREQUAL "Devel")
-	set(TAU_PARSER_COMPILE_OPTIONS "-O0;-DNDEBUG;-g0")
-endif()
 add_subdirectory(external/parser)
 
 # grammars are compiled ahead of time, so tau never parses .tgf at runtime
@@ -450,11 +447,18 @@ add_subdirectory("src")
 #
 # Testing
 #
+# include(CTest) also defines BUILD_TESTING, which the binding's own
+# ctest entries gate on, so it must run for that family too even when
+# no C++ test family is on.
+if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS OR TAU_BUILD_BINDING_PYTHON)
+	include(CTest)
+endif ()
+
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS
  OR TAU_BUILD_BENCHMARK)
 	message(STATUS "Building tests")
-	include(CTest)
 	add_subdirectory(tests)
 endif ()
 
@@ -573,6 +577,13 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
 elseif (TAU_BUILD_EXECUTABLE AND TAU_MACOS_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+	# DragNDrop (.dmg) shells out to hdiutil, so it is only usable when the
+	# build actually runs on macOS. The ZIP stays in the list either way.
+	if (APPLE)
+		list(APPEND CPACK_GENERATOR "DragNDrop")
+		set(CPACK_DMG_VOLUME_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+		set(CPACK_DMG_FORMAT "UDZO")
+	endif()
 elseif (TAU_BUILD_EXECUTABLE AND TAU_RPM_PACKAGE)
 	set(CPACK_GENERATOR "RPM")
 	set(CPACK_RPM_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.rpm")

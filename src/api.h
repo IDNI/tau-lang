@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 /**
  * @file api.h
@@ -27,6 +27,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
+#include "bv_widening_options.h"
 #include "heuristics/bv_simplify_options.h"
 #include "interpreter.h"
 #include "utility/measure.h"
@@ -142,6 +143,14 @@ struct api {
 	static void set_charvar(bool state);
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
+	/** @brief Enable/disable exact (widened) bitvector arithmetic. */
+	static void set_bv_widening(bool state);
+	/**
+	 * @brief Cap the computed width exact bitvector arithmetic may widen to.
+	 *
+	 * 0 leaves the default (1024) unchanged.
+	 */
+	static void set_bv_max_width(size_t width);
 	/**
 	 * @brief Select where predicate blasting may run (see `blast_site`).
 	 *
@@ -186,6 +195,12 @@ struct api {
 	 * path and leaves the quantifier in place. 0 = unlimited (the default).
 	 */
 	static void set_block_max_splits(size_t n);
+	/**
+	 * @brief Enable/disable the quantifier-free decision of closed bitvector
+	 * formulas whose binders are all of one kind (bv_ba.h,
+	 * `bv_quantifier_free_decision`). Off by default.
+	 */
+	static void set_bv_quantifier_free_decision(bool state);
 	/**
 	 * @brief Set the anti-prenex driver's maximum round count.
 	 *
@@ -242,6 +257,13 @@ struct api {
 	 * is a bound on the search, not a proof that no fixed point exists.
 	 */
 	static void set_max_enum_steps(size_t n);
+	/**
+	 * @brief Cap the untyped saturation probe `calculate_fixed_point` runs
+	 * over a residual recurrence reference; 0 = unlimited. Defaults to
+	 * 10000, since a diverging probe never stabilizes; a finite
+	 * `max_enum_steps` tightens it further.
+	 */
+	static void set_max_probe_steps(size_t n);
 	/**
 	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
 	 * (default). Oscillation is detected regardless; this bounds only
@@ -301,9 +323,19 @@ struct api {
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable/disable support-component factoring of the Tau-BA
-	/// constant/valid tests (tau_ba.tmpl.h). Off by default.
+	/// constant/valid tests (tau_ba.tmpl.h). On by default.
 	static void set_ba_component_factoring(bool state);
-	/// Enable or disable ANSI color highlighting in pretty-printed output.
+	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
+	/// interpreter's sweep (0 = no pinning; tau_ba.h).
+	static void set_ba_decision_pins(size_t n);
+	/// Enable/disable the test-point elimination of quantified bitvector
+	/// variables compared only against constants (normalizer.tmpl.h). Off by
+	/// default.
+	static void set_bv_case_split(bool state);
+	/// Cap the constants a quantified bitvector variable may be tested
+	/// against for the case split to apply (0 = unlimited).
+	static void set_bv_case_split_max_tests(size_t n);
+	/** @brief Enable/disable ANSI colour highlighting in output. */
 	static void set_highlighting(bool state);
 	/// Enable or disable JSON output format for printing.
 	static void set_json(bool state);
@@ -486,14 +518,19 @@ struct api {
 	/// @copydoc substitute(const std::string&,const std::string&,const std::string&)
 	static htref substitute(htref expression, htref that, htref with);
 
-	/// Apply multiple substitutions sequentially (left to right).
-	/// Each key in @p that_with is replaced by its corresponding value.
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static optional_string substitute(
 		const std::string& expression,
 		const std::map<std::string, std::string>& that_with);
-	/// @copydoc substitute(const std::string&,const std::map<std::string,std::string>&)
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static tref substitute(tref expression, std::map<tref, tref> that_with);
-	/// @copydoc substitute(const std::string&,const std::map<std::string,std::string>&)
+	/** @brief Apply all substitutions in @p that_with to @p expression
+	 * simultaneously: every match is found against the original
+	 * expression and no pair's replacement is re-matched by another. */
 	static htref substitute(
 		htref expression,
 		std::map<htref, htref> that_with);
@@ -733,6 +770,27 @@ struct api {
 	static std::optional<std::map<stream_at, std::string>> step(
 		interpreter<node>& i);
 
+	/**
+	 * @brief Return @p i's current specification, serialized.
+	 *
+	 * Follows every update the interpreter has applied, so a caller that
+	 * has to rebuild an interpreter can read this instead of scraping the
+	 * "Updated specification" log line. Not the `u` output stream, which
+	 * carries the incoming revision rather than the merged result.
+	 */
+	static std::string current_spec(const interpreter<node>& i);
+
+	/**
+	 * @brief Return @p i's spec revision counter.
+	 *
+	 * Bumped once per applied update, never on a rejected one, so a caller
+	 * can tell that `current_spec` changed without diffing the string.
+	 */
+	static size_t spec_revision(const interpreter<node>& i);
+
+	// -----------------------------------------------------------------------
+	// Simplification and inference
+	// -----------------------------------------------------------------------
 	/// Run BA type inference on an expression.  Infers types, canonizes
 	/// quantifier IDs, unnests G-in-G, and checks for semantic errors.
 	/// @param use_defaults  When true, apply default type rules.

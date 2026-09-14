@@ -81,11 +81,33 @@ TEST_SUITE("Execution: revision stream continuity") {
 	}
 }
 
+// Sets bv_widening for the lifetime of the enclosing scope and restores
+// whatever value it had before, even on a REQUIRE/CHECK-failure stack
+// unwind. Local copy of the RAII guard in tests/unit/test_bv_widening.cpp
+// and tests/unit/test_bv_ba_hooks.cpp (bv_widening is declared in
+// bv_widening_options.h, already visible here transitively through
+// test_tau_helpers.h, the same way test_bv_ba_hooks.cpp gets it without a
+// direct include).
+struct bv_widening_scope {
+	bool prev;
+	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
+	~bv_widening_scope() { bv_widening = prev; }
+};
+
+// Same RAII shape for bv_max_width (the widening cap).
+struct bv_max_width_scope {
+	size_t prev;
+	explicit bv_max_width_scope(size_t w) : prev(bv_max_width) {
+		bv_max_width = w;
+	}
+	~bv_max_width_scope() { bv_max_width = prev; }
+};
+
 TEST_SUITE("Execution") {
 
 	// Pins on printed formulas must be order-insensitive
-	// (values_matches_any_of / an explicit list of accepted conjunct
-	// orderings), never a single exact string, whenever the printed
+	// (values_match_mod_and_or compares trees modulo AND/OR order),
+	// never a single exact string, whenever the printed
 	// formula conjoins two or more commutative parts. Parser
 	// regeneration (`./dev regen`) renumbers grammar nonterminals
 	// globally, which can change subtree interning order and flip which
@@ -120,36 +142,28 @@ TEST_SUITE("Execution") {
 		strings i2_values = {
 			"<:x> = 0", "<:y> = 0", "<:z> = 0"
 		};
-		// values_matches_any_of's #ifdef DEBUG branch (test_helpers.h)
-		// only compares against expected[0] -- a "canonicity" check that
-		// is active for every Debug build (-DDEBUG, cmake/tau-common.cmake)
-		// -- so the current parser's actual printed ordering must be
-		// listed FIRST in each position below; the remaining entries are
-		// kept as fallback orderings for values_matches_any_of's full
-		// any-of behavior in non-Debug builds. See the 8f1a74c1
-		// order-insensitivity note at the top of this suite.
+		// Order within a candidate no longer matters; the remaining
+		// entries are the structurally different results.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
 				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
+				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
-				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
 		std::vector<strings> o1_expected = {
 			{ "T" }, { "<:x> = 0" },
 			{
-				"<:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:x> = 0",
+				"<:x> = 0 && <:y> = 0",
 			},
 			{
-				"<:x> = 0 && <:z> = 0 && <:y> = 0",
 				"<:y> = 0 && <:z> = 0 && <:x> = 0",
+				"<:z> = 0 && <:x> = 0 && <:y> = 0",
+				"<:x> = 0 && <:z> = 0 && <:y> = 0",
 				"<:x> = 0 && <:y> = 0 && <:z> = 0",
 				"<:y> = 0 && <:x> = 0 && <:z> = 0",
-				"<:z> = 0 && <:x> = 0 && <:y> = 0",
-				// 2026-08-28 ADT + left-assoc grammar regen
-				"<:z> = 0 && <:y> = 0 && <:x> = 0",
 			}
 		};
 		io_context<node_t> ctx;
@@ -164,9 +178,9 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		CHECK( values_matches_any_of(o1_values, o1_expected) );
+		CHECK( values_match_mod_and_or(o1_values, o1_expected) );
 		auto u_values = u->get_values();
-		CHECK( values_matches_any_of(u_values, u_expected) );
+		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
@@ -184,11 +198,11 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> o3_expected = {
 			{
-				"<:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:x> = 0",
+				"<:x> = 0 && <:y> = 0",
 			}, {
-				"<:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:x> = 0",
+				"<:x> = 0 && <:y> = 0",
 			}
 		};
 		io_context<node_t> ctx;
@@ -202,10 +216,9 @@ TEST_SUITE("Execution") {
 		CHECK( maybe_i.has_value() );
 		DBG(TAU_LOG_TRACE << "o3 get values";)
 		auto o3_values = o3->get_values();
-		CHECK( values_matches_any_of(o3_values, o3_expected) );
+		CHECK( values_match_mod_and_or(o3_values, o3_expected) );
 		auto u_values = u->get_values();
-		for (size_t _dbg_i = 0; _dbg_i < u_values.size(); _dbg_i++) std::cerr << "INTERP_U[" << _dbg_i << "]: " << u_values[_dbg_i] << "\n";
-		CHECK( values_matches_any_of(u_values, u_expected) );
+		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
@@ -303,8 +316,8 @@ TEST_SUITE("Execution") {
 	//
 	// u's printed conjunct order ("o2 && o3" vs "o3 && o2") depends on
 	// parser subtree interning order -- see the order-insensitivity note
-	// at the top of this suite (8f1a74c1 bisection) -- so both orders are
-	// accepted here via values_matches_any_of instead of an exact match.
+	// at the top of this suite (8f1a74c1 bisection) -- so order is
+	// absorbed by values_match_mod_and_or instead of pinned.
 	TEST_CASE("u[t] = i1[t]: merge_parts") {
 		bdd_init<Bool>();
 		auto spec = create_spec(
@@ -312,15 +325,10 @@ TEST_SUITE("Execution") {
 		strings i1_values = {
 			"F", "o2[t] = 0 && o3[t] = 0", "F", "F"
 		};
-		// The Debug-only "canonicity" branch of values_matches_any_of
-		// (test_helpers.h, #ifdef DEBUG) only compares against
-		// expected[0], so the actual ordering must be listed first; see
-		// the dec_seq case above and the 8f1a74c1 note at the top of
-		// this suite.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o2[t]:tau = 0 && o3[t]:tau = 0",
 				"always o3[t]:tau = 0 && o2[t]:tau = 0",
+				"always o2[t]:tau = 0 && o3[t]:tau = 0",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -339,7 +347,7 @@ TEST_SUITE("Execution") {
 		CHECK( o2->get_values() == o2_expected );
 		CHECK( o3->get_values() == o3_expected );
 		auto u_values = u->get_values();
-		CHECK( values_matches_any_of(u_values, u_expected) );
+		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
 	// An update already implied by the running spec must leave the spec
@@ -448,35 +456,36 @@ TEST_SUITE("Execution") {
 		strings u_expected = {
 			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
-		// Actual orderings must be listed first per position -- the
-		// Debug-only "canonicity" branch of values_matches_any_of
-		// (test_helpers.h, #ifdef DEBUG) only compares against
-		// expected[0]; see the dec_seq case above and the 8f1a74c1
-		// note at the top of this suite.
 		std::vector<strings> o1_expected = {
 		{
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 		}, {
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 		}, {
+			// Re-pinned 2026-09-07 after the ba_constant regen.
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
 			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
@@ -510,8 +519,7 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		for (size_t _dbg_i = 0; _dbg_i < o1_values.size(); _dbg_i++) std::cerr << "THIS_O1[" << _dbg_i << "]: " << o1_values[_dbg_i] << "\n";
-		CHECK( values_matches_any_of(o1_values, o1_expected) );
+		CHECK( values_match_mod_and_or(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
 	}
@@ -551,7 +559,11 @@ TEST_SUITE("Execution") {
 		REQUIRE( u_values.size() == 5 );
 		CHECK( u_values[1] == "always o2[t]:tau = 0" );
 		CHECK( u_values[2] == "always o3[t]:tau = 0" );
-		CHECK( u_values[3] == "always o2[t]:tau = o3[t]:tau" );
+		// the equation's operand order is a hash/nt-id-order-dependent
+		// tie-break that drifts with parser regens; both are the same
+		// update
+		CHECK(( u_values[3] == "always o2[t]:tau = o3[t]:tau"
+			|| u_values[3] == "always o3[t]:tau = o2[t]:tau" ));
 		// the o2 and o3 parts (2 alternatives each) merged into one part
 		// holding the 2x2 cross product of their alternatives
 		const auto& parts = maybe_i.value().original_spec;
@@ -1114,6 +1126,33 @@ TEST_SUITE("only outputs") {
 }
 
 
+namespace {
+// Runs `sample` for `steps` steps, feeding the input stream i1 (of BA type
+// `i1_type`) from `i1_values`, and returns the values written to the
+// sbf-typed output o1 -- or nullopt when the interpreter rejects the spec as
+// unsat. `o2` optionally collects a second sbf-typed output and `i2_values`
+// optionally feeds a second, sbf-typed input stream i2.
+std::optional<strings> run_latch(const char* sample, const strings& i1_values,
+	size_t i1_type, size_t steps,
+	std::shared_ptr<vector_output_stream> o2 = nullptr,
+	const strings* i2_values = nullptr)
+{
+	bdd_init<Bool>(); // every case of this file initialises the BDD library itself
+	io_context<node_t> ctx;
+	ctx.add_input("i1", i1_type,
+		std::make_shared<vector_input_stream>(i1_values));
+	if (i2_values) ctx.add_input("i2", sbf_type_id<node_t>(),
+		std::make_shared<vector_input_stream>(*i2_values));
+	auto o1 = std::make_shared<vector_output_stream>();
+	ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+	if (o2) ctx.add_output("o2", sbf_type_id<node_t>(), o2);
+	tref spec = create_spec(ctx, sample);
+	auto maybe_i = run<node_t>(spec, ctx, steps);
+	if (!maybe_i.has_value()) return std::nullopt;
+	return o1->get_values();
+}
+} // namespace
+
 TEST_SUITE("with inputs and outputs") {
 
 	TEST_CASE("i1[t] = o1[t]") {
@@ -1153,41 +1192,321 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
-	// Regression test: nested conditionals over a mix of `:tau` and `:bv[N]`
-	// streams reported "Internal error: Tau specification is unexpectedly
-	// unsat" at step 0 instead of producing a solution.
-	//
-	// Nested conditionals compile to a conjunction of disjunctions in which
-	// the bitvector and Tau atoms sit in the same clauses, so no lift can
-	// separate them. eliminate_bv_and_quantifiers used to skip all bv-typed
-	// content in its second anti-prenex pass on the grounds that the solver
-	// had already decided whatever was closeable -- which does not hold for a
-	// scope the bv translator cannot read at all (it holds a `:tau`
-	// constant). The `all i2[1]:bv[8] (...)` block was then left standing with
-	// nothing able to resolve it, the step system became unsolvable, and the
-	// run declared the spec unsat.
-	//
-	// REVIEW (HIGH): bisect-proven 2026-08-18 that 8f1a74c1's parser
-	// regeneration (nonterminal renumbering -> term-order change ->
-	// different pivot-atom order in anti_prenex_block's Boole
-	// decomposition, per gdb stack sampling: the spin is the Shannon
-	// split recursion, not cvc5) regressed this case from <600s (old
-	// parser) to >1500s hang (4/4 attempts, up to 3h+); previously
-	// 12-271s nondeterministic (GitHub #70 family).
-	//
-	// SKIPPED 2026-08-19 after bounding attempts failed: runtime caps
-	// block_boole_max_splits/block_max_rounds at 100000/-, 2000/20 and
-	// 500/200 all leave the run above 7 minutes (the capped give-up
-	// re-wraps the block and the pipeline re-enters on the grown
-	// formula). The durable fix is #70's decomposition-order work —
-	// pivot selection must not be sensitive to grammar renumbering.
-	// 2026-08-19: pivot tie-breaking is now regeneration-stable
-	// (printed-form ties, normal_forms.tmpl.h) — cost no longer
-	// re-rolls on regen — but the stable order is still slow for THIS
-	// case (>600s measured), so the skip stands. Un-skip when this
-	// case completes within the ctest timeout again.
-	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat"
-		* doctest::skip())
+	// Regression tests for GitHub #100: a guarded update with an initial
+	// condition was reported unsat. create_spec_partition splits the single
+	// always body into one always per clause and unsqueeze_always re-folded
+	// them through always_conjunction, which shifted the clause with the
+	// smaller lookback (the set branch, lookback 0) one step into the past.
+	// Instantiated at the start point, that clause constrained the input at
+	// time 0 -- an input the run never reads -- and for-all-inputs collapsed
+	// to F (or, with an init the shifted clause happened to satisfy, the
+	// solver assigned the unread input and step 1 failed). unsqueeze_always
+	// now folds the bodies verbatim. Every "(#100)" case below was wrong on
+	// main before the fix; the "stays unsat" cases guard against
+	// over-correcting. Each case checks the exact output sequence, so a
+	// spurious verdict at any step is caught, not only the initial unsat.
+	TEST_CASE("guarded latch with init 0 is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1" } );
+	}
+
+	// With init 1 the same spec used to pass the fixpoint but fail at step 1
+	// with "Failed to find output stream for stream 'i1'".
+	TEST_CASE("guarded latch with init 1 is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "1", "1", "1", "1" } );
+	}
+
+	// The equation form of the same latch never had the problem (a single
+	// clause has nothing to re-align); it is the control for the two above.
+	TEST_CASE("equation form of the guarded latch runs (#100 control)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0)"
+			" && (o1[t]:sbf = o1[t-1]:sbf | i1[t]:sbf).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1" } );
+	}
+
+	// Nested conditionals: a set/hold/clear update selected by the input.
+	TEST_CASE("three-way guarded update with init is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:sbf = 0)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf) : (o1[t]:sbf = 0))).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1" } );
+	}
+
+	// Three levels of nesting, the innermost guard on the previous state.
+	TEST_CASE("three-level guarded update with init is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:sbf = 0)"
+			" ? ((o1[t-1]:sbf = 1) ? (o1[t]:sbf = 0)"
+			" : (o1[t]:sbf = o1[t-1]:sbf)) : (o1[t]:sbf = 0))).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "0", "1" } );
+	}
+
+	// A nested update on o1 next to a second output that reads the previous
+	// state (a result register). The fixpoint-side filter proposed in PR 103
+	// did not cover this shape; the verbatim fold does.
+	TEST_CASE("guarded update coupled with a previous-state register (#100)") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[0]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? (o1[t]:sbf = o1[t-1]:sbf | 1)"
+			" : ((i1[t]:sbf = 0) ? (o1[t]:sbf = o1[t-1]:sbf)"
+			" : (o1[t]:sbf = o2[t-1]:sbf))) && (o2[t]:sbf = o1[t-1]:sbf).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "1" } );
+		CHECK ( o2->get_values() == strings{ "1", "0", "0", "1", "1" } );
+	}
+
+	// A set branch that also asserts the previous state. With init 1 every
+	// input has a run (o1 is 1 at all times); with init 0 an input of 1 at
+	// t = 1 demands o1[0] = 1, so the spec is genuinely unsat.
+	TEST_CASE("set branch asserting the previous state, init 1 runs (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t-1]:sbf = 1 && o1[t]:sbf = 1) : (o1[t]:sbf = 1)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "1", "1", "1", "1", "1" } );
+	}
+	TEST_CASE("set branch asserting the previous state, init 0 stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t-1]:sbf = 1 && o1[t]:sbf = 1) : (o1[t]:sbf = 1)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Lookback 2 with two initial conditions: the guarded update reads two
+	// steps back, so the fixpoint still takes a step after the fix.
+	TEST_CASE("guarded latch with lookback 2 and two inits (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? (o1[t]:sbf = o1[t-2]:sbf | 1)"
+			" : (o1[t]:sbf = o1[t-2]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "0", "1", "0" } );
+	}
+
+	// A toggle in the else branch.
+	TEST_CASE("guarded set with toggle-else and init is satisfiable (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : (o1[t]:sbf = o1[t-1]:sbf')).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "1", "0", "1" } );
+	}
+
+	// A bitvector command selecting the update of an sbf-typed state.
+	TEST_CASE("bitvector command three-way update with init (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:bv[2] = { 1 }:bv[2])"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:bv[2] = { 2 }:bv[2])"
+			" ? (o1[t]:sbf = o1[t-1]:sbf) : (o1[t]:sbf = 0))).",
+			{ "0", "1", "2", "3" }, bv_type_id<node_t>(2), 5);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0" } );
+	}
+
+	// Guards against over-correcting: an EXPLICITLY written shifted clause
+	// next to its original deliberately governs one step below the start;
+	// with the init contradicting it at time 0 the spec is unsat and must
+	// stay so (only the interpreter's own re-alignment was wrong).
+	TEST_CASE("deliberate shifted twin with init stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[t]:sbf = i1[t]:sbf)"
+			" && (o1[t-1]:sbf = i1[t-1]:sbf).",
+			{ "1", "0" }, sbf_type_id<node_t>(), 3);
+		CHECK ( !o1.has_value() );
+	}
+
+	// An init at time 1 on the guarded latch: an input of 1 at t = 1 forces
+	// o1[1] = 1, contradicting the init, so for-all-inputs is unsat.
+	TEST_CASE("guarded latch with init at time 1 stays unsat") {
+		auto o1 = run_latch("(o1[1]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Two inits that contradict a pure hold stay unsat.
+	TEST_CASE("inits contradicting a guarded hold stay unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? (o1[t]:sbf = o1[t-1]:sbf)"
+			" : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0" }, sbf_type_id<node_t>(), 4);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Deeper shapes for the same defect: more levels of `?:` and initial
+	// conditions at positions other than 0. The "(#100)" cases were wrong
+	// on main before the fix (unsat, or the solver assigning the unread
+	// input); the others pin behaviour that was already right.
+
+	// Depth 3 on two inputs.
+	TEST_CASE("depth-3 conditional on two inputs with init") {
+		strings i2_values = { "1", "1", "0", "0" };
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? ((i2[t]:sbf = 1) ? (o1[t]:sbf = 1) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" : ((i2[t]:sbf = 1) ? ((o1[t-1]:sbf = 1) ? (o1[t]:sbf = 0)"
+			" : (o1[t]:sbf = 1)) : (o1[t]:sbf = o1[t-1]:sbf))).",
+			{ "0", "1", "1", "0" }, sbf_type_id<node_t>(), 5, nullptr, &i2_values);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "1", "1", "1" } );
+	}
+
+	// Depth 5: a five-way chain on a bv[3] command (set, hold, clear,
+	// toggle, otherwise hold).
+	TEST_CASE("depth-5 command chain with init (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:bv[3] = { 0 }:bv[3])"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:bv[3] = { 1 }:bv[3])"
+			" ? (o1[t]:sbf = o1[t-1]:sbf) : ((i1[t]:bv[3] = { 2 }:bv[3])"
+			" ? (o1[t]:sbf = 0) : ((i1[t]:bv[3] = { 3 }:bv[3])"
+			" ? (o1[t]:sbf = o1[t-1]:sbf') : (o1[t]:sbf = o1[t-1]:sbf))))).",
+			{ "1", "0", "3", "2", "4", "3" }, bv_type_id<node_t>(3), 7);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "0", "0", "0", "1" } );
+	}
+
+	// Depth 3 on the state history with lookback 3 and inits at 0, 1, 2.
+	// Twelve steps: GitHub #115 -- the step after the initial segment used
+	// to enumerate the DNF paths of the raw continuation (with its absolute
+	// run prefix) before substituting memory, and took tens of seconds at
+	// step 5 and minutes at step 6. The inputs are consumed from step 3 on
+	// (steps 0-2 are fixed by the inits), alternating 0, 1: input 0 holds;
+	// input 1 clears when the two previous values are 1, sets when only the
+	// previous one is, and copies o1[t-3] when the previous is 0. Hence
+	// 3: hold 1; 4: 1,1 -> 0; 5: hold 0; 6: prev 0 -> o1[3] = 1; 7: hold 1;
+	// 8: 1,1 -> 0; 9: hold 0; 10: prev 0 -> o1[7] = 1; 11: hold 1.
+	TEST_CASE("depth-3 guard on the history, lookback 3, three inits (#100, #115)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 0) && (o1[2]:sbf = 1)"
+			" && ((i1[t]:sbf = 1) ? ((o1[t-1]:sbf = 1) ? ((o1[t-2]:sbf = 1)"
+			" ? (o1[t]:sbf = 0) : (o1[t]:sbf = 1)) : (o1[t]:sbf = o1[t-3]:sbf))"
+			" : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1", "0", "1", "0", "1", "0", "1", "0", "1" },
+			sbf_type_id<node_t>(), 12);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0", "0",
+			"1", "1", "0", "0", "1", "1" } );
+	}
+
+	// An init at position 2 only. i1[1] = 1 makes o1[1] = o1[0] | 1 = 1
+	// whatever o1[0] is, and t >= 2 follows from it, so 1..4 are forced.
+	// o1[0] is free: i1[0] = 0 takes the else branch, leaving it o1[-1].
+	TEST_CASE("guarded latch with an init at position 2 only (#100)") {
+		auto o1 = run_latch("(o1[2]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		REQUIRE ( o1.has_value() );
+		REQUIRE ( o1.value().size() == 5 );
+		CHECK ( strings(o1.value().begin() + 1, o1.value().end())
+			== strings{ "1", "1", "1", "1" } );
+	}
+
+	// Inits at 0 and 2 with a gap: inputs (0, 0) at t = 1, 2 would force
+	// o1[2] = o1[0] = 0 against the init, so for-all-inputs is unsat.
+	TEST_CASE("guarded latch with inits at 0 and 2 stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[2]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		CHECK ( !o1.has_value() );
+	}
+
+	// A constant position on an INPUT stream is an assumption on the
+	// input and stays unsat (same convention as "i1[t] = o1[t] && o1[0] = 0"
+	// above).
+	TEST_CASE("guarded latch with a constant on the input stays unsat") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (i1[1]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf)).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5);
+		CHECK ( !o1.has_value() );
+	}
+
+	// Two outputs initialised at different positions: o2[1] = o1[0] is
+	// forced by the register clause, so o2[1] = 1 contradicts o1[0] = 0
+	// and o2[1] = 0 agrees with it.
+	TEST_CASE("register init at position 1 contradicting o1[0] stays unsat") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[1]:sbf = 1) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" && (o2[t]:sbf = o1[t-1]:sbf).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		CHECK ( !o1.has_value() );
+	}
+	TEST_CASE("register init at position 1 agreeing with o1[0] runs (#100)") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[1]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = o1[t-1]:sbf | 1) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" && (o2[t]:sbf = o1[t-1]:sbf).",
+			{ "0", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "1" } );
+		// o2[0] lies before the register clause's first governed point and
+		// is the solver's choice; from position 1 on it mirrors o1[t-1].
+		strings o2_values = o2->get_values();
+		REQUIRE ( o2_values.size() == 5 );
+		CHECK ( strings(o2_values.begin() + 1, o2_values.end())
+			== strings{ "0", "0", "1", "1" } );
+	}
+
+	// Depth 4 on a bv[2] command plus a lookback-2 register, inits on both
+	// outputs at positions 0 and 1.
+	TEST_CASE("depth-4 command with a lookback-2 register and four inits (#100)") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1) && (o2[0]:sbf = 0)"
+			" && (o2[1]:sbf = 0) && ((i1[t]:bv[2] = { 1 }:bv[2]) ? (o1[t]:sbf = 1)"
+			" : ((i1[t]:bv[2] = { 0 }:bv[2]) ? (o1[t]:sbf = o1[t-1]:sbf)"
+			" : ((i1[t]:bv[2] = { 2 }:bv[2]) ? (o1[t]:sbf = o1[t-2]:sbf)"
+			" : (o1[t]:sbf = 0)))) && (o2[t]:sbf = o1[t-2]:sbf).",
+			{ "2", "1", "0", "3" }, bv_type_id<node_t>(2), 6, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "1", "0", "1", "1", "0" } );
+		CHECK ( o2->get_values() == strings{ "0", "0", "0", "1", "0", "1" } );
+	}
+
+	// A conditional nested in the else branch whose innermost guard reads
+	// two steps back; the third branch is reached by a non-constant sbf
+	// input.
+	TEST_CASE("nested else branch with a lookback-2 guard, two inits (#100)") {
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? (o1[t]:sbf = 1) : ((i1[t]:sbf = 0) ? ((o1[t-2]:sbf = 1)"
+			" ? (o1[t]:sbf = 0) : (o1[t]:sbf = o1[t-1]:sbf))"
+			" : (o1[t]:sbf = o1[t-2]:sbf))).",
+			{ "0", "1", "x", "1", "0" }, sbf_type_id<node_t>(), 7);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "0", "1", "0", "1", "1" } );
+	}
+
+	// A two-bit state machine: depth 4 over the input and both state bits,
+	// both bits initialised.
+	TEST_CASE("two-bit state machine with depth-4 transitions") {
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o1 = run_latch("(o1[0]:sbf = 0) && (o2[0]:sbf = 0) && ((i1[t]:sbf = 1)"
+			" ? ((o1[t-1]:sbf = 0) ? ((o2[t-1]:sbf = 0)"
+			" ? ((o1[t]:sbf = 0) && (o2[t]:sbf = 1))"
+			" : ((o1[t]:sbf = 1) && (o2[t]:sbf = 0)))"
+			" : ((o1[t]:sbf = 1) && (o2[t]:sbf = 1)))"
+			" : ((o1[t]:sbf = o1[t-1]:sbf) && (o2[t]:sbf = o2[t-1]:sbf))).",
+			{ "1", "1", "0", "1" }, sbf_type_id<node_t>(), 5, o2);
+		REQUIRE ( o1.has_value() );
+		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "1" } );
+		CHECK ( o2->get_values() == strings{ "0", "1", "0", "0", "1" } );
+	}
+
+	// GitHub #107 shape: a `?:` controller over a bitvector command, with
+	// :tau state and a bitvector result code. Skipped from 2026-08-19 (over
+	// 600 s at every split budget then); re-enabled 2026-09-11 when it was
+	// found to complete in milliseconds with the bitvector case split on or
+	// off. The reporter's four-line script is pinned as a REPL test, where
+	// the split is what makes the first step budget-independent.
+	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat")
 	{
 		const char* sample =
 			"o0seal[0]:tau = 1 && o0law[0]:tau = 1 && "
@@ -1248,6 +1567,193 @@ TEST_SUITE("with inputs and outputs") {
 		auto maybe_i = run<node_t>(spec, ctx, 2);
 		CHECK( maybe_i.has_value() );
 		CHECK ( o1->get_values() == strings{ "10", "2" } );
+	}
+
+	// A specification whose widened arithmetic would exceed bv_max_width
+	// fails its first normalization (nullptr, with the pass's own error
+	// line) and make_interpreter must report "cannot run" instead of
+	// enumerating the paths of a null spec: i1*i1 at bv[8] needs W = 16.
+	TEST_CASE("spec exceeding the widening cap cannot be run") {
+		bdd_init<Bool>();
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12);
+		auto spec = create_spec("o1[t]:bv[8] = i1[t]:bv[8] * i1[t]:bv[8].");
+		io_context<node_t> ctx;
+		strings i1_values = { "3", "4" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( !maybe_i.has_value() );
+		CHECK( o1->get_values().empty() );
+	}
+
+	// An update proposal whose widened arithmetic would exceed the cap is
+	// rejected ("No update performed") and the running spec stays as it
+	// was: o7 keeps echoing i9 after the rejected step exactly as before
+	// it, and the run itself does not fail. The stream names are fresh
+	// (o7/i8/i9): the tau-typed o1/i1 of the update cases above linger in
+	// the process-wide stream type registry and make a bv-typed o1 update
+	// proposal unparseable when the suite runs in file order.
+	TEST_CASE("update exceeding the widening cap is rejected, spec kept") {
+		bdd_init<Bool>();
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12);
+		auto spec = create_spec("u[t] = i8[t] && o7[t]:bv[8] = i9[t]:bv[8].");
+		strings i1_values = {
+			"F", "o7[t]:bv[8] = i9[t]:bv[8] * i9[t]:bv[8]", "F"
+		};
+		strings i2_values = { "1", "2", "3" };
+		io_context<node_t> ctx;
+		ctx.add_input("i8", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i9", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_output("o7", bv_type_id<node_t>(8), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == strings{ "1", "2", "3" } );
+	}
+
+	// Task 8 (bv-widening): prove the widened semantics through a live
+	// execution run, not just direct widen_bv_arithmetic/normalizer calls
+	// (Tasks 4-6). `min(i1[t] + i2[t], {200}:bv[8])` is the brief's
+	// saturating-add idiom: at step 0, i1=200/i2=100 overflows bv[8]
+	// (200+100=300). Steps 1-3 use small, non-overflowing pairs so the
+	// two semantics agree there, isolating the divergence to index 0.
+	//
+	// Modular (bv_widening off, cvc5 native bv[8] add): 300 mod 256 = 44;
+	// min(44, 200) = 44.
+	// Exact (bv_widening on): needed_width(add) = max(8,8)+1 = 9, so
+	// 200+100 = 300 fits (no wrap); min(300, 200) = 200; the atom's
+	// bare-storage truncating cast back to bv[8] is lossless (200 <=
+	// 255).
+	TEST_CASE("always o1 = min(i1+i2, 200): wraps to 44 when bv_widening is off") {
+		bdd_init<Bool>();
+		REQUIRE( !bv_widening ); // default; no scope guard turns it on here
+		auto spec = create_spec(
+			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
+		io_context<node_t> ctx;
+		strings i1_values = { "200", "10", "5", "0" };
+		strings i2_values = { "100", "20", "5", "0" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == strings{ "44", "30", "10", "0" } );
+	}
+
+	TEST_CASE("always o1 = min(i1+i2, 200): saturates to 200 when bv_widening is on") {
+		bdd_init<Bool>();
+		bv_widening_scope widen;
+		auto spec = create_spec(
+			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
+		io_context<node_t> ctx;
+		strings i1_values = { "200", "10", "5", "0" };
+		strings i2_values = { "100", "20", "5", "0" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == strings{ "200", "30", "10", "0" } );
+	}
+
+	// Task 8 pwr probe: does an UPDATE rule containing bv arithmetic get
+	// elaborated the same way a compile-time spec does? `i1` stays the
+	// tau-typed update-submission channel (the `u[t] = i1[t]` idiom used
+	// throughout this suite's "u[t] = i1[t]: ..." cases); the update text
+	// references a SEPARATE bv[8] stream `i2` for the arithmetic operand
+	// -- mirroring the "dec_seq" case above, which uses a second stream
+	// (there, tau-typed) referenced from inside a submitted update rather
+	// than i1 itself, because i1 is already pinned to tau (u's type) by
+	// the submission clause and cannot also carry bv[8] values without a
+	// type conflict once the update clause is merged into the running
+	// spec.
+	//
+	// The original spec leaves o1 UNCONSTRAINED (unlike "u[t] = i1[t]:
+	// spec_replace" above, which pins a baseline for o1 to replace).
+	// Confirmed by a trace-level investigation (see the Task 8 report):
+	// pinning a conflicting baseline instead routes pointwise_revision
+	// through its documented "I1" last-resort-alternative path
+	// (interpreter.tmpl.h ~1806-1823) rather than the plain "append as a
+	// new spec part" path (~1526-1540) this test now takes -- an earlier
+	// version of this test pinned o1 to a baseline and observed a stuck
+	// value there, which turned out to be an artifact of that alternate
+	// path, not a widening defect (flagged separately, out of this task's
+	// scope). The update submitted at step 1 introduces `min(i2*3, 100)`
+	// for o1, effective from step 2 onward (one-step lag, same as every
+	// other update case in this suite).
+	//
+	// i2's programmatic stream is only read starting the first step it
+	// becomes an active input, i.e. from step 2 onward (positional
+	// consumption from the stream's own cursor, not indexed by absolute
+	// time) -- confirmed by a trace-level rerun. So `i2_values` need only
+	// the two entries actually consumed at steps 2-3, not four
+	// time-aligned ones.
+	//
+	// i2 = 90: 90*3 = 270 overflows bv[8] (270 mod 256 = 14) -- modular
+	// would give min(14,100) = 14. Exact (widened): needed_width(mul(8,8))
+	// = 16, 270 fits, min(270,100) = 100, truncated losslessly to bv[8].
+	// With bv_widening on for the whole run, o1 must read 100 at steps
+	// 2-3, not 14.
+	TEST_CASE("pwr: an update rule with bv arithmetic is elaborated under bv_widening") {
+		bdd_init<Bool>();
+		// The type of a stream name is global to the process
+		// (definitions<node_t>::instance(), see the same fix and comment
+		// in tests/integration/test_integration-bv_stress_check.cpp).
+		// `o1` and `i2` were already pinned to :tau by dozens of earlier
+		// "u[t] = i1[t]: ..." cases above in this same suite (none of
+		// which annotate them, so they default to tau); without clearing
+		// here, the update text below fails to parse as a stream value
+		// with "Incompatible type information ..., expected tau, found
+		// bv[8]" the first time o1/i2 are read back as bv[8] through
+		// interpreter::read() -> ba_constants<node>::get(line, ...) (the
+		// two direct-execution tests above never hit this: their o1/i1/i2
+		// are only ever parsed once, through create_spec's own
+		// self-contained inference, never re-parsed from a runtime
+		// stream-value string).
+		definitions<node_t>::instance().clear();
+		bv_widening_scope widen;
+		auto spec = create_spec("u[t] = i1[t].");
+		strings i1_values = {
+			"F",
+			"always o1[t]:bv[8] = min(i2[t]:bv[8] * { 3 }:bv[8], { 100 }:bv[8])",
+			"F", "F"
+		};
+		strings i2_values = { "90", "90" };
+		io_context<node_t> ctx;
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		// o1 is unconstrained before the update, so it produces no value
+		// (is not part of the executed spec) at steps 0-1 at all; it only
+		// becomes an active output once the revision (submitted at step 1,
+		// effective from step 2) introduces it. get_values() therefore
+		// collects exactly two entries -- one per produced step (2 and 3),
+		// not four time-indexed slots.
+		REQUIRE( o1_values.size() == 2 );
+		CHECK( o1_values[0] == "100" );
+		CHECK( o1_values[1] == "100" );
 	}
 
 }

@@ -237,23 +237,9 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		// Order flipped again by the 2026-08-27 regen (left-assoc
-		// arithmetic + `(bv[N])` cast disambiguation in tau.tgf), and
-		// again by the 2026-09-02 word-synonym regen.
-		CHECK( matches_to_str_to_any_of(res, {
-			"xba'|x'b'a = 0 || b&(x'|a)|xb'a != 0",
-			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0",
-			"a'bx|ab'x' = 0 || a&(b|x)|a'bx' != 0",
-			"xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0",
-			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
-			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
-			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
-			"xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0",
-			"b'x'a|bxa' = 0 || b&(x'|a)|b'xa != 0",
-			"a'xb|ax'b' = 0 || a&(x|b)|a'x'b != 0",
+		CHECK( matches_mod_and_or_any_of(res, {
 			"ab'x'|a'bx = 0 || a&(b|x)|a'bx' != 0",
+			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0"
 		}) );
 	}
 	TEST_CASE("2") {
@@ -488,10 +474,11 @@ TEST_SUITE("Normalizer bv mixed-type") {
 	// Free bitvector variables with no quantifier at all must stay put: there
 	// is nothing to decide, so the arithmetic atom survives verbatim.
 	TEST_CASE("bv_arith_all_free_with_sbf_conjunct") {
-		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "s = 0 && x+y = 0", "x+y = 0 && s = 0" }) );
+		// the expected wff is parsed now, so it carries the types
+		// the printed form elides
+		CHECK( normalize_and_check_mod_and_or(
+			"x:bv[8] + y:bv[8] = { 0 }:bv[8] && s = 0.",
+			"s = 0 && x:bv[8] + y:bv[8] = { 0 }:bv[8]") );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf

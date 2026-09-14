@@ -44,7 +44,7 @@ new BA type (the default BA types operators are already defined).
 
 An example of how to implement these operators can be found in the file
 `src/boolean_algebras/tau_ba.h` (and the corresponding
-`src/boolean_algebras/tau_ba.tmpl.h`). Also check `src/boolean_algebras/bdd_handle.h`.
+`src/boolean_algebras/tau_ba.tmpl.h`). Also check `src/boolean_algebras/bdds/bdd_handle.h`.
 
 ## Defining comparison operators for your new BA
 
@@ -56,7 +56,7 @@ and `operator!=(const YourBA& ba, bool b)`.
 
 An example of how to implement these operators can be found in the file
 `src/boolean_algebras/tau_ba.h` (and the corresponding
-`src/boolean_algebras/tau_ba.tmpl.h`). Also check `src/boolean_algebras/bdd_handle.h`.
+`src/boolean_algebras/tau_ba.tmpl.h`). Also check `src/boolean_algebras/bdds/bdd_handle.h`.
 
 ## Parsing constants of your BAs
 

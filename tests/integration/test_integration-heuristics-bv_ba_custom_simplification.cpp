@@ -514,6 +514,20 @@ TEST_SUITE("max_simplify_rounds") {
 	}
 }
 
+// identity_of feeds the folded form of a block that collapsed to nothing.
+// For bitvectors `1` is the all-ones top element, not the multiplicative
+// identity, so the bf_mul identity must be the numeric one.
+TEST_SUITE("identity_of") {
+	TEST_CASE("bf_add identity is zero") {
+		CHECK(identity_of<node_t>(tree<node_t>::bf_add, bv8_type_id<node_t>())
+			== tau::get("0:bv[8]", parse_opts_bf));
+	}
+	TEST_CASE("bf_mul identity is the numeric one, not the top element") {
+		CHECK(identity_of<node_t>(tree<node_t>::bf_mul, bv8_type_id<node_t>())
+			== tau::get("{1}:bv[8]", parse_opts_bf));
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

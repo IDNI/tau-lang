@@ -532,6 +532,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		const std::vector<htref>* definition_heads = nullptr; ///< Known definition heads.
 		subtree_map<node, size_t>* global_scope = nullptr;    ///< Pre-known global types.
 		io_context<node>* context = nullptr;        ///< I/O stream context.
+		const std::vector<htref>* session_type_defs = nullptr; ///< REPL-session type_defs to pre-register before flattening.
 	};
 
 	/** @brief Convert parser @p result to a tree using @p options. */
@@ -842,6 +843,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_div(tref l, tref r);
 	/** @brief Build `l % r`. */
 	static tref build_bf_mod(tref l, tref r);
+	/** @brief Build `min(l, r)` (unsigned bitvector minimum). */
+	static tref build_bf_min(tref l, tref r);
+	/** @brief Build `max(l, r)` (unsigned bitvector maximum). */
+	static tref build_bf_max(tref l, tref r);
 
 	// Terminal, variable and constant builders
 	/** @brief Build the `T` (true) BA constant for type @p ba_tid. */

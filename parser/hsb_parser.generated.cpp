@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "hsb_parser.generated.h"
 
 namespace hsb_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -132,8 +134,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(33), (T(17)+T(18)+NT(4)+T(19)));
 //G58:  __E_nat_14(46)       => digit(2).
 	p(NT(46), (NT(2)));
-//G59:  __E_nat_14(46)       => digit(2) __E_nat_14(46).
-	p(NT(46), (NT(2)+NT(46)));
+//G59:  __E_nat_14(46)       => __E_nat_14(46) digit(2).
+	p(NT(46), (NT(46)+NT(2)));
 //G60:  nat(4)               => __E_nat_14(46).
 	p(NT(4), (NT(46)));
 //G61:  unum(5)              => nat(4) '.' nat(4).
@@ -152,5 +154,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace hsb_parser_data

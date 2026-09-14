@@ -50,13 +50,18 @@ namespace idni::tau_lang {
  * `infer_ba_types = false`).
  * @param ctx I/O context; unused in this pass (io stream ADT layouts arrive
  * in a later task) -- accepted so callers do not need to special-case it.
+ * @param session_type_defs Optional REPL-session `type_def`s (declared on
+ * earlier, separately parsed lines) to pre-register into the registry
+ * before @p spec's own type_defs -- see `adt_registry::build`'s override
+ * semantics. `nullptr` (the default) matches today's spec-only behavior.
  * @return The flattened tree, or `nullptr` after `LOG_ERROR` on any spec
  * error (registry error, conflicting annotation, untyped/unknown member
  * access, member access on a non-tuple, shape mismatch, or a tuple-typed
  * term used outside `=`/`!=`/a quantifier binder).
  */
 template <NodeType node>
-tref adt_flatten(tref spec, io_context<node>* ctx = nullptr);
+tref adt_flatten(tref spec, io_context<node>* ctx = nullptr,
+	const std::vector<htref>* session_type_defs = nullptr);
 
 } // namespace idni::tau_lang
 

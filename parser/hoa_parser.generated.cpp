@@ -3,10 +3,12 @@
 //
 // productions() lives here so the table is compiled once, not per TU.
 //
+#include "parser.h"
 #include "hoa_parser.generated.h"
 
 namespace hoa_parser_data {
 
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
 idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
@@ -16,8 +18,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
 //G0:   __E_start_0(19)      => null.
 	p(NT(19), (nul));
-//G1:   __E_start_0(19)      => hline(18) __E_start_0(19).
-	p(NT(19), (NT(18)+NT(19)));
+//G1:   __E_start_0(19)      => __E_start_0(19) hline(18).
+	p(NT(19), (NT(19)+NT(18)));
 //G2:   start(17)            => __E_start_0(19) body(20).
 	p(NT(17), (NT(19)+NT(20)));
 //G3:   hline(18)            => states_line(21).
@@ -36,8 +38,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(25), (NT(6)+NT(26)));
 //G10:  __E_ap_line_2(27)    => null.
 	p(NT(27), (nul));
-//G11:  __E_ap_line_2(27)    => __E_ap_line_1(25) __E_ap_line_2(27).
-	p(NT(27), (NT(25)+NT(27)));
+//G11:  __E_ap_line_2(27)    => __E_ap_line_2(27) __E_ap_line_1(25).
+	p(NT(27), (NT(27)+NT(25)));
 //G12:  ap_line(23)          => 'A' 'P' ':' b(5) num(7) __E_ap_line_2(27) b(5) '\n'.
 	p(NT(23), (T(9)+T(10)+T(6)+NT(5)+NT(7)+NT(27)+NT(5)+T(7)));
 //G13:  __E_ap_name_3(29)    => '"' qrun(30) '"'.
@@ -62,8 +64,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(32), (NT(32)+NT(9)));
 //G23:  __E_body_5(35)       => null.
 	p(NT(35), (nul));
-//G24:  __E_body_5(35)       => belem(34) __E_body_5(35).
-	p(NT(35), (NT(34)+NT(35)));
+//G24:  __E_body_5(35)       => __E_body_5(35) belem(34).
+	p(NT(35), (NT(35)+NT(34)));
 //G25:  __E_body_6(36)       => end_part(37).
 	p(NT(36), (NT(37)));
 //G26:  __E_body_6(36)       => null.
@@ -142,8 +144,8 @@ idni::prods<char_type, terminal_type>& productions() {
 	p(NT(48), (NT(49)));
 //G63:  __E_num_14(51)       => digit(3).
 	p(NT(51), (NT(3)));
-//G64:  __E_num_14(51)       => digit(3) __E_num_14(51).
-	p(NT(51), (NT(3)+NT(51)));
+//G64:  __E_num_14(51)       => __E_num_14(51) digit(3).
+	p(NT(51), (NT(51)+NT(3)));
 //G65:  num(7)               => __E_num_14(51).
 	p(NT(7), (NT(51)));
 //G66:  __N_0(59)            => '"'.
@@ -204,5 +206,6 @@ idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
+#endif
 
 } // namespace hoa_parser_data

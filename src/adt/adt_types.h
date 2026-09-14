@@ -72,17 +72,32 @@ struct adt_member {
 template <NodeType node>
 struct adt_registry {
 	/**
-	 * @brief Collect every `type_def` under @p spec and resolve all of them.
+	 * @brief Collect every `type_def` under @p spec (plus, if given, every
+	 * `type_def` reachable from @p session_type_defs) and resolve all of
+	 * them.
+	 *
+	 * @p session_type_defs (when non-null) is registered first, in vector
+	 * order -- a later same-name entry within it silently replaces an
+	 * earlier one, no error. @p spec's own type_defs are then registered:
+	 * a name that came from @p session_type_defs is silently overridden
+	 * (last-def-wins across sources: the current spec always wins over the
+	 * session it is layered on top of); a name first seen in @p spec itself
+	 * still hits the duplicate-name error below if declared twice *within*
+	 * @p spec. This lets a REPL's later line see an earlier line's `type`
+	 * declarations while a redeclaration on the later line itself still
+	 * takes precedence.
 	 *
 	 * @return The built registry, or `std::nullopt` after `LOG_ERROR` on:
-	 * a duplicate type name, a duplicate member (including one introduced
-	 * via inheritance), a cycle (through members, aliases, or parents), a
-	 * type inheriting from something that does not resolve to a tuple, or
-	 * a `type_parents` entry naming an unregistered type. An unregistered
-	 * type name in a *member* position is not an error: it is treated as a
-	 * base (non-ADT) type and passed through unchanged.
+	 * a duplicate type name declared twice within @p spec itself, a
+	 * duplicate member (including one introduced via inheritance), a cycle
+	 * (through members, aliases, or parents), a type inheriting from
+	 * something that does not resolve to a tuple, or a `type_parents` entry
+	 * naming an unregistered type. An unregistered type name in a *member*
+	 * position is not an error: it is treated as a base (non-ADT) type and
+	 * passed through unchanged.
 	 */
-	static std::optional<adt_registry> build(tref spec);
+	static std::optional<adt_registry> build(tref spec,
+		const std::vector<htref>* session_type_defs = nullptr);
 
 	/** @brief Return `true` if @p name_sid has a `type_def` in this registry. */
 	bool defines(size_t name_sid) const;

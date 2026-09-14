@@ -1,0 +1,96 @@
+# Recurrence relations over abstract data types.
+#
+# See demos/README.md for how to run this script.
+
+# demo_1.3 defines functions and predicates by recurrence relations; demo_4.2
+# applies definitions to the members of demo_4.1's tuple types. Recurrences
+# combine with tuples under the same two rules: apply them to MEMBERS, which
+# flattening has already turned into plain variables of the member's own
+# type, and make the definition carry that type -- on the head of a function
+# case, or as a parameter annotation inside the body of a predicate case.
+
+# A recursive function over sbf, applied to a member. cf[n] is n complements
+# of its argument, so cf[3](p.a) unfolds to p.a', and the equation links
+# Point's two members. The (p:Point = p) conjunct is demo_4.1's trick for
+# fixing p's type while leaving it free, so the result displays the
+# unfolded relation:
+
+cf[0](x):sbf := x
+cf[n](x):sbf := cf[n-1](x)'
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (cf[3](p.a) = p.b)
+
+# An even offset unfolds back to the member itself:
+
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (cf[4](p.a) = p.b)
+
+# Quantifying the tuple variable instead decides the formula -- no sbf value
+# equals its own complement, so:
+
+type Point = {a: sbf, b: sbf}. n all p:Point (cf[3](p.a) != p.a)
+
+# A recursive predicate types its parameter inside the body -- in EVERY case
+# of the recurrence, since each case is a definition of its own:
+
+qz[0](x) := (x:sbf = 0)
+qz[n](x) := qz[n-1](x) && (x:sbf != 1)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && qz[3](p.a)
+
+# A call with the offset omitted asks for the fixpoint (demo_1.3), and works
+# over a member just as over a plain variable. qz[1] already normalizes to
+# qz[0] -- in sbf, x = 0 implies x != 1 -- so the fixpoint is p.a = 0:
+
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && qz(p.a)
+
+# solve accepts fixpoint calls over members too, and reports per flattened
+# member as always:
+
+type Point = {a: sbf, b: sbf}. solve x:Point = x && qz(x.a) && x.b != 0
+
+# Function recurrences reach fixpoints the same way: mf[1] is x & x, which
+# is x again, so the fixpoint of mf is the member itself:
+
+mf[0](x):sbf := x
+mf[n](x):sbf := mf[n-1](x) & x
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (mf(p.a) = p.b)
+
+# Not every recurrence settles (demo_1.3). vf alternates between a value and
+# its complement forever; the loop is detected, and a looping FUNCTION falls
+# back to 0, so the equation pins p.b rather than relating it to p.a:
+
+vf[0](x):sbf := x
+vf[n](x):sbf := vf[n-1](x)'
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && (vf(p.a) = p.b)
+
+# A looping PREDICATE falls back to F, and fallback picks the answer
+# instead. Note the step case below: its only mention of x is the recursive
+# call, which cannot carry the annotation -- so a trivially true typed
+# equation supplies the type that every case must see:
+
+wz[0](x) := (x:sbf = 0)
+wz[n](x) := !wz[n-1](x) && (x:sbf = x)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && wz(p.a)
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && wz(p.a) fallback first
+type Point = {a: sbf, b: sbf}. n (p:Point = p) && wz(p.a) fallback last
+
+# Bitvector members take recurrences too; as in demo_4.2, the head carries
+# the member's base type. gb[n] is n complements of bv[8]'s 0, so odd
+# offsets require p.v to be the all-ones bitvector -- displayed as its
+# complement being 0 -- and even offsets require p.v = 0:
+
+gb[0](y):bv[8] := 0
+gb[n](y):bv[8] := gb[n-1](y)'
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. n (p:Pix = p) && (gb[3](p.v) = p.v)
+type byte = bv[8]. type Pix = {v: byte, on: sbf}. n (p:Pix = p) && (gb[4](p.v) = p.v)
+
+# The rules of demo_1.3 and demo_4.2 carry over unchanged: a relative offset
+# in the body needs an offset on the head, a recurrence has to progress
+# towards its base case, and a recurrence applied to a WHOLE tuple value
+# never expands -- pass the members. One rule is specific to recursive
+# predicates and worth repeating: EVERY case must see the parameter's type.
+# A recurrence annotated in the base case only is now REJECTED outright, at
+# the very first call -- indexed or offset-free alike -- with an error
+# naming the disagreeing cases: "the cases of recurrence ... disagree on
+# their argument types ...; annotate the argument the same way in every
+# case". Type each case, as qz and wz do above, and the family is accepted.
+
+quit

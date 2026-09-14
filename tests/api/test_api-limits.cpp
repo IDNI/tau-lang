@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -27,8 +27,10 @@ TEST_SUITE("Tau API - runtime limits") {
 				&max_flag_search_steps },
 			{ &tau_api::set_max_def_passes,      &max_def_passes },
 			{ &tau_api::set_max_enum_steps,      &max_enum_steps },
+			{ &tau_api::set_max_probe_steps,     &max_probe_steps },
 			{ &tau_api::set_max_rewrite_rounds,  &max_rewrite_rounds },
 			{ &tau_api::set_max_simplify_rounds, &max_simplify_rounds },
+			{ &tau_api::set_ba_decision_pins,    &ba_decision_pins },
 		};
 		for (const row& r : rows) {
 			const size_t saved = *r.global;
@@ -66,6 +68,17 @@ TEST_SUITE("Tau API - runtime limits") {
 		tau_api::set_pwr_semantic_fallback(false);
 		CHECK_FALSE( pwr_semantic_fallback );
 		pwr_semantic_fallback = saved;
+	}
+
+	// The case-split cap follows the block budgets: 0 = unlimited = SIZE_MAX.
+	TEST_CASE("bv case split cap maps 0 to SIZE_MAX") {
+		const size_t saved = bv_case_split_max_tests;
+		tau_api::set_bv_case_split_max_tests(3);
+		CHECK( bv_case_split_max_tests == 3 );
+		tau_api::set_bv_case_split_max_tests(0);
+		CHECK( bv_case_split_max_tests
+			== std::numeric_limits<size_t>::max() );
+		bv_case_split_max_tests = saved;
 	}
 
 	TEST_CASE("interpreter statics") {

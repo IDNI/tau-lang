@@ -274,7 +274,11 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
 	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
-	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	// check is trace-log-only; a D4 bv-widening cap violation surfaces as
+	// nullptr here, and LOG_FM would dereference it whenever trace
+	// logging is enabled.
+	if (check) LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	else LOG_TRACE << "lgrs/check: nullptr (bv-widening cap exceeded)\n";
 #endif // DEBUG
 
 	return phi;
@@ -1398,6 +1402,7 @@ bool has_bv_arithmetic(tref f) {
 			// bv_conjs_only_pure_equality routes them to solve_bv, not LGRS.
 			|| is<node, tau::bf_and>(n) || is<node, tau::bf_or>(n)
 			|| is<node, tau::bf_neg>(n) || is<node, tau::bf_xor>(n)
+			|| is<node, tau::bf_min>(n)  || is<node, tau::bf_max>(n)
 			// a width cast crosses algebras; lgrs cannot see across it
 			|| is<node, tau::bf_cast>(n);
 	}) != nullptr;
@@ -1453,6 +1458,11 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	}
 #endif // DEBUG
 	form = normalize_non_temp<node>(form);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here for the first time; propagate it as this
+	// function's own established error convention rather than
+	// dereferencing it below.
+	if (!form) { error = true; return {}; }
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
 		// early to simplify solving
@@ -1520,7 +1530,21 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			if (tau::get(conj).equals_F()) continue;
 			size_t type = find_ba_type<node>(conj);
 			if (!is_atomic_fm<node>(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
-				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
+				// A ref surviving to this point matched no definition
+				// (calls that COULD match were expanded upstream, and a
+				// mismatched call is rejected by validate_rr_call_types)
+				// -- an uninterpreted predicate is fine to normalize but
+				// has no solutions to enumerate. Name it, instead of the
+				// generic message, so the user looks at the definition
+				// rather than at the solver.
+				if (tref uref = tau::get(conj).find_top(
+						is<node, tau::ref>); uref)
+					LOG_ERROR << "Cannot solve `" << TAU_TO_STR(conj)
+						<< "`: it contains an unresolved reference `"
+						<< TAU_TO_STR(uref) << "` with no matching"
+						" definition";
+				else LOG_ERROR << "Found clause containing non-equation: "
+					<< TAU_TO_STR(path);
 				error = true;
 				break;
 			}

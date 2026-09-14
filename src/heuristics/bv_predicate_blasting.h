@@ -629,6 +629,52 @@ tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
 
+/**
+ * @brief Computes a predicate constraining result to be the unsigned minimum
+ * of left and right.
+ *
+ * The constraint is ((left < right) -> result = left) &&
+ * (!(left < right) -> result = right), built from the bvlt recurrence and
+ * negated bvneq equalities. Unlike bvdiv/bvmod and the shifts, both operands
+ * may be variables; there is no constant-argument precondition.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable (fresh, of the operands' bv type)
+ * @return The resulting predicate term, or nullptr if a bitwidth cannot be
+ * determined
+ *
+ * @par Example
+ * @code{.cpp}
+ * // min(3, 5) = 3 (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp,
+ * // TEST_SUITE("bvmin")).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && min(x, { 5 }:bv[4]) = { 3 }:bv[4]).")
+ *     .value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
+ */
+template<NodeType node>
+tref bvmin(tref left, tref right, tref result);
+
+/**
+ * @brief Computes a predicate constraining result to be the unsigned maximum
+ * of left and right: the dual of @ref bvmin, with the copied sides swapped
+ * over the same (left < right) test.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable (fresh, of the operands' bv type)
+ * @return The resulting predicate term, or nullptr if a bitwidth cannot be
+ * determined
+ */
+template<NodeType node>
+tref bvmax(tref left, tref right, tref result);
+
 } // namespace idni::tau_lang
 
 

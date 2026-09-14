@@ -25,6 +25,16 @@ inline size_t max_def_passes = 0;
 /// REPL `enumsteps`, or `api::set_max_enum_steps`.
 inline size_t max_enum_steps = 0;
 
+/// Cap on the untyped saturation probe `calculate_fixed_point` runs over a
+/// residual recurrence reference to tell a type-blocked rule from a
+/// legitimately uninterpreted one; 0 = unlimited. A diverging probe (e.g.
+/// cross-family type-blocked mutual recursion) never stabilizes, so the
+/// default is a finite 10000 rather than unlimited; the effective cap is the
+/// smaller of this and a finite `max_enum_steps`. Runtime parameter by
+/// policy: set via `--max-probe-steps`, REPL `probesteps`, or
+/// `api::set_max_probe_steps`.
+inline size_t max_probe_steps = 10000;
+
 /**
  * @internal
  * @brief Descriptor of a single reference offset.
@@ -141,9 +151,222 @@ tref scope_out_independent_conjuncts(tref fm) {
  * @endcode
  * @endinternal
  */
+// Test-point elimination of a quantified bitvector variable v that occurs
+// only in comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`, possibly negated)
+// against constants c_1 < ... < c_k of its own type.
+//
+// Over the unsigned, finite bitvector order every such atom changes its value
+// only at a c_i, so phi is constant on each cell the c_i cut the domain into
+// -- every c_i on its own, and the open intervals below c_1, between
+// consecutive c_i, and above c_k -- and one witness per non-empty cell
+// decides it:
+//
+//     ex v phi   ==   \/ over cells  phi[v := witness(cell)]
+//     all v phi  ==   /\ over cells  phi[v := witness(cell)]
+//
+// When v is only ever tested for equality, all interval cells agree (every
+// test is false there) and a single complement witness stands for them:
+// k + 1 instances instead of at most 2k + 1. This is the finite-domain form
+// of test-point elimination (Cooper / Ferrante-Rackoff), an identity on the
+// formula; the substituted tests fold to T/F in the normalization that
+// follows, which is what makes the instances cheap.
+//
+// The same identity holds for symbolic bounds t_i (test points 0, t_i and
+// t_i + 1), but its instances then carry `t_i + 1` arithmetic and atoms such
+// as `t + 1 = t` that the normalization does not decide, so they would be
+// handed to blasting -- the path this pass exists to avoid. Measured on the
+// integration tests: such instances come back as residues, not as T/F. The
+// symbolic case is therefore left to the existing pipeline.
+//
+// Why it is here: a conditional over a bitvector command, `i[t] = c ? A : B`,
+// desugars to `(i[t] != c || A) && (i[t] = c || B)` -- the guard in both
+// polarities. When the interpreter closes a boundary step it quantifies such
+// commands and result codes, and bitvector atoms are reserved for blasting and
+// the solver, so the Boole decomposition splits on the remaining atomless
+// equalities and carries every guard unchanged into both branches of every
+// split. Eliminating the tested variable first lets the guards fold before
+// any block is formed.
+//
+// Structural criterion only: any other occurrence of v (inside a term, a
+// comparison with a non-constant, both sides of one atom, a nested binder of
+// the same variable), or a variable of a foreign type, leaves the quantifier
+// to the existing pipeline untouched. A cell exists for every tested
+// constant, so the domain is never exhausted and no width limit is needed.
+namespace bv_case_split_detail {
+
+// Base-2 digits of the bitvector constant in `c`, left-padded to `width`.
+template <NodeType node>
+std::optional<std::string> bits_of(tref c, size_t width) {
+	auto cte = std::get<bv>(tree<node>::get(c).get_ba_constant());
+	if (!cte.isBitVectorValue()) return std::nullopt;
+	std::string s = cte.getBitVectorValue();
+	if (s.size() > width) return std::nullopt;
+	return std::string(width - s.size(), '0') + s;
+}
+
+// Successor of a padded base-2 string; nullopt on overflow (all ones).
+inline std::optional<std::string> succ(std::string s) {
+	for (size_t i = s.size(); i-- > 0;) {
+		if (s[i] == '0') { s[i] = '1'; return s; }
+		s[i] = '0';
+	}
+	return std::nullopt;
+}
+
+} // namespace bv_case_split_detail
+
+template <NodeType node>
+tref bv_case_split_quantifiers(tref formula) {
+	using tau = tree<node>;
+	using namespace bv_case_split_detail;
+	auto is_comparison = [](const tau& atom) {
+		switch (atom.value.nt) {
+			case tau::bf_eq: case tau::bf_neq:
+			case tau::bf_lt: case tau::bf_lteq:
+			case tau::bf_gt: case tau::bf_gteq:
+			case tau::bf_nlt: case tau::bf_nlteq:
+			case tau::bf_ngt: case tau::bf_ngteq:
+				return true;
+			default: return false;
+		}
+	};
+	auto is_order = [](const tau& atom) {
+		return atom.value.nt != tau::bf_eq && atom.value.nt != tau::bf_neq;
+	};
+	auto step = [&](tref n) -> tref {
+		if (!is_child_quantifier<node>(n)) return n;
+		const tau& t = tau::get(n);
+		const tref var = t[0].first();
+		const tref scope = t[0].second();
+		const size_t vtype = tau::get(var).get_ba_type();
+		if (vtype == 0 || !is_bv_type_family<node>(vtype)) return n;
+		const size_t width = get_bv_width<node>(vtype);
+		if (width == 0) return n;
+		// Scan: every occurrence of `var` must be one side of a comparison
+		// whose other side is a constant of the same type. BA constants are
+		// opaque and not descended into.
+		std::vector<tref> occ;
+		std::vector<tref> tests;   // the tested constants (term nodes), deduplicated
+		bool ok = true, any_order = false;
+		std::vector<tref> st{scope};
+		while (!st.empty() && ok) {
+			tref x = st.back(); st.pop_back();
+			if (!x) continue;
+			const tau& tx = tau::get(x);
+			if (tx.is_ba_constant()) continue;
+			// A nested binder of the same variable: its occurrences are
+			// structurally identical to the free ones and would be
+			// substituted with them. Decline rather than capture.
+			if (is_child_quantifier<node>(x)
+				&& tau::get(tx[0].first()) == tau::get(var)) { ok = false; break; }
+			if (tx.is(tau::wff) && is_comparison(tx[0])) {
+				const tau& atom = tx[0];
+				tref l = atom[0][0].get(), r = atom[1][0].get();
+				const bool lv = tau::get(l) == tau::get(var);
+				const bool rv = tau::get(r) == tau::get(var);
+				if (lv || rv) {
+					if (lv && rv) { ok = false; break; }
+					tref other = lv ? r : l;
+					if (!tau::get(other).is_ba_constant()
+						|| tau::get(other).get_ba_type() != vtype) { ok = false; break; }
+					occ.push_back(lv ? l : r);
+					if (is_order(atom)) any_order = true;
+					bool seen = false;
+					for (tref c : tests)
+						if (tau::get(c) == tau::get(other)) { seen = true; break; }
+					if (!seen) tests.push_back(other);
+					continue;
+				}
+			}
+			if (tau::get(x) == tau::get(var)) { ok = false; break; }
+			for (tref c : tx.children()) st.push_back(c);
+		}
+		if (!ok || occ.empty()
+			|| tests.size() > bv_case_split_max_tests) return n;
+		auto constant_of = [&](const std::string& bits) -> tref {
+			typename node::constant cte = {make_bitvector_value(width, bits)};
+			return tau::get_ba_constant(cte, vtype);
+		};
+		const std::string zero(width, '0');
+		std::vector<tref> witnesses;
+		// Known cells: sort the constants, then each of them and one value per
+		// non-empty interval (a single complement value when no order atom
+		// occurs -- all intervals agree then).
+		std::vector<std::pair<std::string, tref>> tested;
+		for (tref c : tests) {
+			auto bits = bits_of<node>(c, width);
+			if (!bits) return n;
+			tested.emplace_back(*bits, c);
+		}
+		std::sort(tested.begin(), tested.end(),
+			[](const auto& a, const auto& b) { return a.first < b.first; });
+		for (const auto& [_, c] : tested) witnesses.push_back(c);
+		std::vector<std::string> gaps;
+		if (tested.front().first != zero) gaps.push_back(zero);
+		for (size_t i = 0; i + 1 < tested.size(); ++i) {
+			auto s = succ(tested[i].first);
+			if (s && *s < tested[i + 1].first) gaps.push_back(*s);
+		}
+		if (auto s = succ(tested.back().first); s) gaps.push_back(*s);
+		if (!any_order && !gaps.empty()) gaps.resize(1);
+		for (const auto& g : gaps) witnesses.push_back(constant_of(g));
+		// Miniscoping before instantiating: only the part of the scope that
+		// mentions `var` is instantiated per cell. For either quantifier,
+		// Q v (A(v) && B) == (Q v A) && B and Q v (A(v) || B) == (Q v A) || B
+		// when B does not contain v, so an independent conjunct or disjunct is
+		// attached once, outside the case analysis, instead of being copied
+		// into every cell (a scope carrying heavy content about other
+		// variables would otherwise multiply that content by the cell count).
+		const bool is_ex = t.child_is(tau::wff_ex);
+		auto instance = [&](tref body, tref w) -> tref {
+			subtree_map<node, tref> changes;
+			for (tref o : occ) changes[o] = w;
+			return rewriter::replace<node>(body, changes);
+		};
+		auto cases = [&](tref body) -> tref {
+			tref res = nullptr;
+			for (tref w : witnesses) {
+				tref inst = instance(body, w);
+				res = !res ? inst : is_ex ? tau::build_wff_or(res, inst)
+					: tau::build_wff_and(res, inst);
+			}
+			return res;
+		};
+		auto eliminate = [&](auto& self, tref body) -> tref {
+			if (!contains<node>(body, var)) return body;
+			const tau& tb = tau::get(body);
+			if (tb.is(tau::wff) && (tb.child_is(tau::wff_and) || tb.child_is(tau::wff_or))) {
+				tref l = tb[0].first(), r = tb[0].second();
+				const bool lv = contains<node>(l, var), rv = contains<node>(r, var);
+				if (lv != rv) {
+					tref dep = self(self, lv ? l : r), ind = lv ? r : l;
+					return tb.child_is(tau::wff_and)
+						? tau::build_wff_and(dep, ind)
+						: tau::build_wff_or(dep, ind);
+				}
+			}
+			return cases(body);
+		};
+		return eliminate(eliminate, scope);
+	};
+	auto visit = [](tref x) { return while_is_formula<node>(x); };
+	return post_order<node>(formula).apply_unique(step, visit);
+}
+
 template <NodeType node>
 tref eliminate_bv_and_quantifiers(tref form) {
 	using tau = tree<node>;
+	// The split only applies to a bitvector-typed binder: skip the walk
+	// when there is none. find_top_until, not find_top: tau_ba constants
+	// carry their own binders and are not formula nodes.
+	if (bv_case_split_enabled() && tau::get(form).find_top_until(
+		[](tref k) {
+			if (!is_child_quantifier<node>(k)) return false;
+			const size_t vt = tau::get(tau::get(k)[0].first()).get_ba_type();
+			return vt != 0 && is_bv_type_family<node>(vt);
+		},
+		[](tref k) { return !while_is_formula<node>(k); }) != nullptr)
+		form = bv_case_split_quantifiers<node>(form);
 
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
 	// inside a bitvector quantifier's scope makes the whole scope fail
@@ -361,6 +584,25 @@ tref normalize(tref form) {
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
 	//	using tt = tau::traverser;
+	// Guard against a nullptr ARGUMENT, not just a nullptr result: since
+	// normalize_non_temp/normalize_with_temp_simp can themselves now
+	// return nullptr (the D4 cap below), a growing set of call sites feed
+	// one of THOSE results straight back in as another call's fm (e.g.
+	// `normalize_non_temp<node>(to_unbounded_continuation<node>(...))`,
+	// satisfiability.tmpl.h). Without this, such a chain would crash
+	// inside widen_bv_arithmetic's own tau::get(fm) below rather than
+	// propagating cleanly.
+	if (!fm) return nullptr;
+	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
+	// runs (including the cache lookup just below, so a cached result is
+	// keyed on the already-widened formula). Unconditionally called --
+	// widen_bv_arithmetic itself is a no-op when the `bv_widening` flag is
+	// off (see bv_widening.h) -- and any D4 cap error is already logged by
+	// the pass, so a nullptr here just propagates the failure.
+	if (bv_widening) {
+		fm = widen_bv_arithmetic<node>(fm);
+		if (!fm) return nullptr;
+	}
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
 	// stay uncached).
@@ -622,6 +864,16 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it the same as any other
+	// undecidable shape check_decided reports -- a conservative
+	// "answering negatively" fallback, not a proof.
+	if (!normalized) {
+		LOG_ERROR << "is_non_temp_nso_satisfiable: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const auto& t = tau::get(normalized);
 
 	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
@@ -659,6 +911,14 @@ bool is_non_temp_nso_unsat(tref n) {
 	const trefs& vars = get_free_vars<node>(nn);
 	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
+	// See is_non_temp_nso_satisfiable above: a D4 cap violation surfaces
+	// as nullptr; treat it as undecidable, answering negatively.
+	if (!normalized) {
+		LOG_ERROR << "is_non_temp_nso_unsat: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const auto& t = tau::get(normalized);
 	check_decided<node>("is_non_temp_nso_unsat", normalized);
 	return t.equals_F();
@@ -710,6 +970,15 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
 	tref ndir1 = normalize_non_temp<node>(imp1);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, answering
+	// negatively, same as any other shape check_decided reports.
+	if (!ndir1) {
+		LOG_ERROR << "are_nso_equivalent: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const tau& tdir1 = tau::get(ndir1);
 	check_decided<node>("are_nso_equivalent", ndir1);
 	if (tdir1.equals_F()) {
@@ -717,6 +986,12 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 	tref ndir2 = normalize_non_temp<node>(imp2);
+	if (!ndir2) {
+		LOG_ERROR << "are_nso_equivalent: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	const tau& tdir2 = tau::get(ndir2);
 	check_decided<node>("are_nso_equivalent", ndir2);
 	const bool res = (tdir1.equals_T() && tdir2.equals_T());
@@ -782,6 +1057,15 @@ bool is_nso_impl(tref n1, tref n2) {
 		imp = tau::build_wff_all_many(vars, imp);
 		LOG_DEBUG << "wff: " << LOG_FM(imp);
 		tref nres = normalize_non_temp<node>(imp);
+		// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+		// surfaces as nullptr here; treat it as undecidable, answering
+		// negatively, same as any other shape check_decided reports.
+		if (!nres) {
+			LOG_ERROR << "is_nso_impl: normalization failed "
+				"(bv-widening cap exceeded); answering negatively. This "
+				"is a conservative fallback, not a proof.";
+			return false;
+		}
 		if (tau::get(nres).find_top(is_quantifier<node>)) {
 			// Dual attempt, as in normalize_with_temp_simp: the
 			// substitution-based one-point pass inside anti_prenex only
@@ -957,6 +1241,16 @@ bool are_bf_equal(tref n1, tref n2) {
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
 	tref normalized = normalize_non_temp<node>(bf_equal_fm);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, answering
+	// negatively, same as any other shape check_decided-style callers
+	// report.
+	if (!normalized) {
+		LOG_ERROR << "are_bf_equal: normalization failed (bv-widening cap "
+			"exceeded); answering negatively. This is a conservative "
+			"fallback, not a proof.";
+		return false;
+	}
 	LOG_TRACE << "Normalized: " << LOG_FM(normalized);
 
 	auto check = tt(normalized) | tau::wff_t;
@@ -1318,6 +1612,18 @@ inline tref flatten_always_conjuncts(tref fm) {
 template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
+	// Guard against a nullptr ARGUMENT, not just a nullptr result: see
+	// normalize_non_temp's own copy of this comment.
+	if (!fm) return nullptr;
+	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
+	// runs. Unconditionally called -- widen_bv_arithmetic itself is a no-op
+	// when the `bv_widening` flag is off (see bv_widening.h) -- and any D4
+	// cap error is already logged by the pass, so a nullptr here just
+	// propagates the failure.
+	if (bv_widening) {
+		fm = widen_bv_arithmetic<node>(fm);
+		if (!fm) return nullptr;
+	}
 	// Merge top-level (G A) && (G B) → G(A && B) before any further
 	// processing.  G is universal, so G(A) ∧ G(B) ≡ G(A ∧ B), and the
 	// downstream pipeline (transform_to_execution, ltl_aba) only finds
@@ -1855,6 +2161,64 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 	LOG_DEBUG << "max lookback " << max_lookback;
 
+	// Families defined by the driving recurrence: the full rr_sig (name,
+	// offset arity, AND ref-arg arity), matching is_functional_ref's
+	// fixpoint-call family match. Name+arg_arity alone would conflate an
+	// indexed family like `f[n]/f[0]` with an unrelated plain function
+	// `f(x)` of the same name/arity (see validate_rr_case_types's family
+	// key in tau_tree_extractors.tmpl.h for the same fix and the fuller
+	// rationale) -- here that conflation would make this guard treat a
+	// residual belonging to the unrelated plain function as if it were
+	// part of the recurrence this call actually drives.
+	std::set<rr_sig> def_families;
+	for (const auto& r : nso_rr.rec_relations)
+		if (tref h = unwrap_to_ref<node>(r.first->get()); h)
+			def_families.insert(get_rr_sig<node>(h));
+
+	// Support for the partial-match guard below (search "Partial-match
+	// guard" for the rationale). Hoisted out of the `for (i)` loop since
+	// both are loop-invariant: `untyped_rules` depends only on @p nso_rr,
+	// not on the current step, and `legit_uninterpreted` accumulates
+	// verdicts *across* steps -- trees are hash-consed, so a residual
+	// with the same shape recurring at a later step (as it typically
+	// does for a legitimately-uninterpreted base) is literally the same
+	// tref, and the untyped re-saturation probe below need only ever be
+	// paid once for it, not once per step.
+	// apply_unique takes its callable by non-const lvalue reference (see
+	// pre_order<node>::apply_unique's signature in
+	// external/parser/src/utility/tree.h/tree_traversals_pre_order.tmpl.h)
+	// -- it must be a named variable, not a temporary lambda, or overload
+	// resolution fails to bind. Mirrors resolve_io_vars's `resolve`
+	// lambda, passed the same way.
+	auto do_untype = [](tref m) { return untype<node>(m); };
+	auto strip_types = [&do_untype](tref n) {
+		return pre_order<node>(n).apply_unique(do_untype);
+	};
+	rewriter::rules untyped_rules;
+	if (!def_families.empty())
+		for (const auto& ur : nso_rr.rec_relations)
+			untyped_rules.emplace_back(
+				tau::geth(strip_types(ur.first->get())),
+				tau::geth(strip_types(ur.second->get())));
+	// The untyped probe's own saturation cap. Stripping types only
+	// ENABLES matches (never blocks one the typed loop above already
+	// found), so an untyped re-saturation can diverge on a shape the
+	// typed loop never reached -- e.g. cross-family type-blocked mutual
+	// recursion (`a[n](x:sbf) := b[n](x)` with `b[n](x:tau) := a[n](x)`:
+	// each family is internally consistent on its own, so
+	// validate_rr_case_types passes both, the typed loop leaves a
+	// residual, and the untyped probe would rewrite a->b->a->b... with
+	// no fixed point, forever). The cap is the runtime `max_probe_steps`
+	// (finite by default, so the guard that exists to turn a hang into a
+	// fast error cannot itself hang), tightened by `max_enum_steps` when
+	// the caller bounded the enumeration itself; 0 means unlimited for
+	// either.
+	const size_t unlimited = std::numeric_limits<size_t>::max();
+	const size_t probe_cap = std::min(
+		max_probe_steps ? max_probe_steps : unlimited,
+		max_enum_steps ? max_enum_steps : unlimited);
+	subtree_unordered_set<node> legit_uninterpreted;
+
 	// Whether any rule application has ever rewritten an enumerated step.
 	// A rule with a capture offset matches every index from its lookback
 	// on, and a fixed-offset rule only indices up to max_lookback, so if
@@ -1902,6 +2266,109 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				"mismatch between the call site and the rules); "
 				"giving up.";
 			return nullptr;
+		}
+
+		// Partial-match guard: rules were applied to saturation, yet the
+		// step still holds a reference into a family this recurrence
+		// defines. This is only a defect when some rule's PATTERN
+		// actually covers this position and a type mismatch is what
+		// blocked it (typically the family's cases disagree on argument
+		// types -- normally caught earlier by validate_rr_case_types;
+		// this is the fallback for any future partial-match cause). It
+		// is NOT a defect when no rule covers this position at all
+		// regardless of type -- e.g. a step-only recurrence (no base
+		// case) enumerated down to an offset no rule's pattern reaches
+		// leaves an uninterpreted call that are_nso_equivalent treats as
+		// an opaque atom, and a fixpoint parametric in it can still be
+		// found (see "no initial condition",
+		// test_integration-nso_rr_fixed_point.cpp).
+		//
+		// Tell the two apart by re-attempting saturation on an UNTYPED
+		// clone of the whole step (using the hoisted untyped rules),
+		// via the exact same per-rule application the loop above just
+		// used, and see which residual(s) that unblocks: a residual
+		// whose own untyped shape is no longer present anywhere in the
+		// probe result was rewritten by some rule once its type stopped
+		// blocking -- that rule's shape does cover the position and
+		// this IS the defect. A residual whose untyped shape is still
+		// present unchanged was never going to match here regardless of
+		// type -- legitimately left alone (and memoized: trees are
+		// hash-consed, so the same shape recurring at a later step is
+		// literally the same tref and is skipped without re-probing).
+		// Checking every not-yet-cleared residual against the SAME
+		// single probe run (rather than probing per residual) is what
+		// lets one whole-step probe correctly attribute the error to
+		// the specific residual a rule actually unblocks, instead of
+		// always blaming whichever residual happens to appear first in
+		// document order.
+		trefs residuals;
+		for (tref rr_ref : tau::get(current).select_all(is<node, tau::ref>)) {
+			if (def_families.contains(get_rr_sig<node>(rr_ref))
+				&& !legit_uninterpreted.contains(rr_ref))
+				residuals.push_back(rr_ref);
+		}
+		if (!residuals.empty()) {
+			tref untyped_current = strip_types(current);
+			tref probe = untyped_current;
+			bool probe_changed;
+			bool probe_exhausted = false;
+			size_t probe_steps = 0;
+			do {
+				probe_changed = false;
+				// Deliberately does not re-check lookbacks[ri] > i (the
+				// main loop's skip for a fixed-offset rule whose literal
+				// offset the enumeration hasn't reached yet): by this
+				// point in the outer loop i >= max_lookback always
+				// holds, so every rule was already eligible above and
+				// stays eligible here.
+				for (const auto& ur : untyped_rules) {
+					tref pprev = probe;
+					probe = nso_rr_apply<node>(ur, probe);
+					if (tau::get(probe) != tau::get(pprev))
+						probe_changed = true;
+				}
+				if (probe_changed && ++probe_steps >= probe_cap) {
+					// Divergence, not silence: the probe kept finding
+					// something to rewrite, so some rule's shape DOES
+					// cover this residual -- it was genuinely type-
+					// blocked in the typed loop above. Exhausting the
+					// cap is therefore itself the "blocked" verdict,
+					// same as if the probe had stabilized on a changed
+					// result; fall through to attribution below with
+					// whatever the probe last produced.
+					probe_exhausted = true;
+					break;
+				}
+			} while (probe_changed);
+			subtree_unordered_set<node> probe_refs;
+			for (tref pr : tau::get(probe).select_all(is<node, tau::ref>))
+				probe_refs.insert(pr);
+			tref blocked = nullptr;
+			for (tref rr_ref : residuals) {
+				if (!probe_refs.contains(strip_types(rr_ref))) {
+					blocked = rr_ref;
+					break;
+				}
+			}
+			// A stabilized probe with every residual's untyped shape
+			// still present means none of them was ever going to match
+			// (the normal, legitimate case, handled below); an
+			// exhausted (diverging) probe never gets to claim that --
+			// name whichever residual triggered this probe run.
+			if (!blocked && probe_exhausted) blocked = residuals.front();
+			if (blocked) {
+				LOG_ERROR << "calculate_fixed_point: `"
+					<< LOG_FM(blocked) << "` remains after every rule"
+					" was applied to saturation; one of its cases"
+					" never matches the call (kind or type mismatch);"
+					" giving up.";
+				return nullptr;
+			}
+			for (tref rr_ref : residuals) legit_uninterpreted.insert(rr_ref);
+			DBG(LOG_TRACE << "calculate_fixed_point: " << residuals.size()
+				<< " residual(s) remain, but no rule matches any of"
+				" them even untyped; legitimately uninterpreted,"
+				" continuing";)
 		}
 
 		LOG_DEBUG << "Begin enumeration step";
@@ -1995,7 +2462,13 @@ tref normalizer(const rr<node>& nso_rr) {
 	tref res = normalize_with_temp_simp<node>(fm);
 
 	LOG_DEBUG << "End normalizer";
-	LOG_DEBUG << "Result: " << LOG_FM(res);
+	// res may now be nullptr (a D4 bv-widening cap violation, already
+	// LOG_ERROR'd by the pass) -- LOG_FM would dereference it whenever
+	// debug/trace logging is enabled, so guard it; the nullptr itself is
+	// intentionally propagated to the caller below, same as the
+	// pre-existing nso_rr_apply failure path just above.
+	if (res) LOG_DEBUG << "Result: " << LOG_FM(res);
+	else LOG_DEBUG << "Result: nullptr (bv-widening cap exceeded)";
 	return res;
 }
 

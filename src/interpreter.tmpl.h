@@ -254,7 +254,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
 			LOG_ERROR << "Failed to find output stream for stream '"
-				<< get_var_name<node>(vn) << "'";
+				<< TAU_TO_STR(io_var) << "'";
 			DBG(LOG_TRACE << ctx;)
 			DBG(LOG_TRACE << dump_to_str());
 			return false;
@@ -693,10 +693,17 @@ std::optional<interpreter<node>>
 					{ mixed = true; break; }
 			if (mixed) {
 				tref combined = tau::_T();
-				for (tref g : g_parts)
-					combined = tau::build_wff_and(combined, normalizer<node>(g));
-				for (tref o : other_parts)
-					combined = tau::build_wff_and(combined, normalizer<node>(o));
+				for (tref g : g_parts) {
+					tref ng = normalizer<node>(g);
+					if (!ng) { combined = nullptr; break; }
+					combined = tau::build_wff_and(combined, ng);
+				}
+				for (tref o : other_parts) {
+					if (!combined) break;
+					tref no = normalizer<node>(o);
+					if (!no) { combined = nullptr; break; }
+					combined = tau::build_wff_and(combined, no);
+				}
 				spec = combined;
 				goto post_normalization;
 			}
@@ -709,6 +716,15 @@ std::optional<interpreter<node>>
 	if (!has_ltl_operators<node>(spec) && !witness_ltl_route)
 		spec = normalizer<node>(spec);
 post_normalization:
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat the spec as unrealizable, the same
+	// as the "no clause was executable" failure path below, rather than
+	// dereferencing it in expression_paths.
+	if (!spec) {
+		LOG_ERROR << "Tau specification failed to normalize "
+			"(bv-widening cap exceeded)\n";
+		return {};
+	}
 	// Full LTL formulas (F/U/R/W) need a different execution strategy.
 	// Convert the realizable LTL spec to an equivalent safety (always) formula
 	// that the existing interpreter pipeline can execute step-by-step.
@@ -730,6 +746,11 @@ post_normalization:
 		since_aux_anchor = std::move(unanchored_aux);
 		// Normalize the derived safety formula and recurse with it.
 		spec = normalizer<node>(safety_spec);
+		if (!spec) {
+			LOG_ERROR << "Tau specification failed to normalize "
+				"(bv-widening cap exceeded)\n";
+			return {};
+		}
 	}
 	// For each spec clause, we check if it is executable
 	for (tref clause : expression_paths<node>(spec)) {
@@ -943,6 +964,21 @@ static tref combined_spec_fm(
 	return tau::build_wff_and(part_fms);
 }
 
+// Defined here rather than beside the other interpreter members: the call to
+// combined_spec_fm is not found by ADL, so it has to be declared above this
+// point for two-phase lookup.
+template <NodeType node>
+tref interpreter<node>::spec_partition_fm(
+	const std::vector<std::pair<htrefs, htref>>& parts)
+{
+	return unsqueeze_always(combined_spec_fm<node>(parts));
+}
+
+template <NodeType node>
+tref interpreter<node>::current_spec_fm() const {
+	return spec_partition_fm(original_spec);
+}
+
 template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool>
 	interpreter<node>::step()
@@ -1128,13 +1164,27 @@ std::pair<std::optional<assignment<node>>, bool>
 		// rewrite dominated a replay profile of the load test).
 		tref part_at_t = update_to_time_point(spec_part,
 							formula_time_point);
+		// Substitute memory and simplify before enumerating paths: the
+		// read set in appear_within_lookback comes from this same tree,
+		// so no path here can carry an input the solver must bind. The
+		// substitution also commutes with the enumeration, and it is what
+		// keeps the step after the initial segment cheap (GitHub #115):
+		// the continuation carries an absolute run prefix whose atoms
+		// memory already decides, and enumerating the paths of the raw
+		// formula first multiplied the path count by that prefix (over
+		// 100 s and gigabytes at step 5 of a lookback-3 spec with three
+		// inits).
+		part_at_t = syntactic_formula_simplification<node>(
+				rewriter::replace<node>(part_at_t, memory));
 		for (tref path : expression_paths<node>(part_at_t)) {
-			// rewriting the inputs and inserting them into memory
-			// TODO: Check why constant time positions are not being replaced
-			tref current = rewriter::replace<node>(path, memory);
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
-			current = normalize_non_temp<node>(current);
+			tref current = normalize_non_temp<node>(path);
+			// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+			// pass) surfaces as nullptr here; treat this path as
+			// unsolvable (same as solution_with_max_update finding no
+			// solution below) rather than dereferencing it.
+			if (!current) continue;
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
@@ -1144,6 +1194,26 @@ std::pair<std::optional<assignment<node>>, bool>
 					<< "\t\t" << LOG_FM_DUMP(k) << "\n"
 					<< "\t\t" << LOG_FM_DUMP(v) << "\n";
 #endif // DEBUG
+			// The solver must never bind an input variable directly; a
+			// leftover free input here means memory substitution or
+			// future-time elimination in get_ubt_ctn_at missed it.
+			auto step_io_vars = tau::get(current).select_top(
+						is_child<node, tau::io_var>);
+			for (tref v : step_io_vars) {
+				bool bad = !is_io_initial<node>(v)
+					|| tau::get(v).is_input_variable()
+					|| get_io_time_point<node>(v) > (int_t)time_point;
+				if (!bad) continue;
+				LOG_ERROR << "Unsolved stream variable '" << TAU_TO_STR(v)
+					<< "' in the step formula at time point " << time_point
+					<< ": " << LOG_FM(current) << "\n";
+				std::stringstream keys_ss;
+				keys_ss << "memory keys:";
+				for (const auto& [k, mval] : memory)
+					keys_ss << " " << TAU_TO_STR(k);
+				LOG_ERROR << keys_ss.str() << "\n";
+				return {};
+			}
 			auto path_solution = solution_with_max_update(current);
 #ifdef DEBUG
 			if (path_solution) {
@@ -1159,7 +1229,11 @@ std::pair<std::optional<assignment<node>>, bool>
 				auto substituted = rewriter::replace<node>(
 						current, path_solution.value());
 				auto check = normalize_non_temp<node>(substituted);
-				LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
+				// check is debug-log-only; a D4 bv-widening cap
+				// violation surfaces as nullptr here, and LOG_FM would
+				// dereference it whenever trace logging is enabled.
+				if (check) LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
+				else LOG_TRACE << "step/check: nullptr (bv-widening cap exceeded)\n";
 			} else {
 				LOG_TRACE << "step/solution: no solution\n";
 			}
@@ -1428,8 +1502,13 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		}
 		LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
 
-		// Eliminate added quantifiers
-		part_alts.push_back(normalize_non_temp<node>(step_ubt_ctn));
+		// Eliminate added quantifiers. A D4 bv-widening cap violation
+		// (already LOG_ERROR'd by the pass) surfaces as nullptr here;
+		// drop this alternative rather than pushing a null tref that
+		// step()'s consuming loop would later dereference.
+		if (tref normalized = normalize_non_temp<node>(step_ubt_ctn);
+			normalized)
+				part_alts.push_back(normalized);
 		}
 		upd_ubt_ctn.push_back(std::move(part_alts));
 	}
@@ -1441,6 +1520,10 @@ template <NodeType node>
 bool interpreter<node>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_spec begin \n";
 	if (final_system) return true;
+	// Idempotent per time point: appear_within_lookback and step() both
+	// call this for the same time_point, and it must not redo the
+	// quantifier elimination in the initial segment twice.
+	if (step_spec_time_point_ == (int_t)time_point) return true;
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
 	LOG_TRACE << "calculate_initial_spec[initial_segment]: " << initial_segment << "\n";
@@ -1448,17 +1531,24 @@ bool interpreter<node>::calculate_initial_spec() {
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		step_spec = get_ubt_ctn_at(time_point);
+		step_spec_time_point_ = (int_t)time_point;
 	} else if (time_point == initial_segment) {
-		// TODO: update constant time positions with values from memory to simplify step_spec
+		// The continuation is used verbatim from here on. Its constant
+		// time positions (the initial conditions and the run prefix that
+		// bridges them to the relative body) are already fixed by memory,
+		// so fold them now: every later step then enumerates the paths of
+		// the relative body only (GitHub #115).
 		step_spec.clear();
 		step_spec.reserve(ubt_ctn.size());
 		for (const htrefs& part : ubt_ctn) {
 			trefs part_alts;
 			part_alts.reserve(part.size());
-			for (const auto& h : part) part_alts.push_back(h->get());
+			for (const auto& h : part) part_alts.push_back(
+				rewriter::replace<node>(h->get(), memory));
 			step_spec.push_back(std::move(part_alts));
 		}
 		final_system = true;
+		step_spec_time_point_ = (int_t)time_point;
 	}
 	LOG_TRACE << "calculate_initial_systems[result]: true";
 	LOG_TRACE << "calculate_initial_systems end";
@@ -1558,6 +1648,10 @@ tref interpreter<node>::get_executable_spec(
 
 	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 	tref executable = transform_to_execution<node>(clause, start_time, true);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; propagate a clean nullptr rather than
+	// dereferencing it below.
+	if (!executable) return nullptr;
 	DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
 	if (tau::get(executable).equals_F()) return nullptr;
 	// Make sure that no constant time position is smaller than 0
@@ -1574,6 +1668,7 @@ tref interpreter<node>::get_executable_spec(
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
 		executable, io_vars, start_time);
+	if (!constraints) return nullptr;
 	if (tau::get(constraints).equals_F()) return nullptr;
 	DBG(LOG_TRACE << "compute_systems/constraints: " << constraints;)
 	if (!tau::get(constraints).equals_T()) {
@@ -1736,6 +1831,15 @@ std::optional<typename interpreter<node>::update_plan>
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
 	shifted_update = normalizer<node>(shifted_update);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; reject the update cleanly, the same as
+	// the other "No update performed" guards above -- the current spec
+	// (original_spec/memory) is left untouched (B1: never half-commit).
+	if (!shifted_update) {
+		LOG_WARNING << "No update performed: normalization failed "
+			"(bv-widening cap exceeded)\n";
+		return {};
+	}
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
 	// The constant time positions in original_spec need to be replaced by
@@ -2026,6 +2130,7 @@ bool interpreter<node>::update(tref update) {
 	// below can fail and leave the interpreter half-updated.
 	ubt_ctn = std::move(plan->ubt_ctn);
 	original_spec = std::move(plan->spec);
+	++spec_revision_;
 	output_partition = std::move(plan->partition);
 	outputs = std::move(plan->outputs);
 	inputs = std::move(plan->inputs);
@@ -2153,6 +2258,13 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		return r;
 	};
 	update = normalizer<node>(update);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; fold it into the SAME nullopt convention
+	// this function already uses for "definitions in a clause do not
+	// settle" -- the caller (interpreter::update) already treats a
+	// nullopt revision as "the update cannot be accepted", leaving the
+	// current spec untouched (B1: never half-commit).
+	if (!update) return {};
 	// If the update is T, nothing changes
 	if (tau::get(update).equals_T()) return to_htrefs(alts);
 	// PW-R6: one satisfiability memo per factored revision — the clause,
@@ -3029,22 +3141,35 @@ bool interpreter<node>::is_excluded_output(tref var) {
 template <NodeType node>
 trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
+	// step_spec is read below for t == time_point; keep it current here too,
+	// since callers (e.g. get_inputs_for_step) may reach this before step().
+	if (!calculate_initial_spec()) return appeared;
+	auto check = [&](tref fm, size_t t) {
+		tref step_ubt_ctn = update_to_time_point(fm,
+			t < formula_time_point ? formula_time_point : t);
+		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
+		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
+		// Try to find var in step_ubt_ctn
+		for (tref v : vars) {
+			if (contains<node>(step_ubt_ctn, v))
+				if (std::ranges::find_if(
+					appeared, [&v](const auto& n) {
+						return tau::get(n) == tau::get(v);
+					}) == appeared.end())
+					appeared.emplace_back(v);
+		}
+	};
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		for (const htrefs& part : ubt_ctn) for (const auto& h : part) {
-			tref step_ubt_ctn = update_to_time_point(h->get(),
-				t < formula_time_point ? formula_time_point : t);
-			step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-			// We only apply a heuristic in order to decide if the variable still appears
-			step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
-			// Try to find var in step_ubt_ctn
-			for (tref v : vars) {
-				if (contains<node>(step_ubt_ctn, v))
-					if (std::ranges::find_if(
-						appeared, [&v](const auto& n) {
-							return tau::get(n) == tau::get(v);
-						}) == appeared.end())
-						appeared.emplace_back(v);
-			}
+		// This step's read set must come from the same tree, substituted
+		// and simplified the same way, that step(values) hands the solver.
+		// Lookahead steps keep the raw alternatives: no step formula yet.
+		if (t == time_point) {
+			for (const trefs& part_alts : step_spec)
+				for (tref spec_part : part_alts)
+					check(spec_part, t);
+		} else {
+			for (const htrefs& part : ubt_ctn) for (const auto& h : part)
+				check(h->get(), t);
 		}
 	}
 	return appeared;
@@ -3061,14 +3186,23 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 			c = tau::_T();
 		}
 	}
-	// B6: fold via always_conjunction instead of a verbatim
-	// build_wff_and of the bodies -- clauses with different lookbacks
-	// must be shifted to a common frame before they share one always,
-	// exactly as always_conjunction (used by the normalizer and by
-	// pointwise_revision) does.
+	// Fold the bodies VERBATIM, without re-aligning their lookbacks. The
+	// clauses of one part come from a single always body that
+	// create_spec_partition split per conjunct, so they already share
+	// one time frame: `always (A(t) && B(t))` means A and B from the same
+	// start point. Folding them through always_conjunction instead (as
+	// 76a69031 did) shifts the clause with the smaller lookback into the
+	// past, `always (A(t-1) && B(t))`, which asserts A one step BEFORE the
+	// run starts and, with an initial condition on the state, constrains
+	// an input the run never reads: a guarded latch such as
+	// `(o1[0] = 0) && (i1[t] = 1 ? o1[t] = 1 : o1[t] = o1[t-1])` was
+	// reported unsat (GitHub #100). always_conjunction is only right for
+	// two SEPARATELY written always statements, each with its own start;
+	// that case is merged by the normalizer before the spec reaches the
+	// interpreter and never arrives here as clauses of one always.
 	tref aw_body = nullptr;
 	for (tref b : aw_clauses)
-		aw_body = aw_body ? always_conjunction<node>(aw_body, b) : b;
+		aw_body = aw_body ? tau::build_wff_and(aw_body, b) : b;
 	return tau::build_wff_and(
 		tau::build_wff_always(aw_body ? aw_body : tau::_T()),
 		tau::build_wff_and(clauses));

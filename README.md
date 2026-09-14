@@ -1028,7 +1028,9 @@ for details),
 stream. The type of a stream also determines the type of the Boolean function
 (see also subsection [Streams](#streams)) and
 * `0` and `1` stand for the bottom and top element in the fixed Boolean
-algebra.
+algebra. For a bitvector type they are the all-zeros and the **all-ones**
+vector, so `1:bv[8]` is `255`, not the number one (see
+[`0` and `1` in bitvectors](#0-and-1-in-bitvectors)).
 
 The order of the operations is the following (from higher precedence
 to lower): `'` > `&` > `^` > `|` > `fex ... ...` > `fall ... ...`.
@@ -1058,6 +1060,8 @@ term => (term _ '+' _ term) | (term _ '-' _ term) | (term _ '*' _ term)
       | (term _ '/' _ term) | (term _ '%' _ term) | (term _ "!&" _ term)
       | (term _ "!|" _ term) | (term _ "!^" _ term) | (term _ "<<" _ term)
       | (term _ ">>" _ term) | ("(" "bv" "[" bit_width "]" ")" _ term)
+      | ("min" _ "(" _ term _ "," _ term _ ")")
+      | ("max" _ "(" _ term _ "," _ term _ ")")
 ```
 
 where `term` is as above are as above and
@@ -1076,9 +1080,46 @@ the new operators meaning is given in the following table:
 | `<<`              | left shift of bitvector by a number of bits            |
 | `>>`              | right shift of bitvector by a number of bits           |
 | `(bv[n])`         | cast of a term to a bitvector of width `n`             |
+| `min(x, y)`       | unsigned minimum of two bitvectors                     |
+| `max(x, y)`       | unsigned maximum of two bitvectors                     |
 
-The last entry is a cast. It converts its operand to the bitvector type of the
-given width, for example:
+### `0` and `1` in bitvectors
+
+As in every Boolean algebra, `0` and `1` denote the bottom and the top
+element. For `bv[n]` the bottom is the all-zeros vector and the top is the
+**all-ones** vector `2^n - 1`, so `1:bv[8]` is `255`. The number one is a
+constant, `{1}:bv[8]`. This holds everywhere a bare `1` meets a bitvector,
+in input and in output:
+
+| written                    | meaning for `bv[8]`                                   |
+|----------------------------|-------------------------------------------------------|
+| `1:bv[8]`, `x + 1`         | `255`; `x + 255`, i.e. `x - 1` modulo 256             |
+| `{1}:bv[8]`, `x + {1}:bv[8]` | the number one; the successor of `x`                |
+| `x <= 1`                   | always true                                           |
+| `1 <= x`                   | `x = 255`, i.e. `x' = 0`                              |
+| `x'`                       | `255 - x`, the bitwise complement                     |
+| `(bv[8]) 1:bv[4]`          | `{15}:bv[8]`: the cast widens `1111` with zeros       |
+| `n {255}:bv[8]`            | prints `1`: an all-ones constant is shown as the top  |
+
+Prefer braced constants (`{ #x01 }`, `{1}:bv[8]`) whenever a number is
+intended, and read a bare `1` in bitvector output as "all ones". The
+saturating idioms below rely on this: `i1'` is `2^w - 1 - i1` because the
+complement is taken against the all-ones top.
+
+`min` and `max` are call-style builtins, defined only for bitvectors: using
+them on operands of any other Boolean algebra is a type-resolution error. Like
+the comparison operators they compare unsigned, so e.g.
+`max({200}:bv[8], {100}:bv[8])` is `{200}:bv[8]` even though 200 is negative
+as a signed 8-bit value. For satisfiability they are handed to CVC5 as
+`ite(bvule(x, y), ...)`; under predicate blasting (`-B`) they blast through a
+fresh result variable `r` constrained by
+`((x < y) -> r = x) && ((x >= y) -> r = y)` (the dual for `max`), with no
+constant-operand precondition. Being self-delimiting they take no part in
+operator precedence, and the names `min` and `max` are reserved: a user
+function of that name can no longer be called with exactly two arguments.
+
+The `(bv[n])` entry is a cast. It converts its operand to the bitvector type
+of the given width, for example:
 
 ```
 (bv[8]) x = { #x1f } : bv[8]
@@ -1087,6 +1128,445 @@ given width, for example:
 The cast operand must be a parenthesized term, a constant, a variable, a
 function call, `0`, `1`, a negation, a functional quantifier or another cast;
 wrap anything else in parentheses.
+
+A cast converts between bitvector widths only. Its operand must itself be a
+bitvector term, and its result is a bitvector of the target width that takes
+part in the surrounding formula like any other term: casting an `sbf` or
+`tau` term, or mixing a cast with a non-bitvector sibling as in
+`((bv[8]) x:bv[4]) & y:sbf = 0`, is a type error reported during type
+inference.
+
+### Division and remainder by zero
+
+Division and remainder are total functions with the SMT-LIB semantics of
+`bvudiv` and `bvurem` (as implemented by CVC5). Neither raises an error on a
+zero divisor; instead, for a bitvector `x` of width `w`:
+
+```
+x / 0  =  2^w - 1     (all-ones, the maximum value of bv[w])
+x % 0  =  x
+```
+
+In particular `x / 0` yields the *maximum* of the type — the least safe
+default for anything metering, pricing or otherwise accumulating — so never
+rely on it implicitly. The same rule reaches `x / x` and `0 / x`: both are
+`{1}` and `0` only for `x != 0`, and the maximum at `x = 0`, so the
+normalizer leaves them unfolded while `x` is symbolic; `1 / 0` and `1 % 0`
+are the all-ones top element again. When a divisor can be zero, guard it in the
+specification and pick the zero-case value explicitly:
+
+```
+always ( ( i2[t]:bv[24] != { #x000000 }:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] / i2[t]:bv[24] ) )
+      || ( i2[t]:bv[24] =  { #x000000 }:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+```
+
+Here `1200 / 3` gives `400` as usual, while a zero divisor gives `0` — the
+spec author's own choice — instead of the inherited `16777215`.
+
+### Overflow: checked and saturating arithmetic
+
+`+`, `-`, `*` and `<<` are modular, with the SMT-LIB semantics of `bvadd`,
+`bvsub`, `bvmul` and `bvshl`: results wrap around at the bit width silently —
+there is no error, no flag and no carry bit. A wrapped value looks like any
+other value, so a specification that must not wrap has to say so itself. Since
+Tau is a constraint language, the overflow condition is expressible with the
+ordinary operators, and a specification can branch on it. The patterns below
+are the recommended forms; all examples use `bv[24]`, whose maximum is
+`{ #xffffff }` (16777215), but nothing in them is width-specific.
+
+**Saturating addition.** Unsigned addition overflowed iff the sum is smaller
+than an operand:
+
+```
+always ( ( ( i1[t]:bv[24] + i2[t]:bv[24] ) >= i1[t]:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] + i2[t]:bv[24] ) )
+      || ( ( i1[t]:bv[24] + i2[t]:bv[24] ) <  i1[t]:bv[24] && o1[t]:bv[24] = { #xffffff }:bv[24] ) ).
+
+  16777115 + 100  ->  16777215   (exact sum, no clamp needed)
+  16777215 + 100  ->  16777215   (clamped instead of wrapping to 99)
+```
+
+**Checked multiplication by a constant.** The largest safe operand
+`floor((2^w - 1) / n)` is itself a constant, so the guard is a plain
+comparison — no arithmetic at all. For `n = 5` at width 24 the threshold is
+`{ #x333333 }`:
+
+```
+always ( ( i1[t]:bv[24] <= { #x333333 }:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] * { #x000005 }:bv[24] ) )
+      || ( i1[t]:bv[24] >  { #x333333 }:bv[24] && o1[t]:bv[24] = { #xffffff }:bv[24] ) ).
+
+  3355443  ->  16777215   (largest exact product)
+  3355444  ->  16777215   (clamped instead of wrapping to 4)
+```
+
+**Checked multiplication by a variable.** When the multiplier is itself a
+stream there is no precomputable threshold; the round-trip test
+`(a * b) / b = a` detects the wrap (guard the divisor per
+[Division and remainder by zero](#division-and-remainder-by-zero)):
+
+```
+always ( ( i2[t]:bv[24] != { #x000000 }:bv[24] && ( ( i1[t]:bv[24] * i2[t]:bv[24] ) / i2[t]:bv[24] ) =  i1[t]:bv[24]
+           && o1[t]:bv[24] = ( i1[t]:bv[24] * i2[t]:bv[24] ) )
+      || ( i2[t]:bv[24] != { #x000000 }:bv[24] && ( ( i1[t]:bv[24] * i2[t]:bv[24] ) / i2[t]:bv[24] ) != i1[t]:bv[24]
+           && o1[t]:bv[24] = { #xffffff }:bv[24] )
+      || ( i2[t]:bv[24] =  { #x000000 }:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+
+  4000000 * 5  ->  16777215   (detected; the raw product wraps)
+```
+
+**Saturating (monus) subtraction.** Underflow is an ordering comparison:
+
+```
+always ( ( i1[t]:bv[24] >= i2[t]:bv[24] && o1[t]:bv[24] = ( i1[t]:bv[24] - i2[t]:bv[24] ) )
+      || ( i1[t]:bv[24] <  i2[t]:bv[24] && o1[t]:bv[24] = { #x000000 }:bv[24] ) ).
+
+  100 - 1000  ->  0   (clamped instead of 16776316)
+```
+
+Getting the addition predicate subtly wrong is easy, so prefer copying these
+forms over re-deriving them.
+
+With the [`min`/`max` builtins](#bitvectors), the two saturating forms above
+collapse to single expressions — no branch at all. `i1'` is the bitwise
+complement, i.e. `2^w - 1 - i1`, so the addend below can never push the sum
+past the maximum:
+
+```
+always o1[t]:bv[24] = ( i1[t]:bv[24] + min(i2[t]:bv[24], i1[t]:bv[24]') ).   # saturating +
+always o1[t]:bv[24] = ( i1[t]:bv[24] - min(i1[t]:bv[24], i2[t]:bv[24]) ).    # saturating (monus) -
+```
+
+The checked-multiplication patterns keep their branches: the product itself
+wraps, so no post-hoc `min` can recover it. The
+[exact (widened) arithmetic mode](#exact-widened-arithmetic-mode) below lifts
+exactly this restriction, for callers willing to opt in.
+
+### Exact (widened) arithmetic mode
+
+Everything above is *modular*: intermediate results wrap silently at the
+operands' declared width, so a computation that must not overflow has to be
+reasoned about with the guard patterns above, or, for addition and
+subtraction only, with the `min`/`max` idiom that closes this section. Tau
+also offers an opt-in **exact (widened) arithmetic mode** that instead
+computes each atomic formula's arithmetic exactly, as over the naturals, at
+whatever width is needed to avoid any overflow, and truncates only once, at
+the point where a result is actually stored. Under this mode the
+checked-multiplication gap admitted just above disappears: `min(i1*i2, K)`
+becomes a correct, guard-free saturating multiplication.
+
+The mode is off by default and changes nothing when disabled. Turn it on
+with:
+
+* the command line options `-y`, `--bv-widening` (enable the mode; disabled
+  by default) and `-Y`, `--bv-max-width <n>` (cap the width the mode is
+  allowed to compute at; `0` leaves the current cap unchanged, 1024 unless
+  already set). Both apply whether Tau is run as a REPL or given a
+  specification file directly.
+* the matching REPL options `y|bvwidening` (on/off) and `bvmaxwidth`
+  (numeric, `set bvmaxwidth <n>`; `0` leaves the current cap unchanged).
+* the API setters `api::set_bv_widening(bool)` and
+  `api::set_bv_max_width(size_t)`.
+
+**Semantics.** For every bitvector atomic formula (an equality, a
+comparison, an interval), the mode computes, bottom-up, the minimum width
+`W` at which none of the atom's arithmetic can overflow:
+
+| Node                                     | Needed width                                               |
+|------------------------------------------|------------------------------------------------------------|
+| variable, io_var, constant               | the atom's own declared or inferred width `w` (a leaf's own type is not consulted separately) |
+| `a + b`                                  | `max(width(a), width(b)) + 1`                               |
+| `a - b`                                  | `max(width(a), width(b))`                                   |
+| `a * b`                                  | `width(a) + width(b)`                                       |
+| `a / b`, `a % b`                         | `width(a)` (a quotient or remainder never exceeds the dividend) |
+| `a << k` (`k` a constant)                | `width(a) + k`                                              |
+| `a >> k`, `a >> v` (either kind of shift right) | `width(a)`                                          |
+| `a << v` (`v` a variable)                | `width(a)` — see caveat below                              |
+| `min(a, b)`, `max(a, b)`                 | `max(width(a), width(b))`                                   |
+| `&`, `\|`, `^`, `'`, `!&`, `!\|`, `!^`   | `max` of the operand widths — run at `W` like everything else, see caveat below |
+
+`W` is the largest of these over the whole atom. Every leaf is upcast once
+to `bv[W]` by zero-extension and every operator is retyped `bv[W]`; there is
+no interior truncation anywhere. The only place a result is ever cut back
+down is an equality with exactly one bare variable/stream side (an
+"assignment"): there, the *other* side is computed at `W` and then cast
+down, truncating, to the variable's own declared width — so
+`o1[t] = i1[t] + i2[t]` still stores the same wrapped sum as in the default
+mode, while `o1[t] = min(i1[t] + i2[t], K)` lets `min` see the exact,
+unwrapped sum before it clamps. A comparison, an interval, or an equality
+between two compound expressions is instead extended on both sides and
+compared or equated exactly, with no truncation at all — this is where the
+mode is most visible: `i1*i2 <= c` stops wrapping.
+
+**The mode changes what formulas mean.** Widening is not a faster or more
+precise way of answering the same question: it rewrites every atom into a
+different formula, one over exact arithmetic, *before* any decision
+procedure sees it, so satisfiability, validity, normalization, `solve`, and
+the realizability of a specification are all decided for that rewritten
+formula. A formula whose truth depends on wrap-around can therefore flip
+its answer when the mode is switched on:
+
+```
+sat ex x:bv[4] (x:bv[4] << {4}:bv[4] != {0}:bv[4]).
+
+  modular                        ->  F   (a 4-bit value shifted left by 4 is always 0)
+  widened (--bv-widening)        ->  T   (the shift runs at W = 8: 1 << 4 = 16 != 0, so x = 1 works)
+
+valid all x:bv[8] (x:bv[8] + x:bv[8] >= x:bv[8]).
+
+  modular                        ->  F   (128 + 128 wraps to 0 < 128)
+  widened (--bv-widening)        ->  T   (the sum runs at W = 9 and never wraps)
+
+n x:bv[4] << {4}:bv[4] = {0}:bv[4]
+
+  modular                        ->  T
+  widened (--bv-widening)        ->  (bv[8]) x<<{ 4 }:bv[8] = 0
+```
+
+Neither answer is wrong; they answer different questions. The modular
+answer is the one for the formula as written over `bv[4]`/`bv[8]`, and the
+widened answer is the one for its exact-arithmetic reading. So the mode
+must be chosen for a specification as a whole, not toggled around
+individual queries, and a wrap-around that a specification *relies on*
+(a mask computed by shifting, a counter meant to roll over) has to be
+pinned with an explicit cast, which the mode leaves untouched:
+`sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4]).` answers
+`F` in both modes. The only construct that keeps its modular meaning on
+its own is the assignment truncation described above:
+`always o1[t]:bv[4] = i1[t]:bv[4] << {4}:bv[4] && o1[t] != {0}:bv[4]` stays
+unsatisfiable with the mode on, because the shifted value is cut back to
+4 bits when it is stored in `o1[t]`.
+
+**Which commands see the mode.** The widening pass runs at the entry of the
+normalizer, after definitions have been expanded, so a command decides the
+widened formula exactly when it normalizes its argument. Everything else
+handles the formula as written, in modular arithmetic, even with the mode
+on:
+
+| Command                                                          | Widened | Notes                                                                 |
+|------------------------------------------------------------------|---------|-----------------------------------------------------------------------|
+| `normalize` / `n` on a formula                                    | yes     | prints the elaborated atoms with their casts; the result is a fixed point (`n %1` returns it unchanged) |
+| `sat`, `unsat`, `valid`                                           | yes     | on formulas and on specifications alike                               |
+| `solve`                                                          | yes     | the assignment is searched for in the widened atoms                   |
+| `run` / `r`, a specification file, runtime updates                | yes     | every execution step normalizes the current specification, see below |
+| `dnf`, `cnf`, `nnf`, `mnf`, `qelim`, `subst`, `inst`              | no      | these transform the tree without normalizing it                       |
+| a bare term, a history entry                                      | no      | there is no atom to widen; the tree is stored as parsed               |
+
+```
+qelim ex x (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
+
+  modular                        ->  T   (x = 16: the product wraps to 0)
+  widened (--bv-widening)        ->  T   (qelim does not normalize, so the same modular answer)
+
+sat ex x:bv[8] (x * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
+
+  modular                        ->  T
+  widened (--bv-widening)        ->  F   (the product runs at W = 16 and is never 0 for x != 0)
+
+solve --bv x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8].
+
+  modular                        ->  x := { 240 }:bv[8]
+  widened (--bv-widening)        ->  no solution
+```
+
+The split matters when commands are chained through the history: whatever a
+non-normalizing command has already decided stays decided in modular
+arithmetic (`qelim` above returns `T`, and `sat %1` can only confirm it),
+while whatever it leaves in place as a formula is widened by the next
+normalizing command that receives it.
+
+**Normalization.** `n` is the command that shows what the pass did: each
+leaf appears under its zero-extending cast, every operator is retyped, and
+an assignment keeps its truncating outer cast. Two details of the printed
+form are worth knowing:
+
+* A constant product that would wrap is not folded while the mode is on, so
+  `n { 16 }:bv[8] * { 16 }:bv[8]` prints the product itself instead of `0`.
+  Inside an atom the same product is computed exactly: `n { 16 }:bv[8] *
+  { 16 }:bv[8] <= { 200 }:bv[8]` is `F` with the mode on and `T` without it,
+  while `n x:bv[8] = { 16 }:bv[8] * { 16 }:bv[8]` is `x = 0` in both modes,
+  because an assignment truncates the exact 256 back to 8 bits.
+* Definitions are expanded first and widened afterwards, so a call whose
+  body carries the arithmetic is widened like inline arithmetic: with
+  `fn(a:bv[8]) := a * a.`, `n fn(x) <= { 200 }:bv[8]` prints
+  `{ 200 }:bv[16] !< (bv[16]) x*(bv[16]) x`. A call that is *not* expanded
+  is an opaque subterm and leaves its atom modular, see below.
+
+**Execution.** The interpreter normalizes the current specification at
+every step — the initial specification, its expanded definitions, and any
+update merged at runtime — so with the mode on each step is solved over the
+widened atoms. Inputs are read at their declared width and outputs are
+stored at theirs: an output equation is an assignment, so the value that
+reaches the stream is always truncated to the stream's width, exactly as in
+the default mode. What changes is everything that sits *between* the
+arithmetic and the store — a comparison guard, a `min`/`max`, a division —
+which now sees the exact intermediate value. Two runs on `bv[8]` inputs
+`16, 200, 3`:
+
+```
+always o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8].
+
+  modular                        ->  0, 128, 48    (256 and 3200 wrap on the way into o1)
+  widened (--bv-widening)        ->  0, 128, 48    (same: the assignment truncates the exact product)
+
+always (   i1[t]:bv[8] * { 16 }:bv[8] <= { 200 }:bv[8] && o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8] )
+    || (   i1[t]:bv[8] * { 16 }:bv[8] >  { 200 }:bv[8] && o1[t]:bv[8] = { 200 }:bv[8] ).
+
+  modular                        ->  0, 128, 48    (the guard compares the wrapped product, so it never fires)
+  widened (--bv-widening)        ->  200, 200, 48  (the guard sees 256 and 3200 and clamps)
+```
+
+A runtime update goes through the same normalization when it is accepted,
+so its widened form is what gets merged and printed. With `u[t] = i1[t]`
+running and `o1[t]:bv[8] = min({ 16 }:bv[8] * { 16 }:bv[8], { 200 }:bv[8])`
+proposed on `i1`:
+
+```
+  modular                        ->  u[0] := always o1[t]:bv[8] = 0              then o1[1] := 0
+  widened (--bv-widening)        ->  u[0] := always o1[t]:bv[8] = { 200 }:bv[8]  then o1[1] := 200
+```
+
+A proportional value is the everyday case of this: `( i1[t] * 5 ) / 100`
+wraps at the operand width in the default mode as soon as `i1 * 5` exceeds
+the maximum, while with the mode on the product is formed at twice the
+width, the quotient is exact and — a quotient never needing more bits than
+its dividend — the final truncation into the output is lossless. At
+`bv[24]` with `i1 = 3355444` the default mode stores `0` and the widened
+mode stores the exact `167772`.
+
+Realizability follows the same reading: whether a specification is accepted
+for execution or rejected (`Tau specification is unsat`) is decided for its
+widened formula. Inputs are universally quantified, so a constraint on an
+input that only holds without wrap-around is rejected in the default mode
+and accepted with the mode on:
+
+```
+always o1[t]:bv[8] = { 1 }:bv[8] && i1[t]:bv[8] * { 2 }:bv[8] >= i1[t]:bv[8].
+
+  modular                        ->  Tau specification is unsat   (i1 = 128 doubles to 0 < 128)
+  widened (--bv-widening)        ->  o1[0] := 1, o1[1] := 1, ...  (the product runs at W = 16, so it always holds)
+```
+
+Conversely a specification that is only satisfiable thanks to a wrap-around
+is rejected with the mode on:
+
+```
+always o1[t]:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && o1[t]:bv[8] != { 0 }:bv[8].
+
+  modular                        ->  o1[0] := 240                (240 * 16 = 3840 wraps to 0)
+  widened (--bv-widening)        ->  Tau specification is unsat  (no nonzero 8-bit value has a zero exact product)
+```
+
+The setting is global to the process
+(`api::set_bv_widening`) and is read at each normalization, so choose it
+before a specification is built and keep it for the whole run rather than
+switching it between steps.
+
+**Caveats.**
+
+* Subtraction still wraps on underflow: `-`'s needed width never grows on
+  its own (`max(width(a), width(b))`), so an underflowing subtraction still
+  wraps, just at `W` rather than at the base width when it sits above an
+  already-widened operand. Guard it exactly as in the default mode, with
+  `a >= b`.
+* A variable-amount left shift is the one operation the mode cannot bound:
+  accounting for every possible shift amount could need up to
+  `w + 2^{w_v} - 1` bits, so `a << v` for a variable `v` still executes at
+  `W` and can still wrap there. A constant-amount shift, `a << k`, is fully
+  accounted for and exact.
+* Complement and the other negating bitwise operators (`'`, `!&`, `!|`,
+  `!^`) act at `W`, not at the operand's own declared width, because every
+  operator in the atom runs at the atom's computed width. So `x'` means
+  `2^W - 1 - x`, not the base-width complement zero-extended — meaning the
+  saturating idiom `min(i2, i1')` from the previous section no longer means
+  "clamp against `i1`'s own maximum" once `i1'` is computed at some wider
+  `W`:
+
+  ```
+  sat ex x ((x:bv[8] * { 255 }:bv[8])' <= { 200 }:bv[8]).
+
+    modular                        ->  T   (x = 1 gives complement 0 <= 200)
+    widened (--bv-widening)        ->  F   (the complement is computed at W = 16, always >= 510)
+  ```
+
+  If a specific width is intended, pin it explicitly with a cast, exactly
+  as in the default mode:
+
+  ```
+  (bv[8]) i1[t]:bv[8]'          # the base-width (8-bit) complement, regardless of the surrounding computation's width
+  ```
+
+  A cast is always a boundary for this pass: whatever it wraps is left
+  untouched — it computes exactly as it does in the default mode, at its
+  own widths — and its result enters the surrounding widened computation at
+  the cast's declared width, recovering today's exact meaning even with the
+  mode switched on — e.g. adding the cast to the query above,
+  `sat ex x ((bv[8]) (x:bv[8] * { 255 }:bv[8])' <= { 200 }:bv[8]).`, answers
+  `T` again with `--bv-widening` still on.
+
+**Payoff.** With the mode on, the two saturating patterns that need a
+branch in the default mode — and the checked multiply that needs one no
+matter what, per the admission above — both collapse to a single `min`:
+
+```
+always o1[t]:bv[8] = min( i1[t]:bv[8] + i2[t]:bv[8], { 200 }:bv[8] ).   # guard-free saturating +
+
+  200 + 100  ->  200   (exact sum 300 does not fit under {200}, so min clamps to it)
+  200 + 100  ->  44    (default mode: the sum itself already wrapped to 44 before min ever ran)
+```
+
+```
+always o1[t]:bv[8] = min( i1[t]:bv[8] * i2[t]:bv[8], { 200 }:bv[8] ).   # guard-free checked *
+
+  16 * 16  ->  200   (exact product 256 does not fit under {200}, so min clamps to it)
+  16 * 16  ->  0     (default mode: the product itself already wrapped to 0; no post-hoc min can recover it)
+```
+
+The second pattern is the one this section opened by ruling out: with the
+mode on, the multiplication itself never wraps, so `min` sees the real
+product and the previously-impossible checked multiply becomes an ordinary
+guard-free expression.
+
+**Opaque subterms.** An atom containing a subterm the width computation
+does not understand — a function or predicate call, a capture — is left
+exactly as written, in modular semantics, with no diagnostic: the mode
+widens only atoms whose arithmetic it can see through completely. Expand
+such calls (or rewrite the atom without them) if it must be exact.
+
+**Cap.** `W` is bounded by `--bv-max-width`/`bvmaxwidth` (default 1024); a
+formula that would need a wider computation fails cleanly instead of
+growing without bound. Exceeding it logs two error lines and the query
+answers conservatively rather than crashing or hanging, e.g.:
+
+```
+(Error) bv-widening: required width 16 exceeds bv-max-width 8
+(Error) is_tau_formula_sat: normalization failed (bv-widening cap exceeded); answering unsat. This is a conservative fallback, not a proof.
+```
+
+A satisfiability check answers unsat (`F`), a validity check answers "not
+valid", and constructing or updating a specification that would exceed the
+cap is rejected the same way — in every case this is a conservative
+fallback the cap forces, not a proof that the formula is actually
+unsatisfiable/invalid/unacceptable.
+
+**Cost.** The mode is inert — identical performance — when off. When on,
+a ground or lightly-quantified spec runs about as fast as the default mode;
+widening one atom's arithmetic by a few dozen extra bits is cheap for CVC5.
+Quantified nonlinear arithmetic is a different story: doubling the width of
+a product inside a quantifier can turn an instant query into an
+intractable one, e.g.
+`valid all x all y ((x:bv[64]*y:bv[64])/y = x || y = {0}:bv[64])` answers in
+well under a second in the default mode but does not finish in five minutes
+once widened to bv[128]. The mode is at its best for executable specs and
+ground or lightly-quantified reasoning; deep quantified nonlinear
+arithmetic may need the cap, or restructuring the specification, to stay
+tractable.
+
+The guard idioms from the previous section remain the answer in the
+default mode, and stay available — and correct — with the exact mode
+switched on too. [`demos/demo_2.4-exact_bitvector_arithmetic.tau`](demos/demo_2.4-exact_bitvector_arithmetic.tau)
+walks through the mode interactively, including the cap and a saturating
+stream accumulator.
+
+### Precedence of term operations
 
 The order of *all* term operations, bitvector and Boolean alike, is the
 following (from higher precedence to lower):
@@ -1673,7 +2153,7 @@ Here are some small examples to illustrate the type inference system:
       - the outer `x` is inferred to be of the default type `tau`,
       - no type mismatch occurs as both `x` are in different scopes.
 6. `ex x x = 1 : bv[8]`:
-      - the constant `1` is typed as `bv[8]`,
+      - the constant `1` is typed as `bv[8]` (it is the all-ones vector `{255}:bv[8]`, see [`0` and `1` in bitvectors](#0-and-1-in-bitvectors)),
       - `x` is inferred to be of the same type as the constant `1`, i.e. `bv[8]`,
       - no type mismatch occurs.
 7. `x:bv[8] = {1}:bv[16]`:
@@ -1975,7 +2455,10 @@ as explained in step 1 above.
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
 In particular, we require that `T` and `F` are reserved for truth values in Tau specifications
 and `0` and `1` stand for the corresponding Boolean
-algebra elements.
+algebra elements. The names `min` and `max` are reserved for the builtin
+bitvector operations (see [Bitvectors](#bitvectors)): a two-argument call
+`min(x, y)` or `max(x, y)` always denotes the builtin, never a user-defined
+function of the same name.
 
 # **Command line interface**
 
@@ -2007,19 +2490,24 @@ will be started.
 
 The general options are the following:
 
-| Option             | Description                                             |
-|--------------------|---------------------------------------------------------|
-| -h, --help         | detailed information about options                      |
-| -l, --license      | show the license                                        |
-| -v, --version      | show the version of the executable                      |
-| -V, --charvar      | char-as-variable short form (enabled by default)        |
-| -B, --blasting     | bitvector predicate blasting (disabled by default)      |
-| -S, --severity     | severity level (trace/debug/info/error); default `info` |
-| -I, --indenting    | indent formulas in output                               |
-| -H, --highlighting | syntax highlighting                                     |
-| -b, --benchmarks   | print benchmarks (enabled by default)                   |
-| -J, --json         | output in JSON format                                   |
-| -q, --quit         | quit when no input is available (scripted runs)         |
+| Option             | Description                                           |
+|--------------------|-------------------------------------------------------|
+| -h, --help         | detailed information about options                    |
+| -l, --license      | show the license                                      |
+| -v, --version      | show the version of the executable                    |
+|--------------------|-------------------------------------------------------|
+| -V, --charvar      | charvar (enabled by default)                          |
+| -B, --blasting     | bitvector predicate blasting (disabled by default)    |
+| -C, --bv-case-split | bitvector case split of quantified variables tested against constants (enabled by default) |
+| -K, --ba-component-factoring | decide tau-algebra constants per support component (enabled by default) |
+| -y, --bv-widening  | exact (widened) bitvector arithmetic (disabled by default) |
+| -Y, --bv-max-width | cap on the width exact bitvector arithmetic may compute at (0 = default 1024) |
+| -S, --severity     | severity level (trace/debug/info/error)               |
+| -I, --indenting    | indenting of the formulas                             |
+| -H, --highlighting | syntax highlighting                                   |
+| -b, --benchmarks   | print benchmarks (enabled by default)                 |
+| -J, --json         | output in JSON format                                 |
+| -q, --quit         | quit when no input is available                       |
 
 Whereas the REPL specific options are:
 
@@ -2036,17 +2524,21 @@ and the limit options, which bound the engine's iterative searches. Every
 cap defaults to unlimited (`0`) except the two temporal-normalization caps
 (`--max-fixpoint-steps`, `--max-flag-search-steps`), which ship at `500`
 because those searches have no termination guarantee — unlimited turns a
-non-converging spec from a loud give-up into a hang (pass `0` to opt in); the
-two gc knobs keep their tuned defaults.
-Each has a matching REPL option (see [REPL options](#repl-options)):
+non-converging spec from a loud give-up into a hang (pass `0` to opt in),
+`--ba-decision-pins` (4096, 0 = none) and `--max-probe-steps` (10000);
+`--spec-size-warn`'s `0` means off, and the two gc knobs keep their tuned
+defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 
 | Option                        | Description                                                                            |
 |-------------------------------|----------------------------------------------------------------------------------------|
 | -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part (0 = unlimited)              |
-| -W, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
+| -Z, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
+| -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (0 = unlimited) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
+| -k, --bv-case-split-max-tests | cap the constants a quantified bitvector variable may be tested against for the case split (0 = unlimited) |
+| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (default 500; 0 = unlimited)                 |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (default 500; 0 = unlimited) |
@@ -2055,6 +2547,7 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
 | -P, --max-def-passes          | cap definition-expansion passes (0 = unlimited)                                        |
 | -E, --max-enum-steps          | cap recurrence-relation enumeration steps (0 = unlimited)                              |
+| -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default 10000, 0 = unlimited) |
 | -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (0 = unlimited)                                         |
 | -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)                              |
 | -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
@@ -2180,6 +2673,23 @@ whether bitvector predicates are expanded into their bit-level encoding. It's
 off by default (the REPL starts with the value of the `-B, --blasting` command
 line option, which defaults to off).
 
+* `casesplit|bvcasesplit`: Can be on/off. Controls the bitvector case split: a quantified
+bitvector variable that occurs only in comparisons against constants of its
+type is eliminated by one witness per cell those constants cut the domain
+into, before any quantifier block forms. It's on by default (the REPL starts
+with the value of the `-C, --bv-case-split` command line option).
+
+* `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
+tau-algebra constant tests: a constant whose clauses share no variables is
+decided per component, each decision remembered across steps, instead of as a
+whole. It's on by default (the REPL starts with the value of the
+`-K, --ba-component-factoring` command line option).
+
+* `y|bvwidening`: Can be on/off. Controls the
+[exact (widened) bitvector arithmetic mode](#exact-widened-arithmetic-mode).
+It's off by default (the REPL starts with the value of the `-y, --bv-widening`
+command line option).
+
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
 
@@ -2197,6 +2707,15 @@ anti-prenexing (`--block-max-splits`). Unlimited by default.
 
 * `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
 (`--block-max-rounds`). Unlimited by default.
+
+* `casesplitmaxtests|bvcasesplitmaxtests|maxcasetests`: cap on the constants a quantified
+bitvector variable may be tested against for the case split to apply
+(`--bv-case-split-max-tests`). Unlimited by default.
+
+* `decisionpins|badecisionpins`: how many decided tau-algebra rows keep their key tree alive
+across the interpreter's step sweep, oldest released first
+(`--ba-decision-pins`). 4096 by default; `0` disables the pinning (a raw
+count, not "unlimited").
 
 * `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
 elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
@@ -2227,6 +2746,12 @@ cap (`--max-simplify-rounds`). Unlimited by default.
 * `enumsteps|maxenumsteps`: recurrence-relation enumeration step cap
 (`--max-enum-steps`). Unlimited by default.
 
+* `probesteps|maxprobesteps`: cap on the untyped saturation probe that
+`calculate_fixed_point` runs over a residual recurrence reference to tell a
+type-blocked rule from a legitimately uninterpreted one (`--max-probe-steps`).
+10000 by default, since a diverging probe never stabilizes; a finite
+`enumsteps` tightens it further; 0 = unlimited.
+
 * `rewriterounds|maxrewriterounds`: rewrite-to-fixpoint round cap
 (`--max-rewrite-rounds`). Unlimited by default.
 
@@ -2242,6 +2767,11 @@ characters (`--spec-size-warn`). 0 (off) by default.
 
 * `revisionalts|maxrevisionalts`: cap on revision alternatives kept per
 specification part (`--max-revision-alts`). Unlimited by default.
+
+* `bvmaxwidth`: cap on the width the exact bitvector arithmetic mode may
+compute at (`--bv-max-width`). 1024 by default; unlike the budgets above it is
+a hard ceiling that is never unlimited, and setting it to 0 leaves the current
+value unchanged.
 
 ## **Functions, predicates and input/output stream variables**
 
@@ -2310,10 +2840,31 @@ syntax for `<repl_memory>`:
 You can substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
-* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
+* `substitute|subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>, ...]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (this one being a memory position, well-formed formula or Boolean
-function).
+function). Several comma separated `match/replace` pairs may be given in one
+command; all pairs are applied simultaneously in a single pass over the input,
+so every match is found against the original expression and no pair's
+replacement is ever re-matched by another pair (`s x & y [x / y, y / x]` swaps
+`x` and `y`). Repeating the same match pattern in two pairs is an error.
+The result must remain well-typed: a replacement whose type conflicts with the
+matched context (e.g. `s x:sbf & y:sbf = 0 [x:sbf / z:bv[16]]`, or mismatched
+bitvector widths) is rejected at substitution time instead of storing an
+ill-typed expression. Untyped expressions carry the default type (`tau`) and
+an unannotated replacement adopts the matched context's type
+(`s x:sbf & y:sbf = 0 [x:sbf / z]` yields `zy = 0` with `z` typed `sbf`).
+A pair whose match pattern does not occur in the input is reported with a
+warning instead of silently leaving the input unchanged. An input that cannot
+be type-inferred at all (e.g. bitvector arithmetic without width annotations)
+is matched as parsed, so `s a + b = c [a / d]` substitutes `a` even though
+the expression carries no type information.
+Several bracket groups may follow the input: each group is applied to the
+result of the previous one, while the pairs inside a group stay simultaneous.
+So `s a | c [a / b] [b / d]` chains — the `b` introduced by the first group
+is rewritten to `d` by the second — whereas `s a | c [a / b, b / d]` yields
+`b | c`. The same match pattern may appear in different groups (that is what
+chaining is for); repeating it inside one group is still an error.
 
 * `instantiate|inst|i <repl_memory|tau> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position, well-formed formula or Boolean function in the given
@@ -2321,6 +2872,12 @@ well-formed or Boolean function expression.
 
 * `instantiate|inst|i <repl_memory|term> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position or Boolean function in the given expression.
+
+`instantiate` accepts the same multiple forms as `substitute`: several comma
+separated `var/value` pairs in one bracket are applied simultaneously
+(`i x & y [x / y, y / x]` swaps `x` and `y`), and several bracket groups
+compose sequentially. The match side of every pair must be a variable, and
+the same type safety and no-match reporting apply.
 
 ## **Logical procedures**
 
@@ -2686,8 +3243,11 @@ static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
 (`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
-`set_charvar`, `set_blasting`, `set_indenting`, `set_highlighting`, `set_json` and
-`set_severity` mirror the command line options.
+`set_charvar`, `set_blasting`, `set_bv_case_split`, `set_ba_component_factoring`,
+`set_bv_widening`, `set_indenting`, `set_highlighting`, `set_json` and
+`set_severity` mirror the command line options, and every runtime limit has a
+setter of the same name as its option (`set_block_max_splits`,
+`set_bv_case_split_max_tests`, `set_ba_decision_pins`, `set_bv_max_width`, ...).
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and

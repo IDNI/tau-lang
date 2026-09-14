@@ -80,6 +80,7 @@ tests/benchmark/data/*
 logs/*
 .gdbinit
 external/boost
+/tau-testnet/
 libboost-mingw-w64
 private/*
 .clangd
@@ -91,7 +92,6 @@ __pycache__/
 *.py[codz]
 *$py.class
 .pytest_cache/
-.github
 .claude
 .worktrees
 CLAUDE.local.md

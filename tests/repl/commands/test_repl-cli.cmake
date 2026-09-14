@@ -146,6 +146,8 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_revision_alts|max-revision-alts|a|4|revisionalts|4"
 	"block_max_splits|block-max-splits|p|512|maxsplits|512"
 	"block_max_rounds|block-max-rounds|r|33|maxrounds|33"
+	"bv_case_split_max_tests|bv-case-split-max-tests|k|5|casesplitmaxtests|5"
+	"ba_decision_pins|ba-decision-pins|N|77|decisionpins|77"
 	"max_fixpoint_steps|max-fixpoint-steps|f|9|fixpointsteps|9"
 	"max_flag_search_steps|max-flag-search-steps|F|12|flagsteps|12"
 	"max_blast_reentry_depth|max-blast-reentry-depth|D|8|blastdepth|8"
@@ -153,11 +155,12 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_simplify_rounds|max-simplify-rounds|m|1000|simplifyrounds|1000"
 	"max_def_passes|max-def-passes|P|40|defpasses|40"
 	"max_enum_steps|max-enum-steps|E|33|enumsteps|33"
+	"max_probe_steps|max-probe-steps|M|44|probesteps|44"
 	"max_rewrite_rounds|max-rewrite-rounds|R|21|rewriterounds|21"
 	"gc_min_size|gc-min-size|G|512|gcminsize|512"
 	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"
-	"max_consistency_subsets|max-consistency-subsets|k|9|maxsubsets|9"
-	"cache_bound|cache-bound|C|123|cachebound|123"
+	"max_consistency_subsets|max-consistency-subsets|j|9|maxsubsets|9"
+	"cache_bound|cache-bound|A|123|cachebound|123"
 	"max_cover_products|max-cover-products|n|9|maxcoverproducts|9"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
@@ -204,4 +207,43 @@ add_test(NAME "test_repl-cli-issue74_bv_accumulator_default_flags"
 	COMMAND bash -c "printf 'i1:bv[8] := in console.\\nrun (o0s[0]:bv[8] = {#x05}:bv[8]) && (o0s[t]:bv[8] = o0s[t-1]:bv[8] + i1[t]:bv[8]).\\n3\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-cli-issue74_bv_accumulator_default_flags" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o0s\\[2\\] := 8"
+	TIMEOUT 120)
+
+# --- bv widening flags -------------------------------------------------------
+# -y/--bv-widening and -Y/--bv-max-width reach the api before either the REPL
+# or a spec file runs (main.cpp applies them unconditionally, unlike -B).
+add_test(NAME "test_repl-cli-bv_widening_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -e \"get bvwidening\"")
+set_tests_properties("test_repl-cli-bv_widening_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "bvwidening: *on"
+	FAIL_REGULAR_EXPRESSION "Error")
+add_test(NAME "test_repl-cli-bv_widening_long_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening -e \"get bvwidening\"")
+set_tests_properties("test_repl-cli-bv_widening_long_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "bvwidening: *on"
+	FAIL_REGULAR_EXPRESSION "Error")
+add_test(NAME "test_repl-cli-bv_max_width_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -Y 64 -e \"get bvmaxwidth\"")
+set_tests_properties("test_repl-cli-bv_max_width_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "bvmaxwidth: *64"
+	FAIL_REGULAR_EXPRESSION "Error")
+# The flag changes the answer: 16 * 16 = 0 holds at 8 bits only modularly.
+add_test(NAME "test_repl-cli-bv_widening_flag_changes_semantics"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -e \"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]\"")
+set_tests_properties("test_repl-cli-bv_widening_flag_changes_semantics" PROPERTIES
+	PASS_REGULAR_EXPRESSION "%1.*: F"
+	FAIL_REGULAR_EXPRESSION "Error")
+# A cap too small for the formula fails loudly and conservatively (F), with
+# both the pass's own error and the entry point's fallback message -- and
+# without crashing. The errors ARE the expected output, so no FAIL regex.
+add_test(NAME "test_repl-cli-bv_max_width_cap_exceeded"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -Y 12 -e \"sat o:bv[8] = x * y\"")
+set_tests_properties("test_repl-cli-bv_max_width_cap_exceeded" PROPERTIES
+	PASS_REGULAR_EXPRESSION "required width 16 exceeds bv-max-width 12(.*\n)*.*%1.*: F")
+# Spec-file mode gets the flags too (they are applied before the file runs):
+# a one-step run of the guard-free saturating add stores 200, not 44.
+add_test(NAME "test_repl-cli-bv_widening_spec_file_mode"
+	COMMAND bash -c "printf 'i1:bv[8] := in console.\\ni2:bv[8] := in console.\\nrun always o1[t]:bv[8] = min(i1[t] + i2[t], {200}:bv[8]).\\n200\\n100\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -X")
+set_tests_properties("test_repl-cli-bv_widening_spec_file_mode" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := 200"
 	TIMEOUT 120)

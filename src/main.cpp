@@ -48,9 +48,25 @@ cli::options tau_options() {
 	// hung every plain `tau` run of a bv accumulator that the API
 	// completed instantly.
 	opts["blasting"] = cli::option("blasting", 'B', bv_blasting)
-		.set_description(std::string("blasting (")
+		.set_description(std::string("bitvector predicate blasting (")
 			+ (bv_blasting ? "enabled" : "disabled")
 			+ " by default)");
+	opts["ba-component-factoring"] = cli::option("ba-component-factoring",
+		'K', ba_component_factoring)
+		.set_description(std::string("decide tau-algebra constants per "
+			"support component (")
+			+ (ba_component_factoring ? "enabled" : "disabled")
+			+ " by default)");
+	opts["bv-case-split"] = cli::option("bv-case-split", 'C', bv_case_split)
+		.set_description(std::string("bitvector case split of quantified "
+			"variables tested against constants (")
+			+ (bv_case_split ? "enabled" : "disabled") + " by default)");
+	opts["bv-widening"] = cli::option("bv-widening", 'y', bv_widening)
+		.set_description(std::string("exact (widened) bitvector arithmetic (")
+			+ (bv_widening ? "enabled" : "disabled") + " by default)");
+	opts["bv-max-width"] = cli::option("bv-max-width", 'Y', "0")
+		.set_description("cap the widened bitvector computation width "
+			"(0 = default 1024)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
@@ -69,9 +85,9 @@ cli::options tau_options() {
 	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
 		.set_description("use legacy terminal REPL instead of FTXUI");
 	opts["status"] = cli::option("status", 's', true)
-		.set_description("display status");
+		.set_description("display status (enabled by default)");
 	opts["color"] = cli::option("color", 'c', true)
-		.set_description("use colors");
+		.set_description("use colors (enabled by default)");
 	DBG(opts["debug"] = cli::option("debug", 'd', true)
 		.set_description("debug mode");)
 	opts["experimental"] = cli::option("experimental", 'x', false)
@@ -79,7 +95,7 @@ cli::options tau_options() {
 	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
 		.set_description("warn when an updated specification exceeds "
 			"this many characters (0 = off)");
-	opts["pwr-semantic"] = cli::option("pwr-semantic", 'W', false)
+	opts["pwr-semantic"] = cli::option("pwr-semantic", 'Z', false)
 		.set_description("enable the semantic (winning-region) fallback "
 			"of the temporal pointwise revision (off by default)");
 	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
@@ -89,6 +105,13 @@ cli::options tau_options() {
 	opts["block-max-splits"] = cli::option("block-max-splits", 'p', "0")
 		.set_description("cap per-block Boole-decomposition splits in "
 			"anti-prenexing (0 = unlimited)");
+	opts["bv-case-split-max-tests"] = cli::option("bv-case-split-max-tests",
+		'k', "0")
+		.set_description("cap the constants a quantified bitvector variable "
+			"may be tested against for the case split (0 = unlimited)");
+	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
+		.set_description("decided tau-algebra rows whose key tree is kept "
+			"alive across the step sweep (default 4096, 0 = none)");
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
@@ -119,6 +142,9 @@ cli::options tau_options() {
 	opts["max-def-passes"] = cli::option("max-def-passes", 'P', "0")
 		.set_description("cap definition-expansion passes "
 			"(0 = unlimited)");
+	opts["max-probe-steps"] = cli::option("max-probe-steps", 'M', "10000")
+		.set_description("cap the untyped saturation probe over a residual "
+			"recurrence reference (default 10000, 0 = unlimited)");
 	opts["max-enum-steps"] = cli::option("max-enum-steps", 'E', "0")
 		.set_description("cap recurrence-relation enumeration steps "
 			"(0 = unlimited)");
@@ -129,21 +155,22 @@ cli::options tau_options() {
 	// on mostly-feasible atoms; a fired cap is sound (false UNREALIZABLE
 	// at worst, warned loudly), an uncapped walk is a hang.
 	opts["max-consistency-subsets"] =
-		cli::option("max-consistency-subsets", 'k', "4096")
+		cli::option("max-consistency-subsets", 'j', "4096")
 		.set_description("cap k-ary consistency subset checks per atom "
 			"group (default 4096; 0 = unlimited)");
 	opts["max-cover-products"] =
 		cli::option("max-cover-products", 'n', "256")
 		.set_description("cap the ABA oracle's mixed-type coverage "
 			"expansion (default 256; 0 = unlimited)");
-	opts["cache-bound"] = cli::option("cache-bound", 'C', "4096")
+	opts["cache-bound"] = cli::option("cache-bound", 'A', "4096")
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default 4096; 0 = unbounded)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
-		.set_description("tree-node count floor before gc may trigger");
+		.set_description("tree-node count floor before gc may trigger "
+			"(default 256)");
 	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
 		.set_description("gc triggers when node count grows by this "
-			"factor since last sweep (<= 0 disables gc)");
+			"factor since last sweep (default 1.5; <= 0 disables gc)");
 	return opts;
 }
 
@@ -244,6 +271,10 @@ int main(int argc, char** argv) {
 	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
 	bool blasting = opts["blasting"].get<bool>();
+	tau_api::set_bv_case_split(opts["bv-case-split"].get<bool>());
+	tau_api::set_ba_component_factoring(
+		opts["ba-component-factoring"].get<bool>());
+	bool bv_widening_opt = opts["bv-widening"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by
@@ -255,6 +286,8 @@ int main(int argc, char** argv) {
 	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
+	tau_api::set_bv_case_split_max_tests(optnum("bv-case-split-max-tests"));
+	tau_api::set_ba_decision_pins(optnum("ba-decision-pins"));
 	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
@@ -263,6 +296,7 @@ int main(int argc, char** argv) {
 	tau_api::set_max_simplify_rounds(optnum("max-simplify-rounds"));
 	tau_api::set_max_def_passes(optnum("max-def-passes"));
 	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
+	tau_api::set_max_probe_steps(optnum("max-probe-steps"));
 	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
 	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
 	tau_api::set_max_cover_products(optnum("max-cover-products"));
@@ -270,6 +304,14 @@ int main(int argc, char** argv) {
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
+	// Applied here unconditionally, like bv-widening/bv-max-width below,
+	// so the flags take effect in spec-file mode too; the REPL options
+	// struct then starts from the same values. The option's default is the
+	// library's own (see the GitHub #74 comment above), so this is a no-op
+	// unless the flag was given.
+	tau_api::set_blasting(blasting);
+	tau_api::set_bv_widening(bv_widening_opt);
+	tau_api::set_bv_max_width(optnum("bv-max-width"));
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
@@ -285,6 +327,7 @@ int main(int argc, char** argv) {
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,
 		.blasting = blasting,
+		.bv_widening = bv_widening_opt,
 		.print_benchmarks = opts["benchmarks"].get<bool>(),
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),
@@ -295,7 +338,7 @@ int main(int argc, char** argv) {
 	string e = opts["evaluate"].get<string>();
 	if (e.size()) {
 		DBG(TAU_LOG_TRACE << "evaluating REPL command: " << e;)
-		return re.eval(e);
+		return re.eval(e).value_or(0);
 	}
 	DBG(TAU_LOG_TRACE << "running REPL";)
 	welcome();

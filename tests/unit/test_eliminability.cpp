@@ -174,6 +174,25 @@ TEST_SUITE("eliminability") {
 			CHECK(a.verdict_of(v) == elim_verdict::blasteable);
 	}
 
+	TEST_CASE("min/max atoms are blasteable for any operands") {
+		// min/max blast via a fresh result variable and the comparison
+		// predicate ((a < b) -> r = a) && (!(a < b) -> r = b), with no
+		// constant-argument precondition -- unlike div/mod and shifts,
+		// which demote to elim_verdict::arithmetic on a variable second
+		// argument.
+		for (const char* s : {
+			"min(x:bv[4], y:bv[4]) = { 0 }:bv[4].",
+			"max(x:bv[4], y:bv[4]) = { 0 }:bv[4]." }) {
+			tref c = get_nso_rr(s).value().main->get();
+			analysis_context<node_t> ctx;
+			ctx.bv_is_solver_owned = true;
+			auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
+			for (tref v : conj_vars(c))
+				CHECK(a.verdict_of(v)
+					== elim_verdict::blasteable);
+		}
+	}
+
 	TEST_CASE("bv atoms are eliminable when the solver cannot own them") {
 		// A formula carrying a constant of another Boolean algebra is one
 		// cvc5 cannot translate at all, so its bv scopes will never be

@@ -48,234 +48,72 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			       subtree_map<node, bv>& free_vars, bv_eval_memo<node>& memo,
 			       size_t& ctx_counter, size_t ctx) {
 	using tau = tree<node>;
-	using tt = tree<node>::traverser;
+	using tt = typename tree<node>::traverser;
 
-	tref key = form | tt::ref;
-	auto& by_ctx = memo[key];
-	if (auto it = by_ctx.find(ctx); it != by_ctx.end())
-		return std::optional<bv>(it->second);
+	// Walked with the library's pre_order visit, which is iterative: a
+	// formula nests as deep as it likes, and a worker thread gets 512 KiB
+	// on Darwin against 8 MiB on glibc, so recursing here is a crash.
+	// `down` opens a node, `up` folds it once all its children are done.
+	// There is no fold traversal in the tree API, so the children's
+	// values are carried on an explicit value stack.
 
-	std::optional<bv> eval_result = [&]() -> std::optional<bv> {
-
-	auto nt = form | tt::nt;
-
-	switch (nt) {
-		case tau::wff_always:
-		case tau::wff_sometimes: {
-			return bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
+	// How a node consumes its children. Anything with no case below is a
+	// leaf and evaluates to nullopt.
+	enum kind { leaf, wrap, unary, binary, binder };
+	auto kind_of = [](size_t nt) {
+		switch (nt) {
+		// wrappers: the value is the value of the single child.
+		// bf_parenthesis is transparent too -- "(" bf ")" carries no
+		// semantics of its own (needed_width/widen_term already treat it
+		// as a pass-through, bv_widening.h); missing it here meant any
+		// bv formula containing one (e.g. bv_widening's own `(x*y)'`
+		// shape, forced by the grammar around a complement/cast operand)
+		// silently failed to translate, which made both a formula AND its
+		// negation "fail to translate", so is_bv_formula_valid (unsat of
+		// the negation) came back true regardless of the real semantics.
+		case tau::wff_always: case tau::wff_sometimes:
+		case tau::wff: case tau::bf: case tau::bf_parenthesis:
+		case tau::ctnvar:
+			return wrap;
+		case tau::wff_all: case tau::wff_ex:	return binder;
+		case tau::wff_neg: case tau::bf_neg: case tau::bf_cast:
+			return unary;
+		case tau::wff_and: case tau::wff_or:
+		case tau::bf_eq: case tau::bf_neq:
+		case tau::bf_lteq: case tau::bf_nlteq:
+		case tau::bf_gt: case tau::bf_ngt:
+		case tau::bf_gteq: case tau::bf_ngteq:
+		case tau::bf_lt: case tau::bf_nlt:
+		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+		case tau::bf_div: case tau::bf_mod:
+		case tau::bf_and: case tau::bf_nand:
+		case tau::bf_or: case tau::bf_nor:
+		case tau::bf_xor: case tau::bf_xnor:
+		case tau::bf_shl: case tau::bf_shr:
+		case tau::bf_min: case tau::bf_max:	return binary;
+		default:				return leaf;
 		}
-		// Hooks normalize these wrappers to their contained bitvector formulas.
-		case tau::wff: case tau::bf:
-		/*case tau::bv:*/ {
-			return bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-		}
+	};
+
+	auto eval_leaf = [&](tref n, size_t nt) -> std::optional<bv> {
+		switch (nt) {
 		case tau::wff_t: return make_bitvector_true();
 		case tau::wff_f: return make_bitvector_false();
-		case tau::wff_neg: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			return l ? std::optional<bv>(make_term_not(l.value())) : std::nullopt;
-		}
-		case tau::wff_and: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_and(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::wff_or: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_or(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::wff_all: {
-			tref v = (form | tt::first | tt::ref);
-			// If the bound "variable" is not actually a variable (e.g., a constant
-			// due to variable capture in substitution), just evaluate the body.
-			if (!is<node>(v, tau::variable))
-				return bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
-			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			// vars is now shared by reference across the whole recursion, so a
-			// shadowed outer binding of the same tref (nested quantifiers
-			// sharing the same variable tref due to caching) must be saved and
-			// restored -- unlike the previous by-value vars, an unconditional
-			// erase here would now also delete that outer binding for the
-			// caller instead of just for this call's own local copy.
-			auto prev = vars.find(v);
-			std::optional<bv> outer = prev != vars.end() ? std::optional(prev->second) : std::nullopt;
-			vars[v] = x;
-
-			// A fresh, never-reused context: this specific wff_all node is
-			// entered at most once, so every shared subtree reached from
-			// its body while it is on the stack sees this same vars
-			// content -- see the memo-taking overload's doc.
-			size_t body_ctx = ++ctx_counter;
-			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, body_ctx);
-			if (outer) vars[v] = *outer; else vars.erase(v);
-			if (!f) return std::nullopt;
-			return std::optional<bv>(make_term_forall({x}, f.value()));
-		}
-		case tau::wff_ex: {
-			tref v = (form | tt::first | tt::ref);
-			// If the bound "variable" is not actually a variable, just evaluate the body.
-			if (!is<node>(v, tau::variable))
-				return bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
-			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			// See the wff_all case above for why the outer binding must be
-			// saved and restored now that vars is passed by reference.
-			auto prev = vars.find(v);
-			std::optional<bv> outer = prev != vars.end() ? std::optional(prev->second) : std::nullopt;
-			vars[v] = x;
-
-			// See the wff_all case above for why a fresh context is minted
-			// here rather than reusing the enclosing one.
-			size_t body_ctx = ++ctx_counter;
-			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, body_ctx);
-			if (outer) vars[v] = *outer; else vars.erase(v);
-			if (!f) return std::nullopt;
-			return std::optional<bv>(make_term_exists({x}, f.value()));
-		}
 		case tau::variable: {
-			// check if the variable is alr
-			tref v = form | tt::ref;
-			if (auto it = vars.find(v); it != vars.end()) return it->second;
-			if (auto it = free_vars.find(form | tt::ref); it != free_vars.end()) return it->second;
-			auto vn = (form | tt::Tree).to_str();
-			// create a new constant according to the type and added to the map
-			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
-			auto x = cvc5_term_manager.mkConst(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-			free_vars.emplace(form | tt::ref, x);
+			if (auto it = vars.find(n); it != vars.end())
+				return it->second;
+			if (auto it = free_vars.find(n); it != free_vars.end())
+				return it->second;
+			auto vn = (tt(n) | tt::Tree).to_str();
+			// a new constant of the right type, remembered as free
+			size_t bv_size = get_bv_size<node>(
+				tau::get(n).get_ba_type_tree());
+			// no builder wrapper for mkConst yet, unlike mkVar
+			auto x = cvc5_term_manager.mkConst(
+				cvc5_term_manager.mkBitVectorSort(bv_size),
+				vn.c_str());
+			free_vars.emplace(n, x);
 			return std::optional<bv>(x);
-		}
-		case tau::bf_eq: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_equal(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_neq: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_distinct(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_lteq: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_less_equal(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_nlteq: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_not(make_term_less_equal(l.value(), r.value()))) : std::nullopt;
-		}
-		case tau::bf_gt: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_greater(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_ngt: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_not(make_term_greater(l.value(), r.value()))) : std::nullopt;
-		}
-		case tau::bf_gteq: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_greater_equal(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_ngteq: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_not(make_term_greater_equal(l.value(), r.value()))) : std::nullopt;
-		}
-		case tau::bf_lt: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_less(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_nlt: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_term_not(make_term_less(l.value(), r.value()))) : std::nullopt;
-		}
-		case tau::bf_neg: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			return (l) ? std::optional<bv>(make_bitvector_not(l.value())) : std::nullopt;
-		}
-		case tau::bf_cast: {
-			tref c = form | tt::ref;
-			size_t target_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
-			auto src = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			if (!src) return std::nullopt;
-			size_t src_size = src.value().getSort().getBitVectorSize();
-			if (target_size > src_size)
-				return std::optional<bv>(make_bitvector_zero_extend(src.value(), target_size - src_size));
-			if (target_size < src_size)
-				return std::optional<bv>(make_bitvector_extract(src.value(), target_size - 1, 0));
-			return src;
-		}
-		case tau::bf_add: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_add(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_sub: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_sub(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_mul: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_mul(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_div: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_div(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_mod: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_mod(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_and: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_and(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_nand: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_nand(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_or: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_or(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_nor: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_nor(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_xor: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_xor(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_xnor: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_xnor(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_shl: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_shl(l.value(), r.value())) : std::nullopt;
-		}
-		case tau::bf_shr: {
-			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
-			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars, memo, ctx_counter, ctx);
-			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
 		case tau::ba_constant: {
 			// is_bv_solvable_formula only inspects variable nodes, so a
@@ -284,9 +122,9 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			// std::get would then throw std::bad_variant_access in release
 			// (the DBG-only assert doesn't guard it there). Fail gracefully
 			// instead, same as any other untranslatable node.
-			auto cte = form | tt::ba_constant;
+			auto cte = tt(n) | tt::ba_constant;
 			if (!std::holds_alternative<bv>(cte)) return std::nullopt;
-			return std::optional<bv>(std::get<bv>(cte));
+			return std::get<bv>(cte);
 		}
 		case tau::bf_t: {
 			// Same rationale as the ba_constant case above: a non-bv
@@ -295,34 +133,196 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			// is_bv_solvable_formula only inspects variable nodes.
 			// get_bv_size requires an explicit bitwidth; fail
 			// gracefully instead of asserting/crashing.
-			tref c = form | tt::ref;
-			tref type_tree = tau::get(c).get_ba_type_tree();
-			if (!is_bv_type_family<node>(tau::get(c).get_ba_type())
+			tref type_tree = tau::get(n).get_ba_type_tree();
+			if (!is_bv_type_family<node>(tau::get(n).get_ba_type())
 				|| !(tt(type_tree) | tau::subtype))
 				return std::nullopt;
-			auto bv_size = get_bv_size<node>(type_tree);
-			return make_bitvector_top_elem(bv_size);
+			return make_bitvector_top_elem(get_bv_size<node>(type_tree));
 		}
 		case tau::bf_f: {
-			tref c = form | tt::ref;
-			tref type_tree = tau::get(c).get_ba_type_tree();
-			if (!is_bv_type_family<node>(tau::get(c).get_ba_type())
+			tref type_tree = tau::get(n).get_ba_type_tree();
+			if (!is_bv_type_family<node>(tau::get(n).get_ba_type())
 				|| !(tt(type_tree) | tau::subtype))
 				return std::nullopt;
-			auto bv_size = get_bv_size<node>(type_tree);
-			return make_bitvector_bottom_elem(bv_size);
+			return make_bitvector_bottom_elem(get_bv_size<node>(type_tree));
 		}
-		case tau::ctnvar: {
-			return bv_eval_node<node>(form | tt::first, vars, free_vars, memo, ctx_counter, ctx);
+		default: return std::nullopt;
+		}
+	};
+
+	auto combine1 = [&](tref n, size_t nt, const std::optional<bv>& o)
+		-> std::optional<bv>
+	{
+		if (!o) return std::nullopt;
+		const bv& l = o.value();
+		switch (nt) {
+		case tau::wff_neg: return make_term_not(l);
+		case tau::bf_neg: return make_bitvector_not(l);
+		case tau::bf_cast: {
+			size_t target_size = get_bv_size<node>(
+				tau::get(n).get_ba_type_tree());
+			size_t src_size = l.getSort().getBitVectorSize();
+			if (target_size > src_size)
+				return make_bitvector_zero_extend(
+					l, target_size - src_size);
+			if (target_size < src_size)
+				return make_bitvector_extract(
+					l, target_size - 1, 0);
+			return o;
 		}
 		default:
+			// kind_of said unary but no case here: the two tables
+			// have drifted, and nullopt reads as "untranslatable"
+			DBG(assert(false);)
 			return std::nullopt;
-	}
+		}
+	};
 
-	}();
+	auto combine2 = [&](size_t nt, const std::optional<bv>& a,
+		const std::optional<bv>& b) -> std::optional<bv>
+	{
+		if (!a || !b) return std::nullopt;
+		const bv& l = a.value();
+		const bv& r = b.value();
+		switch (nt) {
+		case tau::wff_and: return make_term_and(l, r);
+		case tau::wff_or: return make_term_or(l, r);
+		case tau::bf_eq: return make_term_equal(l, r);
+		case tau::bf_neq: return make_term_distinct(l, r);
+		case tau::bf_lteq: return make_term_less_equal(l, r);
+		case tau::bf_nlteq: return make_term_not(make_term_less_equal(l, r));
+		case tau::bf_gt: return make_term_greater(l, r);
+		case tau::bf_ngt: return make_term_not(make_term_greater(l, r));
+		case tau::bf_gteq: return make_term_greater_equal(l, r);
+		case tau::bf_ngteq: return make_term_not(make_term_greater_equal(l, r));
+		case tau::bf_lt: return make_term_less(l, r);
+		case tau::bf_nlt: return make_term_not(make_term_less(l, r));
+		case tau::bf_add: return make_bitvector_add(l, r);
+		case tau::bf_sub: return make_bitvector_sub(l, r);
+		case tau::bf_mul: return make_bitvector_mul(l, r);
+		case tau::bf_div: return make_bitvector_div(l, r);
+		case tau::bf_mod: return make_bitvector_mod(l, r);
+		case tau::bf_and: return make_bitvector_and(l, r);
+		case tau::bf_nand: return make_bitvector_nand(l, r);
+		case tau::bf_or: return make_bitvector_or(l, r);
+		case tau::bf_nor: return make_bitvector_nor(l, r);
+		case tau::bf_xor: return make_bitvector_xor(l, r);
+		case tau::bf_xnor: return make_bitvector_xnor(l, r);
+		case tau::bf_shl: return make_bitvector_shl(l, r);
+		case tau::bf_shr: return make_bitvector_shr(l, r);
+		case tau::bf_min: return make_bitvector_min(l, r);
+		case tau::bf_max: return make_bitvector_max(l, r);
+		default:
+			// see combine1: kind_of and this switch must agree
+			DBG(assert(false);)
+			return std::nullopt;
+		}
+	};
 
-	if (eval_result) by_ctx.emplace(ctx, eval_result.value());
-	return eval_result;
+	// One entry per binder currently open, innermost last.
+	struct binding {
+		tref var;
+		bv x;
+		std::optional<bv> outer;	// shadowed binding, restored on up
+	};
+
+	std::vector<std::optional<bv>> vals;	// one value per finished node
+	std::vector<size_t> ctxs{ ctx };	// innermost binder context
+	std::vector<binding> binders;
+	vals.reserve(64);
+
+	auto memoise = [&](tref n, size_t c, const std::optional<bv>& v) {
+		// looked up fresh rather than held across the children:
+		// evaluating them inserts into memo and can rehash it
+		if (v) memo[n].try_emplace(c, v.value());
+	};
+
+	auto down = [&](tref n) {
+		if (auto mit = memo.find(n); mit != memo.end())
+			if (auto it = mit->second.find(ctxs.back());
+				it != mit->second.end())
+			{
+				vals.push_back(it->second);
+				return false;	// already known, and no up
+			}
+		const size_t nt = tau::get(n).value.nt;
+		if (kind_of(nt) != binder) {
+			if (kind_of(nt) != leaf) return true;
+			auto v = eval_leaf(n, nt);
+			memoise(n, ctxs.back(), v);
+			vals.push_back(std::move(v));
+			return false;
+		}
+		tref v = tau::get(n).first();
+		// a bound "variable" that is not one (variable capture in
+		// substitution) binds nothing; the body is taken as it is
+		if (!is<node>(v, tau::variable)) return true;
+		size_t bv_size = get_bv_size<node>(
+			tau::get(v).get_ba_type_tree());
+		bv x = make_bitvector_var(
+			cvc5_term_manager.mkBitVectorSort(bv_size),
+			tau::get(v).to_str());
+		// vars is shared, so an outer binding of the same tref (nested
+		// quantifiers sharing a variable tref through caching) is saved
+		// and restored rather than erased, which would drop it for the
+		// caller
+		auto prev = vars.find(v);
+		binders.push_back({ v, x, prev != vars.end()
+			? std::optional<bv>(prev->second) : std::nullopt });
+		vars[v] = x;
+		// a fresh, never-reused context: this binder is entered at most
+		// once, so every shared subtree under it sees this same vars
+		ctxs.push_back(++ctx_counter);
+		return true;
+	};
+
+	auto up = [&](tref n) {
+		const size_t nt = tau::get(n).value.nt;
+		const kind k = kind_of(nt);
+		// every visited child left exactly one value behind
+		const size_t cs = tau::get(n).children_size();
+		DBG(assert(vals.size() >= cs);)
+		const size_t base = vals.size() - cs;
+		std::optional<bv> res;
+		switch (k) {
+		case wrap: res = std::move(vals[base]); break;
+		case unary: res = combine1(n, nt, vals[base]); break;
+		case binary: res = combine2(nt, vals[base], vals[base + 1]);
+			break;
+		case binder: {
+			// the body is the second child; the first is the bound
+			// variable, which resolves through vars to its own term
+			const std::optional<bv>& body = vals[base + cs - 1];
+			if (binders.empty() || binders.back().var
+				!= tau::get(n).first())
+			{
+				// bound nothing (see down), so no quantifier
+				res = body;
+				break;
+			}
+			const binding b = binders.back();
+			binders.pop_back();
+			ctxs.pop_back();
+			if (b.outer) vars[b.var] = b.outer.value();
+			else vars.erase(b.var);
+			if (body) res = nt == tau::wff_all
+				? make_term_forall({ b.x }, body.value())
+				: make_term_exists({ b.x }, body.value());
+			break;
+		}
+		default: break;	// leaf: down returned false, no up
+		}
+		vals.resize(base);
+		memoise(n, ctxs.back(), res);
+		vals.push_back(std::move(res));
+	};
+
+	tref root = form | tt::ref;
+	if (!root) return std::nullopt;
+	auto all = [](tref) { return true; };
+	pre_order<node>(root).visit(down, all, up);
+	DBG(assert(vals.size() == 1);)
+	return vals.empty() ? std::nullopt : vals.front();
 }
 
 template<NodeType node>
@@ -540,6 +540,78 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 #endif // TAU_CACHE
 
 	subtree_map<node, bv> vars, free_vars;
+	// Opt-in quantifier-free decision (bv_quantifier_free_decision). A closed
+	// formula whose binders are all existential, all in positive polarity and
+	// each variable bound once, is satisfiable exactly when its matrix is, so
+	// the binders are dropped and the variables become free constants; one
+	// whose binders are all universal is satisfiable exactly when the negated
+	// matrix is unsatisfiable, so it is negated as well and the verdict
+	// inverted. Either way cvc5 then sees a QF_BV problem and bitblasts it
+	// eagerly, instead of running its quantifier instantiation on a formula
+	// that has no alternation to instantiate. Anything else -- both kinds,
+	// a binder under a negation, a variable bound twice -- takes the path
+	// below unchanged.
+	if (bv_quantifier_free_decision_enabled()) {
+		const bool has_ex = tau::get(form).find_top(is<node, tau::wff_ex>) != nullptr;
+		const bool has_all = tau::get(form).find_top(is<node, tau::wff_all>) != nullptr;
+		if (has_ex != has_all) {
+			const auto kind = has_ex ? tau::wff_ex : tau::wff_all;
+			// The universal identity sat(all x phi) == !sat(!phi) holds
+			// only for a closed formula: with a free y, sat(all x phi(x, y))
+			// asks for some y that works for every x, whereas !sat(!phi)
+			// asks that phi hold for every x and every y. Every caller
+			// closes the formula before asking, but the pass must not
+			// depend on that, so a universal with a free variable takes
+			// the quantified path. The existential identity has no such
+			// condition: the free variables simply stay free.
+			bool eligible = has_ex || get_free_vars<node>(form).empty();
+			subtree_map<node, int> bound;
+			std::vector<std::pair<tref, bool>> stack{{form, false}};
+			while (!stack.empty() && eligible) {
+				auto [n, under_neg] = stack.back(); stack.pop_back();
+				if (!n) continue;
+				const tau& t = tau::get(n);
+				if (t.is(tau::wff_neg)) under_neg = true;
+				if (t.is(kind)) {
+					if (under_neg || !is<node>(t.first(), tau::variable)
+						|| ++bound[t.first()] > 1) eligible = false;
+				}
+				for (tref c : t.children()) stack.push_back({c, under_neg});
+			}
+			if (eligible) {
+				auto drop_binder = [kind](tref n) -> tref {
+					const tau& t = tau::get(n);
+					if (t.is(tau::wff) && t.child_is(kind)) return t[0].second();
+					return n;
+				};
+				tref matrix = form;
+				for (;;) { // binders nest; peel until none is left
+					tref next = pre_order<node>(matrix).apply_unique(drop_binder, while_is_formula<node>);
+					if (next == matrix) break;
+					matrix = next;
+				}
+				const bool invert = !has_ex;
+				if (invert) matrix = tau::build_wff_neg(matrix);
+				LOG_DEBUG << "bv_formula_sat_status: quantifier-free decision"
+					<< (invert ? " (universal, inverted)" : "") << ": " << LOG_FM(matrix);
+				cvc5::Solver qf_solver(cvc5_term_manager);
+				config_cvc5_solver_quantifier_free(qf_solver);
+				auto qf_expr = bv_eval_node<node>(tt(matrix), vars, free_vars);
+				if (!qf_expr) {
+					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
+					return memo(std::nullopt);
+				}
+				qf_solver.assertFormula(qf_expr.value());
+				auto qf_result = qf_solver.checkSat();
+				if (qf_result.isSat()) return memo(invert ? bv_sat_status::unsat : bv_sat_status::sat);
+				if (qf_result.isUnknown()) {
+					LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << qf_expr.value();
+					return memo(bv_sat_status::unknown);
+				}
+				return memo(invert ? bv_sat_status::sat : bv_sat_status::unsat);
+			}
+		}
+	}
 	// A fresh solver per query is deliberate, do NOT share one like
 	// normalize_bv's (B12): cvc5 forbids a second checkSat without
 	// incremental mode ("cannot make multiple queries unless incremental

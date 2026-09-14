@@ -19,6 +19,8 @@ set(TESTS
 	temporal_connectives
 	bv_ba-simplification
 	bv_ba-cast
+	canonicalize_tref
+	bv_widening
 	cvc5
 	eliminability
 	execution

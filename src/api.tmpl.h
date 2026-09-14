@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
 
@@ -53,6 +53,14 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_bv_widening(bool widening) { bv_widening = widening; }
+
+template <NodeType node>
+void api<node>::set_bv_max_width(size_t width) {
+	if (width > 0) bv_max_width = width;
+}
+
+template <NodeType node>
 void api<node>::set_blast_placement(int site) {
 	blast_placement = (site >= static_cast<int>(blast_site::per_leaf)
 		&& site <= static_cast<int>(blast_site::per_formula))
@@ -88,6 +96,11 @@ void api<node>::set_cvc5_options(int set) {
 template <NodeType node>
 void api<node>::set_block_max_splits(size_t n) {
 	block_boole_max_splits = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
+void api<node>::set_bv_quantifier_free_decision(bool state) {
+	bv_quantifier_free_decision = state;
 }
 
 template <NodeType node>
@@ -128,6 +141,11 @@ void api<node>::set_max_def_passes(size_t n) {
 template <NodeType node>
 void api<node>::set_max_enum_steps(size_t n) {
 	max_enum_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_probe_steps(size_t n) {
+	max_probe_steps = n;
 }
 
 template <NodeType node>
@@ -188,6 +206,21 @@ void api<node>::set_indenting(bool indenting) {
 template <NodeType node>
 void api<node>::set_ba_component_factoring(bool state) {
 	ba_component_factoring = state;
+}
+
+template <NodeType node>
+void api<node>::set_ba_decision_pins(size_t n) {
+	ba_decision_pins = n;
+}
+
+template <NodeType node>
+void api<node>::set_bv_case_split(bool state) {
+	bv_case_split = state;
+}
+
+template <NodeType node>
+void api<node>::set_bv_case_split_max_tests(size_t n) {
+	bv_case_split_max_tests = n ? n : std::numeric_limits<size_t>::max();
 }
 
 template <NodeType node>
@@ -467,9 +500,35 @@ tref api<node>::substitute(tref expr, tref that, tref with) {
 
 template <NodeType node>
 tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
-	for (auto [that, with] : that_with)
-		expr = substitute(expr, that, with);
-	return expr;
+	if (!expr) {
+		TAU_LOG_ERROR << "Invalid argument(s)";
+		return nullptr;
+	}
+	// Validate every pair the way the single-pair overload does and
+	// collect the pairs into a structurally keyed map (matching compares
+	// subtrees, not pointers), then apply them all in one simultaneous
+	// pass: every match is found against the original expression and no
+	// pair's replacement is re-matched by another pair, so {x/y, y/x}
+	// swaps instead of collapsing both variables into one.
+	bool e = is_term(expr);
+	subtree_map<node, tref> changes;
+	for (auto [that, with] : that_with) {
+		if (!that || !with) {
+			TAU_LOG_ERROR << "Invalid argument(s)";
+			return nullptr;
+		}
+		bool t = is_term(that), w = is_term(with);
+		if ((e && e != t) || (e && e != w) || (!e && t != w)) {
+			TAU_LOG_ERROR << "Invalid argument(s)";
+			return nullptr;
+		}
+		// two structurally equal match patterns are ambiguous
+		if (!changes.emplace(that, with).second) {
+			TAU_LOG_ERROR << "Invalid argument(s)";
+			return nullptr;
+		}
+	}
+	return tau::get(expr).substitute(changes);
 }
 
 // Normal forms
@@ -620,9 +679,30 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 template <NodeType node>
 bool is_whole_query_bv_solvable(tref fm) {
 	using tau = tree<node>;
-	return fm
+	// Under bv widening the exact (widened) semantics is produced inside
+	// normalization (normalize_with_temp_simp); cvc5 on the raw formula
+	// would answer with the modular one, so the fast path stands down.
+	return fm && !bv_widening
+		&& tau::get(fm).is(tau::wff)
 		&& !tau::get(fm).find_top(is_temporal_quantifier<node>)
 		&& is_bv_solvable_formula<node>(fm);
+}
+
+/// The string overloads arrive with a spec root (get_spec_or_term wraps
+/// any formula in one). The pre-normalization steps below -- the G-merge
+/// and the bv fast paths -- take a wff, so a definition-free spec is
+/// unwrapped to its main formula here; a spec carrying definitions stays
+/// whole and is unwrapped by normalize_formula (get_nso_rr), which is the
+/// only step that knows how to apply them.
+template <NodeType node>
+tref unwrap_definition_free_spec(tref fm) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	if (!fm || !tau::get(fm).is(tau::spec)) return fm;
+	if (tt(fm) | tau::definitions) return fm;
+	if (tref main = tt(fm) | tau::main | tau::wff | tt::ref; main)
+		return main;
+	return fm;
 }
 
 /// Fast path for sat/unsat; nullopt when it does not apply or cvc5 is unsure.
@@ -650,11 +730,18 @@ std::optional<bool> bv_fast_path_valid(tref fm) {
 
 template <NodeType node>
 bool api<node>::realizable(tref fm) {
-	fm = simplify(fm);
+	fm = unwrap_definition_free_spec<node>(simplify(fm));
+	if (!fm) return false;
+	// A spec whose main is a formula is as decidable as the formula itself
+	// (normalize_formula unwraps it); the string overloads always arrive
+	// here with a spec root.
+	using tt = tau::traverser;
+	const bool is_fm = is_formula(fm) || (tau::get(fm).is(tau::spec)
+		&& (tt(fm) | tau::main | tau::wff | tt::ref));
+	if (!is_fm) return false;
 	// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 	// normalization so the downstream pipeline sees a single wff_always.
-	if (fm) fm = flatten_always_conjuncts<node>(fm);
-	if (!fm || !is_formula(fm)) return false;
+	if (is_formula(fm)) fm = flatten_always_conjuncts<node>(fm);
 	// bv fast path; falls through when undecided.
 	if (auto fast = bv_fast_path_sat<node>(fm); fast.has_value())
 		return fast.value();
@@ -680,9 +767,11 @@ bool api<node>::realizable(tref fm) {
 		// A data quantifier under a full-LTL operator survives normalization;
 		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
 		// invariant, so route the RAW formula to the LTL-ABA solver instead.
+		// A spec root contributes its main formula (the solver takes a wff).
 		if (has_ltl_operators<node>(fm)
 			&& tau::get(nf).find_top(is_quantifier<node>))
-			return is_tau_formula_sat<node>(fm, 0, true);
+			return is_tau_formula_sat<node>(is_formula(fm) ? fm
+				: (tt(fm) | tau::main | tau::wff | tt::ref), 0, true);
 		return is_tau_formula_sat<node>(nf, 0, true);
 	} catch (const ltl_synthesis_error& e) {
 		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
@@ -702,14 +791,14 @@ bool api<node>::unrealizable(tref fm) {
 
 template <NodeType node>
 bool api<node>::sat(tref fm) {
-	fm = simplify(fm);
+	fm = unwrap_definition_free_spec<node>(simplify(fm));
 	// G(A) ∧ G(B) ≡ G(A ∧ B); merge top-level conjunctions of G so the
 	// downstream safety pipeline sees one wff_always.  Non-mergeable
 	// Boolean combinations (disjunction, negation, F-on-non-singletons,
 	// etc.) survive flatten unchanged and are routed to the full-LTL
 	// pipeline by is_tau_formula_sat itself — there's no longer a
 	// pre-check that rejects them at this layer.
-	if (fm) fm = flatten_always_conjuncts<node>(fm);
+	if (fm && is_formula(fm)) fm = flatten_always_conjuncts<node>(fm);
 	return fm && realizable(fm);
 }
 
@@ -723,14 +812,14 @@ bool api<node>::unsat(tref fm) {
 
 template <NodeType node>
 bool api<node>::valid(tref fm) {
-	fm = simplify(fm);
-	if (fm) fm = flatten_always_conjuncts<node>(fm);
+	fm = unwrap_definition_free_spec<node>(simplify(fm));
+	if (fm && is_formula(fm)) fm = flatten_always_conjuncts<node>(fm);
 	return fm && valid_spec(fm);
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
-	fm = simplify(fm);
+	fm = unwrap_definition_free_spec<node>(simplify(fm));
 	if (!fm) return false;
 	// bv fast path; falls through when undecided.
 	if (auto fast = bv_fast_path_valid<node>(fm); fast.has_value())
@@ -917,21 +1006,21 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 template <NodeType node>
 std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 	rr<node> nso_rr;
-	// AP1-16: by reference -- copying the io_context (three subtree maps
-	// + remaps + console factory) per call was pure waste; all uses read.
-	auto& ctx = *definitions<node>::instance().get_io_context();
-	if (contains(expr, tau::ref)) {
-		typename node::type type = tau::get(expr).get_type();
-		if (type == tau::spec) {
-			if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
-				ctx, expr); mayb_nso_rr)
-					nso_rr = mayb_nso_rr.value();
-			else return {};
-		} else {
-			nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
-			if (!nso_rr.main) return {};
-		}
-	} else nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
+	auto ctx = *definitions<node>::instance().get_io_context();
+	// A spec root is always unwrapped to its main formula and definitions,
+	// whether or not it contains a ref: get_spec_or_term yields a spec for
+	// any formula, and a spec node handed whole to the normalizer as its
+	// main formula is negated as if it were a wff by the syntactic
+	// simplifier (a Debug abort in build_wff_neg, a malformed tree in
+	// Release).
+	if (tau::get(expr).is(tau::spec)) {
+		if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(ctx, expr);
+			mayb_nso_rr) nso_rr = mayb_nso_rr.value();
+		else return {};
+	} else {
+		nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
+		if (!nso_rr.main) return {};
+	}
 	return nso_rr;
 }
 
