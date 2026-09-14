@@ -14,3 +14,6 @@ add_repl_test(enable_cmd-indenting "enable indenting" "indenting: *on")
 add_repl_test(enable_cmd-status "enable status" "status: *on")
 add_repl_test(enable_cmd-casesplit "enable casesplit. get casesplit" "casesplit: *on")
 add_repl_test(enable_cmd-factoring "disable factoring. enable factoring. get factoring" "factoring: *on")
+
+add_repl_test(enable_cmd-bvwidening "enable bvwidening. get bvwidening"
+	"bvwidening: *on")

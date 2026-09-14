@@ -204,3 +204,42 @@ add_test(NAME "test_repl-cli-issue74_bv_accumulator_default_flags"
 set_tests_properties("test_repl-cli-issue74_bv_accumulator_default_flags" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o0s\\[2\\] := 8"
 	TIMEOUT 120)
+
+# --- bv widening flags -------------------------------------------------------
+# -y/--bv-widening and -Y/--bv-max-width reach the api before either the REPL
+# or a spec file runs (main.cpp applies them unconditionally, unlike -B).
+add_test(NAME "test_repl-cli-bv_widening_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -e \"get bvwidening\"")
+set_tests_properties("test_repl-cli-bv_widening_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "bvwidening: *on"
+	FAIL_REGULAR_EXPRESSION "Error")
+add_test(NAME "test_repl-cli-bv_widening_long_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening -e \"get bvwidening\"")
+set_tests_properties("test_repl-cli-bv_widening_long_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "bvwidening: *on"
+	FAIL_REGULAR_EXPRESSION "Error")
+add_test(NAME "test_repl-cli-bv_max_width_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -Y 64 -e \"get bvmaxwidth\"")
+set_tests_properties("test_repl-cli-bv_max_width_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "bvmaxwidth: *64"
+	FAIL_REGULAR_EXPRESSION "Error")
+# The flag changes the answer: 16 * 16 = 0 holds at 8 bits only modularly.
+add_test(NAME "test_repl-cli-bv_widening_flag_changes_semantics"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -e \"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]\"")
+set_tests_properties("test_repl-cli-bv_widening_flag_changes_semantics" PROPERTIES
+	PASS_REGULAR_EXPRESSION "%1.*: F"
+	FAIL_REGULAR_EXPRESSION "Error")
+# A cap too small for the formula fails loudly and conservatively (F), with
+# both the pass's own error and the entry point's fallback message -- and
+# without crashing. The errors ARE the expected output, so no FAIL regex.
+add_test(NAME "test_repl-cli-bv_max_width_cap_exceeded"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -Y 12 -e \"sat o:bv[8] = x * y\"")
+set_tests_properties("test_repl-cli-bv_max_width_cap_exceeded" PROPERTIES
+	PASS_REGULAR_EXPRESSION "required width 16 exceeds bv-max-width 12(.*\n)*.*%1.*: F")
+# Spec-file mode gets the flags too (they are applied before the file runs):
+# a one-step run of the guard-free saturating add stores 200, not 44.
+add_test(NAME "test_repl-cli-bv_widening_spec_file_mode"
+	COMMAND bash -c "printf 'i1:bv[8] := in console.\\ni2:bv[8] := in console.\\nrun always o1[t]:bv[8] = min(i1[t] + i2[t], {200}:bv[8]).\\n200\\n100\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -X")
+set_tests_properties("test_repl-cli-bv_widening_spec_file_mode" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := 200"
+	TIMEOUT 120)

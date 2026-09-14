@@ -52,6 +52,14 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_bv_widening(bool widening) { bv_widening = widening; }
+
+template <NodeType node>
+void api<node>::set_bv_max_width(size_t width) {
+	if (width > 0) bv_max_width = width;
+}
+
+template <NodeType node>
 void api<node>::set_blast_placement(int site) {
 	blast_placement = (site >= static_cast<int>(blast_site::per_leaf)
 		&& site <= static_cast<int>(blast_site::per_formula))

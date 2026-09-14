@@ -74,3 +74,28 @@ add_repl_test_fail(set_cmd-fixpointsteps_flag_value_rejected
 	"set fixpointsteps on" "Invalid value")
 add_repl_test_fail(set_cmd-gcgrowth_bad_value_rejected
 	"set gcgrowth 1..5" "Invalid value")
+
+# --- bv widening (exact bitvector arithmetic) -------------------------------
+# bvwidening is a flag, bvmaxwidth a count; each round-trips through the api
+# setter and back out of `get`. bvmaxwidth 0 does not mean unlimited: it
+# leaves the current cap unchanged (the api setter ignores 0), so setting it
+# after a real value reads that value back, not "unlimited".
+add_repl_test(set_cmd-bvwidening_on
+	"set bvwidening on. get bvwidening" "bvwidening: *on")
+add_repl_test(set_cmd-bvwidening_off_again
+	"set bvwidening on. set bvwidening off. get bvwidening"
+	"bvwidening: *off")
+add_repl_test(set_cmd-bvmaxwidth
+	"set bvmaxwidth 64. get bvmaxwidth" "bvmaxwidth: *64")
+add_repl_test(set_cmd-bvmaxwidth_zero_keeps_current
+	"set bvmaxwidth 64. set bvmaxwidth 0. get bvmaxwidth" "bvmaxwidth: *64")
+add_repl_test_fail(set_cmd-bvmaxwidth_flag_value_rejected
+	"set bvmaxwidth on" "Invalid value")
+add_repl_test_fail(set_cmd-bvmaxwidth_enable_rejected
+	"enable bvmaxwidth" "takes a count, not a flag")
+# The mode actually changes what the decision procedures answer: 16 * 16
+# wraps to 0 at 8 bits in the default mode and is 256 -- never 0 -- once the
+# exact mode is on, in the same session.
+add_repl_test(set_cmd-bvwidening_changes_semantics
+	"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]. set bvwidening on. sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]"
+	"%1.*: T(.*\n)*.*%2.*: F")

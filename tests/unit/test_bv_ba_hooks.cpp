@@ -453,6 +453,155 @@ TEST_SUITE("bv term_min/term_max: constant folding") {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// bv_widening: fit-gated constant folding.
+//
+// With bv_widening on, term_add/sub/mul/shl must decline to fold a constant
+// operation whose exact result does not fit the operands' width -- the node
+// is left symbolic (the operator survives) for the later elaboration pass to
+// widen. With bv_widening off (the default), folding is bit-identical to
+// today: it always happens, wrapping/truncating modularly.
+//
+// Every case that turns bv_widening on does so through bv_widening_scope
+// (RAII), never by hand: the bf() helper below the flag-flip REQUIREs its
+// parse succeeded, and a REQUIRE failure unwinds the stack instead of
+// falling through to a trailing manual reset -- which would otherwise leak
+// bv_widening == true into every later test case in the binary. The
+// destructor runs regardless of how the case exits, so the scope guard
+// covers both the normal and the aborted path. Later tasks that add more
+// bv_widening cases should reuse this guard rather than restoring by hand.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Sets bv_widening for the lifetime of the enclosing scope and restores
+// whatever value it had before, even if the scope is exited by a REQUIRE
+// failure (stack unwinding still runs destructors of already-constructed
+// locals).
+struct bv_widening_scope {
+	bool prev;
+	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
+	~bv_widening_scope() { bv_widening = prev; }
+};
+
+} // namespace
+
+TEST_SUITE("bv widening: fit-gated constant folding") {
+
+	TEST_CASE("add: wrap declined when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{200}:bv[8] + {100}:bv[8]"); // 300 wraps to 44 at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) != nullptr);
+	}
+
+	TEST_CASE("add: fit still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{100}:bv[8] + {50}:bv[8]"); // 150 fits at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) == nullptr);
+		CHECK(src == bf("{150}:bv[8]"));
+	}
+
+	TEST_CASE("add: wrap still folds modularly when bv_widening is off") {
+		CHECK(bf("{200}:bv[8] + {100}:bv[8]") == bf("{44}:bv[8]"));
+	}
+
+	TEST_CASE("sub: underflow declined when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{200}:bv[8] - {201}:bv[8]"); // 200 - 201 underflows
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_sub>) != nullptr);
+	}
+
+	TEST_CASE("sub: fit still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{200}:bv[8] - {100}:bv[8]"); // 100, no underflow
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_sub>) == nullptr);
+		CHECK(src == bf("{100}:bv[8]"));
+	}
+
+	TEST_CASE("sub: underflow still folds modularly when bv_widening is off") {
+		CHECK(bf("{200}:bv[8] - {201}:bv[8]") == bf("{255}:bv[8]"));
+	}
+
+	TEST_CASE("mul: wrap declined when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{16}:bv[8] * {16}:bv[8]"); // 256 wraps to 0 at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) != nullptr);
+	}
+
+	TEST_CASE("mul: fit still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{15}:bv[8] * {15}:bv[8]"); // 225 fits at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) == nullptr);
+		CHECK(src == bf("{225}:bv[8]"));
+	}
+
+	TEST_CASE("mul: wrap still folds modularly when bv_widening is off") {
+		CHECK(bf("{16}:bv[8] * {16}:bv[8]") == bf("0:bv[8]"));
+	}
+
+	TEST_CASE("shl: wrap declined when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{129}:bv[8] << {1}:bv[8]"); // 258 wraps to 2 at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) != nullptr);
+	}
+
+	TEST_CASE("shl: fit still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		tref src = bf("{1}:bv[8] << {2}:bv[8]"); // 4 fits at bv[8]
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) == nullptr);
+		CHECK(src == bf("{4}:bv[8]"));
+	}
+
+	TEST_CASE("shl: wrap still folds modularly when bv_widening is off") {
+		CHECK(bf("{129}:bv[8] << {1}:bv[8]") == bf("{2}:bv[8]"));
+	}
+
+	TEST_CASE("mul: a zero factor folds even when bv_widening is on") {
+		// c2 == 0 can never overflow (the product is 0), so the round-trip
+		// check is skipped and the fold happens exactly as when off --
+		// whichever side the zero is on.
+		bv_widening_scope widen;
+		CHECK(bf("{16}:bv[8] * {0}:bv[8]") == bf("0:bv[8]"));
+		CHECK(bf("{0}:bv[8] * {16}:bv[8]") == bf("0:bv[8]"));
+	}
+
+	TEST_CASE("add: an exact fit at the top still folds when bv_widening is on") {
+		// 128 + 127 = 255 is bv[8]'s largest value: no overflow, so it
+		// folds (to the canonical top element), while the top element
+		// plus anything nonzero wraps and is declined -- the fit gate
+		// reads the top element as the constant 255 it is.
+		bv_widening_scope widen;
+		CHECK(bf("{128}:bv[8] + {127}:bv[8]") == bf("1:bv[8]"));
+		tref src = bf("1:bv[8] + {10}:bv[8]"); // 255 + 10 = 265 wraps to 9
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) != nullptr);
+	}
+
+	TEST_CASE("add: top plus X folds modularly when bv_widening is off") {
+		CHECK(bf("1:bv[8] + {10}:bv[8]") == bf("{9}:bv[8]"));
+	}
+
+	TEST_CASE("mul: an exact fit at the top still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		CHECK(bf("{51}:bv[8] * {5}:bv[8]") == bf("1:bv[8]")); // 255 exactly
+		tref src = bf("{128}:bv[8] * {2}:bv[8]"); // 256 wraps to 0
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) != nullptr);
+	}
+
+	TEST_CASE("shl: a fit that lands on the top bit still folds when bv_widening is on") {
+		bv_widening_scope widen;
+		CHECK(bf("{1}:bv[8] << {7}:bv[8]") == bf("{128}:bv[8]"));
+		tref src = bf("{1}:bv[8] << {8}:bv[8]"); // 256 wraps to 0
+		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) != nullptr);
+	}
+
+	TEST_CASE("div, mod and shr are never gated: they cannot overflow") {
+		bv_widening_scope widen;
+		CHECK(bf("{200}:bv[8] / {3}:bv[8]") == bf("{66}:bv[8]"));
+		CHECK(bf("{200}:bv[8] % {3}:bv[8]") == bf("{2}:bv[8]"));
+		CHECK(bf("{200}:bv[8] >> {3}:bv[8]") == bf("{25}:bv[8]"));
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

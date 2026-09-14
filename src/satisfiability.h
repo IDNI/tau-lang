@@ -14,6 +14,8 @@
 #ifndef __IDNI__TAU__SATISFIABILITY_H__
 #define __IDNI__TAU__SATISFIABILITY_H__
 
+#include <optional>
+
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -48,7 +50,8 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
  * @param fm Unbounded continuation formula.
  * @param io_vars IO variable nodes (updated with any new variables).
  * @param start_time Time step at which the continuation was started.
- * @return Formula constraining uninterpreted constants, or `T` if none exist.
+ * @return Formula constraining uninterpreted constants, or `T` if none exist;
+ * `nullptr` when normalization fails on a `bv_widening` width-cap violation.
  *
  * @par Example
  * This function only operates on an already-transformed unbounded
@@ -75,7 +78,9 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  * @param fm Normalized Tau formula.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return Formula ready for step-by-step execution.
+ * @return Formula ready for step-by-step execution (`F` when @p fm has no
+ * satisfiable continuation), or `nullptr` when normalization fails on a
+ * `bv_widening` width-cap violation (already logged by the widening pass).
  *
  * @par Example
  * @code{.cpp}
@@ -102,7 +107,9 @@ tref transform_to_execution(tref fm, const int_t start_time = 0,
  * @param fm Tau formula to test.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return `true` if the formula is satisfiable.
+ * @return `true` if the formula is satisfiable; `false` also when
+ * normalization fails on a `bv_widening` width-cap violation (a logged,
+ * conservative fallback, not a proof of unsatisfiability).
  *
  * @par Example
  * @code{.cpp}
@@ -130,7 +137,9 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * @tparam node Tree node type.
  * @param f1 Antecedent formula.
  * @param f2 Consequent formula.
- * @return `true` if every model of @p f1 satisfies @p f2.
+ * @return `true` if every model of @p f1 satisfies @p f2; `false` also when
+ * normalization fails on a `bv_widening` width-cap violation (a logged,
+ * conservative fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -157,7 +166,9 @@ bool is_tau_impl(tref f1, tref f2);
  * @tparam node Tree node type.
  * @param f1 First formula (closed).
  * @param f2 Second formula (closed).
- * @return `true` if @p f1 and @p f2 have identical models.
+ * @return `true` if @p f1 and @p f2 have identical models; `false` also
+ * when normalization fails on a `bv_widening` width-cap violation (a
+ * logged, conservative fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -186,7 +197,8 @@ template <typename node> static int factored_tau_valid(tref fm);
  * @param fm Formula to simplify.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return Simplified formula.
+ * @return Simplified formula, or `nullptr` when normalization fails on a
+ * `bv_widening` width-cap violation (already logged by the widening pass).
  *
  * @par Example
  * @code{.cpp}

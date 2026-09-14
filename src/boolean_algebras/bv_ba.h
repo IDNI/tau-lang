@@ -534,11 +534,17 @@ inline bool operator!=(const cvc5::Term& lhs, const bool& rhs);
 inline bool operator!=(const bool& lhs, const cvc5::Term& rhs);
 
 // Bitvector specific symbol simplification
-/** @brief Simplify an `add` bitvector symbol node @p symbol. */
+// term_add, term_sub, term_mul and term_shl fold a constant pair at the
+// operands' width; under the opt-in `bv_widening` mode (bv_widening_options.h)
+// they decline the fold -- leaving the node symbolic -- whenever the exact
+// result would not fit, so the later widening pass can compute it at a wider
+// width instead of wrapping it here. div, mod and shr cannot overflow and
+// always fold.
+/** @brief Simplify an `add` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_add(tref symbol);
-/** @brief Simplify a `sub` bitvector symbol node @p symbol. */
+/** @brief Simplify a `sub` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_sub(tref symbol);
-/** @brief Simplify a `mul` bitvector symbol node @p symbol. */
+/** @brief Simplify a `mul` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_mul(tref symbol);
 /** @brief Simplify a `div` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_div(tref symbol);
@@ -546,7 +552,7 @@ template<NodeType node> tref term_div(tref symbol);
 template<NodeType node> tref term_mod(tref symbol);
 /** @brief Simplify a `shr` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_shr(tref symbol);
-/** @brief Simplify a `shl` bitvector symbol node @p symbol. */
+/** @brief Simplify a `shl` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_shl(tref symbol);
 /** @brief Simplify a `nor` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_nor(tref symbol);

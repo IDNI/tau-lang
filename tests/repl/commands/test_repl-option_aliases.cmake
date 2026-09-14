@@ -111,3 +111,8 @@ add_repl_test_fail(option_numeric-enable_refused
 	"enable fixpointsteps" "takes a count")
 add_repl_test_fail(option_numeric-toggle_refused
 	"toggle gcgrowth" "takes a count")
+
+# --- bv widening: the `y` short form mirrors the CLI's -y ---------------------
+add_repl_test(option_alias-y          "get y"          "bvwidening:")
+add_repl_test(option_alias-bvwidening "get bvwidening" "bvwidening:")
+add_repl_test(option_alias-bvmaxwidth "get bvmaxwidth" "bvmaxwidth:")

@@ -843,7 +843,6 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 	tref predicate = nullptr;
 	bool error = false;
-	auto type_id = tau::get(term).get_ba_type();
 
 	// Operands may have been replaced by fresh variables already (post-order
 	// traversal blasts inner operations first), so resolve them through the
@@ -866,6 +865,23 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
+		// Each hoisted intermediate must be typed from ITS OWN subterm's
+		// width, not a single width shared across the whole atom: a
+		// widened "truncating assignment" atom (o = ...) resets its own
+		// ba_type back to base_w via the outer cast while everything
+		// inside that cast still runs at the wider, per-subterm W (the
+		// amended D2/D3 widening rule) -- t is exactly that subterm here,
+		// already retyped to its own correct width by widen_bv_arithmetic.
+		//
+		// For a tree the widening pass never touched, the per-subterm type
+		// usually IS the atom's own type (type inference unifies every
+		// operand of an atom to one width), so this reads as an identity
+		// change there -- but not universally: a user-written cast around
+		// arithmetic is a type boundary, so subterms on either side of it
+		// genuinely differ in width, and taking the width from the subterm
+		// fixes a latent width bug in exactly those atoms, widening mode
+		// or not.
+		auto type_id = tau::get(t).get_ba_type();
 
 		switch (nt) {
 			case tau::bf_add: case tau::bf_sub: {
@@ -920,8 +936,10 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			case tau::bf_cast: {
 				auto child = tau::get(t).child(0);
 				auto src = lookup(child);
-				auto target_type_id = tau::get(t).get_ba_type();
-				auto result = tau::build_variable(target_type_id);
+				// The cast's target width IS this subterm's own width,
+				// i.e. exactly the type_id computed above -- no separate
+				// lookup needed.
+				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				auto src_width = get_bv_type_bitwidth<node>(src);
 				auto target_width = get_bv_type_bitwidth<node>(result);

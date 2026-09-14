@@ -67,7 +67,7 @@ namespace idni::tau_lang {
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, blasting_opt, case_split_opt, factoring_opt,
-	highlighting_opt,
+	bvwidening_opt, highlighting_opt,
 	indenting_opt,
 	print_benchmarks_opt, debug_opt,
 	// Numeric, unlike every option above: they take a count, not a flag, so
@@ -83,7 +83,7 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
 	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
-	spec_size_warn_opt, revision_alts_opt };
+	spec_size_warn_opt, revision_alts_opt, bv_max_width_opt };
 
 /**
  * @brief REPL evaluator for the Tau interactive shell.
@@ -117,6 +117,7 @@ struct repl_evaluator {
 		bool blasting            = bv_blasting; ///< Bitvector predicate blasting; follows the library default.
 		bool case_split          = bv_case_split; ///< Bitvector case split; follows the library default.
 		bool factoring           = ba_component_factoring; ///< Tau-BA component factoring; follows the library default.
+		bool bv_widening         = idni::tau_lang::bv_widening; ///< Exact (widened) bitvector arithmetic; follows the library default.
 		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options deliberately have no mirror fields
@@ -284,6 +285,9 @@ private:
 
 	/// @brief Update the factoring option to @p value and return the old value.
 	bool update_factoring(bool value);
+
+	/// @brief Update the bv-widening option to @p value and return the old value.
+	bool update_bv_widening(bool value);
 
 	// history
 	/// @brief Retrieve the history entry referenced by @p n.

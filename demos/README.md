@@ -29,8 +29,8 @@ when standard input is a pipe rather than a terminal.
 
 The demos use `../tests/integration/test_files/` for sample stream inputs and
 `/tmp` for stream outputs, so they assume a \*nix filesystem layout. On Windows,
-adjust those paths. `demo_3.4-interpreter_bitvectors.tau` and
-`demo_4.1-abstract_data_types.tau` instead use their own `fixture/`
+adjust those paths. `demo_2.4-exact_bitvector_arithmetic.tau`, `demo_3.4-interpreter_bitvectors.tau`
+and `demo_4.1-abstract_data_types.tau` instead use their own `fixture/`
 subdirectory (relative to `demos/`) for their file stream examples.
 
 ## The demos
@@ -45,6 +45,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_2.1-solver.tau` | `solve` and `lgrs`: satisfying assignments, splitters, Tau constants |
 | `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions |
 | `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5; the `min`/`max` builtins |
+| `demo_2.4-exact_bitvector_arithmetic.tau` | The `bvwidening` option: exact (overflow-free) bitvector arithmetic, guard-free saturating `min`, casts as boundaries, the `bvmaxwidth` cap, and a saturating stream accumulator |
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
@@ -54,7 +55,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_4.2-adt_functions_and_predicates.tau` | Functions and predicates over tuple members: typed heads, body annotations, mixed-algebra tuples, deep member paths |
 | `demo_4.3-adt_recurrence_relations.tau` | Recurrence relations over tuple members: indexed and fixpoint calls, loops and `fallback`, bitvector members |
 | `demo_4.4-adts_as_arguments.tau` | Whole tuple values as definition arguments: one parameter per flattened member, sub-tuples, mixed algebras, recurrences |
-| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, and the resource budgets with their give-ups |
+| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, how `bvwidening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bvmaxwidth`, and the resource budgets with their give-ups |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.

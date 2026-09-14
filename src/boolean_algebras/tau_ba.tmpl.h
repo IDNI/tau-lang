@@ -168,14 +168,30 @@ static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	auto&& compute)
 {
 	using node = typename tau_ba<BAs...>::node;
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; `compute` (is_tau_formula_sat/is_tau_impl
+	// et al., neither of which guards a nullptr ARGUMENT) would
+	// dereference it. Skip `compute` entirely and answer conservatively
+	// with `false` -- for the two current callers, is_zero()/is_one(),
+	// this means "cannot decide zero" and "cannot decide one", the least
+	// likely default to cause a wrong simplification either way.
+	auto safe_compute = [&](tref normalized) {
+		if (!normalized) {
+			LOG_ERROR << "cached_tau_ba_predicate: normalization failed "
+				"(bv-widening cap exceeded); answering false. This is a "
+				"conservative fallback, not a proof.";
+			return false;
+		}
+		return compute(normalized);
+	};
 	if (!fm.nso_rr.rec_relations.empty())
-		return compute(normalizer<node>(fm.nso_rr));
+		return safe_compute(normalizer<node>(fm.nso_rr));
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
 	++tau_ba_predicate_misses;
-	bool res = compute(normalizer<node>(fm.nso_rr));
+	bool res = safe_compute(normalizer<node>(fm.nso_rr));
 	pin_decided_key<node>(key);
 	return cache.insert_or_assign(key, res).first->second;
 }
@@ -406,6 +422,11 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	tref result =
 		nso_rr_apply<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
 	result = simp_tau_unsat_valid<node<tau_ba<BAs...>, BAs...>>(result);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; returning the input unchanged rather than
+	// constructing a tau_ba from a null main formula, which would poison
+	// it (a null nso_rr.main) for whatever consumes this tau_ba next.
+	if (!result) return fm;
 	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(result));
 }
 
@@ -430,9 +451,14 @@ bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
-	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(
-		normalizer<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr), st);
-	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(s));
+	using node = node<tau_ba<BAs...>, BAs...>;
+	tref normalized = normalizer<node>(fm.nso_rr);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; returning the input unchanged rather than
+	// feeding it to tau_splitter, same convention as normalize_tau above.
+	if (!normalized) return fm;
+	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(normalized, st);
+	return tau_ba<BAs...>(tree<node>::geth(s));
 }
 
 template <typename... BAs>

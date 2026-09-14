@@ -2162,6 +2162,51 @@ TEST_SUITE("ba_types_inference: type conflicts are rejected") {
 		CHECK( infers_wff("(bv[8]) fall x:bv[4] x = { 1 }:bv[8]") );
 		CHECK( !infers_wff("(bv[8]) fall x x = { 1 }:bv[8]") );
 	}
+
+	// A cast only ever targets a bitvector width, so a non-bitvector
+	// operand is an inference error. Every one of these used to pass
+	// inference untouched and abort inside the solver's cast translation
+	// (Debug: "bv type must have explicit bitwidth"; Release: a core
+	// dump) -- for a variable, an uninterpreted constant and a stream
+	// alike, and for a bare term as much as for an atomic formula.
+	TEST_CASE("cast operand must be a bitvector") {
+		CHECK( !infers_wff("(bv[8]) x:sbf = y:bv[8]") );
+		CHECK( !infers_wff("(bv[8]) x:tau = y:bv[8]") );
+		CHECK( !infers_wff("(bv[8]) <:c>:tau = y:bv[8]") );
+		CHECK( !infers_wff("(bv[8]) i1[t]:sbf = o1[t]:bv[8]") );
+		CHECK( !infers_wff("ex x:sbf ((bv[8]) x = y:bv[8])") );
+		CHECK( !infers_bf("(bv[8]) x:sbf") );
+		CHECK( !infers_bf("(bv[8]) (x:sbf & y:sbf)") );
+		// A nested cast's operand is judged by that cast, not the outer one.
+		CHECK( !infers_wff("(bv[16]) ((bv[8]) x:sbf) = y:bv[16]") );
+		// Positive controls: bitvector operands of any width stay accepted.
+		CHECK( infers_wff("(bv[8]) x:bv[4] = y:bv[8]") );
+		CHECK( infers_wff("(bv[8]) i1[t]:bv[4] = o1[t]:bv[8]") );
+		CHECK( infers_bf("(bv[8]) x:bv[16]") );
+	}
+
+	// The other direction: the cast's RESULT is a member of the enclosing
+	// atom's type scope, so it cannot meet a non-bitvector sibling, and
+	// an untyped sibling takes the cast's own width.
+	TEST_CASE("cast result unifies with its enclosing scope") {
+		CHECK( !infers_wff("((bv[8]) x:bv[4]) & y:sbf = 0") );
+		CHECK( !infers_wff("(bv[8]) x:bv[4] = y:sbf") );
+		CHECK( !infers_wff("(bv[8]) x:bv[4] = y:tau") );
+		CHECK( !infers_wff("(bv[8]) x:bv[4] = (bv[16]) y:bv[4]") );
+		CHECK( infers_wff("(bv[8]) x:bv[4] = y") );
+		CHECK( infers_wff("((bv[8]) x:bv[4]) & y = 0") );
+		CHECK( infers_wff("(bv[8]) x:bv[4] = (bv[8]) y:bv[16]") );
+		// The width an untyped sibling takes IS the cast's width.
+		tref fm = tree<node_t>::get("(bv[8]) x:bv[4] = y", parse_wff_no_infer());
+		REQUIRE( fm != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(fm);
+		REQUIRE( inferred != nullptr );
+		tref y = nullptr;
+		for (tref v : tree<node_t>::get(inferred).select_all(is<node_t>(tau::variable)))
+			if (tree<node_t>::get(v).to_str().rfind("y", 0) == 0) y = v;
+		REQUIRE( y != nullptr );
+		CHECK( tree<node_t>::get(y).get_ba_type() == bv_type_id<node_t>(8) );
+	}
 }
 
 // ── Branch pass: the rr / ref / fallback error arms ─────────────────────────

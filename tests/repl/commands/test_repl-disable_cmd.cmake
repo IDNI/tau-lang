@@ -11,3 +11,7 @@ add_repl_test(disable_cmd-status "disable status" "status: *off")
 add_repl_test(disable_cmd-colors "disable colors" "colors: *off")
 add_repl_test(disable_cmd-casesplit "enable casesplit. disable casesplit. get casesplit" "casesplit: *off")
 add_repl_test(disable_cmd-factoring "disable factoring. get factoring" "factoring: *off")
+
+add_repl_test(disable_cmd-bvwidening
+	"enable bvwidening. disable bvwidening. get bvwidening"
+	"bvwidening: *off")

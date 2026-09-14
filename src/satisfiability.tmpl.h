@@ -699,6 +699,10 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 	}
 	// Eliminate all variables
 	uconst_ctns = normalize_non_temp<node>(uconst_ctns);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here for the first time; propagate it as a
+	// clean nullptr rather than dereferencing it below.
+	if (!uconst_ctns) return nullptr;
 	// Now add all uninterpreted constants which disappeared during elimination of variables
 	// and set them to 0
 	trefs left_uconsts = tau::get(uconst_ctns).select_top(
@@ -879,9 +883,14 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 		LOG_DEBUG << "Continuation at step " << step_num << ": "
 			<< LOG_FM(chi_replc);
 	}
+	// Log the value actually returned below (chi_prev_replc, unnormalized)
+	// rather than re-normalizing just for this message: normalize_non_temp
+	// can now return nullptr on a D4 bv-widening cap violation, and that
+	// nullptr was never checked here (LOG_FM would dereference it whenever
+	// debug/trace logging is enabled).
 	LOG_DEBUG << "Unbounded continuation of Tau formula "
 		<< "reached fixpoint after " << step_num - 1 << " steps: "
-		<< LOG_FM(normalize_non_temp<node>(chi_prev_replc));
+		<< LOG_FM(chi_prev_replc);
 	return { chi_prev_replc, step_num - 1 };
 }
 
@@ -1215,6 +1224,9 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 					initials, lookback + point_after_inits);
 
 	ubd_ctn = normalize_non_temp<node>(ubd_ctn);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; propagate it rather than dereferencing.
+	if (!ubd_ctn) return nullptr;
 	ubd_ctn = transform_back_non_initials<node>(ubd_ctn, point_after_inits - 1);
 
 	// Run phi_inf until all initial conditions are taken into account
@@ -1237,6 +1249,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 
 		// Check if run is still sat
 		run = normalize_non_temp<node>(run);
+		if (!run) return nullptr;
 		if (!is_run_satisfiable<node>(run)) {
 			print_fixpoint_info(
 				"Temporal normalization of always specification reached fixpoint after "
@@ -1248,6 +1261,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	}
 	auto result = normalize_non_temp<node>(
 		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
+	if (!result) return nullptr;
 	// The following is std::cout because it should always be printed
 	print_fixpoint_info(
 		"Temporal normalization of always specification reached fixpoint after "
@@ -1465,12 +1479,19 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @param max_st_lookback Greatest lookback among the original
  * `sometimes` clauses.
  * @return The conjunction `aw@l && ... && aw@(l+max_st_lookback-1)`,
- * where `l` is @p aw's lookback, or `nullptr` when @p max_st_lookback
- * is `0`.
+ * where `l` is @p aw's lookback, wrapped in an engaged `std::optional`;
+ * the engaged value is `nullptr` when @p max_st_lookback is `0` (the
+ * legitimate "no initial segment at all" answer, which callers must treat
+ * as an empty conjunct, not as a failure). Returns `std::nullopt` -- a
+ * distinct channel -- when normalizing the segment failed, i.e. on a D4
+ * bv-widening cap violation (already `LOG_ERROR`'d by the pass): callers
+ * must propagate that failure rather than continue without the initial
+ * run, since silently dropping those conjuncts only ever makes the
+ * remaining formula EASIER to satisfy (an anti-conservative answer).
  * @endinternal
  */
 template <NodeType node>
-tref make_initial_run(tref aw, const int_t max_st_lookback) {
+std::optional<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using tau = tree<node>;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
@@ -1479,8 +1500,16 @@ tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	tref run = nullptr;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, t + i);
-		if (run) run = normalize_non_temp<node>(
-					tau::build_wff_and(run, current_aw));
+		if (run) {
+			run = normalize_non_temp<node>(
+						tau::build_wff_and(run, current_aw));
+			// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+			// pass) surfaces as nullptr here; report it on the failure
+			// channel, which is what keeps it distinguishable from the
+			// legitimate `max_st_lookback == 0` nullptr below (see this
+			// function's doc comment).
+			if (!run) return std::nullopt;
+		}
 		else run = current_aw;
 	}
 	return run;
@@ -1567,8 +1596,16 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 					st_flags, st_io_vars, time_point - 1);
 	st_io_vars = tau::get(st_flags).select_top(is_child<node, tau::io_var>);
 
-	// Create the initial phase of the always part
-	tref run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
+	// Create the initial phase of the always part. std::nullopt (as opposed
+	// to an engaged nullptr, which just means "no initial segment", the
+	// max_st_lookback == 0 case) is a normalization failure -- a D4
+	// bv-widening cap violation -- and must be propagated like every other
+	// guarded site below: continuing with `run = nullptr` would silently
+	// DROP the initial-run conjuncts and make the remaining search easier,
+	// i.e. answer satisfiable/realizable when it must not.
+	auto initial_run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
+	if (!initial_run) return nullptr;
+	tref run = *initial_run;
 	// Check if flag can be raised up to the highest initial condition + 2
 	// which corresponds to checking the sometimes statement up to time point
 	// of the highest initial condition + 1
@@ -1583,6 +1620,10 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		auto current_flag = fm_at_time_point<node>(st_flags, st_io_vars, i);
 		auto normed_run = normalize_non_temp<node>(
 					tau::build_wff_and(run, current_flag));
+		// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+		// pass) surfaces as nullptr here; propagate a clean nullptr
+		// rather than dereferencing it below.
+		if (!normed_run) return nullptr;
 		if (is_run_satisfiable<node>(normed_run)) {
 			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
 			LOG_DEBUG << LOG_FM(normed_run);
@@ -1597,6 +1638,12 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		// that it will never be raised at this timepoint
 		run = normalize_non_temp<node>(tau::build_wff_and(run,
 					tau::build_wff_neg(current_flag)));
+		// A D4 bv-widening cap violation surfaces as nullptr here; return
+		// it immediately -- falling into the next iteration's `if (run)`
+		// check (top of this loop) would silently discard it and restart
+		// from `current_aw`, masking the failure as an empty/initial
+		// `run` instead of a real error.
+		if (!run) return nullptr;
 	}
 	// Since flag could not be raised in the initial segment, we now check if it
 	// can be raised at all. To this end we calculate chi_inf
@@ -1616,6 +1663,10 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	auto [chi_inf, steps] = find_fixpoint_chi<node>(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
 	chi_inf = normalize_non_temp<node>(chi_inf);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; propagate a clean nullptr rather than
+	// dereferencing it below.
+	if (!chi_inf) return nullptr;
 
 	// LOG_TRACE << "Fixpoint chi after normalize: " << chi_inf;
 	if (tau::get(chi_inf).equals_F()) {
@@ -1682,6 +1733,10 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 
 		auto normed_run = normalize_non_temp<node>(
 					tau::build_wff_and(run, current_flag));
+		// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+		// pass) surfaces as nullptr here; propagate a clean nullptr
+		// rather than dereferencing it below.
+		if (!normed_run) return nullptr;
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
 		if (is_run_satisfiable<node>(normed_run)) {
@@ -1699,6 +1754,12 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		// that it will never be raised at this timepoint
 		run = normalize_non_temp<node>(tau::build_wff_and(run,
 					tau::build_wff_neg(current_flag)));
+		// A D4 bv-widening cap violation surfaces as nullptr here; return
+		// it immediately -- the next iteration unconditionally rebuilds
+		// `run` via build_wff_and (no `if (run)` guard in this unbounded
+		// loop, unlike the bounded loop above), so a null `run` here
+		// would otherwise be fed straight into that builder call.
+		if (!run) return nullptr;
 	}
 }
 
@@ -1714,10 +1775,21 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 		return _F<node>();
 	}
 #ifdef TAU_CACHE
-	using cache_t = std::map<std::pair<tref, int_t>, tref,
-				subtree_pair_less<node, int_t>>;
+	// The key includes `bv_widening`, nested with start_time as the pair's
+	// second element (subtree_pair_less falls back to a plain `<` on any
+	// non-tref PT, and std::pair<int_t, bool> already has one) -- same
+	// defect class, and the same fix, as nso_rr_apply's caches
+	// (nso_rr.tmpl.h): this function rebuilds nodes (always_to_
+	// unbounded_continuation, to_unbounded_continuation, normalize_non_temp
+	// itself) via ordinary construction, which runs the bv_widening-
+	// sensitive fit-gated folding hooks, so a cached result computed with
+	// the flag one way must not be replayed for the other.
+	using cache_key_t = std::pair<tref, std::pair<int_t, bool>>;
+	using cache_t = std::map<cache_key_t, tref,
+				subtree_pair_less<node, std::pair<int_t, bool>>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find(std::make_pair(fm, start_time));
+	if (auto it = cache.find(std::make_pair(fm,
+		std::make_pair(start_time, bv_widening)));
 		it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	auto elim_aw = [](tref f) {
@@ -1733,6 +1805,10 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation<node>(
 						aw_fm, start_time, output);
+		// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+		// pass) surfaces as nullptr here; propagate a clean nullptr
+		// rather than building a wff_always around it below.
+		if (!ubd_aw_fm) return nullptr;
 		auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 					tau::build_wff_always(ubd_aw_fm));
 		ev_t = transform_to_eventual_variables<node>(
@@ -1740,10 +1816,12 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 		// Check if there is a sometimes present
 		if (ev_t.first == ubd_fm) {
 #ifdef TAU_CACHE
-			cache.emplace(std::make_pair(
-				elim_aw(ubd_fm), start_time), elim_aw(ubd_fm));
-			return cache.emplace(std::make_pair(fm, start_time),
-					     elim_aw(ubd_fm)).first->second;
+			cache.emplace(std::make_pair(elim_aw(ubd_fm),
+				std::make_pair(start_time, bv_widening)),
+				elim_aw(ubd_fm));
+			return cache.emplace(std::make_pair(fm,
+				std::make_pair(start_time, bv_widening)),
+				elim_aw(ubd_fm)).first->second;
 #endif // TAU_CACHE
 			return elim_aw(ubd_fm);
 		}
@@ -1758,8 +1836,9 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 			if (!is_non_temp_nso_satisfiable<node>(fm))
 				aw_fm = tau::_F();
 #ifdef TAU_CACHE
-			return cache.emplace(std::make_pair(fm, start_time),
-					     aw_fm).first->second;
+			return cache.emplace(std::make_pair(fm,
+				std::make_pair(start_time, bv_widening)),
+				aw_fm).first->second;
 #endif // TAU_CACHE
 			return aw_fm;
 		}
@@ -1774,8 +1853,9 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	DBG(assert(aw_after_ev != nullptr);)
 	if (aw_after_ev == nullptr) {
 #ifdef TAU_CACHE
-		return cache.emplace(std::make_pair(fm, start_time),
-				     elim_aw(fm)).first->second;
+		return cache.emplace(std::make_pair(fm,
+			std::make_pair(start_time, bv_widening)),
+			elim_aw(fm)).first->second;
 #endif // TAU_CACHE
 		return elim_aw(fm);
 	}
@@ -1790,12 +1870,19 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 				aw_after_ev, st[0], ubd_aw_fm, start_time,
 				ev_t.second, output));
 	else res = aw_after_ev;
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass, in
+	// either to_unbounded_continuation or the normalize_non_temp call
+	// above) surfaces as nullptr here; propagate a clean nullptr rather
+	// than dereferencing it in elim_aw below.
+	if (!res) return nullptr;
 	res = elim_aw(res);
 	LOG_DEBUG << "End transform_to_execution: " << LOG_FM(res);
 #ifdef TAU_CACHE
-	cache.emplace(std::make_pair(res, start_time), res);
-	return cache.emplace(std::make_pair(fm, start_time),
-			     res).first->second;
+	cache.emplace(std::make_pair(res,
+		std::make_pair(start_time, bv_widening)), res);
+	return cache.emplace(std::make_pair(fm,
+		std::make_pair(start_time, bv_widening)),
+		res).first->second;
 #endif // TAU_CACHE
 	return res;
 }
@@ -1805,10 +1892,28 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Start is_tau_formula_sat: " << LOG_FM(fm);
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, conservatively
+	// answering "not sat" (the same convention solve_bv/is_bv_formula_sat
+	// already use for a cvc5 translation failure).
+	if (!normalized_fm) {
+		LOG_ERROR << "is_tau_formula_sat: normalization failed "
+			"(bv-widening cap exceeded); answering unsat. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : expression_paths<node>(normalized_fm)) {
-		if (!tau::get(transform_to_execution<node>(
-			clause, start_time, output)).equals_F()) {
+		tref executed = transform_to_execution<node>(
+			clause, start_time, output);
+		if (!executed) {
+			LOG_ERROR << "is_tau_formula_sat: transform_to_execution "
+				"failed (bv-widening cap exceeded); answering unsat "
+				"for this clause. This is a conservative fallback, "
+				"not a proof.";
+			continue;
+		}
+		if (!tau::get(executed).equals_F()) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
 			return true;
 		}
@@ -1825,9 +1930,24 @@ bool is_tau_impl(tref f1, tref f2) {
 	tref f2_norm = normalize<node>(f2);
 	tref imp_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, conservatively
+	// answering "does not imply" rather than dereferencing it below.
+	if (!imp_check) {
+		LOG_ERROR << "is_tau_impl: normalization failed (bv-widening "
+			"cap exceeded); answering negatively. This is a "
+			"conservative fallback, not a proof.";
+		return false;
+	}
 	// Now check that each disjunct is not satisfiable
 	for (tref c : expression_paths<node>(imp_check)) {
 		auto ctn = transform_to_execution<node>(c);
+		if (!ctn) {
+			LOG_ERROR << "is_tau_impl: transform_to_execution failed "
+				"(bv-widening cap exceeded); answering negatively. "
+				"This is a conservative fallback, not a proof.";
+			return false;
+		}
 		if (!tau::get(ctn).equals_F()) return false;
 	}
 	return true;
@@ -1842,9 +1962,25 @@ bool are_tau_equivalent(tref f1, tref f2) {
 	tref f2_norm = normalize<node>(f2);
 	tref equiv_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_equiv(f1_norm, f2_norm)));
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat it as undecidable, conservatively
+	// answering "not equivalent" rather than dereferencing it below.
+	if (!equiv_check) {
+		LOG_ERROR << "are_tau_equivalent: normalization failed "
+			"(bv-widening cap exceeded); answering negatively. This "
+			"is a conservative fallback, not a proof.";
+		return false;
+	}
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : expression_paths<node>(equiv_check)) {
 		auto ctn = transform_to_execution<node>(c);
+		if (!ctn) {
+			LOG_ERROR << "are_tau_equivalent: transform_to_execution "
+				"failed (bv-widening cap exceeded); answering "
+				"negatively. This is a conservative fallback, not a "
+				"proof.";
+			return false;
+		}
 		if (!tau::get(ctn).equals_F()) return false;
 	}
 	return true;
@@ -1867,14 +2003,22 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	if (fv == 1) return tau::_T();
 	if (fv < 0 && is_tau_impl<node>(tau::_T(), fm)) return tau::_T();
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; propagate a clean nullptr rather than
+	// dereferencing it in expression_paths below.
+	if (!normalized_fm) return nullptr;
 	trefs clauses = {tau::_F()};
 	// Check satisfiability of each clause -- unit-wise where exact
 	for (tref clause: expression_paths<node>(normalized_fm)) {
 		bool keep;
 		int fs = factor ? factored_tau_sat<node>(clause) : -1;
 		if (fs >= 0) keep = (fs == 1);
-		else keep = !tau::get(transform_to_execution<node>(
-			clause, start_time, output)).equals_F();
+		else {
+			tref executed = transform_to_execution<node>(
+				clause, start_time, output);
+			if (!executed) return nullptr;
+			keep = !tau::get(executed).equals_F();
+		}
 		if (keep) clauses.push_back(clause);
 	}
 	tref res = tau::build_wff_or(clauses);

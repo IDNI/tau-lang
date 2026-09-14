@@ -62,9 +62,18 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 	enum kind { leaf, wrap, unary, binary, binder };
 	auto kind_of = [](size_t nt) {
 		switch (nt) {
-		// wrappers: the value is the value of the single child
+		// wrappers: the value is the value of the single child.
+		// bf_parenthesis is transparent too -- "(" bf ")" carries no
+		// semantics of its own (needed_width/widen_term already treat it
+		// as a pass-through, bv_widening.h); missing it here meant any
+		// bv formula containing one (e.g. bv_widening's own `(x*y)'`
+		// shape, forced by the grammar around a complement/cast operand)
+		// silently failed to translate, which made both a formula AND its
+		// negation "fail to translate", so is_bv_formula_valid (unsat of
+		// the negation) came back true regardless of the real semantics.
 		case tau::wff_always: case tau::wff_sometimes:
-		case tau::wff: case tau::bf: case tau::ctnvar:
+		case tau::wff: case tau::bf: case tau::bf_parenthesis:
+		case tau::ctnvar:
 			return wrap;
 		case tau::wff_all: case tau::wff_ex:	return binder;
 		case tau::wff_neg: case tau::bf_neg: case tau::bf_cast:

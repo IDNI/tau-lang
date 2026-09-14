@@ -81,6 +81,19 @@ TEST_SUITE("Execution: revision stream continuity") {
 	}
 }
 
+// Sets bv_widening for the lifetime of the enclosing scope and restores
+// whatever value it had before, even on a REQUIRE/CHECK-failure stack
+// unwind. Local copy of the RAII guard in tests/unit/test_bv_widening.cpp
+// and tests/unit/test_bv_ba_hooks.cpp (bv_widening is declared in
+// bv_widening_options.h, already visible here transitively through
+// test_tau_helpers.h, the same way test_bv_ba_hooks.cpp gets it without a
+// direct include).
+struct bv_widening_scope {
+	bool prev;
+	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
+	~bv_widening_scope() { bv_widening = prev; }
+};
+
 TEST_SUITE("Execution") {
 
 	// Pins on printed formulas must be order-insensitive
@@ -1539,6 +1552,143 @@ TEST_SUITE("with inputs and outputs") {
 		auto maybe_i = run<node_t>(spec, ctx, 2);
 		CHECK( maybe_i.has_value() );
 		CHECK ( o1->get_values() == strings{ "10", "2" } );
+	}
+
+	// Task 8 (bv-widening): prove the widened semantics through a live
+	// execution run, not just direct widen_bv_arithmetic/normalizer calls
+	// (Tasks 4-6). `min(i1[t] + i2[t], {200}:bv[8])` is the brief's
+	// saturating-add idiom: at step 0, i1=200/i2=100 overflows bv[8]
+	// (200+100=300). Steps 1-3 use small, non-overflowing pairs so the
+	// two semantics agree there, isolating the divergence to index 0.
+	//
+	// Modular (bv_widening off, cvc5 native bv[8] add): 300 mod 256 = 44;
+	// min(44, 200) = 44.
+	// Exact (bv_widening on): needed_width(add) = max(8,8)+1 = 9, so
+	// 200+100 = 300 fits (no wrap); min(300, 200) = 200; the atom's
+	// bare-storage truncating cast back to bv[8] is lossless (200 <=
+	// 255).
+	TEST_CASE("always o1 = min(i1+i2, 200): wraps to 44 when bv_widening is off") {
+		bdd_init<Bool>();
+		REQUIRE( !bv_widening ); // default; no scope guard turns it on here
+		auto spec = create_spec(
+			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
+		io_context<node_t> ctx;
+		strings i1_values = { "200", "10", "5", "0" };
+		strings i2_values = { "100", "20", "5", "0" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == strings{ "44", "30", "10", "0" } );
+	}
+
+	TEST_CASE("always o1 = min(i1+i2, 200): saturates to 200 when bv_widening is on") {
+		bdd_init<Bool>();
+		bv_widening_scope widen;
+		auto spec = create_spec(
+			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
+		io_context<node_t> ctx;
+		strings i1_values = { "200", "10", "5", "0" };
+		strings i2_values = { "100", "20", "5", "0" };
+		ctx.add_input("i1", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		CHECK( o1->get_values() == strings{ "200", "30", "10", "0" } );
+	}
+
+	// Task 8 pwr probe: does an UPDATE rule containing bv arithmetic get
+	// elaborated the same way a compile-time spec does? `i1` stays the
+	// tau-typed update-submission channel (the `u[t] = i1[t]` idiom used
+	// throughout this suite's "u[t] = i1[t]: ..." cases); the update text
+	// references a SEPARATE bv[8] stream `i2` for the arithmetic operand
+	// -- mirroring the "dec_seq" case above, which uses a second stream
+	// (there, tau-typed) referenced from inside a submitted update rather
+	// than i1 itself, because i1 is already pinned to tau (u's type) by
+	// the submission clause and cannot also carry bv[8] values without a
+	// type conflict once the update clause is merged into the running
+	// spec.
+	//
+	// The original spec leaves o1 UNCONSTRAINED (unlike "u[t] = i1[t]:
+	// spec_replace" above, which pins a baseline for o1 to replace).
+	// Confirmed by a trace-level investigation (see the Task 8 report):
+	// pinning a conflicting baseline instead routes pointwise_revision
+	// through its documented "I1" last-resort-alternative path
+	// (interpreter.tmpl.h ~1806-1823) rather than the plain "append as a
+	// new spec part" path (~1526-1540) this test now takes -- an earlier
+	// version of this test pinned o1 to a baseline and observed a stuck
+	// value there, which turned out to be an artifact of that alternate
+	// path, not a widening defect (flagged separately, out of this task's
+	// scope). The update submitted at step 1 introduces `min(i2*3, 100)`
+	// for o1, effective from step 2 onward (one-step lag, same as every
+	// other update case in this suite).
+	//
+	// i2's programmatic stream is only read starting the first step it
+	// becomes an active input, i.e. from step 2 onward (positional
+	// consumption from the stream's own cursor, not indexed by absolute
+	// time) -- confirmed by a trace-level rerun. So `i2_values` need only
+	// the two entries actually consumed at steps 2-3, not four
+	// time-aligned ones.
+	//
+	// i2 = 90: 90*3 = 270 overflows bv[8] (270 mod 256 = 14) -- modular
+	// would give min(14,100) = 14. Exact (widened): needed_width(mul(8,8))
+	// = 16, 270 fits, min(270,100) = 100, truncated losslessly to bv[8].
+	// With bv_widening on for the whole run, o1 must read 100 at steps
+	// 2-3, not 14.
+	TEST_CASE("pwr: an update rule with bv arithmetic is elaborated under bv_widening") {
+		bdd_init<Bool>();
+		// The type of a stream name is global to the process
+		// (definitions<node_t>::instance(), see the same fix and comment
+		// in tests/integration/test_integration-bv_stress_check.cpp).
+		// `o1` and `i2` were already pinned to :tau by dozens of earlier
+		// "u[t] = i1[t]: ..." cases above in this same suite (none of
+		// which annotate them, so they default to tau); without clearing
+		// here, the update text below fails to parse as a stream value
+		// with "Incompatible type information ..., expected tau, found
+		// bv[8]" the first time o1/i2 are read back as bv[8] through
+		// interpreter::read() -> ba_constants<node>::get(line, ...) (the
+		// two direct-execution tests above never hit this: their o1/i1/i2
+		// are only ever parsed once, through create_spec's own
+		// self-contained inference, never re-parsed from a runtime
+		// stream-value string).
+		definitions<node_t>::instance().clear();
+		bv_widening_scope widen;
+		auto spec = create_spec("u[t] = i1[t].");
+		strings i1_values = {
+			"F",
+			"always o1[t]:bv[8] = min(i2[t]:bv[8] * { 3 }:bv[8], { 100 }:bv[8])",
+			"F", "F"
+		};
+		strings i2_values = { "90", "90" };
+		io_context<node_t> ctx;
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		// o1 is unconstrained before the update, so it produces no value
+		// (is not part of the executed spec) at steps 0-1 at all; it only
+		// becomes an active output once the revision (submitted at step 1,
+		// effective from step 2) introduces it. get_values() therefore
+		// collects exactly two entries -- one per produced step (2 and 3),
+		// not four time-indexed slots.
+		REQUIRE( o1_values.size() == 2 );
+		CHECK( o1_values[0] == "100" );
+		CHECK( o1_values[1] == "100" );
 	}
 
 }

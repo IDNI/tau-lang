@@ -249,7 +249,11 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
 	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
-	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	// check is trace-log-only; a D4 bv-widening cap violation surfaces as
+	// nullptr here, and LOG_FM would dereference it whenever trace
+	// logging is enabled.
+	if (check) LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+	else LOG_TRACE << "lgrs/check: nullptr (bv-widening cap exceeded)\n";
 #endif // DEBUG
 
 	return phi;
@@ -1258,6 +1262,11 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	assert(!tau::get(form).find_top(is_temporal_quantifier<node>));
 #endif // DEBUG
 	form = normalize_non_temp<node>(form);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here for the first time; propagate it as this
+	// function's own established error convention rather than
+	// dereferencing it below.
+	if (!form) { error = true; return {}; }
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
 		// early to simplify solving

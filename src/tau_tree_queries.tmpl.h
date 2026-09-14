@@ -29,10 +29,17 @@ bool is(tref n, std::initializer_list<size_t> nts) {
 	return false;
 }
 
-// factory method for is predicate
+// factory method for is predicate. The list is copied into a vector: a
+// std::initializer_list only views a temporary array that dies at the end
+// of the full expression it appears in, so capturing it by value would
+// leave a predicate stored in a variable (`auto p = is<node>({...});`)
+// reading freed memory the moment it is used.
 template <NodeType node>
 inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
-	return [nts](tref n) { return is<node>(n, nts); };
+	return [nts = std::vector<size_t>(nts)](tref n) {
+		for (auto nt : nts) if (tree<node>::get(n).is(nt)) return true;
+		return false;
+	};
 }
 
 template <NodeType node>

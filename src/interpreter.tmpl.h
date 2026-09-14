@@ -569,6 +569,15 @@ std::optional<interpreter<node>>
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
 	// Find a satisfiable unbound continuation from spec
 	spec = normalizer<node>(spec);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; treat the spec as unrealizable, the same
+	// as the "no clause was executable" failure path below, rather than
+	// dereferencing it in expression_paths.
+	if (!spec) {
+		LOG_ERROR << "Tau specification failed to normalize "
+			"(bv-widening cap exceeded)\n";
+		return {};
+	}
 	// For each spec clause, we check if it is executable
 	for (tref clause : expression_paths<node>(spec)) {
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
@@ -820,6 +829,11 @@ std::pair<std::optional<assignment<node>>, bool>
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
 			tref current = normalize_non_temp<node>(path);
+			// A D4 bv-widening cap violation (already LOG_ERROR'd by the
+			// pass) surfaces as nullptr here; treat this path as
+			// unsolvable (same as solution_with_max_update finding no
+			// solution below) rather than dereferencing it.
+			if (!current) continue;
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
@@ -864,7 +878,11 @@ std::pair<std::optional<assignment<node>>, bool>
 				auto substituted = rewriter::replace<node>(
 						current, path_solution.value());
 				auto check = normalize_non_temp<node>(substituted);
-				LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
+				// check is debug-log-only; a D4 bv-widening cap
+				// violation surfaces as nullptr here, and LOG_FM would
+				// dereference it whenever trace logging is enabled.
+				if (check) LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
+				else LOG_TRACE << "step/check: nullptr (bv-widening cap exceeded)\n";
 			} else {
 				LOG_TRACE << "step/solution: no solution\n";
 			}
@@ -1076,8 +1094,13 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		}
 		LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
 
-		// Eliminate added quantifiers
-		part_alts.push_back(normalize_non_temp<node>(step_ubt_ctn));
+		// Eliminate added quantifiers. A D4 bv-widening cap violation
+		// (already LOG_ERROR'd by the pass) surfaces as nullptr here;
+		// drop this alternative rather than pushing a null tref that
+		// step()'s consuming loop would later dereference.
+		if (tref normalized = normalize_non_temp<node>(step_ubt_ctn);
+			normalized)
+				part_alts.push_back(normalized);
 		}
 		upd_ubt_ctn.push_back(std::move(part_alts));
 	}
@@ -1207,6 +1230,10 @@ tref interpreter<node>::get_executable_spec(
 
 	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 	tref executable = transform_to_execution<node>(clause, start_time, true);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; propagate a clean nullptr rather than
+	// dereferencing it below.
+	if (!executable) return nullptr;
 	DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
 	if (tau::get(executable).equals_F()) return nullptr;
 	// Make sure that no constant time position is smaller than 0
@@ -1223,6 +1250,7 @@ tref interpreter<node>::get_executable_spec(
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
 		executable, io_vars, start_time);
+	if (!constraints) return nullptr;
 	if (tau::get(constraints).equals_F()) return nullptr;
 	DBG(LOG_TRACE << "compute_systems/constraints: " << constraints;)
 	if (!tau::get(constraints).equals_T()) {
@@ -1371,6 +1399,15 @@ void interpreter<node>::update(tref update) {
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
 	shifted_update = normalizer<node>(shifted_update);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; reject the update cleanly, the same as
+	// the other "No update performed" guards above -- the current spec
+	// (original_spec/memory) is left untouched (B1: never half-commit).
+	if (!shifted_update) {
+		LOG_WARNING << "No update performed: normalization failed "
+			"(bv-widening cap exceeded)\n";
+		return;
+	}
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 	// std::cout << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
@@ -1654,6 +1691,13 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		return r;
 	};
 	update = normalizer<node>(update);
+	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
+	// surfaces as nullptr here; fold it into the SAME nullopt convention
+	// this function already uses for "definitions in a clause do not
+	// settle" -- the caller (interpreter::update) already treats a
+	// nullopt revision as "the update cannot be accepted", leaving the
+	// current spec untouched (B1: never half-commit).
+	if (!update) return {};
 	// If the update is T, nothing changes
 	if (tau::get(update).equals_T()) return to_htrefs(alts);
 	for (tref clause : expression_paths<node>(update)) {

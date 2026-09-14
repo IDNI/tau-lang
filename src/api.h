@@ -27,6 +27,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
+#include "bv_widening_options.h"
 #include "heuristics/bv_simplify_options.h"
 #include "interpreter.h"
 #include "utility/measure.h"
@@ -123,6 +124,14 @@ struct api {
 	static void set_charvar(bool state);
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
+	/** @brief Enable/disable exact (widened) bitvector arithmetic. */
+	static void set_bv_widening(bool state);
+	/**
+	 * @brief Cap the computed width exact bitvector arithmetic may widen to.
+	 *
+	 * 0 leaves the default (1024) unchanged.
+	 */
+	static void set_bv_max_width(size_t width);
 	/**
 	 * @brief Select where predicate blasting may run (see `blast_site`).
 	 *
