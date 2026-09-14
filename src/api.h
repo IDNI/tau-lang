@@ -721,6 +721,24 @@ struct api {
 	static result<std::map<stream_at, std::string>> step(
 		interpreter<node>& i);
 
+	/**
+	 * @brief Return @p i's current specification, serialized.
+	 *
+	 * Follows every update the interpreter has applied, so a caller that
+	 * has to rebuild an interpreter can read this instead of scraping the
+	 * "Updated specification" log line. Not the `u` output stream, which
+	 * carries the incoming revision rather than the merged result.
+	 */
+	static std::string current_spec(const interpreter<node>& i);
+
+	/**
+	 * @brief Return @p i's spec revision counter.
+	 *
+	 * Bumped once per applied update, never on a rejected one, so a caller
+	 * can tell that `current_spec` changed without diffing the string.
+	 */
+	static size_t spec_revision(const interpreter<node>& i);
+
 	/// Drive the interpreter through its full step loop (see
 	/// interpreter::run_loop): steps until the spec is exhausted, input
 	/// ends, or the user quits.

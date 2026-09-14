@@ -286,6 +286,66 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(collected_outputs == std::vector<std::string>({ "F", "T", "F" }));
 	}
 
+	TEST_CASE("current_spec and spec_revision follow applied updates") {
+		auto maybe_i = tau_api::get_interpreter("u[t] = i[t].");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		// feeds every input of the next step the same value
+		auto submit = [&i](const std::string& value) {
+			std::map<stream_at, std::string> assigned;
+			for (auto& at : tau_api::get_inputs_for_step(i))
+				assigned[at] = value;
+			return tau_api::step(i, assigned);
+		};
+
+		CHECK(tau_api::spec_revision(i) == 0);
+		const std::string initial = tau_api::current_spec(i);
+		CHECK(!initial.empty());
+
+		// a step that carries no update leaves both untouched
+		CHECK(submit("T.").has_value());
+		CHECK(tau_api::spec_revision(i) == 0);
+		CHECK(tau_api::current_spec(i) == initial);
+
+		// an applied update bumps the revision exactly once
+		CHECK(submit("u[t] = i[t] | i[t-1].").has_value());
+		CHECK(tau_api::spec_revision(i) == 1);
+		const std::string updated = tau_api::current_spec(i);
+		CHECK(updated != initial);
+
+		// and a plain step after it still does not
+		CHECK(submit("F.").has_value());
+		CHECK(tau_api::spec_revision(i) == 1);
+		CHECK(tau_api::current_spec(i) == updated);
+	}
+
+	TEST_CASE("a rejected update leaves spec_revision and current_spec alone") {
+		auto maybe_i = tau_api::get_interpreter("u[t] = i[t].");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		auto submit = [&i](const std::string& value) {
+			std::map<stream_at, std::string> assigned;
+			for (auto& at : tau_api::get_inputs_for_step(i))
+				assigned[at] = value;
+			return tau_api::step(i, assigned);
+		};
+
+		// advance so the absolute positions below read before the start
+		CHECK(submit("T.").has_value());
+		CHECK(submit("T.").has_value());
+
+		const size_t revision = tau_api::spec_revision(i);
+		const std::string spec = tau_api::current_spec(i);
+
+		// update() refuses this one ("invalid memory access was found"):
+		// the step still succeeds, but nothing may move
+		CHECK(submit("u[-2] = i[-2].").has_value());
+		CHECK(tau_api::spec_revision(i) == revision);
+		CHECK(tau_api::current_spec(i) == spec);
+	}
+
 	TEST_CASE("with remapped streams") {
 
 		// Remap input and output streams from default console to custom streams

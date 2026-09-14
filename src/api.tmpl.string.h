@@ -358,6 +358,16 @@ result<interpreter<node>> api<node>::get_interpreter(
 }
 
 template <NodeType node>
+std::string api<node>::current_spec(const interpreter<node>& i) {
+	return TAU_TO_STR(i.current_spec_fm());
+}
+
+template <NodeType node>
+size_t api<node>::spec_revision(const interpreter<node>& i) {
+	return i.spec_revision();
+}
+
+template <NodeType node>
 std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 	// Build the set of input variables needed at the current time point,
 	// filter to those within the spec's lookback window, and return

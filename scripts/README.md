@@ -141,6 +141,24 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
   node. Adding `-DTAU_BUILD_BROWSER_TESTS=ON` registers `browser_suite`, which
   drives the same binaries in headless Chrome. See the WebAssembly section of
   [`AGENTS.md`](../AGENTS.md) for the constraints.
+- `test-with-tau-testnet [<PRESET>] [<CMAKE_OPTIONS>] [-- <PYTEST_ARGS>]` —
+  clone [tau-testnet](https://github.com/IDNI/tau-testnet), build the Python
+  binding from the current source, and run tau-testnet's pytest suite against
+  it. Downstream mirror of the parser's `test-with-tau`. Defaults to the
+  `release-binding-python` preset; any of the `*-binding-python*` presets
+  work, and one without the binding is rejected after the build.
+
+  `TAU_TESTNET_DIR` reuses an existing checkout instead of cloning into
+  `./tau-testnet`. `TAU_TESTNET_PYTHON` picks the interpreter the venv is
+  built from — tau-testnet pins exact dependency versions, and several pin
+  no wheel past cp312, so the newest interpreter on the box may not work.
+
+  ```bash
+  ./dev test-with-tau-testnet
+  ./dev test-with-tau-testnet devel-binding-python-tests -DTAU_BUILD_JOBS=10
+  ./dev test-with-tau-testnet -- -k test_consensus_time
+  TAU_TESTNET_PYTHON=$(uv python find 3.12) ./dev test-with-tau-testnet
+  ```
 
 ## Benchmarking
 

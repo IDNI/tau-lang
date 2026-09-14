@@ -1073,6 +1073,21 @@ static tref combined_spec_fm(
 	return tau::build_wff_and(part_fms);
 }
 
+// Defined here rather than beside the other interpreter members: the call to
+// combined_spec_fm is not found by ADL, so it has to be declared above this
+// point for two-phase lookup.
+template <NodeType node>
+tref interpreter<node>::spec_partition_fm(
+	const std::vector<std::pair<htrefs, htref>>& parts)
+{
+	return unsqueeze_always(combined_spec_fm<node>(parts));
+}
+
+template <NodeType node>
+tref interpreter<node>::current_spec_fm() const {
+	return spec_partition_fm(original_spec);
+}
+
 // LTL state-variable names: Mealy "o__ltl_ms<i>__", S-operator "o__ltl_s<i>__".
 template <NodeType node>
 static bool is_ltl_state_var_name(const std::string& name) {
@@ -2491,8 +2506,7 @@ std::optional<typename interpreter<node>::update_plan>
 				"rebuild failed for the revised specification\n";
 			continue;
 		}
-		tref updated_spec = unsqueeze_always(
-			combined_spec_fm<node>(current_spec));
+		tref updated_spec = spec_partition_fm(current_spec);
 		return update_plan(std::move(current_ubd_ctn),
 			std::move(current_spec), std::move(uf),
 			std::move(new_inputs), std::move(new_outputs),
@@ -2523,6 +2537,7 @@ bool interpreter<node>::update(tref update) {
 	// below can fail and leave the interpreter half-updated.
 	ubt_ctn = std::move(plan->ubt_ctn);
 	original_spec = std::move(plan->spec);
+	++spec_revision_;
 	output_partition = std::move(plan->partition);
 	outputs = std::move(plan->outputs);
 	inputs = std::move(plan->inputs);

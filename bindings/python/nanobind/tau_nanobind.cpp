@@ -201,10 +201,16 @@ NB_MODULE(tau, m) {
 	nb::class_<interpreter_t>(m, "interpreter")
 		.def(nb::init<interpreter_t&&>())
 		.def_ro("time_point", &interpreter_t::time_point)
+		.def_prop_ro("spec_revision", [](const interpreter_t& self) {
+			return tau_api::spec_revision(self);
+		})
+		.def("current_spec", [](const interpreter_t& self) {
+			return tau_api::current_spec(self);
+		}, "The interpreter's current specification as a string. "
+		"Follows every applied update; not the `u` stream, which "
+		"carries the incoming revision rather than the merged result.")
 
 		// ── Inspection (plan §14) ────────────────────────────────────
-		.def("current_spec", &interpreter_t::current_spec,
-			"Return the current running spec as a tau-syntax string.")
 		.def("reset", &interpreter_t::reset,
 			"Reset the interpreter to time t=0 (preserving spec / streams / cached_solution).")
 		.def("current_state", &interpreter_t::current_state,
@@ -296,8 +302,7 @@ NB_MODULE(tau, m) {
 				spec = to_optional(tau_api::get_formula(spec_str));
 				if (!spec) return false;
 			}
-			return idni::tau_lang::is_ltl_aba_realizable<node_t>(
-				*spec, 0, false);
+			return to_optional(tau_api::realizable(*spec)).value_or(false);
 		}, "spec"_a,
 		"Check realisability of a tau spec / LTL formula (REAL oracle).");
 

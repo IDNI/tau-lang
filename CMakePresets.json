@@ -173,7 +173,8 @@
 			"cacheVariables": {
 				"TAU_BUILD_TESTS": "ON",
 				"TAU_BUILD_EXECUTABLE": "ON",
-				"TAU_BUILD_BINDING_PYTHON": "ON"
+				"TAU_BUILD_BINDING_PYTHON": "ON",
+				"TAU_BUILD_NANOBIND": "ON"
 			}
 		},
 		{
@@ -255,7 +256,8 @@
 			"name": "_build-binding-python",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_BUILD_BINDING_PYTHON": "ON"
+				"TAU_BUILD_BINDING_PYTHON": "ON",
+				"TAU_BUILD_NANOBIND": "ON"
 			}
 		},
 		{
