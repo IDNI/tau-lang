@@ -10,7 +10,7 @@ Run any script from the project root via `./dev`:
 
 `./dev help` lists available scripts (everything in `scripts/*.sh`).
 
-Shared build helpers ([`devrc`](../../external/parser/scripts/devrc) with
+Shared build helpers ([`devrc`](../external/parser/scripts/devrc) with
 `normalize_args`, `dev_entry`, `build_entry`, `preset_entry`, `test_entry`)
 live in the parser submodule at `external/parser/scripts/`.
 
@@ -159,10 +159,10 @@ image build is passed `--secret id=gh_token`. It is extensionless because only
 
 ## Distributed builds (icecream)
 
-[`icecc-terminal-log`](../../external/parser/scripts/icecc-terminal-log) wraps a
+[`icecc-terminal-log`](../external/parser/cmake/use-icecream/icecc-terminal-log) wraps a
 command and tails icecc logs to stderr. Enable icecream via
 [`CMakeLocalLists.txt`](../CMakeLocalLists.txt) (`use-icecream.cmake`).
 
 ```bash
-external/parser/scripts/icecc-terminal-log ./dev release
+external/parser/cmake/use-icecream/icecc-terminal-log ./dev release
 ```
