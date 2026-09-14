@@ -392,7 +392,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
 		return true;
 	};
-	auto is_to_wrap = [](size_t nt, size_t pt) {
+	// nt: the child's type, pt: the parent's type, right: the child is the
+	// parent's right operand. A child is wrapped when the parent binds
+	// tighter; a right operand is also wrapped when it sits on the same
+	// left-chaining level as the parent (`a - (b - c)`, `a + (b - c)`,
+	// `a * (b / c)`, `a >> (b << c)`), since the grammar chains those
+	// levels left to right and an unwrapped right operand would re-parse
+	// as the left-chained tree.
+	auto is_to_wrap = [](size_t nt, size_t pt, bool right = false) {
 		static const std::set<size_t> no_wrap_for = {
 			bf_ref, bf_neg, ba_constant, bf_t,
 			bf_f, wff_ref, wff_neg, wff_semantic_neg, wff_t, wff_f, constraint, capture,
@@ -458,13 +465,15 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ wff,                580 },
 			{ bf_fall,            700 },
 			{ bf_fex,             710 },
+			// the three braced groups of the README's precedence table
+			// share one level each and chain left to right
 			{ bf_shr,             711 },
-			{ bf_shl,             712 },
+			{ bf_shl,             711 },
 			{ bf_add,             713 },
-			{ bf_sub,             714 },
+			{ bf_sub,             713 },
 			{ bf_mod,             715 },
-			{ bf_mul,             716 },
-			{ bf_div,             717 },
+			{ bf_mul,             715 },
+			{ bf_div,             715 },
 			{ bf_nor,             718 },
 			{ bf_xnor,            719 },
 			{ bf_nand,            720 },
@@ -500,7 +509,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		// 	<< node_it->second
 		// 	// << " (" << node_type << ")"
 		// 	<< "\n";
-		return p_it->second > n_it->second;
+		if (p_it->second > n_it->second) return true;
+		static const std::set<size_t> left_chaining = {
+			bf_shr, bf_shl, bf_add, bf_sub, bf_mod, bf_mul, bf_div };
+		return right && p_it->second == n_it->second
+			&& left_chaining.contains(pt);
 	};
 
 	auto indent = [&depth, &os]() {
@@ -637,8 +650,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				break;
 			case wff:
 			case bf:
-				if (parent && is_to_wrap(t.first_tree()
-					.get_type(), pnt))
+				if (parent && is_to_wrap(t.first_tree().get_type(),
+					pnt, get(parent).children_size() == 2
+						&& get(parent)[1].get() == ref))
 				{
 					wraps.insert(ref), out("(");
 					last_quant_nt = nul;

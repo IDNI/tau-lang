@@ -10,6 +10,9 @@
 #include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -43,6 +46,28 @@ static std::string normalize_blasting_off(const std::string& s) {
 	return r.has_value() ? tau::get(r.value()).to_str() : "null";
 }
 
+// Virtual memory currently used, in bytes, or 0 if unavailable. The cap
+// below is relative to this: an absolute RLIMIT_AS low enough to stop a
+// worker thread stack from mapping turns an allocation failure into
+// SIGBUS, which catch (std::bad_alloc&) cannot see.
+// Note: Darwin's virtual_size counts reserved-but-unmapped regions too,
+// so the resulting cap is looser there than on Linux.
+static size_t current_vm_bytes() {
+#ifdef __APPLE__
+	mach_task_basic_info_data_t info;
+	mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+	if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+		reinterpret_cast<task_info_t>(&info), &count)
+			!= KERN_SUCCESS) return 0;
+	return static_cast<size_t>(info.virtual_size);
+#else
+	std::ifstream statm("/proc/self/statm");
+	size_t vm_pages = 0;
+	if (!(statm >> vm_pages)) return 0;
+	return vm_pages * static_cast<size_t>(sysconf(_SC_PAGESIZE));
+#endif
+}
+
 static void check_blasting_correctness(const char* f) {
 	using namespace std::chrono;
 
@@ -51,15 +76,13 @@ static void check_blasting_correctness(const char* f) {
 	// operator new to throw std::bad_alloc, which the worker catches.
 	struct rlimit saved_rlimit;
 	getrlimit(RLIMIT_AS, &saved_rlimit);
-	{
-		std::ifstream statm("/proc/self/statm");
-		size_t vm_pages = 0;
-		statm >> vm_pages;
-		rlim_t page_size = static_cast<rlim_t>(sysconf(_SC_PAGESIZE));
-		rlim_t new_cur   = static_cast<rlim_t>(vm_pages) * page_size
-		                 + static_cast<rlim_t>(MEMORY_LIMIT_MB) * 1024ULL * 1024ULL;
-		if (saved_rlimit.rlim_max != RLIM_INFINITY && new_cur > saved_rlimit.rlim_max)
-			new_cur = saved_rlimit.rlim_max;
+	if (const size_t vm = current_vm_bytes(); vm) {
+		rlim_t new_cur = static_cast<rlim_t>(vm)
+			+ static_cast<rlim_t>(MEMORY_LIMIT_MB)
+				* 1024ULL * 1024ULL;
+		if (saved_rlimit.rlim_max != RLIM_INFINITY
+			&& new_cur > saved_rlimit.rlim_max)
+				new_cur = saved_rlimit.rlim_max;
 		struct rlimit new_rlimit = { new_cur, saved_rlimit.rlim_max };
 		setrlimit(RLIMIT_AS, &new_rlimit);
 	}

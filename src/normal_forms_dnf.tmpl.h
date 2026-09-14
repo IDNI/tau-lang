@@ -551,6 +551,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 		// Substitute all sometimes by !always! and push inner equality in
 		fm = pre_order<node>(fm).apply_unique(smt_replace);
 		fm = unequal_to_not_equal<node>(fm);
+		fm = order_atoms_to_literals<node>(fm);
 	} else fm = apply_all_xor_def<node>(fm); // term case
 	trefs vars = is_wff ? tau::get(fm).select_top(is_wff_bdd_var<node>)
 			 : tau::get(fm).select_top(is_bf_bdd_var<node>);

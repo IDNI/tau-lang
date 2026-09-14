@@ -24,12 +24,31 @@
 
 namespace idni::tau_lang {
 
-/// Opt-in for support-component factoring of the Tau-BA constant/valid
-/// tests (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h). Off by
-/// default; enabled via `api::set_ba_component_factoring(true)` or the
-/// environment variable TAU_BA_COMPONENT_FACTORING (a value of "0"
-/// disables).
-inline bool ba_component_factoring = false;
+/// Support-component factoring of the Tau-BA constant/valid tests
+/// (`is_zero`/`is_one`; see the note in tau_ba.tmpl.h): a conjunction whose
+/// conjuncts share no variables is satisfiable exactly when every component
+/// is, and validity distributes over conjunction, so the whole-constant
+/// decision of an accumulating spec is replaced by one decision per
+/// component, each remembered across steps. On by default (GitHub #92: the
+/// accumulating run of #90 goes from 42 s to 5 s with identical output);
+/// disabled via `api::set_ba_component_factoring(false)`,
+/// `--ba-component-factoring=false`, the REPL option `factoring`, or the
+/// environment variable TAU_BA_COMPONENT_FACTORING=0 (any other value
+/// enables; the variable overrides the flag in both directions).
+inline bool ba_component_factoring = true;
+
+/// How many decided rows of the Tau-BA decision caches (`is_zero`/`is_one`
+/// and the per-component factoring) keep their key tree pinned across the
+/// interpreter's per-step sweep, oldest released first. Rows whose key tree
+/// nothing else holds were dropped at every sweep and their constant
+/// re-decided at the next step (GitHub #92). 0 disables the pinning; set via
+/// api::set_ba_decision_pins, --ba-decision-pins, or the REPL option
+/// decisionpins.
+inline size_t ba_decision_pins = 4096;
+
+/// Misses of the cached is_zero/is_one predicate (decisions computed rather
+/// than found), for tests and diagnostics.
+inline size_t tau_ba_predicate_misses = 0;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.

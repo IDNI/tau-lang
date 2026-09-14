@@ -36,6 +36,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
 
+#include <cstdlib>
 #include <cvc5/cvc5.h>
 
 #include "backends/cvc5/cvc5.h"
@@ -67,6 +68,43 @@ using solution = subtree_map<node, tref>;
  */
 template<NodeType node>
 size_t get_bv_size(const tref t);
+
+/// Opt-in: decide a closed bitvector formula whose binders are all of one
+/// kind quantifier-free (see `bv_formula_sat_status`). A formula with only
+/// existential binders in positive polarity is satisfiable exactly when its
+/// matrix is (`sat(ex x phi) == sat(phi)` with `x` free); one with only
+/// universal binders is satisfiable exactly when the negated matrix is not
+/// (`sat(all x phi) == !sat(!phi)`). Such a formula is then handed to cvc5 in
+/// `QF_BV` with eager bitblasting instead of the quantified `BV` logic.
+/// Off by default; enabled via `--bv-quantifier-free-decision`, the REPL
+/// option `bv-quantifier-free-decision`, or the environment variable
+/// TAU_BV_QF_DECISION (a value of "0" disables).
+inline bool bv_quantifier_free_decision = false;
+
+inline bool bv_quantifier_free_decision_enabled() {
+	static const bool env = [] {
+		const char* v = std::getenv("TAU_BV_QF_DECISION");
+		return v && *v && !(v[0] == '0' && v[1] == '\0');
+	}();
+	return bv_quantifier_free_decision || env;
+}
+
+/**
+ * @brief Configure a solver for a quantifier-free decision-only query.
+ *
+ * `QF_BV` with eager bitblasting: the whole formula goes to the SAT solver
+ * at once, which is what a closed, binder-free bitvector query wants. Models
+ * and proofs are never read by the callers of `bv_formula_sat_status`, and
+ * every instance performs exactly one checkSat, so incrementality is off as
+ * well. Only reachable through `bv_quantifier_free_decision`.
+ */
+inline void config_cvc5_solver_quantifier_free(cvc5::Solver& solver) {
+	solver.setOption("incremental", "false");
+	solver.setOption("produce-models", "false");
+	solver.setOption("produce-proofs", "false");
+	solver.setOption("bitblast", "eager");
+	solver.setLogic("QF_BV");
+}
 
 /**
  * @brief Configures the given cvc5 solver instance for bit-vector logic.
@@ -596,6 +634,7 @@ template<NodeType node> tref simplify_bv_term(tref term);
 #include "boolean_algebras/bv/bv_ba_helpers.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_hooks.tmpl.h"
 #include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
+#include "boolean_algebras/bv/heuristics/bv_case_split.h"
 #include "boolean_algebras/bv/bv_descriptor.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__

@@ -106,16 +106,13 @@ inline bool normalize_and_expect_fail(const char* sample, typename node_t::type 
 }
 
 inline bool matches_to_any_of(const std::string& fm_str, const strings& expected) {
-#ifdef DEBUG // trace canonicity between versions of Tau (diagnostic only:
-	      // must NOT gate the result on expected[0] alone, or this
-	      // silently narrows "matches any of expected" down to "matches
-	      // the first expected value" in DEBUG builds only, while
-	      // RELEASE builds correctly check the whole list below)
-	const bool canonical = fm_str == expected[0];
-	std::stringstream ss; ss << "expression: " << fm_str;
-	if (!canonical) ss << TAU_LOG_ERROR_COLOR << " is not canonical"
-		<< TC.CLEAR() << ". expected: " << expected[0];
-	TAU_LOG_TRACE << ss.str();
+#ifdef DEBUG // report noncanonicality, never gate the result on expected[0]
+	if (!expected.empty()) {
+		if (fm_str != expected[0]) TAU_LOG_INFO << "expression: "
+			<< fm_str << " is not canonical. expected: "
+			<< expected[0];
+		else TAU_LOG_TRACE << "expression: " << fm_str;
+	}
 #endif // DEBUG
 	for (const auto& e : expected) if (fm_str == e) {
 		DBG(TAU_LOG_TRACE << "found in expected: " << fm_str;)
@@ -271,10 +268,8 @@ inline bool values_matches_any_of_canonical_conjuncts(const strings& values,
 
 // True for the associative-commutative Boolean connectives only. Every
 // other operator -- crucially bf_eq, whose operand orientation is meant to
-// be canonical and must not be masked by a test that can't see it wrong
-// (.local/build-emscripten.md §4i) -- is left untouched by the functions
-// below. bf_eq gets its own, narrower exception: see
-// is_bare_variable_operand.
+// be canonical -- is left untouched by the functions below. bf_eq gets its
+// own, narrower exception: see is_bare_variable_operand.
 inline bool is_and_or_nt(size_t nt) {
 	return nt == tau::wff_and || nt == tau::wff_or
 		|| nt == tau::bf_and  || nt == tau::bf_or;
@@ -284,10 +279,10 @@ inline bool is_and_or_nt(size_t nt) {
 // uninterpreted constant, nor an input or output stream variable.
 // simplify_using_equality_term_comp (src/heuristics/simplify_using_equality.tmpl.h)
 // gives every other category a canonical priority order; only this one
-// falls through to tau::subtree_less, a content-hash tie-break (§4i's
-// residual paragraph). simplify_using_equality_dnf::term_comp
-// (normal_forms_bf.tmpl.h) implements the same order on the DNF path. op
-// is a bf-typed bf_eq child, as build_bf_eq requires.
+// falls through to tau::subtree_less, a content-hash tie-break.
+// simplify_using_equality_dnf::term_comp (normal_forms_bf.tmpl.h)
+// implements the same order on the DNF path. op is a bf-typed bf_eq child,
+// as build_bf_eq requires.
 inline bool is_bare_variable_operand(tref op) {
 	const auto& o = tau::get(op);
 	if (o.children_size() != 1) return false;
@@ -299,80 +294,79 @@ inline bool is_bare_variable_operand(tref op) {
 }
 
 // The single-child nonterminal ("wff" or "bf") that wraps every operand of
-// nt, and therefore sits between one wff_and/bf_and (etc.) node and the
-// next link of the same chain -- see build_wff_and/build_bf_and in
-// tau_tree_builders.tmpl.h, which build exactly `get(wrapper, get(nt, l,
-// r))`.
+// nt, and sits between one wff_and/bf_and (etc.) node and the next link of
+// the same chain. build_wff_and/build_bf_and (tau_tree_builders.tmpl.h)
+// build exactly `get(wrapper, get(nt, l, r))`.
 inline size_t and_or_wrapper_nt(size_t nt) {
 	return (nt == tau::wff_and || nt == tau::wff_or) ? tau::wff : tau::bf;
 }
 
-// Flattens the (possibly multi-level) chain of nt-typed operands reachable
-// from t through and_or_wrapper_nt(nt), appending each operand that is not
-// itself part of the chain to out.
-inline void flatten_and_or_chain(tref t, size_t nt, size_t wrapper_nt,
-	trefs& out)
-{
-	const auto& nd = tau::get(t);
-	if (nd.value.nt == nt) {
-		for (tref c : nd.get_children())
-			flatten_and_or_chain(c, nt, wrapper_nt, out);
-	} else if (nd.value.nt == wrapper_nt && nd.children_size() == 1) {
-		flatten_and_or_chain(nd.only_child(), nt, wrapper_nt, out);
-	} else out.push_back(t);
-}
-
-// Canonicalizes t into a structural key: every node is tagged with its
-// nonterminal id. At a wff_and/wff_or/bf_and/bf_or node, the chain of
-// same-connective operands is flattened, each operand canonicalized
-// recursively, and the results sorted -- so operand order stops mattering
-// at every nesting level, not just the top one. A bf_eq node whose two
-// operands are both bare variables (is_bare_variable_operand) sorts them
-// the same way -- that pair's orientation is hash-dependent, not
-// meaningful, per §4i's residual paragraph. Every other node (crucially
-// bf_eq between operands of different term_comp categories, e.g. an io
-// variable against a plain one) recurses into its children preserving
-// their order, since there the orientation is canonical and a violation of
-// it must still fail. A childless node's own printed form is used as its
-// content, since there is no ordering left to canonicalize once recursion
-// bottoms out.
+// Structural key for t. At an and/or node, operands sort at every nesting
+// level, since their order carries no meaning. A bf_eq between two bare
+// variables (is_bare_variable_operand) sorts its pair the same way, since
+// that orientation is only a content-hash tie-break. Every other node keeps
+// its child order, since there the orientation is canonical and a
+// violation of it must still fail. Post-order, so every child key is ready
+// when its parent is visited.
 inline std::string canonicalize_tref(tref t) {
 	if (!t) return "-";
-	const auto& nd = tau::get(t);
-	const size_t nt = nd.value.nt;
-	const std::string tag = std::to_string(nt);
-	if (is_and_or_nt(nt)) {
-		trefs operands;
-		flatten_and_or_chain(t, nt, and_or_wrapper_nt(nt), operands);
-		strings parts;
-		for (tref op : operands) parts.push_back(canonicalize_tref(op));
-		std::sort(parts.begin(), parts.end());
-		std::string res = tag + "[";
-		for (size_t i = 0; i < parts.size(); i++) {
-			if (i) res += ",";
-			res += parts[i];
+	std::unordered_map<tref, std::string> key;
+	std::unordered_map<tref, strings> chain;
+	auto join = [](const strings& v, const char* open, const char* close) {
+		std::string r = open;
+		for (size_t i = 0; i < v.size(); i++) {
+			if (i) r += ",";
+			r += v[i];
 		}
-		return res + "]";
-	}
-	trefs ch = nd.get_children();
-	if (nt == tau::bf_eq && ch.size() == 2
-	&& is_bare_variable_operand(ch[0]) && is_bare_variable_operand(ch[1])) {
-		strings parts{ canonicalize_tref(ch[0]), canonicalize_tref(ch[1]) };
-		std::sort(parts.begin(), parts.end());
-		return tag + "(" + parts[0] + "," + parts[1] + ")";
-	}
-	if (ch.empty()) return tag + ":" + nd.to_str();
-	std::string res = tag + "(";
-	for (size_t i = 0; i < ch.size(); i++) {
-		if (i) res += ",";
-		res += canonicalize_tref(ch[i]);
-	}
-	return res + ")";
+		return r + close;
+	};
+	auto visit = [&](tref n) {
+		const auto& nd = tau::get(n);
+		const size_t nt = nd.value.nt;
+		const size_t cs = nd.children_size();
+		const std::string tag = std::to_string(nt);
+		if (is_and_or_nt(nt)) {
+			const size_t wrapper = and_or_wrapper_nt(nt);
+			strings ops;
+			for (size_t i = 0; i < cs; i++) {
+				tref c = nd[i].get();
+				const auto& cd = tau::get(c);
+				// operands sit under a single-child
+				// wrapper; a nested chain of the same
+				// connective splices in
+				if (cd.value.nt == wrapper
+					&& cd.children_size() == 1)
+						c = cd.only_child();
+				if (auto it = chain.find(c); it != chain.end())
+					ops.insert(ops.end(),
+						it->second.begin(),
+						it->second.end());
+				else ops.push_back(key[c]);
+			}
+			std::sort(ops.begin(), ops.end());
+			chain[n] = ops;
+			key[n] = tag + join(ops, "[", "]");
+			return true;
+		}
+		if (nt == tau::bf_eq && cs == 2
+			&& is_bare_variable_operand(nd[0].get())
+			&& is_bare_variable_operand(nd[1].get()))
+		{
+			strings p{ key[nd[0].get()], key[nd[1].get()] };
+			std::sort(p.begin(), p.end());
+			key[n] = tag + join(p, "(", ")");
+			return true;
+		}
+		if (cs == 0) { key[n] = tag + ":" + nd.to_str(); return true; }
+		strings ch;
+		for (size_t i = 0; i < cs; i++) ch.push_back(key[nd[i].get()]);
+		key[n] = tag + join(ch, "(", ")");
+		return true;
+	};
+	post_order<node_t>(t).search(visit);
+	return key[t];
 }
 
-// Compares result against expected up to AND/OR commutativity at every
-// nesting level. Equality (and every other) operand orientation must match
-// exactly -- see canonicalize_tref.
 inline bool matches_tree_mod_and_or(tref result, tref expected) {
 	return canonicalize_tref(result) == canonicalize_tref(expected);
 }
@@ -381,14 +375,24 @@ inline bool matches_tree_mod_and_or(tref result, tref expected) {
 // argument does) and compares under matches_tree_mod_and_or.
 inline bool matches_bf_mod_and_or(tref result, const char* expected_bf) {
 	tref expected = tau::get(expected_bf, parse_bf());
-	return expected && matches_tree_mod_and_or(result, expected);
+	if (!expected) {
+		TAU_LOG_ERROR << "expected bf does not parse: "
+			<< expected_bf;
+		return false;
+	}
+	return matches_tree_mod_and_or(result, expected);
 }
 
 // Parses expected_wff with the wff grammar and compares under
 // matches_tree_mod_and_or.
 inline bool matches_wff_mod_and_or(tref result, const char* expected_wff) {
 	tref expected = tau::get(expected_wff, parse_wff());
-	return expected && matches_tree_mod_and_or(result, expected);
+	if (!expected) {
+		TAU_LOG_ERROR << "expected wff does not parse: "
+			<< expected_wff;
+		return false;
+	}
+	return matches_tree_mod_and_or(result, expected);
 }
 
 // True if result matches any one of several structurally distinct expected
@@ -427,6 +431,42 @@ inline bool normalize_and_check(const char* sample, const strings& expected) {
 
 inline bool normalize_and_check(const char* sample, const std::string& expected) {
 	return normalize_and_check(sample, strings{ expected });
+}
+
+inline bool matches_bf_mod_and_or_any_of(tref fm, const strings& expected) {
+	for (const auto& e : expected)
+		if (matches_bf_mod_and_or(fm, e.c_str())) return true;
+	return false;
+}
+
+// values_matches_any_of, but comparing trees modulo AND/OR order rather
+// than printed strings. The per-position candidate list is kept: it also
+// holds genuinely different results, not just reorderings. The values
+// arrive printed, so each is parsed back before comparing.
+inline bool values_match_mod_and_or(const strings& values,
+	const std::vector<strings>& expected)
+{
+	if (values.size() != expected.size()) return false;
+	for (size_t i = 0; i < values.size(); i++) {
+		tref v = tau::get(values[i].c_str(), parse_wff());
+		if (!v) {
+			TAU_LOG_ERROR << "value does not parse: "
+				<< values[i];
+			return false;
+		}
+		if (!matches_wff_mod_and_or_any_of(v, expected[i])) return false;
+	}
+	return true;
+}
+
+inline bool normalize_and_check_mod_and_or(const char* sample,
+	const char* expected_wff)
+{
+	auto nso_rr = get_nso_rr(sample);
+	if (!nso_rr.has_value()) return false;
+	auto result = normalizer<node_t>(nso_rr.value());
+	if (!result.has_value()) return false;
+	return matches_wff_mod_and_or(result.value(), expected_wff);
 }
 
 } // namespace idni::tau_lang

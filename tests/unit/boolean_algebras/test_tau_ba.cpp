@@ -857,6 +857,71 @@ TEST_CASE("is_tau_closed on G(o1=T) spec") {	auto b = from_spec("G (o1[t]:tau = 
 
 } // TEST_SUITE LTL integration
 
+// ============================================================================
+// GitHub #92 (residue b): the decision caches of is_zero/is_one are keyed on
+// tree identity and filtered after every sweep, so a decided row whose key
+// tree nothing held was dropped and the constant re-decided at the next
+// step. The keys of decided rows are now pinned with a handle, bounded by
+// ba_decision_pins; with the cap at 0 the old behaviour is back.
+TEST_SUITE("tau_ba — decision rows survive the sweep") {
+// ============================================================================
+
+// The interpreter's per-step sweep (interpreter::maybe_gc) keeps only what
+// definitions and the term-BDD store still reference, plus any pinned
+// handle, and drops the rest. do_gc() above keeps nothing, so it cannot
+// stand in here.
+static void sweep() {
+	std::unordered_set<tref> keep;
+	definitions<node_t>::instance().collect_live_refs(keep);
+	tau_term_bdd<node_t>::collect_live_refs(keep);
+	tau::gc(keep);
+}
+
+TEST_CASE("a pinned key is found again after a sweep") {
+	const size_t saved = ba_decision_pins;
+	ba_decision_pins = 4096;
+	const size_t m0 = tau_ba_predicate_misses;
+	{
+		tref fm = tau::get("(x:sbf = 0) && (y:sbf = 1)", parse_wff());
+		REQUIRE( fm != nullptr );
+		test_ba a(fm);
+		CHECK_FALSE( a.is_zero() );
+	}
+	CHECK( tau_ba_predicate_misses == m0 + 1 );
+	sweep();
+	{
+		tref fm = tau::get("(x:sbf = 0) && (y:sbf = 1)", parse_wff());
+		REQUIRE( fm != nullptr );
+		test_ba b(fm);
+		CHECK_FALSE( b.is_zero() );
+	}
+	CHECK( tau_ba_predicate_misses == m0 + 1 );
+	ba_decision_pins = saved;
+}
+
+TEST_CASE("with the cap at 0 the row is lost at the sweep") {
+	const size_t saved = ba_decision_pins;
+	ba_decision_pins = 0;
+	const size_t m0 = tau_ba_predicate_misses;
+	{
+		tref fm = tau::get("(z:sbf = 0) && (w:sbf = 1)", parse_wff());
+		REQUIRE( fm != nullptr );
+		test_ba a(fm);
+		CHECK_FALSE( a.is_zero() );
+	}
+	CHECK( tau_ba_predicate_misses == m0 + 1 );
+	sweep();
+	{
+		tref fm = tau::get("(z:sbf = 0) && (w:sbf = 1)", parse_wff());
+		REQUIRE( fm != nullptr );
+		test_ba b(fm);
+		CHECK_FALSE( b.is_zero() );
+	}
+	CHECK( tau_ba_predicate_misses == m0 + 2 );
+	ba_decision_pins = saved;
+}
+
+} // TEST_SUITE decision rows survive the sweep
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

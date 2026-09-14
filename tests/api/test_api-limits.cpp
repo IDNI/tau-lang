@@ -27,6 +27,7 @@ TEST_SUITE("Tau API - runtime limits") {
 			{ &tau_api::set_max_enum_steps,      &max_enum_steps },
 			{ &tau_api::set_max_rewrite_rounds,  &max_rewrite_rounds },
 			{ &tau_api::set_max_simplify_rounds, &max_simplify_rounds },
+			{ &tau_api::set_ba_decision_pins,    &ba_decision_pins },
 		};
 		for (const row& r : rows) {
 			const size_t saved = *r.global;
@@ -80,6 +81,23 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK_FALSE( pwr_semantic_fallback );
 		pwr_semantic_fallback = saved;
 	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	// The case-split cap follows the block budgets: 0 = unlimited = SIZE_MAX.
+	// Driven through bv's own `case-split-max-tests` option, not an api
+	// setter: only bv's own case-split pass can ever make progress against
+	// it, so the option lives on bv's descriptor (bv_descriptor.tmpl.h).
+	TEST_CASE("bv case split cap maps 0 to SIZE_MAX") {
+		using bv_descriptor = ba_descriptor<bv, node_t>;
+		const size_t saved = bv_case_split_max_tests;
+		bv_descriptor::set_case_split_max_tests_option(3);
+		CHECK( bv_case_split_max_tests == 3 );
+		bv_descriptor::set_case_split_max_tests_option(0);
+		CHECK( bv_case_split_max_tests
+			== std::numeric_limits<size_t>::max() );
+		bv_case_split_max_tests = saved;
+	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("interpreter statics") {
 		const size_t sw = interpreter<node_t>::spec_size_warn_threshold;

@@ -690,32 +690,83 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 		const char* spec50 = "always i1[t]:bv[24] > { #x0003e8 }:bv[24]"
 			" -> o9[t]:bv[24] = { #x000032 }:bv[24].";
 		const std::vector<std::string> in{ "2000", "500", "0" };
-		// Another bv spec runs first, so its constants get their cvc5
-		// term ids before spec7's `7` does -- the report's driver
-		// difference in miniature.
+		// Only t=0 is constrained (2000 > 1000). At t=1 and t=2 the
+		// implication is vacuous, o9 is free, and every satisfying
+		// value is equally legal -- so the witness itself is not
+		// pinned. Pinning it meant re-pinning on every parser regen,
+		// since nonterminal renumbering moves node hashes and so
+		// clause order, and it differed per platform as well.
+		// What must hold is that the witness is a function of the spec
+		// alone: the same spec, with a different bv spec driven in
+		// between, must answer the same. That is the #89 regression --
+		// it produced 7, 7, 7 after other activity where the spec on
+		// its own gave 7, 0, 0.
+		auto before = drive(spec7, in);
 		auto other = drive(spec50, in);
+		auto after = drive(spec7, in);
+		REQUIRE(before.size() == 3);
 		REQUIRE(other.size() == 3);
+		REQUIRE(after.size() == 3);
+		INFO("before: " << before[0] << "," << before[1] << ","
+			<< before[2] << " after: " << after[0] << ","
+			<< after[1] << "," << after[2] << " other: "
+			<< other[0] << "," << other[1] << "," << other[2]);
+		// the constrained step is the spec's own constant, not a choice
+		CHECK(before[0] == "7");
+		CHECK(after[0] == "7");
 		CHECK(other[0] == "50");
-		// The free-region witness must be what a fresh process gives
-		// for this spec on its own. (Before the fix this sequence
-		// produced 7, 7, 7 while a fresh process gave 7, 0, 0 -- the
-		// report's split.)
-		auto witness = drive(spec7, in);
-		// The canonical free-region choice moves with every parser regen
-		// (nonterminal renumbering changes node hashes and so clause
-		// order). Re-pinned after nonterminals started hashing by name: a
-		// fresh process gives 7, 7, 7 for spec7 and 50, 50, 50 for spec50
-		// on their own, and so must these post-activity runs -- each spec
-		// keeps its own constant throughout, so there is no cross-spec
-		// bleed regardless of which value the free region settles on.
-		// Re-pin whenever the grammar is regenerated; the property
-		// under test is fresh == post-activity, not the specific
-		// witness.
-		INFO("witness: " << witness[0] << "," << witness[1] << ","
-			<< witness[2] << " other: " << other[0] << ","
-			<< other[1] << "," << other[2]);
-		CHECK(witness == std::vector<std::string>({ "7", "7", "7" }));
-		CHECK(other == std::vector<std::string>({ "50", "50", "50" }));
+		// a free step may be any bv[24], so that whole range is the
+		// witness's legal set -- checked rather than pinned
+		auto in_bv24 = [](const std::string& v) {
+			if (v.empty() || v.size() > 8) return false;
+			if (v.find_first_not_of("0123456789") != std::string::npos)
+				return false;
+			return std::stoul(v) <= ((1UL << 24) - 1);
+		};
+		for (size_t t = 1; t < 3; ++t) {
+			CAPTURE(t);
+			CHECK(in_bv24(before[t]));
+			CHECK(in_bv24(after[t]));
+			CHECK(in_bv24(other[t]));
+		}
+		// same spec, different prior activity, same free region --
+		// checked both ways round, so neither spec is the only one
+		// whose stability is tested
+		auto other_after = drive(spec50, in);
+		REQUIRE(other_after.size() == 3);
+		CHECK(before == after);
+		CHECK(other == other_after);
+	}
+}
+
+// SAT-1 regression: the string overloads of sat/unsat/valid/realizable parse
+// through get_spec_or_term, which yields a `spec` root for any formula. The
+// tref overloads then either rejected that root (realizable required a bare
+// wff, so sat() answered false for every satisfiable formula) or handed it
+// whole to the normalizer (get_nso_rr only unwrapped a spec containing a
+// ref), where the syntactic simplifier negated a non-wff and aborted Debug.
+// Every case below is decided through the REPL with the same answers.
+TEST_SUITE("Tau API - string - sat/valid decide plain formulas") {
+
+	TEST_CASE_FIXTURE(api_fixture, "SAT-1: sat and unsat decide") {
+		CHECK( tau_api::sat("x = 0 || x != 0").value() );
+		CHECK( !tau_api::sat("x = 0 && x != 0").value() );
+		CHECK( tau_api::unsat("x = 0 && x != 0").value() );
+		CHECK( tau_api::sat("ex x:bv[8] x = {0}:bv[8]").value() );
+		CHECK( tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])").value() );
+		CHECK( !tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])").value() );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "SAT-1: valid decides, quantified bv included") {
+		CHECK( tau_api::valid("x = 0 || x != 0").value() );
+		CHECK( !tau_api::valid("x = 0").value() );
+		CHECK( tau_api::valid("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])").value() );
+		CHECK( !tau_api::valid("all x:bv[8] x / x = {1}:bv[8]").value() );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "SAT-1: realizable decides") {
+		CHECK( tau_api::realizable("x = 0 || x != 0").value() );
+		CHECK( tau_api::unrealizable("x = 0 && x != 0").value() );
 	}
 }
 #endif // TAU_PACK_HAS_BA_BV

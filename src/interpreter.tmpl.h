@@ -259,7 +259,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
 			LOG_ERROR << "Failed to find output stream for stream '"
-				<< get_var_name<node>(vn) << "'";
+				<< TAU_TO_STR(io_var) << "'";
 			DBG(LOG_TRACE << ctx;)
 			DBG(LOG_TRACE << dump_to_str());
 			return false;
@@ -1146,15 +1146,41 @@ struct solve_step_provider : step_provider<node> {
 			// true -- which throws away the very choice the encoding needs
 			// committed, leaving the bits to the zero fill.
 			const bool state_part = mentions_ltl_state_var<node>(spec_part);
-			for (tref path : expression_paths<node>(spec_part)) {
-				// rewriting the inputs and inserting them into memory
-				tref updated = update_to_time_point<node>(path, formula_time_point);
-				tref current = rewriter::replace<node>(updated, local_memory);
+			// The substitution commutes with path enumeration, and
+			// enumerating the raw formula's paths first multiplies the
+			// path count by the absolute run prefix that memory already
+			// decides (GitHub #115).
+			tref part_at_t = update_to_time_point<node>(spec_part,
+				formula_time_point);
+			part_at_t = syntactic_formula_simplification<node>(
+				rewriter::replace<node>(part_at_t, local_memory));
+			for (tref path : expression_paths<node>(part_at_t)) {
+				tref current = path;
 				// Simplify after updating stream variables
 				if (!state_part) {
 					auto normalized = normalize_non_temp<node>(current);
 					if (!normalized.has_value()) continue;
 					current = normalized.value();
+				}
+				// The solver must never bind an input variable directly; a
+				// leftover free input here means memory substitution or
+				// future-time elimination in get_ubt_ctn_at missed it.
+				auto step_io_vars = tau::get(current).select_top(
+							is_child<node, tau::io_var>);
+				for (tref v : step_io_vars) {
+					bool bad = !is_io_initial<node>(v)
+						|| tau::get(v).is_input_variable()
+						|| get_io_time_point<node>(v) > (int_t)time_point;
+					if (!bad) continue;
+					LOG_ERROR << "Unsolved stream variable '" << TAU_TO_STR(v)
+						<< "' in the step formula at time point " << time_point
+						<< ": " << LOG_FM(current) << "\n";
+					std::stringstream keys_ss;
+					keys_ss << "memory keys:";
+					for (const auto& [k, mval] : local_memory)
+						keys_ss << " " << TAU_TO_STR(k);
+					LOG_ERROR << keys_ss.str() << "\n";
+					return std::nullopt;
 				}
 				auto path_solution = solution_with_max_update<node>(
 					current, time_point);
@@ -1838,6 +1864,10 @@ template <NodeType node>
 bool interpreter<node>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_spec begin \n";
 	if (final_system) return true;
+	// Idempotent per time point: appear_within_lookback and step() both
+	// call this for the same time_point, and it must not redo the
+	// quantifier elimination in the initial segment twice.
+	if (step_spec_time_point_ == (int_t)time_point) return true;
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
 	LOG_TRACE << "calculate_initial_spec[initial_segment]: " << initial_segment << "\n";
@@ -1845,17 +1875,24 @@ bool interpreter<node>::calculate_initial_spec() {
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		step_spec = get_ubt_ctn_at(time_point);
+		step_spec_time_point_ = (int_t)time_point;
 	} else if (time_point == initial_segment) {
-		// TODO: update constant time positions with values from memory to simplify step_spec
+		// The continuation is used verbatim from here on. Its constant
+		// time positions (the initial conditions and the run prefix that
+		// bridges them to the relative body) are already fixed by memory,
+		// so fold them now: every later step then enumerates the paths of
+		// the relative body only (GitHub #115).
 		step_spec.clear();
 		step_spec.reserve(ubt_ctn.size());
 		for (const htrefs& part : ubt_ctn) {
 			trefs part_alts;
 			part_alts.reserve(part.size());
-			for (const auto& h : part) part_alts.push_back(h->get());
+			for (const auto& h : part) part_alts.push_back(
+				rewriter::replace<node>(h->get(), memory));
 			step_spec.push_back(std::move(part_alts));
 		}
 		final_system = true;
+		step_spec_time_point_ = (int_t)time_point;
 	}
 	LOG_TRACE << "calculate_initial_systems[result]: true";
 	LOG_TRACE << "calculate_initial_systems end";
@@ -1970,6 +2007,11 @@ void interpreter<node>::compute_lookback_and_initial() {
 	lookback = get_max_shift<node>(io_vars);
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial<node>(io_vars);
+	fixed_inputs_.clear();
+	for (tref v : io_vars)
+		if (is_io_initial<node>(v) && tau::get(v).is_input_variable())
+			fixed_inputs_.emplace(get_var_name<node>(v),
+				get_io_time_point<node>(v));
 }
 
 template <NodeType node>
@@ -2489,6 +2531,8 @@ bool interpreter<node>::update(tref update) {
 	// The systems for solver need to be recomputed at beginning of next step
 	final_system = false;
 	chosen_alt_.clear();
+	// The cached step spec belongs to the previous specification.
+	step_spec_time_point_ = -1;
 	compute_lookback_and_initial();
 	// IN-N3: the synthesised strategy (if any) described the spec
 	// before this revision; keep it for reset()'s re-seeding, but mark
@@ -3481,33 +3525,44 @@ bool interpreter<node>::is_excluded_output(tref var) {
 template <NodeType node>
 trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
-	// Table mode leaves ubt_ctn empty on purpose (see its doc comment) and
-	// seeds live_probe_atoms instead; the general solve path is the mirror
-	// image. Walking both covers either case uniformly. ubt_ctn is a
-	// per-part list of alternatives (I1); flatten it before combining with
-	// the flat live_probe_atoms list.
-	htrefs probe_ctn;
-	for (const htrefs& part : ubt_ctn)
-		probe_ctn.insert(probe_ctn.end(), part.begin(), part.end());
-	probe_ctn.insert(probe_ctn.end(),
-		live_probe_atoms.begin(), live_probe_atoms.end());
-	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		for (const auto& h : probe_ctn) {
-			tref step_ubt_ctn = update_to_time_point(h->get(),
-				t < formula_time_point ? formula_time_point : t);
-			step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-			// We only apply a heuristic in order to decide if the variable still appears
-			step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
-			// Try to find var in step_ubt_ctn
-			for (tref v : vars) {
-				if (contains<node>(step_ubt_ctn, v))
-					if (std::ranges::find_if(
-						appeared, [&v](const auto& n) {
-							return tau::get(n) == tau::get(v);
-						}) == appeared.end())
-						appeared.emplace_back(v);
-			}
+	// step_spec is read below for t == time_point; keep it current here too,
+	// since callers (e.g. get_inputs_for_step) may reach this before step().
+	if (!calculate_initial_spec()) return appeared;
+	auto check = [&](tref fm, size_t t) {
+		tref step_ubt_ctn = update_to_time_point(fm,
+			t < formula_time_point ? formula_time_point : t);
+		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
+		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
+		for (tref v : vars) {
+			if (contains<node>(step_ubt_ctn, v))
+				if (std::ranges::find_if(
+					appeared, [&v](const auto& n) {
+						return tau::get(n) == tau::get(v);
+					}) == appeared.end())
+					appeared.emplace_back(v);
 		}
+	};
+	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
+		// This step's read set must come from the same tree, substituted
+		// and simplified the same way, that step(values) hands the solver.
+		// Lookahead steps keep the raw alternatives: no step formula yet.
+		if (t == time_point) {
+			// A fixed-position input is read at its step whatever the
+			// step formula keeps: a later step reads it from memory.
+			for (tref v : vars)
+				if (fixed_inputs_.contains({get_var_name<node>(v),
+					get_io_time_point<node>(tau::trim(v))}))
+					appeared.emplace_back(v);
+			for (const trefs& part_alts : step_spec)
+				for (tref spec_part : part_alts)
+					check(spec_part, t);
+		} else {
+			for (const htrefs& part : ubt_ctn)
+				for (const auto& h : part) check(h->get(), t);
+		}
+		// Table mode leaves ubt_ctn empty and seeds live_probe_atoms
+		// instead, so probe it at every t.
+		for (const auto& h : live_probe_atoms) check(h->get(), t);
 	}
 	return appeared;
 }
@@ -3523,14 +3578,23 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 			c = tau::_T();
 		}
 	}
-	// B6: fold via always_conjunction instead of a verbatim
-	// build_wff_and of the bodies -- clauses with different lookbacks
-	// must be shifted to a common frame before they share one always,
-	// exactly as always_conjunction (used by the normalizer and by
-	// pointwise_revision) does.
+	// Fold the bodies VERBATIM, without re-aligning their lookbacks. The
+	// clauses of one part come from a single always body that
+	// create_spec_partition split per conjunct, so they already share
+	// one time frame: `always (A(t) && B(t))` means A and B from the same
+	// start point. Folding them through always_conjunction instead (as
+	// 76a69031 did) shifts the clause with the smaller lookback into the
+	// past, `always (A(t-1) && B(t))`, which asserts A one step BEFORE the
+	// run starts and, with an initial condition on the state, constrains
+	// an input the run never reads: a guarded latch such as
+	// `(o1[0] = 0) && (i1[t] = 1 ? o1[t] = 1 : o1[t] = o1[t-1])` was
+	// reported unsat (GitHub #100). always_conjunction is only right for
+	// two SEPARATELY written always statements, each with its own start;
+	// that case is merged by the normalizer before the spec reaches the
+	// interpreter and never arrives here as clauses of one always.
 	tref aw_body = nullptr;
 	for (tref b : aw_clauses)
-		aw_body = aw_body ? always_conjunction<node>(aw_body, b) : b;
+		aw_body = aw_body ? tau::build_wff_and(aw_body, b) : b;
 	return tau::build_wff_and(
 		tau::build_wff_always(aw_body ? aw_body : tau::_T()),
 		tau::build_wff_and(clauses));
@@ -3637,7 +3701,7 @@ result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	TAU_TRY(interpreter<node> intrprtr,
 		interpreter<node>::make_interpreter(form, ctx));
 	if (!intrprtr.run_loop(steps)) {
-		r.error(code::io_error, "Failed to write outputs");
+		r.error(code::runtime_error, "Execution stopped on a failed step");
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
@@ -3662,7 +3726,13 @@ bool interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 	// Continuously perform execution step until user quits
 	while (true) {
 		auto step_r = intrprtr.step();
-		if (!step_r.has_value()) break;
+		if (!step_r.has_value()) {
+			// End of input is the normal exit. Every other failure
+			// must reach the caller, as in the REPL run loop.
+			if (step_awaiting_input(step_r.report())) break;
+			step_r.print(std::cerr);
+			return false;
+		}
 		auto& [output, auto_continue] = step_r.value();
 
 		DBG(LOG_TRACE << "run[output]: ";

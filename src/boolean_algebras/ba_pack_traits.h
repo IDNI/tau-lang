@@ -247,6 +247,24 @@ Form pack_preprocess(Form form) {
 }
 
 /**
+ * @brief Run @p form through the case-split quantifier elimination of every
+ * BA that offers it.
+ *
+ * No BA in the pack declaring the capability means nothing case-splits this
+ * formula, so this returns @p form unchanged -- the same "absent means
+ * ordinary" convention as @ref pack_preprocess.
+ */
+template <typename Node, typename Form>
+Form pack_case_split_quantifiers(Form form) {
+	Form out = form;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_case_split_quantifiers<Node, BA>)
+			out = ba_descriptor<BA, Node>::case_split_quantifiers(out);
+	});
+	return out;
+}
+
+/**
  * @brief `true` when some BA in the pack says its own preprocessing
  * (@ref pack_preprocess) can still make progress on @p form.
  *
@@ -313,6 +331,20 @@ void pack_set_ba_component_factoring(bool state) {
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_component_factoring<Node, BA>)
 			ba_descriptor<BA, Node>::set_ba_component_factoring(state);
+	});
+}
+
+/**
+ * @brief Set the cap on pinned decided rows, owned by tau_ba.h.
+ *
+ * Optional: a pack without tau leaves this a silent no-op, same shape
+ * as @ref pack_set_ba_component_factoring.
+ */
+template <typename Node>
+void pack_set_ba_decision_pins(size_t n) {
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_decision_pins<Node, BA>)
+			ba_descriptor<BA, Node>::set_ba_decision_pins(n);
 	});
 }
 

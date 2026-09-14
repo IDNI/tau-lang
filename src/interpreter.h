@@ -18,6 +18,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <optional>
 #include <vector>
 
@@ -539,9 +540,13 @@ private:
 	/// Per spec part, the alternatives' continuations at the current step.
 	std::vector<trefs> step_spec;
 	bool final_system = false;
+	/// Time point step_spec was last (re)computed for; -1 means stale.
+	int_t step_spec_time_point_ = -1;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
+	/// Inputs the spec names at a fixed time position, by name and time.
+	std::set<std::pair<std::string, int_t>> fixed_inputs_;
 	int_t announced_step_ = -1;
 
 	// Freshness ledger for step()'s warm-up direct-decode fallback;
@@ -726,7 +731,14 @@ private:
 	/// @brief Return those variables in @p vars that appear within the lookback.
 	trefs appear_within_lookback(const trefs& vars);
 
-	/// @brief Unsqueeze `always` statements without adjusting time points.
+	/// @brief Re-fold the per-clause `always` wrappers of one partition
+	/// part into a single `always`, conjoining the bodies verbatim.
+	///
+	/// The clauses were split from one `always` body by
+	/// create_spec_partition, so they share a time frame and must not be
+	/// re-aligned to a common lookback (that shift asserts the shorter
+	/// clause one step before the start and makes guarded latches with an
+	/// initial condition read as unsat, GitHub #100).
 	static tref unsqueeze_always(tref cnf_expression);
 
 	/// @brief Dump interpreter state to @p os.

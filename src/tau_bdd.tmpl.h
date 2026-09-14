@@ -167,21 +167,21 @@ void tau_term_bdd<node>::sync_order_cache(const order& o) {
 	// ex_memo/quant_memo entry exists; the function-local static's
 	// initialisation is thread-safe. An inline static data member of
 	// this class template would only be instantiated on odr-use, which
-	// is not reliable here. bintree<node>::mtx_ (the Tau tree's own
+	// is not reliable here. bintree<node>::mutex() (the Tau tree's own
 	// mutex, not the BDD store's) is taken the same way create_cache()
 	// takes it, protecting gc_callbacks; sync_order_cache() is never
 	// called from inside bintree<node>::gc(), so this cannot deadlock
 	// against the exclusive lock gc() holds while running gc_callbacks.
 	static const bool registered = [] {
-		std::unique_lock lock(bintree<node>::mtx_);
+		std::unique_lock lock(bintree<node>::mutex());
 		bintree<node>::gc_callbacks.push_back(
 			[](const std::unordered_set<tref>& kept) {
-				// Runs with bintree<node>::mtx_ held exclusively by
+				// Runs with bintree<node>::mutex() held exclusively by
 				// the sweeping gc() -- touch nothing but pointer-set
 				// lookups and iterator-based erases on our own maps.
 				// No bintree::get/tau::get/comparator/hasher call is
 				// safe here: those dereference nodes that may already
-				// be freed, and would also deadlock re-locking mtx_.
+				// be freed, and would also deadlock re-locking it.
 				tau_term_bdd<node>::prune_caches(kept);
 			});
 		return true;
@@ -1025,6 +1025,7 @@ template<NodeType node>
 std::optional<typename tau_term_bdd_handle<node>::term_handle>
 tau_term_bdd_handle<node>::convert_to_handle(tref tau_node) {
 	auto it = U.find(tau_node);
+	DBG(assert(it != U.end()));
 	if (it != U.end()) return it->second;
 	return std::nullopt;
 }

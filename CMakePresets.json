@@ -172,7 +172,8 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_TESTS": "ON",
-				"TAU_BUILD_EXECUTABLE": "ON"
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_BINDING_PYTHON": "ON"
 			}
 		},
 		{
@@ -240,6 +241,21 @@
 			"cacheVariables": {
 				"TAU_BUILD_EXECUTABLE": "ON",
 				"TAU_RPM_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_macos-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_MACOS_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_build-binding-python",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_PYTHON": "ON"
 			}
 		},
 		{
@@ -682,6 +698,26 @@
 			"inherits": ["release", "_rpm-package"]
 		},
 		{
+			"name": "release-packages-macos",
+			"inherits": ["release", "_macos-package"]
+		},
+		{
+			"name": "release-binding-python",
+			"inherits": ["release", "_build-binding-python"]
+		},
+		{
+			"name": "release-binding-python-tests",
+			"inherits": ["release", "_build-binding-python"]
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"inherits": ["debug", "_build-binding-python", "_build-type-debug"]
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"inherits": ["devel", "_build-binding-python"]
+		},
+		{
 			"name": "release-mingw-packages",
 			"inherits": [
 				"release-mingw",
@@ -756,6 +792,14 @@
 		{
 			"name": "debug-ninja",
 			"configurePreset": "debug-ninja"
+		},
+		{
+			"name": "devel-ninja-gcc",
+			"configurePreset": "devel-ninja-gcc"
+		},
+		{
+			"name": "devel-make-gcc",
+			"configurePreset": "devel-make-gcc"
 		},
 		{
 			"name": "release-clang",
@@ -906,6 +950,26 @@
 			"configurePreset": "release-packages-rpm"
 		},
 		{
+			"name": "release-packages-macos",
+			"configurePreset": "release-packages-macos"
+		},
+		{
+			"name": "release-binding-python",
+			"configurePreset": "release-binding-python"
+		},
+		{
+			"name": "release-binding-python-tests",
+			"configurePreset": "release-binding-python-tests"
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"configurePreset": "debug-binding-python-tests"
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"configurePreset": "devel-binding-python-tests"
+		},
+		{
 			"name": "release-mingw-packages",
 			"configurePreset": "release-mingw-packages"
 		},
@@ -1010,6 +1074,33 @@
 		{
 			"name": "debug-emscripten-tests",
 			"configurePreset": "debug-emscripten-tests"
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"configurePreset": "debug-binding-python-tests",
+			"filter": {
+				"include": {
+					"name": "binding-python"
+				}
+			}
+		},
+		{
+			"name": "release-binding-python-tests",
+			"configurePreset": "release-binding-python-tests",
+			"filter": {
+				"include": {
+					"name": "binding-python"
+				}
+			}
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"configurePreset": "devel-binding-python-tests",
+			"filter": {
+				"include": {
+					"name": "binding-python"
+				}
+			}
 		},
 		{
 			"name": "release-all",

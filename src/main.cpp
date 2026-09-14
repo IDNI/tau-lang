@@ -40,15 +40,19 @@ cli::options tau_options() {
 		.set_description("show license for Tau");
 	opts["charvar"] = cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
-	// GitHub #74: the default is the library's `preprocessing`, not a second
-	// hardcoded one -- a CLI-only `true` here silently overrode the
-	// library's decision to keep preprocessing off (see tau.h) and hung
-	// every plain `tau` run of a bv accumulator that the API completed
-	// instantly.
+	// GitHub #74: the default comes from the library's `preprocessing`
+	// global, not a second hardcoded value -- a CLI-only value here once
+	// silently overrode the library and hung a plain `tau` run.
 	opts["preprocessing"] = cli::option("preprocessing", 'B', preprocessing)
 		.set_description(std::string("BA preprocessing, e.g. bv predicate "
 			"blasting (")
 			+ (preprocessing ? "enabled" : "disabled")
+			+ " by default)");
+	opts["ba-component-factoring"] = cli::option("ba-component-factoring",
+		'K', ba_component_factoring)
+		.set_description(std::string("decide tau-algebra constants per "
+			"support component (")
+			+ (ba_component_factoring ? "enabled" : "disabled")
 			+ " by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
@@ -88,6 +92,9 @@ cli::options tau_options() {
 	opts["block-max-splits"] = cli::option("block-max-splits", 'p', "0")
 		.set_description("cap per-block Boole-decomposition splits in "
 			"anti-prenexing (0 = unlimited)");
+	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
+		.set_description("decided tau-algebra rows whose key tree is kept "
+			"alive across the step sweep (0 = none)");
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
@@ -293,6 +300,8 @@ int main(int argc, char** argv) {
 	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
 	bool preprocess = opts["preprocessing"].get<bool>();
+	tau_api::set_ba_component_factoring(
+		opts["ba-component-factoring"].get<bool>());
 	bool exp = opts["experimental"].get<bool>();
 	// Every numeric limit goes through its api setter so the CLI and the
 	// REPL `set` command share one wiring surface (0 = unlimited by
@@ -304,6 +313,7 @@ int main(int argc, char** argv) {
 	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
+	tau_api::set_ba_decision_pins(optnum("ba-decision-pins"));
 	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));

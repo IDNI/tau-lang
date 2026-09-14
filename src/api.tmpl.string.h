@@ -578,7 +578,7 @@ template <NodeType node>
 result<bool> api<node>::run(interpreter<node>& i, bool quit_on_idle) {
 	result<bool> r;
 	if (i.run_loop(0, quit_on_idle)) r = true;
-	else r.error(code::io_error, "Failed to write a step's output");
+	else r.error(code::runtime_error, "Execution stopped on a failed step");
 	DBG(assert(r.is_well_formed());)
 	return r;
 }

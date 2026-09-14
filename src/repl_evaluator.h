@@ -70,7 +70,8 @@ namespace idni::tau_lang {
 
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, preprocessing_opt, highlighting_opt, indenting_opt,
+	colors_opt, charvar_opt, preprocessing_opt, factoring_opt,
+	highlighting_opt, indenting_opt,
 	print_benchmarks_opt, debug_opt,
 	// Numeric, unlike every option above: they take a count, not a flag, so
 	// enable/disable/toggle do not apply to them. Full names only -- the
@@ -80,6 +81,7 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	// reads the global back, so the REPL and the CLI options stay two views
 	// of the same knob.
 	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
+	decision_pins_opt,
 	fixpoint_steps_opt,
 	flag_search_steps_opt, squeeze_cap_opt,
 	simplify_rounds_opt, def_passes_opt, enum_steps_opt,
@@ -125,7 +127,9 @@ struct repl_evaluator {
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
-		bool preprocessing       = true;  ///< Enable BA preprocessing passes (e.g. bv predicate blasting).
+		bool preprocessing       = idni::tau_lang::preprocessing; ///< BA preprocessing passes, e.g. bv predicate blasting; follows the library default.
+		bool factoring           = ba_component_factoring; ///< Tau-BA component factoring; follows the library default.
+		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 		// The numeric limit options deliberately have no mirror fields
 		// here: `set` writes the library globals through the api setters
@@ -332,6 +336,9 @@ private:
 
 	// fragment command
 	void fragment_cmd(const tt& n);
+
+	/// @brief Update the factoring option to @p value and return the old value.
+	bool update_factoring(bool value);
 
 	// history
 	/// @brief Retrieve the history entry referenced by @p n.

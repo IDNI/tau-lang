@@ -151,6 +151,10 @@ tref scope_out_independent_conjuncts(tref fm) {
 template <NodeType node>
 tref eliminate_arithmetic_and_quantifiers(tref form) {
 	using tau = tree<node>;
+	// Case-split quantifier elimination is an identity on the formula, so
+	// running it unconditionally is always safe. Which BA, if any, can make
+	// progress is for the pack fold to decide, and the owning BA gates it.
+	form = pack_case_split_quantifiers<node>(form);
 
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
 	// inside a bitvector quantifier's scope makes the whole scope fail

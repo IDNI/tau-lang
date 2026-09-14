@@ -31,13 +31,25 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
+# AppleClang rejects -ffat-lto-objects under LTO; plain -flto=auto works.
+# The probe needs -flto=auto: without it the flag is accepted everywhere.
+include(CheckCXXCompilerFlag)
+set(CMAKE_REQUIRED_FLAGS "-flto=auto")
+check_cxx_compiler_flag("-ffat-lto-objects" TAU_HAVE_FAT_LTO_OBJECTS)
+unset(CMAKE_REQUIRED_FLAGS)
+if(TAU_HAVE_FAT_LTO_OBJECTS)
+	set(TAU_FAT_LTO ";-ffat-lto-objects")
+else()
+	set(TAU_FAT_LTO "")
+endif()
+
 # LTO only pays off when something LTO-links it; test targets are all -fno-lto.
 # -ffat-lto-objects is what lets those -fno-lto targets link an LTO-built
 # library, and em++ has no equivalent, so wasm takes the LTO-off path whole.
 if ((TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
 	AND NOT EMSCRIPTEN)
-	set(TAU_LTO_COMPILE_FLAGS "-flto=auto;-ffat-lto-objects")
+	set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
 	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")
 	set(TAU_LTO_LINK "-flto=auto")
 else()
@@ -120,7 +132,6 @@ function(target_setup target)
 			# warnings as errors in dev configs only, so a newly
 			# introduced warning is caught there, not in Release
 			$<$<OR:$<CONFIG:Debug>,$<CONFIG:Coverage>,$<CONFIG:RelWithDebInfo>>:-Werror>
-			-Wfatal-errors    # first error stops compilation
 			# -ftemplate-backtrace-limit=0
 		)
 	else()

@@ -1837,6 +1837,26 @@ bool has_compound_term_ops(tref f) {
 }
 
 /**
+ * @brief True iff @p f is `NOT(x) = 0` for a single variable x: the shape
+ * a rewrite hook produces from `x = 1` where a BA's 1 and 0 coincide with
+ * the generic bf_t/bf_f (bv[1]). Still a single-variable equality despite
+ * the bf_neg has_compound_term_ops otherwise flags as compound.
+ */
+template <NodeType node>
+bool is_negated_var_eq_zero(tref f) {
+	using tau = tree<node>;
+	const tau& t = tau::get(f);
+	if (!t.child_is(tau::bf_eq)) return false;
+	const tau& eq = t[0];
+	auto is_neg_of_lone_var = [](const tau& operand) {
+		return operand.child_is(tau::bf_neg)
+			&& operand[0][0].child_is(tau::variable);
+	};
+	return (is_neg_of_lone_var(eq[0]) && eq[1].equals_0())
+		|| (is_neg_of_lone_var(eq[1]) && eq[0].equals_0());
+}
+
+/**
  * @brief True iff @p conjs is non-empty and every conjunct is a bf_eq
  * with no bv arithmetic or casts, so the bv partition can be squeezed
  * and solved algebraically per width (via lgrs) instead of via cvc5.
@@ -1846,7 +1866,8 @@ bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 	using tau = tree<node>;
 	for (tref conj : conjs) {
 		if (!tau::get(conj).child_is(tau::bf_eq)) return false;
-		if (has_compound_term_ops<node>(conj)) return false;
+		if (has_compound_term_ops<node>(conj)
+			&& !is_negated_var_eq_zero<node>(conj)) return false;
 	}
 	return !conjs.empty();
 }

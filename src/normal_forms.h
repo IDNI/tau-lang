@@ -78,10 +78,9 @@ auto lex_var_comp = [](tref x, tref y) {
  * @brief Predicate that classifies a wff node as a BDD variable.
  *
  * In BDD-based DNF/CNF reductions of well-formed formulas the following node
- * types are treated as atomic BDD variables: `bf_eq`, the ordering comparisons
- * (`bf_lt`, `bf_lteq`, `bf_gt`, `bf_gteq` and their negated `n` variants),
- * `wff_ref`, `wff_ex`, `wff_sometimes`, `wff_always`, `wff_all`, and
- * `constraint`.
+ * types are treated as atomic BDD variables: `bf_eq`, the ordering
+ * comparisons `bf_lt` and `bf_lteq`, `wff_ref`, `wff_ex`, `wff_sometimes`,
+ * `wff_always`, `wff_all`, and `constraint`.
  *
  * The classification has to cover *every* atom kind that can reach `reduce`,
  * not just the ones it can reason about. An atom missing from this set matches
@@ -89,10 +88,11 @@ auto lex_var_comp = [](tref x, tref y) {
  * never enters the clause's path vector and `build_reduced_formula` rebuilds
  * the clause without it (`x < y && s = 0` came back as `s = 0`). When such an
  * atom is the only one in the formula the variable set comes out empty and
- * `reduce` answers `F` for a satisfiable formula. Ordering comparisons reach
- * `reduce` unexpanded whenever the BA does not expand them at construction
- * time -- bitvectors and qlt keep them raw (see `hooks_tau.tmpl.h`) -- so they
- * are listed here and treated as opaque, exactly as `constraint` already is.
+ * `reduce` answers `F` for a satisfiable formula. `dnf_cnf_to_reduced` runs
+ * `unequal_to_not_equal` and `order_atoms_to_literals` before reaching this
+ * predicate, so every order atom arrives as `bf_lt` or `bf_lteq`, possibly
+ * under `wff_neg`; they are listed here and treated as opaque, exactly as
+ * `constraint` already is.
  * @tparam node Tree node type.
  * @todo Extend for the full grammar.
  */
@@ -100,20 +100,17 @@ template <NodeType node>
 inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	// `n` is a wff wrapper, so the invariant to check is on its child: the
-	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal.
-	// Asserting `t.is(bf_neq)` instead would be vacuously true and check
-	// nothing.
+	// `n` is a wff wrapper, so the invariant to check is on its child. The
+	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal
+	// and order_atoms_to_literals. Asserting `t.is(bf_neq)` instead would
+	// be vacuously true and check nothing.
 	DBG(assert(!t.child_is(tau::bf_neq));)
+	DBG(assert(!t.child_is(tau::bf_nlt) && !t.child_is(tau::bf_nlteq)
+		&& !t.child_is(tau::bf_gt) && !t.child_is(tau::bf_gteq)
+		&& !t.child_is(tau::bf_ngt) && !t.child_is(tau::bf_ngteq));)
 	return t.child_is(tau::bf_eq)
 		|| t.child_is(tau::bf_lt)
-		|| t.child_is(tau::bf_nlt)
 		|| t.child_is(tau::bf_lteq)
-		|| t.child_is(tau::bf_nlteq)
-		|| t.child_is(tau::bf_gt)
-		|| t.child_is(tau::bf_ngt)
-		|| t.child_is(tau::bf_gteq)
-		|| t.child_is(tau::bf_ngteq)
 		|| t.child_is(tau::wff_ref)
 		|| t.child_is(tau::wff_ex)
 		|| t.child_is(tau::wff_sometimes)

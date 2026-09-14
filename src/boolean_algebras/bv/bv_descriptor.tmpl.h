@@ -179,6 +179,15 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
+	 * @brief Eliminate a quantified bitvector variable tested only against
+	 * constants; returns @p n unchanged when `bv_case_split` is disabled.
+	 */
+	static tref case_split_quantifiers(tref n) {
+		return bv_case_split_enabled()
+			? bv_case_split_quantifiers<node_t>(n) : n;
+	}
+
+	/**
 	 * @brief Set bv's OWN preprocessing switch (`bv_blasting`), not the
 	 * core master `preprocessing`.
 	 *
@@ -199,20 +208,40 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_blastdepth_option(size_t n) {
 		max_blast_reentry_depth = n;
 	}
+	static bool get_case_split_option() { return bv_case_split; }
+	static void set_case_split_option(bool enabled) {
+		bv_case_split = enabled;
+	}
+	static size_t get_case_split_max_tests_option() {
+		return bv_case_split_max_tests;
+	}
+	static void set_case_split_max_tests_option(size_t n) {
+		bv_case_split_max_tests = n ? n : std::numeric_limits<size_t>::max();
+	}
+	static bool get_qf_decision_option() { return bv_quantifier_free_decision; }
+	static void set_qf_decision_option(bool enabled) {
+		bv_quantifier_free_decision = enabled;
+	}
 	/// @}
 
 	/**
-	 * @brief bv's own CLI/REPL options, addressed as `bv-blasting` and
-	 * `bv-blastdepth`.
+	 * @brief bv's own CLI/REPL options, addressed as `bv-blasting`,
+	 * `bv-blastdepth`, `bv-case-split`, `bv-case-split-max-tests` and
+	 * `bv-quantifier-free-decision`.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
 	 * `blastdepth` mirrors core's `max_blast_reentry_depth`, whose storage
 	 * stays in core (see the comment at its definition in
 	 * antiprenexing/antiprenexing.h) but which only bv's own blasting pass
-	 * can ever make progress against.
+	 * can ever make progress against. `case-split` and
+	 * `case-split-max-tests` mirror bv's own `bv_case_split` and
+	 * `bv_case_split_max_tests` switches
+	 * (heuristics/bv_case_split.h), which only bv's own case-split pass
+	 * (@ref case_split_quantifiers) reads. `quantifier-free-decision`
+	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h).
 	 */
-	static std::array<ba_option, 2> options() {
+	static std::array<ba_option, 5> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -225,6 +254,22 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				get_blastdepth_option, set_blastdepth_option,
 				"cap blast-block re-entry nesting in anti-prenexing "
 				"(0 = unlimited)" },
+			{ "case-split", ba_option_kind::flag,
+				get_case_split_option, set_case_split_option,
+				nullptr, nullptr,
+				"bitvector case split of quantified variables tested "
+				"against constants (enabled by default)" },
+			{ "case-split-max-tests", ba_option_kind::count,
+				nullptr, nullptr,
+				get_case_split_max_tests_option,
+				set_case_split_max_tests_option,
+				"cap the constants a quantified bitvector variable may "
+				"be tested against for the case split (0 = unlimited)" },
+			{ "quantifier-free-decision", ba_option_kind::flag,
+				get_qf_decision_option, set_qf_decision_option,
+				nullptr, nullptr,
+				"decide a closed bitvector formula whose binders are all "
+				"of one kind quantifier-free (off by default)" },
 		}};
 	}
 

@@ -641,6 +641,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// values, then walks program_desc's strategy with the same matching
 	// logic the emitted step() uses, and confirms the edge reached at
 	// k_max carries the same witness constant the interpreter produced.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("branching example: artifact program_desc matches the "
 	          "interpreter's per-branch output") {
 		bdd_init<Bool>();
@@ -718,6 +719,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(has(edge_1->witness_ctors[0].second, "\"" + interp_1 + "\""));
 		CHECK(has(edge_2->witness_ctors[0].second, "\"" + interp_2 + "\""));
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	// Multi-position atom o1[1] = o2[3]: max-position hoisting must give
 	// each io_var its own offset (k_max - j), not flatten every io_var to

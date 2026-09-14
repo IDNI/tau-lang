@@ -141,11 +141,13 @@ set_tests_properties("test_repl-cli-help_lists_limit_options" PROPERTIES
 # Each row: testname|longflag|shortflag|value|get-option|expected-value.
 # The round trip proves flag -> optnum() -> api setter -> library global -> get.
 # Values are distinct from the defaults so a silently-ignored flag fails.
+# An empty shortflag field means the option has no short form.
 set(TAU_CLI_LIMIT_ROWS
 	"spec_size_warn|spec-size-warn|w|4096|specsizewarn|4096"
 	"max_revision_alts|max-revision-alts|a|4|revisionalts|4"
 	"block_max_splits|block-max-splits|p|512|maxsplits|512"
 	"block_max_rounds|block-max-rounds|r|33|maxrounds|33"
+	"ba_decision_pins|ba-decision-pins|N|77|decisionpins|77"
 	"max_fixpoint_steps|max-fixpoint-steps|f|9|fixpointsteps|9"
 	"max_flag_search_steps|max-flag-search-steps|F|12|flagsteps|12"
 	"block_squeeze_cap|block-squeeze-cap|z|64|squeezecap|64"
@@ -172,11 +174,13 @@ foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	set_tests_properties("test_repl-cli-limit_long-${nm}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "${opt}: *${expect}"
 		FAIL_REGULAR_EXPRESSION "Error")
-	add_test(NAME "test_repl-cli-limit_short-${nm}"
-		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -${sflag} ${val} -e \"get ${opt}\"")
-	set_tests_properties("test_repl-cli-limit_short-${nm}" PROPERTIES
-		PASS_REGULAR_EXPRESSION "${opt}: *${expect}"
-		FAIL_REGULAR_EXPRESSION "Error")
+	if(NOT sflag STREQUAL "")
+		add_test(NAME "test_repl-cli-limit_short-${nm}"
+			COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -${sflag} ${val} -e \"get ${opt}\"")
+		set_tests_properties("test_repl-cli-limit_short-${nm}" PROPERTIES
+			PASS_REGULAR_EXPRESSION "${opt}: *${expect}"
+			FAIL_REGULAR_EXPRESSION "Error")
+	endif()
 	add_test(NAME "test_repl-cli-help_lists-${nm}"
 		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --help")
 	set_tests_properties("test_repl-cli-help_lists-${nm}" PROPERTIES
@@ -198,17 +202,31 @@ else()
 		FAIL_REGULAR_EXPRESSION "Error")
 endif()
 
+# --- bv-case-split-max-tests CLI flag (BA-declared option) -------------------
+# bv declares case-split-max-tests as its own option, addressed
+# bv-case-split-max-tests, present when bv is in the configured pack -- hence
+# gated by hand here rather than through the uniform TAU_CLI_LIMIT_ROWS loop.
+tau_repl_unsupported(_tau_skip "get bv-case-split-max-tests")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-cli-bv_case_split_max_tests_flag")
+else()
+	add_test(NAME "test_repl-cli-bv_case_split_max_tests_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-case-split-max-tests 5 -e \"get bv-case-split-max-tests\"")
+	set_tests_properties("test_repl-cli-bv_case_split_max_tests_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bv-case-split-max-tests: *5"
+		FAIL_REGULAR_EXPRESSION "Error")
+endif()
+
 # --- preprocessing default (GitHub #74) --------------------------------------
-# The library default is `preprocessing = false`
-# (heuristics/preprocess_placement.h), because predicate blasting hands cvc5
-# thousands of auxiliary quantifiers it does not need. The
-# CLI's own option table used to hardcode its own default of `true`, so every
-# plain `tau` invocation silently overrode the library decision, and the
-# single-lookback bv accumulator from #74 hung on the CLI while completing
-# instantly with `-B false` (or through the C++/Python API, which never saw the
-# CLI default). Drives the plain CLI, no -B given: it must finish and produce
-# the reporter's expected 5, 8, 8. The input prompt answers `q` with a parse
-# Error (that is how the run is ended without a tty), so no FAIL regex here.
+# The CLI's own option table used to hardcode its own default of `true`, so
+# every plain `tau` invocation silently overrode the library's
+# `preprocessing` global, and the single-lookback bv accumulator from #74
+# hung on the CLI while completing instantly through the API. This test
+# checks that the CLI reports the library's value, whatever it is, instead
+# of holding a second hardcoded default. Drives the plain CLI, no -B given:
+# it must finish and produce the reporter's expected 5, 8, 8. The input
+# prompt answers `q` with a parse Error (that is how the run is ended
+# without a tty), so no FAIL regex here.
 add_test(NAME "test_repl-cli-blasting_default_off"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get preprocessing\"")
 set_tests_properties("test_repl-cli-blasting_default_off" PROPERTIES

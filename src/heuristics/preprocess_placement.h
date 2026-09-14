@@ -94,20 +94,22 @@ namespace idni::tau_lang {
 // first time ever, in 99.1s, but stays opt-in -- over the 60s
 // default-suite bar.
 //
-// Decision: `preprocessing` defaults to `false`. cvc5 already bit-blasts
-// internally, so predicate blasting on top of it hands cvc5 thousands of
-// auxiliary quantifiers to re-decide instead of letting it work on the
-// arithmetic natively -- the 2026-08-08 finding (whole suite faster,
-// bv[16]x50 iterations 122s vs never), replicated here 2026-08-15 across
-// the full matrix. `solver_placement` stays `eager` (A0's own row: beats
-// A1/A2 on correctness, and W2/W3 outright). `preprocess_placement` stays
-// `per_leaf` and `preprocess_method` stays `anti_prenex_result` -- not because
-// either measures better than `preprocessing=false`, but as the
-// when-enabled fallback: best-measured among the preprocessing-on (Row B)
-// cells for a caller that re-enables preprocessing explicitly. `per_formula`
-// breaks the stress suite outright (W2 itself times out), and every Row B
-// cell still times out on W3 -- `per_leaf`/`anti_prenex_result` is simply
-// the row that regresses least elsewhere while preprocessing is on.
+// Decision: `preprocessing` defaults to `false`, which is what the
+// measurement above argues for. cvc5 already bit-blasts internally, so
+// predicate blasting on top of it hands cvc5 thousands of auxiliary
+// quantifiers to re-decide instead of letting it work on the arithmetic
+// natively -- the 2026-08-08 finding (whole suite faster, bv[16]x50
+// iterations 122s vs never), replicated here 2026-08-15 across the full
+// matrix. The REPL, the CLI and the library all read this global, so the
+// three agree on the value. `solver_placement`
+// stays `eager` (A0's own row: beats A1/A2 on correctness, and W2/W3
+// outright). `preprocess_placement` stays `per_leaf` and `preprocess_method`
+// stays `anti_prenex_result` -- the best-measured combination among the
+// preprocessing-on (Row B) cells: `per_formula` breaks the stress suite
+// outright (W2 itself times out), and every Row B cell still times out on
+// W3.
+// TODO (HIGH) remeasure this matrix against the current bv decision
+// procedures and set the default from the result.
 //
 // NOT thread-safe: Controls whether a BA's preprocessing pass (bv's predicate
 // blasting today) is enabled. The tau library assumes single-threaded access.

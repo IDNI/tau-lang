@@ -102,9 +102,7 @@ TEST_SUITE("adt integration") {
 		// propagates in scope" case) must normalize to the same result.
 		// Comparing normalized RESULTS to each other (rather than either one
 		// against a hardcoded expected string) sidesteps disjunct/conjunct
-		// ordering differences between the two derivations, and avoids
-		// tripping matches_to_any_of's DEBUG-only "expected[0] must be
-		// canonical" check in test_helpers.h (not invoked here at all).
+		// ordering differences between the two derivations.
 		bdd_init<Bool>();
 		auto adt_nso = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "

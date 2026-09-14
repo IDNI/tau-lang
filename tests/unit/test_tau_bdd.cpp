@@ -135,7 +135,7 @@ TEST_SUITE("BDD creation terms") {
 		// opaque leaf terms; their relative print order is decided by a
 		// content-hash tie-break (see tau_bdd.tmpl.h am_cmp/subtree_less)
 		// that is not a guaranteed canonical order and can flip whenever
-		// the parser grammar changes (nonterminal ids feed the hash).
+		// the parser grammar changes.
 		CHECK((tau::get(t).to_str() == "x&(yz)'|x'"
 			|| tau::get(t).to_str() == "x&(zy)'|x'"));
 	}
@@ -160,6 +160,7 @@ TEST_SUITE("BDD creation terms") {
 		// single "canonical" permutation. Check content instead of order:
 		// every one of the 8 variables must appear exactly once.
 		std::string res = tau::get(t).to_str();
+		INFO("result: " << res);
 		CHECK(res.size() == 8);
 		for (char c : std::string("xyzqwert"))
 			CHECK(std::count(res.begin(), res.end(), c) == 1);
@@ -239,12 +240,12 @@ TEST_SUITE("BDD and many") {
 		tref xx = bdd::to_tau_term(x, 1);
 		// The product's factor order and duplicate-literal spelling are
 		// a subtree_less / NDEBUG-dependent artifact that shifts with
-		// every parser regeneration (three regens produced five distinct
-		// spellings, differing even in duplicate counts -- idempotent in
-		// a product, so harmless). Pin the content instead: the negated
-		// factor in either orientation, the variables {a, b, c, d}, and
-		// nothing else.
+		// every parser regeneration -- idempotent in a product, so
+		// harmless. Pin the content instead: the negated factor in
+		// either orientation, the variables {a, b, c, d}, and nothing
+		// else.
 		std::string res = tau::get(xx).to_str();
+		INFO("result: " << res);
 		// The factor prints with or without an explicit `&` (Release
 		// spells the product by juxtaposition: "(f'e')'dccbba").
 		bool factor_found = false;

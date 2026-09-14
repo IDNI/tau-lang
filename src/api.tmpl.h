@@ -214,6 +214,11 @@ void api<node>::set_ba_component_factoring(bool state) {
 }
 
 template <NodeType node>
+void api<node>::set_ba_decision_pins(size_t n) {
+	pack_set_ba_decision_pins<node>(n);
+}
+
+template <NodeType node>
 void api<node>::set_highlighting(bool highlighting) {
 	pretty_printer_highlighting = highlighting;
 }
@@ -889,7 +894,12 @@ result<bool> api<node>::realizable(tref fm) {
 	// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 	// normalization so the downstream pipeline sees a single wff_always.
 	fm = flatten_always_conjuncts<node>(simplified);
-	if (!fm || !is_formula(fm)) {
+	// get_spec_or_term yields a spec for any formula, and normalize_formula
+	// unwraps it, so a spec root is as decidable as the formula it wraps.
+	using tt = tau::traverser;
+	const bool is_fm = is_formula(fm) || (tau::get(fm).is(tau::spec)
+		&& (tt(fm) | tau::main | tau::wff | tt::ref));
+	if (!fm || !is_fm) {
 		r.error(code::invalid_argument, "Invalid formula");
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -1296,28 +1306,28 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 	// AP1-16: by reference -- copying the io_context (three subtree maps
 	// + remaps + console factory) per call was pure waste; all uses read.
 	auto& ctx = *definitions<node>::instance().get_io_context();
-	if (contains(expr, tau::ref)) {
-		typename node::type type = tau::get(expr).get_type();
-		if (type == tau::spec) {
-			if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
-				ctx, expr); mayb_nso_rr)
-					nso_rr = mayb_nso_rr.value();
-			else {
-				r.error(code::internal_error,
-					"Failed to resolve recurrence relations");
-				DBG(assert(r.is_well_formed());)
-				return r;
-			}
-		} else {
-			nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
-			if (!nso_rr.main) {
-				r.error(code::internal_error,
-					"Failed to resolve I/O variables");
-				DBG(assert(r.is_well_formed());)
-				return r;
-			}
+	// A spec root is always unwrapped, whether or not it holds a ref: a
+	// spec handed whole to the normalizer as its main formula is negated
+	// as if it were a wff by the syntactic simplifier.
+	if (tau::get(expr).is(tau::spec)) {
+		if (auto mayb_nso_rr = tau_lang::get_nso_rr<node>(
+			ctx, expr); mayb_nso_rr)
+				nso_rr = mayb_nso_rr.value();
+		else {
+			r.error(code::internal_error,
+				"Failed to resolve recurrence relations");
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
-	} else nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
+	} else {
+		nso_rr.main = tau::geth(resolve_io_vars<node>(ctx, expr));
+		if (!nso_rr.main) {
+			r.error(code::internal_error,
+				"Failed to resolve I/O variables");
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+	}
 	r = std::move(nso_rr);
 	DBG(assert(r.is_well_formed());)
 	return r;

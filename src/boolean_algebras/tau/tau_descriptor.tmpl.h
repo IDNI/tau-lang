@@ -91,6 +91,11 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 		ba_component_factoring = state;
 	}
 
+	/// Set the cap on pinned decided rows, owned by tau_ba.h.
+	static void set_ba_decision_pins(size_t n) {
+		ba_decision_pins = n;
+	}
+
 	/// Read tau's component-factoring switch, owned by tau_ba.h.
 	static bool ba_component_factoring_enabled() {
 		return idni::tau_lang::ba_component_factoring_enabled();

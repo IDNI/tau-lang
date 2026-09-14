@@ -1046,7 +1046,9 @@ for details),
 stream. The type of a stream also determines the type of the Boolean function
 (see also subsection [Streams](#streams)) and
 * `0` and `1` stand for the bottom and top element in the fixed Boolean
-algebra.
+algebra. For a bitvector type they are the all-zeros and the **all-ones**
+vector, so `1:bv[8]` is `255`, not the number one (see
+[`0` and `1` in bitvectors](#0-and-1-in-bitvectors)).
 
 The order of the operations is the following (from higher precedence
 to lower): `'` > `&` > `^` > `|` > `fex ... ...` > `fall ... ...`.
@@ -1099,6 +1101,29 @@ the new operators meaning is given in the following table:
 | `min(x, y)`       | unsigned minimum of two bitvectors                     |
 | `max(x, y)`       | unsigned maximum of two bitvectors                     |
 
+### `0` and `1` in bitvectors
+
+As in every Boolean algebra, `0` and `1` denote the bottom and the top
+element. For `bv[n]` the bottom is the all-zeros vector and the top is the
+**all-ones** vector `2^n - 1`, so `1:bv[8]` is `255`. The number one is a
+constant, `{1}:bv[8]`. This holds everywhere a bare `1` meets a bitvector,
+in input and in output:
+
+| written                    | meaning for `bv[8]`                                   |
+|----------------------------|-------------------------------------------------------|
+| `1:bv[8]`, `x + 1`         | `255`; `x + 255`, i.e. `x - 1` modulo 256             |
+| `{1}:bv[8]`, `x + {1}:bv[8]` | the number one; the successor of `x`                |
+| `x <= 1`                   | always true                                           |
+| `1 <= x`                   | `x = 255`, i.e. `x' = 0`                              |
+| `x'`                       | `255 - x`, the bitwise complement                     |
+| `(bv[8]) 1:bv[4]`          | `{15}:bv[8]`: the cast widens `1111` with zeros       |
+| `n {255}:bv[8]`            | prints `1`: an all-ones constant is shown as the top  |
+
+Prefer braced constants (`{ #x01 }`, `{1}:bv[8]`) whenever a number is
+intended, and read a bare `1` in bitvector output as "all ones". The
+saturating idioms below rely on this: `i1'` is `2^w - 1 - i1` because the
+complement is taken against the all-ones top.
+
 `min` and `max` are call-style builtins, defined only for bitvectors: using
 them on operands of any other Boolean algebra is a type-resolution error. Like
 the comparison operators they compare unsigned, so e.g.
@@ -1135,7 +1160,10 @@ x % 0  =  x
 
 In particular `x / 0` yields the *maximum* of the type — the least safe
 default for anything metering, pricing or otherwise accumulating — so never
-rely on it implicitly. When a divisor can be zero, guard it in the
+rely on it implicitly. The same rule reaches `x / x` and `0 / x`: both are
+`{1}` and `0` only for `x != 0`, and the maximum at `x = 0`, so the
+normalizer leaves them unfolded while `x` is symbolic; `1 / 0` and `1 % 0`
+are the all-ones top element again. When a divisor can be zero, guard it in the
 specification and pick the zero-case value explicitly:
 
 ```
@@ -1807,7 +1835,7 @@ Here are some small examples to illustrate the type inference system:
       - the outer `x` is inferred to be of the default type `tau`,
       - no type mismatch occurs as both `x` are in different scopes.
 6. `ex x x = 1 : bv[8]`:
-      - the constant `1` is typed as `bv[8]`,
+      - the constant `1` is typed as `bv[8]` (it is the all-ones vector `{255}:bv[8]`, see [`0` and `1` in bitvectors](#0-and-1-in-bitvectors)),
       - `x` is inferred to be of the same type as the constant `1`, i.e. `bv[8]`,
       - no type mismatch occurs.
 7. `x:bv[8] = {1}:bv[16]`:
@@ -2150,7 +2178,8 @@ The general options are the following:
 | -l, --license      | show the license                                        |
 | -v, --version      | show the version of the executable                      |
 | -V, --charvar      | char-as-variable short form (enabled by default)        |
-| -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (disabled by default) |
+| -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (enabled by default) |
+| -K, --ba-component-factoring | decide tau-algebra constants per support component (enabled by default) |
 | -S, --severity     | severity level (trace/debug/info/error); default `info` |
 | -I, --indenting    | indent formulas in output                               |
 | -H, --highlighting | syntax highlighting                                     |
@@ -2184,6 +2213,7 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 | -W, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
+| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (default 500; 0 = unlimited) |
@@ -2199,11 +2229,17 @@ Each has a matching REPL option (see [REPL options](#repl-options)):
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
 addressed `--<ba>-<option>`, and present when that BA is part of the build. bv, for instance, declares `--bv-blasting` (bv's own
-predicate-blasting switch, enabled by default) and `--bv-blastdepth` (cap
-blast-block re-entry nesting in anti-prenexing, 0 = unlimited); bv blasts
-only when both `--preprocessing`/`-B` and `--bv-blasting` are on. In a build
-without bv, `--bv-blasting` and `--bv-blastdepth` are not recognized options
-at all.
+predicate-blasting switch, enabled by default), `--bv-blastdepth` (cap
+blast-block re-entry nesting in anti-prenexing, 0 = unlimited),
+`--bv-case-split` (bitvector case split of quantified variables tested
+against constants, enabled by default), `--bv-case-split-max-tests` (cap
+the constants a quantified bitvector variable may be tested against for the
+case split, 0 = unlimited) and `--bv-quantifier-free-decision` (decide a
+closed bitvector formula whose binders are all of one kind quantifier-free,
+off by default); bv blasts only when both `--preprocessing`/`-B`
+and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
+`--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests` and
+`--bv-quantifier-free-decision` are not recognized options at all.
 
 ## `tau_codegen` — synthesis-to-C++ compiler
 
@@ -2323,7 +2359,13 @@ REPL. It's on by default.
 
 * `B|preprocessing`: Can be on/off. Master switch for every BA-specific
 preprocessing pass, e.g. bv's own predicate blasting (see below) — off
-disables all of them regardless of their own setting. It's off by default.
+disables all of them regardless of their own setting. It's on by default.
+
+* `factoring`: Can be on/off. Controls support-component factoring of the
+tau-algebra constant tests: a constant whose clauses share no variables is
+decided per component, each decision remembered across steps, instead of as a
+whole. It's on by default (the REPL starts with the value of the
+`-K, --ba-component-factoring` command line option).
 
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
@@ -2342,6 +2384,11 @@ anti-prenexing (`--block-max-splits`). Unlimited by default.
 
 * `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
 (`--block-max-rounds`). Unlimited by default.
+
+* `decisionpins`: how many decided tau-algebra rows keep their key tree alive
+across the interpreter's step sweep, oldest released first
+(`--ba-decision-pins`). 4096 by default; `0` disables the pinning (a raw
+count, not "unlimited").
 
 * `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
 elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
@@ -2391,10 +2438,20 @@ BA is part of the build; `set`/`get`/`enable`/`disable`/`toggle` route such a
 name to its owning BA the same way they route a bare name to a core option. bv, for
 instance, declares `bv-blasting` (its own predicate-blasting switch,
 mirroring `--bv-blasting`; on by default, but effective only while the
-master `preprocessing` above is also on) and `bv-blastdepth` (blast-block
+master `preprocessing` above is also on), `bv-blastdepth` (blast-block
 re-entry nesting cap in anti-prenexing, mirroring `--bv-blastdepth`;
-unlimited by default). In a session built without bv, `set bv-blasting off`
-reports `No BA named 'bv' in this pack (...)` instead of changing anything.
+unlimited by default), `bv-case-split` (the bitvector case split: a
+quantified bitvector variable that occurs only in comparisons against
+constants of its type is eliminated by one witness per cell those constants
+cut the domain into, before any quantifier block forms; mirroring
+`--bv-case-split`, on by default), `bv-case-split-max-tests` (cap on the
+constants a quantified bitvector variable may be tested against for the case
+split to apply, mirroring `--bv-case-split-max-tests`; unlimited by default)
+and `bv-quantifier-free-decision` (decide a closed bitvector formula whose
+binders are all of one kind quantifier-free, mirroring
+`--bv-quantifier-free-decision`; off by default).
+In a session built without bv, `set bv-blasting off` reports `No BA named
+'bv' in this pack (...)` instead of changing anything.
 
 ## **Functions, predicates and input/output stream variables**
 
@@ -2866,8 +2923,11 @@ static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
 (`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
-`set_charvar`, `set_preprocessing`, `set_indenting`, `set_highlighting`, `set_json` and
-`set_severity` mirror the command line options.
+`set_charvar`, `set_preprocessing`, `set_bv_case_split`, `set_ba_component_factoring`,
+`set_indenting`, `set_highlighting`, `set_json` and `set_severity` mirror the
+command line options, and every runtime limit has a setter of the same name as
+its option (`set_block_max_splits`, `set_bv_case_split_max_tests`,
+`set_ba_decision_pins`, ...).
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and

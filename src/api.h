@@ -274,8 +274,11 @@ struct api {
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable or disable support-component factoring of the Tau-BA
-	/// constant/valid tests (tau_ba.tmpl.h). Off by default.
+	/// constant/valid tests (tau_ba.tmpl.h). On by default.
 	static void set_ba_component_factoring(bool state);
+	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
+	/// interpreter's sweep (0 = no pinning; tau_ba.h). Default 4096.
+	static void set_ba_decision_pins(size_t n);
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
 	/// Enable or disable JSON output format for printing.

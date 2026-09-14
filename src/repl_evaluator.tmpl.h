@@ -7,6 +7,12 @@
 
 namespace idni::tau_lang {
 
+// 0 and SIZE_MAX both mean no cap.
+inline std::string count_limit_str(size_t v) {
+	return v == 0 || v == std::numeric_limits<size_t>::max()
+		? "unlimited" : std::to_string(v);
+}
+
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
 							term::color::BRIGHT)
@@ -1492,6 +1498,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
 	if (x == "B" || x == "preprocessing") return preprocessing_opt;
+	if (x == "factoring")                return factoring_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1514,6 +1521,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "blockmaxrounds")    return block_max_rounds_opt;
 	if (x == "maxclauses"
 		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
+	if (x == "decisionpins")         return decision_pins_opt;
 	if (x == "fixpointsteps"
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
@@ -1596,6 +1604,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ preprocessing_opt, [this]() {
 		out << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
+	{ factoring_opt,     [this]() {
+		out << "factoring:           " << pbool[opt.factoring] << "\n"; } },
 	{ highlighting_opt, [this]() {
 		out << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    [this]() {
@@ -1610,14 +1620,14 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	// directly would otherwise be misreported here. Both "unlimited"
 	// representations print alike: 0 for the caps and SIZE_MAX for the
 	// two decrementing block budgets.
-	auto climit = [](size_t v) -> std::string {
-		return v == 0 || v == std::numeric_limits<size_t>::max()
-			? "unlimited" : std::to_string(v); };
+	auto climit = count_limit_str;
 	std::map<repl_option, std::function<void()>> limit_printers = {
 	{ block_max_splits_opt, [climit, this]() {
 		out << "maxsplits:           " << climit(block_boole_max_splits) << "\n"; } },
 	{ block_max_rounds_opt, [climit, this]() {
 		out << "maxrounds:           " << climit(block_max_rounds) << "\n"; } },
+	{ decision_pins_opt, [this]() { // a raw count: 0 means none, not unlimited
+		out << "decisionpins:        " << ba_decision_pins << "\n"; } },
 	{ cqe_max_clauses_opt, [climit, this]() {
 		out << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
 	{ fixpoint_steps_opt, [climit, this]() {
@@ -1678,7 +1688,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 			out << e.family << "-" << e.option.name << ": ";
 			if (e.option.kind == ba_option_kind::flag)
 				out << pbool[e.option.get_flag()] << "\n";
-			else out << e.option.get_count() << "\n";
+			else out << count_limit_str(e.option.get_count()) << "\n";
 		}
 		return;
 	}
@@ -1772,6 +1782,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		update_charvar(update_bool_value(opt.charvar)); } },
 	{ preprocessing_opt,   [&]() {
 		update_preprocessing(update_bool_value(opt.preprocessing)); } },
+	{ factoring_opt,   [&]() {
+		update_factoring(update_bool_value(opt.factoring)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1790,6 +1802,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_block_max_splits(*n); } },
 	{ block_max_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_block_max_rounds(*n); } },
+	{ decision_pins_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ba_decision_pins(*n); } },
 	{ cqe_max_clauses_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_cqe_max_clauses(*n); } },
 	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
@@ -1861,6 +1875,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case colors_opt:           TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
 	case preprocessing_opt:    update_preprocessing(update_fn(opt.preprocessing)); break;
+	case factoring_opt:        update_factoring(update_fn(opt.factoring)); break;
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -1868,6 +1883,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case block_max_splits_opt:
 	case block_max_rounds_opt:
 	case cqe_max_clauses_opt:
+	case decision_pins_opt:
 	case fixpoint_steps_opt:
 	case flag_search_steps_opt:
 	case squeeze_cap_opt:
@@ -1918,7 +1934,7 @@ void repl_evaluator<BAs...>::get_cmd_ba_option(const std::string& dotted) {
 	if (!o) return;
 	out << family << "-" << name << ": "
 		<< (o->kind == ba_option_kind::flag
-			? pbool[o->get_flag()] : std::to_string(o->get_count()))
+			? pbool[o->get_flag()] : count_limit_str(o->get_count()))
 		<< "\n";
 }
 
@@ -2006,6 +2022,13 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Unknown fragment. Available: ltl, ctl_star\n";
 		error = true;
 	}
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_factoring(bool value) {
+	api<node>::set_ba_component_factoring(opt.factoring = value);
+	return value;
 }
 
 template <typename... BAs>
@@ -2155,11 +2178,21 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 					return idni::diagnostics::result<int>(2);
 		auto req = *pending;
 		pending.reset();
-		if (!run_abort_ && req.kind == pending_request::stream_value)
-			req.stream->set(src);
+		// A tuple-typed console stream prompts for whole wire literals
+		// ({ ... }); a bare q/quit can never be one (req.type_tree is null
+		// exactly for tuple prompts -- see continue_running), so accept it
+		// as "end the run" here too. Without this, a piped script has no
+		// way to leave an always-constrained tuple run: q would be fed to
+		// the wire parser, rejected, and re-prompted until end-of-file.
+		// Plain streams are untouched -- there a bare q could be a value.
 		bool stop = run_abort_
-			|| (req.kind == pending_request::continue_or_quit
+			|| ((req.kind == pending_request::continue_or_quit
+				|| (req.kind == pending_request::stream_value
+					&& !req.type_tree))
 				&& (src == "q" || src == "quit"));
+		if (!run_abort_ && !stop
+			&& req.kind == pending_request::stream_value)
+			req.stream->set(src);
 		run_abort_ = false;
 		if (stop) finish_running();
 		else {

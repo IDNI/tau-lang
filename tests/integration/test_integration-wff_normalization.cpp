@@ -243,15 +243,13 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
-		// The 7 listed strings are not all one AND/OR-commutative class:
+		// The listed strings are not all one AND/OR-commutative class:
 		// pairwise-checking them under matches_wff_mod_and_or splits them
-		// into exactly two -- one factored on b ("b&(a|x')|b'ax", the
-		// entries that started "ba'x.." / "x'b'a.." / "b'ax'.." / "b'x'a..")
-		// and one factored on a ("a&(x|b)|x'a'b", the rest) -- a genuine
-		// second hash-dependent choice (which variable boole_normal_form
-		// factors on), not a permutation of the same tree. Both stay as
-		// canonical representatives of their class; every other listed
-		// string was a commutative reordering within one of the two.
+		// into exactly two -- one factored on b ("b&(a|x')|b'ax") and one
+		// factored on a ("a&(x|b)|x'a'b") -- a genuine second
+		// hash-dependent choice (which variable boole_normal_form factors
+		// on), not a permutation of the same tree. Both stay as canonical
+		// representatives of their class.
 		CHECK( (matches_wff_mod_and_or(res, "ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0")
 			|| matches_wff_mod_and_or(res, "xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0")) );
 	}
@@ -487,10 +485,11 @@ TEST_SUITE("Normalizer bv mixed-type") {
 	// Free bitvector variables with no quantifier at all must stay put: there
 	// is nothing to decide, so the arithmetic atom survives verbatim.
 	TEST_CASE("bv_arith_all_free_with_sbf_conjunct") {
-		// Conjunct order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
-			" && s = 0.", strings{ "s = 0 && x+y = 0", "x+y = 0 && s = 0" }) );
+		// the expected wff is parsed now, so it carries the types
+		// the printed form elides
+		CHECK( normalize_and_check_mod_and_or(
+			"x:bv[8] + y:bv[8] = { 0 }:bv[8] && s = 0.",
+			"s = 0 && x:bv[8] + y:bv[8] = { 0 }:bv[8]") );
 	}
 
 	// Interleaved all/ex over bv comparison chains mixed with an sbf

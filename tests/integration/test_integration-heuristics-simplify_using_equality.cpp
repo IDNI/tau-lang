@@ -149,7 +149,7 @@ TEST_SUITE("simplify_using_equality_direct_atm") {
 		tref zero_t = tau::get(orig)[0].second();
 		tref rev    = tau::build_bf_eq(zero_t, x_t);
 		tref result = simplify_using_equality_direct_atm<node_t>(rev);
-		CHECK(matches_to_str_to_any_of(result, { "x = 0" }));
+		CHECK(matches_wff_mod_and_or_any_of(result, { "x = 0" }));
 	}
 
 	TEST_CASE("reversed inequality 0 != x is reoriented to x != 0") {
@@ -158,7 +158,7 @@ TEST_SUITE("simplify_using_equality_direct_atm") {
 		tref zero_t = tau::get(orig)[0].second();
 		tref rev    = tau::build_bf_neq(zero_t, x_t);
 		tref result = simplify_using_equality_direct_atm<node_t>(rev);
-		CHECK(matches_to_str_to_any_of(result, { "x != 0" }));
+		CHECK(matches_wff_mod_and_or_any_of(result, { "x != 0" }));
 	}
 
 	TEST_CASE("idempotent for equality atom") {
@@ -326,14 +326,7 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// Order flipped by the 8f1a74c1 parser regen (Debug's
-		// matches_to_any_of only checks expected[0] -- see test_helpers.h).
-		CHECK( matches_to_str_to_any_of(res, {
-			"yx|zx = 0",
-			"yx|xz = 0",
-			"xy|zx = 0",
-			"xy|xz = 0",
-		}) );
+		CHECK( matches_wff_mod_and_or_any_of(res, { "yx|zx = 0" }) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "(o1[1]' = 0 && s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 && o1[0]' = 0 || o1[0]o1[1]'|o1[0]' = 0 && s = 0 && (s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 || z|z's != 0 && s != 0 && y|y'w != 0 && w != 0 && (z != 0 || y = 0 || o1[1]' = 0) && (y != 0 || z = 0) || z|z's != 0 && y|y'w != 0 && y != 0 && w != 0 && (s != 0 || o1[1] = 0) && (z != 0 || o1[1]' = 0)) && o1[0]' != 0) && v != 0 && x != 0 && o1[0] != 0.";
@@ -363,31 +356,11 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// Each atom is a commutative product whose printed orientation is
-		// a subtree_less tie-break that flips under parser regeneration
-		// (8f1a74c1 did). Accept every orientation combination of the
-		// four kept atoms; the conjunct order itself is stable.
-		CHECK( matches_to_str_to_any_of(res, {
-			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
-			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
-			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
-			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
-			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
-			"xy = 0 && vw = 0 && yw = 0 && vx = 0",
-			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
-			"xy = 0 && wv = 0 && wy = 0 && vx = 0",
-			"xy = 0 && wv = 0 && yw = 0 && xv = 0",
-			"xy = 0 && wv = 0 && yw = 0 && vx = 0",
-			"yx = 0 && vw = 0 && wy = 0 && xv = 0",
-			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
-			"yx = 0 && vw = 0 && yw = 0 && xv = 0",
-			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
-			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
-			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
-			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
-			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
-		}) );
+		// Each atom is a bf_eq between two plain variables, so its
+		// orientation is a content-hash tie-break, and the conjunct order
+		// is AND commutativity -- matches_wff_mod_and_or absorbs both, so
+		// one shape covers every printed permutation.
+		CHECK( matches_wff_mod_and_or(res, "yx = 0 && wv = 0 && wy = 0 && vx = 0") );
 	}
 	TEST_CASE("8") {
 		const char* sample = "xyk|x'yk:bv[16] < 1 && y = 1.";
@@ -458,14 +431,14 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "(x = 0) || (y = x || z = x).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0.
-		// Disjunct order is wff_or commutativity, and each equality's own
-		// operand orientation is a content-hash tie-break too (both sides
-		// are plain variables, so term_comp falls through to
-		// tau::subtree_less) -- matches_wff_mod_and_or absorbs both. An
-		// equality between operands of different term_comp categories
-		// (e.g. an io variable against a plain one) would still have to
-		// match exactly.
+		// y=x and z=x stay in some orientation -- they must NOT become
+		// y=0/z=0. Disjunct order is wff_or commutativity, and each
+		// equality's own operand orientation is a content-hash tie-break
+		// too, since both sides are plain variables and term_comp falls
+		// through to tau::subtree_less. matches_wff_mod_and_or absorbs
+		// both. An equality between operands of different term_comp
+		// categories (e.g. an io variable against a plain one) would
+		// still have to match exactly.
 		CHECK(matches_wff_mod_and_or(res, "x = 0 || x = y || x = z"));
 	}
 

@@ -75,8 +75,7 @@ TEST_SUITE("matches_tree_mod_and_or") {
 		// Both operands fall into term_comp's same, final category (a
 		// plain variable, neither io nor an uninterpreted constant), so
 		// their order is a content-hash tie-break (subtree_less), not
-		// canonical -- .local/build-emscripten.md §4i's residual
-		// paragraph. "x = y" and "y = x" are the same case, not two.
+		// canonical. "x = y" and "y = x" are the same case, not two.
 		tref fm = tau::get("x = y", parse_wff());
 		CHECK(matches_wff_mod_and_or(fm, "y = x"));
 	}
@@ -86,7 +85,7 @@ TEST_SUITE("matches_tree_mod_and_or") {
 	{
 		// An output stream variable and an input stream variable are
 		// different term_comp categories with a documented priority
-		// order (§4i), so this orientation is meant to be canonical --
+		// order, so this orientation is meant to be canonical --
 		// swapping it is a real bug, not noise, and must still fail.
 		// Built through get_nso_rr rather than parse_wff() directly: a
 		// bare parse leaves io_var's data field (which is_input_variable/
