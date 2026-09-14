@@ -888,6 +888,131 @@ its own is the assignment truncation described above:
 unsatisfiable with the mode on, because the shifted value is cut back to
 4 bits when it is stored in `o1[t]`.
 
+**Which commands see the mode.** The widening pass runs at the entry of the
+normalizer, after definitions have been expanded, so a command decides the
+widened formula exactly when it normalizes its argument. Everything else
+handles the formula as written, in modular arithmetic, even with the mode
+on:
+
+| Command                                                          | Widened | Notes                                                                 |
+|------------------------------------------------------------------|---------|-----------------------------------------------------------------------|
+| `normalize` / `n` on a formula                                    | yes     | prints the elaborated atoms with their casts; the result is a fixed point (`n %1` returns it unchanged) |
+| `sat`, `unsat`, `valid`                                           | yes     | on formulas and on specifications alike                               |
+| `solve`                                                          | yes     | the assignment is searched for in the widened atoms                   |
+| `run` / `r`, a specification file, runtime updates                | yes     | every execution step normalizes the current specification, see below |
+| `dnf`, `cnf`, `nnf`, `mnf`, `qelim`, `subst`, `inst`              | no      | these transform the tree without normalizing it                       |
+| a bare term, a history entry                                      | no      | there is no atom to widen; the tree is stored as parsed               |
+
+```
+qelim ex x (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
+
+  modular                        ->  T   (x = 16: the product wraps to 0)
+  widened (--bv-widening)        ->  T   (qelim does not normalize, so the same modular answer)
+
+sat ex x:bv[8] (x * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
+
+  modular                        ->  T
+  widened (--bv-widening)        ->  F   (the product runs at W = 16 and is never 0 for x != 0)
+
+solve --bv x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8].
+
+  modular                        ->  x := { 240 }:bv[8]
+  widened (--bv-widening)        ->  no solution
+```
+
+The split matters when commands are chained through the history: whatever a
+non-normalizing command has already decided stays decided in modular
+arithmetic (`qelim` above returns `T`, and `sat %1` can only confirm it),
+while whatever it leaves in place as a formula is widened by the next
+normalizing command that receives it.
+
+**Normalization.** `n` is the command that shows what the pass did: each
+leaf appears under its zero-extending cast, every operator is retyped, and
+an assignment keeps its truncating outer cast. Two details of the printed
+form are worth knowing:
+
+* A constant product that would wrap is not folded while the mode is on, so
+  `n { 16 }:bv[8] * { 16 }:bv[8]` prints the product itself instead of `0`.
+  Inside an atom the same product is computed exactly: `n { 16 }:bv[8] *
+  { 16 }:bv[8] <= { 200 }:bv[8]` is `F` with the mode on and `T` without it,
+  while `n x:bv[8] = { 16 }:bv[8] * { 16 }:bv[8]` is `x = 0` in both modes,
+  because an assignment truncates the exact 256 back to 8 bits.
+* Definitions are expanded first and widened afterwards, so a call whose
+  body carries the arithmetic is widened like inline arithmetic: with
+  `fn(a:bv[8]) := a * a.`, `n fn(x) <= { 200 }:bv[8]` prints
+  `{ 200 }:bv[16] !< (bv[16]) x*(bv[16]) x`. A call that is *not* expanded
+  is an opaque subterm and leaves its atom modular, see below.
+
+**Execution.** The interpreter normalizes the current specification at
+every step — the initial specification, its expanded definitions, and any
+update merged at runtime — so with the mode on each step is solved over the
+widened atoms. Inputs are read at their declared width and outputs are
+stored at theirs: an output equation is an assignment, so the value that
+reaches the stream is always truncated to the stream's width, exactly as in
+the default mode. What changes is everything that sits *between* the
+arithmetic and the store — a comparison guard, a `min`/`max`, a division —
+which now sees the exact intermediate value. Two runs on `bv[8]` inputs
+`16, 200, 3`:
+
+```
+always o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8].
+
+  modular                        ->  0, 128, 48    (256 and 3200 wrap on the way into o1)
+  widened (--bv-widening)        ->  0, 128, 48    (same: the assignment truncates the exact product)
+
+always (   i1[t]:bv[8] * { 16 }:bv[8] <= { 200 }:bv[8] && o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8] )
+    || (   i1[t]:bv[8] * { 16 }:bv[8] >  { 200 }:bv[8] && o1[t]:bv[8] = { 200 }:bv[8] ).
+
+  modular                        ->  0, 128, 48    (the guard compares the wrapped product, so it never fires)
+  widened (--bv-widening)        ->  200, 200, 48  (the guard sees 256 and 3200 and clamps)
+```
+
+A runtime update goes through the same normalization when it is accepted,
+so its widened form is what gets merged and printed. With `u[t] = i1[t]`
+running and `o1[t]:bv[8] = min({ 16 }:bv[8] * { 16 }:bv[8], { 200 }:bv[8])`
+proposed on `i1`:
+
+```
+  modular                        ->  u[0] := always o1[t]:bv[8] = 0              then o1[1] := 0
+  widened (--bv-widening)        ->  u[0] := always o1[t]:bv[8] = { 200 }:bv[8]  then o1[1] := 200
+```
+
+A proportional value is the everyday case of this: `( i1[t] * 5 ) / 100`
+wraps at the operand width in the default mode as soon as `i1 * 5` exceeds
+the maximum, while with the mode on the product is formed at twice the
+width, the quotient is exact and — a quotient never needing more bits than
+its dividend — the final truncation into the output is lossless. At
+`bv[24]` with `i1 = 3355444` the default mode stores `0` and the widened
+mode stores the exact `167772`.
+
+Realizability follows the same reading: whether a specification is accepted
+for execution or rejected (`Tau specification is unsat`) is decided for its
+widened formula. Inputs are universally quantified, so a constraint on an
+input that only holds without wrap-around is rejected in the default mode
+and accepted with the mode on:
+
+```
+always o1[t]:bv[8] = { 1 }:bv[8] && i1[t]:bv[8] * { 2 }:bv[8] >= i1[t]:bv[8].
+
+  modular                        ->  Tau specification is unsat   (i1 = 128 doubles to 0 < 128)
+  widened (--bv-widening)        ->  o1[0] := 1, o1[1] := 1, ...  (the product runs at W = 16, so it always holds)
+```
+
+Conversely a specification that is only satisfiable thanks to a wrap-around
+is rejected with the mode on:
+
+```
+always o1[t]:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && o1[t]:bv[8] != { 0 }:bv[8].
+
+  modular                        ->  o1[0] := 240                (240 * 16 = 3840 wraps to 0)
+  widened (--bv-widening)        ->  Tau specification is unsat  (no nonzero 8-bit value has a zero exact product)
+```
+
+The setting is global to the process
+(`api::set_bv_widening`) and is read at each normalization, so choose it
+before a specification is built and keep it for the whole run rather than
+switching it between steps.
+
 **Caveats.**
 
 * Subtraction still wraps on underflow: `-`'s needed width never grows on
