@@ -74,7 +74,7 @@ inline bool normalize_and_check(const char* sample,
 
 	DBG(TAU_LOG_DEBUG << "(T) nso_rr: " << to_str<node>(nso_rr.value());)
 
-	tref result = normalizer<node>(nso_rr.value());
+	tref result = normalizer<node>(nso_rr.value()).value_or(nullptr);
 	if (!result) return expect_fail;
 
 	DBG(TAU_LOG_DEBUG << "(T) Normalized result: " << TAU_LOG_FM(result);)
@@ -237,7 +237,7 @@ inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
 
-	tref result = normalizer<node_t>(nso_rr.value());
+	tref result = normalizer<node_t>(nso_rr.value()).value_or(nullptr);
 	if (!result) return false;
 
 	return matches_to_str_to_any_of(result, expected);
@@ -286,7 +286,7 @@ inline bool normalize_and_check_mod_and_or(const char* sample,
 {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
-	tref result = normalizer<node_t>(nso_rr.value());
+	tref result = normalizer<node_t>(nso_rr.value()).value_or(nullptr);
 	if (!result) return false;
 	return matches_wff_mod_and_or(result, expected_wff);
 }

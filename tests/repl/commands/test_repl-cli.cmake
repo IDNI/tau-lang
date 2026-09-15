@@ -230,13 +230,13 @@ add_test(NAME "test_repl-cli-bv_widening_flag_changes_semantics"
 set_tests_properties("test_repl-cli-bv_widening_flag_changes_semantics" PROPERTIES
 	PASS_REGULAR_EXPRESSION "%1.*: F"
 	FAIL_REGULAR_EXPRESSION "Error")
-# A cap too small for the formula fails loudly and conservatively (F), with
-# both the pass's own error and the entry point's fallback message -- and
-# without crashing. The errors ARE the expected output, so no FAIL regex.
+# A cap too small for the formula is undecidable: the entry point reports the
+# error and answers with no verdict at all. The error IS the expected output,
+# so no FAIL regex.
 add_test(NAME "test_repl-cli-bv_max_width_cap_exceeded"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -y -Y 12 -e \"sat o:bv[8] = x * y\"")
 set_tests_properties("test_repl-cli-bv_max_width_cap_exceeded" PROPERTIES
-	PASS_REGULAR_EXPRESSION "required width 16 exceeds bv-max-width 12(.*\n)*.*%1.*: F")
+	PASS_REGULAR_EXPRESSION "required width 16 exceeds bv-max-width 12")
 # Spec-file mode gets the flags too (they are applied before the file runs):
 # a one-step run of the guard-free saturating add stores 200, not 44.
 add_test(NAME "test_repl-cli-bv_widening_spec_file_mode"

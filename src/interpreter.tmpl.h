@@ -568,7 +568,7 @@ std::optional<interpreter<node>>
 {
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
 	// Find a satisfiable unbound continuation from spec
-	spec = normalizer<node>(spec);
+	spec = normalizer<node>(spec).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; treat the spec as unrealizable, the same
 	// as the "no clause was executable" failure path below, rather than
@@ -828,7 +828,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		for (tref path : expression_paths<node>(part_at_t)) {
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
-			tref current = normalize_non_temp<node>(path);
+			tref current = normalize_non_temp<node>(path).value_or(nullptr);
 			// A D4 bv-widening cap violation (already LOG_ERROR'd by the
 			// pass) surfaces as nullptr here; treat this path as
 			// unsolvable (same as solution_with_max_update finding no
@@ -877,7 +877,7 @@ std::pair<std::optional<assignment<node>>, bool>
 				}
 				auto substituted = rewriter::replace<node>(
 						current, path_solution.value());
-				auto check = normalize_non_temp<node>(substituted);
+				auto check = normalize_non_temp<node>(substituted).value_or(nullptr);
 				// check is debug-log-only; a D4 bv-widening cap
 				// violation surfaces as nullptr here, and LOG_FM would
 				// dereference it whenever trace logging is enabled.
@@ -1098,7 +1098,7 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		// (already LOG_ERROR'd by the pass) surfaces as nullptr here;
 		// drop this alternative rather than pushing a null tref that
 		// step()'s consuming loop would later dereference.
-		if (tref normalized = normalize_non_temp<node>(step_ubt_ctn);
+		if (tref normalized = normalize_non_temp<node>(step_ubt_ctn).value_or(nullptr);
 			normalized)
 				part_alts.push_back(normalized);
 		}
@@ -1229,7 +1229,7 @@ tref interpreter<node>::get_executable_spec(
 	LOG_TRACE << "get_executable_spec begin\n";
 
 	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
-	tref executable = transform_to_execution<node>(clause, start_time, true);
+	tref executable = transform_to_execution<node>(clause, start_time, true).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; propagate a clean nullptr rather than
 	// dereferencing it below.
@@ -1260,12 +1260,9 @@ tref interpreter<node>::get_executable_spec(
 				tau_type<node>()),
 			.mode = solver_mode::general
 		};
-		bool solve_error = false;
-		auto model = solve<node>(constraints, options, solve_error);
-		if (solve_error) {
-			LOG_ERROR << "Internal error in solver\n";
-			return nullptr;
-		}
+		auto model = solve<node>(constraints, options);
+		if (report_has_code(model.report(), code::solver_error))
+			LOG_ERROR << messages::internal_error_in_solver << "\n";
 		if (!model) return nullptr;
 
 		LOG_INFO << "Tau specification part " << tau::get(clause) << " is executed setting ";
@@ -1398,7 +1395,7 @@ void interpreter<node>::update(tref update) {
 		return;
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
-	shifted_update = normalizer<node>(shifted_update);
+	shifted_update = normalizer<node>(shifted_update).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; reject the update cleanly, the same as
 	// the other "No update performed" guards above -- the current spec
@@ -1561,7 +1558,7 @@ void interpreter<node>::update(tref update) {
 					unchanged = !pwr_contains_bv_content<node>(old_fm)
 						&& !pwr_contains_bv_content<node>(new_fm)
 						&& are_tau_equivalent<node>(
-							old_fm, new_fm);
+							old_fm, new_fm).value_or(false);
 				}
 				if (!unchanged) {
 					current_spec[i].first =
@@ -1690,7 +1687,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		for (tref f : v) r.push_back(tree<node>::geth(f));
 		return r;
 	};
-	update = normalizer<node>(update);
+	update = normalizer<node>(update).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; fold it into the SAME nullopt convention
 	// this function already uses for "definitions in a clause do not
@@ -1709,7 +1706,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
 		LOG_TRACE << "pwr/clause: " << LOG_FM(clause) << "\n";
-		if (!is_tau_formula_sat<node>(clause, start_time))
+		if (!is_tau_formula_sat<node>(clause, start_time).value_or(false))
 			continue;
 
 		// An update already implied by the running spec is a no-op;
@@ -1719,7 +1716,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		if (!alts.empty()
 			&& !pwr_contains_bv_content<node>(spec_fm)
 			&& !pwr_contains_bv_content<node>(clause)
-			&& is_tau_impl<node>(spec_fm, clause)) {
+			&& is_tau_impl<node>(spec_fm, clause).value_or(false)) {
 			LOG_DEBUG << "pwr/update already implied by the "
 				"specification; keeping it unchanged\n";
 			return to_htrefs(alts);
@@ -1753,7 +1750,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			if (sts.empty()) return base;
 			tref with = build_wff_and<node>(base,
 				build_wff_and<node>(sts));
-			return is_tau_formula_sat<node>(with, start_time)
+			return is_tau_formula_sat<node>(with, start_time).value_or(false)
 				? with : base;
 		};
 
@@ -1810,7 +1807,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				// only; see the note on the alternative
 				// flattening above.
 				bodies[i] = normalize_non_temp<node>(
-					bodies[i]);
+					bodies[i]).value_or(nullptr);
 			}
 			// Gate: is the plain conjunction of the update with
 			// the part -- one always over the disjunction of the
@@ -1824,7 +1821,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				build_wff_and<node>(upd_sometime));
 			LOG_TRACE << "pwr/gate: " << LOG_FM(gate) << "\n";
 			const bool plain_ok =
-				is_tau_formula_sat<node>(gate, start_time);
+				is_tau_formula_sat<node>(gate, start_time).value_or(false);
 			if (!plain_ok && !upd_always) {
 				// Without an always part in the update there
 				// is no weaker always to fall back on; the
@@ -1833,7 +1830,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 					"replacing the accumulated "
 					"specification with the update "
 					"clause\n";
-				tref d = normalize_with_temp_simp<node>(clause);
+				tref d = normalize_with_temp_simp<node>(clause).value_or(nullptr);
 				if (!d) return {};
 				return to_htrefs({ d });
 			}
@@ -1925,12 +1922,13 @@ std::optional<assignment<node>> interpreter<node>::solution_with_max_update(
 			.mode = solver_mode::general
 		};
 		// solve the given system of equations
-		bool solve_error = false;
-		std::optional<solution<node>> s = solve<node>(fm, options, solve_error);
-		if (solve_error) {
-			LOG_ERROR << "Internal error in solver\n";
+		auto sr = solve<node>(fm, options);
+		if (report_has_code(sr.report(), code::solver_error)) {
+			LOG_ERROR << messages::internal_error_in_solver << "\n";
 			return std::optional<solution<node>>();
 		}
+		std::optional<solution<node>> s;
+		if (sr.has_value()) s = std::move(sr).value();
 // #ifdef DEBUG
 // 		if (s) for (auto [k, v] : s.value()) LOG_TRACE
 // 			<< "get_solution/solution: \n\t\tkey: " << LOG_FM_DUMP(k) << "\n\t\tvalue: " << LOG_FM_DUMP(v);

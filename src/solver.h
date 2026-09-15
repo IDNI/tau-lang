@@ -13,6 +13,7 @@
 #ifndef __IDNI__TAU__SOLVER_H__
 #define __IDNI__TAU__SOLVER_H__
 
+#include "tau_diagnostics.h"
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -125,10 +126,10 @@ std::optional<solution<node>> find_solution(equality eq);
  *
  * @tparam node Tree node type.
  * @param equality The equality to solve.
- * @return An optional solution.
+ * @return The solution, or a report carrying code::unsat when there is none.
  */
 template <NodeType node>
-std::optional<solution<node>> lgrs(equality equality);
+result<solution<node>> lgrs(equality equality);
 
 /**
  * @brief Solves the given minterm system.
@@ -212,13 +213,12 @@ tref var, tref term);
  * @tparam node Tree node type.
  * @param form The tau form to solve.
  * @param options The solver options.
- * @param error Reports if a clause is found that is not supported within
- * solving, or if normalizing @p form failed on a `bv_widening` width-cap
- * violation (already logged by the widening pass).
- * @return An optional solution (`nullopt` whenever @p error is set).
+ * @return The solution, or a report carrying code::unsat when there is none
+ *         and code::solver_error on an unsupported clause or a `bv_widening`
+ *         width-cap violation (already logged by the widening pass).
  */
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, solver_options options, bool& error);
+result<solution<node>> solve(tref form, solver_options options);
 
 /**
  * @brief Solves the given tau forms.
@@ -226,11 +226,10 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
  * @tparam node Tree node type.
  * @param forms The tau forms to solve.
  * @param options The solver options.
- * @param error Reports if a clause is found that is not supported within solving
- * @return An optional solution.
+ * @return The solution, or a report carrying code::unsat when there is none.
  */
 template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error);
+result<solution<node>> solve(const trefs& forms, solver_options options);
 
 } // namespace idni::tau_lang
 

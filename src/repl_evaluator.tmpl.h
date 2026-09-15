@@ -595,10 +595,15 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
 	measuring m;
-	tref r;
+	tref r = nullptr;
 	switch (type) {
-		case tau::wff: r = tau_api::normalize_formula(m, value); break;
-		case tau::bf:  r = tau_api::normalize_term(m, value); break;
+		case tau::wff:
+			r = tau_api::normalize_formula(m, value)
+				.value_or(nullptr);
+			break;
+		case tau::bf:
+			r = tau_api::normalize_term(m, value).value_or(nullptr);
+			break;
 		default: return nullptr;
 	}
 	return benchmarks(m), r;
@@ -816,7 +821,7 @@ size_t get_solver_cmd_type(tref n) {
 // rendered as the typed one/zero constant of the variable's own annotated
 // type when it has one, falling back to type_id (the command's type).
 template <NodeType node>
-void print_solver_cmd_solution(std::optional<solution<node>>& solution,
+void print_solver_cmd_solution(result<solution<node>>& solution,
 		size_t type_id)
 {
 	using tau = tree<node>;
@@ -914,8 +919,11 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
-		r = tau_api::valid(m, value) ? tau::_T() : tau::_F();
+	if (tref value = get_any(n[1].get()); value) {
+		auto res = tau_api::valid(m, value);
+		// a decided verdict answers; anything else leaves r null
+		if (res.has_value()) r = res.value() ? tau::_T() : tau::_F();
+	}
 	return benchmarks(m), r;
 }
 
@@ -924,8 +932,11 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
-		r = tau_api::sat(m, value) ? tau::_T() : tau::_F();
+	if (tref value = get_any(n[1].get()); value) {
+		auto res = tau_api::sat(m, value);
+		// a decided verdict answers; anything else leaves r null
+		if (res.has_value()) r = res.value() ? tau::_T() : tau::_F();
+	}
 	return benchmarks(m), r;
 }
 
@@ -934,8 +945,11 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
-		r = tau_api::unsat(m, value) ? tau::_T() : tau::_F();
+	if (tref value = get_any(n[1].get()); value) {
+		auto res = tau_api::unsat(m, value);
+		// a decided verdict answers; anything else leaves r null
+		if (res.has_value()) r = res.value() ? tau::_T() : tau::_F();
+	}
 	return benchmarks(m), r;
 }
 

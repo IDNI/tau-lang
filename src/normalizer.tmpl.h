@@ -502,8 +502,10 @@ tref eliminate_bv_and_quantifiers(tref form) {
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 /** @internal @copydoc normalize @endinternal */
 template <NodeType node>
-tref normalize(tref form) {
+result<tref> normalize(tref form) {
 	using tau = tree<node>;
+	result<tref> r;
+	if (!form) return r.with_error(code::invalid_argument);
 	// Caching architecture (see private/2026-08-15-normalizer-caching-plan.md,
 	// "Explicitly NOT cacheable as-is", for the full rationale):
 	// This entry cache (and normalize_non_temp's below) dedupes whole-formula
@@ -519,7 +521,8 @@ tref normalize(tref form) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(form); it != cache.end()) return it->second;
+	if (auto it = cache.find(form); it != cache.end())
+		return r.with_assert_check_value(it->second);
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
 	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
@@ -541,19 +544,22 @@ tref normalize(tref form) {
 	}
 	// Now normalize the temporal layer and convert the formulas below the temporal
 	// quantifiers to Boole normal form
-	tref result = normalize_temporal_quantifiers<node>(form);
+	tref out = normalize_temporal_quantifiers<node>(form);
 #ifdef TAU_CACHE
-	cache.emplace(form, result);
+	cache.emplace(form, out);
 #endif // TAU_CACHE
-	return result;
+	if (!out) return r.with_error(code::internal_error,
+		messages::normalization_produced_no_formula);
+	return r.with_assert_check_value(out);
 }
 
 // Assumes that the formula passed does not have temporal quantifiers
 // This normalization will non perform the temporal normalization
 /** @internal @copydoc normalize_non_temp @endinternal */
 template <NodeType node>
-tref normalize_non_temp(tref fm) {
+result<tref> normalize_non_temp(tref fm) {
 	//	using tt = tau::traverser;
+	result<tref> r;
 	// Guard against a nullptr ARGUMENT, not just a nullptr result: since
 	// normalize_non_temp/normalize_with_temp_simp can themselves now
 	// return nullptr (the D4 cap below), a growing set of call sites feed
@@ -562,7 +568,7 @@ tref normalize_non_temp(tref fm) {
 	// satisfiability.tmpl.h). Without this, such a chain would crash
 	// inside widen_bv_arithmetic's own tau::get(fm) below rather than
 	// propagating cleanly.
-	if (!fm) return nullptr;
+	if (!fm) return r.with_error(code::invalid_argument);
 	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
 	// runs (including the cache lookup just below, so a cached result is
 	// keyed on the already-widened formula). Unconditionally called --
@@ -571,7 +577,8 @@ tref normalize_non_temp(tref fm) {
 	// the pass, so a nullptr here just propagates the failure.
 	if (bv_widening) {
 		fm = widen_bv_arithmetic<node>(fm);
-		if (!fm) return nullptr;
+		if (!fm) return r.with_error(code::internal_error,
+			messages::non_temp_normalization_produced_no_formula);
 	}
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
@@ -580,10 +587,11 @@ tref normalize_non_temp(tref fm) {
 	using tau = tree<node>;
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	if (auto it = cache.find(fm); it != cache.end())
+		return r.with_assert_check_value(it->second);
 #endif // TAU_CACHE
-	tref result = eliminate_bv_and_quantifiers<node>(fm);
-	result = term_boole_normal_form<node>(result);
+	tref out = eliminate_bv_and_quantifiers<node>(fm);
+	out = term_boole_normal_form<node>(out);
 	// NOTE: Do NOT add `tau::reget` here. It strips the explicit bitwidth
 	// subtype from BV-typed nodes (io_vars and BV constants), causing
 	// get_bv_size assertions downstream. `fold_trivial_quantifiers` is a
@@ -601,11 +609,13 @@ tref normalize_non_temp(tref fm) {
 	// formula that is plainly T. Pinned by
 	// "a term containing a bf_ref still normalizes"
 	// (test_integration-normalizer_helpers.cpp).
-	result = fold_trivial_quantifiers<node>(result);
+	out = fold_trivial_quantifiers<node>(out);
 #ifdef TAU_CACHE
-	cache.emplace(fm, result);
+	cache.emplace(fm, out);
 #endif // TAU_CACHE
-	return result;
+	if (!out) return r.with_error(code::internal_error,
+		messages::non_temp_normalization_produced_no_formula);
+	return r.with_assert_check_value(out);
 }
 
 /**
@@ -726,22 +736,24 @@ tref get_ref(tref n) {
 // Check that the Tau formula does not use Boolean combinations of models
 /** @internal @copydoc has_no_boolean_combs_of_models @endinternal */
 template <NodeType node>
-bool has_no_boolean_combs_of_models(tref n) {
+result<bool> has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
+	result<bool> r;
+	if (!n) return r.with_error(code::invalid_argument);
 	const auto& fm = tau::get(n);
 	if (is<node>(fm.first(), tau::wff_always)) {
 		// check that there is no wff_always or wff_sometimes in the subtree
 		if (fm[0][0].find_top(is<node, tau::wff_always>))
-			return false;
+			return r.with_assert_check_value(false);
 		if (fm[0][0].find_top(is<node, tau::wff_sometimes>))
-			return false;
+			return r.with_assert_check_value(false);
 	} else {
 		if (fm.find_top(is<node, tau::wff_always>))
-			return false;
+			return r.with_assert_check_value(false);
 		if (fm.find_top(is<node, tau::wff_sometimes>))
-			return false;
+			return r.with_assert_check_value(false);
 	}
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 /**
@@ -809,10 +821,10 @@ bool check_decided(const char* who, tref normalized) {
 
 /** @internal @copydoc is_non_temp_nso_satisfiable @endinternal */
 template <NodeType node>
-bool is_non_temp_nso_satisfiable(tref n) {
+result<bool> is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
-
-	DBG(assert(n != nullptr));
+	result<bool> r;
+	if (!n) return r.with_error(code::invalid_argument);
 
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
@@ -820,7 +832,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
-	tref normalized = normalize_non_temp<node>(nn);
+	tref normalized = normalize_non_temp<node>(nn).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; treat it the same as any other
 	// undecidable shape check_decided reports -- a conservative
@@ -829,7 +841,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 		LOG_ERROR << "is_non_temp_nso_satisfiable: normalization failed "
 			"(bv-widening cap exceeded); answering negatively. This is a "
 			"conservative fallback, not a proof.";
-		return false;
+		return r.with_assert_check_value(false);
 	}
 	const auto& t = tau::get(normalized);
 
@@ -838,7 +850,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 
 	check_decided<node>("is_non_temp_nso_satisfiable", normalized);
 
-	return t.equals_T();
+	return r.with_assert_check_value(t.equals_T());
 }
 
 /**
@@ -854,32 +866,33 @@ bool is_non_temp_nso_satisfiable(tref n) {
  * @par Example
  * @code{.cpp}
  * tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
- * CHECK( is_non_temp_nso_unsat<node_t>(fm) );
+ * CHECK( is_non_temp_nso_unsat<node_t>(fm).value_or(false) );
  * @endcode
  * @endinternal
  */
 template <NodeType node>
-bool is_non_temp_nso_unsat(tref n) {
+result<bool> is_non_temp_nso_unsat(tref n) {
 	using tau = tree<node>;
-	DBG(assert(n != nullptr));
+	result<bool> r;
+	if (!n) return r.with_error(code::invalid_argument);
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
 	nn = tau::build_wff_ex_many(vars, nn);
-	tref normalized = normalize_non_temp<node>(nn);
+	tref normalized = normalize_non_temp<node>(nn).value_or(nullptr);
 	// See is_non_temp_nso_satisfiable above: a D4 cap violation surfaces
 	// as nullptr; treat it as undecidable, answering negatively.
 	if (!normalized) {
 		LOG_ERROR << "is_non_temp_nso_unsat: normalization failed "
 			"(bv-widening cap exceeded); answering negatively. This is a "
 			"conservative fallback, not a proof.";
-		return false;
+		return r.with_assert_check_value(false);
 	}
 	const auto& t = tau::get(normalized);
 	check_decided<node>("is_non_temp_nso_unsat", normalized);
-	return t.equals_F();
+	return r.with_assert_check_value(t.equals_F());
 }
 
 /** @internal @copydoc are_nso_equivalent @endinternal */
@@ -891,8 +904,8 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	LOG_TRACE << "-- n2: " << LOG_FM(n2);
 
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
-	DBG(assert((has_no_boolean_combs_of_models<node>(n1)
-		&& has_no_boolean_combs_of_models<node>(n2)));)
+	DBG(assert((has_no_boolean_combs_of_models<node>(n1).value_or(false)
+		&& has_no_boolean_combs_of_models<node>(n2).value_or(false)));)
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
@@ -927,7 +940,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
-	tref ndir1 = normalize_non_temp<node>(imp1);
+	tref ndir1 = normalize_non_temp<node>(imp1).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; treat it as undecidable, answering
 	// negatively, same as any other shape check_decided reports.
@@ -943,7 +956,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
-	tref ndir2 = normalize_non_temp<node>(imp2);
+	tref ndir2 = normalize_non_temp<node>(imp2).value_or(nullptr);
 	if (!ndir2) {
 		LOG_ERROR << "are_nso_equivalent: normalization failed "
 			"(bv-widening cap exceeded); answering negatively. This is a "
@@ -987,15 +1000,17 @@ bool is_nso_equivalent_to_any_of(tref n, trefs& previous) {
 
 /** @internal @copydoc is_nso_impl @endinternal */
 template <NodeType node>
-bool is_nso_impl(tref n1, tref n2) {
+result<bool> is_nso_impl(tref n1, tref n2) {
 	using tau = tree<node>;
+	result<bool> r;
+	if (!n1 || !n2) return r.with_error(code::invalid_argument);
 
 	LOG_DEBUG << "Begin is_nso_impl";
 	LOG_TRACE << "n1 " << LOG_FM(n1);
 	LOG_TRACE << "n2 " << LOG_FM(n2);
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
-	DBG(assert((has_no_boolean_combs_of_models<node>(n1)
-		 && has_no_boolean_combs_of_models<node>(n2)));)
+	DBG(assert((has_no_boolean_combs_of_models<node>(n1).value_or(false)
+		 && has_no_boolean_combs_of_models<node>(n2).value_or(false)));)
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
@@ -1004,7 +1019,7 @@ bool is_nso_impl(tref n1, tref n2) {
 
 	if (tau::get(n1) == tau::get(n2)) {
 		LOG_DEBUG << "End is_nso_impl: true (n1 implies n2)";
-		return true;
+		return r.with_assert_check_value(true);
 	}
 
 	// Decides `all vars (f -> g)` by closing over f's and g's free
@@ -1014,7 +1029,7 @@ bool is_nso_impl(tref n1, tref n2) {
 		const trefs& vars = get_free_vars<node>(imp);
 		imp = tau::build_wff_all_many(vars, imp);
 		LOG_DEBUG << "wff: " << LOG_FM(imp);
-		tref nres = normalize_non_temp<node>(imp);
+		tref nres = normalize_non_temp<node>(imp).value_or(nullptr);
 		// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 		// surfaces as nullptr here; treat it as undecidable, answering
 		// negatively, same as any other shape check_decided reports.
@@ -1062,12 +1077,12 @@ bool is_nso_impl(tref n1, tref n2) {
 	if (cons.empty()) {
 		LOG_DEBUG << "End is_nso_impl: true (consequent is syntactically"
 			" contained in the antecedent)";
-		return true;
+		return r.with_assert_check_value(true);
 	}
 	if (ante.size() + cons.size() <= 2) {
 		const bool holds = closed_impl_holds(n1, n2);
 		LOG_DEBUG << "End is_nso_impl: " << holds;
-		return holds;
+		return r.with_assert_check_value(holds);
 	}
 	// Antecedent conjuncts first, so each group's members split into a
 	// leading antecedent part and a trailing consequent part.
@@ -1105,14 +1120,14 @@ bool is_nso_impl(tref n1, tref n2) {
 			if (gj != gi && is_group_unsat(gj)) {
 				LOG_DEBUG << "End is_nso_impl: true (antecedent"
 					" unsatisfiable)";
-				return true;
+				return r.with_assert_check_value(true);
 			}
 		LOG_DEBUG << "End is_nso_impl: false (component not implied: "
 			<< LOG_FM(tau::build_wff_and(group_cons[gi])) << ")";
-		return false;
+		return r.with_assert_check_value(false);
 	}
 	LOG_DEBUG << "End is_nso_impl: true";
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 /**
@@ -1158,7 +1173,7 @@ bool are_bf_equal(tref n1, tref n2) {
 	bf_equal_fm = tau::build_wff_all_many(vars, bf_equal_fm);
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
-	tref normalized = normalize_non_temp<node>(bf_equal_fm);
+	tref normalized = normalize_non_temp<node>(bf_equal_fm).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here; treat it as undecidable, answering
 	// negatively, same as any other shape check_decided-style callers
@@ -1397,9 +1412,9 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 			if (tau::get(parts[i]).equals_T()) continue;
 			for (size_t j = i + 1; j < parts.size(); ++j) {
 				if (tau::get(parts[j]).equals_T()) continue;
-				if (is_nso_impl<node>(repr(parts[i]), repr(parts[j])))
+				if (is_nso_impl<node>(repr(parts[i]), repr(parts[j])).value_or(false))
 					parts[j] = tau::_T();
-				else if (is_nso_impl<node>(repr(parts[j]), repr(parts[i])))
+				else if (is_nso_impl<node>(repr(parts[j]), repr(parts[i])).value_or(false))
 					parts[i] = tau::_T();
 			}
 		}
@@ -1412,12 +1427,12 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 		tref f = tau::build_wff_and(
 			get_temporally_quantified_formula<node>(aw),
 			get_temporally_quantified_formula<node>(st));
-		if (is_non_temp_nso_unsat<node>(f)) return std::nullopt;
+		if (is_non_temp_nso_unsat<node>(f).value_or(false)) return std::nullopt;
 	}
 
 	// Eliminate sometimes parts implied by any always part.
 	for (tref aw : aw_parts) for (tref& st : st_parts)
-		if (is_nso_impl<node>(aw, get_temporally_quantified_formula<node>(st))) st = tau::_T();
+		if (is_nso_impl<node>(aw, get_temporally_quantified_formula<node>(st)).value_or(false)) st = tau::_T();
 
 	// Eliminate sometimes parts implied by other sometimes parts.
 	eliminate_implied(st_parts, get_temporally_quantified_formula<node>);
@@ -1430,11 +1445,12 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 
 /** @internal @copydoc normalize_with_temp_simp @endinternal */
 template <NodeType node>
-tref normalize_with_temp_simp(tref fm) {
+result<tref> normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Guard against a nullptr ARGUMENT, not just a nullptr result: see
 	// normalize_non_temp's own copy of this comment.
-	if (!fm) return nullptr;
+	if (!fm) return r.with_error(code::invalid_argument);
 	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
 	// runs. Unconditionally called -- widen_bv_arithmetic itself is a no-op
 	// when the `bv_widening` flag is off (see bv_widening.h) -- and any D4
@@ -1442,9 +1458,10 @@ tref normalize_with_temp_simp(tref fm) {
 	// propagates the failure.
 	if (bv_widening) {
 		fm = widen_bv_arithmetic<node>(fm);
-		if (!fm) return nullptr;
+		if (!fm) return r.with_error(code::internal_error,
+			messages::temp_normalization_produced_no_formula);
 	}
-	fm = normalize<node>(fm);
+	fm = normalize<node>(fm).value_or(nullptr);
 	// Substitution based eliminations rebuild nodes without running the
 	// construction hooks, so trivially foldable residues (constant
 	// equations, quantifiers over T/F...) may survive; rebuild with hooks
@@ -1475,8 +1492,8 @@ tref normalize_with_temp_simp(tref fm) {
 		{
 			subtree_map<node, tref> changes;
 			for (tref b : blocks) {
-				tref r = eliminate_bv_and_quantifiers<node>(b);
-				if (!r || r == b || tau::get(r).find_top(
+				tref eb = eliminate_bv_and_quantifiers<node>(b);
+				if (!eb || eb == b || tau::get(eb).find_top(
 					is_quantifier<node>))
 				{
 					// Dual attempt: the substitution-based
@@ -1492,8 +1509,9 @@ tref normalize_with_temp_simp(tref fm) {
 						node>(tau::build_wff_neg(b));
 					if (nb && !tau::get(nb).find_top(
 						is_quantifier<node>))
-						r = normalize_non_temp<node>(
-							tau::build_wff_neg(nb));
+						eb = normalize_non_temp<node>(
+							tau::build_wff_neg(nb))
+								.value_or(nullptr);
 				}
 				// Adopt only a fully quantifier-free result: a
 				// partially processed block (anti-prenex
@@ -1502,9 +1520,9 @@ tref normalize_with_temp_simp(tref fm) {
 				// original, and adopting it fattens the
 				// stored spec and multiplies its DNF paths on
 				// every later normalization.
-				if (r && r != b && !tau::get(r).find_top(
+				if (eb && eb != b && !tau::get(eb).find_top(
 					is_quantifier<node>))
-					changes.emplace(b, r);
+					changes.emplace(b, eb);
 			}
 			if (!changes.empty())
 				fm = fold_trivial_quantifiers<node>(tau::reget(
@@ -1513,16 +1531,17 @@ tref normalize_with_temp_simp(tref fm) {
 	}
 	// Apply present function/predicate definitions
 	fm = expand_defs_until_settled<node>(fm, [](tref n) { return n; },
-		[](tref n) { return normalize<node>(n); });
-	if (!fm) return nullptr;
+		[](tref n) { return normalize<node>(n).value_or(nullptr); });
+	if (!fm) return r.with_error(code::internal_error,
+		messages::temp_normalization_produced_no_formula);
 
 	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
-		return fm;
+		return r.with_assert_check_value(fm);
 	// If after normalization no temporal quantifier is present, the formula
 	// is non-temporal
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
-		return fm;
+		return r.with_assert_check_value(fm);
 	tref nn = tau::_F();
 	// The temporal layer of a formula is in DNF
 	for (tref clause : expression_paths<node>(fm)) {
@@ -1536,7 +1555,9 @@ tref normalize_with_temp_simp(tref fm) {
 	}
 	DBG(assert(nn != nullptr);)
 	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
-	return nn;
+	if (!nn) return r.with_error(code::internal_error,
+		messages::temp_normalization_produced_no_formula);
+	return r.with_assert_check_value(nn);
 }
 
 /**
@@ -2188,7 +2209,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
 		LOG_DEBUG << "Normalize step";
-		current = nt == tau::wff ? normalize<node>(current)
+		current = nt == tau::wff ? normalize<node>(current).value_or(nullptr)
 					 : bf_reduced_dnf<node>(current);
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
@@ -2264,15 +2285,17 @@ tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 // REVIEW (HIGH) review overall execution
 /** @internal @copydoc normalizer(const rr<node>&) @endinternal */
 template <NodeType node>
-tref normalizer(const rr<node>& nso_rr) {
+result<tref> normalizer(const rr<node>& nso_rr) {
 	// IDEA extract this to an operator| overload
+	result<tref> r;
 
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 
 	tref fm = nso_rr_apply<node>(nso_rr);
-	if (!fm) return nullptr;
-	tref res = normalize_with_temp_simp<node>(fm);
+	if (!fm) return r.with_error(code::internal_error,
+		messages::normalization_produced_no_formula);
+	tref res = normalize_with_temp_simp<node>(fm).value_or(nullptr);
 
 	LOG_DEBUG << "End normalizer";
 	// res may now be nullptr (a D4 bv-widening cap violation, already
@@ -2282,13 +2305,20 @@ tref normalizer(const rr<node>& nso_rr) {
 	// pre-existing nso_rr_apply failure path just above.
 	if (res) LOG_DEBUG << "Result: " << LOG_FM(res);
 	else LOG_DEBUG << "Result: nullptr (bv-widening cap exceeded)";
-	return res;
+	if (!res) return r.with_error(code::internal_error,
+		messages::normalization_produced_no_formula);
+	return r.with_assert_check_value(res);
 }
 
 /** @internal @copydoc normalizer(tref) @endinternal */
 template <NodeType node>
-tref normalizer(tref fm) {
-	return normalize_with_temp_simp<node>(fm);
+result<tref> normalizer(tref fm) {
+	result<tref> r;
+	if (!fm) return r.with_error(code::invalid_argument);
+	tref out = normalize_with_temp_simp<node>(fm).value_or(nullptr);
+	if (!out) return r.with_error(code::internal_error,
+		messages::normalization_produced_no_formula);
+	return r.with_assert_check_value(out);
 }
 
 /**

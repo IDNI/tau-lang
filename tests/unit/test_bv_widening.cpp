@@ -1450,9 +1450,9 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		const char* sample = "ex x (x * x <= { 200 }:bv[8]).";
 		auto nso_rr = get_nso_rr(sample);
 		REQUIRE(nso_rr.has_value());
-		tref normalized = normalizer<node_t>(nso_rr.value());
+		tref normalized = normalizer<node_t>(nso_rr.value()).value_or(nullptr);
 		REQUIRE(normalized != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(normalized));
+		CHECK(is_tau_formula_sat<node_t>(normalized).value_or(false));
 	}
 
 	// A stricter variant of the audit above: `x * {3}` (a genuine constant
@@ -1474,9 +1474,9 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		const char* sample = "ex x (x:bv[8] * { 3 }:bv[8] <= { 200 }:bv[8]).";
 		auto nso_rr = get_nso_rr(sample);
 		REQUIRE(nso_rr.has_value());
-		tref normalized = normalizer<node_t>(nso_rr.value());
+		tref normalized = normalizer<node_t>(nso_rr.value()).value_or(nullptr);
 		REQUIRE(normalized != nullptr);
-		CHECK(is_tau_formula_sat<node_t>(normalized));
+		CHECK(is_tau_formula_sat<node_t>(normalized).value_or(false));
 	}
 
 	// Post-review fix: a D4 cap violation (needed width W exceeds a
@@ -1497,7 +1497,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12); // x*y at bv[8] needs W=16 > 12
 		auto fm = parse_wff("o:bv[8] = x * y");
-		CHECK( !is_tau_formula_sat<node_t>(fm) );
+		CHECK( !is_tau_formula_sat<node_t>(fm).value_or(false) );
 	}
 
 	// Second post-review round: normalizer<node>(tref) (normalizer.tmpl.h,
@@ -1526,7 +1526,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 	TEST_CASE("D4 cap violation through get_interpreter fails cleanly, not a crash") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12); // i[t]*i[t] at bv[8] needs W=16 > 12
-		tref fm = tau_api::get_formula("o[t]:bv[8] = i[t]:bv[8] * i[t]:bv[8]");
+		tref fm = tau_api::get_formula("o[t]:bv[8] = i[t]:bv[8] * i[t]:bv[8]").value_or(nullptr);
 		REQUIRE(fm != nullptr);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
@@ -1568,11 +1568,11 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 			"min(i9[t]:bv[8] * { 3 }:bv[8], { 100 }:bv[8]).";
 		auto nso_rr = get_nso_rr(sample);
 		REQUIRE(nso_rr.has_value());
-		tref normalized = normalizer<node_t>(nso_rr.value());
+		tref normalized = normalizer<node_t>(nso_rr.value()).value_or(nullptr);
 		REQUIRE(normalized != nullptr);
 		INFO("normalized: " << tree<node_t>::get(normalized).to_str());
-		CHECK(is_tau_formula_sat<node_t>(normalized));
-		tref executable = transform_to_execution<node_t>(normalized);
+		CHECK(is_tau_formula_sat<node_t>(normalized).value_or(false));
+		tref executable = transform_to_execution<node_t>(normalized).value_or(nullptr);
 		INFO("transform_to_execution result: "
 			<< (executable ? tree<node_t>::get(executable).to_str()
 				: std::string("<nullptr>")));
@@ -1642,7 +1642,7 @@ std::string widen_blast_normalize(tref fm) {
 	if (!widened) return "widen_error";
 	tref blasted = bv_predicate_blasting<node_t>(widened);
 	if (!blasted) return "blast_error";
-	tref result = normalizer<node_t>(blasted);
+	tref result = normalizer<node_t>(blasted).value_or(nullptr);
 	if (!result) return "null";
 	return tree<node_t>::get(result).to_str();
 }
@@ -1786,7 +1786,7 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// modular half only has to state the precondition it relies on.)
 		REQUIRE(!bv_widening);
 		CHECK(is_tau_formula_sat<node_t>(
-			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")));
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")).value_or(false));
 
 		// Exact (bv_widening on, set BEFORE parsing so the fit-gate
 		// leaves 16*16 unfolded -- the "load-bearing" ordering Task 6's
@@ -1797,7 +1797,7 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// constant {256}:bv[16]); 256 != 0 -> UNSAT.
 		bv_widening_scope widen;
 		CHECK(!is_tau_formula_sat<node_t>(
-			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")));
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] = { 0 }:bv[8]")).value_or(false));
 	}
 
 	TEST_CASE("both-compound comparison: exact product clears a threshold the modular wrap never reaches") {
@@ -1815,12 +1815,12 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// residual ground atom regardless).
 		REQUIRE(!bv_widening);
 		CHECK(!is_tau_formula_sat<node_t>(
-			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")));
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")).value_or(false));
 
 		// Exact: 256 > 200 -> TRUE -- SAT.
 		bv_widening_scope widen;
 		CHECK(is_tau_formula_sat<node_t>(
-			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")));
+			parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] > { 200 }:bv[8]")).value_or(false));
 	}
 
 	// Temporal case: a genuine realizability flip through the full
@@ -1851,9 +1851,9 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// satisfies BOTH conjuncts simultaneously: 16*16 mod 256 = 0
 		// (first conjunct), and 16 > 10 (second) -- REALIZABLE.
 		REQUIRE(!bv_widening);
-		tref fm_off = tau_api::get_formula(spec);
+		tref fm_off = tau_api::get_formula(spec).value_or(nullptr);
 		REQUIRE(fm_off != nullptr);
-		CHECK(tau_api::realizable(fm_off));
+		CHECK(tau_api::realizable(fm_off).value_or(false));
 
 		// Exact (bv_widening on, set before parsing): the equality is now
 		// extended to W = 16 and compared EXACTLY (not mod 256). As an
@@ -1866,9 +1866,9 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// no single value of o1[t] can satisfy both conjuncts at once --
 		// UNREALIZABLE.
 		bv_widening_scope widen;
-		tref fm_on = tau_api::get_formula(spec);
+		tref fm_on = tau_api::get_formula(spec).value_or(nullptr);
 		REQUIRE(fm_on != nullptr);
-		CHECK(!tau_api::realizable(fm_on));
+		CHECK(!tau_api::realizable(fm_on).value_or(false));
 	}
 
 	// The REVERSE-direction temporal sentinel, and the discriminating
@@ -1916,9 +1916,9 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// lands in [0, 144], never >= 250. No value of o2[t] satisfies all
 		// three conjuncts -- UNREALIZABLE.
 		REQUIRE(!bv_widening);
-		tref fm_off = tau_api::get_formula(spec);
+		tref fm_off = tau_api::get_formula(spec).value_or(nullptr);
 		REQUIRE(fm_off != nullptr);
-		CHECK(!tau_api::realizable(fm_off));
+		CHECK(!tau_api::realizable(fm_off).value_or(false));
 
 		// Exact (bv_widening on, set before parsing): 2*o2 is computed at
 		// W = 16 and never wraps, so it is in [256, 400] for the whole
@@ -1927,9 +1927,9 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// REALIZABLE.
 		bv_widening_scope widen;
 		bv_max_width_scope cap(20);
-		tref fm_on = tau_api::get_formula(spec);
+		tref fm_on = tau_api::get_formula(spec).value_or(nullptr);
 		REQUIRE(fm_on != nullptr);
-		CHECK(tau_api::realizable(fm_on));
+		CHECK(tau_api::realizable(fm_on).value_or(false));
 	}
 }
 
@@ -2120,8 +2120,8 @@ TEST_SUITE("bv widening - D4 cap propagation through the guarded entry points") 
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
 		tref fm = parse_wff("o:bv[8] = x * y");
-		CHECK(!is_non_temp_nso_satisfiable<node_t>(fm));
-		CHECK(!is_non_temp_nso_unsat<node_t>(fm));
+		CHECK(!is_non_temp_nso_satisfiable<node_t>(fm).value_or(false));
+		CHECK(!is_non_temp_nso_unsat<node_t>(fm).value_or(false));
 	}
 
 	TEST_CASE("is_nso_impl and are_nso_equivalent answer false") {
@@ -2129,7 +2129,7 @@ TEST_SUITE("bv widening - D4 cap propagation through the guarded entry points") 
 		bv_max_width_scope cap(12);
 		tref f1 = parse_wff("o:bv[8] = x * y");
 		tref f2 = parse_wff("o:bv[8] = x + y");
-		CHECK(!is_nso_impl<node_t>(f1, f2));
+		CHECK(!is_nso_impl<node_t>(f1, f2).value_or(false));
 		CHECK(!are_nso_equivalent<node_t>(f1, f2));
 	}
 
@@ -2149,26 +2149,25 @@ TEST_SUITE("bv widening - D4 cap propagation through the guarded entry points") 
 		bv_max_width_scope cap(12);
 		tref f1 = parse_wff("o:bv[8] = x * y");
 		tref f2 = parse_wff("o:bv[8] = x + y");
-		CHECK(!is_tau_impl<node_t>(f1, f2));
-		CHECK(!are_tau_equivalent<node_t>(f1, f2));
+		CHECK(!is_tau_impl<node_t>(f1, f2).value_or(false));
+		CHECK(!are_tau_equivalent<node_t>(f1, f2).value_or(false));
 	}
 
 	TEST_CASE("solve reports an error and no solution") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
 		tref fm = parse_wff("o:bv[8] = x * y");
-		bool error = false;
-		auto sol = solve<node_t>(fm, solver_options{}, error);
-		CHECK(error);
+		auto sol = solve<node_t>(fm, solver_options{});
+		CHECK(sol.has_error());
 		CHECK(!sol.has_value());
 	}
 
-	TEST_CASE("simp_tau_unsat_valid and normalizer(tref) propagate nullptr") {
+	TEST_CASE("simp_tau_unsat_valid propagates nullptr, normalizer reports the cap error") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
 		tref fm = parse_wff("o:bv[8] = x * y");
 		CHECK(simp_tau_unsat_valid<node_t>(fm) == nullptr);
-		CHECK(normalizer<node_t>(fm) == nullptr);
+		CHECK(normalizer<node_t>(fm).has_error());
 	}
 
 	TEST_CASE("just under the cap still widens") {

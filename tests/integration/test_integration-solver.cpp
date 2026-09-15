@@ -17,7 +17,7 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	using tau = tree<node>;
 	DBG(TAU_LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
 	tref substitution = rewriter::replace<node>(eq, sol);
-	tref check = normalizer<node>(substitution);
+	tref check = normalizer<node>(substitution).value_or(nullptr);
 #ifdef DEBUG
 	// std::cout << "check_solution/solution: " << dump<node>(sol) << "\n";
 	std::cout << "check_solution/equation: " << tau::get(eq).dump_to_str() << "\n";
@@ -656,8 +656,7 @@ TEST_SUITE("solve") {
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
 		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
-		bool solve_error = false;
-		auto solution = solve<node_t>(form, options, solve_error);
+		auto solution = solve<node_t>(form, options);
 		return solution ? check_solution<node_t>(form, solution.value()) : false;
 	}
 
@@ -826,30 +825,28 @@ TEST_SUITE("solve") {
 	}
 
 	// SO-26: solve() on the plain Boolean constants T and F (as opposed to
-	// an inequality/equation system). solve(tref, options, error) special
-	// cases both right at its entry point (solver.tmpl.h):
-	//   if (tau::get(form).equals_T()) return { solution<node>() };
-	//   if (tau::get(form).equals_F()) return {};
+	// an inequality/equation system). solve(tref, options) special cases
+	// both right at its entry point (solver.tmpl.h):
+	//   if (tau::get(form).equals_T()) return r.with_value(solution<node>());
+	//   if (tau::get(form).equals_F()) return r.with_error(code::unsat, ...);
 	TEST_CASE("solve on the T constant is trivially satisfiable") {
-		bool solve_error = false;
 		solver_options options = {
 			.splitter_one = node_t::ba::splitter_one(tau_type<node_t>()),
 			.mode = solver_mode::general
 		};
-		auto solution = solve<node_t>(tau::_T(), options, solve_error);
-		CHECK ( !solve_error );
+		auto solution = solve<node_t>(tau::_T(), options);
+		CHECK ( !report_has_code(solution.report(), code::solver_error) );
 		CHECK ( solution.has_value() );
 		CHECK ( solution.value().empty() );
 	}
 
 	TEST_CASE("solve on the F constant is unsatisfiable") {
-		bool solve_error = false;
 		solver_options options = {
 			.splitter_one = node_t::ba::splitter_one(tau_type<node_t>()),
 			.mode = solver_mode::general
 		};
-		auto solution = solve<node_t>(tau::_F(), options, solve_error);
-		CHECK ( !solve_error );
+		auto solution = solve<node_t>(tau::_F(), options);
+		CHECK ( !report_has_code(solution.report(), code::solver_error) );
 		CHECK ( !solution.has_value() );
 	}
 
@@ -910,7 +907,7 @@ TEST_SUITE("solve") {
 		// off-by-a-constant regression in the bound.
 		tref spec = get_nso_rr<node_t>(tau::get(
 			"(always o1[t] = 1) && (sometimes o1[8] = 1).")).value().main->get();
-		CHECK ( is_tau_formula_sat<node_t>(spec) );
+		CHECK ( is_tau_formula_sat<node_t>(spec).value_or(false) );
 	}
 
 	TEST_CASE("flag_boundary: unsat via a high explicit initial condition") {
@@ -923,7 +920,7 @@ TEST_SUITE("solve") {
 		// computation and reporting unsat.
 		tref spec = get_nso_rr<node_t>(tau::get(
 			"(always o1[8] = 0) && (sometimes o1[8] != 0).")).value().main->get();
-		CHECK ( !is_tau_formula_sat<node_t>(spec) );
+		CHECK ( !is_tau_formula_sat<node_t>(spec).value_or(false) );
 	}
 
 	TEST_CASE("flag_boundary: unsat with a larger always-part lookback") {
@@ -936,6 +933,6 @@ TEST_SUITE("solve") {
 		// "sometimes" clause unsatisfiable.
 		tref spec = get_nso_rr<node_t>(tau::get(
 			"(always o1[t] = o1[t-3]) && (sometimes o1[t] != o1[t-6]).")).value().main->get();
-		CHECK ( !is_tau_formula_sat<node_t>(spec) );
+		CHECK ( !is_tau_formula_sat<node_t>(spec).value_or(false) );
 	}
 }

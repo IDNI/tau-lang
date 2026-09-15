@@ -67,7 +67,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 		auto formula = get_nso_rr<node_t>(s);
 		CHECK( formula.has_value() );
 		if (!formula.has_value()) return;
-		tref result = normalizer<node_t>(formula.value());
+		tref result = normalizer<node_t>(formula.value()).value_or(nullptr);
 		CHECK( tau::get(result).child_is(tau::wff_t) );
 	}
 
@@ -79,7 +79,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 		auto formula = get_nso_rr<node_t>(s);
 		CHECK( formula.has_value() );
 		if (!formula.has_value()) return;
-		tref result = normalizer<node_t>(formula.value());
+		tref result = normalizer<node_t>(formula.value()).value_or(nullptr);
 		CHECK( tau::get(result).child_is(tau::wff_t) );
 	}
 }

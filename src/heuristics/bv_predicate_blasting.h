@@ -74,7 +74,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -112,7 +112,7 @@ tref bit(tref operand, int_t bit);
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto shifted = tau::build_bf_variable(bv_type_id<node_t>(4));
  * tref constraint = bvshl_by_one<node_t>(x, shifted);
- * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint) );
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint).value_or(false) );
  * @endcode
  */
 template<NodeType node>
@@ -133,7 +133,7 @@ tref bvshl_by_one(tref base, tref shifted);
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto shifted = tau::build_bf_variable(bv_type_id<node_t>(4));
  * tref constraint = bvshr_by_one<node_t>(x, shifted);
- * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint) );
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint).value_or(false) );
  * @endcode
  */
 template<NodeType node>
@@ -157,7 +157,7 @@ tref bvshr_by_one(tref base, tref shifted);
  *     "ex x ex y (x = { 3 }:bv[4] && x << { 3 }:bv[4] = y && "
  *     "y = { 8 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -181,7 +181,7 @@ tref bvshl(tref base, tref count, tref shifted);
  *     "ex x ex y (x = { 15 }:bv[4] && x >> { 4 }:bv[4] = y && "
  *     "y = { 0 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -210,12 +210,12 @@ tref bvshr(tref base, tref count, tref shifted);
  * tref fm_ok = get_nso_rr(
  *     "ex x (x = { 3 }:bv[2] && (bv[4]) x = { 3 }:bv[4]).").value().main->get();
  * CHECK( tau::get(normalizer<node_t>(
- *     bv_predicate_blasting<node_t>(fm_ok))).equals_T() );
+ *     bv_predicate_blasting<node_t>(fm_ok)).value_or(nullptr)).equals_T() );
  *
  * tref fm_bad = get_nso_rr(
  *     "ex x (x = { 3 }:bv[2] && (bv[4]) x = { 11 }:bv[4]).").value().main->get();
  * CHECK( tau::get(normalizer<node_t>(
- *     bv_predicate_blasting<node_t>(fm_bad))).equals_F() );
+ *     bv_predicate_blasting<node_t>(fm_bad)).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
@@ -244,7 +244,7 @@ tref bvcast(tref src, tref result);
  * // TEST_CASE("bvneq: x != x is never satisfiable")).
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * tref pred = bvneq<node_t>(x, x);
- * CHECK( tau::get(normalizer<node_t>(pred)).equals_F() );
+ * CHECK( tau::get(normalizer<node_t>(pred).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
@@ -265,7 +265,7 @@ tref bvneq(tref left, tref right);
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -285,7 +285,7 @@ tref bvlt(tref left, tref right);
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
  * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_F() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
@@ -464,7 +464,7 @@ tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
  * tref fm = get_nso_rr(
  *     "ex x (x = { 15 }:bv[4] && x + { 1 }:bv[4] = { 0 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -492,7 +492,7 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux);
  * tref fm = get_nso_rr(
  *     "ex x (x = { 0 }:bv[4] && x - { 1 }:bv[4] = { 15 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -521,7 +521,7 @@ tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x * { 6 }:bv[4] = { 2 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -564,7 +564,7 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
  * tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, tau::get_bv_constant(4, 1)));
  * tref good = tau::build_wff_and(tau::build_wff_and(constraint, x10),
  *     tau::build_wff_and(q3, r1));
- * CHECK( is_non_temp_nso_satisfiable<node_t>(good) );
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(good).value_or(false) );
  * @endcode
  */
 template<NodeType node>
@@ -594,7 +594,7 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
  *     "ex x ex y (x = { 10 }:bv[4] && x / { 3 }:bv[4] = y && "
  *     "y = { 3 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -623,7 +623,7 @@ tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
  *     "ex x ex y (x = { 10 }:bv[4] && x % { 3 }:bv[4] = y && "
  *     "y = { 1 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -654,7 +654,7 @@ tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
  *     "ex x (x = { 3 }:bv[4] && min(x, { 5 }:bv[4]) = { 3 }:bv[4]).")
  *     .value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>

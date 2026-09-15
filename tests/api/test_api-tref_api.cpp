@@ -13,19 +13,19 @@ TEST_SUITE("Tau API - settings") {
 
 	TEST_CASE("set_charvar") {
 		tau_api::set_charvar(false);
-		tref xyz = tau_api::get_term("xyz");
+		tref xyz = tau_api::get_term("xyz").value_or(nullptr);
 		CHECK(xyz); // term must be variable, because charvar is false
 		CHECK(tau::get(xyz)[0].is(tau::variable));
 
 		tau_api::set_charvar(true);
-		xyz = tau_api::get_term("xyz");
+		xyz = tau_api::get_term("xyz").value_or(nullptr);
 		CHECK(xyz); // term must be bf_and, because charvar is true
 		CHECK(tau::get(xyz)[0].is(tau::bf_and));
 	}
 
 	TEST_CASE("set_indenting") {
 		// tau_api::set_indenting(true); // TODO
-		tref fm = tau_api::get_formula("x = 0 && z = 0 || y = 1");
+		tref fm = tau_api::get_formula("x = 0 && z = 0 || y = 1").value_or(nullptr);
 		std::string got = tau_api::to_str(fm);
 		std::string expected = "x = 0 && z = 0 || y = 1";
 		CHECK(got == expected);
@@ -37,12 +37,12 @@ TEST_SUITE("Tau API - settings") {
 
 	TEST_CASE("set_highlighting") {
 		// tau_api::set_highlighting(true); // TODO
-		tref fm = tau_api::get_formula("x = 0 && z = 0 || y = 1");
+		tref fm = tau_api::get_formula("x = 0 && z = 0 || y = 1").value_or(nullptr);
 		std::string got = tau_api::to_str(fm);
 		std::string expected = "x = 0 && z = 0 || y = 1";
 		CHECK(got == expected);
 		tau_api::set_highlighting(false);
-		fm = tau_api::get_formula("x = 0 && z = 0 || y = 1");
+		fm = tau_api::get_formula("x = 0 && z = 0 || y = 1").value_or(nullptr);
 		got = tau_api::to_str(fm);
 		expected = "x = 0 && z = 0 || y = 1";
 		CHECK(got == expected);
@@ -65,12 +65,12 @@ TEST_SUITE("Tau API - settings") {
 	// AP-34: set_json toggles measuring::operator() between the plain-text
 	// and JSON renderings; nothing anywhere exercised it.
 	TEST_CASE("set_json") {
-		tref t = tau_api::get_formula("T");
+		tref t = tau_api::get_formula("T").value_or(nullptr);
 		REQUIRE(t);
 
 		tau_api::set_json(false);
 		measuring text_m;
-		CHECK(tau_api::sat(text_m, t));
+		CHECK(tau_api::sat(text_m, t).value_or(false));
 		std::ostringstream text_out;
 		text_out << text_m;
 		CHECK(text_out.str().find('{') == std::string::npos);
@@ -78,7 +78,7 @@ TEST_SUITE("Tau API - settings") {
 
 		tau_api::set_json(true);
 		measuring json_m;
-		CHECK(tau_api::sat(json_m, t));
+		CHECK(tau_api::sat(json_m, t).value_or(false));
 		std::ostringstream json_out;
 		json_out << json_m;
 		CHECK(json_out.str().find("\"measured\": \"sat\"") != std::string::npos);
@@ -93,53 +93,53 @@ TEST_SUITE("Tau API - tref - parsing") {
 	TEST_CASE_FIXTURE(api_fixture, "get_term") {
 		for (const auto& term : terms) {
 			DBG(TAU_LOG_TRACE << "get_term: " << term;)
-			CHECK(tau_api::get_term(term));
+			CHECK(tau_api::get_term(term).has_value());
 		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_formula") {
 		for (const auto& formula : formulas) {
 			DBG(TAU_LOG_TRACE << "get_formula: " << formula;)
-			CHECK(tau_api::get_formula(formula));
+			CHECK(tau_api::get_formula(formula).has_value());
 		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_function_def") {
 		for (const auto& function_def : function_defs) {
 			DBG(TAU_LOG_TRACE << "get_function_def: " << function_def;)
-			CHECK(tau_api::get_function_def(function_def));
+			CHECK(tau_api::get_function_def(function_def).has_value());
 		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_predicate_def") {
 		for (const auto& predicate_def : predicate_defs) {
 			DBG(TAU_LOG_TRACE << "get_predicate_def: " << predicate_def;)
-			CHECK(tau_api::get_predicate_def(predicate_def));
+			CHECK(tau_api::get_predicate_def(predicate_def).has_value());
 		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_stream_def") {
 		for (const auto& stream_def : stream_defs) {
 			DBG(TAU_LOG_TRACE << "get_stream_def: " << stream_def;)
-			CHECK(tau_api::get_stream_def(stream_def));
+			CHECK(tau_api::get_stream_def(stream_def).has_value());
 		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_spec") {
 		for (const auto& spec : specs) {
 			DBG(TAU_LOG_TRACE << "get_spec: " << spec;)
-			CHECK(tau_api::get_spec(spec));
+			CHECK(tau_api::get_spec(spec).has_value());
 		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_definition") {
 		for (const auto& definition : predicate_defs) {
 			DBG(TAU_LOG_TRACE << "get_definition - predicate_def: " << definition;)
-			CHECK(tau_api::get_definition(definition));
+			CHECK(tau_api::get_definition(definition).has_value());
 		}
 		for (const auto& function_def : function_defs) {
 			DBG(TAU_LOG_TRACE << "get_definition - function_def: " << function_def;)
-			CHECK(tau_api::get_definition(function_def));
+			CHECK(tau_api::get_definition(function_def).has_value());
 		}
 	}
 
@@ -148,19 +148,57 @@ TEST_SUITE("Tau API - tref - parsing") {
 		// the parse result unconditionally, crashing (DBG assert / null
 		// deref in release) instead of returning nullptr on a malformed
 		// definition string.
-		CHECK(tau_api::get_definition("this is not a definition") == nullptr);
+		CHECK(!tau_api::get_definition("this is not a definition").has_value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a failed parse reports code::parse_error") {
+		auto bad = tau_api::get_formula("&& x =");
+		REQUIRE(!bad.has_value());
+		CHECK(bad.has_error());
+		CHECK(report_has_code(bad.report(), code::parse_error));
+		// a successful parse carries a value and a clean report
+		auto good = tau_api::get_formula("x = 0");
+		REQUIRE(good.has_value());
+		CHECK(!good.has_error());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "add_definition reports invalid arguments") {
+		tref head = tau_api::get_term("x").value_or(nullptr);
+		REQUIRE(head != nullptr);
+		auto r = tau_api::add_definition(nullptr, head);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+	}
+
+	// The measuring parse overloads are macro-generated (MT/MH in
+	// api.tmpl.measuring.h) and nothing else instantiates them.
+	TEST_CASE_FIXTURE(api_fixture, "measuring parse overloads carry the result") {
+		measuring m;
+		CHECK(tau_api::get_term(m, "x").has_value());
+		CHECK(tau_api::geth_term(m, "x").has_value());
+		CHECK(tau_api::get_spec(m, "x = 0.").has_value());
+		CHECK(tau_api::geth_spec(m, "x = 0.").has_value());
+		auto bad = tau_api::get_formula(m, "&& x =");
+		CHECK(!bad.has_value());
+		CHECK(report_has_code(bad.report(), code::parse_error));
+		auto hbad = tau_api::geth_formula(m, "&& x =");
+		CHECK(!hbad.has_value());
+		CHECK(report_has_code(hbad.report(), code::parse_error));
+		tref head = tau_api::get_term("x").value_or(nullptr);
+		REQUIRE(head != nullptr);
+		CHECK(!tau_api::add_definition(m, nullptr, head).has_value());
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_spec_or_term") {
 		for (const auto& spec : specs) {
 			DBG(TAU_LOG_TRACE << "get_spec_or_term - spec: " << spec;)
-			tref s = tau_api::get_spec_or_term(spec);
+			tref s = tau_api::get_spec_or_term(spec).value_or(nullptr);
 			CHECK(s);
 			CHECK(tau::get(s).is(tau::spec));
 		}
 		for (const auto& term : terms) {
 			DBG(TAU_LOG_TRACE << "get_spec_or_term - term: " << term;)
-			tref t = tau_api::get_spec_or_term(term);
+			tref t = tau_api::get_spec_or_term(term).value_or(nullptr);
 			CHECK(t);
 			CHECK(tau::get(t).is(tau::bf));
 		}
@@ -169,7 +207,7 @@ TEST_SUITE("Tau API - tref - parsing") {
 	TEST_CASE_FIXTURE(api_fixture, "get_formula_or_term") {
 		for (const auto& formula : formulas) {
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - formula: " << formula;)
-			tref f = tau_api::get_formula_or_term(formula);
+			tref f = tau_api::get_formula_or_term(formula).value_or(nullptr);
 			CHECK(f);
 			DBG(using node = node_t;)
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - formula: " << TAU_LOG_FM_DUMP(f);)
@@ -177,7 +215,7 @@ TEST_SUITE("Tau API - tref - parsing") {
 		}
 		for (const auto& term : terms) {
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - term: " << term;)
-			tref t = tau_api::get_formula_or_term(term);
+			tref t = tau_api::get_formula_or_term(term).value_or(nullptr);
 			CHECK(t);
 			CHECK(tau::get(t).is(tau::bf));
 		}
@@ -188,7 +226,7 @@ TEST_SUITE("Tau API - tref - querying") {
 
 	TEST_CASE_FIXTURE(api_fixture, "contains") {
 		DBG(using node = node_t;)
-		tref t = tau_api::get_term("x + 0", false);
+		tref t = tau_api::get_term("x + 0", false).value_or(nullptr);
 		DBG(TAU_LOG_TRACE << "contains on term: " << TAU_LOG_FM_DUMP(t);)
 		CHECK(tau_api::contains(t, tau::bf));
 		CHECK(tau_api::contains(t, tau::bf_add));
@@ -199,7 +237,7 @@ TEST_SUITE("Tau API - tref - querying") {
 		CHECK(!tau_api::contains(t, tau::wff_f));
 		CHECK(!tau_api::contains(t, tau::wff_t));
 
-		tref f = tau_api::get_formula("x = 0 && y ^ 1 = 1", false);
+		tref f = tau_api::get_formula("x = 0 && y ^ 1 = 1", false).value_or(nullptr);
 		DBG(TAU_LOG_TRACE << "contains on formula: " << TAU_LOG_FM_DUMP(f);)
 		CHECK(tau_api::contains(f, tau::wff));
 		CHECK(tau_api::contains(f, tau::wff_and));
@@ -217,7 +255,7 @@ TEST_SUITE("Tau API - tref - querying") {
 	TEST_CASE_FIXTURE(api_fixture, "is_term") {
 		for (const auto& term : terms) {
 			DBG(TAU_LOG_TRACE << "is_term: " << term;)
-			tref t = tau_api::get_formula_or_term(term);
+			tref t = tau_api::get_formula_or_term(term).value_or(nullptr);
 			CHECK(tau_api::is_term(t));
 			CHECK(!tau_api::is_formula(t));
 		}
@@ -226,7 +264,7 @@ TEST_SUITE("Tau API - tref - querying") {
 	TEST_CASE_FIXTURE(api_fixture, "is_formula") {
 		for (const auto& formula : formulas) {
 			DBG(TAU_LOG_TRACE << "is_formula: " << formula;)
-			tref f = tau_api::get_formula_or_term(formula);
+			tref f = tau_api::get_formula_or_term(formula).value_or(nullptr);
 			CHECK(tau_api::is_formula(f));
 			CHECK(!tau_api::is_term(f));
 		}
@@ -240,9 +278,9 @@ TEST_SUITE("Tau API - tref - using definitions") {
 	// test below uses symbol names not used anywhere else in this file to
 	// avoid clashing with definitions registered by other test cases.
 	TEST_CASE_FIXTURE(api_fixture, "apply_def") {
-		tref def = tau_api::get_function_def("apply_def_f(x) := x + 1");
+		tref def = tau_api::get_function_def("apply_def_f(x) := x + 1").value_or(nullptr);
 		REQUIRE(def);
-		tref expr = tau_api::get_term("apply_def_f(t)", false);
+		tref expr = tau_api::get_term("apply_def_f(t)", false).value_or(nullptr);
 		REQUIRE(expr);
 		// before applying the definition, the call to `apply_def_f` is
 		// still an unresolved reference
@@ -252,12 +290,12 @@ TEST_SUITE("Tau API - tref - using definitions") {
 		CHECK(!tau_api::contains(applied, tau::ref));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "apply_defs") {
-		tref f = tau_api::get_function_def("apply_defs_f(x) := x + 1");
-		tref g = tau_api::get_function_def("apply_defs_g(x) := x'");
+		tref f = tau_api::get_function_def("apply_defs_f(x) := x + 1").value_or(nullptr);
+		tref g = tau_api::get_function_def("apply_defs_g(x) := x'").value_or(nullptr);
 		REQUIRE(f);
 		REQUIRE(g);
 		tref expr = tau_api::get_term(
-			"apply_defs_f(t) + apply_defs_g(t)", false);
+			"apply_defs_f(t) + apply_defs_g(t)", false).value_or(nullptr);
 		REQUIRE(expr);
 		CHECK(tau_api::contains(expr, tau::ref));
 		tref applied = tau_api::apply_defs(
@@ -279,7 +317,7 @@ TEST_SUITE("Tau API - tref - using definitions") {
 		// be newline-separated (unlike the REPL's ". "-separated
 		// multi-command syntax).
 		tref spec = tau_api::get_spec(
-			"apply_all_defs_f(x) := x'.\napply_all_defs_f(z) = 0.");
+			"apply_all_defs_f(x) := x'.\napply_all_defs_f(z) = 0.").value_or(nullptr);
 		REQUIRE(spec);
 		CHECK(tau_api::contains(spec, tau::ref));
 		tref applied = tau_api::apply_all_defs(spec);
@@ -291,7 +329,7 @@ TEST_SUITE("Tau API - tref - using definitions") {
 
 TEST_SUITE("Tau API - tref - printing") {
 	TEST_CASE_FIXTURE(api_fixture, "print") {
-		tref fm = tau_api::get_formula("x = 0 && y = 1");
+		tref fm = tau_api::get_formula("x = 0 && y = 1").value_or(nullptr);
 		REQUIRE(fm);
 		std::ostringstream os;
 		tau_api::print(os, fm);
@@ -303,7 +341,7 @@ TEST_SUITE("Tau API - tref - printing") {
 		CHECK(null_os.str().empty());
 	}
 	TEST_CASE_FIXTURE(api_fixture, "to_str") {
-		tref fm = tau_api::get_formula("x = 0 && y = 1");
+		tref fm = tau_api::get_formula("x = 0 && y = 1").value_or(nullptr);
 		REQUIRE(fm);
 		CHECK(tau_api::to_str(fm) == "x = 0 && y = 1");
 		CHECK(tau_api::to_str(nullptr) == "");
@@ -312,9 +350,9 @@ TEST_SUITE("Tau API - tref - printing") {
 
 TEST_SUITE("Tau API - tref - substitution") {
 	TEST_CASE_FIXTURE(api_fixture, "substitute") {
-		tref x = tau_api::get_term("x");
-		tref y = tau_api::get_term("y");
-		tref expr = tau_api::get_term("x + 1");
+		tref x = tau_api::get_term("x").value_or(nullptr);
+		tref y = tau_api::get_term("y").value_or(nullptr);
+		tref expr = tau_api::get_term("x + 1").value_or(nullptr);
 		REQUIRE(x);
 		REQUIRE(y);
 		REQUIRE(expr);
@@ -323,11 +361,11 @@ TEST_SUITE("Tau API - tref - substitution") {
 		CHECK(tau_api::to_str(result) == "y+1");
 	}
 	TEST_CASE_FIXTURE(api_fixture, "substitute map") {
-		tref x = tau_api::get_term("x");
-		tref y = tau_api::get_term("y");
-		tref a = tau_api::get_term("a");
-		tref b = tau_api::get_term("b");
-		tref expr = tau_api::get_term("x + a");
+		tref x = tau_api::get_term("x").value_or(nullptr);
+		tref y = tau_api::get_term("y").value_or(nullptr);
+		tref a = tau_api::get_term("a").value_or(nullptr);
+		tref b = tau_api::get_term("b").value_or(nullptr);
+		tref expr = tau_api::get_term("x + a").value_or(nullptr);
 		REQUIRE(x);
 		REQUIRE(y);
 		REQUIRE(a);
@@ -344,9 +382,9 @@ TEST_SUITE("Tau API - tref - substitution") {
 	// applying the pairs one after another would collapse x and y into a
 	// single variable instead of exchanging them.
 	TEST_CASE_FIXTURE(api_fixture, "substitute map is simultaneous") {
-		tref x = tau_api::get_term("x");
-		tref y = tau_api::get_term("y");
-		tref expr = tau_api::get_term("x + y");
+		tref x = tau_api::get_term("x").value_or(nullptr);
+		tref y = tau_api::get_term("y").value_or(nullptr);
+		tref expr = tau_api::get_term("x + y").value_or(nullptr);
 		REQUIRE(x);
 		REQUIRE(y);
 		REQUIRE(expr);
@@ -356,10 +394,10 @@ TEST_SUITE("Tau API - tref - substitution") {
 		CHECK(tau_api::to_str(result) == "y+x");
 	}
 	TEST_CASE_FIXTURE(api_fixture, "substitute map does not chain") {
-		tref a = tau_api::get_term("a");
-		tref b = tau_api::get_term("b");
-		tref c = tau_api::get_term("c");
-		tref expr = tau_api::get_term("a + c");
+		tref a = tau_api::get_term("a").value_or(nullptr);
+		tref b = tau_api::get_term("b").value_or(nullptr);
+		tref c = tau_api::get_term("c").value_or(nullptr);
+		tref expr = tau_api::get_term("a + c").value_or(nullptr);
 		REQUIRE(a);
 		REQUIRE(b);
 		REQUIRE(c);
@@ -375,7 +413,7 @@ TEST_SUITE("Tau API - tref - substitution") {
 	// unconditionally; is_term() dereferences its argument, so a null tref
 	// asserted (debug) or was UB (release) instead of returning nullptr.
 	TEST_CASE_FIXTURE(api_fixture, "substitute with a null argument returns nullptr") {
-		tref x = tau_api::get_term("x");
+		tref x = tau_api::get_term("x").value_or(nullptr);
 		REQUIRE(x != nullptr);
 		CHECK(tau_api::substitute(nullptr, x, x) == nullptr);
 		CHECK(tau_api::substitute(x, nullptr, x) == nullptr);
@@ -385,14 +423,14 @@ TEST_SUITE("Tau API - tref - substitution") {
 
 TEST_SUITE("Tau API - tref - normal forms") {
 	TEST_CASE_FIXTURE(api_fixture, "boole_normal_form") {
-		tref fm = tau_api::get_formula("x = 0 && y = 1");
+		tref fm = tau_api::get_formula("x = 0 && y = 1").value_or(nullptr);
 		REQUIRE(fm);
 		tref bnf = tau_api::boole_normal_form(fm);
 		REQUIRE(bnf);
 		CHECK(tau_api::contains(bnf, tau::wff));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "dnf") {
-		tref fm = tau_api::get_formula("(x = 0 || y = 0) && z = 0");
+		tref fm = tau_api::get_formula("(x = 0 || y = 0) && z = 0").value_or(nullptr);
 		REQUIRE(fm);
 		tref d = tau_api::dnf(fm);
 		REQUIRE(d);
@@ -400,7 +438,7 @@ TEST_SUITE("Tau API - tref - normal forms") {
 		CHECK(tau_api::contains(d, tau::wff_or));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "cnf") {
-		tref fm = tau_api::get_formula("x = 0 || (y = 0 && z = 0)");
+		tref fm = tau_api::get_formula("x = 0 || (y = 0 && z = 0)").value_or(nullptr);
 		REQUIRE(fm);
 		tref c = tau_api::cnf(fm);
 		REQUIRE(c);
@@ -408,7 +446,7 @@ TEST_SUITE("Tau API - tref - normal forms") {
 		CHECK(tau_api::contains(c, tau::wff_and));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "nnf") {
-		tref fm = tau_api::get_formula("!(x = 0 && y = 0)");
+		tref fm = tau_api::get_formula("!(x = 0 && y = 0)").value_or(nullptr);
 		REQUIRE(fm);
 		tref n = tau_api::nnf(fm);
 		REQUIRE(n);
@@ -420,7 +458,7 @@ TEST_SUITE("Tau API - tref - normal forms") {
 
 TEST_SUITE("Tau API - tref - procedures") {
 	TEST_CASE_FIXTURE(api_fixture, "simplify") {
-		tref t = tau_api::get_term("x", false);
+		tref t = tau_api::get_term("x", false).value_or(nullptr);
 		REQUIRE(t);
 		tref s = tau_api::simplify(t);
 		REQUIRE(s);
@@ -430,7 +468,7 @@ TEST_SUITE("Tau API - tref - procedures") {
 		CHECK(tau_api::simplify(nullptr) == nullptr);
 	}
 	TEST_CASE_FIXTURE(api_fixture, "infer") {
-		tref t = tau_api::get_term("x", false);
+		tref t = tau_api::get_term("x", false).value_or(nullptr);
 		REQUIRE(t);
 		tref inferred = tau_api::infer(t);
 		REQUIRE(inferred);
@@ -438,30 +476,30 @@ TEST_SUITE("Tau API - tref - procedures") {
 		CHECK(tau_api::infer(nullptr) == nullptr);
 	}
 	TEST_CASE_FIXTURE(api_fixture, "syntactic_term_simplification") {
-		tref t = tau_api::get_term("x & x", false);
+		tref t = tau_api::get_term("x & x", false).value_or(nullptr);
 		REQUIRE(t);
 		tref s = tau_api::syntactic_term_simplification(t);
 		REQUIRE(s);
 		CHECK(tau_api::to_str(s) == "x");
 	}
 	TEST_CASE_FIXTURE(api_fixture, "syntactic_formula_simplification") {
-		tref fm = tau_api::get_formula("x = 0 && x = 0", false);
+		tref fm = tau_api::get_formula("x = 0 && x = 0", false).value_or(nullptr);
 		REQUIRE(fm);
 		tref s = tau_api::syntactic_formula_simplification(fm);
 		REQUIRE(s);
 		CHECK(tau_api::to_str(s) == "x = 0");
 	}
 	TEST_CASE_FIXTURE(api_fixture, "normalize_term") {
-		tref t = tau_api::get_term("x & x'");
+		tref t = tau_api::get_term("x & x'").value_or(nullptr);
 		REQUIRE(t);
-		tref n = tau_api::normalize_term(t);
+		tref n = tau_api::normalize_term(t).value_or(nullptr);
 		REQUIRE(n);
 		CHECK(tau_api::to_str(n) == "0");
 	}
 	TEST_CASE_FIXTURE(api_fixture, "normalize_formula") {
-		tref fm = tau_api::get_formula("x & x' = 0");
+		tref fm = tau_api::get_formula("x & x' = 0").value_or(nullptr);
 		REQUIRE(fm);
-		tref n = tau_api::normalize_formula(fm);
+		tref n = tau_api::normalize_formula(fm).value_or(nullptr);
 		REQUIRE(n);
 		CHECK(tau_api::to_str(n) == "T");
 	}
@@ -469,14 +507,14 @@ TEST_SUITE("Tau API - tref - procedures") {
 		// r(x, y) is an undefined predicate reference, so the existential
 		// cannot be resolved away as a trivially-closed subformula; it
 		// must survive anti_prenex (possibly reordered/renamed).
-		tref fm = tau_api::get_formula("(ex x r(x, y)) && z = 0");
+		tref fm = tau_api::get_formula("(ex x r(x, y)) && z = 0").value_or(nullptr);
 		REQUIRE(fm);
 		tref a = tau_api::anti_prenex(fm);
 		REQUIRE(a);
 		CHECK(tau_api::contains(a, tau::wff_ex));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "eliminate_quantifiers") {
-		tref fm = tau_api::get_formula("ex x x = 0");
+		tref fm = tau_api::get_formula("ex x x = 0").value_or(nullptr);
 		REQUIRE(fm);
 		tref e = tau_api::eliminate_quantifiers(fm);
 		REQUIRE(e);
@@ -485,53 +523,53 @@ TEST_SUITE("Tau API - tref - procedures") {
 	TEST_CASE_FIXTURE(api_fixture, "realizable") {
 		// realizable/unrealizable require a plain formula (is_formula()
 		// gates on a wff node), not a full multi-clause spec.
-		tref fm = tau_api::get_formula("x = 0");
+		tref fm = tau_api::get_formula("x = 0").value_or(nullptr);
 		REQUIRE(fm);
-		CHECK(tau_api::realizable(fm));
+		CHECK(tau_api::realizable(fm).value_or(false));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "unrealizable") {
-		tref fm = tau_api::get_formula("F");
+		tref fm = tau_api::get_formula("F").value_or(nullptr);
 		REQUIRE(fm);
-		CHECK(tau_api::unrealizable(fm));
+		CHECK(tau_api::unrealizable(fm).value_or(false));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "sat") {
-		tref t = tau_api::get_formula("T");
-		tref f = tau_api::get_formula("F");
+		tref t = tau_api::get_formula("T").value_or(nullptr);
+		tref f = tau_api::get_formula("F").value_or(nullptr);
 		REQUIRE(t);
 		REQUIRE(f);
-		CHECK(tau_api::sat(t));
-		CHECK(!tau_api::sat(f));
+		CHECK(tau_api::sat(t).value_or(false));
+		CHECK(!tau_api::sat(f).value_or(false));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "unsat") {
-		tref t = tau_api::get_formula("T");
-		tref f = tau_api::get_formula("F");
+		tref t = tau_api::get_formula("T").value_or(nullptr);
+		tref f = tau_api::get_formula("F").value_or(nullptr);
 		REQUIRE(t);
 		REQUIRE(f);
-		CHECK(tau_api::unsat(f));
-		CHECK(!tau_api::unsat(t));
+		CHECK(tau_api::unsat(f).value_or(false));
+		CHECK(!tau_api::unsat(t).value_or(false));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "valid") {
-		tref t = tau_api::get_formula("T");
-		tref x = tau_api::get_formula("x = 0");
+		tref t = tau_api::get_formula("T").value_or(nullptr);
+		tref x = tau_api::get_formula("x = 0").value_or(nullptr);
 		REQUIRE(t);
 		REQUIRE(x);
-		CHECK(tau_api::valid(t));
-		CHECK(!tau_api::valid(x));
+		CHECK(tau_api::valid(t).value_or(false));
+		CHECK(!tau_api::valid(x).value_or(false));
 	}
 	TEST_CASE_FIXTURE(api_fixture, "valid_spec") {
-		tref t = tau_api::get_formula("T");
-		tref x = tau_api::get_formula("x = 0");
+		tref t = tau_api::get_formula("T").value_or(nullptr);
+		tref x = tau_api::get_formula("x = 0").value_or(nullptr);
 		REQUIRE(t);
 		REQUIRE(x);
-		CHECK(tau_api::valid_spec(t));
+		CHECK(tau_api::valid_spec(t).value_or(false));
 		// x = 0 is not logically equivalent to T
-		CHECK(!tau_api::valid_spec(x));
+		CHECK(!tau_api::valid_spec(x).value_or(false));
 	}
 }
 
 TEST_SUITE("Tau API - tref - solving") {
 	TEST_CASE_FIXTURE(api_fixture, "solve") {
-		tref eq = tau_api::get_formula("x | y = 0");
+		tref eq = tau_api::get_formula("x | y = 0").value_or(nullptr);
 		REQUIRE(eq);
 		auto solution = tau_api::solve(eq, solver_mode::general);
 		REQUIRE(solution.has_value());
@@ -547,7 +585,7 @@ TEST_SUITE("Tau API - tref - solving") {
 		// (src/tau_tree.tmpl.h:579). The line above had already extracted
 		// the equality into `equality`, whose two children are the sides
 		// meant to be checked; the screen now indexes that instead.
-		tref eq = tau_api::get_formula("x | y = 0");
+		tref eq = tau_api::get_formula("x | y = 0").value_or(nullptr);
 		REQUIRE(eq);
 		auto solution = tau_api::lgrs(eq);
 		REQUIRE(solution.has_value());
@@ -572,7 +610,7 @@ TEST_SUITE("Tau API - tref - execution") {
 		// annotations are required since a bare formula (unlike a parsed
 		// spec) never gets its stream types pushed into the global
 		// io_context.
-		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau");
+		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau").value_or(nullptr);
 		REQUIRE(fm);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(maybe_i.has_value());
@@ -594,8 +632,8 @@ TEST_SUITE("Tau API - htref - null guards (AP-2)") {
 	TEST_CASE_FIXTURE(api_fixture, "bool-returning overloads reject a null htref") {
 		CHECK(tau_api::is_term(htref{}) == false);
 		CHECK(tau_api::is_formula(htref{}) == false);
-		CHECK(tau_api::sat(htref{}) == false);
-		CHECK(tau_api::valid(htref{}) == false);
+		CHECK(tau_api::sat(htref{}).value_or(false) == false);
+		CHECK(tau_api::valid(htref{}).value_or(false) == false);
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "htref-returning overloads reject a null htref") {
@@ -614,7 +652,7 @@ TEST_SUITE("Tau API - htref - null guards (AP-2)") {
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "substitute rejects null htref arguments") {
-		htref x = tau_api::geth_term("x");
+		htref x = tau_api::geth_term("x").value_or(nullptr);
 		REQUIRE(x != nullptr);
 		CHECK(tau_api::substitute(htref{}, x, x) == nullptr);
 		CHECK(tau_api::substitute(x, htref{}, x) == nullptr);

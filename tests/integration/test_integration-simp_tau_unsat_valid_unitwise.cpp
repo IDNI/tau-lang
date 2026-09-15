@@ -21,9 +21,9 @@ using tau_api = api<node_t>;
 namespace {
 
 std::string api_normalize(const std::string& s) {
-	tref f = tau_api::get_formula_or_term(s.c_str());
+	tref f = tau_api::get_formula_or_term(s.c_str()).value_or(nullptr);
 	REQUIRE(f != nullptr);
-	tref n = tau_api::normalize_formula(f);
+	tref n = tau_api::normalize_formula(f).value_or(nullptr);
 	REQUIRE(n != nullptr);
 	return tau::get(n).to_str();
 }

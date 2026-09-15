@@ -22,7 +22,7 @@ using tau_api = api<node_t>;
 namespace {
 
 tref fm(const char* src) {
-	tref f = tau_api::get_formula(src);
+	tref f = tau_api::get_formula(src).value_or(nullptr);
 	REQUIRE(f);
 	return f;
 }

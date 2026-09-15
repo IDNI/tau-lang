@@ -20,7 +20,7 @@ tref parse_wff(const std::string& sample) {
 
 std::string norm(const std::string& sample) {
 	auto wff = parse_wff(sample);
-	return wff ? tau::get(normalizer<node_t>(wff)).to_str() : "parse_error";
+	return wff ? tau::get(normalizer<node_t>(wff).value_or(nullptr)).to_str() : "parse_error";
 }
 
 // Two samples normalize to the same formula, or to formulas whose
@@ -28,9 +28,9 @@ std::string norm(const std::string& sample) {
 bool same(const std::string& a, const std::string& b) {
 	tref ra = parse_wff(a), rb = parse_wff(b);
 	if (!ra || !rb) return false;
-	ra = normalizer<node_t>(ra), rb = normalizer<node_t>(rb);
+	ra = normalizer<node_t>(ra).value_or(nullptr), rb = normalizer<node_t>(rb).value_or(nullptr);
 	if (tau::get(ra) == tau::get(rb)) return true;
-	return tau::get(normalizer<node_t>(tau::build_wff_equiv(ra, rb))).equals_T();
+	return tau::get(normalizer<node_t>(tau::build_wff_equiv(ra, rb)).value_or(nullptr)).equals_T();
 }
 
 } // namespace

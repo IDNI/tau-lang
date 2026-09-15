@@ -185,13 +185,13 @@ static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 		return compute(normalized);
 	};
 	if (!fm.nso_rr.rec_relations.empty())
-		return safe_compute(normalizer<node>(fm.nso_rr));
+		return safe_compute(normalizer<node>(fm.nso_rr).value_or(nullptr));
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
 	++tau_ba_predicate_misses;
-	bool res = safe_compute(normalizer<node>(fm.nso_rr));
+	bool res = safe_compute(normalizer<node>(fm.nso_rr).value_or(nullptr));
 	pin_decided_key<node>(key);
 	return cache.insert_or_assign(key, res).first->second;
 }
@@ -322,7 +322,7 @@ static int factored_tau_sat(tref fm) {
 		}
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
-		bool sres = is_tau_formula_sat<node>(f);
+		bool sres = is_tau_formula_sat<node>(f).value_or(false);
 		pin_decided_key<node>(f);
 		cache.insert_or_assign(f, sres);
 		all_sat = sres;
@@ -345,7 +345,7 @@ static int factored_tau_valid(tref fm) {
 			all = it->second;
 			continue;
 		}
-		bool vres = is_tau_impl<node>(tau::_T(), units[i]);
+		bool vres = is_tau_impl<node>(tau::_T(), units[i]).value_or(false);
 		pin_decided_key<node>(units[i]);
 		cache.insert_or_assign(units[i], vres);
 		all = vres;
@@ -363,7 +363,7 @@ bool tau_ba<BAs...>::is_zero() const {
 			if (int r = factored_tau_sat<node>(normalized);
 					r >= 0)
 				return r == 0;
-		return !is_tau_formula_sat<node>(normalized);
+		return !is_tau_formula_sat<node>(normalized).value_or(false);
 	});
 }
 
@@ -377,7 +377,7 @@ bool tau_ba<BAs...>::is_one() const {
 			if (int r = factored_tau_valid<node>(normalized);
 					r >= 0)
 				return r == 1;
-		return is_tau_impl<node>(tau::_T(), normalized);
+		return is_tau_impl<node>(tau::_T(), normalized).value_or(false);
 	});
 }
 
@@ -452,12 +452,12 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 	using node = node<tau_ba<BAs...>, BAs...>;
-	tref normalized = normalizer<node>(fm.nso_rr);
-	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
-	// surfaces as nullptr here; returning the input unchanged rather than
-	// feeding it to tau_splitter, same convention as normalize_tau above.
-	if (!normalized) return fm;
-	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(normalized, st);
+	auto normalized = normalizer<node>(fm.nso_rr);
+	// A D4 bv-widening cap violation surfaces as an errored result here;
+	// return the input unchanged rather than feeding it to tau_splitter,
+	// same convention as normalize_tau above.
+	if (!normalized || !*normalized) return fm;
+	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(*normalized, st);
 	return tau_ba<BAs...>(tree<node>::geth(s));
 }
 

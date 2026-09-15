@@ -81,16 +81,16 @@ TEST_SUITE("Tau API - string - malformed input") {
 
 	TEST_CASE_FIXTURE(api_fixture, "formula checks reject malformed input") {
 		for (const auto& s : malformed) {
-			// realizable/valid/valid_spec/sat all bottom out on a null
-			// tref, which every one of them treats as "not satisfied".
-			CHECK(!tau_api::realizable(s));
-			CHECK(!tau_api::valid(s));
-			CHECK(!tau_api::valid_spec(s));
-			CHECK(!tau_api::sat(s));
-			// unrealizable/unsat are defined as the negation of the
-			// above, so a malformed input reports true here.
-			CHECK(tau_api::unrealizable(s));
-			CHECK(tau_api::unsat(s));
+			// A malformed input no longer decides anything: the parse
+			// failure propagates, so every verdict comes back with no
+			// value and a parse_error report rather than a silent
+			// false (and, for the negated pair, a silent true).
+			CHECK(!tau_api::realizable(s).has_value());
+			CHECK(!tau_api::valid(s).has_value());
+			CHECK(!tau_api::valid_spec(s).has_value());
+			CHECK(!tau_api::sat(s).has_value());
+			CHECK(!tau_api::unrealizable(s).has_value());
+			CHECK(!tau_api::unsat(s).has_value());
 		}
 	}
 
@@ -711,23 +711,23 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 TEST_SUITE("Tau API - string - sat/valid decide plain formulas") {
 
 	TEST_CASE_FIXTURE(api_fixture, "SAT-1: sat and unsat decide") {
-		CHECK( tau_api::sat("x = 0 || x != 0") );
-		CHECK( !tau_api::sat("x = 0 && x != 0") );
-		CHECK( tau_api::unsat("x = 0 && x != 0") );
-		CHECK( tau_api::sat("ex x:bv[8] x = {0}:bv[8]") );
-		CHECK( tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])") );
-		CHECK( !tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])") );
+		CHECK( tau_api::sat("x = 0 || x != 0").value_or(false) );
+		CHECK( !tau_api::sat("x = 0 && x != 0").value_or(false) );
+		CHECK( tau_api::unsat("x = 0 && x != 0").value_or(false) );
+		CHECK( tau_api::sat("ex x:bv[8] x = {0}:bv[8]").value_or(false) );
+		CHECK( tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])").value_or(false) );
+		CHECK( !tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])").value_or(false) );
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "SAT-1: valid decides, quantified bv included") {
-		CHECK( tau_api::valid("x = 0 || x != 0") );
-		CHECK( !tau_api::valid("x = 0") );
-		CHECK( tau_api::valid("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])") );
-		CHECK( !tau_api::valid("all x:bv[8] x / x = {1}:bv[8]") );
+		CHECK( tau_api::valid("x = 0 || x != 0").value_or(false) );
+		CHECK( !tau_api::valid("x = 0").value_or(false) );
+		CHECK( tau_api::valid("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])").value_or(false) );
+		CHECK( !tau_api::valid("all x:bv[8] x / x = {1}:bv[8]").value_or(false) );
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "SAT-1: realizable decides") {
-		CHECK( tau_api::realizable("x = 0 || x != 0") );
-		CHECK( tau_api::unrealizable("x = 0 && x != 0") );
+		CHECK( tau_api::realizable("x = 0 || x != 0").value_or(false) );
+		CHECK( tau_api::unrealizable("x = 0 && x != 0").value_or(false) );
 	}
 }

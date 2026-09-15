@@ -25,28 +25,29 @@ std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
 
 template <NodeType node>
 bool api<node>::is_term(const std::string& term) {
-	return get_term(term) != nullptr;
+	return get_term(term).has_value();
 }
 
 template <NodeType node>
 bool api<node>::is_formula(const std::string& formula) {
-	return get_formula(formula) != nullptr;
+	return get_formula(formula).has_value();
 }
 
 // Using definitions
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_def(
+result<std::string> api<node>::apply_def(
 	const std::string& def, const std::string& expr)
 {
 	return apply_defs(std::set<std::string>{ def }, expr);
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_defs(
+result<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
 {
+	result<std::string> r;
 	subtree_set<node> tdefs;
 	// A definition that fails to parse used to be inserted as nullptr and
 	// then silently skipped by the tref-level apply_defs' "if (def)"
@@ -54,20 +55,24 @@ std::optional<std::string> api<node>::apply_defs(
 	// dropped from a definition that legitimately had no effect. Report
 	// the failure instead of silently continuing without it.
 	for (const std::string& def : defs) {
-		tref d = get_definition(def);
+		auto d = r.merge_take(get_definition(def));
 		if (!d) {
 			TAU_LOG_ERROR << "Failed to parse definition: " << def;
-			return {};
+			DBG(assert(r.is_well_formed());)
+			return r;
 		}
-		tdefs.insert(d);
+		tdefs.insert(*d);
 	}
-	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a)
-		return to_str(a);
-	return {};
+	TAU_TRY(tref parsed, get_spec_or_term(expr));
+	tref a = apply_defs(tdefs, parsed);
+	if (!a) {
+		return r.with_error(code::internal_error, "Failed to apply definitions");
+	}
+	return r.with_assert_check_value(to_str(a));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_all_defs(const std::string& expr) {
+result<std::string> api<node>::apply_all_defs(const std::string& expr) {
 	return apply_defs(std::set<std::string>{}, expr);
 }
 
@@ -75,30 +80,38 @@ std::optional<std::string> api<node>::apply_all_defs(const std::string& expr) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::substitute(
+result<std::string> api<node>::substitute(
 	const std::string& expr,
 	const std::string& that,
 	const std::string& with)
 {
-	tref e = get_formula_or_term(expr); if (!e) return {};
-	tref t = get_formula_or_term(that); if (!t) return {};
-	tref w = get_formula_or_term(with); if (!w) return {};
-	if (tref s = substitute(e, t, w); s) return to_str(s);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	TAU_TRY(tref t, get_formula_or_term(that));
+	TAU_TRY(tref w, get_formula_or_term(with));
+	tref s = substitute(e, t, w);
+	if (!s) {
+		return r.with_error(code::invalid_argument, messages::failed_to_substitute);
+	}
+	return r.with_assert_check_value(to_str(s));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::substitute(
+result<std::string> api<node>::substitute(
 	const std::string& expr,
 	const std::map<std::string, std::string>& that_with)
 {
-	tref e = get_formula_or_term(expr); if (!e) return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
 	for (auto [that, with] : that_with) {
-		tref t = get_formula_or_term(that); if (!t) return {};
-		tref w = get_formula_or_term(with); if (!w) return {};
-		e = substitute(e, t, w); if (!e) return {};
+		TAU_TRY(tref t, get_formula_or_term(that));
+		TAU_TRY(tref w, get_formula_or_term(with));
+		e = substitute(e, t, w);
+		if (!e) {
+			return r.with_error(code::invalid_argument, messages::failed_to_substitute);
+		}
 	}
-	return to_str(e);
+	return r.with_assert_check_value(to_str(e));
 }
 
 
@@ -106,122 +119,169 @@ std::optional<std::string> api<node>::substitute(
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
+result<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
-	if (tref a = apply_all_defs(get_formula_or_term(expr)); a)
-		if (tref b = tau_lang::boole_normal_form<node>(a); b)
-			return to_str(b);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	tref a = apply_all_defs(e);
+	tref b = a ? tau_lang::boole_normal_form<node>(a) : nullptr;
+	if (!b) {
+		return r.with_error(code::internal_error, "Failed to compute boole normal form");
+	}
+	return r.with_assert_check_value(to_str(b));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::dnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref d = dnf(e); d) return to_str(d);
-	return {};
+result<std::string> api<node>::dnf(const std::string& expr)
+{
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	tref out = dnf(e);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to compute dnf");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::cnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref c = cnf(e); c) return to_str(c);
-	return {};
+result<std::string> api<node>::cnf(const std::string& expr)
+{
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	tref out = cnf(e);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to compute cnf");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::nnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref n = nnf(e); n) return to_str(n);
-	return {};
+result<std::string> api<node>::nnf(const std::string& expr)
+{
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	tref out = nnf(e);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to compute nnf");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 // Procedures
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::syntactic_term_simplification(
+result<std::string> api<node>::syntactic_term_simplification(
 	const std::string& term)
 {
-	if (tref e = get_term(term); e)
-		if (tref s = syntactic_term_simplification(e); s)
-			return to_str(s);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_term(term));
+	tref out = syntactic_term_simplification(e);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to simplify term");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::syntactic_formula_simplification(
+result<std::string> api<node>::syntactic_formula_simplification(
 	const std::string& fm)
 {
-	if (tref e = get_formula(fm); e)
-		if (tref s = syntactic_formula_simplification(e); s)
-			return to_str(s);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula(fm));
+	tref out = syntactic_formula_simplification(e);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to simplify formula");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::normalize_term(const std::string& expr)
+result<std::string> api<node>::normalize_term(const std::string& expr)
 {
-	if (tref term = get_term(expr); term)
-		if (tref n = normalize_term(term); n) return to_str(n);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref term, get_term(expr));
+	TAU_TRY(tref out, normalize_term(term));
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::normalize_formula(
+result<std::string> api<node>::normalize_formula(
 	const std::string& expr)
 {
-	if (tref fm = get_formula(expr); fm)
-		if (tref n = normalize_formula(fm); n) return to_str(n);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref fm, get_formula(expr));
+	TAU_TRY(tref out, normalize_formula(fm));
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::anti_prenex(const std::string& expr) {
-	if (tref fm = get_formula(expr); fm)
-		if (tref a = anti_prenex(fm); a) return to_str(a);
-	return {};
+result<std::string> api<node>::anti_prenex(const std::string& expr)
+{
+	result<std::string> r;
+	TAU_TRY(tref fm, get_formula(expr));
+	tref out = anti_prenex(fm);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to anti-prenex formula");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::eliminate_quantifiers(
+result<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
-	if (tref e = get_formula(expr); e)
-		if (tref a = apply_all_defs(e); a)
-			if (tref r = resolve_quantifiers<node>(
-				tau_lang::anti_prenex<node>(a)); r)
-					return to_str(r);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula(expr));
+	tref a = apply_all_defs(e);
+	tref q = a ? resolve_quantifiers<node>(tau_lang::anti_prenex<node>(a))
+		   : nullptr;
+	if (!q) {
+		return r.with_error(code::internal_error, "Failed to eliminate quantifiers");
+	}
+	return r.with_assert_check_value(to_str(q));
 }
 
 template <NodeType node>
-bool api<node>::realizable(const std::string& expr) {
-	return realizable(get_spec_or_term(expr));
+result<bool> api<node>::realizable(const std::string& expr) {
+	result<bool> r;
+	TAU_TRY(tref e, get_spec_or_term(expr));
+	return realizable(e);
 }
 
 template <NodeType node>
-bool api<node>::unrealizable(const std::string& expr) {
-	return unrealizable(get_spec_or_term(expr));
+result<bool> api<node>::unrealizable(const std::string& expr) {
+	result<bool> r;
+	TAU_TRY(tref e, get_spec_or_term(expr));
+	return unrealizable(e);
 }
 
 template <NodeType node>
-bool api<node>::sat(const std::string& expr) {
-	return sat(get_spec_or_term(expr));
+result<bool> api<node>::sat(const std::string& expr) {
+	result<bool> r;
+	TAU_TRY(tref e, get_spec_or_term(expr));
+	return sat(e);
 }
 
 template <NodeType node>
-bool api<node>::unsat(const std::string& expr) {
-	return !sat(expr);
+result<bool> api<node>::unsat(const std::string& expr) {
+	result<bool> r;
+	TAU_TRY(bool v, sat(expr));
+	return r.with_value(!v);
 }
 
 template <NodeType node>
-bool api<node>::valid(const std::string& expr) {
-	return valid(get_spec_or_term(expr));
+result<bool> api<node>::valid(const std::string& expr) {
+	result<bool> r;
+	TAU_TRY(tref e, get_spec_or_term(expr));
+	return valid(e);
 }
 
 template <NodeType node>
-bool api<node>::valid_spec(const std::string& expr) {
-	return valid_spec(get_spec_or_term(expr));
+result<bool> api<node>::valid_spec(const std::string& expr) {
+	result<bool> r;
+	TAU_TRY(tref e, get_spec_or_term(expr));
+	return valid_spec(e);
 }
 
 
@@ -229,37 +289,37 @@ bool api<node>::valid_spec(const std::string& expr) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::map<std::string, std::string>> api<node>::solve(
+result<std::map<std::string, std::string>> api<node>::solve(
 	const std::string& formula,
 	solver_mode mode)
 {
-	if (auto solution = solve(get_formula(formula), mode); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
-	return {};
+	result<std::map<std::string, std::string>> r;
+	TAU_TRY(tref fm, get_formula(formula));
+	TAU_TRY(auto solution, solve(fm, mode));
+	std::map<std::string, std::string> s;
+	for (auto& [var, val] : solution)
+		s.emplace(to_str(var), to_str(val));
+	return r.with_assert_check_value(std::move(s));
 }
 
 template <NodeType node>
-std::optional<std::map<std::string, std::string>> api<node>::lgrs(
+result<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	if (auto solution = lgrs(get_formula(equation)); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
-	return {};
+	result<std::map<std::string, std::string>> r;
+	TAU_TRY(tref eq, get_formula(equation));
+	TAU_TRY(auto solution, lgrs(eq));
+	std::map<std::string, std::string> s;
+	for (auto& [var, val] : solution)
+		s.emplace(to_str(var), to_str(val));
+	return r.with_assert_check_value(std::move(s));
 }
 
 // Execution
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification)
 {
 	interpreter_options options;
@@ -267,17 +327,28 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 }
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification,
 	interpreter_options& options)
 {
+	result<interpreter<node>> r;
 	DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
 	tau_spec<node> spec;
 	if (!spec.parse(specification)) {
-		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
-		return {};
+		for (const auto& error : spec.errors()) {
+			TAU_LOG_ERROR << error;
+			r.error(code::parse_error, error);
+		}
+		if (r.has_error()) {
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		return r.with_error(code::parse_error,
+			messages::failed_to_parse_spec);
 	}
-	return get_interpreter(spec, options);
+	r = get_interpreter(spec, options);
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 template <NodeType node>
@@ -302,14 +373,17 @@ std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 }
 
 template <NodeType node>
-std::optional<std::map<stream_at, std::string>> api<node>::step(
+result<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i, std::map<stream_at, std::string> inputs)
 {
 	DBG(using tau = tree<node>;)
 
+	result<std::map<stream_at, std::string>> r;
 	auto& ctx = i.ctx;
 
-	if (!i.calculate_initial_spec()) return {};
+	if (!i.calculate_initial_spec()) {
+		return r.with_error(code::internal_error, messages::failed_to_calculate_initial_spec);
+	}
 
 	// Build inputs for the step
 	DBG(TAU_LOG_TRACE << "number of inputs: " << inputs.size();)
@@ -326,7 +400,8 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (it == ctx.inputs.end()) {
 			TAU_LOG_ERROR << "Input stream " << in.name
 						<< " not found in context";
-			return {};
+			return r.with_error(code::invalid_input_stream,
+				"Input stream not found in context");
 		}
 		DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
 		step_inputs.emplace_back(
@@ -351,13 +426,14 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (!cnst) {
 			TAU_LOG_ERROR << "Failed to parse input value "
 								<< input_value;
-			return {};
+			return r.with_error(code::parse_error, "Failed to parse input value");
 		}
 		tref c = build_bf_ba_constant<node>(cnst.value().first, type_id);
 		if (has_open_tau_fm_in_constant<node>(c)) {
 			TAU_LOG_ERROR <<"Constant contains an open tau formula: "
 								<< input_value;
-			return {};
+			return r.with_error(code::invalid_argument,
+				"Constant contains an open tau formula");
 		}
 		values[step_input] = c;
 		DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
@@ -369,7 +445,9 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	if (!output.has_value()) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
-		return {};
+		// invalid_state is the step-awaiting-input protocol; see
+		// step_awaiting_input() in tau_diagnostics.h.
+		return r.with_error(code::invalid_state, messages::no_input_provided);
 	}
 	// Build outputs for the step
 	std::map<stream_at, std::string> outputs;
@@ -381,7 +459,8 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		if (!i.serialize_constant(ss, val, i.ctx.type_of(out))) {
 			TAU_LOG_ERROR << "No Boolean algebra element assigned "
 				"to output '" << TAU_TO_STR(out) << "'";
-			return {};
+			return r.with_error(code::invalid_output_stream,
+				"No Boolean algebra element assigned to output");
 		}
 		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
@@ -391,34 +470,41 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		i.update(update);
 	else warn_if_update_dropped<node>(i, output.value());
 
+	// Not an error: no value and no report means the spec asked not to
+	// continue. An empty result that does carry an error is a real failure.
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
-		return {};
+		return r;
 	}
 
-	return outputs;
+	return r.with_assert_check_value(std::move(outputs));
 }
 
 template <NodeType node>
-std::optional<std::map<stream_at, std::string>> api<node>::step(
+result<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i)
 {
 	using tau = tree<node>;
 
-	if (!i.calculate_initial_spec()) return {};
+	result<std::map<stream_at, std::string>> r;
+	if (!i.calculate_initial_spec()) {
+		return r.with_error(code::internal_error, messages::failed_to_calculate_initial_spec);
+	}
 
 	// Step the interpreter
 	auto [output, auto_continue] = i.step();
 	if (!output.has_value()) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
-		return {};
+		// invalid_state is the step-awaiting-input protocol; see
+		// step_awaiting_input() in tau_diagnostics.h.
+		return r.with_error(code::invalid_state, messages::no_input_provided);
 	}
 
 	// Write output values
 	if (!i.write(output.value())) {
 		TAU_LOG_ERROR << "Failed to write outputs";
-		return {};
+		return r.with_error(code::io_error, "Failed to write outputs");
 	}
 
 	// Build outputs for the step
@@ -436,21 +522,27 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		i.update(update);
 	else warn_if_update_dropped<node>(i, output.value());
 
+	// Not an error: no value and no report means the spec asked not to
+	// continue. An empty result that does carry an error is a real failure.
 	if (!auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
-		return {};
+		return r;
 	}
 
-	return outputs;
+	return r.with_assert_check_value(std::move(outputs));
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::simplify(const std::string& expr,
+result<std::string> api<node>::simplify(const std::string& expr,
 	bool use_defaults)
 {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref s = simplify(e, use_defaults); s) return to_str(s);
-	return {};
+	result<std::string> r;
+	TAU_TRY(tref e, get_formula_or_term(expr));
+	tref out = simplify(e, use_defaults);
+	if (!out) {
+		return r.with_error(code::internal_error, "Failed to simplify");
+	}
+	return r.with_assert_check_value(to_str(out));
 }
 
 } // namespace idni::tau_lang

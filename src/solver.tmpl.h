@@ -213,8 +213,10 @@ std::optional<solution<node>> find_solution(equality eq) {
 	return find_solution<node>(eq, substitution, solver_mode::maximum);
 }
 
+// Reports why lgrs failed: no solution is code::unsat, a null equality is
+// code::invalid_argument.
 template <NodeType node>
-std::optional<solution<node>> lgrs(equality eq) {
+result<solution<node>> lgrs(equality eq) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
@@ -225,9 +227,11 @@ std::optional<solution<node>> lgrs(equality eq) {
 
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<solution<node>> r;
+	if (!eq) return r.with_error(code::invalid_argument);
 	if (tau::get(eq).equals_T()) {
 		DBG(LOG_TRACE << "lgrs/solution: {}";)
-		return solution<node>();
+		return r.with_value(solution<node>());
 	}
 
 	DBG(LOG_TRACE << "lgrs/eq: " << LOG_FM(eq) << "\n";)
@@ -235,7 +239,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 	auto s = find_solution<node>(eq);
 	if (!s.has_value()) {
 		DBG(LOG_TRACE << "lgrs/no solution";)
-		return {};
+		return r.with_error(code::unsat, messages::no_solution_found);
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
@@ -248,7 +252,8 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/equality: " << LOG_FM(eq);
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
-	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
+	tref check = normalizer<node>(rewriter::replace<node>(eq, phi))
+							.value_or(nullptr);
 	// check is trace-log-only; a D4 bv-widening cap violation surfaces as
 	// nullptr here, and LOG_FM would dereference it whenever trace
 	// logging is enabled.
@@ -256,7 +261,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 	else LOG_TRACE << "lgrs/check: nullptr (bv-widening cap exceeded)\n";
 #endif // DEBUG
 
-	return phi;
+	return r.with_value(std::move(phi));
 }
 
 // Input iterator enumerating the non-zero minterms of a BF f: every
@@ -1238,13 +1243,18 @@ bool bv_conjs_only_pure_equality(const subtree_set<node>& conjs) {
 }
 
 // entry point for the solver
+// Reports why solve failed: an unsupported clause is code::solver_error,
+// no solution is code::unsat.
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, solver_options options, bool& error) {
+result<solution<node>> solve(tref form, solver_options options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	error = false;  // Initialize error flag
-	if (tau::get(form).equals_T()) return { solution<node>() };
-	if (tau::get(form).equals_F()) return {};
+	result<solution<node>> r;
+	if (!form) return r.with_error(code::invalid_argument);
+	bool error = false;
+	if (tau::get(form).equals_T()) return r.with_value(solution<node>());
+	if (tau::get(form).equals_F())
+		return r.with_error(code::unsat, messages::no_solution_found);
 
 #ifdef DEBUG
 	LOG_TRACE << "solve/form: " << LOG_FM(form);
@@ -1261,12 +1271,13 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	// The solver cannot solve temporally quantified formulas
 	assert(!tau::get(form).find_top(is_temporal_quantifier<node>));
 #endif // DEBUG
-	form = normalize_non_temp<node>(form);
+	form = normalize_non_temp<node>(form).value_or(nullptr);
 	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
 	// surfaces as nullptr here for the first time; propagate it as this
 	// function's own established error convention rather than
 	// dereferencing it below.
-	if (!form) { error = true; return {}; }
+	if (!form) return r.with_error(code::solver_error,
+		messages::internal_error_in_solver);
 	for (tref path : expression_paths<node>(form)) {
 		// collect assignments, i.e. variable = expression
 		// early to simplify solving
@@ -1356,7 +1367,8 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				it->second.insert(conj);
 			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
-		if (error) return {};
+		if (error) return r.with_error(code::solver_error,
+			messages::internal_error_in_solver);
 
 		bool bv_sat = false, skip = false;
 		solution<node> clause_solution;
@@ -1435,17 +1447,17 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				a = bf_reduced_dnf<node>(a);
 				clause_solution.emplace(v, a);
 			}
-			return clause_solution;
+			return r.with_value(std::move(clause_solution));
 		}
 	}
-	return {};
+	return r.with_error(code::unsat, messages::no_solution_found);
 }
 
 template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error) {
+result<solution<node>> solve(const trefs& forms, solver_options options) {
 	using tau = tree<node>;
 
-	return solve<node>(tau::build_wff_and(forms), options, error);
+	return solve<node>(tau::build_wff_and(forms), options);
 }
 
 

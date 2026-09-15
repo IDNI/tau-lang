@@ -31,7 +31,7 @@ using test_node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 using sbf_node_t  = node<bv, sbf_ba>;
 
 // Top-level entry point.
-template bool is_tau_formula_sat<test_node_t>(tref, int_t, bool);
+template result<bool> is_tau_formula_sat<test_node_t>(tref, int_t, bool);
 
 template struct tree    <test_node_t>;
 template struct get_hook<test_node_t>;
@@ -41,8 +41,8 @@ template struct tree    <sbf_node_t>;
 template struct get_hook<sbf_node_t>;
 
 // Normalizer pipeline.
-template tref normalizer                <test_node_t>(const rr<test_node_t>&);
-template tref normalizer                <test_node_t>(tref);
+template result<tref> normalizer   <test_node_t>(const rr<test_node_t>&);
+template result<tref> normalizer   <test_node_t>(tref);
 template tref nso_rr_apply              <test_node_t>(const rewriter::rule&, const tref&);
 template tref nso_rr_apply              <test_node_t>(const rewriter::rules&, tref);
 template tref nso_rr_apply              <test_node_t>(const rr<test_node_t>&);

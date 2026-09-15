@@ -32,7 +32,7 @@ static std::string normalize_blasting_on(const std::string& s) {
 	auto wff = parse_wff(s);
 	if (!wff) return "parse_error";
 	bool saved = bv_blasting; bv_blasting = true;
-	auto r = normalizer<node_t>(wff);
+	auto r = normalizer<node_t>(wff).value_or(nullptr);
 	bv_blasting = saved;
 	return r ? tau::get(r).to_str() : "null";
 }
@@ -41,7 +41,7 @@ static std::string normalize_blasting_off(const std::string& s) {
 	auto wff = parse_wff(s);
 	if (!wff) return "parse_error";
 	bool saved = bv_blasting; bv_blasting = false;
-	auto r = normalizer<node_t>(wff);
+	auto r = normalizer<node_t>(wff).value_or(nullptr);
 	bv_blasting = saved;
 	return r ? tau::get(r).to_str() : "null";
 }

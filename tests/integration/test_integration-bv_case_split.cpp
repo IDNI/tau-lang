@@ -25,7 +25,7 @@ tref parse_wff(const std::string& sample) {
 tref normalized(const std::string& sample, bool on) {
 	split_config c(on);
 	auto wff = parse_wff(sample);
-	return wff ? normalizer<node_t>(wff) : nullptr;
+	return wff ? normalizer<node_t>(wff).value_or(nullptr) : nullptr;
 }
 
 std::string norm(const std::string& sample, bool on) {
@@ -41,7 +41,7 @@ bool agree(const std::string& sample) {
 	if (!off || !on) return false;
 	if (tau::get(off) == tau::get(on)) return true;
 	split_config c(false);
-	return tau::get(normalizer<node_t>(tau::build_wff_equiv(off, on))).equals_T();
+	return tau::get(normalizer<node_t>(tau::build_wff_equiv(off, on)).value_or(nullptr)).equals_T();
 }
 
 strings run_command_spec(bool on) {

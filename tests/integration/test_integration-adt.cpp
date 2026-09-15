@@ -37,7 +37,7 @@
 // confirm the result normalizes to T.
 static bool check_adt_solution(tref eq, const solution<node_t>& sol) {
 	tref substitution = rewriter::replace<node_t>(eq, sol);
-	tref check = normalizer<node_t>(substitution);
+	tref check = normalizer<node_t>(substitution).value_or(nullptr);
 	return tau::get(check).equals_T();
 }
 
@@ -110,8 +110,8 @@ TEST_SUITE("adt integration") {
 			"((x.a = 0 && x.b = 0) || (x.a != 1 || x.b != 1)).");
 		REQUIRE( adt_nso.has_value() );
 		REQUIRE( hand_nso.has_value() );
-		tref adt_res = normalizer<node_t>(adt_nso.value());
-		tref hand_res = normalizer<node_t>(hand_nso.value());
+		tref adt_res = normalizer<node_t>(adt_nso.value()).value_or(nullptr);
+		tref hand_res = normalizer<node_t>(hand_nso.value()).value_or(nullptr);
 		REQUIRE( adt_res != nullptr );
 		REQUIRE( hand_res != nullptr );
 		CHECK( tau::get(adt_res).to_str() == tau::get(hand_res).to_str() );
@@ -123,7 +123,7 @@ TEST_SUITE("adt integration") {
 		tref spec = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "
 			"ex x:Point (x = 0).").value().main->get();
-		CHECK( is_tau_formula_sat<node_t>(spec) );
+		CHECK( is_tau_formula_sat<node_t>(spec).value_or(false) );
 	}
 
 	TEST_CASE("sat: unsatisfiable tuple spec") {
@@ -132,7 +132,7 @@ TEST_SUITE("adt integration") {
 		tref spec = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "
 			"ex x:Point (x = 0 && x != 0).").value().main->get();
-		CHECK( !is_tau_formula_sat<node_t>(spec) );
+		CHECK( !is_tau_formula_sat<node_t>(spec).value_or(false) );
 	}
 
 	TEST_CASE("solver: ADT-typed unknowns") {
@@ -149,9 +149,8 @@ TEST_SUITE("adt integration") {
 			.splitter_one = node_t::ba::splitter_one(sbf_type<node_t>()),
 			.mode = solver_mode::general
 		};
-		bool solve_error = false;
-		auto solution = solve<node_t>(form, options, solve_error);
-		REQUIRE( !solve_error );
+		auto solution = solve<node_t>(form, options);
+		REQUIRE( !report_has_code(solution.report(), code::solver_error) );
 		REQUIRE( solution.has_value() );
 
 		// Solution-inspection API #1: substituting the solution back into

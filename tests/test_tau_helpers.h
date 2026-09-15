@@ -15,7 +15,7 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return std::make_pair(nullptr, nullptr);
 	tref fm = nso_rr.value().main->get();
-	if (do_normalize) fm = normalizer<node_t>(fm);
+	if (do_normalize) fm = normalizer<node_t>(fm).value_or(nullptr);
 	tref s = tau_splitter<bas_pack>(fm, st);
 	return std::make_pair(fm, s);
 }

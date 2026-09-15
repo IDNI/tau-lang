@@ -19,7 +19,7 @@ TEST_SUITE("interpreter") {
 	TEST_CASE("get_interpreter(tref) builds a working interpreter and "
 		  "time_point starts at 0")
 	{
-		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau");
+		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau").value_or(nullptr);
 		REQUIRE(fm);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		REQUIRE(maybe_i.has_value());
@@ -50,7 +50,7 @@ TEST_SUITE("interpreter") {
 		// quantifier, so the resulting normalized formula still has a
 		// free variable and get_interpreter must refuse to build an
 		// interpreter for it.
-		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau && x = 0");
+		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau && x = 0").value_or(nullptr);
 		REQUIRE(fm);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
@@ -58,7 +58,7 @@ TEST_SUITE("interpreter") {
 
 	TEST_CASE("get_interpreter(tref) rejects an unsatisfiable formula") {
 		tref fm = tau_api::get_formula(
-			"o[t]:tau = i[t]:tau && o[t]:tau != i[t]:tau");
+			"o[t]:tau = i[t]:tau && o[t]:tau != i[t]:tau").value_or(nullptr);
 		REQUIRE(fm);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
@@ -71,7 +71,7 @@ TEST_SUITE("interpreter") {
 		// input streams into a single bf value the equality can compare
 		// against.
 		tref fm = tau_api::get_formula(
-			"o[t]:tau = i1[t]:tau & i2[t]:tau");
+			"o[t]:tau = i1[t]:tau & i2[t]:tau").value_or(nullptr);
 		REQUIRE(fm);
 		auto maybe_i = tau_api::get_interpreter(fm);
 		REQUIRE(maybe_i.has_value());

@@ -70,21 +70,21 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 	using node = tau_lang::node<BAs...>;
 	if (spec_clause) {
 		// We are dealing with a temporal formula
-		DBG(assert(is_tau_impl<node>(splitter, fm));)
+		DBG(assert(is_tau_impl<node>(splitter, fm).value_or(false));)
 		tref new_spec_clause = normalize_with_temp_simp<node>(
-			rewriter::replace<node>(spec_clause, fm, splitter));
+			rewriter::replace<node>(spec_clause, fm, splitter)).value_or(nullptr);
 		// nullptr when the definitions in the clause do not settle;
 		// no normalized clause means no splitter to report.
 		if (!new_spec_clause) return false;
-		if (is_tau_formula_sat<node>(new_spec_clause)) {
-			if (!are_tau_equivalent<node>(new_spec_clause, spec_clause))
+		if (is_tau_formula_sat<node>(new_spec_clause).value_or(false)) {
+			if (!are_tau_equivalent<node>(new_spec_clause, spec_clause).value_or(false))
 				return true;
 		}
 	} else {
 		// We are dealing with a non-temporal formula
-		if (is_non_temp_nso_satisfiable<node>(splitter)
+		if (is_non_temp_nso_satisfiable<node>(splitter).value_or(false)
 			&& !are_nso_equivalent<node>(splitter, fm)) {
-			DBG(assert(is_nso_impl<node>(splitter, fm));)
+			DBG(assert(is_nso_impl<node>(splitter, fm).value_or(false));)
 			return true;
 		}
 	}
@@ -430,7 +430,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 		bool is_redundant = false;
 		for (size_t j = 0; j < clauses.size(); ++j) {
 			if ((size_t) i == j) continue;
-			if (is_tau_impl<node>(clauses[j], clauses[i])) {
+			if (is_tau_impl<node>(clauses[j], clauses[i]).value_or(false)) {
 				clauses.erase(clauses.begin() + i);
 				--i, is_redundant = true;
 				break;

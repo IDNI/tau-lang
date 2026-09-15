@@ -53,7 +53,7 @@ tref bf(const std::string& sample) {
 // Parses a well-formed formula; used for the comparison hooks, which are
 // dispatched from the wff-level hooks in src/hooks.tmpl.h.
 tref wff(const std::string& sample) {
-	tref src = tau_api::get_formula(sample);
+	tref src = tau_api::get_formula(sample).value_or(nullptr);
 	if (src == nullptr) TAU_LOG_ERROR << "wff parsing failed for: " << sample;
 	REQUIRE(src != nullptr);
 	return src;
@@ -624,21 +624,21 @@ TEST_SUITE("Cleanup") {
 TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
 
 	TEST_CASE("x / x is the top element at x = 0") {
-		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])")));
-		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])")));
+		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])")).value_or(false));
+		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])")).value_or(false));
 	}
 
 	TEST_CASE("x / x is one for x != 0") {
-		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])")));
+		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])")).value_or(false));
 	}
 
 	TEST_CASE("0 / x is the top element at x = 0") {
-		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {255}:bv[8])")));
-		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {0}:bv[8])")));
+		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {255}:bv[8])")).value_or(false));
+		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {0}:bv[8])")).value_or(false));
 	}
 
 	TEST_CASE("0 / x is zero for x != 0") {
-		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> {0}:bv[8] / x = {0}:bv[8])")));
+		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> {0}:bv[8] / x = {0}:bv[8])")).value_or(false));
 	}
 
 	TEST_CASE("0 / constant still folds") {
@@ -647,7 +647,7 @@ TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
 	}
 
 	TEST_CASE("top element % 0 is the top element through sat") {
-		CHECK(tau_api::sat(wff("{255}:bv[8] % 0 = {255}:bv[8]")));
-		CHECK(!tau_api::sat(wff("{255}:bv[8] % 0 = {1}:bv[8]")));
+		CHECK(tau_api::sat(wff("{255}:bv[8] % 0 = {255}:bv[8]")).value_or(false));
+		CHECK(!tau_api::sat(wff("{255}:bv[8] % 0 = {1}:bv[8]")).value_or(false));
 	}
 }

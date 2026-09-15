@@ -29,7 +29,7 @@ tref parse_wff(const std::string& sample) {
 std::string norm(const std::string& sample, bool on) {
 	qf_config c(on);
 	auto wff = parse_wff(sample);
-	return wff ? tau::get(normalizer<node_t>(wff)).to_str() : "parse_error";
+	return wff ? tau::get(normalizer<node_t>(wff).value_or(nullptr)).to_str() : "parse_error";
 }
 
 // A subset-sum over k guarded contributions: bv[1] selectors s_i, bv[8]

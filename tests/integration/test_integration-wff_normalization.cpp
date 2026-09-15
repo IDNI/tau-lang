@@ -38,7 +38,7 @@ TEST_SUITE("Normalizer") {
 	TEST_CASE("8") {
 		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = normalize_non_temp<node_t>(fm);
+		tref res = normalize_non_temp<node_t>(fm).value_or(nullptr);
 		CHECK(tau::get(res).to_str() == "u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau");
 	}
 	// Block-driver tests: exercise anti_prenex_block through normalize
@@ -65,7 +65,7 @@ TEST_SUITE("Normalizer") {
 	TEST_CASE("ex_quantifier_eliminated") {
 		// ∃x. x|y = 0 → y = 0 (x is eliminated; result has no ex-quantifier)
 		tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
-		tref res = normalize_non_temp<node_t>(fm);
+		tref res = normalize_non_temp<node_t>(fm).value_or(nullptr);
 		CHECK(!tau::get(res).find_top(is<node_t, tau::wff_ex>));
 	}
 }
@@ -473,7 +473,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		tref fm = get_nso_rr("ex y ex x (x:bv[8] * y:bv[8] ="
 			" { 1 }:bv[8] && q(x)).").value().main->get();
 		REQUIRE( fm != nullptr );
-		tref res = normalize_non_temp<node_t>(fm);
+		tref res = normalize_non_temp<node_t>(fm).value_or(nullptr);
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 		CHECK( !tau::get(res).equals_T() );
@@ -535,7 +535,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		REQUIRE( fm != nullptr );
 		// Give the constant its internal `always` binder, the shape the
 		// normalizer actually produces for it (see TEST_CASE("8")).
-		tref with_binder = normalize_non_temp<node_t>(fm);
+		tref with_binder = normalize_non_temp<node_t>(fm).value_or(nullptr);
 		REQUIRE( with_binder != nullptr );
 		const std::string before = tau::get(with_binder).to_str();
 		tref res = scope_out_independent_conjuncts<node_t>(with_binder);
@@ -599,7 +599,7 @@ TEST_SUITE("Normalizer bv sibling-taint") {
 		// Use the api entry (inference + io_var resolution +
 		// normalizer), the path the interpreter-built formulas take
 		// and the one the R6 residues were observed through.
-		tref res = api<node_t>::normalize_formula(spec);
+		tref res = api<node_t>::normalize_formula(spec).value_or(nullptr);
 		REQUIRE( res != nullptr );
 		return tau::get(res).find_top(
 			is_quantifier<node_t>) == nullptr;

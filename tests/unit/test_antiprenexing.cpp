@@ -1191,7 +1191,7 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		const size_t ty = tau::get(var).get_ba_type();
 		tref g = rewriter::replace<node_t>(res, var,
 			one ? tau::_1_trimmed(ty) : tau::_0_trimmed(ty));
-		return tau::get(normalize_non_temp<node_t>(tau::reget(g)))
+		return tau::get(normalize_non_temp<node_t>(tau::reget(g)).value_or(nullptr))
 			.equals_T();
 	}
 
@@ -1271,7 +1271,7 @@ TEST_SUITE("PureBaBvEliminability") {
 		// kept quantifier.
 		tref fm = get_nso_rr("ex x (x:bv[1] != { 0 }:bv[1] "
 			"&& x:bv[1] != { 1 }:bv[1]).").value().main->get();
-		tref r = normalize_non_temp<node_t>(fm);
+		tref r = normalize_non_temp<node_t>(fm).value_or(nullptr);
 		CHECK_FALSE( tau::get(r).equals_T() );
 	}
 }

@@ -58,7 +58,7 @@ static std::string blast_normalize(const std::string& sample) {
 	};
 	if (tau::get(wff).find_top(has_arithmetic) && blasted == wff)
 		return "not_blasted";
-	auto result = normalizer<node_t>(blasted);
+	auto result = normalizer<node_t>(blasted).value_or(nullptr);
 	if (!result) return "null";
 	return tau::get(result).to_str();
 }
@@ -1125,7 +1125,7 @@ static std::string blast_normalize_interval(const std::string& sample) {
 		return "no_interval_after_inference";
 	auto blasted = bv_predicate_blasting<node_t>(typed);
 	if (!blasted) return "blast_error";
-	auto result = normalizer<node_t>(blasted);
+	auto result = normalizer<node_t>(blasted).value_or(nullptr);
 	if (!result) return "null";
 	return tau::get(result).to_str();
 }
@@ -1598,7 +1598,7 @@ TEST_SUITE("aux var elimination") {
 	// end; wider/other shapes are shelved below, each for one of two
 	// distinct reasons:
 	//  - add/>= at bv[32] and up: blast_formula() itself is fast; the wall
-	//    is in normalizer<node_t>()/cvc5's own solving, not in
+	//    is in normalizer<node_t>().value_or(nullptr)/cvc5's own solving, not in
 	//    quantify_aux_vars.
 	//  - the nested (bvsub -> shr/shl -> bvadd) shape: the wall is inside
 	//    quantify_aux_vars' own BDD fold (bdd_and_many/bdd_ex over a
