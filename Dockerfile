@@ -126,6 +126,11 @@ COPY --from=source /tau-lang /tau-lang
 
 WORKDIR /tau-lang
 
+# The presets name clang and clang++. The versioned package provides
+# only clang-19 and clang++-19.
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
+	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+
 # Argument NIGHTLY=yes is used to build nightly packages (works only if RELEASE=yes)
 ARG NIGHTLY=no
 
