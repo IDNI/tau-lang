@@ -380,7 +380,14 @@ tref api<node>::substitute(tref expr, tref that, tref with) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return nullptr;
 	}
-	return tau::get(expr).substitute(that, with);
+	// The library's one substitution, then — exactly as before — the
+	// canonical ids the API publishes: a replacement holding a binder of
+	// either kind brings its own ids into the expression, and the pass
+	// renumbers the result by depth over the shared id space.
+	tref result = term_handle<node>::substitute(expr, that, with);
+	if (tau::get(with).find_top(is_logical_or_functional_quant<node>))
+		return canonize_quantifier_ids<node>(result);
+	return result;
 }
 
 template <NodeType node>
@@ -396,6 +403,7 @@ tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 	// pair's replacement is re-matched by another pair, so {x/y, y/x}
 	// swaps instead of collapsing both variables into one.
 	bool e = is_term(expr);
+	bool canonize = false;
 	subtree_map<node, tref> changes;
 	for (auto [that, with] : that_with) {
 		if (!that || !with) {
@@ -412,8 +420,11 @@ tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 			TAU_LOG_ERROR << "Invalid argument(s)";
 			return nullptr;
 		}
+		if (tau::get(with).find_top(is_logical_or_functional_quant<node>))
+			canonize = true;
 	}
-	return tau::get(expr).substitute(changes);
+	tref result = term_handle<node>::substitute(expr, changes);
+	return canonize ? canonize_quantifier_ids<node>(result) : result;
 }
 
 // Normal forms

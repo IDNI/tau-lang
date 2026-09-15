@@ -1006,27 +1006,6 @@ tref tree<node>::untype(tref term) {
 	return ch.empty() ? tau::get(retyped) : tau::get(retyped, ch);
 }
 
-template<NodeType node>
-tref tree<node>::substitute(tref that, tref with) const {
-	// If the replacement subtree 'with' contains a quantifier, the quantifier
-	// ids need to be recalculated after substitution; otherwise just use simple replace.
-	if (tau::get(with).find_top(is_logical_or_functional_quant<node>)) {
-		return canonize_quantifier_ids<node>(this->replace(that, with));
-	} else return this->replace(that, with);
-}
-
-template<NodeType node>
-tref tree<node>::substitute(const auto& changes) const {
-	bool canonize = false;
-	for (auto& [k, v] : changes) {
-		if (tau::get(v).find_top(is_logical_or_functional_quant<node>))
-			canonize = true;
-	}
-	if (canonize) {
-		return canonize_quantifier_ids<node>(this->replace(changes));
-	} else return this->replace(changes);
-}
-
 // Combine the count predicates in query[] into one that accepts a node
 // iff any of them does. query is captured by pointer and must outlive
 // the returned predicate.
@@ -1163,16 +1142,6 @@ std::vector<trefs> tree<node>::select_all_until_by_predicates(
 template<NodeType node>
 tref untype(tref term) {
 	return tree<node>::untype(term);
-}
-
-template <NodeType node>
-tref substitute(tref formula, tref that, tref with) {
-	return tree<node>::get(formula).substitute(that, with);
-}
-
-template<NodeType node>
-tref substitute(tref formula, const auto& changes) {
-	return tree<node>::get(formula).substitute(changes);
 }
 
 } // namespace idni::tau_lang

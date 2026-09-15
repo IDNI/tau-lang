@@ -506,11 +506,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Return a copy of @p term with all BA type annotations stripped. */
 	static tref untype(tref term);
 
-	/** @brief Replace @p that with @p with in this subtree. */
-	tref substitute(tref that, tref with) const;
-	/** @brief Apply all substitutions in @p changes to this subtree. */
-	tref substitute(const auto& changes) const;
-
 	// -----------------------------------------------------------------------
 	// Predicate-based selection helpers
 	// -----------------------------------------------------------------------
@@ -997,14 +992,6 @@ private:
 /** @brief Return a copy of @p term with all BA type annotations stripped. */
 template <NodeType node>
 tref untype(tref term);
-
-/** @brief Return @p formula with @p that replaced by @p with. */
-template <NodeType node>
-tref substitute(tref formula, tref that, tref with);
-
-/** @brief Return @p formula with all substitutions in @p changes applied. */
-template <NodeType node>
-tref substitute(tref formula, const auto& changes);
 
 // ---------------------------------------------------------------------------
 // Printer free functions (tau_tree_printers.tmpl.h)

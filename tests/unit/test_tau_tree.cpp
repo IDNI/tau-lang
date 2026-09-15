@@ -197,16 +197,18 @@ TEST_SUITE("canonize_quantifier_ids") {
 	}
 
 	TEST_CASE("substitute re-canonicalizes across the two kinds") {
-		// tree::substitute re-runs the pass whenever the replacement
-		// holds a functional quantifier; the pass now handles one, so
-		// the enclosing formula binder is renumbered over the shared
-		// depth count instead of colliding with the subscript.
+		// The API re-runs the pass whenever the replacement holds a
+		// functional quantifier — the library's substitution leaves
+		// the ids it finds alone — and the pass handles one, so the
+		// enclosing formula binder is renumbered over the shared depth
+		// count instead of colliding with the subscript.
 		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
 		tref z = tau::build_variable(std::string("z"), tau_type_id<node_t>());
 		tref fm = tau::build_wff_ex(x,
 			tau::build_wff_and(x_eq_0("x"), x_eq_0("y")), true);
 		tref with = tau::build_bf_fex(z, x_eq_0_bf("z"), false);
-		tref got = tau::get(fm).substitute(x_eq_0_bf("y"), with);
+		tref got = canonize_quantifier_ids<node_t>(
+			term_handle<node_t>::substitute(fm, x_eq_0_bf("y"), with));
 
 		tref one = tau::build_variable(std::string("1"), tau_type_id<node_t>());
 		tref two = tau::build_variable(std::string("2"), tau_type_id<node_t>());
