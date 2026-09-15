@@ -855,6 +855,26 @@ TEST_SUITE("BDD term_handle substitute") {
 		CHECK(calls == 0);
 	}
 
+	TEST_CASE("a shared reference argument is re-emitted once per call") {
+		tref x = vr("x");
+		// The SAME `ref_arg` node under two different references. The
+		// traversal's own cache does not cover it — a node the walk
+		// changes never enters that cache — so the call-wide argument
+		// memo is what keeps the hook to one run.
+		tref psi = wff("x & v1 = 0");
+		tref f = build_bf_and<node_t>(ref_term(trefs{ psi }),
+			ref_term(trefs{ bf("v9"), psi }));
+		size_t calls = 0;
+		auto count = [&calls](tref a) { ++calls; return a; };
+		tref s = hbdd::substitute(f, x, bf("z"), {}, count);
+		CHECK(s != f);
+		CHECK(calls == 1);
+	}
+
+	// A backed term whose LEAF holds a backed term of the same order has
+	// its own case, below the gc suite: it pins a `BDD_ID` inside a BDD
+	// leaf for the rest of the process, which that suite counts.
+
 	TEST_CASE("the substitution is simultaneous: a key inside the replacement stays") {
 		tref x = vr("x"), a = vr("a"), b = vr("b");
 		tref res = hbdd::substitute(bf("x & a"), x, bf("x & b"));
@@ -1079,6 +1099,43 @@ TEST_SUITE("BDD handle creation") {
 		// tau::get(tau_res->get()).print(std::cout << "res: ") << "\n";
 		CHECK(tau::get(tau_res->get()).to_str() ==
 			"sv&(wx&(yz|y'z')|w'x'&(yz|y'z'))|s'v'&(wx&(yz|y'z')|w'x'&(yz|y'z'))");
+	}
+
+}
+
+TEST_SUITE("BDD term_handle substitute through a nested BDD_ID") {
+	using bdd  = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+
+	// Below the gc suite on purpose: this case pins a `BDD_ID` inside a
+	// BDD leaf, and the BDD store is never swept, so the universe keeps
+	// that entry for the rest of the process.
+	TEST_CASE("a backed term whose leaf holds a backed term of the same order") {
+		tref x = vr("x"), p = vr("p"), c = vr("c"), z = vr("z");
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		bdd::order o {{x, 0}, {p, 1}};
+		// x·c as a node of `o`, inside a reference argument, which
+		// makes the whole reference a LEAF of an outer BDD over the
+		// same order: x is a decision variable of BOTH and is
+		// composed out of both by one call.
+		tref inner = hbdd::convert_to_tau_node(bf("x & c"), o);
+		REQUIRE(hbdd::is_bdd_backed(inner));
+		tref f = hbdd::convert_to_tau_node(rewriter::replace<node_t>(
+			bf("x & p & r(a)"), bf("a"), inner), o);
+		REQUIRE(hbdd::is_bdd_backed(f));
+		REQUIRE(bdd::is_ordered(hbdd::convert_to_handle(f).get(), o));
+		tref s = hbdd::substitute(f, x, bf("z"), o);
+		CHECK(hbdd::is_bdd_backed(s));
+		const trefs& fv = get_free_vars<node_t>(s);
+		CHECK(!std::binary_search(fv.begin(), fv.end(), x,
+			tau::subtree_less));
+		for (tref v : { p, c, z })
+			CHECK(std::binary_search(fv.begin(), fv.end(), v,
+				tau::subtree_less));
+		// the finish reaches the nested node too
+		CHECK(!has_bdd_id(hbdd::convert_to_tau_terms(s)));
 	}
 
 }

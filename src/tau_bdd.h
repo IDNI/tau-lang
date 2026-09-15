@@ -558,15 +558,17 @@ struct tau_term_bdd_handle {
 	 * it is not free, the subtree is not entered, and an untouched subtree
 	 * comes back as the SAME tref — @p formula itself when no key is free
 	 * in it. The cost is that a spine node — a same-connective
-	 * continuation of a chain — asked for its free variables gets a row of
-	 * its own.
+	 * continuation of a chain, in a formula (`wff_and`, `wff_or`) or in a
+	 * term (`bf_and`, `bf_or`) alike — is asked for its free variables
+	 * here and so gets a row of its own.
 	 *
 	 * @p with IS PREPARED ONCE, before the walk: a `BDD_ID` anywhere
 	 * inside it is spelled out (`convert_to_tau_terms`), and a logical or
 	 * functional quantifier inside it has its bound variables RENAMED
 	 * APART (`rename_apart`), so no binder of @p formula can share an id
-	 * with a binder of @p with on any path. Binder ids are left canonical
-	 * for the caller to restore.
+	 * with a binder of @p with on any path. @p formula's own binder ids
+	 * are left exactly as they are; restoring canonical ids over the
+	 * result is the caller's step.
 	 *
 	 * A BDD-BACKED term is rewritten in the store: its LEAVES first, by
 	 * this same substitution, and then ONE simultaneous `bdd_compose` for
@@ -672,6 +674,12 @@ private:
 		/// capture check is the one reader, so a Release build leaves
 		/// it empty.
 		trefs free_in_with;
+		/// ONE memo per rewrite: a reference argument → what the walk
+		/// made of it, the hook included. Keyed by subtree identity,
+		/// so the copies of a shared argument — the leaves of a BDD
+		/// and the tree body reach the same one — are rewritten and
+		/// re-emitted once per call.
+		mutable subtree_unordered_map<node, tref> argument_memo;
 	};
 	/** @brief The walk of `substitute`, over a prepared @p s. */
 	static tref substitute(tref formula, const substitution& s,

@@ -1577,19 +1577,30 @@ tref tau_term_bdd_handle<node>::substitute(tref formula, const substitution& s,
 				find_ba_type<node>(n));
 		}
 		// A reference argument is rewritten whole and re-emitted
-		// through the hook, ONCE: the walk stops on the change, and a
-		// nested reference inside the argument is finished by the
-		// recursive call before the outer hook runs.
+		// through the hook, ONCE per call: the call-wide memo holds
+		// what the argument became, so a shared one is rewritten and
+		// re-emitted a single time however many references and BDD
+		// leaves reach it. A nested reference inside the argument is
+		// finished by the recursive call before the outer hook runs.
 		if (t.is(tau::ref_arg)) {
-			tref a = tau::trim_right_sibling(t.first());
-			tref a2 = substitute(a, s, o, on_argument);
-			if (a2 == a) return n;
-			return tau::get(t.value, on_argument(a2));
+			const tref a = tau::trim_right_sibling(t.first());
+			auto it = s.argument_memo.find(a);
+			if (it == s.argument_memo.end()) {
+				tref r = substitute(a, s, o, on_argument);
+				if (r != a) r = on_argument(r);
+				it = s.argument_memo.emplace(a, r).first;
+			}
+			if (it->second == a) return n;
+			return tau::get(t.value, it->second);
 		}
 		// A binder on the path is where capture would happen. The
 		// replacements are renamed apart and their free variables are
-		// free at the site, so it cannot; Debug checks it.
-		DBG(if (is_logical_or_functional_quant<node>(n))
+		// free at the site, so it cannot; Debug checks it. Only under
+		// the occurrence guard: without it every subtree is entered,
+		// including ones that hold no occurrence, where a binder over
+		// a free variable of a replacement is no capture at all.
+		DBG(if (s.keys_are_variables
+			&& is_logical_or_functional_quant<node>(n))
 			assert(!std::binary_search(s.free_in_with.begin(),
 				s.free_in_with.end(),
 				tau::trim_right_sibling(t.first()),
