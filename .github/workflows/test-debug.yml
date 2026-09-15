@@ -19,17 +19,17 @@ jobs:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # ./dev and the image build both need the parser submodule
           submodules: recursive
 
       # container-driver builder; required for --cache-to type=gha
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
       # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v3
+      - uses: crazy-max/ghaction-github-runtime@v4
 
       # cvc5 and boost are built from source and cached under the shared
       # 'tau-deps' scope. Change the scope name to force a rebuild.
@@ -61,14 +61,14 @@ jobs:
       # bump to force a rebuild of the cached ~/.tau dependency tree
       TAU_DEPS_EPOCH: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
       - name: Restore ~/.tau (cvc5 + boost)
         id: cache-tau
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ~/.tau
           key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
@@ -85,7 +85,7 @@ jobs:
       # discard the deps and force a rebuild on the next run
       - name: Save ~/.tau (cvc5 + boost)
         if: steps.cache-tau.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/.tau
           key: ${{ steps.cache-tau.outputs.cache-primary-key }}
