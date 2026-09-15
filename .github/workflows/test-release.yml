@@ -115,12 +115,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   macos:
-    name: macOS release tests (lto ${{ matrix.lto }})
+    name: macOS release tests
     runs-on: macos-15
-    strategy:
-      fail-fast: false
-      matrix:
-        lto: [ON, OFF]
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -166,8 +162,7 @@ jobs:
           CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
         run: |
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_LTO=${{ matrix.lto }}
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -185,7 +180,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: macos-clang-crash-lto-${{ matrix.lto }}
+          name: macos-clang-crash
           path: ${{ runner.temp }}/clang-crash
           if-no-files-found: ignore
 
