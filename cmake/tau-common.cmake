@@ -43,10 +43,12 @@ else()
 	set(TAU_FAT_LTO "")
 endif()
 
+option(TAU_LTO "Build the library and the executables with link time optimization" ON)
+
 # LTO only pays off when something LTO-links it; test targets are all -fno-lto.
 # -ffat-lto-objects is what lets those -fno-lto targets link an LTO-built
 # library, and em++ has no equivalent, so wasm takes the LTO-off path whole.
-if ((TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
+if (TAU_LTO AND (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
 	AND NOT EMSCRIPTEN)
 	set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
@@ -56,7 +58,7 @@ else()
 	set(TAU_LTO_COMPILE_FLAGS "")
 	set(TAU_LTO_COMPILE "")
 	set(TAU_LTO_LINK "")
-	message(STATUS "LTO off: nothing links with LTO here (tests are -fno-lto)")
+	message(STATUS "LTO off")
 endif()
 
 set(TAU_DEVEL_OPTIONS "-O0;-DDEBUG;-g0")
