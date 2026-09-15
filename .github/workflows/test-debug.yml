@@ -15,7 +15,7 @@ jobs:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # ./dev and the image build both need the parser submodule
           submodules: recursive
@@ -57,7 +57,7 @@ jobs:
       # bump to force a rebuild of the cached ~/.tau dependency tree
       TAU_DEPS_EPOCH: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
