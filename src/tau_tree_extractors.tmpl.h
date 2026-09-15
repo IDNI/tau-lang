@@ -1068,7 +1068,11 @@ trefs get_free_vars_appearance_order(tref expression) {
 			scoped.extract(tau::trim(n));
 		}
 	};
-	pre_order<node>(expression).visit_unique(f, all, up);
+	// Every occurrence is walked, not every distinct node: `scoped` holds
+	// the binders entered on the way down, so what a variable contributes
+	// depends on where it sits. The result is deduplicated by the
+	// `subtree_vec_contains` test above instead.
+	pre_order<node>(expression).visit(f, all, up);
 	return free_vars;
 }
 
