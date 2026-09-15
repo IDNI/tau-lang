@@ -1,0 +1,108 @@
+# Exact (widened) bitvector arithmetic: the bv-widening option.
+#
+# See demos/README.md for how to run this script.
+
+# demo_2.3 showed that bitvector arithmetic is modular: every intermediate
+# result wraps silently at the width of its type, so 16 * 16 is 0 at 8 bits.
+# The README's "checked and saturating arithmetic" section builds guards
+# around that, and admits one gap: a checked multiplication cannot be
+# recovered after the fact, because the product itself has already wrapped.
+#
+# The bv-widening option closes that gap. When it is on, every atomic formula
+# (an equality, a comparison, an interval) computes its arithmetic exactly,
+# at whatever width avoids overflow, and truncates only once -- when a result
+# is stored into a variable or stream of a declared width. The option is off
+# by default; nothing changes until it is switched on:
+
+get bv-widening
+get bv-max-width
+
+# The zero-divisor query from the end of demo_2.3, modular first. A nonzero
+# 8-bit value can square to zero, since 16 * 16 = 256 wraps to 0:
+
+sat x:bv[8] * x:bv[8] = {0}:bv[8] && x:bv[8] != {0}:bv[8]
+
+# With widening on, the product is the exact 256, never 0, so no such x:
+
+set bv-widening on
+sat x:bv[8] * x:bv[8] = {0}:bv[8] && x:bv[8] != {0}:bv[8]
+
+# n shows what the option does to a formula. Each operand is zero-extended
+# to the width the product needs (8 + 8 = 16 bits), the multiplication is
+# retyped to that width, and a comparison is decided there exactly:
+
+n a:bv[8] * b:bv[8] <= c:bv[8]
+
+# An equality with a bare variable on one side is an assignment: the other
+# side is computed wide and then cast back down, truncating, to the
+# variable's own width. So o = a * b still stores the low 8 bits, exactly as
+# in the default mode ...
+
+n o:bv[8] = a:bv[8] * b:bv[8]
+
+# ... but anything BETWEEN the arithmetic and the store now sees the exact
+# value. That is the guard-free checked multiply: min sees 256 and clamps it
+# to 200, where the default mode would have clamped the wrapped 0 to 0:
+
+solve o:bv[8] = min({16}:bv[8] * {16}:bv[8], {200}:bv[8])
+
+# The same idiom is a guard-free saturating add. The sum 200 + 100 = 300
+# needs 9 bits, which the mode provides, so min clamps at 200 instead of
+# seeing the wrapped 44:
+
+solve o:bv[8] = min({200}:bv[8] + {100}:bv[8], {200}:bv[8])
+
+# Every arithmetic operator takes part: here a remainder of the exact
+# product, 256 % 7 = 4, where the modular product 0 leaves remainder 0:
+
+solve o:bv[8] = ({16}:bv[8] * {16}:bv[8]) % {7}:bv[8]
+
+# Comparisons compare exactly on both sides, with no truncation at all, so
+# a property that only holds over the naturals becomes provable at 8 bits:
+
+valid all x (x:bv[8] * x:bv[8] >= x:bv[8])
+
+# Subtraction is the exception the README documents: it never grows on its
+# own, so an underflow still wraps. Guard it with >= exactly as before:
+
+solve o:bv[8] = {10}:bv[8] - {20}:bv[8]
+
+# A cast is a boundary for the mode. Whatever it wraps computes as in the
+# default mode, at its own width, so a cast is how a specific modular
+# computation is kept inside an otherwise exact atom. The product below
+# wraps to 0 because of the cast, so 0 + 10 <= 20 holds ...
+
+n (bv[8]) ({16}:bv[8] * {16}:bv[8]) + {10}:bv[8] <= {20}:bv[8]
+
+# ... whereas without it the exact 256 + 10 does not:
+
+n {16}:bv[8] * {16}:bv[8] + {10}:bv[8] <= {20}:bv[8]
+
+# bv-max-width caps how wide the mode may compute. A formula needing more
+# than the cap fails loudly and conservatively: sat answers F, with an error
+# explaining that the cap, not the formula, produced the answer. The
+# product here needs 16 bits:
+
+set bv-max-width 12
+sat o:bv[8] = x:bv[8] * y:bv[8]
+set bv-max-width 1024
+sat o:bv[8] = x:bv[8] * y:bv[8]
+
+# The mode reaches executed specifications too (demo_3.4 runs the modular
+# versions of these). A saturating accumulator no longer needs the
+# complement trick: min clamps the exact sum. Inputs 200, 100 and 7 give
+# 200, then 200 + 100 = 300 clamped to 250, then 250 + 7 clamped to 250:
+
+i1:bv[8] := in file("fixture/bv8-length_3.in").
+o1:bv[8] := out console.
+r o1[0] = min(i1[0], {250}:bv[8]) && o1[t] = min(o1[t-1] + i1[t], {250}:bv[8])
+q
+
+# Switching the option off restores the modular semantics for everything
+# that follows; the command line twins are --bv-widening and --bv-max-width,
+# which also apply when a specification file is run directly.
+
+set bv-widening off
+sat x:bv[8] * x:bv[8] = {0}:bv[8] && x:bv[8] != {0}:bv[8]
+
+quit

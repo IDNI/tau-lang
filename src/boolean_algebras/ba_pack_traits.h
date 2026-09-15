@@ -265,6 +265,43 @@ Form pack_case_split_quantifiers(Form form) {
 }
 
 /**
+ * @brief Elaborate @p form's arithmetic atoms through the exact-width
+ * widening of every BA that offers it.
+ *
+ * No BA in the pack declaring the capability means no BA widens this
+ * formula, so this returns @p form unchanged -- the same "absent means
+ * ordinary" convention as @ref pack_preprocess.
+ */
+template <typename Node, typename Form>
+Form pack_widen_arithmetic(Form form) {
+	Form out = form;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_widen_arithmetic<Node, BA>)
+			out = ba_descriptor<BA, Node>::widen_arithmetic(out);
+	});
+	return out;
+}
+
+/**
+ * @brief Whether any BA's arithmetic widening is currently active.
+ *
+ * A cache whose entries are built by ordinary node construction (which runs
+ * a widening-capable BA's own fit-gated folding hooks, not just @ref
+ * pack_widen_arithmetic) must key on this, or a stale entry built under one
+ * setting is replayed after the setting flips. False when no BA in the pack
+ * declares the capability.
+ */
+template <typename Node>
+bool pack_widening_active() {
+	bool active = false;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_widening_state<Node, BA>)
+			active = active || ba_descriptor<BA, Node>::widening_state();
+	});
+	return active;
+}
+
+/**
  * @brief `true` when some BA in the pack says its own preprocessing
  * (@ref pack_preprocess) can still make progress on @p form.
  *

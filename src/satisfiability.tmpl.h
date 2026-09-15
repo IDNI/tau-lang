@@ -730,8 +730,11 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 	// Eliminate all variables
 	if (auto normed = normalize_non_temp<node>(uconst_ctns);
 		normed.has_value()) uconst_ctns = normed.value();
-	else LOG_ERROR << "get_uninterpreted_constants_constraints: "
-		"normalization failed; leaving constraints unreduced.";
+	else {
+		LOG_ERROR << "get_uninterpreted_constants_constraints: "
+			"normalization failed; propagating failure.";
+		return nullptr;
+	}
 	// Now add all uninterpreted constants which disappeared during elimination of variables
 	// and set them to 0
 	trefs left_uconsts = tau::get(uconst_ctns).select_top(
@@ -1531,15 +1534,22 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @param aw Original (pre-continuation) always-part.
  * @param max_st_lookback Greatest lookback among the original
  * `sometimes` clauses.
- * @return The conjunction `aw@l && ... && aw@(l+max_st_lookback-1)`,
- * where `l` is @p aw's lookback, or `nullptr` when @p max_st_lookback
- * is `0`.
+ * @return A `result<tref>` carrying the conjunction
+ * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is @p aw's lookback;
+ * an engaged value of `T` is the legitimate "no initial segment at all"
+ * answer for @p max_st_lookback `0`, the identity callers conjoin in as an
+ * empty conjunct rather than a failure. A failed result -- e.g. on a D4
+ * bv-widening cap violation -- means normalizing the segment failed:
+ * callers must propagate that failure rather than continue without the
+ * initial run, since silently dropping those conjuncts only ever makes the
+ * remaining formula EASIER to satisfy (an anti-conservative answer).
  * @endinternal
  */
 template <NodeType node>
-tref make_initial_run(tref aw, const int_t max_st_lookback) {
+result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using tau = tree<node>;
+	result<tref> r;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
 	const int_t t = get_max_shift<node>(io_vars);
 
@@ -1547,16 +1557,13 @@ tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	for (int_t i = 0; i < max_st_lookback; ++i) {
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, t + i);
 		if (run) {
-			auto normed = normalize_non_temp<node>(
-				tau::build_wff_and(run, current_aw));
-			if (!normed.has_value()) {
-				LOG_ERROR << "make_initial_run: normalization failed";
-				return nullptr;
-			}
-			run = normed.value();
+			TAU_TRY(tref normed, normalize_non_temp<node>(
+				tau::build_wff_and(run, current_aw)));
+			run = normed;
 		} else run = current_aw;
 	}
-	return run;
+	// A `nullptr` value reads as a failed result, not the empty run.
+	return r.with_value(run ? run : tau::_T());
 }
 
 /**
@@ -1611,17 +1618,6 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	LOG_DEBUG << "Begin to_unbounded_continuation";
 
 	using tau = tree<node>;
-	// Every caller below already treats a null/unsatisfiable formula the
-	// same way normalization failure should be treated here: fail toward
-	// "not satisfiable yet", not toward a fabricated formula.
-	auto normalize_nt = [](tref t) -> tref {
-		auto normed = normalize_non_temp<node>(t);
-		if (!normed.has_value()) {
-			LOG_ERROR << "to_unbounded_continuation: normalization failed";
-			return nullptr;
-		}
-		return normed.value();
-	};
 	DBG({ auto nbc = has_no_boolean_combs_of_models<node>(ubd_aw_continuation);
 		assert(nbc.has_value() && nbc.value()); })
 	DBG(assert(is_child<node>(ev_var_flags, tau::wff_sometimes));)
@@ -1652,8 +1648,16 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 					st_flags, st_io_vars, time_point - 1);
 	st_io_vars = tau::get(st_flags).select_top(is_child<node, tau::io_var>);
 
-	// Create the initial phase of the always part
-	tref run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
+	// Create the initial phase of the always part. A failed result (as
+	// opposed to an engaged `T`, which just means "no initial segment",
+	// the max_st_lookback == 0 case) is a normalization failure -- a D4
+	// bv-widening cap violation -- and must be propagated like every other
+	// guarded site below: continuing with `run = nullptr` would silently
+	// DROP the initial-run conjuncts and make the remaining search easier,
+	// i.e. answer satisfiable/realizable when it must not.
+	auto initial_run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
+	if (!initial_run) return nullptr;
+	tref run = initial_run.value();
 	// Check if flag can be raised up to the highest initial condition + 2
 	// which corresponds to checking the sometimes statement up to time point
 	// of the highest initial condition + 1
@@ -1663,11 +1667,16 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
 	for (int_t i = s; i <= flag_boundary; ++i) {
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
-		if (run) run = tau::build_wff_and(run, current_aw);
+		// `T` is the empty-run identity here, matching the old nullptr case.
+		if (!tau::get(run).equals_T())
+			run = tau::build_wff_and(run, current_aw);
 		else run = current_aw;
 		auto current_flag = fm_at_time_point<node>(st_flags, st_io_vars, i);
-		auto normed_run = normalize_nt(
-					tau::build_wff_and(run, current_flag));
+		auto normed_run = normalize_non_temp<node>(
+					tau::build_wff_and(run, current_flag)).value_or(nullptr);
+		// A cap violation surfaces as nullptr; propagate it rather than
+		// dereferencing it below.
+		if (!normed_run) return nullptr;
 		auto sat = is_run_satisfiable<node>(normed_run);
 		if (sat.has_value() && sat.value()) {
 			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
@@ -1681,8 +1690,12 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
-		run = normalize_nt(tau::build_wff_and(run,
-					tau::build_wff_neg(current_flag)));
+		run = normalize_non_temp<node>(tau::build_wff_and(run,
+					tau::build_wff_neg(current_flag))).value_or(nullptr);
+		// A cap violation surfaces as nullptr; return it immediately --
+		// falling into the next iteration's `equals_T()` check would
+		// silently restart from `current_aw`, masking the failure.
+		if (!run) return nullptr;
 	}
 	// Since flag could not be raised in the initial segment, we now check if it
 	// can be raised at all. To this end we calculate chi_inf
@@ -1701,7 +1714,10 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	// Find fixpoint of chi after highest initial condition
 	auto [chi_inf, steps] = find_fixpoint_chi<node>(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
-	chi_inf = normalize_nt(chi_inf);
+	chi_inf = normalize_non_temp<node>(chi_inf).value_or(nullptr);
+	// A cap violation surfaces as nullptr; propagate it rather than
+	// dereferencing it below.
+	if (!chi_inf) return nullptr;
 
 	// LOG_TRACE << "Fixpoint chi after normalize: " << chi_inf;
 	if (tau::get(chi_inf).equals_F()) {
@@ -1767,8 +1783,11 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		auto current_flag
 			= fm_at_time_point<node>(st_flags, st_io_vars, i);
 
-		auto normed_run = normalize_nt(
-					tau::build_wff_and(run, current_flag));
+		auto normed_run = normalize_non_temp<node>(
+					tau::build_wff_and(run, current_flag)).value_or(nullptr);
+		// A cap violation surfaces as nullptr; propagate it rather than
+		// dereferencing it below.
+		if (!normed_run) return nullptr;
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
 		auto sat = is_run_satisfiable<node>(normed_run);
@@ -1785,8 +1804,12 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
-		run = normalize_nt(tau::build_wff_and(run,
-					tau::build_wff_neg(current_flag)));
+		run = normalize_non_temp<node>(tau::build_wff_and(run,
+					tau::build_wff_neg(current_flag))).value_or(nullptr);
+		// A cap violation surfaces as nullptr; return it immediately --
+		// this unbounded loop rebuilds `run` unconditionally next
+		// iteration, unlike the bounded loop above.
+		if (!run) return nullptr;
 	}
 }
 

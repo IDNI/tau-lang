@@ -11,6 +11,10 @@
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/stl/bind_map.h>
 
+#include <optional>
+#include <sstream>
+#include <string_view>
+
 #include "tau.h"
 #include "preferences.h"
 
@@ -47,6 +51,73 @@ using vector_output_stream = idni::tau_lang::vector_output_stream;
 using input_streams_remap = idni::tau_lang::input_streams_remap;
 using output_streams_remap = idni::tau_lang::output_streams_remap;
 
+using report_t = idni::tau_lang::report;
+using code_t   = idni::tau_lang::code;
+
+// A report flattened into something nanobind can hand to Python. The three
+// display bands are kept apart so a caller can show errors without losing
+// the warnings and the timing/count scopes that came with a success.
+struct py_report {
+	std::vector<std::string> errors;
+	std::vector<std::string> warnings;
+	std::vector<std::string> infos;
+	std::vector<int> codes;          // raw code tag per report node
+	std::vector<std::string> code_names;
+	bool has_error = false;
+	// True when the report carries code::invalid_state, the
+	// step-awaiting-input protocol (tau_diagnostics.h).
+	bool awaiting_input = false;
+	std::string text;                // operator<< rendering
+};
+
+static py_report make_py_report(const report_t& rep) {
+	py_report out;
+	out.has_error = rep.has_error();
+	out.awaiting_input = idni::tau_lang::step_awaiting_input(rep);
+	for (const auto& n : rep.nodes()) {
+		out.codes.push_back(static_cast<int>(n.tag));
+		out.code_names.emplace_back(idni::diagnostics::code_name(n.tag));
+	}
+	// These are data, not display, so render them without colour. `text`
+	// keeps it: that field is the human rendering.
+	static const idni::term::colors plain(false);
+	rep.print(idni::diagnostics::sinks{
+		.error   = [&](std::string_view l) { out.errors.emplace_back(l); },
+		.warning = [&](std::string_view l) { out.warnings.emplace_back(l); },
+		.info    = [&](std::string_view l) { out.infos.emplace_back(l); },
+	}, plain);
+	std::ostringstream os;
+	os << rep;
+	out.text = os.str();
+	return out;
+}
+
+// Value plus report. Deliberately not an Optional and deliberately not a
+// raise: raising on error throws away the warnings and the timed scopes that
+// a *successful* call accumulates, which is exactly what a consumer wanting
+// both the error and the timings needs. `unwrap()` is there for callers that
+// do prefer an exception.
+//
+// The value is type-erased: nanobind binds concrete types, so a py_result<T>
+// would need one Python class per T.
+struct py_result {
+	nb::object value;
+	py_report report;
+	bool has_value = false;
+};
+
+// Converts eagerly, so the value owns its data and outlives this result.
+template <typename T>
+static py_result to_py_result(idni::tau_lang::result<T>&& r) {
+	py_result out;
+	out.report = make_py_report(r.report());
+	out.has_value = r.has_value();
+	out.value = out.has_value
+		? nb::cast(std::move(r).value(), nb::rv_policy::move)
+		: nb::none();
+	return out;
+}
+
 NB_MAKE_OPAQUE(input_streams_remap);
 NB_MAKE_OPAQUE(output_streams_remap);
 
@@ -57,16 +128,13 @@ bool leak_warnings() {
 	return false;
 }
 
-// Drops a result<T>'s report and adapts its value/error state to the
-// nullable shape the Python surface exposed before result<T> existed.
-template <typename T>
-std::optional<T> to_optional(idni::tau_lang::result<T> r) {
-	if (!r.has_value()) return std::nullopt;
-	return std::move(r).value();
-}
-
 NB_MODULE(tau, m) {
 	nb::set_leak_warnings(leak_warnings());
+
+	// The CLI's --color, for embedders. report fields are always plain
+	// (see make_py_report); this governs what the engine writes to stdout.
+	m.def("set_colors", [](bool state) { tau_api::set_colors(state); },
+		"state"_a, "Enable or disable ANSI colour in engine output.");
 
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")
@@ -263,9 +331,9 @@ NB_MODULE(tau, m) {
 		// ── PWR / runtime methods ────────────────────────────────────
 		.def("can_extend",
 			[](interpreter_t& i, const std::string& psi_str) {
-				auto psi = to_optional(tau_api::get_formula(psi_str));
-				if (!psi) return false;
-				return i.can_extend(*psi);
+				auto psi = tau_api::get_formula(psi_str);
+				if (!psi.has_value()) return false;
+				return i.can_extend(psi.value());
 			}, "psi"_a,
 			"Per-revision realisability pre-check via syntactic PWR.")
 		.def("admissible_outputs",
@@ -286,9 +354,9 @@ NB_MODULE(tau, m) {
 		// fires between turns (via the user's call cadence), never mid-token.
 		.def("update",
 			[](interpreter_t& i, const std::string& psi_str) {
-				auto psi = to_optional(tau_api::get_formula(psi_str));
-				if (!psi) return false;
-				i.update(*psi);
+				auto psi = tau_api::get_formula(psi_str);
+				if (!psi.has_value()) return false;
+				i.update(psi.value());
 				return true;
 			}, "psi"_a,
 			"Apply pointwise revision: merge the running spec with `psi`.");
@@ -296,13 +364,13 @@ NB_MODULE(tau, m) {
 	// REAL oracle — check realisability of a spec or LTL formula.
 	m.def("is_realizable",
 		[](const std::string& spec_str) -> bool {
-			auto spec = to_optional(tau_api::get_spec(spec_str));
-			if (!spec) {
+			auto spec = tau_api::get_spec(spec_str);
+			if (!spec.has_value()) {
 				// Try formula parse as fallback (LTL-only inputs).
-				spec = to_optional(tau_api::get_formula(spec_str));
-				if (!spec) return false;
+				spec = tau_api::get_formula(spec_str);
+				if (!spec.has_value()) return false;
 			}
-			return to_optional(tau_api::realizable(*spec)).value_or(false);
+			return tau_api::realizable(spec.value()).value_or(false);
 		}, "spec"_a,
 		"Check realisability of a tau spec / LTL formula (REAL oracle).");
 
@@ -312,27 +380,63 @@ NB_MODULE(tau, m) {
 		-> std::string
 		{
 			using tau_t = idni::tau_lang::tree<node_t>;
-			auto spec = to_optional(tau_api::get_spec(spec_str));
-			if (!spec) return "";
+			auto spec = tau_api::get_spec(spec_str);
+			if (!spec.has_value()) return "";
 			idni::tref strengthened = idni::tau_lang::apply_preferences<
-				node_t>(*spec, po);
+				node_t>(spec.value(), po);
 			if (strengthened == nullptr) return "";
 			return tau_t::get(strengthened).to_str();
 		}, "spec"_a, "po"_a,
 		"Strengthen a spec with operator preferences (lex-priority).");
 
+	// Diagnostics
+	nb::class_<py_report>(m, "report",
+		"Structured diagnostics for one api call: the three display "
+		"bands kept apart, plus the raw code tags.")
+		.def_ro("errors", &py_report::errors)
+		.def_ro("warnings", &py_report::warnings)
+		.def_ro("infos", &py_report::infos)
+		.def_ro("codes", &py_report::codes)
+		.def_ro("code_names", &py_report::code_names)
+		.def_ro("has_error", &py_report::has_error)
+		.def_ro("awaiting_input", &py_report::awaiting_input,
+			"True when the call stopped because a step needs an "
+			"input value (code::invalid_state).")
+		.def("__str__", [](const py_report& r) { return r.text; })
+		.def("__repr__", [](const py_report& r) {
+			return "<tau.report errors=" +
+				std::to_string(r.errors.size()) + " warnings=" +
+				std::to_string(r.warnings.size()) + ">";
+		});
+
+	nb::class_<py_result>(m, "result",
+		"What an api call produced plus its diagnostics report. "
+		"Falsy when there is no value; `value` is None then.")
+		.def_ro("value", &py_result::value)
+		.def_ro("report", &py_result::report)
+		.def("__bool__", [](const py_result& r) { return r.has_value; })
+		.def("unwrap", [](const py_result& r) {
+			if (!r.has_value)
+				throw std::runtime_error(r.report.text);
+			return r.value;
+		}, "The value, or raise RuntimeError with the report.")
+		.def("__repr__", [](const py_result& r) {
+			return std::string("<tau.result ") + (r.has_value
+				? "ok" : "empty") + " errors=" +
+				std::to_string(r.report.errors.size()) + ">";
+		});
+
 	// API functions
 	m.def("get_interpreter",
-		[](const std::string& spec) -> std::optional<interpreter_t> {
-			return to_optional(tau_api::get_interpreter(spec));
+		[](const std::string& spec) {
+			return to_py_result(tau_api::get_interpreter(spec));
 		}, "specification"_a,
-		"Create an interpreter from a specification string.");
+		"Create an interpreter from a specification string. "
+		"Returns a result carrying the value and report.");
 
 	m.def("get_interpreter",
-		[](const std::string& spec, interpreter_options& opts)
-			-> std::optional<interpreter_t>
-		{
-			return to_optional(tau_api::get_interpreter(spec, opts));
+		[](const std::string& spec, interpreter_options& opts) {
+			return to_py_result(tau_api::get_interpreter(spec, opts));
 		}, "specification"_a, "options"_a,
 		"Create an interpreter from a specification string with options.");
 
@@ -345,17 +449,14 @@ NB_MODULE(tau, m) {
 	m.def("step",
 		[](interpreter_t& i,
 			const std::map<stream_at, std::string>& inputs)
-			-> std::optional<std::map<stream_at, std::string>>
 		{
-			return to_optional(tau_api::step(i, inputs));
+			return to_py_result(tau_api::step(i, inputs));
 		}, "interpreter"_a, "inputs"_a,
 		"Step the interpreter with given inputs.");
 
 	m.def("step",
-		[](interpreter_t& i)
-			-> std::optional<std::map<stream_at, std::string>>
-		{
-			return to_optional(tau_api::step(i));
+		[](interpreter_t& i) {
+			return to_py_result(tau_api::step(i));
 		}, "interpreter"_a,
 		"Step the interpreter without inputs (uses remapped streams).");
 
@@ -366,12 +467,11 @@ NB_MODULE(tau, m) {
 		[](interpreter_t& i,
 		   const std::map<stream_at, std::string>& inputs,
 		   const std::optional<std::string>& u_str)
-		-> std::optional<std::map<stream_at, std::string>>
 		{
-			auto result = to_optional(tau_api::step(i, inputs));
+			auto result = to_py_result(tau_api::step(i, inputs));
 			if (u_str.has_value() && !u_str->empty()) {
-				auto u = to_optional(tau_api::get_formula(*u_str));
-				if (u) i.update(*u);
+				auto u = tau_api::get_formula(*u_str);
+				if (u.has_value()) i.update(u.value());
 			}
 			return result;
 		}, "interpreter"_a, "inputs"_a, "u"_a = std::nullopt,

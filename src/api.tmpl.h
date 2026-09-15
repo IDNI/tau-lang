@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
 
@@ -154,6 +154,11 @@ void api<node>::set_max_enum_steps(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_max_probe_steps(size_t n) {
+	max_probe_steps = n;
+}
+
+template <NodeType node>
 void api<node>::set_max_rewrite_rounds(size_t n) {
 	max_rewrite_rounds = n;
 }
@@ -221,6 +226,13 @@ void api<node>::set_ba_decision_pins(size_t n) {
 template <NodeType node>
 void api<node>::set_highlighting(bool highlighting) {
 	pretty_printer_highlighting = highlighting;
+}
+
+// pretty_printer_highlighting above is the tree printer; this is the terminal
+// colour used by diagnostics rendering (idni::TC, term_colors.h).
+template <NodeType node>
+void api<node>::set_colors(bool colors) {
+	idni::TC.set(colors);
 }
 
 template <NodeType node>
@@ -355,12 +367,12 @@ result<tref> api<node>::get_spec(const std::string& src) {
 			TAU_LOG_ERROR << error;
 			r.error(code::parse_error, error);
 		}
-		if (!r.has_error()) r.error(code::parse_error, "Failed to parse spec");
+		if (!r.has_error()) r.error(code::parse_error, messages::failed_to_parse_spec);
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
 	if (tref s = spec.get(); s) r = s;
-	else r.error(code::parse_error, "Failed to parse spec");
+	else r.error(code::parse_error, messages::failed_to_parse_spec);
 	DBG(assert(r.is_well_formed());)
 	return r;
 }

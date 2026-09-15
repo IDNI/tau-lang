@@ -48,6 +48,11 @@ add_test(NAME "test_repl-limit_effect-enumsteps_giveup"
 set_tests_properties("test_repl-limit_effect-enumsteps_giveup" PROPERTIES
 	PASS_REGULAR_EXPRESSION "no fixed point and no loop after 1 enumeration steps")
 
+# The untyped saturation probe cap (--max-probe-steps) has no REPL-level
+# effect test: the REPL's call-type validation rejects every type-blocked
+# recurrence before calculate_fixed_point runs, so its exhausted-probe
+# verdict is exercised from test_integration-nso_rr_fixed_point instead.
+
 # spec-size-warn: any accepted update trips a 1-char threshold. The update
 # stream u takes its value from i1; the interactive run is driven on stdin
 # (-X legacy REPL, the tty-free branch), same pattern as test_repl-run_cmd.

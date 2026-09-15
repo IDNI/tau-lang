@@ -96,6 +96,19 @@ add_repl_test(option_alias-maxdefpasses
 	"get maxdefpasses"        "defpasses:")
 add_repl_test(option_alias-maxenumsteps
 	"get maxenumsteps"        "enumsteps:")
+add_repl_test(option_alias-maxprobesteps
+	"get maxprobesteps"       "probesteps:")
+# CLI-mirroring aliases (the CLI long name with the dashes stripped).
+add_repl_test(option_alias-bacomponentfactoring
+	"get bacomponentfactoring" "factoring:")
+add_repl_test(option_alias-badecisionpins
+	"get badecisionpins"      "decisionpins:")
+# bv's own options, addressed bv-case-split / bv-case-split-max-tests, with
+# no dashless core alias, same shape as bv_blastdepth above.
+add_repl_test(option_alias-bv_case_split
+	"get bv-case-split" "bv-case-split:")
+add_repl_test(option_alias-bv_case_split_max_tests
+	"get bv-case-split-max-tests" "bv-case-split-max-tests:")
 add_repl_test(option_alias-maxrewriterounds
 	"get maxrewriterounds"    "rewriterounds:")
 add_repl_test(option_alias-gcgrowthfactor
@@ -114,3 +127,10 @@ add_repl_test_fail(option_numeric-enable_refused
 	"enable fixpointsteps" "takes a count")
 add_repl_test_fail(option_numeric-toggle_refused
 	"toggle gcgrowth" "takes a count")
+
+# bv's own options, addressed bv-widening / bv-max-width, with no core alias
+# and no short form, same shape as bv_blastdepth above.
+add_repl_test(option_alias-bv_widening
+	"get bv-widening" "bv-widening:")
+add_repl_test(option_alias-bv_max_width
+	"get bv-max-width" "bv-max-width:")

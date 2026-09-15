@@ -168,6 +168,29 @@ TEST_SUITE("rec relations fixed point") {
 			"a(x).";
 		CHECK( fp_test_fail(sample) );
 	}
+
+	TEST_CASE("probe cap exhausted still reports the blocked rule") {
+		// Same shape as above, but with the untyped probe capped at a
+		// single step (the max_probe_steps global behind api::set_max_probe_steps,
+		// --max-probe-steps / REPL probesteps): the probe rewrites once,
+		// hits the cap and is treated as diverging, so the verdict comes
+		// from the exhausted-probe branch of calculate_fixed_point rather
+		// than from natural stabilization. Either way the enumeration
+		// gives up (nullptr), which is what fp_test_fail checks. The cap
+		// is restored so the other cases keep the shipped default.
+		const size_t saved = max_probe_steps;
+		max_probe_steps = 1;
+		const char* sample =
+			"a[n](x:sbf) := b[n-1](x)."
+			"b[n](x:tau) := a[n-1](x)."
+			"a(x).";
+		CHECK( fp_test_fail(sample) );
+		// An unlimited cap (0) must not change the verdict either: the
+		// probe on this well-founded shape stabilizes on its own.
+		max_probe_steps = 0;
+		CHECK( fp_test_fail(sample) );
+		max_probe_steps = saved;
+	}
 }
 
 TEST_SUITE("rec relations well foundedness") {

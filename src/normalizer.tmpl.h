@@ -32,6 +32,16 @@ inline size_t max_def_passes = 0;
 /// REPL `enumsteps`, or `api::set_max_enum_steps`.
 inline size_t max_enum_steps = 0;
 
+/// Cap on the untyped saturation probe `calculate_fixed_point` runs over a
+/// residual recurrence reference to tell a type-blocked rule from a
+/// legitimately uninterpreted one; 0 = unlimited. A diverging probe (e.g.
+/// cross-family type-blocked mutual recursion) never stabilizes, so the
+/// default is a finite 10000 rather than unlimited; the effective cap is the
+/// smaller of this and a finite `max_enum_steps`. Runtime parameter by
+/// policy: set via `--max-probe-steps`, REPL `probesteps`, or
+/// `api::set_max_probe_steps`.
+inline size_t max_probe_steps = 10000;
+
 /**
  * @internal
  * @brief Descriptor of a single reference offset.
@@ -372,7 +382,7 @@ result<tref> normalize(tref form) {
 	}
 	if (!result) {
 		return r.with_assert_check_error(code::internal_error,
-			"temporal layer normalization produced no formula");
+			messages::normalization_produced_no_formula);
 	}
 #ifdef TAU_CACHE
 	cache.emplace(cache_key, result);
@@ -387,8 +397,19 @@ result<tref> normalize(tref form) {
 template <NodeType node>
 result<tref> normalize_non_temp(tref fm) {
 	result<tref> r;
+	// Guard against a nullptr ARGUMENT, not just a nullptr result: a
+	// growing set of call sites feed one normalization's (possibly null)
+	// result straight back in as another call's fm.
 	if (!fm) {
 		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+	}
+	// Widen before the cache lookup, so a cached result is keyed on the
+	// widened formula; a BA's own width-cap violation returns nullptr
+	// here and must propagate rather than crash downstream.
+	fm = pack_widen_arithmetic<node>(fm);
+	if (!fm) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::non_temp_normalization_produced_no_formula);
 	}
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
@@ -1495,6 +1516,13 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	if (!fm) {
 		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
+	// Widen before anything else runs; a BA's own width-cap violation
+	// returns nullptr and must propagate rather than crash downstream.
+	fm = pack_widen_arithmetic<node>(fm);
+	if (!fm) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::temp_normalization_produced_no_formula);
+	}
 	// Merge top-level (G A) && (G B) → G(A && B) before any further
 	// processing.  G is universal, so G(A) ∧ G(B) ≡ G(A ∧ B), and the
 	// downstream pipeline (transform_to_execution, ltl_aba) only finds
@@ -1625,6 +1653,10 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	}
 	DBG(assert(nn != nullptr);)
 	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
+	if (!nn) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::temp_normalization_produced_no_formula);
+	}
 	return r.with_assert_check_value(nn);
 }
 
@@ -2135,13 +2167,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// each family is internally consistent on its own, so
 	// validate_rr_case_types passes both, the typed loop leaves a
 	// residual, and the untyped probe would rewrite a->b->a->b... with
-	// no fixed point, forever). Reuse max_enum_steps when the caller set
-	// a finite bound (0 means unlimited); otherwise fall back to a
-	// generous but finite constant so the guard that exists to turn a
-	// hang into a fast error cannot itself hang.
-	static constexpr size_t probe_saturation_fallback_cap = 10000;
-	const size_t probe_cap = max_enum_steps
-		? max_enum_steps : probe_saturation_fallback_cap;
+	// no fixed point, forever). The cap is the runtime `max_probe_steps`
+	// (finite by default, so the guard that exists to turn a hang into a
+	// fast error cannot itself hang), tightened by `max_enum_steps` when
+	// the caller bounded the enumeration itself; 0 means unlimited for
+	// either.
+	const size_t unlimited = std::numeric_limits<size_t>::max();
+	const size_t probe_cap = std::min(
+		max_probe_steps ? max_probe_steps : unlimited,
+		max_enum_steps ? max_enum_steps : unlimited);
 	subtree_unordered_set<node> legit_uninterpreted;
 
 	// Whether any rule application has ever rewritten an enumerated step.

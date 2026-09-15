@@ -72,9 +72,9 @@ cli::options tau_options() {
 	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
 		.set_description("use legacy terminal REPL instead of FTXUI");
 	opts["status"] = cli::option("status", 's', true)
-		.set_description("display status");
+		.set_description("display status (enabled by default)");
 	opts["color"] = cli::option("color", 'c', true)
-		.set_description("use colors");
+		.set_description("use colors (enabled by default)");
 	DBG(opts["debug"] = cli::option("debug", 'd', true)
 		.set_description("debug mode");)
 	opts["experimental"] = cli::option("experimental", 'x', false)
@@ -94,7 +94,7 @@ cli::options tau_options() {
 			"anti-prenexing (0 = unlimited)");
 	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
 		.set_description("decided tau-algebra rows whose key tree is kept "
-			"alive across the step sweep (0 = none)");
+			"alive across the step sweep (default 4096, 0 = none)");
 	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
 		.set_description("cap anti-prenexing quantifier-block driver "
 			"rounds (0 = unlimited)");
@@ -119,6 +119,9 @@ cli::options tau_options() {
 	opts["max-def-passes"] = cli::option("max-def-passes", 'P', "0")
 		.set_description("cap definition-expansion passes "
 			"(0 = unlimited)");
+	opts["max-probe-steps"] = cli::option("max-probe-steps", 'M', "10000")
+		.set_description("cap the untyped saturation probe over a residual "
+			"recurrence reference (default 10000, 0 = unlimited)");
 	opts["max-enum-steps"] = cli::option("max-enum-steps", 'E', "0")
 		.set_description("cap recurrence-relation enumeration steps "
 			"(0 = unlimited)");
@@ -140,10 +143,11 @@ cli::options tau_options() {
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default 4096; 0 = unbounded)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
-		.set_description("tree-node count floor before gc may trigger");
+		.set_description("tree-node count floor before gc may trigger "
+			"(default 256)");
 	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
 		.set_description("gc triggers when node count grows by this "
-			"factor since last sweep (<= 0 disables gc)");
+			"factor since last sweep (default 1.5; <= 0 disables gc)");
 	// BA-declared options: one CLI flag per option a BA in the configured
 	// pack declares about itself, registered as --<family>-<option> (e.g.
 	// --bv-blasting), with default and description taken from the BA's own
@@ -321,6 +325,7 @@ int main(int argc, char** argv) {
 	tau_api::set_max_simplify_rounds(optnum("max-simplify-rounds"));
 	tau_api::set_max_def_passes(optnum("max-def-passes"));
 	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
+	tau_api::set_max_probe_steps(optnum("max-probe-steps"));
 	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
 	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
 	tau_api::set_max_cover_products(optnum("max-cover-products"));

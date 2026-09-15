@@ -1,0 +1,121 @@
+name: Release Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux packages
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v3
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v3
+
+      # --load is needed: the container-driver builder does not populate the
+      # local image store. Packages land in ~/.tau/packages.
+      - name: Build image with release packages
+        run: |
+          ./dev docker packages --load \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # upload-artifact globs literally and will not expand ~,
+      # so hand it an absolute path through the env
+      - name: Locate Linux packages
+        run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux
+          path: ${{ env.PKG_DIR }}
+
+  macos:
+    name: macOS packages
+    runs-on: macos-15
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+      # bump to force a rebuild of the cached ~/.tau dependency tree
+      TAU_DEPS_EPOCH: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
+      - name: Cache ~/.tau (cvc5 + boost)
+        id: cache-tau
+        uses: actions/cache@v4
+        with:
+          path: ~/.tau
+          key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
+
+      - name: Build cvc5
+        if: steps.cache-tau.outputs.cache-hit != 'true'
+        run: ./dev dep-cvc5.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Build boost
+        if: steps.cache-tau.outputs.cache-hit != 'true'
+        run: ./dev dep-boost.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Build macOS packages (.dmg + .zip)
+        run: ./dev preset release-packages-macos -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # upload-artifact globs literally and will not expand ~,
+      # so hand it an absolute path through the env
+      - name: Locate macOS packages
+        run: echo "PKG_DIR=$HOME/.tau/packages" >> "$GITHUB_ENV"
+
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos
+          path: ${{ env.PKG_DIR }}
+
+  publish:
+    name: Publish release
+    needs: [ linux, macos ]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # merge-multiple flattens both artifacts into one directory
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: packages
+
+      - name: Read version and date
+        run: |
+          echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
+          echo "date_iso=$(date +%F)" >> $GITHUB_ENV
+
+      - name: List collected packages
+        run: ls -la packages/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ env.version }}"
+          name: "Tau Language Framework ${{ env.version }}"
+          body: "Tau Language Framework ${{ env.version }} release ${{ env.date_iso }} commit ${{ github.sha }}"
+          draft: true
+          prerelease: true
+          files: packages/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

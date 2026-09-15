@@ -22,3 +22,6 @@ if(_tau_skip)
 else()
 	add_repl_test(enable_cmd-bv_case_split "enable bv-case-split. get bv-case-split" "bv-case-split: *on")
 endif()
+
+add_repl_test(enable_cmd-bvwidening "enable bv-widening. get bv-widening"
+	"bv-widening: *on")

@@ -18,21 +18,47 @@ using attr = diag::attr;
 using diag_sink = diag::sink;
 using diag_sinks = diag::sinks;
 
+// Static message strings, mirroring idni::parser_strings::messages. Use
+// these instead of repeating the same literal across error sites.
+struct messages {
+	using sv = std::string_view;
+	static constexpr sv failed_to_parse_spec
+		= "Failed to parse spec";
+	static constexpr sv normalization_produced_no_formula
+		= "normalization produced no formula";
+	static constexpr sv non_temp_normalization_produced_no_formula
+		= "non-temporal normalization produced no formula";
+	static constexpr sv temp_normalization_produced_no_formula
+		= "temporal normalization produced no formula";
+	static constexpr sv execution_transform_produced_no_formula
+		= "execution transform produced no formula";
+	static constexpr sv failed_to_build_rewriting_rules
+		= "Failed to build rewriting rules from specification";
+	static constexpr sv failed_to_substitute = "Failed to substitute";
+	static constexpr sv failed_to_calculate_initial_spec
+		= "Failed to calculate initial spec";
+	static constexpr sv no_input_provided = "No input provided";
+	static constexpr sv auto_continue_is_false = "Auto continue is false";
+	static constexpr sv no_solution_found = "No solution found";
+	static constexpr sv internal_error_in_solver
+		= "Internal error in solver";
+};
+
 // Gates per-rule application/hit accounting in nso_rr_apply(rule, tref);
 // off by default since it costs a map lookup per rewrite. Set alongside the
 // REPL/CLI "benchmarks" option so a benchmark run also gets rule counts.
 inline bool rule_counting = false;
 
-inline bool step_awaiting_input(const report& rep) {
-	for (const auto& n : rep.nodes())
-		if (n.tag == code::invalid_state) return true;
+// True when the report carries a node tagged @p c.
+inline bool report_has_code(const report& rep, code c) {
+	for (const auto& n : rep.nodes()) if (n.tag == c) return true;
 	return false;
 }
 
-inline bool report_has_code(const report& rep, code c) {
-	for (const auto& n : rep.nodes())
-		if (n.tag == c) return true;
-	return false;
+// True when a step stopped because it needs input. invalid_state is reserved
+// for exactly that: a completed step never carries it.
+inline bool step_awaiting_input(const report& rep) {
+	return report_has_code(rep, code::invalid_state);
 }
 
 } // namespace idni::tau_lang

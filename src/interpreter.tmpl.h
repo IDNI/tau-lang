@@ -1830,10 +1830,12 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		}
 		LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
 
-		// Eliminate added quantifiers
+		// Eliminate added quantifiers; drop this alternative rather than
+		// pushing an un-eliminated formula when normalization fails (e.g.
+		// a bv-widening cap violation, already logged by the pass).
 		auto normalized = normalize_non_temp<node>(step_ubt_ctn);
-		part_alts.push_back(normalized.has_value()
-			? normalized.value() : step_ubt_ctn);
+		if (normalized.has_value())
+			part_alts.push_back(normalized.value());
 		}
 		upd_ubt_ctn.push_back(std::move(part_alts));
 	}
@@ -2032,6 +2034,10 @@ result<tref> interpreter<node>::get_executable_spec(
 	// compute model for uninterpreted constants and solve it
 	tref constraints = get_uninterpreted_constants_constraints<node>(
 		executable, io_vars, start_time);
+	if (!constraints) {
+		return r.with_assert_check_error(code::unsat,
+			"Uninterpreted-constant constraints failed to normalize");
+	}
 	if (tau::get(constraints).equals_F()) {
 		return r.with_assert_check_error(code::unsat,
 			"Uninterpreted-constant constraints are unsatisfiable");
@@ -2196,7 +2202,10 @@ std::optional<typename interpreter<node>::update_plan>
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
 	{
 		auto nr = normalizer<node>(shifted_update);
-		if (!nr.has_value()) return {};
+		if (!nr.has_value()) {
+			LOG_WARNING << "No update performed: normalization failed\n";
+			return {};
+		}
 		shifted_update = nr.value();
 	}
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";

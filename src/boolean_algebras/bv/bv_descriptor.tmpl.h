@@ -143,7 +143,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	// `auto` return keeps the solution type out of the generic fold.
 
 	/** @brief Solve @p form with bv's own solver. */
-	static auto solve(tref form) { return solve_bv<node_t>(form); }
+	// Exact arithmetic must see the widened atoms before cvc5 does.
+	static auto solve(tref form) -> decltype(solve_bv<node_t>(form)) {
+		form = widen_arithmetic(form);
+		if (!form) return std::nullopt;
+		return solve_bv<node_t>(form);
+	}
 
 	/**
 	 * @brief `true` when bv can solve @p form at all.
@@ -161,7 +166,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * cvc5 answering unknown, and translation failing, both mean "no definite
 	 * answer" -- never "unsatisfiable".
 	 */
+	// Exact arithmetic must see the widened atoms before cvc5 does.
 	static std::optional<bool> sat_status(tref form) {
+		form = widen_arithmetic(form);
+		if (!form) return std::nullopt;
 		auto status = bv_formula_sat_status<node_t>(form);
 		if (status == bv_sat_status::sat) return true;
 		if (status == bv_sat_status::unsat) return false;
@@ -186,6 +194,22 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return bv_case_split_enabled()
 			? bv_case_split_quantifiers<node_t>(n) : n;
 	}
+
+	/**
+	 * @brief Elaborate bitvector arithmetic atoms to an overflow-free width;
+	 * returns @p fm unchanged when `bv_widening` is disabled.
+	 */
+	static tref widen_arithmetic(tref fm) {
+		return bv_widening ? widen_bv_arithmetic<node_t>(fm) : fm;
+	}
+
+	/**
+	 * @brief Whether `bv_widening` is currently on -- read (not applied) by
+	 * callers that must key a cache on it, since it also gates the
+	 * construction-time fit-gated folding hooks (bv_ba_hooks.tmpl.h), not
+	 * just @ref widen_arithmetic.
+	 */
+	static bool widening_state() { return bv_widening; }
 
 	/**
 	 * @brief Set bv's OWN preprocessing switch (`bv_blasting`), not the
@@ -222,12 +246,18 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_qf_decision_option(bool enabled) {
 		bv_quantifier_free_decision = enabled;
 	}
+	static bool get_widening_option() { return bv_widening; }
+	static void set_widening_option(bool enabled) { bv_widening = enabled; }
+	static size_t get_max_width_option() { return bv_max_width; }
+	static void set_max_width_option(size_t n) {
+		if (n) bv_max_width = n;
+	}
 	/// @}
 
 	/**
 	 * @brief bv's own CLI/REPL options, addressed as `bv-blasting`,
-	 * `bv-blastdepth`, `bv-case-split`, `bv-case-split-max-tests` and
-	 * `bv-quantifier-free-decision`.
+	 * `bv-blastdepth`, `bv-case-split`, `bv-case-split-max-tests`,
+	 * `bv-quantifier-free-decision`, `bv-widening` and `bv-max-width`.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
@@ -240,8 +270,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * (heuristics/bv_case_split.h), which only bv's own case-split pass
 	 * (@ref case_split_quantifiers) reads. `quantifier-free-decision`
 	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h).
+	 * `widening` and `max-width` mirror `bv_widening` and `bv_max_width`
+	 * (heuristics/bv_widening.h), read by @ref widen_arithmetic.
 	 */
-	static std::array<ba_option, 5> options() {
+	static std::array<ba_option, 7> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -270,6 +302,16 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				nullptr, nullptr,
 				"decide a closed bitvector formula whose binders are all "
 				"of one kind quantifier-free (off by default)" },
+			{ "widening", ba_option_kind::flag,
+				get_widening_option, set_widening_option,
+				nullptr, nullptr,
+				"exact (widened) bitvector arithmetic instead of modular "
+				"wraparound (off by default)" },
+			{ "max-width", ba_option_kind::count,
+				nullptr, nullptr,
+				get_max_width_option, set_max_width_option,
+				"cap the width widening may compute up to (0 leaves the "
+				"cap unchanged)" },
 		}};
 	}
 

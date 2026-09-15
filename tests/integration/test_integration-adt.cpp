@@ -158,6 +158,7 @@ TEST_SUITE("adt integration") {
 			.mode = solver_mode::general
 		};
 		auto solution = solve<node_t>(form, options);
+		REQUIRE( !report_has_code(solution.report(), code::solver_error) );
 		REQUIRE( solution.has_value() );
 
 		// Solution-inspection API #1: substituting the solution back into

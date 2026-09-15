@@ -116,6 +116,8 @@ need solver or LTL types, which sit beside their single consumer:
 | `solve(fm)` | your own decision procedure for a whole formula | the single declarer (two are refused at compile time) |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
 | `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch | every declarer, chained in pack order |
+| `widen_arithmetic(fm)` | elaborate your arithmetic atoms to an overflow-free width before solving | every declarer, chained in pack order |
+| `widening_state()` | whether your widening is currently on, for a caller that must key a cache on it (your own construction-time hooks read it too, not just `widen_arithmetic`) | any declarer active |
 | `formula_is_preprocessable(fm)`, `has_preprocessing_residue(fm)` | whether your pass can still make progress / left a shape closing would make expensive | any declarer |
 | `term_is_blasteable(term)` | whether a term with an arithmetic operator can be blasted | owner of the term's type |
 | `arith_ops` | that the grammar's arithmetic term operators apply to your type | owner |

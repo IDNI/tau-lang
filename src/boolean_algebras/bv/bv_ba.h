@@ -563,11 +563,17 @@ template <NodeType node> size_t get_bv_width(tref t);
 template <NodeType node> size_t get_bv_width(size_t ba_type_id);
 
 // Bitvector specific symbol simplification
-/** @brief Simplify an `add` bitvector symbol node @p symbol. */
+// term_add, term_sub, term_mul and term_shl fold a constant pair at the
+// operands' width; under the opt-in `bv_widening` mode (heuristics/bv_widening.h)
+// they decline the fold -- leaving the node symbolic -- whenever the exact
+// result would not fit, so the later widening pass can compute it at a wider
+// width instead of wrapping it here. div, mod and shr cannot overflow and
+// always fold.
+/** @brief Simplify an `add` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_add(tref symbol);
-/** @brief Simplify a `sub` bitvector symbol node @p symbol. */
+/** @brief Simplify a `sub` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_sub(tref symbol);
-/** @brief Simplify a `mul` bitvector symbol node @p symbol. */
+/** @brief Simplify a `mul` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_mul(tref symbol);
 /** @brief Simplify a `div` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_div(tref symbol);
@@ -575,7 +581,7 @@ template<NodeType node> tref term_div(tref symbol);
 template<NodeType node> tref term_mod(tref symbol);
 /** @brief Simplify a `shr` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_shr(tref symbol);
-/** @brief Simplify a `shl` bitvector symbol node @p symbol. */
+/** @brief Simplify a `shl` bitvector symbol node @p symbol (fit-gated under `bv_widening`). */
 template<NodeType node> tref term_shl(tref symbol);
 /** @brief Simplify a `nor` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_nor(tref symbol);
@@ -635,6 +641,7 @@ template<NodeType node> tref simplify_bv_term(tref term);
 #include "boolean_algebras/bv/bv_ba_hooks.tmpl.h"
 #include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 #include "boolean_algebras/bv/heuristics/bv_case_split.h"
+#include "boolean_algebras/bv/heuristics/bv_widening.h"
 #include "boolean_algebras/bv/bv_descriptor.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__

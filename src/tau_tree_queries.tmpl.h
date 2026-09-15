@@ -29,14 +29,15 @@ bool is(tref n, std::initializer_list<size_t> nts) {
 	return false;
 }
 
-// factory method for is predicate.
-// WARNING (TT1-21): the returned closure captures the initializer_list BY
-// VALUE, which is a VIEW over the caller's temporary backing array -- valid
-// only within the creating full-expression. Do NOT store the result; for a
-// storable predicate build it from a std::vector instead.
+// factory method for is predicate. The list is copied into a vector: an
+// initializer_list only views a temporary array that dies at the end of
+// the full expression, so a stored predicate would read freed memory.
 template <NodeType node>
 inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
-	return [nts](tref n) { return is<node>(n, nts); };
+	return [nts = std::vector<size_t>(nts)](tref n) {
+		for (auto nt : nts) if (tree<node>::get(n).is(nt)) return true;
+		return false;
+	};
 }
 
 template <NodeType node>

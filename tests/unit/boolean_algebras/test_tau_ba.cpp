@@ -158,6 +158,18 @@ TEST_CASE("bool != tau_ba: true != F") {
 	CHECK(true != tau_zero());
 }
 
+// A constant that carries recurrence relations is decided through
+// the uncached branch of cached_tau_ba_predicate (its key would be the
+// main formula alone, which does not identify the constant).
+TEST_CASE("a constant with recurrence relations is decided uncached") {
+	auto nso_rr = get_nso_rr("f[0](x) := T. f[n](x) := f[n-1](x). f(y).");
+	REQUIRE(nso_rr.has_value());
+	REQUIRE(!nso_rr.value().rec_relations.empty());
+	test_ba spec(nso_rr.value().rec_relations, nso_rr.value().main);
+	CHECK( spec.is_one() );
+	CHECK_FALSE( spec.is_zero() );
+}
+
 } // TEST_SUITE is_zero / is_one
 
 // ============================================================================

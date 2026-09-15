@@ -584,15 +584,21 @@ TEST_SUITE("satisfiability helpers") {
 	}
 
 	// Closes: `make_initial_run` (src/satisfiability.tmpl.h:1203) had no test.
-	TEST_CASE("make_initial_run: nullptr for zero lookback, instantiated run otherwise") {
+	TEST_CASE("make_initial_run: T for zero lookback, instantiated run otherwise") {
 		// Spec-parsed: make_initial_run instantiates through
 		// transform_io_var, which needs the in/out classification.
 		tref aw = spec_always_body("always o1[t] = o1[t-1].");
 		REQUIRE( aw != nullptr );
-		// the loop body never runs, so `run` stays nullptr
-		CHECK( make_initial_run<node_t>(aw, 0) == nullptr );
+		// The loop body never runs, so `run` stays the empty-conjunct
+		// identity `T`, reported as a value (not an error) so callers can
+		// tell it apart from a normalization failure.
+		auto empty_run = make_initial_run<node_t>(aw, 0);
+		REQUIRE( empty_run.has_value() );
+		CHECK( tau::get(empty_run.value()).equals_T() );
 
-		tref run = make_initial_run<node_t>(aw, 2);
+		auto run_res = make_initial_run<node_t>(aw, 2);
+		REQUIRE( run_res.has_value() );
+		tref run = run_res.value();
 		REQUIRE( run != nullptr );
 		// every io_var of the run refers to a constant time point
 		trefs rvs = io_vars_of(run);

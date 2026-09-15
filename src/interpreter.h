@@ -136,7 +136,9 @@ struct interpreter {
 	 * @brief Build an interpreter from a normalized Tau specification.
 	 * @param spec Normalized Tau formula.
 	 * @param ctx I/O context.
-	 * @return Initialized interpreter, or an error result if the spec is unsatisfiable.
+	 * @return Initialized interpreter, or an error result if the spec is
+	 * unsatisfiable or fails to normalize (a `bv_widening` width-cap
+	 * violation, already logged by the widening pass).
 	 */
 	static result<interpreter> make_interpreter(tref spec,
 		const io_context<node>& ctx);

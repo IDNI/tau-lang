@@ -10,8 +10,9 @@ class TauDirectUpdater:
 	def __init__(self, spec: str):
 
 		"Create a Tau interpreter for a given specification"
-		self.i = tau.get_interpreter(spec)
-		assert self.i is not None, "Failed to create interpreter"
+		r = tau.get_interpreter(spec)
+		assert r, f"Failed to create interpreter: {r.report.errors}"
+		self.i = r.value
 
 	def submit(self, value: str):
 
@@ -25,8 +26,9 @@ class TauDirectUpdater:
 				input_values[input] = value
 
 		"Step the interpreter with the assigned value"
-		outputs = tau.step(self.i, input_values)
-		assert outputs is not None, "Failed to step interpreter"
+		res = tau.step(self.i, input_values)
+		assert res, f"Failed to step interpreter: {res.report.errors}"
+		outputs = res.value
 
 		"Retrieve the output value from the update output"
 		for output, output_value in outputs.items():

@@ -39,9 +39,15 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	};
 
 #ifdef TAU_CACHE
-	using cache_t = std::map<std::pair<rewriter::rule, tref>, tref>;
+	// apply_rule below rebuilds nodes via ordinary construction, which runs
+	// a widening-capable BA's own construction-time folding hooks -- key on
+	// pack_widening_active so a stale entry built under one setting is not
+	// replayed after the setting flips.
+	using cache_t = std::map<std::tuple<rewriter::rule, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
+	const bool widening = pack_widening_active<node>();
+	if (auto it = cache.find({r, n, widening}); it != cache.end())
+		return it->second;
 #endif // TAU_CACHE
 
 	try {
@@ -66,7 +72,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // DEBUG
 
 #ifdef TAU_CACHE
-		cache[{r, n}] = nn;
+		cache[{r, n, widening}] = nn;
 #endif // TAU_CACHE
 
 		return nn;
@@ -84,9 +90,13 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #ifdef TAU_CACHE
-	using cache_t = std::map<std::pair<rewriter::rules, tref>, tref>;
+	// See the single-rule overload above: key on pack_widening_active for
+	// the same reason.
+	using cache_t = std::map<std::tuple<rewriter::rules, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
+	const bool widening = pack_widening_active<node>();
+	if (auto it = cache.find({rs, n, widening}); it != cache.end())
+		return it->second;
 #endif // TAU_CACHE
 
 	if (rs.empty()) return n;
@@ -94,7 +104,7 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 	for (auto& r : rs) nn = nso_rr_apply<node>(r, nn);
 
 #ifdef TAU_CACHE
-	cache[{rs, n}] = nn;
+	cache[{rs, n, widening}] = nn;
 #endif // TAU_CACHE
 	return nn;
 }

@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -590,6 +590,17 @@ TEST_SUITE("Tau API - string - solving success paths") {
 		}
 	}
 
+	// The string-level solve(formula, mode) overload's success path.
+	// Typed sbf so the untyped default (tau, whose zero renders as "F")
+	// does not change what "0" is checking here.
+	TEST_CASE_FIXTURE(api_fixture, "solve with a mode renders the solution to strings") {
+		auto s = tau_api::solve("x:sbf = 0", solver_mode::general);
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().size() == 1 );
+		CHECK( s.value().begin()->first == "x" );
+		CHECK( s.value().begin()->second == "0" );
+	}
+
 	// api::lgrs is NOT called here with a single equality such as "x = 0",
 	// because it aborts. That abort is a known pre-existing bug (see the note
 	// on the "lgrs" case in tests/api/test_api-tref_api.cpp) and it is
@@ -614,6 +625,17 @@ TEST_SUITE("Tau API - string - solving success paths") {
 	// "Invalid argument(s)" gracefully. That guard is what is covered here.
 	TEST_CASE_FIXTURE(api_fixture, "lgrs rejects a non-equality gracefully") {
 		CHECK( !tau_api::lgrs("x = 0 || y = 0").has_value() );
+	}
+
+	// A single equality is the ordinary case: lgrs builds the general
+	// solution and renders it to strings. Typed sbf so the untyped default
+	// (tau, whose zero renders as "F") does not change what "0" is checking.
+	TEST_CASE_FIXTURE(api_fixture, "lgrs renders the solution to strings") {
+		auto s = tau_api::lgrs("x:sbf = 0");
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().size() == 1 );
+		CHECK( s.value().begin()->first == "x" );
+		CHECK( s.value().begin()->second == "0" );
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "solve and lgrs reject malformed input") {

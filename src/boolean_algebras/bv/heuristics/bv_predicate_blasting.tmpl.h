@@ -840,7 +840,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -890,6 +890,23 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
+		// Each hoisted intermediate must be typed from ITS OWN subterm's
+		// width, not a single width shared across the whole atom: a
+		// widened "truncating assignment" atom (o = ...) resets its own
+		// ba_type back to base_w via the outer cast while everything
+		// inside that cast still runs at the wider, per-subterm W (the
+		// amended D2/D3 widening rule) -- t is exactly that subterm here,
+		// already retyped to its own correct width by widen_bv_arithmetic.
+		//
+		// For a tree the widening pass never touched, the per-subterm type
+		// usually IS the atom's own type (type inference unifies every
+		// operand of an atom to one width), so this reads as an identity
+		// change there -- but not universally: a user-written cast around
+		// arithmetic is a type boundary, so subterms on either side of it
+		// genuinely differ in width, and taking the width from the subterm
+		// fixes a latent width bug in exactly those atoms, widening mode
+		// or not.
+		auto type_id = tau::get(t).get_ba_type();
 
 		switch (nt) {
 			case tau::bf_add: case tau::bf_sub: {
@@ -944,8 +961,10 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			case tau::bf_cast: {
 				auto child = tau::get(t).child(0);
 				auto src = lookup(child);
-				auto target_type_id = tau::get(t).get_ba_type();
-				auto result = tau::build_variable(target_type_id);
+				// The cast's target width IS this subterm's own width,
+				// i.e. exactly the type_id computed above -- no separate
+				// lookup needed.
+				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				auto src_width = get_bv_type_bitwidth<node>(src);
 				auto target_width = get_bv_type_bitwidth<node>(result);
@@ -1053,7 +1072,7 @@ static tref keep_comparison_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1074,7 +1093,7 @@ static tref eq_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:546-547).
  * tref fm = get_nso_rr("ex x x:bv[4] != x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_F() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
@@ -1097,7 +1116,7 @@ static tref neq_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1133,7 +1152,7 @@ static tref lt_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
  * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_F() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
@@ -1170,7 +1189,7 @@ static tref gt_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x <= { 3 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1194,7 +1213,7 @@ static tref lteq_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:389-391).
  * tref fm = get_nso_rr("all x x:bv[4] >= x:bv[4].").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1219,7 +1238,7 @@ static tref gteq_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[4] && x !< { 2 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1245,7 +1264,7 @@ static tref nlt_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[4] && x !> { 2 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1270,7 +1289,7 @@ static tref ngt_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[2] && x !<= { 1 }:bv[2]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1294,7 +1313,7 @@ static tref nlteq_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 0 }:bv[4] && x !>= { 1 }:bv[4]).").value().main->get();
  * tref blasted = bv_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
@@ -1319,7 +1338,7 @@ static tref ngteq_predicate(tref atomic) {
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
  * tref blasted = wff_predicate_blasting<node_t>(fm);
- * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 /**

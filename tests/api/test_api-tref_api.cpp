@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include <sstream>
 
@@ -134,6 +134,25 @@ TEST_SUITE("Tau API - tref - parsing") {
 		// deref in release) instead of returning nullptr on a malformed
 		// definition string.
 		CHECK(!tau_api::get_definition("this is not a definition").has_value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "a failed parse reports code::parse_error") {
+		auto bad = tau_api::get_formula("&& x =");
+		REQUIRE(!bad.has_value());
+		CHECK(bad.has_error());
+		CHECK(report_has_code(bad.report(), code::parse_error));
+		// a successful parse carries a value and a clean report
+		auto good = tau_api::get_formula("x = 0");
+		REQUIRE(good.has_value());
+		CHECK(!good.has_error());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "add_definition reports invalid arguments") {
+		tref head = tau_api::get_term("x").value_or(nullptr);
+		REQUIRE(head != nullptr);
+		auto r = tau_api::add_definition(nullptr, head);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "get_spec_or_term") {

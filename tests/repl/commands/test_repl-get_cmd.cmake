@@ -21,7 +21,7 @@ add_repl_test(get_cmd-lists_specsizewarn_off "get" "specsizewarn: *off")
 
 # --- bare `get` prints every limit option (covers the limit_printers map) ----
 foreach(opt maxsplits maxrounds decisionpins fixpointsteps flagsteps squeezecap
-		simplifyrounds defpasses enumsteps rewriterounds gcminsize
+		simplifyrounds defpasses enumsteps probesteps rewriterounds gcminsize
 		gcgrowth specsizewarn revisionalts maxsubsets cachebound
 		maxcoverproducts)
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
@@ -72,3 +72,20 @@ add_repl_test(get_cmd-gcminsize "set gcminsize 512. get gcminsize"
 add_repl_test(get_cmd-specsizewarn_off_roundtrip
 	"set specsizewarn 4096. set specsizewarn 0. get specsizewarn"
 	"specsizewarn: *off")
+
+# --- bv widening (exact bitvector arithmetic) -------------------------------
+# Both knobs are listed by bare `get` and readable on their own; the mode is
+# off by default and the width cap defaults to 1024 (a hard ceiling, printed
+# as a plain number: unlike the limits above, 0 is never a valid value).
+# The bare-`get` cases below name no BA in their own command text, so they are
+# gated by hand the same way as bv-blastdepth above.
+tau_repl_unsupported(_tau_skip "get bv-widening")
+if(_tau_skip)
+	tau_repl_record_skip("get_cmd-all_lists_bv-widening")
+	tau_repl_record_skip("get_cmd-all_lists_bv-max-width")
+else()
+	add_repl_test(get_cmd-all_lists_bv-widening "get" "bv-widening: *off")
+	add_repl_test(get_cmd-all_lists_bv-max-width "get" "bv-max-width: *1024")
+endif()
+add_repl_test(get_cmd-bv-widening "get bv-widening" "bv-widening: *off")
+add_repl_test(get_cmd-bv-max-width "get bv-max-width" "bv-max-width: *1024")

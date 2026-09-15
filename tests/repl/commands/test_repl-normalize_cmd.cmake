@@ -151,3 +151,17 @@ add_repl_test(normalize_cmd-fp_call_function_converging
 add_repl_test(normalize_cmd-fp_call_after_unrelated_function_def
 	"g[0](y):sbf := 0. g[n](y):sbf := g[n-1](y)'. k[0](x) := x = 0. k[n](x) := k[n-1](x) && x != 1. normalize k(y)"
 	": y = 0")
+
+# A cast of a non-bitvector operand, or a cast result meeting a
+# non-bitvector sibling, is rejected by type inference. Both used to reach
+# the solver's cast translation and abort the process (Debug: "bv type must
+# have explicit bitwidth"; Release: a core dump). The error IS the expected
+# output, so add_repl_test_fail.
+add_repl_test_fail(normalize_cmd-cast_of_sbf_operand_rejected
+	"n (bv[8]) x:sbf = y:bv[8]" "Incompatible type information")
+add_repl_test_fail(normalize_cmd-cast_of_tau_stream_rejected
+	"n (bv[8]) i1[t]:tau = o1[t]:bv[8]" "Incompatible type information")
+add_repl_test_fail(normalize_cmd-cast_result_meets_sbf_rejected
+	"n ((bv[8]) x:bv[4]) & y:sbf = 0" "Incompatible type information")
+add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
+	"n (bv[8]) x:bv[4] = y" "y")

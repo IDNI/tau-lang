@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
 
@@ -342,7 +342,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 			TAU_LOG_ERROR << error;
 			r.error(code::parse_error, error);
 		}
-		if (!r.has_error()) r.error(code::parse_error, "Failed to parse spec");
+		if (!r.has_error()) r.error(code::parse_error, messages::failed_to_parse_spec);
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
@@ -386,7 +386,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	auto& ctx = i.ctx;
 
 	if (!i.calculate_initial_spec()) {
-		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
+		return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 	}
 
 	// Build inputs for the step
@@ -445,7 +445,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 	// Step the interpreter
 	auto step_v = r.take_or_error(i.step(values), code::invalid_state,
-		"No input provided");
+		messages::no_input_provided);
 	if (!step_v) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)
@@ -499,12 +499,12 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 	result<std::map<stream_at, std::string>> r;
 	if (!i.calculate_initial_spec()) {
-		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
+		return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 	}
 
 	// Step the interpreter
 	auto step_v = r.take_or_error(i.step(), code::invalid_state,
-		"No input provided");
+		messages::no_input_provided);
 	if (!step_v) {
 		DBG(TAU_LOG_TRACE << "No input provided or error."
 			<< " Quit at time point " << i.time_point;)

@@ -13,6 +13,7 @@
 #ifndef __IDNI__TAU__SOLVER_H__
 #define __IDNI__TAU__SOLVER_H__
 
+#include "tau_diagnostics.h"
 #include "tau_tree.h"
 #include "solver_types.h"
 #include "tau_diagnostics.h"

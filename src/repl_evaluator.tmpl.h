@@ -1487,7 +1487,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
 	if (x == "B" || x == "preprocessing") return preprocessing_opt;
-	if (x == "factoring")                return factoring_opt;
+	if (x == "factoring"
+		|| x == "bacomponentfactoring") return factoring_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1510,7 +1511,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "blockmaxrounds")    return block_max_rounds_opt;
 	if (x == "maxclauses"
 		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
-	if (x == "decisionpins")         return decision_pins_opt;
+	if (x == "decisionpins"
+		|| x == "badecisionpins")    return decision_pins_opt;
 	if (x == "fixpointsteps"
 		|| x == "maxfixpointsteps")  return fixpoint_steps_opt;
 	if (x == "flagsteps"
@@ -1523,6 +1525,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxdefpasses")      return def_passes_opt;
 	if (x == "enumsteps"
 		|| x == "maxenumsteps")      return enum_steps_opt;
+	if (x == "probesteps"
+		|| x == "maxprobesteps")     return probe_steps_opt;
 	if (x == "rewriterounds"
 		|| x == "maxrewriterounds")  return rewrite_rounds_opt;
 	if (x == "gcminsize")                return gc_min_size_opt;
@@ -1629,6 +1633,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "simplifyrounds:      " << climit(max_simplify_rounds) << "\n"; } },
 	{ def_passes_opt, [climit, this]() {
 		out << "defpasses:           " << climit(max_def_passes) << "\n"; } },
+	{ probe_steps_opt, [climit, this]() {
+		out << "probesteps:          " << climit(max_probe_steps) << "\n"; } },
 	{ enum_steps_opt, [climit, this]() {
 		out << "enumsteps:           " << climit(max_enum_steps) << "\n"; } },
 	{ rewrite_rounds_opt, [climit, this]() {
@@ -1807,6 +1813,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_max_def_passes(*n); } },
 	{ enum_steps_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_enum_steps(*n); } },
+	{ probe_steps_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_max_probe_steps(*n); } },
 	{ rewrite_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_rewrite_rounds(*n); } },
 	{ gc_min_size_opt, [&]() { if (auto n = str2count(); n)
@@ -1879,6 +1887,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case simplify_rounds_opt:
 	case def_passes_opt:
 	case enum_steps_opt:
+	case probe_steps_opt:
 	case rewrite_rounds_opt:
 	case gc_min_size_opt:
 	case gc_growth_opt:
@@ -2244,6 +2253,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  indenting              indenting of Tau formulas            on/off\n"
 		"  charvar (V)            character-variable notation          on/off\n"
 		"  preprocessing (B)      BA preprocessing (e.g. bv blasting)  on/off\n"
+		"  factoring              tau-algebra component factoring      on/off\n"
 		"  benchmarks (b)         print timing benchmarks              on/off\n";
 	static const std::string numeric_options =
 		"and the numeric limit options, set with `set <option> <n>` "
@@ -2253,12 +2263,14 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
 		"  maxclauses             cqe DNF clauses per distributed scope unlimited\n"
+		"  decisionpins           decided tau-algebra rows kept alive  4096\n"
 		"  fixpointsteps          temporal-normalization fixpoint steps unlimited\n"
 		"  flagsteps              eventual-flag search steps           unlimited\n"
 		"  squeezecap             block-squeeze operand-set size cap   unlimited\n"
 		"  simplifyrounds         bitvector simplification rounds      unlimited\n"
 		"  defpasses              definition-expansion passes          unlimited\n"
 		"  enumsteps              recurrence enumeration steps         unlimited\n"
+		"  probesteps             untyped recurrence probe steps       10000\n"
 		"  rewriterounds          rewrite-to-fixpoint rounds           unlimited\n"
 		"  gcminsize              gc trigger floor (tree nodes)        256\n"
 		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"

@@ -41,6 +41,10 @@ add_repl_test(set_cmd-defpasses
 	"set defpasses 40. get defpasses" "defpasses: *40")
 add_repl_test(set_cmd-enumsteps
 	"set enumsteps 33. get enumsteps" "enumsteps: *33")
+add_repl_test(set_cmd-probesteps
+	"set probesteps 44. get probesteps" "probesteps: *44")
+add_repl_test(set_cmd-probesteps_unlimited
+	"set probesteps 0. get probesteps" "probesteps: *unlimited")
 add_repl_test(set_cmd-rewriterounds
 	"set rewriterounds 21. get rewriterounds" "rewriterounds: *21")
 add_repl_test(set_cmd-gcminsize
@@ -91,3 +95,28 @@ add_repl_test_fail(set_cmd-fixpointsteps_flag_value_rejected
 	"set fixpointsteps on" "Invalid value")
 add_repl_test_fail(set_cmd-gcgrowth_bad_value_rejected
 	"set gcgrowth 1..5" "Invalid value")
+
+# --- bv widening (exact bitvector arithmetic) -------------------------------
+# bv-widening is a flag, bv-max-width a count; each round-trips through the
+# api setter and back out of `get`. bv-max-width 0 does not mean unlimited:
+# it leaves the current cap unchanged (the api setter ignores 0), so setting
+# it after a real value reads that value back, not "unlimited".
+add_repl_test(set_cmd-bvwidening_on
+	"set bv-widening on. get bv-widening" "bv-widening: *on")
+add_repl_test(set_cmd-bvwidening_off_again
+	"set bv-widening on. set bv-widening off. get bv-widening"
+	"bv-widening: *off")
+add_repl_test(set_cmd-bvmaxwidth
+	"set bv-max-width 64. get bv-max-width" "bv-max-width: *64")
+add_repl_test(set_cmd-bvmaxwidth_zero_keeps_current
+	"set bv-max-width 64. set bv-max-width 0. get bv-max-width" "bv-max-width: *64")
+add_repl_test_fail(set_cmd-bvmaxwidth_flag_value_rejected
+	"set bv-max-width on" "Invalid value: expected a count")
+add_repl_test_fail(set_cmd-bvmaxwidth_enable_rejected
+	"enable bv-max-width" "takes a count, not a flag")
+# The mode actually changes what the decision procedures answer: 16 * 16
+# wraps to 0 at 8 bits in the default mode and is 256 -- never 0 -- once the
+# exact mode is on, in the same session.
+add_repl_test(set_cmd-bvwidening_changes_semantics
+	"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]. set bv-widening on. sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]"
+	"%1.*: T(.*\n)*.*%2.*: F")

@@ -236,6 +236,8 @@ std::optional<solution<node>> find_solution(equality eq) {
 	return find_solution<node>(eq, substitution, solver_mode::maximum);
 }
 
+// Reports why lgrs failed: no solution is code::unsat, a null equality is
+// code::invalid_argument.
 template <NodeType node>
 result<solution<node>> lgrs(equality eq) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
@@ -262,7 +264,7 @@ result<solution<node>> lgrs(equality eq) {
 	auto s = find_solution<node>(eq);
 	if (!s.has_value()) {
 		DBG(LOG_TRACE << "lgrs/no solution";)
-		return r.with_assert_check_error(code::unsat, "No solution found");
+		return r.with_assert_check_error(code::unsat, messages::no_solution_found);
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
@@ -1865,6 +1867,8 @@ bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 }
 
 // entry point for the solver
+// Reports why solve failed: an unsupported clause is code::solver_error,
+// no solution is code::unsat.
 template <NodeType node>
 result<solution<node>> solve(tref form, solver_options options) {
 	result<solution<node>> r;
@@ -1877,7 +1881,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 		return r.with_assert_check_value(solution<node>());
 	}
 	if (tau::get(form).equals_F()) {
-		return r.with_assert_check_error(code::unsat, "No solution found");
+		return r.with_assert_check_error(code::unsat, messages::no_solution_found);
 	}
 
 #ifdef DEBUG
@@ -2096,7 +2100,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 			return r.with_assert_check_value(std::move(clause_solution));
 		}
 	}
-	return r.with_assert_check_error(code::unsat, "No solution found");
+	return r.with_assert_check_error(code::unsat, messages::no_solution_found);
 }
 
 // (SO-7: the trefs overload of solve() was deleted -- zero callers.)

@@ -49,7 +49,8 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
  * @param fm Unbounded continuation formula.
  * @param io_vars IO variable nodes (updated with any new variables).
  * @param start_time Time step at which the continuation was started.
- * @return Formula constraining uninterpreted constants, or `T` if none exist.
+ * @return Formula constraining uninterpreted constants, or `T` if none exist;
+ * `nullptr` when normalization fails on a `bv_widening` width-cap violation.
  *
  * @par Example
  * This function only operates on an already-transformed unbounded
@@ -76,7 +77,9 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  * @param fm Normalized Tau formula.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return Formula ready for step-by-step execution.
+ * @return Formula ready for step-by-step execution (`F` when @p fm has no
+ * satisfiable continuation), or `nullptr` when normalization fails on a
+ * `bv_widening` width-cap violation (already logged by the widening pass).
  *
  * @par Example
  * @code{.cpp}
@@ -96,6 +99,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
 					const bool output = false);
+
 
 /**
  * @brief Check whether a Tau formula is satisfiable.
@@ -130,12 +134,15 @@ template <NodeType node>
 result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
 	const bool output = false);
 
+
 /**
  * @brief Check whether temporal formula @p f1 implies @p f2.
  * @tparam node Tree node type.
  * @param f1 Antecedent formula.
  * @param f2 Consequent formula.
- * @return `true` if every model of @p f1 satisfies @p f2.
+ * @return `true` if every model of @p f1 satisfies @p f2; `false` also when
+ * normalization fails on a `bv_widening` width-cap violation (a logged,
+ * conservative fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -144,8 +151,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * // o1[t] != 1 && ...), which contradicts the "always" part and is
  * // therefore unsatisfiable, so the implication holds. This mirrors the
  * // "is fm valid/a tautology" idiom used at src/api.tmpl.h:439
- * // (`is_tau_impl<node>(tau::_T(), normalize_formula(fm))`) and
- * // src/boolean_algebras/tau_ba.tmpl.h:105.
+ * // (`is_tau_impl<node>(tau::_T(), normalize_formula(fm)).value_or(false)`) and
+ * // src/boolean_algebras/tau/tau_ba.tmpl.h.
  * tref f1 = create_spec("always o1[t] = 1.");
  * tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
  * bool result = is_tau_impl<node_t>(f1, f2).value();
@@ -162,7 +169,9 @@ result<bool> is_tau_impl(tref f1, tref f2);
  * @tparam node Tree node type.
  * @param f1 First formula (closed).
  * @param f2 Second formula (closed).
- * @return `true` if @p f1 and @p f2 have identical models.
+ * @return `true` if @p f1 and @p f2 have identical models; `false` also
+ * when normalization fails on a `bv_widening` width-cap violation (a
+ * logged, conservative fallback, not a proof).
  *
  * @par Example
  * @code{.cpp}
@@ -178,7 +187,7 @@ result<bool> is_tau_impl(tref f1, tref f2);
 template <NodeType node>
 result<bool> are_tau_equivalent(tref f1, tref f2);
 
-// Support-component factoring (defined in boolean_algebras/tau_ba.tmpl.h,
+// Support-component factoring (defined in boolean_algebras/tau/tau_ba.tmpl.h,
 // same translation unit): used by simp_tau_unsat_valid below to decide its
 // per-path satisfiability tests unit-wise where that is exact.
 inline bool ba_component_factoring_enabled();
@@ -191,13 +200,14 @@ template <typename node> static int factored_tau_valid(tref fm);
  * @param fm Formula to simplify.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
- * @return Simplified formula.
+ * @return Simplified formula, or `nullptr` when normalization fails on a
+ * `bv_widening` width-cap violation (already logged by the widening pass).
  *
  * @par Example
  * @code{.cpp}
  * // First disjunct is unsatisfiable (o2[t] cannot be both 0 and 1 at the
  * // same time step), second disjunct is satisfiable. Tracing the
- * // implementation: is_tau_impl<node>(T, fm) fails first (fm is not
+ * // implementation: is_tau_impl<node>(T, fm).value_or(false) fails first (fm is not
  * // valid), so fm is normalized into DNF disjuncts and each disjunct whose
  * // transform_to_execution(...) is not F is kept; the unsatisfiable first
  * // disjunct is therefore dropped from the result.

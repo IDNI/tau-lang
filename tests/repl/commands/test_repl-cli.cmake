@@ -154,6 +154,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_simplify_rounds|max-simplify-rounds|m|1000|simplifyrounds|1000"
 	"max_def_passes|max-def-passes|P|40|defpasses|40"
 	"max_enum_steps|max-enum-steps|E|33|enumsteps|33"
+	"max_probe_steps|max-probe-steps|M|44|probesteps|44"
 	"max_rewrite_rounds|max-rewrite-rounds|R|21|rewriterounds|21"
 	"gc_min_size|gc-min-size|G|512|gcminsize|512"
 	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"
@@ -241,5 +242,57 @@ else()
 		COMMAND bash -c "printf 'i1:bv[8] := in console.\\nrun (o0s[0]:bv[8] = {#x05}:bv[8]) && (o0s[t]:bv[8] = o0s[t-1]:bv[8] + i1[t]:bv[8]).\\n3\\n0\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 	set_tests_properties("test_repl-cli-issue74_bv_accumulator_default_flags" PROPERTIES
 		PASS_REGULAR_EXPRESSION "o0s\\[2\\] := 8"
+		TIMEOUT 120)
+endif()
+
+# --- bv widening flags -------------------------------------------------------
+# --bv-widening and --bv-max-width reach the api before either the REPL or a
+# spec file runs (main.cpp applies them unconditionally, unlike -B). The
+# flags themselves name no BA in the command text CTest sees, so they are
+# gated by hand here rather than through add_repl_test's automatic gate --
+# same mechanism as bv_blastdepth_flag above.
+tau_repl_unsupported(_tau_skip "get bv-widening")
+if(_tau_skip)
+	tau_repl_record_skip("test_repl-cli-bv_widening_flag")
+	tau_repl_record_skip("test_repl-cli-bv_widening_long_flag")
+	tau_repl_record_skip("test_repl-cli-bv_max_width_flag")
+	tau_repl_record_skip("test_repl-cli-bv_widening_flag_changes_semantics")
+	tau_repl_record_skip("test_repl-cli-bv_max_width_cap_exceeded")
+	tau_repl_record_skip("test_repl-cli-bv_widening_spec_file_mode")
+else()
+	add_test(NAME "test_repl-cli-bv_widening_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening -e \"get bv-widening\"")
+	set_tests_properties("test_repl-cli-bv_widening_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bv-widening: *on"
+		FAIL_REGULAR_EXPRESSION "Error")
+	add_test(NAME "test_repl-cli-bv_widening_long_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening -e \"get bv-widening\"")
+	set_tests_properties("test_repl-cli-bv_widening_long_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bv-widening: *on"
+		FAIL_REGULAR_EXPRESSION "Error")
+	add_test(NAME "test_repl-cli-bv_max_width_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-max-width 64 -e \"get bv-max-width\"")
+	set_tests_properties("test_repl-cli-bv_max_width_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bv-max-width: *64"
+		FAIL_REGULAR_EXPRESSION "Error")
+	# The flag changes the answer: 16 * 16 = 0 holds at 8 bits only modularly.
+	add_test(NAME "test_repl-cli-bv_widening_flag_changes_semantics"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening -e \"sat {16}:bv[8] * {16}:bv[8] = {0}:bv[8]\"")
+	set_tests_properties("test_repl-cli-bv_widening_flag_changes_semantics" PROPERTIES
+		PASS_REGULAR_EXPRESSION "%1.*: F"
+		FAIL_REGULAR_EXPRESSION "Error")
+	# A cap too small for the formula is undecidable: the entry point reports
+	# the error and answers with no verdict at all. The error IS the expected
+	# output, so no FAIL regex.
+	add_test(NAME "test_repl-cli-bv_max_width_cap_exceeded"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening --bv-max-width 12 -e \"sat o:bv[8] = x * y\"")
+	set_tests_properties("test_repl-cli-bv_max_width_cap_exceeded" PROPERTIES
+		PASS_REGULAR_EXPRESSION "required width 16 exceeds bv-max-width 12")
+	# Spec-file mode gets the flags too (they are applied before the file
+	# runs): a one-step run of the guard-free saturating add stores 200, not 44.
+	add_test(NAME "test_repl-cli-bv_widening_spec_file_mode"
+		COMMAND bash -c "printf 'i1:bv[8] := in console.\\ni2:bv[8] := in console.\\nrun always o1[t]:bv[8] = min(i1[t] + i2[t], {200}:bv[8]).\\n200\\n100\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening -X")
+	set_tests_properties("test_repl-cli-bv_widening_spec_file_mode" PROPERTIES
+		PASS_REGULAR_EXPRESSION "o1\\[0\\] := 200"
 		TIMEOUT 120)
 endif()

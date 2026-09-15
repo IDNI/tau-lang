@@ -19,3 +19,7 @@ if(_tau_skip)
 else()
 	add_repl_test(disable_cmd-bv_case_split "enable bv-case-split. disable bv-case-split. get bv-case-split" "bv-case-split: *off")
 endif()
+
+add_repl_test(disable_cmd-bvwidening
+	"enable bv-widening. disable bv-widening. get bv-widening"
+	"bv-widening: *off")

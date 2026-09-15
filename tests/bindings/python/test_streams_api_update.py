@@ -14,13 +14,15 @@ class TauStreamUpdater:
 		opts.input_remaps["i"] = self.i_stream
 		opts.output_remaps["u"] = self.u_stream
 
-		self.i = tau.get_interpreter(spec, opts)
-		assert self.i is not None, "Failed to create interpreter"
+		r = tau.get_interpreter(spec, opts)
+		assert r, f"Failed to create interpreter: {r.report.errors}"
+		self.i = r.value
 
 	def submit(self, i: str):
 		self.i_stream.put(i)
-		outputs = tau.step(self.i)
-		assert outputs is not None, "Failed to step interpreter"
+		res = tau.step(self.i)
+		assert res, f"Failed to step interpreter: {res.report.errors}"
+		outputs = res.value
 		return self.u_stream.get()
 
 def main():
