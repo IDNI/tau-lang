@@ -28,9 +28,13 @@
  *
  * THE LIVE ORDER IS THE CALLER'S: every BDD primitive here takes the order
  * as an explicit parameter (the component's `ctx.order`, §5); nothing in
- * this file stores one. Only one order may be live at a time, so a
- * component's D2 finish (`convert_to_tau_terms`) runs before the next
- * `prepare_terms`.
+ * this file stores one. Orders that live together AGREE on their common keys
+ * — a component's `P`, the sub-order the library's chain case builds by
+ * dropping a chain's subscripts, the tiny order a chain resolution builds
+ * over its own subscripts — and the library's cache sync merges them instead
+ * of clearing (`sync_order_cache`). A component's D2 finish
+ * (`convert_to_tau_terms`) still runs before the next `prepare_terms`: a
+ * `BDD_ID` is a node of ONE order.
  * The two simplifiers default to the empty order — phases 1, 2 and 5, where
  * nothing is BDD-backed (§3). Debug builds check, at every BDD primitive's
  * entry, that the ref passed in is a reduced ordered BDD under `order`
@@ -43,6 +47,10 @@
  * a quantification over all of `P`) comes back as its plain term, so a
  * `P`-free term never carries a `BDD_ID` — which is what
  * `convert_to_tau_node_or_term`, the one way a term is emitted here, does.
+ * ONE EXCEPTION, in keep mode (§7 `DISCHARGE`): a WHOLE-BLOCK emission
+ * `Q_X (bf(BDD_ID))` is `X`-free yet keeps its BDD body, which nothing
+ * rewrites mid-block; the component's close resolves it with one
+ * quantification on the stored BDD and the finish spells what is kept.
  * It interns (tau_bdd.tmpl.h), so the same BDD under the same type is the
  * same node in every component: the D2 round trip and hash-consed identity
  * hold.
@@ -68,8 +76,10 @@ namespace idni::tau_lang::anti_prenexing {
 //
 //   BDD-backed term        term_handle<node>::is_bdd_backed(t)
 //   D2 finish              term_handle<node>::convert_to_tau_terms(phi)
-//   ∀_X f  /  ∃_X f        quantify_over(binder::all / binder::ex, f, X, order)
+//   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X, order)
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
+//   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
+//   RESOLVE_FUNCTIONAL     resolve_functional_quantifiers (below)
 //
 // BDD-BACKED: the term is a `bf(BDD_ID)` node, i.e. BDD-backed under the
 // live order with at least one decision variable. The `bf` WRAPPER is the
@@ -89,8 +99,16 @@ namespace idni::tau_lang::anti_prenexing {
 //
 // ∀_X / ∃_X: `quantify_over` is the one entry point — a block is
 // kind-homogeneous, so the library's mixed-prefix `bdd_quant` is never
-// needed, and callers that hold a `binder` (SETTLE_FUNCTIONAL, DISCHARGE)
-// pass it through.
+// needed, and callers that hold a kind (SETTLE_FUNCTIONAL, DISCHARGE) pass
+// it through.
+//
+// SYMBOLIC ∀_Y / ∃_Y: the library's chain CONSTRUCTOR is the one builder
+// (`quants` outermost first, a block `Y` of one kind giving all pairs with
+// that kind). It is canonical — absent subscripts dropped, each same-kind run
+// in content order, an adjoining run of the body merged — and folds a chain
+// that binds every free variable of a plain body to its constant, which is
+// the term-level FOLD_DEGENERATE_BINDERS and DISCHARGE's keep-mode emission
+// in one call.
 
 // --- the representation boundary (PREPARE_TERMS, D2) -----------------------------
 
@@ -104,10 +122,12 @@ namespace idni::tau_lang::anti_prenexing {
  * solver path consumes it as written); a FORMULA-level binder, a reference
  * and a temporal operator transported opaque (§7 translates a unit at query
  * time; the push never enters the other two); a TERM-level functional
- * quantifier `∀_Y`/`∃_Y` SLID onto its body's leaves — `∀_Y(x·b₁ ∪ x′·b₀) =
- * x·∀_Y b₁ ∪ x′·∀_Y b₀`, dually for `∃_Y`, innermost first, linear in the
- * body's BDD. Memoised per atom and per term within the call. The caller
- * (§5) owns `order` and passes it to every later term operation.
+ * quantifier `∀_Y`/`∃_Y` slid onto its body's leaves by the LIBRARY's own
+ * chain case (§1: the chain is collected whole, its body built over the live
+ * order minus the subscripts, the chain wrapped onto every leaf; a chain
+ * touching no decision variable is one leaf as it stands) — nothing here
+ * prepares a term for it. Memoised per atom and per term within the call.
+ * The caller (§5) owns `order` and passes it to every later term operation.
  *
  * @param body  the component's body, a `wff`
  * @param P     the component, `X`'s order
@@ -130,33 +150,60 @@ template <NodeType node>
 tref cofactor(tref f, tref x, bool bit, const var_order<node>& order);
 
 /**
- * @brief §1 `∀_X f = f₀·f₁` (`kind == binder::all`) and `∃_X f = f₀ ∪ f₁`
- * (`binder::ex`) over a block: ONE BDD quantification, never expanded to
+ * @brief §1 `∀_X f = f₀·f₁` (`kind == tbdd::all`) and `∃_X f = f₀ ∪ f₁`
+ * (`tbdd::ex`) over a block: ONE BDD quantification, never expanded to
  * 2^|X| terms; when `X` covers all decision variables this is the meet (the
  * join) of the leaves in one traversal. `order` is the live order; `f`
  * itself for a plain `f` or an empty `X`.
  */
 template <NodeType node>
-tref quantify_over(binder kind, tref f, const block& X,
+tref quantify_over(quantifier<node> kind, tref f, const block& X,
 	const var_order<node>& order);
-
-/**
- * @brief The SYMBOLIC functional-quantifier term `∀_Y f` / `∃_Y f`: a nested
- * chain of single-variable `bf_fall` / `bf_fex` nodes (the builders and the
- * parser allow no other shape), the subscripts in CONTENT ORDER
- * (`subtree_less`, the order `get_free_vars` returns), outermost first, so
- * permutations of `Y` give one node; a variable of `Y` not free in `f` is
- * dropped (the term-level FOLD_DEGENERATE_BINDERS), a constant `f` is
- * returned as it is. `Y` is excluded from its `FV`. The key of §1
- * `quant_memo` ("the key IS the query") and DISCHARGE's `keep_functional`
- * emission (layer 3).
- */
-template <NodeType node>
-tref functional_quantifier(binder kind, const block& Y, tref f);
 
 /// The term carries a functional quantifier (`SETTLE_FUNCTIONAL`'s test, §6).
 template <NodeType node>
 bool carries_functional_quantifier(tref f);
+
+/**
+ * @brief §3 `RESOLVE_FUNCTIONAL(φ, kf)`: every functional-quantifier chain of
+ * `n` — a `bf` term or a `wff` formula, entered everywhere (binders,
+ * reference arguments, chain bodies) and, for a BDD-backed term, its LEAVES —
+ * resolved INNERMOST FIRST, the engine behind `RESOLVE_FUNCTIONAL` and
+ * `SETTLE_FUNCTIONAL` (§3, §6). `order` is the LIVE order, empty when none is
+ * live; every `BDD_ID` `n` carries must belong to it (Debug-asserted).
+ *
+ * Per chain: canonicalise it through the library's constructor (which drops
+ * degenerate and shadowed subscripts, merges runs and already folds a closed
+ * chain), then, unless `keep` accepts the canonical prefix, quantify.
+ *
+ * A chain over a BDD-BACKED body — keep mode's whole-block emission
+ * `Q_X (bf(BDD_ID))` (§7 `DISCHARGE`) — is settled where it lies, one
+ * quantification of the stored ref under the LIVE order, whenever the
+ * subscripts are keys of it and the prefix's nesting follows its ranks (one
+ * kind always does: a set quantification commutes). The result is a BDD under
+ * the live order, emitted like every other term — plain when nothing
+ * branches, which is the usual whole-block outcome.
+ *
+ * Otherwise the GENERAL path: the body as a BDD over an order ranking the
+ * chain's INNERMOST subscript lowest (a stored BDD not legal under it is
+ * spelled out first, a `BDD_ID` being a node of ONE order), quantified by the
+ * prefix and spelled with `to_tau_term`. The result of this path is PLAIN: a
+ * `BDD_ID` minted under the chain's order would be a node of the wrong one.
+ *
+ * LEAF HAZARD (§1): a subscript hiding inside a leaf (a reference argument, a
+ * foreign-typed subterm) is not reached by the quantification, so such a
+ * chain cannot be resolved and STAYS, rebuilt over its already-resolved body
+ * — the spec's "partial". A chain left standing, kept or hazardous, is never
+ * swallowed by an enclosing chain of the OTHER kind, so a `keep` decision
+ * taken inside holds across a block boundary; a same-kind run above it is the
+ * SAME block, which merges into one chain and is decided once.
+ *
+ * Memoised per node by the traversal, within the call; layer 3 wires the
+ * cross-call `quant_memo` (§1: the key IS the chain over its plain body).
+ */
+template <NodeType node>
+tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
+	const keep_functional_fn<node>& keep = keep_no_functional<node>);
 
 // --- substitution inside a term -----------------------------------------------
 

@@ -348,8 +348,8 @@ TEST_CASE("T13: binder accessors, no renaming") {
 	tref body = atom("a");
 	tref ex = tau::build_wff_ex(fvar("x"), body, false);
 	tref all = tau::build_wff_all(fvar("y"), body, false);
-	CHECK(ap::binder_kind<node_t>(ex) == ap::binder::ex);
-	CHECK(ap::binder_kind<node_t>(all) == ap::binder::all);
+	CHECK(ap::binder_kind<node_t>(ex) == tau_term_bdd<node_t>::ex);
+	CHECK(ap::binder_kind<node_t>(all) == tau_term_bdd<node_t>::all);
 	// The variable is the binder's first child, so it carries the body as
 	// its right sibling: compare by content.
 	CHECK(same(ap::binder_var<node_t>(ex), fvar("x")));

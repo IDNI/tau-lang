@@ -160,9 +160,9 @@ TEST_SUITE("anti_prenex/foundations/prims: rewrap") {
 
 	TEST_CASE("the kind parameter selects the binder") {
 		tref phi = eq0("a");
-		CHECK(ap::rewrap<node_t>(phi, { qvar("x") }, ap::binder::all)
+		CHECK(ap::rewrap<node_t>(phi, { qvar("x") }, tau_term_bdd<node_t>::all)
 			== tau::build_wff_all(qvar("x"), phi, false));
-		CHECK(ap::rewrap<node_t>(phi, { qvar("x") }, ap::binder::all)
+		CHECK(ap::rewrap<node_t>(phi, { qvar("x") }, tau_term_bdd<node_t>::all)
 			!= ap::rewrap<node_t>(phi, { qvar("x") }));
 	}
 

@@ -17,6 +17,10 @@
  *    `bdd_cofactor`): recursive over BDD refs with a per-call memo, the
  *    shape of its own workers (`bdd_ex`, `bdd_compose_impl`). Walks over the
  *    TAU tree go through `pre_order` (dag.h, tree.h).
+ *  - `build_bdd` owns the functional-quantifier SLIDE: it collects a chain
+ *    whole, builds the body under the order minus the subscripts and wraps
+ *    the chain onto every leaf, so nothing here prepares a term for it and
+ *    every caller hands it the term as written.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__
@@ -38,50 +42,27 @@ template <NodeType node> using bref  = typename tau_term_bdd<node>::ref;
 template <NodeType node> using thandle = term_handle<node>;
 
 /**
- * @brief §1 SLIDE of the functional quantifiers inside a plain term: every
- * `∀_y b` / `∃_y b` whose body touches `P` becomes the `BDD_ID` of
- * `y·∀_y b₁ ∪ y′·∀_y b₀`, i.e. the body's BDD over `P` with the quantifier
- * pushed onto every leaf — innermost first, since the walk is post-order
- * (`pre_order`'s `up`), and `build_bdd` absorbs a `BDD_ID` subterm through
- * `U`. A quantifier whose body is `P`-free is a leaf as it stands.
+ * @brief The maximal functional-quantifier chain hanging off the `bf` node
+ * @p n: its prefix OUTERMOST FIRST and the body it sits on. An empty prefix
+ * (and @p n itself) when @p n is no chain. @p stop holds the chain nodes the
+ * collection must not enter — the ones a resolution left standing.
  */
 template <NodeType node>
-tref slide_quantifiers(tref t, const var_order<node>& order) {
+std::pair<typename tbdd<node>::quants, tref> strip_chain(tref n,
+	const subtree_unordered_set<node>& stop)
+{
 	using tau = tree<node>;
-	using bdd = tbdd<node>;
-	auto down  = [](tref n) { return n; };
-	auto visit = [](tref n) { return while_is_boolean_operation<node>(n); };
-	auto up = [&order](tref n) -> tref {
+	typename tbdd<node>::quants q;
+	while (!stop.contains(n)) {
 		const tau& tn = tau::get(n);
-		if (!tn.is(tau::bf)) return n;
-		const tau& c = tn[0];
-		if (!(c.is(tau::bf_fall) || c.is(tau::bf_fex))) return n;
-		tref y    = tau::trim_right_sibling(c.first());
-		tref body = tau::trim_right_sibling(c.second());
-		if (!bdd::has_bdd_var(body, order)) return n;
-		// A term-level binder never shadows a block variable: binder ids
-		// are canonical after phase 0.
-		DBG(assert(!order.contains(y));)
-		const binder k = c.is(tau::bf_fall) ? binder::all : binder::ex;
-		bref<node> b = bdd::build_bdd(body, order);
-		auto fq = [&](tref leaf) {
-			return functional_quantifier<node>(k, block{ y }, leaf);
-		};
-		return thandle<node>::convert_to_tau_node_or_term(
-			thandle<node>(bdd::map_leaves(b, fq, order)),
-			find_ba_type<node>(n));
-	};
-	return pre_order<node>(t).apply_unique(down, visit, up);
-}
-
-/// The BDD of any term under the live order: `build_bdd` resolves a
-/// `bf(BDD_ID)` through `U` itself (a BDD-backed term is its own BDD, and
-/// the slide is a no-op on it), and builds a plain term over `P` with the
-/// quantifiers slid, absorbing `BDD_ID` subterms (a `bf_and` of two
-/// cofactors, a complement) as it goes.
-template <NodeType node>
-bref<node> to_ref(tref t, const var_order<node>& order) {
-	return tbdd<node>::build_bdd(slide_quantifiers<node>(t, order), order);
+		if (!tn.child_is(tau::bf_fall) && !tn.child_is(tau::bf_fex))
+			break;
+		const tau& c = tau::get(tn.first());
+		q.emplace_back(tau::trim_right_sibling(c.first()),
+			c.is(tau::bf_fall) ? tbdd<node>::all : tbdd<node>::ex);
+		n = tau::trim_right_sibling(c.second());
+	}
+	return { std::move(q), n };
 }
 
 /**
@@ -156,7 +137,8 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 		if (auto it = term_memo.find(t); it != term_memo.end())
 			return it->second;
 		tref r = thandle<node>::convert_to_tau_node_or_term(
-			thandle<node>(to_ref<node>(t, order)), find_ba_type<node>(t));
+			thandle<node>(tbdd<node>::build_bdd(t, order)),
+			find_ba_type<node>(t));
 		return term_memo.emplace(t, r).first->second;
 	};
 	// Equations only (ruling 2): an order atom is never cofactored and is
@@ -198,7 +180,7 @@ tref cofactor(tref f, tref x, bool bit, const var_order<node>& order) {
 }
 
 template <NodeType node>
-tref quantify_over(binder kind, tref f, const block& X,
+tref quantify_over(quantifier<node> kind, tref f, const block& X,
 	const var_order<node>& order)
 {
 	using namespace terms_detail;
@@ -206,39 +188,11 @@ tref quantify_over(binder kind, tref f, const block& X,
 	bref<node> r = thandle<node>::convert_to_handle(f).get();
 	DBG(assert(tbdd<node>::is_ordered(r, order));)
 	trefs v(X.begin(), X.end());
-	bref<node> q = kind == binder::all
+	bref<node> q = kind == tbdd<node>::all
 		? tbdd<node>::bdd_all(r, std::move(v), order)
 		: tbdd<node>::bdd_ex(r, v, order);
 	return thandle<node>::convert_to_tau_node_or_term(thandle<node>(q),
 		find_ba_type<node>(f));
-}
-
-template <NodeType node>
-tref functional_quantifier(binder kind, const block& Y, tref f) {
-	using tau = tree<node>;
-	f = tau::trim_right_sibling(f);
-	if (tau::get(f).equals_0() || tau::get(f).equals_1()) return f;
-	// Only the variables actually free in `f` (a binder over an absent
-	// variable is degenerate), in content order, deduplicated.
-	const trefs& vars = get_free_vars<node>(f);
-	trefs ys;
-	for (tref y : Y) {
-		y = tau::trim_right_sibling(y);
-		if (std::binary_search(vars.begin(), vars.end(), y, tau::subtree_less))
-			ys.push_back(y);
-	}
-	if (ys.empty()) return f;
-	std::sort(ys.begin(), ys.end(), tau::subtree_less);
-	ys.erase(std::unique(ys.begin(), ys.end(),
-		[](tref a, tref b) { return tau::subtree_equals(a, b); }), ys.end());
-	// Outermost first in `ys`, so the chain is folded from the back. The
-	// builders rename the bound variable by default; the module never does
-	// (ground rule 4), so every call passes `false`.
-	tref r = f;
-	for (auto it = ys.rbegin(); it != ys.rend(); ++it)
-		r = kind == binder::all ? build_bf_fall<node>(*it, r, false)
-			: build_bf_fex<node>(*it, r, false);
-	return r;
 }
 
 template <NodeType node>
@@ -255,6 +209,134 @@ bool carries_functional_quantifier(tref f) {
 	};
 	return !tbdd<node>::visit_nodes(
 		thandle<node>::convert_to_handle(f).get(), at_node);
+}
+
+template <NodeType node>
+tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
+	const keep_functional_fn<node>& keep)
+{
+	using tau = tree<node>;
+	using namespace terms_detail;
+	// The chains this call left standing — kept by `keep`, or blocked by
+	// the leaf hazard. A chain above one stops its collection there, so a
+	// decision taken inside holds across a change of kind, i.e. at a block
+	// boundary; a SAME-kind run above it is the same block, which the
+	// constructor merges and `keep` then decides once, on the whole run.
+	subtree_unordered_set<node> standing;
+	auto down  = [](tref m) { return m; };
+	auto visit = [](tref) { return true; };
+	// Post-order, so a chain nested in a body is resolved before the chain
+	// above it (the spec's innermost first).
+	auto up = [&](tref m) -> tref {
+		const tau& tm = tau::get(m);
+		if (!tm.is(tau::bf) || standing.contains(m)) return m;
+		// A BDD-backed term keeps its chains in the LEAVES, not in the
+		// tree, and that is exactly SETTLE_FUNCTIONAL's input (§6:
+		// `TERM_OF` of a prepared equation): resolve them there and
+		// re-emit. A leaf whose chain is kept or hazardous comes back
+		// as it was, and one that came to hold a decision variable is
+		// re-canonicalised by `map_leaves`.
+		if (thandle<node>::is_bdd_backed(m)) {
+			bref<node> s = thandle<node>::convert_to_handle(m).get();
+			DBG(assert(tbdd<node>::is_ordered(s, order));)
+			auto in_leaf = [&](tref leaf) {
+				return resolve_functional_quantifiers<node>(
+					leaf, order, keep);
+			};
+			bref<node> r = tbdd<node>::map_leaves(s, in_leaf, order);
+			return r == s ? m
+				: thandle<node>::convert_to_tau_node_or_term(
+					thandle<node>(r), find_ba_type<node>(m));
+		}
+		if (!tm.child_is(tau::bf_fall) && !tm.child_is(tau::bf_fex))
+			return m;
+		// Canonicalise first: the constructor drops a degenerate or
+		// shadowed subscript, merges the runs and already folds a
+		// closed chain, so what is left is a duplicate-free prefix
+		// whose ranks below satisfy `bdd_quant`'s assertion, and `keep`
+		// sees the canonical chain.
+		auto [q0, b0] = strip_chain<node>(m, standing);
+		tref c = tbdd<node>::build_functional_quantifiers(q0, b0);
+		auto [q, body] = strip_chain<node>(c, standing);
+		if (q.empty()) return c;        // folded, or nothing left to bind
+		if (keep(q)) return standing.insert(c), c;
+		// The chain's own order: the INNERMOST subscript lowest, over
+		// the subscripts alone. A subscript is bound here, so it is
+		// normally no key of the live order and the library's memos
+		// survive the switch; where it is one (a settled sub-block's
+		// emission, §1) the ranks disagree and the memos are dropped,
+		// which is the cache sync doing its job.
+		var_order<node> o;
+		for (size_t i = 0; i < q.size(); ++i)
+			o.emplace(q[i].first, int_t(q.size() - i));
+		bool one_kind = true;
+		trefs ys;
+		for (const auto& [y, k] : q) {
+			if (k != q[0].second) one_kind = false;
+			ys.push_back(y);
+		}
+		// LEAF HAZARD (§1): a subscript inside a leaf is not reached by
+		// any quantification, so the chain stays — the spec's partial
+		// resolution, over the body its inner chains already resolved.
+		auto hidden = [&o](bref<node> x) {
+			for (tref v : thandle<node>::get_free_leaf_vars(x.b))
+				if (o.contains(v)) return true;
+			return false;
+		};
+		// One kind is a SET quantification (the members commute), which
+		// shares the library's `ex` memo; a mixed prefix needs the
+		// nesting to follow the ranks, `bdd_quant`'s own precondition.
+		auto quantify = [&](bref<node> x, const var_order<node>& ord) {
+			trefs v = ys;
+			return !one_kind ? tbdd<node>::bdd_quant(x, q, ord)
+				: q[0].second == tbdd<node>::all
+					? tbdd<node>::bdd_all(x, std::move(v), ord)
+					: tbdd<node>::bdd_ex(x, v, ord);
+		};
+		if (thandle<node>::is_bdd_backed(body)) {
+			bref<node> s = thandle<node>::convert_to_handle(body).get();
+			if (hidden(s)) return standing.insert(c), c;
+			// The WHOLE-BLOCK emission `Q_X (bf(BDD_ID))` of keep
+			// mode (§7 `DISCHARGE`): the subscripts are decision
+			// variables of the stored BDD, so ONE quantification
+			// under the LIVE order settles it where it lies, and
+			// the result is a BDD under that order — emitted like
+			// every other term, plain when nothing branches (the
+			// usual whole-block outcome).
+			bool live = !order.empty();
+			for (tref y : ys)
+				if (!order.contains(y)) { live = false; break; }
+			if (live) {
+				DBG(assert(tbdd<node>::is_ordered(s, order));)
+				bool nested = true;
+				for (size_t i = 1; i < q.size(); ++i)
+					if (!tbdd<node>::less_then(q[i].first,
+						q[i - 1].first, order))
+					{ nested = false; break; }
+				if (one_kind || nested)
+					return thandle<node>::
+						convert_to_tau_node_or_term(
+							thandle<node>(quantify(s, order)),
+							find_ba_type<node>(body));
+			}
+		}
+		// The general path, over the chain's own order: a stored BDD
+		// that is not legal under it is spelled out first (a `BDD_ID`
+		// is a node of ONE order).
+		bref<node> b;
+		if (thandle<node>::is_bdd_backed(body)) {
+			bref<node> s = thandle<node>::convert_to_handle(body).get();
+			b = tbdd<node>::is_ordered(s, o) ? s
+				: tbdd<node>::build_bdd(
+					thandle<node>::convert_to_tau_terms(body), o);
+		} else b = tbdd<node>::build_bdd(body, o);
+		if (hidden(b)) return standing.insert(c), c;
+		// PLAIN on this path: the chain's order is not the live one, so
+		// a `BDD_ID` minted under it would be a node of the wrong order.
+		return tbdd<node>::to_tau_term(quantify(b, o),
+			find_ba_type<node>(body));
+	};
+	return pre_order<node>(n).apply_unique(down, visit, up);
 }
 
 // --- substitution inside a term -----------------------------------------------
@@ -291,7 +373,8 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 	r = tbdd<node>::map_leaves(r, leaf_subst, order);
 	// 2. the decision variable, by BDD compose.
 	if (order.contains(x))
-		r = tbdd<node>::bdd_compose(r, x, to_ref<node>(t, order), order);
+		r = tbdd<node>::bdd_compose(r, x,
+			tbdd<node>::build_bdd(t, order), order);
 	return thandle<node>::convert_to_tau_node_or_term(thandle<node>(r),
 		find_ba_type<node>(f));
 }
@@ -313,7 +396,7 @@ tref simplify_term(tref t, const var_order<node>& order) {
 	// canonical already; a plain combination of BDD-backed subterms is
 	// built over `P`), then every leaf through the path simplifier and
 	// the rebuild that merges leaves that became equal.
-	bref<node> r = to_ref<node>(t, order);
+	bref<node> r = tbdd<node>::build_bdd(t, order);
 	DBG(assert(tbdd<node>::is_ordered(r, order));)
 	auto sps = [](tref leaf) { return syntactic_path_simplification<node>(leaf); };
 	return thandle<node>::convert_to_tau_node_or_term(
@@ -368,7 +451,8 @@ tref term_of(tref atom, const var_order<node>& order) {
 		return build_bf_xor<node>(l, r);
 	// The ring sum of two BDD-backed sides is a BDD operation; a plain side
 	// (a constant, a P-free term) is a leaf under the same order.
-	bref<node> a = to_ref<node>(l, order), b = to_ref<node>(r, order);
+	bref<node> a = tbdd<node>::build_bdd(l, order),
+		b = tbdd<node>::build_bdd(r, order);
 	DBG(assert(bdd::is_ordered(a, order) && bdd::is_ordered(b, order));)
 	return thandle<node>::convert_to_tau_node_or_term(
 		thandle<node>(bdd::bdd_xor(a, b, order)),

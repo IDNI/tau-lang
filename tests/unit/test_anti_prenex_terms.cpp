@@ -194,52 +194,53 @@ TEST_CASE("quantify_over over all of P: meet / join of the leaves") {
 	order_t o = order_of(P);
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & a | x' & b = 0"), P, o)).first;
 	REQUIRE(th::is_bdd_backed(l));
-	tref all = ap::quantify_over<node_t>(ap::binder::all, l, P, o);
-	tref ex  = ap::quantify_over<node_t>(ap::binder::ex,  l, P, o);
+	tref all = ap::quantify_over<node_t>(tb::all, l, P, o);
+	tref ex  = ap::quantify_over<node_t>(tb::ex,  l, P, o);
 	CHECK(!th::is_bdd_backed(all));
 	CHECK(!th::is_bdd_backed(ex));
 	CHECK(same_function(all, bf("a & b"), { a, b }));
 	CHECK(same_function(ex,  bf("a | b"), { a, b }));
 	// over an empty block, or on a plain term: identity
-	CHECK(ap::quantify_over<node_t>(ap::binder::all, l, {}, o) == l);
-	CHECK(ap::quantify_over<node_t>(ap::binder::ex, bf("a"), P, o) == bf("a"));
+	CHECK(ap::quantify_over<node_t>(tb::all, l, {}, o) == l);
+	CHECK(ap::quantify_over<node_t>(tb::ex, bf("a"), P, o) == bf("a"));
 	// over PART of the decision set: the library's quantification, and the
 	// result stays BDD-backed on the rest
 	tref y = vr("y");
 	ap::block Q{ x, y };
 	order_t oq = order_of(Q);
 	tref g = sides(ap::prepare_terms<node_t>(wff("x & y & a | x' & b = 0"), Q, oq)).first;
-	tref exx = ap::quantify_over<node_t>(ap::binder::ex, g, { x }, oq);
+	tref exx = ap::quantify_over<node_t>(tb::ex, g, { x }, oq);
 	CHECK(th::is_bdd_backed(exx));
 	trefs vx{ x };
 	CHECK(ref_of(exx, oq) == tb::bdd_ex(ref_of(g, oq), vx, oq));
 	CHECK(same_function(exx, bf("y & a | b"), { y, a, b }));
 }
 
-// 4. the slide ----------------------------------------------------------------
+// 4. the library's slide, and RESOLVE_FUNCTIONAL -------------------------------
 
-TEST_CASE("prepare_terms slides a functional quantifier onto the leaves, innermost first") {
-	tref x = vr("x");
+TEST_CASE("prepare_terms: the library slides a functional quantifier onto the leaves") {
+	tref x = vr("x"), v = vr("v");
 	ap::block P{ x };
 	order_t o = order_of(P);
-	// ∀_y (x·y ∪ x′·z) = x·∀_y y ∪ x′·∀_y z = x·(fall y y) ∪ x′·z
+	// ∀_y (x·y ∪ x′·z) = x·∀_y y ∪ x′·∀_y z = x·0 ∪ x′·z: the high leaf is
+	// a closed chain, which the constructor folds.
 	tref l = sides(ap::prepare_terms<node_t>(wff("fall y (x & y | x' & z) = 0"), P, o)).first;
 	REQUIRE(th::is_bdd_backed(l));
-	tref hi = ap::cofactor<node_t>(l, x, true, o);
-	tref lo = ap::cofactor<node_t>(l, x, false, o);
-	CHECK(tau::subtree_equals(hi, bf("fall y y")));
-	CHECK(tau::subtree_equals(lo, bf("z")));
-	CHECK(ap::carries_functional_quantifier<node_t>(l));
-	// nested: ∀_y ∃_w (x·y·w ∪ x′·z) → x·∀_y ∃_w (y·w) ∪ x′·z. The chain
-	// keeps the parser's canonical ids and the leaf is rebuilt in content
-	// order of those ids, which no parse string reproduces (the parser
-	// orders operands under the source names and canonicalises afterwards),
-	// so the chain is compared binder by binder and the leaf as a function.
-	tref n = sides(ap::prepare_terms<node_t>(wff("fall y fex w (x & y & w | x' & z) = 0"), P, o)).first;
+	CHECK(ref_of(l, o) == tb::build_bdd(bf("x' & z"), o));
+	CHECK(!ap::carries_functional_quantifier<node_t>(l));
+	// nested, with `v` free in the body so the chain survives on the leaf:
+	// ∀_y ∃_w (x·y·w·v ∪ x′·z) → x·∀_y ∃_w (y·w·v) ∪ x′·z. The chain keeps
+	// the parser's canonical ids and the leaf is rebuilt in content order of
+	// those ids, which no parse string reproduces (the parser orders
+	// operands under the source names and canonicalises afterwards), so the
+	// chain is compared binder by binder and the leaf as a function.
+	tref n = sides(ap::prepare_terms<node_t>(
+		wff("fall y fex w (x & y & w & v | x' & z) = 0"), P, o)).first;
 	REQUIRE(th::is_bdd_backed(n));
+	CHECK(ap::carries_functional_quantifier<node_t>(n));
 	{
 		tref got = ap::cofactor<node_t>(n, x, true, o);
-		tref want = bf("fall y fex w (y & w)");
+		tref want = bf("fall y fex w (y & w & v)");
 		auto var  = [](tref q) { return tau::trim_right_sibling(tau::get(q)[0].first()); };
 		auto body = [](tref q) { return tau::trim_right_sibling(tau::get(q)[0].second()); };
 		REQUIRE(tau::get(got).child_is(tau::bf_fall));
@@ -247,7 +248,8 @@ TEST_CASE("prepare_terms slides a functional quantifier onto the leaves, innermo
 		tref got_in = body(got), want_in = body(want);
 		REQUIRE(tau::get(got_in).child_is(tau::bf_fex));
 		CHECK(tau::subtree_equals(var(got_in), var(want_in)));
-		CHECK(same_function(body(got_in), body(want_in), { var(got), var(got_in) }));
+		CHECK(same_function(body(got_in), body(want_in),
+			{ var(got), var(got_in), v }));
 	}
 	CHECK(tau::subtree_equals(ap::cofactor<node_t>(n, x, false, o), bf("z")));
 	// a quantifier whose body is P-free is a leaf as it stands
@@ -255,33 +257,111 @@ TEST_CASE("prepare_terms slides a functional quantifier onto the leaves, innermo
 	CHECK(tau::subtree_equals(ap::cofactor<node_t>(m, x, true, o), bf("fall y (y | z)")));
 }
 
-TEST_CASE("functional_quantifier: one node per permutation, absent variables dropped") {
-	tref y = vr("y"), z = vr("z"), w = vr("w");
+TEST_CASE("carries_functional_quantifier: plain, and in a BDD-backed term's leaves") {
+	tref y = vr("y"), z = vr("z");
 	tref f = bf("y & z");
-	tref a = ap::functional_quantifier<node_t>(ap::binder::all, { y, z }, f);
-	tref b = ap::functional_quantifier<node_t>(ap::binder::all, { z, y }, f);
-	CHECK(a == b);
-	CHECK(tau::get(a).child_is(tau::bf_fall));
-	// a nested single-variable chain, as the parser builds it. The module
-	// keeps the source names (it never renames, ground rule 4) while the
-	// parser canonicalises functional subscripts, so the built chain is
-	// canonicalised before the comparison.
-	tref ca = canonize_quantifier_ids<node_t>(a);
-	CHECK((tau::subtree_equals(ca, bf("fall y fall z (y & z)"))
-		|| tau::subtree_equals(ca, bf("fall z fall y (y & z)"))));
-	CHECK((tau::subtree_equals(ca, bf("fall y, z (y & z)"))
-		|| tau::subtree_equals(ca, bf("fall z, y (y & z)"))));
-	// w ∉ FV(f): dropped
-	CHECK(ap::functional_quantifier<node_t>(ap::binder::ex, { w }, f) == f);
-	CHECK(ap::functional_quantifier<node_t>(ap::binder::ex, { w, y }, f)
-		== ap::functional_quantifier<node_t>(ap::binder::ex, { y }, f));
-	// a constant is returned as it is
-	CHECK(ap::functional_quantifier<node_t>(ap::binder::all, { y }, bf("1")) == bf("1"));
-	// Y excluded from FV
-	const trefs& fv = get_free_vars<node_t>(a);
-	CHECK(fv.empty());
+	tref a = tb::build_functional_quantifiers({{y, tb::all}}, bf("y & z & w"));
+	REQUIRE(tau::get(a).child_is(tau::bf_fall));
 	CHECK(ap::carries_functional_quantifier<node_t>(a));
 	CHECK(!ap::carries_functional_quantifier<node_t>(f));
+	// BDD-backed: the chains sit in the leaves, not in the tree
+	ap::block P{ z };
+	order_t o = order_of(P);
+	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(a), P, o)).first;
+	REQUIRE(th::is_bdd_backed(l));
+	CHECK(ap::carries_functional_quantifier<node_t>(l));
+}
+
+TEST_CASE("resolve_functional_quantifiers: plain, nested, hazard, keep") {
+	tref y = vr("y"), z = vr("z"), w = vr("w"), u = vr("u");
+	// ∀y (y ∪ z) = z
+	tref c = tb::build_functional_quantifiers({{y, tb::all}}, bf("y | z"));
+	REQUIRE(tau::get(c).child_is(tau::bf_fall));
+	tref r = ap::resolve_functional_quantifiers<node_t>(c, {});
+	CHECK(!ap::carries_functional_quantifier<node_t>(r));
+	CHECK(same_function(r, bf("z"), { z }));
+	// nested, mixed kinds: ∀y ∃w (y·w·z ∪ y′·u) = z·u
+	tref inner = tb::build_functional_quantifiers({{w, tb::ex}},
+		bf("y & w & z | y' & u"));
+	tref outer = tb::build_functional_quantifiers({{y, tb::all}}, inner);
+	REQUIRE(tau::get(outer).child_is(tau::bf_fall));
+	tref r2 = ap::resolve_functional_quantifiers<node_t>(outer, {});
+	CHECK(!ap::carries_functional_quantifier<node_t>(r2));
+	CHECK(same_function(r2, bf("z & u"), { z, u }));
+	// the LEAF HAZARD: `y` hides inside a reference argument, so the
+	// quantification cannot reach it and the chain stays as it is
+	tref hz = tb::build_functional_quantifiers({{y, tb::all}}, bf("y & r(y)"));
+	REQUIRE(tau::get(hz).child_is(tau::bf_fall));
+	CHECK(ap::resolve_functional_quantifiers<node_t>(hz, {}) == hz);
+	// `keep` accepting everything leaves every chain standing
+	auto keep_all = [](const tb::quants&) { return true; };
+	CHECK(ap::resolve_functional_quantifiers<node_t>(c, {}, keep_all) == c);
+	CHECK(ap::resolve_functional_quantifiers<node_t>(outer, {}, keep_all) == outer);
+	// `keep` accepting only the ∃ run: the ∀ above it resolves over the kept
+	// chain, which rides into the leaves and survives
+	auto keep_ex = [](const tb::quants& q) { return q[0].second == tb::ex; };
+	tref r3 = ap::resolve_functional_quantifiers<node_t>(outer, {}, keep_ex);
+	CHECK(r3 != outer);
+	CHECK(ap::carries_functional_quantifier<node_t>(r3));
+	// resolving again with nothing kept finishes the job
+	CHECK(same_function(ap::resolve_functional_quantifiers<node_t>(r3, {}),
+		bf("z & u"), { z, u }));
+}
+
+TEST_CASE("resolve_functional_quantifiers: the chains inside a BDD-backed term's leaves") {
+	tref x = vr("x"), y = vr("y");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// x·(∀y (y ∪ z)) ∪ x′·w, prepared over {x}: the chain is a LEAF, since
+	// its body does not touch P. Resolving it gives x·z ∪ x′·w.
+	tref chain = tb::build_functional_quantifiers({{y, tb::all}}, bf("y | z"));
+	tref t = tau::build_bf_or(tau::build_bf_and(bf("x"), chain),
+		tau::build_bf_and(bf("x'"), bf("w")));
+	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(t), P, o)).first;
+	REQUIRE(th::is_bdd_backed(l));
+	REQUIRE(ap::carries_functional_quantifier<node_t>(l));
+	tref r = ap::resolve_functional_quantifiers<node_t>(l, o);
+	CHECK(!ap::carries_functional_quantifier<node_t>(r));
+	CHECK(th::is_bdd_backed(r));
+	CHECK(ref_of(r, o) == tb::build_bdd(bf("x & z | x' & w"), o));
+	// nothing to resolve: the same node back
+	CHECK(ap::resolve_functional_quantifiers<node_t>(r, o) == r);
+}
+
+TEST_CASE("resolve_functional_quantifiers: a whole-block chain over a stored BDD") {
+	tref x = vr("x"), y = vr("y"), a = vr("a"), b = vr("b");
+	order_t live {{ x, 1 }, { y, 2 }};
+	tref node = th::convert_to_tau_node(bf("x & y & a | x' & b"), live);
+	REQUIRE(th::is_bdd_backed(node));
+	tb::ref s = th::convert_to_handle(node).get();
+	const size_t ty = find_ba_type<node_t>(node);
+	// one kind over ALL the decision variables: one quantification on the
+	// stored ref under the LIVE order, emitted like every other term
+	for (auto kind : { tb::all, tb::ex }) {
+		tref c = tb::build_functional_quantifiers(
+			{{ x, kind }, { y, kind }}, node);
+		REQUIRE(ap::carries_functional_quantifier<node_t>(c));
+		trefs v{ x, y };
+		tb::ref want = kind == tb::all ? tb::bdd_all(s, v, live)
+			: tb::bdd_ex(s, v, live);
+		CHECK(ap::resolve_functional_quantifiers<node_t>(c, live)
+			== th::convert_to_tau_node_or_term(th(want), ty));
+	}
+	// MIXED kinds whose nesting follows the live ranks (the inner subscript
+	// ranks lower): still one quantification, under the live order
+	tb::quants qin {{ y, tb::all }, { x, tb::ex }};
+	tref cin = tb::build_functional_quantifiers(qin, node);
+	tref rin = ap::resolve_functional_quantifiers<node_t>(cin, live);
+	CHECK(rin == th::convert_to_tau_node_or_term(
+		th(tb::bdd_quant(s, qin, live)), ty));
+	CHECK(same_function(rin, bf("b"), { a, b }));   // ∀y ∃x = b
+	// the other nesting: `bdd_quant`'s precondition fails under the live
+	// order, so the general path spells and rebuilds — same function
+	tb::quants qout {{ x, tb::all }, { y, tb::ex }};
+	tref cout = tb::build_functional_quantifiers(qout, node);
+	tref rout = ap::resolve_functional_quantifiers<node_t>(cout, live);
+	CHECK(!ap::carries_functional_quantifier<node_t>(rout));
+	CHECK(same_function(rout, bf("a & b"), { a, b }));  // ∀x ∃y = a·b
 }
 
 // 5. subst_term ---------------------------------------------------------------

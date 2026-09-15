@@ -226,7 +226,7 @@ template <NodeType node> bool is_flat_tree(tref n);
 // --- binder accessors -----------------------------------------------------------
 
 /// Kind of a formula binder node (`wff_ex` → ex, `wff_all` → all).
-template <NodeType node> binder binder_kind(tref n);
+template <NodeType node> quantifier<node> binder_kind(tref n);
 /// The bound variable of a formula binder node (child 0, a `variable`).
 template <NodeType node> tref binder_var(tref n);
 /// The body of a formula binder node (child 1, a `wff`).

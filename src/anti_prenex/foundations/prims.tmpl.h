@@ -21,7 +21,7 @@ tref canonicalise_binder_ids(tref phi) {
 // New: no existing helper wraps an ordered list without renaming -- the
 // `_many` builders always rename, which ground rule 4 forbids here.
 template <NodeType node>
-tref rewrap(tref phi, const block& X, binder kind) {
+tref rewrap(tref phi, const block& X, quantifier<node> kind) {
 	using tau = tree<node>;
 	DBG(assert(phi != nullptr);)
 #ifdef DEBUG
@@ -39,7 +39,7 @@ tref rewrap(tref phi, const block& X, binder kind) {
 #endif // DEBUG
 	// `X[0]` is the outermost binder, so attach from the back.
 	for (auto it = X.rbegin(); it != X.rend(); ++it)
-		phi = kind == binder::ex
+		phi = kind == tau_term_bdd<node>::ex
 			? tau::build_wff_ex(*it, phi, false)
 			: tau::build_wff_all(*it, phi, false);
 	return phi;

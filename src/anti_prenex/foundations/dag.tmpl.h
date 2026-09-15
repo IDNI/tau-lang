@@ -290,9 +290,10 @@ bool is_flat_tree(tref n) {
 // --- binder accessors -----------------------------------------------------------
 
 template <NodeType node>
-binder binder_kind(tref n) {
+quantifier<node> binder_kind(tref n) {
 	DBG(assert(is_child_quantifier<node>(n));)
-	return is_child<node>(n, tree<node>::wff_ex) ? binder::ex : binder::all;
+	return is_child<node>(n, tree<node>::wff_ex) ? tau_term_bdd<node>::ex
+		: tau_term_bdd<node>::all;
 }
 
 template <NodeType node>

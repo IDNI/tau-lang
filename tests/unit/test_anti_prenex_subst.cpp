@@ -157,7 +157,7 @@ TEST_CASE("subst_var: descends into a unit on the TRY_WITNESS_DEEP shape, no ren
 	// The pin became 2·a = 2·a, folded to T by the hooks and left the chain;
 	// the unit was entered and rebuilt with the SAME bound variable.
 	REQUIRE(is_child_quantifier<node_t>(r));
-	CHECK(ap::binder_kind<node_t>(r) == ap::binder::all);
+	CHECK(ap::binder_kind<node_t>(r) == tau_term_bdd<node_t>::all);
 	CHECK(same(ap::binder_var<node_t>(r), z1));
 	tref body = ap::binder_body<node_t>(r);
 	REQUIRE(is_atomic_fm<node_t>(body));

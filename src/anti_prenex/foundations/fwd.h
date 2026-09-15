@@ -42,8 +42,13 @@ using block = trefs;
 using ba_type_id = size_t;
 
 /// Kind of a formula binder (`wff_ex`/`wff_all`) or of a term-level functional
-/// quantifier (`bf_fex`/`bf_fall`, §1).
-enum class binder { ex, all };
+/// quantifier (`bf_fex`/`bf_fall`, §1): the BDD library's own enum, so a kind
+/// reaches `bdd_quant` and `build_functional_quantifiers` unchanged and no
+/// translation table exists anywhere. Values are `tau_term_bdd<node>::ex` and
+/// `::all` (an unscoped enum inside the class); the alias is only here to keep
+/// signatures readable.
+template <NodeType node>
+using quantifier = typename tau_term_bdd<node>::Quantifier;
 
 /// The three answers of `ASK` (§7); the value type of §1 `solver_memo`.
 enum class answer { sat, unsat, unknown };
@@ -62,6 +67,19 @@ using simplify_formula_fn = std::function<tref(tref)>;
 /// The identity, the default `simplify_formula_fn` (never an empty
 /// `std::function`, which would throw when called).
 inline const simplify_formula_fn identity_formula = [](tref t) { return t; };
+
+/// §1 `keep_functional` as `RESOLVE_FUNCTIONAL` sees it: a pure predicate on
+/// the chain's prefix (outermost first), asked once per chain at a resolution
+/// site. Layer 3 supplies the block-level callback `ANTI_PRENEX` takes.
+template <NodeType node>
+using keep_functional_fn =
+	std::function<bool(const typename tau_term_bdd<node>::quants&)>;
+
+/// The default `keep_functional_fn`: keep nothing (never an empty
+/// `std::function`, which would throw when called).
+template <NodeType node>
+inline const keep_functional_fn<node> keep_no_functional =
+	[](const typename tau_term_bdd<node>::quants&) { return false; };
 
 /**
  * @brief A set of node handles stored as a table VALUE: sorted by

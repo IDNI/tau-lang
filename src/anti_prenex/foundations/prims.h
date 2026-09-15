@@ -59,7 +59,8 @@ tref canonicalise_binder_ids(tref phi);
  * a non-canonical D3 key). An empty `X` returns `φ`.
  */
 template <NodeType node>
-tref rewrap(tref phi, const block& X, binder kind = binder::ex);
+tref rewrap(tref phi, const block& X,
+	quantifier<node> kind = tau_term_bdd<node>::ex);
 
 /**
  * @brief §3 `FOLD_DEGENERATE_BINDERS(φ)`: drop a binder over a constant
