@@ -3,6 +3,12 @@
 #ifndef TAU_TAU_BDD_TMPL_H
 #define TAU_TAU_BDD_TMPL_H
 
+#include <algorithm>
+#include <cctype>
+#include <ranges>
+#include <stdexcept>
+#include <string>
+
 #include "tau_bdd.h"
 
 #undef LOG_CHANNEL_NAME
@@ -1411,19 +1417,187 @@ bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& 
 	return term_handle(tbdd::bdd_compose(get(), std::move(raw), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::substitute(tref, tref, term_handle, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd_handle::bound_vars(tref) @endinternal */
 template<NodeType node>
-tref tau_term_bdd_handle<node>::substitute(tref formula, tref var,
-	term_handle with, const order& o) {
-	auto subst = [&](tref n) -> tref {
-		if (!is_bdd_backed(n)) return n;
-		auto it = U.find(key_of(n));
-		DBG(assert(it != U.end()));
-		if (it == U.end()) return n;
-		term_handle result = it->second.bdd_compose(var, with, o);
-		return convert_to_tau_node(result, find_ba_type<node>(n));
+trefs tau_term_bdd_handle<node>::bound_vars(tref t) {
+	using tau = tree<node>;
+	subtree_set<node> vs;
+	auto f = [&vs](tref m) {
+		if (is_logical_or_functional_quant<node>(m))
+			vs.insert(tau::trim_right_sibling(tau::get(m).first()));
+		return true;
 	};
-	return pre_order<node>(formula).apply_until_change(subst);
+	pre_order<node>(t).visit_unique(f);
+	return trefs(vs.begin(), vs.end());
+}
+
+/** @internal @copydoc tau_term_bdd_handle::rename_apart(tref, tref) @endinternal */
+template<NodeType node>
+tref tau_term_bdd_handle<node>::rename_apart(tref n, tref t) {
+	using tau = tree<node>;
+	const trefs bound = bound_vars(t);
+	if (bound.empty()) return t;
+	const int_t base = std::max(find_biggest_var_id<node>(n),
+		find_biggest_var_id<node>(t));
+	subtree_map<node, tref> changes;
+	for (tref v : bound) {
+		const std::string name = get_var_name<node>(v);
+		if (name.empty() || !std::ranges::all_of(name,
+			[](unsigned char c) { return std::isdigit(c) != 0; }))
+			continue;
+		int_t id;
+		try { id = static_cast<int_t>(std::stoll(name)); }
+		catch (const std::out_of_range&) { continue; }
+		changes.emplace(v, tau::build_variable(std::to_string(id + base),
+			tau::get(v).get_ba_type()));
+	}
+	if (changes.empty()) return t;
+	return rewriter::replace<node>(t, changes);
+}
+
+/** @internal @copydoc tau_term_bdd_handle::substitute(tref, tref, tref, const order&, const argument_hook&) @endinternal */
+template<NodeType node>
+tref tau_term_bdd_handle<node>::substitute(tref formula, tref that, tref with,
+	const order& o, const argument_hook& on_argument)
+{
+	DBG(assert(that != nullptr && with != nullptr);)
+	return substitute(formula, subtree_map<node, tref>{ { that, with } },
+		o, on_argument);
+}
+
+/** @internal @copydoc tau_term_bdd_handle::substitute(tref, const subtree_map<node, tref>&, const order&, const argument_hook&) @endinternal */
+template<NodeType node>
+tref tau_term_bdd_handle<node>::substitute(tref formula,
+	const subtree_map<node, tref>& changes, const order& o,
+	const argument_hook& on_argument)
+{
+	using tau = tree<node>;
+	DBG(assert(formula != nullptr);)
+	if (changes.empty()) return formula;
+	// The entry step, once per call: every replacement is spelled out and
+	// renamed apart here, and the walk below — the leaves of a BDD and the
+	// arguments of a reference included — reuses the result. Renaming is
+	// not idempotent, so it happens in this one place.
+	substitution s;
+	subtree_set<node> vars;
+	for (const auto& [key, value] : changes) {
+		tref k = tau::trim_right_sibling(key);
+		tref w = tau::trim_right_sibling(value);
+		DBG(assert(k != nullptr && w != nullptr);)
+		// A witness is PLAIN: a `BDD_ID` inside it is spelled out once
+		// here, not once per leaf and per reference argument below.
+		if (tau::get(w).find_top([](tref m) {
+			return tau::get(m).is(tau::BDD_ID); }))
+			w = convert_to_tau_terms(w);
+		// And its binders are moved out of the formula's id range,
+		// AFTER that spelling: a spelled BDD brings its leaves' chains
+		// into the tree.
+		if (tau::get(w).find_top(is_logical_or_functional_quant<node>))
+			w = rename_apart(formula, w);
+		// A variable key is matched in its `bf` wrapper and used bare
+		// for the occurrence guard and the compose; both spellings of
+		// it name the same key.
+		tref var = nullptr;
+		if (const tau& t = tau::get(k); t.is(tau::variable)) {
+			var = k;
+			k = tau::get(tau::bf, k);
+		} else if (t.is(tau::bf) && t.first() != nullptr
+			&& tau::get(t.first()).is(tau::variable))
+			var = tau::trim_right_sibling(t.first());
+		if (var == nullptr) s.keys_are_variables = false;
+		else {
+			vars.insert(var);
+			s.by_variable.emplace_back(var, w);
+		}
+		s.changes.emplace(k, w);
+	}
+	s.vars.assign(vars.begin(), vars.end());
+#ifdef DEBUG
+	subtree_set<node> free_in_with;
+	for (const auto& [k, w] : s.changes) {
+		const trefs& fv = get_free_vars<node>(w);
+		free_in_with.insert(fv.begin(), fv.end());
+	}
+	s.free_in_with.assign(free_in_with.begin(), free_in_with.end());
+#endif
+	return substitute(formula, s, o, on_argument);
+}
+
+/** @internal @copydoc tau_term_bdd_handle::substitute(tref, const substitution&, const order&, const argument_hook&) @endinternal */
+template<NodeType node>
+tref tau_term_bdd_handle<node>::substitute(tref formula, const substitution& s,
+	const order& o, const argument_hook& on_argument)
+{
+	using tau = tree<node>;
+	// The occurrence guard (§10): one cached free-variable test per `wff`
+	// or `bf` node. A node no key variable is free in is not entered, so
+	// it comes back as the same tref, and a key rebound below it is left
+	// alone. A key that is no variable has no such test and everything is
+	// entered.
+	auto free_in = [&s](tref n) {
+		const trefs& fv = get_free_vars<node>(n);
+		for (tref v : s.vars)
+			if (std::binary_search(fv.begin(), fv.end(), v,
+				tau::subtree_less)) return true;
+		return false;
+	};
+	auto visit_subtree = [&](tref n) {
+		if (!s.keys_are_variables) return true;
+		const tau& t = tau::get(n);
+		return (!t.is(tau::wff) && !t.is(tau::bf)) || free_in(n);
+	};
+	auto f = [&](tref n) -> tref {
+		// An occurrence, compared by content. The walk stops here, so
+		// nothing inside a replacement is rewritten again.
+		if (const tref r = get_cached<node>(n, s.changes); r != n)
+			return r;
+		const tau& t = tau::get(n);
+		// A BDD-backed term holds its variables in the store, not as
+		// tree nodes: the hidden occurrences inside the LEAVES first,
+		// on the original leaves, so a key inside a replacement is not
+		// substituted again; then ONE compose for the keys that are
+		// decision variables.
+		if (is_bdd_backed(n)) {
+			DBG(assert(!o.empty());)
+			const ref x = convert_to_handle(n).get();
+			DBG(assert(tbdd::is_ordered(x, o));)
+			auto leaf = [&](tref l) {
+				return substitute(l, s, o, on_argument);
+			};
+			ref r = tbdd::map_leaves(x, leaf, o);
+			typename tbdd::subs_t subs;
+			for (const auto& [v, w] : s.by_variable)
+				if (o.contains(v))
+					subs.emplace_back(v,
+						tbdd::build_bdd(w, o));
+			if (!subs.empty())
+				r = tbdd::bdd_compose(r, std::move(subs), o);
+			if (r == x) return n;
+			return convert_to_tau_node_or_term(term_handle(r),
+				find_ba_type<node>(n));
+		}
+		// A reference argument is rewritten whole and re-emitted
+		// through the hook, ONCE: the walk stops on the change, and a
+		// nested reference inside the argument is finished by the
+		// recursive call before the outer hook runs.
+		if (t.is(tau::ref_arg)) {
+			tref a = tau::trim_right_sibling(t.first());
+			tref a2 = substitute(a, s, o, on_argument);
+			if (a2 == a) return n;
+			return tau::get(t.value, on_argument(a2));
+		}
+		// A binder on the path is where capture would happen. The
+		// replacements are renamed apart and their free variables are
+		// free at the site, so it cannot; Debug checks it.
+		DBG(if (is_logical_or_functional_quant<node>(n))
+			assert(!std::binary_search(s.free_in_with.begin(),
+				s.free_in_with.end(),
+				tau::trim_right_sibling(t.first()),
+				tau::subtree_less));)
+		return n;
+	};
+	return pre_order<node>(formula).apply_unique_until_change(f,
+		visit_subtree);
 }
 
 /** @internal @copydoc tau_term_bdd_handle::get() const @endinternal */

@@ -689,10 +689,67 @@ TEST_SUITE("BDD IO variable") {
 	}
 }
 
+namespace {
+
+/// Any `BDD_ID` node anywhere in the tree.
+bool has_bdd_id(tref n) {
+	return tau::get(n).find_top([](tref m) {
+		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
+}
+
+tref bf(const char* s) {
+	tref t = tau::get(s, parse_bf());
+	REQUIRE(t != nullptr);
+	return t;
+}
+tref wff(const char* s) {
+	tref t = tau::get(s, parse_wff());
+	REQUIRE(t != nullptr);
+	return t;
+}
+/// The trimmed `variable` node of a one-variable term — the shape order keys
+/// and free-variable sets hold.
+tref vr(const char* s) { return tau::trim(bf(s)); }
+
+/// The first node of kind `nt` below `n` (the root included).
+tref find_kind(tref n, size_t nt) {
+	return tau::get(n).find_top([nt](tref m) {
+		return tau::get(m).is(nt); });
+}
+
+/// The bound variable of the first binder of kind `nt` below `n`.
+std::string bound_name(tref n, size_t nt) {
+	tref q = find_kind(n, nt);
+	REQUIRE(q != nullptr);
+	return get_var_name<node_t>(tau::get(q).first());
+}
+
+/// Semantic equality of two terms over the variables `vs`: equal ROBDDs under
+/// one order over all of them (leaves opaque). Both are spelled out first,
+/// since a BDD-backed term's own ref belongs to its own order.
+bool same_function(tref a, tref b, const trefs& vs) {
+	using bdd  = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+	bdd::order o;
+	for (size_t i = 0; i < vs.size(); ++i) o.emplace(vs[i], int_t(i));
+	return bdd::build_bdd(hbdd::convert_to_tau_terms(a), o)
+		== bdd::build_bdd(hbdd::convert_to_tau_terms(b), o);
+}
+
+/// A reference `r(<args>)` as a `bf` term. The grammar's `ref_arg` is `bf`
+/// only, so a FORMULA argument — the shape a re-simplification hook is
+/// visible on — is built, not parsed.
+tref ref_term(const trefs& args) {
+	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_ref("r", args)));
+}
+
+} // namespace
+
 TEST_SUITE("BDD term_handle substitute") {
+	using bdd  = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+
 	TEST_CASE("substitute x→z in BDD of xy gives BDD of yz") {
-		using bdd = tau_term_bdd<node_t>;
-		using hbdd = term_handle<node_t>;
 		tau::get_options opts = { .parse = { .start = tau::bf } };
 #ifdef TAU_CACHE
 		bdd::clear_caches();
@@ -704,14 +761,157 @@ TEST_SUITE("BDD term_handle substitute") {
 		bdd::order o = {{tx, 0}, {ty, 1}, {tz, 2}};
 		// Build BDD for "xy" and register as a BDD_ID tau node in U
 		tref node_xy = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
-		// Build handle for the substitution value: single-variable BDD of "z"
-		hbdd with_z = hbdd::build(tau::get("z", opts), o);
 		// Substitute x → z across the formula containing the BDD node
-		tref result_node = hbdd::substitute(node_xy, tx, with_z, o);
+		tref result_node = hbdd::substitute(node_xy, tx,
+			tau::get("z", opts), o);
 		// Retrieve the tau term for the resulting BDD (z has rank 2 > y rank 1, so y is above z)
 		tref result_term = hbdd::U.find(hbdd::key_of(result_node))
 			->second.to_tau_term(1);
 		CHECK(tau::get(result_term).to_str() == "yz");
+	}
+
+	TEST_CASE("a plain formula: the occurrences go, and a formula without the key comes back as itself") {
+		tref x = vr("x");
+		tref phi = wff("x & a = 0 && b & c = 0");
+		tref res = hbdd::substitute(phi, x, bf("z"));
+		CHECK(res != phi);
+		CHECK(res == wff("z & a = 0 && b & c = 0"));
+		// the `bf(x)` spelling of the key names the same key
+		CHECK(hbdd::substitute(phi, bf("x"), bf("z")) == res);
+		// nothing to do: the same tref, spelling and all
+		tref psi = wff("b & c = 0");
+		CHECK(hbdd::substitute(psi, x, bf("z")) == psi);
+	}
+
+	TEST_CASE("a BDD-backed term: the leaves are entered and the decision variable composes") {
+		tref x = vr("x"), y = vr("y"), z = vr("z");
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		bdd::order o {{y, 0}, {x, 1}};
+		tref f = hbdd::convert_to_tau_node(bf("x & r(x)"), o);
+		REQUIRE(hbdd::is_bdd_backed(f));
+		// The replacement is plain: the compose builds its BDD under the
+		// live order, and the leaf rewrite — x hides inside the
+		// reference argument — puts it in as it stands.
+		tref t = bf("y & z");
+		REQUIRE(!has_bdd_id(t));
+		tref s = hbdd::substitute(f, x, t, o);
+		CHECK(hbdd::is_bdd_backed(s));
+		CHECK(same_function(s, bf("y & z & r(y & z)"), { x, y, z }));
+		// the finish: nothing BDD-backed remains anywhere
+		CHECK(!has_bdd_id(hbdd::convert_to_tau_terms(s)));
+		// a replacement carrying a BDD_ID is spelled out ONCE by the
+		// entry step, and gives the same result
+		tref backed = hbdd::convert_to_tau_node(t, o);
+		REQUIRE(hbdd::is_bdd_backed(backed));
+		CHECK(hbdd::substitute(f, x, backed, o) == s);
+	}
+
+	TEST_CASE("a leaf that gains a decision variable is re-canonicalised") {
+		tref p = vr("p"), a = vr("a"), b = vr("b"), c = vr("c");
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		bdd::order o {{p, 0}};
+		// p·a ∪ p′·b with the outer variable a in a leaf; a ← p·c puts
+		// the decision variable into that leaf, which the rebuild lifts
+		tref f = hbdd::convert_to_tau_node(bf("pa|p'b"), o);
+		REQUIRE(hbdd::is_bdd_backed(f));
+		tref s = hbdd::substitute(f, a, bf("p & c"), o);
+		CHECK(hbdd::is_bdd_backed(s));
+		CHECK(same_function(s, bf("pc|p'b"), { p, b, c }));
+	}
+
+	TEST_CASE("a reference argument is reached, and the hook runs once per touched argument") {
+		tref x = vr("x"), z = vr("z");
+		// (S·v2) ∪ (S·v3) with S = x·r(x, ψ(x)): the two occurrences of
+		// S are two spellings of one content, so S is rewritten once
+		// and each of the reference's two touched arguments is
+		// re-emitted exactly once.
+		tref psi = wff("x & v1 = 0");
+		tref S = build_bf_and<node_t>(bf("x"),
+			ref_term(trefs{ bf("x"), psi }));
+		tref f = build_bf_or<node_t>(build_bf_and<node_t>(S, bf("v2")),
+			build_bf_and<node_t>(S, bf("v3")));
+		size_t calls = 0;
+		auto count = [&calls](tref a) { ++calls; return a; };
+		tref s = hbdd::substitute(f, x, bf("z"), {}, count);
+		CHECK(calls == 2);
+		CHECK(s != f);
+		const trefs& fv = get_free_vars<node_t>(s);
+		CHECK(!std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));
+		CHECK(std::binary_search(fv.begin(), fv.end(), z, tau::subtree_less));
+		// Both copies were rewritten, the argument formula with them.
+		tref S_z = build_bf_and<node_t>(bf("z"),
+			ref_term(trefs{ bf("z"), wff("z & v1 = 0") }));
+		CHECK(s == build_bf_or<node_t>(build_bf_and<node_t>(S_z, bf("v2")),
+			build_bf_and<node_t>(S_z, bf("v3"))));
+		// An argument the key does not reach is not re-emitted.
+		tref g = build_bf_and<node_t>(bf("x"),
+			ref_term(trefs{ bf("v1"), wff("v1 & v4 = 0") }));
+		calls = 0;
+		(void) hbdd::substitute(g, x, bf("z"), {}, count);
+		CHECK(calls == 0);
+	}
+
+	TEST_CASE("the substitution is simultaneous: a key inside the replacement stays") {
+		tref x = vr("x"), a = vr("a"), b = vr("b");
+		tref res = hbdd::substitute(bf("x & a"), x, bf("x & b"));
+		CHECK(same_function(res, bf("x & b & a"), { x, a, b }));
+	}
+
+	TEST_CASE("a replacement carrying a functional quantifier is renamed apart") {
+		tref x = vr("x");
+		tref unit = wff("ex z (x & z = 0)");    // z is "1"
+		tref t = bf("fall w (w | q5)");         // w is "1" as well
+		REQUIRE(bound_name(unit, tau::wff_ex) == "1");
+		REQUIRE(bound_name(t, tau::bf_fall) == "1");
+		tref res = hbdd::substitute(unit, x, t);
+		// the unit's binder keeps its id; the subscript moved above it
+		CHECK(bound_name(res, tau::wff_ex) == "1");
+		CHECK(bound_name(res, tau::bf_fall) != "1");
+		// the free variables are the replacement's, unchanged by the rename
+		CHECK(get_free_vars<node_t>(res).size() == 1);
+		CHECK(get_free_vars<node_t>(res)[0] == vr("q5"));
+	}
+
+	TEST_CASE("rename apart: the base counts ids that live only inside a BDD_ID") {
+		// The largest ids around may occur ONLY inside a backed term —
+		// a decision variable has no tree node at all. If the base
+		// missed them, a renamed subscript could land on one and the
+		// clash would surface when the BDD is spelled out again.
+		tref x = vr("x");
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref p5 = tau::build_variable("5", tau::get(x).get_ba_type());
+		bdd::order o {{p5, 0}};
+		tref f = hbdd::convert_to_tau_node(tau::build_bf_and(
+			tau::get(tau::bf, x), tau::get(tau::bf, p5)), o);
+		REQUIRE(hbdd::is_bdd_backed(f));
+		// "5" has no variable node left in the term, and the base still sees it
+		CHECK(tau::get(f).find_top([](tref m) {
+			return tau::get(m).is(tau::variable); }) == nullptr);
+		CHECK(find_biggest_var_id<node_t>(f) == 5);
+		tref t = bf("fall w (w | q5)");         // the subscript is "1"
+		REQUIRE(bound_name(t, tau::bf_fall) == "1");
+		tref res = hbdd::substitute(f, x, t, o);
+		// the chain rode into a BDD leaf; spell the term to read its subscript
+		CHECK(bound_name(hbdd::convert_to_tau_terms(res), tau::bf_fall)
+			== "6");                        // 1 + base, base = 5
+	}
+
+	TEST_CASE("a rebound key is left alone") {
+		tref unit = wff("ex x (x & s1 = 0)");   // the bound x is "1"
+		tref bx = tau::trim_right_sibling(
+			tau::get(find_kind(unit, tau::wff_ex)).first());
+		CHECK(hbdd::substitute(unit, bx, bf("z")) == unit);
+		// at a site where the key IS free, the rebinding unit rides along
+		tref phi = build_wff_and<node_t>(wff("x & s2 = 0"), unit);
+		tref res = hbdd::substitute(phi, vr("x"), bf("z"));
+		CHECK(res != phi);
+		CHECK(res == build_wff_and<node_t>(wff("z & s2 = 0"), unit));
 	}
 }
 
@@ -882,16 +1082,6 @@ TEST_SUITE("BDD handle creation") {
 	}
 
 }
-
-namespace {
-
-/// Any `BDD_ID` node anywhere in the tree.
-bool has_bdd_id(tref n) {
-	return tau::get(n).find_top([](tref m) {
-		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
-}
-
-} // namespace
 
 TEST_SUITE("BDD is_ordered") {
 	using bdd = tau_term_bdd<node_t>;
