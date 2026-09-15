@@ -115,8 +115,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   macos:
-    name: macOS release tests
+    name: macOS release tests (lto ${{ matrix.lto }})
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        lto: [ON, OFF]
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -156,7 +160,34 @@ jobs:
         run: brew install nanobind
 
       - name: Build tau and tests, run tests (Release)
-        run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        env:
+          # Apple clang prints no stack dump. A crash leaves a preprocessed
+          # reproducer here, and that is the only trace of it.
+          CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
+        run: |
+          mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_LTO=${{ matrix.lto }}
+
+      - name: Collect the compiler crash reports
+        if: failure()
+        run: |
+          d="${{ runner.temp }}/clang-crash"
+          cp ~/Library/Logs/DiagnosticReports/clang* "$d"/ 2>/dev/null || true
+          ls -la "$d"
+          for f in "$d"/*.ips "$d"/*.crash; do
+            [ -f "$f" ] || continue
+            echo "== $f"
+            cat "$f"
+          done
+
+      - name: Upload the compiler crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-clang-crash-lto-${{ matrix.lto }}
+          path: ${{ runner.temp }}/clang-crash
+          if-no-files-found: ignore
 
       - name: Run tau
         run: ./build/release/tau -v
