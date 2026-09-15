@@ -82,7 +82,7 @@ cli::options tau_options() {
 	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
 		.set_description("warn when an updated specification exceeds "
 			"this many characters (0 = off)");
-	opts["pwr-semantic"] = cli::option("pwr-semantic", 'W', false)
+	opts["pwr-semantic"] = cli::option("pwr-semantic", 'Z', false)
 		.set_description("enable the semantic (winning-region) fallback "
 			"of the temporal pointwise revision (off by default)");
 	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
@@ -132,14 +132,14 @@ cli::options tau_options() {
 	// on mostly-feasible atoms; a fired cap is sound (false UNREALIZABLE
 	// at worst, warned loudly), an uncapped walk is a hang.
 	opts["max-consistency-subsets"] =
-		cli::option("max-consistency-subsets", 'k', "4096")
+		cli::option("max-consistency-subsets", 'j', "4096")
 		.set_description("cap k-ary consistency subset checks per atom "
 			"group (default 4096; 0 = unlimited)");
 	opts["max-cover-products"] =
 		cli::option("max-cover-products", 'n', "256")
 		.set_description("cap the ABA oracle's mixed-type coverage "
 			"expansion (default 256; 0 = unlimited)");
-	opts["cache-bound"] = cli::option("cache-bound", 'C', "4096")
+	opts["cache-bound"] = cli::option("cache-bound", 'A', "4096")
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default 4096; 0 = unbounded)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")

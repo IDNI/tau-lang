@@ -73,6 +73,26 @@ static bool has_past_operators(tref fm) {
 	}) != nullptr;
 }
 
+// True when every temporal operator in an always body sits on a chain of
+// conjunctions and always nodes, which the normalizer splits into plain
+// always conjuncts. Any other nesting needs the LTL(ABA) pipeline.
+template <NodeType node>
+static bool always_body_splits(tref body) {
+	using tau = tree<node>;
+	const auto& t = tau::get(body);
+	if (!t.has_child()) return true;
+	auto nt = t[0].value.nt;
+	if (nt == tau::wff_and)
+		return always_body_splits<node>(t[0].first())
+		    && always_body_splits<node>(t[0].second());
+	if (nt == tau::wff_parenthesis || nt == tau::wff_always)
+		return always_body_splits<node>(t[0].first());
+	return t.find_top([](tref n) {
+		return is_child<node>(n, tau::wff_always)
+		    || is_child<node>(n, tau::wff_sometimes);
+	}) == nullptr;
+}
+
 // ── sat_has_ltl_operators / realizability_has_game_operators ──────────────────
 
 // True if the formula has an operator the safety pipeline cannot decide
@@ -90,13 +110,11 @@ bool sat_has_ltl_operators(tref fm) {
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
 		if (sat_needs_ltl_pipeline(nt)) return true;
-		// A nested eventuality -- G(sometimes ...), sometimes(G ...),
-		// sometimes(sometimes ...) -- is beyond the safety pipeline's
-		// clause simplifier, which expects G and sometimes as separate
-		// top-level conjuncts. Route it like U, R, W, S and T.
+		// A nested sometimes, or an always whose body does not sit on a
+		// conjunction chain, is beyond the safety pipeline's clause
+		// simplifier. Route it like U, R, W, S and T.
 		if (nt == tau::wff_always)
-			return t[0][0].find_top(
-				is<node, tau::wff_sometimes>) != nullptr;
+			return !always_body_splits<node>(t[0].first());
 		if (nt == tau::wff_sometimes)
 			return t[0][0].find_top(
 				is<node, tau::wff_sometimes>) != nullptr
@@ -122,7 +140,10 @@ bool realizability_has_game_operators(tref fm) {
 	bool result = tau::get(fm).find_top([](tref n) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
-		return realizability_needs_game(t[0].value.nt);
+		auto nt = t[0].value.nt;
+		if (realizability_needs_game(nt)) return true;
+		return nt == tau::wff_always
+		    && !always_body_splits<node>(t[0].first());
 	}) != nullptr;
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
