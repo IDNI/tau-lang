@@ -98,14 +98,30 @@ void tau_term_bdd<node>::clear_caches() {
 	and_many_memo.clear();
 	quant_memo.clear();
 	ite_memo.clear();
+	// The tables and the order they were populated under go together: a
+	// caller clearing them by hand (the tests do, between cases) starts
+	// the union afresh as well.
+	last_order.clear();
+	has_last_order = false;
 }
 
 /** @internal @copydoc tau_term_bdd::sync_order_cache(const order&) @endinternal */
 template<NodeType node>
 void tau_term_bdd<node>::sync_order_cache(const order& o) {
-	if (has_last_order && o == last_order) return;
-	clear_caches();
-	last_order = o;
+	// last_order is the UNION of the orders seen since the last clear. A
+	// memo entry is keyed by BDD refs alone, so it stays valid under any
+	// order that gives the keys it was computed under the SAME ranks; only
+	// a key coming back with a different rank invalidates the tables.
+	for (const auto& [k, r] : o)
+		if (auto it = last_order.find(k);
+			it != last_order.end() && it->second != r)
+		{
+			clear_caches();
+			last_order = o;
+			has_last_order = true;
+			return;
+		}
+	last_order.insert(o.begin(), o.end());
 	has_last_order = true;
 }
 #endif
@@ -355,11 +371,75 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 			const tau& tf = tau::get(f);
 			return bdd_not(build_bdd(tf.first(), o));
 		}
+		case tau::bf_fall:
+		case tau::bf_fex: {
+			// §1 the functional-quantifier CHAIN: `Q_Y b` over the
+			// order's keys is `x·Q_Y b₁ ∪ x′·Q_Y b₀` for a key `x`
+			// outside `Y`, i.e. the body's BDD with the chain pushed
+			// onto every leaf. A subscript that IS a key is bound
+			// here, so it is dropped from the order the body is
+			// built under and re-bound by the wrap.
+			quants q;
+			tref body = nullptr;
+			for (tref c = f;;) {
+				const tau& tc = tau::get(c);
+				q.emplace_back(tau::trim_right_sibling(tc.first()),
+					tc.is(tau::bf_fall) ? all : ex);
+				body = tau::trim_right_sibling(tc.second());
+				const tau& tb = tau::get(body);
+				if (!tb.child_is(tau::bf_fall)
+					&& !tb.child_is(tau::bf_fex)) break;
+				c = tb.first();
+			}
+			// The chain meets no key: ONE leaf, but a canonical
+			// one -- the constructor puts an input chain into
+			// content order, merges its runs, drops a degenerate
+			// subscript and folds a closed chain, and `add` maps a
+			// folded `bf_t`/`bf_f` to the terminals. The body is
+			// never built under @p o (it may be arbitrarily large),
+			// only inside that fold, under the chain's own order;
+			// a chain nested in it lands in this same case with a
+			// smaller body, so the recursion terminates. The free
+			// variables of a chain are read off its `bf` wrapper,
+			// which excludes the subscripts.
+			if (!has_bdd_var(tau::get(tau::bf,
+				tau::trim_right_sibling(f)), o))
+				return add(tau::trim(
+					build_functional_quantifiers(q, body)));
+			bool keyed = false;
+			for (const auto& qy : q)
+				if (o.contains(qy.first)) { keyed = true; break; }
+			order sub;
+			const order* ob = &o;
+			if (keyed) {
+				// A stored BDD has the subscripts as decision
+				// variables, which the sub-order no longer
+				// admits: spell it out before dropping them.
+				if (tau::get(body).find_top([](tref m) {
+					return tau::get(m).is(tau::BDD_ID); }))
+					body = term_handle<node>::
+						convert_to_tau_terms(body);
+				sub = o;
+				for (const auto& qy : q) sub.erase(qy.first);
+				ob = &sub;
+			}
+			// rebuild = false: a wrapped leaf is re-interned as a
+			// leaf, never built as a BDD -- see the worker.
+			auto wrap = [&q](tref leaf) {
+				return build_functional_quantifiers(q, leaf);
+			};
+			std::unordered_map<ref, ref> memo;
+			ref r = map_leaves(build_bdd(body, *ob), wrap, o, false,
+				memo);
+			DBG(assert(is_ordered(r, o));)
+			return r;
+		}
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID
 			const auto& m = term_handle<node>::U;
 			auto it = m.find(term_handle<node>::key_of(f));
 			if (it != m.end()) {
+				DBG(assert(is_ordered(it->second.get(), o));)
 				return it->second.get();
 			} else {
 				// If the BDD id is not found,
@@ -386,6 +466,99 @@ bool tau_term_bdd<node>::has_bdd_var(tref term, const order& o) {
 	if (o.empty()) return false;
 	for (tref v : get_free_vars<node>(term)) if (o.contains(v)) return true;
 	return false;
+}
+
+/** @internal @copydoc tau_term_bdd::build_functional_quantifiers(const quants&, tref) @endinternal */
+template<NodeType node>
+tref tau_term_bdd<node>::build_functional_quantifiers(const quants& q,
+	tref body)
+{
+	using tau = tree<node>;
+	body = tau::trim_right_sibling(body);
+	DBG(assert(tau::get(body).is(tau::bf));)
+	if (q.empty()) return body;
+	if (tau::get(body).equals_0() || tau::get(body).equals_1()) return body;
+	// 1. Drop the subscripts that do not occur free in `body` (a binder
+	//    over an absent variable is degenerate) and keep a repeated one at
+	//    its INNERMOST occurrence, the one that actually binds.
+	const trefs& fv = get_free_vars<node>(body);
+	quants kept;
+	for (size_t i = 0; i < q.size(); ++i) {
+		tref y = tau::trim_right_sibling(q[i].first);
+		if (!std::binary_search(fv.begin(), fv.end(), y,
+			tau::subtree_less)) continue;
+		bool rebound = false;
+		for (size_t j = i + 1; j < q.size() && !rebound; ++j)
+			rebound = tau::subtree_equals(
+				tau::trim_right_sibling(q[j].first), y);
+		if (!rebound) kept.emplace_back(y, q[i].second);
+	}
+	if (kept.empty()) return body;
+	// 2. The maximal runs of one kind: quantifiers of one run commute, so
+	//    each run is sorted into content order and a permutation of a block
+	//    gives one node.
+	std::vector<std::pair<Quantifier, trefs>> segs;
+	for (const auto& [y, k] : kept) {
+		if (segs.empty() || segs.back().first != k)
+			segs.emplace_back(k, trefs{});
+		segs.back().second.push_back(y);
+	}
+	// 3. `body`'s own outermost run joins the new innermost one when the
+	//    kinds agree, so a chain assembled in two steps is one node. Its
+	//    subscripts are bound in `body`, hence distinct from the ones kept
+	//    above.
+	{
+		const bool uni = segs.back().first == all;
+		while (tau::get(body).child_is(uni ? tau::bf_fall : tau::bf_fex)) {
+			const tau& c = tau::get(tau::get(body).first());
+			segs.back().second.push_back(
+				tau::trim_right_sibling(c.first()));
+			body = tau::trim_right_sibling(c.second());
+		}
+	}
+	// The chain, outermost first, and the order it quantifies under:
+	// the INNERMOST subscript ranks 1, outward from there, which is what
+	// `bdd_quant` asserts of the reversed prefix.
+	quants prefix;
+	for (auto& [k, ys] : segs) {
+		std::sort(ys.begin(), ys.end(), tau::subtree_less);
+		for (tref y : ys) prefix.emplace_back(y, k);
+	}
+	order o;
+	for (size_t i = 0; i < prefix.size(); ++i)
+		o.emplace(prefix[i].first, int_t(prefix.size() - i));
+	// 4. FOLD: a chain binding every free variable of a PLAIN body is a
+	//    CONSTANT -- once no subscript is left in a leaf either, the
+	//    quantified BDD holds no variable at all, so its term is the
+	//    chain's value whatever it spells (`_1`/`_0` for a terminal, the
+	//    leaf itself for a variable-free leaf). Two bodies are left
+	//    standing: one holding a `BDD_ID`, which belongs to another order
+	//    and folds at the finish; and one with a subscript hidden inside a
+	//    LEAF (§1's leaf hazard: a reference argument, a foreign-typed
+	//    subterm), which `bdd_quant` does not reach. The cached free-var
+	//    test comes first so the `BDD_ID` walk only runs on closed bodies.
+	bool bound = true;
+	for (tref v : get_free_vars<node>(body))
+		if (!o.contains(v)) { bound = false; break; }
+	if (bound) bound = tau::get(body).find_top([](tref m) {
+		return tau::get(m).is(tau::BDD_ID); }) == nullptr;
+	if (bound) {
+		ref b = build_bdd(body, o);
+		bool hidden = false;
+		for (tref v : term_handle<node>::get_free_leaf_vars(b.b))
+			if (o.contains(v)) { hidden = true; break; }
+		if (!hidden) return to_tau_term(bdd_quant(b, prefix, o),
+			find_ba_type<node>(body));
+	}
+	// 5. Wrap, innermost subscript first. The builders rename the bound
+	//    variable by default; here the subscripts are spelled by the
+	//    caller, so nothing is ever renamed.
+	tref r = body;
+	for (size_t i = prefix.size(); i--;)
+		r = prefix[i].second == all
+			? tau::build_bf_fall(prefix[i].first, r, false)
+			: tau::build_bf_fex(prefix[i].first, r, false);
+	return r;
 }
 
 /** @internal @copydoc tau_term_bdd::bdd_and(ref, tref) @endinternal */
@@ -638,11 +811,11 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_cofactor_impl(ref x, tref xi,
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::map_leaves(ref, Fn&, const order&, std::unordered_map<ref, ref>&) @endinternal */
+/** @internal @copydoc tau_term_bdd::map_leaves(ref, Fn&, const order&, bool, std::unordered_map<ref, ref>&) @endinternal */
 template<NodeType node>
 template<typename Fn>
 tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn,
-	const order& o, std::unordered_map<ref, ref>& memo) {
+	const order& o, bool rebuild, std::unordered_map<ref, ref>& memo) {
 	using tau = tree<node>;
 	if (x == T || x == F) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
@@ -651,11 +824,18 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn,
 		tref in  = get_var_term(x);
 		tref out = fn(in);
 		if (out == in) r = x;
-		else if (has_bdd_var(out, o)) r = build_bdd(out, o);
-		else r = add(tau::trim(out));
+		else if (rebuild && has_bdd_var(out, o)) r = build_bdd(out, o);
+		else {
+			// Without the rebuild the caller promises to add no
+			// key of @p o a leaf did not already hold, so nothing
+			// of the order is buried by the re-interning.
+			DBG(assert(rebuild || !has_bdd_var(out, o)
+				|| has_bdd_var(in, o));)
+			r = add(tau::trim(out));
+		}
 	} else {
-		ref h = map_leaves(get_high(x), fn, o, memo);
-		ref l = map_leaves(get_low(x), fn, o, memo);
+		ref h = map_leaves(get_high(x), fn, o, rebuild, memo);
+		ref l = map_leaves(get_low(x), fn, o, rebuild, memo);
 		tref var = get_var(x);
 		auto below = [&](ref c) {
 			return leaf(c) || less_then(var, get_var(c), o);
@@ -673,7 +853,7 @@ template<typename Fn>
 tau_term_bdd<node>::ref tau_term_bdd<node>::map_leaves(ref x, Fn& fn,
 	const order& o) {
 	std::unordered_map<ref, ref> memo;
-	return map_leaves(x, fn, o, memo);
+	return map_leaves(x, fn, o, true, memo);
 }
 
 /** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs&, const order&) @endinternal */

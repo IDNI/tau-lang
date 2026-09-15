@@ -126,17 +126,27 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	static cache_quant_t    quant_memo;     ///< @brief Memoisation table for general quantification.
 	static cache_ite_t      ite_memo;       ///< @brief Memoisation table for if-then-else.
 
-	/** @brief Clear all memoisation caches. */
+	/** @brief Clear all memoisation caches, and with them `last_order`. */
 	static void clear_caches();
 
 	// The memo tables are keyed by BDD refs alone, not by order, so a
-	// cached entry is only valid under the order it was computed with.
-	// Every public entry point calls sync_order_cache() first, which
-	// clears all five tables when @p o differs from last_order.
-	static order last_order;      ///< @brief Order the memo caches were last populated under.
+	// cached entry is only valid under an order that AGREES with the one it
+	// was computed under on their common keys. Every public entry point
+	// calls sync_order_cache() first, which merges @p o into last_order and
+	// clears all five tables only on a conflicting rank.
+	static order last_order;      ///< @brief UNION of the orders the memo caches were populated under since the last clear.
 	static bool  has_last_order;  ///< @brief Whether `last_order` holds a valid previous order.
 
-	/** @brief Clear all memoisation caches if @p o differs from the order last seen at a public entry point. */
+	/**
+	 * @brief Merge @p o into `last_order`, clearing all memoisation caches
+	 * when @p o gives a key of `last_order` a DIFFERENT rank.
+	 *
+	 * Orders that agree on their common keys live together: a component's
+	 * `P` and a sub-order of it (the chain case of `build_bdd` drops the
+	 * subscripts of a functional quantifier), or the tiny order a
+	 * functional-quantifier fold builds over its own subscripts. Rank
+	 * EQUALITY is the test, so a sub-order keeps the tables.
+	 */
 	static void sync_order_cache(const order& o);
 #endif
 
@@ -200,6 +210,33 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * `false` for an empty order.
 	 */
 	static bool has_bdd_var(tref term, const order& o);
+
+	/**
+	 * @brief The canonical functional-quantifier chain over @p body (a `bf`
+	 * term) with the prefix @p q, OUTERMOST FIRST: a nest of one-variable
+	 * `bf_fall` / `bf_fex` binders, the only shape the builders and the
+	 * parser allow.
+	 *
+	 * Canonical, so permutations inside one quantifier block give one node:
+	 * a subscript not free in @p body is dropped (the term-level
+	 * FOLD_DEGENERATE_BINDERS) and a repeated one kept at its INNERMOST
+	 * occurrence, which is the one that binds; each maximal run of one kind
+	 * is sorted into content order (`subtree_less`); and a @p body that is
+	 * itself a chain whose outermost run has the kind of the new innermost
+	 * one joins that run, so the same chain assembled in two steps is one
+	 * node.
+	 *
+	 * FOLD: a chain binding every free variable of a PLAIN @p body (no
+	 * `BDD_ID` anywhere) is a CONSTANT — the body's BDD over the subscripts,
+	 * quantified with `bdd_quant`, as its constant term (`_1` / `_0` of the
+	 * body's type for a terminal). A body holding a `BDD_ID` is never folded
+	 * here (it folds at the finish), and neither is one whose leaves hide a
+	 * subscript (the §1 LEAF HAZARD).
+	 *
+	 * An empty @p q, a constant @p body, and a chain left with no subscript
+	 * all give @p body itself.
+	 */
+	static tref build_functional_quantifiers(const quants& q, tref body);
 
 	/** @brief AND of @p x and a leaf (Tau formula) @p y. */
 	static ref bdd_and(ref x, tref y);
@@ -339,8 +376,14 @@ private:
 	static bool visit_nodes(ref x, Fn& fn, std::unordered_set<tref>& seen);
 	static bool is_ordered(ref x, const order& o,
 		std::unordered_set<tref>& seen);
+	// @p rebuild: the public map_leaves passes `true` — a changed leaf that
+	// came to hold a decision variable is built as a BDD. `false` keeps
+	// every changed leaf a LEAF (`add`), which is what the chain case of
+	// build_bdd needs: wrapping a leaf in a functional quantifier can leave
+	// a key of @p o inside it (a hazard leaf, a reference argument holding
+	// one), and rebuilding would re-enter the chain case forever.
 	template <typename Fn>
-	static ref map_leaves(ref x, Fn& fn, const order& o,
+	static ref map_leaves(ref x, Fn& fn, const order& o, bool rebuild,
 		std::unordered_map<ref, ref>& memo);
 	// Memoised worker for to_tau_term(ref, size_t): shared BDD nodes are
 	// rebuilt once per top-level call instead of once per path.

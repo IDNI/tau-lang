@@ -1258,3 +1258,300 @@ TEST_SUITE("BDD handle bdd_ex") {
 		CHECK(v[0] == tx);
 	}
 }
+
+namespace {
+
+/// A `bf` term from source.
+tref pbf(const char* s) {
+	static tau::get_options opts = { .parse = { .start = tau::bf } };
+	tref t = tau::get(s, opts);
+	REQUIRE(t != nullptr);
+	return t;
+}
+/// The trimmed `variable` node of a one-variable term — the shape order keys
+/// and quantifier subscripts hold.
+tref pvar(const char* s) { return tau::trim(pbf(s)); }
+/// The subscript of a functional-quantifier chain (its `bf` wrapper).
+tref qvar(tref n) {
+	return tau::trim_right_sibling(tau::get(n)[0].first());
+}
+/// The body of a functional-quantifier chain (its `bf` wrapper).
+tref qbody(tref n) {
+	return tau::trim_right_sibling(tau::get(n)[0].second());
+}
+
+} // namespace
+
+TEST_SUITE("BDD build_functional_quantifiers") {
+	using bdd = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+
+	TEST_CASE("canonical: permutations, absent subscripts, merged runs") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref y = pvar("y"), z = pvar("z"), u = pvar("u");
+		// `w` stays free, so nothing folds
+		tref f = pbf("y & z & w");
+		tref a = bdd::build_functional_quantifiers(
+			{{y, bdd::all}, {z, bdd::all}}, f);
+		tref b = bdd::build_functional_quantifiers(
+			{{z, bdd::all}, {y, bdd::all}}, f);
+		CHECK(a == b);
+		CHECK(tau::get(a).child_is(tau::bf_fall));
+		// a subscript that is not free in the body is dropped
+		CHECK(bdd::build_functional_quantifiers({{u, bdd::all}}, f) == f);
+		CHECK(bdd::build_functional_quantifiers({{u, bdd::all}, {y, bdd::all}}, f)
+			== bdd::build_functional_quantifiers({{y, bdd::all}}, f));
+		// an empty prefix and a constant body give the body back
+		CHECK(bdd::build_functional_quantifiers({}, f) == f);
+		CHECK(bdd::build_functional_quantifiers({{y, bdd::all}}, pbf("1"))
+			== pbf("1"));
+		// a body that is already a chain of the same kind merges into one
+		// sorted run: `fall z (fall y ...)` is the node `fall {y,z} ...`
+		tref inner = bdd::build_functional_quantifiers({{y, bdd::all}}, f);
+		CHECK(bdd::build_functional_quantifiers({{z, bdd::all}}, inner) == a);
+		// a repeated subscript binds at its innermost occurrence
+		CHECK(bdd::build_functional_quantifiers(
+			{{y, bdd::ex}, {y, bdd::all}}, f)
+			== bdd::build_functional_quantifiers({{y, bdd::all}}, f));
+	}
+
+	TEST_CASE("mixed kinds nest in the given order") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref y = pvar("y"), z = pvar("z");
+		tref f = pbf("y & z & w");
+		tref m = bdd::build_functional_quantifiers(
+			{{y, bdd::all}, {z, bdd::ex}}, f);
+		REQUIRE(tau::get(m).child_is(tau::bf_fall));
+		CHECK(tau::subtree_equals(qvar(m), y));
+		tref in = qbody(m);
+		REQUIRE(tau::get(in).child_is(tau::bf_fex));
+		CHECK(tau::subtree_equals(qvar(in), z));
+		CHECK(qbody(in) == f);
+		// the other nesting is another node (the two runs do not commute)
+		CHECK(bdd::build_functional_quantifiers(
+			{{z, bdd::ex}, {y, bdd::all}}, f) != m);
+	}
+
+	TEST_CASE("fold: a chain binding every free variable of a plain body") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref y = pvar("y"), u = pvar("u");
+		CHECK(tau::get(bdd::build_functional_quantifiers(
+			{{y, bdd::all}}, pbf("y"))).equals_0());
+		CHECK(tau::get(bdd::build_functional_quantifiers(
+			{{y, bdd::ex}}, pbf("y"))).equals_1());
+		// a variable-free leaf is the chain's value as it stands:
+		// ∀y (y ∪ r(1)) = r(1), not a terminal and not a chain
+		CHECK(tau::subtree_equals(bdd::build_functional_quantifiers(
+			{{y, bdd::all}}, pbf("y | r(1)")), pbf("r(1)")));
+		// `z` stays free: no fold
+		tref c = bdd::build_functional_quantifiers({{y, bdd::all}},
+			pbf("y | z"));
+		CHECK(tau::get(c).child_is(tau::bf_fall));
+		CHECK(!tau::get(c).equals_0());
+		CHECK(!tau::get(c).equals_1());
+		// a body holding a BDD_ID is never folded here
+		bdd::order o {{y, 1}, {u, 2}};
+		tref n = hbdd::convert_to_tau_node(pbf("y | u"), o);
+		REQUIRE(hbdd::is_bdd_backed(n));
+		tref d = bdd::build_functional_quantifiers(
+			{{y, bdd::all}, {u, bdd::all}}, n);
+		CHECK(tau::get(d).child_is(tau::bf_fall));
+	}
+}
+
+TEST_SUITE("BDD build_bdd functional-quantifier chain") {
+	using bdd = tau_term_bdd<node_t>;
+
+	TEST_CASE("the chain slides onto the leaves, subscripts no keys") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = pvar("x"), ty = pvar("y"), tw = pvar("w"), tv = pvar("v");
+		bdd::order o {{tx, 1}};
+		// ∀y (x·y ∪ x′·z) = x·(∀y y) ∪ x′·(∀y z) = x·0 ∪ x′·z
+		tref f = bdd::build_functional_quantifiers({{ty, bdd::all}},
+			pbf("x & y | x' & z"));
+		REQUIRE(tau::get(f).child_is(tau::bf_fall));
+		CHECK(bdd::build_bdd(f, o) == bdd::build_bdd(pbf("x' & z"), o));
+		// nested, mixed kinds: the high leaf is the chain over the leaf
+		tref g = bdd::build_functional_quantifiers(
+			{{ty, bdd::all}, {tw, bdd::ex}},
+			pbf("x & y & w & v | x' & z"));
+		bdd::ref r = bdd::build_bdd(g, o);
+		CHECK(bdd::is_ordered(r, o));
+		REQUIRE(!bdd::leaf(r));
+		CHECK(tau::subtree_equals(bdd::get_var(r), tx));
+		bdd::ref hi = bdd::get_high(r), lo = bdd::get_low(r);
+		REQUIRE(bdd::leaf(hi));
+		REQUIRE(bdd::leaf(lo));
+		CHECK(tau::subtree_equals(bdd::get_var_term(lo), pbf("z")));
+		tref hit = bdd::get_var_term(hi);
+		REQUIRE(tau::get(hit).child_is(tau::bf_fall));
+		CHECK(tau::subtree_equals(qvar(hit), ty));
+		tref hin = qbody(hit);
+		REQUIRE(tau::get(hin).child_is(tau::bf_fex));
+		CHECK(tau::subtree_equals(qvar(hin), tw));
+		// the innermost body is y·w·v as a function
+		bdd::order o3 {{ty, 1}, {tw, 2}, {tv, 3}};
+		CHECK(bdd::build_bdd(qbody(hin), o3)
+			== bdd::build_bdd(pbf("y & w & v"), o3));
+	}
+
+	TEST_CASE("a subscript that IS a key is bound, not a decision variable") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = pvar("x"), tz = pvar("z");
+		bdd::order o {{tx, 1}, {tz, 2}};
+		tref body = pbf("x & z | x' & w");
+		tref f = bdd::build_functional_quantifiers({{tx, bdd::all}}, body);
+		REQUIRE(tau::get(f).child_is(tau::bf_fall));
+		bdd::ref r = bdd::build_bdd(f, o);
+		CHECK(bdd::is_ordered(r, o));
+		// no decision node on the bound `x`
+		auto absent = [&tx](bdd::ref c, bool is_leaf) {
+			return is_leaf
+				|| !tau::subtree_equals(bdd::get_var(c), tx);
+		};
+		CHECK(bdd::visit_nodes(r, absent));
+		// the oracle: ∀x of the body built under the full order. Each
+		// chain leaf of `r` is resolved on its own subscript first.
+		auto resolve = [](tref l) -> tref {
+			if (!tau::get(l).child_is(tau::bf_fall)) return l;
+			tref sub = qvar(l), bod = qbody(l);
+			bdd::order ox {{sub, 1}};
+			return bdd::to_tau_term(bdd::bdd_quant(
+				bdd::build_bdd(bod, ox), {{sub, bdd::all}}, ox),
+				find_ba_type<node_t>(bod));
+		};
+		bdd::order oz {{tz, 2}};
+		bdd::ref got = bdd::map_leaves(r, resolve, oz);
+		bdd::ref want = bdd::bdd_all(bdd::build_bdd(body, o),
+			trefs{ tx }, o);
+		CHECK(got == want);
+	}
+
+	TEST_CASE("a chain meeting no key is one leaf") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = pvar("x"), ty = pvar("y");
+		bdd::order o {{tx, 1}};
+		tref f = bdd::build_functional_quantifiers({{ty, bdd::all}},
+			pbf("y | a"));
+		REQUIRE(tau::get(f).child_is(tau::bf_fall));
+		bdd::ref r = bdd::build_bdd(f, o);
+		// one leaf, the chain itself: the body is never built
+		CHECK(bdd::leaf(r));
+		CHECK(bdd::node_count(r) == 1);
+		CHECK(tau::subtree_equals(bdd::get_var_term(r), f));
+		// an INPUT-shaped chain is canonicalised on the way into the
+		// leaf: the run comes out in content order, either way round
+		tref tz = pvar("z");
+		tref raw = tau::build_bf_fall(tz,
+			tau::build_bf_fall(ty, pbf("y & z & w"), false), false);
+		bdd::ref rr = bdd::build_bdd(raw, o);
+		REQUIRE(bdd::leaf(rr));
+		CHECK(tau::subtree_equals(bdd::get_var_term(rr),
+			bdd::build_functional_quantifiers(
+				{{ty, bdd::all}, {tz, bdd::all}},
+				pbf("y & z & w"))));
+		// and a closed one folds: `fall y y` is F whatever the order
+		CHECK(bdd::build_bdd(
+			tau::build_bf_fall(ty, pbf("y"), false), o) == bdd::F);
+	}
+
+	TEST_CASE("a hazard leaf terminates in one leaf") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = pvar("x"), ty = pvar("y");
+		bdd::order o {{tx, 1}};
+		// `r(x)` hides the key `x` inside a reference argument, so the
+		// wrapped leaf still holds a key; rebuilding it would re-enter
+		// this very case for ever.
+		tref f = bdd::build_functional_quantifiers({{ty, bdd::all}},
+			pbf("y & r(x)"));
+		REQUIRE(tau::get(f).child_is(tau::bf_fall));
+		bdd::ref r = bdd::build_bdd(f, o);
+		CHECK(bdd::leaf(r));
+		CHECK(bdd::node_count(r) == 1);
+		CHECK(tau::get(bdd::get_var_term(r)).child_is(tau::bf_fall));
+	}
+
+	TEST_CASE("shadowing: a bound subscript spelled like the key stays bound") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref q = pvar("q");
+		tref one = tau::build_variable("1", tau::get(q).get_ba_type());
+		tref b1 = tau::get(tau::bf, one);
+		tref chain = bdd::build_functional_quantifiers({{one, bdd::all}},
+			tau::build_bf_or(b1, tau::get(tau::bf, q)));
+		REQUIRE(tau::get(chain).child_is(tau::bf_fall));
+		// the chain holds only `q` free: its own `1` is bound
+		CHECK(get_free_vars<node_t>(chain).size() == 1);
+		tref f = tau::build_bf_and(b1, chain);
+		bdd::order o {{one, 1}};
+		bdd::ref r = bdd::build_bdd(f, o);
+		REQUIRE(!bdd::leaf(r));
+		CHECK(tau::subtree_equals(bdd::get_var(r), one));
+		bdd::ref hi = bdd::get_high(r);
+		REQUIRE(bdd::leaf(hi));
+		CHECK(tau::subtree_equals(bdd::get_var_term(hi), chain));
+		// as a function: the free `1` set to 1 leaves the chain, set to 0
+		// gives 0 — the bound `1` is untouched either way
+		CHECK(bdd::bdd_cofactor(r, one, true, o) == bdd::build_bdd(chain, o));
+		CHECK(bdd::bdd_cofactor(r, one, false, o) == bdd::F);
+	}
+}
+
+#ifdef TAU_CACHE
+TEST_SUITE("BDD sync_order_cache") {
+	using bdd = tau_term_bdd<node_t>;
+
+	TEST_CASE("a consistent sub-order or extension keeps the tables") {
+		bdd::clear_caches();
+		CHECK(!bdd::has_last_order);
+		CHECK(bdd::last_order.empty());
+		tref tx = pvar("x"), ty = pvar("y"), tz = pvar("z");
+		bdd::order o1 {{tx, 1}, {ty, 2}};
+		bdd::order o2 {{tx, 1}};
+		bdd::order o3 {{tx, 1}, {ty, 2}, {tz, 3}};
+		bdd::order oc {{tx, 2}, {ty, 1}};
+		tref s = pbf("x & y | x' & c");
+		bdd::ref r1 = bdd::build_bdd(s, o1);
+		CHECK(bdd::has_last_order);
+		CHECK(bdd::last_order == o1);
+		size_t n = bdd::and_memo.size();
+		REQUIRE(n > 0);
+		// a sub-order and an extension merge into last_order and leave
+		// every table standing
+		bdd::sync_order_cache(o2);
+		CHECK(bdd::and_memo.size() == n);
+		CHECK(bdd::last_order == o1);
+		bdd::sync_order_cache(o3);
+		CHECK(bdd::and_memo.size() == n);
+		CHECK(bdd::last_order == o3);
+		// a key coming back with another rank clears everything
+		bdd::sync_order_cache(oc);
+		CHECK(bdd::and_memo.empty());
+		CHECK(bdd::and_many_memo.empty());
+		CHECK(bdd::ex_memo.empty());
+		CHECK(bdd::quant_memo.empty());
+		CHECK(bdd::ite_memo.empty());
+		CHECK(bdd::last_order == oc);
+		// the results are the same whatever the tables did
+		bdd::build_bdd(pbf("x & d"), o2);
+		bdd::build_bdd(pbf("x & y & z"), o3);
+		bdd::build_bdd(s, oc);
+		CHECK(bdd::build_bdd(s, o1) == r1);
+	}
+}
+#endif
