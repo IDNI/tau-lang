@@ -380,10 +380,9 @@ tref api<node>::substitute(tref expr, tref that, tref with) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return nullptr;
 	}
-	// The library's one substitution, then — exactly as before — the
-	// canonical ids the API publishes: a replacement holding a binder of
-	// either kind brings its own ids into the expression, and the pass
-	// renumbers the result by depth over the shared id space.
+	// Substitute, then renumber the binder ids by depth when the
+	// replacement brings binders of its own, so the API publishes
+	// canonical ids.
 	tref result = tau::get(expr).substitute(that, with);
 	if (tau::get(with).find_top(is_logical_or_functional_quant<node>))
 		return canonize_quantifier_ids<node>(result);

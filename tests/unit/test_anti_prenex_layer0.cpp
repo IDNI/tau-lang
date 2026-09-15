@@ -21,14 +21,14 @@
 //  3. the module's call of the library substitution: it reaches inside a
 //     reference and re-emits every argument it touched through the module's
 //     re-simplifier, with `atoms` and `get_free_vars` keeping their reach
-//     (the substitution itself is tested in test_tau_bdd.cpp). Both build
+//     (the substitution itself is tested in test_tau_tree.cpp). Both build
 //     types.
 //  4. every pass caches per node: table state after one query. Both build
 //     types.
 //     No layer-0 function writes a gated table, so the milestone's
 //     `#ifdef TAU_CACHE` clause applies from layer 3's `cof_memo` on; the one
 //     Release-only case here pins that table's key identity on a real
-//     (BDD_ID term, x) pair (Lucca, Sep 10 2026).
+//     (BDD_ID term, x) pair.
 //
 // Conventions (the brief): a chain member carries a right sibling, so every
 // comparison against a separately built node is by CONTENT; `get_free_vars` stores
@@ -554,7 +554,7 @@ TEST_CASE("atoms vs fv on a unit: [atm ↦ T/F] is unit-opaque, [x ← t] descen
 TEST_CASE("the library substitution reaches a reference's arguments and re-simplifies them") {
 	// §1/§4: substitution is the one rewrite that reaches inside a
 	// reference; every argument it touches is re-emitted through the hook,
-	// once per touched argument (ruling 4, Sep 10 2026). This is the
+	// once per touched argument. This is the
 	// MODULE's call of `tree<node>::substitute`: the live order and
 	// a hook that sends a `bf` argument to SIMPLIFY_TERM. A `wff` argument
 	// gets the identity here because SIMPLIFY is layer 1 and does not

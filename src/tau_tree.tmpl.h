@@ -293,13 +293,11 @@ bool has_semantic_error(tref fm);
 #include "ba_types.h"  // ba types dictionary
 
 namespace idni::tau_lang {
-	// Forward declarations required by tau_tree_builders.tmpl.h
+	// Forward declarations for tau_tree_builders.tmpl.h
 	// (find_biggest_var_id), tau_tree_extractors.tmpl.h (get_free_vars)
-	// and tau_tree_substitute.tmpl.h (substitute) to handle BDD_ID nodes;
-	// the full definitions are provided by tau_bdd.h. The three read a
-	// BDD-backed term through the store, since such a term keeps its
-	// variables there rather than as tree nodes; `substitute` also writes
-	// one, through `map_leaves` and `bdd_compose` on the BDD itself.
+	// and tau_tree_substitute.tmpl.h (substitute), which read a BDD-backed
+	// term through the BDD store, where such a term keeps its variables;
+	// `substitute` also writes one. Defined in tau_bdd.h.
 	template <NodeType node> struct tau_term_bdd_handle;
 	template <NodeType node> struct tau_term_bdd;
 } // namespace idni::tau_lang

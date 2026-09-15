@@ -6,12 +6,12 @@
  * `rename_apart`. Included by tau_tree.tmpl.h; tau_tree.h says what each one
  * means, the comments here say how it is built.
  *
- * Substitution is a TREE operation, and a `BDD_ID` is one node kind it knows
+ * Substitution is a tree operation, and a `BDD_ID` is one node kind it knows
  * about: a BDD-backed term keeps its variables in the BDD store rather than
  * as tree nodes, so the walk reaches them through
- * `tau_term_bdd_handle<node>` — the same forward declaration, and the same
- * reason, as `get_free_vars` (tau_tree_extractors.tmpl.h) and
- * `find_biggest_var_id` (tau_tree_builders.tmpl.h).
+ * `tau_term_bdd_handle<node>`, as `get_free_vars`
+ * (tau_tree_extractors.tmpl.h) and `find_biggest_var_id`
+ * (tau_tree_builders.tmpl.h) do.
  */
 
 #ifndef __IDNI__TAU__TAU_TREE_SUBSTITUTE_TMPL_H__
@@ -95,14 +95,15 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 		tref k = tau::trim_right_sibling(key);
 		tref w = tau::trim_right_sibling(value);
 		DBG(assert(k != nullptr && w != nullptr);)
-		// A witness is PLAIN: a `BDD_ID` inside it is spelled out once
-		// here, not once per leaf and per reference argument below.
+		// A replacement carrying a `BDD_ID` is spelled out as a plain
+		// term once, here, rather than at every leaf and reference
+		// argument below.
 		if (tau::get(w).find_top([](tref m) {
 			return tau::get(m).is(tau::BDD_ID); }))
 			w = handle::convert_to_tau_terms(w);
-		// And its binders are moved out of the formula's id range,
-		// AFTER that spelling: a spelled BDD brings its leaves' chains
-		// into the tree.
+		// Then its bound variables are renamed apart, after the
+		// spelling, which may have brought binders out of the BDD's
+		// leaves.
 		if (tau::get(w).find_top(is_logical_or_functional_quant<node>))
 			w = rename_apart(formula, w);
 		// A variable key is matched in its `bf` wrapper and used bare
@@ -143,11 +144,11 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 	using tau   = tree<node>;
 	using tbdd  = tau_term_bdd<node>;
 	using handle = tau_term_bdd_handle<node>;
-	// The occurrence guard (§10): one cached free-variable test per `wff`
-	// or `bf` node. A node no key variable is free in is not entered, so
-	// it comes back as the same tref, and a key rebound below it is left
-	// alone. A key that is no variable has no such test and everything is
-	// entered.
+	// The occurrence guard: one cached free-variable test per `wff` or
+	// `bf` node. A node no key variable is free in is not entered, so it
+	// comes back as the same tref, and a key rebound below it is left
+	// alone. When some key is not a variable there is no such test and
+	// every node is entered.
 	auto free_in = [&s](tref n) {
 		const trefs& fv = tau_lang::get_free_vars<node>(n);
 		for (tref v : s.vars)
@@ -166,11 +167,11 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		if (const tref r = get_cached<node>(n, s.changes); r != n)
 			return r;
 		const tau& t = tau::get(n);
-		// A BDD-backed term holds its variables in the store, not as
-		// tree nodes: the hidden occurrences inside the LEAVES first,
-		// on the original leaves, so a key inside a replacement is not
-		// substituted again; then ONE compose for the keys that are
-		// decision variables.
+		// A BDD-backed term holds its variables in the BDD store, not
+		// as tree nodes. Its leaves are rewritten first, on the
+		// original leaves, so a key inside a replacement is not
+		// substituted again; then one compose removes the keys that
+		// are decision variables.
 		if (handle::is_bdd_backed(n)) {
 			DBG(assert(!o.empty());)
 			const typename tbdd::ref x =
@@ -191,12 +192,11 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 			return handle::convert_to_tau_node_or_term(handle(r),
 				find_ba_type<node>(n));
 		}
-		// A reference argument is rewritten whole and re-emitted
-		// through the hook, ONCE per call: the call-wide memo holds
-		// what the argument became, so a shared one is rewritten and
-		// re-emitted a single time however many references and BDD
-		// leaves reach it. A nested reference inside the argument is
-		// finished by the recursive call before the outer hook runs.
+		// A reference argument is rewritten whole and passed through
+		// the hook once per call: the memo holds its result, so a
+		// shared argument is not rewritten again. A reference nested
+		// inside the argument is finished by the recursive call
+		// first.
 		if (t.is(tau::ref_arg)) {
 			const tref a = tau::trim_right_sibling(t.first());
 			auto it = s.argument_memo.find(a);
@@ -208,12 +208,11 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 			if (it->second == a) return n;
 			return tau::get(t.value, it->second);
 		}
-		// A binder on the path is where capture would happen. The
-		// replacements are renamed apart and their free variables are
-		// free at the site, so it cannot; Debug checks it. Only under
-		// the occurrence guard: without it every subtree is entered,
-		// including ones that hold no occurrence, where a binder over
-		// a free variable of a replacement is no capture at all.
+		// A binder is where capture would happen. The replacements are
+		// renamed apart and their free variables are free at the site,
+		// so it cannot; Debug checks it, and only under the occurrence
+		// guard, since without it subtrees holding no occurrence are
+		// entered too.
 		DBG(if (s.keys_are_variables
 			&& is_logical_or_functional_quant<node>(n))
 			assert(!std::binary_search(s.free_in_with.begin(),

@@ -9,9 +9,8 @@
  * `φ[x ← t]` is the library's `tree<node>::substitute` (tau_tree.h), called
  * directly with the live order and a re-simplifying argument hook.
  *
- * §10: "Substitution needs occurrence guards. `[atm ↦ T/F]` needs one —
- * `atoms_memo`, a per-node atom vocabulary with exactly the substitution's own
- * reach (unit-opaque, §4)."
+ * The occurrence guard of §10 is `atoms_memo`, a per-node atom vocabulary
+ * with exactly this substitution's reach (unit-opaque, §4).
  *
  * REACH (§4). `[atm ↦ T/F]` reaches through ∧, ∨ and ¬ only: a unit, a
  * reference and a TEMPORAL operator are opaque leaves, and a temporal body is

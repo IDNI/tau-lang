@@ -2,8 +2,7 @@
 
 // Layer 0 unit tests for src/anti_prenex/foundations/subst.h (package C).
 // Spec: anti_prenex.md §1 (atoms_memo), §3 (`[atm ↦ T/F]`), §4 (what may
-// touch a unit), §10 (occurrence guards); the rulings of Sep 10 2026 are
-// cited in subst.h.
+// touch a unit), §10 (occurrence guards).
 //
 // `φ[x ← t]` is the library's `tree<node>::substitute` and is tested in
 // tests/unit/test_tau_tree.cpp; the module's own call of it is in
@@ -85,7 +84,7 @@ TEST_CASE("[atm ↦ T/F] treats a unit as an opaque leaf") {
 	CHECK(!ap::has_atom<node_t>(u, a));
 	CHECK(ap::atoms<node_t>(u).empty());
 	// The same unit under `[x ← t]` IS entered — the one licensed rewrite,
-	// and the library's business (test_tau_bdd.cpp).
+	// and the library's business (test_tau_tree.cpp).
 }
 
 // --- the chain shape ------------------------------------------------------------------
@@ -103,7 +102,7 @@ TEST_CASE("[atm ↦ T/F] erases in place, so a canonical chain stays canonical")
 	}
 }
 
-TEST_CASE("a temporal operator is opaque to [atm ↦ T/F] (ruling 1)") {
+TEST_CASE("a temporal operator is opaque to [atm ↦ T/F]") {
 	tref a = wff("x = 0");
 	tref alw = tau::build_wff_always(a);
 	REQUIRE(is_child_temporal_quantifier<node_t>(alw));
@@ -168,7 +167,7 @@ TEST_CASE("atoms: the vocabulary with subst_atom's reach, sorted, one row per no
 	CHECK(in_fv(u, vr("x")));
 }
 
-TEST_CASE("atoms: no row on a spine node, a row on every other wrapper (ruling 5)") {
+TEST_CASE("atoms: no row on a spine node, a row on every other wrapper") {
 	// Fresh names: the table is process-wide and hash-consing would hand a
 	// row from another case to the same node.
 	tref s1 = wff("s1 = 0"), s2 = wff("s2 = 0"), s3 = wff("s3 = 0");
