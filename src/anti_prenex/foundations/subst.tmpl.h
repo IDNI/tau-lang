@@ -24,9 +24,11 @@
  * nothing, `subst_term` composes. (2) A member's CONTENT changes, so a
  * changed chain has to be re-canonicalised (D1); `replace` rebuilds it as the
  * binary node it was. (3) A touched reference argument is re-simplified once
- * (inv. 6). (4) `tree::substitute` renumbers every binder id of the whole
+ * (inv. 6). (4) `tree::substitute` renumbers every binder id of the WHOLE
  * formula when `t` carries a functional quantifier, against the module's id
- * policy (phase-0 ids are memo keys; phase 5 restores canonicity). Not among
+ * policy (phase-0 ids are memo keys; phase 5 restores canonicity) — the
+ * rename apart below moves the WITNESS's bound ids alone and leaves `φ`'s
+ * where they are. Not among
  * the reasons: `replace` IS unique-cached, and `replace_if` DOES take a
  * descent predicate, so the occurrence guard alone would not have justified
  * a new walk.
@@ -173,6 +175,22 @@ tref subst_var(tref phi, tref x, tref t, const var_order<node>& order,
 	DBG(assert(tau::get(x).is(tau::variable));)
 	DBG(assert(tau::get(phi).is(tau::wff));)
 	if (!has_free<node>(phi, x)) return phi;
+	// A WITNESS IS PLAIN (§3): this is the boundary where the spec's "a
+	// caller spells one ONCE per substitution" happens — once here, before
+	// the walk, rather than once per atom side inside `subst_term`, which
+	// takes the plain contract and Debug-asserts it.
+	if (tau::get(t).find_top([](tref m) {
+		return tau::get(m).is(tau::BDD_ID); }))
+		t = term_handle<node>::convert_to_tau_terms(t);
+	// RENAME APART (§3), once, before the walk and AFTER that spelling (a
+	// spelled BDD brings its leaves' chains into the tree): a witness
+	// carrying a functional quantifier would otherwise leave the site's
+	// binder and a subscript of `t` sharing one id on a path — the
+	// shadowing pair — until phase 5. Shifting `t`'s bound ids above every
+	// id in sight removes it at the source, and `subst_term` may then
+	// rewrite without renaming.
+	if (carries_functional_quantifier<node>(t))
+		t = terms_detail::rename_apart<node>(phi, t);
 #ifdef DEBUG
 	// A COPY: `get_free_vars` hands out a reference into its table.
 	const trefs t_vars = get_free_vars<node>(t);

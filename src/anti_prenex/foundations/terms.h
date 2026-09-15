@@ -214,9 +214,16 @@ tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
  * reference argument it touches is re-emitted through `simplify_term` (a
  * formula argument through `simplify_formula`, §1), so arguments stay
  * simplified (inv. 6). For a plain (non-BDD) term: ordinary replace with the
- * same re-simplification. Returns `f` itself when `x ∉ FV(f)`. A BDD-backed
- * `t` enters a leaf as its plain term, so no `BDD_ID` ever nests inside a
- * leaf (the compose on the decision variable uses `t`'s BDD directly).
+ * same re-simplification. Returns `f` itself when `x ∉ FV(f)`.
+ *
+ * A WITNESS IS PLAIN (§3, ruling 2): `t` carries no `BDD_ID` anywhere, so
+ * nothing is spelled here — the leaf rewrite puts `t` in as it stands and the
+ * compose builds its BDD under `order`. A caller holding a backed term spells
+ * it ONCE, before the substitution. Debug asserts it.
+ *
+ * And nothing is RENAMED here: no binder of `f` may share a bound variable
+ * with `t` (Debug asserts it). `subst_var` establishes that once, by renaming
+ * the witness apart before its walk.
  */
 template <NodeType node>
 tref subst_term(tref f, tref x, tref t, const var_order<node>& order,

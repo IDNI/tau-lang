@@ -101,6 +101,64 @@ tref subst_plain(tref f, tref x, tref t,
 	return pre_order<node>(f).apply_unique_until_change(cb);
 }
 
+/// The BOUND variables of @p t — a formula binder's variable and a functional
+/// quantifier's subscript alike, ONE shared id space (phase 0) — trimmed and
+/// sorted by `subtree_less`, so the result is binary-searchable.
+template <NodeType node>
+trefs bound_vars(tref t) {
+	using tau = tree<node>;
+	subtree_set<node> vs;
+	auto f = [&vs](tref m) {
+		if (is_logical_or_functional_quant<node>(m))
+			vs.insert(tau::trim_right_sibling(tau::get(m).first()));
+		return true;
+	};
+	pre_order<node>(t).visit_unique(f);
+	return trefs(vs.begin(), vs.end());
+}
+
+/**
+ * @brief §3 RENAME APART: every bound variable of the WITNESS @p t moved above
+ * every id in sight — `k ↦ k + base` with
+ * `base = max(find_biggest_var_id(n), find_biggest_var_id(t))` — so that no
+ * binder on any path of @p n can equal a bound variable inside @p t.
+ *
+ * This removes the SHADOWING PAIR at its source: a `t` carrying a functional
+ * quantifier used to leave the site's binder and the subscript sharing one id
+ * on a path until phase 5; now no pair ever forms, and phase 5's
+ * `CANONICALISE_BINDER_IDS` restores the depth ids. Bound ids are canonical
+ * depth ids after phase 0, hence at most `find_biggest_var_id(t)`, so every
+ * shifted name is above every numeric name of @p t and of @p n and one plain
+ * `rewriter::replace` over @p t is capture-free — no rename can land on an
+ * occurrence of something else. The map is keyed by the variable NODE, so two
+ * binders sharing an id (siblings, never one inside the other) are renamed
+ * alike, and both the binder position and every occurrence in its scope move
+ * together. A bound variable whose name is no id is left alone (there is
+ * nothing to shift, and it cannot collide with a depth id).
+ */
+template <NodeType node>
+tref rename_apart(tref n, tref t) {
+	using tau = tree<node>;
+	const trefs bound = bound_vars<node>(t);
+	if (bound.empty()) return t;
+	const int_t base = std::max(find_biggest_var_id<node>(n),
+		find_biggest_var_id<node>(t));
+	subtree_map<node, tref> changes;
+	for (tref v : bound) {
+		const std::string name = get_var_name<node>(v);
+		if (name.empty() || !std::ranges::all_of(name,
+			[](unsigned char c) { return std::isdigit(c) != 0; }))
+			continue;
+		int_t id;
+		try { id = static_cast<int_t>(std::stoll(name)); }
+		catch (const std::out_of_range&) { continue; }
+		changes.emplace(v, tau::build_variable(std::to_string(id + base),
+			tau::get(v).get_ba_type()));
+	}
+	if (changes.empty()) return t;
+	return rewriter::replace<node>(t, changes);
+}
+
 /// The atom under one optional `¬`, and whether there was one.
 template <NodeType node>
 std::pair<tref, bool> unwrap_neg(tref a) {
@@ -349,17 +407,37 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 	using namespace terms_detail;
 	x = tau::trim_right_sibling(x);
 	DBG(assert(tau::get(x).is(tau::variable));)
+	// A WITNESS IS PLAIN (§3, ruling 2): it carries no `BDD_ID` anywhere,
+	// so nothing is spelled here and no `BDD_ID` can enter a leaf or a
+	// reference argument. A caller holding a backed term spells it ONCE,
+	// before the substitution.
+	DBG(assert(tau::get(t).find_top([](tref m) {
+		return tree<node>::get(m).is(tree<node>::BDD_ID); }) == nullptr);)
+	// And `subst_term` never renames: no binder of `f` may share a bound
+	// variable with `t`. `subst_var` establishes that once, by renaming the
+	// witness apart before its walk.
+#ifdef DEBUG
+	if (carries_functional_quantifier<node>(t)) {
+		const trefs tb = bound_vars<node>(t);
+		bool apart = true;
+		auto chk = [&](tref m) {
+			if (is_logical_or_functional_quant<node>(m)
+				&& std::binary_search(tb.begin(), tb.end(),
+					tau::trim_right_sibling(tau::get(m).first()),
+					tau::subtree_less)) apart = false;
+			return apart;
+		};
+		pre_order<node>(f).visit_unique(chk);
+		assert(apart);
+	}
+#endif
 	{
 		const trefs& vars = get_free_vars<node>(f);
 		if (!std::binary_search(vars.begin(), vars.end(), x, tau::subtree_less))
 			return f;
 	}
-	// Ruling 2: no BDD_ID ever enters a leaf, so the term that goes into a
-	// leaf or a reference argument is plain.
-	const tref t_plain = thandle<node>::is_bdd_backed(t)
-		? thandle<node>::convert_to_tau_terms(t) : t;
 	if (!thandle<node>::is_bdd_backed(f))
-		return subst_plain<node>(f, x, t_plain, simplify_formula);
+		return subst_plain<node>(f, x, t, simplify_formula);
 	bref<node> r = thandle<node>::convert_to_handle(f).get();
 	DBG(assert(tbdd<node>::is_ordered(r, order));)
 	// 1. the hidden occurrences, inside the leaves — on the ORIGINAL
@@ -368,7 +446,7 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 		const trefs& vars = get_free_vars<node>(leaf);
 		if (!std::binary_search(vars.begin(), vars.end(), x, tau::subtree_less))
 			return leaf;
-		return subst_plain<node>(leaf, x, t_plain, simplify_formula);
+		return subst_plain<node>(leaf, x, t, simplify_formula);
 	};
 	r = tbdd<node>::map_leaves(r, leaf_subst, order);
 	// 2. the decision variable, by BDD compose.

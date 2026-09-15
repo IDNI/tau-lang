@@ -1282,6 +1282,31 @@ tref qbody(tref n) {
 
 } // namespace
 
+TEST_SUITE("BDD find_biggest_var_id") {
+	using bdd = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+
+	TEST_CASE("a BDD_ID is no black box: the stored BDD's ids count") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref q = pvar("q");
+		// a numeric variable that becomes a DECISION variable, so it has
+		// no tree node left in the term that carries the BDD
+		tref v7 = tau::build_variable("7", tau::get(q).get_ba_type());
+		tref plain = tau::build_bf_and(tau::get(tau::bf, v7),
+			tau::get(tau::bf, q));
+		CHECK(find_biggest_var_id<node_t>(plain) == 7);
+		bdd::order o {{ v7, 1 }};
+		tref backed = hbdd::convert_to_tau_node(plain, o);
+		REQUIRE(hbdd::is_bdd_backed(backed));
+		// no variable node anywhere in the term itself
+		CHECK(tau::get(backed).find_top([](tref m) {
+			return tau::get(m).is(tau::variable); }) == nullptr);
+		CHECK(find_biggest_var_id<node_t>(backed) == 7);
+	}
+}
+
 TEST_SUITE("BDD build_functional_quantifiers") {
 	using bdd = tau_term_bdd<node_t>;
 	using hbdd = term_handle<node_t>;

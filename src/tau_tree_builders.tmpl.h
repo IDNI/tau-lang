@@ -202,6 +202,14 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 // a path) and on no free variable of it. Every variable node is visited -- a
 // free numeric name can sit below a numeric quantifier. Names too big for
 // int_t saturate to the int_t maximum.
+//
+// A BDD_ID is no black box here: its ids count too. A term backed by a BDD
+// holds its variables in the store, not as tree nodes -- a decision variable
+// has no node at all -- so the stored BDD's free variables (decision
+// variables included) are read through U, exactly as get_free_vars does
+// (tau_tree_extractors.tmpl.h). Without that a fresh id could land on a
+// block variable that only occurs inside a backed term, and the collision
+// would surface when the finish spells the BDD out again.
 template <NodeType node>
 int_t find_biggest_var_id(tref fm) {
 	using tau = tree<node>;
@@ -211,16 +219,27 @@ int_t find_biggest_var_id(tref fm) {
 		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
 		return true;
 	};
-	auto f = [&](tref n) {
-		if (is<node, tau::variable>(n)) {
-			if (auto name = get_var_name<node>(n); is_number(name)) {
-				try {
-					id = std::max(id, static_cast<int_t>(std::stoll(name)));
-				} catch (const std::out_of_range&) {
-					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max();
-				}
+	auto consider = [&](tref v) {
+		if (auto name = get_var_name<node>(v); is_number(name)) {
+			try {
+				id = std::max(id, static_cast<int_t>(std::stoll(name)));
+			} catch (const std::out_of_range&) {
+				// Variable name exceeds range; use max id
+				id = std::numeric_limits<int_t>::max();
 			}
+		}
+	};
+	auto f = [&](tref n) {
+		if (is<node, tau::variable>(n)) consider(n);
+		else if (tau::get(n).is(tau::BDD_ID)) {
+			// `U` is keyed by the `BDD_ID` node itself (tau_bdd.h).
+			const auto& bdd_u = tau_term_bdd_handle<node>::U;
+			if (auto jt = bdd_u.find(
+					tau_term_bdd_handle<node>::key_of(n));
+				jt != bdd_u.end())
+				for (tref v : tau_term_bdd_handle<node>::
+					get_free_tau_vars(jt->second.get().b))
+					consider(v);
 		}
 		return true;
 	};

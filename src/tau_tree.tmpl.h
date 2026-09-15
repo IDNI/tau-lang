@@ -292,6 +292,13 @@ bool has_semantic_error(tref fm);
 #include "rr.h"        // recurrence relations structure
 #include "ba_types.h"  // ba types dictionary
 
+namespace idni::tau_lang {
+	// Forward declaration required by tau_tree_builders.tmpl.h
+	// (find_biggest_var_id) and tau_tree_extractors.tmpl.h (get_free_vars)
+	// to handle BDD_ID nodes; full definition provided by tau_bdd.h.
+	template <NodeType node> struct tau_term_bdd_handle;
+} // namespace idni::tau_lang
+
 #include "tau_tree_builders.h"
 
 #include "ref_types_inference.h"
@@ -311,12 +318,6 @@ bool has_semantic_error(tref fm);
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
-
-namespace idni::tau_lang {
-	// Forward declaration required by tau_tree_extractors.tmpl.h to handle BDD_ID
-	// nodes in get_free_vars (full definition provided by tau_bdd.h).
-	template <NodeType node> struct tau_term_bdd_handle;
-} // namespace idni::tau_lang
 
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
 #include "tau_tree_from_parser.tmpl.h"

@@ -412,18 +412,27 @@ TEST_CASE("subst_term: a leaf that gains a block variable is re-canonicalised") 
 	CHECK(ap::leaf_fv<node_t>(s).size() == 2); // b and c, p is a decision node again
 }
 
-TEST_CASE("subst_term: a BDD-backed t composes on the decision variable and enters no leaf as BDD_ID") {
+TEST_CASE("subst_term: a PLAIN witness composes on the decision variable and enters the leaves") {
 	tref x = vr("x"), y = vr("y"), z = vr("z");
 	ap::block P{ x, y };
 	order_t o = order_of(P);
 	tref f = sides(ap::prepare_terms<node_t>(wff("x & r(x) = 0"), P, o)).first;
-	tref t = sides(ap::prepare_terms<node_t>(wff("y & z = 0"), P, o)).first;
 	REQUIRE(th::is_bdd_backed(f));
-	REQUIRE(th::is_bdd_backed(t));
+	// The witness is plain by contract: `subst_term` spells nothing. The
+	// compose builds its BDD under the live order, and the leaf rewrite —
+	// `x` hides inside the reference argument — puts it in as it stands.
+	tref t = bf("y & z");
+	REQUIRE(!has_bdd_id(t));
 	tref s = ap::subst_term<node_t>(f, x, t, o);
+	CHECK(th::is_bdd_backed(s));
 	CHECK(same_function(s, bf("y & z & r(y & z)"), { x, y, z }));
 	// finish: nothing BDD-backed remains anywhere
 	CHECK(!has_bdd_id(th::convert_to_tau_terms(s)));
+	// the same result a caller gets by spelling a backed witness ONCE
+	// before the call, which is how a backed one reaches here now
+	tref backed = sides(ap::prepare_terms<node_t>(wff("y & z = 0"), P, o)).first;
+	REQUIRE(th::is_bdd_backed(backed));
+	CHECK(ap::subst_term<node_t>(f, x, th::convert_to_tau_terms(backed), o) == s);
 }
 
 // 6. simplify_term ------------------------------------------------------------

@@ -628,13 +628,13 @@ TEST_CASE("subst_var: capture-safe on the parser's canonical ids, and the ids st
 	}
 }
 
-TEST_CASE("subst_var with a witness carrying a functional quantifier: the F5 shadowing pair, repaired by phase 5") {
-	// Ruling 5 (Sep 10 2026): a `t` carrying a functional
-	// quantifier may leave a SHADOWING PAIR of ids on one path — the unit's
-	// binder and the quantifier's subscript are both "1" — until phase 5's
-	// CANONICALISE_BINDER_IDS. Recorded as EXPECTED, not as an error:
-	// semantically safe (the subscript is bound inside its own body, and
-	// A's FV reads it so), and the depth numbering repairs it in one pass.
+TEST_CASE("subst_var with a witness carrying a functional quantifier: renamed apart, so the F5 pair never forms") {
+	// Ruling 5 (Sep 10 2026), as amended: a `t` carrying a functional
+	// quantifier used to leave a SHADOWING PAIR of ids on one path — the
+	// unit's binder and the quantifier's subscript both "1" — until phase
+	// 5's CANONICALISE_BINDER_IDS. `subst_var` now RENAMES the witness
+	// apart before its walk, so the pair never forms; phase 5 still
+	// restores the depth ids.
 	tref x = vr("x");
 	tref unit = wff("ex z (x & z = 0)");                  // z is "1"
 	tref t = bf("fall w (w | q5)");                       // w is "1" as well
@@ -644,19 +644,53 @@ TEST_CASE("subst_var with a witness carrying a functional quantifier: the F5 sha
 	REQUIRE(get_var_name<node_t>(tau::get(tq).first()) == "1");
 	tref res = ap::subst_var<node_t>(unit, x, t, {});
 	REQUIRE(is_child_quantifier<node_t>(res));
+	// the unit's binder keeps its id; the subscript moved above it
 	CHECK(get_var_name<node_t>(ap::binder_var<node_t>(res)) == "1");
 	tref rq = find_kind(res, tau::bf_fall);
 	REQUIRE(rq != nullptr);
-	CHECK(get_var_name<node_t>(tau::get(rq).first()) == "1");
+	CHECK(get_var_name<node_t>(tau::get(rq).first()) != "1");
+	// the free variables are the witness's, unchanged by the rename
 	CHECK(get_free_vars<node_t>(res).size() == 1);
 	CHECK(ap::fv_meets<node_t>(res, { vr("q5") }));
 	CHECK(!ap::fv_meets<node_t>(res, { x }));
+	// phase 5 puts the depth ids back, and is idempotent
 	tref canon = ap::canonicalise_binder_ids<node_t>(res);
 	CHECK(canon != res);
 	CHECK(get_var_name<node_t>(ap::binder_var<node_t>(canon)) == "2");
 	CHECK(get_var_name<node_t>(tau::get(find_kind(canon, tau::bf_fall)).first()) == "1");
 	CHECK(ap::canonicalise_binder_ids<node_t>(canon) == canon);
 	CHECK(get_free_vars<node_t>(canon).size() == 1);
+}
+
+TEST_CASE("rename apart: the base counts ids that live only inside a BDD_ID") {
+	// In phase 4 the largest ids of a component are the BLOCK variables,
+	// and after `prepare_terms` they may occur ONLY inside a backed term —
+	// a decision variable has no tree node at all. If the base missed them,
+	// a renamed subscript could land on one and the pair would reappear
+	// when the finish spells the BDD out again.
+	tref x = vr("x");
+	tref p5 = tau::build_variable("5", tau::get(x).get_ba_type());
+	ap::block P{ p5 };
+	order_t o = order_for(P);
+	tref phi = build_bf_eq_0<node_t>(tau::build_bf_and(
+		tau::get(tau::bf, x), tau::get(tau::bf, p5)));
+	tref prepared = ap::prepare_terms<node_t>(phi, P, o);
+	REQUIRE(has_bdd_id(prepared));
+	// "5" has no variable node left in the term, and the base still sees it
+	CHECK(tau::get(prepared).find_top([](tref m) {
+		return tau::get(m).is(tau::variable); }) == nullptr);
+	CHECK(find_biggest_var_id<node_t>(prepared) == 5);
+	tref t = bf("fall w (w | q5)");                       // the subscript is "1"
+	REQUIRE(get_var_name<node_t>(tau::get(find_kind(t, tau::bf_fall)).first()) == "1");
+	tref res = ap::subst_var<node_t>(prepared, x, t, o);
+	// the chain rode into a BDD leaf; spell the term to read its subscript
+	tref spelled = th::convert_to_tau_terms(res);
+	tref rq = find_kind(spelled, tau::bf_fall);
+	REQUIRE(rq != nullptr);
+	const std::string sub = get_var_name<node_t>(tau::get(rq).first());
+	CHECK(sub == "6");                                   // 1 + base, base = 5
+	CHECK(ap::fv_meets<node_t>(spelled, { p5 }));        // the clash was real
+	CHECK(!ap::fv_meets<node_t>(spelled, { x }));
 }
 
 TEST_CASE("subst_var: a node without the variable is returned untouched, spelling and all") {

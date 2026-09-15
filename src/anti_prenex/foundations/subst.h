@@ -66,6 +66,18 @@ namespace idni::tau_lang::anti_prenexing {
  * `x` are replaced and no result is re-entered, so `x ∈ FV(t)` is allowed
  * (ruling 6). Debug builds assert that `FV(t)` meets no binder on the path.
  *
+ * A WITNESS IS PLAIN (§3). This is the BOUNDARY where the spec's "a caller
+ * spells one once per substitution" happens: a `t` carrying a `BDD_ID` is
+ * spelled out here, ONCE, before the walk — rather than once per atom side
+ * inside `subst_term`, which takes the plain contract and Debug-asserts it.
+ *
+ * RENAME APART (§3): when `t` carries a functional quantifier, its BOUND
+ * variables are moved above every id in sight once, before the walk
+ * (`terms_detail::rename_apart`), so no binder of `φ` can equal a subscript
+ * inside `t` on any path. The SHADOWING PAIR the spec's ruling 5 tolerated
+ * until phase 5 therefore never forms, and no substitution below renames;
+ * phase 5's `CANONICALISE_BINDER_IDS` restores the depth ids.
+ *
  * @param order            the live BDD order (`ctx.order`), for `subst_term`;
  *                         empty at phases 1, 2 and 5
  * @param simplify_formula re-simplifier for FORMULA arguments of touched
