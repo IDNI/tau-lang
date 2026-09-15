@@ -297,15 +297,17 @@ TEST_CASE("resolve_functional_quantifiers: plain, nested, hazard, keep") {
 	auto keep_all = [](const tb::quants&) { return true; };
 	CHECK(ap::resolve_functional_quantifiers<node_t>(c, {}, keep_all) == c);
 	CHECK(ap::resolve_functional_quantifiers<node_t>(outer, {}, keep_all) == outer);
-	// `keep` accepting only the ∃ run: the ∀ above it resolves over the kept
-	// chain, which rides into the leaves and survives
+	// the nest is ONE question, on the prefix outermost first: accepting the
+	// ∀ it starts with keeps the ∃ under it too
+	auto keep_all_kind = [](const tb::quants& q) {
+		return q[0].second == tb::all; };
+	CHECK(ap::resolve_functional_quantifiers<node_t>(outer, {}, keep_all_kind)
+		== outer);
+	// and declining that prefix resolves the nest whole, in one pass
 	auto keep_ex = [](const tb::quants& q) { return q[0].second == tb::ex; };
 	tref r3 = ap::resolve_functional_quantifiers<node_t>(outer, {}, keep_ex);
-	CHECK(r3 != outer);
-	CHECK(ap::carries_functional_quantifier<node_t>(r3));
-	// resolving again with nothing kept finishes the job
-	CHECK(same_function(ap::resolve_functional_quantifiers<node_t>(r3, {}),
-		bf("z & u"), { z, u }));
+	CHECK(!ap::carries_functional_quantifier<node_t>(r3));
+	CHECK(same_function(r3, bf("z & u"), { z, u }));
 }
 
 TEST_CASE("resolve_functional_quantifiers: the chains inside a BDD-backed term's leaves") {
@@ -362,6 +364,118 @@ TEST_CASE("resolve_functional_quantifiers: a whole-block chain over a stored BDD
 	tref rout = ap::resolve_functional_quantifiers<node_t>(cout, live);
 	CHECK(!ap::carries_functional_quantifier<node_t>(rout));
 	CHECK(same_function(rout, bf("a & b"), { a, b }));  // ∀x ∃y = a·b
+}
+
+TEST_CASE("resolve_functional_quantifiers: a mixed nest is ONE unit of work") {
+	tref x = vr("x"), y = vr("y"), z = vr("z"), w = vr("w");
+	tref f = bf("x & z | y & w");
+	tb::quants q {{ x, tb::ex }, { y, tb::all }};
+	tref c = tb::build_functional_quantifiers(q, f);
+	REQUIRE(tau::get(c).child_is(tau::bf_fex));
+	std::vector<tb::quants> seen;
+	auto rec = [&seen](const tb::quants& p) { seen.push_back(p); return false; };
+	tref r = ap::resolve_functional_quantifiers<node_t>(c, {}, rec);
+	// asked ONCE, on the canonical prefix of the whole nest, outermost first
+	REQUIRE(seen.size() == 1);
+	REQUIRE(seen[0].size() == 2);
+	CHECK(tau::subtree_equals(seen[0][0].first, x));
+	CHECK(seen[0][0].second == tb::ex);
+	CHECK(tau::subtree_equals(seen[0][1].first, y));
+	CHECK(seen[0][1].second == tb::all);
+	// and resolved in ONE pass over the chain's own order, the innermost
+	// subscript ranking lowest
+	order_t o {{ y, 1 }, { x, 2 }};
+	CHECK(r == tb::to_tau_term(tb::bdd_quant(tb::build_bdd(f, o), q, o),
+		find_ba_type<node_t>(f)));
+	CHECK(same_function(r, bf("z"), { z, w }));   // ∃x ∀y (x·z ∪ y·w) = z
+}
+
+TEST_CASE("resolve_functional_quantifiers: a same-kind nest is one merged prefix") {
+	tref x = vr("x"), y = vr("y");
+	tref f = bf("x & z | y & w");
+	tref c = tb::build_functional_quantifiers(
+		{{ x, tb::all }, { y, tb::all }}, f);
+	std::vector<tb::quants> seen;
+	auto rec = [&seen](const tb::quants& p) { seen.push_back(p); return true; };
+	tref r = ap::resolve_functional_quantifiers<node_t>(c, {}, rec);
+	// one run, one question, both subscripts in it (content order inside a
+	// run, so the pair is not asserted positionally)
+	REQUIRE(seen.size() == 1);
+	REQUIRE(seen[0].size() == 2);
+	CHECK(seen[0][0].second == tb::all);
+	CHECK(seen[0][1].second == tb::all);
+	CHECK((tau::subtree_equals(seen[0][0].first, x)
+		|| tau::subtree_equals(seen[0][1].first, x)));
+	CHECK((tau::subtree_equals(seen[0][0].first, y)
+		|| tau::subtree_equals(seen[0][1].first, y)));
+	// kept: the whole canonical chain comes back, its inner binder untouched
+	CHECK(r == c);
+	REQUIRE(tau::get(r).child_is(tau::bf_fall));
+	tref inner = tau::trim_right_sibling(tau::get(tau::get(r).first()).second());
+	CHECK(tau::get(inner).child_is(tau::bf_fall));
+}
+
+TEST_CASE("resolve_functional_quantifiers: a chain inside the body goes first") {
+	tref x = vr("x"), y = vr("y"), z = vr("z"), w = vr("w"), v = vr("v");
+	// ∀x ∃v ( x·z·v ∪ ∃y (y·w) ) — the ∃y is NOT adjacent: it sits under ∪,
+	// so it is a chain of its own, resolved before the nest above it
+	tref in = tb::build_functional_quantifiers({{ y, tb::ex }}, bf("y & w"));
+	tref body = tau::build_bf_or(bf("x & z & v"), in);
+	tref c = tb::build_functional_quantifiers(
+		{{ x, tb::all }, { v, tb::ex }}, body);
+	std::vector<tb::quants> seen;
+	auto rec = [&seen](const tb::quants& p) { seen.push_back(p); return false; };
+	tref r = ap::resolve_functional_quantifiers<node_t>(c, {}, rec);
+	REQUIRE(seen.size() == 2);
+	REQUIRE(seen[0].size() == 1);
+	CHECK(tau::subtree_equals(seen[0][0].first, y));   // the nested one first
+	REQUIRE(seen[1].size() == 2);                      // then the nest, whole
+	CHECK(tau::subtree_equals(seen[1][0].first, x));
+	CHECK(tau::subtree_equals(seen[1][1].first, v));
+	CHECK(!ap::carries_functional_quantifier<node_t>(r));
+	// ∃y (y·w) = w, and ∀x ∃v (x·z·v ∪ w) = w
+	CHECK(same_function(r, bf("w"), { z, w }));
+}
+
+TEST_CASE("resolve_functional_quantifiers: a subscript in a leaf leaves the others resolvable") {
+	tref x = vr("x"), y = vr("y");
+	tref f = bf("x & r(y)");                     // y hides in the argument
+	tref want = tb::build_functional_quantifiers({{ y, tb::all }}, bf("r(y)"));
+	// ∃x ∀y (x·r(y)) = ∀y r(y): `x` resolves, `∀y` stays where it is
+	for (auto prefix : { tb::quants{{ x, tb::ex }, { y, tb::all }},
+		tb::quants{{ y, tb::all }, { x, tb::ex }} })
+	{
+		tref c = tb::build_functional_quantifiers(prefix, f);
+		REQUIRE(ap::carries_functional_quantifier<node_t>(c));
+		std::vector<tb::quants> seen;
+		auto rec = [&seen](const tb::quants& p) {
+			seen.push_back(p); return false; };
+		tref r = ap::resolve_functional_quantifiers<node_t>(c, {}, rec);
+		// one question for the nest, even though only part of it resolves
+		REQUIRE(seen.size() == 1);
+		CHECK(seen[0].size() == 2);
+		CHECK(ap::carries_functional_quantifier<node_t>(r));
+		CHECK(tau::subtree_equals(r, want));
+		const trefs& fv = get_free_vars<node_t>(r);
+		CHECK(!std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));
+	}
+}
+
+TEST_CASE("resolve_functional_quantifiers: keep sees the canonical prefix of a degenerate nest") {
+	tref x = vr("x"), y = vr("y");
+	// `fall x fall y (x & z)`, spelled without the constructor: `y` binds
+	// nothing, so the canonical prefix holds `x` alone
+	tref raw = tau::build_bf_fall(y, bf("x & z"), false);
+	raw = tau::build_bf_fall(x, raw, false);
+	std::vector<tb::quants> seen;
+	auto rec = [&seen](const tb::quants& p) { seen.push_back(p); return true; };
+	tref r = ap::resolve_functional_quantifiers<node_t>(raw, {}, rec);
+	REQUIRE(seen.size() == 1);
+	REQUIRE(seen[0].size() == 1);
+	CHECK(tau::subtree_equals(seen[0][0].first, x));
+	CHECK(seen[0][0].second == tb::all);
+	// kept, and the canonical chain is what comes back
+	CHECK(r == tb::build_functional_quantifiers({{ x, tb::all }}, bf("x & z")));
 }
 
 // 5. simplify_term ------------------------------------------------------------

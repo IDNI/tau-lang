@@ -81,9 +81,8 @@ namespace idni::tau_lang::anti_prenexing {
 // of last resort everywhere (result-join emission, `EXPAND`'s disjunct key),
 // so that no order anywhere depends on construction history. It compares the
 // node value first (hash, then kind and payload), then the child list, and
-// ignores right siblings. It is deterministic and content-derived within one
-// build, but it bottoms out in `std::hash` and is therefore not stable across
-// toolchains, which no use in the spec needs. It is a strict weak ordering:
+// ignores right siblings. It is deterministic and content-derived. It is a
+// strict weak ordering:
 // `subtree_less(a, b)` and `subtree_less(b, a)` are both false iff `a` and
 // `b` are the same node.
 //
