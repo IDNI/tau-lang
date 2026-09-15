@@ -523,6 +523,9 @@ result<tref> normalize(tref form) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end())
 		return r.with_assert_check_value(it->second);
+	// Key the memo on the ORIGINAL input -- `form` is reassigned below, so
+	// storing under it never matches a later lookup.
+	const tref cache_key = form;
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
 	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
@@ -546,7 +549,7 @@ result<tref> normalize(tref form) {
 	// quantifiers to Boole normal form
 	tref out = normalize_temporal_quantifiers<node>(form);
 #ifdef TAU_CACHE
-	cache.emplace(form, out);
+	cache.emplace(cache_key, out);
 #endif // TAU_CACHE
 	if (!out) return r.with_error(code::internal_error,
 		messages::normalization_produced_no_formula);
