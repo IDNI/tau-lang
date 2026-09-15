@@ -31,6 +31,22 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      # A buildkit cache mount lives on the builder, and a runner is
+      # discarded after the job, so the ccache directory needs a round trip
+      # through the actions cache.
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-ubuntu-24.04-debug-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-24.04-debug-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
       # cvc5 and boost are built from source and cached under the shared
       # 'tau-deps' scope. Change the scope name to force a rebuild.
       - name: Build deps stage (cvc5 + boost, cached)
