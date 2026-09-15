@@ -523,10 +523,11 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 * it replaces, so a replacement is never entered again: the
 	 * substitution is simultaneous, and @p that may occur inside @p with.
 	 *
-	 * @p that is any subtree. A variable, bare or as the `bf(variable)`
-	 * term, is the common key; it is matched in its `bf` wrapper, so a
-	 * binder's own variable node is never rewritten. Occurrences are
-	 * matched by content.
+	 * @p that is any subtree and is matched exactly as given, by content.
+	 * A variable is the common key, bare or as the `bf(variable)` term;
+	 * either spelling identifies the variable for the occurrence guard and
+	 * the compose. In the BDD regime a key and its replacement are `bf`
+	 * terms.
 	 *
 	 * When every key is a variable, a `wff` or `bf` node is entered only if
 	 * one of them is free in it (`get_free_vars`). An untouched subtree

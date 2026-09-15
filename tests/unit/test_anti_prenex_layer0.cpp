@@ -542,7 +542,7 @@ TEST_CASE("atoms vs fv on a unit: [atm ↦ T/F] is unit-opaque, [x ← t] descen
 	CHECK(tau::get(ap::subst_atom<node_t>(phi, A, false)).equals_F());
 	// The variable substitution descends into the unit and leaves the
 	// vocabulary as it was.
-	tref res = tau::get(phi).substitute(x, bf("z"));
+	tref res = tau::get(phi).substitute(bf("x"), bf("z"));
 	CHECK(res != phi);
 	CHECK(!ap::fv_meets<node_t>(res, { x }));
 	tref unit2 = member_where(res, is_child_quantifier<node_t>);
@@ -565,7 +565,7 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	tref x = vr("x"), z = vr("z");
 	tref phi = wff("f(x) && x & u1 = 0");
 	REQUIRE(ap::members<node_t>(phi).size() == 2);
-	tref res = tau::get(phi).substitute(x, bf("z"), {}, resimplify);
+	tref res = tau::get(phi).substitute(bf("x"), bf("z"), {}, resimplify);
 	CHECK(res != phi);
 	CHECK(!ap::fv_meets<node_t>(res, { x }));
 	CHECK(ap::fv_meets<node_t>(res, { z }));
@@ -575,7 +575,7 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	// is SIMPLIFY_TERM's own output (per-path contradiction, u1′ under
 	// u1), the function u1·u2, the symbol untouched.
 	tref t2 = bf("u1 & (u1' | u2)");
-	tref res2 = tau::get(phi).substitute(x, t2, {}, resimplify);
+	tref res2 = tau::get(phi).substitute(bf("x"), t2, {}, resimplify);
 	tref ref2 = member_where(res2, is_child<node_t, tau::wff_ref>);
 	REQUIRE(ref2 != nullptr);
 	tref arg2 = find_kind(ref2, tau::ref_arg);
@@ -586,7 +586,7 @@ TEST_CASE("the library substitution reaches a reference's arguments and re-simpl
 	CHECK(find_kind(a2, tau::bf_neg) == nullptr);
 	CHECK(same(find_kind(ref2, tau::sym), find_kind(phi, tau::sym)));
 	// A reference whose arguments do not hold the variable is the same node.
-	CHECK(tau::get(wff("f(u1)")).substitute(x, bf("z"), {}, resimplify)
+	CHECK(tau::get(wff("f(u1)")).substitute(bf("x"), bf("z"), {}, resimplify)
 		== wff("f(u1)"));
 }
 

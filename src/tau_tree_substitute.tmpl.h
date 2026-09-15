@@ -106,14 +106,12 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 		// leaves.
 		if (tau::get(w).find_top(is_logical_or_functional_quant<node>))
 			w = rename_apart(formula, w);
-		// A variable key is matched in its `bf` wrapper and used bare
-		// for the occurrence guard and the compose; both spellings of
-		// it name the same key.
+		// The key is matched exactly as given. Either spelling of a
+		// variable key, bare or in its `bf` wrapper, names the
+		// variable the occurrence guard and the compose need.
 		tref var = nullptr;
-		if (const tau& t = tau::get(k); t.is(tau::variable)) {
-			var = k;
-			k = tau::get(tau::bf, k);
-		} else if (t.is(tau::bf) && t.first() != nullptr
+		if (const tau& t = tau::get(k); t.is(tau::variable)) var = k;
+		else if (t.is(tau::bf) && t.first() != nullptr
 			&& tau::get(t.first()).is(tau::variable))
 			var = tau::trim_right_sibling(t.first());
 		if (var == nullptr) s.keys_are_variables = false;
