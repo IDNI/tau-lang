@@ -92,7 +92,7 @@ namespace idni::tau_lang::anti_prenexing {
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
 //   RESOLVE_FUNCTIONAL     resolve_functional_quantifiers (below)
-//   φ[x ← t]  /  f[x ← t]  term_handle<node>::substitute(φ, bf(x), t, order, hook)
+//   φ[x ← t]  /  f[x ← t]  tree<node>::substitute(φ, bf(x), t, order, hook)
 //
 // BDD-BACKED: the term is a `bf(BDD_ID)` node, i.e. it is backed by a BDD
 // under the live order and has at least one decision variable. The `bf`

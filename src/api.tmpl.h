@@ -384,7 +384,7 @@ tref api<node>::substitute(tref expr, tref that, tref with) {
 	// canonical ids the API publishes: a replacement holding a binder of
 	// either kind brings its own ids into the expression, and the pass
 	// renumbers the result by depth over the shared id space.
-	tref result = term_handle<node>::substitute(expr, that, with);
+	tref result = tau::get(expr).substitute(that, with);
 	if (tau::get(with).find_top(is_logical_or_functional_quant<node>))
 		return canonize_quantifier_ids<node>(result);
 	return result;
@@ -423,7 +423,7 @@ tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 		if (tau::get(with).find_top(is_logical_or_functional_quant<node>))
 			canonize = true;
 	}
-	tref result = term_handle<node>::substitute(expr, changes);
+	tref result = tau::get(expr).substitute(changes);
 	return canonize ? canonize_quantifier_ids<node>(result) : result;
 }
 

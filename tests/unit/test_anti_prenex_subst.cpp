@@ -5,8 +5,8 @@
 // touch a unit), §10 (occurrence guards); the rulings of Sep 10 2026 are
 // cited in subst.h.
 //
-// `φ[x ← t]` is the library's `term_handle<node>::substitute` and is tested
-// in tests/unit/test_tau_bdd.cpp; the module's own call of it is in
+// `φ[x ← t]` is the library's `tree<node>::substitute` and is tested in
+// tests/unit/test_tau_tree.cpp; the module's own call of it is in
 // test_anti_prenex_layer0.cpp.
 //
 // Conventions. Every substitution takes the `wff` WRAPPER. A member of a chain

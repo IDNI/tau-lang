@@ -293,10 +293,15 @@ bool has_semantic_error(tref fm);
 #include "ba_types.h"  // ba types dictionary
 
 namespace idni::tau_lang {
-	// Forward declaration required by tau_tree_builders.tmpl.h
-	// (find_biggest_var_id) and tau_tree_extractors.tmpl.h (get_free_vars)
-	// to handle BDD_ID nodes; full definition provided by tau_bdd.h.
+	// Forward declarations required by tau_tree_builders.tmpl.h
+	// (find_biggest_var_id), tau_tree_extractors.tmpl.h (get_free_vars)
+	// and tau_tree_substitute.tmpl.h (substitute) to handle BDD_ID nodes;
+	// the full definitions are provided by tau_bdd.h. The three read a
+	// BDD-backed term through the store, since such a term keeps its
+	// variables there rather than as tree nodes; `substitute` also writes
+	// one, through `map_leaves` and `bdd_compose` on the BDD itself.
 	template <NodeType node> struct tau_term_bdd_handle;
+	template <NodeType node> struct tau_term_bdd;
 } // namespace idni::tau_lang
 
 #include "tau_tree_builders.h"
@@ -320,6 +325,9 @@ namespace idni::tau_lang {
 #include "tau_tree_queries.tmpl.h"
 
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
+// Must come after tau_tree_extractors.tmpl.h: substitute's occurrence guard
+// is get_free_vars.
+#include "tau_tree_substitute.tmpl.h"
 #include "tau_tree_from_parser.tmpl.h"
 
 // Must come after tau_tree_from_parser.tmpl.h: adt_types.tmpl.h uses the

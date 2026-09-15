@@ -6,8 +6,8 @@
  * atom substitution `φ[atm ↦ T/F]` of §3 with the occurrence guard of §10,
  * and §1's `atoms_memo` behind it.
  *
- * `φ[x ← t]` is the library's `term_handle<node>::substitute` (tau_bdd.h),
- * called directly with the live order and a re-simplifying argument hook.
+ * `φ[x ← t]` is the library's `tree<node>::substitute` (tau_tree.h), called
+ * directly with the live order and a re-simplifying argument hook.
  *
  * §10: "Substitution needs occurrence guards. `[atm ↦ T/F]` needs one —
  * `atoms_memo`, a per-node atom vocabulary with exactly the substitution's own

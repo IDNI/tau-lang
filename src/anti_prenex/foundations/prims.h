@@ -15,7 +15,7 @@
  * What the ids buy: an outer binder's id is strictly greater than the id of
  * any binder below it, whatever the kinds, so `FV(t)` meets no binder on the
  * path and `[x ← t]` is capture-safe inside a bound scope (the library's
- * `term_handle<node>::substitute`). Ids are not unique — siblings share one
+ * `tree<node>::substitute`). Ids are not unique — siblings share one
  * — and need not be; strict decrease along a
  * path is the whole property. Numbering starts at 1 and ignores free
  * variables that are themselves numerically named: such names arise only from

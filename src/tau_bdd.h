@@ -13,8 +13,6 @@
 #ifndef TAU_TAU_BDD_H
 #define TAU_TAU_BDD_H
 
-#include <functional>
-
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -529,103 +527,6 @@ struct tau_term_bdd_handle {
 	/** @brief Apply simultaneous substitutions @p subs under @p o. */
 	term_handle bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& o) const;
 
-	/**
-	 * @brief The re-simplifier a TOUCHED reference argument is re-emitted
-	 * through, once per argument the substitution changed. The identity by
-	 * default.
-	 */
-	using argument_hook = std::function<tref(tref)>;
-
-	/**
-	 * @brief `formula[that ← with]`, the one substitution of the library:
-	 * every occurrence of @p that in @p formula becomes @p with.
-	 *
-	 * ONE pre-order walk over the ORIGINAL formula, unique-cached and
-	 * stopping at every node it changes, so a replacement is never
-	 * re-entered: the substitution is SIMULTANEOUS and `that` may occur
-	 * inside @p with.
-	 *
-	 * KEYS. @p that is any subtree; the common case is a VARIABLE, spelled
-	 * bare or as the `bf(variable)` term, and both spellings name the same
-	 * key. An occurrence is matched by CONTENT, as `rewriter::replace`
-	 * matches one, so the right sibling of the node does not enter the
-	 * comparison. A variable is matched in its `bf` wrapper alone, which
-	 * is why a binder's own variable node is never rewritten.
-	 *
-	 * OCCURRENCE GUARD. When every key is a variable, a `wff` or `bf` node
-	 * is entered iff one of them is free in it (`get_free_vars`, one
-	 * cached test). That is the capture-awareness: where a key is rebound
-	 * it is not free, the subtree is not entered, and an untouched subtree
-	 * comes back as the SAME tref — @p formula itself when no key is free
-	 * in it. The cost is that a spine node — a same-connective
-	 * continuation of a chain, in a formula (`wff_and`, `wff_or`) or in a
-	 * term (`bf_and`, `bf_or`) alike — is asked for its free variables
-	 * here and so gets a row of its own.
-	 *
-	 * @p with IS PREPARED ONCE, before the walk: a `BDD_ID` anywhere
-	 * inside it is spelled out (`convert_to_tau_terms`), and a logical or
-	 * functional quantifier inside it has its bound variables RENAMED
-	 * APART (`rename_apart`), so no binder of @p formula can share an id
-	 * with a binder of @p with on any path. @p formula's own binder ids
-	 * are left exactly as they are; restoring canonical ids over the
-	 * result is the caller's step.
-	 *
-	 * A BDD-BACKED term is rewritten in the store: its LEAVES first, by
-	 * this same substitution, and then ONE simultaneous `bdd_compose` for
-	 * the key variables that are decision variables of @p o. Leaves first,
-	 * so a key occurring inside @p with is not substituted twice. @p o is
-	 * the live BDD order; a Debug build asserts that it is non-empty and
-	 * that every BDD-backed term the walk meets is ordered under it, which
-	 * is what a caller passing the empty default promises about
-	 * @p formula.
-	 *
-	 * A REFERENCE ARGUMENT is reached, rewritten by this same substitution
-	 * and re-emitted through @p on_argument, exactly once per argument the
-	 * rewrite changed; a nested reference inside it is finished before the
-	 * outer hook runs.
-	 *
-	 * Every other node is rebuilt through the hooked `tree::get`, so the
-	 * construction hooks (`T`/`F` folding, `¬¬`, constant atoms, the term
-	 * folds) apply on the way up. Nothing is re-canonicalised here: a
-	 * chain keeps the nesting it had minus the rewritten members, and a
-	 * temporal operator is entered like any other node.
-	 */
-	static tref substitute(tref formula, tref that, tref with,
-		const order& o = {},
-		const argument_hook& on_argument = identity);
-	/** @brief @p formula with every key of @p changes replaced by its
-	 * value, all at once; the pair overload is a one-entry map. */
-	static tref substitute(tref formula,
-		const subtree_map<node, tref>& changes, const order& o = {},
-		const argument_hook& on_argument = identity);
-
-	/**
-	 * @brief The BOUND variables of @p t — a formula binder's variable and
-	 * a functional quantifier's subscript alike, in one shared id space —
-	 * trimmed and sorted by `subtree_less`, so the result is
-	 * binary-searchable.
-	 */
-	static trefs bound_vars(tref t);
-	/**
-	 * @brief @p t with every bound variable of it moved above every id in
-	 * sight — `k ↦ k + base`, with
-	 * `base = max(find_biggest_var_id(n), find_biggest_var_id(t))` — so
-	 * that no binder on any path of @p n can equal a bound variable inside
-	 * @p t, and a substitution of @p t into @p n forms no shadowing pair.
-	 *
-	 * Bound ids are canonical depth ids, hence at most
-	 * `find_biggest_var_id(t)`, so every shifted name lands above every
-	 * numeric name of @p t and of @p n and one plain `rewriter::replace`
-	 * over @p t is capture-free: no rename can land on an occurrence of
-	 * something else. The map is keyed by the variable NODE, so two
-	 * binders that share an id (siblings, never one inside the other) are
-	 * renamed alike, and both the binder position and every occurrence in
-	 * its scope move together. A bound variable whose name is not an id is
-	 * left alone: there is nothing to shift, and it cannot collide with a
-	 * depth id.
-	 */
-	static tref rename_apart(tref n, tref t);
-
 	/** @brief Return the underlying BDD reference. */
 	ref get() const;
 
@@ -653,37 +554,6 @@ struct tau_term_bdd_handle {
 
 private:
 	using bdd_fv_cache_t = std::unordered_map<tref, trefs>;
-
-	/**
-	 * @brief What `substitute` prepares once and every recursive call
-	 * below it reuses: the replacements as the walk matches and applies
-	 * them, already spelled out and renamed apart.
-	 */
-	struct substitution {
-		/// Matched node → its replacement, a variable key held in its
-		/// `bf` wrapper.
-		subtree_map<node, tref> changes;
-		/// The key variables, sorted by `subtree_less` for the
-		/// occurrence guard; complete iff `keys_are_variables`.
-		trefs vars;
-		/// Variable key → its replacement, for the BDD compose.
-		std::vector<std::pair<tref, tref>> by_variable;
-		/// Every key is a variable, so the occurrence guard applies.
-		bool keys_are_variables = true;
-		/// The free variables of the replacements, sorted. Debug's
-		/// capture check is the one reader, so a Release build leaves
-		/// it empty.
-		trefs free_in_with;
-		/// ONE memo per rewrite: a reference argument → what the walk
-		/// made of it, the hook included. Keyed by subtree identity,
-		/// so the copies of a shared argument — the leaves of a BDD
-		/// and the tree body reach the same one — are rewritten and
-		/// re-emitted once per call.
-		mutable subtree_unordered_map<node, tref> argument_memo;
-	};
-	/** @brief The walk of `substitute`, over a prepared @p s. */
-	static tref substitute(tref formula, const substitution& s,
-		const order& o, const argument_hook& on_argument);
 };
 
 template<NodeType node>
