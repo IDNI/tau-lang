@@ -825,24 +825,53 @@ const trefs& get_free_vars(tref n) {
 	// the walk -- a node notes where its own entries start and truncates
 	// back to there when done -- so only a node that owns a cache entry
 	// allocates.
-	trefs loose;
-	std::vector<const trefs*> parts;
+	// One record per node that changes the chain its children see: an owner
+	// (which opens its own chain, or none for a binder) and any node with
+	// several children that ends an open chain. Wrappers, links and atoms
+	// push none, so the top frame is always the nearest such ancestor. An
+	// owner also records where its own contributions begin. `up` pops a
+	// frame exactly when it reaches the node that pushed it.
+	struct frame {
+		tref at;
+		size_t chain;
+		size_t lmark;
+		size_t mark;
+		bool owns;
+	};
+	// The walk's working storage, lent from a thread-local spare and given
+	// back on exit, so that a call on a warm thread allocates none of it.
+	// Taken by move rather than shared: a nested call -- get_free_tau_vars
+	// computes through this function -- finds the spare empty and works on
+	// storage of its own.
+	struct workspace {
+		trefs loose;
+		std::vector<const trefs*> parts;
+		std::vector<frame> frames;
+		// A flat table cleared by a generation bump, so a link costs no
+		// allocation and clearing costs no pass (tree_traversals.tmpl.h).
+		subtree_seen<node> opened;
+		void clear() {
+			loose.clear(), parts.clear(), frames.clear(), opened.clear();
+		}
+	};
+	static thread_local workspace spare;
+	workspace ws = std::move(spare);
+	ws.clear();
+	struct give_back {
+		workspace& to;
+		workspace& from;
+		~give_back() { to = std::move(from); }
+	} giver{ spare, ws };
+	trefs& loose = ws.loose;
+	std::vector<const trefs*>& parts = ws.parts;
 	// Chain links already taken apart (see `down`). A link reached again
 	// is computed as a node of its own, so a subformula that several
 	// branches of the DAG reach is taken apart only once.
-	subtree_unordered_set<node> opened;
+	subtree_seen<node>& opened = ws.opened;
 	// Lambdas rather than `tau::subtree_less` itself, which would reach the
 	// algorithms below as a function pointer and never inline.
 	auto less = [](tref a, tref b) { return tau::subtree_less(a, b); };
 	auto equal = [](tref a, tref b) { return tau::subtree_equals(a, b); };
-	// The nodes that own a cache entry: connectives, which form the chains
-	// below, and binders, which close a scope. Term connectives (`bf_and`,
-	// `bf_or`) count like the formula ones.
-	auto is_cacheable = [](const tau& t) {
-		return t.is(tau::wff_and) || t.is(tau::wff_or)
-			|| t.is(tau::bf_and) || t.is(tau::bf_or)
-			|| is_logical_or_functional_quant<node>(t.get());
-	};
 	// No node carries this type, so it stands for "no chain open".
 	static constexpr size_t no_chain = static_cast<size_t>(-1);
 	// The union of two sets that already carry the shape above.
@@ -869,50 +898,56 @@ const trefs& get_free_vars(tref n) {
 		parts.erase(std::unique(parts.begin() + mark, parts.end()),
 			parts.end());
 		// The loose variables and every set but the largest are sorted
-		// together, and the largest is then merged into them.
+		// together, and the largest is then merged into them. They are
+		// gathered in the node's own range of `loose`, which is truncated
+		// when it closes anyway, so only the answer is allocated.
 		size_t big = mark;
 		for (size_t i = mark + 1; i < parts.size(); ++i)
 			if (parts[i]->size() > parts[big]->size()) big = i;
-		trefs rest(loose.begin() + lmark, loose.end());
 		for (size_t i = mark; i < parts.size(); ++i)
-			if (i != big) rest.insert(rest.end(), parts[i]->begin(),
+			if (i != big) loose.insert(loose.end(), parts[i]->begin(),
 				parts[i]->end());
-		std::sort(rest.begin(), rest.end(), less);
-		rest.erase(std::unique(rest.begin(), rest.end(), equal), rest.end());
-		if (mark == parts.size()) return rest;
-		if (rest.empty()) return *parts[big];
-		return merged(rest, *parts[big]);
+		const auto first = loose.begin() + lmark;
+		std::sort(first, loose.end(), less);
+		loose.erase(std::unique(first, loose.end(), equal), loose.end());
+		if (mark == parts.size()) return trefs(first, loose.end());
+		if (first == loose.end()) return *parts[big];
+		const trefs& b = *parts[big];
+		trefs out;
+		out.reserve((loose.end() - first) + b.size());
+		std::set_union(first, loose.end(), b.begin(), b.end(),
+			std::back_inserter(out), less);
+		return out;
 	};
-	// One record per node the walk descends into: the chain that node hands
-	// to its children and, when it owns a cache entry, where its own
-	// contributions begin. `pre_order::visit` calls `up` for exactly the
-	// nodes `down` returned true on, so the two stay in step.
-	struct frame {
-		size_t chain;
-		size_t lmark;
-		size_t mark;
-		bool owns;
-	};
-	std::vector<frame> frames;
+	std::vector<frame>& frames = ws.frames;
+	// A sentinel below every frame: no chain is open above the key, and no
+	// node is null, so `up` never matches it.
+	frames.push_back({ nullptr, no_chain, 0, 0, false });
 	// Pre-order: records what @p m contributes and says whether to descend.
 	auto down = [&](tref m, tref parent) -> bool {
 		const tau& t = tau::get(m);
-		const size_t chain = frames.empty() ? no_chain
-			: frames.back().chain;
-		// A binder's children are its bound variable and its body, in that
-		// order (build_binder, tau_tree_builders.tmpl.h). The variable
-		// contributes nothing of its own; the occurrences of it the body
-		// contributes are removed when the binder closes.
-		if (parent && is_logical_or_functional_quant<node>(parent)
-			&& m == tau::get(parent).first()) return false;
-		if (is_var_or_capture<node>(m)) {
+		const size_t chain = frames.back().chain;
+		// One switch on the type: the branches below are exclusive, and
+		// which one a node takes is decided by its type alone.
+		switch (static_cast<size_t>(t.get_type())) {
+		case tau::variable:
+		case tau::capture:
+			// A binder's children are its bound variable and its body, in
+			// that order (build_binder, tau_tree_builders.tmpl.h). The
+			// variable contributes nothing of its own; the occurrences of
+			// it the body contributes are removed when the binder closes.
+			if (parent && m == tau::get(parent).first()
+				&& is_logical_or_functional_quant<node>(parent))
+				return false;
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
 			// Not descending: an offset under a variable (`x[t-1]`) is
-			// not a free occurrence.
-			loose.push_back(tau::trim_right_sibling(m));
+			// not a free occurrence. A variable with no right sibling is
+			// its own trimmed form, and interning would only find it
+			// again under the map's lock.
+			loose.push_back(t.has_right_sibling()
+				? tau::trim_right_sibling(m) : m);
 			return false;
-		}
-		if (t.is(tau::BDD_ID)) {
+		case tau::BDD_ID: {
 			// A BDD-backed term holds its variables in the BDD, not in
 			// the tree. `U` is keyed by the `BDD_ID` node (tau_bdd.h),
 			// and get_free_tau_vars returns them in the shape above.
@@ -926,7 +961,13 @@ const trefs& get_free_vars(tref n) {
 			}
 			return false;
 		}
-		if (is_cacheable(t)) {
+		// The nodes that own a cache entry: connectives, which form the
+		// chains, and binders, which close a scope. Term connectives
+		// (`bf_and`, `bf_or`) count like the formula ones.
+		case tau::wff_and: case tau::wff_or:
+		case tau::bf_and: case tau::bf_or:
+		case tau::wff_all: case tau::wff_ex:
+		case tau::bf_fall: case tau::bf_fex:
 			if (auto it = free_vars_map.find(m); it != free_vars_map.end()) {
 				if (!it->second.empty()) parts.push_back(&it->second);
 				return false;
@@ -934,28 +975,33 @@ const trefs& get_free_vars(tref n) {
 			// A link of the chain contributes its operands instead of a
 			// set of its own, so the whole of `a && (b && (c && ...))` --
 			// or any tree of `&&` -- is merged in one go, not per link.
-			// It owns no frame: its operands belong to the node that does.
-			if (t.is(chain) && opened.insert(m).second) {
-				frames.push_back({ chain, 0, 0, false });
+			// It owns no frame: its operands belong to the node that does,
+			// and they see the same chain.
+			if (t.is(chain) && !opened.contains(m)) {
+				opened.insert(m);
 				return true;
 			}
 			// A binder opens a fresh scope, which no chain crosses into.
-			frames.push_back({ is_logical_or_functional_quant<node>(m)
+			frames.push_back({ m, is_logical_or_functional_quant<node>(m)
 					? no_chain : static_cast<size_t>(t.get_type()),
 				loose.size(), parts.size(), true });
 			return true;
+		default:
+			// Any other node contributes what its children do. Any node
+			// with a single child passes an open chain through -- a
+			// wrapper, but a negation or a temporal operator too, none of
+			// which change which variables are free. A node with several
+			// children ends the chain, which is the one case that needs
+			// recording.
+			if (chain != no_chain && t.has_child()
+				&& tau::get(t.first()).has_right_sibling())
+				frames.push_back({ m, no_chain, 0, 0, false });
+			return true;
 		}
-		// Any other node contributes what its children do. Any node with
-		// a single child passes an open chain through -- a wrapper, but a
-		// negation or a temporal operator too, none of which change which
-		// variables are free. A node with several children ends the chain.
-		frames.push_back({ t.has_child()
-				&& !tau::get(t.first()).has_right_sibling()
-			? chain : no_chain, 0, 0, false });
-		return true;
 	};
 	// Post-order: closes the frame @p m opened, and stores its answer.
 	auto up = [&](tref m) {
+		if (frames.back().at != m) return;
 		const frame f = frames.back();
 		frames.pop_back();
 		if (!f.owns) return;
@@ -978,7 +1024,7 @@ const trefs& get_free_vars(tref n) {
 		if (!published.empty()) parts.push_back(&published);
 	};
 	pre_order<node>(key).visit(down, all, up);
-	DBG(assert(frames.empty());)
+	DBG(assert(frames.size() == 1);)
 	// A cacheable key has already stored its own answer above. A key that
 	// collected one whole set and no loose variable -- an equation over a
 	// single term, say -- is that set. Anything else is the union of what
