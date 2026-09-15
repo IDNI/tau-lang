@@ -92,20 +92,43 @@ bool has_ltl_operators(tref fm) {
 	// always/sometimes stays in the safety pipeline (eventual variables,
 	// lookback-faithful), but a NESTED sometimes -- G(F φ), F(G φ), F(F φ)
 	// -- is beyond that machinery (NZ-1 conservative fallbacks, fixpoint
-	// give-ups) and must route here.  always-under-always carries no
-	// liveness and stays with the safety pipeline as before.
+	// give-ups) and must route here.
+	//
+	// An always under an always is harmless only on a pure conjunction
+	// chain: G(A && G B) ≡ G A && G B and G(G B) ≡ G B, which the
+	// normalizer splits before the safety pipeline sees the formula.  A
+	// nested always anywhere else -- under a disjunction, a negation or an
+	// implication, as in G(A || G B) or G(!(G B)) -- is a genuine LTL
+	// nesting: the safety pipeline's always_to_unbounded_continuation
+	// requires a single always with no temporal operator inside it, and
+	// fed such a shape it aborts (Devel) or loops (Release).  The check is
+	// polarity-agnostic on purpose: a negation inside the body is not a
+	// conjunction, so everything below it counts as nested, and a negation
+	// above the outer always only reaches the safety pipeline with a shape
+	// that collapses regardless of its polarity.
 	if (!result) {
 		auto is_g_or_f = [](tref n) {
 			return is_child<node>(n, tree<node>::wff_always)
 			    || is_child<node>(n, tree<node>::wff_sometimes);
 		};
+		// True when every temporal operator inside an always body sits
+		// on a chain of conjunctions and always nodes (or none at all).
+		auto splittable = [&](auto&& self, tref body) -> bool {
+			const auto& t = tau::get(body);
+			if (!t.has_child()) return true;
+			auto nt = t[0].value.nt;
+			if (nt == tau::wff_and)
+				return self(self, t[0].first())
+				    && self(self, t[0].second());
+			if (nt == tau::wff_parenthesis || nt == tau::wff_always)
+				return self(self, t[0].first());
+			return t.find_top(is_g_or_f) == nullptr;
+		};
 		for (tref tq : tau::get(fm).select_top(is_g_or_f)) {
 			tref body = tau::trim2(tq);
 			if (is_child<node>(tq, tau::wff_sometimes)
 				? tau::get(body).find_top(is_g_or_f) != nullptr
-				: tau::get(body).find_top(
-					is_child<node, tau::wff_sometimes>)
-						!= nullptr) {
+				: !splittable(splittable, body)) {
 				result = true;
 				break;
 			}

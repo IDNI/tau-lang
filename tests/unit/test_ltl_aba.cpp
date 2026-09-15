@@ -136,6 +136,54 @@ TEST_SUITE("LTL parser") {
 		REQUIRE(fm != nullptr);
 		CHECK(has_ltl_operators<node_t>(fm));
 	}
+
+	TEST_CASE("has_ltl_operators: always under always routes unless it "
+		"sits on a conjunction chain")
+	{
+		// G(G B) and G(A && G B) split into plain always parts, so the
+		// safety pipeline keeps them.
+		tref gg = wff("G (G (o1[t] = 0))");
+		REQUIRE(gg != nullptr);
+		CHECK_FALSE(has_ltl_operators<node_t>(gg));
+		tref g_and_g = wff("G ((o1[t] = 1) && G (o1[t] = 0))");
+		REQUIRE(g_and_g != nullptr);
+		CHECK_FALSE(has_ltl_operators<node_t>(g_and_g));
+		// A negated always under an always is a nested eventually:
+		// G(!(G B)) = G(F(!B)).  The fuzzer (seed 42, formula 195) hit
+		// this shape and the safety pipeline asserted on it.
+		tref g_not_g = wff("G (!(G (i1[t] = 0)))");
+		REQUIRE(g_not_g != nullptr);
+		CHECK(has_ltl_operators<node_t>(g_not_g));
+		// Under a disjunction or an implication the nested always does
+		// not split either.
+		tref g_or_g = wff("G ((i1[t] = 0) || G (o1[t] = 1))");
+		REQUIRE(g_or_g != nullptr);
+		CHECK(has_ltl_operators<node_t>(g_or_g));
+		tref g_imply_g = wff("G ((o1[t] = 1) -> G (o1[t] = 1))");
+		REQUIRE(g_imply_g != nullptr);
+		CHECK(has_ltl_operators<node_t>(g_imply_g));
+		// A conjunction chain ending in a non-splittable nesting still
+		// routes.
+		tref chain = wff("G ((o1[t] = 1) && G ((i1[t] = 0) || G (o1[t] = 1)))");
+		REQUIRE(chain != nullptr);
+		CHECK(has_ltl_operators<node_t>(chain));
+	}
+
+	TEST_CASE("nested always shapes decide instead of aborting") {
+		// G(!(G(i1 = 0))) = G F (i1 != 0): the environment owns i1 and
+		// can keep it at 0 forever, so the spec is unrealizable.
+		tref g_not_g = spec("G (!(G (i1[t] = 0))).");
+		REQUIRE(g_not_g != nullptr);
+		CHECK_FALSE(is_tau_formula_sat<node_t>(g_not_g));
+		// The system can satisfy G(i1 = 0 || G(o1 = 1)) by holding o1 at 1.
+		tref g_or_g = spec("G ((i1[t] = 0) || G (o1[t] = 1)).");
+		REQUIRE(g_or_g != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(g_or_g));
+		// G(o1 = 1 -> G(o1 = 1)) is realizable by keeping o1 constant.
+		tref g_imply_g = spec("G ((o1[t] = 1) -> G (o1[t] = 1)).");
+		REQUIRE(g_imply_g != nullptr);
+		CHECK(is_tau_formula_sat<node_t>(g_imply_g));
+	}
 }
 
 // ── 2. Propositional LTL ─────────────────────────────────────────────────────
