@@ -62,15 +62,6 @@ enum class answer { sat, unsat, unknown };
 template <NodeType node>
 using var_order = typename term_handle<node>::order;
 
-/// Callback through which a term-level rewrite re-simplifies a FORMULA
-/// argument of a reference it touched (§1: "a formula argument through
-/// SIMPLIFY"). Layer 1 supplies `simplify`; the default is the identity.
-using simplify_formula_fn = std::function<tref(tref)>;
-
-/// The identity, the default `simplify_formula_fn`. Never an empty
-/// `std::function`, which would throw when called.
-inline const simplify_formula_fn identity_formula = [](tref t) { return t; };
-
 /// §1 `keep_functional` as `RESOLVE_FUNCTIONAL` sees it: a pure predicate on
 /// a functional-quantifier chain's prefix (outermost first), asked once per
 /// chain at a resolution site. Layer 3 supplies the block-level callback

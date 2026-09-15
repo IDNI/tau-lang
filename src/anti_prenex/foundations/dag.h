@@ -218,9 +218,9 @@ void set_neg(tref n, tref negated);
 /// `f ≤ g` or `f < g`. The push never splits an order atom; only the
 /// bitvector router's solver path consumes one (§1). This predicate
 /// classifies what the input holds. The module does not build order atoms
-/// itself, apart from an atom that substitution rebuilds (subst.h); not
-/// building them is what keeps it clear of the order-operator construction
-/// hooks.
+/// itself, apart from an atom that the library's substitution rebuilds
+/// through the hooks; not building them is what keeps it clear of the
+/// order-operator construction hooks.
 template <NodeType node> bool is_order_atom(tref n);
 /// One `¬` over an atom.
 template <NodeType node> bool is_negated_atom(tref n);

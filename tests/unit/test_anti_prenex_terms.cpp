@@ -364,78 +364,7 @@ TEST_CASE("resolve_functional_quantifiers: a whole-block chain over a stored BDD
 	CHECK(same_function(rout, bf("a & b"), { a, b }));  // ∀x ∃y = a·b
 }
 
-// 5. subst_term ---------------------------------------------------------------
-
-TEST_CASE("subst_term: reaches a reference argument and re-simplifies it") {
-	tref x = vr("x"), z = vr("z");
-	ap::block P{ x };
-	order_t o = order_of(P);
-	tref t = bf("x & r(x & z)");
-	tref l = sides(ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(t), P, o)).first;
-	REQUIRE(th::is_bdd_backed(l));
-	// the leaf hazard: x is hidden in the reference argument
-	trefs lfv = ap::leaf_fv<node_t>(l);
-	CHECK(std::binary_search(lfv.begin(), lfv.end(), x, tau::subtree_less));
-	// x ← z′: the decision node composes, the argument becomes r(z′·z),
-	// which the re-simplification folds to r(0)
-	tref s = ap::subst_term<node_t>(l, x, bf("z'"), o);
-	const trefs& fv = get_free_vars<node_t>(s);
-	CHECK(!std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));
-	CHECK(std::binary_search(fv.begin(), fv.end(), z, tau::subtree_less));
-	CHECK(!th::is_bdd_backed(s)); // no decision variable is left
-	CHECK(tau::get(s).find_top([](tref m) {
-		return tree<node_t>::get(m).is(tau::bf_ref); }) != nullptr);
-	// the argument folded to 0
-	tref arg = tau::get(s).find_top([](tref m) {
-		return tree<node_t>::get(m).is(tau::ref_arg); });
-	REQUIRE(arg != nullptr);
-	CHECK(tau::get(arg)[0].equals_0());
-	// x ∉ FV(f): the same tref
-	CHECK(ap::subst_term<node_t>(bf("y & z"), x, bf("z"), o) == bf("y & z"));
-	// a plain term: ordinary replace
-	CHECK(tau::subtree_equals(ap::subst_term<node_t>(bf("x & y"), x, bf("z"), {}),
-		bf("z & y")));
-}
-
-TEST_CASE("subst_term: a leaf that gains a block variable is re-canonicalised") {
-	tref p = vr("p"), a = vr("a"), b = vr("b"), c = vr("c");
-	ap::block P{ p };
-	order_t o = order_of(P);
-	// p·a ∪ p′·b with the OUTER variable a in a leaf; a ← p·c puts the
-	// decision variable into that leaf, which the rebuild must lift:
-	// p·(p·c) ∪ p′·b = p·c ∪ p′·b
-	tref f = sides(ap::prepare_terms<node_t>(wff("p & a | p' & b = 0"), P, o)).first;
-	REQUIRE(th::is_bdd_backed(f));
-	tref s = ap::subst_term<node_t>(f, a, bf("p & c"), o);
-	CHECK(th::is_bdd_backed(s));
-	CHECK(same_function(s, bf("p & c | p' & b"), { p, b, c }));
-	CHECK(ap::leaf_fv<node_t>(s).size() == 2); // b and c, p is a decision node again
-}
-
-TEST_CASE("subst_term: a PLAIN witness composes on the decision variable and enters the leaves") {
-	tref x = vr("x"), y = vr("y"), z = vr("z");
-	ap::block P{ x, y };
-	order_t o = order_of(P);
-	tref f = sides(ap::prepare_terms<node_t>(wff("x & r(x) = 0"), P, o)).first;
-	REQUIRE(th::is_bdd_backed(f));
-	// The witness is plain by contract: `subst_term` spells nothing. The
-	// compose builds its BDD under the live order, and the leaf rewrite —
-	// `x` hides inside the reference argument — puts it in as it stands.
-	tref t = bf("y & z");
-	REQUIRE(!has_bdd_id(t));
-	tref s = ap::subst_term<node_t>(f, x, t, o);
-	CHECK(th::is_bdd_backed(s));
-	CHECK(same_function(s, bf("y & z & r(y & z)"), { x, y, z }));
-	// finish: nothing BDD-backed remains anywhere
-	CHECK(!has_bdd_id(th::convert_to_tau_terms(s)));
-	// the same result a caller gets by spelling a backed witness ONCE
-	// before the call, which is how a backed one reaches here now
-	tref backed = sides(ap::prepare_terms<node_t>(wff("y & z = 0"), P, o)).first;
-	REQUIRE(th::is_bdd_backed(backed));
-	CHECK(ap::subst_term<node_t>(f, x, th::convert_to_tau_terms(backed), o) == s);
-}
-
-// 6. simplify_term ------------------------------------------------------------
+// 5. simplify_term ------------------------------------------------------------
 
 TEST_CASE("simplify_term: the four laws on a plain term") {
 	CHECK(tau::get(ap::simplify_term<node_t>(bf("0 & x"))).equals_0());
@@ -474,7 +403,7 @@ TEST_CASE("simplify_term: leaves simplified and merged in the BDD regime") {
 	CHECK(tau::subtree_equals(ap::simplify_term<node_t>(bf("y & (y' | z)"), o), bf("y & z")));
 }
 
-// 7. simplify_atom ------------------------------------------------------------
+// 6. simplify_atom ------------------------------------------------------------
 
 TEST_CASE("simplify_atom: plain regime folds and is idempotent") {
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & x' = 0"))).equals_T());
@@ -512,7 +441,7 @@ TEST_CASE("simplify_atom: BDD regime is side-wise and folds through the hooks") 
 	CHECK(sb == b);
 }
 
-// 8. term_of, norm_equation ---------------------------------------------------
+// 7. term_of, norm_equation ---------------------------------------------------
 
 TEST_CASE("term_of reads l + r without touching the atom; norm_equation descends through ¬") {
 	tref x = vr("x"), y = vr("y");
@@ -551,7 +480,7 @@ TEST_CASE("term_of reads l + r without touching the atom; norm_equation descends
 #endif
 }
 
-// 9. mem_size ----------------------------------------------------------------
+// 8. mem_size ----------------------------------------------------------------
 
 TEST_CASE("mem_size: shared BDD nodes counted once, terminals zero, leaves one") {
 	tref x = vr("x"), y = vr("y");
@@ -575,7 +504,7 @@ TEST_CASE("mem_size: shared BDD nodes counted once, terminals zero, leaves one")
 	CHECK(ap::mem_size<node_t>(bf("x & r(y & z)")) == 3);
 }
 
-// 10. D2 round trip ------------------------------------------------------------
+// 9. D2 round trip ------------------------------------------------------------
 
 TEST_CASE("convert_to_tau_terms: no BDD_ID remains, and prepare ∘ finish is the identity node (D2)") {
 	tref x = vr("x"), y = vr("y"), z = vr("z");
@@ -605,7 +534,7 @@ TEST_CASE("convert_to_tau_terms: no BDD_ID remains, and prepare ∘ finish is th
 	CHECK(th::convert_to_handle(l1) == th::U.find(th::key_of(l1))->second);
 }
 
-// 11. leaf hazard ------------------------------------------------------------
+// 10. leaf hazard ------------------------------------------------------------
 
 TEST_CASE("leaf_fv: the leaves' contribution alone") {
 	tref x = vr("x"), y = vr("y"), z = vr("z");

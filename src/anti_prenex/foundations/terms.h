@@ -92,6 +92,7 @@ namespace idni::tau_lang::anti_prenexing {
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
 //   RESOLVE_FUNCTIONAL     resolve_functional_quantifiers (below)
+//   φ[x ← t]  /  f[x ← t]  term_handle<node>::substitute(φ, bf(x), t, order, hook)
 //
 // BDD-BACKED: the term is a `bf(BDD_ID)` node, i.e. it is backed by a BDD
 // under the live order and has at least one decision variable. The `bf`
@@ -229,32 +230,6 @@ bool carries_functional_quantifier(tref f);
 template <NodeType node>
 tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
 	const keep_functional_fn<node>& keep = keep_no_functional<node>);
-
-// --- substitution inside a term -----------------------------------------------
-
-/**
- * @brief §1 term-level `f[x ← t]`.
- *
- * For a BDD-backed `f` this is a BDD compose on the decision variable `x`
- * PLUS a rewrite of `x` inside every leaf (`r(x) ↦ r(t)`). The pair is sound
- * for any term, reaches every occurrence, and needs no leaf guard. For a
- * plain (non-BDD) term it is an ordinary replace. Either way, every reference
- * argument it touches is re-emitted through `simplify_term` — a formula
- * argument through `simplify_formula` (§1) — so arguments stay simplified
- * (invariant 6). Returns `f` itself when `x ∉ FV(f)`.
- *
- * A WITNESS IS PLAIN (§3): `t` carries no `BDD_ID` anywhere, so nothing is
- * spelled out here — the leaf rewrite puts `t` in as it stands and the
- * compose builds its BDD under `order`. A caller holding a BDD-backed term
- * spells it ONCE, before the substitution. Debug asserts this.
- *
- * Nothing is RENAMED here either: no binder of `f` may share a bound variable
- * with `t` (Debug asserts it). `subst_var` establishes that once, by renaming
- * the witness apart before its walk.
- */
-template <NodeType node>
-tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
-	const simplify_formula_fn& simplify_formula = identity_formula);
 
 // --- the two aggressive normalisers of invariant 6 --------------------------------
 

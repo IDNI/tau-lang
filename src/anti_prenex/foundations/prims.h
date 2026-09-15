@@ -9,13 +9,14 @@
  * Reuse: `canonize_quantifier_ids` (tau_tree_builders.tmpl.h) numbers binders
  * by depth (id = maximum quantifier depth below + 1) and handles shadowing.
  * It covers functional quantifiers too, over ONE id space shared with the
- * formula binders, so the parser, `tree::substitute`, the api layer and this
- * module all number alike — and ids are part of every memo key.
+ * formula binders, so the parser, the api layer and this module all number
+ * alike — and ids are part of every memo key.
  *
  * What the ids buy: an outer binder's id is strictly greater than the id of
  * any binder below it, whatever the kinds, so `FV(t)` meets no binder on the
- * path and `[x ← t]` is capture-safe inside a bound scope (subst.h). Ids are
- * not unique — siblings share one — and need not be; strict decrease along a
+ * path and `[x ← t]` is capture-safe inside a bound scope (the library's
+ * `term_handle<node>::substitute`). Ids are not unique — siblings share one
+ * — and need not be; strict decrease along a
  * path is the whole property. Numbering starts at 1 and ignores free
  * variables that are themselves numerically named: such names arise only from
  * this pass, the module never introduces a binder that was not already there,

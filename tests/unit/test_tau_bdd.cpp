@@ -806,6 +806,10 @@ TEST_SUITE("BDD term_handle substitute") {
 		tref backed = hbdd::convert_to_tau_node(t, o);
 		REQUIRE(hbdd::is_bdd_backed(backed));
 		CHECK(hbdd::substitute(f, x, backed, o) == s);
+		// and the plain path over the same term agrees as a function,
+		// with no BDD anywhere
+		CHECK(same_function(s, hbdd::substitute(bf("x & r(x)"), x, t, {}),
+			{ x, y, z }));
 	}
 
 	TEST_CASE("a leaf that gains a decision variable is re-canonicalised") {
@@ -920,6 +924,108 @@ TEST_SUITE("BDD term_handle substitute") {
 		// the chain rode into a BDD leaf; spell the term to read its subscript
 		CHECK(bound_name(hbdd::convert_to_tau_terms(res), tau::bf_fall)
 			== "6");                        // 1 + base, base = 5
+	}
+
+	TEST_CASE("the walk descends into a binder and keeps it") {
+		tref x = vr("x");
+		tref unit = wff("ex z (x & z = 0)");
+		CHECK(tau::subtree_equals(hbdd::substitute(unit, x, bf("y")),
+			wff("ex z (y & z = 0)")));
+		// two levels, a mixed kind: the ids are 2 and 1, neither is `y`
+		tref deep = wff("all w ex z (x & z = w)");
+		CHECK(tau::subtree_equals(hbdd::substitute(deep, x, bf("y")),
+			wff("all w ex z (y & z = w)")));
+		// x ← x changes nothing, so nothing is re-shaped: the same tref
+		tref two = wff("x = 0 && x = 1");
+		CHECK(hbdd::substitute(two, x, bf("x")) == two);
+		// and an untouched member of a rewritten chain is reused
+		tref d = wff("a = 0 || b = 0");
+		tref r = hbdd::substitute(build_wff_and<node_t>(wff("x = 0"), d),
+			x, bf("y"));
+		tref kept = tau::get(r).find_top([](tref m) {
+			return tau::get(m).is(tau::wff)
+				&& tau::get(m).child_is(tau::wff_or); });
+		REQUIRE(kept != nullptr);
+		CHECK(tau::trim_right_sibling(kept) == d);
+	}
+
+	TEST_CASE("the rebuild goes through the construction hooks") {
+		tref x = vr("x");
+		CHECK(tau::get(hbdd::substitute(wff("x = 0"), x, bf("1"))).equals_F());
+		CHECK(tau::get(hbdd::substitute(wff("x = y"), x, bf("y"))).equals_T());
+		// a chain folds around a decided atom
+		CHECK(tau::get(hbdd::substitute(wff("x = 0 && b = 0"), x,
+			bf("1"))).equals_F());
+		CHECK(tau::subtree_equals(hbdd::substitute(wff("x = 0 || b = 0"),
+			x, bf("1")), wff("b = 0")));
+		// the TERM hooks fold inside a rewritten side before the atom is
+		// rebuilt: y′·y is 0, and 0 = 0 is T
+		CHECK(tau::get(hbdd::substitute(wff("x & y = 0"), x,
+			bf("y'"))).equals_T());
+		// what no hook folds stays: the deep folding is the caller's
+		tref r = hbdd::substitute(wff("x & y = 0"), x, bf("z'"));
+		REQUIRE(is_atomic_fm<node_t>(r));
+		CHECK(find_kind(r, tau::bf_neg) != nullptr);
+		// a negated atom keeps its negation; a negated decided atom folds
+		CHECK(tau::subtree_equals(hbdd::substitute(wff("!(x = 0)"), x,
+			bf("y")), wff("!(y = 0)")));
+		CHECK(tau::get(hbdd::substitute(wff("!(x = 0)"), x,
+			bf("0"))).equals_F());
+	}
+
+	TEST_CASE("a node built with the hooks off is rebuilt through them") {
+		tref x = vr("x");
+		tref a = wff("x = 0"), b = wff("b = 0");
+		// a genuine `wff_imply` node exists only with the hooks off;
+		// rebuilt, it goes through the imply hook
+		tref imp;
+		{
+			use_hooks_guard<node_t> g(false);
+			imp = tau::get(tau::wff, tau::get(tau::wff_imply, a, b));
+		}
+		REQUIRE(tau::get(imp).child_is(tau::wff_imply));
+		CHECK(tau::subtree_equals(hbdd::substitute(imp, x, bf("y")),
+			build_wff_imply<node_t>(wff("y = 0"), b)));
+		// without the key it is untouched, hooks or not
+		CHECK(hbdd::substitute(imp, vr("q"), bf("y")) == imp);
+		// an ORDER atom: the bitvector shape is kept …
+		tref lt = wff("x:bv[8] & z:bv[8] <= y:bv[8]");
+		tref r = hbdd::substitute(lt, vr("x:bv[8]"), bf("w:bv[8]"));
+		REQUIRE(find_kind(r, tau::bf_lteq) != nullptr);
+		// … and a Boolean one, built with the hooks off as the parser
+		// builds it, comes back as the hooks' equation f·g′ = 0
+		tref bx = tau::build_bf_variable("x", 0),
+		     by = tau::build_bf_variable("y", 0),
+		     bz = tau::build_bf_variable("z", 0);
+		tref bl;
+		{
+			use_hooks_guard<node_t> g(false);
+			bl = tau::build_bf_lteq(bx, by);
+		}
+		tref rb = hbdd::substitute(bl, tau::trim(bx), bz);
+		CHECK(is_child<node_t>(rb, tau::bf_eq));
+		CHECK(tau::subtree_equals(rb, tau::build_bf_eq_0(
+			build_bf_and<node_t>(bz, build_bf_neg<node_t>(by)))));
+	}
+
+	TEST_CASE("a temporal operator is entered like any other node") {
+		tref x = vr("x");
+		tref alw = tau::build_wff_always(wff("x = 0"));
+		REQUIRE(is_child_temporal_quantifier<node_t>(alw));
+		tref r = hbdd::substitute(alw, x, bf("y"));
+		CHECK(r != alw);
+		CHECK(tau::subtree_equals(r,
+			tau::build_wff_always(wff("y = 0"))));
+	}
+
+	TEST_CASE("the hook's result IS the new argument") {
+		tref x = vr("x");
+		tref R = ref_term(trefs{ wff("x = 0") });
+		auto to_T = [](tref) { return tau::_T(); };
+		tref m = hbdd::substitute(R, x, bf("y"), {}, to_T);
+		tref ra = find_kind(m, tau::ref_arg);
+		REQUIRE(ra != nullptr);
+		CHECK(tau::get(ra)[0].equals_T());
 	}
 
 	TEST_CASE("a rebound key is left alone") {
