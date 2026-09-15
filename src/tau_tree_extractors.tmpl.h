@@ -827,7 +827,7 @@ const trefs& get_free_vars(tref n) {
 	// allocates.
 	trefs loose;
 	std::vector<const trefs*> parts;
-	// Chain links already taken apart (see `collect`). A link reached again
+	// Chain links already taken apart (see `down`). A link reached again
 	// is computed as a node of its own, so a subformula that several
 	// branches of the DAG reach is taken apart only once.
 	subtree_unordered_set<node> opened;
@@ -883,17 +883,34 @@ const trefs& get_free_vars(tref n) {
 		if (rest.empty()) return *parts[big];
 		return merged(rest, *parts[big]);
 	};
-	// Appends everything @p m contributes to the node being computed.
-	// @p chain is the node type of the connective chain being taken apart,
-	// or `no_chain`.
-	auto collect = [&](this auto&& self, tref m, size_t chain) -> void {
+	// One record per node the walk descends into: the chain that node hands
+	// to its children and, when it owns a cache entry, where its own
+	// contributions begin. `pre_order::visit` calls `up` for exactly the
+	// nodes `down` returned true on, so the two stay in step.
+	struct frame {
+		size_t chain;
+		size_t lmark;
+		size_t mark;
+		bool owns;
+	};
+	std::vector<frame> frames;
+	// Pre-order: records what @p m contributes and says whether to descend.
+	auto down = [&](tref m, tref parent) -> bool {
 		const tau& t = tau::get(m);
+		const size_t chain = frames.empty() ? no_chain
+			: frames.back().chain;
+		// A binder's children are its bound variable and its body, in that
+		// order (build_binder, tau_tree_builders.tmpl.h). The variable
+		// contributes nothing of its own; the occurrences of it the body
+		// contributes are removed when the binder closes.
+		if (parent && is_logical_or_functional_quant<node>(parent)
+			&& m == tau::get(parent).first()) return false;
 		if (is_var_or_capture<node>(m)) {
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
 			// Not descending: an offset under a variable (`x[t-1]`) is
 			// not a free occurrence.
 			loose.push_back(tau::trim_right_sibling(m));
-			return;
+			return false;
 		}
 		if (t.is(tau::BDD_ID)) {
 			// A BDD-backed term holds its variables in the BDD, not in
@@ -907,60 +924,61 @@ const trefs& get_free_vars(tref n) {
 					::get_free_tau_vars(it->second.get().b);
 				if (!fv.empty()) parts.push_back(&fv);
 			}
-			return;
+			return false;
 		}
 		if (is_cacheable(t)) {
 			if (auto it = free_vars_map.find(m); it != free_vars_map.end()) {
 				if (!it->second.empty()) parts.push_back(&it->second);
-				return;
+				return false;
 			}
 			// A link of the chain contributes its operands instead of a
 			// set of its own, so the whole of `a && (b && (c && ...))` --
 			// or any tree of `&&` -- is merged in one go, not per link.
+			// It owns no frame: its operands belong to the node that does.
 			if (t.is(chain) && opened.insert(m).second) {
-				for (tref c : t.children()) self(c, chain);
-				return;
+				frames.push_back({ chain, 0, 0, false });
+				return true;
 			}
-			const size_t lmark = loose.size(), mark = parts.size();
-			trefs result;
-			if (is_logical_or_functional_quant<node>(m)) {
-				// A fresh scope, fed only by this binder's subtree. Its
-				// children are the bound variable and the body, in that
-				// order (build_binder, tau_tree_builders.tmpl.h): the
-				// variable is skipped here, and the occurrences of it the
-				// body contributes are removed below.
-				const tref bound = t.first();
-				DBG(assert(is_var_or_capture<node>(bound));)
-				for (tref c : t.children())
-					if (c != bound) self(c, no_chain);
-				result = combine(lmark, mark);
-				if (auto it = std::lower_bound(result.begin(),
-						result.end(), bound, less);
-					it != result.end() && tau::subtree_equals(*it, bound))
-				{
-					DBG(LOG_TRACE << "removing quantified var: "
-									<< LOG_FM(bound);)
-					result.erase(it);
-				}
-			} else {
-				for (tref c : t.children()) self(c, t.get_type());
-				result = combine(lmark, mark);
-			}
-			loose.resize(lmark), parts.resize(mark);
-			const trefs& published = free_vars_map.emplace(
-				m, std::move(result)).first->second;
-			if (!published.empty()) parts.push_back(&published);
-			return;
+			// A binder opens a fresh scope, which no chain crosses into.
+			frames.push_back({ is_logical_or_functional_quant<node>(m)
+					? no_chain : static_cast<size_t>(t.get_type()),
+				loose.size(), parts.size(), true });
+			return true;
 		}
 		// Any other node contributes what its children do. Any node with
 		// a single child passes an open chain through -- a wrapper, but a
 		// negation or a temporal operator too, none of which change which
 		// variables are free. A node with several children ends the chain.
-		const size_t inner = t.has_child()
-			&& !tau::get(t.first()).has_right_sibling() ? chain : no_chain;
-		for (tref c : t.children()) self(c, inner);
+		frames.push_back({ t.has_child()
+				&& !tau::get(t.first()).has_right_sibling()
+			? chain : no_chain, 0, 0, false });
+		return true;
 	};
-	collect(key, no_chain);
+	// Post-order: closes the frame @p m opened, and stores its answer.
+	auto up = [&](tref m) {
+		const frame f = frames.back();
+		frames.pop_back();
+		if (!f.owns) return;
+		trefs result = combine(f.lmark, f.mark);
+		if (is_logical_or_functional_quant<node>(m)) {
+			const tref bound = tau::get(m).first();
+			DBG(assert(is_var_or_capture<node>(bound));)
+			if (auto it = std::lower_bound(result.begin(), result.end(),
+					bound, less);
+				it != result.end() && tau::subtree_equals(*it, bound))
+			{
+				DBG(LOG_TRACE << "removing quantified var: "
+								<< LOG_FM(bound);)
+				result.erase(it);
+			}
+		}
+		loose.resize(f.lmark), parts.resize(f.mark);
+		const trefs& published = free_vars_map.emplace(
+			m, std::move(result)).first->second;
+		if (!published.empty()) parts.push_back(&published);
+	};
+	pre_order<node>(key).visit(down, all, up);
+	DBG(assert(frames.empty());)
 	// A cacheable key has already stored its own answer above. A key that
 	// collected one whole set and no loose variable -- an equation over a
 	// single term, say -- is that set. Anything else is the union of what
