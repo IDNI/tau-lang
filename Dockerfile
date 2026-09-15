@@ -131,6 +131,9 @@ WORKDIR /tau-lang
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
 	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
+# The HTTP oracle in nlang links libcurl.
+RUN apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev
+
 # Argument NIGHTLY=yes is used to build nightly packages (works only if RELEASE=yes)
 ARG NIGHTLY=no
 
