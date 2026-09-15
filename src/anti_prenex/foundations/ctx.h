@@ -4,25 +4,32 @@
  * @file ctx.h
  * @brief Anti-prenexing foundations (layer 0), package E: `ctx` (the §1 ctx
  * table), the memo tables — the six §1 result tables and the structural
- * per-node facet tables — the memo wrapper with the taint rule (§1 cache
+ * per-node facet tables — the memo wrapper with its taint rule (§1 cache
  * scope, §6 `PUSH_BLOCK`), and the flush.
  *
  * Every table is an entry of `enum class table` with a `table_traits`
- * specialisation, a static GC-registered `create_cache` instance. `gated`
- * tables (the six §1 result tables) exist under `#ifdef TAU_CACHE` only —
- * OFF in Debug — and no result may depend on a hit; unconditional tables
- * (the structural facets) always exist, so their accessors may return
- * references — `store` and `memoised` return one for an unconditional table
- * and a value for a gated one, split by a `requires` clause. THE `#ifdef`
- * LIVES IN ctx.tmpl.h's `table_ptr` ALONE: consumers reach a table only
- * through `find` / `lookup` / `store` / `memoised` /
- * `flush_solver_dependent`, which see a missing table as a miss, a no-op, or
- * plain computation. Taint and flush are the §1 policies for knobs that sit
- * in no key; `qbf_memo` is exempt from every flush.
+ * specialisation and a static GC-registered `create_cache` instance. A
+ * `gated` table — one of the six §1 result tables — exists under
+ * `#ifdef TAU_CACHE` only, which is off in Debug, and no result may depend on
+ * a hit. An unconditional table — a structural facet — always exists, so its
+ * accessors may return references: `store` and `memoised` return a reference
+ * for an unconditional table and a value for a gated one, split by a
+ * `requires` clause.
  *
- * Every function taking a `ctx` takes it by MUTABLE REFERENCE: EXPAND and
- * DECOMPOSE_ARMS write `expand_count`. Single-threaded, like every knob and
- * cache in the library.
+ * THE `#ifdef` LIVES IN ctx.tmpl.h's `table_ptr` ALONE. Consumers reach a
+ * table only through `find`, `lookup`, `store`, `memoised` and
+ * `flush_solver_dependent`, each of which sees a missing table as a miss, a
+ * no-op, or plain computation.
+ *
+ * Taint and flush are the §1 policies for knobs that sit in no key. TAINT: a
+ * computation that hit a budget returns its result but writes no entry.
+ * FLUSH: when the solver configuration changes, every table whose entries
+ * could embed a solver verdict is cleared. `qbf_memo` is exempt from every
+ * flush.
+ *
+ * Every function taking a `ctx` takes it by MUTABLE REFERENCE, because
+ * `EXPAND` and `DECOMPOSE_ARMS` write `expand_count`. Single-threaded, like
+ * every knob and cache in the library.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
@@ -38,13 +45,13 @@
 #include "options.h"
 
 /// The reference-returning `store` and `memoised` hand back a reference into
-/// a table, never to an argument — but GCC's `-Wdangling-reference` heuristic
-/// flags any call that returns a reference and takes a CLASS-TYPE temporary,
-/// however that temporary is passed. `atoms`' and `leaf_fv`' fills are
-/// exactly that shape (`store(n, tref_set{…})`), so without this every such
+/// a table, never to an argument. GCC's `-Wdangling-reference` heuristic,
+/// however, flags any call that returns a reference and takes a CLASS-TYPE
+/// temporary, however that temporary is passed. The `atoms` fill is exactly
+/// that shape (`store(n, tref_set{…})`), so without this attribute such a
 /// call would be an error under `-Werror`. Measured on GCC 16: the scalar
 /// facets (`size_memo`, `negative_tree_memo`) never trip it, the `tref_set`
-/// ones always do. The attribute (GCC 14+) states what the heuristic cannot
+/// one always does. The attribute (GCC 14+) states what the heuristic cannot
 /// see; elsewhere it expands to nothing.
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(gnu::no_dangling)
 #	define TAU_ANTI_PRENEX_NO_DANGLING [[gnu::no_dangling]]
@@ -59,22 +66,23 @@ namespace idni::tau_lang::anti_prenexing {
 /**
  * @brief §1 `ctx`, the per-component context set up by §5 `PUSH_EX_BLOCK`.
  *
- * The GLOBAL members of the spec's table — `taint_count` and the memo
- * tables — are not stored here: they are reached through `taint_count<node>()`
- * and the table functions below (§1: "the global tables, cross-run, never
+ * The GLOBAL members of the spec's table — `taint_count` and the memo tables
+ * — are not stored here. They are reached through `taint_count<node>()` and
+ * the table functions below (§1: "the global tables, cross-run, never
  * reset"). Everything stored here is component-scoped.
  */
 template <NodeType node>
 struct ctx {
-	/// §1 `type`: the block's BA type `τ`. Single, by invariant 2 (components
-	/// are type-homogeneous). `0` (the untyped id) means "not set up".
+	/// §1 `type`: the block's Boolean-algebra type `τ`. A single type, by
+	/// invariant 2: components are type-homogeneous. `0`, the untyped id, means
+	/// "not set up".
 	ba_type_id type = 0;
 	/// §1 `order`: BDD variable order, inner → LOWER rank; §5 `P[i] ↦ |P| - i`.
 	var_order<node> order;
 	/// §1 `prio`: variable priority, inner → HIGHER rank; §5 `P[i] ↦ i + 1`.
-	/// Read by EXPAND's disjunct key, DECOMPOSE_ARMS's pinned-variable choice,
-	/// FOLD_DECIDED's probe variable. The two conventions are opposite and
-	/// cannot be merged (§1).
+	/// Read by `EXPAND`'s disjunct key, `DECOMPOSE_ARMS`'s pinned-variable
+	/// choice, and `FOLD_DECIDED`'s probe variable. The two conventions are
+	/// opposite and cannot be merged (§1).
 	var_order<node> prio;
 	/// The six knobs (§1 ctx table), copied from options.h at setup.
 	size_t subsume_max   = anti_prenexing::subsume_max;
@@ -84,46 +92,46 @@ struct ctx {
 	size_t accept_growth = anti_prenexing::accept_growth;
 	size_t accept_floor  = anti_prenexing::accept_floor;
 	/// §1 `keep_functional`: emit `∀_X`/`∃_X` symbolically instead of
-	/// discharging them; in the `push_memo`/`elim_memo` keys (D3).
+	/// discharging them. Part of the `push_memo` / `elim_memo` keys.
 	bool keep_functional = false;
-	/// §1 `expand_count`: cases built by EXPAND so far — the one
-	/// COMPONENT-scoped counter, reset to 0 at setup, shared with
-	/// DECOMPOSE_ARMS through the one `ctx&` threaded down.
+	/// §1 `expand_count`: the cases `EXPAND` has built so far — the one
+	/// COMPONENT-scoped counter, reset to 0 at setup and shared with
+	/// `DECOMPOSE_ARMS` through the single `ctx&` threaded down.
 	size_t expand_count = 0;
 
 	/**
 	 * @brief §5 setup for one component: `type`, the two rank maps over `P`
 	 * (`P[0]` outermost), the knobs read from options.h AT THIS CALL,
-	 * `keep_functional`, `expand_count = 0`.
+	 * `keep_functional`, and `expand_count = 0`.
 	 */
 	static ctx for_component(const block& P, ba_type_id type, bool keep_functional);
 };
 
 // --- taint ----------------------------------------------------------------------
 
-/// §1 `taint_count`: budget hits so far, GLOBAL, never reset, never gated.
-/// Incremented by every source of taint (EXPAND and DECOMPOSE_ARMS
-/// exhaustion, a DECIDE_FINITE sweep abandoned to an ASK that ends
-/// `unknown`); read by the memo wrapper, which caches only across an
-/// unchanged count. `taint()` is the only writer.
+/// §1 `taint_count`: the number of budget hits so far. GLOBAL, never reset,
+/// never gated. It is incremented by every source of taint (`EXPAND` and
+/// `DECOMPOSE_ARMS` exhaustion, a `DECIDE_FINITE` sweep abandoned to an `ASK`
+/// that ends `unknown`) and read by the memo wrapper, which caches only
+/// across an unchanged count. `taint()` is the only writer.
 template <NodeType node>
 size_t taint_count();
 
 /// The one increment every source of taint calls. The counter is per `node`
 /// type, so a taint source in code templated on the BDD node type (the
-/// `qbf_node_max` sweep of DECIDE_FINITE) must name the FORMULA node type
+/// `qbf_node_max` sweep of `DECIDE_FINITE`) must name the FORMULA node type
 /// here, the one whose tables the wrapper guards.
 template <NodeType node>
 void taint();
 
 // --- the tables -------------------------------------------------------------------
 
-/// Every table of the module: the six §1 result tables (gated caches) and
-/// the structural per-node facet tables (unconditional).
+/// Every table of the module: the six §1 result tables (gated caches) and the
+/// structural per-node facet tables (unconditional).
 enum class table {
 	// §1 result tables — gated
-	push_memo,     ///< `(REWRAP(φ, X), keep_functional) → formula` (D3); also EXPAND's state memo
-	elim_memo,     ///< `(REWRAP(clause, X), keep_functional) → formula` (D3)
+	push_memo,     ///< `(REWRAP(φ, X), keep_functional) → formula`; also EXPAND's state memo
+	elim_memo,     ///< `(REWRAP(clause, X), keep_functional) → formula`
 	quant_memo,    ///< functional-quantifier term → term; the key IS the query
 	cof_memo,      ///< `(settled term, x) → cof_entry`; filled and read by COF
 	solver_memo,   ///< canonical closed query → sat / unsat / unknown
@@ -156,11 +164,11 @@ static_assert([] {
 	"`all_tables` must list every table exactly once, in enum order");
 
 /// Structural hash of a `(tref, tref)` key, consistent with
-/// `subtree_pair_equal<node, tref>` (both ignore right siblings). The two
-/// CONTENT hashes are mixed by `idni::hash_combine`; never hand a `tref`
-/// itself to `hash_combine` or to `std::hash<std::pair<…>>`, which route it
-/// through `portable_hash`, i.e. hash it by POINTER — equal keys would then
-/// get unequal hashes and the entry would be lost.
+/// `subtree_pair_equal<node, tref>`; both ignore right siblings. The two
+/// CONTENT hashes are mixed by `idni::hash_combine`. Never hand a `tref`
+/// itself to `hash_combine` or to `std::hash<std::pair<…>>`: those route it
+/// through `portable_hash`, i.e. hash it by POINTER, so equal keys would get
+/// unequal hashes and the entry would be lost.
 template <NodeType node>
 struct tref_pair_hash {
 	size_t operator()(const std::pair<tref, tref>& k) const {
@@ -182,9 +190,9 @@ struct tref_bool_hash {
 };
 
 /**
- * @brief Key, value and map type of each table, and its three policies:
+ * @brief Key, value and map type of each table, plus its three policies:
  * `gated` (exists under `TAU_CACHE` only), `taint_aware` (the wrapper writes
- * only across an unchanged `taint_count`), `solver_flushed` (cleared by
+ * only across an unchanged `taint_count`), and `solver_flushed` (cleared by
  * `flush_solver_dependent`).
  */
 template <NodeType node, table T>
@@ -297,35 +305,36 @@ struct table_traits<node, table::negative_tree_memo> {
  * @brief The table instance, or `nullptr` when it does not exist (a gated
  * table with `TAU_CACHE` off). The ONLY place the module spells
  * `#ifdef TAU_CACHE` is this function's definition in ctx.tmpl.h. An
- * unconditional table is a function-local static `create_cache` reference,
- * as `get_free_vars`' is.
+ * unconditional table is a function-local static `create_cache` reference, as
+ * `get_free_vars`' is.
  */
 template <NodeType node, table T>
 typename table_traits<node, T>::map_t* table_ptr();
 
 // --- reads, writes, the wrapper, the flush -------------------------------------------
 // Template parameters are `<node, table>` throughout, the order of
-// `table_traits`; both are always spelled explicitly (a `key_t` parameter is a
-// non-deduced context): `find<node, table::push_memo>(key)`.
+// `table_traits`, and both are always spelled explicitly, since a `key_t`
+// parameter is a non-deduced context: `find<node, table::push_memo>(key)`.
 //
-// LIFETIME of a pointer or reference INTO a table: stable across every later
-// insertion — the maps are node-based `unordered_map`s, which keep mapped
-// values put across a rehash, so a recursive fill may hold a parent's
-// reference while its children insert — and invalidated only by a
+// LIFETIME of a pointer or reference INTO a table: it stays valid across
+// every later insertion, because the maps are node-based `unordered_map`s,
+// which keep mapped values put across a rehash — so a recursive fill may hold
+// a parent's reference while its children insert. It is invalidated only by a
 // `bintree<node>::gc()` sweep, which REBUILDS every registered table. Nothing
 // in this module sweeps (the callers are the interpreter's `maybe_gc` and the
 // tests), so a facet reference is good for the length of a run; copy it
-// before any call that can sweep. dag.h states the same rule for `get_free_vars`.
+// before any call that can sweep. dag.h states the same rule for
+// `get_free_vars`.
 //
 // `store` and `memoised` come in two forms, chosen by the table's `gated`
-// flag: an unconditional table always has storage and hands out a REFERENCE;
-// a gated table has none with `TAU_CACHE` off, so it can only return a VALUE.
-// The split is a `requires` clause rather than a second name, so a caller
-// that asks a gated table for a reference fails to compile in both build
-// types instead of in Release alone.
+// flag: an unconditional table always has storage and hands out a REFERENCE,
+// while a gated table has none with `TAU_CACHE` off and can only return a
+// VALUE. The split is a `requires` clause rather than a second name, so a
+// caller that asks a gated table for a reference fails to compile in both
+// build types instead of in Release alone.
 
 /// Pointer to the entry for `key`, or `nullptr` on a miss or a missing table.
-/// A read; the lazy fills go through `memoised` below.
+/// A plain read; the lazy fills go through `memoised` below.
 template <NodeType node, table T>
 const typename table_traits<node, T>::value_t*
 find(const typename table_traits<node, T>::key_t& key);
@@ -353,13 +362,15 @@ void store(const typename table_traits<node, T>::key_t& key,
 	typename table_traits<node, T>::value_t value);
 
 /**
- * @brief §1/§6 memo wrapper for a GATED table: return the entry for `key`;
- * on a miss compute `compute()` and record it — for a `taint_aware` table
- * only if `taint_count` is unchanged across the computation (a hit inside
- * the computation is a hit inside every enclosing one: transitivity for
- * free), for every other table unconditionally. The result is always
- * returned; a tainted result is returned, never cached. Plain `compute()`
- * when the table does not exist — nothing else.
+ * @brief §1/§6 memo wrapper for a GATED table: return the entry for `key`,
+ * and on a miss compute `compute()` and record it.
+ *
+ * For a `taint_aware` table the result is recorded only if `taint_count` is
+ * unchanged across the computation; a hit inside the computation is a hit
+ * inside every enclosing one, so transitivity comes for free. For every other
+ * table it is recorded unconditionally. The result is always returned; a
+ * tainted result is returned but never cached. When the table does not exist
+ * this is a plain `compute()` and nothing else.
  */
 template <NodeType node, table T, typename Compute>
 	requires (table_traits<node, T>::gated)
@@ -368,17 +379,19 @@ memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 
 /**
  * @brief The same wrapper for an UNCONDITIONAL table: the lazy fill of a
- * structural facet (`formula_size`, `neg_of`, `is_negative_tree`, `atoms`,
- * `leaf_fv`) — compute on the first query, store, hand back a reference into
- * the table, so an accessor can return `const trefs&`. The accessor is the
- * table's only writer (§10: computed once, never recomputed). No structural
- * table is `taint_aware`: a facet is a pure function of its node, and a
- * budget hit cannot change it. `compute()` may recurse into `memoised` on
- * the same table — the reference this call returns survives those
- * insertions (LIFETIME, above) — but recursion costs one frame per level,
- * so a whole-tree fill belongs in a post-order walk (`pre_order`'s `up`
- * callback) that calls `find`/`store` per node, not in a recursive
- * `compute`.
+ * structural facet (`formula_size`, `neg_of`, `is_negative_tree`, `atoms`).
+ * Compute on the first query, store, and hand back a reference into the
+ * table, so that an accessor can return `const trefs&`. The accessor is the
+ * table's only writer (§10: computed once, never recomputed).
+ *
+ * No structural table is `taint_aware`: a facet is a pure function of its
+ * node, and a budget hit cannot change it.
+ *
+ * `compute()` may recurse into `memoised` on the same table — the reference
+ * this call returns survives those insertions (see LIFETIME above) — but
+ * recursion costs one frame per level, so a whole-tree fill belongs in a
+ * post-order walk (`pre_order`'s `up` callback) that calls `find` / `store`
+ * per node, not in a recursive `compute`.
  */
 template <NodeType node, table T, typename Compute>
 	requires (!table_traits<node, T>::gated)
@@ -386,12 +399,13 @@ TAU_ANTI_PRENEX_NO_DANGLING
 const typename table_traits<node, T>::value_t&
 memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 
-/// §1 FLUSH: the solver configuration changed — clear every `solver_flushed`
-/// table (`solver_memo`, `push_memo`, `elim_memo`), whole tables: an entry
-/// carries no record of whether it embedded a solver verdict. `qbf_memo` is
-/// exempt (its entries are mathematical truths), and so is every structural
-/// table. Caller: the api layer on a solver option change (layer 4+); until
-/// then a test-only entry point.
+/// §1 FLUSH: when the solver configuration changes, clear every
+/// `solver_flushed` table (`solver_memo`, `push_memo`, `elim_memo`) as a
+/// whole, since an entry carries no record of whether it embedded a solver
+/// verdict. `qbf_memo` is exempt, its entries being mathematical truths, and
+/// so is every structural table. The caller is the api layer on a solver
+/// option change (layer 4 and later); until then this is a test-only entry
+/// point.
 template <NodeType node>
 void flush_solver_dependent();
 

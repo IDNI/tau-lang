@@ -2,7 +2,8 @@
 
 /**
  * @file prims.tmpl.h
- * @brief Template implementations for prims.h (package D). Included by prims.h.
+ * @brief Template implementations for prims.h (package D). Included by
+ * prims.h.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__PRIMS_TMPL_H__
@@ -11,15 +12,16 @@
 
 namespace idni::tau_lang::anti_prenexing {
 
-// Reuse: `canonize_quantifier_ids` is this primitive, extended in place
-// (ruling, Sep 9 2026) -- a second numbering would break every memo key.
+// `canonize_quantifier_ids` IS this primitive: it numbers formula binders
+// and functional quantifiers in one shared id space. A second, separate
+// numbering would break every memo key.
 template <NodeType node>
 tref canonicalise_binder_ids(tref phi) {
 	return canonize_quantifier_ids<node>(phi);
 }
 
-// New: no existing helper wraps an ordered list without renaming -- the
-// `_many` builders always rename, which ground rule 4 forbids here.
+// No existing helper wraps an ordered list without renaming: the `_many`
+// builders always rename, which this module must not do.
 template <NodeType node>
 tref rewrap(tref phi, const block& X, quantifier<node> kind) {
 	using tau = tree<node>;
@@ -27,7 +29,7 @@ tref rewrap(tref phi, const block& X, quantifier<node> kind) {
 #ifdef DEBUG
 	// The contract, checked in Debug only: every element a variable, no
 	// repeats (a repeat would build a vacuous inner binder and a
-	// non-canonical D3 key). `X` is a block, so this stays small. NOT
+	// non-canonical memo key). `X` is a block, so this stays small. NOT
 	// checked: `X` ⊆ FV(phi) -- a graceful exit of invariant 3 may re-wrap
 	// a variable the body has since lost, which is legal and is what
 	// `fold_degenerate_binders` cleans up.
@@ -45,10 +47,11 @@ tref rewrap(tref phi, const block& X, quantifier<node> kind) {
 	return phi;
 }
 
-// New, after the vacuous drop in normalizer.tmpl.h's
-// `scope_out_independent_conjuncts`: that one is welded into a push pass this
-// module must not depend on, and the hooks fold no binder. Post-order, so a
-// cascade collapses in one go; `apply_unique` memoises per node (§10).
+// The vacuous-binder drop in `scope_out_independent_conjuncts`
+// (normalizer.tmpl.h) cannot be reused here: it is welded into a push pass
+// this module must not depend on, and the construction hooks fold no binder.
+// Post-order, so a cascade collapses in one go; `apply_unique` memoises per
+// node (§10).
 template <NodeType node>
 tref fold_degenerate_binders(tref phi) {
 	using tau = tree<node>;
@@ -62,8 +65,8 @@ tref fold_degenerate_binders(tref phi) {
 		// variables, so the test below already drops the binder. Dropping
 		// it at all assumes a non-empty domain, as the normalizer does.
 		// `var` comes from trim2 and still carries its right sibling,
-		// while `get_free_vars` stores trimmed nodes; comparing the two is safe
-		// because subtree_less ignores a node's right sibling.
+		// while `get_free_vars` stores trimmed nodes; comparing the two is
+		// safe because subtree_less ignores a node's right sibling.
 		const trefs& vars = get_free_vars<node>(body);
 		if (std::binary_search(vars.begin(), vars.end(), var,
 			tau::subtree_less)) return n;

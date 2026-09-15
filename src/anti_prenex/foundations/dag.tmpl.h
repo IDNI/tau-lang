@@ -3,16 +3,17 @@
 /**
  * @file dag.tmpl.h
  * @brief Template implementations for dag.h (package A). Included by dag.h.
+ * dag.h says what each function means; the comments here say how it is built.
  *
- * Everything here is a facet of the existing hash-consed tree, built from
- * what the codebase already has: `get_free_vars` for FV, `get_leaves` for the
- * D1 member view, `subtree_vec_contains` for the membership scan,
- * `build_wff_*` for the raw constructors, the `is_child_*` family for the
- * wrapper-form classification, and `pre_order` (whose `up` callback is the
- * post-order visit) for the two walks that fill a table. A §1 term that IS
- * one library call is not re-declared (dag.h's VOCABULARY block lists them).
- * The three cached facets reach their tables through ctx.h's `find`/`store`
- * and never spell `#ifdef TAU_CACHE`.
+ * Everything is a facet of the existing hash-consed tree, assembled from what
+ * the codebase already has: `get_free_vars` for the free variables,
+ * `get_leaves` for the member view, `subtree_vec_contains` for the membership
+ * scan, `build_wff_*` for the raw constructors, the `is_child_*` family for
+ * the wrapper-form classification, and `pre_order` — whose `up` callback is
+ * the post-order visit — for the two walks that fill a table. A §1 term that
+ * IS one library call is not re-declared (dag.h's VOCABULARY block lists
+ * them). The three cached facets reach their tables through ctx.h's `find`
+ * and `store` and never spell `#ifdef TAU_CACHE`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__DAG_TMPL_H__
@@ -28,12 +29,12 @@ namespace idni::tau_lang::anti_prenexing {
 
 namespace detail {
 
-/// The OPERATOR nodes `formula_size` walks through — the two connectives, the
-/// negation and the two binders — the ones whose formula children carry their
-/// own `|·|`. Anything else below a wrapper (an atom's operator node and its
-/// terms, `wff_ref`, the temporal operators, the constants, a binder's
-/// variable) is opaque and is never entered, so the wrapper above it counts 1.
-/// Wrappers themselves are decided before this is reached.
+/// The OPERATOR nodes `formula_size` walks through: the two connectives, the
+/// negation and the two binders, i.e. the ones whose formula children carry a
+/// `|·|` of their own. Anything else below a wrapper — an atom's operator
+/// node and its terms, `wff_ref`, the temporal operators, the constants, a
+/// binder's variable — is opaque and is never entered, so the wrapper above
+/// it counts 1. Wrappers themselves are decided before this is reached.
 template <NodeType node>
 bool size_structural(tref n) {
 	using tau = tree<node>;
@@ -67,9 +68,9 @@ size_t formula_size(tref n) {
 	// because an earlier query already measured it is read back from
 	// `size_memo`, and anything opaque (a term, a variable) contributes
 	// nothing. `local` is not a duplicate of the table for its own sake:
-	// the walk must reach the right answer without depending on a lookup
-	// succeeding (ground rule 2). The traversal is iterative, which a
-	// chain needs: a spine is as deep as it is long.
+	// the walk has to reach the right answer without depending on a
+	// lookup succeeding. The traversal is iterative, which a chain needs:
+	// a spine is as deep as it is long.
 	subtree_unordered_map<node, size_t> local;
 	auto measured = [&local](tref m) -> size_t {
 		if (auto it = local.find(m); it != local.end()) return it->second;
@@ -134,7 +135,7 @@ block fv_intersect(tref n, const block& X) {
 	return out;
 }
 
-// --- member view and raw canonical chains (D1) ---------------------------------
+// --- member view and raw canonical chains ---------------------------------------
 
 template <NodeType node>
 trefs members(tref n) {

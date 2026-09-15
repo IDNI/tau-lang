@@ -25,7 +25,7 @@ ctx<node> ctx<node>::for_component(const block& P, ba_type_id type,
 	bool keep_functional)
 {
 	// The six knobs are the struct's default member initialisers, which
-	// read options.h HERE, when this `ctx` is constructed — a knob changed
+	// read options.h HERE, when this `ctx` is constructed, so a knob changed
 	// between two components applies to the second one (§1: the constants
 	// are provisional and tunable).
 	ctx c;
@@ -58,7 +58,7 @@ size_t& taint_counter() {
 
 /// Debug-only check that a key names real nodes: a bare `tref` key IS the
 /// node, a `(tref, bool)` key holds one, and `cof_memo`'s `(tref, tref)`
-/// holds one in EACH half — a null in either would be dereferenced by
+/// holds one in EACH half. A null in either half would be dereferenced by
 /// `hash_lcrs_tref` in every build type.
 template <typename key_t>
 bool key_is_nonnull(const key_t& key) {
@@ -152,8 +152,8 @@ memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute)
 	if (auto it = m->find(key); it != m->end()) return it->second;
 	if constexpr (table_traits<node, T>::taint_aware) {
 		// §1 cache scope, TAINT: a computation that hit a budget returns
-		// its result (sound, inv. 3) and writes no entry. Transitivity is
-		// free — a hit inside the computation is a hit inside every
+		// its result (sound, invariant 3) and writes no entry. Transitivity
+		// is free — a hit inside the computation is a hit inside every
 		// enclosing one, so every wrapper up the stack sees the counter
 		// move too.
 		const size_t before = taint_count<node>();

@@ -2,24 +2,28 @@
 
 /**
  * @file terms.tmpl.h
- * @brief Template implementations for terms.h (package B). Included by terms.h.
+ * @brief Template implementations for terms.h (package B). Included by
+ * terms.h. terms.h says what each function means; the comments here say how
+ * it is built.
  *
  * Conventions of the BDD library this file rides on (tau_bdd.h):
- *  - `U` is keyed by the `BDD_ID` node under the `bf` wrapper (`key_of`),
- *    the same tref in every spelling of the wrapper, so a lookup steps to
- *    the child and never trims; `convert_to_tau_node` interns
- *    (tau_bdd.tmpl.h), so one BDD per type is one Tau node.
- *  - a BDD leaf's variable (`get_var`, as a `bf` term `get_var_term`) is the
- *    TRIMMED Tau node under `bf` (a `bf_neg` node for an inverted leaf);
- *    `add(leaf)` takes the trimmed node and maps `bf_t`/`bf_f` to the
+ *  - the library's universe map `U`, which links a `BDD_ID` node to its BDD,
+ *    is keyed by the `BDD_ID` node under the `bf` wrapper (`key_of`). That is
+ *    the same tref in every spelling of the wrapper, so a lookup steps to the
+ *    child and never trims. `convert_to_tau_node` interns (tau_bdd.tmpl.h),
+ *    so one BDD per type is one Tau node.
+ *  - a BDD leaf's variable (`get_var`, or `get_var_term` as a `bf` term) is
+ *    the TRIMMED Tau node under `bf`, a `bf_neg` node for an inverted leaf.
+ *    `add(leaf)` takes the trimmed node and maps `bf_t` / `bf_f` to the
  *    terminals.
- *  - the memoised BDD walks are the library's (`visit_nodes`, `map_leaves`,
- *    `bdd_cofactor`): recursive over BDD refs with a per-call memo, the
- *    shape of its own workers (`bdd_ex`, `bdd_compose_impl`). Walks over the
- *    TAU tree go through `pre_order` (dag.h, tree.h).
+ *  - the memoised BDD walks are the library's own (`visit_nodes`,
+ *    `map_leaves`, `bdd_cofactor`): recursive over BDD references with a
+ *    per-call memo, the shape of its own workers (`bdd_ex`,
+ *    `bdd_compose_impl`). Walks over the TAU tree go through `pre_order`
+ *    (dag.h, tree.h) instead.
  *  - `build_bdd` owns the functional-quantifier SLIDE: it collects a chain
- *    whole, builds the body under the order minus the subscripts and wraps
- *    the chain onto every leaf, so nothing here prepares a term for it and
+ *    whole, builds the body under the order minus the subscripts, and wraps
+ *    the chain onto every leaf. Nothing here prepares a term for that, and
  *    every caller hands it the term as written.
  */
 
@@ -28,9 +32,9 @@
 
 // `syntactic_path_simplification` (heuristics/) and
 // `syntactic_atomic_formula_simplification` (normal_forms.tmpl.h, declared
-// nowhere else) — the simplification building blocks (ruling 4). The
-// heuristics header must be included through normal_forms.h, which
-// declares what its body uses before the body.
+// nowhere else) are the simplification building blocks the two normalisers
+// below reuse. The heuristics header must be included through
+// normal_forms.h, which declares what its body uses before the body.
 #include "normal_forms.h"
 
 namespace idni::tau_lang::anti_prenexing {
@@ -43,7 +47,7 @@ template <NodeType node> using thandle = term_handle<node>;
 
 /**
  * @brief The maximal functional-quantifier chain hanging off the `bf` node
- * @p n: its prefix OUTERMOST FIRST and the body it sits on. An empty prefix
+ * @p n: its prefix OUTERMOST FIRST, and the body it sits on. An empty prefix
  * (and @p n itself) when @p n is no chain. @p stop holds the chain nodes the
  * collection must not enter — the ones a resolution left standing.
  */
@@ -67,12 +71,12 @@ std::pair<typename tbdd<node>::quants, tref> strip_chain(tref n,
 
 /**
  * @brief `f[x ← t]` on a PLAIN term: every `bf(x)` becomes `t`, and every
- * reference argument that held `x` is re-emitted through `simplify_term`
- * (a formula argument through `simplify_formula`) after its own rewrite,
- * invariant 6. NEW over `rewriter::replace` (ground rule 9) for that
- * re-simplification alone, which needs the parent of the argument node.
- * Capture-safe by the canonical binder ids of phase 0 (a term-level binder
- * inside `f` never binds `x`; Debug asserts it). One `pre_order` walk,
+ * reference argument that held `x` is re-emitted through `simplify_term` — a
+ * formula argument through `simplify_formula` — after its own rewrite, which
+ * is invariant 6. `rewriter::replace` cannot do this: the re-simplification
+ * needs the PARENT of the argument node, which `replace` does not offer.
+ * Capture-safe by the canonical binder ids of phase 0, since a term-level
+ * binder inside `f` never binds `x` (Debug asserts it). One `pre_order` walk,
  * memoised per node.
  */
 template <NodeType node>
@@ -102,8 +106,8 @@ tref subst_plain(tref f, tref x, tref t,
 }
 
 /// The BOUND variables of @p t — a formula binder's variable and a functional
-/// quantifier's subscript alike, ONE shared id space (phase 0) — trimmed and
-/// sorted by `subtree_less`, so the result is binary-searchable.
+/// quantifier's subscript alike, in ONE shared id space (phase 0) — trimmed
+/// and sorted by `subtree_less`, so the result is binary-searchable.
 template <NodeType node>
 trefs bound_vars(tref t) {
 	using tau = tree<node>;
@@ -118,23 +122,25 @@ trefs bound_vars(tref t) {
 }
 
 /**
- * @brief §3 RENAME APART: every bound variable of the WITNESS @p t moved above
- * every id in sight — `k ↦ k + base` with
+ * @brief §3 RENAME APART: move every bound variable of the WITNESS @p t above
+ * every id in sight — `k ↦ k + base`, with
  * `base = max(find_biggest_var_id(n), find_biggest_var_id(t))` — so that no
  * binder on any path of @p n can equal a bound variable inside @p t.
  *
- * This removes the SHADOWING PAIR at its source: a `t` carrying a functional
- * quantifier used to leave the site's binder and the subscript sharing one id
- * on a path until phase 5; now no pair ever forms, and phase 5's
- * `CANONICALISE_BINDER_IDS` restores the depth ids. Bound ids are canonical
- * depth ids after phase 0, hence at most `find_biggest_var_id(t)`, so every
- * shifted name is above every numeric name of @p t and of @p n and one plain
- * `rewriter::replace` over @p t is capture-free — no rename can land on an
- * occurrence of something else. The map is keyed by the variable NODE, so two
- * binders sharing an id (siblings, never one inside the other) are renamed
- * alike, and both the binder position and every occurrence in its scope move
- * together. A bound variable whose name is no id is left alone (there is
- * nothing to shift, and it cannot collide with a depth id).
+ * This is what keeps a SHADOWING PAIR from forming: without it, a `t`
+ * carrying a functional quantifier would leave the site's binder and that
+ * subscript sharing one id on a path until phase 5. Phase 5's
+ * `CANONICALISE_BINDER_IDS` restores the depth ids afterwards.
+ *
+ * Bound ids are canonical depth ids after phase 0, hence at most
+ * `find_biggest_var_id(t)`, so every shifted name lands above every numeric
+ * name of @p t and of @p n and one plain `rewriter::replace` over @p t is
+ * capture-free: no rename can land on an occurrence of something else. The
+ * map is keyed by the variable NODE, so two binders that share an id
+ * (siblings, never one inside the other) are renamed alike, and both the
+ * binder position and every occurrence in its scope move together. A bound
+ * variable whose name is not an id is left alone: there is nothing to shift,
+ * and it cannot collide with a depth id.
  */
 template <NodeType node>
 tref rename_apart(tref n, tref t) {
@@ -170,7 +176,7 @@ std::pair<tref, bool> unwrap_neg(tref a) {
 
 } // namespace terms_detail
 
-// --- the representation boundary (PREPARE_TERMS, D2) -----------------------------
+// --- the representation boundary (PREPARE_TERMS) ---------------------------------
 
 template <NodeType node>
 tref prepare_terms(tref body, [[maybe_unused]] const block& P,
@@ -182,11 +188,11 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 	assert(P.size() == order.size());
 	for (tref p : P) assert(order.contains(p));
 #endif
-	// Per term, within this call (ground rule 2: a per-pass memo).
+	// Memoised per term, within this call only.
 	subtree_unordered_map<node, tref> term_memo;
 	auto prep = [&](tref t) -> tref {
 		t = tau::trim_right_sibling(t);
-		if (thandle<node>::is_bdd_backed(t)) { // a prepared input (D2 idempotence)
+		if (thandle<node>::is_bdd_backed(t)) { // already prepared: idempotent
 			DBG(assert(tbdd<node>::is_ordered(
 				thandle<node>::convert_to_handle(t).get(), order));)
 			return t;
@@ -199,8 +205,8 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 			find_ba_type<node>(t));
 		return term_memo.emplace(t, r).first->second;
 	};
-	// Equations only (ruling 2): an order atom is never cofactored and is
-	// consumed plain by the solver path, so it is left as written.
+	// Equations only: an order atom is never cofactored and is consumed
+	// plain by the solver path, so it is left as written.
 	auto f = [&](tref n) -> tref {
 		const tau& tn = tau::get(n);
 		if (!tn.is(tau::wff) || !tn.child_is(tau::bf_eq)) return n;
@@ -211,7 +217,7 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 		return build_bf_eq<node>(l2, r2);
 	};
 	// Descend through connectives and negation only: a binder, a
-	// reference and a temporal operator are opaque (ruling 2).
+	// reference and a temporal operator are opaque.
 	auto visit = [](tref n) {
 		const tau& tn = tau::get(n);
 		return tn.is(tau::wff) || tn.is(tau::wff_and) || tn.is(tau::wff_or)
@@ -310,9 +316,9 @@ tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
 			return m;
 		// Canonicalise first: the constructor drops a degenerate or
 		// shadowed subscript, merges the runs and already folds a
-		// closed chain, so what is left is a duplicate-free prefix
-		// whose ranks below satisfy `bdd_quant`'s assertion, and `keep`
-		// sees the canonical chain.
+		// closed chain. What is left is a duplicate-free prefix whose
+		// ranks below satisfy `bdd_quant`'s assertion, and `keep` sees
+		// the canonical chain.
 		auto [q0, b0] = strip_chain<node>(m, standing);
 		tref c = tbdd<node>::build_functional_quantifiers(q0, b0);
 		auto [q, body] = strip_chain<node>(c, standing);
@@ -407,10 +413,10 @@ tref subst_term(tref f, tref x, tref t, const var_order<node>& order,
 	using namespace terms_detail;
 	x = tau::trim_right_sibling(x);
 	DBG(assert(tau::get(x).is(tau::variable));)
-	// A WITNESS IS PLAIN (§3, ruling 2): it carries no `BDD_ID` anywhere,
-	// so nothing is spelled here and no `BDD_ID` can enter a leaf or a
-	// reference argument. A caller holding a backed term spells it ONCE,
-	// before the substitution.
+	// A WITNESS IS PLAIN (§3): it carries no `BDD_ID` anywhere,
+	// so nothing is spelled out here and no `BDD_ID` can enter a leaf
+	// or a reference argument. A caller holding a BDD-backed term
+	// spells it ONCE, before the substitution.
 	DBG(assert(tau::get(t).find_top([](tref m) {
 		return tree<node>::get(m).is(tree<node>::BDD_ID); }) == nullptr);)
 	// And `subst_term` never renames: no binder of `f` may share a bound
@@ -555,11 +561,12 @@ size_t mem_size(tref t) {
 	if (!thandle<node>::is_bdd_backed(t)) {
 		// Term-structure nodes only, each distinct one once: every child of
 		// a `bf` wrapper — an operator, a functional quantifier, a leaf
-		// (variable, constant, reference) — counts 1; the wrappers are not
+		// (variable, constant or reference) — counts 1; the wrappers are not
 		// counted, and the walk does not enter a leaf's own nodes (a
 		// variable's name, a reference's arguments) or a quantifier's
-		// subscript. `visit_subtree` gates a node's own visit, so a leaf is
-		// admitted by its parent and its children are not.
+		// subscript. The traversal's `visit_subtree` predicate gates a node's
+		// own visit, so a leaf is admitted by its parent and its children are
+		// not.
 		using tau = tree<node>;
 		size_t n = 0;
 		auto count = [&n](tref m) {
@@ -584,8 +591,8 @@ trefs leaf_fv(tref f) {
 	using tau = tree<node>;
 	f = tau::trim_right_sibling(f);
 	if (!thandle<node>::is_bdd_backed(f)) return get_free_vars<node>(f);
-	// The library's `get_free_leaf_vars`: by value, not stored (Lucca,
-	// Sep 10: no `leaf_fv_memo`).
+	// The library's `get_free_leaf_vars`, by value and never stored: the
+	// per-leaf sets are `get_free_vars`' own cached entries.
 	return thandle<node>::get_free_leaf_vars(
 		thandle<node>::convert_to_handle(f).get().b);
 }
