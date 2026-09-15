@@ -123,15 +123,17 @@ auto pack_owner_apply(size_t ba_type, F&& f) {
 	if (!ba_type) return out;
 	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		bool done = false;
-		([&] {
-			using BA = std::tuple_element_t<Is, pack>;
+		// A lambda called inside the fold pattern crashes clang 17 and 19.
+		auto step = [&]<std::size_t I>() {
+			using BA = std::tuple_element_t<I, pack>;
 			if (done) return;
 			if constexpr (ba_has_descriptor_v<Node, BA>)
 				if (ba_descriptor<BA, Node>::owns_type(ba_type)) {
 					done = true;
 					out = f.template operator()<BA>();
 				}
-		}(), ...);
+		};
+		(step.template operator()<Is>(), ...);
 	}(std::make_index_sequence<std::tuple_size_v<pack>>{});
 	return out;
 }

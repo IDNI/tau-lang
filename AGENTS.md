@@ -225,12 +225,13 @@ should render it. Each fold's empty case is chosen deliberately — `pack_solve`
 static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
 and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
 type" is ordinary. When writing a fold, name the capability as a concept in
-`ba_descriptor.h` and test the name with `if constexpr` inside `pack_visit_all`
-or `pack_owner_apply`; never nest a `requires`-expression inside the fold's
-lambda (gcc 13 crashes on it), and never use `?:` in a fold expression (it
-instantiates both arms for every BA). `default_type_priority`: lower wins the
-pack's default type; tau 0, sbf and Bool 1, every other in-tree BA 50, ties by
-pack order.
+`ba_descriptor.h` and test the name with `if constexpr` inside
+`pack_visit_all` or `pack_owner_apply`; never nest a `requires`-expression
+inside the fold's lambda (gcc 13 crashes on it), never use `?:` in a fold
+expression (it instantiates both arms for every BA), and never call a lambda
+expression inside the fold pattern (clang 17 and 19 crash on it).
+`default_type_priority`: lower wins the pack's default type; tau 0, sbf and
+Bool 1, every other in-tree BA 50, ties by pack order.
 
 **Rewrite hooks are a second, separate mechanism.** `ba_descriptor.h` also
 declares `ba_wff_hooks<BA, Node>` and `ba_term_hooks<BA, Node>` — *defined and

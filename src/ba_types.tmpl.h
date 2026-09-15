@@ -273,16 +273,11 @@ std::vector<htref>& ba_types<node>::type_trees() {
 	using tau = tree<node>;
 	static std::vector<htref> t = [] {
 		std::vector<htref> v { tau::geth(untyped_type<node>()) };
-		[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-			([&] {
-				using BA = std::tuple_element_t<Is,
-					typename node::bas_tuple>;
-				if constexpr (ba_has_descriptor_v<node, BA>)
-					v.push_back(tau::geth(ba_descriptor<BA,
-						node>::type_tree()));
-			}(), ...);
-		}(std::make_index_sequence<
-			std::tuple_size_v<typename node::bas_tuple>>{});
+		pack_visit_all<node>([&]<typename BA>() {
+			if constexpr (ba_has_descriptor_v<node, BA>)
+				v.push_back(tau::geth(
+					ba_descriptor<BA, node>::type_tree()));
+		});
 		return v;
 	}();
 	return t;
