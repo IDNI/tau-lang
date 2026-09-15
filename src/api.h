@@ -296,6 +296,10 @@ struct api {
 	static void set_bv_case_split_max_tests(size_t n);
 	/** @brief Enable/disable ANSI colour highlighting in output. */
 	static void set_highlighting(bool state);
+
+	/// Enable or disable ANSI colour in engine output, the same switch
+	/// the CLI exposes as --color. Off makes diagnostics plain text.
+	static void set_colors(bool state);
 	/** @brief Enable/disable JSON output mode. */
 	static void set_json(bool state);
 	/** @brief Set the active Boost.Log severity threshold. */

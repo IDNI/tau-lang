@@ -77,11 +77,14 @@ static py_report make_py_report(const report_t& rep) {
 		out.codes.push_back(static_cast<int>(n.tag));
 		out.code_names.emplace_back(idni::diagnostics::code_name(n.tag));
 	}
+	// These are data, not display, so render them without colour. `text`
+	// keeps it: that field is the human rendering.
+	static const idni::term::colors plain(false);
 	rep.print(idni::diagnostics::sinks{
 		.error   = [&](std::string_view l) { out.errors.emplace_back(l); },
 		.warning = [&](std::string_view l) { out.warnings.emplace_back(l); },
 		.info    = [&](std::string_view l) { out.infos.emplace_back(l); },
-	});
+	}, plain);
 	std::ostringstream os;
 	os << rep;
 	out.text = os.str();
@@ -126,6 +129,11 @@ bool leak_warnings() {
 
 NB_MODULE(tau, m) {
 	nb::set_leak_warnings(leak_warnings());
+
+	// The CLI's --color, for embedders. report fields are always plain
+	// (see make_py_report); this governs what the engine writes to stdout.
+	m.def("set_colors", [](bool state) { idni::TC.set(state); }, "state"_a,
+		"Enable or disable ANSI colour in engine output.");
 
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")

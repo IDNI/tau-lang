@@ -207,6 +207,13 @@ void api<node>::set_highlighting(bool highlighting) {
 	pretty_printer_highlighting = highlighting;
 }
 
+// pretty_printer_highlighting above is the tree printer; this is the terminal
+// colour used by diagnostics rendering (idni::TC, term_colors.h).
+template <NodeType node>
+void api<node>::set_colors(bool colors) {
+	idni::TC.set(colors);
+}
+
 template <NodeType node>
 void api<node>::set_json(bool json) {
 	print_json = json;
