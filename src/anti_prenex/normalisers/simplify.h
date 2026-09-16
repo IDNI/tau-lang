@@ -25,9 +25,10 @@
  * binder over its variable or over a variable of its witness. Temporal
  * operators are opaque to both passes. References are opaque too — their
  * arguments only under `ref_args`, and then through `SIMPLIFY_TERM`, never
- * through a pin. The pinning conjunct itself STAYS: `y` is free, so the
- * conjunct still constrains it, and for a weak pin it is what keeps the
- * residual `p = 0`.
+ * through a pin. The pinning conjunct itself STAYS, rewritten by every pin but
+ * its OWN: `y` is free, so the conjunct still constrains it, and for a weak
+ * pin it is what keeps the residual `p = 0` — while its own pin would fold it
+ * to `T` and drop that constraint.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_H__

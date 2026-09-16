@@ -12,12 +12,13 @@
 // pins `y` with witness `a` AND `a` with witness `y`, both strictly and both
 // with a witness of the same size, so which one the match returns is the
 // content order's business. A case that needs a direction uses an
-// asymmetric equation (`y = a·b` pins only `y`). And the pass matches the
-// equation members of a conjunction IN CONTENT ORDER, so a pin reaches the
-// equations after it and no others (§3: "a conjunct already emitted is not
-// revisited"); a case that needs the rewrite to happen puts the target in a
-// NON-equation member, which the traversal rewrites under the whole
-// environment.
+// asymmetric equation (`y = a·b` pins only `y`). And a conjunction is handled
+// in TWO STAGES: its X-free equation members are MATCHED in content order,
+// each under the pins admitted before it, and then EVERY equation member is
+// REWRITTEN under the environment those matches leave behind, minus its own
+// pin. So the content order decides which pins exist, never which members
+// they reach — a target sibling is rewritten whether it is an equation or
+// not — and a pinning conjunct comes back rewritten by every pin but its own.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -203,22 +204,27 @@ TEST_CASE("S5: the spec's example — the pin folds `x·y ∪ x′·t` to `t`") 
 	CHECK(folded);
 }
 
-TEST_CASE("S5b: between two EQUATION members the content order decides") {
+TEST_CASE("S5b: an EQUATION sibling is rewritten too, whatever the content "
+	"order") {
 	tref x = bvar("x"), y = bvar("y"), a = bvar("a"), b = bvar("b");
 	const tref t = land(a, b);
 	tref pinning = eq(y, t);
 	tref target = eq0(lor(land(x, y), land(lneg(x), t)));
-	tref got = simp(conj(pinning, target));
+	tref phi = conj(pinning, target);
+	tref got = simp(phi);
 	INFO("two equations: ", tau::get(got).to_str());
-	CHECK(are_nso_equivalent<node_t>(got, conj(pinning, target)));
-	// The pass matches the equations in content order and rewrites each
-	// one under the pins admitted BEFORE it, so the target is rewritten
-	// exactly when the pinning equation sorts first (§3).
+	CHECK(are_nso_equivalent<node_t>(got, phi));
+	// The frame matches its pins first and rewrites every equation member
+	// afterwards, so which of the two atoms sorts first decides nothing
+	// here: the target folds either way.
 	tref rest = other_member(got, pinning);
 	REQUIRE(rest != nullptr);
-	if (tau::subtree_less(pinning, target))
-		CHECK(!holds_var(rest, "y"));
-	else CHECK(same(rest, target));
+	CHECK(!holds_var(rest, "y"));
+	CHECK(same(ap::term_of<node_t>(rest, {}), t));
+	// The pinning conjunct is still there, as written.
+	bool kept = false;
+	for (tref m : members(got)) if (same(m, pinning)) kept = true;
+	CHECK(kept);
 }
 
 TEST_CASE("S6: propagation reaches a disjunctive sibling and a binder body") {
@@ -281,10 +287,10 @@ TEST_CASE("S8: pins chain within one pass") {
 	tref y = bvar("y"), z = bvar("z"), a = bvar("a"), b = bvar("b"),
 		c = bvar("c");
 	const tref t = land(a, b);
-	// `y = a·b ∧ z = y·c ∧ ψ(z)`: the second equation becomes `z = a·b·c`
-	// under the first, and ψ — a non-equation member — sees neither `y`
-	// nor `z`. The two equations are ordered by content, so this case
-	// asserts the chain only when the first pin sorts first.
+	// `y = a·b ∧ z = y·c ∧ ψ(z)`: `z`'s witness is rewritten by `y`'s pin
+	// — on insert if `y` came first, in stage 2 otherwise — so the second
+	// equation comes back as `z = a·b·c` and ψ mentions neither variable.
+	// Whichever equation sorts first, the outcome is the same.
 	tref p1 = eq(y, t), p2 = eq(z, land(y, c));
 	tref psi = disj(eq0(lor(z, bvar("d"))), eq0(bvar("e")));
 	tref phi = conj(p1, conj(p2, psi));
@@ -292,15 +298,65 @@ TEST_CASE("S8: pins chain within one pass") {
 	INFO("chained: ", tau::get(got).to_str());
 	CHECK(are_nso_equivalent<node_t>(got, phi));
 	CHECK(no_fused_atoms(got));
-	if (tau::subtree_less(p1, p2)) {
-		// `z`'s witness was rewritten by `y`'s pin before it joined,
-		// so ψ mentions neither variable.
-		for (tref m : members(got))
-			if (!same(m, p1) && !is_child<node_t>(m, tau::bf_eq)) {
-				CHECK(!holds_var(m, "z"));
-				CHECK(!holds_var(m, "y"));
-			}
+	for (tref m : members(got))
+		if (!is_child<node_t>(m, tau::bf_eq)) {
+			CHECK(!holds_var(m, "z"));
+			CHECK(!holds_var(m, "y"));
+		}
+	// The chained equation itself: `z = (a·b)·c`, the form the normalised
+	// environment holds for `z`.
+	const tref expected = ap::simplify_atom<node_t>(
+		eq(z, land(t, c)), {});
+	bool chained = false;
+	for (tref m : members(got)) if (same(m, expected)) chained = true;
+	CHECK(chained);
+}
+
+TEST_CASE("S8b: a pinning conjunct is never rewritten by its OWN pin") {
+	tref y = bvar("y"), t = bvar("t"), a = bvar("a"), b = bvar("b"),
+		c = bvar("c"), d = bvar("d");
+	tref psi = disj(eq0(lor(y, c)), eq0(d));
+	// STRICT: its own pin would rewrite `y = a·b` into its residual
+	// `p = 0`, which folds to `T` — the constraint on `y` would simply be
+	// gone. It stays as written.
+	tref strict = eq(y, land(a, b));
+	tref got = simp(conj(strict, psi));
+	INFO("strict: ", tau::get(got).to_str());
+	bool kept = false;
+	for (tref m : members(got)) if (same(m, strict)) kept = true;
+	CHECK(kept);
+	CHECK(are_nso_equivalent<node_t>(got, conj(strict, psi)));
+	// WEAK: the residual `c·d = 0` is what the pinning conjunct keeps in
+	// place (§3), so dropping it would lose a constraint outright.
+	tref weak = eq0(lor(lxor(y, t), land(c, d)));
+	tref got2 = simp(conj(weak, psi));
+	INFO("weak: ", tau::get(got2).to_str());
+	bool kept2 = false;
+	for (tref m : members(got2)) if (same(m, weak)) kept2 = true;
+	CHECK(kept2);
+	CHECK(are_nso_equivalent<node_t>(got2, conj(weak, psi)));
+}
+
+TEST_CASE("S8c: but it IS rewritten by every other pin") {
+	tref y = bvar("y"), z = bvar("z"), a = bvar("a"), b = bvar("b"),
+		c = bvar("c");
+	tref p1 = eq(y, land(a, b)), p2 = eq(z, land(y, c));
+	tref phi = conj(p1, p2);
+	tref got = simp(phi);
+	INFO("pair: ", tau::get(got).to_str());
+	CHECK(are_nso_equivalent<node_t>(got, phi));
+	// `y`'s conjunct is untouched by its own pin; `z`'s carries `y`'s
+	// witness, which is the same form the environment holds for `z`.
+	const tref expected = ap::simplify_atom<node_t>(
+		eq(z, land(land(a, b), c)), {});
+	bool kept_y = false, rewritten_z = false;
+	for (tref m : members(got)) {
+		if (same(m, p1)) kept_y = true;
+		if (same(m, expected)) rewritten_z = true;
 	}
+	CHECK(kept_y);
+	CHECK(rewritten_z);
+	CHECK(!holds_var(other_member(got, p1), "y"));
 }
 
 TEST_CASE("S9: the cap refuses a pin") {

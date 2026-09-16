@@ -23,13 +23,8 @@
 //     the input holds both.
 //  4. `neg(φ)` is filled on demand and the dualisation round trip restores
 //     the binder and temporal kinds (§3 NEG, §5 PROCESS_BLOCK).
-//
-// The spec's `f = xy ∪ x′a` example is deliberately NOT here: in the plain
-// regime both of its conjuncts are equations, and the pass matches equations
-// in content order, so whether the target is rewritten depends on which of
-// the two sorts first (see test_anti_prenex_simplify.cpp, S5b). That question
-// is with the spec's author; this file tests the mechanism through a
-// non-equation target instead.
+//  5. the spec's own example of what propagation is FOR — `f = xy ∪ x′a`
+//     reaching `a` — through the whole pipeline, in both regimes.
 //
 // Conventions (the layer-0 brief): a chain member carries a right sibling, so
 // a comparison against a separately built node is by CONTENT unless the claim
@@ -55,6 +50,8 @@ tref conj(tref l, tref r) { return tau::build_wff_and(l, r); }
 tref disj(tref l, tref r) { return tau::build_wff_or(l, r); }
 tref land(tref l, tref r) { return tau::build_bf_and(l, r); }
 tref lor(tref l, tref r)  { return tau::build_bf_or(l, r); }
+tref lneg(tref t)         { return tau::build_bf_neg(t); }
+tref lxor(tref l, tref r) { return tau::build_bf_xor(l, r); }
 
 tref ex(const char* v, tref body) {
 	return tau::build_wff_ex(fvar(v), body, false);
@@ -234,6 +231,70 @@ TEST_CASE("L4: `neg(φ)` is filled on demand and the round trip restores the "
 	// `SIMPLIFY` leaves the round trip alone: it is already in normal
 	// form, and a temporal operator is opaque to both its passes.
 	CHECK(ap::simplify<node_t>(restored) == restored);
+}
+
+// --- 5. what propagation is for ------------------------------------------------------
+
+TEST_CASE("L5: the spec's `f = xy ∪ x′t` example reaches `t`") {
+	tref x = bvar("x"), y = bvar("y"), a = bvar("a"), b = bvar("b");
+	// `t = a·b` rather than a bare variable, so the equation is
+	// asymmetric and the pin direction is fixed at `y ↦ t` (§3's match
+	// takes either side of `y = a`).
+	const tref t = land(a, b);
+	tref pinning = eq(y, t);
+	tref target = eq0(lor(land(x, y), land(lneg(x), t)));
+	tref phi = conj(pinning, target);
+	tref got = pipeline(phi);
+	INFO("flagship: ", tau::get(got).to_str());
+	CHECK(are_nso_equivalent<node_t>(got, phi));
+	CHECK(no_fused_atoms(got));
+	CHECK(pipeline(got) == got);
+	// `y` survives in the pinning conjunct alone — which still constrains
+	// it, `y + t` being its term — and the target's term folded to the
+	// witness: `f₀ = t` and `f₁ = y` compared unequal until `y := t`.
+	size_t with_y = 0, folded = 0;
+	for (tref m : ap::members<node_t>(got)) {
+		if (ap::fv_meets<node_t>(m, ap::block{ fvar("y") })) {
+			++with_y;
+			CHECK(is_child<node_t>(m, tau::bf_eq));
+			CHECK(same(ap::term_of<node_t>(m, {}),
+				ap::simplify_term<node_t>(lxor(y, t))));
+		} else if (is_child<node_t>(m, tau::bf_eq)
+			&& same(ap::term_of<node_t>(m, {}), t)) ++folded;
+	}
+	CHECK(with_y == 1);
+	CHECK(folded == 1);
+}
+
+TEST_CASE("L5b: the same in the BDD regime, which is where the spec meets it") {
+	tref x = bvar("x"), y = bvar("y"), a = bvar("a"), b = bvar("b");
+	const tref t = land(a, b);
+	tref phi = conj(eq(y, t), eq0(lor(land(x, y), land(lneg(x), t))));
+	// §5's setup for a one-variable block: the order over `x`, then the
+	// terms prepared under it — the target touches `x` and becomes
+	// BDD-backed, the pinning equation does not and stays plain.
+	const ap::block P{ fvar("x") };
+	const ap::var_order<node_t> o =
+		ap::ctx<node_t>::for_component(P, 0, false).order;
+	tref prepared = ap::prepare_terms<node_t>(phi, P, o);
+	// The preparation really did back a term, or this case would silently
+	// be the plain one again.
+	REQUIRE(holds(prepared, tau::BDD_ID));
+	tref got = ap::simplify<node_t>(prepared, o);
+	// The propagation runs on the plain pinning equation (`X`-free, as
+	// §3's orientation rule demands) and rewrites the BDD-backed target
+	// through the library's compose: both its cofactors become `t`, the
+	// BDD stops branching on `x`, and the atom comes back PLAIN.
+	size_t with_y = 0, folded = 0;
+	for (tref m : ap::members<node_t>(got)) {
+		if (ap::fv_meets<node_t>(m, ap::block{ fvar("y") })) ++with_y;
+		else if (is_child<node_t>(m, tau::bf_eq)
+			&& same(ap::term_of<node_t>(m, o), t)) ++folded;
+	}
+	CHECK(with_y == 1);
+	CHECK(folded == 1);
+	// and the result is free of `x`, which is what lets the block go.
+	CHECK(!ap::fv_meets<node_t>(got, P));
 }
 
 }

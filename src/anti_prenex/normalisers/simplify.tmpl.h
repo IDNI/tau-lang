@@ -147,13 +147,17 @@ namespace detail {
  * @brief §3 `SIMPLIFY`'s first pass: equality propagation, one `pre_order`
  * traversal per call.
  *
- * DEEP, ONE PASS, CHAINED (§3). At a conjunction the equation members are
- * matched first, in content order; a pin joins the environment for everything
- * after it, so chained pins propagate within the pass. The environment is
- * kept idempotent — a new witness is rewritten by the pins in force, and the
- * ranges in force are rewritten by the new pin — and CAPPED by
- * `propagate_growth`. It is not a fixpoint: a member already emitted is not
- * revisited.
+ * DEEP, ONE PASS, CHAINED (§3). A conjunction is handled in TWO STAGES before
+ * the traversal descends into it: its X-free equation members are MATCHED in
+ * content order, each under the pins admitted before it, so chained pins
+ * propagate within the pass; then every equation member is REWRITTEN under the
+ * environment those matches leave behind, minus its own pin. So the order of
+ * the matches decides which pins exist, and no member's final form depends on
+ * where it sorted. The environment is kept idempotent — a new witness is
+ * rewritten by the pins in force, and the ranges in force are rewritten by the
+ * new pin — and CAPPED by `propagate_growth`. It is still not a fixpoint: a
+ * pin that only surfaces once the sweep has folded something waits for the
+ * next construction site.
  */
 template <NodeType node>
 struct propagation {
@@ -214,6 +218,15 @@ private:
 		kind_t kind = plain;
 		size_t version = 0;
 	};
+	/// What stage 1 of a frame learned about one equation leaf: the form
+	/// it was matched in, the pin it got (if any) and the size of `pins`
+	/// right after its own step, which tells stage 2 whether anything
+	/// joined the environment after it.
+	struct matched_leaf {
+		tref first = nullptr;
+		std::optional<size_t> own;
+		size_t pins_after = 0;
+	};
 	/// One open conjunction. `pending` holds the rewritten form of every
 	/// equation member, by POSITION (a member carries its right sibling,
 	/// so the key is the node as it occurs), and `spine` the inner chain
@@ -265,6 +278,21 @@ private:
 		return bare;
 	}
 
+	/// `rewrite_atom` with ONE pin taken out of the environment for this
+	/// substitution: a PINNING conjunct is rewritten by every pin but its
+	/// own (§3). Its own would fold it to `T` — `f[y ← f₁′]` IS the
+	/// residual `p = 0`, which is `T` for a strict pin — and drop the
+	/// constraint the spec keeps in place, weak pins' residual included.
+	tref rewrite_atom_excluding(tref a, std::optional<size_t> own) {
+		if (!own || !pins[*own].active) return rewrite_atom(a);
+		const tref key = pins[*own].key;
+		const tref witness = pins[*own].witness;
+		changes.erase(key);
+		const tref res = rewrite_atom(a);
+		changes[key] = witness;
+		return res;
+	}
+
 	/// `ref_args` mode: every `bf` argument of a reference through
 	/// `SIMPLIFY_TERM`, never through a pin (§3). Post-order, so a
 	/// reference nested inside an argument is finished first.
@@ -290,14 +318,16 @@ private:
 	}
 
 	/// §3: admit the pin of `atom`, if it has one and the cap allows it.
-	void try_admit(tref atom) {
+	/// @return the index of the pin it admitted in `pins`, or `nullopt`.
+	/// Stage 2 needs it to leave a conjunct out of its OWN pin.
+	std::optional<size_t> try_admit(tref atom) {
 		const std::optional<pin<node>> p = matched(atom);
-		if (!p) return;
+		if (!p) return {};
 		const tref key = term_key<node>(p->var);
 		// A variable already pinned IN FORCE cannot be pinned again:
 		// its occurrences are rewritten before they are ever matched.
 		// (One only SUSPENDED may be, and the two undo in order.)
-		if (changes.contains(key)) return;
+		if (changes.contains(key)) return {};
 		// The new range under the environment in force, so that the
 		// environment stays idempotent.
 		tref w = p->witness;
@@ -327,7 +357,7 @@ private:
 		// admitted in this pass. Precision, never soundness.
 		const size_t new_atom_sum = atom_sum
 			+ mem_size<node>(term_of<node>(atom, order));
-		if (new_witness_sum > propagate_growth * new_atom_sum) return;
+		if (new_witness_sum > propagate_growth * new_atom_sum) return {};
 		for (const auto& [i, r] : rewritten) {
 			undo.push_back({ i, false, pins[i].witness,
 				pins[i].size });
@@ -342,6 +372,7 @@ private:
 		witness_sum = new_witness_sum;
 		atom_sum = new_atom_sum;
 		version = ++next_version;
+		return pins.size() - 1;
 	}
 
 	void undo_to(size_t mark) {
@@ -414,10 +445,31 @@ private:
 		return markers.push_back(m), n;
 	}
 
-	/// §3: the conjunction is where pins are matched and admitted. The
-	/// equation members first, in content order, so that a pin is in force
-	/// for everything it can rewrite; the rest are rewritten by the
-	/// traversal, under the environment this leaves behind.
+	/**
+	 * @brief §3: the conjunction is where pins are matched and admitted,
+	 * in TWO STAGES, both here, before the traversal descends.
+	 *
+	 * STAGE 1, MATCH: the X-FREE positive equations, in content order —
+	 * an X-touching one can never pin (§3's orientation rule), since a
+	 * witness is X-free and a substitution cannot remove a block variable.
+	 * Each is rewritten by the environment in force so far and offered to
+	 * `try_admit`, so a chained pin joins for the leaves after it and the
+	 * environment stays normalised on insert. That first form exists for
+	 * the pin test alone.
+	 *
+	 * STAGE 2, REWRITE: EVERY positive equation of the frame, X-touching
+	 * ones included, rewritten from the ORIGINAL leaf under the FINAL
+	 * environment — one substitution and one `SIMPLIFY_ATOM` per equation
+	 * — with the leaf's OWN pin left out. Its own pin would fold it to
+	 * `T` and drop the constraint the spec keeps in place; every OTHER
+	 * pin applies, so `z = y` under a later `y ↦ a` becomes `z = a`, which
+	 * is what the normalised environment already says. A leaf that saw no
+	 * admission after its own keeps its stage-1 form: the environment
+	 * minus its own pin is the one that form was computed under.
+	 *
+	 * The non-equation members are untouched here; the traversal rewrites
+	 * them under the environment this leaves behind.
+	 */
 	tref open_frame(tref n, marker m) {
 		frame fr;
 		fr.undo_mark = undo.size();
@@ -433,16 +485,36 @@ private:
 		frames.push_back(std::move(fr));
 		m.kind = frame_top;
 		markers.push_back(m);
-		trefs eqs;
-		for (tref l : leaves)
-			if (is_positive_equation<node>(l)) eqs.push_back(l);
-		std::sort(eqs.begin(), eqs.end(), tau::subtree_less);
-		for (tref e : eqs) {
-			const tref rewritten = rewrite_atom(e);
-			frames.back().pending.emplace(e, rewritten);
-			// A member that only BECOMES a pin once rewritten joins
+		trefs eqs, candidates;
+		for (tref l : leaves) {
+			if (!is_positive_equation<node>(l)) continue;
+			eqs.push_back(l);
+			if (!fv_meets<node>(l, X)) candidates.push_back(l);
+		}
+		// --- stage 1 -----------------------------------------------
+		std::sort(candidates.begin(), candidates.end(),
+			tau::subtree_less);
+		std::unordered_map<tref, matched_leaf> stage1;
+		for (tref e : candidates) {
+			const tref first = rewrite_atom(e);
+			// A leaf that only BECOMES a pin once rewritten joins
 			// the environment like any other (§3).
-			try_admit(rewritten);
+			const std::optional<size_t> own = try_admit(first);
+			stage1.emplace(e, matched_leaf{ first, own,
+				pins.size() });
+		}
+		// --- stage 2 -----------------------------------------------
+		for (tref e : eqs) {
+			const auto it = stage1.find(e);
+			if (it != stage1.end()
+				&& it->second.pins_after == pins.size()) {
+				frames.back().pending.emplace(e,
+					it->second.first);
+				continue;
+			}
+			frames.back().pending.emplace(e,
+				rewrite_atom_excluding(e, it == stage1.end()
+					? std::nullopt : it->second.own));
 		}
 		return n;
 	}
