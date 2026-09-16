@@ -184,7 +184,7 @@ term representation, per component (PREPARE_TERMS):
 | `accept_growth` | growth factor of the per-component SIZE ACCEPTANCE (§5): a component push whose result exceeds `max(γ·\|input\|, accept_floor)` is discarded for the re-wrapped input (inv. 3). `γ = 16`. Neither taint nor flush attaches (cache scope, below) |
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires — moderate growth is routine and often repaid downstream; the test exists for detonation (§5). `2²⁰` |
 | `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): once `Σ‖witnesses‖` exceeds this factor times `Σ‖TERM_OF(pinning conjunct)‖`, the pass admits no further pin. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
-| `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a conjunct occurring in more members than this is no candidate key, and a member all of whose conjuncts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
+| `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
 | `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). The callback takes two argument forms — per block the block's variables, `kf(X)` (§5), and per chain the chain's canonical prefix, outermost first, with kinds (`RESOLVE_FUNCTIONAL`, §3) — and is a pure function of its argument either way |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
@@ -764,12 +764,13 @@ SIMPLIFIED_OR_JOIN(r₁, …, rₙ):     // INCREMENTAL: a builder fed one opera
         r a literal whose complement is a member  →  the join is T   // unit elim
         anything else           →  add r
     result: one top-level absorption pass (d ∨ (d ∧ e) = d) — indexed the
-    way SAT subsumption is: an occurrence list conjunct → members, a member's
-    candidates are the members of its RAREST conjunct, the test a marking
-    subset test; a conjunct in more than absorb_occ_max members is no
-    candidate key, and a member all of whose conjuncts exceed it stays
-    unabsorbed (precision, never soundness — EXPAND's cases share nearly
-    every conjunct and are skipped for free) — then ⋁ members
+    way SAT subsumption is. A member's PARTS are its members when it is the
+    dual connective (here the conjuncts of an ∧-member), else itself. An
+    occurrence list part → members; a member's candidates are the members
+    of its RAREST part, the test a marking subset test; a part in more than
+    absorb_occ_max members is no candidate key, and a member all of whose
+    parts exceed it stays unabsorbed (precision, never soundness — EXPAND's
+    cases share nearly every part and are skipped for free) — then ⋁ members
     EMITTED IN THE CONTENT ORDER (§1): insertion order drives evaluation and
     the short-circuits, but the assembled node is a function of the member
     SET — with flattening for associativity, assembly is AC-canonical, so
@@ -818,16 +819,22 @@ unequal until `y := a` turns `f` into `a`.
   conjunct keeps `p = 0` in place, and `f₁′ = f₀·p′` agrees with `f₀` wherever
   `p = 0`. Harmless for the squeeze: an X-free positive contributes the same
   term to both cofactors, which can only make `f₀ = f₁` more likely.
-- **Deep, one pass, chained.** ONE traversal of the conjunction: its equation
-  conjuncts first, in content order, then the rest, in content order — so a
-  pin is in force for everything it can rewrite. Every conjunct is rewritten
-  by the environment in force, and a conjunct that is, or thereby BECOMES, a
-  pin JOINS the environment for the conjuncts after it: chained pins
-  propagate within the pass, the environment kept idempotent (a new witness
-  rewritten by the pins in force, the ranges in force rewritten by the new
-  pin). Not a fixpoint: a conjunct already emitted is not revisited, and a pin
-  that only surfaces once the sweep has folded something waits for the next
-  construction site that `SIMPLIFY`s it. The substitution descends through a
+- **Deep, one pass, chained — two stages at the conjunction.** ONE traversal
+  of the conjunction. MATCH first: the `X`-free positive equation conjuncts
+  in content order, each rewritten by the pins admitted so far and then
+  tested — a conjunct that is, or thereby BECOMES, a pin JOINS the
+  environment for the conjuncts after it, so chained pins propagate within
+  the pass, the environment kept idempotent (a new witness rewritten by the
+  pins in force, the ranges in force rewritten by the new pin). Then REWRITE
+  every conjunct under the environment the match ended with: the equations
+  at the conjunction — a pinning one under the environment MINUS ITS OWN
+  PIN, so it stays and keeps constraining its variable, while every other
+  pin does reach it — and the rest as the traversal meets them. So the
+  result does not depend on the order of the equations, and the example
+  above folds whichever conjunct sorts first. Not a fixpoint: nothing is
+  re-matched after the rewrite, and a pin that only surfaces once the sweep
+  has folded something waits for the next construction site that
+  `SIMPLIFY`s it. The substitution descends through a
   sibling's whole ∧/∨ structure — a disjunctive sibling's members included —
   and INTO binder units (§4), a pin suspended under a binder over its variable
   or over a variable of its witness; temporal operators are opaque to both
