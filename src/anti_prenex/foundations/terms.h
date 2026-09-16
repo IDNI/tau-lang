@@ -185,6 +185,19 @@ template <NodeType node>
 bool carries_functional_quantifier(tref f);
 
 /**
+ * @brief The MAXIMAL functional-quantifier chain hanging off the `bf` node
+ * @p n (§1, §3): its prefix OUTERMOST FIRST with the kinds, and the body it
+ * sits on. An empty prefix — and @p n itself — when @p n is no chain. The
+ * whole nest is taken, kinds mixed freely, because that is the resolver's ONE
+ * unit of work (below).
+ *
+ * It is also how a `keep_functional_fn` (fwd.h) reads the chain NODE it is
+ * handed: prefix and body come off the node with this one call.
+ */
+template <NodeType node>
+std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
+
+/**
  * @brief §3 `RESOLVE_FUNCTIONAL(φ, order, kf)`: resolve the
  * functional-quantifier chains of `n` that `keep` does not keep. This is the
  * engine behind both `RESOLVE_FUNCTIONAL` and `SETTLE_FUNCTIONAL` (§3, §6).
@@ -202,9 +215,10 @@ bool carries_functional_quantifier(tref f);
  * Per chain: the prefix is canonicalised through the library's constructor,
  * which drops a degenerate or shadowed subscript, sorts each same-kind run
  * into content order, merges an adjoining run of the body, and folds a closed
- * plain chain. `keep` is then asked ONCE, on that canonical prefix, outermost
- * first and with the kinds; a yes keeps the whole chain, and nothing inside it
- * is looked at again.
+ * plain chain. `keep` is then asked ONCE, on that canonical chain's NODE —
+ * the prefix outermost first with the kinds, and the body below it, both read
+ * off with `strip_chain` (above); a yes keeps the whole chain, and nothing
+ * inside it is looked at again.
  *
  * LIVE PATH — the body BDD-backed under `order`, every subscript a key of
  * `order`, none of them hidden in a leaf, and the prefix of one kind or nested

@@ -62,19 +62,23 @@ enum class answer { sat, unsat, unknown };
 template <NodeType node>
 using var_order = typename term_handle<node>::order;
 
-/// §1 `keep_functional` as `RESOLVE_FUNCTIONAL` sees it: a pure predicate on
-/// a functional-quantifier chain's prefix (outermost first), asked once per
-/// chain at a resolution site. Layer 3 supplies the block-level callback
-/// `ANTI_PRENEX` takes.
+/// §1 `keep_functional`: the ONE callback `ANTI_PRENEX` takes, a pure
+/// predicate on a NODE, asked once per site. Per CHAIN (`RESOLVE_FUNCTIONAL`,
+/// §3) the resolver hands it the canonical chain's term node — the prefix
+/// outermost first with its kinds, and the body below it, which `strip_chain`
+/// (terms.h) reads off. Per BLOCK (§5, layer 4) it is handed the block's
+/// binder node `REWRAP(matrix, X)`, the run head with its variables outermost
+/// first over the matrix. What the policy needs it reads off that node: a
+/// prefix, or a variable list, alone would not let it look at what is
+/// quantified.
 template <NodeType node>
-using keep_functional_fn =
-	std::function<bool(const typename tau_term_bdd<node>::quants&)>;
+using keep_functional_fn = std::function<bool(tref)>;
 
-/// The default `keep_functional_fn`: keep nothing. Never an empty
-/// `std::function`, which would throw when called.
+/// The default `keep_functional_fn`: keep nothing, whatever the node. Never
+/// an empty `std::function`, which would throw when called.
 template <NodeType node>
 inline const keep_functional_fn<node> keep_no_functional =
-	[](const typename tau_term_bdd<node>::quants&) { return false; };
+	[](tref) { return false; };
 
 /**
  * @brief A set of node handles stored as a table VALUE: a vector kept sorted

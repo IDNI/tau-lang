@@ -45,28 +45,6 @@ template <NodeType node> using tbdd  = tau_term_bdd<node>;
 template <NodeType node> using bref  = typename tau_term_bdd<node>::ref;
 template <NodeType node> using thandle = term_handle<node>;
 
-/**
- * @brief The MAXIMAL functional-quantifier chain hanging off the `bf` node
- * @p n: its prefix OUTERMOST FIRST, and the body it sits on. An empty prefix
- * (and @p n itself) when @p n is no chain. The whole nest is taken, kinds
- * mixed freely: it is ONE unit of work.
- */
-template <NodeType node>
-std::pair<typename tbdd<node>::quants, tref> strip_chain(tref n) {
-	using tau = tree<node>;
-	typename tbdd<node>::quants q;
-	for (;;) {
-		const tau& tn = tau::get(n);
-		if (!tn.child_is(tau::bf_fall) && !tn.child_is(tau::bf_fex))
-			break;
-		const tau& c = tau::get(tn.first());
-		q.emplace_back(tau::trim_right_sibling(c.first()),
-			c.is(tau::bf_fall) ? tbdd<node>::all : tbdd<node>::ex);
-		n = tau::trim_right_sibling(c.second());
-	}
-	return { std::move(q), n };
-}
-
 /// The order a chain quantifies under: its INNERMOST subscript ranks 1,
 /// outward from there, over the subscripts alone. That is what `bdd_quant`
 /// asserts of the reversed prefix.
@@ -262,10 +240,11 @@ tref resolve_chains(tref n, const var_order<node>& order,
 		// Canonical now: a degenerate or shadowed subscript is gone,
 		// each run is in content order, an adjoining run of the body is
 		// merged in, and a closed plain chain is already folded. `keep`
-		// sees that prefix, ONCE, and its yes keeps the whole chain.
+		// sees that chain NODE, ONCE — prefix and body come off it with
+		// `strip_chain` (§3) — and its yes keeps the whole chain.
 		auto [q, body] = strip_chain<node>(c);
 		if (q.empty()) return done.insert(c), c;
-		if (keep(q)) return done.insert(c), c;
+		if (keep(c)) return done.insert(c), c;
 		tref r = resolve_chain<node>(q, body, order);
 		return done.insert(r), r;
 	};
@@ -383,6 +362,26 @@ bool carries_functional_quantifier(tref f) {
 	};
 	return !tbdd<node>::visit_nodes(
 		thandle<node>::convert_to_handle(f).get(), at_node);
+}
+
+// Down the `bf_fall` / `bf_fex` spine, one binder per step: its subscript and
+// its kind onto the prefix, then on into the body, until what hangs below is
+// no binder any more. Nothing else in the tree is entered.
+template <NodeType node>
+std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n) {
+	using tau = tree<node>;
+	using tbdd = tau_term_bdd<node>;
+	typename tbdd::quants q;
+	for (;;) {
+		const tau& tn = tau::get(n);
+		if (!tn.child_is(tau::bf_fall) && !tn.child_is(tau::bf_fex))
+			break;
+		const tau& c = tau::get(tn.first());
+		q.emplace_back(tau::trim_right_sibling(c.first()),
+			c.is(tau::bf_fall) ? tbdd::all : tbdd::ex);
+		n = tau::trim_right_sibling(c.second());
+	}
+	return { std::move(q), n };
 }
 
 template <NodeType node>

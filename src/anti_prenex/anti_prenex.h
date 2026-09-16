@@ -51,22 +51,27 @@
 namespace idni::tau_lang::anti_prenexing {
 
 /**
- * @brief §3 `ANTI_PRENEX(φ, keep_functional = false)` — the whole pipeline.
+ * @brief §3 `ANTI_PRENEX(φ, keep_functional = (· ↦ false))` — the whole
+ * pipeline.
  *
  * Phases, in this fixed order: 0 `CANONICALISE_BINDER_IDS`; 1 `TO_NNF` then
  * `SIMPLIFY(φ, ref_args = true)`; 2 `ELIMINATE_BY_SUBSTITUTION` then
- * `SIMPLIFY`; 3 `NORMALIZE_OPERATORS`; 4 `PROCESS_ALL_BLOCKS`; 5 `SIMPLIFY`,
- * `FOLD_DEGENERATE_BINDERS`, `CANONICALISE_BINDER_IDS`. A formula without a
- * quantifier is returned as is. Defined at layer 2 (phase 4 is the identity
- * until layer 4).
+ * `SIMPLIFY`; 3 `NORMALIZE_OPERATORS`; 4 `PROCESS_ALL_BLOCKS`; 5
+ * `RESOLVE_FUNCTIONAL`, `SIMPLIFY`, `FOLD_DEGENERATE_BINDERS`,
+ * `CANONICALISE_BINDER_IDS`. A formula without a quantifier is returned as
+ * is. Defined at layer 2 (phase 4 is the identity until layer 4).
  *
- * @param phi             a `wff` node
- * @param keep_functional §1 `ctx.keep_functional`: emit `∀_X`/`∃_X`
- *                        symbolically instead of discharging them
+ * @param phi a `wff` node
+ * @param kf  §1 `keep_functional`, the ONE callback of the run, pure and
+ *            asked on a NODE (fwd.h): the chain's node at a phase-5 chain
+ *            resolution (§3) and the block's binder node per block (§5), a
+ *            yes emitting `∀_X`/`∃_X` symbolically instead of discharging
+ *            them. The default keeps nothing
  * @return the anti-prenexed formula, a `wff` node
  */
 template <NodeType node>
-tref anti_prenex(tref phi, bool keep_functional = false);
+tref anti_prenex(tref phi,
+	const keep_functional_fn<node>& kf = keep_no_functional<node>);
 
 } // namespace idni::tau_lang::anti_prenexing
 
