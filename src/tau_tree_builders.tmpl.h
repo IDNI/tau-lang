@@ -219,15 +219,26 @@ int_t find_biggest_var_id(tref fm) {
 		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
 		return true;
 	};
-	auto consider = [&](tref v) {
-		if (auto name = get_var_name<node>(v); is_number(name)) {
-			try {
-				id = std::max(id, static_cast<int_t>(std::stoll(name)));
-			} catch (const std::out_of_range&) {
-				// Variable name exceeds range; use max id
-				id = std::numeric_limits<int_t>::max();
-			}
+	auto consider_name = [&](const std::string& name) {
+		if (!is_number(name)) return;
+		try {
+			id = std::max(id, static_cast<int_t>(std::stoll(name)));
+		} catch (const std::out_of_range&) {
+			// Variable name exceeds range; use max id
+			id = std::numeric_limits<int_t>::max();
 		}
+	};
+	// A numeric id sits on a `variable` holding its `var_name` as its
+	// child, which is the shape `build_binder` mints, so it is read there
+	// directly. Any other spelling -- an io variable keeps its name a
+	// level deeper, and is never a plain number -- is asked the general
+	// way, which unwraps through the traverser.
+	auto consider = [&](tref v) {
+		const tau& t = tau::get(v);
+		if (t.is(tau::variable) && t.first() != nullptr
+			&& tau::get(t.first()).is(tau::var_name))
+			consider_name(tau::get(t.first()).get_string());
+		else consider_name(get_var_name<node>(v));
 	};
 	auto f = [&](tref n) {
 		if (is<node, tau::variable>(n)) consider(n);
