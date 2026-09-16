@@ -389,6 +389,51 @@ TEST_CASE("S8d: an admission that re-normalises a range denies the shortcut") {
 	CHECK(!holds_var(folded_z, "w"));
 }
 
+TEST_CASE("S8e: the same equation at two positions of one chain") {
+	tref y = bvar("y"), t = bvar("t"), z = bvar("z"), a = bvar("a"),
+		b = bvar("b"), c = bvar("c"), d = bvar("d");
+	const tref sibling = eq0(lor(y, z));
+	// The input is not deduplicated, so the same equation may stand at two
+	// positions of one chain. Each position is a member of its own — it
+	// carries its own right sibling — and the frame matches and rewrites
+	// it as such: one of them admits the pin and keeps its form, the other
+	// is rewritten by it.
+	const tref strict = eq(y, land(a, b));
+	const tref phi = conj(conj(strict, sibling), strict);
+	REQUIRE(members(phi).size() == 3);
+	const tref got = simp(phi);
+	INFO("strict twice: ", tau::get(got).to_str());
+	CHECK(are_nso_equivalent<node_t>(got, phi));
+	CHECK(no_fused_atoms(got));
+	// A strict pin rewrites the second copy to `T`, which drops out, so
+	// the equation is left once and `y` is gone from the sibling.
+	bool kept = false;
+	for (tref m : members(got)) if (same(m, strict)) kept = true;
+	CHECK(kept);
+	CHECK(members(got).size() == 2);
+	CHECK(!holds_var(other_member(got, strict), "y"));
+	// A WEAK pin leaves a residual rather than `T`, so both positions
+	// stay, each in its own form: the one that pinned as written, the
+	// other with the witness substituted in. The third member is no
+	// candidate — an equation under `¬` pins nothing — so these two are
+	// all the frame matches.
+	const tref weak = eq0(lor(lxor(y, t), land(c, d)));
+	const tref opaque = neg(eq0(bvar("g")));
+	const tref phi2 = conj(conj(weak, opaque), weak);
+	const tref got2 = simp(phi2);
+	INFO("weak twice: ", tau::get(got2).to_str());
+	CHECK(are_nso_equivalent<node_t>(got2, phi2));
+	CHECK(no_fused_atoms(got2));
+	CHECK(members(got2).size() == 3);
+	bool kept2 = false, rewritten = false;
+	for (tref m : members(got2)) {
+		if (same(m, weak)) kept2 = true;
+		else if (is_child<node_t>(m, tau::bf_eq)) rewritten = true;
+	}
+	CHECK(kept2);
+	CHECK(rewritten);
+}
+
 TEST_CASE("S9: the cap refuses a pin") {
 	tref y = bvar("y"), a = bvar("a"), b = bvar("b"), c = bvar("c");
 	tref pinning = eq(y, lor(lor(a, b), c));

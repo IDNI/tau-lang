@@ -267,6 +267,14 @@ private:
 	/// equation member, by POSITION (a member carries its right sibling,
 	/// so the key is the node as it occurs), and `spine` the inner chain
 	/// wrappers, which must not open a frame of their own.
+	///
+	/// BY POSITION, NOT BY CONTENT, in both. The input is not
+	/// deduplicated, so one equation may stand at two positions of the
+	/// chain, and each is matched and rewritten on its own — the second
+	/// under the pin the first admits. And a node content-equal to a
+	/// member but standing somewhere else below the frame, inside a
+	/// disjunct say, is no member of it: the traversal rewrites that one
+	/// under the environment in force where it stands.
 	struct frame {
 		size_t undo_mark = 0;
 		size_t version_before = 0;
@@ -359,6 +367,9 @@ private:
 	{
 		environment e = before;
 		for (tref c : candidates) {
+			// One conjunct is left out, not every copy of it: a
+			// content-equal candidate at another position is still
+			// a conjunct of the frame.
 			if (c == leaf) continue;
 			admit_into(e, rewrite_under(e, c), nullptr, own_key);
 		}
@@ -599,6 +610,9 @@ private:
 		// yet among them). Copied only when there is a candidate.
 		const environment before = candidates.empty() ? environment{}
 							     : env;
+		// What each candidate learns, by POSITION like `pending`: an
+		// equation spelled at two positions is matched twice, the
+		// second time under the pin the first admitted.
 		std::unordered_map<tref, matched_leaf> stage1;
 		for (tref e : candidates) {
 			const tref first = rewrite_atom(e);
