@@ -7,7 +7,7 @@
 // either "dynamic" (per-window independence) or "static" (one global graph
 // for the entire trace).
 //
-// Reference: OCFuncs design paper (naturalog/agents/docs/research/ocfuncs.tex)
+// Reference: the OCFuncs design paper (kept outside this repository).
 
 #ifndef __IDNI__TAU__OCFUNCS_H__
 #define __IDNI__TAU__OCFUNCS_H__

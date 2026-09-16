@@ -21,8 +21,19 @@
 
 namespace idni::tau_lang {
 
-// Analyze the formula text for common mistakes and return a short hint.
-// Returns empty string if no specific hint applies.
+/**
+ * @brief Analyze the formula text for common mistakes and return a short
+ * hint.
+ *
+ * Returns empty string if no specific hint applies.  The checks, in order:
+ * a forward time reference `[t+k]`, a missing trailing `.` on formula-like
+ * input, an unknown type annotation (against the configured pack's type
+ * names), and nested `G` operators.
+ * @tparam node Node type supplying `node::ba::type_names()` and
+ * `node::ba::types_joined()`.
+ * @param formula Raw formula text that failed to parse.
+ * @return A one-line hint, or the empty string.
+ */
 template <typename node>
 inline std::string classify_parse_error(const std::string& formula) {
 	static const std::regex re_fwd_ref(R"(\[t\s*\+)");

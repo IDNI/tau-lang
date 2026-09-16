@@ -35,22 +35,34 @@
 
 namespace idni::tau_lang {
 
+/// @brief One preference: an output stream and the value it should take at
+/// every step.
 struct preference_entry {
 	std::string var_name;        // output stream variable name (e.g. "o1")
 	std::string preferred_value; // value literal in tau syntax (e.g. "0", "1", "<:5>")
 };
 
+/// @brief Ordered list of preferences; earlier entries win over later ones.
 struct preference_order {
 	std::vector<preference_entry> entries;
 };
 
-// Strengthen `spec` with tie-breaker clauses derived from `po`. Returns the
-// new spec (or `spec` unchanged if `po.entries` is empty / all preferences
-// are unrealisable on top of the running spec).
-//
-// Preferences are conjuncted in declaration order; each is gated on
-// realisability of the spec-so-far ∧ this-preference. Failing preferences
-// are silently dropped (logged at DEBUG level).
+/**
+ * @brief Strengthen `spec` with tie-breaker clauses derived from `po`.
+ *
+ * Returns the new spec (or `spec` unchanged if `po.entries` is empty / all
+ * preferences are unrealisable on top of the running spec).
+ *
+ * Preferences are conjuncted in declaration order; each is gated on
+ * realisability of the spec-so-far ∧ this-preference. Failing preferences
+ * are silently dropped (logged at DEBUG level).  A preference whose clause
+ * fails to parse, or whose realizability check comes back undecided, is
+ * dropped the same way.
+ * @tparam node Tree node type.
+ * @param spec Specification to strengthen.
+ * @param po Preferences in priority order.
+ * @return The strengthened specification.
+ */
 template <NodeType node>
 tref apply_preferences(tref spec, const preference_order& po) {
 	using tau = tree<node>;

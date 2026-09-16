@@ -35,9 +35,16 @@ inline bool pwr_semantic_fallback = false;
 // AST classification helpers
 // ---------------------------------------------------------------------------
 
-// Identify the temporal operator kind of a wff node.
+/// @brief Identify the temporal operator kind of a wff node.
 enum class temporal_op { NONE, ALWAYS, SOMETIMES, U, R, W, S, T };
 
+/**
+ * @brief Return the temporal operator kind at the root of a wff node.
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect (may be null).
+ * @return The operator kind, or `temporal_op::NONE` when the root is not
+ * a temporal operator.
+ */
 template <NodeType node>
 temporal_op get_temporal_op(tref fm) {
 	using tau = tree<node>;
@@ -55,19 +62,38 @@ temporal_op get_temporal_op(tref fm) {
 	return temporal_op::NONE;
 }
 
+/**
+ * @brief True iff the root of @p fm is a temporal operator.
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect.
+ * @return `true` iff `get_temporal_op` is not `temporal_op::NONE`.
+ */
 template <NodeType node>
 bool is_temporal(tref fm) {
 	return get_temporal_op<node>(fm) != temporal_op::NONE;
 }
 
-// Check if the operator is binary (U/R/W/S/T) vs unary (G/F/sometimes).
+/**
+ * @brief Check if the operator is binary (U/R/W/S/T) vs unary
+ * (G/F/sometimes).
+ * @param op Operator kind.
+ * @return `true` for U, R, W, S and T.
+ */
 inline bool is_binary_temporal(temporal_op op) {
 	return op == temporal_op::U || op == temporal_op::R
 	    || op == temporal_op::W || op == temporal_op::S
 	    || op == temporal_op::T;
 }
 
-// Check whether a node is a boolean combination (and/or/neg) at the wff level.
+/**
+ * @brief Check whether a node is a boolean combination (and/or/neg) at the
+ * wff level.
+ *
+ * Also true for `wff_imply`, `wff_equiv` and `wff_xor`.
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect (may be null).
+ * @return `true` iff the root is a wff Boolean connective.
+ */
 template <NodeType node>
 bool is_wff_boolean(tref fm) {
 	using tau = tree<node>;
@@ -80,20 +106,33 @@ bool is_wff_boolean(tref fm) {
 	    || nt == tau::wff_xor;
 }
 
-// Check whether a node is an atom (non-temporal wff leaf).
+/**
+ * @brief Check whether a node is an atom (non-temporal wff leaf).
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect.
+ * @return `true` iff the root is neither temporal nor a Boolean connective.
+ */
 template <NodeType node>
 bool is_atom_leaf(tref fm) {
 	return !is_temporal<node>(fm) && !is_wff_boolean<node>(fm);
 }
 
-// PW-N2: a non-temporal formula -- an atom or any Boolean combination of
-// atoms with no temporal operator anywhere inside. The semantic per-step
-// revision (semantic_revise_atoms) is defined for these as a whole: its
-// ∃o.(α∧β) → α construction only needs α and β to be step formulas, not
-// atoms. Without this, `revise()` sent a conjunction such as
-// `(i1 = 1 -> o1 = 1) && o2 = 0` against an atom update into the
-// operator-mismatch case and dropped the spec side entirely, so the
-// second of two conflicting updates forgot the first's revision.
+/**
+ * @brief True iff @p fm is a non-temporal formula: an atom or any Boolean
+ * combination of atoms with no temporal operator anywhere inside.
+ *
+ * PW-N2: a non-temporal formula -- an atom or any Boolean combination of
+ * atoms with no temporal operator anywhere inside. The semantic per-step
+ * revision (semantic_revise_atoms) is defined for these as a whole: its
+ * ∃o.(α∧β) → α construction only needs α and β to be step formulas, not
+ * atoms. Without this, `revise()` sent a conjunction such as
+ * `(i1 = 1 -> o1 = 1) && o2 = 0` against an atom update into the
+ * operator-mismatch case and dropped the spec side entirely, so the
+ * second of two conflicting updates forgot the first's revision.
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect; a null tref yields `false`.
+ * @return `true` iff no temporal operator occurs in @p fm.
+ */
 template <NodeType node>
 bool is_non_temporal_fm(tref fm) {
 	using tau = tree<node>;
@@ -107,16 +146,30 @@ bool is_non_temporal_fm(tref fm) {
 // Role decomposition: invariant side vs commitment side
 // ---------------------------------------------------------------------------
 
-// For a binary temporal operator, extract the invariant and commitment children.
-//   U: inv=LHS, commit=RHS    (φ₁ U φ₂)
-//   W: inv=LHS, commit=RHS    (φ₁ W φ₂) — weak until
-//   R: inv=RHS, commit=LHS    (φ₁ R φ₂) — dual of U
-//   S: inv=LHS, commit=RHS    (φ₁ S φ₂)
-//   T: inv=RHS, commit=LHS    (φ₁ T φ₂) — dual of S
+/**
+ * @brief The invariant and commitment sides of a binary temporal operator.
+ * @tparam node Tree node type.
+ */
 
 template <NodeType node>
 struct role_pair { tref invariant; tref commitment; };
 
+/**
+ * @brief For a binary temporal operator, extract the invariant and
+ * commitment children.
+ *
+ *   U: inv=LHS, commit=RHS    (φ₁ U φ₂)
+ *   W: inv=LHS, commit=RHS    (φ₁ W φ₂) — weak until
+ *   R: inv=RHS, commit=LHS    (φ₁ R φ₂) — dual of U
+ *   S: inv=LHS, commit=RHS    (φ₁ S φ₂)
+ *   T: inv=RHS, commit=LHS    (φ₁ T φ₂) — dual of S
+ *
+ * Only valid for binary temporal operators (U/R/W/S/T); G, F/sometimes and
+ * non-temporal roots yield `{nullptr, nullptr}`.
+ * @tparam node Tree node type.
+ * @param fm Binary temporal formula.
+ * @return The invariant and commitment children.
+ */
 template <NodeType node>
 role_pair<node> decompose_roles(tref fm) {
 	using tau = tree<node>;
@@ -141,7 +194,15 @@ role_pair<node> decompose_roles(tref fm) {
 	}
 }
 
-// Rebuild a binary temporal operator from invariant and commitment sides.
+/**
+ * @brief Rebuild a binary temporal operator from invariant and commitment
+ * sides.
+ * @tparam node Tree node type.
+ * @param op Binary operator kind (U/R/W/S/T).
+ * @param inv Invariant side.
+ * @param commit Commitment side.
+ * @return The rebuilt formula, or nullptr for a non-binary @p op.
+ */
 template <NodeType node>
 tref rebuild_from_roles(temporal_op op, tref inv, tref commit) {
 	using tau = tree<node>;
@@ -155,9 +216,15 @@ tref rebuild_from_roles(temporal_op op, tref inv, tref commit) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Gather top-level conjuncts from a conjunction chain
-// ---------------------------------------------------------------------------
+/**
+ * @brief Gather top-level conjuncts from a conjunction chain.
+ *
+ * Nested `wff_and` nodes are flattened; any other node is appended as one
+ * conjunct.
+ * @tparam node Tree node type.
+ * @param fm Formula to flatten (a null tref adds nothing).
+ * @param out Receives the conjuncts in left-to-right order.
+ */
 
 template <NodeType node>
 void gather_top_conjuncts(tref fm, std::vector<tref>& out) {
@@ -173,15 +240,18 @@ void gather_top_conjuncts(tref fm, std::vector<tref>& out) {
 	out.push_back(fm);
 }
 
-// ---------------------------------------------------------------------------
-// Select current-time system output variables from a formula.
-//
-// For the per-step semantic formula, we quantify only current-step
-// controllable outputs (o_i[t]), NOT lookback outputs (o_i[t-k])
-// and NOT input variables (i_j[t]).  In tau-ltl's AST, atoms at
-// temporal-tree leaves reference the current time step after
-// normalization, so all output io_vars found here are current-time.
-// ---------------------------------------------------------------------------
+/**
+ * @brief Select current-time system output variables from a formula.
+ *
+ * For the per-step semantic formula, we quantify only current-step
+ * controllable outputs (o_i[t]), NOT lookback outputs (o_i[t-k])
+ * and NOT input variables (i_j[t]).  In tau-ltl's AST, atoms at
+ * temporal-tree leaves reference the current time step after
+ * normalization, so all output io_vars found here are current-time.
+ * @tparam node Tree node type.
+ * @param fm Formula to scan.
+ * @return The current-time output io_vars of @p fm.
+ */
 
 template <NodeType node>
 trefs select_output_vars(tref fm) {
@@ -196,9 +266,17 @@ trefs select_output_vars(tref fm) {
 	return tau::get(fm).select_top(pred);
 }
 
-// ---------------------------------------------------------------------------
-// Semantic per-step formula: ((∃o. α∧β) → α) ∧ β
-// ---------------------------------------------------------------------------
+/**
+ * @brief Semantic per-step formula:
+ * ((exists o. alpha && beta) -> alpha) && beta.
+ *
+ * The existential quantifies the current-time output variables of alpha&&beta
+ * (see `select_output_vars`).
+ * @tparam node Tree node type.
+ * @param alpha Spec side.
+ * @param beta Update side.
+ * @return The revised step formula.
+ */
 
 template <NodeType node>
 tref semantic_revise_atoms(tref alpha, tref beta) {
@@ -216,23 +294,33 @@ tref semantic_revise_atoms(tref alpha, tref beta) {
 	return build_wff_and<node>(impl, beta);
 }
 
-// ---------------------------------------------------------------------------
-// PW-R6: per-revision satisfiability memo.
-//
-// One revision asks is_tau_formula_sat for the same (formula, start_time)
-// several times: the trees are hash-consed, so Step 1's `spec ∧ update`,
-// Step 2's `clause ∧ update` on a single-clause spec and revise()'s
-// early-exit conjunction are one identical tref — and each repeat is a
-// fresh ltlsynt subprocess on temporal content. The memo answers repeats
-// within one revision in every build; the cross-revision TAU_CACHE memo
-// inside is_tau_formula_sat itself only exists where TAU_CACHE is on
-// (Release), so this one is load-bearing in Debug. Keyed by tref identity
-// (hash-consing makes that structural identity); transient, so no
-// GC integration is needed.
-// ---------------------------------------------------------------------------
-
+/**
+ * @brief PW-R6: per-revision satisfiability memo.
+ *
+ * One revision asks is_tau_formula_sat for the same (formula, start_time)
+ * several times: the trees are hash-consed, so Step 1's `spec ∧ update`,
+ * Step 2's `clause ∧ update` on a single-clause spec and revise()'s
+ * early-exit conjunction are one identical tref — and each repeat is a
+ * fresh ltlsynt subprocess on temporal content. The memo answers repeats
+ * within one revision in every build; the cross-revision TAU_CACHE memo
+ * inside is_tau_formula_sat itself only exists where TAU_CACHE is on
+ * (Release), so this one is load-bearing in Debug. Keyed by tref identity
+ * (hash-consing makes that structural identity); transient, so no
+ * GC integration is needed.
+ */
 using pwr_sat_memo = std::map<std::pair<tref, int_t>, bool>;
 
+/**
+ * @brief Memoised `is_tau_formula_sat` for one revision.
+ *
+ * An undecided (error) verdict from `is_tau_formula_sat` is read as
+ * unsatisfiable and memoised as such.
+ * @tparam node Tree node type.
+ * @param fm Formula to decide.
+ * @param start_time Start time passed through to `is_tau_formula_sat`.
+ * @param memo Memo to consult and fill; a null pointer disables memoisation.
+ * @return The (possibly cached) satisfiability verdict.
+ */
 template <NodeType node>
 bool pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo) {
 	auto compute = [&] {
@@ -247,13 +335,24 @@ bool pwr_memo_sat(tref fm, const int_t start_time, pwr_sat_memo* memo) {
 	return r;
 }
 
-// ---------------------------------------------------------------------------
-// Core recursive revision: revise(φ, ψ, ψ_f)
-//
-// φ   = spec subtree
-// ψ   = aligned update subtree
-// ψ_f = full update formula (for REAL checks)
-// ---------------------------------------------------------------------------
+/**
+ * @brief Core recursive revision: revise(phi, psi, psi_f).
+ *
+ * φ   = spec subtree
+ * ψ   = aligned update subtree
+ * ψ_f = full update formula (for REAL checks)
+ *
+ * Returns phi unchanged when REAL(phi && psi_f) holds; otherwise dispatches
+ * on the operator kinds of phi and psi (the numbered cases in the body),
+ * falling back to psi on an operator mismatch.
+ * @tparam node Tree node type.
+ * @param phi Spec subtree.
+ * @param psi Aligned update subtree.
+ * @param psi_f Full update formula.
+ * @param start_time Start time for the realizability checks.
+ * @param memo Optional per-revision memo (see `pwr_sat_memo`).
+ * @return The revised subtree.
+ */
 
 template <NodeType node>
 tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
@@ -359,11 +458,19 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 	return psi;
 }
 
-// ---------------------------------------------------------------------------
-// And-distribution: distribute ∧ into invariant slots
-//   (a∧b) U c → (a U c) ∧ (b U c)
-//   a R (b∧c) → (a R b) ∧ (a R c)
-// ---------------------------------------------------------------------------
+/**
+ * @brief And-distribution: distribute && into invariant slots.
+ *
+ *   (a∧b) U c → (a U c) ∧ (b U c)
+ *   a R (b∧c) → (a R b) ∧ (a R c)
+ *
+ * Also splits `G(a&&b)` into `G(a) && G(b)` and recurses through a top-level
+ * conjunction; the input is returned unchanged (same tref) when nothing
+ * distributes.
+ * @tparam node Tree node type.
+ * @param fm Formula to distribute.
+ * @return The distributed formula, or @p fm itself when unchanged.
+ */
 
 template <NodeType node>
 tref and_distribute(tref fm) {
@@ -465,11 +572,20 @@ tref and_distribute(tref fm) {
 	return fm;
 }
 
-// ---------------------------------------------------------------------------
-// Top-level pointwise revision: spec * update
-//
-// Steps 0-5 from pwr-ltl.tex § The pointwise revision algorithm.
-// ---------------------------------------------------------------------------
+/**
+ * @brief Top-level pointwise revision: spec * update.
+ *
+ * Steps 0-5 from pwr-ltl.tex § The pointwise revision algorithm.
+ *
+ * Both inputs must already be normalized (the interpreter does this before
+ * calling); the result is the verified assembly, or `update` alone when the
+ * assembly is not realizable.
+ * @tparam node Tree node type.
+ * @param spec Current (normalized) specification.
+ * @param update Normalized update formula.
+ * @param start_time Start time for the realizability checks.
+ * @return The revised specification.
+ */
 
 template <NodeType node>
 tref pointwise_revision_temporal(

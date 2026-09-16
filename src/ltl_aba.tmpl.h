@@ -1,4 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+//
+// Umbrella implementation header for ltl_aba.h: pulls in the algorithm
+// headers (A/B skeletons, the Algorithm D game), the formula type-set
+// helpers and satisfiability.h, sets the "ltl_aba" log channel, and then
+// includes the four sub-files in the original code order:
+// ltl_aba_helpers.tmpl.h, ltl_aba_synthesis.tmpl.h,
+// ltl_aba_normalization.tmpl.h and ltl_aba_builders.tmpl.h.
 
 #include "ltl_aba.h"
 #include "formula_type_set.h"

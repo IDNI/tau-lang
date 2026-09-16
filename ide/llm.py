@@ -64,7 +64,7 @@ LANGUAGE SEMANTICS & RULES (CRITICAL — read every point)
    - Quantifiers: "all x,y wff" (universal), "ex x,y wff" (existential)
    - Temporal (LTL): G/always/[] (globally), F/sometimes/<> (eventually),
      U (until), R (release), W (weak until), S (since), T (triggered)
-   - CTL* (requires `fragment ctl_star.`): A (for-all-paths), E (exists-path),
+   - CTL* (requires `fragment ctl_star`): A (for-all-paths), E (exists-path),
      - (semantic negation = no winning strategy)
    - Constants: T (true), F (false)
    - Conditional: wff ? wff : wff
@@ -110,7 +110,7 @@ LANGUAGE SEMANTICS & RULES (CRITICAL — read every point)
    - whatis <expr>. — type inspection
    - run <spec>. — execute a specification
    - lgrs <wff>. — least general residual solution
-   - fragment ltl | ctl_star. — switch grammar fragment
+   - fragment ltl | ctl_star — switch grammar fragment
 
 8. RECURRENCE RELATIONS
    - Define named relations: name(args) := expr.
@@ -165,8 +165,8 @@ Example 8: LTL with delay/lookback
   o1 := out console.
   G (o1[t]:tau = i1[t-1]:tau).
 
-Example 9: CTL* fragment (requires: fragment ctl_star.)
-  fragment ctl_star.
+Example 9: CTL* fragment (requires: fragment ctl_star)
+  fragment ctl_star
   A G (o1[t] = 1).
 
 Example 10: Substitution

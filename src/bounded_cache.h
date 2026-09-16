@@ -76,13 +76,35 @@
 
 namespace idni::tau_lang {
 
-// LG-27: the runtime bound consulted by the string-keyed synthesis caches
-// (see `call_ltlsynt_game`). A cache constructed with `&cache_bound` reads
-// the current value on every insert, so `--cache-bound` / REPL `set
-// cachebound` / `api::set_cache_bound` take effect immediately. Runtime
-// parameter by policy; 0 = unbounded.
+/**
+ * @brief The runtime bound consulted by the string-keyed synthesis caches
+ * (0 = unbounded).
+ *
+ * LG-27: the runtime bound consulted by the string-keyed synthesis caches
+ * (see `call_ltlsynt_game`). A cache constructed with `&cache_bound` reads
+ * the current value on every insert, so `--cache-bound` / REPL `set
+ * cachebound` / `api::set_cache_bound` take effect immediately. Runtime
+ * parameter by policy; 0 = unbounded.
+ */
 inline std::size_t cache_bound = 4096;
 
+/**
+ * @brief std::map with a configurable max-size bound and FIFO eviction
+ * (see the file header for the rationale and the std::map subset offered).
+ *
+ * TT2-13: two bounding modes. The compile-time `Max` template
+ * parameter is the original mode (kept for the existing unit tests
+ * and benchmark). Constructing with a pointer to a runtime bound
+ * switches to runtime mode: the pointee is read on every insert, so
+ * a `set cachebound N` tightens or loosens a live cache. In both
+ * modes a bound of 0 means unbounded; in runtime mode the FIFO
+ * queue is maintained even while the bound is 0, so a later
+ * non-zero bound still knows the insertion order.
+ * @tparam K Key type.
+ * @tparam V Mapped type.
+ * @tparam Cmp Key comparator.
+ * @tparam Max Compile-time bound; 0 means unbounded -- same as std::map.
+ */
 template <typename K, typename V,
           typename Cmp = std::less<K>,
           std::size_t Max = 0> // Max == 0 means unbounded — same as std::map
@@ -95,39 +117,47 @@ struct bounded_cache {
 	using const_iterator = typename map_t::const_iterator;
 	using key_compare = Cmp;
 
-	// TT2-13: two bounding modes. The compile-time `Max` template
-	// parameter is the original mode (kept for the existing unit tests
-	// and benchmark). Constructing with a pointer to a runtime bound
-	// switches to runtime mode: the pointee is read on every insert, so
-	// a `set cachebound N` tightens or loosens a live cache. In both
-	// modes a bound of 0 means unbounded; in runtime mode the FIFO
-	// queue is maintained even while the bound is 0, so a later
-	// non-zero bound still knows the insertion order.
+	/// @brief Compile-time mode: the bound is the `Max` template parameter.
 	bounded_cache() = default;
+	/// @brief Runtime mode: the bound is read from @p runtime_bound on
+	/// every insert (see the class comment).
 	explicit bounded_cache(const std::size_t* runtime_bound)
 		: runtime_bound_(runtime_bound) {}
 
 	// --- queries ----------------------------------------------------
 
+	/// @brief True iff the cache holds no entry.
 	bool empty()       const noexcept { return map_.empty(); }
+	/// @brief Number of entries currently held.
 	std::size_t size() const noexcept { return map_.size(); }
+	/// @brief The compile-time bound `Max`.
 	static constexpr std::size_t max_size() noexcept { return Max; }
+	/// @brief The bound in effect: the runtime pointee, else `Max`.
 	std::size_t bound() const noexcept {
 		return runtime_bound_ ? *runtime_bound_ : Max;
 	}
 
+	/// @brief Lookup by key, as std::map::find.
 	iterator       find(const K& k)       { return map_.find(k); }
+	/// @brief Lookup by key, as std::map::find.
 	const_iterator find(const K& k) const { return map_.find(k); }
 
+	/// @brief True iff @p k is present.
 	bool contains(const K& k) const { return map_.contains(k); }
 
+	/// @brief Iterator to the first entry of the underlying map.
 	iterator       begin()       { return map_.begin(); }
+	/// @brief Iterator to the first entry of the underlying map.
 	const_iterator begin() const { return map_.begin(); }
+	/// @brief Past-the-end iterator of the underlying map.
 	iterator       end()         { return map_.end(); }
+	/// @brief Past-the-end iterator of the underlying map.
 	const_iterator end()   const { return map_.end(); }
 
 	// --- mutations --------------------------------------------------
 
+	/// @brief Access or default-insert the value for @p k; an insert may
+	/// evict the oldest entry.
 	V& operator[](const K& k) {
 		auto it = map_.find(k);
 		if (it != map_.end()) return it->second;
@@ -136,7 +166,7 @@ struct bounded_cache {
 		return ins->second;
 	}
 
-	// Same return shape as std::map::emplace: {iterator, bool}.
+	/// @brief Same return shape as std::map::emplace: {iterator, bool}.
 	template <typename... Args>
 	std::pair<iterator, bool> emplace(Args&&... args) {
 		auto r = map_.emplace(std::forward<Args>(args)...);
@@ -144,19 +174,22 @@ struct bounded_cache {
 		return r;
 	}
 
+	/// @brief Insert a copy of @p v, as std::map::insert.
 	std::pair<iterator, bool> insert(const value_type& v) {
 		auto r = map_.insert(v);
 		if (r.second) on_insert(r.first);
 		return r;
 	}
 
+	/// @brief Insert @p v by move, as std::map::insert.
 	std::pair<iterator, bool> insert(value_type&& v) {
 		auto r = map_.insert(std::move(v));
 		if (r.second) on_insert(r.first);
 		return r;
 	}
 
-	// O(n) scan of order_ deque; acceptable for current cache sizes.
+	/// @brief Erase the entry for @p k; returns the number erased (0 or 1).
+	/// O(n) scan of order_ deque; acceptable for current cache sizes.
 	std::size_t erase(const K& k) {
 		auto it = map_.find(k);
 		if (it == map_.end()) return 0;
@@ -170,6 +203,7 @@ struct bounded_cache {
 		return 1;
 	}
 
+	/// @brief Erase the entry at @p it and return the following iterator.
 	iterator erase(iterator it) {
 		if (tracked()) {
 			for (auto qit = order_.begin(); qit != order_.end(); ++qit) {
@@ -179,6 +213,7 @@ struct bounded_cache {
 		return map_.erase(it);
 	}
 
+	/// @brief Remove every entry (and the FIFO queue when tracked).
 	void clear() {
 		map_.clear();
 		if (tracked()) order_.clear();
@@ -186,6 +221,7 @@ struct bounded_cache {
 
 	// --- introspection (used by the benchmark) ---------------------
 
+	/// @brief Number of entries evicted so far.
 	std::size_t evictions() const noexcept { return evictions_; }
 
 private:

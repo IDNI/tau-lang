@@ -29,7 +29,7 @@
 
 namespace idni::tau_lang::mealy {
 
-// mealy_edge of the extracted Mealy machine.
+/// @brief Edge of the extracted Mealy machine.
 struct mealy_edge {
 	int from_state;       // vertex index (b, q) in the product game
 	int input_sigma;      // T_2 index
@@ -37,23 +37,39 @@ struct mealy_edge {
 	int to_state;         // next vertex index
 };
 
-// Mealy machine: Q states, |T_2| inputs per state, |T_3| outputs per
-// edge.  INDEX SPACES (LG-13): `initial_state` is the RAW GAME VERTEX
-// (b_0, q_0), stored verbatim (the tests pin this), while edges'
-// from/to are DENSE state indices remapped via vertex_to_state -- do
-// not walk edges starting from initial_state without translating it
-// through the same map first.
+/**
+ * @brief Mealy machine: Q states, |T_2| inputs per state, |T_3| outputs
+ * per edge.
+ *
+ * INDEX SPACES (LG-13): `initial_state` is the RAW GAME VERTEX
+ * (b_0, q_0), stored verbatim (the tests pin this), while edges'
+ * from/to are DENSE state indices remapped via vertex_to_state -- do
+ * not walk edges starting from initial_state without translating it
+ * through the same map first.
+ */
 struct machine {
 	int num_states = 0;
 	int initial_state = 0;
 	std::vector<mealy_edge> edges;
 };
 
-// Extract a Mealy machine from a winning-strategy witness map.
-// `winning_vertices` is the winning region (vertex indices); `witness`
-// maps (vertex, σ) → τ for each σ ∈ T_2 at each winning vertex.
-// `successor` computes the next vertex from (vertex, τ) using the game's
-// transition function (sh(τ)|_m combined with δ_A(q, J(τ))).
+/**
+ * @brief Extract a Mealy machine from a winning-strategy witness map.
+ *
+ * `winning_vertices` is the winning region (vertex indices); `witness`
+ * maps (vertex, σ) → τ for each σ ∈ T_2 at each winning vertex.
+ * `successor` computes the next vertex from (vertex, τ) using the game's
+ * transition function (sh(τ)|_m combined with δ_A(q, J(τ))).
+ * Edges whose witness is missing or whose successor is not a winning
+ * vertex are skipped.
+ * @tparam Successor Callable `(int vertex, int tau) -> int`.
+ * @param winning_vertices Winning region as vertex indices.
+ * @param initial_state Raw game vertex (b_0, q_0), stored verbatim.
+ * @param witness Map (vertex, sigma) -> tau.
+ * @param num_T2 |T_2|.
+ * @param successor Next-vertex function.
+ * @return The extracted machine with dense edge indices.
+ */
 template <class Successor>
 inline machine extract_mealy(
     const std::vector<int>& winning_vertices,

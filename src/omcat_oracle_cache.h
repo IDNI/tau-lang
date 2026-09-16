@@ -27,9 +27,12 @@
 
 namespace idni::tau_lang::omcat {
 
-// Key: a hashable identifier for an atomic-query batch.  The
-// discriminator encodes which atomic relations were queried; the
-// result is the type index (int).
+/**
+ * @brief Key: a hashable identifier for an atomic-query batch.
+ *
+ * The discriminator encodes which atomic relations were queried; the
+ * result is the type index (int).
+ */
 struct oracle_key {
 	uint64_t hash;
 	// BA2-7: keep the queried batch and compare it too -- hash-only
@@ -40,26 +43,30 @@ struct oracle_key {
 		return hash == o.hash && atomic_results == o.atomic_results;
 	}
 };
+/// @brief Hash functor for `oracle_key` (uses the precomputed FNV hash).
 struct oracle_key_hash {
+	/// @brief The stored hash of @p k.
 	size_t operator()(const oracle_key& k) const noexcept {
 		return static_cast<size_t>(k.hash);
 	}
 };
 
+/// @brief Thread-safe map from atomic-query batches to type indices.
 class oracle_cache {
 public:
-	// Returns the cached type index for `key`, or -1 if not present.
+	/// @brief Returns the cached type index for `key`, or -1 if not
+	/// present.
 	int get(const oracle_key& key) const {
 		std::lock_guard<std::mutex> lg(mtx_);
 		auto it = map_.find(key);
 		return it == map_.end() ? -1 : it->second;
 	}
-	// Stores the result; overwrites existing entry.
+	/// @brief Stores the result; overwrites existing entry.
 	void put(const oracle_key& key, int value) {
 		std::lock_guard<std::mutex> lg(mtx_);
 		map_[key] = value;
 	}
-	// Compute-and-cache: calls `compute` only on a miss.
+	/// @brief Compute-and-cache: calls `compute` only on a miss.
 	template <class F>
 	int get_or_compute(const oracle_key& key, F&& compute) {
 		{
@@ -72,10 +79,12 @@ public:
 		map_.emplace(key, v);
 		return v;
 	}
+	/// @brief Number of cached entries.
 	size_t size() const {
 		std::lock_guard<std::mutex> lg(mtx_);
 		return map_.size();
 	}
+	/// @brief Remove every cached entry.
 	void clear() {
 		std::lock_guard<std::mutex> lg(mtx_);
 		map_.clear();
@@ -85,8 +94,13 @@ private:
 	std::unordered_map<oracle_key, int, oracle_key_hash> map_;
 };
 
-// Compute a key by hashing a vector of atomic-query results.  Each atomic
-// query is a small integer (e.g., sign of a comparison).
+/**
+ * @brief Compute a key by hashing a vector of atomic-query results.
+ *
+ * Each atomic query is a small integer (e.g., sign of a comparison).
+ * @param atomic_results The queried batch.
+ * @return The key (FNV-1a hash plus the batch itself).
+ */
 inline oracle_key make_oracle_key(const std::vector<int>& atomic_results) {
 	uint64_t h = 1469598103934665603ull; // FNV-1a offset basis
 	for (int r : atomic_results) {

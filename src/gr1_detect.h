@@ -27,11 +27,11 @@ namespace idni::tau_lang {
 
 namespace gr1_detect_internal {
 
-// The one temporal-operator predicate shared by the three classifiers
-// (gr1_detect, liveness_decomp, spec.h).  GR-R1/GR-4: the CTL* quantifiers
-// A/E and the semantic negation `-phi` are temporal in every sense that
-// matters here (they nest a path formula), so G(A phi) is NOT a safety
-// invariant.
+/// @brief The one temporal-operator predicate shared by the three classifiers
+/// (gr1_detect, liveness_decomp, spec.h).  GR-R1/GR-4: the CTL* quantifiers
+/// A/E and the semantic negation `-phi` are temporal in every sense that
+/// matters here (they nest a path formula), so G(A phi) is NOT a safety
+/// invariant.
 template <NodeType node>
 inline bool is_temporal_operator_node(tref n) {
 	using tau = tree<node>;
@@ -45,7 +45,7 @@ inline bool is_temporal_operator_node(tref n) {
 	    || nt == tau::wff_E       || nt == tau::wff_semantic_neg;
 }
 
-// True iff `n` is the eventually operator.
+/// @brief True iff `n` is the eventually operator.
 template <NodeType node>
 inline bool is_eventually_node(tref n) {
 	using tau = tree<node>;
@@ -55,6 +55,8 @@ inline bool is_eventually_node(tref n) {
 	return nt == tau::wff_sometimes;
 }
 
+/// @brief True iff no temporal operator node occurs in `fm` (a null tref
+/// counts as non-temporal).
 template <NodeType node>
 inline bool is_non_temporal(tref fm) {
 	using tau = tree<node>;
@@ -64,9 +66,10 @@ inline bool is_non_temporal(tref fm) {
 	}) == nullptr;
 }
 
+/// @brief Kind of a top-level conjunct: G(safe), GF(live) or anything else.
 enum class gr1_conjunct { Safety, Liveness, Other };
 
-// Classify a single top-level conjunct.
+/// @brief Classify a single top-level conjunct.
 template <NodeType node>
 inline gr1_conjunct classify_conjunct(tref fm) {
 	using tau = tree<node>;
@@ -92,9 +95,9 @@ inline gr1_conjunct classify_conjunct(tref fm) {
 	return gr1_conjunct::Other;
 }
 
-// Walk top-level && chain, classifying each leaf.  Supports wff_and with
-// arbitrary arity — the parser may flatten A && B && C to a single 3-child
-// wff_and or keep it left/right-associated; we handle both.
+/// @brief Walk top-level && chain, classifying each leaf.  Supports wff_and
+/// with arbitrary arity -- the parser may flatten A && B && C to a single
+/// 3-child wff_and or keep it left/right-associated; we handle both.
 template <NodeType node>
 inline bool is_gr1_impl(tref fm, int& n_safety, int& n_liveness) {
 	using tau = tree<node>;
@@ -119,14 +122,29 @@ inline bool is_gr1_impl(tref fm, int& n_safety, int& n_liveness) {
 
 } // namespace gr1_detect_internal
 
-// Returns true iff the formula is a conjunction of G(safe) and GF(live)
-// with non-temporal bodies.  Writes the count of each to out-params.
+/**
+ * @brief Returns true iff the formula is a conjunction of G(safe) and
+ * GF(live) with non-temporal bodies.
+ *
+ * Writes the count of each to out-params.
+ * @tparam node Tree node type.
+ * @param fm Formula to classify.
+ * @param n_safety Receives the number of G(safe) conjuncts.
+ * @param n_liveness Receives the number of GF(live) conjuncts.
+ * @return `true` iff @p fm is in the simple GR(1) fragment.
+ */
 template <NodeType node>
 inline bool is_gr1_fragment(tref fm, int& n_safety, int& n_liveness) {
 	n_safety = 0; n_liveness = 0;
 	return gr1_detect_internal::is_gr1_impl<node>(fm, n_safety, n_liveness);
 }
 
+/**
+ * @brief Same as the three-argument overload, discarding the counts.
+ * @tparam node Tree node type.
+ * @param fm Formula to classify.
+ * @return `true` iff @p fm is in the simple GR(1) fragment.
+ */
 template <NodeType node>
 inline bool is_gr1_fragment(tref fm) {
 	int s = 0, l = 0;

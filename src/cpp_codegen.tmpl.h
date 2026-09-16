@@ -1,4 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+//
+// Implementation of the data-driven emit path declared in cpp_codegen.h:
+// the codegen_detail helpers (identifier sanitising, HOA guard label to C++
+// expression and to cubes, double literals, atom field classification, the
+// ba-type registry snapshot, the ground tref expression builders and the
+// per-cube guard construction), the two program_desc builders
+// (build_program_desc_prop for the purely-propositional case and the
+// templated build_program_desc for solved strategies with data atoms), the
+// declared-open and atoms appendix emitters, and the single non-templated
+// emit_program() that walks a program_desc into the generated class.
 
 #ifndef __IDNI__TAU__CPP_CODEGEN_TMPL_H__
 #define __IDNI__TAU__CPP_CODEGEN_TMPL_H__

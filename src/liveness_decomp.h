@@ -30,6 +30,11 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Structured decomposition of a GR(1)-shaped formula into its
+ * safety invariant and its GF obligations.
+ * @tparam node Tree node type.
+ */
 template <NodeType node>
 struct liveness_decomp {
 	// The G(ψ_safe) conjunct, or nullptr if no safety.
@@ -44,6 +49,7 @@ struct liveness_decomp {
 
 namespace liveness_decomp_internal {
 
+/// @brief Flatten a top-level `wff_and` chain into its conjuncts.
 template <NodeType node>
 inline void gather_conjuncts(tref fm, std::vector<tref>& out) {
 	using tau = tree<node>;
@@ -61,6 +67,18 @@ inline void gather_conjuncts(tref fm, std::vector<tref>& out) {
 
 } // namespace liveness_decomp_internal
 
+/**
+ * @brief Split phi = G(psi_safe) && GF(psi_1) && ... && GF(psi_n) into its
+ * safety part and its liveness bodies (see the file header).
+ *
+ * Non-GR(1) formulas (and a null/empty input) come back as a
+ * default-constructed liveness_decomp -- `is_gr1 == false`, null
+ * `safety_part`, empty `liveness_parts`.  Several safety conjuncts are
+ * merged into one G over the conjunction of their bodies.
+ * @tparam node Tree node type.
+ * @param fm Formula to decompose.
+ * @return The decomposition.
+ */
 template <NodeType node>
 inline liveness_decomp<node> decompose_liveness(tref fm) {
 	using tau = tree<node>;

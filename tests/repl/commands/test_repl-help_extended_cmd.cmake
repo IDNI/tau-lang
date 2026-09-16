@@ -70,3 +70,8 @@ add_repl_test(help_reset_cmd      "help reset"   "reset command")
 # examples
 add_repl_test(help_examples_cmd   "help examples" "examples")
 add_repl_test(help_example_cmd    "help example"  "examples")
+
+# help arms for the run-session and fragment commands (previously the switch
+# had no case for them and printed nothing)
+add_repl_test(help_stop_cmd     "help stop"     "discard the stored run session")
+add_repl_test(help_fragment_cmd "help fragment" "fragment ctl_star")

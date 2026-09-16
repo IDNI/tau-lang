@@ -35,9 +35,17 @@
 
 namespace idni::tau_lang::alg_b {
 
+/// @brief Name of the j-th P-bit input proposition, "p_<j>".
 inline std::string P_name(int j) { return "p_" + std::to_string(j); }
+/// @brief Name of the j-th R-bit output proposition, "r_<j>".
 inline std::string R_name(int j) { return "r_" + std::to_string(j); }
 
+/**
+ * @brief Encode T_2 index sigma as a conjunction of n_pbits P-literals.
+ * @param sigma T_2 index to encode.
+ * @param n_pbits Number of P-bits; 0 yields "true".
+ * @return The conjunction in Spot syntax.
+ */
 inline std::string p_encode(int sigma, int n_pbits) {
 	if (n_pbits == 0) return "true";
 	std::ostringstream ss;
@@ -49,6 +57,12 @@ inline std::string p_encode(int sigma, int n_pbits) {
 	return ss.str();
 }
 
+/**
+ * @brief Encode T_1 index rho as a conjunction of n_rbits R-literals.
+ * @param rho T_1 index to encode.
+ * @param n_rbits Number of R-bits; 0 yields "true".
+ * @return The conjunction in Spot syntax.
+ */
 inline std::string r_encode(int rho, int n_rbits) {
 	if (n_rbits == 0) return "true";
 	std::ostringstream ss;
@@ -60,6 +74,12 @@ inline std::string r_encode(int rho, int n_rbits) {
 	return ss.str();
 }
 
+/**
+ * @brief Conjunction of d_i / !d_i literals for bitmask A over K atoms.
+ * @param A D-bitmask.
+ * @param K Number of data atoms; 0 yields "true".
+ * @return The conjunction in Spot syntax.
+ */
 inline std::string d_pattern(int A, int K) {
 	if (K == 0) return "true";
 	std::ostringstream ss;
@@ -71,6 +91,8 @@ inline std::string d_pattern(int A, int K) {
 	return ss.str();
 }
 
+/// @brief Output of `build_algorithm_b_skeleton`: the formula, its input
+/// and output propositions and the encoding sizes.
 struct b_skeleton_bundle {
 	std::string formula;
 	std::vector<std::string> outs;  // r_0..r_{n_rbits-1} then d_0..d_{K-1}
@@ -82,13 +104,24 @@ struct b_skeleton_bundle {
 	int K       = 0;
 };
 
-// Build the P_σ-augmented synthesis formula.
-//
-// feasible_set_b: triples (T2_idx, rho, A) that are feasible
-//                (i.e. ∃T₃ type τ with 2-type(τ.m,τ.x)=T2[T2_idx] and 1-type(τ.y)=rho
-//                 and D-bitmask of τ = A).
-// t2_pos_m[σ]:   pos_m field of T₂ type σ (needed for Ψ_I grouping).
-// phi_star_ltl:  LTL skeleton over d_0..d_{K-1} in Spot format.
+/**
+ * @brief Build the P_sigma-augmented synthesis formula.
+ *
+ * feasible_set_b: triples (T2_idx, rho, A) that are feasible
+ *                (i.e. ∃T₃ type τ with 2-type(τ.m,τ.x)=T2[T2_idx] and 1-type(τ.y)=rho
+ *                 and D-bitmask of τ = A).
+ * t2_pos_m[σ]:   pos_m field of T₂ type σ (needed for Ψ_I grouping).
+ * phi_star_ltl:  LTL skeleton over d_0..d_{K-1} in Spot format.
+ * @param T1_size |T_1|.
+ * @param T2_size |T_2|.
+ * @param K Number of data subformulas.
+ * @param feasible_set_b Feasible (T2_idx, rho, A) triples.
+ * @param t2_pos_m pos_m field per T_2 type.
+ * @param phi_star_ltl LTL skeleton over d_0..d_{K-1}; empty means "true".
+ * @return The bundle {formula, outs, ins, n_rbits, n_pbits, T1_size,
+ * T2_size, K}; the formula is `(assume) -> (guarantee)`, or the guarantee
+ * alone when there is nothing to assume.
+ */
 inline b_skeleton_bundle build_algorithm_b_skeleton(
 	int T1_size,
 	int T2_size,

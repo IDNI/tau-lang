@@ -2264,8 +2264,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
 		"  maxclauses             cqe DNF clauses per distributed scope unlimited\n"
 		"  decisionpins           decided tau-algebra rows kept alive  4096\n"
-		"  fixpointsteps          temporal-normalization fixpoint steps unlimited\n"
-		"  flagsteps              eventual-flag search steps           unlimited\n"
+		"  fixpointsteps          temporal-normalization fixpoint steps 500\n"
+		"  flagsteps              eventual-flag search steps           500\n"
 		"  squeezecap             block-squeeze operand-set size cap   unlimited\n"
 		"  simplifyrounds         bitvector simplification rounds      unlimited\n"
 		"  defpasses              definition-expansion passes          unlimited\n"
@@ -2344,9 +2344,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  cnf                     convert a Tau expression to conjunctive normal form\n"
 		<< "  dnf                     convert a Tau expression to disjunctive normal form\n"
 		<< "  mnf                     convert a Tau expression to minterm normal form\n"
-		<< "  anf                     convert a Tau expression to algebraic normal form\n"
 		<< "  nnf                     convert a Tau expression to negation normal form\n"
-		<< "  pnf                     convert a Tau expression to prenex normal form\n"
 		<< "  onf                     convert a Tau formula to order normal form\n"
 		<< "\n"
 
@@ -2489,6 +2487,20 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "a new `run <tau>` replaces any stored session; `run` / `run N steps`\n"
 		<< "with no formula continue the stored one. `N step` (singular) also works.\n"
 		<< "\n";
+		break;
+	case tau::stop_sym: out
+		<< "the stop command discards the stored run session\n\n"
+		<< "a run started with `run N steps` keeps its session so that a later `run` or\n"
+		<< "`run N steps` can continue it; stop clears that session\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  stop                    discard the stored run session\n";
+		break;
+	case tau::fragment_sym: out
+		<< "the fragment command selects the grammar fragment used to parse formulas\n\n"
+		<< "usage:\n"
+		<< "  fragment ltl            default LTL fragment (F, G, U, R, W, S, T)\n"
+		<< "  fragment ctl_star       CTL* fragment, adds the A, E and - operators\n";
 		break;
 	case tau::memory_sym: out
 		<< "the memory command prints the running interpreter's current\n"
@@ -2710,6 +2722,9 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  (Tau term function)    rr1(x,y,z) := (x & y) | z\n"
 		<< "  (Tau formula function) rr2(x,y,z) := ( x = 0 || y = 0) && z = 0\n\n"
 		<< "\n";
+		break;
+	default: out
+		<< "no help available for this command; `help` lists the commands\n";
 		break;
 	}
 }

@@ -39,6 +39,7 @@ namespace idni::tau_lang::alg_d {
 
 // ── Synthesis game (from ltlsynt --print-game-hoa) ───────────────────────
 
+/// @brief Synthesis parity game parsed from `ltlsynt --print-game-hoa`.
 struct synth_game {
 	int num_states = 0;
 	int init       = 0;
@@ -72,12 +73,16 @@ struct synth_game {
 
 namespace hoa_guard {
 
+/// @brief Advance @p i past spaces and tabs in @p s.
 static inline void skip_ws(const std::string& s, size_t& i) {
 	while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
 }
 
+/// @brief Evaluate a disjunction (E|E) of the guard grammar from position
+/// @p i.
 static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps);
 
+/// @brief Evaluate one atom (t, f, N, !E or (E)) of the guard grammar.
 static bool eval_atom(const std::string& s, size_t& i, int bitmask, int n_aps) {
 	skip_ws(s, i);
 	if (i >= s.size()) return false;
@@ -105,6 +110,7 @@ static bool eval_atom(const std::string& s, size_t& i, int bitmask, int n_aps) {
 	return false;
 }
 
+/// @brief Evaluate a conjunction (E&E) of the guard grammar.
 static bool eval_and(const std::string& s, size_t& i, int bitmask, int n_aps) {
 	bool v = eval_atom(s, i, bitmask, n_aps);
 	while (true) {
@@ -144,14 +150,16 @@ static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
 // exceeds `max_cubes`.  Callers must REFUSE the edge in that case: falling
 // back to a partial reading is exactly the defect this replaces.
 
+/// @brief One literal of a guard cube: AP index and polarity.
 struct lit { int ap; bool pos; };
+/// @brief A cube is a conjunction of literals; the empty cube is true. A DNF
+/// is a vector of cubes; an empty vector == false.
 using cube = std::vector<lit>;   // conjunction; empty cube == true
-// A DNF is a vector of cubes; an empty vector == false.
 
 namespace dnf_detail {
 
-// Normalise a cube: sort by AP, drop duplicates, reject if an AP appears with
-// both polarities (the cube is then unsatisfiable).
+/// @brief Normalise a cube: sort by AP, drop duplicates, reject if an AP
+/// appears with both polarities (the cube is then unsatisfiable).
 inline bool normalise_cube(cube& c) {
 	std::sort(c.begin(), c.end(), [](const lit& a, const lit& b) {
 		return a.ap != b.ap ? a.ap < b.ap : (int)a.pos < (int)b.pos;
@@ -168,6 +176,8 @@ inline bool normalise_cube(cube& c) {
 	return true;
 }
 
+/// @brief Recursive-descent parser turning a guard label into DNF cubes,
+/// failing when the expansion exceeds `max_cubes`.
 struct parser {
 	const std::string& s;
 	size_t i = 0;
@@ -262,6 +272,16 @@ struct parser {
 
 } // namespace dnf_detail
 
+/**
+ * @brief Expand a HOA guard label into its DNF cubes.
+ *
+ * Returns nullopt when the label does not parse or the expansion exceeds
+ * `max_cubes` (see the section comment above: callers must REFUSE the edge
+ * in that case).  An empty label is the unconditional guard.
+ * @param label Guard label over AP indices.
+ * @param max_cubes Cap on the number of cubes produced.
+ * @return The cubes, or `std::nullopt`.
+ */
 inline std::optional<std::vector<cube>> to_dnf(
 	const std::string& label, size_t max_cubes = 512)
 {
@@ -278,7 +298,7 @@ inline std::optional<std::vector<cube>> to_dnf(
 
 } // namespace hoa_guard
 
-/// Evaluate a HOA guard label under an AP assignment. Bit `i` of
+/// @brief Evaluate a HOA guard label under an AP assignment. Bit `i` of
 /// @p bitmask is the truth value of AP index `i` (the convention used by
 /// build_product_game's 2^n_aps assignment loops and by the tests).
 inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
@@ -288,6 +308,18 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
 
 // ── HOA synthesis game parser ─────────────────────────────────────────────
 
+/**
+ * @brief Parse the HOA text of `ltlsynt --print-game-hoa` into a
+ * `synth_game`.
+ *
+ * Reads the header (states, start, APs, controllable APs, state players,
+ * acceptance) and the body transitions, then derives state and edge
+ * priorities in the solver's max-odd convention as described in the body
+ * comments.  A text containing more than one `HOA:` block (a decomposed
+ * specification) yields an empty game.
+ * @param hoa_text HOA text to parse.
+ * @return The parsed game; `num_states == 0` when nothing was parsed.
+ */
 inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 	synth_game g;
 
@@ -488,19 +520,26 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 
 // ── Call ltlsynt and get parity game ──────────────────────────────────────
 
-// Run ltlsynt on `phi_prop` and parse `--print-game-hoa` into a synth_game.
-//
-// DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
-// `write_tempfile` + `spawn_capture`, which live in that header and are
-// included after this one; the callers below need only this declaration.
-// Not spelled inline here: a unit that includes this header without the
-// definition (the qlt plugin's own) would declare an inline function it
-// never defines, which gcc rejects; the definition is inline and is
-// emitted by every unit that includes it.
-//
-// An error result means the subprocess produced no verdict (see
-// classify_spot_exit); the caller merges it into its own result rather
-// than reading it as an empty, definitively unrealizable game.
+/**
+ * @brief Run ltlsynt on `phi_prop` and parse `--print-game-hoa` into a
+ * synth_game.
+ *
+ * DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
+ * `write_tempfile` + `spawn_capture`, which live in that header and are
+ * included after this one; the callers below need only this declaration.
+ * Not spelled inline here: a unit that includes this header without the
+ * definition (the qlt plugin's own) would declare an inline function it
+ * never defines, which gcc rejects; the definition is inline and is
+ * emitted by every unit that includes it.
+ *
+ * An error result means the subprocess produced no verdict (see
+ * classify_spot_exit); the caller merges it into its own result rather
+ * than reading it as an empty, definitively unrealizable game.
+ * @param phi_prop Propositional LTL formula in Spot syntax.
+ * @param ins Input proposition names.
+ * @param outs Output proposition names.
+ * @return The parsed synthesis game, or an error result.
+ */
 result<synth_game> call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
@@ -518,6 +557,8 @@ result<synth_game> call_ltlsynt_game(
 // For trans-based acceptance: insert intermediate "color" state per edge.
 // State i in intermediate layer: (q * T1_size + rho) + offset.
 
+/// @brief Product of the synthesis game with the T_1 memory types (state
+/// index q * T1_size + rho, plus edge stubs for transition acceptance).
 struct product_game {
 	int  n_states = 0;
 	int  init     = 0;
@@ -526,7 +567,7 @@ struct product_game {
 	std::vector<std::vector<int>> succs;
 };
 
-/// Parse the disjunct index N from a `d_N` atomic-proposition name.
+/// @brief Parse the disjunct index N from a `d_N` atomic-proposition name.
 /// Returns -1 if @p ap is not a `d_` AP.
 inline int d_index_from_ap_name(const std::string& ap) {
 	if (ap.size() <= 2 || ap[0] != 'd' || ap[1] != '_') return -1;
@@ -538,7 +579,7 @@ inline int d_index_from_ap_name(const std::string& ap) {
 	return idx;
 }
 
-/// Project an AP assignment (bit `i` = truth of AP index `i`) onto the
+/// @brief Project an AP assignment (bit `i` = truth of AP index `i`) onto the
 /// controllable `d_N` APs: bit `N` of the result is set iff `d_N` is true
 /// in @p assignment. @p K bounds the accepted disjunct indices.
 inline int d_pattern_from_assignment(const synth_game& G, int assignment, int K) {
@@ -552,10 +593,17 @@ inline int d_pattern_from_assignment(const synth_game& G, int assignment, int K)
 	return pat;
 }
 
-// The system's choices as (D_pattern, AP assignment) pairs. An output AP the
-// game does not mention is unconstrained by the formula, so its D-bit still
-// ranges over both values instead of silently reading as false — otherwise half
-// the system's moves disappear and a realizable spec can report UNREALIZABLE.
+/**
+ * @brief The system's choices as (D_pattern, AP assignment) pairs.
+ *
+ * An output AP the game does not mention is unconstrained by the formula,
+ * so its D-bit still ranges over both values instead of silently reading as
+ * false -- otherwise half the system's moves disappear and a realizable spec
+ * can report UNREALIZABLE.
+ * @param G Synthesis game.
+ * @param K Number of D propositions.
+ * @return Every (D_pattern, assignment) pair the system may pick.
+ */
 inline std::vector<std::pair<int,int>> sys_choices(const synth_game& G, int K) {
 	const int n_aps = (int)G.aps.size();
 	std::vector<int> ap_of_d(K, -1);
@@ -610,14 +658,39 @@ inline std::vector<std::pair<int,int>> sys_choices(const synth_game& G, int K) {
 // there, and `seed_since_aux_bits` in interpreter.tmpl.h).  All three say
 // the same thing: history before the first enforced step is the defaulted
 // zero stream.
-//
-// `sorted_constants` must be the sorted, deduplicated constants list the
-// T1/T3 positions were enumerated from (collect_qlt_constants returns it in
-// exactly that form).
+
+/**
+ * @brief The fixed t = 0 initial memory type, rho_0 = qlt_type_of(0,
+ * constants) (convention (F), see the section comment above).
+ *
+ * `sorted_constants` must be the sorted, deduplicated constants list the
+ * T1/T3 positions were enumerated from (collect_qlt_constants returns it in
+ * exactly that form).
+ * @param sorted_constants Sorted, deduplicated qlt constants.
+ * @return The T_1 index of the value 0.
+ */
 inline int initial_memory(const std::vector<omcat::rational>& sorted_constants) {
 	return omcat::qlt_type_of(omcat::rational(0, 1), sorted_constants);
 }
 
+/**
+ * @brief Build the product game (game x T_1) described in the section
+ * comment above.
+ *
+ * Sys edges enumerate `sys_choices` and keep only D-patterns with a T3
+ * type feasible from the current memory; env edges keep the memory and are
+ * filtered by the same feasibility (sec. 14); edge stubs carry transition-based
+ * priorities.  The initial product state is (G.init, init_rho); an
+ * out-of-range @p init_rho is a caller bug (asserted; left as-is in Release,
+ * which downstream reads as UNREALIZABLE).
+ * @param G Synthesis game.
+ * @param T1_size |T_1|.
+ * @param T3 Enumerated 3-types.
+ * @param type_A D-bitmask per T3 type.
+ * @param K Number of D propositions.
+ * @param init_rho Initial memory, from `initial_memory()`.
+ * @return The product game.
+ */
 inline product_game build_product_game(
 	const synth_game& G,
 	int T1_size,
@@ -848,8 +921,11 @@ inline product_game build_product_game(
 
 namespace zielonka_impl {
 
+/// @brief Set of product-game state indices.
 using StateSet = std::set<int>;
 
+/// @brief Attractor of @p T for player @p p over the given successor
+/// relation (standard backward closure).
 static StateSet attractor(
 	int p,               // attracting player (0 or 1)
 	const StateSet& T,
@@ -889,6 +965,8 @@ static StateSet attractor(
 	return attr;
 }
 
+/// @brief Zielonka recursion on the subgame @p V; returns {W0, W1}. Dead ends
+/// are decided by the caller, not here (see the NOTE in the body).
 static std::pair<StateSet,StateSet> solve(
 	const StateSet& V,
 	int n,
@@ -958,33 +1036,37 @@ static std::pair<StateSet,StateSet> solve(
 
 } // namespace zielonka_impl
 
-// Returns the set of states where player 1 (sys) wins.
-//
-// LG-32 / AL-R1 / §14 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
-// semantics say the player who cannot move LOSES the finite play, while
-// `solve` scores every state by its priority's parity — so dead ends are
-// decided here, BEFORE the parity recursion, the standard way:
-//
-//   repeat until the subgame has no dead ends:
-//     a dead end is lost for its owner; award it to the opponent TOGETHER
-//     WITH the opponent's attractor of it, and remove that attractor from
-//     the subgame (removal can create new dead ends, hence the loop);
-//   then run Zielonka on the residual subgame, which has none.
-//
-// Every state the attractors removed carries exactly one of two facts: the
-// winner can force the play into the dead-end set (∃-rule), or the loser
-// cannot avoid it (∀-rule).  A state remaining in the residual keeps at
-// least one in-subgame successor by the same rules, so `solve`'s internal
-// restriction to V creates no fresh dead ends.
-//
-// History: this replaces the prune-own-suicidal-edges + one-shot-override
-// patch, which deliberately REFUSED the opponent attractor because
-// `build_product_game`'s environment edges were over-approximated (any
-// satisfiable guard, no data feasibility) — a phantom env move could then
-// "force" sys into a dead end no real environment can reach, flipping the
-// realizable ALG-D-28.  §14 made the env edges precise (the same T3
-// feasibility filter the sys edges use), so the refusal's reason is gone
-// and the textbook rule is exactly right.
+/**
+ * @brief Returns the set of states where player 1 (sys) wins.
+ *
+ * LG-32 / AL-R1 / §14 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
+ * semantics say the player who cannot move LOSES the finite play, while
+ * `solve` scores every state by its priority's parity — so dead ends are
+ * decided here, BEFORE the parity recursion, the standard way:
+ *
+ *   repeat until the subgame has no dead ends:
+ *     a dead end is lost for its owner; award it to the opponent TOGETHER
+ *     WITH the opponent's attractor of it, and remove that attractor from
+ *     the subgame (removal can create new dead ends, hence the loop);
+ *   then run Zielonka on the residual subgame, which has none.
+ *
+ * Every state the attractors removed carries exactly one of two facts: the
+ * winner can force the play into the dead-end set (∃-rule), or the loser
+ * cannot avoid it (∀-rule).  A state remaining in the residual keeps at
+ * least one in-subgame successor by the same rules, so `solve`'s internal
+ * restriction to V creates no fresh dead ends.
+ *
+ * History: this replaces the prune-own-suicidal-edges + one-shot-override
+ * patch, which deliberately REFUSED the opponent attractor because
+ * `build_product_game`'s environment edges were over-approximated (any
+ * satisfiable guard, no data feasibility) — a phantom env move could then
+ * "force" sys into a dead end no real environment can reach, flipping the
+ * realizable ALG-D-28.  §14 made the env edges precise (the same T3
+ * feasibility filter the sys edges use), so the refusal's reason is gone
+ * and the textbook rule is exactly right.
+ * @param pg Product game to solve.
+ * @return Indices of the product states won by player 1.
+ */
 inline std::set<int> zielonka_win_player1(const product_game& pg) {
 	std::set<int> V;
 	for (int s = 0; s < pg.n_states; ++s) V.insert(s);
@@ -1056,21 +1138,31 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
 
 // ── Main Algorithm D entry point ──────────────────────────────────────────
 
-// PRECONDITION (LG-30): output-only qlt atoms. Nothing below guards this --
-// input atoms would silently produce garbage (the env branch never models
-// input choice). Callers must check atom_has_any_input first, as both
-// current callers (solve_ltl_aba, semantic_pwr_optimal) do.
-// Returns REALIZABLE/UNREALIZABLE via Algorithm D, or an error result when
-// the ltlsynt subprocess gave no verdict -- that case is undecided, not
-// UNREALIZABLE, and the caller must not read it as one.
-// phi_star: propositional LTL with D_0,...,D_{K-1} as output propositions.
-// T1_size: |T_1|.
-// T3: enumerated 3-types.
-// type_A: D_pattern bitmask for each T3 type.
-// K: number of D propositions.
-// init_rho: the fixed initial memory type — pass initial_memory(constants)
-//   (LG-12: the ∃ρ₀ loop this replaces let the system win by asserting a
-//   phantom previous output; see the convention block at initial_memory).
+/**
+ * @brief Decide realizability via Algorithm D: synthesis game, product with
+ * T_1, Zielonka from the one initial state.
+ *
+ * PRECONDITION (LG-30): output-only qlt atoms. Nothing below guards this --
+ * input atoms would silently produce garbage (the env branch never models
+ * input choice). Callers must check atom_has_any_input first, as both
+ * current callers (solve_ltl_aba, semantic_pwr_optimal) do.
+ * Returns REALIZABLE/UNREALIZABLE via Algorithm D, or an error result when
+ * the ltlsynt subprocess gave no verdict -- that case is undecided, not
+ * UNREALIZABLE, and the caller must not read it as one.
+ * @param phi_star propositional LTL with D_0,...,D_{K-1} as output
+ * propositions.
+ * @param T1_size |T_1|.
+ * @param T3 enumerated 3-types.
+ * @param type_A D_pattern bitmask for each T3 type.
+ * @param K number of D propositions.
+ * @param init_rho the fixed initial memory type -- pass
+ *   initial_memory(constants) (LG-12: the exists-rho_0 loop this replaces
+ *   let the system win by asserting a phantom previous output; see the
+ *   convention block at initial_memory).
+ * @return `true` iff player 1 wins from (G.init, init_rho); `false` for an
+ * empty formula, an empty T_1 or an empty game; an error result when
+ * ltlsynt gave no verdict.
+ */
 inline result<bool> solve_algorithm_d(
 	const std::string& phi_star,
 	int T1_size,
@@ -1104,6 +1196,8 @@ inline result<bool> solve_algorithm_d(
 
 // ── Extended Algorithm D: returns winning region for semantic PWR ──────────
 
+/// @brief Extended Algorithm D result: verdict plus the winning region and
+/// the games it was computed on (consumed by semantic PWR).
 struct alg_d_result {
 	bool realizable = false;
 	std::set<int> winning_region;     // W1 state indices in product game
@@ -1118,10 +1212,23 @@ struct alg_d_result {
 	int init_rho = -1;
 };
 
-// PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
-// init_rho: the fixed initial memory type — pass initial_memory(constants).
-// An error result means the ltlsynt subprocess gave no verdict (undecided,
-// not unrealizable); see solve_algorithm_d above.
+/**
+ * @brief Same as `solve_algorithm_d`, but returns the winning region and
+ * the games for semantic PWR.
+ *
+ * PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
+ * An error result means the ltlsynt subprocess gave no verdict (undecided,
+ * not unrealizable); see solve_algorithm_d above.
+ * @param phi_star propositional LTL with D_0,...,D_{K-1} as output
+ * propositions.
+ * @param T1_size |T_1|.
+ * @param T3 enumerated 3-types.
+ * @param type_A D_pattern bitmask for each T3 type.
+ * @param K number of D propositions.
+ * @param init_rho the fixed initial memory type -- pass
+ * initial_memory(constants).
+ * @return The result; `init_rho` stays -1 when unrealizable.
+ */
 inline result<alg_d_result> solve_algorithm_d_full(
 	const std::string& phi_star,
 	int T1_size,

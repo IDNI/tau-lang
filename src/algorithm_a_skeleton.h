@@ -33,9 +33,15 @@
 
 namespace idni::tau_lang::alg_a {
 
+/// @brief Name of the j-th R-bit output proposition, "r_<j>".
 inline std::string R_name(int j) { return "r_" + std::to_string(j); }
 
-// Encode T₁ index rho as a conjunction of n_rbits R-literals.
+/**
+ * @brief Encode T_1 index rho as a conjunction of n_rbits R-literals.
+ * @param rho T_1 index to encode.
+ * @param n_rbits Number of R-bits; 0 yields "true".
+ * @return The conjunction in Spot syntax.
+ */
 inline std::string r_encode(int rho, int n_rbits) {
 	if (n_rbits == 0) return "true";
 	std::ostringstream ss;
@@ -47,8 +53,14 @@ inline std::string r_encode(int rho, int n_rbits) {
 	return ss.str();
 }
 
-// Conjunction of D_i / !D_i literals for bitmask A over K atoms.
-// Returns "true" when K == 0.
+/**
+ * @brief Conjunction of D_i / !D_i literals for bitmask A over K atoms.
+ *
+ * Returns "true" when K == 0.
+ * @param A D-bitmask.
+ * @param K Number of data atoms.
+ * @return The conjunction in Spot syntax.
+ */
 inline std::string d_pattern(int A, int K) {
 	if (K == 0) return "true";
 	std::ostringstream ss;
@@ -60,13 +72,23 @@ inline std::string d_pattern(int A, int K) {
 	return ss.str();
 }
 
-// Negated infeasibility atom: !(r_encode(rho) & d_pattern(A)).
-// When K==0 collapses to !r_encode(rho) (avoids "& true").
+/**
+ * @brief Negated infeasibility atom: !(r_encode(rho) & d_pattern(A)).
+ *
+ * When K==0 collapses to !r_encode(rho) (avoids "& true").
+ * @param rho T_1 index.
+ * @param A D-bitmask.
+ * @param K Number of data atoms.
+ * @param n_rbits Number of R-bits.
+ * @return The negated atom in Spot syntax.
+ */
 inline std::string neg_atom(int rho, int A, int K, int n_rbits) {
 	if (K == 0) return "!(" + r_encode(rho, n_rbits) + ")";
 	return "!(" + r_encode(rho, n_rbits) + " & " + d_pattern(A, K) + ")";
 }
 
+/// @brief Output of `build_algorithm_a_skeleton`: the formula, its output
+/// propositions and the encoding sizes.
 struct skeleton_bundle {
 	std::string formula;
 	std::vector<std::string> outs; // r_0..r_{n_rbits-1} then D_0..D_{K-1}
@@ -75,6 +97,19 @@ struct skeleton_bundle {
 	int K       = 0;
 };
 
+/**
+ * @brief Build the Algorithm A (D_i + R_rho) synthesis formula described in
+ * the file header.
+ *
+ * Emits the R-validity clauses (1), the unconditional (2) and per-sigma
+ * conditional (3) infeasibility clauses in the compact form when the
+ * feasible A-set is smaller than its complement, then phi* verbatim (4).
+ * @param T1_size |T_1| = 2k+1.
+ * @param K Number of data subformulas.
+ * @param feasible_set Feasible (sigma, rho, A) triples.
+ * @param phi_star_ltl LTL skeleton over D_0..D_{K-1}; empty means "true".
+ * @return The bundle {formula, outs, n_rbits, T1_size, K}.
+ */
 inline skeleton_bundle build_algorithm_a_skeleton(
 	int T1_size,
 	int K,

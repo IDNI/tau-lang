@@ -26,8 +26,12 @@
 
 namespace idni::tau_lang::omcat {
 
-// Plain rational (p/q) — we avoid qlt_rational here to keep this header
-// free of the tau_tree template chain.  Internal use only.
+/**
+ * @brief Plain rational (p/q) -- we avoid qlt_rational here to keep this
+ * header free of the tau_tree template chain.  Internal use only.
+ *
+ * The constructor normalises the sign so that `q` is non-negative.
+ */
 struct rational {
 	long long p = 0, q = 1;
 	rational() = default;
@@ -36,8 +40,15 @@ struct rational {
 	}
 };
 
+/// @brief 128-bit integer used for overflow-free cross-multiplication.
 __extension__ typedef __int128 omcat_int128_;
 
+/**
+ * @brief Three-way compare two rationals by 128-bit cross-multiplication.
+ * @param a Left operand.
+ * @param b Right operand.
+ * @return -1, 0 or +1 as `a` is less than, equal to or greater than `b`.
+ */
 inline int cmp(const rational& a, const rational& b) {
 	// a.p/a.q  vs  b.p/b.q :  cross-multiply. BA2-24: widened to 128-bit
 	// -- long long products overflow for parse-reachable magnitudes and
@@ -49,39 +60,57 @@ inline int cmp(const rational& a, const rational& b) {
 	return 0;
 }
 
-// A 1-type over (ℚ, <) with named finite constants c_0 < c_1 < ... < c_{k-1}.
-// Encoded as an integer position:
-//   pos = 2i       means c_{i-1} < x < c_i      (interval; i=0 ⇒ (-∞, c_0); i=k ⇒ (c_{k-1}, +∞))
-//   pos = 2i+1     means x = c_i                (point, 0 ≤ i < k)
-// Total: 2k+1 types.
+/**
+ * @brief A 1-type over (Q, <) with named finite constants c_0 < c_1 < ... <
+ * c_{k-1}.
+ *
+ * Encoded as an integer position:
+ *   pos = 2i       means c_{i-1} < x < c_i      (interval; i=0 ⇒ (-∞, c_0); i=k ⇒ (c_{k-1}, +∞))
+ *   pos = 2i+1     means x = c_i                (point, 0 ≤ i < k)
+ * Total: 2k+1 types.
+ */
 struct qlt_type1 {
 	int pos = 0;
 	std::vector<rational> constants;
 
+	/// @brief True iff the type is a point x = c_i (odd position).
 	bool is_point() const { return (pos & 1) == 1; }
+	/// @brief True iff the type is an open interval (even position).
 	bool is_interval() const { return !is_point(); }
+	/// @brief The encoded position.
 	int index() const { return pos; }
+	/// @brief Number of named constants k.
 	int num_constants() const { return (int)constants.size(); }
 
-	// Interval pos=2i spans (c_{i-1}, c_i) (with c_{-1}=-∞, c_k=+∞).
-	// Point pos=2i+1 is x = c_i.  Ordering against the named constant c_j:
+	/// @brief True iff every x of this type satisfies x < c_j.
+	/// Interval pos=2i spans (c_{i-1}, c_i) (with c_{-1}=-∞, c_k=+∞).
+	/// Point pos=2i+1 is x = c_i.  Ordering against the named constant c_j:
 	bool less_than(int j) const {
 		const int hp = pos >> 1;
 		return is_point() ? hp < j : hp <= j;
 	}
+	/// @brief True iff this type is the point x = c_j.
 	bool equal_to(int j) const { return is_point() && (pos >> 1) == j; }
+	/// @brief True iff every x of this type satisfies x > c_j.
 	bool greater_than(int j) const {
 		const int hp = pos >> 1;
 		// interval (c_{i-1}, c_i): x > c_j iff i-1 >= j, equivalently i > j.
 		return hp > j; // BA2-14: both ternary branches were identical
 	}
 
-	// AL-R2: all arithmetic in 128 bits, reduced by gcd before narrowing
-	// (the BA2-24 rationale for `cmp` applies here verbatim: long long
-	// products of parse-reachable p/q pairs overflow, and a corrupted
-	// witness mis-orders T2/T3 enumeration).  The interior witness is the
-	// MEDIANT (a.p+b.p)/(a.q+b.q), which lies strictly between a < b for
-	// positive denominators and never needs a product at all.
+	/**
+	 * @brief A concrete rational witness of this type.
+	 *
+	 * AL-R2: all arithmetic in 128 bits, reduced by gcd before narrowing
+	 * (the BA2-24 rationale for `cmp` applies here verbatim: long long
+	 * products of parse-reachable p/q pairs overflow, and a corrupted
+	 * witness mis-orders T2/T3 enumeration).  The interior witness is the
+	 * MEDIANT (a.p+b.p)/(a.q+b.q), which lies strictly between a < b for
+	 * positive denominators and never needs a product at all.
+	 * @return The constant itself for a point type; c_0 - 1, c_{k-1} + 1
+	 * or the mediant of the two bounding constants for an interval, and 0
+	 * when there are no constants at all.
+	 */
 	rational realize() const {
 		int k = (int)constants.size();
 		if (is_point()) return constants[pos >> 1];
@@ -102,6 +131,8 @@ struct qlt_type1 {
 	}
 
 private:
+	/// @brief Reduce num/den by their gcd and narrow to long long (halving
+	/// as a best-effort approximation when the reduced value does not fit).
 	static rational make_reduced(omcat_int128_ num, omcat_int128_ den) {
 		if (den < 0) { num = -num; den = -den; }
 		omcat_int128_ x = num < 0 ? -num : num, y = den;
@@ -120,6 +151,14 @@ private:
 public:
 };
 
+/**
+ * @brief Enumerate the 2k+1 1-types of (Q, <) over the given constants.
+ *
+ * The constants are sorted and deduplicated first; every returned type
+ * carries that normalised list.
+ * @param constants Named constants (any order, duplicates allowed).
+ * @return The 1-types in position order 0..2k.
+ */
 inline std::vector<qlt_type1> enumerate_qlt_T1(std::vector<rational> constants) {
 	std::sort(constants.begin(), constants.end(),
 	    [](const rational& a, const rational& b) { return cmp(a, b) < 0; });
@@ -138,6 +177,13 @@ inline std::vector<qlt_type1> enumerate_qlt_T1(std::vector<rational> constants) 
 	return out;
 }
 
+/**
+ * @brief The 1-type position of a value against sorted constants.
+ * @param v Value to classify.
+ * @param sorted_consts Sorted, deduplicated constants.
+ * @return 2i for c_{i-1} < v < c_i, 2i+1 for v = c_i, 2k when v exceeds
+ * every constant.
+ */
 inline int qlt_type_of(const rational& v, const std::vector<rational>& sorted_consts) {
 	const int k = (int)sorted_consts.size();
 	for (int i = 0; i < k; ++i) {
@@ -148,26 +194,31 @@ inline int qlt_type_of(const rational& v, const std::vector<rational>& sorted_co
 	return 2 * k;
 }
 
-// A 2-type over (ℚ, <) with finite constants: the order of two free
-// variables m, x among themselves and against the named constants.
-// Encoded as (pos_m, pos_x, rel) where rel ∈ {LT, EQ, GT} describes the
-// order relation between m and x.  This is the natural exocat T_2 for
-// (memory, input) at a single time step.
+/// @brief Order relation between two free variables.
 enum class relation : uint8_t { LT = 0, EQ = 1, GT = 2 };
 
+/**
+ * @brief A 2-type over (Q, <) with finite constants: the order of two free
+ * variables m, x among themselves and against the named constants.
+ *
+ * Encoded as (pos_m, pos_x, rel) where rel ∈ {LT, EQ, GT} describes the
+ * order relation between m and x.  This is the natural exocat T_2 for
+ * (memory, input) at a single time step.
+ */
 struct qlt_type2 {
 	int pos_m = 0;
 	int pos_x = 0;
 	relation rel = relation::LT;
 	std::vector<rational> constants;
 
-	// Restriction onto the m-component: just the 1-type of m.
+	/// @brief Restriction onto the m-component: just the 1-type of m.
 	qlt_type1 restrict_m() const {
 		qlt_type1 t;
 		t.pos = pos_m;
 		t.constants = constants;
 		return t;
 	}
+	/// @brief Restriction onto the x-component: just the 1-type of x.
 	qlt_type1 restrict_x() const {
 		qlt_type1 t;
 		t.pos = pos_x;
@@ -176,10 +227,15 @@ struct qlt_type2 {
 	}
 };
 
-// Enumerate the 2-types of (ℚ, <) with the given named constants.
-// Not every (pos_m, pos_x, rel) is admissible: if m's 1-type and x's
-// 1-type already fix their relative order (e.g., m = c_0 and x = c_1 with
-// c_0 < c_1 implies rel must be LT), we emit only the consistent triples.
+/**
+ * @brief Enumerate the 2-types of (Q, <) with the given named constants.
+ *
+ * Not every (pos_m, pos_x, rel) is admissible: if m's 1-type and x's
+ * 1-type already fix their relative order (e.g., m = c_0 and x = c_1 with
+ * c_0 < c_1 implies rel must be LT), we emit only the consistent triples.
+ * @param constants Named constants.
+ * @return The admissible 2-types.
+ */
 inline std::vector<qlt_type2> enumerate_qlt_T2(const std::vector<rational>& constants) {
 	auto t1 = enumerate_qlt_T1(constants);
 	std::vector<qlt_type2> out;
@@ -218,8 +274,15 @@ inline std::vector<qlt_type2> enumerate_qlt_T2(const std::vector<rational>& cons
 
 // ── 3-types (m, x, y) for Algorithm A (binary T_3 encoding). ────────────
 
-// Returns -1 if both 1-types lie in the same interval (free ordering),
-// otherwise the forced relation: 0=LT, 1=EQ, 2=GT.
+/**
+ * @brief The order relation two 1-types force between their elements.
+ *
+ * Returns -1 if both 1-types lie in the same interval (free ordering),
+ * otherwise the forced relation: 0=LT, 1=EQ, 2=GT.
+ * @param ta First 1-type.
+ * @param tb Second 1-type.
+ * @return -1, or the forced relation as an int.
+ */
 inline int forced_rel_between(const qlt_type1& ta, const qlt_type1& tb) {
 	if (ta.is_interval() && tb.is_interval() && ta.pos == tb.pos) return -1;
 	rational av = ta.realize(), bv = tb.realize();
@@ -227,7 +290,13 @@ inline int forced_rel_between(const qlt_type1& ta, const qlt_type1& tb) {
 	return c < 0 ? 0 : (c == 0 ? 1 : 2);
 }
 
-// Transitivity check for a (r_mx, r_xy, r_my) triple.
+/**
+ * @brief Transitivity check for a (r_mx, r_xy, r_my) triple.
+ * @param r_mx Relation between m and x.
+ * @param r_xy Relation between x and y.
+ * @param r_my Relation between m and y.
+ * @return `true` iff the triple is consistent with a linear order.
+ */
 inline bool rel3_consistent(relation r_mx, relation r_xy, relation r_my) {
 	if (r_mx == relation::LT && r_xy == relation::LT) return r_my == relation::LT;
 	if (r_mx == relation::LT && r_xy == relation::EQ) return r_my == relation::LT;
@@ -239,19 +308,27 @@ inline bool rel3_consistent(relation r_mx, relation r_xy, relation r_my) {
 	return true; // (LT,GT) or (GT,LT): any r_my consistent
 }
 
-// 3-type of (memory m, input x, output y) over (ℚ, <, Σ).
+/// @brief 3-type of (memory m, input x, output y) over (Q, <, Sigma).
 struct qlt_type3 {
 	int pos_m = 0, pos_x = 0, pos_y = 0;
 	relation rel_mx = relation::LT, rel_my = relation::LT, rel_xy = relation::LT;
 	std::vector<rational> constants;
 
+	/// @brief The 1-type of m.
 	qlt_type1 restrict_m() const { qlt_type1 t; t.pos = pos_m; t.constants = constants; return t; }
+	/// @brief The 1-type of x.
 	qlt_type1 restrict_x() const { qlt_type1 t; t.pos = pos_x; t.constants = constants; return t; }
+	/// @brief The 1-type of y.
 	qlt_type1 restrict_y() const { qlt_type1 t; t.pos = pos_y; t.constants = constants; return t; }
 };
 
-// Enumerate all 3-types for (ℚ, <) with the given named constants.
-// Filters the T_1^3 product by forced-relation consistency and transitivity.
+/**
+ * @brief Enumerate all 3-types for (Q, <) with the given named constants.
+ *
+ * Filters the T_1^3 product by forced-relation consistency and transitivity.
+ * @param constants Named constants.
+ * @return The admissible 3-types.
+ */
 inline std::vector<qlt_type3> enumerate_qlt_T3(const std::vector<rational>& constants) {
 	auto t1 = enumerate_qlt_T1(constants);
 	std::vector<qlt_type3> out;
@@ -302,20 +379,30 @@ inline std::vector<qlt_type3> enumerate_qlt_T3(const std::vector<rational>& cons
 // D Phase 3; the μ/ν fixpoints over 2^{T_1} assemble from it.
 // ────────────────────────────────────────────────────────────────────────
 
-// Controllable-predecessor over T_1.  Returns memory types b such that:
-//   ∀ σ ∈ T_2 with σ|_m = b,  ∃ ρ' ∈ next_memory_admissible(σ) ∩ W.
-// `next_memory_admissible(σ)` enumerates the 1-types ρ' that the system
-// can achieve as y's type given the current (m, x) pair of type σ.
-// For the qlt-only case (no extra constraint A), any ρ' is achievable
-// because the system can output any rational — so next_memory_admissible
-// = T_1 for every σ.  The quantifier reduces to:
-//   ∀ σ ∈ T_2 with σ|_m = b,  W ≠ ∅.
-// Equivalently, `Pre(W) = T_1 if W ≠ ∅ else ∅`.
-//
-// The structure below anticipates the general case where A ⊊ T_3 via a
-// callable `admissible_next` that takes (σ) and returns the ρ's the
-// system can reach under the current-step constraint.  Callers of Pre_A
-// build such a callable using their preferred ι(ψ) encoding.
+/**
+ * @brief Controllable-predecessor over T_1.
+ *
+ * Returns memory types b such that:
+ *   ∀ σ ∈ T_2 with σ|_m = b,  ∃ ρ' ∈ next_memory_admissible(σ) ∩ W.
+ * `next_memory_admissible(σ)` enumerates the 1-types ρ' that the system
+ * can achieve as y's type given the current (m, x) pair of type σ.
+ * For the qlt-only case (no extra constraint A), any ρ' is achievable
+ * because the system can output any rational — so next_memory_admissible
+ * = T_1 for every σ.  The quantifier reduces to:
+ *   ∀ σ ∈ T_2 with σ|_m = b,  W ≠ ∅.
+ * Equivalently, `Pre(W) = T_1 if W ≠ ∅ else ∅`.
+ *
+ * The structure below anticipates the general case where A ⊊ T_3 via a
+ * callable `admissible_next` that takes (σ) and returns the ρ's the
+ * system can reach under the current-step constraint.  Callers of Pre_A
+ * build such a callable using their preferred ι(ψ) encoding.
+ * @tparam AdmissibleNext Callable `(const qlt_type2&) -> container of int`.
+ * @param T1 Enumerated 1-types.
+ * @param T2 Enumerated 2-types.
+ * @param W_indices Target set W as 1-type positions.
+ * @param admissible_next Reachable next-memory types per 2-type.
+ * @return The positions b in Pre(W).
+ */
 template <class AdmissibleNext>
 inline std::vector<int> Pre_over_T1(
     const std::vector<qlt_type1>& T1,
@@ -346,7 +433,13 @@ inline std::vector<int> Pre_over_T1(
 	return result;
 }
 
-// Unconstrained Pre: system can reach any ρ' at the next step.
+/**
+ * @brief Unconstrained Pre: system can reach any rho' at the next step.
+ * @param T1 Enumerated 1-types.
+ * @param T2 Enumerated 2-types.
+ * @param W_indices Target set W as 1-type positions.
+ * @return The positions b in Pre(W) with every rho' admissible.
+ */
 inline std::vector<int> Pre_over_T1_any(
     const std::vector<qlt_type1>& T1,
     const std::vector<qlt_type2>& T2,
@@ -362,7 +455,13 @@ inline std::vector<int> Pre_over_T1_any(
 
 // ── Fixpoint operators over 2^{T_1} (Algorithm D Phase 3). ─────────────
 
-// νX. f(X).  Start with X = T_1, iterate until stable.
+/**
+ * @brief nu X. f(X).  Start with X = T_1, iterate until stable.
+ * @tparam F Callable `(std::vector<int>) -> std::vector<int>`.
+ * @param T1 Enumerated 1-types (the initial set).
+ * @param f Monotone operator on position sets.
+ * @return The (sorted) greatest fixpoint.
+ */
 template <class F>
 inline std::vector<int> nu_fixpoint(const std::vector<qlt_type1>& T1, F f) {
 	std::vector<int> cur;
@@ -377,7 +476,12 @@ inline std::vector<int> nu_fixpoint(const std::vector<qlt_type1>& T1, F f) {
 	}
 }
 
-// μX. f(X).  Start with X = ∅, iterate until stable.
+/**
+ * @brief mu X. f(X).  Start with X = {}, iterate until stable.
+ * @tparam F Callable `(std::vector<int>) -> std::vector<int>`.
+ * @param f Monotone operator on position sets.
+ * @return The (sorted) least fixpoint.
+ */
 template <class F>
 inline std::vector<int> mu_fixpoint(const std::vector<qlt_type1>& /*T1*/, F f) {
 	std::vector<int> cur;
@@ -391,15 +495,23 @@ inline std::vector<int> mu_fixpoint(const std::vector<qlt_type1>& /*T1*/, F f) {
 	}
 }
 
-// ── Opt-1: forward reachability pruning on T_1. ───────────────────────
-//
-// Given an initial memory type b_0 and a transition relation
-// next: (b, σ) → set of reachable ρ' memory types (what the system can
-// produce in response to environment input σ), compute the set of
-// 1-types reachable from b_0 via any sequence of env+system moves.
-//
-// Intended use:  pass this set as a mask into the main game so that
-// subsequent Pre evaluations only scan reachable types.
+/**
+ * @brief Opt-1: forward reachability pruning on T_1.
+ *
+ * Given an initial memory type b_0 and a transition relation
+ * next: (b, σ) → set of reachable ρ' memory types (what the system can
+ * produce in response to environment input σ), compute the set of
+ * 1-types reachable from b_0 via any sequence of env+system moves.
+ *
+ * Intended use:  pass this set as a mask into the main game so that
+ * subsequent Pre evaluations only scan reachable types.
+ * @tparam NextRelation Callable `(const qlt_type2&) -> container of int`.
+ * @param b0 Initial memory type position.
+ * @param T1 Enumerated 1-types.
+ * @param T2 Enumerated 2-types.
+ * @param next Reachable next-memory types per 2-type.
+ * @return The reachable positions in increasing order.
+ */
 template <class NextRelation>
 inline std::vector<int> reachable_from(
     int b0,

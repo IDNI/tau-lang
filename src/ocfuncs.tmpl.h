@@ -1,4 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+//
+// Implementation of the OCFuncs pipeline declared in ocfuncs.h: Steps 1-6
+// (mode and support checking, window purification, local legal profiles,
+// static profile alphabet, quantifier elimination, temporal LTL
+// generation), the ocfuncs_compile entry point that chains them, function
+// declaration extraction from a parsed spec, type resolution and the
+// detection predicate.  This is the v1 skeleton the body comments
+// describe: Step 3 builds a single profile, Step 5 passes the formula
+// through to the existing normalizer and Step 6 leaves function
+// applications in place, so ocfuncs_compile logs an error and returns
+// nullptr rather than hand the input back as a result.
 
 #include "ocfuncs.h"
 #include "tau_tree.h"

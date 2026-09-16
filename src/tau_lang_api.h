@@ -1,45 +1,53 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// tau-lang LTL(ABA) stable public API surface — Q40-API1.
-//
-// This header documents and re-exports the three functions that form the
-// stable external interface for LTL(ABA) synthesis and execution.  All
-// three are template functions parameterized by the node type, but in
-// practice callers should use the default `node_t` (the concrete BA pack
-// exported from tau.h).
-//
-// Semantic contract:
-//   - Formulas must be terminated with a '.' (spec terminator).
-//   - Output variables are named o1, o2, … (system-controlled).
-//   - Input variables are named i1, i2, … (environment-controlled).
-//   - Time indices: o1[t] = current output; o1[t-k] = k steps lookback.
-//   - REALIZABLE  = ∃strategy. ∀env. formula holds on every infinite run.
-//   - UNREALIZABLE = ∀strategy. ∃env. formula fails on some infinite run.
-//   - G (globally/always) uses the existing safety pipeline.
-//   - F, U, R, W, S, T use the full LTL(ABA) pipeline (Spot + ABA oracle).
-//
-// Environment variables that affect synthesis:
-//   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no
-//                          heuristic: unset behaves as B, i.e. Algorithm B is
-//                          gated on and the default ABA-oracle path is used
-//                          when B does not apply.  Only A, B and D are
-//                          recognised; any other value (including "C" and
-//                          "auto") disables every gate, falls through to the
-//                          default path, and is reported with a warning.
-//                          Pure-output qlt formulas take Algorithm A
-//                          unconditionally, whatever this is set to.
-//                          Note (LS-20): an EXPLICIT `B` is not a no-op
-//                          relative to unset -- it additionally enables the
-//                          polarity-complete pairwise constraint pass in
-//                          normalization (unset only defaults the gate in
-//                          the builders).
-//   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60)
-//   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
-//   TAU_LTL_EXPORT_STRATEGY_FILE=<path>  Write strategy HOA to file
-//   TAU_LTL_WITNESS=1       On UNREALIZABLE, print counterexample trace
-//   TAU_LTL_SIMPLIFICATION=bwoa|sat|bisim-sat|none  ltlsynt minimization
-//
-// Version: 1.0 (2026-04-21)
+/**
+ * @file tau_lang_api.h
+ * @brief tau-lang LTL(ABA) stable public API surface -- Q40-API1.
+ *
+ * This header documents and re-exports the three functions that form the
+ * stable external interface for LTL(ABA) synthesis and execution.  All
+ * three are template functions parameterized by the node type, but in
+ * practice callers should use the default `node_t` (the concrete BA pack
+ * exported from tau.h).
+ *
+ * Semantic contract:
+ *   - Formulas must be terminated with a '.' (spec terminator).
+ *   - Output variables are named o1, o2, … (system-controlled).
+ *   - Input variables are named i1, i2, … (environment-controlled).
+ *   - Time indices: o1[t] = current output; o1[t-k] = k steps lookback.
+ *   - REALIZABLE  = ∃strategy. ∀env. formula holds on every infinite run.
+ *   - UNREALIZABLE = ∀strategy. ∃env. formula fails on some infinite run.
+ *   - G (globally/always) uses the existing safety pipeline.
+ *   - F, U, R, W, S, T use the full LTL(ABA) pipeline (Spot + ABA oracle).
+ *
+ * Environment variables that affect synthesis:
+ *   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no
+ *                          heuristic: unset behaves as B, i.e. Algorithm B is
+ *                          gated on and the default ABA-oracle path is used
+ *                          when B does not apply.  Only A, B and D are
+ *                          recognised; any other value (including "C" and
+ *                          "auto") disables every gate, falls through to the
+ *                          default path, and is reported with a warning.
+ *                          Pure-output qlt formulas take Algorithm A
+ *                          unconditionally, whatever this is set to.
+ *                          Note (LS-20): an EXPLICIT `B` is not a no-op
+ *                          relative to unset -- it additionally enables the
+ *                          polarity-complete pairwise constraint pass in
+ *                          normalization (unset only defaults the gate in
+ *                          the builders).
+ *   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60)
+ *   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
+ *   `TAU_LTL_EXPORT_STRATEGY_FILE=<path>`  Write strategy HOA to file
+ *   TAU_LTL_WITNESS=1       On UNREALIZABLE, print counterexample trace
+ *   TAU_LTL_SIMPLIFICATION=bwoa|sat|bisim-sat|none  ltlsynt minimization
+ *
+ * The header declares nothing itself: `is_tau_formula_sat`, `get_nso_rr`
+ * and `run` are declared in satisfiability.h, tau.h and interpreter.h
+ * (all reached through the includes below) and described in the section
+ * comments inside the namespace.
+ *
+ * Version: 1.0 (2026-04-21)
+ */
 
 #ifndef __IDNI__TAU__TAU_LANG_API_H__
 #define __IDNI__TAU__TAU_LANG_API_H__

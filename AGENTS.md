@@ -78,15 +78,18 @@ ctest --preset release-tests -R <pattern> --output-on-failure
 ./dev test <TEST_NAME>
 
 # Run a single compiled devel test binary directly
-./build/devel/tests/unit/test_bool
-./build/devel/tests/integration/test_integration-satisfiability1
+./build/devel/test_bool
+./build/devel/test_integration-interpreter
 
-# Run a single compiled release test binary directly
-./build/release/tests/unit/test_bool
-./build/release/tests/integration/test_integration-satisfiability1
+# Run a single compiled release test binary directly (test binaries sit at the
+# root of the build tree, not under tests/)
+./build/release/test_bool
+./build/release/test_integration-interpreter
 ```
 
-Tests use the **doctest** framework (`src/doctest.h`). Test organization uses `TEST_SUITE` / `TEST_CASE` macros. Test helper headers live in `tests/` (e.g., `test_helpers.h`, `test_tau_helpers.h`, `test_integration-satisfiability_helper.h`).
+Tests use the **doctest** framework (`src/doctest.h`). Test organization uses `TEST_SUITE` / `TEST_CASE` macros. Test helper headers live in `tests/` and its subfolders (e.g., `test_helpers.h`, `test_tau_helpers.h`, `integration/satisfiability/test_integration-satisfiability_helper.h`).
+
+`tests/CMakeLists.txt` keeps a `TAU_SKIP_TESTS` cache list of C++ suites that are not built by default because REPL tests cover the same ground; pass `-DTAU_SKIP_TESTS=` (empty) to build and run them too.
 
 Always follow those guidelines using `./dev` and `ctest` to run tests.
 Workflow: `devel` is only for a quick build check and for iterating during
@@ -277,6 +280,18 @@ for iterating.
 
 Checks whether a Tau specification is satisfiable. `solver.h` handles the underlying decision procedures. `normal_forms.h` / `normalizer.h` transform specs into normal forms required by the solver.
 
+### LTL(ABA) realizability and synthesis (`src/ltl_aba*.h`)
+
+Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas are decided by an external synthesis tool (`ltlsynt` from Spot) over a propositional skeleton whose atoms are ABA comparisons: `ltl_aba.h` (entry points, runtime caps), `ltl_aba_helpers.tmpl.h` (routing: `sat_has_ltl_operators` / `realizability_has_game_operators`, atom extraction), `ltl_aba_normalization.tmpl.h` (past-operator compilation, oracle feasibility), `ltl_aba_synthesis.tmpl.h` (`ltlsynt` process, HOA parsing via `parser/hoa.tgf`), `ltl_aba_builders.tmpl.h` (skeleton builders, CTL\* reduction, strategy to safety formula). Algorithm variants for ω-categorical types live in `algorithm_a_skeleton.h`, `algorithm_b_skeleton.h` and `algorithm_d_game.h`; the qlt type enumeration and semantic revision live with the `qlt` plugin (`boolean_algebras/qlt/omcat_*`, `qlt_semantic_pwr.tmpl.h`). `gr1_detect.h`, `liveness_decomp.h` and `mealy_extract.h` are staged and not wired into the dispatch.
+
+### Code generation, revision and bindings
+
+- `cpp_codegen.h` / `cpp_codegen.tmpl.h`, `codegen_strategy.h` and the per-BA `<id>_codegen.tmpl.h` files — emit a synthesized strategy as a standalone C++17 program.
+- `pointwise_revision.h`, `preferences.h` — pointwise revision of a running specification and its preference order.
+- `ocfuncs.h` / `ocfuncs.tmpl.h` — heterogeneous OMCAT function symbols (V1 skeleton, not usable yet: the REPL `func` command has no handler).
+- `parse_error_hint.h` — actionable hints for parse errors.
+- `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`).
+
 ### Heuristics (`src/heuristics/`)
 
 Optimization passes applied before/during solving. Everything here works on
@@ -309,7 +324,7 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
 
 ### Execution & Interpreter (`src/interpreter.h`, `src/repl_evaluator.h`)
 
-`interpreter.h` executes Tau specs and manages the REPL. `repl_evaluator.h` is the execution engine for synthesized programs.
+`interpreter.h` is the execution engine: it runs a Tau spec step by step, applies revisions and drives the synthesized strategy. `repl_evaluator.h` implements the REPL commands on top of it.
 
 ## Code Conventions
 

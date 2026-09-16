@@ -57,6 +57,7 @@ demangling via `cxxabi.h`.
 | `TAU_BUILD_STATIC_LIBRARY` | OFF | Build `libTAU.a` |
 | `TAU_BUILD_SHARED_LIBRARY` | OFF | Build `libTAU.so` |
 | `TAU_BUILD_BINDING_PYTHON_NANOBIND` | OFF | Build the nanobind Python binding |
+| `TAU_BUILD_BINDING_PYTHON_CTYPE` | OFF | Build the ctypes Python C ABI shim |
 | `TAU_USE_CCACHE` | OFF | Use ccache for faster rebuilds |
 | `TAU_ADDRESS_SANITIZER` | OFF | Build with ASan |
 | `TAU_LOG_CHANNELS` | OFF | Enable debug/trace logging channels |
@@ -82,8 +83,8 @@ The test binary `tau_eval` (in `tests/unit/`) is a reference evaluator used by i
 
 # Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for a module map, data flow diagram, and key type descriptions.
+See the "Architecture" section of [AGENTS.md](AGENTS.md) for the module map, and `docs/tau_tree.md` for the tree representation.
 
 # Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, branching, and how to add new BAs or heuristics.
+See `docs/adding_base_bas.md` for how to add a new Boolean algebra, and the "Code Conventions" section of [AGENTS.md](AGENTS.md) for the annotations and file layout conventions.
