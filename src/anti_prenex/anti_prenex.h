@@ -76,4 +76,6 @@ tref anti_prenex(tref phi,
 
 } // namespace idni::tau_lang::anti_prenexing
 
+#include "anti_prenex.tmpl.h"
+
 #endif // __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
