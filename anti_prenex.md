@@ -186,7 +186,7 @@ term representation, per component (PREPARE_TERMS):
 | `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): once `Σ‖witnesses‖` exceeds this factor times `Σ‖TERM_OF(pinning conjunct)‖`, the pass admits no further pin. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
-| `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). The callback takes two argument forms — per block the block's variables, `kf(X)` (§5), and per chain the chain's canonical prefix, outermost first, with kinds (`RESOLVE_FUNCTIONAL`, §3) — and is a pure function of its argument either way |
+| `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per block it is handed the block's binder node — `REWRAP(matrix, X)`, the run head with its variables outermost first and the matrix below (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL`, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
 | `quant_memo` | functional-quantifier chain over a PLAIN body → term, GLOBAL and order-independent — the key IS the query (`ASK`'s convention) and names term, kinds, and quantified set in one node; entries are pure functions of it. Used by `SETTLE_FUNCTIONAL`/`RESOLVE_FUNCTIONAL` only; `DISCHARGE` keeps no table (keep mode emits the chain, non-keep mode is one BDD quantification covered by the library's own memos) |
@@ -336,11 +336,11 @@ fallback live in `solver_memo` under that table's flush rule.
 ## 3. Top level
 
 ```
-ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK, pure: a
-                                                  //   block's variables (§5),
-                                                  //   or a chain's canonical
-                                                  //   prefix, outermost first
-                                                  //   with kinds (§3) → bool
+ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK on a NODE, pure:
+                                                  //   a block's binder node
+                                                  //   (§5) or a canonical
+                                                  //   chain's term node (§3)
+                                                  //   → bool (§1 ctx table)
     if φ carries no quantifier: return φ
  0. φ ← CANONICALISE_BINDER_IDS(φ)     // formula binders AND functional-
                                        //   quantifier subscripts: makes every
@@ -664,8 +664,9 @@ The remaining primitives are defined by their contracts alone:
   Per chain: canonicalise through the term constructor first (absent
   subscripts dropped, a repeated one kept innermost, same-kind runs in content
   order, an adjoining run merged, a closed plain chain folded), then ask `kf`
-  ONCE, on the canonical prefix — outermost first, with kinds. Kept ⇒ the
-  whole chain stays.
+  ONCE, on the canonical chain's NODE — prefix outermost first with kinds,
+  and the body below it, for the callback to read. Kept ⇒ the whole chain
+  stays.
 
   LIVE PATH: the body BDD-backed under the live order and every subscript a
   key of it (keep mode's whole-block emission, §7 `DISCHARGE`), and the prefix
@@ -974,7 +975,8 @@ PUSH_EX_BLOCK(body, X, kf):
         ctx.type  ← the BA type of P
         ctx.order ← { P[i] ↦ |P|-i }              // inner → LOWER,  ranks 1..|P|
         ctx.prio  ← { P[i] ↦ i+1 }                // inner → HIGHER, ranks 1..|P|
-        ctx.keep_functional ← kf(X)               // the callback, per block
+        ctx.keep_functional ← kf(REWRAP(body, X)) // the callback, per block, on
+                                                  //   the block's node (§1)
         ctx.subsume_max ← K = 32 ; ctx.qbf_node_max ← K′ = 2²⁰
         ctx.case_max ← K″ = 16 ; ctx.expand_max ← K‴ = 2¹⁴
         ctx.accept_growth ← γ = 16 ; ctx.accept_floor ← 2²⁰
