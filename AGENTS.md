@@ -39,7 +39,8 @@ Other presets: `{devel,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau
 
 Notes:
 - Arguments may appear in any order: preset name, `run`, `-D…`, `-v`,
-  `--target NAME`, `-G GENERATOR`, and `--` (args after `--` go to `tau`).
+  `--target NAME`, `--keep-cache` (no `--fresh`: the cache of the build
+  directory stays), `-G GENERATOR`, and `--` (args after `--` go to `tau`).
 - Appending `run` runs ctest for `*-tests`/`*-all` presets, otherwise runs `tau`.
 - Always use the explicit form `./dev preset <name>` — bare `./dev <preset-name>`
   asks an interactive Y/n question and will hang non-interactive shells.

@@ -28,6 +28,7 @@ All of the following may appear **in any order** on the command line:
 | `Debug` / `Release` / `RelWithDebInfo` / `Coverage` | legacy build type |
 | `-v` | verbose build |
 | `--target NAME` | build only this target |
+| `--keep-cache` | preset only: keep the CMake cache of the build directory instead of a fresh configure |
 | `-G NAME` | sets `GENERATOR` (not `DEV_CMAKE`); legacy build defaults to Ninja; preset uses preset generator unless `-G` is passed |
 | preset name (e.g. `release-tests`) | preset to configure |
 | `run` | after preset build: run tests or `tau` |
