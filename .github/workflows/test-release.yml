@@ -154,8 +154,8 @@ jobs:
           path: ~/.tau
           key: ${{ steps.cache-tau.outputs.cache-primary-key }}
 
-      - name: Install nanobind
-        run: brew install nanobind
+      - name: Install nanobind and spot for the LTL suites
+        run: brew install nanobind spot
 
       - name: Build tau and tests, run tests (Release)
         env:
