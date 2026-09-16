@@ -1089,6 +1089,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "bvcasesplit")       return case_split_opt;
 	if (x == "defelim"
 		|| x == "bvdefinitionalelimination") return defelim_opt;
+	if (x == "stepprop"
+		|| x == "stepdefinitionalpropagation") return stepprop_opt;
 	if (x == "factoring"
 		|| x == "bacomponentfactoring") return factoring_opt;
 	if (x == "y" || x == "bvwidening")   return bvwidening_opt;
@@ -1206,6 +1208,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "casesplit:           " << pbool[opt.case_split] << "\n"; } },
 	{ defelim_opt,       [this]() {
 		std::cout << "defelim:             " << pbool[opt.defelim] << "\n"; } },
+	{ stepprop_opt,      [this]() {
+		std::cout << "stepprop:            " << pbool[opt.stepprop] << "\n"; } },
 	{ factoring_opt,     [this]() {
 		std::cout << "factoring:           " << pbool[opt.factoring] << "\n"; } },
 	{ bvwidening_opt,    [this]() {
@@ -1369,6 +1373,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		update_case_split(update_bool_value(opt.case_split)); } },
 	{ defelim_opt,   [&]() {
 		update_defelim(update_bool_value(opt.defelim)); } },
+	{ stepprop_opt,   [&]() {
+		update_stepprop(update_bool_value(opt.stepprop)); } },
 	{ factoring_opt,   [&]() {
 		update_factoring(update_bool_value(opt.factoring)); } },
 	{ bvwidening_opt,   [&]() {
@@ -1461,6 +1467,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case blasting_opt:     	   update_blasting(update_fn(opt.blasting)); break;
 	case case_split_opt:       update_case_split(update_fn(opt.case_split)); break;
 	case defelim_opt:          update_defelim(update_fn(opt.defelim)); break;
+	case stepprop_opt:         update_stepprop(update_fn(opt.stepprop)); break;
 	case factoring_opt:        update_factoring(update_fn(opt.factoring)); break;
 	case bvwidening_opt:       update_bv_widening(update_fn(opt.bv_widening)); break;
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
@@ -1518,6 +1525,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_defelim(bool value) {
 	api<node>::set_bv_definitional_elimination(opt.defelim = value);
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_stepprop(bool value) {
+	api<node>::set_step_definitional_propagation(opt.stepprop = value);
 	return value;
 }
 
@@ -1752,6 +1766,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  blasting               bitvector predicate blasting         on/off\n"
 		"  casesplit              bitvector case split                 on/off\n"
 		"  defelim                definitional existential elimination on/off\n"
+		"  stepprop               definitional propagation per step     on/off\n"
 		"  factoring              tau-algebra component factoring      on/off\n"
 		"  bvwidening             exact (widened) bitvector arithmetic on/off\n"
 		"  highlighting           syntax highlighting of Tau formulas  on/off\n"

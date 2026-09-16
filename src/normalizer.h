@@ -71,6 +71,22 @@ inline bool bv_definitional_elimination_enabled() {
 	}();
 	return env ? *env : bv_definitional_elimination;
 }
+/// Definitional propagation in the interpreter's step: before the step
+/// formula's expression paths are enumerated, normalize it once, substitute
+/// every top-level `o = c` (c a constant) and repeat until no new constant
+/// appears; the values are carried into the solution. Off by default; an
+/// identity on the solutions. Enabled via `api::set_step_definitional_propagation`,
+/// `--step-definitional-propagation`, the REPL option `stepprop`, or
+/// TAU_STEP_DEFINITIONAL_PROPAGATION=1 (the variable overrides the flag).
+inline bool step_definitional_propagation = false;
+inline bool step_definitional_propagation_enabled() {
+	static const std::optional<bool> env = []() -> std::optional<bool> {
+		const char* v = std::getenv("TAU_STEP_DEFINITIONAL_PROPAGATION");
+		if (!v || !*v) return std::nullopt;
+		return !(v[0] == '0' && v[1] == '\0');
+	}();
+	return env ? *env : step_definitional_propagation;
+}
 
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.

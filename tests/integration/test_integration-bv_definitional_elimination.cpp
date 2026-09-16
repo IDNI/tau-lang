@@ -13,8 +13,8 @@
 namespace {
 
 struct defelim_config {
-	defelim_config(bool on) { bv_definitional_elimination = on; }
-	~defelim_config() { bv_definitional_elimination = false; }
+	defelim_config(bool on) { bv_definitional_elimination = on; step_definitional_propagation = on; }
+	~defelim_config() { bv_definitional_elimination = false; step_definitional_propagation = false; }
 };
 
 tref parse_wff(const std::string& sample) {
@@ -146,6 +146,14 @@ TEST_SUITE("bv definitional elimination") {
 	TEST_CASE("declines: a reader is no definition") {
 		CHECK(agree("ex x (x:bv[8] < { 3 }:bv[8] && (x:bv[8] = { 1 }:bv[8] || a = 0))"));
 		CHECK(!binder_removed("ex x (x:bv[8] < { 3 }:bv[8] && (x:bv[8] = { 1 }:bv[8] || a = 0))"));
+	}
+
+	TEST_CASE("a run whose step forks on values its own definitions determine: same outputs") {
+		// Two guarded blocks read a value computed in the same step; without the
+		// propagation the step enumerates 2^2 paths, with it one.
+		const char* spec = "(o1[t]:bv[8] = (i1[t]:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && ((o1[t]:bv[8] + { 40 }:bv[8] > { 42 }:bv[8]) ? (o2[t]:bv[8] = { 42 }:bv[8]) : (o2[t]:bv[8] = o1[t]:bv[8] + { 40 }:bv[8])) && ((o1[t]:bv[8] + { 2 }:bv[8] > { 4 }:bv[8]) ? (o3[t]:bv[8] = { 1 }:bv[8]) : (o3[t]:bv[8] = { 0 }:bv[8])).";
+		CHECK(run_spec(spec, false) == run_spec(spec, true));
+		CHECK(run_spec(spec, true) == strings{ "42", "42", "42", "42" });
 	}
 
 	TEST_CASE("a run with a computed value read by a guard: same outputs") {

@@ -825,6 +825,54 @@ std::pair<std::optional<assignment<node>>, bool>
 		// inits).
 		part_at_t = syntactic_formula_simplification<node>(
 				rewriter::replace<node>(part_at_t, memory));
+		// Definitional propagation (opt-in). The step formula still holds the
+		// clauses of its conditionals, and a guard that reads a value the
+		// step's own definitions determine (`pos + dice > 42` with `dice`
+		// computed from the inputs) is not folded by the syntactic
+		// simplification above. expression_paths then enumerates one path per
+		// fork -- 2^k for k open guards -- and each path is normalized and
+		// solved until the first satisfiable one (256 paths and ~200 unsat
+		// solver calls per step on a four-block spec; 2 million paths on a
+		// larger one). Here: normalize once, substitute every top-level
+		// `o = c` with c a constant, simplify, and repeat until no new
+		// constant appears. A top-level `o = c` holds in every solution, so
+		// the enumerated formula is equivalent and its solutions, extended
+		// by the propagated values, are exactly the original ones.
+		subtree_map<node, tref> propagated;   // bf(o) -> bf(c), added to the path solution
+		if (step_definitional_propagation_enabled()) {
+			for (int r = 0; r < 8; ++r) {
+				tref pn = normalize_non_temp<node>(part_at_t);
+				if (!pn) break;
+				part_at_t = pn;
+				subtree_map<node, tref> consts;
+				std::vector<tref> st{part_at_t};
+				while (!st.empty()) {
+					tref x = st.back(); st.pop_back();
+					const tau& tx = tau::get(x);
+					if (tx.is(tau::wff) && tx.child_is(tau::wff_and)) {
+						st.push_back(tx[0].first()); st.push_back(tx[0].second());
+						continue;
+					}
+					if (!(tx.is(tau::wff) && tx.child_is(tau::bf_eq))) continue;
+					const tau& atom = tx[0];
+					tref l = atom[0][0].get(), r_ = atom[1][0].get();
+					const bool lc = tau::get(l).is_ba_constant(), rc = tau::get(r_).is_ba_constant();
+					if (lc == rc) continue;
+					tref var = lc ? r_ : l;
+					if (!is<node>(var, tau::variable)) continue;
+					// The constant may still be an unevaluated term of the
+					// algebra (built by the substitution); fold it before it
+					// is substituted and reported.
+					tref cbf = normalize_ba<node>(lc ? atom[0].get() : atom[1].get());
+					if (consts.emplace(var, tau::get(cbf)[0].get()).second)
+						propagated.emplace(lc ? atom[1].get() : atom[0].get(), cbf);
+				}
+				if (consts.empty()) break;
+				tref replaced = rewriter::replace<node>(part_at_t, consts);
+				if (replaced == part_at_t) break;
+				part_at_t = syntactic_formula_simplification<node>(replaced);
+			}
+		}
 		for (tref path : expression_paths<node>(part_at_t)) {
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
@@ -888,6 +936,9 @@ std::pair<std::optional<assignment<node>>, bool>
 			}
 #endif // DEBUG
 			if (path_solution) {
+				for (const auto& [pv, pval] : propagated)
+					if (!path_solution.value().contains(pv))
+						path_solution.value().emplace(pv, pval);
 				solved = true;
 				for (const auto& [var, value] : path_solution.value()) {
 					// Check if we are dealing with a stream variable
