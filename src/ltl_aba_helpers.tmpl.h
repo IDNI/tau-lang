@@ -73,24 +73,25 @@ static bool has_past_operators(tref fm) {
 	}) != nullptr;
 }
 
-// True when every temporal operator in an always body sits on a chain of
-// conjunctions and always nodes, which the normalizer splits into plain
-// always conjuncts. Any other nesting needs the LTL(ABA) pipeline.
+// True when an always body contains another always or a sometimes. The
+// parser already splits the only harmless nestings, G(A && G B) into
+// G A && G B and G(G B) into G B (unnest_nested_always, run from
+// tau_tree_from_parser and api::infer), so a nested always that is still
+// present here is either a genuine LTL nesting -- under a disjunction, a
+// negation or an implication, as in G(A || G B) or G(!(G B)) -- or a tree
+// built after parsing. The safety pipeline's always_to_unbounded_continuation
+// requires a single always with no temporal operator inside it and, fed such
+// a shape, aborts (Devel) or loops (Release); the LTL(ABA) pipeline decides
+// all of them. The check is polarity-agnostic on purpose: G(!(G B)) is
+// G(F(!B)) once the negation is pushed, and the same holds under an
+// implication.
 template <NodeType node>
-static bool always_body_splits(tref body) {
+static bool always_body_nests(tref body) {
 	using tau = tree<node>;
-	const auto& t = tau::get(body);
-	if (!t.has_child()) return true;
-	auto nt = t[0].value.nt;
-	if (nt == tau::wff_and)
-		return always_body_splits<node>(t[0].first())
-		    && always_body_splits<node>(t[0].second());
-	if (nt == tau::wff_parenthesis || nt == tau::wff_always)
-		return always_body_splits<node>(t[0].first());
-	return t.find_top([](tref n) {
+	return tau::get(body).find_top([](tref n) {
 		return is_child<node>(n, tau::wff_always)
 		    || is_child<node>(n, tau::wff_sometimes);
-	}) == nullptr;
+	}) != nullptr;
 }
 
 // ── sat_has_ltl_operators / realizability_has_game_operators ──────────────────
@@ -110,11 +111,11 @@ bool sat_has_ltl_operators(tref fm) {
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
 		if (sat_needs_ltl_pipeline(nt)) return true;
-		// A nested sometimes, or an always whose body does not sit on a
-		// conjunction chain, is beyond the safety pipeline's clause
+		// A nested sometimes, or an always with any temporal operator
+		// inside its body, is beyond the safety pipeline's clause
 		// simplifier. Route it like U, R, W, S and T.
 		if (nt == tau::wff_always)
-			return !always_body_splits<node>(t[0].first());
+			return always_body_nests<node>(t[0].first());
 		if (nt == tau::wff_sometimes)
 			return t[0][0].find_top(
 				is<node, tau::wff_sometimes>) != nullptr
@@ -143,7 +144,7 @@ bool realizability_has_game_operators(tref fm) {
 		auto nt = t[0].value.nt;
 		if (realizability_needs_game(nt)) return true;
 		return nt == tau::wff_always
-		    && !always_body_splits<node>(t[0].first());
+		    && always_body_nests<node>(t[0].first());
 	}) != nullptr;
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
