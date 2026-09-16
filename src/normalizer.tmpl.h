@@ -248,10 +248,16 @@ tref bv_case_split_quantifiers(tref formula) {
 		std::vector<tref> occ;
 		std::vector<tref> tests;   // the tested constants (term nodes), deduplicated
 		bool ok = true, any_order = false;
+		// Walk the scope as a DAG: a substitution pass upstream produces
+		// shared subterms, and revisiting a shared subtree once per parent
+		// is exponential in the sharing (the scan did not return on a
+		// 34k-node DAG whose tree unfolding exceeds 2e7). The result does
+		// not depend on the order, only on the set of nodes seen.
 		std::vector<tref> st{scope};
+		std::unordered_set<tref> seen;
 		while (!st.empty() && ok) {
 			tref x = st.back(); st.pop_back();
-			if (!x) continue;
+			if (!x || !seen.insert(x).second) continue;
 			const tau& tx = tau::get(x);
 			if (tx.is_ba_constant()) continue;
 			// A nested binder of the same variable: its occurrences are
@@ -332,18 +338,45 @@ tref bv_case_split_quantifiers(tref formula) {
 			}
 			return res;
 		};
+		// Instantiate only what depends on v. Along an `&&`/`||` chain the
+		// conjuncts (disjuncts) free of v are kept once outside the cases
+		// (the quantifier distributes over the connective for them); a
+		// binder of *another* variable of the *same* kind is passed through
+		// (same-kind quantifiers commute, and the witnesses are constants,
+		// so nothing is captured). Without this, a foreign binder between
+		// v and its dependent conjunct made `cases` copy the whole scope --
+		// inner binders included -- once per cell, and nested blocks
+		// multiplied (x25 per block on a closure with five cells per
+		// command, see the issue).
 		auto eliminate = [&](auto& self, tref body) -> tref {
 			if (!contains<node>(body, var)) return body;
 			const tau& tb = tau::get(body);
 			if (tb.is(tau::wff) && (tb.child_is(tau::wff_and) || tb.child_is(tau::wff_or))) {
-				tref l = tb[0].first(), r = tb[0].second();
-				const bool lv = contains<node>(l, var), rv = contains<node>(r, var);
-				if (lv != rv) {
-					tref dep = self(self, lv ? l : r), ind = lv ? r : l;
-					return tb.child_is(tau::wff_and)
-						? tau::build_wff_and(dep, ind)
-						: tau::build_wff_or(dep, ind);
+				const bool is_and = tb.child_is(tau::wff_and);
+				std::vector<tref> dep, ind;
+				std::function<void(tref)> flat = [&](tref x) {
+					const tau& tx = tau::get(x);
+					if (tx.is(tau::wff) && tx.child_is(is_and ? tau::wff_and : tau::wff_or)) {
+						flat(tx[0].first()); flat(tx[0].second()); return;
+					}
+					(contains<node>(x, var) ? dep : ind).push_back(x);
+				};
+				flat(body);
+				if (!ind.empty()) {
+					tref d = dep.size() == 1 ? dep[0]
+						: (is_and ? tau::build_wff_and(dep) : tau::build_wff_or(dep));
+					std::vector<tref> parts{self(self, d)};
+					parts.insert(parts.end(), ind.begin(), ind.end());
+					return is_and ? tau::build_wff_and(parts) : tau::build_wff_or(parts);
 				}
+			}
+			if (is_child_quantifier<node>(body)
+				&& tb.child_is(is_ex ? tau::wff_ex : tau::wff_all)
+				&& !(tau::get(tb[0].first()) == tau::get(var))) {
+				tref y = tb[0].first(), sc = tb[0].second();
+				tref inner = self(self, sc);
+				return is_ex ? tau::build_wff_ex(y, inner, false)
+					: tau::build_wff_all(y, inner, false);
 			}
 			return cases(body);
 		};
