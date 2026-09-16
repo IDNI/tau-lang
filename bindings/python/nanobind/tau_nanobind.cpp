@@ -16,18 +16,13 @@
 #include <string_view>
 
 #include "tau.h"
+#include "tau_pack.h"
 #include "preferences.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
 
-using bv = idni::tau_lang::bv;
-using sbf_ba = idni::tau_lang::sbf_ba;
-template <typename... BAs>
-using tau_ba = idni::tau_lang::tau_ba<BAs...>;
-
-#define bas_pack tau_ba<bv, sbf_ba>, bv, sbf_ba
-using node_t = idni::tau_lang::node<bas_pack>;
+using node_t = idni::tau_lang::tau_pack::node_t;
 
 using interpreter_t = idni::tau_lang::interpreter<node_t>;
 using tau_api = idni::tau_lang::api<node_t>;

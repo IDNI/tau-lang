@@ -146,6 +146,9 @@ fi
 # --keep-cache adds the binding to whatever the build directory holds
 # already instead of reconfiguring it from scratch.
 PRESET_ARGS=(--keep-cache -DPython_EXECUTABLE="${VENV_PYTHON}")
+# Only the extension module is used below. The build directory may also be
+# configured for the test suite, which this script never runs.
+[[ " $* " == *" --target "* ]] || PRESET_ARGS+=(--target tau_nanobind)
 [[ -z ${PRESET_GIVEN} ]] && PRESET_ARGS+=("${DEFAULT_PRESET}")
 PRESET_ARGS+=("$@")
 preset_entry "${PRESET_ARGS[@]}"
