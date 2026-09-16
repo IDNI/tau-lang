@@ -96,7 +96,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 
 	TEST_CASE("G(o1:qlt > 1/2): emits tref o1 with an exact-rational factory expression") {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
 		CHECK(d->needs_tau_link);
@@ -130,7 +130,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 	TEST_CASE("G(o1>0 && !(o1<2)): negative literal constrains the witness") {
 		auto sol = synth(
 			"G(o1[t]:qlt > {0}:qlt && !(o1[t]:qlt < {2}:qlt))");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
 		std::ostringstream os;
@@ -147,7 +147,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 
 	TEST_CASE("G(o1:qlt > 1/4): exact-rational witness satisfies > 1/4") {
 		auto sol = synth("G(o1[t]:qlt > {1/4}:qlt)");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
 		std::ostringstream os;
@@ -169,7 +169,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 	TEST_CASE("G(o1:bv = i1:bv): output routes as a witness template; the "
 	          "standalone emitter refuses") {
 		auto sol = synth("G(o1[t]:bv = i1[t]:bv)");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
 		REQUIRE(d->atoms.size() == 1);
@@ -189,7 +189,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 
 	TEST_CASE("G(o1:qlt > 1/3 && o1:qlt < 2/3): exact-rational witness stays in (1/3, 2/3)") {
 		auto sol = synth("G(o1[t]:qlt > {1/3}:qlt && o1[t]:qlt < {2/3}:qlt)");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
 		std::ostringstream os;
@@ -210,7 +210,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 
 	TEST_CASE("G(o1:qlt > 1/2): exact-rational witness satisfies > 1/2 (structural)") {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol, "witness_gt");
 		REQUIRE(d.has_value());
 		CHECK(d->needs_tau_link);
@@ -226,7 +226,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 
 	TEST_CASE("G(o1:qlt > 1/4 && o1:qlt < 3/4): exact-rational witness stays in (1/4, 3/4) (structural)") {
 		auto sol = synth("G(o1[t]:qlt > {1/4}:qlt && o1[t]:qlt < {3/4}:qlt)");
-		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol, "bounded_witness");
 		REQUIRE(d.has_value());
 		std::ostringstream os;

@@ -28,6 +28,7 @@
 #include "test_tau_helpers.h"
 
 #include <random>
+#include <sstream>
 #include <string>
 #include <cstdlib>
 #include <cstdio>
@@ -69,24 +70,41 @@ static const formula ATOMS[] = {
 };
 static constexpr int N_ATOMS = 4;
 
+// Two-element atoms: bv[1] has exactly the elements {0, 1}, so `(x = 0) ||
+// (x = 1)` IS a tautology and every verdict must agree with Spot's
+// propositional reading. Mismatches on this atom set are genuine
+// disagreements, which is what lets the CROSS-bv1 suite run with zero
+// tolerance where the untyped suite can only be informational.
+// Stream types are process-global once inferred, and the suites above fix
+// o1/i1 as :tau, so these atoms use their own streams (o2/i2); the Spot
+// side keeps o1/i1, which spot_decide declares as output/input.
+static const formula BV1_ATOMS[] = {
+	{"(o2[t]:bv[1] = 1)", "o1"},
+	{"(o2[t]:bv[1] = 0)", "(!o1)"},
+	{"(i2[t]:bv[1] = 1)", "i1"},
+	{"(i2[t]:bv[1] = 0)", "(!i1)"},
+};
+
 // Recursive random formula generator.
 // depth 0 → atom; higher depth → operator applied to sub-formulas.
-static formula make_formula(mt19937& rng, int depth) {
+static formula make_formula(mt19937& rng, int depth,
+	const formula* atoms = ATOMS)
+{
 	// Force atom at depth 0 or with 1/3 probability at shallow depths
 	if (depth == 0 || (depth <= 2 && rng() % 3 == 0))
-		return ATOMS[rng() % N_ATOMS];
+		return atoms[rng() % N_ATOMS];
 
 	int op = rng() % 9; // 0-2: unary, 3-8: binary (includes S since)
 	if (op < 3) {
-		auto child = make_formula(rng, depth - 1);
+		auto child = make_formula(rng, depth - 1, atoms);
 		switch (op) {
 			case 0: return {"G (" + child.tau + ")", "G(" + child.spot + ")"};
 			case 1: return {"F (" + child.tau + ")", "F(" + child.spot + ")"};
 			case 2: return {"!(" + child.tau + ")", "!(" + child.spot + ")"};
 		}
 	}
-	auto left  = make_formula(rng, depth - 1);
-	auto right = make_formula(rng, depth - 1);
+	auto left  = make_formula(rng, depth - 1, atoms);
+	auto right = make_formula(rng, depth - 1, atoms);
 	// Wrap operands in extra parens for tau to avoid precedence issues.
 	std::string lt = "(" + left.tau + ")";
 	std::string rt = "(" + right.tau + ")";
@@ -105,19 +123,35 @@ static formula make_formula(mt19937& rng, int depth) {
 		// Spot's ltlsynt does not support past operators, so S formulas are
 		// skipped in the CROSS test (spot_decide returns -1 for past LTL).
 		case 8: return {"(" + lt + " S "  + rt + ")", ""};
-		default: return ATOMS[0];
+		default: return atoms[0];
 	}
 }
 
 // ── tau oracle ─────────────────────────────────────────────────────────────────
 
-// Returns 1 (realizable), 0 (unrealizable), -1 (parse error / skip).
+// Returns 1 (satisfiable), 0 (unsatisfiable), -1 (parse error / skip /
+// undecided). Used by the CRASH and DETERM suites.
 static int tau_decide(const string& spec_str) {
 	auto nso = get_nso_rr<node_t>(tau::get(spec_str.c_str()));
 	if (!nso.has_value()) return -1;
 	tref fm = nso.value().main->get();
 	if (!fm) return -1;
 	auto r = is_tau_formula_sat<node_t>(fm);
+	if (!r.has_value()) return -1;
+	return r.value() ? 1 : 0;
+}
+
+// Returns 1 (REALIZABLE), 0 (UNREALIZABLE), -1 (parse error / no verdict).
+// ltlsynt answers realizability, so the cross-check must ask tau the same
+// question: is_tau_formula_sat answers satisfiability and leaves an
+// unrealizable full-LTL formula undecided, which the old CROSS suite
+// silently skipped -- it only ever compared the REALIZABLE half.
+// Takes the bare formula (no trailing "."): api::get_formula runs the type
+// inference the typed bv[1] atoms need, which the raw parse does not.
+static int tau_decide_realizable(const string& formula_str) {
+	auto fm = api<node_t>::get_formula(formula_str);
+	if (!fm.has_value()) return -1;
+	auto r = api<node_t>::realizable(fm.value());
 	if (!r.has_value()) return -1;
 	return r.value() ? 1 : 0;
 }
@@ -240,7 +274,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 			// where spot cross-validation is meaningful.
 			if (f.tau.find("o1") == string::npos) { ++skipped; continue; }
 
-			int tau_r  = tau_decide(spec);
+			int tau_r  = tau_decide_realizable(f.tau);
 			if (tau_r < 0) { ++skipped; continue; }
 
 			int spot_r = spot_decide(f.spot);
@@ -248,23 +282,68 @@ TEST_SUITE("LTL fuzz (property-based)") {
 
 			++checked;
 			if (tau_r != spot_r) {
-				// Record mismatch as MESSAGE (informational), not FAIL_CHECK.
-				// Some mismatches are semantic-by-design: atomless BA has
-				// non-{0,1} elements that falsify Bool-only tautologies like
-				// `(i1=0) || (i1=1)`.  We tolerate a small mismatch rate and
-				// only fail the test if the rate is abnormally high, which
-				// would indicate a real tau-lang regression.
-				MESSAGE("Mismatch #" << i << ":"
-				        << " tau=" << tau_r << " spot=" << spot_r
-				        << "\n  tau  formula: " << spec
-				        << "\n  spot formula: " << f.spot);
+				// Informational: over the atomless default algebra a
+				// mismatch can be semantic-by-design (non-{0,1} elements
+				// falsify Bool-only tautologies like `(i1=0) || (i1=1)`),
+				// and this suite cannot tell that class from a bug. The
+				// CROSS-bv1 suite below is the one that can, and it runs
+				// with zero tolerance; here the rate is only a sanity
+				// bound against a wholesale regression.
+				// One pre-built string: under
+				// DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE a
+				// `<<` chain of literals is logged as pointer values.
+				std::ostringstream msg;
+				msg << "Mismatch #" << i << ": tau=" << tau_r
+				    << " spot=" << spot_r
+				    << "\n  tau  formula: " << spec
+				    << "\n  spot formula: " << f.spot;
+				MESSAGE(msg.str());
 				++mismatches;
 			}
 		}
-		MESSAGE("Checked " << checked << " formulas, skipped " << skipped
-		        << ", mismatches " << mismatches);
-		// Allow up to 15% mismatch rate (semantic-by-design cases).
-		// A higher rate would indicate a real tau-lang regression.
+		std::ostringstream summary;
+		summary << "Checked " << checked << " formulas, skipped " << skipped
+		        << ", mismatches " << mismatches;
+		MESSAGE(summary.str());
 		CHECK(mismatches * 100 <= checked * 15);
+	}
+
+	// Same cross-check over bv[1] atoms, where {0, 1} are the only elements
+	// and tau's semantics coincide with Spot's propositional one: every
+	// disagreement is a real one, so none is tolerated and each is a
+	// failure that names the formula.
+	TEST_CASE("CROSS-bv1: tau verdict matches Spot over two-element atoms"
+		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0)) {
+		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  45);
+		int      count = get_env_int ("TAU_FUZZ_COUNT", 300) / 3;
+		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
+		if (count < 1) count = 1;
+		if (depth < 1) depth = 1;
+		if (depth > 5) depth = 5;
+		mt19937  rng(seed);
+
+		int checked = 0, skipped = 0;
+		for (int i = 0; i < count; ++i) {
+			do_gc();
+			auto f = make_formula(rng, depth, BV1_ATOMS);
+			string spec = f.tau + ".";
+			if (f.tau.find("o2") == string::npos) { ++skipped; continue; }
+			int tau_r = tau_decide_realizable(f.tau);
+			if (tau_r < 0) { ++skipped; continue; }
+			int spot_r = spot_decide(f.spot);
+			if (spot_r < 0) { ++skipped; continue; }
+			++checked;
+			std::ostringstream msg;
+			msg << "formula #" << i << ": tau=" << tau_r
+			    << " spot=" << spot_r
+			    << "\n  tau  formula: " << spec
+			    << "\n  spot formula: " << f.spot;
+			CHECK_MESSAGE(tau_r == spot_r, msg.str());
+		}
+		std::ostringstream summary;
+		summary << "CROSS-bv1: checked " << checked << " formulas, skipped "
+			<< skipped;
+		MESSAGE(summary.str());
+		CHECK(checked > 0);
 	}
 }

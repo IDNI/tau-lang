@@ -552,9 +552,16 @@ TEST_CASE("pwr/nested-until: U-of-U spec revised by U-of-U update"
 	auto o2v = o2->get_values();
 	for (size_t i = 0; i < o2v.size(); ++i)
 		std::cerr << "NESTED-U/o2[" << i << "]=" << o2v[i] << "\n";
-	// At minimum: no crash.  This CHECK always fires (the value is irrelevant).
-	bool ran = true;
-	CHECK( ran );
+	// Either the revision worked, in which case the run produced one value
+	// per requested step on every stream, or it refused gracefully and
+	// produced nothing. Anything in between (a truncated run) is a defect.
+	if (maybe_i.has_value()) {
+		CHECK( u_values.size() == 4 );
+		CHECK( o1v.size() == 4 );
+		CHECK( o2v.size() == 4 );
+	} else {
+		CHECK( u_values.empty() );
+	}
 }
 
 // Update is F (bottom): no clause is sat — pwr returns F at line 1073.

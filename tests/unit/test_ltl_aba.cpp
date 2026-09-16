@@ -45,6 +45,17 @@
 
 using namespace idni::tau_lang;
 
+// LT-14: the S (since) / T (trigger) compilation into the ltlsynt skeleton
+// does not exist yet, so every spec whose realizability hinges on it is
+// reported UNREALIZABLE today. The cases below pin that KNOWN-WRONG verdict
+// explicitly -- they are regression guards for the current behaviour, not a
+// claim that the specs are unrealizable. When S/T compilation lands they
+// must flip to CHECK(...) and this macro goes away.
+#define CHECK_KNOWN_WRONG_UNREALIZABLE(expr) \
+	CHECK_MESSAGE(!(expr), "pinned known-wrong UNREALIZABLE: awaits S/T " \
+		"compilation (LT-14); flip to CHECK when it lands")
+
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 // Call gc() to flush interning caches between test cases.
@@ -2357,7 +2368,7 @@ TEST_SUITE("LTL S/U mixed nesting with lookback (S/T pending compilation)") {
 	TEST_CASE("((o1:qlt={3}) S (o2[t-1]:qlt={1})) U (i1[t-3]:qlt={1/2}) — S pending") {
 		tref fm = spec("((o1[t]:qlt = {3}:qlt) S (o2[t-1]:qlt = {1}:qlt)) U (i1[t-3]:qlt = {1/2}:qlt).");
 		REQUIRE(fm != nullptr);
-		CHECK_FALSE(sat(fm)); // TODO: S compilation
+		CHECK_KNOWN_WRONG_UNREALIZABLE(sat(fm));
 	}
 }
 
@@ -3028,10 +3039,11 @@ TEST_CASE("QLT: Realizable complex right-nested until with constant and past inp
 
 // ── 31. DeepSeek: 50 S/U mixed nesting ───────────────────────────────────────
 //
-// All tests in this suite use the Since (S) operator, compiled away via
-// auxiliary output variables before passing to ltlsynt. Tests marked
-// CHECK use sbf/qlt types; remaining CHECK_FALSE cases are genuinely
-// unrealizable (env blocks a required input value).
+// All tests in this suite use the Since (S) operator. Tests marked CHECK
+// use sbf/qlt types; the CHECK_FALSE cases are genuinely unrealizable (env
+// blocks a required input value); the CHECK_KNOWN_WRONG_UNREALIZABLE cases
+// pin today's wrong UNREALIZABLE, which stands until the S/T compilation
+// into the ltlsynt skeleton exists (LT-14; see the macro at the top).
 
 TEST_SUITE("DeepSeek: 50 S/U mixed nesting") {
 
@@ -3052,7 +3064,7 @@ TEST_CASE("[SU-02] (o1:qlt={3}) U ((o2:qlt={1/2}) S (o1[t-1]:qlt=i1[t-1]:qlt)) i
 TEST_CASE("[SU-03] F((o1[t]:sbf & i1[t]:sbf) = 1) is UNREALIZABLE (S pending)") {
     tref fm = spec("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-04] ((o1[t]:sbf = i1[t-1]:sbf) S (o2[t]:sbf = 0)) U (o1[t]:sbf = 1) is REALIZABLE (S pending)") {
@@ -3076,7 +3088,7 @@ TEST_CASE("[SU-06] ((i1[t-3]:sbf = {Y}:sbf) U (o1[t]:sbf = i2[t-1]:sbf)) S (o2[t
 TEST_CASE("[SU-07] (o1:qlt={(0,1)}) U (S requires i2[t]:qlt={0}) is UNREALIZABLE (S pending)") {
     tref fm = spec("(o1[t]:qlt = {(0,1)}:qlt) U ((o2[t]:qlt = i1[t-3]:qlt) S (i2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-08] ((o1:sbf={X}) S (o2:sbf={Y&Z})) U (i1[t-1]=o1[t-2]) is UNREALIZABLE — adversarial env blocks terminal") {
@@ -3090,7 +3102,7 @@ TEST_CASE("[SU-08] ((o1:sbf={X}) S (o2:sbf={Y&Z})) U (i1[t-1]=o1[t-2]) is UNREAL
 TEST_CASE("[SU-09] G((o1:sbf=0) U ((o2:sbf={X}) && (i2[t]:sbf=1))) is UNREALIZABLE (S pending)") {
     tref fm = spec("G ((o1[t]:sbf = 0) U ((o2[t]:sbf = {X}:sbf) && (i2[t]:sbf = 1))).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-10] F(((o1:qlt={1/2}) S (o2:qlt={3})) U (i1[t-1]={[0,2]})) is UNREALIZABLE — pure-input terminal never cooperates") {
@@ -3110,7 +3122,7 @@ TEST_CASE("[SU-11] (((o1[t]:sbf = i2[t-2]:sbf) U (o2[t]:sbf = {X|Y&Z}:sbf)) S (i
 TEST_CASE("[SU-12] (o2:qlt=0) U (((i1[t-1]:qlt=1) S (o1:qlt={(0,1)})) U (i2[t]:qlt=1)) is UNREALIZABLE (S pending)") {
     tref fm = spec("(o2[t]:qlt = {0}:qlt) U (((i1[t-1]:qlt = {1}:qlt) S (o1[t]:qlt = {(0,1)}:qlt)) U (i2[t]:qlt = {1}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-13] ((i1[t]:sbf={X&Y}) U (o1[t]:sbf=0)) S ((o2[t-1]:sbf=i2[t-2]:sbf) U (i1[t-3]:sbf={Z}:sbf)) is UNREALIZABLE — strong past: ψ(0) requires env to send {Z}, env blocks") {
@@ -3122,7 +3134,7 @@ TEST_CASE("[SU-13] ((i1[t]:sbf={X&Y}) U (o1[t]:sbf=0)) S ((o2[t-1]:sbf=i2[t-2]:s
 TEST_CASE("[SU-14] G((o1:sbf | i1:sbf) = 0) is UNREALIZABLE (S pending)") {
     tref fm = spec("G ((o1[t]:sbf | i1[t]:sbf) = 0).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-15] (((o2[t]:qlt=i1[t-1]:qlt) S (o1[t]:qlt={0}:qlt)) U (i2[t-2]:qlt={1/2}:qlt)) S (o2[t]:qlt={[0,1]}:qlt) is REALIZABLE (S pending)") {
@@ -3134,7 +3146,7 @@ TEST_CASE("[SU-15] (((o2[t]:qlt=i1[t-1]:qlt) S (o1[t]:qlt={0}:qlt)) U (i2[t-2]:q
 TEST_CASE("[SU-16] F((o1:sbf={X}) U ((o2:sbf={Y}) S (i1[t]:sbf={Z}))) is UNREALIZABLE (S pending)") {
     tref fm = spec("F ((o1[t]:sbf = {X}:sbf) U ((o2[t]:sbf = {Y}:sbf) S (i1[t]:sbf = {Z}:sbf))).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-17] (i2[t-2]:sbf=o1[t-3]:sbf) U (((o2[t]:sbf={X&Z}) S (i1[t-1]:sbf={Y})) U (o1[t]:sbf=0)) is REALIZABLE (S pending)") {
@@ -3152,7 +3164,7 @@ TEST_CASE("[SU-18] G((o1:qlt={1}) S (o2:qlt=i2[t-1]:qlt)) is REALIZABLE") {
 TEST_CASE("[SU-19] ((o1:sbf=1) U (o2:sbf={X&Y})) S (i2[t]:sbf={X|Y}) is UNREALIZABLE (S pending)") {
     tref fm = spec("((o1[t]:sbf = 1) U (o2[t]:sbf = {X & Y}:sbf)) S (i2[t]:sbf = {X | Y}:sbf).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-20] (((i1[t-3]:qlt={0}) S (o1:qlt={[0,2]})) U (o2[t]:qlt=i2[t-2]:qlt)) S (i1[t-1]:qlt={1}) is UNREALIZABLE — strong past: ψ(0)=i1[-1]={1}, env blocks") {
@@ -3170,7 +3182,7 @@ TEST_CASE("[SU-21] F((o1[t]:sbf=i1[t-1]:sbf) U (G(o2[t]:sbf={Y&Z}))) is REALIZAB
 TEST_CASE("[SU-22] ((o2:qlt=1) U (i1[t]:qlt=0)) S ((o1[t-1]:qlt=i2[t-3]:qlt) U (i1[t-2]:qlt={1/2})) is UNREALIZABLE (S pending)") {
     tref fm = spec("((o2[t]:qlt = {1}:qlt) U (i1[t]:qlt = {0}:qlt)) S ((o1[t-1]:qlt = i2[t-3]:qlt) U (i1[t-2]:qlt = {1/2}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-23] (o1:sbf={X|(Y&Z)}) S (((o2[t]:sbf=i1[t-2]:sbf) U (i2[t-1]:sbf={X})) S (o1[t-3]:sbf=1)) is REALIZABLE (S pending)") {
@@ -3182,7 +3194,7 @@ TEST_CASE("[SU-23] (o1:sbf={X|(Y&Z)}) S (((o2[t]:sbf=i1[t-2]:sbf) U (i2[t-1]:sbf
 TEST_CASE("[SU-24] G((o1:qlt={(0,1)}) U (i2[t]:qlt={0})) is UNREALIZABLE (S pending)") {
     tref fm = spec("G ((o1[t]:qlt = {(0,1)}:qlt) U (i2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-25] (((o2[t]:sbf={Y}) S (i1[t-1]:sbf={Z})) U (o1[t]:sbf=i2[t-3]:sbf)) S (o2[t-2]:sbf={X&Y}) is REALIZABLE (S pending)") {
@@ -3230,7 +3242,7 @@ TEST_CASE("[SU-31] (o2:qlt=i1[t-1]:qlt) U ((o1:qlt={1/2}) S (i2[t-2]:qlt={0})) i
 TEST_CASE("[SU-32] G((o1:sbf=1) U ((o2:sbf={X|(Y&Z)}) & (i2[t]:sbf=0))) is UNREALIZABLE (S pending)") {
     tref fm = spec("G ((o1[t]:sbf = 1) U ((o2[t]:sbf = {X | (Y & Z)}:sbf) && (i2[t]:sbf = 0))).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-33] ((i1[t-3]:sbf={Y}) S (o2:sbf={X|Z})) U (o1:sbf=i2[t-2]:sbf) is REALIZABLE") {
@@ -3248,7 +3260,7 @@ TEST_CASE("[SU-34] F((o1:qlt={(0,1)}) && (o2:qlt={0})) is REALIZABLE (S pending)
 TEST_CASE("[SU-35] G((o1:sbf=i1[t-1]:sbf) U (i2[t]:sbf={Y&Z})) is UNREALIZABLE (S pending)") {
     tref fm = spec("G ((o1[t]:sbf = i1[t-1]:sbf) U (i2[t]:sbf = {Y & Z}:sbf)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-36] (o1:qlt={[0,1]}) S ((o2:qlt=i1[t-2]:qlt) U (i2[t-3]:qlt={1})) is UNREALIZABLE — strong past: ψ(0) U-terminal i2[t-3]={1} is pure input, env blocks") {
@@ -3266,7 +3278,7 @@ TEST_CASE("[SU-37] (((o1:sbf={X&Y}) U (i1[t-1]:sbf={Z})) S (o2:sbf=i2[t-2]:sbf))
 TEST_CASE("[SU-38] F((o1:qlt=i1[t]:qlt) & (i2[t]:qlt={0})) is UNREALIZABLE (S pending)") {
     tref fm = spec("F ((o1[t]:qlt = i1[t]:qlt) && (i2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-39] G((o2:sbf={Y}) S (o1:sbf=i1[t-3]:sbf)) is REALIZABLE") {
@@ -3278,7 +3290,7 @@ TEST_CASE("[SU-39] G((o2:sbf={Y}) S (o1:sbf=i1[t-3]:sbf)) is REALIZABLE") {
 TEST_CASE("[SU-40] ((i2[t-2]:qlt={0}) U (o1:qlt={1})) S ((o2:qlt=i1[t-1]:qlt) U (i2[t]:qlt={1/2})) is UNREALIZABLE (S pending)") {
     tref fm = spec("((i2[t-2]:qlt = {0}:qlt) U (o1[t]:qlt = {1}:qlt)) S ((o2[t]:qlt = i1[t-1]:qlt) U (i2[t]:qlt = {1/2}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-41] (o1:sbf={X}) U (((o2:sbf=i1[t-2]:sbf) S (i2[t-3]:sbf={Y})) U (o1[t-1]:sbf=1)) is UNREALIZABLE") {
@@ -3296,7 +3308,7 @@ TEST_CASE("[SU-42] F(G(o2:qlt={[0,1]})) is REALIZABLE") {
 TEST_CASE("[SU-43] ((o1:sbf=i1[t-1]:sbf) S (o2:sbf={X&Z})) U (i2[t]:sbf={Y}) is UNREALIZABLE (S pending)") {
     tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) S (o2[t]:sbf = {X & Z}:sbf)) U (i2[t]:sbf = {Y}:sbf).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-44] (((i1[t-3]:qlt={1}) S (o2:qlt={0})) U (o1:qlt=i2[t-2]:qlt)) S (i1[t-1]:qlt={(0,1)}) is UNREALIZABLE — strong past: ψ(0)=i1[-1]={(0,1)}, env blocks") {
@@ -3326,7 +3338,7 @@ TEST_CASE("[SU-47] ((o2:sbf={Y}) U (o1:sbf={X|Z})) S (i1[t-2]:sbf={X}) is UNREAL
 TEST_CASE("[SU-48] ((i1[t-1]:qlt={3}) S (o2:qlt={1/2})) U (i1[t]:qlt={0}) is UNREALIZABLE (S pending)") {
     tref fm = spec("((i1[t-1]:qlt = {3}:qlt) S (o2[t]:qlt = {1/2}:qlt)) U (i1[t]:qlt = {0}:qlt).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // TODO: S compilation
+    CHECK_KNOWN_WRONG_UNREALIZABLE(realizable(fm));
 }
 
 TEST_CASE("[SU-49] (o1:sbf={X&Y}) R (o2[t-1]:sbf={X|Z}) is REALIZABLE") {
