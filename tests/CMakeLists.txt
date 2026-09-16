@@ -55,35 +55,24 @@ add_compile_definitions(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE)
 set(TAU_SKIP_TESTS
 	test_integration-satisfiability-bool
 	test_integration-satisfiability-sbf
-	test_integration-satisfiability-hsb
 	test_integration-satisfiability-qint
 	test_integration-satisfiability-qlt
 	test_integration-satisfiability-tau_ba
 	test_integration-satisfiability-mixed
 	test_integration-satisfiability-bv
 	test_ltl_benchmarks
-	test_ltl_multi_type_oracle
-	test_ltl_soundness_regression
-	test_ltl_many_sorted
 	test_by_grammar
-	test_ltl_correctness
-	test_integration-interpreter_ltl_multiio
-	test_integration-solver-hsb
 	test_integration-solver-qint
-	test_integration-solver-qlt
 	test_integration-solver-mixed
 	test_integration-solver-sbf
 	test_tau_tree_printers
 	test_integration-quantifiers
-	test_temporal_connectives
-	test_integration-ltl_aba_execution
 	test_integration-blasting_correctness_check1
 	test_integration-blasting_correctness_check2
 	test_integration-blasting_correctness_check3
 	test_integration-blasting_correctness_check4
 	test_integration-blasting_correctness_check5
-	test_ltl_strategy_exec
-	CACHE STRING "Test targets skipped because covered by REPL tests")
+	CACHE STRING "C++ test targets not built by default: the REPL tests cover the same ground. The LTL, qlt-solver and hsb suites are NOT in this list because they are the only direct tests of several synthesis and solver entry points. Pass -DTAU_SKIP_TESTS= to build everything.")
 
 # The REPL tests that cover these are not built for wasm, so nothing would
 # exercise them there.
