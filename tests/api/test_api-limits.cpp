@@ -3,6 +3,8 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+#include <cstdlib>
+
 using tau_api = api<node_t>;
 
 TEST_SUITE("Tau API - runtime limits") {
@@ -70,6 +72,101 @@ TEST_SUITE("Tau API - runtime limits") {
 		CHECK( block_max_rounds == std::numeric_limits<size_t>::max() );
 		block_boole_max_splits = s1;
 		block_max_rounds = s2;
+	}
+
+	// The LTL(ABA) knobs promoted from environment variables / header
+	// constants: each setter writes its parameter, and the accessors
+	// resolve parameter > environment > default.
+	TEST_CASE("ltl timeout: parameter beats environment, -1 unsets") {
+		const long saved = ltl_timeout_sec_param;
+		tau_api::set_ltl_timeout_sec(-1);
+		setenv("TAU_LTL_TIMEOUT_SEC", "17", 1);
+		CHECK( ltl_timeout_sec() == 17 );
+		tau_api::set_ltl_timeout_sec(9);
+		CHECK( ltl_timeout_sec() == 9 );
+		tau_api::set_ltl_timeout_sec(0);
+		CHECK( ltl_timeout_sec() == 0 );
+		// Garbage in the environment keeps the default (LS-9).
+		tau_api::set_ltl_timeout_sec(-1);
+		setenv("TAU_LTL_TIMEOUT_SEC", "abc", 1);
+		CHECK( ltl_timeout_sec() == 60 );
+		// Values above one day clamp (SY-R5).
+		tau_api::set_ltl_timeout_sec(1000000);
+		CHECK( ltl_timeout_sec() == ltl_timeout_sec_max );
+		unsetenv("TAU_LTL_TIMEOUT_SEC");
+		ltl_timeout_sec_param = saved;
+	}
+
+	TEST_CASE("ltl algorithm: parameter beats environment, garbage is auto") {
+		const std::string saved = ltl_algorithm_param;
+		tau_api::set_ltl_algorithm("");
+		unsetenv("TAU_LTL_ALG");
+		CHECK( ltl_algorithm_choice() == "" );
+		setenv("TAU_LTL_ALG", "D", 1);
+		CHECK( ltl_algorithm_choice() == "D" );
+		tau_api::set_ltl_algorithm("b");
+		CHECK( ltl_algorithm_choice() == "B" );
+		tau_api::set_ltl_algorithm("auto");
+		CHECK( ltl_algorithm_choice() == "" );
+		tau_api::set_ltl_algorithm("C");
+		CHECK( ltl_algorithm_choice() == "" );
+		unsetenv("TAU_LTL_ALG");
+		ltl_algorithm_param = saved;
+	}
+
+	TEST_CASE("ltl QE cap: parameter beats environment, garbage keeps 2") {
+		const size_t saved = ltl_qe_max_vars_param;
+		tau_api::set_ltl_qe_max_vars(0);
+		unsetenv("TAU_LTL_OMCAT_QE_MAX_VARS");
+		CHECK( ltl_qe_max_vars() == 2 );
+		setenv("TAU_LTL_OMCAT_QE_MAX_VARS", "4", 1);
+		CHECK( ltl_qe_max_vars() == 4 );
+		setenv("TAU_LTL_OMCAT_QE_MAX_VARS", "abc", 1);
+		CHECK( ltl_qe_max_vars() == 2 );
+		tau_api::set_ltl_qe_max_vars(3);
+		CHECK( ltl_qe_max_vars() == 3 );
+		unsetenv("TAU_LTL_OMCAT_QE_MAX_VARS");
+		ltl_qe_max_vars_param = saved;
+	}
+
+	TEST_CASE("ltl game caps write their globals verbatim") {
+		const size_t s1 = ltl_hoa_max_states, s2 = ltl_guard_max_cubes;
+		tau_api::set_ltl_hoa_max_states(77);
+		CHECK( ltl_hoa_max_states == 77 );
+		tau_api::set_ltl_hoa_max_states(0);
+		CHECK( ltl_hoa_max_states == 0 );
+		tau_api::set_ltl_guard_max_cubes(5);
+		CHECK( ltl_guard_max_cubes == 5 );
+		ltl_hoa_max_states = s1;
+		ltl_guard_max_cubes = s2;
+	}
+
+	// The verdict memos are keyed on the formula; the budget fingerprint
+	// is what tells them a runtime budget moved in between.
+	TEST_CASE("verdict budget fingerprint moves with every budget") {
+		const size_t base = verdict_budget_fingerprint();
+		const size_t saved_fp = max_fixpoint_steps;
+		const size_t saved_fl = max_flag_search_steps;
+		const size_t saved_cs = max_consistency_subsets;
+		const long   saved_to = ltl_timeout_sec_param;
+		const std::string saved_alg = ltl_algorithm_param;
+		max_fixpoint_steps = saved_fp + 1;
+		CHECK( verdict_budget_fingerprint() != base );
+		max_fixpoint_steps = saved_fp;
+		CHECK( verdict_budget_fingerprint() == base );
+		max_flag_search_steps = saved_fl + 1;
+		CHECK( verdict_budget_fingerprint() != base );
+		max_flag_search_steps = saved_fl;
+		max_consistency_subsets = saved_cs + 1;
+		CHECK( verdict_budget_fingerprint() != base );
+		max_consistency_subsets = saved_cs;
+		tau_api::set_ltl_timeout_sec(ltl_timeout_sec() + 1);
+		CHECK( verdict_budget_fingerprint() != base );
+		ltl_timeout_sec_param = saved_to;
+		tau_api::set_ltl_algorithm("B");
+		CHECK( verdict_budget_fingerprint() != base );
+		ltl_algorithm_param = saved_alg;
+		CHECK( verdict_budget_fingerprint() == base );
 	}
 
 	// PW-N4: the semantic PWR fallback is a runtime knob, OFF by default.

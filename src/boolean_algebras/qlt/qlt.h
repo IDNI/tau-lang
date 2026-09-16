@@ -22,6 +22,25 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Cap on the data atoms the omcat (qlt) T3 encodings accept: the
+ * A/B/D skeletons and the semantic PWR compute `1 << K` and enumerate 2^K
+ * masks, so K is bounded here (LG-9/LS-11). Above the cap the default
+ * ABA-oracle path decides instead. Runtime parameter by policy (qlt's own
+ * `qlt-t3-cap` CLI/REPL option); clamped to 30 (a signed shift is
+ * undefined at 31); 0 = unlimited within that bound.
+ */
+inline size_t qlt_t3_encoding_cap = 20;
+
+/// Effective T3 atom cap: `qlt_t3_encoding_cap` bounded by 30.
+inline int qlt_t3_encoding_cap_effective() {
+	const size_t hard = 30;
+	if (qlt_t3_encoding_cap == 0 || qlt_t3_encoding_cap > hard)
+		return (int) hard;
+	return (int) qlt_t3_encoding_cap;
+}
+
+
 /** @brief Type tree of the qlt type. */
 template <NodeType node> tref qlt_type();
 /** @brief Type id of the qlt type. */
@@ -162,6 +181,15 @@ std::optional<qlt_piece> qlt_piece_intersect(const qlt_piece& a, const qlt_piece
 
 struct qlt {
 	std::vector<qlt_piece> pieces; // sorted by lo, disjoint, normalised
+	// Set when `pieces` OVER-approximates the true set: an intersection
+	// whose endpoint comparison was undecidable kept a whole operand
+	// (qlt_piece_intersect), or a piece's emptiness is undecidable
+	// (qlt_piece_empty). The flag propagates through `|` and `&`, and
+	// `operator~` returns `top` for an inexact value: complementing an
+	// over-approximation exactly would UNDER-approximate, which is how
+	// `x = {c} && ~({c} & [0,1])` used to reach a wrong UNSAT. Structural
+	// equality ignores the flag (it compares the representation).
+	bool inexact = false;
 
 	static qlt bottom() { return {}; }
 	static qlt top();
@@ -191,6 +219,11 @@ struct qlt {
 private:
 	static qlt normalise(std::vector<qlt_piece> ps);
 };
+
+/// True when the emptiness of @p p cannot be decided (a symbolic endpoint
+/// against an incomparable one); such a piece is kept as non-empty, which
+/// over-approximates (see qlt_piece_empty).
+bool qlt_piece_emptiness_undecidable(const qlt_piece& p);
 
 // --- stream output ---
 std::ostream& operator<<(std::ostream& os, const qlt& q);

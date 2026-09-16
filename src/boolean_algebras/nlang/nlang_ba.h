@@ -52,6 +52,13 @@ template <NodeType node> size_t nlang_type_id();
 //   TAU_LLM_MODEL     — optional; when unset no model is sent and the
 //                       endpoint picks its own.
 
+/**
+ * @brief Wall-clock cap, in seconds, on each LLM HTTP request the nlang
+ * oracle makes (curl's CURLOPT_TIMEOUT). Runtime parameter by policy
+ * (nlang's own `nlang-http-timeout` CLI/REPL option); 0 = no cap.
+ */
+inline long nlang_http_timeout_sec = 15;
+
 // --- LLM API helpers (implemented in nlang_ba.cpp, linked via libTAU) ---
 std::string llm_query(const std::string& prompt);
 bool llm_is_empty(const std::string& description);

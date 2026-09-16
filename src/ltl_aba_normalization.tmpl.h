@@ -327,6 +327,11 @@ static bool aba_existential_feasible(tref fm) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
+	// The verdict depends on the QE free-variable cap (below); a cap change
+	// between two queries must not return the old cap's answer.
+	static size_t cache_budget = ltl_verdict_budget_fingerprint();
+	if (const size_t fp = ltl_verdict_budget_fingerprint();
+		fp != cache_budget) { cache.clear(); cache_budget = fp; }
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	auto compute = [&]() -> bool {
@@ -357,20 +362,19 @@ static bool aba_existential_feasible(tref fm) {
 		// Above that we fall through to the general solver.
 		//
 		// The cap is a runtime parameter, not a compile-time constant:
-		// TAU_LTL_OMCAT_QE_MAX_VARS (default 2).  Setting it higher restores
-		// the old — unsound — behaviour and is only useful for measuring
-		// what the fast path was buying.
+		// `--ltl-qe-max-vars` / `set ltlqemaxvars` /
+		// `api::set_ltl_qe_max_vars`, with TAU_LTL_OMCAT_QE_MAX_VARS as
+		// the environment fallback (default 2; see ltl_qe_max_vars() in
+		// ltl_aba.h). Setting it higher restores the old — unsound —
+		// behaviour and is only useful for measuring what the fast path
+		// was buying.
 
 		// Joint check first: it is the only thing that catches a
 		// transitivity chain, and it is exact when it fires.
 		if (qlt_order_conj_unsat<node>(fm)) return false;
 
 		const trefs& free_vars = tau::get(fm).get_free_vars();
-		size_t qe_max_vars = 2;
-		if (const char* env_cap = std::getenv("TAU_LTL_OMCAT_QE_MAX_VARS")) {
-			int v = std::atoi(env_cap);
-			if (v > 0) qe_max_vars = (size_t)v;
-		}
+		const size_t qe_max_vars = ltl_qe_max_vars();
 		if (!free_vars.empty() && free_vars.size() <= qe_max_vars) {
 			bool all_omcat = true;
 			for (tref v : free_vars)
@@ -391,10 +395,30 @@ static bool aba_existential_feasible(tref fm) {
 			}
 		}
 		// A free variable whose algebra can always satisfy its own outputs
-		// makes the formula feasible without asking the solver.
+		// makes the formula feasible without asking the solver. LA-R5:
+		// this is a per-variable claim the algebra makes about itself (an
+		// oracle algebra such as nlang cannot decide the joint constraint
+		// `o = p && o = q` for distinct literals p, q), so it is the one
+		// knowingly optimistic direction of this oracle. Say so once.
 		for (tref v : tau::get(fm).get_free_vars())
 			if (pack_type_output_always_satisfiable<node>(
-				tree<node>::get(v).get_ba_type())) return true;
+				tree<node>::get(v).get_ba_type()))
+			{
+				static bool warned = false;
+				if (!warned) {
+					warned = true;
+					TAU_LOG_WARNING << "[ltl_aba] a "
+						<< get_ba_type_name<node>(
+							tree<node>::get(v).get_ba_type())
+						<< " output is assumed feasible because the "
+						"algebra declares its outputs always "
+						"satisfiable; joint constraints over "
+						"distinct literals of that algebra are "
+						"not checked (a false REALIZABLE is "
+						"possible)";
+				}
+				return true;
+			}
 		auto sat = is_non_temp_nso_satisfiable<node>(fm);
 		return sat.has_value() && sat.value();
 	};
@@ -1496,40 +1520,56 @@ static void add_consistency_constraints(
 	// combinations (¬p_i ∧ p_j), (p_i ∧ ¬p_j), (¬p_i ∧ ¬p_j) for each pair.
 	// Uses existential feasibility (∃m,x,y. combo) — same standard as the
 	// oracle — so we emit exactly the constraints the oracle would later reject.
-	// Gated on TAU_LTL_ALG=B; default behaviour is unchanged.
+	// Gated on the synthesis algorithm choice being B (`--ltl-alg B` /
+	// `set ltlalg B` / TAU_LTL_ALG=B); default behaviour is unchanged.
+	//
+	// Pure-input pairs are ALWAYS checked, with the infeasible combinations
+	// added as environment assumptions: over a finite algebra such as
+	// bv[1] the environment can never make both `i = 0` and `i = 1` false,
+	// and without the assumption `G(!(!(i=0) && !(i=1)))` ltlsynt lets it,
+	// so a tautology like `F ((i=0) || (i=1))` came back UNREALIZABLE
+	// (found by the CROSS-bv1 fuzz suite). The system side does not need
+	// this for soundness (the per-edge oracle refuses infeasible system
+	// moves), hence the gate above stays for it.
 	{
-		const bool alg_b_mode = [] {
-			const char* v = std::getenv("TAU_LTL_ALG");
-			return v && std::string_view(v) == "B";
-		}();
-		if (alg_b_mode || polarity_complete) {
-			for (size_t i = 0; i < atoms.size(); ++i) {
-				if (is_pure_input_atom<node>(atoms[i].first)) continue;
-				tref neg_i = tau::build_wff_neg(atoms[i].first);
-				for (size_t j = i + 1; j < atoms.size(); ++j) {
-					if (is_pure_input_atom<node>(atoms[j].first)) continue;
-					if (find_ba_type<node>(atoms[i].first)
-					    != find_ba_type<node>(atoms[j].first)) continue;
-					tref neg_j = tau::build_wff_neg(atoms[j].first);
-					const auto& ni = atoms[i].second;
-					const auto& nj = atoms[j].second;
-					auto emit = [&](tref combo, const std::string& c) {
-						if (skeleton.find(c) == std::string::npos
-						    && !aba_existential_feasible<node>(combo)) {
-							skeleton += " && " + c;
-							if (out_constraints) out_constraints->push_back(c);
-						}
-					};
-					// (¬p_i ∧ p_j)
-					emit(tau::build_wff_and(neg_i, atoms[j].first),
-					     "G(!(!(" + ni + ") && " + nj + "))");
-					// (p_i ∧ ¬p_j)
-					emit(tau::build_wff_and(atoms[i].first, neg_j),
-					     "G(!(" + ni + " && !(" + nj + ")))");
-					// (¬p_i ∧ ¬p_j)
-					emit(tau::build_wff_and(neg_i, neg_j),
-					     "G(!(!(" + ni + ") && !(" + nj + ")))");
-				}
+		const bool alg_b_mode = ltl_algorithm_choice() == "B";
+		const bool sys_pairs = alg_b_mode || polarity_complete;
+		for (size_t i = 0; i < atoms.size(); ++i) {
+			const bool in_i = is_pure_input_atom<node>(atoms[i].first);
+			if (!in_i && !sys_pairs) continue;
+			tref neg_i = tau::build_wff_neg(atoms[i].first);
+			for (size_t j = i + 1; j < atoms.size(); ++j) {
+				const bool in_j = is_pure_input_atom<node>(atoms[j].first);
+				// Same-role pairs only: both inputs (assumptions) or, when
+				// enabled, both non-inputs (requirements).
+				if (in_i != in_j) continue;
+				if (!in_i && !sys_pairs) continue;
+				if (find_ba_type<node>(atoms[i].first)
+				    != find_ba_type<node>(atoms[j].first)) continue;
+				tref neg_j = tau::build_wff_neg(atoms[j].first);
+				const auto& ni = atoms[i].second;
+				const auto& nj = atoms[j].second;
+				auto emit = [&](tref combo, const std::string& c) {
+					if (skeleton.find(c) != std::string::npos
+					    || input_assumptions.find(c) != std::string::npos)
+						return;
+					if (aba_existential_feasible<node>(combo)) return;
+					if (in_i) {
+						if (!input_assumptions.empty())
+							input_assumptions += " && ";
+						input_assumptions += c;
+					} else skeleton += " && " + c;
+					if (out_constraints) out_constraints->push_back(c);
+				};
+				// (¬p_i ∧ p_j)
+				emit(tau::build_wff_and(neg_i, atoms[j].first),
+				     "G(!(!(" + ni + ") && " + nj + "))");
+				// (p_i ∧ ¬p_j)
+				emit(tau::build_wff_and(atoms[i].first, neg_j),
+				     "G(!(" + ni + " && !(" + nj + ")))");
+				// (¬p_i ∧ ¬p_j)
+				emit(tau::build_wff_and(neg_i, neg_j),
+				     "G(!(!(" + ni + ") && !(" + nj + ")))");
 			}
 		}
 	}

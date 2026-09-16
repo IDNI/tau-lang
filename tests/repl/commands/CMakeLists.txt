@@ -17,6 +17,7 @@ include(test_repl-ba_options.cmake)
 include(test_repl-fragment_cmd.cmake)
 include(test_repl-ctl_star_cmd.cmake)
 include(test_repl-ltl_env.cmake)
+include(test_repl-realizable_bv1.cmake)
 include(test_repl-codegen_cli.cmake)
 include(test_repl-ba_constants_cmd.cmake)
 # enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd
@@ -64,7 +65,9 @@ include(test_repl-dnf_cmd.cmake)
 include(test_repl-nnf_cmd.cmake)
 include(test_repl-mnf_cmd.cmake)
 include(test_repl-anf_pnf_cmd.cmake)
-# include(test_repl-onf_cmd.cmake)
+# The old test_repl-onf_cmd.cmake (never included) pinned expectations its
+# own TODO said were unreviewed and that the command does not meet (`onf X
+# (X = 0)` prints `X = 0`, not `F`); it was removed rather than enabled.
 include(test_repl-onf_cmd-crash_regression.cmake)
 
 # history and definitions commands

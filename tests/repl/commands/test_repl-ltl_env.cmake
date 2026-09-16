@@ -50,3 +50,48 @@ add_test(NAME "test_repl-ltl_env-timeout_garbage_warns"
 	COMMAND bash -c "TAU_LTL_TIMEOUT_SEC=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl F (o1[t] = 1)\" 2>&1")
 set_tests_properties("test_repl-ltl_env-timeout_garbage_warns" PROPERTIES
 	PASS_REGULAR_EXPRESSION "TAU_LTL_TIMEOUT_SEC='abc' is not a non-negative number")
+
+# The environment variables are fallbacks of the runtime parameters: the
+# variable shows through `get` when the option is unset, and the CLI flag
+# wins when both are given.
+add_test(NAME "test_repl-ltl_env-timeout_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_TIMEOUT_SEC=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltltimeout\"")
+set_tests_properties("test_repl-ltl_env-timeout_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltltimeout: *5s")
+add_test(NAME "test_repl-ltl_env-timeout_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_TIMEOUT_SEC=5 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-timeout 9 -e \"get ltltimeout\"")
+set_tests_properties("test_repl-ltl_env-timeout_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltltimeout: *9s")
+add_test(NAME "test_repl-ltl_env-timeout_flag_rejects_garbage"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-timeout abc -e \"get ltltimeout\" 2>&1")
+set_tests_properties("test_repl-ltl_env-timeout_flag_rejects_garbage" PROPERTIES
+	PASS_REGULAR_EXPRESSION "expects a non-negative number")
+add_test(NAME "test_repl-ltl_env-alg_env_is_the_fallback"
+	COMMAND bash -c "TAU_LTL_ALG=D $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlalg\"")
+set_tests_properties("test_repl-ltl_env-alg_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlalg: *D")
+add_test(NAME "test_repl-ltl_env-alg_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_ALG=D $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-alg A -e \"get ltlalg\"")
+set_tests_properties("test_repl-ltl_env-alg_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlalg: *A")
+add_test(NAME "test_repl-ltl_env-alg_garbage_reads_as_auto"
+	COMMAND bash -c "TAU_LTL_ALG=C $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlalg\" 2>&1")
+set_tests_properties("test_repl-ltl_env-alg_garbage_reads_as_auto" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlalg: *auto")
+add_test(NAME "test_repl-ltl_env-qe_env_is_validated"
+	COMMAND bash -c "TAU_LTL_OMCAT_QE_MAX_VARS=abc $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get ltlqemaxvars\" 2>&1")
+set_tests_properties("test_repl-ltl_env-qe_env_is_validated" PROPERTIES
+	PASS_REGULAR_EXPRESSION "keeping the default 2")
+add_test(NAME "test_repl-ltl_env-qe_flag_beats_env"
+	COMMAND bash -c "TAU_LTL_OMCAT_QE_MAX_VARS=4 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-qe-max-vars 3 -e \"get ltlqemaxvars\"")
+set_tests_properties("test_repl-ltl_env-qe_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlqemaxvars: *3")
+# BA-declared knobs promoted from header constants.
+add_test(NAME "test_repl-ltl_env-qlt_t3_cap_option"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-t3-cap 12 -e \"get qlt-t3-cap\"")
+set_tests_properties("test_repl-ltl_env-qlt_t3_cap_option" PROPERTIES
+	PASS_REGULAR_EXPRESSION "qlt-t3-cap: *12")
+add_test(NAME "test_repl-ltl_env-nlang_http_timeout_option"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set nlang-http-timeout 3\"")
+set_tests_properties("test_repl-ltl_env-nlang_http_timeout_option" PROPERTIES
+	PASS_REGULAR_EXPRESSION "nlang-http-timeout: *3")

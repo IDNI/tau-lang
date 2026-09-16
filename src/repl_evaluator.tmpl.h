@@ -1539,6 +1539,11 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxconsistencysubsets") return consistency_subsets_opt;
 	if (x == "cachebound")               return cache_bound_opt;
 	if (x == "maxcoverproducts")         return cover_products_opt;
+	if (x == "ltltimeout")               return ltl_timeout_opt;
+	if (x == "ltlalg")                   return ltl_alg_opt;
+	if (x == "ltlqemaxvars")             return ltl_qe_max_vars_opt;
+	if (x == "ltlhoamaxstates")          return ltl_hoa_max_states_opt;
+	if (x == "ltlguardmaxcubes")         return ltl_guard_max_cubes_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1654,7 +1659,22 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ cache_bound_opt, [climit, this]() {
 		out << "cachebound:          " << climit(cache_bound) << "\n"; } },
 	{ cover_products_opt, [climit, this]() {
-		out << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } }
+		out << "maxcoverproducts:    " << climit(max_cover_products) << "\n"; } },
+	// Effective values, so the environment fallbacks show through when the
+	// parameter itself is unset.
+	{ ltl_timeout_opt, [this]() {
+		const int t = ltl_timeout_sec();
+		out << "ltltimeout:          "
+			<< (t ? std::to_string(t) + "s" : "off") << "\n"; } },
+	{ ltl_alg_opt, [this]() {
+		const std::string a = ltl_algorithm_choice();
+		out << "ltlalg:              " << (a.empty() ? "auto" : a) << "\n"; } },
+	{ ltl_qe_max_vars_opt, [this]() {
+		out << "ltlqemaxvars:        " << ltl_qe_max_vars() << "\n"; } },
+	{ ltl_hoa_max_states_opt, [climit, this]() {
+		out << "ltlhoamaxstates:     " << climit(ltl_hoa_max_states) << "\n"; } },
+	{ ltl_guard_max_cubes_opt, [climit, this]() {
+		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes) << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1830,7 +1850,25 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ cache_bound_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_cache_bound(*n); } },
 	{ cover_products_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_max_cover_products(*n); } } };
+		api<node>::set_max_cover_products(*n); } },
+	{ ltl_timeout_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_timeout_sec((long) std::min<size_t>(*n,
+			(size_t) ltl_timeout_sec_max)); } },
+	{ ltl_alg_opt, [&]() {
+		std::string a = v;
+		for (auto& c : a) c = (char) std::toupper((unsigned char) c);
+		if (a != "A" && a != "B" && a != "D" && a != "AUTO") {
+			TAU_LOG_ERROR << "Invalid value: expected A, B, D or "
+				"auto\n";
+			return;
+		}
+		api<node>::set_ltl_algorithm(a); } },
+	{ ltl_qe_max_vars_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_qe_max_vars(*n); } },
+	{ ltl_hoa_max_states_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_hoa_max_states(*n); } },
+	{ ltl_guard_max_cubes_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_guard_max_cubes(*n); } } };
 	setters[o]();
 }
 
@@ -2102,6 +2140,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::whatis_cmd:         result = whatis_cmd(command); break;
 	case tau::reset_cmd:          reset_cmd(); break;
 	case tau::comment:            break;
+	// The grammar accepts `func` declarations (OCFuncs), but the
+	// compilation pipeline behind them is a stub (ocfuncs.tmpl.h): say so
+	// instead of reporting an unknown command or silently ignoring it.
+	case tau::func_cmd:           error = true; out << std::endl;
+		TAU_LOG_ERROR << "func declarations (OCFuncs) are not "
+			"implemented yet; the declaration was ignored";
+		break;
 	// error handling
 	default: error = true; out << std::endl;
 		TAU_LOG_ERROR << "Unknown command";
@@ -2278,7 +2323,12 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  revisionalts           revision alternatives kept per part  unlimited\n"
 		"  maxsubsets             k-ary consistency subset checks      4096\n"
 		"  cachebound             string-keyed synthesis cache bound   4096\n"
-		"  maxcoverproducts       oracle mixed-type coverage products  256\n";
+		"  maxcoverproducts       oracle mixed-type coverage products  256\n"
+		"  ltltimeout             ltlsynt watchdog in seconds (0 = off) 60\n"
+		"  ltlalg                 omcat synthesis algorithm A/B/D/auto auto\n"
+		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"
+		"  ltlhoamaxstates        accepted ltlsynt strategy states     4194304\n"
+		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n";
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration
 	// order. Flags join the enable/disable/toggle-eligible list; counts

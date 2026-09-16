@@ -248,7 +248,8 @@ std::string llm_query(const std::string& prompt) {
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, nlang_curl_write_cb);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+	// Runtime parameter (nlang-http-timeout); 0 = no cap.
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, nlang_http_timeout_sec);
 
 	CURLcode res = curl_easy_perform(curl);
 	long status = 0;
@@ -328,9 +329,11 @@ bool llm_is_empty(const std::string& description) {
 		if (it != cache.is_empty_cache.end()) return it->second;
 	}
 	if (!llm_api_key()) {
+		// Not cached: the conservative default is not an oracle answer,
+		// and a key configured later in the process must not find it
+		// pinned for the process lifetime.
 		warn_llm_unavailable();
-		std::lock_guard<std::mutex> lk(cache.mtx);
-		return cache.is_empty_cache.emplace(description, false).first->second;
+		return false;
 	}
 	std::string prompt =
 		"Is the statement '"
@@ -353,9 +356,8 @@ bool llm_is_universal(const std::string& description) {
 		if (it != cache.is_universal_cache.end()) return it->second;
 	}
 	if (!llm_api_key()) {
-		warn_llm_unavailable();
-		std::lock_guard<std::mutex> lk(cache.mtx);
-		return cache.is_universal_cache.emplace(description, false).first->second;
+		warn_llm_unavailable(); // see llm_is_empty: not cached
+		return false;
 	}
 	std::string prompt =
 		"Is the statement '"
@@ -380,9 +382,8 @@ bool llm_equivalent(const std::string& a, const std::string& b) {
 		if (it != cache.equivalent_cache.end()) return it->second;
 	}
 	if (!llm_api_key()) {
-		warn_llm_unavailable();
-		std::lock_guard<std::mutex> lk(cache.mtx);
-		return cache.equivalent_cache.emplace(key_pair, false).first->second;
+		warn_llm_unavailable(); // see llm_is_empty: not cached
+		return false;
 	}
 	std::string prompt =
 		"Are the two statements '"
@@ -405,10 +406,8 @@ std::string llm_stronger_statement(const std::string& description) {
 		if (it != cache.sub_cache.end()) return it->second;
 	}
 	if (!llm_api_key()) {
-		warn_llm_unavailable();
-		std::string fallback = description + " and specifically so";
-		std::lock_guard<std::mutex> lk(cache.mtx);
-		return cache.sub_cache.emplace(description, fallback).first->second;
+		warn_llm_unavailable(); // see llm_is_empty: not cached
+		return description + " and specifically so";
 	}
 	std::string prompt =
 		"Give one logically stronger statement that strictly implies '"
@@ -438,10 +437,8 @@ nlang_ba::fptr llm_decompose(const std::string& s) {
 	}
 
 	if (!llm_api_key()) {
-		warn_llm_unavailable();
-		auto result = F::mk_atom(s);
-		std::lock_guard<std::mutex> lk(cache.mtx);
-		return cache.decompose_cache.emplace(s, result).first->second;
+		warn_llm_unavailable(); // see llm_is_empty: not cached
+		return F::mk_atom(s);
 	}
 
 	std::string prompt =

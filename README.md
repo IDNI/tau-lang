@@ -736,13 +736,24 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TAU_LTL_TIMEOUT_SEC` | 60 | Wall-clock limit for each `ltlsynt` call (0 = disable). |
+| `TAU_LTL_TIMEOUT_SEC` | 60 | Wall-clock limit for each `ltlsynt` call (0 = disable). Environment fallback of `--ltl-timeout` / REPL `set ltltimeout`; the option wins when given. |
 | `TAU_LTL_EXPORT_STRATEGY` | _unset_ | `hoa` prints winning-strategy HOA to stderr; `dot` prints Graphviz dot (falls back to HOA if `autfilt` is unavailable). |
 | `TAU_LTL_EXPORT_STRATEGY_FILE` | _unset_ | If set to a path, also writes the HOA strategy to that file on success. |
 | `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Forwarded to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
 | `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
-| `TAU_LTL_QLT_QE_MAX_VARS` | 2 | Free-variable cap for the `qlt` existential quantifier-elimination fast path. Values above 2 re-enable a fast path that is not sound; leave it at the default. |
-| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). |
+| `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path. Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
+| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
+
+The watchdog, the algorithm choice and the QE cap are runtime parameters
+with a CLI flag, a REPL option and an `api::set_*` setter each (see the CLI
+and REPL option tables); the environment variables above remain as fallbacks
+for scripts that already set them. Two more LTL(ABA) caps have no
+environment form: `--ltl-hoa-max-states` (largest strategy accepted from
+`ltlsynt`, default 2^22) and `--ltl-guard-max-cubes` (DNF cubes a HOA guard
+may expand into in the Algorithm D game, default 512). The `qlt` algebra
+declares `--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at
+most 30) and `nlang` declares `--nlang-http-timeout` (seconds per LLM
+request, default 15).
 
 **Execution**: when the interpreter pipeline is given a realizable LTL formula,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
@@ -2577,7 +2588,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
-| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (default 500; 0 = unlimited) |
+| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
 | -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
 | -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
@@ -2590,6 +2601,11 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
 | -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited)        |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
+| -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
+| -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
+| -K, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
+| -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
+| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -2778,12 +2794,13 @@ default.
 * `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
 (`--max-fixpoint-steps`). Default 500 — the search has no convergence
 guarantee, so unlimited (`0`) hangs on a non-converging spec instead of giving
-up loudly.
+up loudly. A give-up is reported as an error ("gave up before reaching a
+result"), never as a `T`/`F` verdict.
 
 * `flagsteps|maxflagsearchsteps`: cap on the eventual-flag search past the
-flag boundary; a bounded give-up reports unsatisfiable
-(`--max-flag-search-steps`). Default 500, for the same reason as
-`fixpointsteps`; a give-up reports unsatisfiable, which is wrong but bounded.
+flag boundary (`--max-flag-search-steps`). Default 500, for the same reason
+as `fixpointsteps`; a give-up is likewise an error, not an unsatisfiable
+verdict.
 
 * `squeezecap|blocksqueezecap`: operand-set size above which block squeezing
 declines (`--block-squeeze-cap`). Unlimited by default.
@@ -2828,6 +2845,28 @@ is sound but may answer unrealizable.
 
 * `cachebound`: bound on the string-keyed synthesis caches, with FIFO eviction
 (`--cache-bound`). 4096 by default; 0 = unbounded.
+
+* `ltltimeout`: wall-clock cap in seconds on each `ltlsynt` call
+(`--ltl-timeout`). 60 by default, or `TAU_LTL_TIMEOUT_SEC` when that is set;
+0 disables the watchdog. `get ltltimeout` shows the effective value.
+
+* `ltlalg`: the omcat synthesis algorithm, `A`, `B`, `D` or `auto`
+(`--ltl-alg`). `auto` by default, or `TAU_LTL_ALG` when that is set.
+
+* `ltlqemaxvars`: free-variable cap of the omcat quantifier-elimination fast
+path (`--ltl-qe-max-vars`). 2 by default, or `TAU_LTL_OMCAT_QE_MAX_VARS` when
+that is set; values above 2 re-enable a fast path that is not sound.
+
+* `ltlhoamaxstates`: largest state count accepted from an `ltlsynt` HOA
+strategy (`--ltl-hoa-max-states`). 4194304 by default; 0 = unlimited.
+
+* `ltlguardmaxcubes`: cap on the DNF cubes a HOA guard may expand into in the
+Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default; 0 =
+unlimited.
+
+Changing any of these, or the two temporal-normalization caps, between two
+queries drops the verdict memos, so the next `sat`/`realizable` is decided
+under the new budgets rather than answered from the old ones.
 
 Beyond the options above, each Boolean algebra in the configured pack may
 expose options of its own, addressed `<ba>-<option>` and reachable when that

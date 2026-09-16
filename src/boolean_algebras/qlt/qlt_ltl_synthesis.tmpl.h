@@ -30,6 +30,7 @@
 #include "ba_types.h"
 #include "boolean_algebras/qlt/omcat_constants.h"
 #include "boolean_algebras/qlt/qlt.h"
+#include "ltl_aba_limits.h"
 // Unlike ltl_aba.h / normalizer.h, definitions.h only reaches io_context.h,
 // so it is safe to include directly here -- needed by the LA-10 constant-
 // output witness builder to resolve a freshly-parsed atom's io_vars.
@@ -119,11 +120,13 @@ static bool is_algorithm_a_applicable(
 	if (atoms.empty()) return false;
 	// LG-9: bound K -- the A/B/D encodings compute 1 << K (signed-shift
 	// UB at K >= 31) and enumerate 2^K masks (exponential strings well
-	// before that). Mirrors semantic_pwr's cap.
-	if (atoms.size() > 20) {
+	// before that). The cap is qlt's runtime option `qlt-t3-cap`
+	// (qlt_t3_encoding_cap, qlt.h), shared with the semantic PWR.
+	const int t3_cap = qlt_t3_encoding_cap_effective();
+	if ((int) atoms.size() > t3_cap) {
 		LOG_WARNING << "[ltl_aba] " << atoms.size() << " data atoms "
-			"exceed the T3-encoding cap (20); falling back to the "
-			"default ABA-oracle path";
+			"exceed the T3-encoding cap (" << t3_cap << ", option "
+			"qlt-t3-cap); falling back to the default ABA-oracle path";
 		return false;
 	}
 	for (auto& [f, _] : atoms) {
@@ -731,10 +734,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 	ltl_aba_solution<node> sol;
 	sol.atoms = atoms;
 
-	const bool alg_d_mode = [] {
-		const char* v = std::getenv("TAU_LTL_ALG");
-		return v && std::string_view(v) == "D";
-	}();
+	const std::string alg_choice = ltl_algorithm_choice();
+	const bool alg_d_mode = alg_choice == "D";
 	bool alg_d_has_input = false;
 	for (auto& [f, _] : sol.atoms)
 		if (atom_has_any_input<node>(f)) { alg_d_has_input = true; break; }
@@ -807,26 +808,11 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		             " falling through to default";
 	}
 
-	const char* alg_env = std::getenv("TAU_LTL_ALG");
-	const bool alg_b_mode = !alg_env || std::string_view(alg_env) == "B";
-	const bool alg_a_mode = alg_env && std::string_view(alg_env) == "A";
-	// LS-8: only A, B and D are recognised.  Anything else — "C", "auto",
-	// a typo — silently disables every gate and falls through to the
-	// default ABA-oracle path, which is not what the documentation used
-	// to describe.  Say so, once.
-	if (alg_env && *alg_env) {
-		std::string_view v(alg_env);
-		if (v != "A" && v != "B" && v != "D") {
-			static bool warned = false;
-			if (!warned) {
-				warned = true;
-				LOG_WARNING << "[ltl_aba] TAU_LTL_ALG=\"" << v
-				            << "\" is not recognised (only A, B and D "
-				               "are); falling through to the default "
-				               "ABA-oracle path\n";
-			}
-		}
-	}
+	// The choice comes from `--ltl-alg` / `set ltlalg` / TAU_LTL_ALG;
+	// ltl_algorithm_choice() (ltl_aba.h) validates it and reports an
+	// unrecognised value once (LS-8), returning "" for the default routing.
+	const bool alg_b_mode = alg_choice.empty() || alg_choice == "B";
+	const bool alg_a_mode = alg_choice == "A";
 	if (is_algorithm_a_applicable<node>(sol.atoms)) {
 		// Check whether any atom has an input variable.
 		bool any_input = false;
@@ -887,7 +873,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			return r.with_value(propositional_synthesis<node>{alg_a_sol});
 		}
 		if (alg_a_mode)
-			LOG_DEBUG << "[ltl_aba] TAU_LTL_ALG=A ignored because input variables are present";
+			LOG_DEBUG << "[ltl_aba] algorithm A (ltl-alg) ignored because input variables are present";
 		// Algorithm B is only sound when the same T_3-classification
 		// holds: it shares the symbolic atom-mask with Algorithm A.
 		// Atoms that don't classify (top/bot qlt constants etc.)

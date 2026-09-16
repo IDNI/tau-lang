@@ -6,38 +6,17 @@
 // Generated from parser/hoa.tgf into the build tree; bare spelling, same as
 // tau_tree.h's own include of "tau_parser.generated.h".
 #include "hoa_parser.generated.h"
+#include <climits>
+#include <filesystem>
 
 namespace idni::tau_lang {
 
 // ── Spot subprocess ───────────────────────────────────────────────────────────
 
-// LS-9: one parser for the TAU_LTL_TIMEOUT_SEC watchdog (default 60s;
-// explicit "0" disables). Garbage keeps the DEFAULT instead of atoi's 0
-// silently removing the wall-clock cap on external ltlsynt/ltl2tgba.
-// SY-R5: range garbage is clamped to one day with the same warning --
-// `(int) v` used to turn 2^32 into 0 (watchdog silently OFF) and 2^31
-// into a negative, and values near INT_MAX overflowed the poll bound.
-inline constexpr long ltl_timeout_sec_max = 86400;
-
-inline int ltl_timeout_sec() {
-	int timeout_sec = 60;
-	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
-		char* end = nullptr;
-		errno = 0;
-		long v = std::strtol(env_sec, &end, 10);
-		if (end == env_sec || *end != '\0' || v < 0 || errno == ERANGE) {
-			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
-				<< "' is not a non-negative number; keeping the default "
-				<< timeout_sec << "s";
-		} else if (v > ltl_timeout_sec_max) {
-			TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC=" << v
-				<< " exceeds the maximum; clamping to "
-				<< ltl_timeout_sec_max << "s";
-			timeout_sec = (int) ltl_timeout_sec_max;
-		} else timeout_sec = (int) v;
-	}
-	return timeout_sec;
-}
+// The ltlsynt watchdog is the runtime parameter `ltl_timeout_sec_param`
+// (ltl_aba.h): `--ltl-timeout`, REPL `set ltltimeout`,
+// `api::set_ltl_timeout_sec`, with TAU_LTL_TIMEOUT_SEC as the environment
+// fallback. `ltl_timeout_sec()` there resolves the precedence.
 
 
 // Spawn an external command directly via posix_spawnp (no shell), capture
@@ -184,12 +163,20 @@ inline std::pair<std::string, int> run_cmd(const std::string& cmd) {
 #endif // __EMSCRIPTEN__
 }
 
-// Write `content` to a fresh /tmp/<prefix>_XXXXXX path.  Caller owns
-// removal.  Returns the absolute path on success, "" on failure.
+// Write `content` to a fresh <tmpdir>/<prefix>_XXXXXX path, where <tmpdir>
+// honours TMPDIR (std::filesystem::temp_directory_path) and falls back to
+// /tmp.  Caller owns removal.  Returns the absolute path on success, "" on
+// failure.
 static std::string write_tempfile(const std::string& prefix,
                                   const std::string& content)
 {
-	std::string tmpl = "/tmp/" + prefix + "_XXXXXX";
+	std::string dir = "/tmp";
+	try {
+		std::error_code ec;
+		auto d = std::filesystem::temp_directory_path(ec);
+		if (!ec && !d.empty()) dir = d.string();
+	} catch (...) {}
+	std::string tmpl = dir + "/" + prefix + "_XXXXXX";
 	std::vector<char> buf(tmpl.begin(), tmpl.end());
 	buf.push_back('\0');
 	int fd = ::mkstemp(buf.data());
@@ -223,7 +210,8 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 		outs_str += output_props[i];
 	}
 
-	// Configurable timeout: TAU_LTL_TIMEOUT_SEC (default 60). 0 disables.
+	// Configurable watchdog (--ltl-timeout / `set ltltimeout` /
+	// TAU_LTL_TIMEOUT_SEC; default 60). 0 disables.
 	int timeout_sec = ltl_timeout_sec();
 
 	// Always write the formula to a temp file and use `-F path`.  The old
@@ -277,8 +265,9 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 		std::string msg = "ltlsynt produced no verdict (exit "
 		                + std::to_string(exit_code) + ")";
 		if (exit_code == 143)
-			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
-			     + std::to_string(timeout_sec) + "s)";
+			msg += " — killed by the ltl-timeout watchdog ("
+			     + std::to_string(timeout_sec) + "s; --ltl-timeout / "
+			     "`set ltltimeout` / TAU_LTL_TIMEOUT_SEC)";
 		LOG_ERROR << "[ltl_aba] " << msg
 		          << "; the realizability of this specification is UNKNOWN\n";
 		return r.with_error(code::solver_error, msg);
@@ -402,8 +391,11 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	hoa_automaton aut;
 	// A strategy with more states than this is not something ltlsynt
 	// produces for any specification this pipeline builds; an absurd
-	// count is a garbled header, not an automaton (SY-R3).
-	constexpr long max_states = 1L << 22;
+	// count is a garbled header, not an automaton (SY-R3). Runtime
+	// parameter `ltl_hoa_max_states` (0 = unlimited).
+	const long max_states = ltl_hoa_max_states
+		? (long) std::min<size_t>(ltl_hoa_max_states, (size_t) LONG_MAX)
+		: LONG_MAX;
 	bool seen_states = false;
 
 	auto num_of = [](const tt& n) -> long {
@@ -579,8 +571,9 @@ inline result<synth_game> call_ltlsynt_game(
 		std::string msg = "ltlsynt --print-game-hoa produced no game "
 			"(exit " + std::to_string(exit_code) + ")";
 		if (exit_code == 143)
-			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
-			     + std::to_string(timeout_sec) + "s)";
+			msg += " — killed by the ltl-timeout watchdog ("
+			     + std::to_string(timeout_sec) + "s; --ltl-timeout / "
+			     "`set ltltimeout` / TAU_LTL_TIMEOUT_SEC)";
 		LOG_ERROR << "[ltl_aba] " << msg << "\n";
 		return r.with_error(code::solver_error, msg);
 	}
@@ -590,7 +583,18 @@ inline result<synth_game> call_ltlsynt_game(
 	// Insert-then-copy: the freshly inserted entry is the newest in FIFO
 	// order, so an eviction triggered by this insert can only remove
 	// OLDER entries (bound >= 1) — reading it back right after is safe.
-	auto [it, inserted] = cache.emplace(key, parse_synth_game_hoa(hoa));
+	// The hand-written HOA game parser reports a rejected header (bad
+	// counts, too many APs, a decomposed multi-game text) as the EMPTY
+	// game; like the spot failures above that is no verdict, not an
+	// UNREALIZABLE one, so refuse here instead of caching it.
+	synth_game game = parse_synth_game_hoa(hoa);
+	if (game.num_states == 0) {
+		LOG_ERROR << "[ltl_aba] ltlsynt --print-game-hoa output could "
+			"not be parsed into a synthesis game\n";
+		return r.with_error(code::parse_error, "malformed synthesis game "
+			"HOA from ltlsynt; the parity game could not be built");
+	}
+	auto [it, inserted] = cache.emplace(key, std::move(game));
 	(void) inserted;  // the find above missed, so this always inserts
 	return r.with_value(it->second);
 }

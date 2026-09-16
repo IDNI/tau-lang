@@ -274,6 +274,42 @@ struct api {
 	 */
 	static void set_max_cover_products(size_t n);
 	/**
+	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
+	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
+	 * a negative value unsets the parameter so the `TAU_LTL_TIMEOUT_SEC`
+	 * environment fallback (default 60) applies again. Values above one
+	 * day clamp.
+	 */
+	/// sat() past its simplify/flatten prefix, for callers (realizable)
+	/// that already simplified and flattened `fm`.
+	static result<bool> sat_prepared(tref fm);
+	static void set_ltl_timeout_sec(long seconds);
+	/**
+	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
+	 * `"auto"` (`ltl_algorithm_param`); the empty string unsets the
+	 * parameter so the `TAU_LTL_ALG` environment fallback applies again.
+	 * An unrecognised value is reported once and read as `auto`.
+	 */
+	static void set_ltl_algorithm(const std::string& alg);
+	/**
+	 * @brief Free-variable cap of the omcat quantifier-elimination fast
+	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
+	 * that is not sound. 0 unsets the parameter so the
+	 * `TAU_LTL_OMCAT_QE_MAX_VARS` environment fallback (default 2) applies.
+	 */
+	static void set_ltl_qe_max_vars(size_t n);
+	/**
+	 * @brief Largest state count accepted from an `ltlsynt` HOA strategy
+	 * (`ltl_hoa_max_states`); default 2^22, 0 = unlimited.
+	 */
+	static void set_ltl_hoa_max_states(size_t n);
+	/**
+	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
+	 * the Algorithm D product game (`ltl_guard_max_cubes`); default 512,
+	 * 0 = unlimited.
+	 */
+	static void set_ltl_guard_max_cubes(size_t n);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */

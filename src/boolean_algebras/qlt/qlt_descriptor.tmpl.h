@@ -10,6 +10,7 @@
 
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
+#include <array>
 #include "ba_types.h"
 // Reaches nothing beyond the standard library itself, unlike normalizer.h,
 // so it is safe here; needed for `result<...>` before ltl_aba_result.h.
@@ -56,6 +57,31 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<qlt, node_t>(
 			type_tree, type_name);
+	}
+
+	/// @name qlt-declared CLI/REPL options
+	/// Backing getter/setter for @ref options; plain free functions so they
+	/// decay to the function pointers `ba_option` holds.
+	/// @{
+	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap; }
+	static void set_t3_cap_option(size_t n) { qlt_t3_encoding_cap = n; }
+	/// @}
+
+	/**
+	 * @brief The options qlt declares about itself: `qlt-t3-cap`, the
+	 * data-atom cap of the T3 encodings (Algorithms A/B/D and the semantic
+	 * PWR); above it the default ABA-oracle path decides. Clamped to 30
+	 * (the encodings shift `1 << K`); 0 = that bound.
+	 */
+	static std::array<ba_option, 1> options() {
+		return {{
+			{ "t3-cap", ba_option_kind::count,
+				nullptr, nullptr,
+				get_t3_cap_option, set_t3_cap_option,
+				"cap the data atoms the qlt T3 synthesis encodings "
+				"accept before the ABA-oracle path decides instead "
+				"(default 20, at most 30; 0 = 30)" },
+		}};
 	}
 
 	static tref type_tree() {

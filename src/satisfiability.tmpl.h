@@ -38,6 +38,25 @@ inline size_t max_fixpoint_steps = 500;
 inline size_t max_flag_search_steps = 500;
 
 /**
+ * @brief Fingerprint of every runtime parameter that can change a
+ * satisfiability or realizability verdict: the two temporal-normalization
+ * caps above and the LTL(ABA) knobs (`ltl_verdict_budget_fingerprint`).
+ * The verdict memos in this file are keyed on the formula only and drop
+ * their entries when it changes. (The semantic PWR fallback lives in
+ * pointwise_revision.h, which includes this header; it steers the
+ * revision, not these memos.)
+ */
+inline size_t verdict_budget_fingerprint() {
+	size_t seed = 0;
+	auto mix = [&seed](size_t v) {
+		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+	};
+	mix(max_fixpoint_steps);
+	mix(max_flag_search_steps);
+	return ltl_verdict_budget_fingerprint(seed);
+}
+
+/**
  * @internal
  * @brief Print a diagnostic message describing a fixpoint computation's
  * outcome, if diagnostic output was requested.
@@ -828,9 +847,17 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	while (step_num < lookback || !impl(phi_prev, phi)){
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
+			// A bounded give-up is not a fixpoint: the partial phi
+			// would decide the query with a formula that is neither
+			// the continuation nor a refutation. Surface it as
+			// nullptr (no result) so the caller reports an error
+			// instead of a verdict (--max-fixpoint-steps /
+			// `set fixpointsteps`; 0 = unlimited).
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
-				<< " steps without reaching a fixpoint, giving up";
-			break;
+				<< " steps without reaching a fixpoint, giving up; "
+				"raise --max-fixpoint-steps (`set fixpointsteps`, "
+				"0 = unlimited) to decide this specification";
+			return { nullptr, step_num };
 		}
 		phi_prev = phi;
 		++step_num;
@@ -911,9 +938,13 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	{
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
+			// Same contract as find_fixpoint_phi: a give-up yields no
+			// result rather than a partial chi.
 			LOG_ERROR << "find_fixpoint_chi: exceeded " << max_fixpoint_steps
-				<< " steps without reaching a fixpoint, giving up";
-			break;
+				<< " steps without reaching a fixpoint, giving up; "
+				"raise --max-fixpoint-steps (`set fixpointsteps`, "
+				"0 = unlimited) to decide this specification";
+			return { nullptr, step_num };
 		}
 		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
 
@@ -1263,13 +1294,19 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
 	auto [ubd_ctn, steps] = find_fixpoint_phi<node>(fm, flag_initials, io_vars,
 					initials, lookback + point_after_inits);
+	// A fixpoint-step give-up surfaces as nullptr: no continuation, no
+	// verdict (the caller reports an error).
+	if (!ubd_ctn) return nullptr;
 
 	{
 		auto normed = normalize_non_temp<node>(ubd_ctn);
 		if (!normed.has_value()) {
+			// A normalization failure (a cap violation) is not a
+			// refutation either; it used to return F, which every
+			// caller read as unsatisfiable.
 			LOG_ERROR << "always_to_unbounded_continuation: "
 				"normalization of the unbound continuation failed";
-			return tau::_F();
+			return nullptr;
 		}
 		ubd_ctn = normed.value();
 	}
@@ -1714,6 +1751,8 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	// Find fixpoint of chi after highest initial condition
 	auto [chi_inf, steps] = find_fixpoint_chi<node>(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
+	// A fixpoint-step give-up surfaces as nullptr; propagate it.
+	if (!chi_inf) return nullptr;
 	chi_inf = normalize_non_temp<node>(chi_inf).value_or(nullptr);
 	// A cap violation surfaces as nullptr; propagate it rather than
 	// dereferencing it below.
@@ -1764,19 +1803,24 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 					+ (int_t)max_flag_search_steps;
 	for (int_t i = flag_boundary + 1; true; ++i) {
 		if (flag_search_bounded && i > flag_search_limit) {
+			// A bounded give-up is no verdict: it used to report F,
+			// which callers read as a proof of unsatisfiability. Surface
+			// it as nullptr (no result) so transform_to_execution
+			// reports an error instead.
 			LOG_ERROR << "to_unbounded_continuation: the eventual "
 				"variable flag could not be raised within "
 				<< max_flag_search_steps << " steps past the flag "
-				"boundary; giving up and reporting unsatisfiable. "
-				"This is a bounded failure, not a proof of "
-				"unsatisfiability.";
+				"boundary; giving up without a verdict. This is a "
+				"bounded failure, not a proof of unsatisfiability; "
+				"raise --max-flag-search-steps (`set flagsteps`, "
+				"0 = unlimited) to decide this specification.";
 			print_fixpoint_info("Temporal normalization of Tau "
 				"specification gave up after " +
 				std::to_string(steps) + " fixpoint steps and " +
 				std::to_string(max_flag_search_steps) +
-				" flag search steps, yielding the result: ",
-				TAU_TO_STR(tau::_F()), output);
-			return tau::_F();
+				" flag search steps without a result",
+				"", output);
+			return nullptr;
 		}
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
 		run = tau::build_wff_and(run, current_aw);
@@ -1834,6 +1878,15 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
 				subtree_pair_less<node, int_t>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// The continuation depends on the runtime budgets (fixpoint and flag
+	// search steps, the synthesis knobs); a budget change between two
+	// queries must not return the first one's result.
+	static size_t cache_budget = verdict_budget_fingerprint();
+	if (const size_t fp = verdict_budget_fingerprint(); fp != cache_budget)
+	{
+		cache.clear();
+		cache_budget = fp;
+	}
 	if (auto it = cache.find(std::make_pair(fm, start_time));
 		it != cache.end())
 	{
@@ -1855,6 +1908,16 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			// If there is an always part, replace it with its unbound continuation
 			ubd_aw_fm = always_to_unbounded_continuation<node>(
 							aw_fm, start_time, output);
+			// nullptr = a bounded give-up (max_fixpoint_steps) or a
+			// normalization cap: no verdict, so report an error
+			// instead of deciding on a missing continuation.
+			if (!ubd_aw_fm) {
+				return r.with_assert_check_error(code::solver_error,
+					"the temporal normalization gave up before "
+					"reaching a result (see --max-fixpoint-steps, "
+					"0 = unlimited); the specification could not "
+					"be decided");
+			}
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
 			ev_t = transform_to_eventual_variables<node>(
@@ -1937,10 +2000,21 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	{
 		auto _s = r.open("unbounded_continuation");
 		if (!tau::get(aw_after_ev).equals_F() && !st.empty()) {
-			TAU_TRY_OR(res,
-				normalize_non_temp<node>(to_unbounded_continuation<node>(
+			tref ctn = to_unbounded_continuation<node>(
 					aw_after_ev, st[0], ubd_aw_fm, start_time,
-					ev_t.second, output)),
+					ev_t.second, output);
+			// A bounded give-up (max_fixpoint_steps /
+			// max_flag_search_steps) or a normalization cap surfaces
+			// as nullptr: no verdict, so report an error rather than
+			// a formula the caller would read as sat or unsat.
+			if (!ctn) {
+				return r.with_assert_check_error(code::solver_error,
+					"the temporal normalization gave up before "
+					"reaching a result (see --max-fixpoint-steps / "
+					"--max-flag-search-steps, 0 = unlimited); the "
+					"specification could not be decided");
+			}
+			TAU_TRY_OR(res, normalize_non_temp<node>(ctn),
 				code::internal_error,
 				"Normalization of the unbounded continuation failed");
 		} else res = aw_after_ev;
@@ -1992,6 +2066,18 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// below) are undecided on every call, not just the first -- cache
 	// that verdict too, or a repeated query re-runs ltlsynt for nothing.
 	static cache_t& undecided = tree<node>::template create_cache<cache_t>();
+	// Both memos are keyed on (formula, start_time) only, while every
+	// runtime budget (max_fixpoint_steps, max_flag_search_steps, the
+	// LTL(ABA) caps and knobs, the semantic PWR fallback) can change the
+	// verdict: `sat φ`, `set fixpointsteps 0`, `sat φ` must not return the
+	// first query's answer. Drop the entries whenever the budgets moved.
+	static size_t cache_budget = verdict_budget_fingerprint();
+	if (const size_t fp = verdict_budget_fingerprint(); fp != cache_budget)
+	{
+		cache.clear();
+		undecided.clear();
+		cache_budget = fp;
+	}
 	if (!output) {
 		if (auto it = cache.find(std::make_pair(fm, start_time));
 			it != cache.end())

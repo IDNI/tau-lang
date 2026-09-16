@@ -279,6 +279,10 @@ qlt_endpoint qlt_hi_max(const qlt_endpoint& a, const qlt_endpoint& b) {
 // unknown, and the piece is kept: this algebra over-approximates undecidable
 // cases, because dropping a piece would turn a satisfiable constraint such as
 // `x = {c} && 0 <= x <= 1` into a wrong UNSAT.
+bool qlt_piece_emptiness_undecidable(const qlt_piece& p) {
+	return qlt_sem_cmp(p.lo.val, p.hi.val) == std::partial_ordering::unordered;
+}
+
 bool qlt_piece_empty(const qlt_piece& p) {
 	auto c = qlt_sem_cmp(p.lo.val, p.hi.val);
 	if (c == std::partial_ordering::greater)   return true;
@@ -370,17 +374,18 @@ qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b) {
 // Nothing decidable is lost by this: `({c} & [0,1]) & ~{c}` still collapses to
 // bot through the exact equal-name path.
 //
-// Caveat -- this is a policy, not one-sided soundness.  Over-approximation is
-// not closed under complement: `operator~` is exact, so negating an
-// over-approximated set under-approximates.  `~({c} & [0,1])` computes as
-// `~{c}` = `(-inf,c) | (c,+inf)`, whereas the true complement is all of Q when
-// c is outside [0,1]; conjoining `x = {c}` with it then yields bot, a wrong
-// UNSAT reached through this very convention.  The trade-off is deliberate:
-// every choice here is wrong for some model, and this one at least keeps `&`
-// exact wherever the comparison is decidable and never returns an endpoint
-// pair that was not already present in an operand.  Sound treatment of
-// undecidable comparisons needs case splits (or a constraint store), which
-// this representation cannot express.
+// Over-approximation is not closed under complement: an exact `operator~` of
+// an over-approximated set under-approximates. `~({c} & [0,1])` computed as
+// `~{c}` = `(-inf,c) | (c,+inf)` used to make `x = {c} && ~({c} & [0,1])`
+// collapse to bot -- a wrong UNSAT -- whereas the true complement is all of
+// Q when c is outside [0,1]. The value therefore carries an `inexact` flag
+// (qlt::inexact): `operator&` sets it whenever this branch fires (or a
+// produced piece has undecidable emptiness), `|` and `&` propagate it, and
+// `operator~` answers `top` for an inexact operand, which keeps every
+// derived value an over-approximation. The result is one-sided: never a
+// wrong UNSAT, possibly a wrong SAT on undecidable comparisons -- the same
+// direction `qlt_piece_empty` already takes. Exact treatment needs case
+// splits (or a constraint store), which this representation cannot express.
 std::optional<qlt_piece> qlt_piece_intersect(const qlt_piece& a, const qlt_piece& b)
 {
 	auto lo = qlt_lo_max(a.lo, b.lo);
@@ -441,7 +446,9 @@ qlt qlt::operator|(const qlt& o) const {
 	ps.reserve(pieces.size() + o.pieces.size());
 	for (auto& p : pieces) ps.push_back(p);
 	for (auto& p : o.pieces) ps.push_back(p);
-	return normalise(std::move(ps));
+	qlt r = normalise(std::move(ps));
+	r.inexact = r.inexact || inexact || o.inexact;
+	return r;
 }
 
 qlt qlt::operator&(const qlt& o) const {
@@ -453,15 +460,33 @@ qlt qlt::operator&(const qlt& o) const {
 	// `normalise` restores sortedness and merges what is mergeable.
 	std::vector<qlt_piece> result;
 	result.reserve(pieces.size() * o.pieces.size());
+	bool approx = inexact || o.inexact;
 	for (const auto& p : pieces)
 		for (const auto& q : o.pieces)
-			if (auto r = qlt_piece_intersect(p, q); r)
+			if (auto r = qlt_piece_intersect(p, q); r) {
+				// The over-approximating branch of qlt_piece_intersect
+				// returns a whole operand; an exact intersection is
+				// the pointwise max/min of the endpoints, so any
+				// result that is not that (or whose emptiness is
+				// undecidable) marks the value inexact.
+				const bool exact_lo = qlt_lo_max(p.lo, q.lo).has_value();
+				const bool exact_hi = qlt_hi_min(p.hi, q.hi).has_value();
+				if (!exact_lo || !exact_hi
+					|| qlt_piece_emptiness_undecidable(*r))
+					approx = true;
 				result.push_back(*r);
-	return normalise(std::move(result));
+			}
+	qlt res = normalise(std::move(result));
+	res.inexact = res.inexact || approx;
+	return res;
 }
 
 qlt qlt::operator~() const {
 	if (pieces.empty()) return top();
+	// Complementing an over-approximation exactly would under-approximate
+	// (see qlt_piece_intersect); `top` is the smallest over-approximation
+	// of the complement this representation can state.
+	if (inexact) return top();
 	std::vector<qlt_piece> result;
 	// Start from -inf
 	qlt_endpoint cur{ qlt_rational::make_neg_inf(), qlt_bound::OPEN };

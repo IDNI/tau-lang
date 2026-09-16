@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <iostream>
+#include <cerrno>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 
@@ -142,6 +144,27 @@ cli::options tau_options() {
 	opts["cache-bound"] = cli::option("cache-bound", 'A', "4096")
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default 4096; 0 = unbounded)");
+	// The two LTL(ABA) knobs below keep an environment fallback
+	// (TAU_LTL_TIMEOUT_SEC, TAU_LTL_ALG) for scripts that already set it;
+	// an empty default means "not given", so the fallback stays in force
+	// unless the flag is passed.
+	opts["ltl-timeout"] = cli::option("ltl-timeout", 'T', "")
+		.set_description("wall-clock cap in seconds on each ltlsynt call "
+			"(0 = no watchdog; default: TAU_LTL_TIMEOUT_SEC or 60)");
+	opts["ltl-alg"] = cli::option("ltl-alg", 'L', "")
+		.set_description("omcat synthesis algorithm: A, B, D or auto "
+			"(default: TAU_LTL_ALG or auto)");
+	opts["ltl-qe-max-vars"] = cli::option("ltl-qe-max-vars", 'K', "0")
+		.set_description("free-variable cap of the omcat QE fast path; "
+			"above 2 is not sound (0 = TAU_LTL_OMCAT_QE_MAX_VARS or 2)");
+	opts["ltl-hoa-max-states"] =
+		cli::option("ltl-hoa-max-states", 'Y', "4194304")
+		.set_description("largest state count accepted from an ltlsynt "
+			"HOA strategy (default 4194304; 0 = unlimited)");
+	opts["ltl-guard-max-cubes"] =
+		cli::option("ltl-guard-max-cubes", 'U', "512")
+		.set_description("cap the DNF cubes a HOA guard may expand into "
+			"in the Algorithm D game (default 512; 0 = unlimited)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
 		.set_description("tree-node count floor before gc may trigger "
 			"(default 256)");
@@ -330,6 +353,20 @@ int main(int argc, char** argv) {
 	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
 	tau_api::set_max_cover_products(optnum("max-cover-products"));
 	tau_api::set_cache_bound(optnum("cache-bound"));
+	if (const string t = opts["ltl-timeout"].get<string>(); !t.empty()) {
+		char* end = nullptr;
+		errno = 0;
+		long v = std::strtol(t.c_str(), &end, 10);
+		if (end == t.c_str() || *end != '\0' || v < 0 || errno == ERANGE)
+			return error("--ltl-timeout expects a non-negative number "
+				"of seconds, got '" + t + "'");
+		tau_api::set_ltl_timeout_sec(v);
+	}
+	if (const string a = opts["ltl-alg"].get<string>(); !a.empty())
+		tau_api::set_ltl_algorithm(a);
+	tau_api::set_ltl_qe_max_vars(optnum("ltl-qe-max-vars"));
+	tau_api::set_ltl_hoa_max_states(optnum("ltl-hoa-max-states"));
+	tau_api::set_ltl_guard_max_cubes(optnum("ltl-guard-max-cubes"));
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));

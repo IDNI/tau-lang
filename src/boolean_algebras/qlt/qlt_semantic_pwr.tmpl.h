@@ -210,9 +210,9 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	int K = (int)atoms.size();
 	int T1_size = 2 * (int)constants.size() + 1;
 	// LS-11: named cap + a log line when it trips (the silent gate hid
-	// why optimal mode never ran for >= 21 atoms). Promote to a runtime
-	// parameter when that mechanism lands (same family as issue #36).
-	constexpr int semantic_pwr_max_atoms = 20;
+	// why optimal mode never ran for >= 21 atoms). The cap is qlt's
+	// runtime option `qlt-t3-cap` (qlt_t3_encoding_cap, qlt.h).
+	const int semantic_pwr_max_atoms = qlt_t3_encoding_cap_effective();
 	if (T1_size <= 0 || K <= 0 || K > semantic_pwr_max_atoms) {
 		if (K > semantic_pwr_max_atoms)
 			TAU_LOG_DEBUG << "[semantic_pwr] optimal mode skipped: "

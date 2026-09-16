@@ -12,11 +12,27 @@
 #
 
 # find_fixpoint_phi: a lookback-2 always-spec needs at least 2 phi steps, so
-# a cap of 1 must give up (loudly) and still terminate.
+# a cap of 1 must give up (loudly) and still terminate. A give-up is no
+# verdict: the query must end in an error, never print `%1: T` or `%1: F`
+# (the partial phi used to be decided as if it were the continuation).
 add_test(NAME "test_repl-limit_effect-fixpointsteps_giveup"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 1 -e \"sat always o1[t] = o1[t-2]\"")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 1 -e \"sat always o1[t] = o1[t-2]\" 2>&1")
 set_tests_properties("test_repl-limit_effect-fixpointsteps_giveup" PROPERTIES
-	PASS_REGULAR_EXPRESSION "find_fixpoint_phi: exceeded 1 steps")
+	PASS_REGULAR_EXPRESSION "find_fixpoint_phi: exceeded 1 steps"
+	FAIL_REGULAR_EXPRESSION ": T|: F")
+add_test(NAME "test_repl-limit_effect-fixpointsteps_giveup_is_an_error"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-fixpoint-steps 1 -e \"sat always o1[t] = o1[t-2]\" 2>&1")
+set_tests_properties("test_repl-limit_effect-fixpointsteps_giveup_is_an_error" PROPERTIES
+	PASS_REGULAR_EXPRESSION "gave up before reaching a result")
+
+# The verdict memo is keyed on the formula; a budget change between two
+# queries must drop it. With the cap raised back to unlimited the same
+# spec, asked again in the same session, must be decided (`: T`) instead
+# of answered from the first query's give-up.
+add_test(NAME "test_repl-limit_effect-fixpointsteps_memo_dropped_on_change"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set fixpointsteps 1. sat always o1[t] = o1[t-2]. set fixpointsteps 0. sat always o1[t] = o1[t-2]\" 2>&1")
+set_tests_properties("test_repl-limit_effect-fixpointsteps_memo_dropped_on_change" PROPERTIES
+	PASS_REGULAR_EXPRESSION ": T")
 
 # fixpointsteps ships unlimited, so this workload completes without
 # ever reaching a cap.

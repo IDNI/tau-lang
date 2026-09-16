@@ -24,6 +24,13 @@
 #include "bounded_cache.h"
 #include "ocltl_phi_delta.h"
 #include "boolean_algebras/nso_ba.h"
+#include "logging.h"
+#include "ltl_aba_limits.h"
+#include <algorithm>
+#include <cctype>
+#include <cerrno>
+#include <cstdlib>
+#include <functional>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -62,6 +69,35 @@ inline size_t max_consistency_subsets = 4096;
  * `set maxcoverproducts`, `api::set_max_cover_products`); 0 = unlimited.
  */
 inline size_t max_cover_products = 256;
+
+// The ltlsynt watchdog, the algorithm choice and the QE cap
+// (`ltl_timeout_sec_param`, `ltl_algorithm_param`, `ltl_qe_max_vars_param`
+// and their accessors) live in ltl_aba_limits.h so the qlt plugin headers,
+// which are compiled before this header is complete, can read them.
+
+/**
+ * @brief Fingerprint of every runtime parameter that can change a
+ * satisfiability or realizability verdict.
+ *
+ * The verdict memos (`is_tau_formula_sat`, `transform_to_execution`, the
+ * oracle feasibility caches) are keyed on the formula only; a budget change
+ * between two queries would otherwise return the first query's bounded
+ * give-up as the second's answer. Each memo compares this fingerprint with
+ * the one it was filled under and drops its entries when they differ.
+ */
+inline size_t ltl_verdict_budget_fingerprint(size_t seed = 0) {
+	auto mix = [&seed](size_t v) {
+		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+	};
+	mix(max_consistency_subsets);
+	mix(max_cover_products);
+	mix((size_t) ltl_timeout_sec());
+	mix(std::hash<std::string>{}(ltl_algorithm_choice()));
+	mix(ltl_qe_max_vars());
+	mix(ltl_hoa_max_states);
+	mix(ltl_guard_max_cubes);
+	return seed;
+}
 
 // ── Detection ────────────────────────────────────────────────────────────────
 

@@ -36,3 +36,21 @@ add_repl_test_fail(set_cmd-severity_invalid "set severity foobar" "Invalid sever
 
 # get with equals-sign syntax
 add_repl_test(set_cmd-status_equals "set status = off" "off")
+
+# LTL(ABA) synthesis knobs: get shows the effective value, set round-trips
+# through the api setter, an unknown algorithm letter is rejected.
+add_repl_test(get_cmd-ltltimeout        "get ltltimeout"        "ltltimeout: *60s")
+add_repl_test(set_cmd-ltltimeout        "set ltltimeout 7"      "ltltimeout: *7s")
+add_repl_test(set_cmd-ltltimeout_off    "set ltltimeout 0"      "ltltimeout: *off")
+add_repl_test(get_cmd-ltlalg            "get ltlalg"            "ltlalg: *auto")
+add_repl_test(set_cmd-ltlalg_b          "set ltlalg B"          "ltlalg: *B")
+add_repl_test(set_cmd-ltlalg_lowercase  "set ltlalg d"          "ltlalg: *D")
+add_repl_test(set_cmd-ltlalg_auto       "set ltlalg B. set ltlalg auto. get ltlalg" "ltlalg: *auto")
+add_repl_test_fail(set_cmd-ltlalg_invalid "set ltlalg C"      "expected A, B, D or auto")
+add_repl_test(get_cmd-ltlqemaxvars      "get ltlqemaxvars"      "ltlqemaxvars: *2")
+add_repl_test(set_cmd-ltlqemaxvars      "set ltlqemaxvars 3"    "ltlqemaxvars: *3")
+add_repl_test(get_cmd-ltlhoamaxstates   "get ltlhoamaxstates"   "ltlhoamaxstates: *4194304")
+add_repl_test(set_cmd-ltlhoamaxstates   "set ltlhoamaxstates 0" "ltlhoamaxstates: *unlimited")
+add_repl_test(get_cmd-ltlguardmaxcubes  "get ltlguardmaxcubes"  "ltlguardmaxcubes: *512")
+add_repl_test(set_cmd-ltlguardmaxcubes  "set ltlguardmaxcubes 9" "ltlguardmaxcubes: *9")
+add_repl_test(help_set_lists_ltl_options "help set" "ltltimeout")

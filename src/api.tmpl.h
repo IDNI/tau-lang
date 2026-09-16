@@ -204,6 +204,32 @@ void api<node>::set_max_cover_products(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_timeout_sec(long seconds) {
+	ltl_timeout_sec_param = seconds < 0 ? -1
+		: std::min(seconds, ltl_timeout_sec_max);
+}
+
+template <NodeType node>
+void api<node>::set_ltl_algorithm(const std::string& alg) {
+	ltl_algorithm_param = alg;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_qe_max_vars(size_t n) {
+	ltl_qe_max_vars_param = n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_hoa_max_states(size_t n) {
+	ltl_hoa_max_states = n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_guard_max_cubes(size_t n) {
+	ltl_guard_max_cubes = n;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	pwr_semantic_fallback = on;
 }
@@ -856,10 +882,15 @@ result<bool> api<node>::realizable(tref fm) {
 	if (!fm || !is_fm) {
 		return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 	}
-	// whole-query BA fast path; falls through when undecided.
-	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
-		return r.with_assert_check_value(fast.value());
-	}
+	// Whole-query BA fast path; falls through when undecided. It decides
+	// SATISFIABILITY (every stream chosen existentially), which equals
+	// realizability only when no input stream is involved: over inputs it
+	// answered `(o1:bv[1] = 1) && (i1:bv[1] = 0)` REALIZABLE, although the
+	// environment owns i1 (found by the CROSS-bv1 fuzz suite).
+	if (!atom_has_any_input<node>(fm))
+		if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
+			return r.with_assert_check_value(fast.value());
+		}
 	// normalize_formula() fails on failures that are reachable from user
 	// input: a non-well-founded recurrence, a definition set whose
 	// expansion never settles, a fallback type mismatch, or a get_nso_rr
@@ -887,7 +918,10 @@ result<bool> api<node>::realizable(tref fm) {
 		// verdict, so ask the realizability procedure directly
 		// instead of going through it.
 		r = is_ltl_aba_realizable<node>(target, 0, true);
-	} else if (auto s = sat(fm); s.has_value() && !s.value()) {
+	} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
+		s.has_value() && !s.value()) {
+		// (a spec root is not a formula: sat() used to reject it with
+		// an error here, which fell through the same way)
 		// unsat(fm) => unrealizable(fm): reject without running
 		// synthesis. An undecided sat (error) is not a decided
 		// false, so it falls through to the real check below.
@@ -927,6 +961,15 @@ result<bool> api<node>::sat(tref fm) {
 	if (!fm || !is_formula(fm)) {
 		return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 	}
+	return sat_prepared(fm);
+}
+
+// sat() after its simplify/flatten prefix. realizable() has already paid
+// that prefix (simplify is a full type-inference traversal with no memo)
+// when it asks for the unsat shortcut, so it enters here directly.
+template <NodeType node>
+result<bool> api<node>::sat_prepared(tref fm) {
+	result<bool> r;
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
 		return r.with_assert_check_value(fast.value());

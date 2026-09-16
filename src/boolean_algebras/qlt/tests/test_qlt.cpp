@@ -944,6 +944,43 @@ TEST_CASE("{c} & [0,1] over-approximates to {c}") {
 
 // The equal-sym path is exact, so the undecidable over-approximation above
 // does not leak into a case that is decidable.
+// The over-approximating intersection marks its result inexact, and the
+// complement of an inexact value is `top`: `x = {c} && ~({c} & [0,1])` must
+// stay satisfiable (c outside [0,1] is a model), where the exact complement
+// `~{c}` used to decide it UNSAT.
+TEST_CASE("{c} & [0,1] is marked inexact, {c} itself is not") {
+	auto a = sym_singleton("c");
+	CHECK(!a.inexact);
+	CHECK((a & cc(0, 1)).inexact);
+	CHECK((cc(0, 1) & a).inexact);
+	CHECK(!(a & a).inexact);
+	CHECK(!(cc(0, 1) & cc(0, 2)).inexact);
+}
+
+TEST_CASE("complement of an inexact value is top") {
+	auto a = sym_singleton("c");
+	auto approx = a & cc(0, 1);
+	CHECK((~approx) == qlt::top());
+	CHECK(!(~approx).inexact);
+}
+
+TEST_CASE("{c} & ~({c} & [0,1]) stays non-empty") {
+	auto a = sym_singleton("c");
+	auto r = a & ~(a & cc(0, 1));
+	CHECK(r != qlt::bottom());
+	CHECK(r == a);
+}
+
+TEST_CASE("inexactness propagates through | and &") {
+	auto a = sym_singleton("c");
+	auto d = sym_singleton("d");
+	auto approx = a & cc(0, 1);
+	CHECK((approx | d).inexact);
+	CHECK((d | approx).inexact);
+	CHECK((approx & cc(0, 5)).inexact);
+	CHECK(!(d | cc(0, 1)).inexact);
+}
+
 TEST_CASE("({c} & [0,1]) & ~{c} is still bot") {
 	auto a = sym_singleton("c");
 	CHECK(((a & cc(0, 1)) & ~a) == qlt::bottom());

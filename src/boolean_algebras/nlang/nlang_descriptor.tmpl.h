@@ -10,6 +10,7 @@
 
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
+#include <array>
 #include "ba_types.h"
 
 namespace idni::tau_lang {
@@ -43,6 +44,31 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	static bool matches_type(tref type_tree) {
 		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
 			type_tree, type_name);
+	}
+
+	/// @name nlang-declared CLI/REPL options
+	/// @{
+	static size_t get_http_timeout_option() {
+		return (size_t) nlang_http_timeout_sec;
+	}
+	static void set_http_timeout_option(size_t n) {
+		nlang_http_timeout_sec = (long) n;
+	}
+	/// @}
+
+	/**
+	 * @brief The options nlang declares about itself:
+	 * `nlang-http-timeout`, the per-request wall-clock cap of the LLM
+	 * oracle's HTTP calls in seconds (default 15; 0 = no cap).
+	 */
+	static std::array<ba_option, 1> options() {
+		return {{
+			{ "http-timeout", ba_option_kind::count,
+				nullptr, nullptr,
+				get_http_timeout_option, set_http_timeout_option,
+				"cap each LLM oracle HTTP request at this many "
+				"seconds (default 15; 0 = no cap)" },
+		}};
 	}
 
 	static tref type_tree() {
