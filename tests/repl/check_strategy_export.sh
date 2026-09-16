@@ -8,13 +8,15 @@ set -u
 TAU="${1:?usage: check_strategy_export.sh <tau-binary> <command>}"
 CMD="${2:?usage: check_strategy_export.sh <tau-binary> <command>}"
 
+source "${BASH_SOURCE[0]%/*}/resolve_timeout.sh"
+
 TMP="$(mktemp -t tau_strategy_export.XXXXXX.hoa)" || {
 	echo "FAIL: could not create temp file" >&2; exit 1; }
 # Remove on every exit path, unlike the C++ case.
 # on the success path, which leaks a file per failed run.
 trap 'rm -f "${TMP}"' EXIT
 
-out="$(TAU_LTL_EXPORT_STRATEGY_FILE="${TMP}" timeout 300 "${TAU}" -e "${CMD}" 2>&1)"
+out="$(TAU_LTL_EXPORT_STRATEGY_FILE="${TMP}" run_with_timeout 300 "${TAU}" -e "${CMD}" 2>&1)"
 rc=$?
 
 if [ "${rc}" -eq 124 ]; then

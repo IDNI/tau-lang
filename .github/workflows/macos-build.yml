@@ -37,8 +37,8 @@ jobs:
       - name: Run tau
         run: ./build-Release/tau -v
 
-      - name: Install spot for the LTL suites
-        run: brew install spot
+      - name: Install spot and coreutils for the test suites
+        run: brew install spot coreutils
 
       - name: Build tests
         run: ./dev release -DTAU_BUILD_API_TESTS=ON

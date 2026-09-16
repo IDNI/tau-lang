@@ -98,6 +98,30 @@ suite once in `release` before committing — do not run the full suite in
 devel first. Never use debug (`-O0`) builds or test runs for verification;
 debug exists only for gdb.
 
+## Logging and diagnostics
+
+`src/logging.h` is the reference for logging. It documents the stream macros
+(`LOG_ERROR`, `LOG_WARNING`, `LOG_INFO`, `LOG_DEBUG`, `LOG_TRACE`), the color
+helpers, and the line-number helpers. Error, warning and info messages always
+print. A debug or trace message needs two gates open at the same time:
+
+- `-DTAU_LOG_CHANNELS=ON` compiles the debug and trace channels in.
+- The channel name must appear uncommented in the `LOG_ENABLED_CHANNELS` list
+  in `src/logging.h`. Each file names its own channel with `LOG_CHANNEL_NAME`,
+  usually after the includes. Most channels in that list stay commented out.
+
+A test binary needs a third option, `-DTAU_LOG_TRACE_TESTS=ON`. It makes the
+test main lower the severity to trace (`tests/test_init.h`). Without it the
+severity stays at info, and no trace line prints even with the channel on.
+
+`src/tau_diagnostics.h` gives the other instrument, over
+`external/parser/src/utility/diagnostics.h`. A `report` collects structured
+nodes instead of text. `report::open(name)` opens a timed scope and records the
+elapsed microseconds when the scope closes. The same report carries counters
+(`info_count`) and memory figures (`info_kb`), and the scope names show which
+branch a run took. Set `rule_counting` to get per-rule hit counts. Prefer a
+report over a trace channel when you must measure, count, or benchmark.
+
 ## WebAssembly
 
 Tau builds for wasm through Emscripten as three separate artifacts: a **library**
