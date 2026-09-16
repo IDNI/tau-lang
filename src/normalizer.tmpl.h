@@ -389,6 +389,16 @@ tref bv_case_split_quantifiers(tref formula) {
 template <NodeType node>
 tref eliminate_bv_and_quantifiers(tref form) {
 	using tau = tree<node>;
+	// Definitional existentials first (opt-in). An output that a total
+	// definition determines is substituted where it is read -- and dropped
+	// where it is not -- before the case split can copy its definition into
+	// every instance and before the closed bitvector formula reaches the
+	// solver with the binders still on it. The substitution pass itself
+	// exists (anti_prenex runs it), but on this path it ran after both.
+	if (bv_definitional_elimination_enabled()) {
+		form = ex_subs_definitional_elimination<node>(form);
+		form = scope_out_independent_conjuncts<node>(form);
+	}
 	// The split only applies to a bitvector-typed binder: skip the walk
 	// when there is none. find_top_until, not find_top: tau_ba constants
 	// carry their own binders and are not formula nodes.

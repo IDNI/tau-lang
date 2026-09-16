@@ -60,6 +60,43 @@ tref ex_subs_based_elimination(tref var, tref ex_clause);
 template <NodeType node>
 tref ex_subs_based_elimination(tref fm);
 
+/**
+ * @brief Eliminate the bitvector variables of a block of same-kind
+ * existential binders that a total definition determines.
+ *
+ * The block is the run of `ex` binders in conjunct position hanging off
+ * @p root. For a bound bitvector `x`, the conjuncts of a block scope that
+ * mention `x` are flattened into clauses `D_i || x = c_i` with `x`-free
+ * `D_i` (a bare equation has `D_i = F`; clauses with the same `c` merge).
+ * The smallest subset whose `D`-conjunction is propositionally
+ * unsatisfiable is a total definition: it forces `x` in every cell. If
+ * every pair `D_i || D_j` is valid the cells are exclusive and
+ *
+ *     ex x (definition && psi(x))  ==  \/_i (!D_i && psi[x := c_i])
+ *
+ * which is `T` when nothing reads `x`. Non-exclusive cells keep the
+ * consistency atoms `D_j || c_i = c_j`. Variables are taken in reverse
+ * dependency order (one whose witnesses no other definition mentions
+ * first), a witness that a binder inside the scope would capture declines
+ * the substitution, and a variable without a total definition keeps its
+ * binder. An identity on the formula.
+ *
+ * @tparam node Tree node type.
+ * @param root A `wff` whose child is the outermost `wff_ex` of the block.
+ * @return The rewritten block, or @p root when nothing applies.
+ */
+template <NodeType node>
+tref ex_subs_block_elimination(tref root);
+
+/**
+ * @brief Apply `ex_subs_block_elimination` to every existential block of
+ * @p fm, outermost first (pre-order continues into the rewritten node).
+ * Called at the entry of `eliminate_bv_and_quantifiers` when
+ * `bv_definitional_elimination` is on.
+ */
+template <NodeType node>
+tref ex_subs_definitional_elimination(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "ex_subs_based_elimination.tmpl.h"

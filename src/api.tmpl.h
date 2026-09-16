@@ -198,6 +198,11 @@ void api<node>::set_bv_case_split(bool state) {
 }
 
 template <NodeType node>
+void api<node>::set_bv_definitional_elimination(bool state) {
+	bv_definitional_elimination = state;
+}
+
+template <NodeType node>
 void api<node>::set_bv_case_split_max_tests(size_t n) {
 	bv_case_split_max_tests = n ? n : std::numeric_limits<size_t>::max();
 }

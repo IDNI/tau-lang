@@ -57,6 +57,11 @@ cli::options tau_options() {
 		.set_description(std::string("bitvector case split of quantified "
 			"variables tested against constants (")
 			+ (bv_case_split ? "enabled" : "disabled") + " by default)");
+	opts["bv-definitional-elimination"] = cli::option(
+		"bv-definitional-elimination", 'L', bv_definitional_elimination)
+		.set_description(std::string("eliminate existentially quantified "
+			"bitvector variables that a total definition determines, before "
+			"the case split (") + (bv_definitional_elimination ? "enabled" : "disabled") + " by default)");
 	opts["bv-widening"] = cli::option("bv-widening", 'y', bv_widening)
 		.set_description(std::string("exact (widened) bitvector arithmetic (")
 			+ (bv_widening ? "enabled" : "disabled") + " by default)");
@@ -249,6 +254,8 @@ int main(int argc, char** argv) {
 	bool charvar = opts["charvar"].get<bool>();
 	bool blasting = opts["blasting"].get<bool>();
 	tau_api::set_bv_case_split(opts["bv-case-split"].get<bool>());
+	tau_api::set_bv_definitional_elimination(
+		opts["bv-definitional-elimination"].get<bool>());
 	tau_api::set_ba_component_factoring(
 		opts["ba-component-factoring"].get<bool>());
 	bool bv_widening_opt = opts["bv-widening"].get<bool>();

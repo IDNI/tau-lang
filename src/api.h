@@ -290,6 +290,8 @@ struct api {
 	/// variables compared only against constants (normalizer.tmpl.h). Off by
 	/// default.
 	static void set_bv_case_split(bool state);
+	/// @brief Enable/disable the elimination of definitional existentials (bv_definitional_elimination).
+	static void set_bv_definitional_elimination(bool state);
 	/// Cap the constants a quantified bitvector variable may be tested
 	/// against for the case split to apply (0 = unlimited).
 	static void set_bv_case_split_max_tests(size_t n);

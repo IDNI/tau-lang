@@ -55,6 +55,22 @@ inline bool bv_case_split_enabled() {
 /// api::set_bv_case_split_max_tests, --bv-case-split-max-tests, or the REPL
 /// option casesplitmaxtests.
 inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
+/// Elimination of definitional existentials before the case split (see
+/// `ex_subs_definitional_elimination` in heuristics/ex_subs_based_elimination.h
+/// and the entry of `eliminate_bv_and_quantifiers`). Off by default; an
+/// identity on the formula. Enabled via `api::set_bv_definitional_elimination`,
+/// `--bv-definitional-elimination`, the REPL option `defelim`, or the
+/// environment variable TAU_BV_DEFINITIONAL_ELIMINATION=1 (the variable
+/// overrides the flag in both directions, as for the case split).
+inline bool bv_definitional_elimination = false;
+inline bool bv_definitional_elimination_enabled() {
+	static const std::optional<bool> env = []() -> std::optional<bool> {
+		const char* v = std::getenv("TAU_BV_DEFINITIONAL_ELIMINATION");
+		if (!v || !*v) return std::nullopt;
+		return !(v[0] == '0' && v[1] == '\0');
+	}();
+	return env ? *env : bv_definitional_elimination;
+}
 
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
