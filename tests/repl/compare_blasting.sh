@@ -14,7 +14,7 @@ TIME_LIMIT_S=1200
 ulimit -v "${MEMORY_LIMIT_KB}" 2>/dev/null || \
 	echo "warning: could not apply ${MEMORY_LIMIT_KB}KB address-space limit" >&2
 
-source "${BASH_SOURCE[0]%/*}/resolve_timeout.sh"
+source "${BASH_SOURCE[0]%/*}/../../scripts/resolve_timeout"
 
 # Run one normalization and echo its result line.
 run_normalize() {

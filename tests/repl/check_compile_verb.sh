@@ -7,7 +7,7 @@ set -u
 TAU="${1:?usage: check_compile_verb.sh <tau-binary> <spec-file>}"
 SPEC="${2:?usage: check_compile_verb.sh <tau-binary> <spec-file>}"
 
-source "${BASH_SOURCE[0]%/*}/resolve_timeout.sh"
+source "${BASH_SOURCE[0]%/*}/../../scripts/resolve_timeout"
 
 TMPDIR="$(mktemp -d -t tau_compile_verb.XXXXXX)" || {
 	echo "FAIL: could not create scratch dir" >&2; exit 1; }
