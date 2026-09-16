@@ -37,7 +37,9 @@
 #include "foundations/subst.h"
 #include "foundations/prims.h"
 #include "foundations/ctx.h"
-// layer 1 — normalisers/joins.h, nnf.h, simplify.h
+// layer 1 — normalisers
+#include "normalisers/joins.h"
+// normalisers/nnf.h, normalisers/simplify.h
 // layer 2 — witness/witness.h
 // layer 3 — shared/parts.h, cofactors.h; eliminate/conditions.h,
 //           eliminate_block.h, atomless.h

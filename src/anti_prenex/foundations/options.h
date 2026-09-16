@@ -3,7 +3,8 @@
 /**
  * @file options.h
  * @brief Anti-prenexing foundations (layer 0): the six knobs of the §1 ctx
- * table, as process-wide defaults.
+ * table, plus `absorb_occ_max`, which belongs to the result joins and is read
+ * bare — all as process-wide defaults.
  *
  * Plain `inline` globals in a dependency-free header — the pattern of
  * `heuristics/bv_simplify_options.h` — so both the algorithm and the API
@@ -57,6 +58,14 @@ inline size_t accept_growth = 16;
 
 /// §1: absolute `|·|` below which the size acceptance never fires.
 inline size_t accept_floor = size_t(1) << 20;
+
+/// §1 `absorb_occ_max`: occurrence limit of the result joins' absorption pass
+/// (§3). A part occurring in more members than this is no candidate key, and
+/// a member all of whose parts exceed it stays unabsorbed. NOT a component
+/// knob: the joins run in every phase and have no ctx, so `ctx::for_component`
+/// does not copy it and every use reads it BARE, here. Precision, never
+/// soundness.
+inline size_t absorb_occ_max = 32;
 
 } // namespace idni::tau_lang::anti_prenexing
 
