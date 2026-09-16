@@ -14,10 +14,12 @@ TIME_LIMIT_S=1200
 ulimit -v "${MEMORY_LIMIT_KB}" 2>/dev/null || \
 	echo "warning: could not apply ${MEMORY_LIMIT_KB}KB address-space limit" >&2
 
+source "${BASH_SOURCE[0]%/*}/resolve_timeout.sh"
+
 # Run one normalization and echo its result line.
 run_normalize() {
 	local mode="$1" out rc
-	out="$(timeout "${TIME_LIMIT_S}" "${TAU}" \
+	out="$(run_with_timeout "${TIME_LIMIT_S}" "${TAU}" \
 		-e "set bv-blasting ${mode}. normalize ${FORMULA}." 2>&1)"
 	rc=$?
 	if [ "${rc}" -eq 124 ]; then
