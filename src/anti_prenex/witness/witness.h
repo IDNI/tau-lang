@@ -88,13 +88,17 @@ std::optional<tref> try_witness(tref x, tref psi);
  * function of the binder node.
  *
  * One descent from `Φ` toward `x`'s occurrences, through ∧, ∨ and binders
- * only. A SPINE is a `wff_and` for `Q = ∃` and a `wff_or` for `Q = ∀`; at one
- * the pass rewrites, in the first of two shapes that fits:
+ * only. A SPINE is a flattened `wff_and` for `Q = ∃` and a flattened `wff_or`
+ * for `Q = ∀` — and EVERY OTHER NODE IS A ONE-MEMBER SPINE, so a lone `x = t`
+ * body, or a bare guarded assignment, fires as well as one among siblings
+ * (§3: what the loop's last arm declines is an atom WITHOUT a pin). At a
+ * spine the pass rewrites, in the first of two shapes that fits:
  *
  *  - a PLAIN PIN: a member that is `x = t` (`Q = ∃`) or `x ≠ t` (`Q = ∀`),
  *    STRICT — the member is DROPPED, so a weak pin's residual would be lost —
  *    with `x ∉ FV(t)` and `FV(t) ∩ D = ∅`. The spine becomes its other
- *    members, each `[x ← t]`.
+ *    members, each `[x ← t]`; on a one-member spine that join is EMPTY, which
+ *    is `T` for `∃` and `F` for `∀`.
  *  - a CASE PIN: a member `M` that is an ∨-of-branches (`Q = ∀`: an
  *    ∧-of-branches) every branch of which pins `x` strictly, at most
  *    `case_max` branches, and whose WHOLE node avoids `D`. The spine becomes

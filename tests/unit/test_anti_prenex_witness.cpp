@@ -285,6 +285,47 @@ TEST_CASE("W10: the case-pin counterexample — the WHOLE member must avoid D") 
 	// is free in two members, so the descent stops.
 	CHECK(!ap::try_witness_deep<node_t>(EX, fvar("x"),
 		all_("y", conj(guard, eq0(lor(x, a))))).has_value());
+	// THE TEST IS REACHED, and `D` is the only thing refusing it: the same
+	// shape under a binder of `Q`'s OWN kind — nothing flips, so `D` stays
+	// empty and `y` is usable — IS rewritten, to `∃y.(y = 0 ∨ y ≠ 0)`.
+	auto r = ap::try_witness_deep<node_t>(EX, fvar("x"), ex("y", guard));
+	REQUIRE(r.has_value());
+	CHECK(!holds_var(*r, "x"));
+	CHECK(are_nso_equivalent<node_t>(ex("x", ex("y", guard)), *r));
+}
+
+TEST_CASE("W10b: a node that is no junction is a ONE-MEMBER spine") {
+	tref x = bvar("x"), t = bvar("t"), a = bvar("a"), c = bvar("c");
+	tref t1 = bvar("t1"), t2 = bvar("t2");
+	// `∃x.(x = t)`: the body is the whole spine, the pin is its only
+	// member, and what is left is the EMPTY ∧-join — `T`.
+	auto r = ap::try_witness_deep<node_t>(EX, fvar("x"), eq(x, t));
+	REQUIRE(r.has_value());
+	CHECK(tau::get(*r).equals_T());
+	// The ∀ dual, in both spellings of the negated equation: the empty
+	// ∨-join is `F`, and `∀x.(x ≠ t)` is indeed F.
+	for (tref pinning : { neg(eq(x, t)), neq(x, t) }) {
+		auto q = ap::try_witness_deep<node_t>(ALL, fvar("x"), pinning);
+		REQUIRE(q.has_value());
+		CHECK(tau::get(*q).equals_F());
+	}
+	// Under the OTHER connective: the descent reaches the atom, which is
+	// its own one-member spine, and `a ∨ T` folds.
+	const tref under_or = disj(eq0(a), eq(x, t));
+	auto u = ap::try_witness_deep<node_t>(EX, fvar("x"), under_or);
+	REQUIRE(u.has_value());
+	CHECK(!holds_var(*u, "x"));
+	CHECK(are_nso_equivalent<node_t>(ex("x", under_or), *u));
+	CHECK(tau::get(*u).equals_T());
+	// A BARE guarded assignment, with no `R` to carry: the ∨-node is the
+	// one-member spine and the case pin rewrites it to
+	// `⋁ᵢ (dᵢ minus its pin)[x ← tᵢ]`.
+	const tref bare = disj(conj(eq0(c), eq(x, t1)),
+		conj(neg(eq0(c)), eq(x, t2)));
+	auto b = ap::try_witness_deep<node_t>(EX, fvar("x"), bare);
+	REQUIRE(b.has_value());
+	CHECK(!holds_var(*b, "x"));
+	CHECK(are_nso_equivalent<node_t>(ex("x", bare), *b));
 }
 
 TEST_CASE("W11: a branch that is a unit is never a case pin") {
@@ -385,6 +426,9 @@ TEST_CASE("W15: one pass eliminates two binders, nested or side by side") {
 	CHECK(!holds(r, tau::wff_ex));
 	CHECK(are_nso_equivalent<node_t>(r, nested));
 	CHECK(same(r, eq0(lor(lor(t, b), a))));
+	// A binder over a lone pin: the one-member spine leaves `T`.
+	CHECK(tau::get(ap::eliminate_by_substitution<node_t>(
+		ex("x", eq(x, t)))).equals_T());
 	// A formula no rewrite fires on comes back as the same node.
 	const tref stuck = ex("x", conj(eq0(land(x, b)), eq0(lor(x, a))));
 	CHECK(ap::eliminate_by_substitution<node_t>(stuck) == stuck);

@@ -230,72 +230,73 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 	const tref root = tau::trim_right_sibling(phi);
 	tref n = root;
 	for (;;) {
-		if (is_child<node>(n, spine_nt)) {
-			const trefs ms = members<node>(n);
-			// A PLAIN PIN: the first member that pins `x` strictly
-			// with a witness clear of `D`. The spine becomes its
-			// other members, each `[x ← t]`, joined in its own
-			// connective; the pin itself is dropped.
-			for (size_t i = 0; i < ms.size(); ++i) {
-				std::optional<pin<node>> p =
-					strict_pin_of<node>(ms[i], x, Q);
-				if (!p || fv_meets<node>(p->witness, D)) continue;
-				// (a) a strict witness is `x`-free by `usable`.
-				DBG(assert(!holds<node>(p->witness, x));)
-				trefs rest;
-				rest.reserve(ms.size() - 1);
+		const bool is_spine = is_child<node>(n, spine_nt);
+		const bool is_other = is_child<node>(n, other_nt);
+		// EVERY node is a spine (§3: a flattened conjunction for
+		// `Q = ∃`, a disjunction for `Q = ∀`). One of the spine's own
+		// connective hands over its members; ANY OTHER NODE IS A
+		// ONE-MEMBER SPINE, and the two tests below fire on it exactly
+		// as they would among siblings — which is why the loop's last
+		// arm reads "an atom WITHOUT a pin". What is left after the pin
+		// is then the EMPTY join: `T` for `∃`, `F` for `∀`.
+		const trefs ms = is_spine ? members<node>(n) : trefs{ n };
+		// A PLAIN PIN: the first member that pins `x` strictly with a
+		// witness clear of `D`. The spine becomes its other members,
+		// each `[x ← t]`, joined in its own connective; the pin itself
+		// is dropped.
+		for (size_t i = 0; i < ms.size(); ++i) {
+			std::optional<pin<node>> p =
+				strict_pin_of<node>(ms[i], x, Q);
+			if (!p || fv_meets<node>(p->witness, D)) continue;
+			// (a) a strict witness is `x`-free by `usable`.
+			DBG(assert(!holds<node>(p->witness, x));)
+			trefs rest;
+			rest.reserve(ms.size() - 1);
+			for (size_t j = 0; j < ms.size(); ++j)
+				if (j != i) rest.push_back(subst_var<node>(
+					ms[j], key, p->witness));
+			return rewriter::replace<node>(root, n,
+				join_of<node>(rest, ex));
+		}
+		// A CASE PIN: the WHOLE member must avoid `D`, not only the
+		// witnesses — past a kind flip the branch CHOICE may not depend
+		// on the inner variable (§3). The spine becomes
+		// `⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus M))[x ← tᵢ]`, dualised
+		// for `∀`; on a one-member spine there is nothing to carry and
+		// it is `⋁ᵢ (dᵢ minus its pin)[x ← tᵢ]`.
+		for (size_t i = 0; i < ms.size(); ++i) {
+			if (fv_meets<node>(ms[i], D)) continue;
+			auto bs = case_pin_of<node>(ms[i], x, Q);
+			if (!bs) continue;
+			trefs cases;
+			cases.reserve(bs->size());
+			for (const case_branch<node>& b : *bs) {
+				trefs parts;
+				parts.reserve(ms.size());
+				parts.push_back(subst_var<node>(
+					b.residue, key, b.witness));
 				for (size_t j = 0; j < ms.size(); ++j)
-					if (j != i) rest.push_back(subst_var<node>(
-						ms[j], key, p->witness));
-				return rewriter::replace<node>(root, n,
-					join_of<node>(rest, ex));
+					if (j != i) parts.push_back(
+						subst_var<node>(ms[j],
+							key, b.witness));
+				cases.push_back(join_of<node>(parts, ex));
 			}
-			// A CASE PIN: the WHOLE member must avoid `D`, not only
-			// the witnesses — past a kind flip the branch CHOICE may
-			// not depend on the inner variable (§3). The spine
-			// becomes `⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus M))
-			// [x ← tᵢ]`, dualised for `∀`.
-			for (size_t i = 0; i < ms.size(); ++i) {
-				if (fv_meets<node>(ms[i], D)) continue;
-				auto bs = case_pin_of<node>(ms[i], x, Q);
-				if (!bs) continue;
-				trefs cases;
-				cases.reserve(bs->size());
-				for (const case_branch<node>& b : *bs) {
-					trefs parts;
-					parts.reserve(ms.size());
-					parts.push_back(subst_var<node>(
-						b.residue, key, b.witness));
-					for (size_t j = 0; j < ms.size(); ++j)
-						if (j != i) parts.push_back(
-							subst_var<node>(ms[j],
-								key, b.witness));
-					cases.push_back(
-						join_of<node>(parts, ex));
-				}
-				return rewriter::replace<node>(root, n,
-					join_of<node>(cases, !ex));
-			}
-			// CONFINEMENT (b): `x` free in two members would put an
-			// occurrence outside the node any rewrite here reaches.
+			return rewriter::replace<node>(root, n,
+				join_of<node>(cases, !ex));
+		}
+		// THE DESCENT, one rule for both connectives: CONFINEMENT (b)
+		// refuses a junction with `x` free in two members — a rewrite
+		// below it would leave an occurrence outside the node it
+		// touches — and the `x`-free siblings of the one member that
+		// holds `x` ride along outside `Qx`.
+		if (is_spine || is_other) {
+			const trefs kids = is_spine ? ms : members<node>(n);
 			tref into = nullptr;
-			for (tref m : ms) if (holds<node>(m, x)) {
+			for (tref m : kids) if (holds<node>(m, x)) {
 				if (into) return {};
 				into = m;
 			}
 			if (!into) return {};   // nothing left to descend to
-			n = tau::trim_right_sibling(into);
-			continue;
-		}
-		if (is_child<node>(n, other_nt)) {
-			// The other connective: `x`-free siblings ride along
-			// outside `Qx`, so one child may hold `x` — no more.
-			tref into = nullptr;
-			for (tref m : members<node>(n)) if (holds<node>(m, x)) {
-				if (into) return {};
-				into = m;
-			}
-			if (!into) return {};
 			n = tau::trim_right_sibling(into);
 			continue;
 		}
