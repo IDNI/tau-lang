@@ -147,10 +147,22 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 	// as the same tref and a key rebound below it is left alone. When some
 	// key is not a variable there is no such test and every node is
 	// entered.
+	// Both sides are sorted and deduplicated, so the intersection is found
+	// by searching each element of the shorter one in the longer: a clause
+	// whose row holds two variables costs two searches against sixty-four
+	// keys, not sixty-four. The comparator is a lambda because
+	// `tau::subtree_less` passed by name reaches the search as a function
+	// pointer and never inlines.
 	auto holds_key = [&s](const trefs& fv) {
-		for (tref v : s.vars)
-			if (std::binary_search(fv.begin(), fv.end(), v,
-				tau::subtree_less)) return true;
+		if (fv.empty()) return false;
+		auto less = [](tref a, tref b) {
+			return tau::subtree_less(a, b); };
+		const bool fv_is_smaller = fv.size() < s.vars.size();
+		const trefs& small = fv_is_smaller ? fv : s.vars;
+		const trefs& large = fv_is_smaller ? s.vars : fv;
+		for (tref v : small)
+			if (std::binary_search(large.begin(), large.end(), v,
+				less)) return true;
 		return false;
 	};
 	// A wrapper around one chain connective. `get_free_vars` answers such a
