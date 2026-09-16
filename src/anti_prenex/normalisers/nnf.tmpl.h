@@ -36,21 +36,6 @@ namespace idni::tau_lang::anti_prenexing {
 
 namespace detail {
 
-/// The raw chain `down` hands to the walk: the members folded LEFT-NESTED
-/// through the hooked binary builder, neither sorted nor deduplicated —
-/// content order and deduplication are `up`'s join, once the members are
-/// normalised. Every member here is freshly built, so none carries a right
-/// sibling.
-template <NodeType node, bool conj>
-tref raw_chain(const trefs& ms) {
-	DBG(assert(!ms.empty());)
-	tref r = ms.front();
-	for (size_t i = 1; i < ms.size(); ++i)
-		r = conj ? build_wff_and<node>(r, ms[i])
-			 : build_wff_or<node>(r, ms[i]);
-	return r;
-}
-
 /// `¬m` for every member, in the member view's order.
 template <NodeType node>
 trefs negated_members(const trefs& ms) {
@@ -98,8 +83,7 @@ tref factored_neg_of_disjunction(const trefs& ms) {
 			in_all = in_part[j].contains(p);
 		if (in_all) C.push_back(p), shared.insert(p);
 	}
-	if (C.empty())
-		return raw_chain<node, true>(negated_members<node>(ms));
+	if (C.empty()) return build_wff_and<node>(negated_members<node>(ms));
 	trefs residues;
 	residues.reserve(ms.size());
 	for (size_t j = 0; j < ms.size(); ++j) {
@@ -113,7 +97,7 @@ tref factored_neg_of_disjunction(const trefs& ms) {
 	out.reserve(C.size() + 1);
 	for (tref c : C) out.push_back(build_wff_neg<node>(c));
 	out.push_back(build_wff_neg<node>(rests));
-	return raw_chain<node, false>(out);
+	return build_wff_or<node>(out);
 }
 
 /// §3 `TO_NNF`'s `down`: ONE negation rewritten at the node it stands on, the
@@ -128,8 +112,12 @@ tref nnf_down(tref n) {
 	// `neg(ψ)` IS the NNF of `¬ψ` (§1), so a hit ends this subtree: the
 	// walk descends into a formula that is already normalised.
 	if (const tref hit = neg_of<node>(psi); hit != nullptr) return hit;
+	// A chain handed to the walk is raw: the n-ary builder folds left
+	// through the hooks (the neutral seed folds away on the first step),
+	// neither sorting nor deduplicating — that is `up`'s join, once the
+	// members are normalised.
 	if (is_child<node>(psi, tau::wff_and))
-		return raw_chain<node, false>(
+		return build_wff_or<node>(
 			negated_members<node>(members<node>(psi)));
 	if (is_child<node>(psi, tau::wff_or))
 		return factored_neg_of_disjunction<node>(members<node>(psi));

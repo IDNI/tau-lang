@@ -55,6 +55,9 @@ bool carries_quantifier(tref phi) {
 template <NodeType node>
 tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	DBG(assert(phi != nullptr);)
+	// Every chain built below relies on the construction hooks: a neutral
+	// operand, and the n-ary builders' seed, fold away only while they are on.
+	DBG(assert(tree<node>::use_hooks);)
 	phi = tree<node>::trim_right_sibling(phi);
 	// §3's entry test: with no quantifier of either kind there is nothing
 	// to push and nothing to resolve, so the formula comes back as the
