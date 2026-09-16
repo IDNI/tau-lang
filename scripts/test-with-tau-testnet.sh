@@ -30,6 +30,10 @@
 # python3) -- tau-testnet pins exact dependency versions, so the newest
 # interpreter on the box is not always one they publish wheels for.
 #
+# The configure keeps the cache of the preset's build directory, so a
+# binding preset over an existing build of the same directory reuses its
+# objects and its configured pack.
+#
 # Coverage note: tau-testnet's conftest.py sets TAU_FORCE_TEST=1, so most of
 # the suite runs against its deterministic test validator and never reaches
 # the engine. The files that do construct a real TauInterface -- and so load
@@ -116,25 +120,32 @@ if ! "${VENV_PYTHON}" -m pip install -r "${TESTNET_DIR}/requirements.txt"; then
 	echo >&2
 	echo "Error: could not install tau-testnet's requirements with" >&2
 	echo "  $("${VENV_PYTHON}" --version 2>&1)" >&2
-	echo >&2
-	echo "requirements.txt pins exact versions, and several of those pins" >&2
-	echo "publish no wheel past cp312 (blake3==0.4.1, coincurve via libp2p)." >&2
-	echo "On a newer interpreter pip builds them from source instead, which" >&2
-	echo "needs their build toolchains and hits their build bugs -- neither" >&2
-	echo "of which says anything about tau-lang. tau-testnet's own" >&2
-	echo "Dockerfile.standalone runs on ubuntu:24.04 (Python 3.12) for this" >&2
-	echo "reason. Point the venv at an interpreter the pins have wheels for:" >&2
-	echo "  rm -rf ${VENV_DIR}" >&2
-	echo "  TAU_TESTNET_PYTHON=python3.12 ./dev test-with-tau-testnet" >&2
-	echo "If no such interpreter is installed, 'uv python install 3.12'" >&2
-	echo "fetches one without root; pass 'uv python find 3.12' above." >&2
+	# The interpreter hint only applies past 3.12; on 3.12 the pip error
+	# above is the whole story.
+	minor="$("${VENV_PYTHON}" -c 'import sys; print(sys.version_info.minor)')"
+	if [ "${minor}" -gt 12 ]; then
+		echo >&2
+		echo "requirements.txt pins exact versions, and several of those pins" >&2
+		echo "publish no wheel past cp312 (blake3==0.4.1, coincurve via libp2p)." >&2
+		echo "On a newer interpreter pip builds them from source instead, which" >&2
+		echo "needs their build toolchains and hits their build bugs -- neither" >&2
+		echo "of which says anything about tau-lang. tau-testnet's own" >&2
+		echo "Dockerfile.standalone runs on ubuntu:24.04 (Python 3.12) for this" >&2
+		echo "reason. Point the venv at an interpreter the pins have wheels for:" >&2
+		echo "  rm -rf ${VENV_DIR}" >&2
+		echo "  TAU_TESTNET_PYTHON=python3.12 ./dev test-with-tau-testnet" >&2
+		echo "If no such interpreter is installed, 'uv python install 3.12'" >&2
+		echo "fetches one without root; pass 'uv python find 3.12' above." >&2
+	fi
 	exit 1
 fi
 # not in requirements.txt: needed to configure the binding, not to run it
 "${VENV_PYTHON}" -m pip install nanobind
 
-# configure and build the preset; sets PRESET and TAU_BUILD_JOBS
-PRESET_ARGS=(-DPython_EXECUTABLE="${VENV_PYTHON}")
+# configure and build the preset; sets PRESET and TAU_BUILD_JOBS.
+# --keep-cache adds the binding to whatever the build directory holds
+# already instead of reconfiguring it from scratch.
+PRESET_ARGS=(--keep-cache -DPython_EXECUTABLE="${VENV_PYTHON}")
 [[ -z ${PRESET_GIVEN} ]] && PRESET_ARGS+=("${DEFAULT_PRESET}")
 PRESET_ARGS+=("$@")
 preset_entry "${PRESET_ARGS[@]}"

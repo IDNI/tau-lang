@@ -23,9 +23,10 @@ jobs:
       - name: Choose the packs
         id: matrix
         run: |
-          default='{"name":"default","pack":""}'
-          nobv='{"name":"nobv","pack":"sbf,tau,qint"}'
-          bvonly='{"name":"bvonly","pack":"sbf,tau,bv"}'
+          # tau-testnet's specs use bv, so only the default pack runs its suite
+          default='{"name":"default","pack":"","testnet":"yes"}'
+          nobv='{"name":"nobv","pack":"sbf,tau,qint","testnet":"no"}'
+          bvonly='{"name":"bvonly","pack":"sbf,tau,bv","testnet":"no"}'
           if [ -f cmake/tau_bas.cmake ]; then
             echo "matrix={\"include\":[$default,$nobv,$bvonly]}" >> "$GITHUB_OUTPUT"
           else
@@ -109,6 +110,7 @@ jobs:
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_BAS=${{ matrix.pack }} \
+            --build-arg TEST_TAU_TESTNET=${{ matrix.testnet }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps
         env:

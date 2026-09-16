@@ -154,6 +154,10 @@ Presets whose name contains **`package`** run `cpack -C Release` after build.
   built from — tau-testnet pins exact dependency versions, and several pin
   no wheel past cp312, so the newest interpreter on the box may not work.
 
+  The image runs the same script with `--build-arg TEST_TAU_TESTNET=yes`,
+  after its own test suite. The release workflow sets it for the default
+  pack.
+
   ```bash
   ./dev test-with-tau-testnet
   ./dev test-with-tau-testnet devel-binding-python-tests -DTAU_BUILD_JOBS=10

@@ -23,6 +23,7 @@
 # use --build-arg BUILD_PRESET="debug" for building of the debugging version (build stage)
 # use --build-arg TESTS="no" to skip running tests (build, w64-build, wasm-build)
 # use --build-arg TEST_GCC_BUILD="no" to skip checking compilation with gcc (build stage)
+# use --build-arg TEST_TAU_TESTNET="yes" to run the tau-testnet suite against the build (build stage)
 # use --build-arg NIGHTLY="yes" to build a nightly package (packages and w64-packages stages)
 
 # Use BUILD_KIT=1 (install docker-buildx) to avoid rebuilds of unnecessary stages
@@ -183,6 +184,24 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	rm -rf build/devel; \
+fi
+
+# Set TEST_TAU_TESTNET=yes to run the tau-testnet suite against this build
+ARG TEST_TAU_TESTNET=no
+
+# The tau-testnet requirements build fastecdsa from source, which needs gmp
+RUN if [ "$TESTS" = "yes" -a "$TEST_TAU_TESTNET" = "yes" ]; then \
+	apt-get update && apt-get install -y --no-install-recommends libgmp-dev; \
+fi
+
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" -a "$TEST_TAU_TESTNET" = "yes" ]; then \
+	scripts/with-gh-token ./dev test-with-tau-testnet \
+		${BUILD_PRESET}-binding-python-tests \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 fi
 
 # Set the entrypoint to the tau executable
