@@ -37,7 +37,17 @@ enum MemorySlotPre {
 	to_dnf_m,                ///< Cache slot for to_dnf traversals.
 	to_cnf_m,                ///< Cache slot for to_cnf traversals.
 	eliminate_quantifiers_m, ///< Cache slot for quantifier elimination traversals.
-	anti_prenex_step_m       ///< Cache slot for anti-prenex step traversals.
+	anti_prenex_step_m,      ///< Cache slot for anti-prenex step traversals.
+	/// Cache slot for `push_negation_in<node, is_wff, false>`. The two
+	/// `fuse_atoms` instantiations rewrite an atom differently, so they must
+	/// not share `push_negation_in_m`: one memo for both would hand a caller
+	/// the other's tree.
+	push_negation_in_nofuse_m,
+	/// Cache slot for the anti-prenexing module's `TO_NNF`
+	/// (`to_canonically_factored_nnf`, anti_prenex/normalisers/nnf.h).
+	/// Separate from `push_negation_in_m`: that pass fuses a negated atom
+	/// into `!=` and friends, which invariant 4 of the spec forbids.
+	factored_nnf_m
 };
 
 /**
@@ -111,10 +121,17 @@ tref apply_all_xor_def(tref fm);
  * above a non-literal node. Operates on wff or bf depending on `is_wff`.
  * @tparam node Tree node type.
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
+ * @tparam fuse_atoms `true` (default) fuses a negated atom into its negated
+ * operator (`!(x = y)` becomes `x != y`, `!(x < y)` becomes `x !< y`, ...);
+ * `false` leaves every atom under its `!` untouched and pushes only through
+ * the connectives, the binders, the temporal operators and the sugar. The
+ * anti-prenexing module needs `false`: its invariant 4 forbids a `!=` and
+ * any negated or mirrored order operator. Each instantiation gets its own
+ * memo slot.
  * @param fm Formula to transform.
  * @return Formula with all negations pushed to literals.
  */
-template <NodeType node, bool is_wff = true>
+template <NodeType node, bool is_wff = true, bool fuse_atoms = true>
 tref push_negation_in(tref fm);
 
 /**

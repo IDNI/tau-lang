@@ -80,12 +80,15 @@ tref norm_trimmed_equation(tref eq) {
  * Handles both wff (`wff_neg`) and bf (`bf_neg`) cases controlled by the `is_wff` template parameter.
  * @tparam node Tree node type.
  * @tparam is_wff `true` to handle `wff_neg` (default), `false` to handle `bf_neg`.
+ * @tparam fuse_atoms `true` (default) fuses a negated atom into its negated
+ * operator; `false` returns such a node unchanged, so the `!` stays at
+ * formula level (the anti-prenexing module's invariant 4).
  * @param fm Formula node whose outermost negation is to be pushed inward.
  * @return Formula with the negation pushed one level deeper, or `fm` unchanged if not applicable.
  * @endinternal
  */
 // Can be used for Tau formula and Boolean function
-template <NodeType node, bool is_wff = true>
+template <NodeType node, bool is_wff = true, bool fuse_atoms = true>
 tref push_negation_one_in(tref fm) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
@@ -93,6 +96,12 @@ tref push_negation_one_in(tref fm) {
 	if constexpr (is_wff) if (t.child_is(tau::wff_neg)) {
 		const tau& ct = t[0][0];
 		if (!ct.has_child()) return fm;
+		// Without atom fusion the ten atom cases below -- `bf_eq`,
+		// `bf_neq` and the eight order operators, which are exactly
+		// what `is_atomic_fm` lists -- are skipped in one test, and
+		// the negation stays where it is.
+		if constexpr (!fuse_atoms)
+			if (is_atomic_fm<node>(ct.get())) return fm;
 		switch (ct[0].value.nt) {
 			// !!A ::= A. Without this case to_nnf cannot remove a
 			// double negation and depends on the construction hooks
@@ -226,16 +235,19 @@ tref apply_all_xor_def(tref fm) {
 
 
 /** @internal @copydoc push_negation_in @endinternal */
-template <NodeType node, bool is_wff>
+template <NodeType node, bool is_wff, bool fuse_atoms>
 tref push_negation_in(tref fm) {
 	auto pn = [](tref n) {
-		return push_negation_one_in<node, is_wff>(n);
+		return push_negation_one_in<node, is_wff, fuse_atoms>(n);
 	};
+	// The two `fuse_atoms` instantiations produce different trees for the
+	// same input, so each needs its own memo slot.
+	constexpr size_t slot = fuse_atoms
+		? MemorySlotPre::push_negation_in_m
+		: MemorySlotPre::push_negation_in_nofuse_m;
 	if constexpr (is_wff) return pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::push_negation_in_m>(
-							pn, while_is_formula<node>);
-	else return pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::push_negation_in_m>(pn);
+		.template apply_unique<slot>(pn, while_is_formula<node>);
+	else return pre_order<node>(fm).template apply_unique<slot>(pn);
 }
 
 

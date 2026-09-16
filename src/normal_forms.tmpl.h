@@ -56,6 +56,10 @@ tref not_equal_to_unequal(tref fm) {
  * @internal
  * @brief Normalizes comparison operators by rewriting `!=`, `nlteq`, `nlt`, `gteq`, `gt`, `ngteq`, and `ngt` to canonical negated `<`, `<=`, or `=` forms.
  * @tparam node Tree node type.
+ * @tparam rewrite_neq `true` (default) rewrites `!=` into a negated equality.
+ * @tparam arithmetic_only `true` restricts the six comparison rewrites to
+ * operators over an arithmetic (bv) type; `!=` is rewritten either way.
+ * Default `false`, which is every existing caller's behaviour.
  * @param fm Formula whose atomic operators are to be normalized.
  * @return Formula with comparison operators rewritten to canonical form.
  *
@@ -100,7 +104,7 @@ tref not_equal_to_unequal(tref fm) {
  * removed or narrowed without a broader rewrite of those consumers.
  * @endinternal
  */
-template<NodeType node, bool rewrite_neq>
+template<NodeType node, bool rewrite_neq, bool arithmetic_only>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
@@ -120,6 +124,25 @@ tref normalize_atomic_formula_operators(tref fm) {
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& c = tau::get(n)[0];
+		// With `arithmetic_only` the six comparison rewrites fire only
+		// where the operator denotes ARITHMETIC comparison (today
+		// bv[n]): the four negated ones are total-order laws and fail
+		// for a lattice order -- over the powerset of {1,2}, a = {1},
+		// b = {2}, `!(a <= b)` holds while `b < a` does not. The
+		// mirror rewrites are plain swaps, valid in any order, but are
+		// guarded with the rest. The `!=` rewrite stays unconditional:
+		// it is formula-level negation, sound in every type.
+		if constexpr (arithmetic_only) switch (c.value.nt) {
+			case tau::bf_nlteq: case tau::bf_nlt:
+			case tau::bf_gteq:  case tau::bf_gt:
+			case tau::bf_ngteq: case tau::bf_ngt: {
+				const size_t type = find_ba_type<node>(c.first());
+				if (type == 0 || !is_bv_type_family<node>(type))
+					return n;
+				break;
+			}
+			default: break;
+		}
 		switch (c.value.nt) {
 			case tau::bf_neq:
 				if constexpr (!rewrite_neq) return n;

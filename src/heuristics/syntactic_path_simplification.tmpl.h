@@ -6,11 +6,14 @@
 namespace idni::tau_lang {
 
 // Forward declaration: defined in normal_forms.tmpl.h, included after this
-// file. This is the first declaration the compiler sees, so the default of
-// `rewrite_neq` lives here. The main entry passes `false`: the sweep files a
-// negated equality under its equality's key in every spelling, so `!=`
-// needs no rewrite on the way in and nothing to restore on the way out.
-template <NodeType node, bool rewrite_neq = true>
+// file. This is the first declaration the compiler sees, so the defaults of
+// `rewrite_neq` and `arithmetic_only` live here. The main entry passes
+// `false` for the first: the sweep files a negated equality under its
+// equality's key in every spelling, so `!=` needs no rewrite on the way in
+// and nothing to restore on the way out. `arithmetic_only = true` restricts
+// the six comparison rewrites to operators that denote ARITHMETIC comparison
+// (today bv[n]); it is the anti-prenexing module's `NORMALIZE_OPERATORS`.
+template <NodeType node, bool rewrite_neq = true, bool arithmetic_only = false>
 tref normalize_atomic_formula_operators(tref fm);
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
