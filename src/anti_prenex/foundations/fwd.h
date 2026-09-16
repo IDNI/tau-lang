@@ -64,13 +64,12 @@ using var_order = typename term_handle<node>::order;
 
 /// §1 `keep_functional`: the ONE callback `ANTI_PRENEX` takes, a pure
 /// predicate on a NODE, asked once per site. Per CHAIN (`RESOLVE_FUNCTIONAL`,
-/// §3) the resolver hands it the canonical chain's term node — the prefix
-/// outermost first with its kinds, and the body below it, which `strip_chain`
-/// (terms.h) reads off. Per BLOCK (§5, layer 4) it is handed the block's
-/// binder node `REWRAP(matrix, X)`, the run head with its variables outermost
-/// first over the matrix. What the policy needs it reads off that node: a
-/// prefix, or a variable list, alone would not let it look at what is
-/// quantified.
+/// §3) it is handed the canonical chain's term node — prefix outermost first
+/// with the kinds, body below it, both read off with `strip_chain` (terms.h).
+/// Per BLOCK (§5) it is handed the block's binder node `REWRAP(matrix, X)`,
+/// the run head with its variables outermost first over the matrix. A node,
+/// rather than a prefix or a variable list, so that the policy can look at
+/// what is quantified.
 template <NodeType node>
 using keep_functional_fn = std::function<bool(tref)>;
 

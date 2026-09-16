@@ -2,48 +2,41 @@
 
 /**
  * @file witness.h
- * @brief Anti-prenexing layer 2: §3's witness steps — `TRY_WITNESS` in its
- * SPELLED mode, phase 2's deep pass `TRY_WITNESS_DEEP`, the case-pin matcher
- * `TRY_CASE_WITNESS`, and phase 2's driver `ELIMINATE_BY_SUBSTITUTION`.
+ * @brief §3's witness steps: `TRY_WITNESS` in its SPELLED mode, phase 2's
+ * deep pass `TRY_WITNESS_DEEP`, the case-pin matcher `TRY_CASE_WITNESS` and
+ * phase 2's driver `ELIMINATE_BY_SUBSTITUTION`.
  *
- * ONE MATCH UNDERNEATH, layer 1's: `find_pin_for(atom, x)` (simplify.h) is
- * `TRY_WITNESS`'s pin asked about the variable being eliminated. Nothing here
- * re-implements it, and nothing here reads an equation's spelling: `x = t`,
- * `t = x` and `x + t = 0` are one term `TERM_OF(c)` to it, which is what the
- * call sites straddling `NORMALIZE_OPERATORS` (§3) need. An equation under
- * `¬` pins nothing in the ∃ sense — and is exactly what pins in the ∀ sense,
- * where the deep pass works under `¬∃x¬`.
+ * ONE MATCH UNDERNEATH: `find_pin_for(atom, x)` (simplify.h), the PIN — the
+ * equation that solves a variable — asked about the variable being
+ * eliminated. Nothing here reads an equation's spelling: `x = t`, `t = x` and
+ * `x + t = 0` are one term `TERM_OF(c)` to it, which is what the call sites
+ * straddling `NORMALIZE_OPERATORS` (§3) need. An equation under `¬` pins
+ * nothing in the ∃ sense, and is exactly what pins in the ∀ sense, where the
+ * deep pass works under `¬∃x¬`.
  *
- * NO BDD IN SPELLED MODE (§3: "nothing is BDD-backed there"). The three
- * phase-2 entries Debug-assert that their formula carries no `BDD_ID`
- * anywhere. A backed term reaching them is a CALLER BUG, not a case to
- * handle: the one place a backed term meets the witness step is layer 3's
- * `ctx` overload, where the match reads `COF` and the library's substitution
- * spells the witness once. Nothing here calls a finish or spells a term out.
+ * NO BDD IN SPELLED MODE (§3: "nothing is BDD-backed there"). Every entry
+ * here Debug-asserts that its formula carries no `BDD_ID` anywhere; a backed
+ * term reaching one is a CALLER BUG, not a case to handle. Nothing here calls
+ * a finish or spells a term out.
  *
- * WHAT MAY TOUCH A UNIT (§4): the substitution of `x` DESCENDS into a binder
- * unit's body, because the pinning conjunct that licensed it is consumed —
- * dropped here at phase 2 — and an untouched inner occurrence would
- * desynchronise from the outer rewrite. Phase 0's binder ids make that
- * descent capture-safe, and no bound variable is ever renamed. What is opaque
- * is the MATCH: a unit is no conjunction and no disjunction, so it is never a
- * pin and never a case-pin branch.
+ * WHAT MAY TOUCH A UNIT (§4) — a unit is a surviving binder, opaque to every
+ * step: the substitution of `x` DESCENDS into its body, because the pinning
+ * conjunct that licensed the substitution is consumed — dropped at phase 2 —
+ * and an untouched inner occurrence would desynchronise from the outer
+ * rewrite. Phase 0's binder ids make that descent capture-safe, and no bound
+ * variable is ever renamed. What is opaque is the MATCH: a unit is no
+ * conjunction and no disjunction, so it is never a pin and never a case-pin
+ * branch.
  *
  * SIMPLIFICATION: `TRY_WITNESS` simplifies its result (invariant 6 — it hands
- * every caller a formula ready to recurse into); the deep pass does NOT —
+ * every caller a formula ready to recurse into); the deep pass does NOT,
  * phase 2's global `SIMPLIFY` follows it (§3, step 2).
  *
- * WHY NOT THE EXISTING COUSINS (the reuse survey this module owes):
- *  - `heuristics/ex_subs_based_elimination.h` eliminates `∃x.clause` through
- *    a witness found in the clause, but with a matcher of its own on one
- *    spelling, no weak pins, no case pins and no deep descent — it never
- *    leaves the clause it is handed, so none of §3's conditions (a)–(c)
- *    exist in it.
- *  - `heuristics/trivial_skolem.h` drops a variable whose UNIQUE occurrence
- *    an invertible-operator chain isolates, below `wff_or` but not below a
- *    negation or a nested quantifier: a strictly narrower match (one
- *    occurrence, one operator chain) with no pin, no residual and no
- *    confinement test, so it decides nothing §3 decides.
+ * NEIGHBOURS IN `heuristics/`: `ex_subs_based_elimination.h` witnesses `∃x`
+ * inside the one clause it is handed and never leaves it;
+ * `trivial_skolem.h` drops a variable whose UNIQUE occurrence an
+ * invertible-operator chain isolates. Neither has the pins, the case pins or
+ * the descent of §3, so neither decides what these steps decide.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__WITNESS__WITNESS_H__
@@ -67,17 +60,16 @@ namespace idni::tau_lang::anti_prenexing {
  * `∃x.ψ`, or `nullopt`.
  *
  * `ψ` is a conjunction or a single conjunct; its top-level conjuncts
- * (`members`) are scanned for one pinning `x`, with `find_pin_for`. Among
- * several: a STRICT pin first, else the smallest `‖f₁′‖` (`mem_size`) — §3's
- * tie-break, which is the cost every later substitution of the witness pays.
- * The result is `ψ` with `x` replaced by that witness in EVERY conjunct, THE
- * PINNING ONE INCLUDED — its image is the residual `p = 0`, `T` for a strict
- * pin, so no site emits a residual of its own — and then `SIMPLIFY`d
- * (invariant 6).
+ * (`members`) are scanned with `find_pin_for` for one pinning `x`. Among
+ * several: a STRICT pin first — one whose residual `p` folds to `0` — else
+ * the smallest `‖f₁′‖` (`mem_size`), §3's tie-break, which is the cost every
+ * later substitution of the witness pays. The result is `ψ` with `x` replaced
+ * by that witness in EVERY conjunct, THE PINNING ONE INCLUDED — its image is
+ * the residual `p = 0`, `T` for a strict pin, so no site emits a residual of
+ * its own — and then `SIMPLIFY`d (invariant 6).
  *
  * A BINDER IS NEVER RETURNED and never built: only the caller knows what
- * failure means, and `ψ` is not a binder. Layer 3 adds the COF mode behind a
- * `ctx` overload; this entry Debug-asserts that nothing is BDD-backed.
+ * failure means, and `ψ` is not a binder.
  */
 template <NodeType node>
 std::optional<tref> try_witness(tref x, tref psi);
@@ -111,10 +103,7 @@ std::optional<tref> try_witness(tref x, tref psi);
  * as a CONTENT replacement over `Φ`. The ∀ form is the ∃ form under `¬∃x¬`:
  * connectives and pin sense swapped, one argument covering both.
  *
- * NOT SIMPLIFIED: phase 2's global `SIMPLIFY` follows (§3, step 2). The
- * counterexamples of condition (c) — `∃x∀y.(x = y ∧ …)`,
- * `∃x∀y∃z.(x = z ∧ z = y)` — and of the case pin's whole-member condition —
- * `∃x∀y.((y = 0 ∧ x = 0) ∨ (y ≠ 0 ∧ x = 1))` — are what `D` refuses.
+ * NOT SIMPLIFIED: phase 2's global `SIMPLIFY` follows (§3, step 2).
  */
 template <NodeType node>
 std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi);
@@ -127,7 +116,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi);
  * the pin stays and becomes the branch's residual under `[x ← tᵢ]` (§3
  * `TRY_WITNESS`). `rest` is the ∧-join of `ψ`'s other conjuncts. No copy of
  * the rewrite is built here — the ladder (§6) emits it branch by branch, so a
- * deciding branch is the only copy ever paid for.
+ * deciding branch is the only copy paid for.
  */
 template <NodeType node>
 struct case_witness {
@@ -142,12 +131,12 @@ struct case_witness {
  * A CASE PIN for `x` is a disjunction `D = ⋁ᵢ dᵢ` every branch of which has a
  * conjunct pinning `x` strictly with `x ∉ FV(tᵢ)`, at most `case_max`
  * branches. ALL-OR-NOTHING: a branch without a pin would keep `∃x` alive
- * inside its copy. The match stays at `D`'s TOP branches deliberately (§3),
- * and a branch that is a unit is opaque (§4) — it is no conjunction, so it
- * never qualifies.
+ * inside its copy. The match stays at `D`'s TOP branches (§3), and a branch
+ * that is a unit is opaque (§4) — it is no conjunction, so it never
+ * qualifies.
  *
- * The ∃ form, which is the only one phase 4 pushes; phase 2 matches the same
- * shape dualised inside `try_witness_deep`, and layer 3 adds the COF mode.
+ * The ∃ form, which is what phase 4 pushes; `try_witness_deep` matches the
+ * same shape dualised.
  */
 template <NodeType node>
 std::optional<case_witness<node>> try_case_witness(tref x, tref psi);

@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Unit tests for src/anti_prenex/witness/witness.h (layer 2).
+// Unit tests for src/anti_prenex/witness/witness.h.
 // Spec: anti_prenex.md §3 TRY_WITNESS, TRY_WITNESS_DEEP, "A CASE PIN for x",
 // TRY_CASE_WITNESS and ELIMINATE_BY_SUBSTITUTION; §4 "What may touch a unit";
 // §1's `case_max`.
@@ -134,7 +134,7 @@ TEST_CASE("W2: a weak pin substitutes its witness and keeps its residual") {
 	// THE PINNING CONJUNCT STAYS, substituted like every sibling, and its
 	// image IS the residual `p = 0` (§3) — as a FUNCTION: the plain
 	// `SIMPLIFY_TERM` has no xor algebra, so `(t·G' + t) u G` is not folded
-	// to `G` on the page. It is the member that does not mention `b`.
+	// to `G` syntactically. It is the member that does not mention `b`.
 	tref image = nullptr;
 	for (tref m : ap::members<node_t>(*r))
 		if (!holds_var(m, "b")) image = m;
@@ -392,8 +392,8 @@ TEST_CASE("W14: `case_max` refuses a wider case pin, and a unit branch is "
 	const tref psi = conj(disj(conj(eq0(c), eq(x, t1)),
 		conj(neg(eq0(c)), eq(x, t2))), eq0(lor(x, a)));
 	REQUIRE(ap::try_case_witness<node_t>(fvar("x"), psi).has_value());
-	{	// §1 `K″`, read bare at phase 2: one branch is all that is
-		// allowed now, and a two-branch pin declines.
+	{	// §1 `K″`, read bare at phase 2: with the cap at one branch,
+		// a two-branch pin declines.
 		case_max_guard cap(1);
 		CHECK(!ap::try_case_witness<node_t>(fvar("x"), psi).has_value());
 	}

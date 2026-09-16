@@ -1,61 +1,33 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Package F, the REGRESSION CORPUS of the anti-prenexing module: the inputs
-// extracted from the old module's suites that encode behaviour
-// `anti_prenex.md` still wants. Spec: §3 (the pipeline), §4, invariant 4.
+// The REGRESSION CORPUS of the anti-prenexing module: inputs taken from the
+// suites of `src/antiprenexing/` that encode behaviour `anti_prenex.md` still
+// wants. Spec: §3 (the pipeline), §4, invariant 4.
 //
-// Every case runs ONLY `anti_prenexing::anti_prenex` (anti_prenex.h). Nothing
-// here includes or consults `src/antiprenexing/`: the spec is the reference,
-// the old suites are only where the INPUTS come from.
+// Every case runs ONLY `anti_prenexing::anti_prenex` (anti_prenex.h) and
+// names, in one line, the suite and case its input comes from; the spec is
+// the reference, that suite only the source of the input. Cases that pin
+// another module's own entry points, knobs or intermediate steps are not
+// carried over — the spec's push steps are tested where they are defined —
+// and an expectation that was an output STRING is replaced by the semantic
+// claim it stands for: which variables are gone, which binder survives.
 //
 // TWO TIERS PER CASE.
-//  ACTIVE, checked now: the output is EQUIVALENT to the input (by
+//  ACTIVE, checked on every build: the output is EQUIVALENT to the input (by
 //  `are_nso_equivalent` on pure inputs, by GROUND TRUTH — substitute a
 //  constant for the one free variable and normalise the closed instance —
 //  where the checker is undecidable, and not at all where neither applies,
 //  which each such case says); no free variable ESCAPED (`FV(out) ⊆ FV(in)`);
 //  INVARIANT 4 (no `bf_neq`, no negated or mirrored order operator, a `¬`
 //  only directly over an atom); and IDEMPOTENCE by tref.
-//  DORMANT, written now and guarded: "the quantifier was actually eliminated"
-//  and the shapes that depend on it. Each carries `resolved_from_layer(N)`
-//  against the `built_layer` constant below, so the assertions switch on as
-//  the layers land, without rewriting this file. N names the layer whose
-//  machinery the case needs: 4 the block driver, 5 the cheap push steps, 6
+//  DORMANT, written and guarded: "the quantifier is actually eliminated" and
+//  the shapes that depend on it. Each carries `resolved_from_layer(N)`
+//  against the `built_layer` constant below, so an assertion switches on with
+//  the machinery it needs: 4 the block driver, 5 the cheap push steps, 6
 //  decomposition and `EXPAND`, 8 the bitvector method.
 //
-// WHERE THE OLD EXPECTATION WAS A STRING it was replaced by the semantic
-// claim it stood for — which variables are gone, which binder survives —
-// never by the string.
-//
-// WHAT WAS DROPPED, and why (test_antiprenexing.cpp, 98 cases; 19 kept):
-//  - `AntiPrenexBlock` (25): the old 8-argument core with `used_atms`, a
-//    quantifier pattern and an explicit order — the internals of paper steps
-//    2a/2b/2d/2e, the gamma arms and the B11–B16 shapes. The spec's push
-//    steps are layers 5–6 and get their own tests there.
-//  - `BlockSqueeze` (11), `BooleAtomAnalysis` (7), `BlockAtomProfile` (10),
-//    `BlockAtomProfileAtomlessness` (3), `DistributeBlockOverAtoms` (2): the
-//    old SQUEEZE, the γ classification, the atom profile and step 2a's
-//    distribution, all pinned through their own entry points and their caps.
-//  - `BlockSkipPaths` (4), `ProcessQuantifierBlocks` (4),
-//    `QuantBlockPush` (1), `ResolveQuantifiers2Binders` (1): the old driver's
-//    skip runs, block selection and rounds.
-//  - `BlockLimits` (2): budgets and their documented defaults — knobs of the
-//    old module (§1's are `options.h`).
-//  - `DisplacedBinderOrdering` (2): displaced binders and their re-wrap
-//    order, which the spec does not have.
-//  - `coverage: remaining anti-prenex arms` (5): eliminability verdicts, the
-//    solver's ownership of bv and per-category re-wrapping — the old module's
-//    arms and the dead bv region.
-//  - `FrozenBlockNormalization` (2 of 5): the "(real analysis)" variants,
-//    which are the SAME inputs as the two kept ones through the old 2-argument
-//    entry point with an eliminability analysis. Duplicate inputs.
-// (test_leaf_clause.cpp, 12 cases; 4 kept): `leaf_clause direct calls` (8)
-// calls the old `leaf_clause` machinery directly — internals with no spec
-// counterpart.
-//
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
-// juxtaposition is conjunction, so every input keeps the parentheses the old
-// suite gave it.
+// juxtaposition is conjunction, so every input keeps its parentheses.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -68,6 +40,7 @@ namespace ap = idni::tau_lang::anti_prenexing;
 namespace {
 
 /// The layer this module is built to. The dormant tier is keyed on it.
+/// Raising it switches on the assertions that layer makes true.
 constexpr int built_layer = 2;
 
 /// A DORMANT claim's guard: true once the layer that makes it true is built.
@@ -181,16 +154,15 @@ TEST_SUITE("anti_prenex/regression") {
 
 TEST_CASE("R1: a formula without a quantifier is returned unchanged") {
 	// AntiPrenexBlock0Arg / "quantifier-free formula is returned
-	// unchanged": §3's entry test, unchanged by the rework.
+	// unchanged": §3's entry test.
 	tref fm = parse("xy = 0 && wz = 0.");
 	CHECK(ap::anti_prenex<node_t>(fm) == fm);
 }
 
 TEST_CASE("R2: a pin eliminates its binder and lands in the sibling") {
 	// AntiPrenexBlock0Arg / "subs_elim: ex x (xy=0 && x=w) → wy=0": the
-	// witness step, which is phase 2 (§3 TRY_WITNESS_DEEP). The old
-	// expectation was the string "wy = 0"; the claim it stood for is that
-	// `x` is gone and `w` took its place.
+	// witness step, which is phase 2 (§3 TRY_WITNESS_DEEP). The claim: `x`
+	// is gone and `w` has taken its place.
 	tref got = anti_prenexed(parse("ex x (xy = 0 && x = w)."));
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(!holds_var(got, "x"));
@@ -214,7 +186,7 @@ TEST_CASE("R4: excluded middle under a ∀ binder folds to T") {
 
 TEST_CASE("R5: a ∀ over an unsatisfiable body is F") {
 	// AntiPrenexBlock0Arg / "all-block dualization: all x (xy!=0) → F":
-	// `x := 0` refutes it. Deciding that is the block driver's.
+	// `x := 0` refutes it, which the block driver decides.
 	tref got = anti_prenexed(parse("all x xy != 0."));
 	if (resolved_from_layer(4)) {
 		CHECK(tau::get(got).equals_F());
@@ -226,7 +198,7 @@ TEST_CASE("R6: an independent conjunct leaves the block's scope") {
 	// AntiPrenexBlock0Arg / "ex block conjunction decomposition": `wz = 0`
 	// does not touch `x`, so it rides outside, and `∃x.(xy = 0)` is T
 	// (`x := 0`). Scope narrowing and the block's own elimination are
-	// §6/§7, which land at layer 4.
+	// §6/§7.
 	tref got = anti_prenexed(parse("ex x (xy = 0 && wz = 0)."));
 	if (resolved_from_layer(4)) {
 		CHECK(!holds(got, tau::wff_ex));
@@ -269,9 +241,9 @@ TEST_CASE("R10: a binder over a constant scope is dropped") {
 	// AntiPrenexBlock0Arg / "no quantifier survives a constant scope":
 	// `∃x.((x ∪ y)·x′·y′ ≠ 0)` is F for every `y`, so the `∀y` above it
 	// ends up over a constant — which `FOLD_DEGENERATE_BINDERS` drops (§3,
-	// phase 5). ACTIVE already: the term is identically `0`, so SIMPLIFY
-	// folds the atom and both binders sit over a constant; no block has to
-	// be pushed for this one.
+	// phase 5). ACTIVE, not dormant: the term is identically `0`, so
+	// SIMPLIFY folds the atom and both binders sit over a constant — no
+	// block has to be pushed for this one.
 	tref got = anti_prenexed(parse("all y ex x ((x|y)x'y' != 0)."));
 	CHECK(binder_count(got) == 0);
 	CHECK(tau::get(got).equals_F());
@@ -280,11 +252,10 @@ TEST_CASE("R10: a binder over a constant scope is dropped") {
 // --- Gamma4Guard: nothing escapes its scope ---------------------------------------
 
 TEST_CASE("R11: no block variable escapes its scope") {
-	// Gamma4Guard / "no block variable escapes its scope": the old guard
-	// stopped an atom still mentioning another block variable from being
-	// lifted out of the binders. Under the spec that claim is the ACTIVE
-	// tier itself — `FV(out) ⊆ FV(in)` — so these five inputs are kept for
-	// exactly that, on every layer.
+	// Gamma4Guard / "no block variable escapes its scope": an atom still
+	// mentioning another block variable must not be lifted out of the
+	// binders. That claim IS the active tier — `FV(out) ⊆ FV(in)` — so
+	// these five inputs are kept for exactly it.
 	for (const char* s : {
 		"ex x ex y (((x|y')(x'|y') = 0 || w = 0) && x y != 0).",
 		"ex x ex y ((y|y')x = 0 && x y != 0).",
@@ -306,7 +277,7 @@ TEST_CASE("R12: a pure-BA scope over bitvector variables") {
 	// STRUCTURALLY: `are_nso_equivalent` is undecidable on bitvector
 	// content and the ground-truth substitution needs a one-variable
 	// result, which this is not. The elimination itself is the bitvector
-	// method's (§7), layer 8.
+	// method's (§7).
 	tref got = anti_prenexed(
 		parse("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2])."),
 		meaning::structural);
@@ -320,7 +291,7 @@ TEST_CASE("R13: an atomic-BA counterexample is never answered T") {
 	// PureBaBvEliminability / "atomic-BA counterexample: a bv[1] negated
 	// pair is not distributed": `∃x.(x ≠ 0 ∧ x ≠ 1)` is UNSAT over a
 	// two-element BA, so anything that distributes the negated pair would
-	// wrongly answer T. A soundness claim that holds at EVERY layer.
+	// wrongly answer T. A soundness claim, checked on every build.
 	tref got = anti_prenexed(
 		parse("ex x (x:bv[1] != { 0 }:bv[1] && x:bv[1] != { 1 }:bv[1])."),
 		meaning::structural);
@@ -332,8 +303,8 @@ TEST_CASE("R13: an atomic-BA counterexample is never answered T") {
 TEST_CASE("R14: a block over only reference-entangled variables survives") {
 	// FrozenBlockNormalization / "a block over only ref-entangled
 	// variables survives verbatim": `q(y)` is opaque (§4), so nothing can
-	// witness `y` and the binder stays — on every layer. Structural: a
-	// reference puts the equivalence checker out of reach.
+	// witness `y` and the binder stays. Structural: a reference puts the
+	// equivalence checker out of reach.
 	tref got = anti_prenexed(parse("ex y (q(y) && y != 0)."),
 		meaning::structural);
 	CHECK(binder_count(got) == 1);
@@ -352,9 +323,9 @@ TEST_CASE("R15: an eliminable variable over a frozen scope still eliminates") {
 }
 
 TEST_CASE("R16: the same, with the eliminable variable under a disjunction") {
-	// FrozenBlockNormalization / "…, disjunctive form (real analysis)",
-	// kept for its INPUT: every branch of `z = 0 ∨ z = 1` pins `z`, which
-	// is §3's CASE PIN, while `q(y)` again freezes only `y`.
+	// FrozenBlockNormalization / "…, disjunctive form": every branch of
+	// `z = 0 ∨ z = 1` pins `z`, which is §3's CASE PIN, while `q(y)` again
+	// freezes only `y`.
 	tref got = anti_prenexed(parse("ex z ex y ((z = 0 || z = 1) && q(y))."),
 		meaning::structural);
 	CHECK(binder_count(got) == 1);
@@ -378,9 +349,9 @@ TEST_CASE("R17: a frozen binder survives alone, under canonical ids") {
 TEST_CASE("R18: the unique-zero shape keeps the pivot's negation") {
 	// Gamma1NegatedBranch / "the unique-zero fold keeps the pivot's
 	// negation": `∃q.(q ≠ 0 ∧ (a·q = 0 ∨ q = 0))` ≡ `a′ ≠ 0` — T at a = 0,
-	// F at a = 1. The old bug dropped the `q ≠ 0` constraint with the
-	// atom it lived in and answered T at a = 1 as well; the ground truth
-	// is what catches that, whatever the shape of the result.
+	// F at a = 1. A result that drops the `q ≠ 0` constraint along with
+	// the atom it lives in answers T at a = 1 too, which the ground truth
+	// catches whatever the shape of the result.
 	const char* sample = "ex q (!(q = 0) && (a q = 0 || q = 0)).";
 	tref in = parse(sample);
 	tref got = anti_prenexed(in, meaning::ground_truth);
@@ -392,8 +363,8 @@ TEST_CASE("R18: the unique-zero shape keeps the pivot's negation") {
 
 TEST_CASE("R19: the five-conjunct interpreter shape stays sound") {
 	// Gamma1NegatedBranch / "the five-conjunct interpreter shape stays
-	// sound": the shape the issue #70 step system produced, reduced by
-	// delta debugging. Same truth table as R18, for both values of `s`.
+	// sound": a shape from the issue #70 step system, reduced by delta
+	// debugging. Same truth table as R18, for both values of `s`.
 	const char* sample =
 		"ex q (!(q = 0) && (a q = 0 || q = 0) && "
 		"(!(q = a) || !(s' = 0) || a q = q || !(q = 0)) && "
@@ -418,16 +389,16 @@ TEST_CASE("R19: the five-conjunct interpreter shape stays sound") {
 
 TEST_CASE("R20: a disequation is not dropped, single variable") {
 	// leaf_clause / "a disequation is not silently dropped, single
-	// variable": `∃x.(x·a = 0 ∧ ¬(x·b = 0))` is not a tautology — the old
-	// hazard folded the disequation into the positive squeeze and answered
-	// T. A soundness claim for every layer.
+	// variable": `∃x.(x·a = 0 ∧ ¬(x·b = 0))` is not a tautology; an answer
+	// of T would mean the disequation was folded into the positive
+	// squeeze. A soundness claim, checked on every build.
 	tref got = anti_prenexed(parse("ex x (x a = 0 && !(x b = 0))."));
 	CHECK_FALSE(tau::get(got).equals_T());
 }
 
 TEST_CASE("R21: a disequation is not dropped, two-variable block") {
 	// leaf_clause / "a disequation is not silently dropped, block": the
-	// same hazard reached through a block.
+	// same claim reached through a block.
 	tref got = anti_prenexed(
 		parse("ex x, y (x y a = 0 && !(x y b = 0))."));
 	CHECK_FALSE(tau::get(got).equals_T());
@@ -445,7 +416,7 @@ TEST_CASE("R22: both spellings of a disequation give the same answer") {
 TEST_CASE("R23: an independent conjunct is lifted out of the binder") {
 	// leaf_clause / "an independent conjunct is lifted out of the
 	// binder": `w = 0` does not touch `x`, and the block that is left is
-	// fully eliminable. Scope narrowing is §6, layer 4.
+	// fully eliminable. Scope narrowing is §6.
 	tref got = anti_prenexed(parse("ex x (x a = 0 && w = 0)."));
 	CHECK(holds_var(got, "w"));
 	if (resolved_from_layer(4)) {

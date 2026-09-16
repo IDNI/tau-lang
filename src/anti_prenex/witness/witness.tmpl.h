@@ -2,10 +2,10 @@
 
 /**
  * @file witness.tmpl.h
- * @brief Template implementations for witness.h (layer 2). witness.h says
- * what each function means; the comments here say how it is built.
+ * @brief Template implementations for witness.h. witness.h says what each
+ * function means; the comments here say how it is built.
  *
- * The pieces come from the layers below: `find_pin_for` and `simplify`
+ * The pieces come from below: `find_pin_for` and `simplify`
  * (normalisers/simplify.h), the result joins (normalisers/joins.h),
  * `members`, `fv_meets`, `formula_size`, `is_negated_equation`, `atom_of` and
  * the binder accessors (foundations/dag.h), `mem_size` and `simplify_term`
@@ -14,15 +14,13 @@
  * THE TWO REWRITES of the deep pass are the library's, never a hand-rolled
  * walk: `φ[x ← t]` is `tree<node>::substitute` (tau_tree.h) with the empty
  * order — the plain regime of phase 2 — and a re-simplifying argument hook,
- * which is the one thing that dirties a reference argument and is asked to
+ * since substitution is what dirties a reference argument and is asked to
  * clean up after itself (§1, invariant 6); the spine's replacement is
  * `rewriter::replace`, a CONTENT match with a unique-cached, hooked rebuild
  * of the path above it. Replacing every occurrence of the spine is sound
- * exactly because the descent enforced confinement first (§3, condition (b)):
+ * exactly because the descent enforces confinement first (§3, condition (b)):
  * a second occurrence of that node elsewhere in `Φ` would put `x` free in two
- * members of some junction on the way down, which the descent refuses. That
- * is also how the "no private stack" rule is met — the descent is a loop
- * along one child, the rebuild is the library's.
+ * members of some junction on the way down, which the descent refuses.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__WITNESS__WITNESS_TMPL_H__
@@ -93,8 +91,8 @@ tref pin_equation(tref m, quantifier<node> Q) {
 
 /// The STRICT pin of `x` in one member, in `Q`'s form, or `nullopt` (§3). A
 /// weak pin is NO pin for the deep pass: the member is dropped, so the
-/// residual `p = 0` it keeps would be lost. `find_pin_for` (layer 1) is the
-/// match itself; the empty order is phase 2's.
+/// residual `p = 0` it keeps would be lost. `find_pin_for` (simplify.h) is
+/// the match itself; the empty order is phase 2's.
 template <NodeType node>
 std::optional<pin<node>> strict_pin_of(tref m, tref x, quantifier<node> Q) {
 	const tref eq = pin_equation<node>(m, Q);
@@ -124,11 +122,11 @@ struct case_branch {
  * (§3). For `Q = ∀`, under `¬∃x¬`, the dual: an ∧-node whose branches hold a
  * negated-equation DISJUNCT.
  *
- * The match stays at `m`'s TOP branches deliberately (§3): expanding nested
- * structure into deeper cases would let guard disjunctions that merely
- * CONTAIN solving atoms qualify. A branch that is a unit is opaque (§4) — its
- * member view is the unit itself, which is no equation — so it never
- * qualifies, and nothing here descends into one.
+ * The match stays at `m`'s TOP branches (§3): expanding nested structure
+ * into deeper cases would let guard disjunctions that merely CONTAIN solving
+ * atoms qualify. A branch that is a unit is opaque (§4) — its member view is
+ * the unit itself, which is no equation — so it never qualifies, and nothing
+ * here descends into one.
  *
  * `case_max` is read BARE from options.h: phase 2 runs before any component,
  * so there is no ctx (§1, `K″`).
@@ -232,13 +230,11 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 	for (;;) {
 		const bool is_spine = is_child<node>(n, spine_nt);
 		const bool is_other = is_child<node>(n, other_nt);
-		// EVERY node is a spine (§3: a flattened conjunction for
-		// `Q = ∃`, a disjunction for `Q = ∀`). One of the spine's own
-		// connective hands over its members; ANY OTHER NODE IS A
-		// ONE-MEMBER SPINE, and the two tests below fire on it exactly
-		// as they would among siblings — which is why the loop's last
-		// arm reads "an atom WITHOUT a pin". What is left after the pin
-		// is then the EMPTY join: `T` for `∃`, `F` for `∀`.
+		// EVERY node is a spine (§3): the spine's own connective hands
+		// over its members, ANY OTHER NODE IS A ONE-MEMBER SPINE, and
+		// the two tests below fire on it exactly as they would among
+		// siblings. What is left after the pin is then the EMPTY join:
+		// `T` for `∃`, `F` for `∀`.
 		const trefs ms = is_spine ? members<node>(n) : trefs{ n };
 		// A PLAIN PIN: the first member that pins `x` strictly with a
 		// witness clear of `D`. The spine becomes its other members,
@@ -361,17 +357,13 @@ tref eliminate_by_substitution(tref phi) {
 	DBG(assert(!witness_detail::holds_bdd_term<node>(phi));)
 	// The default memo slot is the traversal's own per-call one
 	// (normal_forms_transformations.h): the result at a binder node is a
-	// pure function of the node, so a shared binder is tried once. The
-	// walk continues into what `down` returns, which is how a binder the
-	// rewrite exposed is reached in the same pass.
+	// pure function of the node, so a shared binder is tried once.
 	auto down = [](tref n) {
 		// A rewrite can leave another binder AT THE TOP of what it
-		// returns — `∃x.(x = t ∧ ∃w.ψ)` gives `∃w.ψ[x ← t]` — and the
-		// traversal resumes below the node it just transformed, never
-		// on it. So the attempt repeats here until nothing fires; the
-		// traversal covers everything under that, which is what "the
-		// walk continues into the replacement" means. It terminates:
-		// every round deletes one binder.
+		// returns — `∃x.(x = t ∧ ∃w.ψ)` gives `∃w.ψ[x ← t]` — while
+		// the traversal resumes BELOW the node it just transformed,
+		// never on it. So the attempt repeats here until nothing fires.
+		// It terminates: every round deletes one binder.
 		while (is_child_quantifier<node>(n)) {
 			std::optional<tref> r = try_witness_deep<node>(
 				binder_kind<node>(n), binder_var<node>(n),

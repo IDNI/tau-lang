@@ -461,9 +461,9 @@ TEST_CASE("S12b: two mutually pinning equations both survive") {
 	tref p = bvar("p"), q = bvar("q"), r = bvar("r");
 	// `p = q ∧ r = p`: admitting the second pin NORMALISES the first
 	// pin's range, so the first leaf's own pin ends up inside the other
-	// pin's range. Rewriting a leaf by the final environment with its own
-	// index masked would then rewrite it by its OWN equation and fold it
-	// to `T`, losing what it constrained — the exclusion re-derives the
+	// pin's range. Rewriting a leaf under the final environment with its
+	// own index masked would rewrite it by its OWN equation and fold it to
+	// `T`, losing what it constrained; the exclusion re-derives the
 	// environment without that leaf instead (§3, "minus its own pin").
 	const tref in = conj(eq(p, q), eq(r, p));
 	tref got = simp(in);
@@ -475,12 +475,12 @@ TEST_CASE("S12b: two mutually pinning equations both survive") {
 		CHECK(!tau::get(m).equals_T());
 		CHECK(!tau::get(m).equals_F());
 	}
-	// `r` is still constrained: it was the variable the masking lost.
+	// `r` is still constrained.
 	CHECK(holds_var(got, "r"));
 	// ONE pass is not a fixpoint on this shape, and §3 does not promise
-	// one: which conjunct ends up carrying which pin is what the
-	// re-derivation decides, so `r = q ∧ r = p` settles into
-	// `r = q ∧ q = p` on the next pass — and stays there.
+	// one: which conjunct carries which pin is what the re-derivation
+	// decides, so `r = q ∧ r = p` settles into `r = q ∧ q = p` on the
+	// next pass — and stays there.
 	const tref again = simp(got);
 	CHECK(are_nso_equivalent<node_t>(again, in));
 	CHECK(members(again).size() == 2);

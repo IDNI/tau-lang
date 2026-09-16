@@ -84,19 +84,19 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
  * has in `atom`, or `nullopt`.
  *
  * The same match as `find_pin` — ONE implementation, two entries — asked
- * about a GIVEN variable instead of scanning the atom's free variables. That
+ * about a GIVEN variable instead of scanning the atom's free variables, which
  * is what the witness steps need (§3 `TRY_WITNESS`, `TRY_WITNESS_DEEP`, the
- * case pin): the variable is the one being eliminated, and what they want is
- * its witness. There is nothing to choose here — an atom pins a given
- * variable at most one way; the strict-first, then smallest-`‖f₁′‖` choice
- * of §3 is made by the caller, across the conjuncts it scans.
+ * case pin): the variable is the one being eliminated. There is nothing to
+ * choose here — an atom pins a given variable at most one way; §3's
+ * strict-first, then smallest-`‖f₁′‖` choice is the caller's, across the
+ * conjuncts it scans.
  *
- * `atom` must be a POSITIVE equation, and must be free of the block in scope
- * exactly as `find_pin` requires (the ORIENTATION guard of §3). Phase 2, the
- * only caller before layer 3, runs with no block at all, so the guard is
- * vacuous there and the block is not a parameter. `nullopt` when `x` is not
- * free in the equation's term, when the atom is no positive equation, and
- * when `x` is not pinned.
+ * `atom` must be a POSITIVE equation. The ORIENTATION guard of §3 —
+ * `find_pin`'s requirement that the atom be free of the block in scope — is
+ * not repeated: a caller with a block hands in an atom its own guard already
+ * found block-free, so the block is not a parameter. `nullopt` when the atom
+ * is no positive equation, when `x` is not free in its term, and when `x` is
+ * not pinned.
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin_for(tref atom, tref x,

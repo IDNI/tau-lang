@@ -60,7 +60,7 @@ namespace idni::tau_lang::anti_prenexing {
  * `SIMPLIFY`; 3 `NORMALIZE_OPERATORS`; 4 `PROCESS_ALL_BLOCKS`; 5
  * `RESOLVE_FUNCTIONAL`, `SIMPLIFY`, `FOLD_DEGENERATE_BINDERS`,
  * `CANONICALISE_BINDER_IDS`. A formula without a quantifier is returned as
- * is. Defined at layer 2 (phase 4 is the identity until layer 4).
+ * is, and phase 4 is the identity.
  *
  * @param phi a `wff` node
  * @param kf  §1 `keep_functional`, the ONE callback of the run, pure and

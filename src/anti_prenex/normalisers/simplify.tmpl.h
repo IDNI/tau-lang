@@ -246,7 +246,7 @@ private:
 		size_t version = 0;
 	};
 	/// What one admission did: the index of the pin it added, and whether
-	/// it also REWROTE a range in force. An admission that did env.changes the
+	/// it also REWROTE a range in force. An admission that did changes the
 	/// environment for the leaves before it too, so its own leaf's first
 	/// form was computed under an environment that no longer exists —
 	/// which is what stage 2's shortcut has to watch for.
@@ -256,8 +256,8 @@ private:
 	};
 	/// What stage 1 of a frame learned about one equation leaf: the form
 	/// it was matched in, the admission it produced (if any) and the size
-	/// of `env.pins` right after its own step, which tells stage 2 whether
-	/// anything joined the environment after it.
+	/// of the pin list right after its own step, which tells stage 2
+	/// whether anything joined the environment after it.
 	struct matched_leaf {
 		tref first = nullptr;
 		std::optional<admission> own;
@@ -286,10 +286,9 @@ private:
 
 	/// THE PIN ENVIRONMENT: the admitted pins, the active ones in
 	/// `substitute`'s own parameter form, and the two sums the cap
-	/// compares (§3). The pass holds one LIVE environment, `env`, and
-	/// stage 2 re-derives a SCRATCH copy of it per pinning leaf
-	/// (`open_frame`), which is why this is a value type and not four
-	/// members: an exclusion is a second derivation, not a mask.
+	/// compares (§3). A value type, because the pass holds one LIVE
+	/// environment, `env`, while stage 2 re-derives a SCRATCH copy of it
+	/// per pinning leaf (`open_frame`).
 	struct environment {
 		std::vector<pin_state> pins;
 		subtree_map<node, tref> changes;
@@ -333,18 +332,15 @@ private:
 	 * strict pin folds the conjunct to `T`, taking the constraint on `y`
 	 * with it, a weak pin's residual included.
 	 *
-	 * The exclusion is a RE-DERIVATION, not a mask: stage 1 is run again
+	 * The exclusion is a RE-DERIVATION, not a mask: stage 1 runs again
 	 * over `candidates`, in the same content order and from the same
 	 * starting environment `before`, with `leaf` LEFT OUT and its own
 	 * VARIABLE barred from being pinned at all, and the ORIGINAL leaf is
-	 * rewritten under what that leaves.
-	 *
-	 * Masking the leaf's own index in the final environment was unsound:
-	 * admitting a pin NORMALISES the ranges in force, so a later admission
-	 * can fold this leaf's own pin INTO another pin's range, where masking
-	 * does not reach it — the conjunct was then rewritten by its own
-	 * equation and folded to `T` (`p = q ∧ r = p` came back as `q = p`,
-	 * with `r` unconstrained).
+	 * rewritten under what that leaves. Masking the leaf's own index in
+	 * the final environment is not enough: admitting a pin NORMALISES the
+	 * ranges in force, so a later admission can fold this leaf's own pin
+	 * INTO another pin's range, where a mask does not reach it, and the
+	 * conjunct is then rewritten by its own equation and folds to `T`.
 	 *
 	 * BARRING THE KEY is the other half. Without the leaf, a sibling may
 	 * pin the SAME variable with a different witness, and rewriting the
@@ -352,7 +348,7 @@ private:
 	 * pin would — in `y = a·b ∧ y ∪ z = 0` it would leave neither conjunct
 	 * mentioning `y`. In the live environment a variable is pinned once,
 	 * so "every pin but its own" is exactly "every pin on another
-	 * variable", and that is what the bar reproduces.
+	 * variable", which is what the bar reproduces.
 	 *
 	 * Cost: one re-derivation per pinning leaf the shortcut does not
 	 * cover. `find_pin` is memoised per atom for the whole call, so a
@@ -397,13 +393,13 @@ private:
 	 * @brief §3: admit the pin of `atom` into the environment `e`, if it
 	 * has one and the cap allows it.
 	 *
-	 * It works on an EXPLICIT environment because stage 2's exclusion
-	 * re-derives one from scratch: `e` is the live `env` when `rec` is
-	 * the pass's `undo` list, and a throw-away copy when `rec` is null —
-	 * a scratch run records nothing, since nothing has to be undone.
-	 * `blocked`, when given, is a substitution key no pin may take: the
-	 * variable of the leaf an exclusion is re-deriving without
-	 * (`rewrite_atom_excluding` says why).
+	 * The environment is EXPLICIT because stage 2's exclusion re-derives
+	 * one from scratch: `e` is the live `env` when `rec` is the pass's
+	 * `undo` list, and a throw-away copy when `rec` is null — a scratch
+	 * run records nothing, since nothing has to be undone. `blocked`, when
+	 * given, is a substitution key no pin may take: the variable of the
+	 * leaf an exclusion is re-deriving without (`rewrite_atom_excluding`
+	 * says why).
 	 *
 	 * @return what the admission did — the pin's index, and whether it
 	 *         also REWROTE a range in force — or `nullopt` when nothing
@@ -546,7 +542,7 @@ private:
 	}
 
 	/**
-	 * @brief §3: the conjunction is where env.pins are matched and admitted,
+	 * @brief §3: the conjunction is where pins are matched and admitted,
 	 * in TWO STAGES, both here, before the traversal descends.
 	 *
 	 * STAGE 1, MATCH: the X-FREE positive equations, in content order —
@@ -564,16 +560,12 @@ private:
 	 * becomes `z = a`, which is what the normalised environment already
 	 * says. A leaf that admitted nothing takes the final environment as it
 	 * stands; one that admitted a pin takes the environment RE-DERIVED
-	 * without it (`rewrite_atom_excluding`) — the environment that would
-	 * exist had that leaf never been a candidate, which is NOT the final
-	 * one with its index masked: a later admission normalises the ranges
-	 * in force, so the leaf's own pin can already sit inside another pin's
-	 * range, and masking one key would let the conjunct be rewritten by
-	 * its own equation and fold to `T`, dropping what it constrained.
-	 * A leaf keeps its stage-1 form, and needs no re-derivation at all,
-	 * when nothing joined after its own step AND its own admission rewrote
-	 * no range — exactly when the environment minus its own pin is still
-	 * the one that form was computed under.
+	 * without it (`rewrite_atom_excluding`), the environment that would
+	 * exist had that leaf never been a candidate. It keeps its stage-1
+	 * form, and needs no re-derivation at all, when nothing joined after
+	 * its own step AND its own admission rewrote no range — exactly when
+	 * the environment minus its own pin is still the one that form was
+	 * computed under.
 	 *
 	 * The non-equation members are untouched here; the traversal rewrites
 	 * them under the environment this leaves behind.
@@ -634,10 +626,6 @@ private:
 					it->second.first);
 				continue;
 			}
-			// A leaf that admitted nothing has no own pin to leave
-			// out and takes the final environment; one that did is
-			// rewritten under the environment RE-DERIVED without
-			// it.
 			frames.back().pending.emplace(e, own
 				? rewrite_atom_excluding(before, candidates, e,
 					env.pins[own->index].key)

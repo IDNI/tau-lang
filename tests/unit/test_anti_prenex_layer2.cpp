@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer-2 milestone test for src/anti_prenex/anti_prenex.h: THE PIPELINE RUNS
-// END TO END, with phase 4 the identity. Spec: anti_prenex.md §3
+// End-to-end tests for src/anti_prenex/anti_prenex.h: the whole pipeline on
+// one formula, with phase 4 the identity. Spec: anti_prenex.md §3
 // (ANTI_PRENEX's phase list, TRY_WITNESS_DEEP, RESOLVE_FUNCTIONAL,
 // NORMALIZE_OPERATORS), §1's `keep_functional` row, invariant 4.
 //

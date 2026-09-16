@@ -6,24 +6,23 @@
  * pipeline's phases in the one order the spec fixes. anti_prenex.h says what
  * the entry means; the comments here say how it is built.
  *
- * Every phase is ONE call into a layer below — layer 0's
- * `canonicalise_binder_ids`, `resolve_functional_quantifiers` and
- * `fold_degenerate_binders`, layer 1's `to_canonically_factored_nnf`,
- * `simplify` and `normalize_operators`, layer 2's
- * `eliminate_by_substitution` — and this file adds nothing of its own but the
- * order. PHASE ORDER IS FIXED AS GIVEN (§3): phase 2 runs BEFORE phase 3, so
- * the deep pass still meets a `bf_neq` in either spelling, which is why it
- * reads both (witness.h).
+ * Every phase is ONE call into the module below it —
+ * `canonicalise_binder_ids`, `resolve_functional_quantifiers`,
+ * `fold_degenerate_binders` (foundations), `to_canonically_factored_nnf`,
+ * `simplify`, `normalize_operators` (normalisers) and
+ * `eliminate_by_substitution` (witness) — and this file adds nothing of its
+ * own but the order. PHASE ORDER IS FIXED AS GIVEN (§3): phase 2 runs BEFORE
+ * phase 3, so the deep pass still meets a `bf_neq` in either spelling, which
+ * is why it reads both (witness.h).
  *
- * PHASE 4 IS THE IDENTITY here. `PROCESS_ALL_BLOCKS` — the push, the
- * elimination and everything the `ctx` carries — arrives at layer 4; until
- * then the pipeline runs end to end and every phase around 4 is the spec's,
- * so the milestone is exactly "the pipeline runs, phase 4 does nothing".
+ * PHASE 4 IS THE IDENTITY: `PROCESS_ALL_BLOCKS` — the push, the elimination
+ * and everything the `ctx` carries — is not called here, and the pipeline
+ * runs end to end around it with every other phase the spec's.
  *
  * THE PLAIN REGIME THROUGHOUT: phases 1, 2 and 5 pass the EMPTY order, where
  * nothing is BDD-backed (§3) — `simplify`'s propagation guard is vacuous and
  * `resolve_functional_quantifiers` has no live order to quantify under. A
- * live order exists only inside a component (§5), which is layer 4's.
+ * live order exists only inside a component (§5).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_TMPL_H__
@@ -77,8 +76,8 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	// 3. `f ≠ 0 ↦ ¬(f = 0)` and the fused comparisons, after phase 2 by
 	//    the fixed order (§3).
 	phi = normalize_operators<node>(phi);
-	// 4. `PROCESS_ALL_BLOCKS(φ, keep_functional)` — the identity until
-	//    layer 4 builds it (§3, §4).
+	// 4. `PROCESS_ALL_BLOCKS(φ, keep_functional)` — the identity here
+	//    (§3, §4).
 	// 5. Every chain the callback does not keep, under NO live order, and
 	//    the close: simplify, drop the binders that bind nothing, and
 	//    canonicalise the ids again (§3).
