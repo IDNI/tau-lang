@@ -63,15 +63,93 @@ tref tree<node>::rename_apart(tref n, tref t) {
 	return rewriter::replace<node>(t, changes);
 }
 
+/** @internal @copydoc tree::prepare(substitution&, tref, tref, tref) @endinternal */
+template<NodeType node>
+void tree<node>::prepare(substitution& s, tref formula, tref key, tref value)
+{
+	using tau = tree<node>;
+	using handle = tau_term_bdd_handle<node>;
+	// Trimming interns a node, so it is asked for only when there is a
+	// sibling to drop.
+	tref k = tau::get(key).has_right_sibling()
+		? tau::trim_right_sibling(key) : key;
+	tref w = tau::get(value).has_right_sibling()
+		? tau::trim_right_sibling(value) : value;
+	DBG(assert(k != nullptr && w != nullptr);)
+	// One scan of the replacement answers both questions it is asked: is
+	// a `BDD_ID` in it, and is a binder. The walk stops as soon as both
+	// are known.
+	bool has_bdd_id = false, has_binder = false;
+	tau::get(w).find_top([&](tref m) {
+		if (tau::get(m).is(tau::BDD_ID)) has_bdd_id = true;
+		else if (is_logical_or_functional_quant<node>(m))
+			has_binder = true;
+		return has_bdd_id && has_binder;
+	});
+	// A replacement carrying a `BDD_ID` is spelled out as a plain term
+	// once, here, rather than at every leaf and reference argument below.
+	if (has_bdd_id) {
+		w = handle::convert_to_tau_terms(w);
+		// The spelling may have brought binders out of the BDD's
+		// leaves, which are not tree children, so the question is put
+		// again to the spelled-out term.
+		has_binder = tau::get(w).find_top(
+			is_logical_or_functional_quant<node>) != nullptr;
+	}
+	// Bound variables are renamed apart after the spelling, and renaming
+	// is not idempotent, so it happens in this one place.
+	if (has_binder) w = rename_apart(formula, w);
+	// The key is matched exactly as given. Either spelling of a variable
+	// key, bare or in its `bf` wrapper, names the variable the occurrence
+	// guard and the compose need.
+	tref var = nullptr;
+	if (const tau& t = tau::get(k); t.is(tau::variable)) var = k;
+	else if (t.is(tau::bf) && t.first() != nullptr
+		&& tau::get(t.first()).is(tau::variable))
+		var = tau::trim_right_sibling(t.first());
+	if (var == nullptr) s.keys_are_variables = false;
+	else s.by_variable.emplace_back(var, w);
+	s.key_types.set(static_cast<size_t>(tau::get(k).get_type()));
+	s.changes.emplace(k, w);
+}
+
+/** @internal @copydoc tree::finish(substitution&) @endinternal */
+template<NodeType node>
+void tree<node>::finish(substitution& s) {
+	using tau = tree<node>;
+	// The guard searches the key variables, so they are put in order once
+	// here; one key is already in it. Duplicates are left as they are,
+	// two keys naming one variable being two pairs the compose is entitled
+	// to see.
+	if (s.by_variable.size() > 1)
+		std::ranges::sort(s.by_variable,
+			[](tref a, tref b) { return tau::subtree_less(a, b); },
+			&std::pair<tref, tref>::first);
+#ifdef DEBUG
+	subtree_set<node> free_in_with;
+	for (const auto& [k, w] : s.changes) {
+		const trefs& fv = tau_lang::get_free_vars<node>(w);
+		free_in_with.insert(fv.begin(), fv.end());
+	}
+	s.free_in_with.assign(free_in_with.begin(), free_in_with.end());
+#endif
+}
+
 /** @internal @copydoc tree::substitute(tref, tref, const subtree_unordered_map<node, int_t>&, const argument_hook&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(tref that, tref with,
 	const subtree_unordered_map<node, int_t>& o,
 	const argument_hook& on_argument) const
 {
-	DBG(assert(that != nullptr && with != nullptr);)
-	return substitute(subtree_map<node, tref>{ { that, with } },
-		o, on_argument);
+	using tau = tree<node>;
+	const tref formula = this->get();
+	DBG(assert(formula != nullptr && that != nullptr && with != nullptr);)
+	// One pair, prepared straight into the substitution: the map the other
+	// overload takes would be built only to be read back.
+	substitution s;
+	prepare(s, formula, that, with);
+	finish(s);
+	return tau::substitute(formula, s, o, on_argument);
 }
 
 /** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const subtree_unordered_map<node, int_t>&, const argument_hook&) const @endinternal */
@@ -81,56 +159,16 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	const argument_hook& on_argument) const
 {
 	using tau = tree<node>;
-	using handle = tau_term_bdd_handle<node>;
 	const tref formula = this->get();
 	DBG(assert(formula != nullptr);)
 	if (changes.empty()) return formula;
 	// The entry step, once per call: every replacement is spelled out and
 	// renamed apart here, and the walk below — the leaves of a BDD and the
-	// arguments of a reference included — reuses the result. Renaming is
-	// not idempotent, so it happens in this one place.
+	// arguments of a reference included — reuses the result.
 	substitution s;
-	subtree_set<node> vars;
-	for (const auto& [key, value] : changes) {
-		tref k = tau::trim_right_sibling(key);
-		tref w = tau::trim_right_sibling(value);
-		DBG(assert(k != nullptr && w != nullptr);)
-		// A replacement carrying a `BDD_ID` is spelled out as a plain
-		// term once, here, rather than at every leaf and reference
-		// argument below.
-		if (tau::get(w).find_top([](tref m) {
-			return tau::get(m).is(tau::BDD_ID); }))
-			w = handle::convert_to_tau_terms(w);
-		// Then its bound variables are renamed apart, after the
-		// spelling, which may have brought binders out of the BDD's
-		// leaves.
-		if (tau::get(w).find_top(is_logical_or_functional_quant<node>))
-			w = rename_apart(formula, w);
-		// The key is matched exactly as given. Either spelling of a
-		// variable key, bare or in its `bf` wrapper, names the
-		// variable the occurrence guard and the compose need.
-		tref var = nullptr;
-		if (const tau& t = tau::get(k); t.is(tau::variable)) var = k;
-		else if (t.is(tau::bf) && t.first() != nullptr
-			&& tau::get(t.first()).is(tau::variable))
-			var = tau::trim_right_sibling(t.first());
-		if (var == nullptr) s.keys_are_variables = false;
-		else {
-			vars.insert(var);
-			s.by_variable.emplace_back(var, w);
-		}
-		s.key_types.set(static_cast<size_t>(tau::get(k).get_type()));
-		s.changes.emplace(k, w);
-	}
-	s.vars.assign(vars.begin(), vars.end());
-#ifdef DEBUG
-	subtree_set<node> free_in_with;
-	for (const auto& [k, w] : s.changes) {
-		const trefs& fv = tau_lang::get_free_vars<node>(w);
-		free_in_with.insert(fv.begin(), fv.end());
-	}
-	s.free_in_with.assign(free_in_with.begin(), free_in_with.end());
-#endif
+	for (const auto& [key, value] : changes)
+		prepare(s, formula, key, value);
+	finish(s);
 	return tau::substitute(formula, s, o, on_argument);
 }
 
@@ -158,12 +196,17 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		if (fv.empty()) return false;
 		auto less = [](tref a, tref b) {
 			return tau::subtree_less(a, b); };
-		const bool fv_is_smaller = fv.size() < s.vars.size();
-		const trefs& small = fv_is_smaller ? fv : s.vars;
-		const trefs& large = fv_is_smaller ? s.vars : fv;
-		for (tref v : small)
-			if (std::binary_search(large.begin(), large.end(), v,
-				less)) return true;
+		// The key variables are the `.first` of the pairs, in the same
+		// order the row is in, so either side can be the one searched.
+		if (s.by_variable.size() < fv.size()) {
+			for (const auto& [v, w] : s.by_variable)
+				if (std::binary_search(fv.begin(), fv.end(), v,
+					less)) return true;
+			return false;
+		}
+		for (tref v : fv)
+			if (std::ranges::binary_search(s.by_variable, v, less,
+				&std::pair<tref, tref>::first)) return true;
 		return false;
 	};
 	// A wrapper around one chain connective. `get_free_vars` answers such a

@@ -1070,9 +1070,11 @@ private:
 		/// Matched node → its replacement; a variable key in its `bf`
 		/// wrapper.
 		subtree_map<node, tref> changes;
-		/// The key variables, sorted, for the occurrence guard.
-		trefs vars;
-		/// Variable key → its replacement, for the BDD compose.
+		/// Key variable → its replacement, ordered by the variable.
+		/// Duplicates are kept: two keys naming one variable are two
+		/// pairs, and the compose is entitled to see both. The
+		/// occurrence guard searches this and the BDD compose iterates
+		/// it, so one container serves both.
 		std::vector<std::pair<tref, tref>> by_variable;
 		/// Every key is a variable, so the occurrence guard applies.
 		bool keys_are_variables = true;
@@ -1096,6 +1098,14 @@ private:
 		mutable std::vector<std::pair<tref, tau_bdd_ref<node>>>
 			compose_subs;
 	};
+	/**
+	 * @brief Prepare one (@p key, @p value) pair into @p s: the
+	 * replacement spelled out and renamed apart against @p formula, the
+	 * variable the key names recorded for the guard and the compose.
+	 */
+	static void prepare(substitution& s, tref formula, tref key, tref value);
+	/** @brief Put @p s in the shape the walk reads it in, once every pair is prepared. */
+	static void finish(substitution& s);
 	/** @brief The walk of `substitute`, over a prepared @p s. */
 	static tref substitute(tref formula, const substitution& s,
 		const subtree_unordered_map<node, int_t>& o,
