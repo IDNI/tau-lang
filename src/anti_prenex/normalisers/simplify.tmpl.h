@@ -218,13 +218,22 @@ private:
 		kind_t kind = plain;
 		size_t version = 0;
 	};
+	/// What one admission did: the index of the pin it added, and whether
+	/// it also REWROTE a range in force. The second is what keeps stage
+	/// 2's shortcut honest: such an admission changes the environment for
+	/// the leaves before it as well, so its own leaf's first form was
+	/// computed under an environment that no longer exists.
+	struct admission {
+		size_t index = 0;
+		bool rewrote_ranges = false;
+	};
 	/// What stage 1 of a frame learned about one equation leaf: the form
-	/// it was matched in, the pin it got (if any) and the size of `pins`
-	/// right after its own step, which tells stage 2 whether anything
-	/// joined the environment after it.
+	/// it was matched in, the admission it produced (if any) and the size
+	/// of `pins` right after its own step, which tells stage 2 whether
+	/// anything joined the environment after it.
 	struct matched_leaf {
 		tref first = nullptr;
-		std::optional<size_t> own;
+		std::optional<admission> own;
 		size_t pins_after = 0;
 	};
 	/// One open conjunction. `pending` holds the rewritten form of every
@@ -318,9 +327,10 @@ private:
 	}
 
 	/// §3: admit the pin of `atom`, if it has one and the cap allows it.
-	/// @return the index of the pin it admitted in `pins`, or `nullopt`.
-	/// Stage 2 needs it to leave a conjunct out of its OWN pin.
-	std::optional<size_t> try_admit(tref atom) {
+	/// @return what the admission did — the pin's index, which stage 2
+	/// needs to leave a conjunct out of its OWN pin, and whether a range
+	/// in force was rewritten — or `nullopt` when nothing was admitted.
+	std::optional<admission> try_admit(tref atom) {
 		const std::optional<pin<node>> p = matched(atom);
 		if (!p) return {};
 		const tref key = term_key<node>(p->var);
@@ -372,7 +382,7 @@ private:
 		witness_sum = new_witness_sum;
 		atom_sum = new_atom_sum;
 		version = ++next_version;
-		return pins.size() - 1;
+		return admission{ pins.size() - 1, !rewritten.empty() };
 	}
 
 	void undo_to(size_t mark) {
@@ -463,9 +473,10 @@ private:
 	 * — with the leaf's OWN pin left out. Its own pin would fold it to
 	 * `T` and drop the constraint the spec keeps in place; every OTHER
 	 * pin applies, so `z = y` under a later `y ↦ a` becomes `z = a`, which
-	 * is what the normalised environment already says. A leaf that saw no
-	 * admission after its own keeps its stage-1 form: the environment
-	 * minus its own pin is the one that form was computed under.
+	 * is what the normalised environment already says. A leaf keeps its
+	 * stage-1 form only when nothing joined after its own step AND its own
+	 * admission rewrote no range in force — exactly when the environment
+	 * minus its own pin is still the one that form was computed under.
 	 *
 	 * The non-equation members are untouched here; the traversal rewrites
 	 * them under the environment this leaves behind.
@@ -499,22 +510,32 @@ private:
 			const tref first = rewrite_atom(e);
 			// A leaf that only BECOMES a pin once rewritten joins
 			// the environment like any other (§3).
-			const std::optional<size_t> own = try_admit(first);
+			const std::optional<admission> own = try_admit(first);
 			stage1.emplace(e, matched_leaf{ first, own,
 				pins.size() });
 		}
 		// --- stage 2 -----------------------------------------------
 		for (tref e : eqs) {
 			const auto it = stage1.find(e);
+			const std::optional<admission> own =
+				it == stage1.end() ? std::nullopt
+						   : it->second.own;
+			// The shortcut: nothing joined the environment after
+			// this leaf's own step, and its own admission left
+			// every range in force alone, so the environment minus
+			// its own pin IS the one its first form was computed
+			// under.
 			if (it != stage1.end()
-				&& it->second.pins_after == pins.size()) {
+				&& it->second.pins_after == pins.size()
+				&& !(own && own->rewrote_ranges)) {
 				frames.back().pending.emplace(e,
 					it->second.first);
 				continue;
 			}
 			frames.back().pending.emplace(e,
-				rewrite_atom_excluding(e, it == stage1.end()
-					? std::nullopt : it->second.own));
+				rewrite_atom_excluding(e, own
+					? std::optional<size_t>(own->index)
+					: std::nullopt));
 		}
 		return n;
 	}

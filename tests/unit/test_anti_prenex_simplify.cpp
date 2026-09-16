@@ -359,6 +359,39 @@ TEST_CASE("S8c: but it IS rewritten by every other pin") {
 	CHECK(!holds_var(other_member(got, p1), "y"));
 }
 
+TEST_CASE("S8d: an admission that re-normalises a range denies the shortcut") {
+	tref w = bvar("w"), z = bvar("z"), a = bvar("a"), b = bvar("b"),
+		c = bvar("c");
+	// The corner stage 2's shortcut has to watch for: the FIRST match
+	// admits `z ↦ w·c`, a range that mentions `w`; the SECOND admits
+	// `w ↦ a·b` and thereby REWRITES that range to `(a·b)·c`. The second
+	// leaf is the last to admit, so "nothing joined after me" holds for
+	// it — and only the other half of the test, "and my own admission
+	// rewrote no range", keeps its stage-1 form out of the result. The
+	// names are chosen so that the chained equation sorts FIRST; the
+	// content order is a function of content alone (§1), so the REQUIRE
+	// below is a fact about these two atoms, not about this run.
+	tref first_eq = eq(z, land(w, c));
+	tref second_eq = eq(w, land(a, b));
+	REQUIRE(tau::subtree_less(first_eq, second_eq));
+	tref phi = conj(second_eq, first_eq);
+	tref got = simp(phi);
+	INFO("corner: ", tau::get(got).to_str());
+	CHECK(are_nso_equivalent<node_t>(got, phi));
+	// Both equations come out fully folded: `z`'s by every pin but its
+	// own, `y`'s untouched by its own.
+	const tref folded_z = ap::simplify_atom<node_t>(
+		eq(z, land(land(a, b), c)), {});
+	bool kept_w = false, folded = false;
+	for (tref m : members(got)) {
+		if (same(m, second_eq)) kept_w = true;
+		if (same(m, folded_z)) folded = true;
+	}
+	CHECK(kept_w);
+	CHECK(folded);
+	CHECK(!holds_var(folded_z, "w"));
+}
+
 TEST_CASE("S9: the cap refuses a pin") {
 	tref y = bvar("y"), a = bvar("a"), b = bvar("b"), c = bvar("c");
 	tref pinning = eq(y, lor(lor(a, b), c));
