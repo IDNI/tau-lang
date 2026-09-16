@@ -75,6 +75,9 @@ template <typename... BAs> requires BAsPack<BAs...> struct base_ba_dispatcher;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 template <NodeType node> struct io_context;
 template <NodeType node> struct tau_spec;
+/// A BDD reference, node plus output inversion. Defined in tau_bdd.h; named
+/// here because `substitute` keeps a list of them for its compose.
+template <NodeType node> struct tau_bdd_ref;
 
 // -----------------------------------------------------------------------------
 // htref-keyed containers
@@ -1078,6 +1081,15 @@ private:
 		/// Reference argument → its result after the hook, so a shared
 		/// argument is rewritten once per call.
 		mutable subtree_unordered_map<node, tref> argument_memo;
+		/// The key variables that are decision variables of the order,
+		/// with their replacements as BDDs, in the order a compose
+		/// wants them. Built at the first BDD-backed node the call
+		/// meets, at whatever depth, and reused by every later one:
+		/// the replacements and the order are constants of the call, so
+		/// the list is too. Empty is an answer, hence the flag.
+		mutable bool compose_prepared = false;
+		mutable std::vector<std::pair<tref, tau_bdd_ref<node>>>
+			compose_subs;
 	};
 	/** @brief The walk of `substitute`, over a prepared @p s. */
 	static tref substitute(tref formula, const substitution& s,

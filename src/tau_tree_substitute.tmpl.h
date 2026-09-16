@@ -183,6 +183,27 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		const trefs* fv = cached_free_vars<node>(n);
 		return fv == nullptr || holds_key(*fv);
 	};
+	// The compose list, built at the first BDD-backed node this call meets
+	// and reused by every later one. `build_bdd(w, o)` turns a replacement
+	// into a BDD under the live order, and both are constants of the call,
+	// so the answer is one per call rather than one per backed node. It is
+	// built here rather than in the entry step because a formula with no
+	// backed node in it must not pay for a BDD it never composes.
+	auto compose_list = [&s, &o]() -> const typename tbdd::subs_t& {
+		if (!s.compose_prepared) {
+			for (const auto& [v, w] : s.by_variable)
+				if (o.contains(v)) s.compose_subs.emplace_back(
+					v, tbdd::build_bdd(w, o));
+			// The order a compose descends in, sorted once here
+			// instead of at every node.
+			std::sort(s.compose_subs.begin(), s.compose_subs.end(),
+				[&o](const auto& a, const auto& b) {
+					return tbdd::less_then(a.first,
+						b.first, o); });
+			s.compose_prepared = true;
+		}
+		return s.compose_subs;
+	};
 	auto f = [&](tref n) -> tref {
 		// An occurrence, compared by content. The walk stops here, so
 		// nothing inside a replacement is rewritten again.
@@ -203,13 +224,15 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 				return tau::substitute(l, s, o, on_argument);
 			};
 			typename tbdd::ref r = tbdd::map_leaves(x, leaf, o);
-			typename tbdd::subs_t subs;
-			for (const auto& [v, w] : s.by_variable)
-				if (o.contains(v))
-					subs.emplace_back(v,
-						tbdd::build_bdd(w, o));
-			if (!subs.empty())
-				r = tbdd::bdd_compose(r, std::move(subs), o);
+			const typename tbdd::subs_t& subs = compose_list();
+			// One key takes the single-pair compose, which is the
+			// shape the module's calls have and the one that routes
+			// a constant replacement through the cofactor.
+			if (subs.size() == 1)
+				r = tbdd::bdd_compose(r, subs.front().first,
+					subs.front().second, o);
+			else if (!subs.empty())
+				r = tbdd::bdd_compose(r, subs, o);
 			if (r == x) return n;
 			return handle::convert_to_tau_node_or_term(handle(r),
 				find_ba_type<node>(n));
