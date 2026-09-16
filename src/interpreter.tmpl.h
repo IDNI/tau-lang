@@ -2882,8 +2882,7 @@ std::string interpreter<node>::current_spec() const {
 	if (original_spec.empty()) return "T.";
 	// IN-M2: a multi-alternative part is executed as its first solvable
 	// alternative, so once a step has chosen, report the chosen ones.
-	tref combined = unsqueeze_always(
-		const_cast<interpreter*>(this)->executed_spec_fm(false));
+	tref combined = unsqueeze_always(chosen_spec_fm());
 	return TAU_TO_STR(combined);
 }
 
@@ -2914,6 +2913,7 @@ std::optional<size_t> interpreter<node>::first_solvable_alternative(
 
 template <NodeType node>
 tref interpreter<node>::executed_spec_fm(bool use_memory) {
+	if (!use_memory) return chosen_spec_fm();
 	// Parts are parallel between original_spec (alternatives) and
 	// step_spec/ubt_ctn (their continuations, same order): a chosen
 	// continuation index selects the spec alternative it came from.
@@ -2923,10 +2923,26 @@ tref interpreter<node>::executed_spec_fm(bool use_memory) {
 	for (size_t i = 0; i < original_spec.size(); ++i) {
 		const htrefs& alts = original_spec[i].first;
 		std::optional<size_t> pick;
-		if (alts.size() > 1 && aligned) {
-			if (use_memory) pick = first_solvable_alternative(i);
-			else if (i < chosen_alt_.size()) pick = chosen_alt_[i];
-		}
+		if (alts.size() > 1 && aligned) pick = first_solvable_alternative(i);
+		if (pick && *pick < alts.size())
+			part_fms.push_back(alts[*pick]->get());
+		else part_fms.push_back(part_alts_fm<node>(alts));
+	}
+	return tau::build_wff_and(part_fms);
+}
+
+// The use_memory=false arm of executed_spec_fm: reads chosen_alt_ only, so
+// it is const and current_spec() const needs no const_cast to reach it.
+template <NodeType node>
+tref interpreter<node>::chosen_spec_fm() const {
+	const bool aligned = step_spec.size() == original_spec.size();
+	trefs part_fms;
+	part_fms.reserve(original_spec.size());
+	for (size_t i = 0; i < original_spec.size(); ++i) {
+		const htrefs& alts = original_spec[i].first;
+		std::optional<size_t> pick;
+		if (alts.size() > 1 && aligned && i < chosen_alt_.size())
+			pick = chosen_alt_[i];
 		if (pick && *pick < alts.size())
 			part_fms.push_back(alts[*pick]->get());
 		else part_fms.push_back(part_alts_fm<node>(alts));
@@ -2944,6 +2960,12 @@ void interpreter<node>::reset() {
 	formula_time_point = 0;
 	final_system = false;
 	step_spec.clear();
+	// The step-spec memo remembers the time point step_spec was built
+	// for; with time_point back at 0 a stale memo of 0 would make the
+	// next calculate_initial_spec return early on the EMPTY step_spec,
+	// and the "complete outputs" fallback would then emit default-zero
+	// outputs that poison every lookback read.
+	step_spec_time_point_ = -1;
 	announced_step_ = -1;
 	chosen_alt_.clear();
 	last_outputs_.clear();

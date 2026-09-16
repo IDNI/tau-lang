@@ -613,8 +613,11 @@ add_subdirectory("src")
 # include(CTest) also defines BUILD_TESTING, which the binding's own
 # ctest entries gate on, so it must run for that family too even when
 # no C++ test family is on.
+# TAU_BUILD_BENCHMARK registers ctest entries too (tests/benchmark); without
+# include(CTest) here a benchmark-only configuration never writes the root
+# CTestTestfile.cmake and `ctest` reports "No tests were found".
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
- OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS OR TAU_BUILD_BENCHMARK
  OR TAU_BUILD_BINDING_PYTHON_NANOBIND OR TAU_BUILD_BINDING_PYTHON_CTYPE)
 	include(CTest)
 endif ()

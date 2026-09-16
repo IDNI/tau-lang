@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include <nanobind/nanobind.h>
+#include <stdexcept>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/map.h>
@@ -327,10 +328,17 @@ NB_MODULE(tau, m) {
 		.def("can_extend",
 			[](interpreter_t& i, const std::string& psi_str) {
 				auto psi = tau_api::get_formula(psi_str);
-				if (!psi.has_value()) return false;
+				// A parse failure is not "cannot extend": raise, the
+				// way every other error path of this module does.
+				if (!psi.has_value())
+					throw std::invalid_argument(
+						"can_extend: `" + psi_str
+						+ "` is not a formula: "
+						+ make_py_report(psi.report()).text);
 				return i.can_extend(psi.value());
 			}, "psi"_a,
-			"Per-revision realisability pre-check via syntactic PWR.")
+			"Per-revision realisability pre-check via syntactic PWR. "
+			"Raises ValueError when `psi` does not parse.")
 		.def("admissible_outputs",
 			[assignment_to_dict](interpreter_t& i,
 			                     size_t max_results)
@@ -350,11 +358,20 @@ NB_MODULE(tau, m) {
 		.def("update",
 			[](interpreter_t& i, const std::string& psi_str) {
 				auto psi = tau_api::get_formula(psi_str);
-				if (!psi.has_value()) return false;
-				i.update(psi.value());
-				return true;
+				if (!psi.has_value())
+					throw std::invalid_argument(
+						"update: `" + psi_str
+						+ "` is not a formula: "
+						+ make_py_report(psi.report()).text);
+				// interpreter::update reports a rejected revision (an
+				// unsat or ill-typed result) as false; pass that on
+				// instead of the unconditional True this used to return.
+				return i.update(psi.value());
 			}, "psi"_a,
-			"Apply pointwise revision: merge the running spec with `psi`.");
+			"Apply pointwise revision: merge the running spec with `psi`. "
+			"Returns False when the revision was rejected (the running "
+			"spec is left unchanged); raises ValueError when `psi` does "
+			"not parse.");
 
 	// REAL oracle — check realisability of a spec or LTL formula.
 	m.def("is_realizable",
@@ -363,11 +380,25 @@ NB_MODULE(tau, m) {
 			if (!spec.has_value()) {
 				// Try formula parse as fallback (LTL-only inputs).
 				spec = tau_api::get_formula(spec_str);
-				if (!spec.has_value()) return false;
+				if (!spec.has_value())
+					throw std::invalid_argument(
+						"is_realizable: `" + spec_str
+						+ "` is neither a spec nor a formula: "
+						+ make_py_report(spec.report()).text);
 			}
-			return tau_api::realizable(spec.value()).value_or(false);
+			// A backend failure (ltlsynt missing or timed out, an
+			// undecidable shape) is not UNREALIZABLE: raise instead of
+			// returning False.
+			auto r = tau_api::realizable(spec.value());
+			if (!r.has_value())
+				throw std::runtime_error(
+					"is_realizable: no verdict: "
+					+ make_py_report(r.report()).text);
+			return r.value();
 		}, "spec"_a,
-		"Check realisability of a tau spec / LTL formula (REAL oracle).");
+		"Check realisability of a tau spec / LTL formula (REAL oracle). "
+		"Raises ValueError when the input does not parse and "
+		"RuntimeError when the backend gives no verdict.");
 
 	// Free function: apply_preferences (plan v10 §6 row A1).
 	m.def("apply_preferences",

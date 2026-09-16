@@ -320,6 +320,35 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(tau_api::current_spec(i) == updated);
 	}
 
+	// reset() clears the execution snapshot and takes time back to 0; the
+	// memo that remembers which time point step_spec was built for must go
+	// with it, or the first step after the reset returns early on the EMPTY
+	// step_spec and the "complete outputs" fallback emits default-zero
+	// outputs instead of replaying the spec.
+	TEST_CASE("reset replays the spec from time 0 instead of the stale memo") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		auto submit = [&i](const std::string& value) -> std::string {
+			std::map<stream_at, std::string> assigned;
+			for (auto& at : tau_api::get_inputs_for_step(i))
+				assigned[at] = value;
+			auto outs = tau_api::step(i, assigned);
+			REQUIRE(outs.has_value());
+			REQUIRE(outs.value().size() == 1);
+			return outs.value().begin()->second;
+		};
+
+		const std::string first = submit("T.");
+		CHECK(first == "T");
+		i.reset();
+		CHECK(i.time_point == 0);
+		// The same input at time 0 again must produce the same output.
+		CHECK(submit("T.") == first);
+		CHECK(submit("F.") == "F");
+	}
+
 	TEST_CASE("a rejected update leaves spec_revision and current_spec alone") {
 		auto maybe_i = tau_api::get_interpreter("u[t] = i[t].");
 		REQUIRE(maybe_i.has_value());

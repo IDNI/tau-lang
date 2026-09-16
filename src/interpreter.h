@@ -625,6 +625,9 @@ private:
 	/// the current memory, else the last step's choice), the
 	/// disjunction otherwise.
 	tref executed_spec_fm(bool use_memory);
+	/// The spec restricted to the alternatives the last step chose
+	/// (executed_spec_fm(false)); const, reads chosen_alt_ only.
+	tref chosen_spec_fm() const;
 
 	/// @brief Drop dead and duplicate alternatives (keeping the earliest,
 	/// i.e. strongest, position) and apply the max_revision_alts cap.

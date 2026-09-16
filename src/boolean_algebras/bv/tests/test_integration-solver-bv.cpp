@@ -296,6 +296,23 @@ TEST_SUITE("regression") {
 	}*/
 }
 
+// Ported from main's test_bv_ba-solver2.cpp (deleted on the LTL branch as
+// superseded; this case had no counterpart). BA-15: bv_eval_node's vars map
+// is passed by reference, so the wff_all/wff_ex cases must save and restore
+// any outer binding they shadow (nested quantifiers reusing the same name),
+// or the outer "x" after the inner quantifier closes would fall through to
+// the free-variable case and leak as an unbound variable in the solution.
+TEST_SUITE("cvc5_solve quantifier shadowing") {
+	TEST_CASE("outer x is still bound after an inner quantifier reuses the same name") {
+		const char* sample =
+			"ex x (x = { 1 }:bv[16] && (ex x (x = { 2 }:bv[16])) && x = { 1 }:bv[16])";
+		auto src = tau::get(sample, parse_opts_wff_no_hooks);
+		auto solution = solve_bv<node_t>(src);
+		REQUIRE( solution.has_value() );
+		CHECK( solution->empty() );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
