@@ -2,9 +2,11 @@
 
 /**
  * @file options.h
- * @brief Anti-prenexing foundations (layer 0): the six knobs of the §1 ctx
- * table, plus `absorb_occ_max`, which belongs to the result joins and is read
- * bare — all as process-wide defaults.
+ * @brief Anti-prenexing foundations (layer 0): the eight knobs of the §1 ctx
+ * table as process-wide defaults. The last two — `propagate_growth`, which
+ * belongs to `SIMPLIFY`, and `absorb_occ_max`, which belongs to the result
+ * joins — are process-wide ONLY: both run in every phase without a ctx, so
+ * they are never copied into one and every use reads them bare.
  *
  * Plain `inline` globals in a dependency-free header — the pattern of
  * `heuristics/bv_simplify_options.h` — so both the algorithm and the API
@@ -58,6 +60,13 @@ inline size_t accept_growth = 16;
 
 /// §1: absolute `|·|` below which the size acceptance never fires.
 inline size_t accept_floor = size_t(1) << 20;
+
+/// §1 `propagate_growth`: cap on `SIMPLIFY`'s pin environment (§3). Once
+/// `Σ‖witnesses‖` would exceed this factor times `Σ‖TERM_OF(pinning
+/// conjunct)‖`, the pass admits no further pin. NOT a component knob:
+/// `SIMPLIFY` runs in every phase and has no ctx, so every use reads it BARE,
+/// here. Precision, never soundness.
+inline size_t propagate_growth = 4;
 
 /// §1 `absorb_occ_max`: occurrence limit of the result joins' absorption pass
 /// (§3). A part occurring in more members than this is no candidate key, and

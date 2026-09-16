@@ -777,4 +777,26 @@ tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 	return syntactic_path_simplification_simplify_wff<node>(fm);
 }
 
+template <NodeType node>
+tref syntactic_path_simplification_unchanged_negations(tref fm) {
+	using tau = tree<node>;
+	// Both kinds of assumption, as in `syntactic_path_simplification`;
+	// `units_opaque` stays false, so a binder body is entered under the
+	// keys in force. What is left out is the pair of passes that entry
+	// runs BEFORE the sweep: no `to_nnf` and no
+	// `normalize_atomic_formula_operators` on a formula, which are exactly
+	// the rewrites that would fuse a negation into an atom.
+	path_sweep_options opts;
+	opts.tautologies = true;
+	if (tau::get(fm).is_term()) {
+		if (tau::get(fm).equals_0() || tau::get(fm).equals_1()) return fm;
+		// A term has no negated atoms to preserve, so it takes the
+		// same preparation as in the plain entry.
+		return syntactic_path_simplification_simplify_bf<node>(
+			push_negation_in<node, false>(fm), opts);
+	}
+	if (tau::get(fm).equals_F() || tau::get(fm).equals_T()) return fm;
+	return syntactic_path_simplification_simplify_wff<node>(fm, opts);
+}
+
 } // namespace idni::tau_lang

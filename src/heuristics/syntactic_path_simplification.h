@@ -79,6 +79,38 @@ tref syntactic_path_simplification(tref fm);
 template <NodeType node>
 tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm);
 
+/**
+ * @brief Simplify contradictions AND tautologies along every path without
+ * manipulating existing negations.
+ *
+ * `syntactic_path_simplification`'s sweep — a conjunct assumed true in its
+ * siblings, a disjunct assumed false in its siblings — on the formula AS
+ * WRITTEN: no NNF conversion and no atom normalisation, so a `!(x = 0)` stays
+ * spelled that way and no `!=` or negated ordering operator is introduced. A
+ * literal is still recognised as the complement of its atom in every
+ * spelling, so the folds fire as they do for the other entries.
+ *
+ * It is the second pass of the anti-prenexing module's `SIMPLIFY`
+ * (anti_prenex.md §3), whose invariant 4 forbids the rewrites the plain
+ * entry does on the way in; binder bodies are entered under the keys in
+ * force, which is that spec's §4 rule for `SIMPLIFY`. For a term input this
+ * is exactly what `syntactic_path_simplification` does — a term carries no
+ * such concern.
+ *
+ * @tparam node Tree node type.
+ * @param fm Formula or boolean term to simplify.
+ * @return Simplified formula/term, with every negation where it was.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // The contradiction folds, and `!(x = 0)` is not rewritten into `x != 0`.
+ * tref fm = get_nso_rr("x = 0 && !(x = 0).").value().main->get();
+ * CHECK( tau::get(syntactic_path_simplification_unchanged_negations<node_t>(fm)).equals_F() );
+ * @endcode
+ */
+template <NodeType node>
+tref syntactic_path_simplification_unchanged_negations(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "syntactic_path_simplification.tmpl.h"
