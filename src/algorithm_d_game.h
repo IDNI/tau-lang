@@ -19,6 +19,10 @@
 
 #include "omcat_types.h"
 #include "tau_diagnostics.h"
+#include "ltl_aba_limits.h"
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
 
 #include <algorithm>
 #include <cassert>
@@ -102,7 +106,10 @@ static bool eval_atom(const std::string& s, size_t& i, int bitmask, int n_aps) {
 	if (std::isdigit((unsigned char)s[i])) {
 		size_t j = i;
 		while (j < s.size() && std::isdigit((unsigned char)s[j])) ++j;
-		int ap = std::stoi(s.substr(i, j - i));
+		// Bounded digit run: an AP index beyond int range is a garbled
+		// guard, read as an out-of-range AP (false), never an exception.
+		int ap = -1;
+		if (j - i <= 9) ap = std::stoi(s.substr(i, j - i));
 		i = j;
 		if (ap < 0 || ap >= n_aps) return false;
 		return (bitmask >> ap) & 1;
@@ -239,6 +246,9 @@ struct parser {
 		if (std::isdigit((unsigned char)s[i])) {
 			size_t j = i;
 			while (j < s.size() && std::isdigit((unsigned char)s[j])) ++j;
+			// Bounded digit run (see eval_atom): a garbled index fails
+			// the parse instead of throwing out of it.
+			if (j - i > 9) { failed = true; return {}; }
 			int ap = std::stoi(s.substr(i, j - i));
 			i = j;
 			return { cube{ lit{ ap, true } } };
@@ -283,7 +293,7 @@ struct parser {
  * @return The cubes, or `std::nullopt`.
  */
 inline std::optional<std::vector<cube>> to_dnf(
-	const std::string& label, size_t max_cubes = 512)
+	const std::string& label, size_t max_cubes = ltl_guard_max_cubes)
 {
 	// An empty label is the unconditional guard, same convention the
 	// evaluator and the ABA guard parser use.
@@ -330,7 +340,29 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 	for (size_t p = hoa_text.find("HOA:"); p != std::string::npos;
 		p = hoa_text.find("HOA:", p + 4))
 		if (p == 0 || hoa_text[p - 1] == '\n') ++n_games;
-	if (n_games > 1) return g;
+	if (n_games > 1) {
+		LOG_ERROR << "[ltl_aba:algD] the synthesis game HOA holds "
+			<< n_games << " games (a decomposed specification); only "
+			"a single game can be parsed -- run ltlsynt with "
+			"--decompose=no";
+		return g;
+	}
+
+	// Header integers come from an external process: parse them with a
+	// range check instead of std::stoi, which throws on garbage and
+	// accepts counts the vectors below could never allocate.
+	auto header_int = [](const std::string& s, long max_value) -> long {
+		char* end = nullptr;
+		errno = 0;
+		long v = std::strtol(s.c_str(), &end, 10);
+		if (end == s.c_str() || errno == ERANGE || v < 0 || v > max_value)
+			return -1;
+		while (*end == ' ' || *end == '\t') ++end;
+		return *end == '\0' ? v : -1;
+	};
+	const long max_states = ltl_hoa_max_states
+		? (long) std::min<size_t>(ltl_hoa_max_states, (size_t) LONG_MAX)
+		: LONG_MAX;
 
 	std::istringstream ss(hoa_text);
 	std::string line;
@@ -355,17 +387,41 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 
 		if (!in_body) {
 			if (line.substr(0,7) == "States:") {
-				g.num_states = std::stoi(line.substr(7));
+				const long n = header_int(line.substr(7), max_states);
+				if (n < 1) {
+					LOG_ERROR << "[ltl_aba:algD] malformed synthesis "
+						"game HOA: bad state count '" << line.substr(7)
+						<< "'";
+					return synth_game{};
+				}
+				g.num_states = (int) n;
 				g.player.assign(g.num_states, 0);
 				g.state_color.assign(g.num_states, -1);
 				g.state_priority.assign(g.num_states, 0);
 				g.trans.resize(g.num_states);
 				g.edge_priority.resize(g.num_states);
 			} else if (line.substr(0,6) == "Start:") {
-				g.init = std::stoi(line.substr(6));
+				const long n = header_int(line.substr(6), INT_MAX);
+				if (n < 0) {
+					LOG_ERROR << "[ltl_aba:algD] malformed synthesis "
+						"game HOA: bad start state '" << line.substr(6)
+						<< "'";
+					return synth_game{};
+				}
+				g.init = (int) n;
 			} else if (line.substr(0,3) == "AP:") {
 				std::istringstream apl(line.substr(3));
-				int n; apl >> n;
+				int n = -1; apl >> n;
+				// The product game enumerates 1 << n_aps assignments:
+				// a signed shift is undefined at 31 and the loop is
+				// hopeless well before (ltl_max_game_aps).
+				if (n < 0 || n > ltl_max_game_aps) {
+					LOG_ERROR << "[ltl_aba:algD] synthesis game with "
+						<< n << " atomic propositions exceeds the "
+						<< ltl_max_game_aps << " the product game can "
+						"enumerate; refusing";
+					return synth_game{};
+				}
 				g.aps.resize(n);
 				g.controllable.resize(n, false);
 				for (int i = 0; i < n; ++i) {
@@ -700,6 +756,15 @@ inline product_game build_product_game(
 	int init_rho)                      // initial memory, from initial_memory()
 {
 	const int n_aps = (int)G.aps.size();
+	// The assignment loops below shift `1 << n_aps`; the parser already
+	// refuses such a game, this guards games built by hand (tests, the
+	// semantic PWR). An empty product reads as "no game" upstream.
+	if (n_aps > ltl_max_game_aps) {
+		LOG_ERROR << "[ltl_aba:algD] product game over " << n_aps
+			<< " atomic propositions exceeds the " << ltl_max_game_aps
+			<< " the assignment enumeration supports; refusing";
+		return product_game{};
+	}
 
 	// Fast feasibility lookup: given (pos_m, pos_y, D_pattern), does any T3 type match?
 	// Index: rho * T1_size * (2^K) + rho_prime * (2^K) + D_pattern  → bool
@@ -1182,9 +1247,13 @@ inline result<bool> solve_algorithm_d(
 	TAU_TRY(auto G, call_ltlsynt_game(phi_star, {}, D_outs));
 	if (G.num_states == 0) { return r.with_value(false); }
 
-	// Build product game (G × T_1)
+	// Build product game (G × T_1). An empty product is a refused
+	// construction (too many APs), not an UNREALIZABLE verdict.
 	product_game pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
-	if (pg.n_states == 0) { return r.with_value(false); }
+	if (pg.n_states == 0) {
+		return r.with_error(code::solver_error, "Algorithm D: the "
+			"product game could not be built; no verdict");
+	}
 
 	// Solve parity game with Zielonka
 	auto W1 = zielonka_win_player1(pg);
@@ -1252,7 +1321,10 @@ inline result<alg_d_result> solve_algorithm_d_full(
 
 	result.product_game = build_product_game(
 		result.synth_game, T1_size, T3, type_A, K, init_rho);
-	if (result.product_game.n_states == 0) { return r.with_value(std::move(result)); }
+	if (result.product_game.n_states == 0) {
+		return r.with_error(code::solver_error, "Algorithm D: the "
+			"product game could not be built; no verdict");
+	}
 
 	result.winning_region = zielonka_win_player1(result.product_game);
 

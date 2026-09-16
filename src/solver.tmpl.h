@@ -1896,9 +1896,13 @@ result<solution<node>> solve(tref form, solver_options options) {
 			LOG_TRACE << "solve/options.splitter_one:"
 				<< options.splitter_one; break;
 	}
+#endif // DEBUG
 	// Temporal quantifiers (always/sometimes) may wrap atomic equations
 	// and are unwrapped per-conjunct after path splitting (lines 1226+).
-	// Only flag truly unsupported temporal operators (U, R, W, S, T).
+	// The full-LTL operators (U, R, W, S, T) have no representation in a
+	// solution: refuse them at runtime -- this used to be a DEBUG-only
+	// assertion, so a release build solved past them and returned a
+	// solution for a formula it had silently misread.
 	{
 		auto is_unsupported_temporal = [](tref n) {
 			const auto& t = tree<node>::get(n);
@@ -1906,9 +1910,12 @@ result<solution<node>> solve(tref form, solver_options options) {
 				|| t.is(tau::wff_release) || t.is(tau::wff_weak_until)
 				|| t.is(tau::wff_since) || t.is(tau::wff_trigger);
 		};
-		assert(!tau::get(form).find_top(is_unsupported_temporal));
+		if (tau::get(form).find_top(is_unsupported_temporal)) {
+			return r.with_assert_check_error(code::unsupported_operation,
+				"solve: the formula contains a full-LTL operator "
+				"(U, R, W, S or T) the solver cannot represent");
+		}
 	}
-#endif // DEBUG
 	TAU_TRY_OR(form, normalize_non_temp<node>(form),
 		code::internal_error, "Normalization failed");
 	auto _s = r.open("expression_paths");

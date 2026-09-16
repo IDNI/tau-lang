@@ -168,6 +168,79 @@ State: 1
 		CHECK(g.edge_priority[0][1] == -1);
 	}
 
+	// The header comes from an external process; a garbled or absurd header
+	// yields the empty game (num_states == 0), which call_ltlsynt_game
+	// refuses as "no verdict" -- never an exception (std::stoi used to
+	// throw) and never a game built on a garbage count.
+	TEST_CASE("[ALG-D-32b] garbled header integers yield the empty game") {
+		const std::string tail = R"(
+AP: 1 "p0"
+acc-name: all
+--BODY--
+State: 0
+[t] 0
+--END--
+)";
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: abc\nStart: 0" + tail).num_states == 0);
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 0\nStart: 0" + tail).num_states == 0);
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 99999999999999999999\nStart: 0" + tail)
+				.num_states == 0);
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 1\nStart: -1" + tail).num_states == 0);
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 1\nStart: x" + tail).num_states == 0);
+		// The state cap is the runtime parameter ltl_hoa_max_states.
+		const size_t saved = ltl_hoa_max_states;
+		ltl_hoa_max_states = 3;
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 4\nStart: 0" + tail).num_states == 0);
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 3\nStart: 0" + tail).num_states == 3);
+		ltl_hoa_max_states = saved;
+	}
+
+	TEST_CASE("[ALG-D-32c] more atomic propositions than the game can "
+	          "enumerate yield the empty game") {
+		std::string aps;
+		for (int i = 0; i <= ltl_max_game_aps; ++i)
+			aps += " \"p" + std::to_string(i) + "\"";
+		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: "
+			+ std::to_string(ltl_max_game_aps + 1) + aps
+			+ "\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(hoa).num_states == 0);
+		// ltl_max_game_aps itself is accepted.
+		std::string ok = "HOA: v1\nStates: 1\nStart: 0\nAP: "
+			+ std::to_string(ltl_max_game_aps)
+			+ aps.substr(0, aps.rfind(" \""))
+			+ "\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n--END--\n";
+		CHECK(alg_d::parse_synth_game_hoa(ok).num_states == 1);
+	}
+
+	TEST_CASE("[ALG-D-32d] a decomposed multi-game text yields the empty game") {
+		std::string one = R"(HOA: v1
+States: 1
+Start: 0
+AP: 1 "p0"
+acc-name: all
+--BODY--
+State: 0
+[t] 0
+--END--
+)";
+		CHECK(alg_d::parse_synth_game_hoa(one).num_states == 1);
+		CHECK(alg_d::parse_synth_game_hoa(one + one).num_states == 0);
+	}
+
+	TEST_CASE("[ALG-D-32e] a guard with an absurd AP index reads as false, "
+	          "the DNF parser fails it") {
+		CHECK(!alg_d::eval_guard("99999999999", 1, 2));
+		CHECK(!alg_d::hoa_guard::to_dnf("99999999999").has_value());
+		CHECK(alg_d::hoa_guard::to_dnf("0 & 1").has_value());
+	}
+
 	TEST_CASE("[ALG-D-33] Buchi acceptance: colored state and edge get priority 1") {
 		std::string hoa = R"(HOA: v1
 States: 1

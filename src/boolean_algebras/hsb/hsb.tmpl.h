@@ -374,11 +374,23 @@ struct linexpr_result {
 	double bias = 0.0;
 };
 
+// A number that does not parse, or a fraction with a zero denominator
+// (`1/0` used to become `inf`), yields NaN; build_halfspace rejects every
+// non-finite coefficient, so the literal fails to parse instead of
+// producing an unbounded half-space. Compare qint's checked parser.
 inline double parse_unum(const std::string& s) {
-	auto slash = s.find('/');
-	if (slash != std::string::npos)
-		return std::stod(s.substr(0, slash)) / std::stod(s.substr(slash + 1));
-	return std::stod(s);
+	try {
+		auto slash = s.find('/');
+		if (slash != std::string::npos) {
+			const double q = std::stod(s.substr(slash + 1));
+			if (std::fpclassify(q) == FP_ZERO)
+				return std::numeric_limits<double>::quiet_NaN();
+			return std::stod(s.substr(0, slash)) / q;
+		}
+		return std::stod(s);
+	} catch (const std::exception&) {
+		return std::numeric_limits<double>::quiet_NaN();
+	}
 }
 
 inline size_t eval_var(const tt& v) {
@@ -438,6 +450,12 @@ inline std::optional<hsb_halfspace> build_halfspace(const linexpr_result& le) {
 	size_t dim = 0;
 	for (auto& [i, c] : le.coeffs) dim = std::max(dim, i + 1);
 	if (dim == 0) return std::nullopt;
+	// A NaN/inf coefficient comes from a malformed or zero-denominator
+	// literal (parse_unum); refuse the half-space rather than build one
+	// the arithmetic below cannot reason about.
+	if (!std::isfinite(le.bias)) return std::nullopt;
+	for (auto& [i, c] : le.coeffs)
+		if (!std::isfinite(c)) return std::nullopt;
 	hsb_halfspace h;
 	h.w.assign(dim, 0.0);
 	for (auto& [i, c] : le.coeffs) h.w[i] = c;

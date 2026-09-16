@@ -49,12 +49,31 @@ inline rational parse_rat_literal(const std::string& src) {
 		try {
 			std::string ipart = src.substr(0, dot);
 			std::string fpart = src.substr(dot + 1);
+			// 10^k must stay within long long: 19 or more fractional
+			// digits used to overflow `denom` silently (signed overflow,
+			// no exception) and yield a garbage rational.
+			if (fpart.size() > 18) {
+				LOG_WARNING << "rational parse: '" << src << "' has "
+					<< fpart.size() << " fractional digits, more than "
+					"the 18 an exact rational literal supports; "
+					"returning sentinel";
+				return rational(0, 0);
+			}
 			long long ival = ipart.empty() ? 0 : std::stoll(ipart);
 			long long fval = fpart.empty() ? 0 : std::stoll(fpart);
 			long long denom = 1;
 			for (size_t i = 0; i < fpart.size(); ++i) denom *= 10;
 			long long sign = (ipart.size() && ipart[0] == '-') ? -1 : 1;
-			long long num = sign * (std::abs(ival) * denom + fval);
+			long long scaled = 0, num = 0;
+			if (__builtin_mul_overflow(std::abs(ival), denom, &scaled)
+				|| __builtin_add_overflow(scaled, fval, &num)
+				|| __builtin_mul_overflow(num, sign, &num))
+			{
+				LOG_WARNING << "rational parse: '" << src
+					<< "' does not fit an exact rational literal; "
+					"returning sentinel";
+				return rational(0, 0);
+			}
 			return rational(num, denom);
 		} catch (...) {
 			LOG_WARNING << "rational parse failed for decimal, returning sentinel";

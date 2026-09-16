@@ -293,8 +293,15 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	subtree_map<node, std::vector<std::vector<int_t>>> dnf;
 
 	if (assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0, false)) {
-		assert(dnf.size() == 1);
-		return trace(dnf.begin()->first);
+		// A fully reduced formula has exactly one coefficient. Anything
+		// else is an upstream bug; with assertions compiled out the old
+		// `dnf.begin()->first` would dereference an empty map, so fall
+		// through to the general construction below instead.
+		DBG(assert(dnf.size() == 1);)
+		if (dnf.size() == 1) return trace(dnf.begin()->first);
+		LOG_ERROR << "bf_boole_normal_form: a reduced formula yielded "
+			<< dnf.size() << " coefficients instead of one; building "
+			"the normal form from all of them";
 	}
 	if (dnf.empty()) return trace(_0<node>(find_ba_type<node>(fm)));
 	if (!make_paths_disjoint)
@@ -416,7 +423,17 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 				return false;
 			}
 			auto it = var_pos.find(v.get());
-			assert(it != var_pos.end());
+			// Every literal of the clause was collected into var_pos
+			// by the caller; a miss is an upstream bug. Without the
+			// assertion (release) `i[it->second]` would read through
+			// end(), so log and skip the literal instead.
+			DBG(assert(it != var_pos.end());)
+			if (it == var_pos.end()) {
+				LOG_ERROR << "get_assignment: negated literal missing "
+					"from the clause's variable positions; ignoring "
+					"it";
+				return false;
+			}
 			if (i[it->second] == 1) {
 				// clause is false for DNF, true for CNF
 				clause_is_decided = true;
