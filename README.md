@@ -45,15 +45,14 @@
 	8. [Specification execution](#specification-execution)
 7. [Web IDE](#web-ide)
 8. [Developer infrastructure for ω-categorical synthesis](#developer-infrastructure-for-ω-categorical-synthesis)
-9. [Python bindings (ctypes)](#python-bindings-ctypes)
-10. [Documentation (mdBook)](#documentation-mdbook)
-11. [The C++ API and language bindings](#the-c-api-and-language-bindings)
-12. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
-13. [Known issues](#known-issues)
-14. [Future work](#future-work)
-15. [Submitting issues](#submitting-issues)
-16. [License](#license)
-17. [Authors](#authors)
+9. [Documentation (mdBook)](#documentation-mdbook)
+10. [The C++ API and language bindings](#the-c-api-and-language-bindings)
+11. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
+12. [Known issues](#known-issues)
+13. [Future work](#future-work)
+14. [Submitting issues](#submitting-issues)
+15. [License](#license)
+16. [Authors](#authors)
 
 
 # **Introduction**
@@ -3201,38 +3200,9 @@ no input variables. If a `qlt` formula contains input variables, the dispatcher
 uses Algorithm B even if `TAU_LTL_ALG=A` was requested. Algorithm B adds P-bits
 for the current T₂ type, making the synthesized strategy type-aware.
 
-# **Python bindings (ctypes)**
-
-A minimal ctypes-based Python shim is shipped in `bindings/python/` for
-scripted LTL(ABA) realizability decisions.  Configure with
-`-DTAU_BUILD_BINDING_PYTHON=ON`; the `tau_lang` CMake target produces
-`libtau_lang.so` (or `.dylib` / `.dll`).  Usage:
-
-```python
-from tau_lang import decide, Verdict, last_error
-
-v = decide("G ((o1[t]:qlt > {1/4}:qlt) && (o1[t]:qlt < {3/4}:qlt)).")
-if v == Verdict.REALIZABLE:
-    print("realizable")
-elif v == Verdict.UNREALIZABLE:
-    print("unrealizable")
-else:
-    print("error:", last_error())
-```
-
-Set the `TAU_LTL_LIB` environment variable to the absolute path of the
-built shared library if it isn't on the default search path.  The C API
-header (`bindings/python/tau_lang_c_api.h`) is directly usable by other
-foreign-function-interface callers.
-
-The parse-error hint classifier is also exposed as a pure-header
-utility at `src/parse_error_hint.h` — external consumers can call
-`idni::tau_lang::classify_parse_error(formula)` after a failed parse to
-obtain a short, actionable explanation.
-
 # **Documentation (mdBook)**
 
-A comprehensive user guide is available as an [mdBook](https://rust-lang.github.io/mdBook/) site in the `docs/` folder. It covers the full language reference, all APIs (C++, C, Python, REPL, codegen), tutorials, an error catalog, algorithm selection guide, and performance best practices.
+A comprehensive user guide is available as an [mdBook](https://rust-lang.github.io/mdBook/) site in the `docs/` folder. It covers the full language reference, all APIs (C++, Python, REPL, codegen), tutorials, an error catalog, algorithm selection guide, and performance best practices.
 
 ## Building the docs
 

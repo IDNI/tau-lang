@@ -49,7 +49,8 @@ option(TAU_LTO "Build the library and the executables with link time optimizatio
 # -ffat-lto-objects is what lets those -fno-lto targets link an LTO-built
 # library, and em++ has no equivalent, so wasm takes the LTO-off path whole.
 if (TAU_LTO AND (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
-	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
+	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON_NANOBIND
+	OR TAU_BUILD_BINDING_PYTHON_CTYPE)
 	AND NOT EMSCRIPTEN)
 	set(TAU_LTO_COMPILE_FLAGS "-flto=auto${TAU_FAT_LTO}")
 	set(TAU_LTO_COMPILE ";${TAU_LTO_COMPILE_FLAGS}")

@@ -11,10 +11,13 @@ if [ -z "${NAME}" ]; then
 else
 	case "${NAME}" in
 		"python")
-			BUILD_OPTIONS+=("-DTAU_BUILD_BINDING_PYTHON=ON")
+			BUILD_OPTIONS+=("-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON")
+			;;
+		"python-ctype")
+			BUILD_OPTIONS+=("-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON")
 			;;
 		*)
-			echo "Error: name can be only 'python'"
+			echo "Error: name can be only 'python' or 'python-ctype'"
 			exit 1
 		;;
 	esac

@@ -18,6 +18,7 @@ classifiers = [
 ]
 
 [tool.setuptools]
+package-dir = { "" = "ctypes" }
 py-modules = ["tau_lang"]
 
 [tool.setuptools.package-data]

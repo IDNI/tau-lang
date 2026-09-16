@@ -56,7 +56,7 @@ demangling via `cxxabi.h`.
 | `TAU_BUILD_EXECUTABLE` | ON (if nothing else selected) | Build the `tau` REPL/interpreter |
 | `TAU_BUILD_STATIC_LIBRARY` | OFF | Build `libTAU.a` |
 | `TAU_BUILD_SHARED_LIBRARY` | OFF | Build `libTAU.so` |
-| `TAU_BUILD_BINDING_PYTHON` | OFF | Build Python bindings (nanobind) |
+| `TAU_BUILD_BINDING_PYTHON_NANOBIND` | OFF | Build the nanobind Python binding |
 | `TAU_USE_CCACHE` | OFF | Use ccache for faster rebuilds |
 | `TAU_ADDRESS_SANITIZER` | OFF | Build with ASan |
 | `TAU_LOG_CHANNELS` | OFF | Enable debug/trace logging channels |

@@ -120,7 +120,7 @@ Options:
 - `-DTAU_BUILD_EMSCRIPTEN=ON` — selects the toolchain; set by the presets. It gates
   `include(use-emscripten)` before `project()`, which is why no preset names a
   `toolchainFile` (a preset-supplied one never loads at that point).
-- `-DTAU_BUILD_BINDING_JS=ON` — the embind library, mirroring `TAU_BUILD_BINDING_PYTHON`.
+- `-DTAU_BUILD_BINDING_JS=ON` — the embind library, mirroring `TAU_BUILD_BINDING_PYTHON_NANOBIND`.
 - `-DTAU_BUILD_BROWSER_TESTS=ON` — runs the wasm suite in headless Chrome as the
   `browser_suite` ctest entry. Configure installs Chrome and `puppeteer-core` itself
   via `dep-chrome.sh`/`dep-js-test-deps.sh`. Emscripten-only; fatal otherwise.

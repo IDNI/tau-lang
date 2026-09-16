@@ -3,16 +3,12 @@
 // C API implementation for Python/ctypes bindings.
 // Provides realizability checking and Mealy machine synthesis/execution.
 
-#define bas_pack tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb
-
-// tau.h already includes every pack member's BA header, in the order the
-// pack requires; pre-including one here duplicates a plugin-local template
-// (e.g. qlt's add_consistency_constraints) with a conflicting declaration.
 #include "tau.h"
+#include "tau_pack.h"
 #include "parse_error_hint.h"
 #include "api.h"
 
-#include "tau_lang_c_api.h"
+#include "tau_ctypes.h"
 
 #include <boost/log/core.hpp>
 #include <mutex>
@@ -25,7 +21,7 @@
 
 namespace {
 using namespace idni::tau_lang;
-using node_t = node<bas_pack>;
+using node_t = idni::tau_lang::tau_pack::node_t;
 using tau    = tree<node_t>;
 using tau_api = api<node_t>;
 

@@ -1,6 +1,6 @@
 """Python bindings for tau-lang LTL(ABA) synthesis and execution.
 
-Thin ctypes wrapper around libtau_lang.so / .dylib / .dll.
+Thin ctypes wrapper around libtau_ctypes.so / .dylib / .dll.
 Provides realizability checking, Mealy machine synthesis, and
 step-by-step execution for the Tau-Neuro Phase 1 pipeline.
 
@@ -23,6 +23,8 @@ Example — Mealy machine synthesis and stepping
     print(outputs)  # {"o1": "{1/2}:qlt", "state": 1}
     mealy_free(handle)
 """
+
+# TODO (MEDIUM): decide fate of ctypes binding. Throw away ctypes binding in favor of nanobind?
 
 from __future__ import annotations
 
@@ -74,10 +76,10 @@ class StepError(RuntimeError):
 def _lib_name() -> str:
     system = platform.system()
     if system == "Darwin":
-        return "libtau_lang.dylib"
+        return "libtau_ctypes.dylib"
     if system == "Windows":
-        return "tau_lang.dll"
-    return "libtau_lang.so"
+        return "tau_ctypes.dll"
+    return "libtau_ctypes.so"
 
 
 def _candidate_paths() -> list[str]:
@@ -90,8 +92,9 @@ def _candidate_paths() -> list[str]:
     paths.extend(
         [
             os.path.join(here, name),
-            os.path.join(here, "..", "..", "build", name),
-            os.path.join(here, "..", "..", "build", "bindings", "python", name),
+            os.path.join(here, "..", "..", "..", "build", name),
+            os.path.join(here, "..", "..", "..", "build", "bindings", "python", "ctypes", name),
+            os.path.join(here, "..", "..", "..", "build", "bindings", "python", name),
             os.path.join("/usr/local/lib", name),
             os.path.join("/usr/lib", name),
         ]
@@ -112,7 +115,7 @@ def _load() -> ctypes.CDLL:
             break
     else:
         raise RuntimeError(
-            "libtau_lang not found in any of: "
+            "libtau_ctypes not found in any of: "
             + ", ".join(_candidate_paths())
             + "; set TAU_LTL_LIB to its full path."
         )
