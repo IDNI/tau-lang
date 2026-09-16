@@ -780,6 +780,39 @@ int_t get_max_initial(const trefs& io_vars) {
 	return max_init;
 }
 
+/// The one cache `get_free_vars` fills and `cached_free_vars` reads: a node's
+/// free variables, swept with the tree. One per node type, created on first
+/// use.
+template <NodeType node>
+free_vars_cache_t<node>& free_vars_cache() {
+	static free_vars_cache_t<node>& cache =
+		tree<node>::template create_cache<free_vars_cache_t<node>>();
+	return cache;
+}
+
+/// A `bf`/`wff` wrapper has exactly the free variables of what it wraps, so
+/// both are answered under one key: the wrapped node.
+template <NodeType node>
+tref free_vars_key(tref n) {
+	using tau = tree<node>;
+	const tau& root = tau::get(n);
+	return root.has_child()
+		&& !tau::get(root.first()).has_right_sibling() ? root.first() : n;
+}
+
+/// The cached free variables of @p n, or null when none are cached: a `find`
+/// and nothing else. See the declaration for what it promises.
+template <NodeType node>
+const trefs* cached_free_vars(tref n) {
+	using tau = tree<node>;
+	if (!n) return nullptr;
+	if (typename node::type nt = tau::get(n).get_type();
+		nt != tau::bf && nt != tau::wff) return nullptr;
+	free_vars_cache_t<node>& free_vars_map = free_vars_cache<node>();
+	const auto it = free_vars_map.find(free_vars_key<node>(n));
+	return it == free_vars_map.end() ? nullptr : &it->second;
+}
+
 /**
  * @brief The free variables of @p n, which must be a `bf` or `wff` node.
  *
@@ -800,13 +833,8 @@ const trefs& get_free_vars(tref n) {
 	if (typename node::type nt = tau::get(n).get_type();
 		nt != tau::bf && nt != tau::wff) return no_free_vars;
 
-	using cache_t = subtree_unordered_map<node, trefs>;
-	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
-	// A `bf`/`wff` wrapper has exactly the free variables of what it wraps,
-	// so both are answered under one key: the wrapped node.
-	const tau& root = tau::get(n);
-	const tref key = root.has_child()
-		&& !tau::get(root.first()).has_right_sibling() ? root.first() : n;
+	free_vars_cache_t<node>& free_vars_map = free_vars_cache<node>();
+	const tref key = free_vars_key<node>(n);
 	if (auto it = free_vars_map.find(key); it != free_vars_map.end())
 		return it->second;
 

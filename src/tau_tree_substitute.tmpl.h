@@ -142,22 +142,46 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 	using tau   = tree<node>;
 	using tbdd  = tau_term_bdd<node>;
 	using handle = tau_term_bdd_handle<node>;
-	// The occurrence guard: one cached free-variable test per `wff` or
-	// `bf` node. A node no key variable is free in is not entered, so it
-	// comes back as the same tref, and a key rebound below it is left
-	// alone. When some key is not a variable there is no such test and
-	// every node is entered.
-	auto free_in = [&s](tref n) {
-		const trefs& fv = tau_lang::get_free_vars<node>(n);
+	// The occurrence guard: a `wff` or `bf` node is entered only if a key
+	// variable may be free in it, so a node none of them reaches comes back
+	// as the same tref and a key rebound below it is left alone. When some
+	// key is not a variable there is no such test and every node is
+	// entered.
+	auto holds_key = [&s](const trefs& fv) {
 		for (tref v : s.vars)
 			if (std::binary_search(fv.begin(), fv.end(), v,
 				tau::subtree_less)) return true;
 		return false;
 	};
+	// A wrapper around one chain connective. `get_free_vars` answers such a
+	// chain from its top: the top and every clause under it get an answer
+	// of their own, the links between them are taken apart and get none.
+	auto wraps_connective = [](const tau& t) {
+		const tref c = t.first();
+		if (c == nullptr || tau::get(c).has_right_sibling()) return false;
+		const tau& ct = tau::get(c);
+		return ct.is(tau::wff_and) || ct.is(tau::wff_or)
+			|| ct.is(tau::bf_and) || ct.is(tau::bf_or);
+	};
 	auto visit_subtree = [&](tref n) {
 		if (!s.keys_are_variables) return true;
 		const tau& t = tau::get(n);
-		return (!t.is(tau::wff) && !t.is(tau::bf)) || free_in(n);
+		if (!t.is(tau::wff) && !t.is(tau::bf)) return true;
+		// The root of this walk, and every node that is not a chain
+		// link, are asked outright. Each of them owns its answer, and
+		// the root's is what fills in the answers below it: from any
+		// node it is asked at, the walk answers every owner it reaches
+		// and stops only where one is answered already.
+		if (n == formula || !wraps_connective(t))
+			return holds_key(tau_lang::get_free_vars<node>(n));
+		// A chain link, which after that has no answer of its own. It
+		// is ENTERED rather than asked: asking would walk the whole
+		// subtree below the link and keep an answer for it, at every
+		// link of the chain, which costs a k-clause chain k walks and k
+		// answers of k variables each. Its clauses do own answers, so
+		// nothing below is entered that asking would have pruned.
+		const trefs* fv = cached_free_vars<node>(n);
+		return fv == nullptr || holds_key(*fv);
 	};
 	auto f = [&](tref n) -> tref {
 		// An occurrence, compared by content. The walk stops here, so

@@ -236,6 +236,24 @@ int_t get_max_initial(const trefs& io_vars);
 template <NodeType node>
 const trefs& get_free_vars(tref n);
 
+/// Where a node's free variables are kept.
+template <NodeType node>
+using free_vars_cache_t = subtree_unordered_map<node, trefs>;
+
+/**
+ * @brief The free variables of @p n if `get_free_vars` has already answered
+ * for it, and null otherwise.
+ *
+ * A read-only lookup: it computes nothing, walks nothing and stores nothing.
+ * It answers under the same key convention as `get_free_vars`, so a `bf` or
+ * `wff` wrapper and what it wraps share one answer, and a null @p n or one
+ * that is neither `bf` nor `wff` yields null. The pointer is into the same
+ * cache and is subject to the same rule: it must not be held across a
+ * collection.
+ */
+template <NodeType node>
+const trefs* cached_free_vars(tref n);
+
 template <NodeType node>
 std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars);
 

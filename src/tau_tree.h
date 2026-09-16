@@ -530,7 +530,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 * terms.
 	 *
 	 * When every key is a variable, a `wff` or `bf` node is entered only if
-	 * one of them is free in it (`get_free_vars`). An untouched subtree
+	 * one of them may be free in it: a chain link is entered on its chain's
+	 * answer, a node with a cached answer on its own. An untouched subtree
 	 * comes back as the same tref, and a key rebound below a node is left
 	 * alone.
 	 *
