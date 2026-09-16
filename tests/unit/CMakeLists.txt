@@ -13,6 +13,7 @@ set(TESTS
 	anti_prenex_nnf
 	anti_prenex_simplify
 	anti_prenex_layer1
+	anti_prenex_witness
 	adt_flatten
 	adt_parsing
 	adt_types

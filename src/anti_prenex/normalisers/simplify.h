@@ -80,6 +80,29 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
 	const var_order<node>& order = {});
 
 /**
+ * @brief §3 `TRY_WITNESS`'s pin match asked about ONE variable: the pin `x`
+ * has in `atom`, or `nullopt`.
+ *
+ * The same match as `find_pin` — ONE implementation, two entries — asked
+ * about a GIVEN variable instead of scanning the atom's free variables. That
+ * is what the witness steps need (§3 `TRY_WITNESS`, `TRY_WITNESS_DEEP`, the
+ * case pin): the variable is the one being eliminated, and what they want is
+ * its witness. There is nothing to choose here — an atom pins a given
+ * variable at most one way; the strict-first, then smallest-`‖f₁′‖` choice
+ * of §3 is made by the caller, across the conjuncts it scans.
+ *
+ * `atom` must be a POSITIVE equation, and must be free of the block in scope
+ * exactly as `find_pin` requires (the ORIENTATION guard of §3). Phase 2, the
+ * only caller before layer 3, runs with no block at all, so the guard is
+ * vacuous there and the block is not a parameter. `nullopt` when `x` is not
+ * free in the equation's term, when the atom is no positive equation, and
+ * when `x` is not pinned.
+ */
+template <NodeType node>
+std::optional<pin<node>> find_pin_for(tref atom, tref x,
+	const var_order<node>& order = {});
+
+/**
  * @brief §3 `SIMPLIFY(φ)`: equality propagation, then the spelling-preserving
  * path sweep.
  *

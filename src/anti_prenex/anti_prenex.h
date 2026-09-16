@@ -41,7 +41,8 @@
 #include "normalisers/joins.h"
 #include "normalisers/nnf.h"
 #include "normalisers/simplify.h"
-// layer 2 — witness/witness.h
+// layer 2 — witness
+#include "witness/witness.h"
 // layer 3 — shared/parts.h, cofactors.h; eliminate/conditions.h,
 //           eliminate_block.h, atomless.h
 // layer 4 — push/push.h; driver/blocks.h, component.h

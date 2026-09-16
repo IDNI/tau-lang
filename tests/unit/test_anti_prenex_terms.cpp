@@ -442,6 +442,30 @@ TEST_CASE("resolve_functional_quantifiers: a chain inside the body goes first") 
 	CHECK(same_function(r, bf("w"), { z, w }));
 }
 
+TEST_CASE("resolve_functional_quantifiers: the node keep is handed carries the body") {
+	tref x = vr("x"), v = vr("v"), y = vr("y"), z = vr("z"), w = vr("w");
+	// ∀x ∃v ( x·z·v ∪ ∃y (y·w) ): the nested chain is resolved BEFORE the
+	// nest above it is offered to `keep`, so the body hanging off the node
+	// `keep` is handed is the RESOLVED one (§3) — that body, and not only
+	// the prefix, is what a policy gets to look at.
+	tref in = tb::build_functional_quantifiers({{ y, tb::ex }}, bf("y & w"));
+	tref body = tau::build_bf_or(bf("x & z & v"), in);
+	tref c = tb::build_functional_quantifiers(
+		{{ x, tb::all }, { v, tb::ex }}, body);
+	trefs bodies;
+	auto rec = [&bodies](tref n) {
+		bodies.push_back(ap::strip_chain<node_t>(n).second);
+		return false;
+	};
+	ap::resolve_functional_quantifiers<node_t>(c, {}, rec);
+	REQUIRE(bodies.size() == 2);
+	// the nested chain's own body first, then the nest's — with `∃y (y·w)`
+	// resolved to `w` inside it
+	CHECK(tau::subtree_equals(bodies[0], bf("y & w")));
+	CHECK(!ap::carries_functional_quantifier<node_t>(bodies[1]));
+	CHECK(same_function(bodies[1], bf("x & z & v | w"), { x, z, v, w }));
+}
+
 TEST_CASE("resolve_functional_quantifiers: a subscript in a leaf leaves the others resolvable") {
 	tref x = vr("x"), y = vr("y");
 	tref f = bf("x & r(y)");                     // y hides in the argument

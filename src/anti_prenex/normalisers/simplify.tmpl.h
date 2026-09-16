@@ -74,29 +74,68 @@ tref term_key(tref var) {
 
 // --- the pin match ---------------------------------------------------------------
 
+namespace detail {
+
+/// The term the pin match reads off an atom: `TERM_OF`, with the ring sum
+/// SPELLED OUT first. `TERM_OF` builds `l + r`, a `bf_xor` node in the plain
+/// regime, and the plain `SIMPLIFY_TERM` knows no xor algebra: it leaves
+/// `0 + a` and `1 + a` as they are, so no cofactor folds and no atom pins.
+/// `A + B ↦ A·B′ ∪ A′·B` puts the term in the ∧/∨/′ algebra the cofactors,
+/// the union test and the witness need. A BDD-backed term holds no `bf_xor`,
+/// so in the BDD regime this walk changes nothing. `nullptr` when the atom
+/// cannot pin at all: it is no positive equation, or it touches `X`.
 template <NodeType node>
-std::optional<pin<node>> find_pin(tref atom, const block& X,
-	const var_order<node>& order)
-{
-	using tau = tree<node>;
-	if (atom == nullptr || !detail::is_positive_equation<node>(atom))
-		return {};
+tref pin_term(tref atom, const block& X, const var_order<node>& order) {
+	if (atom == nullptr || !is_positive_equation<node>(atom)) return nullptr;
 	// ORIENTATION (§3): only an `X`-free conjunct propagates — pushing a
 	// block variable into a leaf would break the child-is-cofactor
 	// identity, and `TRY_WITNESS` eliminates such a variable instead. It
 	// also makes every free variable below `X`-free, so the scan needs no
 	// second guard.
-	if (fv_meets<node>(atom, X)) return {};
-	tref f = term_of<node>(atom, order);
+	if (fv_meets<node>(atom, X)) return nullptr;
+	const tref f = term_of<node>(atom, order);
+	if (f == nullptr) return nullptr;
+	return apply_all_xor_def<node>(f);
+}
+
+/// The pin a FREE variable `y` has in the prepared term `f` of BA type
+/// `type`, or `nullopt` (§3): `usable ∧ f₀ ∪ f₁ = 1` on the two cofactors,
+/// witness `f₁′`, STRICT when the residual `p = f₀f₁` folds to `0`. The
+/// per-variable half of the match, which `find_pin` asks of every free
+/// variable and `find_pin_for` of one.
+template <NodeType node>
+std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
+	const var_order<node>& order)
+{
+	using tau = tree<node>;
+	const tref key = term_key<node>(y);
+	const tref f0 = simplify_term<node>(
+		tau::get(f).substitute(key, _0<node>(type), order), order);
+	const tref f1 = simplify_term<node>(
+		tau::get(f).substitute(key, _1<node>(type), order), order);
+	// `usable`: `y` gone from both cofactors. Where it is not, `y` still
+	// hides in a subterm the substitution did not reach and the record
+	// must not be used (§1, the leaf hazard).
+	if (free_in<node>(f0, y) || free_in<node>(f1, y)) return {};
+	// Boole's expansion puts the zeros of `f` at `f₀ ≤ y ≤ f₁′`, an
+	// interval that `f₀ ∪ f₁ = 1` collapses to a point.
+	if (!tau::get(simplify_term<node>(build_bf_or<node>(f0, f1), order))
+		.equals_1()) return {};
+	// The witness is the LOWER end `f₁′`: it carries the residual into
+	// every sibling's terms, where `p = 0` then folds syntactically (§3).
+	const tref witness = simplify_term<node>(build_bf_neg<node>(f1), order);
+	const tref p = simplify_term<node>(build_bf_and<node>(f0, f1), order);
+	return pin<node>{ y, witness, tau::get(p).equals_0() };
+}
+
+} // namespace detail
+
+template <NodeType node>
+std::optional<pin<node>> find_pin(tref atom, const block& X,
+	const var_order<node>& order)
+{
+	const tref f = detail::pin_term<node>(atom, X, order);
 	if (f == nullptr) return {};
-	// THE RING SUM IS SPELLED OUT FIRST. `TERM_OF` builds `l + r`, a
-	// `bf_xor` node in the plain regime, and the plain `SIMPLIFY_TERM`
-	// knows no xor algebra: it leaves `0 + a` and `1 + a` as they are, so
-	// no cofactor folds and no atom pins. `A + B ↦ A·B′ ∪ A′·B` puts the
-	// term in the ∧/∨/′ algebra the cofactors, the union test and the
-	// witness need. A BDD-backed term holds no `bf_xor`, so in the BDD
-	// regime this walk changes nothing.
-	f = apply_all_xor_def<node>(f);
 	const size_t type = find_ba_type<node>(f);
 	// By value: the loop builds nodes, and a reference into
 	// `get_free_vars`' table does not survive a collection (dag.h).
@@ -104,39 +143,31 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
 	std::optional<pin<node>> best;
 	size_t best_size = 0;
 	for (tref y : vars) {
-		const tref key = detail::term_key<node>(y);
-		const tref f0 = simplify_term<node>(
-			tau::get(f).substitute(key, _0<node>(type), order),
-			order);
-		const tref f1 = simplify_term<node>(
-			tau::get(f).substitute(key, _1<node>(type), order),
-			order);
-		// `usable`: `y` gone from both cofactors. Where it is not, `y`
-		// still hides in a subterm the substitution did not reach and
-		// the record must not be used (§1, the leaf hazard).
-		if (detail::free_in<node>(f0, y) || detail::free_in<node>(f1, y))
-			continue;
-		// Boole's expansion puts the zeros of `f` at `f₀ ≤ y ≤ f₁′`,
-		// an interval that `f₀ ∪ f₁ = 1` collapses to a point.
-		if (!tau::get(simplify_term<node>(build_bf_or<node>(f0, f1),
-			order)).equals_1()) continue;
-		// The witness is the LOWER end `f₁′`: it carries the residual
-		// into every sibling's terms, where `p = 0` then folds
-		// syntactically (§3).
-		const tref witness = simplify_term<node>(
-			build_bf_neg<node>(f1), order);
-		const tref p = simplify_term<node>(
-			build_bf_and<node>(f0, f1), order);
+		std::optional<pin<node>> p =
+			detail::pin_of_var<node>(f, y, type, order);
+		if (!p) continue;
 		// A STRICT pin ends the scan: §3 takes one without comparing
 		// witnesses.
-		if (tau::get(p).equals_0())
-			return pin<node>{ y, witness, true };
-		if (const size_t size = mem_size<node>(witness);
+		if (p->strict) return p;
+		if (const size_t size = mem_size<node>(p->witness);
 			!best || size < best_size)
-				best = pin<node>{ y, witness, false },
-				best_size = size;
+				best = p, best_size = size;
 	}
 	return best;
+}
+
+template <NodeType node>
+std::optional<pin<node>> find_pin_for(tref atom, tref x,
+	const var_order<node>& order)
+{
+	// The block is empty here (simplify.h): phase 2 has none, and a later
+	// caller hands in an atom its own guard already found `X`-free.
+	const tref f = detail::pin_term<node>(atom, {}, order);
+	if (f == nullptr) return {};
+	// `find_pin` asks only about free variables, so the per-variable half
+	// may assume it; a variable that does not occur is no pin of the atom.
+	if (!detail::free_in<node>(f, x)) return {};
+	return detail::pin_of_var<node>(f, x, find_ba_type<node>(f), order);
 }
 
 namespace detail {
