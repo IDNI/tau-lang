@@ -2893,15 +2893,22 @@ std::optional<size_t> interpreter<node>::first_solvable_alternative(
 {
 	if (part >= step_spec.size()) return {};
 	const trefs& part_alts = step_spec[part];
-	for (size_t alt_idx = 0; alt_idx < part_alts.size(); ++alt_idx)
-		for (tref path : expression_paths<node>(part_alts[alt_idx])) {
-			auto normalized = normalize_non_temp<node>(
-				rewriter::replace<node>(update_to_time_point(
-					path, formula_time_point), memory));
+	for (size_t alt_idx = 0; alt_idx < part_alts.size(); ++alt_idx) {
+		// The substitution commutes with path enumeration, and
+		// enumerating the raw formula's paths first multiplies the
+		// path count by the absolute run prefix that memory already
+		// decides (GitHub #115).
+		tref alt_at_t = update_to_time_point(part_alts[alt_idx],
+			formula_time_point);
+		alt_at_t = syntactic_formula_simplification<node>(
+			rewriter::replace<node>(alt_at_t, memory));
+		for (tref path : expression_paths<node>(alt_at_t)) {
+			auto normalized = normalize_non_temp<node>(path);
 			if (!normalized.has_value()) continue;
 			if (solution_with_max_update(normalized.value()))
 				return alt_idx;
 		}
+	}
 	return {};
 }
 
