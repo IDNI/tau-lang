@@ -2,33 +2,31 @@
 
 /**
  * @file simplify.h
- * @brief Anti-prenexing normalisers (layer 1), package S: §3 `SIMPLIFY` — the
- * equality-propagation pass and the path sweep behind it — and the plain-regime
- * pin match `TRY_WITNESS` shares with it.
+ * @brief §3 `SIMPLIFY` — equality propagation, then the path sweep — and the
+ * plain-regime pin match it shares with `TRY_WITNESS`.
  *
  * TWO PASSES over an NNF formula, in this order (§3): EQUALITY PROPAGATION,
  * then the PATH SWEEP. Neither re-spells an atom (invariant 4), and neither
  * re-assembles a chain: absorption and canonical assembly belong to the
  * result joins at the construction sites, so a conjunction keeps its nesting
- * minus — or with — its rewritten members (§10).
+ * with its members rewritten in place (§10).
  *
- * WHAT PROPAGATION IS FOR. A conjunct pinning a FREE variable licenses
+ * WHAT PROPAGATION IS FOR: a conjunct pinning a FREE variable licenses
  * substituting the pin's witness for that variable in its sibling conjuncts.
  * It is the only step that carries an assumption from one conjunct into
- * another's TERMS, and it is what lets the syntactic tests fire in cases like
- * `f = xy ∪ x′a`: `f₀ = a` and `f₁ = y` compare unequal until `y := a` turns
- * `f` into `a`. A heuristic, not a monotone gain, hence the cap
- * (`propagate_growth`, options.h).
+ * another's TERMS, and it is what lets the syntactic tests fire on shapes
+ * like `f = xy ∪ x′a`, where `f₀ = a` and `f₁ = y` compare unequal until
+ * `y := a` turns `f` into `a`. A heuristic, not a monotone gain, hence the
+ * cap (`propagate_growth`, options.h).
  *
- * WHAT IT MAY TOUCH (§4). The substitution descends through a sibling's whole
+ * WHAT IT MAY TOUCH (§4): the substitution descends through a sibling's whole
  * ∧/∨ structure and INTO a binder unit's body, with a pin SUSPENDED under a
  * binder over its variable or over a variable of its witness. Temporal
- * operators are opaque to both passes. References are opaque too — their
- * arguments only under `ref_args`, and then through `SIMPLIFY_TERM`, never
- * through a pin. The pinning conjunct itself STAYS, rewritten by every pin but
- * its OWN: `y` is free, so the conjunct still constrains it, and for a weak
- * pin it is what keeps the residual `p = 0` — while its own pin would fold it
- * to `T` and drop that constraint.
+ * operators are opaque to both passes. So are references — their arguments
+ * only under `ref_args`, and then through `SIMPLIFY_TERM`, never through a
+ * pin. The pinning conjunct STAYS, rewritten by every pin but its OWN: `y` is
+ * free, so the conjunct still constrains it, and for a weak pin it is what
+ * keeps the residual `p = 0`, while its own pin would fold it to `T`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_H__
@@ -73,9 +71,9 @@ struct pin {
  * where `usable` is `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a
  * STRICT one first, else the smallest `‖f₁′‖` (`mem_size`).
  *
- * ONE implementation, shared with `TRY_WITNESS`'s spelled mode (layer 2).
- * `order` is the live order; the plain regime (phases 1, 2 and 5) passes the
- * empty one, where nothing is BDD-backed and the `X` guard is vacuous.
+ * ONE implementation, shared with `TRY_WITNESS`'s spelled mode (§3). `order`
+ * is the live order; the plain regime (phases 1, 2 and 5) passes the empty
+ * one, where nothing is BDD-backed and the `X` guard is vacuous.
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin(tref atom, const block& X,

@@ -39,14 +39,13 @@ enum MemorySlotPre {
 	eliminate_quantifiers_m, ///< Cache slot for quantifier elimination traversals.
 	anti_prenex_step_m,      ///< Cache slot for anti-prenex step traversals.
 	/// Cache slot for `push_negation_in<node, is_wff, false>`. The two
-	/// `fuse_atoms` instantiations rewrite an atom differently, so they must
-	/// not share `push_negation_in_m`: one memo for both would hand a caller
-	/// the other's tree.
+	/// `fuse_atoms` instantiations rewrite an atom differently, so a shared
+	/// memo would hand one caller the other's tree.
 	push_negation_in_nofuse_m,
-	/// Cache slot for the anti-prenexing module's `TO_NNF`
-	/// (`to_canonically_factored_nnf`, anti_prenex/normalisers/nnf.h).
-	/// Separate from `push_negation_in_m`: that pass fuses a negated atom
-	/// into `!=` and friends, which invariant 4 of the spec forbids.
+	/// Cache slot for `to_canonically_factored_nnf`
+	/// (anti_prenex/normalisers/nnf.h). Separate from
+	/// `push_negation_in_m`, whose pass fuses a negated atom into `!=` and
+	/// friends — which that module must never build.
 	factored_nnf_m
 };
 
@@ -123,11 +122,10 @@ tref apply_all_xor_def(tref fm);
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @tparam fuse_atoms `true` (default) fuses a negated atom into its negated
  * operator (`!(x = y)` becomes `x != y`, `!(x < y)` becomes `x !< y`, ...);
- * `false` leaves every atom under its `!` untouched and pushes only through
- * the connectives, the binders, the temporal operators and the sugar. The
- * anti-prenexing module needs `false`: its invariant 4 forbids a `!=` and
- * any negated or mirrored order operator. Each instantiation gets its own
- * memo slot.
+ * `false` leaves every atom under its `!` and pushes only through the
+ * connectives, the binders, the temporal operators and the sugar, which is
+ * what the anti-prenexing module needs. Each instantiation has its own memo
+ * slot.
  * @param fm Formula to transform.
  * @return Formula with all negations pushed to literals.
  */

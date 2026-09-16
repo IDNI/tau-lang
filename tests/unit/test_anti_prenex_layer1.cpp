@@ -1,35 +1,32 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer-1 INTEGRATION test of src/anti_prenex/normalisers/ — packages J
-// (joins), N (nnf) and S (simplify) working together, the layer-1 milestone.
-// Spec: anti_prenex.md §3 (TO_NNF, NEG, NORMALIZE_OPERATORS, SIMPLIFY, the
-// result joins), §1 (`neg(φ)`, CONTENT ORDER), invariant 4, invariant 6.
-// Every case crosses at least two of the three packages; the three package
-// tests are complemented, never duplicated.
+// Integration test of src/anti_prenex/normalisers/: joins.h, nnf.h and
+// simplify.h working together. Spec: anti_prenex.md §3 (TO_NNF, NEG,
+// NORMALIZE_OPERATORS, SIMPLIFY, the result joins), §1 (`neg(φ)`, CONTENT
+// ORDER), invariant 4, invariant 6. Every case crosses at least two of the
+// three headers; the per-header suites are complemented, not duplicated.
 //
-// The milestone's claims and how each is observed — through node identity and
-// `are_nso_equivalent`, never through timing:
-//  1. every rewrite is equivalence-preserving on pure inputs, through the
-//     whole phase-1/phase-3 pipeline `TO_NNF → SIMPLIFY(ref_args) →
-//     NORMALIZE_OPERATORS`.
-//  2. the joins are AC-canonical end to end: two spellings of one formula —
-//     different nesting, different member order, a negation pushed one level
-//     differently — reach ONE hash-consed node through `TO_NNF`, and
-//     `SIMPLIFY` of that node is idempotent, which is what makes a memo key
-//     a function of content (§6).
-//  3. the normal form is strong enough for the syntactic tests: invariant 4
-//     holds over the whole pipeline's output — no `bf_neq`, no negated or
-//     mirrored order operator anywhere, binder bodies included — even when
-//     the input holds both.
-//  4. `neg(φ)` is filled on demand and the dualisation round trip restores
+// What the cases claim, observed through node identity and
+// `are_nso_equivalent`:
+//  1. every rewrite of the phase-1/phase-3 pipeline `TO_NNF →
+//     SIMPLIFY(ref_args) → NORMALIZE_OPERATORS` preserves meaning on pure
+//     inputs.
+//  2. the joins are AC-canonical end to end: spellings of one formula that
+//     differ in nesting, in member order and in how far a negation is pushed
+//     reach ONE hash-consed node through `TO_NNF`, and `SIMPLIFY` of that
+//     node is idempotent — which is what makes a memo key a function of
+//     content (§6).
+//  3. invariant 4 holds over the whole pipeline's output — no `bf_neq`, no
+//     negated or mirrored order operator anywhere, binder bodies included —
+//     even when the input holds both.
+//  4. `neg(φ)` is filled on demand, and the dualisation round trip restores
 //     the binder and temporal kinds (§3 NEG, §5 PROCESS_BLOCK).
-//  5. the spec's own example of what propagation is FOR — `f = xy ∪ x′a`
-//     reaching `a` — through the whole pipeline, in both regimes.
+//  5. propagation does what §3 says it is for: `f = xy ∪ x′a` reaches `a`,
+//     in the plain regime and in the BDD regime.
 //
-// Conventions (the layer-0 brief): a chain member carries a right sibling, so
-// a comparison against a separately built node is by CONTENT unless the claim
-// IS the one hash-consed node; members are located by a predicate, never by
-// position.
+// Conventions: a chain member carries a right sibling, so a comparison
+// against a separately built node is by CONTENT unless the claim IS the one
+// hash-consed node; members are located by a predicate, never by position.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -266,7 +263,7 @@ TEST_CASE("L5: the spec's `f = xy ∪ x′t` example reaches `t`") {
 	CHECK(folded == 1);
 }
 
-TEST_CASE("L5b: the same in the BDD regime, which is where the spec meets it") {
+TEST_CASE("L5b: the same example in the BDD regime") {
 	tref x = bvar("x"), y = bvar("y"), a = bvar("a"), b = bvar("b");
 	const tref t = land(a, b);
 	tref phi = conj(eq(y, t), eq0(lor(land(x, y), land(lneg(x), t))));
@@ -277,8 +274,8 @@ TEST_CASE("L5b: the same in the BDD regime, which is where the spec meets it") {
 	const ap::var_order<node_t> o =
 		ap::ctx<node_t>::for_component(P, 0, false).order;
 	tref prepared = ap::prepare_terms<node_t>(phi, P, o);
-	// The preparation really did back a term, or this case would silently
-	// be the plain one again.
+	// The preparation must have backed a term, or this case would only
+	// repeat the plain one.
 	REQUIRE(holds(prepared, tau::BDD_ID));
 	tref got = ap::simplify<node_t>(prepared, o);
 	// The propagation runs on the plain pinning equation (`X`-free, as

@@ -2,40 +2,35 @@
 
 /**
  * @file nnf.h
- * @brief Anti-prenexing normalisers (layer 1), package N: §3 `TO_NNF`, its
- * `NEG` with FACTORED NEGATION, and §3 `NORMALIZE_OPERATORS`.
+ * @brief §3 `TO_NNF`, its `NEG` with FACTORED NEGATION, and §3
+ * `NORMALIZE_OPERATORS`.
  *
- * NEGATION AT FORMULA LEVEL (invariant 4). The module never builds a `bf_neq`
- * and never a negated or mirrored order operator: `¬(f = 0)` stays spelled
- * that way, and an atom under a `¬` keeps its `¬`. That is the one thing this
- * file adds to the existing `to_nnf` of the codebase, which fuses a negated
- * atom into `!=`, `!<`, … — hence the separate pass, the separate memo slot
- * and the `fuse_atoms = false` instantiation of `push_negation_one_in`.
+ * NEGATION AT FORMULA LEVEL (invariant 4): no `bf_neq` and no negated or
+ * mirrored order operator is ever built here, so `¬(f = 0)` stays spelled
+ * that way and an atom under a `¬` keeps it. That is what separates this pass
+ * from `tau_lang::to_nnf`, which fuses a negated atom into `!=`, `!<`, … —
+ * hence its own memo slot and the `fuse_atoms = false` instantiation of
+ * `push_negation_one_in`.
  *
- * ONE WALK. `TO_NNF` is a single `pre_order::apply_unique` over the formula,
- * the shape of `push_negation_in`: `down` rewrites ONE negation at the node
- * it stands on and hands the result back for the walk to descend into, `up`
- * re-emits what the walk rebuilt. Phase 1 meets a raw formula and rebuilds it
- * bottom-up in this one memoised pass; from phase 3 on every node is in NNF
- * already and the only work left is `NEG`, cached on the node as `neg(φ)`
- * (§1, dag.h's `neg_of` / `set_neg`).
+ * ONE WALK: a single `pre_order::apply_unique`, where `down` rewrites ONE
+ * negation at the node it stands on and hands the result back for the walk to
+ * descend into, and `up` re-emits what the walk rebuilt. Phase 1 meets a raw
+ * formula and rebuilds it in this one memoised pass; from phase 3 on every
+ * node is in NNF already and the only work left is `NEG`, cached on the node
+ * as `neg(φ)` (§1, dag.h's `neg_of`/`set_neg`).
  *
- * WHY `up` CARRIES NO MARKER. `up` re-emits EVERY `wff_and` / `wff_or` it
- * closes through the matching join, not only the ones the walk changed. A
- * marker stack pushed in `down` and popped in `up` would desynchronise:
- * `pre_order::traverse` consults its slot memo on the node `down` RETURNED,
- * so on a memo hit `down` has already run while `up` is skipped entirely
- * (measured: a formula with one shared subtree gives 13 `down` calls against
- * 12 `up` calls). Unconditional re-emission needs no marker, and it is the
- * spec's own wording — "∧ / ∨ ↦ re-emitted through the joins over the
- * normalised members — phase 1 canonicalises the raw input's chains". It
- * costs nothing on an already canonical chain, which the joins return
- * unchanged, and the slot memo makes a repeat encounter one lookup.
+ * `up` CARRIES NO MARKER: it re-emits every `wff_and`/`wff_or` it closes
+ * through the matching join, whether or not the walk changed it. A marker
+ * stack pushed in `down` and popped in `up` would desynchronise, because the
+ * memoising traversal consults its slot memo on the node `down` RETURNED and
+ * skips `up` on a hit, `down` having already run. Unconditional re-emission
+ * needs no marker and is what §3 asks for — "∧ / ∨ ↦ re-emitted through the
+ * joins over the normalised members" — and it costs nothing on an already
+ * canonical chain, which the joins return unchanged.
  *
- * THE NEG SLOT is filled by `canonically_factored_neg`, the entry point that
- * asks for one, and not at the inner `¬ψ` nodes a walk happens to pass: a
- * node's slot is filled on first DEMAND (§1), which is exactly what that
- * entry is.
+ * THE NEG SLOT is filled by `canonically_factored_neg`, and not at the inner
+ * `¬ψ` nodes a walk happens to pass: §1 fills a node's slot on first DEMAND,
+ * which is what that entry is.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__NNF_H__
@@ -58,10 +53,9 @@ namespace idni::tau_lang::anti_prenexing {
  * 1's raw input — a chain comes back deduplicated, flattened and in content
  * order.
  *
- * The name avoids hiding `tau_lang::to_nnf`, the codebase's own NNF pass:
+ * The name does not hide `tau_lang::to_nnf`, the codebase's own NNF pass:
  * that one fuses a negated atom into `!=` and the negated order operators,
- * which this module must never build (the `norm_equation` clash terms.h
- * documents is the same hazard one level down).
+ * which this module must never build.
  */
 template <NodeType node>
 tref to_canonically_factored_nnf(tref phi);
@@ -92,8 +86,8 @@ tref canonically_factored_neg(tref psi);
  * negative leaf (§1).
  *
  * It is `normalize_atomic_formula_operators<node, true, true>` under its spec
- * name; the pass has one static cache per instantiation, so the flag keeps
- * this module's results apart from every other caller's for free.
+ * name; that pass caches per instantiation, so the flag keeps these results
+ * apart from every other caller's.
  */
 template <NodeType node>
 tref normalize_operators(tref phi);

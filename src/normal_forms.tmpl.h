@@ -57,9 +57,9 @@ tref not_equal_to_unequal(tref fm) {
  * @brief Normalizes comparison operators by rewriting `!=`, `nlteq`, `nlt`, `gteq`, `gt`, `ngteq`, and `ngt` to canonical negated `<`, `<=`, or `=` forms.
  * @tparam node Tree node type.
  * @tparam rewrite_neq `true` (default) rewrites `!=` into a negated equality.
- * @tparam arithmetic_only `true` restricts the six comparison rewrites to
- * operators over an arithmetic (bv) type; `!=` is rewritten either way.
- * Default `false`, which is every existing caller's behaviour.
+ * @tparam arithmetic_only `true` (default `false`) restricts the six
+ * comparison rewrites to operators over an arithmetic (bv) type; `!=` is
+ * rewritten either way.
  * @param fm Formula whose atomic operators are to be normalized.
  * @return Formula with comparison operators rewritten to canonical form.
  *
@@ -128,10 +128,10 @@ tref normalize_atomic_formula_operators(tref fm) {
 		// where the operator denotes ARITHMETIC comparison (today
 		// bv[n]): the four negated ones are total-order laws and fail
 		// for a lattice order -- over the powerset of {1,2}, a = {1},
-		// b = {2}, `!(a <= b)` holds while `b < a` does not. The
-		// mirror rewrites are plain swaps, valid in any order, but are
-		// guarded with the rest. The `!=` rewrite stays unconditional:
-		// it is formula-level negation, sound in every type.
+		// b = {2}, `!(a <= b)` holds while `b < a` does not. The two
+		// mirror rewrites are valid in any order but are guarded with
+		// them. The `!=` rewrite is formula-level negation, sound in
+		// every type, so it stays unconditional.
 		if constexpr (arithmetic_only) switch (c.value.nt) {
 			case tau::bf_nlteq: case tau::bf_nlt:
 			case tau::bf_gteq:  case tau::bf_gt:

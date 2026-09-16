@@ -780,12 +780,11 @@ tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 template <NodeType node>
 tref syntactic_path_simplification_unchanged_negations(tref fm) {
 	using tau = tree<node>;
-	// Both kinds of assumption, as in `syntactic_path_simplification`;
-	// `units_opaque` stays false, so a binder body is entered under the
-	// keys in force. What is left out is the pair of passes that entry
-	// runs BEFORE the sweep: no `to_nnf` and no
-	// `normalize_atomic_formula_operators` on a formula, which are exactly
-	// the rewrites that would fuse a negation into an atom.
+	// Both kinds of assumption, and `units_opaque` false, so a binder body
+	// is entered under the keys in force. What the plain entry runs BEFORE
+	// its sweep is left out: no `to_nnf` and no
+	// `normalize_atomic_formula_operators`, the two rewrites that would
+	// fuse a negation into an atom.
 	path_sweep_options opts;
 	opts.tautologies = true;
 	if (tau::get(fm).is_term()) {

@@ -2,27 +2,26 @@
 
 /**
  * @file simplify.tmpl.h
- * @brief Template implementations for simplify.h (package S). Included by
- * simplify.h. simplify.h says what each function means; the comments here say
- * how it is built.
+ * @brief Template implementations for simplify.h. simplify.h says what each
+ * function means; the comments here say how it is built.
  *
- * The propagation pass is ONE `pre_order::apply` — the NON-unique variant, so
- * that `down` and `up` pair up exactly and the marker stack is sound. (The
- * memoising variant consults its memo on the node `down` returned and then
- * skips `up`, which a marker stack cannot survive; nnf.h documents that
- * asymmetry.) The pass carries a memo of its own, keyed by (node, environment
- * version), because a node's result depends on the pins in force on its path
- * (§10): a shared subtree met under two environments is two computations.
+ * The propagation pass is ONE `pre_order::apply` — the NON-memoising variant,
+ * so that `down` and `up` pair up exactly and the marker stack is sound. The
+ * memoising variant consults its memo on the node `down` returned and skips
+ * `up` on a hit, which no marker stack survives. The pass carries a memo of
+ * its own, keyed by (node, environment version), because a node's result
+ * depends on the pins in force on its path (§10): a shared subtree met under
+ * two environments is two computations.
  *
- * The state — frames with an undo mark, an environment version, a marker
- * stack, the one-shot `no_descend` flag — is the path sweep's idiom
+ * Its state — frames with an undo mark, an environment version, a marker
+ * stack and the one-shot `no_descend` flag — follows the path sweep
  * (heuristics/syntactic_path_simplification.tmpl.h), which is the same walk
  * one pass later.
  *
- * What is reused from layer 0: `term_of`, `simplify_term`, `simplify_atom`,
- * `mem_size` (terms.h); `fv_meets`, `is_literal`, `binder_var` (dag.h);
- * `tree::substitute` for every rewrite; `get_leaves` for the member view of
- * an open conjunction, with its spine.
+ * The pieces come from the foundations: `term_of`, `simplify_term`,
+ * `simplify_atom`, `mem_size` (terms.h); `fv_meets`, `is_literal`,
+ * `binder_var` (dag.h); `tree::substitute` for every rewrite; `get_leaves`
+ * for the member view of an open conjunction, with its spine.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_TMPL_H__
@@ -36,9 +35,9 @@
 #include <utility>
 #include <vector>
 
-// `syntactic_path_simplification_unchanged_negations` (heuristics/) is
-// `SIMPLIFY`'s second pass; normal_forms.h is the header that assembles the
-// heuristics in the right order, as terms.tmpl.h does for its own.
+// `SIMPLIFY`'s second pass is
+// `syntactic_path_simplification_unchanged_negations` (heuristics/), reached
+// through the one header that assembles the heuristics in the right order.
 #include "normal_forms.h"
 
 namespace idni::tau_lang::anti_prenexing {
@@ -91,13 +90,12 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
 	tref f = term_of<node>(atom, order);
 	if (f == nullptr) return {};
 	// THE RING SUM IS SPELLED OUT FIRST. `TERM_OF` builds `l + r`, a
-	// `bf_xor` node in the plain regime, and the plain `SIMPLIFY_TERM` —
-	// the path simplifier — knows no xor algebra: it leaves `0 + a` and
-	// `1 + a` as they are, so neither cofactor folds and no atom would
-	// ever pin. `A + B ↦ A·B′ ∪ A′·B` puts the term in the ∧/∨/′ algebra
-	// the cofactors, the union test and the witness all need. A BDD-backed
-	// term holds no `bf_xor` node, so in the BDD regime this is a no-op
-	// walk and the cofactors come from the BDD as before.
+	// `bf_xor` node in the plain regime, and the plain `SIMPLIFY_TERM`
+	// knows no xor algebra: it leaves `0 + a` and `1 + a` as they are, so
+	// no cofactor folds and no atom pins. `A + B ↦ A·B′ ∪ A′·B` puts the
+	// term in the ∧/∨/′ algebra the cofactors, the union test and the
+	// witness need. A BDD-backed term holds no `bf_xor`, so in the BDD
+	// regime this walk changes nothing.
 	f = apply_all_xor_def<node>(f);
 	const size_t type = find_ba_type<node>(f);
 	// By value: the loop builds nodes, and a reference into
@@ -129,8 +127,8 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
 			build_bf_neg<node>(f1), order);
 		const tref p = simplify_term<node>(
 			build_bf_and<node>(f0, f1), order);
-		// A STRICT pin ends the scan: it is the cheapest of all, and
-		// the spec takes one without comparing witnesses.
+		// A STRICT pin ends the scan: §3 takes one without comparing
+		// witnesses.
 		if (tau::get(p).equals_0())
 			return pin<node>{ y, witness, true };
 		if (const size_t size = mem_size<node>(witness);
@@ -184,9 +182,7 @@ struct propagation {
 			return while_is_formula<node>(n);
 		};
 		auto u = [this](tref r) { return up(r); };
-		// NOT `apply_unique`: its memo hit skips `up` while `down` has
-		// already run, which no marker stack survives. The pass
-		// memoises on its own, per environment version.
+		// `apply`, not `apply_unique`: the file header says why.
 		tref res = pre_order<node>(phi).apply(f, visit, u);
 		DBG(assert(markers.empty() && frames.empty());)
 		return res;
@@ -219,10 +215,10 @@ private:
 		size_t version = 0;
 	};
 	/// What one admission did: the index of the pin it added, and whether
-	/// it also REWROTE a range in force. The second is what keeps stage
-	/// 2's shortcut honest: such an admission changes the environment for
-	/// the leaves before it as well, so its own leaf's first form was
-	/// computed under an environment that no longer exists.
+	/// it also REWROTE a range in force. An admission that did changes the
+	/// environment for the leaves before it too, so its own leaf's first
+	/// form was computed under an environment that no longer exists —
+	/// which is what stage 2's shortcut has to watch for.
 	struct admission {
 		size_t index = 0;
 		bool rewrote_ranges = false;
@@ -289,9 +285,9 @@ private:
 
 	/// `rewrite_atom` with ONE pin taken out of the environment for this
 	/// substitution: a PINNING conjunct is rewritten by every pin but its
-	/// own (§3). Its own would fold it to `T` — `f[y ← f₁′]` IS the
-	/// residual `p = 0`, which is `T` for a strict pin — and drop the
-	/// constraint the spec keeps in place, weak pins' residual included.
+	/// own (§3). Its own would erase it — `f[y ← f₁′]` IS the residual
+	/// `p = 0`, so a strict pin folds the conjunct to `T` — and with it
+	/// the constraint on `y`, a weak pin's residual included.
 	tref rewrite_atom_excluding(tref a, std::optional<size_t> own) {
 		if (!own || !pins[*own].active) return rewrite_atom(a);
 		const tref key = pins[*own].key;
@@ -470,13 +466,13 @@ private:
 	 * STAGE 2, REWRITE: EVERY positive equation of the frame, X-touching
 	 * ones included, rewritten from the ORIGINAL leaf under the FINAL
 	 * environment — one substitution and one `SIMPLIFY_ATOM` per equation
-	 * — with the leaf's OWN pin left out. Its own pin would fold it to
-	 * `T` and drop the constraint the spec keeps in place; every OTHER
-	 * pin applies, so `z = y` under a later `y ↦ a` becomes `z = a`, which
-	 * is what the normalised environment already says. A leaf keeps its
-	 * stage-1 form only when nothing joined after its own step AND its own
-	 * admission rewrote no range in force — exactly when the environment
-	 * minus its own pin is still the one that form was computed under.
+	 * — with the leaf's OWN pin left out (`rewrite_atom_excluding`).
+	 * Every OTHER pin applies, so `z = y` under a later `y ↦ a` becomes
+	 * `z = a`, which is what the normalised environment already says. A
+	 * leaf keeps its stage-1 form only when nothing joined after its own
+	 * step AND its own admission rewrote no range — exactly when the
+	 * environment minus its own pin is still the one that form was
+	 * computed under.
 	 *
 	 * The non-equation members are untouched here; the traversal rewrites
 	 * them under the environment this leaves behind.

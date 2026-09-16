@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 1 unit tests for src/anti_prenex/normalisers/simplify.h.
+// Unit tests for src/anti_prenex/normalisers/simplify.h.
 // Spec: anti_prenex.md §3 SIMPLIFY and "Equality propagation", §4 "What may
 // touch a unit", §10, and TRY_WITNESS's pin match (§3).
 //
@@ -9,16 +9,14 @@
 // vacuous unless a case builds a block of its own.
 //
 // Two facts the cases are built around. An equation is SYMMETRIC: `y = a`
-// pins `y` with witness `a` AND `a` with witness `y`, both strictly and both
-// with a witness of the same size, so which one the match returns is the
-// content order's business. A case that needs a direction uses an
-// asymmetric equation (`y = a·b` pins only `y`). And a conjunction is handled
-// in TWO STAGES: its X-free equation members are MATCHED in content order,
-// each under the pins admitted before it, and then EVERY equation member is
-// REWRITTEN under the environment those matches leave behind, minus its own
-// pin. So the content order decides which pins exist, never which members
-// they reach — a target sibling is rewritten whether it is an equation or
-// not — and a pinning conjunct comes back rewritten by every pin but its own.
+// pins `y` with witness `a` AND `a` with witness `y`, both strictly and with
+// witnesses of the same size, so which one the match returns is the content
+// order's business; a case that needs a direction uses an asymmetric equation
+// (`y = a·b` pins only `y`). And a conjunction is handled in TWO STAGES — its
+// X-free equations MATCHED in content order, then every equation REWRITTEN
+// under the environment those matches leave behind, minus its own pin — so
+// the content order decides which pins exist, never which members they reach,
+// and a pinning conjunct comes back rewritten by every pin but its own.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -337,7 +335,7 @@ TEST_CASE("S8b: a pinning conjunct is never rewritten by its OWN pin") {
 	CHECK(are_nso_equivalent<node_t>(got2, conj(weak, psi)));
 }
 
-TEST_CASE("S8c: but it IS rewritten by every other pin") {
+TEST_CASE("S8c: a pinning conjunct IS rewritten by every other pin") {
 	tref y = bvar("y"), z = bvar("z"), a = bvar("a"), b = bvar("b"),
 		c = bvar("c");
 	tref p1 = eq(y, land(a, b)), p2 = eq(z, land(y, c));
@@ -362,15 +360,14 @@ TEST_CASE("S8c: but it IS rewritten by every other pin") {
 TEST_CASE("S8d: an admission that re-normalises a range denies the shortcut") {
 	tref w = bvar("w"), z = bvar("z"), a = bvar("a"), b = bvar("b"),
 		c = bvar("c");
-	// The corner stage 2's shortcut has to watch for: the FIRST match
-	// admits `z ↦ w·c`, a range that mentions `w`; the SECOND admits
-	// `w ↦ a·b` and thereby REWRITES that range to `(a·b)·c`. The second
-	// leaf is the last to admit, so "nothing joined after me" holds for
-	// it — and only the other half of the test, "and my own admission
-	// rewrote no range", keeps its stage-1 form out of the result. The
-	// names are chosen so that the chained equation sorts FIRST; the
-	// content order is a function of content alone (§1), so the REQUIRE
-	// below is a fact about these two atoms, not about this run.
+	// The corner stage 2's shortcut has to watch for. The first match
+	// admits `z ↦ w·c`, a range that mentions `w`; the second admits
+	// `w ↦ a·b` and so REWRITES that range to `(a·b)·c`. Nothing joins
+	// after the second leaf, so only the other half of the shortcut's
+	// condition — that its own admission rewrote no range — keeps its
+	// stage-1 form out of the result. The names put the chained equation
+	// first in the content order, which is a function of content alone
+	// (§1), so the REQUIRE below is a fact about these two atoms.
 	tref first_eq = eq(z, land(w, c));
 	tref second_eq = eq(w, land(a, b));
 	REQUIRE(tau::subtree_less(first_eq, second_eq));

@@ -91,11 +91,11 @@ tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm);
  * spelling, so the folds fire as they do for the other entries.
  *
  * It is the second pass of the anti-prenexing module's `SIMPLIFY`
- * (anti_prenex.md §3), whose invariant 4 forbids the rewrites the plain
- * entry does on the way in; binder bodies are entered under the keys in
- * force, which is that spec's §4 rule for `SIMPLIFY`. For a term input this
- * is exactly what `syntactic_path_simplification` does — a term carries no
- * such concern.
+ * (anti_prenex.md §3), whose invariant 4 forbids the rewrites the plain entry
+ * does on the way in; binder bodies are entered under the keys in force,
+ * which is that spec's §4 rule for `SIMPLIFY`. A term input takes the same
+ * route as in `syntactic_path_simplification`, having no negated atoms to
+ * preserve.
  *
  * @tparam node Tree node type.
  * @param fm Formula or boolean term to simplify.

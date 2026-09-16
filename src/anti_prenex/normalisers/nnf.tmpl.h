@@ -2,22 +2,22 @@
 
 /**
  * @file nnf.tmpl.h
- * @brief Template implementations for nnf.h (package N). Included by nnf.h.
- * nnf.h says what each function means; the comments here say how it is built.
+ * @brief Template implementations for nnf.h. nnf.h says what each function
+ * means; the comments here say how it is built.
  *
  * What is reused: `push_negation_one_in<node, true, false>` for the cases
  * that are one level of the existing push (`¬¬`, the binders, the temporal
- * operators, the sugar connectives) — its binder cases already pass
- * `calculate_quant_id = false` and its temporal cases already dualise, so
- * nothing here re-implements them; `normalize_atomic_formula_operators` for
- * `NORMALIZE_OPERATORS`; the package-J joins for every emission; `members`,
- * `neg_of` / `set_neg` from dag.h.
+ * operators, the sugar connectives) — its binder cases pass
+ * `calculate_quant_id = false` and its temporal cases dualise, so nothing
+ * here re-implements them; `normalize_atomic_formula_operators` for
+ * `NORMALIZE_OPERATORS`; the joins for every emission; `members` and
+ * `neg_of`/`set_neg` (dag.h).
  *
- * What `down` builds is RAW: a `build_wff_or` / `build_wff_and` chain whose
+ * What `down` builds is RAW: a `build_wff_or`/`build_wff_and` chain whose
  * members are still negations. The walk descends into it and normalises every
  * member, and `up` re-emits the finished junction through the join — together
- * exactly the spec's `SIMPLIFIED_OR_JOIN(NEG(mⱼ) : j)`, without a second pass
- * and without building the join's result before its members are in NNF.
+ * the spec's `SIMPLIFIED_OR_JOIN(NEG(mⱼ) : j)`, without a second pass and
+ * without building the join's result before its members are in NNF.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__NNF_TMPL_H__
@@ -27,12 +27,9 @@
 #include <utility>
 #include <vector>
 
-// What this pass reuses: `push_negation_one_in`
-// (normal_forms_transformations.tmpl.h), which has no declaration of its own,
-// `normalize_atomic_formula_operators` (normal_forms.tmpl.h, declared in
-// heuristics/syntactic_path_simplification.tmpl.h) and the `MemorySlotPre`
-// slots. `normal_forms.h` is the one header that assembles all three in the
-// right order — terms.tmpl.h reaches its own two the same way.
+// `push_negation_one_in`, `normalize_atomic_formula_operators` and the
+// `MemorySlotPre` slots all come from this one header, which is what
+// assembles them in the right order.
 #include "normal_forms.h"
 
 namespace idni::tau_lang::anti_prenexing {
@@ -145,11 +142,10 @@ tref nnf_down(tref n) {
 	return push_negation_one_in<node, true, false>(n);
 }
 
-/// §3 `TO_NNF`'s `up`: every `wff_and` / `wff_or` the walk closes re-emitted
-/// through the matching join over its normalised members. Unconditional — see
-/// nnf.h on why no marker says whether the node changed. Anything else is
-/// returned as it stands, the term nodes included: `while_is_formula` stops
-/// the descent at a term, and such a node still reaches `up`.
+/// §3 `TO_NNF`'s `up`: every `wff_and`/`wff_or` the walk closes re-emitted
+/// through the matching join over its normalised members, whether or not it
+/// changed (nnf.h says why). Anything else comes back as it stands, a term
+/// node included: the descent stops at a term, but `up` still sees it.
 template <NodeType node>
 tref nnf_up(tref r) {
 	using tau = tree<node>;
@@ -179,9 +175,8 @@ tref canonically_factored_neg(tref psi) {
 	DBG(assert(psi != nullptr);)
 	if (const tref hit = neg_of<node>(psi); hit != nullptr) return hit;
 	// `build_wff_neg` folds `¬¬ψ′` and the two constants through the hooks
-	// before the walk even starts; what the walk gets is the spec's
-	// `TO_NNF(¬ψ)`, and this is the first DEMAND for `neg(ψ)`, so this is
-	// where the slot is filled.
+	// before the walk starts, so the walk gets `TO_NNF(¬ψ)`. This call is
+	// the first demand for `neg(ψ)`, so it fills the slot.
 	const tref negated = to_canonically_factored_nnf<node>(
 		build_wff_neg<node>(psi));
 	set_neg<node>(psi, negated);

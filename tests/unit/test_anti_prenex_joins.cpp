@@ -1,17 +1,16 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 1 unit tests for src/anti_prenex/normalisers/joins.h.
+// Unit tests for src/anti_prenex/normalisers/joins.h.
 // Spec: anti_prenex.md §3 "The result joins", invariant 7, §1 CONTENT ORDER
 // and the `absorb_occ_max` knob.
 //
-// Two conventions the cases lean on, both inherited from layer 0. A member of
-// a chain that is not the last child of its operator node carries a right
-// sibling, so a comparison against a separately built node is by CONTENT
-// unless the claim is that the join returns the one hash-consed node — which
-// it is, for every AC-canonicity case, and those compare trefs. And the
-// construction hooks are ON: they fold T/F, `X ∧ X` and `X ∧ ¬X` one
-// construction after the insert rules do, so a case that means to observe a
-// rule observes it on the BUILDER, not on the assembled node.
+// Two conventions the cases lean on. A member of a chain that is not the last
+// child of its operator node carries a right sibling, so a comparison against
+// a separately built node is by CONTENT — except where the claim IS that the
+// join returns the one hash-consed node, as in every AC-canonicity case, and
+// those compare trefs. And the construction hooks are ON: they fold T/F,
+// `X ∧ X` and `X ∧ ¬X` one construction after the insert rules do, so a case
+// that means to observe a rule observes it on the BUILDER.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"

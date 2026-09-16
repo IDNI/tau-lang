@@ -82,7 +82,7 @@ tref norm_trimmed_equation(tref eq) {
  * @tparam is_wff `true` to handle `wff_neg` (default), `false` to handle `bf_neg`.
  * @tparam fuse_atoms `true` (default) fuses a negated atom into its negated
  * operator; `false` returns such a node unchanged, so the `!` stays at
- * formula level (the anti-prenexing module's invariant 4).
+ * formula level.
  * @param fm Formula node whose outermost negation is to be pushed inward.
  * @return Formula with the negation pushed one level deeper, or `fm` unchanged if not applicable.
  * @endinternal
@@ -97,9 +97,9 @@ tref push_negation_one_in(tref fm) {
 		const tau& ct = t[0][0];
 		if (!ct.has_child()) return fm;
 		// Without atom fusion the ten atom cases below -- `bf_eq`,
-		// `bf_neq` and the eight order operators, which are exactly
-		// what `is_atomic_fm` lists -- are skipped in one test, and
-		// the negation stays where it is.
+		// `bf_neq` and the eight order operators, which are what
+		// `is_atomic_fm` lists -- are skipped in one test and the
+		// negation stays where it is.
 		if constexpr (!fuse_atoms)
 			if (is_atomic_fm<node>(ct.get())) return fm;
 		switch (ct[0].value.nt) {

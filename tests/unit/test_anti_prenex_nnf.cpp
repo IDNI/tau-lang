@@ -1,17 +1,17 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 1 unit tests for src/anti_prenex/normalisers/nnf.h.
+// Unit tests for src/anti_prenex/normalisers/nnf.h.
 // Spec: anti_prenex.md §3 TO_NNF / NEG (factored) / NORMALIZE_OPERATORS,
 // §1 `neg(φ)`, invariant 4.
 //
-// Invariant 4 is the suite's standing claim: no output of this module holds a
-// `bf_neq` or a negated/mirrored order operator ANYWHERE, binder bodies
-// included. `no_fused_atoms` below walks the whole tree and every case that
-// builds something runs it.
+// Invariant 4 is the suite's standing claim: no output holds a `bf_neq` or a
+// negated/mirrored order operator ANYWHERE, binder bodies included.
+// `no_fused_atoms` below walks the whole tree, and every case that builds
+// something runs it.
 //
-// The construction hooks are ON, as everywhere in the module: they fold `¬T`,
-// `¬F` and `¬¬` at construction, so a case that means to observe TO_NNF's own
-// rules keeps its input clear of those.
+// The construction hooks are ON: they fold `¬T`, `¬F` and `¬¬` at
+// construction, so a case that means to observe TO_NNF's own rules keeps its
+// input clear of those.
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
@@ -91,9 +91,8 @@ TEST_CASE("N1: a negated atom keeps its `¬`, never a fused operator") {
 	tref deep = tau::build_wff_ex(fvar("x"),
 		conj(neg(a), tau::build_wff_always(neg(atom("b")))), false);
 	CHECK(no_fused_atoms(nnf(deep)));
-	// An input that already holds a fused atom is NOT re-spelled by this
-	// pass either way: TO_NNF never touches an atom (`NORMALIZE_OPERATORS`
-	// is phase 3's job, tested below).
+	// TO_NNF never touches an atom at all; rewriting a fused one is
+	// `NORMALIZE_OPERATORS`' job, in phase 3.
 	CHECK(no_fused_atoms(nnf(conj(a, atom("b")))));
 }
 
@@ -178,8 +177,8 @@ TEST_CASE("N7: a binder flips without renaming, a temporal operator dualises") {
 	tref x = fvar("x");
 	tref ex = tau::build_wff_ex(x, a, false);
 	tref all_ = tau::build_wff_all(x, a, false);
-	// `¬∃x.ψ ↦ ∀x.NEG(ψ)` and back, with the SAME bound variable node —
-	// `calculate_quant_id = false` everywhere (ground rule 4).
+	// `¬∃x.ψ ↦ ∀x.NEG(ψ)` and back, with the SAME bound variable node:
+	// the module never renames a binder.
 	tref got = nnf(neg(ex));
 	REQUIRE(is_child<node_t>(got, tau::wff_all));
 	CHECK(same(ap::binder_var<node_t>(got), x));
@@ -284,7 +283,7 @@ TEST_CASE("N12: `≠` is rewritten in every type") {
 
 TEST_CASE("N13: the six comparison rewrites fire only on an arithmetic type") {
 	// A Boolean order atom never reaches the pass: the construction hooks
-	// rewrite `<`/`<=` over a non-bv type into equations (dag.h, D4), so
+	// rewrite `<`/`<=` over a non-bv type into equations, so
 	// there is nothing left to normalise.
 	tref bool_le = tau::build_bf_lteq(tau::build_bf_variable("x", 0),
 		tau::build_bf_variable("y", 0));

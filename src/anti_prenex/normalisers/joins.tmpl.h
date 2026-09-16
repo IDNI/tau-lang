@@ -2,14 +2,13 @@
 
 /**
  * @file joins.tmpl.h
- * @brief Template implementations for joins.h (package J). Included by
- * joins.h. joins.h says what each function means; the comments here say how
- * it is built.
+ * @brief Template implementations for joins.h. joins.h says what each
+ * function means; the comments here say how it is built.
  *
- * Everything is assembled from layer 0: `members` for the flattening and for
+ * The pieces come from the foundations: `members` for the flattening and for
  * the parts of a member, `is_literal` and `complement_of` for the unit
- * elimination, `canonical_and` / `canonical_or` for the emission, and
- * `subtree_unordered_set` / `subtree_unordered_map` for every set and index —
+ * elimination, `canonical_and`/`canonical_or` for the emission, and
+ * `subtree_unordered_set`/`subtree_unordered_map` for every set and index —
  * all keyed by CONTENT, which is what a member carrying a right sibling
  * needs.
  */
@@ -52,16 +51,14 @@ trefs parts_of(tref m) {
  * iff `parts(d) ⊆ parts(m′)`, tested by marking: the parts of every member
  * are held as a set, once per member, and `d`'s parts are looked up in it.
  *
- * `absorb_occ_max` (options.h, read BARE — the joins have no ctx) is the cost
- * guard: a part occurring in more members than the limit is no candidate key,
- * so a member all of whose parts exceed it stays unabsorbed. That costs
- * PRECISION, never soundness — `EXPAND`'s cases share nearly every part and
- * are skipped for free.
+ * `absorb_occ_max` (options.h) is the cost guard: a part occurring in more
+ * members than the limit is no candidate key, so a member all of whose parts
+ * exceed it stays unabsorbed. That costs precision, never soundness.
  *
- * Strictly more parts is what keeps the relation acyclic: two members with
- * the same part set never absorb each other. An already absorbed absorber is
- * skipped — by transitivity of ⊆ its own absorber absorbs whatever it would,
- * and that absorber's key passed the occurrence test too.
+ * Strictly more parts keeps the relation acyclic: two members with the same
+ * part set never absorb each other. An already absorbed absorber is skipped —
+ * by transitivity of ⊆ its own absorber absorbs whatever it would, and that
+ * absorber's key passed the occurrence test too.
  */
 template <NodeType node, bool conj>
 trefs absorb(const trefs& ms) {
@@ -135,8 +132,7 @@ bool join_builder<node, conj>::insert_member(tref m) {
 	// decides. The hooks fold both as well, one construction later.
 	if (conj ? t.equals_T() : t.equals_F()) return false;
 	if (conj ? t.equals_F() : t.equals_T()) return is_decided = true;
-	// Rule 4: already a member. O(1) against the content-keyed set, which
-	// is what makes the rule the spec's "hash-consed" test.
+	// Rule 4: already a member, in O(1) against the content-keyed set.
 	if (present.contains(m)) return false;
 	// Rule 5: unit elimination. Only a LITERAL decides — `complement_of`
 	// strips or adds one `¬` and is not `NEG`, so nothing deeper is

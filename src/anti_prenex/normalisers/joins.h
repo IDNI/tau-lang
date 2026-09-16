@@ -2,36 +2,30 @@
 
 /**
  * @file joins.h
- * @brief Anti-prenexing normalisers (layer 1), package J: §3 "The result
- * joins" — `SIMPLIFIED_AND_JOIN` and `SIMPLIFIED_OR_JOIN`, the one way the
- * algorithm assembles already-simplified formulas into a conjunction or a
- * disjunction.
+ * @brief §3 "The result joins": `SIMPLIFIED_AND_JOIN` and
+ * `SIMPLIFIED_OR_JOIN`, the one way the algorithm assembles
+ * already-simplified formulas into a conjunction or a disjunction.
  *
- * INCREMENTAL, by invariant 7: a deciding operand stops the later operands
- * from being evaluated — or BUILT — at all, so the builder takes one operand
- * at a time and answers `decided()` in between, and the n-ary functions are
- * loops over it.
+ * INCREMENTAL (invariant 7): a deciding operand stops the later ones from
+ * being built at all, so the builder takes one operand at a time and answers
+ * `decided()` in between; the n-ary functions are loops over it.
  *
- * SHALLOW by design (§3): every operand is already simplified (invariant 6),
- * so only the members' TOP-LEVEL interaction is new — exactly what the six
- * insert rules and the one absorption pass cover. A member is never descended
- * into, and `SIMPLIFIED_AND_JOIN` does no equality propagation between
- * members: conjuncts that must interact at term level go through `SIMPLIFY`.
+ * SHALLOW (§3): every operand is already simplified (invariant 6), so only
+ * the members' TOP-LEVEL interaction is new — the six insert rules and the
+ * one absorption pass. A member is never descended into, and no equality
+ * propagation happens between members; that belongs to `SIMPLIFY`.
  *
- * AC-CANONICAL: insertion order drives the evaluation and the short-circuits,
- * but the assembled node is a function of the member SET — flattening gives
- * associativity, and the content-order emission of `canonical_and` /
- * `canonical_or` (dag.h) gives commutativity — so converging expansion states
- * build EQUAL memo keys (§6).
+ * AC-CANONICAL: insertion order drives the short-circuits, but the assembled
+ * node is a function of the member SET — flattening gives associativity, the
+ * content-order emission of `canonical_and`/`canonical_or` (dag.h) gives
+ * commutativity — so converging expansion states build equal memo keys (§6).
  *
- * The construction hooks fold `T`/`F`, `X ∧ X` and `X ∧ ¬X` as well. The
- * insert rules are those same facts ONE STEP EARLIER, where they can still
- * stop an operand from being built; nothing here re-implements the folds.
- *
- * The absorption pass is the joins' own: no existing simplifier absorbs at
- * this level — the construction hooks are binary and local, and the path
- * sweep (`heuristics/syntactic_path_simplification`) works down a path, so
- * neither sees `d ∧ (d ∨ e)` as one top-level member interaction.
+ * The construction hooks fold `T`/`F`, `X ∧ X` and `X ∧ ¬X`; the insert rules
+ * are those same facts one step earlier, where they can still stop an operand
+ * from being built. The absorption pass has no counterpart in the codebase:
+ * the hooks are binary and local and the path sweep
+ * (`heuristics/syntactic_path_simplification`) works down a path, so neither
+ * sees `d ∧ (d ∨ e)` as one top-level member interaction.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__JOINS_H__
@@ -48,14 +42,13 @@ namespace idni::tau_lang::anti_prenexing {
  * `SIMPLIFIED_AND_JOIN`, `conj = false` is `SIMPLIFIED_OR_JOIN`, the dual
  * with `T` and `F` swapped.
  *
- * The members are kept in INSERTION order internally — that is the order the
- * insert rules see — while the emission order is the constructor's, the
- * content order of §1.
+ * The members are kept in insertion order, which is the order the insert
+ * rules see; the emission order is the content order of §1.
  *
  * Every operand is a `wff` node. A member taken out of a chain carries its
  * right sibling, so the member set is keyed by CONTENT
- * (`subtree_unordered_set`, whose hash and equality both ignore the right
- * sibling), and `canonical_and` / `canonical_or` trims what it emits.
+ * (`subtree_unordered_set` ignores the right sibling in both its hash and its
+ * equality) and `canonical_and`/`canonical_or` trims what it emits.
  */
 template <NodeType node, bool conj>
 struct join_builder {
@@ -67,9 +60,8 @@ struct join_builder {
 	 * anything else is added.
 	 *
 	 * @return `true` when the join is DECIDED (`F` for ∧, `T` for ∨).
-	 * Later inserts are no-ops, and a caller that keeps feeding the
-	 * builder only wastes its own work — not building the operand at all
-	 * is what invariant 7 asks of it.
+	 * Later inserts are no-ops; invariant 7 asks the caller not to build
+	 * the operand at all.
 	 */
 	bool insert(tref r);
 
@@ -78,14 +70,13 @@ struct join_builder {
 
 	/**
 	 * @brief The absorption pass, then the raw canonical constructor
-	 * (`canonical_and` / `canonical_or`, dag.h): the surviving members in
+	 * (`canonical_and`/`canonical_or`, dag.h): the surviving members in
 	 * content order, deduplicated, folded through the hooked binary
 	 * builder.
 	 *
 	 * A decided join is the deciding constant (`F` for ∧, `T` for ∨); an
 	 * empty join is the neutral one (`T` for ∧, `F` for ∨); one member is
-	 * that member. Nothing is consumed: the builder may be asked twice and
-	 * answers the same.
+	 * that member. Nothing is consumed: two calls answer alike.
 	 */
 	tref result();
 
@@ -104,9 +95,8 @@ private:
  * `join_builder<node, true>` that stops at the first deciding operand. An
  * empty join is `T`.
  *
- * The operands are already built here, so this form cannot honour invariant
- * 7's "never BUILT": a caller whose operands are recursions builds them one
- * at a time and drives the builder itself.
+ * Its operands are already built, so invariant 7's "never built" is beyond
+ * it: a caller whose operands are recursions drives the builder itself.
  */
 template <NodeType node>
 tref simplified_and_join(const trefs& rs);

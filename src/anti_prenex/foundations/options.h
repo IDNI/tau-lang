@@ -6,7 +6,7 @@
  * table as process-wide defaults. The last two — `propagate_growth`, which
  * belongs to `SIMPLIFY`, and `absorb_occ_max`, which belongs to the result
  * joins — are process-wide ONLY: both run in every phase without a ctx, so
- * they are never copied into one and every use reads them bare.
+ * neither is copied into one and every use reads them bare.
  *
  * Plain `inline` globals in a dependency-free header — the pattern of
  * `heuristics/bv_simplify_options.h` — so both the algorithm and the API
@@ -63,17 +63,14 @@ inline size_t accept_floor = size_t(1) << 20;
 
 /// §1 `propagate_growth`: cap on `SIMPLIFY`'s pin environment (§3). Once
 /// `Σ‖witnesses‖` would exceed this factor times `Σ‖TERM_OF(pinning
-/// conjunct)‖`, the pass admits no further pin. NOT a component knob:
-/// `SIMPLIFY` runs in every phase and has no ctx, so every use reads it BARE,
-/// here. Precision, never soundness.
+/// conjunct)‖`, the pass admits no further pin. Not a component knob: read
+/// bare, here. Precision, never soundness.
 inline size_t propagate_growth = 4;
 
 /// §1 `absorb_occ_max`: occurrence limit of the result joins' absorption pass
 /// (§3). A part occurring in more members than this is no candidate key, and
-/// a member all of whose parts exceed it stays unabsorbed. NOT a component
-/// knob: the joins run in every phase and have no ctx, so `ctx::for_component`
-/// does not copy it and every use reads it BARE, here. Precision, never
-/// soundness.
+/// a member all of whose parts exceed it stays unabsorbed. Not a component
+/// knob: read bare, here. Precision, never soundness.
 inline size_t absorb_occ_max = 32;
 
 } // namespace idni::tau_lang::anti_prenexing
