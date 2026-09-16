@@ -35,6 +35,7 @@ case "${CMD}" in
                 echo "  deps          - build deps image"
                 echo "  build-debug   - build build image with debug tests"
                 echo "  build-release - build build image with release tests"
+                echo "  test-with-testnet - run the tau-testnet suite against the build"
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
                 echo "  w64-deps      - build w64-deps image"
@@ -77,6 +78,9 @@ case "${CMD}" in
                 ;;
         "build-release")
                 build --target build --build-arg BUILD_PRESET="release" -t tau:build "${@:2}"
+                ;;
+        "test-with-testnet")
+                build --target testnet -t tau:testnet "${@:2}"
                 ;;
         "packages")
                 build --target packages -t tau:packages "${@:2}" && \

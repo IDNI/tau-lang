@@ -23,10 +23,9 @@ jobs:
       - name: Choose the packs
         id: matrix
         run: |
-          # tau-testnet's specs use bv, so only the default pack runs its suite
-          default='{"name":"default","pack":"","testnet":"yes"}'
-          nobv='{"name":"nobv","pack":"sbf,tau,qint","testnet":"no"}'
-          bvonly='{"name":"bvonly","pack":"sbf,tau,bv","testnet":"no"}'
+          default='{"name":"default","pack":""}'
+          nobv='{"name":"nobv","pack":"sbf,tau,qint"}'
+          bvonly='{"name":"bvonly","pack":"sbf,tau,bv"}'
           if [ -f cmake/tau_bas.cmake ]; then
             echo "matrix={\"include\":[$default,$nobv,$bvonly]}" >> "$GITHUB_OUTPUT"
           else
@@ -110,9 +109,40 @@ jobs:
           ./dev docker build-release \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_BAS=${{ matrix.pack }} \
-            --build-arg TEST_TAU_TESTNET=${{ matrix.testnet }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps
+            --cache-from type=gha,scope=tau-deps \
+            --cache-to   type=gha,scope=tau-release-${{ matrix.name }},mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  testnet:
+    name: tau-testnet suite
+    needs: linux
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # ./dev and the image build both need the parser submodule
+          submodules: recursive
+
+      # container-driver builder; required for type=gha cache
+      - uses: docker/setup-buildx-action@v4
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # tau-testnet's specs use bv, so this suite only runs against the default pack
+      - name: Run the tau-testnet suite
+        run: |
+          ./dev docker test-with-testnet \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-release-default
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
