@@ -246,7 +246,7 @@ private:
 		size_t version = 0;
 	};
 	/// What one admission did: the index of the pin it added, and whether
-	/// it also REWROTE a range in force. An admission that did changes the
+	/// it also REWROTE a range in force. An admission that did env.changes the
 	/// environment for the leaves before it too, so its own leaf's first
 	/// form was computed under an environment that no longer exists —
 	/// which is what stage 2's shortcut has to watch for.
@@ -256,7 +256,7 @@ private:
 	};
 	/// What stage 1 of a frame learned about one equation leaf: the form
 	/// it was matched in, the admission it produced (if any) and the size
-	/// of `pins` right after its own step, which tells stage 2 whether
+	/// of `env.pins` right after its own step, which tells stage 2 whether
 	/// anything joined the environment after it.
 	struct matched_leaf {
 		tref first = nullptr;
@@ -284,11 +284,20 @@ private:
 	const bool ref_args;
 	block X;
 
-	std::vector<pin_state> pins;
-	/// The ACTIVE pins, in `substitute`'s own parameter form.
-	subtree_map<node, tref> changes;
-	size_t witness_sum = 0;         ///< `Σ‖witness‖` over `pins`
-	size_t atom_sum = 0;            ///< `Σ‖TERM_OF(pinning atom)‖`
+	/// THE PIN ENVIRONMENT: the admitted pins, the active ones in
+	/// `substitute`'s own parameter form, and the two sums the cap
+	/// compares (§3). The pass holds one LIVE environment, `env`, and
+	/// stage 2 re-derives a SCRATCH copy of it per pinning leaf
+	/// (`open_frame`), which is why this is a value type and not four
+	/// members: an exclusion is a second derivation, not a mask.
+	struct environment {
+		std::vector<pin_state> pins;
+		subtree_map<node, tref> changes;
+		size_t witness_sum = 0;   ///< `Σ‖witness‖` over `pins`
+		size_t atom_sum = 0;      ///< `Σ‖TERM_OF(pinning atom)‖`
+	};
+
+	environment env;
 	std::vector<undo_record> undo;
 	std::vector<std::vector<size_t>> suspensions;
 	std::vector<marker> markers;
@@ -301,32 +310,63 @@ private:
 
 	// --- rewriting ---------------------------------------------------------
 
-	/// §3: an atom rewritten by the environment in force and re-emitted
-	/// through `SIMPLIFY_ATOM` — which unwraps one `¬` itself — whenever
-	/// the environment changed it, or always in `ref_args` mode, which is
-	/// what establishes invariant 6 in phase 1.
-	tref rewrite_atom(tref a) {
+	/// §3: an atom rewritten by the environment `e` and re-emitted through
+	/// `SIMPLIFY_ATOM` — which unwraps one `¬` itself — whenever the
+	/// environment changed it, or always in `ref_args` mode, which is what
+	/// establishes invariant 6 in phase 1.
+	tref rewrite_under(const environment& e, tref a) {
 		const tref bare = tau::trim_right_sibling(a);
-		const tref res = changes.empty() ? bare
-			: tau::get(bare).substitute(changes, order);
+		const tref res = e.changes.empty() ? bare
+			: tau::get(bare).substitute(e.changes, order);
 		if (res != bare || ref_args)
 			return simplify_atom<node>(res, order);
 		return bare;
 	}
 
-	/// `rewrite_atom` with ONE pin taken out of the environment for this
-	/// substitution: a PINNING conjunct is rewritten by every pin but its
-	/// own (§3). Its own would erase it — `f[y ← f₁′]` IS the residual
-	/// `p = 0`, so a strict pin folds the conjunct to `T` — and with it
-	/// the constraint on `y`, a weak pin's residual included.
-	tref rewrite_atom_excluding(tref a, std::optional<size_t> own) {
-		if (!own || !pins[*own].active) return rewrite_atom(a);
-		const tref key = pins[*own].key;
-		const tref witness = pins[*own].witness;
-		changes.erase(key);
-		const tref res = rewrite_atom(a);
-		changes[key] = witness;
-		return res;
+	/// The same under the LIVE environment, which is what every caller
+	/// outside stage 2's exclusion wants.
+	tref rewrite_atom(tref a) { return rewrite_under(env, a); }
+
+	/**
+	 * @brief §3: a PINNING conjunct rewritten by every pin but its OWN.
+	 * Its own would erase it — `f[y ← f₁′]` IS the residual `p = 0`, so a
+	 * strict pin folds the conjunct to `T`, taking the constraint on `y`
+	 * with it, a weak pin's residual included.
+	 *
+	 * The exclusion is a RE-DERIVATION, not a mask: stage 1 is run again
+	 * over `candidates`, in the same content order and from the same
+	 * starting environment `before`, with `leaf` LEFT OUT and its own
+	 * VARIABLE barred from being pinned at all, and the ORIGINAL leaf is
+	 * rewritten under what that leaves.
+	 *
+	 * Masking the leaf's own index in the final environment was unsound:
+	 * admitting a pin NORMALISES the ranges in force, so a later admission
+	 * can fold this leaf's own pin INTO another pin's range, where masking
+	 * does not reach it — the conjunct was then rewritten by its own
+	 * equation and folded to `T` (`p = q ∧ r = p` came back as `q = p`,
+	 * with `r` unconstrained).
+	 *
+	 * BARRING THE KEY is the other half. Without the leaf, a sibling may
+	 * pin the SAME variable with a different witness, and rewriting the
+	 * leaf by that pin erases the leaf's own constraint just as its own
+	 * pin would — in `y = a·b ∧ y ∪ z = 0` it would leave neither conjunct
+	 * mentioning `y`. In the live environment a variable is pinned once,
+	 * so "every pin but its own" is exactly "every pin on another
+	 * variable", and that is what the bar reproduces.
+	 *
+	 * Cost: one re-derivation per pinning leaf the shortcut does not
+	 * cover. `find_pin` is memoised per atom for the whole call, so a
+	 * candidate whose rewritten form is unchanged is a lookup.
+	 */
+	tref rewrite_atom_excluding(const environment& before,
+		const trefs& candidates, tref leaf, tref own_key)
+	{
+		environment e = before;
+		for (tref c : candidates) {
+			if (c == leaf) continue;
+			admit_into(e, rewrite_under(e, c), nullptr, own_key);
+		}
+		return rewrite_under(e, leaf);
 	}
 
 	/// `ref_args` mode: every `bf` argument of a reference through
@@ -353,37 +393,52 @@ private:
 			find_pin<node>(atom, X, order)).first->second;
 	}
 
-	/// §3: admit the pin of `atom`, if it has one and the cap allows it.
-	/// @return what the admission did — the pin's index, which stage 2
-	/// needs to leave a conjunct out of its OWN pin, and whether a range
-	/// in force was rewritten — or `nullopt` when nothing was admitted.
-	std::optional<admission> try_admit(tref atom) {
+	/**
+	 * @brief §3: admit the pin of `atom` into the environment `e`, if it
+	 * has one and the cap allows it.
+	 *
+	 * It works on an EXPLICIT environment because stage 2's exclusion
+	 * re-derives one from scratch: `e` is the live `env` when `rec` is
+	 * the pass's `undo` list, and a throw-away copy when `rec` is null —
+	 * a scratch run records nothing, since nothing has to be undone.
+	 * `blocked`, when given, is a substitution key no pin may take: the
+	 * variable of the leaf an exclusion is re-deriving without
+	 * (`rewrite_atom_excluding` says why).
+	 *
+	 * @return what the admission did — the pin's index, and whether it
+	 *         also REWROTE a range in force — or `nullopt` when nothing
+	 *         was admitted.
+	 */
+	std::optional<admission> admit_into(environment& e, tref atom,
+		std::vector<undo_record>* rec, tref blocked = nullptr)
+	{
 		const std::optional<pin<node>> p = matched(atom);
 		if (!p) return {};
 		const tref key = term_key<node>(p->var);
+		if (blocked && tau::subtree_equals(key, blocked)) return {};
 		// A variable already pinned IN FORCE cannot be pinned again:
 		// its occurrences are rewritten before they are ever matched.
 		// (One only SUSPENDED may be, and the two undo in order.)
-		if (changes.contains(key)) return {};
+		if (e.changes.contains(key)) return {};
 		// The new range under the environment in force, so that the
 		// environment stays idempotent.
 		tref w = p->witness;
-		if (!changes.empty()) w = simplify_term<node>(
-			tau::get(w).substitute(changes, order), order);
+		if (!e.changes.empty()) w = simplify_term<node>(
+			tau::get(w).substitute(e.changes, order), order);
 		// and every range in force rewritten by the new pin.
 		subtree_map<node, tref> one;
 		one.emplace(key, w);
 		std::vector<std::pair<size_t, tref>> rewritten;
 		size_t new_witness_sum = mem_size<node>(w);
-		for (size_t i = 0; i < pins.size(); ++i) {
-			tref r = pins[i].witness;
-			if (pins[i].active) {
+		for (size_t i = 0; i < e.pins.size(); ++i) {
+			tref r = e.pins[i].witness;
+			if (e.pins[i].active) {
 				r = tau::get(r).substitute(one, order);
-				if (r != pins[i].witness)
+				if (r != e.pins[i].witness)
 					r = simplify_term<node>(r, order);
 			}
-			if (r == pins[i].witness) {
-				new_witness_sum += pins[i].size;
+			if (r == e.pins[i].witness) {
+				new_witness_sum += e.pins[i].size;
 				continue;
 			}
 			new_witness_sum += mem_size<node>(r);
@@ -392,24 +447,32 @@ private:
 		// THE CAP (§3), measured after the insertion: once the ranges
 		// outgrow the equations that licensed them, no further pin is
 		// admitted in this pass. Precision, never soundness.
-		const size_t new_atom_sum = atom_sum
+		const size_t new_atom_sum = e.atom_sum
 			+ mem_size<node>(term_of<node>(atom, order));
 		if (new_witness_sum > propagate_growth * new_atom_sum) return {};
 		for (const auto& [i, r] : rewritten) {
-			undo.push_back({ i, false, pins[i].witness,
-				pins[i].size });
-			pins[i].witness = r;
-			pins[i].size = mem_size<node>(r);
-			if (pins[i].active) changes[pins[i].key] = r;
+			if (rec) rec->push_back({ i, false, e.pins[i].witness,
+				e.pins[i].size });
+			e.pins[i].witness = r;
+			e.pins[i].size = mem_size<node>(r);
+			if (e.pins[i].active) e.changes[e.pins[i].key] = r;
 		}
-		undo.push_back({ pins.size(), true, nullptr, 0 });
-		pins.push_back(pin_state{ p->var, key, w, true,
+		if (rec) rec->push_back({ e.pins.size(), true, nullptr, 0 });
+		e.pins.push_back(pin_state{ p->var, key, w, true,
 			mem_size<node>(w) });
-		changes[key] = w;
-		witness_sum = new_witness_sum;
-		atom_sum = new_atom_sum;
-		version = ++next_version;
-		return admission{ pins.size() - 1, !rewritten.empty() };
+		e.changes[key] = w;
+		e.witness_sum = new_witness_sum;
+		e.atom_sum = new_atom_sum;
+		return admission{ e.pins.size() - 1, !rewritten.empty() };
+	}
+
+	/// The admission into the LIVE environment: it records its undo and
+	/// bumps the version the pass's memo is keyed by.
+	std::optional<admission> try_admit(tref atom) {
+		const std::optional<admission> a =
+			admit_into(env, atom, &undo);
+		if (a) version = ++next_version;
+		return a;
 	}
 
 	void undo_to(size_t mark) {
@@ -417,15 +480,15 @@ private:
 			const undo_record u = undo.back();
 			undo.pop_back();
 			if (u.added) {
-				if (pins.back().active)
-					changes.erase(pins.back().key);
-				pins.pop_back();
+				if (env.pins.back().active)
+					env.changes.erase(env.pins.back().key);
+				env.pins.pop_back();
 				continue;
 			}
-			pins[u.index].witness = u.witness;
-			pins[u.index].size = u.size;
-			if (pins[u.index].active)
-				changes[pins[u.index].key] = u.witness;
+			env.pins[u.index].witness = u.witness;
+			env.pins[u.index].size = u.size;
+			if (env.pins[u.index].active)
+				env.changes[env.pins[u.index].key] = u.witness;
 		}
 	}
 
@@ -483,7 +546,7 @@ private:
 	}
 
 	/**
-	 * @brief §3: the conjunction is where pins are matched and admitted,
+	 * @brief §3: the conjunction is where env.pins are matched and admitted,
 	 * in TWO STAGES, both here, before the traversal descends.
 	 *
 	 * STAGE 1, MATCH: the X-FREE positive equations, in content order —
@@ -495,15 +558,22 @@ private:
 	 * the pin test alone.
 	 *
 	 * STAGE 2, REWRITE: EVERY positive equation of the frame, X-touching
-	 * ones included, rewritten from the ORIGINAL leaf under the FINAL
-	 * environment — one substitution and one `SIMPLIFY_ATOM` per equation
-	 * — with the leaf's OWN pin left out (`rewrite_atom_excluding`).
-	 * Every OTHER pin applies, so `z = y` under a later `y ↦ a` becomes
-	 * `z = a`, which is what the normalised environment already says. A
-	 * leaf keeps its stage-1 form only when nothing joined after its own
-	 * step AND its own admission rewrote no range — exactly when the
-	 * environment minus its own pin is still the one that form was
-	 * computed under.
+	 * ones included, rewritten from the ORIGINAL leaf — one substitution
+	 * and one `SIMPLIFY_ATOM` per equation — with the leaf's OWN pin left
+	 * out. Every OTHER pin applies, so `z = y` under a later `y ↦ a`
+	 * becomes `z = a`, which is what the normalised environment already
+	 * says. A leaf that admitted nothing takes the final environment as it
+	 * stands; one that admitted a pin takes the environment RE-DERIVED
+	 * without it (`rewrite_atom_excluding`) — the environment that would
+	 * exist had that leaf never been a candidate, which is NOT the final
+	 * one with its index masked: a later admission normalises the ranges
+	 * in force, so the leaf's own pin can already sit inside another pin's
+	 * range, and masking one key would let the conjunct be rewritten by
+	 * its own equation and fold to `T`, dropping what it constrained.
+	 * A leaf keeps its stage-1 form, and needs no re-derivation at all,
+	 * when nothing joined after its own step AND its own admission rewrote
+	 * no range — exactly when the environment minus its own pin is still
+	 * the one that form was computed under.
 	 *
 	 * The non-equation members are untouched here; the traversal rewrites
 	 * them under the environment this leaves behind.
@@ -512,8 +582,8 @@ private:
 		frame fr;
 		fr.undo_mark = undo.size();
 		fr.version_before = version;
-		fr.witness_sum_before = witness_sum;
-		fr.atom_sum_before = atom_sum;
+		fr.witness_sum_before = env.witness_sum;
+		fr.atom_sum_before = env.atom_sum;
 		trefs leaves, inner;
 		get_leaves<node>(n, tau::wff_and, leaves, &inner);
 		// The inner chain wrappers: `down` must not open a second frame
@@ -532,6 +602,11 @@ private:
 		// --- stage 1 -----------------------------------------------
 		std::sort(candidates.begin(), candidates.end(),
 			tau::subtree_less);
+		// The environment stage 1 starts from: what an exclusion has to
+		// re-derive from (the outer pins, this frame's admissions not
+		// yet among them). Copied only when there is a candidate.
+		const environment before = candidates.empty() ? environment{}
+							     : env;
 		std::unordered_map<tref, matched_leaf> stage1;
 		for (tref e : candidates) {
 			const tref first = rewrite_atom(e);
@@ -539,7 +614,7 @@ private:
 			// the environment like any other (§3).
 			const std::optional<admission> own = try_admit(first);
 			stage1.emplace(e, matched_leaf{ first, own,
-				pins.size() });
+				env.pins.size() });
 		}
 		// --- stage 2 -----------------------------------------------
 		for (tref e : eqs) {
@@ -553,16 +628,20 @@ private:
 			// its own pin IS the one its first form was computed
 			// under.
 			if (it != stage1.end()
-				&& it->second.pins_after == pins.size()
+				&& it->second.pins_after == env.pins.size()
 				&& !(own && own->rewrote_ranges)) {
 				frames.back().pending.emplace(e,
 					it->second.first);
 				continue;
 			}
-			frames.back().pending.emplace(e,
-				rewrite_atom_excluding(e, own
-					? std::optional<size_t>(own->index)
-					: std::nullopt));
+			// A leaf that admitted nothing has no own pin to leave
+			// out and takes the final environment; one that did is
+			// rewritten under the environment RE-DERIVED without
+			// it.
+			frames.back().pending.emplace(e, own
+				? rewrite_atom_excluding(before, candidates, e,
+					env.pins[own->index].key)
+				: rewrite_atom(e));
 		}
 		return n;
 	}
@@ -574,12 +653,12 @@ private:
 	tref enter_binder(tref n, marker m) {
 		const tref v = tau::trim_right_sibling(binder_var<node>(n));
 		std::vector<size_t> suspended;
-		for (size_t i = 0; i < pins.size(); ++i) {
-			if (!pins[i].active) continue;
-			if (!tau::subtree_equals(pins[i].var, v)
-				&& !free_in<node>(pins[i].witness, v)) continue;
-			pins[i].active = false;
-			changes.erase(pins[i].key);
+		for (size_t i = 0; i < env.pins.size(); ++i) {
+			if (!env.pins[i].active) continue;
+			if (!tau::subtree_equals(env.pins[i].var, v)
+				&& !free_in<node>(env.pins[i].witness, v)) continue;
+			env.pins[i].active = false;
+			env.changes.erase(env.pins[i].key);
 			suspended.push_back(i);
 		}
 		if (!suspended.empty()) version = ++next_version;
@@ -595,8 +674,8 @@ private:
 		case spine: return r;   // a position of the open chain, no state
 		case binder_: {
 			for (size_t i : suspensions.back()) {
-				pins[i].active = true;
-				changes[pins[i].key] = pins[i].witness;
+				env.pins[i].active = true;
+				env.changes[env.pins[i].key] = env.pins[i].witness;
 			}
 			suspensions.pop_back();
 			version = m.version;
@@ -607,8 +686,8 @@ private:
 			frames.pop_back();
 			undo_to(fr.undo_mark);
 			version = fr.version_before;
-			witness_sum = fr.witness_sum_before;
-			atom_sum = fr.atom_sum_before;
+			env.witness_sum = fr.witness_sum_before;
+			env.atom_sum = fr.atom_sum_before;
 			break;
 		}
 		case plain:

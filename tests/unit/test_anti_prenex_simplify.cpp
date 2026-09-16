@@ -455,6 +455,53 @@ TEST_CASE("S12: reference arguments only under `ref_args`") {
 	CHECK(are_nso_equivalent<node_t>(got, ref));
 }
 
+// --- the exclusion of a leaf's own pin ---------------------------------------------------
+
+TEST_CASE("S12b: two mutually pinning equations both survive") {
+	tref p = bvar("p"), q = bvar("q"), r = bvar("r");
+	// `p = q ∧ r = p`: admitting the second pin NORMALISES the first
+	// pin's range, so the first leaf's own pin ends up inside the other
+	// pin's range. Rewriting a leaf by the final environment with its own
+	// index masked would then rewrite it by its OWN equation and fold it
+	// to `T`, losing what it constrained — the exclusion re-derives the
+	// environment without that leaf instead (§3, "minus its own pin").
+	const tref in = conj(eq(p, q), eq(r, p));
+	tref got = simp(in);
+	INFO("got: ", tau::get(got).to_str());
+	CHECK(are_nso_equivalent<node_t>(got, in));
+	const trefs ms = members(got);
+	CHECK(ms.size() == 2);
+	for (tref m : ms) {
+		CHECK(!tau::get(m).equals_T());
+		CHECK(!tau::get(m).equals_F());
+	}
+	// `r` is still constrained: it was the variable the masking lost.
+	CHECK(holds_var(got, "r"));
+	// ONE pass is not a fixpoint on this shape, and §3 does not promise
+	// one: which conjunct ends up carrying which pin is what the
+	// re-derivation decides, so `r = q ∧ r = p` settles into
+	// `r = q ∧ q = p` on the next pass — and stays there.
+	const tref again = simp(got);
+	CHECK(are_nso_equivalent<node_t>(again, in));
+	CHECK(members(again).size() == 2);
+	CHECK(simp(again) == again);
+}
+
+TEST_CASE("S12c: a chain of three pins keeps all three conjuncts") {
+	tref x = bvar("x"), y = bvar("y"), z = bvar("z"), a = bvar("a");
+	// `x = y ∧ y = z ∧ z = a`: each admission rewrites the ranges in
+	// force, so every leaf but the first needs the re-derivation.
+	const tref in = conj(eq(x, y), conj(eq(y, z), eq(z, a)));
+	tref got = simp(in);
+	INFO("got: ", tau::get(got).to_str());
+	CHECK(are_nso_equivalent<node_t>(got, in));
+	CHECK(members(got).size() == 3);
+	for (tref m : members(got)) CHECK(!tau::get(m).equals_T());
+	// every variable of the chain is still tied to the others
+	for (const char* v : { "x", "y", "z", "a" }) CHECK(holds_var(got, v));
+	CHECK(simp(got) == got);
+}
+
 // --- shape and idempotence --------------------------------------------------------------
 
 TEST_CASE("S13: idempotent, and equivalence-preserving") {
