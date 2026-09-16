@@ -17,6 +17,7 @@
 #ifndef __IDNI__TAU__TAU_TREE_H__
 #define __IDNI__TAU__TAU_TREE_H__
 
+#include <bitset>
 #include <concepts>
 #include <string>
 #include <initializer_list>
@@ -1075,6 +1076,10 @@ private:
 		std::vector<std::pair<tref, tref>> by_variable;
 		/// Every key is a variable, so the occurrence guard applies.
 		bool keys_are_variables = true;
+		/// The node types the keys have. A match is by content and
+		/// content includes the type, so a node of no key's type
+		/// cannot be one and is never looked up.
+		std::bitset<size_t(1) << node::nt_bits> key_types;
 		/// The free variables of the replacements, for Debug's capture
 		/// check; empty in Release.
 		trefs free_in_with;

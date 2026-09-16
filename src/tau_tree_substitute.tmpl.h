@@ -119,6 +119,7 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 			vars.insert(var);
 			s.by_variable.emplace_back(var, w);
 		}
+		s.key_types.set(static_cast<size_t>(tau::get(k).get_type()));
 		s.changes.emplace(k, w);
 	}
 	s.vars.assign(vars.begin(), vars.end());
@@ -217,11 +218,16 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		return s.compose_subs;
 	};
 	auto f = [&](tref n) -> tref {
-		// An occurrence, compared by content. The walk stops here, so
-		// nothing inside a replacement is rewritten again.
-		if (const tref r = get_cached<node>(n, s.changes); r != n)
-			return r;
 		const tau& t = tau::get(n);
+		// An occurrence, compared by content. The walk stops here, so
+		// nothing inside a replacement is rewritten again. Only a node
+		// whose type some key has is looked up at all: the comparison
+		// is by content and content includes the type, so no other node
+		// can match, and most of what a walk meets -- wrappers,
+		// connectives, names, constants -- is of no key's type.
+		if (s.key_types.test(static_cast<size_t>(t.get_type())))
+			if (const tref r = get_cached<node>(n, s.changes);
+				r != n) return r;
 		// A BDD-backed term holds its variables in the BDD store, not
 		// as tree nodes. Its leaves are rewritten first, on the
 		// original leaves, so a key inside a replacement is not
