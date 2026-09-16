@@ -137,17 +137,32 @@ TEST_SUITE("LTL parser") {
 		CHECK(has_ltl_operators<node_t>(fm));
 	}
 
-	TEST_CASE("has_ltl_operators: always under always routes unless it "
-		"sits on a conjunction chain")
+	TEST_CASE("has_ltl_operators: every always nested under an always "
+		"routes to LTL(ABA)")
 	{
-		// G(G B) and G(A && G B) split into plain always parts, so the
-		// safety pipeline keeps them.
+		// The parser splits G(G B) and G(A && G B) into plain always
+		// parts (unnest_nested_always), so parsed conjunction chains
+		// stay in the safety pipeline because no nesting is left.
 		tref gg = wff("G (G (o1[t] = 0))");
 		REQUIRE(gg != nullptr);
+		CHECK(tau::get(gg).select_all(is<node_t, tau::wff_always>).size()
+			== 1);
 		CHECK_FALSE(has_ltl_operators<node_t>(gg));
 		tref g_and_g = wff("G ((o1[t] = 1) && G (o1[t] = 0))");
 		REQUIRE(g_and_g != nullptr);
+		CHECK_FALSE(tau::get(g_and_g)[0].is(tau::wff_always));
 		CHECK_FALSE(has_ltl_operators<node_t>(g_and_g));
+		// The same shapes built after parsing keep their nesting, and
+		// the safety pipeline cannot take them: they route.
+		tref a = wff("(o1[t] = 1)");
+		tref b = wff("(o1[t] = 0)");
+		REQUIRE(a != nullptr);
+		REQUIRE(b != nullptr);
+		tref built_gg = build_wff_always<node_t>(build_wff_always<node_t>(b));
+		CHECK(has_ltl_operators<node_t>(built_gg));
+		tref built_g_and_g = build_wff_always<node_t>(
+			tau::build_wff_and(a, build_wff_always<node_t>(b)));
+		CHECK(has_ltl_operators<node_t>(built_g_and_g));
 		// A negated always under an always is a nested eventually:
 		// G(!(G B)) = G(F(!B)).  The fuzzer (seed 42, formula 195) hit
 		// this shape and the safety pipeline asserted on it.
@@ -167,6 +182,25 @@ TEST_SUITE("LTL parser") {
 		tref chain = wff("G ((o1[t] = 1) && G ((i1[t] = 0) || G (o1[t] = 1)))");
 		REQUIRE(chain != nullptr);
 		CHECK(has_ltl_operators<node_t>(chain));
+	}
+
+	TEST_CASE("a nested always built after parsing decides instead of "
+		"aborting")
+	{
+		// G(o1 = 1 && G(o1 = 0)) is unsatisfiable: o1 cannot be 1 now and
+		// 0 from now on.  Built with the builders it keeps its nesting.
+		// The atoms come from spec parses so that their io_vars carry the
+		// input/output role the solver requires.
+		tref a = spec("(o1[t] = 1).");
+		tref b = spec("(o1[t] = 0).");
+		REQUIRE(a != nullptr);
+		REQUIRE(b != nullptr);
+		tref nested = build_wff_always<node_t>(
+			tau::build_wff_and(a, build_wff_always<node_t>(b)));
+		CHECK_FALSE(is_tau_formula_sat<node_t>(nested));
+		// G(G(o1 = 0)) is realizable by holding o1 at 0.
+		tref gg = build_wff_always<node_t>(build_wff_always<node_t>(b));
+		CHECK(is_tau_formula_sat<node_t>(gg));
 	}
 
 	TEST_CASE("nested always shapes decide instead of aborting") {
