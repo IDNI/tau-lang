@@ -116,6 +116,8 @@ need solver or LTL types, which sit beside their single consumer:
 | `solve(fm)` | your own decision procedure for a whole formula | the single declarer (two are refused at compile time) |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
 | `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch | every declarer, chained in pack order |
+| `case_split_quantifiers(fm)` | eliminate your quantified variables tested only against constants by a finite case split, before any quantifier block forms | every declarer, chained in pack order |
+| `eliminate_definitional_existentials(fm)` | substitute your existentially quantified variables that a total definition in their scope determines and drop the binder, before the case split | every declarer, chained in pack order |
 | `widen_arithmetic(fm)` | elaborate your arithmetic atoms to an overflow-free width before solving | every declarer, chained in pack order |
 | `widening_state()` | whether your widening is currently on, for a caller that must key a cache on it (your own construction-time hooks read it too, not just `widen_arithmetic`) | any declarer active |
 | `formula_is_preprocessable(fm)`, `has_preprocessing_residue(fm)` | whether your pass can still make progress / left a shape closing would make expensive | any declarer |

@@ -641,6 +641,7 @@ template<NodeType node> tref simplify_bv_term(tref term);
 #include "boolean_algebras/bv/bv_ba_hooks.tmpl.h"
 #include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 #include "boolean_algebras/bv/heuristics/bv_case_split.h"
+#include "boolean_algebras/bv/heuristics/bv_definitional_elimination.h"
 #include "boolean_algebras/bv/heuristics/bv_widening.h"
 #include "boolean_algebras/bv/bv_descriptor.tmpl.h"
 

@@ -38,6 +38,7 @@ set(TESTS
 	order_atoms_reduce
 	bv_quantifier_free_decision
 	bv_case_split
+	bv_definitional_elimination
 )
 
 foreach(X IN LISTS TESTS)

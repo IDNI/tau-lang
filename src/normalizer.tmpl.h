@@ -164,6 +164,13 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 	// Case-split quantifier elimination is an identity on the formula, so
 	// running it unconditionally is always safe. Which BA, if any, can make
 	// progress is for the pack fold to decide, and the owning BA gates it.
+	// Definitional existentials first: an output that a total definition
+	// determines is substituted where it is read -- and dropped where it is
+	// not -- before the case split can copy its definition into every
+	// instance and before the closed formula reaches the solver with the
+	// binders still on it (GitHub #124). Gated by the owning BA, and an
+	// identity on the formula like the case split.
+	form = pack_eliminate_definitional_existentials<node>(form);
 	form = pack_case_split_quantifiers<node>(form);
 
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct

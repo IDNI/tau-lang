@@ -196,6 +196,16 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
+	 * @brief Substitute existentially quantified bitvector variables that a
+	 * total definition in their scope determines and drop their binders;
+	 * returns @p n unchanged when `bv_definitional_elimination` is disabled.
+	 */
+	static tref eliminate_definitional_existentials(tref n) {
+		return bv_definitional_elimination
+			? bv_eliminate_definitional_existentials<node_t>(n) : n;
+	}
+
+	/**
 	 * @brief Elaborate bitvector arithmetic atoms to an overflow-free width;
 	 * returns @p fm unchanged when `bv_widening` is disabled.
 	 */
@@ -242,6 +252,34 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static void set_case_split_max_tests_option(size_t n) {
 		bv_case_split_max_tests = n ? n : std::numeric_limits<size_t>::max();
 	}
+	static bool get_defelim_option() { return bv_definitional_elimination; }
+	static void set_defelim_option(bool enabled) {
+		bv_definitional_elimination = enabled;
+	}
+	static size_t get_defelim_max_clauses_option() {
+		return bv_defelim_max_clauses;
+	}
+	static void set_defelim_max_clauses_option(size_t n) {
+		bv_defelim_max_clauses = n ? n : std::numeric_limits<size_t>::max();
+	}
+	static size_t get_defelim_max_atoms_option() {
+		return bv_defelim_max_atoms;
+	}
+	static void set_defelim_max_atoms_option(size_t n) {
+		bv_defelim_max_atoms = n ? n : std::numeric_limits<size_t>::max();
+	}
+	static size_t get_defelim_max_subset_option() {
+		return bv_defelim_max_subset;
+	}
+	static void set_defelim_max_subset_option(size_t n) {
+		bv_defelim_max_subset = n ? n : std::numeric_limits<size_t>::max();
+	}
+	static size_t get_defelim_max_rounds_option() {
+		return bv_defelim_max_rounds;
+	}
+	static void set_defelim_max_rounds_option(size_t n) {
+		bv_defelim_max_rounds = n ? n : std::numeric_limits<size_t>::max();
+	}
 	static bool get_qf_decision_option() { return bv_quantifier_free_decision; }
 	static void set_qf_decision_option(bool enabled) {
 		bv_quantifier_free_decision = enabled;
@@ -257,7 +295,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	/**
 	 * @brief bv's own CLI/REPL options, addressed as `bv-blasting`,
 	 * `bv-blastdepth`, `bv-case-split`, `bv-case-split-max-tests`,
-	 * `bv-quantifier-free-decision`, `bv-widening` and `bv-max-width`.
+	 * `bv-definitional-elimination`, `bv-defelim-max-clauses`,
+	 * `bv-defelim-max-atoms`, `bv-defelim-max-subset`,
+	 * `bv-defelim-max-rounds`, `bv-quantifier-free-decision`,
+	 * `bv-widening` and `bv-max-width`.
 	 *
 	 * `blasting` mirrors bv's own `bv_blasting` switch (see @ref preprocess:
 	 * blasting still needs the core master `preprocessing` on as well).
@@ -268,12 +309,15 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * `case-split-max-tests` mirror bv's own `bv_case_split` and
 	 * `bv_case_split_max_tests` switches
 	 * (heuristics/bv_case_split.h), which only bv's own case-split pass
-	 * (@ref case_split_quantifiers) reads. `quantifier-free-decision`
+	 * (@ref case_split_quantifiers) reads. `definitional-elimination` and
+	 * the four `defelim-max-*` caps mirror `bv_definitional_elimination`
+	 * and its caps (heuristics/bv_definitional_elimination.h), read by
+	 * @ref eliminate_definitional_existentials. `quantifier-free-decision`
 	 * mirrors bv's own `bv_quantifier_free_decision` switch (bv_ba.h).
 	 * `widening` and `max-width` mirror `bv_widening` and `bv_max_width`
 	 * (heuristics/bv_widening.h), read by @ref widen_arithmetic.
 	 */
-	static std::array<ba_option, 7> options() {
+	static std::array<ba_option, 12> options() {
 		return {{
 			{ "blasting", ba_option_kind::flag,
 				get_blasting_option, set_blasting_option,
@@ -297,6 +341,35 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				set_case_split_max_tests_option,
 				"cap the constants a quantified bitvector variable may "
 				"be tested against for the case split (0 = unlimited)" },
+			{ "definitional-elimination", ba_option_kind::flag,
+				get_defelim_option, set_defelim_option,
+				nullptr, nullptr,
+				"eliminate existentially quantified bitvector variables "
+				"that a total definition determines, before the case "
+				"split (disabled by default)" },
+			{ "defelim-max-clauses", ba_option_kind::count,
+				nullptr, nullptr,
+				get_defelim_max_clauses_option,
+				set_defelim_max_clauses_option,
+				"cap the clauses a conjunct is flattened into for the "
+				"definitional elimination (default 16, 0 = unlimited)" },
+			{ "defelim-max-atoms", ba_option_kind::count,
+				nullptr, nullptr,
+				get_defelim_max_atoms_option, set_defelim_max_atoms_option,
+				"cap the guard atoms the definitional elimination "
+				"brute-forces over (default 18, at most 30)" },
+			{ "defelim-max-subset", ba_option_kind::count,
+				nullptr, nullptr,
+				get_defelim_max_subset_option,
+				set_defelim_max_subset_option,
+				"cap the clause-subset size searched for a total "
+				"definition (default 4, 0 = unlimited)" },
+			{ "defelim-max-rounds", ba_option_kind::count,
+				nullptr, nullptr,
+				get_defelim_max_rounds_option,
+				set_defelim_max_rounds_option,
+				"cap the definitional-elimination rounds per existential "
+				"block (default 256, 0 = unlimited)" },
 			{ "quantifier-free-decision", ba_option_kind::flag,
 				get_qf_decision_option, set_qf_decision_option,
 				nullptr, nullptr,

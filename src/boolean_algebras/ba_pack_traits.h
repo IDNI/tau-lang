@@ -267,6 +267,21 @@ Form pack_case_split_quantifiers(Form form) {
 }
 
 /**
+ * @brief Run @p form through the definitional-existential elimination of
+ * every BA that offers it (before the case split); absent means ordinary,
+ * as for @ref pack_case_split_quantifiers.
+ */
+template <typename Node, typename Form>
+Form pack_eliminate_definitional_existentials(Form form) {
+	Form out = form;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_eliminate_definitional_existentials<Node, BA>)
+			out = ba_descriptor<BA, Node>::eliminate_definitional_existentials(out);
+	});
+	return out;
+}
+
+/**
  * @brief Elaborate @p form's arithmetic atoms through the exact-width
  * widening of every BA that offers it.
  *

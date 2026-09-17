@@ -150,6 +150,12 @@ concept ba_has_case_split_quantifiers = ba_has_descriptor_v<Node, BA>
 			-> std::convertible_to<tref>; };
 
 template <typename Node, typename BA>
+concept ba_has_eliminate_definitional_existentials = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f) {
+		{ ba_descriptor<BA, Node>::eliminate_definitional_existentials(f) }
+			-> std::convertible_to<tref>; };
+
+template <typename Node, typename BA>
 concept ba_has_widen_arithmetic = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::widen_arithmetic(f) }
