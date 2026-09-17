@@ -12,7 +12,7 @@
  * hence its own memo slot and the `fuse_atoms = false` instantiation of
  * `push_negation_one_in`.
  *
- * ONE WALK: a single `pre_order::apply_unique`, where `down` rewrites ONE
+ * ONE WALK: a single `pre_order::apply_unique_pure`, where `down` rewrites ONE
  * negation at the node it stands on and hands the result back for the walk to
  * descend into, and `up` re-emits what the walk rebuilt. Phase 1 meets a raw
  * formula and rebuilds it in this one memoised pass; from phase 3 on every
@@ -21,8 +21,8 @@
  *
  * `up` CARRIES NO MARKER: it re-emits every `wff_and`/`wff_or` it closes
  * through the matching join, whether or not the walk changed it. A marker
- * stack pushed in `down` and popped in `up` would desynchronise, because the
- * memoising traversal consults its slot memo on the node `down` RETURNED and
+ * stack pushed in `down` and popped in `up` would desynchronise, because
+ * `apply_unique_pure` consults its slot memo on the node `down` RETURNED and
  * skips `up` on a hit, `down` having already run. Unconditional re-emission
  * needs no marker and is what §3 asks for — "∧ / ∨ ↦ re-emitted through the
  * joins over the normalised members" — and it costs nothing on an already

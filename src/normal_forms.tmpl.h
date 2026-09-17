@@ -1655,10 +1655,10 @@ tref to_dnf(tref fm) {
 	};
 	tref r;
 	if constexpr (is_wff) r = pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_dnf_m>(
+		.template apply_unique_pure<MemorySlotPre::to_dnf_m>(
 					pn, while_is_formula<node>, layer_to_dnf);
 	else r = pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_dnf_m>(
+		.template apply_unique_pure<MemorySlotPre::to_dnf_m>(
 					pn, all, layer_to_dnf);
 	LOG_TRACE << "to_dnf result: " << LOG_FM(r);
 	return r;
@@ -1695,7 +1695,7 @@ tref temporal_layer_to_dnf(tref fm) {
 		if (is_temporal_quantifier<node>(n)) return false;
 		return true;
 	};
-	return pre_order<node>(fm).apply_unique(pn, visit, layer_to_dnf);
+	return pre_order<node>(fm).apply_unique_pure(pn, visit, layer_to_dnf);
 }
 
 // Conversion to cnf while applying reductions during the process
@@ -1734,10 +1734,10 @@ tref to_cnf(tref fm) {
 		return push_negation_one_in<node, is_wff>(n);
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_cnf_m>(
+		.template apply_unique_pure<MemorySlotPre::to_cnf_m>(
 					pn, while_is_formula<node>, layer_to_cnf);
 	else return pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_cnf_m>(
+		.template apply_unique_pure<MemorySlotPre::to_cnf_m>(
 					pn, all, layer_to_cnf);
 }
 

@@ -154,7 +154,7 @@ tref to_canonically_factored_nnf(tref phi) {
 	// The slot is this pass's own: `push_negation_in_m` would hand back
 	// the fused normalisation of the other pass (invariant 4).
 	return pre_order<node>(phi)
-		.template apply_unique<MemorySlotPre::factored_nnf_m>(
+		.template apply_unique_pure<MemorySlotPre::factored_nnf_m>(
 			down, while_is_formula<node>, up);
 }
 

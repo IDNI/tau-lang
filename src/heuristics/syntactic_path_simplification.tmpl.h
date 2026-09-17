@@ -66,10 +66,9 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
 //
 // The traversal is pre_order::apply (side effects allowed, `up` fires for
 // every node `f` was applied to). apply_unique cannot be used: its memo key
-// cannot carry the environment and a memo hit skips `up`. `f` refuses the
-// descent through a one-shot flag consumed by the immediately following
-// `visit` call -- the convention the former `skip` used, without its
-// structural matching.
+// cannot carry the environment. `f` refuses the descent through a one-shot
+// flag consumed by the immediately following `visit` call -- the convention
+// the former `skip` used, without its structural matching.
 //
 // Results are memoised on (node, environment version). The version is a
 // counter the environment advances whenever it changes and restores exactly

@@ -6,12 +6,10 @@
  * function means; the comments here say how it is built.
  *
  * The propagation pass is ONE `pre_order::apply` — the NON-memoising variant,
- * so that `down` and `up` pair up exactly and the marker stack is sound. The
- * memoising variant consults its memo on the node `down` returned and skips
- * `up` on a hit, which no marker stack survives. The pass carries a memo of
- * its own, keyed by (node, environment version), because a node's result
- * depends on the pins in force on its path (§10): a shared subtree met under
- * two environments is two computations.
+ * because a node's result depends on the pins in force on its path (§10): a
+ * shared subtree met under two environments is two computations, which no
+ * memo keyed by the node can hold. The pass carries a memo of its own, keyed
+ * by (node, environment version).
  *
  * Its state — frames with an undo mark, an environment version, a marker
  * stack and the one-shot `no_descend` flag — follows the path sweep
