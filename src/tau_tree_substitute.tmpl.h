@@ -209,33 +209,46 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 				&std::pair<tref, tref>::first)) return true;
 		return false;
 	};
-	// A wrapper around one chain connective. `get_free_vars` answers such a
-	// chain from its top: the top and every clause under it get an answer
-	// of their own, the links between them are taken apart and get none.
-	auto wraps_connective = [](const tau& t) {
+	// The connective a `wff`/`bf` wrapper stands for, or null when it wraps
+	// anything else. `get_free_vars` answers a chain of one connective from
+	// its top: the top and every clause under it get an answer of their own,
+	// the links between them are taken apart and get none.
+	auto wrapped_connective = [](const tau& t) -> tref {
 		const tref c = t.first();
-		if (c == nullptr || tau::get(c).has_right_sibling()) return false;
+		if (c == nullptr || tau::get(c).has_right_sibling())
+			return nullptr;
 		const tau& ct = tau::get(c);
 		return ct.is(tau::wff_and) || ct.is(tau::wff_or)
-			|| ct.is(tau::bf_and) || ct.is(tau::bf_or);
+			|| ct.is(tau::bf_and) || ct.is(tau::bf_or) ? c : nullptr;
 	};
-	auto visit_subtree = [&](tref n) {
+	auto visit_subtree = [&](tref n, tref parent) {
 		if (!s.keys_are_variables) return true;
 		const tau& t = tau::get(n);
 		if (!t.is(tau::wff) && !t.is(tau::bf)) return true;
+		const tref c = wrapped_connective(t);
 		// The root of this walk, and every node that is not a chain
 		// link, are asked outright. Each of them owns its answer, and
 		// the root's is what fills in the answers below it: from any
 		// node it is asked at, the walk answers every owner it reaches
 		// and stops only where one is answered already.
-		if (n == formula || !wraps_connective(t))
+		if (parent == nullptr || c == nullptr)
 			return holds_key(tau_lang::get_free_vars<node>(n));
-		// A chain link, which after that has no answer of its own. It
-		// is ENTERED rather than asked: asking would walk the whole
-		// subtree below the link and keep an answer for it, at every
-		// link of the chain, which costs a k-clause chain k walks and k
-		// answers of k variables each. Its clauses do own answers, so
-		// nothing below is entered that asking would have pruned.
+		// A wrapper of the very connective it stands under is a link of
+		// that connective's chain, which its shape says outright: the
+		// chain's answer is kept at its top and a link has none, so
+		// there is nothing here to look up.
+		if (tau::get(c).get_type() == tau::get(parent).get_type())
+			return true;
+		// A link with a negation or a temporal operator above it is not
+		// told apart by the parent, which is then not the connective,
+		// and neither is a wrapper of another connective than the one
+		// above it, which is a chain top and owns an answer. A cached
+		// answer, where there is one, decides; no answer means a link,
+		// which is ENTERED rather than asked: asking would walk the
+		// whole subtree below the link and keep an answer for it, at
+		// every link of the chain, which costs a k-clause chain k walks
+		// and k answers of k variables each. Its clauses do own answers,
+		// so nothing below is entered that asking would have pruned.
 		const trefs* fv = cached_free_vars<node>(n);
 		return fv == nullptr || holds_key(*fv);
 	};
