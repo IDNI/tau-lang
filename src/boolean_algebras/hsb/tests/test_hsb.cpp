@@ -2386,17 +2386,12 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Input hsb, output bv: the constrained-decoding pattern ---
 
-	// SKIPPED (2026-08-20, ap-pwr merge): Release-only false negative. The sat
-// check's normalization leaks a bound variable (`b1 != F` comes back FREE),
-// which check_decided conservatively reports as not-sat. Traced to
-// canonize_quantifier_ids keying quantifier ids on STRUCTURAL identity
-// (tau_tree_builders.tmpl.h scope_to_id.emplace): structurally identical
-// quantifier scopes at different depths collide, and the merge's
-// regeneration-stable pivot ordering now produces exactly such twins on this
-// formula in Release. This is the parked latent id-shift bug (see the ADT
-// branch's reproducer note); fix it there, then un-skip.
-TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE"
-	* doctest::skip()) {
+	// Was skipped 2026-08-20 (ap-pwr merge) as a Release-only false negative
+	// (a bound variable leaked as free out of the sat check's normalization,
+	// traced to structurally identical quantifier scopes colliding in
+	// canonize_quantifier_ids). Re-enabled 2026-09-17: the whole suite passes
+	// in Release on devel; kept as the regression guard for that shape.
+TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
@@ -4456,17 +4451,12 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	// --- Mode A (joint LLM+spec): embed + token + admit ---
 
-	// SKIPPED (2026-08-20, ap-pwr merge): Release-only false negative. The sat
-// check's normalization leaks a bound variable (`b1 != F` comes back FREE),
-// which check_decided conservatively reports as not-sat. Traced to
-// canonize_quantifier_ids keying quantifier ids on STRUCTURAL identity
-// (tau_tree_builders.tmpl.h scope_to_id.emplace): structurally identical
-// quantifier scopes at different depths collide, and the merge's
-// regeneration-stable pivot ordering now produces exactly such twins on this
-// formula in Release. This is the parked latent id-shift bug (see the ADT
-// branch's reproducer note); fix it there, then un-skip.
-TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZABLE"
-	* doctest::skip()) {
+	// Was skipped 2026-08-20 (ap-pwr merge) as a Release-only false negative
+	// (a bound variable leaked as free out of the sat check's normalization,
+	// traced to structurally identical quantifier scopes colliding in
+	// canonize_quantifier_ids). Re-enabled 2026-09-17: the whole suite passes
+	// in Release on devel; kept as the regression guard for that shape.
+TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(

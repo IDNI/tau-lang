@@ -252,46 +252,14 @@ TEST_SUITE("qlt_execution") {
 		for (auto& v : vals) CHECK(v == "2/3");
 	}
 
-	// What's actually happening: test_ltl_qlt_bv QE-03/09/15 all involve an
-	// eventuality (F/U/W) realized through the multi-state Mealy-to-safety encoding
-	// (encode_mealy_as_safety, src/ltl_aba_builders.tmpl.h:942). I confirmed this
-	// by instrumenting interpreter<node>::step() (src/interpreter.tmpl.h:621-688)
-	// and diffing an isolated single-test run (passes) against the full-suite
-	// run (fails):
-	//
-	// This is a genuine architectural gap in step() (a greedy, non-backtracking
-	// conjunctive solver) interacting with process-global normalization-order state
-	// — not a bug local to the Mealy encoding itself.
-	//
-	// A correct fix means adding backtracking/joint-consistency search across
-	// step_spec conjuncts in the interpreter's core stepping loop, which every one
-	// of the 415 tests exercises.
-	// - step() solves each conjunct of the formula (step_spec) independently and
-	// greedily — for each conjunct it walks expression_paths() and commits to the
-	// first satisfiable disjunct into memory, with no backtracking.
-	// - For the one-hot state disjunction (o__ltl_ms0__[t]=1 || o__ltl_ms1__[t]=1),
-	// either literal is locally satisfiable at that point, so the greedy solver picks
-	// whichever comes first in the traversal order.
-	// - Which literal comes firsed and full-suite runs —the disjunction is logically
-	// commutative but gets rendered/traversed in different orders depending on
-	// process-global state (BDD/hash-consing history accumulby every test that ran
-	// eart reset between testcases).
-	// - When the greedy pick for that conjunct conflicts with a later conjunct's
-	// requirement (e.g., "having ms0, we must be in ms1 att=1"), step() has no way
-	// to backtrack — it just reports "unexpectedly unsat" and run() aborts after 1
-	// step. That's exactly the vals.size()==1 symptom, not "stalls forever in a
-	// self-theorized.
-	//
-	// This is a genuine architectural gap in step() (a greedy, non-backtracking
-	// conjunctive solver) interarmalization-order state —not a bug local to the
-	// Mealy encoding itself. A correct fix means adding backtracking/joint-consistency
-	// search across step_spec conjuncts in the interpreter's core stepping loop,
-	// which every one of the 415 tests exercises.
-	//
-	// TODO (HIGH) fix in DEBUG build, then re-enable QE-03/09/15 in unit tests.
-	// For now, skip them in DEBUG.
-	//
-	#ifndef DEBUG
+	// QE-03/09/15 (an eventuality realized through the multi-state
+	// Mealy-to-safety encoding) used to be compiled out under DEBUG: the
+	// interpreter's per-conjunct step solved the one-hot state disjunction
+	// greedily, in a traversal order that depended on process-global state,
+	// and could not backtrack when a later conjunct disagreed, so the full
+	// suite failed where a single case passed. The per-part alternative
+	// selection (first_solvable_alternative / chosen_alt_) decides that
+	// jointly now; both builds pass the whole suite (re-enabled 2026-09-17).
 	TEST_CASE("QE-03: F(o1={1/3}:qlt) outputs 1/3 at least once") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("F (o1[t]:qlt = {1/3}:qlt).", 4);
@@ -302,7 +270,6 @@ TEST_SUITE("qlt_execution") {
 		}
 		CHECK(found);
 	}
-	#endif // DEBUG
 
 	TEST_CASE("QE-04: G(o1>{0}:qlt && o1<{1}:qlt) outputs in (0,1)") {
 		bdd_init<Bool>();
@@ -354,7 +321,6 @@ TEST_SUITE("qlt_execution") {
 
 	// Same as in QE-03.
 	//
-	#ifndef DEBUG
 	TEST_CASE("QE-09: (o1>{0}:qlt) U (o1={1/2}:qlt) eventually reaches 1/2") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt).", 5);
@@ -368,7 +334,6 @@ TEST_SUITE("qlt_execution") {
 		}
 		CHECK(reached);
 	}
-	#endif // DEBUG
 
 	TEST_CASE("QE-10: G(o1={1/2}:qlt || o1={2/3}:qlt) outputs only allowed constants") {
 		bdd_init<Bool>();
@@ -417,7 +382,6 @@ TEST_SUITE("qlt_execution") {
 
 	// Same as QE-03 and QE-09.
 	//
-	#ifndef DEBUG
 	TEST_CASE("QE-15: (o1={1/2}:qlt) W (o1={2/3}:qlt) weak until pattern") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) W (o1[t]:qlt = {2/3}:qlt).", 5);
@@ -430,7 +394,6 @@ TEST_SUITE("qlt_execution") {
 			}
 		}
 	}
-	#endif // DEBUG
 
 	TEST_CASE("QE-16: G(o1!=o1[t-1]:qlt) changes every step") {
 		bdd_init<Bool>();

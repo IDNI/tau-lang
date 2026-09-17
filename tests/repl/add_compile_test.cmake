@@ -14,6 +14,11 @@ function(add_compile_test test_name spec_file)
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash "${TAU_COMPILE_VERB_CHECKER}"
 			"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>" "${spec_file}")
-	# Compiling a nested cmake project takes real time beyond a REPL round-trip.
-	set_tests_properties("test_repl-${test_name}" PROPERTIES TIMEOUT 300)
+	# Compiling a nested cmake project takes real time beyond a REPL
+	# round-trip: 150-175 s alone on a 32-thread machine, and the nested
+	# build competes with the other tests of a `ctest -j` run, where the old
+	# 300 s cap was exceeded regularly. PROCESSORS reserves ctest slots for
+	# that nested build so fewer tests run beside it.
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		TIMEOUT 900 PROCESSORS 4)
 endfunction()

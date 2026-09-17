@@ -395,11 +395,13 @@ static bool aba_existential_feasible(tref fm) {
 			}
 		}
 		// A free variable whose algebra can always satisfy its own outputs
-		// makes the formula feasible without asking the solver. LA-R5:
-		// this is a per-variable claim the algebra makes about itself (an
-		// oracle algebra such as nlang cannot decide the joint constraint
-		// `o = p && o = q` for distinct literals p, q), so it is the one
-		// knowingly optimistic direction of this oracle. Say so once.
+		// makes the formula feasible without asking the solver. Joint
+		// constraints on such a variable are not what this shortcut
+		// decides: the normalizer collapses `o = p && o = q` (and the
+		// input-bearing shapes take the solver path, see
+		// aba_feasible_dispatch). What it does assume is that every
+		// literal of an oracle algebra (nlang) denotes a non-empty
+		// element; offline, nothing checks emptiness. Say so once.
 		for (tref v : tau::get(fm).get_free_vars())
 			if (pack_type_output_always_satisfiable<node>(
 				tree<node>::get(v).get_ba_type()))
@@ -410,12 +412,10 @@ static bool aba_existential_feasible(tref fm) {
 					TAU_LOG_WARNING << "[ltl_aba] a "
 						<< get_ba_type_name<node>(
 							tree<node>::get(v).get_ba_type())
-						<< " output is assumed feasible because the "
+						<< " output atom is taken as feasible: the "
 						"algebra declares its outputs always "
-						"satisfiable; joint constraints over "
-						"distinct literals of that algebra are "
-						"not checked (a false REALIZABLE is "
-						"possible)";
+						"satisfiable, so the emptiness of its "
+						"literals is assumed, not checked";
 				}
 				return true;
 			}
