@@ -403,7 +403,7 @@ private:
 		auto f = [this](tref m) {
 			const tau& t = tau::get(m);
 			if (!t.is(tau::ref_arg)) return m;
-			const tref a = tau::trim_right_sibling(t.first());
+			const tref a = t.first();
 			if (!tau::get(a).is(tau::bf)) return m;
 			const tref s = simplify_term<node>(a, order);
 			return s == a ? m : tau::get(t.value, s);
@@ -677,7 +677,7 @@ private:
 	/// `substitute` is applied per atom below this node and cannot see the
 	/// binder, so the pass is what keeps the capture out.
 	tref enter_binder(tref n, marker m) {
-		const tref v = tau::trim_right_sibling(binder_var<node>(n));
+		const tref v = binder_var<node>(n);
 		std::vector<size_t> suspended;
 		for (size_t i = 0; i < env.pins.size(); ++i) {
 			if (!env.pins[i].active) continue;

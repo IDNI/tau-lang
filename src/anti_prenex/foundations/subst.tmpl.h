@@ -72,7 +72,6 @@ tref subst_atom(tref phi, tref atm, bool value) {
 	using tau = tree<node>;
 	using namespace subst_detail;
 	DBG(assert(phi != nullptr && atm != nullptr);)
-	atm = tau::trim_right_sibling(atm);
 	DBG(assert(is_atomic_fm<node>(atm));)
 	DBG(assert(tau::get(phi).is(tau::wff));)
 	// The guard's first call fills `atoms_memo` for every non-spine wrapper

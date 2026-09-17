@@ -83,8 +83,7 @@ tref pin_equation(tref m, quantifier<node> Q) {
 	if (is_negated_equation<node>(m)) return atom_of<node>(m);
 	if (is_child<node>(m, tau::bf_neq)) {
 		const auto& t = tau::get(m)[0];
-		return tau::build_bf_eq(tau::trim_right_sibling(t.first()),
-			tau::trim_right_sibling(t.second()));
+		return tau::build_bf_eq(t.first(), t.second());
 	}
 	return nullptr;
 }
@@ -137,7 +136,6 @@ std::optional<std::vector<case_branch<node>>> case_pin_of(tref m, tref x,
 {
 	using tau = tree<node>;
 	const bool ex = Q == tau_term_bdd<node>::ex;
-	m = tau::trim_right_sibling(m);
 	if (!is_child<node>(m, ex ? tau::wff_or : tau::wff_and)) return {};
 	const trefs bs = members<node>(m);
 	if (bs.size() > case_max) return {};
@@ -159,8 +157,7 @@ std::optional<std::vector<case_branch<node>>> case_pin_of(tref m, tref x,
 		trefs rest;
 		rest.reserve(ps.size() - 1);
 		for (size_t i = 0; i < ps.size(); ++i)
-			if (i != at) rest.push_back(
-				tau::trim_right_sibling(ps[i]));
+			if (i != at) rest.push_back(ps[i]);
 		out.push_back(case_branch<node>{ b,
 			join_of<node>(rest, ex), hit->witness });
 	}
@@ -192,8 +189,7 @@ std::optional<tref> try_witness(tref x, tref psi) {
 	std::optional<pin<node>> best;
 	size_t best_size = 0;
 	for (tref c : cs) {
-		std::optional<pin<node>> p = find_pin_for<node>(
-			tau::trim_right_sibling(c), x);
+		std::optional<pin<node>> p = find_pin_for<node>(c, x);
 		if (!p) continue;
 		if (p->strict) { best = p; break; }
 		if (const size_t size = mem_size<node>(p->witness);
@@ -293,7 +289,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 				into = m;
 			}
 			if (!into) return {};   // nothing left to descend to
-			n = tau::trim_right_sibling(into);
+			n = into;
 			continue;
 		}
 		if (is_child_quantifier<node>(n)) {
@@ -302,7 +298,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 			// bound after it joins `D`.
 			if (binder_kind<node>(n) != Q) flipped = true;
 			if (flipped) D.push_back(binder_var<node>(n));
-			n = tau::trim_right_sibling(binder_body<node>(n));
+			n = binder_body<node>(n);
 			continue;
 		}
 		// An atom without a pin, a reference, a temporal operator: not
@@ -328,8 +324,7 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
 	for (size_t i = 0; i < cs.size(); ++i) {
 		auto bs = case_pin_of<node>(cs[i], x, tau_term_bdd<node>::ex);
 		if (!bs) continue;
-		const size_t size = formula_size<node>(
-			tau::trim_right_sibling(cs[i]));
+		const size_t size = formula_size<node>(cs[i]);
 		if (best.empty() || size < best_size)
 			best = std::move(*bs), at = i, best_size = size;
 	}
@@ -343,7 +338,7 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
 	trefs rest;
 	rest.reserve(cs.size() - 1);
 	for (size_t i = 0; i < cs.size(); ++i)
-		if (i != at) rest.push_back(tau::trim_right_sibling(cs[i]));
+		if (i != at) rest.push_back(cs[i]);
 	r.rest = simplified_and_join<node>(rest);
 	return r;
 }
@@ -352,7 +347,6 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
 
 template <NodeType node>
 tref eliminate_by_substitution(tref phi) {
-	using tau = tree<node>;
 	DBG(assert(phi != nullptr);)
 	DBG(assert(!witness_detail::holds_bdd_term<node>(phi));)
 	// The default memo slot is the traversal's own per-call one
@@ -367,9 +361,9 @@ tref eliminate_by_substitution(tref phi) {
 		while (is_child_quantifier<node>(n)) {
 			std::optional<tref> r = try_witness_deep<node>(
 				binder_kind<node>(n), binder_var<node>(n),
-				tau::trim_right_sibling(binder_body<node>(n)));
+				binder_body<node>(n));
 			if (!r) break;
-			n = tau::trim_right_sibling(*r);
+			n = *r;
 		}
 		return n;
 	};

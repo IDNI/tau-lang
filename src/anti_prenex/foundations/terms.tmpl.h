@@ -280,7 +280,6 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 	// Memoised per term, within this call only.
 	subtree_unordered_map<node, tref> term_memo;
 	auto prep = [&](tref t) -> tref {
-		t = tau::trim_right_sibling(t);
 		if (thandle<node>::is_bdd_backed(t)) { // already prepared: idempotent
 			DBG(assert(tbdd<node>::is_ordered(
 				thandle<node>::convert_to_handle(t).get(), order));)
@@ -299,8 +298,8 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 	auto f = [&](tref n) -> tref {
 		const tau& tn = tau::get(n);
 		if (!tn.is(tau::wff) || !tn.child_is(tau::bf_eq)) return n;
-		tref l = tau::trim_right_sibling(tn[0].first());
-		tref r = tau::trim_right_sibling(tn[0].second());
+		tref l = tn[0].first();
+		tref r = tn[0].second();
 		tref l2 = prep(l), r2 = prep(r);
 		if (l2 == l && r2 == r) return n;
 		return build_bf_eq<node>(l2, r2);
@@ -319,11 +318,9 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 
 template <NodeType node>
 tref cofactor(tref f, tref x, bool bit, const var_order<node>& order) {
-	using tau = tree<node>;
 	using namespace terms_detail;
 	if (!thandle<node>::is_bdd_backed(f)) return f; // no decision variables
-	x = tau::trim_right_sibling(x);
-	DBG(assert(tau::get(x).is(tau::variable));)
+	DBG(assert(tree<node>::get(x).is(tree<node>::variable));)
 	if (!order.contains(x)) return f;      // not a decision variable
 	bref<node> r = thandle<node>::convert_to_handle(f).get();
 	DBG(assert(tbdd<node>::is_ordered(r, order));)
@@ -377,9 +374,12 @@ std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n) {
 		if (!tn.child_is(tau::bf_fall) && !tn.child_is(tau::bf_fex))
 			break;
 		const tau& c = tau::get(tn.first());
+		// The subscript keys the cross-call memos of `bdd_ex` and
+		// `bdd_quant`, which order their key vectors by tref, so it is
+		// trimmed to the spelling those tables already hold.
 		q.emplace_back(tau::trim_right_sibling(c.first()),
 			c.is(tau::bf_fall) ? tbdd::all : tbdd::ex);
-		n = tau::trim_right_sibling(c.second());
+		n = c.second();
 	}
 	return { std::move(q), n };
 }
@@ -460,8 +460,8 @@ tref term_of(tref atom, const var_order<node>& order) {
 		DBG(assert(false && "term_of: not an equation");)
 		return nullptr;
 	}
-	tref l = tau::trim_right_sibling(t[0].first());
-	tref r = tau::trim_right_sibling(t[0].second());
+	tref l = t[0].first();
+	tref r = t[0].second();
 	if (!thandle<node>::is_bdd_backed(l) && !thandle<node>::is_bdd_backed(r))
 		return build_bf_xor<node>(l, r);
 	// The ring sum of two BDD-backed sides is a BDD operation; a plain side
@@ -519,8 +519,6 @@ size_t mem_size(tref t) {
 template <NodeType node>
 trefs leaf_fv(tref f) {
 	using namespace terms_detail;
-	using tau = tree<node>;
-	f = tau::trim_right_sibling(f);
 	if (!thandle<node>::is_bdd_backed(f)) return get_free_vars<node>(f);
 	// The library's `get_free_leaf_vars`, by value and never stored: the
 	// per-leaf sets are `get_free_vars`' own cached entries.
