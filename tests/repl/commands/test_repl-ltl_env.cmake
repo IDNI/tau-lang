@@ -86,15 +86,26 @@ add_test(NAME "test_repl-ltl_env-qe_flag_beats_env"
 	COMMAND bash -c "TAU_LTL_OMCAT_QE_MAX_VARS=4 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-qe-max-vars 3 -e \"get ltlqemaxvars\"")
 set_tests_properties("test_repl-ltl_env-qe_flag_beats_env" PROPERTIES
 	PASS_REGULAR_EXPRESSION "ltlqemaxvars: *3")
-# BA-declared knobs promoted from header constants.
-add_test(NAME "test_repl-ltl_env-qlt_t3_cap_option"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-t3-cap 12 -e \"get qlt-t3-cap\"")
-set_tests_properties("test_repl-ltl_env-qlt_t3_cap_option" PROPERTIES
-	PASS_REGULAR_EXPRESSION "qlt-t3-cap: *12")
-add_test(NAME "test_repl-ltl_env-nlang_http_timeout_option"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set nlang-http-timeout 3\"")
-set_tests_properties("test_repl-ltl_env-nlang_http_timeout_option" PROPERTIES
-	PASS_REGULAR_EXPRESSION "nlang-http-timeout: *3")
+# BA-declared knobs promoted from header constants. The option exists only
+# when its algebra is in the pack, so each is gated on its own BA.
+tau_repl_unsupported(_tau_skip "get qlt-t3-cap")
+if(_tau_skip)
+	tau_repl_record_skip("ltl_env-qlt_t3_cap_option")
+else()
+	add_test(NAME "test_repl-ltl_env-qlt_t3_cap_option"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-t3-cap 12 -e \"get qlt-t3-cap\"")
+	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_option" PROPERTIES
+		PASS_REGULAR_EXPRESSION "qlt-t3-cap: *12")
+endif()
+tau_repl_unsupported(_tau_skip "set nlang-http-timeout")
+if(_tau_skip)
+	tau_repl_record_skip("ltl_env-nlang_http_timeout_option")
+else()
+	add_test(NAME "test_repl-ltl_env-nlang_http_timeout_option"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set nlang-http-timeout 3\"")
+	set_tests_properties("test_repl-ltl_env-nlang_http_timeout_option" PROPERTIES
+		PASS_REGULAR_EXPRESSION "nlang-http-timeout: *3")
+endif()
 add_test(NAME "test_repl-ltl_env-refinement_rounds_flag"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-refinement-rounds 5 -e \"get ltlrefinementrounds\"")
 set_tests_properties("test_repl-ltl_env-refinement_rounds_flag" PROPERTIES
@@ -107,10 +118,15 @@ add_test(NAME "test_repl-ltl_env-pwr_semantic_flag"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --pwr-semantic -e \"get pwrsemantic\"")
 set_tests_properties("test_repl-ltl_env-pwr_semantic_flag" PROPERTIES
 	PASS_REGULAR_EXPRESSION "pwrsemantic: *on")
-add_test(NAME "test_repl-ltl_env-qlt_const_output_max_flag"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-const-output-max 3 -e \"get qlt-const-output-max\"")
-set_tests_properties("test_repl-ltl_env-qlt_const_output_max_flag" PROPERTIES
-	PASS_REGULAR_EXPRESSION "qlt-const-output-max: *3")
+tau_repl_unsupported(_tau_skip "get qlt-const-output-max")
+if(_tau_skip)
+	tau_repl_record_skip("ltl_env-qlt_const_output_max_flag")
+else()
+	add_test(NAME "test_repl-ltl_env-qlt_const_output_max_flag"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-const-output-max 3 -e \"get qlt-const-output-max\"")
+	set_tests_properties("test_repl-ltl_env-qlt_const_output_max_flag" PROPERTIES
+		PASS_REGULAR_EXPRESSION "qlt-const-output-max: *3")
+endif()
 # The -K short flag belongs to --ba-component-factoring; --ltl-qe-max-vars is -k.
 add_test(NAME "test_repl-ltl_env-qe_short_flag_is_lowercase_k"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -k 3 -e \"get ltlqemaxvars\"")
