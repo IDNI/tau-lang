@@ -1099,6 +1099,60 @@ static bool mentions_ltl_state_var(tref part) {
 }
 
 /**
+ * @brief Definitional propagation of a step formula (GitHub #126).
+ *
+ * A guard that reads a value the same step's definitions determine is not
+ * folded by the syntactic simplification, so `expression_paths` enumerates
+ * one path per such guard. When `interpreter::definitional_propagation` is
+ * on: normalize @p part_at_t once, substitute every top-level `o = c` with c
+ * a constant, simplify, and repeat until no new constant appears. A
+ * top-level `o = c` holds in every solution, so the result is equivalent
+ * and its solutions, extended by @p propagated (bf(o) -> bf(c)), are exactly
+ * the original ones. Returns @p part_at_t unchanged when the switch is off.
+ */
+template <NodeType node>
+tref propagate_step_definitions(tref part_at_t,
+	subtree_map<node, tref>& propagated)
+{
+	using tau = tree<node>;
+	if (!interpreter<node>::definitional_propagation) return part_at_t;
+	// Every round substitutes at least one variable away, so the loop is
+	// bounded by the variables of the formula.
+	for (;;) {
+		auto pn = normalize_non_temp<node>(part_at_t);
+		if (!pn.has_value()) break;
+		part_at_t = pn.value();
+		subtree_map<node, tref> consts;
+		std::vector<tref> st{part_at_t};
+		while (!st.empty()) {
+			tref x = st.back(); st.pop_back();
+			const tau& tx = tau::get(x);
+			if (tx.is(tau::wff) && tx.child_is(tau::wff_and)) {
+				st.push_back(tx[0].first()); st.push_back(tx[0].second());
+				continue;
+			}
+			if (!(tx.is(tau::wff) && tx.child_is(tau::bf_eq))) continue;
+			const tau& atom = tx[0];
+			tref lbf = atom[0].get(), rbf = atom[1].get();
+			const bool lc = tau::get(lbf)[0].is_ba_constant();
+			const bool rc = tau::get(rbf)[0].is_ba_constant();
+			if (lc == rc) continue;
+			tref vbf = lc ? rbf : lbf;
+			if (!tau::get(vbf).child_is(tau::variable)) continue;
+			// The constant may still be an unevaluated term of the
+			// algebra: fold it before it is substituted and reported.
+			tref cbf = normalize_ba<node>(lc ? lbf : rbf);
+			if (consts.emplace(vbf, cbf).second) propagated.emplace(vbf, cbf);
+		}
+		if (consts.empty()) break;
+		tref replaced = rewriter::replace<node>(part_at_t, consts);
+		if (replaced == part_at_t) break;
+		part_at_t = syntactic_formula_simplification<node>(replaced);
+	}
+	return part_at_t;
+}
+
+/**
  * @brief Solves `step_spec` by re-running the general solver each step.
  * @tparam node Tree node type.
  */
@@ -1151,6 +1205,10 @@ struct solve_step_provider : step_provider<node> {
 				formula_time_point);
 			part_at_t = syntactic_formula_simplification<node>(
 				rewriter::replace<node>(part_at_t, local_memory));
+			// A state part is left to the solver as a constraint (above).
+			subtree_map<node, tref> propagated;
+			if (!state_part) part_at_t = propagate_step_definitions<node>(
+				part_at_t, propagated);
 			for (tref path : expression_paths<node>(part_at_t)) {
 				tref current = path;
 				// Simplify after updating stream variables
@@ -1183,6 +1241,9 @@ struct solve_step_provider : step_provider<node> {
 					current, time_point);
 				if (path_solution.has_value()) {
 					solved = true;
+					for (const auto& [pv, pval] : propagated)
+						if (!path_solution.value().contains(pv))
+							path_solution.value().emplace(pv, pval);
 					for (const auto& [var, value] : path_solution.value()) {
 						// Unfiltered: step()'s commit block decides what of
 						// this actually reaches the interpreter's memory/output.
@@ -2901,6 +2962,10 @@ std::optional<size_t> interpreter<node>::first_solvable_alternative(
 			formula_time_point);
 		alt_at_t = syntactic_formula_simplification<node>(
 			rewriter::replace<node>(alt_at_t, memory));
+		if (!mentions_ltl_state_var<node>(alt_at_t)) {
+			subtree_map<node, tref> propagated;
+			alt_at_t = propagate_step_definitions<node>(alt_at_t, propagated);
+		}
 		for (tref path : expression_paths<node>(alt_at_t)) {
 			auto normalized = normalize_non_temp<node>(path);
 			if (!normalized.has_value()) continue;

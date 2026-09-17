@@ -1866,6 +1866,21 @@ bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 	return !conjs.empty();
 }
 
+/**
+ * @brief True iff the pure-equality partition @p conjs mentions more
+ * distinct variables than `lgrs_max_vars` allows on the lgrs route.
+ */
+template <NodeType node>
+bool lgrs_route_too_wide(const subtree_set<node>& conjs) {
+	using tau = tree<node>;
+	if (lgrs_max_vars == std::numeric_limits<size_t>::max()) return false;
+	subtree_set<node> vars;
+	for (tref conj : conjs)
+		for (tref v : tau::get(conj).select_all(is<node, tau::variable>))
+			vars.insert(v);
+	return vars.size() > lgrs_max_vars;
+}
+
 // entry point for the solver
 // Reports why solve failed: an unsupported clause is code::solver_error,
 // no solution is code::unsat.
@@ -2037,12 +2052,63 @@ result<solution<node>> solve(tref form, solver_options options) {
 			tref type_tree = ba_types<node>::type_tree(type);
 			op.type_id = get_ba_type_id<node>(type_tree);
 			if (pack_type_has_arith_ops<node>(type_tree)) {
-				if (conjs_only_pure_equality<node>(conjs)) {
+				// Read off every `var = constant` conjunct before choosing a
+				// route, substituting it into the rest until nothing new is
+				// read off: a normalized step formula is one such equation
+				// per output, and the Boole expansion of the lgrs route
+				// below is exponential in the variables it is handed
+				// (GitHub #121). A conjunct that folds to F under the
+				// substitution refutes the clause; one folding to T is done.
+				subtree_map<node, tref> read_off;
+				subtree_set<node> remaining;
+				bool conflict = false;
+				{
+					subtree_set<node> pending = conjs;
+					for (bool changed = true; changed && !conflict;) {
+						changed = false;
+						subtree_set<node> next;
+						for (tref conj : pending) {
+							tref c = read_off.empty() ? conj
+								: rewriter::replace<node>(conj, read_off);
+							const tau& tc = tau::get(c);
+							if (tc.equals_T()) { changed = true; continue; }
+							if (tc.equals_F()) { conflict = true; break; }
+							if (tc.child_is(tau::bf_eq)) {
+								const tau& eq = tc[0];
+								tref l = eq[0].get(), r = eq[1].get();
+								const bool lv = tau::get(l).child_is(tau::variable);
+								const bool rv = tau::get(r).child_is(tau::variable);
+								const bool lc = tau::get(l).first()
+									&& tau::get(l)[0].is_ba_constant();
+								const bool rc = tau::get(r).first()
+									&& tau::get(r)[0].is_ba_constant();
+								if ((lv && rc) || (rv && lc)) {
+									read_off[lv ? l : r] = lv ? r : l;
+									changed = true;
+									continue;
+								}
+							}
+							next.insert(c);
+						}
+						pending = std::move(next);
+					}
+					remaining = std::move(pending);
+				}
+				if (conflict) { skip = true; }
+				else if (remaining.empty()) {
+					theory_sat = true;
+					for (const auto& [var, value] : read_off)
+						clause_solution[var] = value;
+				} else if (conjs_only_pure_equality<node>(remaining)
+					&& !lgrs_route_too_wide<node>(remaining)) {
+					theory_sat = true;
+					for (const auto& [var, value] : read_off)
+						clause_solution[var] = value;
 					// Without arithmetic (a cast counts as arithmetic) no variable
 					// spans two widths, so each width is an independent Boolean
 					// algebra: squeeze and solve via lgrs per width.
 					std::map<size_t, std::optional<equality>> squeezed_by_width;
-					for (tref raw_eq : conjs) {
+					for (tref raw_eq : remaining) {
 						tref conj = norm_equation<node>(raw_eq);
 						conj = apply_all_xor_def<node>(conj);
 						auto& squeezed = squeezed_by_width[find_ba_type<node>(raw_eq)];
@@ -2058,14 +2124,15 @@ result<solution<node>> solve(tref form, solver_options options) {
 					for (const auto& [_, squeezed] : squeezed_by_width) {
 						DBG(assert(squeezed.has_value());)
 						if (auto lgrs_sol = lgrs<node>(squeezed.value())) {
-							theory_sat = true;
 							for (const auto& [var, value] : lgrs_sol.value())
 								clause_solution[var] = value;
-						} else { skip = true; break; }
+						} else { theory_sat = false; skip = true; break; }
 					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
-					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(conjs))) {
+					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(remaining))) {
 						theory_sat = true;
+						for (const auto& [var, value] : read_off)
+							clause_solution[var] = value;
 						for (const auto& [var, value]: theory_solution.value()) {
 							clause_solution[var] = value;
 						}

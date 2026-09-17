@@ -71,3 +71,16 @@ add_repl_test(get_cmd-ltlwindowmaxpaths    "get ltlwindowmaxpaths"      "ltlwind
 add_repl_test(set_cmd-ltlwindowmaxpaths    "set ltlwindowmaxpaths 12"   "ltlwindowmaxpaths: *12")
 add_repl_test(get_cmd-qlt_const_output_max "get qlt-const-output-max"   "qlt-const-output-max: *100")
 add_repl_test(set_cmd-qlt_const_output_max "set qlt-const-output-max 7" "qlt-const-output-max: *7")
+
+# GitHub #121: the solver's lgrs-route variable cap is a count option.
+add_repl_test(get_cmd-lgrsmaxvars           "get lgrsmaxvars"        "lgrsmaxvars: *8")
+add_repl_test(set_cmd-lgrsmaxvars           "set lgrsmaxvars 3"      "lgrsmaxvars: *3")
+add_repl_test(set_cmd-lgrsmaxvars_unlimited "set lgrsmaxvars 0"      "lgrsmaxvars: *unlimited")
+add_repl_test(help_set_lists_lgrsmaxvars    "help set"               "lgrsmaxvars")
+# GitHub #126: the step's definitional propagation is a Boolean option.
+add_repl_test(get_cmd-stepprop              "get stepprop"           "stepprop: *off")
+add_repl_test(set_cmd-stepprop_on           "set stepprop on"        "stepprop: *on")
+add_repl_test(enable_cmd-stepprop           "enable stepprop. get stepdefinitionalpropagation" "stepprop: *on")
+add_repl_test(disable_cmd-stepprop          "enable stepprop. disable stepprop. get stepprop" "stepprop: *off")
+add_repl_test(toggle_cmd-stepprop           "toggle stepprop. get stepprop" "stepprop: *on")
+add_repl_test(help_set_lists_stepprop       "help set"               "stepprop")

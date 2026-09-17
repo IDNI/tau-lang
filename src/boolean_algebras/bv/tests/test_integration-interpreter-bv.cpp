@@ -24,7 +24,45 @@ struct bv_max_width_scope {
 	~bv_max_width_scope() { bv_max_width = prev; }
 };
 
+// GitHub #126: a run whose step forks on values its own definitions
+// determine, with and without the definitional propagation.
+strings run_forking_spec(bool on) {
+	const bool prev = interpreter<node_t>::definitional_propagation;
+	interpreter<node_t>::definitional_propagation = on;
+	bdd_init<Bool>();
+	auto spec = create_spec(
+		"(o1[t]:bv[8] = (i1[t]:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8])"
+		" && ((o1[t]:bv[8] + { 40 }:bv[8] > { 42 }:bv[8])"
+		"   ? (o2[t]:bv[8] = { 42 }:bv[8]) : (o2[t]:bv[8] = o1[t]:bv[8] + { 40 }:bv[8]))"
+		" && ((o1[t]:bv[8] + { 2 }:bv[8] > { 4 }:bv[8])"
+		"   ? (o3[t]:bv[8] = { 1 }:bv[8]) : (o3[t]:bv[8] = { 0 }:bv[8])).");
+	io_context<node_t> ctx;
+	strings i1_values = { "1", "5", "2", "7" };
+	ctx.add_input("i1", bv_type_id<node_t>(8),
+		std::make_shared<vector_input_stream>(i1_values));
+	auto o2 = std::make_shared<vector_output_stream>();
+	ctx.add_output("o2", bv_type_id<node_t>(8), o2);
+	auto o3 = std::make_shared<vector_output_stream>();
+	ctx.add_output("o3", bv_type_id<node_t>(8), o3);
+	auto maybe_i = run<node_t>(spec, ctx, 4);
+	interpreter<node_t>::definitional_propagation = prev;
+	REQUIRE(maybe_i.has_value());
+	strings out = o2->get_values();
+	for (const auto& v : o3->get_values()) out.push_back(v);
+	return out;
+}
+
 } // namespace
+
+TEST_SUITE("step definitional propagation (bv)") {
+
+	TEST_CASE("a step forking on values its own definitions determine: same outputs") {
+		auto off = run_forking_spec(false);
+		auto on = run_forking_spec(true);
+		CHECK(off == on);
+		CHECK(on == strings{ "42", "42", "42", "42", "0", "1", "1", "0" });
+	}
+}
 
 TEST_SUITE("with inputs and outputs (bv)") {
 

@@ -2607,10 +2607,12 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (0 = unlimited) |
 | -Z, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
+| -t, --step-definitional-propagation | propagate the constants a step formula determines before its paths are enumerated, one path instead of 2^k for k guards reading them (off by default) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
+| -g, --lgrs-max-vars           | hand a pure-equality bitvector system with more distinct variables than this to the solver instead of the `lgrs` route, whose Boole expansion is exponential in them (default 8, 0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
 | -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
@@ -2640,7 +2642,14 @@ blast-block re-entry nesting in anti-prenexing, 0 = unlimited),
 `--bv-case-split` (bitvector case split of quantified variables tested
 against constants, enabled by default), `--bv-case-split-max-tests` (cap
 the constants a quantified bitvector variable may be tested against for the
-case split, 0 = unlimited), `--bv-quantifier-free-decision` (decide a
+case split, 0 = unlimited), `--bv-definitional-elimination` (eliminate
+existentially quantified bitvector variables that a total definition in
+their scope determines, before the case split; off by default) with its
+caps `--bv-defelim-max-clauses`, `--bv-defelim-max-atoms`,
+`--bv-defelim-max-subset` and `--bv-defelim-max-rounds` (flattened clauses
+per conjunct, guard atoms per propositional check, clause-subset size and
+rounds per block; defaults 16, 18, 4 and 256, `0` = unlimited except for
+the atoms, which stop at 30), `--bv-quantifier-free-decision` (decide a
 closed bitvector formula whose binders are all of one kind quantifier-free,
 off by default), `--bv-widening` (exact, widened bitvector arithmetic
 instead of modular wraparound, off by default) and `--bv-max-width` (cap
@@ -2648,6 +2657,7 @@ the width widening may compute at; `0` leaves the current cap unchanged,
 1024 unless already set); bv blasts only when both `--preprocessing`/`-B`
 and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
+`--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
 `--bv-quantifier-free-decision`, `--bv-widening` and `--bv-max-width` are
 not recognized options at all.
 
@@ -2772,6 +2782,14 @@ fallback of the temporal pointwise revision, the mode that re-solves the
 revised specification as an Algorithm D game over the `qlt` type
 (`-Z, --pwr-semantic`). It's off by default.
 
+* `stepprop|stepdefinitionalpropagation`: Can be on/off. Before a step's
+paths are enumerated, normalizes the step formula once, substitutes every
+top-level `o = c` with `c` a constant and repeats until no new constant
+appears, carrying the values into the solution. A guard reading a value the
+same step computes then folds instead of forking the enumeration, so a step
+with `k` such guards solves one path instead of up to `2^k`. An identity on
+the solution set (`-t, --step-definitional-propagation`). It's off by default.
+
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
 
@@ -2798,6 +2816,12 @@ count, not "unlimited").
 * `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
 elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
 default.
+
+* `lgrsmaxvars`: above this many distinct variables, a partition of pure
+bitvector equalities is handed to the solver instead of being squeezed and
+solved through `lgrs`, whose Boole expansion is exponential in the variables;
+`var = constant` conjuncts are read off before the count (`--lgrs-max-vars`).
+8 by default.
 
 * `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
 (`--max-fixpoint-steps`). Default 500 — the search has no convergence
@@ -2899,8 +2923,15 @@ constants of its type is eliminated by one witness per cell those constants
 cut the domain into, before any quantifier block forms; mirroring
 `--bv-case-split`, on by default), `bv-case-split-max-tests` (cap on the
 constants a quantified bitvector variable may be tested against for the case
-split to apply, mirroring `--bv-case-split-max-tests`; unlimited by default)
-`bv-quantifier-free-decision` (decide a closed bitvector formula whose
+split to apply, mirroring `--bv-case-split-max-tests`; unlimited by default),
+`bv-definitional-elimination` (substitute an existentially quantified
+bitvector variable that a total definition in its scope determines -- a bare
+equation, or clauses `D_i || x = c_i` whose guards cover every case -- where
+it is read, and drop its binder, before the case split; mirroring
+`--bv-definitional-elimination`, off by default) with its caps
+`bv-defelim-max-clauses`, `bv-defelim-max-atoms`, `bv-defelim-max-subset` and
+`bv-defelim-max-rounds` (mirroring the command line options of the same
+names), `bv-quantifier-free-decision` (decide a closed bitvector formula whose
 binders are all of one kind quantifier-free, mirroring
 `--bv-quantifier-free-decision`; off by default), `bv-widening` (the
 [exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode),

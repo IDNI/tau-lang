@@ -177,6 +177,12 @@ struct api {
 	 */
 	static void set_cqe_max_clauses(size_t n);
 	/**
+	 * @brief Above this many distinct variables a pure-equality bitvector
+	 * partition goes to the pack solver instead of the `lgrs` route, whose
+	 * Boole expansion is exponential in them (default 8; 0 = unlimited).
+	 */
+	static void set_lgrs_max_vars(size_t n);
+	/**
 	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
 	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
 	 */
@@ -326,6 +332,12 @@ struct api {
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */
 	static void set_pwr_semantic_fallback(bool on);
+	/**
+	 * @brief Propagate the constants a step formula determines before its
+	 * paths are enumerated (`interpreter::definitional_propagation`); OFF
+	 * by default.
+	 */
+	static void set_step_definitional_propagation(bool on);
 	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
 	/// Enable or disable support-component factoring of the Tau-BA

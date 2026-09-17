@@ -93,9 +93,12 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	ltl_timeout_opt, ltl_alg_opt, ltl_qe_max_vars_opt,
 	ltl_hoa_max_states_opt, ltl_guard_max_cubes_opt,
 	ltl_refinement_rounds_opt, ltl_window_max_paths_opt,
+	// The solver's lgrs-route variable cap (`-g --lgrs-max-vars`).
+	lgrs_max_vars_opt,
 	// Boolean, like the first group: the semantic (winning-region) fallback
-	// of the temporal pointwise revision (`-Z --pwr-semantic`).
-	pwr_semantic_opt };
+	// of the temporal pointwise revision (`-Z --pwr-semantic`) and the
+	// step's definitional propagation (`-t --step-definitional-propagation`).
+	pwr_semantic_opt, step_prop_opt };
 
 // Logic fragment: determines which operators are available
 enum logic_fragment { fragment_ltl, fragment_ctl_star };

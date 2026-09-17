@@ -1491,6 +1491,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "bacomponentfactoring") return factoring_opt;
 	if (x == "pwrsemantic"
 		|| x == "Z")                 return pwr_semantic_opt;
+	if (x == "stepprop"
+		|| x == "stepdefinitionalpropagation") return step_prop_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1513,6 +1515,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "blockmaxrounds")    return block_max_rounds_opt;
 	if (x == "maxclauses"
 		|| x == "cqemaxclauses")     return cqe_max_clauses_opt;
+	if (x == "lgrsmaxvars")              return lgrs_max_vars_opt;
 	if (x == "decisionpins"
 		|| x == "badecisionpins")    return decision_pins_opt;
 	if (x == "fixpointsteps"
@@ -1608,6 +1611,9 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
 	{ pwr_semantic_opt,  [this]() {
 		out << "pwrsemantic:         " << pbool[pwr_semantic_fallback] << "\n"; } },
+	{ step_prop_opt,     [this]() {
+		out << "stepprop:            "
+			<< pbool[interpreter<node>::definitional_propagation] << "\n"; } },
 	{ factoring_opt,     [this]() {
 		out << "factoring:           " << pbool[opt.factoring] << "\n"; } },
 	{ highlighting_opt, [this]() {
@@ -1634,6 +1640,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "decisionpins:        " << ba_decision_pins << "\n"; } },
 	{ cqe_max_clauses_opt, [climit, this]() {
 		out << "maxclauses:          " << climit(cqe_max_clauses) << "\n"; } },
+	{ lgrs_max_vars_opt, [climit, this]() {
+		out << "lgrsmaxvars:         " << climit(lgrs_max_vars) << "\n"; } },
 	{ fixpoint_steps_opt, [climit, this]() {
 		out << "fixpointsteps:       " << climit(max_fixpoint_steps) << "\n"; } },
 	{ flag_search_steps_opt, [climit, this]() {
@@ -1812,6 +1820,9 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ pwr_semantic_opt, [&]() {
 		bool v = pwr_semantic_fallback;
 		api<node>::set_pwr_semantic_fallback(update_bool_value(v)); } },
+	{ step_prop_opt, [&]() {
+		bool v = interpreter<node>::definitional_propagation;
+		api<node>::set_step_definitional_propagation(update_bool_value(v)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1834,6 +1845,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		api<node>::set_ba_decision_pins(*n); } },
 	{ cqe_max_clauses_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_cqe_max_clauses(*n); } },
+	{ lgrs_max_vars_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_lgrs_max_vars(*n); } },
 	{ fixpoint_steps_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_max_fixpoint_steps(*n); } },
 	{ flag_search_steps_opt, [&]() { if (auto n = str2count(); n)
@@ -1932,6 +1945,10 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 		bool v = pwr_semantic_fallback;
 		api<node>::set_pwr_semantic_fallback(update_fn(v)); break;
 	}
+	case step_prop_opt: {
+		bool v = interpreter<node>::definitional_propagation;
+		api<node>::set_step_definitional_propagation(update_fn(v)); break;
+	}
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -1955,6 +1972,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case consistency_subsets_opt:
 	case cache_bound_opt:
 	case cover_products_opt:
+	case lgrs_max_vars_opt:
 		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
 			"`set <option> <n>`\n", error = true;
 		return;
@@ -2314,6 +2332,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  preprocessing (B)      BA preprocessing (e.g. bv blasting)  on/off\n"
 		"  factoring              tau-algebra component factoring      on/off\n"
 		"  pwrsemantic (Z)        semantic pointwise-revision fallback on/off\n"
+		"  stepprop               step definitional propagation        on/off\n"
 		"  benchmarks (b)         print timing benchmarks              on/off\n";
 	static const std::string numeric_options =
 		"and the numeric limit options, set with `set <option> <n>` "
@@ -2323,6 +2342,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
 		"  maxclauses             cqe DNF clauses per distributed scope unlimited\n"
+		"  lgrsmaxvars            pure-equality variables on lgrs route 8\n"
 		"  decisionpins           decided tau-algebra rows kept alive  4096\n"
 		"  fixpointsteps          temporal-normalization fixpoint steps 500\n"
 		"  flagsteps              eventual-flag search steps           500\n"

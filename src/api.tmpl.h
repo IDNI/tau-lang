@@ -124,6 +124,11 @@ void api<node>::set_cqe_max_clauses(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_lgrs_max_vars(size_t n) {
+	lgrs_max_vars = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
 void api<node>::set_max_blast_reentry_depth(size_t n) {
 	max_blast_reentry_depth = n;
 }
@@ -242,6 +247,11 @@ void api<node>::set_ltl_window_max_paths(size_t n) {
 template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	pwr_semantic_fallback = on;
+}
+
+template <NodeType node>
+void api<node>::set_step_definitional_propagation(bool on) {
+	interpreter<node>::definitional_propagation = on;
 }
 
 template <NodeType node>

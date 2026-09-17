@@ -103,6 +103,22 @@ struct interpreter {
 	static inline size_t max_revision_alts = 0;
 
 	/**
+	 * @brief Definitional propagation before a step's paths are enumerated.
+	 *
+	 * The step formula keeps the clauses of its conditionals, and a guard
+	 * reading a value the same step's definitions determine is not folded
+	 * by the syntactic simplification, so `expression_paths` enumerates one
+	 * path per open guard -- 2^k for k of them -- and each is normalized
+	 * and solved until the first satisfiable one (GitHub #126). When on,
+	 * the step normalizes the formula once, substitutes every top-level
+	 * `o = c` with c a constant and repeats until no new constant appears,
+	 * carrying the values into the solution; an identity on the solution
+	 * set. Off by default; set via `--step-definitional-propagation`, the
+	 * REPL option `stepprop` or `api::set_step_definitional_propagation`.
+	 */
+	static inline bool definitional_propagation = false;
+
+	/**
 	 * @brief Adaptive tree-node gc trigger knobs.
 	 *
 	 * A sweep fires when bintree<node>::M() has both crossed the

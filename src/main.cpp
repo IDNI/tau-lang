@@ -87,6 +87,10 @@ cli::options tau_options() {
 	opts["pwr-semantic"] = cli::option("pwr-semantic", 'Z', false)
 		.set_description("enable the semantic (winning-region) fallback "
 			"of the temporal pointwise revision (off by default)");
+	opts["step-definitional-propagation"] =
+		cli::option("step-definitional-propagation", 't', false)
+		.set_description("propagate the constants a step formula determines "
+			"before its paths are enumerated (disabled by default)");
 	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
 		.set_description("cap the revision alternatives kept per "
 			"specification part, dropping middle preference tiers "
@@ -103,6 +107,10 @@ cli::options tau_options() {
 	opts["cqe-max-clauses"] = cli::option("cqe-max-clauses", 'Q', "0")
 		.set_description("cap the DNF clauses complete quantifier "
 			"elimination may distribute one scope into (0 = unlimited)");
+	opts["lgrs-max-vars"] = cli::option("lgrs-max-vars", 'g', "8")
+		.set_description("hand a pure-equality bitvector system with more "
+			"distinct variables than this to the solver instead of the "
+			"lgrs route (default 8, 0 = unlimited)");
 	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "0")
 		.set_description("cap temporal-normalization fixpoint steps "
 			"(0 = unlimited)");
@@ -347,10 +355,13 @@ int main(int argc, char** argv) {
 	tau_api::set_spec_size_warn(optnum("spec-size-warn"));
 	tau_api::set_max_revision_alts(optnum("max-revision-alts"));
 	tau_api::set_pwr_semantic_fallback(opts["pwr-semantic"].get<bool>());
+	tau_api::set_step_definitional_propagation(
+		opts["step-definitional-propagation"].get<bool>());
 	tau_api::set_block_max_splits(optnum("block-max-splits"));
 	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
 	tau_api::set_ba_decision_pins(optnum("ba-decision-pins"));
 	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
+	tau_api::set_lgrs_max_vars(optnum("lgrs-max-vars"));
 	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
 	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
 	tau_api::set_block_squeeze_cap(optnum("block-squeeze-cap"));

@@ -18,6 +18,74 @@ TEST_SUITE("Configuration") {
 	}
 }
 
+// GitHub #121: a conjunction of pure bitvector equalities. `var = constant`
+// conjuncts are read off before the route is chosen, and the lgrs route is
+// left above `lgrs_max_vars` distinct variables.
+TEST_SUITE("solve: pure bitvector equalities") {
+
+	static tref parse_form(const std::string& src) {
+		return get_nso_rr<node_t>(tau::get(src)).value().main->get();
+	}
+
+	static solver_options bv8_options() {
+		tref type = ba_types<node_t>::type_tree(bv_type_id<node_t>(8));
+		return { .splitter_one = node_t::ba::splitter_one(type),
+			.mode = solver_mode::general };
+	}
+
+	// The solution substituted into the formula normalizes to T.
+	static bool solves(tref form, const solution<node_t>& sol) {
+		tref inst = rewriter::replace<node_t>(form, sol);
+		auto r = normalizer<node_t>(inst);
+		return r.has_value() && tau::get(r.value()).equals_T();
+	}
+
+	TEST_CASE("twelve variables assigned constants") {
+		std::string src;
+		for (int i = 0; i < 12; ++i)
+			src += (i ? " && " : "") + std::string("o") + std::to_string(i)
+				+ ":bv[8] = { " + std::to_string(i + 1) + " }:bv[8]";
+		tref form = parse_form(src + ".");
+		auto sol = solve<node_t>(form, bv8_options());
+		REQUIRE( sol.has_value() );
+		CHECK( sol.value().size() == 12 );
+		for (const auto& [var, value] : sol.value())
+			CHECK( tau::get(value)[0].is_ba_constant() );
+		CHECK( solves(form, sol.value()) );
+	}
+
+	TEST_CASE("a constant read off into the equations that read it") {
+		tref form = parse_form("o0:bv[8] = { 1 }:bv[8] && o1:bv[8] = o0:bv[8] + { 1 }:bv[8] && o2:bv[8] = o1:bv[8] | { 4 }:bv[8].");
+		auto sol = solve<node_t>(form, bv8_options());
+		REQUIRE( sol.has_value() );
+		CHECK( sol.value().size() == 3 );
+		CHECK( solves(form, sol.value()) );
+	}
+
+	TEST_CASE("two constants for one variable refute the clause") {
+		tref form = parse_form("o0:bv[8] = { 1 }:bv[8] && o1:bv[8] = { 2 }:bv[8] && o0:bv[8] = { 2 }:bv[8].");
+		auto sol = solve<node_t>(form, bv8_options());
+		CHECK( !sol.has_value() );
+	}
+
+	TEST_CASE("the same constant twice is one assignment") {
+		tref form = parse_form("o0:bv[8] = { 1 }:bv[8] && o0:bv[8] = { 1 }:bv[8] && o1:bv[8] = o0:bv[8].");
+		auto sol = solve<node_t>(form, bv8_options());
+		REQUIRE( sol.has_value() );
+		CHECK( solves(form, sol.value()) );
+	}
+
+	TEST_CASE("above the lgrs cap the pack solver answers") {
+		const size_t saved = lgrs_max_vars;
+		lgrs_max_vars = 1;
+		tref form = parse_form("o0:bv[8] = o1:bv[8] && o1:bv[8] = o2:bv[8] && o2:bv[8] != { 0 }:bv[8].");
+		auto sol = solve<node_t>(form, bv8_options());
+		lgrs_max_vars = saved;
+		REQUIRE( sol.has_value() );
+		CHECK( solves(form, sol.value()) );
+	}
+}
+
 TEST_SUITE("cvc5_solve simple") {
 
 	TEST_CASE("X = { 1 }:bv[16]") {
