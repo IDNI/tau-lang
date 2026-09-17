@@ -1215,12 +1215,12 @@ TEST_SUITE("hsb — parser") {
 		auto b = parse_hsb<bas_pack>("x[0] - 1 < 0");
 		REQUIRE(a.has_value()); REQUIRE(b.has_value());
 		CHECK(std::get<hsb>(a->first) == std::get<hsb>(b->first));
-		auto c = parse_hsb<bas_pack>("x[0] <= 1/2");
-		auto d = parse_hsb<bas_pack>("x[0] - 0.5 <= 0");
+		auto c = parse_hsb<bas_pack>("x[0] < 1/2");
+		auto d = parse_hsb<bas_pack>("x[0] - 0.5 < 0");
 		REQUIRE(c.has_value()); REQUIRE(d.has_value());
 		CHECK(std::get<hsb>(c->first) == std::get<hsb>(d->first));
 		// and the old form is unchanged
-		auto e = parse_hsb<bas_pack>("x[0] <= 0");
+		auto e = parse_hsb<bas_pack>("x[0] < 0");
 		REQUIRE(e.has_value());
 		CHECK_FALSE(std::get<hsb>(e->first) == std::get<hsb>(c->first));
 	}
@@ -1230,8 +1230,8 @@ TEST_SUITE("hsb — parser") {
 		auto b = parse_hsb<bas_pack>("x[0] - x[1] < 0");
 		REQUIRE(a.has_value()); REQUIRE(b.has_value());
 		CHECK(std::get<hsb>(a->first) == std::get<hsb>(b->first));
-		auto c = parse_hsb<bas_pack>("2*x[0] <= x[1] - 1");
-		auto d = parse_hsb<bas_pack>("2*x[0] - x[1] + 1 <= 0");
+		auto c = parse_hsb<bas_pack>("2*x[0] < x[1] - 1");
+		auto d = parse_hsb<bas_pack>("2*x[0] - x[1] + 1 < 0");
 		REQUIRE(c.has_value()); REQUIRE(d.has_value());
 		CHECK(std::get<hsb>(c->first) == std::get<hsb>(d->first));
 		auto e = parse_hsb<bas_pack>("x[0] + x[1] < x[1] + 3");
@@ -1251,15 +1251,13 @@ TEST_SUITE("hsb — parser") {
 		auto b = parse_hsb<bas_pack>("-x[0] + 1 <= 0");
 		REQUIRE(b.has_value());
 		CHECK(h == std::get<hsb>(b->first));
-		// `1 < x[0]` (open, not an element) reads as the same closed set
-		auto c = parse_hsb<bas_pack>("1 < x[0]");
-		REQUIRE(c.has_value());
-		CHECK(h == std::get<hsb>(c->first));
-		// and `x[0] <= 1` (closed, not an element) as the open x[0] < 1
-		auto d = parse_hsb<bas_pack>("x[0] <= 1");
+		// `1 < x[0]` (the open set x[0] > 1) and `x[0] <= 1` (the closed
+		// set x[0] <= 1) are not elements of the algebra: rejected.
+		CHECK_FALSE(parse_hsb<bas_pack>("1 < x[0]").has_value());
+		CHECK_FALSE(parse_hsb<bas_pack>("x[0] <= 1").has_value());
+		CHECK_FALSE(parse_hsb<bas_pack>("x[0] <= x[1]").has_value());
 		auto e = parse_hsb<bas_pack>("x[0] < 1");
-		REQUIRE(d.has_value()); REQUIRE(e.has_value());
-		CHECK(std::get<hsb>(d->first) == std::get<hsb>(e->first));
+		REQUIRE(e.has_value());
 		CHECK(std::get<hsb>(e->first).to_string().find(" < 0") != std::string::npos);
 	}
 
@@ -1306,21 +1304,25 @@ TEST_SUITE("hsb — parser") {
 		CHECK(is_hsb_zero(h) == false);
 	}
 
-	TEST_CASE("parse non-strict: x[0] <= 0") {
-		// NOTE: Strictness is canonical — determined by lex_leading_sign(w),
-		// NOT by the comparison operator in the source text.  Here w = [1.0]
-		// gives s(w) = +1, so the parsed halfspace is strict (x[0] < 0)
-		// regardless of the '<=' operator that was written.
-		auto r = parse_hsb<bas_pack>("x[0] <= 0");
+	TEST_CASE("reject non-canonical strictness: x[0] <= 0") {
+		// Strictness is canonical — determined by lex_leading_sign(w), not
+		// by the operator. w = [1.0] gives s(w) = +1, so only the open set
+		// x[0] < 0 exists; the closed spelling is rejected rather than
+		// silently read as the open set (it was, until 2026-09-17).
+		CHECK_FALSE(parse_hsb<bas_pack>("x[0] <= 0").has_value());
+		auto r = parse_hsb<bas_pack>("x[0] < 0");
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
 		CHECK(h.root_halfspace().is_strict() == true); // canonical: determined by s(w)=+1
 	}
 
-	TEST_CASE("parse with negative coefficient: -1*x[0] < 0") {
+	TEST_CASE("parse with negative coefficient: -1*x[0] <= 0") {
 		// -1*x[0] gives w=[-1], s(w)=-1 → non-strict: -x[0] <= 0, i.e. x[0] >= 0.
-		auto r = parse_hsb<bas_pack>("-1*x[0] < 0");
+		// The strict spelling names the open set x[0] > 0, which is not an
+		// element: rejected.
+		CHECK_FALSE(parse_hsb<bas_pack>("-1*x[0] < 0").has_value());
+		auto r = parse_hsb<bas_pack>("-1*x[0] <= 0");
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
@@ -1382,7 +1384,7 @@ TEST_SUITE("hsb — parser") {
 	TEST_CASE("parsed conjunction feasibility") {
 		// Parse two constraints whose conjunction is feasible
 		auto r = parse_hsb<bas_pack>(
-			"(x[0] + 5 < 0 & x[0] + -10 <= 0)");
+			"(x[0] + 5 < 0 & x[0] + -10 < 0)");
 		REQUIRE(r.has_value());
 		CHECK(is_hsb_zero(std::get<hsb>(r->first)) == false);
 	}
@@ -2121,10 +2123,10 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 		REQUIRE(fm != nullptr);
 	}
 
-	TEST_CASE("pipeline: conjunction { (x[0] < 0 & x[1] <= 0) }:hsb parses") {
+	TEST_CASE("pipeline: conjunction { (x[0] < 0 & -x[1] <= 0) }:hsb parses") {
 		gc_fixture gc;
 		tref fm = spec(
-			"o1[t]:hsb = { (x[0] < 0 & x[1] <= 0) }:hsb.");
+			"o1[t]:hsb = { (x[0] < 0 & -x[1] <= 0) }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
@@ -2158,15 +2160,21 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 		}
 	}
 
-	TEST_CASE("pipeline: non-strict inequality { x[0] <= 0 }:hsb parses") {
+	TEST_CASE("pipeline: non-strict inequality { -x[0] <= 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0] <= 0 }:hsb.");
+		tref fm = spec("o1[t]:hsb = { -x[0] <= 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
-	TEST_CASE("pipeline: negative coefficient { -1*x[0] < 0 }:hsb parses") {
+	TEST_CASE("pipeline: non-canonical { x[0] <= 0 }:hsb is rejected") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { -1*x[0] < 0 }:hsb.");
+		tref fm = spec("o1[t]:hsb = { x[0] <= 0 }:hsb.");
+		CHECK(fm == nullptr);
+	}
+
+	TEST_CASE("pipeline: negative coefficient { -1*x[0] <= 0 }:hsb parses") {
+		gc_fixture gc;
+		tref fm = spec("o1[t]:hsb = { -1*x[0] <= 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
@@ -5574,10 +5582,9 @@ TEST_SUITE("hsb — eval_parse_tree") {
 		CHECK(*r == make_hs({1.0}, 0.0));
 	}
 
-	TEST_CASE("eval: x[0] <= 0 same canonical result as x[0] < 0") {
+	TEST_CASE("eval: x[0] <= 0 is rejected (no closed set for a positive leading coefficient)") {
 		auto r = eval_from_str("x[0] <= 0");
-		REQUIRE(r.has_value());
-		CHECK(*r == make_hs({1.0}, 0.0));
+		CHECK_FALSE(r.has_value());
 	}
 
 	TEST_CASE("eval: 2*x[0] < 0 (coeff*var form)") {
@@ -5592,14 +5599,14 @@ TEST_SUITE("hsb — eval_parse_tree") {
 		CHECK(*r == make_hs({3.0}, 0.0));
 	}
 
-	TEST_CASE("eval: -x[0] < 0 (unary minus on var)") {
-		auto r = eval_from_str("-x[0] < 0");
+	TEST_CASE("eval: -x[0] <= 0 (unary minus on var)") {
+		auto r = eval_from_str("-x[0] <= 0");
 		REQUIRE(r.has_value());
 		CHECK(*r == make_hs({-1.0}, 0.0));
 	}
 
-	TEST_CASE("eval: -2*x[0] < 0 (neg coeff*var form)") {
-		auto r = eval_from_str("-2*x[0] < 0");
+	TEST_CASE("eval: -2*x[0] <= 0 (neg coeff*var form)") {
+		auto r = eval_from_str("-2*x[0] <= 0");
 		REQUIRE(r.has_value());
 		CHECK(*r == make_hs({-2.0}, 0.0));
 	}

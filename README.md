@@ -2121,11 +2121,11 @@ closed one `⟨w,x⟩ + b <= 0`; the complement of an element flips both the
 sign and the strictness, which is what keeps the family closed under the
 Boolean operations. So `x[0] < 1` (open, x[0] < 1) and `1 <= x[0]` (closed,
 x[0] >= 1) are elements, while the closed set x[0] <= 1 and the open set
-x[0] > 1 are not. When the operator you write disagrees with the canonical
-strictness (`x[0] <= 1`, `1 < x[0]`) the literal parses as the element the
-algebra does have (`x[0] - 1 < 0`, `-x[0] + 1 <= 0`) and a warning names
-the set that was read; the printed form of an element always shows its
-canonical operator.
+x[0] > 1 are not. A literal whose operator names one of the two missing
+sets (`x[0] <= 1`, `1 < x[0]`) is rejected with an error that shows the
+element the algebra does have (`x[0] - 1 < 0`, `-x[0] + 1 <= 0`); put the
+leading variable on the other side of the comparison to name the other
+bound. The printed form of an element always shows its canonical operator.
 Inside `{...}:hsb`, `&`, `|` and `~` combine constraints; every `&`/`|`
 combination must be parenthesised.  The same combinations are also available
 through the Boolean algebra operations at the formula level.

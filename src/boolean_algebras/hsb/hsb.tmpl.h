@@ -514,20 +514,22 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 		// Strictness is canonical in this algebra (hsb.h): a half-space
 		// whose leading coefficient is positive is open, one whose leading
 		// coefficient is negative is closed, and the other two sets are not
-		// elements of the algebra at all. The operator in the source text
-		// is therefore honoured only when it agrees with that rule; when it
-		// does not, say so rather than silently reading the other set.
+		// elements of the algebra at all. A literal whose operator names
+		// one of those two sets is REJECTED: reading the element that does
+		// exist would silently change the set the user wrote.
 		const bool wrote_strict = (hs_child | tt::nonterminal) == type::hs_lt;
 		if (wrote_strict != opt_h->is_strict()) {
-			LOG_WARNING << "[hsb] a half-space written "
+			LOG_ERROR << "[hsb] the half-space written "
 				<< (wrote_strict ? "strict (`<`)" : "closed (`<=`)")
-				<< " but the lex-half-open algebra has only the "
+				<< " is not an element of the lex-half-open algebra: with "
+				<< (opt_h->is_strict() ? "a positive" : "a negative")
+				<< " leading coefficient only the "
 				<< (opt_h->is_strict() ? "open" : "closed")
-				<< " set for this normal vector (the leading coefficient "
-				<< (opt_h->is_strict() ? "is positive" : "is negative")
-				<< "); reading it as `" << opt_h->to_string() << "`. Flip the "
-				"comparison to name the other bound, e.g. `1 <= x[0]` "
-				"is the closed set x[0] >= 1.";
+				<< " set exists, `" << opt_h->to_string() << "`. Write that "
+				"set, or put the leading variable on the other side of "
+				"the comparison to name the other bound (e.g. `x[0] < 1` "
+				"is open, `1 <= x[0]` is closed).";
+			return std::nullopt;
 		}
 		return hsb::mk_hs(*opt_h);
 	}
