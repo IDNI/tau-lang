@@ -21,6 +21,15 @@ TEST_SUITE("bv operator hooks:intermediate cases") {
 		CHECK(tau::get("{200}:bv[8] + {100}:bv[8]", parse_opts_bf) == tau::get("{44}:bv[8]", parse_opts_bf)); // 300 mod 256 = 44
 	}
 
+	// Bitwise operators on two constants intern as the value, not as a
+	// symbolic term of the algebra (GitHub #120).
+	TEST_CASE("bitwise constant folds intern as values") {
+		CHECK(tau::get("{1}:bv[8] ^ {3}:bv[8]", parse_opts_bf) == tau::get("{2}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{1}:bv[8] | {2}:bv[8]", parse_opts_bf) == tau::get("{3}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{7}:bv[8] & {5}:bv[8]", parse_opts_bf) == tau::get("{5}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{215}:bv[8] ^ {24}:bv[8] ^ {53}:bv[8] ^ {55}:bv[8]", parse_opts_bf) == tau::get("{205}:bv[8]", parse_opts_bf));
+	}
+
 	// Subtraction
 	TEST_CASE("subtraction intermediate values") {
 		CHECK(tau::get("{50}:bv[8] - {20}:bv[8]", parse_opts_bf) == tau::get("{30}:bv[8]", parse_opts_bf));

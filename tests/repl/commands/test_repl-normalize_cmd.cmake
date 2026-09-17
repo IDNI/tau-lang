@@ -165,3 +165,9 @@ add_repl_test_fail(normalize_cmd-cast_result_meets_sbf_rejected
 	"n ((bv[8]) x:bv[4]) & y:sbf = 0" "Incompatible type information")
 add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 	"n (bv[8]) x:bv[4] = y" "y")
+
+# GitHub #120: a chain of bitvector definitions read by two guards folds to
+# constants in either conjunct order (the equality propagation orders the
+# assignments by dependency).
+add_repl_test(normalize_cmd_definition_chain_forward  "n (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
+add_repl_test(normalize_cmd_definition_chain_reversed "n (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")

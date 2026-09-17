@@ -549,7 +549,9 @@ tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return build_bf_ba_constant<node>(l | r, type, right);
+	// Normalized for the same reason as in cte_neg below: a BA may build
+	// the result as a symbolic term that interns apart from its value.
+	return build_bf_ba_constant<node>(node::ba::normalize(l | r), type, right);
 }
 
 template <NodeType node>
@@ -562,7 +564,9 @@ tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return build_bf_ba_constant<node>(l & r, type, right);
+	// Normalized for the same reason as in cte_neg below: a BA may build
+	// the result as a symbolic term that interns apart from its value.
+	return build_bf_ba_constant<node>(node::ba::normalize(l & r), type, right);
 }
 
 template <NodeType node>
@@ -575,7 +579,9 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return build_bf_ba_constant<node>(l ^ r, type, right);
+	// Normalized for the same reason as in cte_neg below: a BA may build
+	// the result as a symbolic term that interns apart from its value.
+	return build_bf_ba_constant<node>(node::ba::normalize(l ^ r), type, right);
 }
 
 template <NodeType node>

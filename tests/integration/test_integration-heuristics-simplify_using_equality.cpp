@@ -125,6 +125,50 @@ TEST_SUITE("simplify_using_equality_sort_atms") {
 		CHECK(!tau::get(conjs[0]).child_is(tau::bf_eq));
 		CHECK(!tau::get(conjs[1]).child_is(tau::bf_eq));
 	}
+
+	// GitHub #120: an assignment is rewritten before it is registered, so
+	// `x = t` must precede every assignment reading x. The chain written
+	// in reverse comes out in dependency order.
+	TEST_CASE("assignments are ordered by dependency") {
+		tref fm = get_nso_rr("x = y' && y = z&w && z = 0.").value().main->get();
+		trefs orig = get_cnf_wff_clauses<node_t>(fm);
+		REQUIRE(orig.size() == 3);
+		trefs conjs = orig;
+		simplify_using_equality_sort_atms<node_t>(conjs);
+		REQUIRE(conjs.size() == 3);
+		CHECK(tau::get(conjs[0]) == tau::get(orig[2]));
+		CHECK(tau::get(conjs[1]) == tau::get(orig[1]));
+		CHECK(tau::get(conjs[2]) == tau::get(orig[0]));
+	}
+
+	TEST_CASE("independent assignments keep their input order") {
+		tref fm = get_nso_rr("x = 0 && y = 1 && z = w.").value().main->get();
+		trefs orig = get_cnf_wff_clauses<node_t>(fm);
+		trefs conjs = orig;
+		simplify_using_equality_sort_atms<node_t>(conjs);
+		REQUIRE(conjs.size() == 3);
+		for (size_t i = 0; i < 3; ++i)
+			CHECK(tau::get(conjs[i]) == tau::get(orig[i]));
+	}
+
+	TEST_CASE("a dependency cycle keeps its input order") {
+		tref fm = get_nso_rr("x = y' && y = x'.").value().main->get();
+		trefs orig = get_cnf_wff_clauses<node_t>(fm);
+		trefs conjs = orig;
+		simplify_using_equality_sort_atms<node_t>(conjs);
+		REQUIRE(conjs.size() == 2);
+		CHECK(tau::get(conjs[0]) == tau::get(orig[0]));
+		CHECK(tau::get(conjs[1]) == tau::get(orig[1]));
+	}
+
+	TEST_CASE("a reader placed before its definition folds either way") {
+		// Both orders of the same chain give the same simplified formula.
+		tref a = get_nso_rr("z = 0 && y = z&w && x = y'.").value().main->get();
+		tref b = get_nso_rr("x = y' && y = z&w && z = 0.").value().main->get();
+		tref ra = simplify_using_equality<node_t>(a);
+		tref rb = simplify_using_equality<node_t>(b);
+		CHECK(tau::get(ra) == tau::get(rb));
+	}
 }
 
 // ── simplify_using_equality_direct_atm ───────────────────────────────────────

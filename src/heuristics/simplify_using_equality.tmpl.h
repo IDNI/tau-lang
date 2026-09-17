@@ -120,7 +120,67 @@ void simplify_using_equality_sort_atms(auto& conjs) {
 			return false;
 		} else return false;
 	};
-	std::ranges::sort(conjs, eq_comp);
+	std::ranges::stable_sort(conjs, eq_comp);
+	// The assignments now lead. Each is rewritten with the union-find as it
+	// stands and registered afterwards, and nothing is visited twice, so
+	// `x = t` has to come before every assignment whose other side reads
+	// `x`; otherwise the reader keeps `x` symbolic and the chain never folds
+	// (GitHub #120). A topological order on that dependency, stable on ties;
+	// a cycle keeps its input order.
+	size_t n_assign = 0;
+	while (n_assign < conjs.size()
+		&& is_equational_assignment<node>(conjs[n_assign])) ++n_assign;
+	if (n_assign < 2) return;
+	// `x = t` defines x and reads the variables of t. `x = y` links two
+	// variables: it defines and reads both, so it follows whatever defines
+	// either of them and precedes whatever reads either.
+	std::vector<subtree_set<node>> defines(n_assign), reads(n_assign);
+	for (size_t i = 0; i < n_assign; ++i) {
+		const tau& eq = tau::get(conjs[i])[0];
+		const bool both_vars = eq[0].child_is(tau::variable)
+			&& eq[1].child_is(tau::variable);
+		for (size_t side = 0; side < 2; ++side) {
+			tref operand = eq[side].get();
+			if (tau::get(operand).child_is(tau::variable)) {
+				defines[i].insert(tau::get(operand).first());
+				if (both_vars) reads[i].insert(tau::get(operand).first());
+				continue;
+			}
+			for (tref v : tau::get(operand).select_all(is<node, tau::variable>))
+				reads[i].insert(v);
+		}
+	}
+	// j depends on i when j reads a variable i defines.
+	std::vector<size_t> indegree(n_assign, 0);
+	std::vector<std::vector<size_t>> dependents(n_assign);
+	for (size_t i = 0; i < n_assign; ++i)
+		for (size_t j = 0; j < n_assign; ++j) {
+			if (i == j) continue;
+			bool dep = false;
+			for (tref v : defines[i])
+				if (reads[j].contains(v)) { dep = true; break; }
+			if (dep) { dependents[i].push_back(j); ++indegree[j]; }
+		}
+	std::vector<tref> ordered;
+	ordered.reserve(n_assign);
+	std::vector<bool> placed(n_assign, false);
+	// Kahn's algorithm, always taking the lowest ready index so that
+	// independent assignments keep their input order.
+	while (ordered.size() < n_assign) {
+		size_t pick = n_assign;
+		for (size_t i = 0; i < n_assign; ++i)
+			if (!placed[i] && indegree[i] == 0) { pick = i; break; }
+		if (pick == n_assign) {
+			// A cycle among the remaining assignments: keep their order.
+			for (size_t i = 0; i < n_assign; ++i)
+				if (!placed[i]) ordered.push_back(conjs[i]);
+			break;
+		}
+		placed[pick] = true;
+		ordered.push_back(conjs[pick]);
+		for (size_t j : dependents[pick]) --indegree[j];
+	}
+	for (size_t i = 0; i < n_assign; ++i) conjs[i] = ordered[i];
 }
 
 /**

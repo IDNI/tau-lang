@@ -45,11 +45,13 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	}
 
 	TEST_CASE("and of constants") {
+		// Folded to its value at construction (cte_and normalizes, GitHub
+		// #120), so the pass is an identity on an already single constant.
 		const char* sample = "{5}:bv[8] & {3}:bv[8]";
 		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
+		CHECK( simplified == tau::get("{1}:bv[8]", parse_opts_bf) );
 	}
 
 	TEST_CASE("nand of constants") {
@@ -66,11 +68,13 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	}
 
 	TEST_CASE("or of constants") {
+		// Folded to its value at construction (cte_or normalizes, GitHub
+		// #120), so the pass is an identity on an already single constant.
 		const char* sample = "{5}:bv[8] | {3}:bv[8]";
 		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
+		CHECK( simplified == tau::get("{7}:bv[8]", parse_opts_bf) );
 	}
 
 	TEST_CASE("nor of constants") {
@@ -84,11 +88,13 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	}
 
 	TEST_CASE("xor of constants") {
+		// Folded to its value at construction (cte_xor normalizes, GitHub
+		// #120), so the pass is an identity on an already single constant.
 		const char* sample = "{5}:bv[8] ^ {3}:bv[8]";
 		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
+		CHECK( simplified == tau::get("{6}:bv[8]", parse_opts_bf) );
 	}
 
 	TEST_CASE("xnor of constants") {
