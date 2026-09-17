@@ -169,8 +169,7 @@ tref canonical_chain(trefs& ms, Build&& build, tref neutral) {
 	// A single member is returned as it stands, so a right sibling it
 	// carries as somebody's operand has to go; from two members on, the
 	// builder re-links every child anyway (`get_raw`).
-	if (ms.size() == 1) return tau::get(ms.front()).has_right_sibling()
-		? tau::trim_right_sibling(ms.front()) : ms.front();
+	if (ms.size() == 1) return tau::trim_right_sibling(ms.front());
 	tref result = ms.front();
 	for (size_t i = 1; i < ms.size(); ++i) result = build(result, ms[i]);
 	return result;

@@ -504,8 +504,8 @@ size_t mem_size(tref t) {
 			if (!tau::get(m).is(tau::bf)) ++n;
 			return true;
 		};
-		// (the traversal calls the predicate on the root without a parent)
-		auto admit = [](tref m, tref parent = nullptr) {
+		// The traversal asks about the root with a null parent.
+		auto admit = [](tref m, tref parent) {
 			return while_is_boolean_operation<node>(m)
 				|| (parent && tau::get(parent).is(tau::bf));
 		};

@@ -119,7 +119,7 @@ const trefs& atoms(tref n) {
 	// never names a spine node — and stored at once. A spine node gets no
 	// row, the queried root always does, and a wrapper that has a row already
 	// is not entered.
-	auto descend = [](tref m, tref = nullptr) -> bool {
+	auto descend = [](tref m) -> bool {
 		if (tau::get(m).is(tau::wff))
 			return find<node, table::atoms_memo>(m) == nullptr;
 		return reach_structural<node>(m);
