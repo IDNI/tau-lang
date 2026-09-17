@@ -969,11 +969,8 @@ const trefs& get_free_vars(tref n) {
 				return false;
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
 			// Not descending: an offset under a variable (`x[t-1]`) is
-			// not a free occurrence. A variable with no right sibling is
-			// its own trimmed form, and interning would only find it
-			// again under the map's lock.
-			loose.push_back(t.has_right_sibling()
-				? tau::trim_right_sibling(m) : m);
+			// not a free occurrence.
+			loose.push_back(tau::trim_right_sibling(m));
 			return false;
 		case tau::BDD_ID: {
 			// A BDD-backed term holds its variables in the BDD, not in

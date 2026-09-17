@@ -1296,9 +1296,7 @@ template<NodeType node>
 tref tau_term_bdd_handle<node>::key_of(tref tau_node) {
 	using tau = tree<node>;
 	const tau& t = tau::get(tau_node);
-	if (t.is(tau::BDD_ID))
-		return t.has_right_sibling() ? tau::trim_right_sibling(tau_node)
-			: tau_node;
+	if (t.is(tau::BDD_ID)) return tau::trim_right_sibling(tau_node);
 	DBG(assert(t.is(tau::bf) && t.child_is(tau::BDD_ID)));
 	// The wrapper's one child carries no right sibling, so it is the
 	// stored node itself, whatever the wrapper's own sibling.

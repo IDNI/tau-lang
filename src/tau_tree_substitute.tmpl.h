@@ -69,12 +69,8 @@ void tree<node>::prepare(substitution& s, tref formula, tref key, tref value)
 {
 	using tau = tree<node>;
 	using handle = tau_term_bdd_handle<node>;
-	// Trimming interns a node, so it is asked for only when there is a
-	// sibling to drop.
-	tref k = tau::get(key).has_right_sibling()
-		? tau::trim_right_sibling(key) : key;
-	tref w = tau::get(value).has_right_sibling()
-		? tau::trim_right_sibling(value) : value;
+	tref k = tau::trim_right_sibling(key);
+	tref w = tau::trim_right_sibling(value);
 	DBG(assert(k != nullptr && w != nullptr);)
 	// One scan of the replacement answers both questions it is asked: is
 	// a `BDD_ID` in it, and is a binder. The walk stops as soon as both
