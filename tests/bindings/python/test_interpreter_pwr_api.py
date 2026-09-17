@@ -9,9 +9,9 @@ including the error paths, which raise instead of answering False.
 import tau_loader as tau
 
 def make():
-	r = tau.get_interpreter("o1[t] = i1[t].")
-	assert r, f"Failed to create interpreter: {r.report.errors}"
-	return r.value
+	i = tau.get_interpreter("o1[t] = i1[t].")
+	assert i is not None, "Failed to create interpreter"
+	return i
 
 def run_steps(i, n):
 	outputs = []
@@ -19,9 +19,9 @@ def run_steps(i, n):
 		assigned = {}
 		for input_at in tau.get_inputs_for_step(i):
 			assigned[input_at] = "T." if step % 2 == 0 else "F."
-		res = tau.step(i, assigned)
-		assert res, f"Failed to step interpreter: {res.report.errors}"
-		outputs.append(list(res.value.values()))
+		step_outputs = tau.step(i, assigned)
+		assert step_outputs is not None, "Failed to step interpreter"
+		outputs.append(list(step_outputs.values()))
 	return outputs
 
 def test_reset_replays_from_time_zero():
@@ -41,9 +41,8 @@ def test_update_changes_current_spec_and_raises_on_garbage():
 	# (the `u` update stream infers them from the running spec, a bare
 	# formula cannot), hence the typed spec here. Stream types are
 	# process-global, so this uses streams no other test touches.
-	r = tau.get_interpreter("o2[t]:sbf = i2[t]:sbf.")
-	assert r, f"Failed to create interpreter: {r.report.errors}"
-	i = r.value
+	i = tau.get_interpreter("o2[t]:sbf = i2[t]:sbf.")
+	assert i is not None, "Failed to create interpreter"
 	before = i.current_spec()
 	assert "o2" in before, before
 	rev0 = i.spec_revision

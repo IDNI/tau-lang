@@ -112,7 +112,7 @@ so the scope tree is walkable. `report::print(os)` renders it; the REPL's
 ## Python
 
 ```python
-r = tau.step(interp, inputs)
+r = tau.step_result(interp, inputs)
 if not r:
     print(r.report.errors)             # also .warnings .infos .codes .code_names
     if r.report.awaiting_input: ...
@@ -120,9 +120,12 @@ if not r:
 out = r.value                          # or r.unwrap() to raise instead
 ```
 
-Every result-returning api call returns one `tau.result`, with `.value`,
-`.report`, `__bool__` and `unwrap()`. Errors are not raised by default, so
-warnings and timing scopes survive on the success path.
+The execution surface comes in two shapes. `get_interpreter` and `step` return
+the value itself and `None` on failure, which is what a caller stepping a spec
+in a loop wants; their `get_interpreter_result` / `step_result` twins return one
+`tau.result`, with `.value`, `.report`, `__bool__` and `unwrap()`. Errors are
+not raised by the result shape, so warnings and timing scopes survive on the
+success path.
 
 `.value` is whatever the call produced, already converted to Python, and `None`
 when the call produced nothing. It owns its data: an interpreter taken out of a

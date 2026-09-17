@@ -114,6 +114,15 @@ static py_result to_py_result(idni::tau_lang::result<T>&& r) {
 	return out;
 }
 
+// The plain shape of the same call: the value, or None when there is none.
+// The report is not lost with it -- the `_result` twin of each function using
+// this hands the same call's report over.
+template <typename T>
+static nb::object unwrap_or_none(idni::tau_lang::result<T>&& r) {
+	if (!r.has_value()) return nb::none();
+	return nb::cast(std::move(r).value(), nb::rv_policy::move);
+}
+
 NB_MAKE_OPAQUE(input_streams_remap);
 NB_MAKE_OPAQUE(output_streams_remap);
 
@@ -453,18 +462,38 @@ NB_MODULE(tau, m) {
 		});
 
 	// API functions
+	//
+	// The execution surface returns the value itself and None when there
+	// is none: that is what an embedder stepping a spec in a loop wants.
+	// Each has a `_result` twin returning tau.result, for a caller that
+	// needs the report -- an empty step and a failed one look alike here
+	// and are told apart by `report.awaiting_input`.
 	m.def("get_interpreter",
 		[](const std::string& spec) {
-			return to_py_result(tau_api::get_interpreter(spec));
+			return unwrap_or_none(tau_api::get_interpreter(spec));
 		}, "specification"_a,
 		"Create an interpreter from a specification string. "
-		"Returns a result carrying the value and report.");
+		"Returns None when the specification could not be compiled.");
 
 	m.def("get_interpreter",
 		[](const std::string& spec, interpreter_options& opts) {
+			return unwrap_or_none(
+				tau_api::get_interpreter(spec, opts));
+		}, "specification"_a, "options"_a,
+		"Create an interpreter from a specification string with "
+		"options. Returns None when it could not be compiled.");
+
+	m.def("get_interpreter_result",
+		[](const std::string& spec) {
+			return to_py_result(tau_api::get_interpreter(spec));
+		}, "specification"_a,
+		"get_interpreter carrying the diagnostics report.");
+
+	m.def("get_interpreter_result",
+		[](const std::string& spec, interpreter_options& opts) {
 			return to_py_result(tau_api::get_interpreter(spec, opts));
 		}, "specification"_a, "options"_a,
-		"Create an interpreter from a specification string with options.");
+		"get_interpreter with options, carrying the report.");
 
 	m.def("get_inputs_for_step",
 		[](interpreter_t& i) {
@@ -476,15 +505,32 @@ NB_MODULE(tau, m) {
 		[](interpreter_t& i,
 			const std::map<stream_at, std::string>& inputs)
 		{
-			return to_py_result(tau_api::step(i, inputs));
+			return unwrap_or_none(tau_api::step(i, inputs));
 		}, "interpreter"_a, "inputs"_a,
-		"Step the interpreter with given inputs.");
+		"Step the interpreter with given inputs. Returns None when "
+		"the step produced no outputs: it awaits an input, or failed.");
 
 	m.def("step",
 		[](interpreter_t& i) {
+			return unwrap_or_none(tau_api::step(i));
+		}, "interpreter"_a,
+		"Step the interpreter without inputs (uses remapped streams). "
+		"Returns None when the step produced no outputs.");
+
+	m.def("step_result",
+		[](interpreter_t& i,
+			const std::map<stream_at, std::string>& inputs)
+		{
+			return to_py_result(tau_api::step(i, inputs));
+		}, "interpreter"_a, "inputs"_a,
+		"step carrying the diagnostics report: `awaiting_input` "
+		"tells an empty step from a failed one.");
+
+	m.def("step_result",
+		[](interpreter_t& i) {
 			return to_py_result(tau_api::step(i));
 		}, "interpreter"_a,
-		"Step the interpreter without inputs (uses remapped streams).");
+		"step without inputs, carrying the diagnostics report.");
 
 	// step + optional PWR (plan v10 §14 step(inputs, optional<formula> u)).
 	// Returns the step's output map; PWR fires AFTER the step (F6-compliant:
@@ -494,12 +540,12 @@ NB_MODULE(tau, m) {
 		   const std::map<stream_at, std::string>& inputs,
 		   const std::optional<std::string>& u_str)
 		{
-			auto result = to_py_result(tau_api::step(i, inputs));
+			auto outputs = unwrap_or_none(tau_api::step(i, inputs));
 			if (u_str.has_value() && !u_str->empty()) {
 				auto u = tau_api::get_formula(*u_str);
 				if (u.has_value()) i.update(u.value());
 			}
-			return result;
+			return outputs;
 		}, "interpreter"_a, "inputs"_a, "u"_a = std::nullopt,
 		"Step then (if `u` is provided) apply PWR with revision `u`.");
 }
