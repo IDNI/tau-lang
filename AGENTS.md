@@ -312,7 +312,6 @@ Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas a
 
 - `cpp_codegen.h` / `cpp_codegen.tmpl.h`, `codegen_strategy.h` and the per-BA `<id>_codegen.tmpl.h` files — emit a synthesized strategy as a standalone C++17 program.
 - `pointwise_revision.h`, `preferences.h` — pointwise revision of a running specification and its preference order.
-- `ocfuncs.h` / `ocfuncs.tmpl.h` — heterogeneous OMCAT function symbols (V1 skeleton, not usable yet: the REPL `func` command has no handler).
 - `parse_error_hint.h` — actionable hints for parse errors.
 - `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`).
 

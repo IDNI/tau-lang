@@ -102,7 +102,6 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                            | bf_t | bf_f | bf_neg | bf_cast | capture
                            | bf_fall | bf_fex)
                                 :bf_cast_oprnd)              :bf_cast
-                        | (func_sym '(' _ func_args _ ')')   :bf_func_app
                         | (bf  _ ">>" _      (bf & ~bf_shr & ~bf_shl)) :bf_shr
                         | (bf  _ "<<" _      (bf & ~bf_shl & ~bf_shr)) :bf_shl
                         | (bf  _ '+' _       (bf & ~bf_add & ~bf_sub)) :bf_add
@@ -133,13 +132,6 @@ bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
-
-# heterogeneous function symbols (OCFuncs)
-func_sym               => chars.
-func_args              => bf (_ ',' _ bf)*.
-func_mode              => "dynamic" :func_dynamic | "static" :func_static.
-func_sort_list         => type (_ ',' _ type)*.
-func_decl              => func_mode __ func_sym _ ':' _ func_sort_list _ "->" _ type.
 
 # constant time constraints
 constraint =>
@@ -225,7 +217,6 @@ cli_command            =>
         | ("stop":stop_sym)                                   :stop_cmd
         | ("memory":memory_sym)                               :memory_cmd
         | ("ltl" :ltl_sym __ spec_arg)                         :ltl_cmd
-        | ("func":func_sym_cmd __ func_decl)                   :func_cmd
         | (("n" | "normalize")
                   :normalize_sym __ spec_arg)                 :normalize_cmd
 # TODO (MEDIUM) maybe we could remove in the subst and inst commands the

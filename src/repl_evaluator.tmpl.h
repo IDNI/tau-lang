@@ -2161,13 +2161,6 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::whatis_cmd:         result = whatis_cmd(command); break;
 	case tau::reset_cmd:          reset_cmd(); break;
 	case tau::comment:            break;
-	// The grammar accepts `func` declarations (OCFuncs), but the
-	// compilation pipeline behind them is a stub (ocfuncs.tmpl.h): say so
-	// instead of reporting an unknown command or silently ignoring it.
-	case tau::func_cmd:           error = true; out << std::endl;
-		TAU_LOG_ERROR << "func declarations (OCFuncs) are not "
-			"implemented yet; the declaration was ignored";
-		break;
 	// error handling
 	default: error = true; out << std::endl;
 		TAU_LOG_ERROR << "Unknown command";

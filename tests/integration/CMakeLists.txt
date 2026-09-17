@@ -32,7 +32,6 @@ set(TESTS
 	heuristics-ex_subs_based_elimination
 	heuristics-trivial_skolem
 	ctl_star
-	ocfuncs
 	bv_stress_check
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise
@@ -49,7 +48,7 @@ foreach(X IN LISTS TESTS)
 	target_include_directories("test_integration-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
-foreach(X IN ITEMS ctl_star ocfuncs satisfiability6 ba_component_factoring
+foreach(X IN ITEMS ctl_star satisfiability6 ba_component_factoring
 		simp_tau_unsat_valid_unitwise)
 	if(NOT TARGET "test_integration-${X}")
 		continue()

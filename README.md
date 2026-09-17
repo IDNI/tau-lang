@@ -20,19 +20,18 @@
     1. [Tau specifications](#tau-specifications)
     2. [Full LTL operators](#full-ltl-operators)
     3. [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)
-    4. [Heterogeneous OMCAT function symbols](#heterogeneous-omcat-function-symbols)
-    5. [Satisfiability and execution](#satisfiability-and-execution)
-    6. [Boolean functions](#boolean-functions)
-    7. [Bitvectors](#bitvectors)
-    8. [Functions and predicates](#functions-and-predicates)
-    9. [Constants](#constants)
-    10. [Streams](#streams)
-    11. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
-    12. [Type system](#type-system)
-    13. [Abstract data types](#abstract-data-types)
-    14. [Constant time constraints](#constant-time-constraints)
-    15. [Pointwise revision](#pointwise-revision)
-    16. [Reserved symbols](#reserved-symbols)
+    4. [Satisfiability and execution](#satisfiability-and-execution)
+    5. [Boolean functions](#boolean-functions)
+    6. [Bitvectors](#bitvectors)
+    7. [Functions and predicates](#functions-and-predicates)
+    8. [Constants](#constants)
+    9. [Streams](#streams)
+    10. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+    11. [Type system](#type-system)
+    12. [Abstract data types](#abstract-data-types)
+    13. [Constant time constraints](#constant-time-constraints)
+    14. [Pointwise revision](#pointwise-revision)
+    15. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -947,45 +946,6 @@ Bloem/Schewe/Khalimov witness-output encoding.  Each existential path choice
 is encoded as an additional witness output variable, allowing the existing
 `ltlsynt`-based pipeline to handle the branching-time property, within the
 placement restrictions listed above.
-
-## **Heterogeneous OMCAT function symbols**
-
-> **Status: experimental, not usable yet.** The `func` declaration parses, but
-> the REPL has no handler for it (the command is reported as unknown) and the
-> OCFuncs compilation pipeline (`src/ocfuncs.h`) is a V1 skeleton: profile
-> enumeration, quantifier elimination and LTL skeleton generation are stubs, so
-> `ocfuncs_compile` logs an error and returns no formula.
-
-Heterogeneous function symbols allow defining typed functions whose arguments
-and results may come from different OMCAT sorts.  The grammar for a declaration
-is `func <mode> <name> : <sort>, ... -> <sort>`:
-
-```
-func dynamic f : Bool -> Bool
-func static g : Bool, Bool -> Bool
-```
-
-### Function modes
-
-| Mode | Meaning |
-|------|---------|
-| `dynamic` | The function may vary per time step (window-level) |
-| `static` | The function is fixed for the entire execution (global graph) |
-
-### Function application
-
-Once the pipeline is complete, declared functions will be applicable in
-formulas:
-
-```
-func dynamic inc : Bool -> Bool
-G(o1[t] = inc(i1[t])).
-```
-
-The intended pipeline (purification, support bounding, profile encoding and
-LTL skeleton generation) is described in `src/ocfuncs.h`; only purification
-and support bounding are implemented today.
-
 
 ## **Satisfiability and execution**
 
