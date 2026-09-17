@@ -2101,6 +2101,12 @@ data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).
 | `((x[0] < 0 & x[1] < 0) \| ~(x[2] < 0))` | Disjunction and negation |
 
 Coefficients can appear before (`0.5*x[0]`) or after (`x[0]*0.5`) the variable.
+A half-space is always written with the constant `0` on the right-hand side
+(`linexpr < 0` or `linexpr <= 0`): the bound goes into the linear expression
+as a bias, so `x[0] + 1/2 < 0` and `x[0] - 1 <= 0` parse while `x[0] < 1` or
+`x[0] <= -1/2` do not. Coefficients and biases are unsigned numbers written
+as integers, decimals (`0.5`) or fractions (`1/2`); a leading `-` negates a
+term, and a fraction with a zero denominator is rejected.
 Inside `{...}:hsb`, `&`, `|` and `~` combine constraints; every `&`/`|`
 combination must be parenthesised.  The same combinations are also available
 through the Boolean algebra operations at the formula level.
