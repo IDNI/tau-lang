@@ -346,8 +346,19 @@ TEST_SUITE("hsb grammar parsing") {
 		CHECK_FALSE(result.found);
 	}
 
-	TEST_CASE("hsb: reject 'x[0] < 1' (rhs is not 0)") {
-		std::string s = "x[0] < 1";
+	// Both sides of a half-space are linear expressions since 2026-09-17;
+	// the tree walk normalises `lhs op rhs` to `(lhs - rhs) op 0`.
+	TEST_CASE("hsb: accept 'x[0] < 1' and 'x[0] <= x[1]' (linear rhs)") {
+		for (const char* src : {"x[0] < 1", "x[0] <= x[1]",
+		                        "2*x[0] <= x[1] - 1", "x[0] + 1/2 < x[1]"}) {
+			std::string s = src;
+			auto result = hsb_parser_instance::instance().parse(s.c_str(), s.size());
+			CHECK(result.found);
+		}
+	}
+
+	TEST_CASE("hsb: reject a chained comparison 'x[0] < 1 < 2'") {
+		std::string s = "x[0] < 1 < 2";
 		auto result = hsb_parser_instance::instance().parse(s.c_str(), s.size());
 		CHECK_FALSE(result.found);
 	}

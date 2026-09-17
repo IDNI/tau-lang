@@ -40,10 +40,13 @@ hsb      => "top"                            :hsb_top
           | halfspace                        :hsb_hs.
 
 # ---- Halfspace constraint ----
-# Each alternative wrapped in () so hs_leq/hs_lt contain linexpr as their child.
+# Each alternative wrapped in () so hs_leq/hs_lt contain the two linexpr
+# operands as their children. Both sides are linear expressions: the tree
+# walk (hsb.tmpl.h) normalises `lhs op rhs` into `(lhs - rhs) op 0`, so
+# `x[0] < 1`, `x[0] <= x[1]` and `x[0] + 1/2 < 0` are all the same shape.
 
-halfspace => ( linexpr _ "<=" _ '0' )        :hs_leq
-           | ( linexpr _ '<'  _ '0' )        :hs_lt.
+halfspace => ( linexpr _ "<=" _ linexpr )    :hs_leq
+           | ( linexpr _ '<'  _ linexpr )    :hs_lt.
 
 # ---- Linear expression (left-recursive) ----
 

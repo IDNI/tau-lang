@@ -492,9 +492,24 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 		return (hsb(*l) | hsb(*r)).root_ref();
 	}
 	case type::hsb_hs: {
-		auto hs_child     = (n | tt::only_child) | tt::only_child;
-		auto linexpr_node = (hs_child | tt::children)()[0];
-		auto opt_h = build_halfspace(eval_linexpr(linexpr_node));
+		// `lhs op rhs` with both sides linear expressions; the half-space
+		// is `(lhs - rhs) op 0`, so `x[0] < 1` is `x[0] - 1 < 0` and
+		// `x[0] <= x[1]` is `x[0] - x[1] <= 0`. A right-hand side of a
+		// plain `0` (the only form the grammar used to accept) subtracts
+		// nothing.
+		auto hs_child = (n | tt::only_child) | tt::only_child;
+		auto ch       = (hs_child | tt::children)();
+		if (ch.size() < 2) return std::nullopt;
+		linexpr_result lhs = eval_linexpr(ch[0]);
+		linexpr_result rhs = eval_linexpr(ch[1]);
+		for (auto& [i, c] : rhs.coeffs) lhs.coeffs[i] -= c;
+		lhs.bias -= rhs.bias;
+		// A coefficient that cancelled exactly leaves no dimension behind.
+		for (auto it = lhs.coeffs.begin(); it != lhs.coeffs.end(); )
+			if (std::fpclassify(it->second) == FP_ZERO)
+				it = lhs.coeffs.erase(it);
+			else ++it;
+		auto opt_h = build_halfspace(lhs);
 		if (!opt_h) return std::nullopt;
 		return hsb::mk_hs(*opt_h);
 	}

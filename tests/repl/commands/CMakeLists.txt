@@ -19,6 +19,7 @@ include(test_repl-ctl_star_cmd.cmake)
 include(test_repl-ltl_env.cmake)
 include(test_repl-realizable_bv1.cmake)
 include(test_repl-misc_cmd.cmake)
+include(test_repl-hsb_literals.cmake)
 include(test_repl-codegen_cli.cmake)
 include(test_repl-ba_constants_cmd.cmake)
 # enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd

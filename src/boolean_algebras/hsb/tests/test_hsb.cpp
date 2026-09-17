@@ -1207,6 +1207,46 @@ TEST_SUITE("hsb — parser") {
 	// half-space; parse_unum yields NaN and build_halfspace refuses it.
 	// (hsb literals are half-spaces in the `linexpr < 0` form, so the bias
 	// carries the fraction.)
+	// Both sides of a half-space are linear expressions; the tree walk
+	// normalises `lhs op rhs` into `(lhs - rhs) op 0`, so the two spellings
+	// denote the same element.
+	TEST_CASE("a constant right-hand side is moved into the bias") {
+		auto a = parse_hsb<bas_pack>("x[0] < 1");
+		auto b = parse_hsb<bas_pack>("x[0] - 1 < 0");
+		REQUIRE(a.has_value()); REQUIRE(b.has_value());
+		CHECK(std::get<hsb>(a->first) == std::get<hsb>(b->first));
+		auto c = parse_hsb<bas_pack>("x[0] <= 1/2");
+		auto d = parse_hsb<bas_pack>("x[0] - 0.5 <= 0");
+		REQUIRE(c.has_value()); REQUIRE(d.has_value());
+		CHECK(std::get<hsb>(c->first) == std::get<hsb>(d->first));
+		// and the old form is unchanged
+		auto e = parse_hsb<bas_pack>("x[0] <= 0");
+		REQUIRE(e.has_value());
+		CHECK_FALSE(std::get<hsb>(e->first) == std::get<hsb>(c->first));
+	}
+
+	TEST_CASE("a variable right-hand side is subtracted coefficient-wise") {
+		auto a = parse_hsb<bas_pack>("x[0] < x[1]");
+		auto b = parse_hsb<bas_pack>("x[0] - x[1] < 0");
+		REQUIRE(a.has_value()); REQUIRE(b.has_value());
+		CHECK(std::get<hsb>(a->first) == std::get<hsb>(b->first));
+		auto c = parse_hsb<bas_pack>("2*x[0] <= x[1] - 1");
+		auto d = parse_hsb<bas_pack>("2*x[0] - x[1] + 1 <= 0");
+		REQUIRE(c.has_value()); REQUIRE(d.has_value());
+		CHECK(std::get<hsb>(c->first) == std::get<hsb>(d->first));
+		auto e = parse_hsb<bas_pack>("x[0] + x[1] < x[1] + 3");
+		auto f = parse_hsb<bas_pack>("x[0] - 3 < 0");
+		REQUIRE(e.has_value()); REQUIRE(f.has_value());
+		CHECK(std::get<hsb>(e->first) == std::get<hsb>(f->first));
+	}
+
+	TEST_CASE("a half-space whose variables all cancel does not parse") {
+		// `x[0] < x[0]` is `0 < 0`: no dimension is left, so build_halfspace
+		// refuses it the way it refuses a bare constant comparison.
+		CHECK_FALSE(parse_hsb<bas_pack>("x[0] < x[0]").has_value());
+		CHECK_FALSE(parse_hsb<bas_pack>("1 < 2").has_value());
+	}
+
 	TEST_CASE("a literal with a zero denominator does not parse") {
 		auto r = parse_hsb<bas_pack>("x[0] + 1/0 < 0");
 		CHECK_FALSE(r.has_value());
