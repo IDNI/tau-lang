@@ -14,8 +14,10 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_CASE_SPLIT_H__
 
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <optional>
+#include <unordered_set>
 
 #include "nso_rr.h"
 

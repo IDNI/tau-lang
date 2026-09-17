@@ -130,6 +130,54 @@ TEST_SUITE("bv case split") {
 			== norm("a = 0", true));
 	}
 
+	// A binder of another variable of the same kind between the tested
+	// variable and its occurrences: the split continues through it and
+	// instantiates only the conjuncts that mention the tested variable,
+	// instead of taking one copy of the whole scope per cell (GitHub #122).
+	TEST_CASE("descends through a same-kind binder of another variable") {
+		CHECK(agree("ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && y:bv[4] = x:bv[4] && (y:bv[4] = { 1 }:bv[4] || b = 0))"));
+		CHECK(agree("all x all y ((x:bv[4] = { 1 }:bv[4] && a = 0) || y:bv[4] != x:bv[4] || b = 0)"));
+		// Two blocks, each testing its own command against constants, the
+		// second reading the first's output.
+		CHECK(agree("all i all j ex x ex y ("
+			"(i:bv[1] = { 0 }:bv[1] -> x:bv[4] = { 2 }:bv[4]) && (i:bv[1] != { 0 }:bv[1] -> x:bv[4] = { 3 }:bv[4])"
+			" && (j:bv[1] = { 0 }:bv[1] -> y:bv[4] = x:bv[4]) && (j:bv[1] != { 0 }:bv[1] -> y:bv[4] = { 4 }:bv[4])"
+			" && (y:bv[4] = { 3 }:bv[4] -> a = 0))"));
+		CHECK(norm("ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && y:bv[4] = x:bv[4] && (y:bv[4] != { 1 }:bv[4] || b = 0))", true)
+			== norm("a = 0 || b = 0", true));
+	}
+
+	TEST_CASE("does not descend through a binder of the other kind") {
+		CHECK(agree("ex x all y ((x:bv[4] = { 1 }:bv[4] || a = 0) && (y:bv[4] = x:bv[4] || b = 0))"));
+		CHECK(agree("all x ex y ((x:bv[4] = { 1 }:bv[4] && a = 0) || (y:bv[4] = x:bv[4] && b = 0))"));
+	}
+
+	// The descent instantiates only the dependent conjuncts: the instance
+	// of a scope with a foreign same-kind binder carries that binder once,
+	// not once per cell.
+	TEST_CASE("the instance carries a foreign binder once") {
+		split_config on(true);
+		// y is compared with z, so its binder is not split and sits between
+		// x and the conjuncts reading x; x is tested against two constants,
+		// three cells.
+		const char* s = "ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && (x:bv[4] = { 3 }:bv[4] || y:bv[4] = z:bv[4]) && (y:bv[4] = { 2 }:bv[4] || c = 0))";
+		tref fm = parse_wff(s);
+		REQUIRE( fm != nullptr );
+		tref split = bv_case_split_quantifiers<node_t>(fm);
+		REQUIRE( split != nullptr );
+		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		CHECK( tau::get(split).select_all(is<node_t, tau::wff_ex>).size() == 1 );
+		CHECK( agree(s) );
+	}
+
+	// The same subterm at several positions: the occurrence scan visits each
+	// node once and the result is the one of the tree walk.
+	TEST_CASE("shared subterms in the occurrence scan") {
+		CHECK(agree("ex x ((x:bv[4] | y:bv[4] = { 3 }:bv[4] || x:bv[4] = { 1 }:bv[4])"
+			" && (x:bv[4] | y:bv[4] = { 3 }:bv[4] || x:bv[4] = { 2 }:bv[4])"
+			" && (x:bv[4] | y:bv[4] != { 3 }:bv[4] || a = 0))"));
+	}
+
 	TEST_CASE("declines on an arithmetic occurrence") {
 		CHECK(agree("ex x (x:bv[4] = { 3 }:bv[4] && x:bv[4] + { 5 }:bv[4] = { 8 }:bv[4])"));
 		CHECK(norm("ex x (x:bv[4] = { 3 }:bv[4] && x:bv[4] + { 5 }:bv[4] = { 8 }:bv[4])", true) == "T");
