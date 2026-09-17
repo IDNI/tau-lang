@@ -371,8 +371,10 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return r.with_value(true);
 	};
 
-	constexpr int max_refinement_rounds = 64;
-	for (int round = 0; ; ++round) {
+	// Runtime parameter (ltl_max_refinement_rounds; 0 = unlimited): each
+	// round blocks one infeasible edge and re-runs ltlsynt.
+	const size_t max_refinement_rounds = ltl_max_refinement_rounds;
+	for (size_t round = 0; ; ++round) {
 		std::vector<std::string> clauses;
 		if (auto rejected = check_edges()) {
 			auto& e = sol.aut.edges[rejected->first][rejected->second];
@@ -388,14 +390,17 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			// oracle before declaring victory.
 			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
 			if (W <= 1) return realizable_now();
-			auto wres = window_infeasible_paths<node>(sol, W, 4096);
+			auto wres = window_infeasible_paths<node>(sol, W,
+				ltl_window_max_paths);
 			if (wres.path_cap_reached) return undecided("window oracle path cap");
 			if (wres.blocking_clauses.empty()) return realizable_now();
 			clauses = std::move(wres.blocking_clauses);
 		}
 
-		if (round >= max_refinement_rounds)
-			return undecided("ABA refinement bound reached");
+		if (max_refinement_rounds && round >= max_refinement_rounds)
+			return undecided("ABA refinement bound reached "
+				"(--ltl-refinement-rounds / `set ltlrefinementrounds`, "
+				"0 = unlimited)");
 		bool added_new = false;
 		for (auto& clause : clauses) {
 			if (sol.skeleton.find(clause) != std::string::npos) continue;

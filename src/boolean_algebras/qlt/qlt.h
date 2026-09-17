@@ -32,6 +32,15 @@ namespace idni::tau_lang {
  */
 inline size_t qlt_t3_encoding_cap = 20;
 
+/**
+ * @brief Cap on the output-position combinations the constant-output fast
+ * path in front of Algorithm B enumerates (LA-10): |T1|^outputs candidate
+ * constant assignments, each checked with `ltlfilt`. Above it the fast
+ * path declines and Algorithm B decides. Runtime parameter by policy
+ * (qlt's own `qlt-const-output-max` CLI/REPL option); 0 = unlimited.
+ */
+inline size_t qlt_const_output_max = 100;
+
 /// Effective T3 atom cap: `qlt_t3_encoding_cap` bounded by 30.
 inline int qlt_t3_encoding_cap_effective() {
 	const size_t hard = 30;

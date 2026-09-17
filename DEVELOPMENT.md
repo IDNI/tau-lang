@@ -67,7 +67,7 @@ demangling via `cxxabi.h`.
 The following executables are built from `src/CMakeLists.txt`:
 
 - **`tau`** — the main REPL and interpreter. Reads specs from files or stdin, runs the interactive REPL with command history, normalization, satisfiability checking, and specification execution.
-- **`tau_codegen`** — standalone spec-to-C++ compiler. Reads a tau spec and emits a self-contained C++17 header implementing the synthesized strategy as a state machine. Usage: `tau_codegen spec.tau -o program.h`.
+- **`tau compile`** — the ahead-of-time compiler is a verb of the `tau` binary, not a separate executable. `tau compile spec.tau [-o exe] [-c c++-compiler]` synthesizes the spec, emits `spec.tau.build/` (a driver `main.cpp` plus a `CMakeLists.txt` linking the emitting build's libTAU) and builds a standalone executable that steps the strategy like `tau spec.tau` does. Emitting a C++ header with the synthesized class is the library API (`build_program_desc` + `emit_program`, `src/cpp_codegen.h`).
 
 # Testing
 

@@ -65,6 +65,12 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/// @{
 	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap; }
 	static void set_t3_cap_option(size_t n) { qlt_t3_encoding_cap = n; }
+	static size_t get_const_output_max_option() {
+		return qlt_const_output_max;
+	}
+	static void set_const_output_max_option(size_t n) {
+		qlt_const_output_max = n;
+	}
 	/// @}
 
 	/**
@@ -73,7 +79,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 * PWR); above it the default ABA-oracle path decides. Clamped to 30
 	 * (the encodings shift `1 << K`); 0 = that bound.
 	 */
-	static std::array<ba_option, 1> options() {
+	static std::array<ba_option, 2> options() {
 		return {{
 			{ "t3-cap", ba_option_kind::count,
 				nullptr, nullptr,
@@ -81,6 +87,13 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 				"cap the data atoms the qlt T3 synthesis encodings "
 				"accept before the ABA-oracle path decides instead "
 				"(default 20, at most 30; 0 = 30)" },
+			{ "const-output-max", ba_option_kind::count,
+				nullptr, nullptr,
+				get_const_output_max_option,
+				set_const_output_max_option,
+				"cap the constant-output assignments the fast path "
+				"in front of Algorithm B enumerates (default 100; "
+				"0 = unlimited)" },
 		}};
 	}
 

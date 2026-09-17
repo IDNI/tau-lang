@@ -1489,6 +1489,8 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "B" || x == "preprocessing") return preprocessing_opt;
 	if (x == "factoring"
 		|| x == "bacomponentfactoring") return factoring_opt;
+	if (x == "pwrsemantic"
+		|| x == "Z")                 return pwr_semantic_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -1544,6 +1546,8 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "ltlqemaxvars")             return ltl_qe_max_vars_opt;
 	if (x == "ltlhoamaxstates")          return ltl_hoa_max_states_opt;
 	if (x == "ltlguardmaxcubes")         return ltl_guard_max_cubes_opt;
+	if (x == "ltlrefinementrounds")      return ltl_refinement_rounds_opt;
+	if (x == "ltlwindowmaxpaths")        return ltl_window_max_paths_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -1602,6 +1606,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		out << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ preprocessing_opt, [this]() {
 		out << "preprocessing:       " << pbool[opt.preprocessing] << "\n"; } },
+	{ pwr_semantic_opt,  [this]() {
+		out << "pwrsemantic:         " << pbool[pwr_semantic_fallback] << "\n"; } },
 	{ factoring_opt,     [this]() {
 		out << "factoring:           " << pbool[opt.factoring] << "\n"; } },
 	{ highlighting_opt, [this]() {
@@ -1674,7 +1680,11 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ ltl_hoa_max_states_opt, [climit, this]() {
 		out << "ltlhoamaxstates:     " << climit(ltl_hoa_max_states) << "\n"; } },
 	{ ltl_guard_max_cubes_opt, [climit, this]() {
-		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes) << "\n"; } }
+		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes) << "\n"; } },
+	{ ltl_refinement_rounds_opt, [climit, this]() {
+		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds) << "\n"; } },
+	{ ltl_window_max_paths_opt, [climit, this]() {
+		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths) << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1799,6 +1809,9 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		update_preprocessing(update_bool_value(opt.preprocessing)); } },
 	{ factoring_opt,   [&]() {
 		update_factoring(update_bool_value(opt.factoring)); } },
+	{ pwr_semantic_opt, [&]() {
+		bool v = pwr_semantic_fallback;
+		api<node>::set_pwr_semantic_fallback(update_bool_value(v)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -1868,7 +1881,11 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ ltl_hoa_max_states_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_hoa_max_states(*n); } },
 	{ ltl_guard_max_cubes_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_ltl_guard_max_cubes(*n); } } };
+		api<node>::set_ltl_guard_max_cubes(*n); } },
+	{ ltl_refinement_rounds_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_max_refinement_rounds(*n); } },
+	{ ltl_window_max_paths_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_ltl_window_max_paths(*n); } } };
 	setters[o]();
 }
 
@@ -1911,6 +1928,10 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
 	case preprocessing_opt:    update_preprocessing(update_fn(opt.preprocessing)); break;
 	case factoring_opt:        update_factoring(update_fn(opt.factoring)); break;
+	case pwr_semantic_opt: {
+		bool v = pwr_semantic_fallback;
+		api<node>::set_pwr_semantic_fallback(update_fn(v)); break;
+	}
 	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
@@ -2299,6 +2320,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  charvar (V)            character-variable notation          on/off\n"
 		"  preprocessing (B)      BA preprocessing (e.g. bv blasting)  on/off\n"
 		"  factoring              tau-algebra component factoring      on/off\n"
+		"  pwrsemantic (Z)        semantic pointwise-revision fallback on/off\n"
 		"  benchmarks (b)         print timing benchmarks              on/off\n";
 	static const std::string numeric_options =
 		"and the numeric limit options, set with `set <option> <n>` "
@@ -2328,7 +2350,9 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  ltlalg                 omcat synthesis algorithm A/B/D/auto auto\n"
 		"  ltlqemaxvars           omcat QE fast-path free-variable cap 2\n"
 		"  ltlhoamaxstates        accepted ltlsynt strategy states     4194304\n"
-		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n";
+		"  ltlguardmaxcubes       Algorithm D guard DNF cubes          512\n"
+		"  ltlrefinementrounds    ABA-oracle refinement rounds         64\n"
+		"  ltlwindowmaxpaths      window-oracle paths per check        4096\n";
 	// BA-declared options ("family-option"), sorted by family then option
 	// name for a deterministic listing independent of pack configuration
 	// order. Flags join the enable/disable/toggle-eligible list; counts

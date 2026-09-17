@@ -230,6 +230,16 @@ void api<node>::set_ltl_guard_max_cubes(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_max_refinement_rounds(size_t n) {
+	ltl_max_refinement_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_ltl_window_max_paths(size_t n) {
+	ltl_window_max_paths = n;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	pwr_semantic_fallback = on;
 }

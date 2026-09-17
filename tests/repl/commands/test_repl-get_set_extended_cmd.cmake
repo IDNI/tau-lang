@@ -54,3 +54,20 @@ add_repl_test(set_cmd-ltlhoamaxstates   "set ltlhoamaxstates 0" "ltlhoamaxstates
 add_repl_test(get_cmd-ltlguardmaxcubes  "get ltlguardmaxcubes"  "ltlguardmaxcubes: *512")
 add_repl_test(set_cmd-ltlguardmaxcubes  "set ltlguardmaxcubes 9" "ltlguardmaxcubes: *9")
 add_repl_test(help_set_lists_ltl_options "help set" "ltltimeout")
+
+# The semantic pointwise-revision fallback is a Boolean option like factoring:
+# get/set/enable/disable/toggle all reach the same library switch.
+add_repl_test(get_cmd-pwrsemantic          "get pwrsemantic"            "pwrsemantic: *off")
+add_repl_test(set_cmd-pwrsemantic_on       "set pwrsemantic on"         "pwrsemantic: *on")
+add_repl_test(enable_cmd-pwrsemantic       "enable pwrsemantic. get Z"  "pwrsemantic: *on")
+add_repl_test(disable_cmd-pwrsemantic      "enable pwrsemantic. disable pwrsemantic. get pwrsemantic" "pwrsemantic: *off")
+add_repl_test(toggle_cmd-pwrsemantic       "toggle pwrsemantic. get pwrsemantic" "pwrsemantic: *on")
+add_repl_test(help_set_lists_pwrsemantic   "help set" "pwrsemantic")
+# The two synthesis caps promoted from header constants.
+add_repl_test(get_cmd-ltlrefinementrounds  "get ltlrefinementrounds"    "ltlrefinementrounds: *64")
+add_repl_test(set_cmd-ltlrefinementrounds  "set ltlrefinementrounds 3"  "ltlrefinementrounds: *3")
+add_repl_test(set_cmd-ltlrefinementrounds_unlimited "set ltlrefinementrounds 0" "ltlrefinementrounds: *unlimited")
+add_repl_test(get_cmd-ltlwindowmaxpaths    "get ltlwindowmaxpaths"      "ltlwindowmaxpaths: *4096")
+add_repl_test(set_cmd-ltlwindowmaxpaths    "set ltlwindowmaxpaths 12"   "ltlwindowmaxpaths: *12")
+add_repl_test(get_cmd-qlt_const_output_max "get qlt-const-output-max"   "qlt-const-output-max: *100")
+add_repl_test(set_cmd-qlt_const_output_max "set qlt-const-output-max 7" "qlt-const-output-max: *7")

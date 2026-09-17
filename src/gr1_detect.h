@@ -14,7 +14,8 @@
 // where each φ_safe, φ_live is non-temporal.  This covers the common
 // request-grant / fairness / mutex-under-safety patterns and admits a
 // polynomial solver via round-robin evaluation of the Pre-based fixpoints
-// (see LTL_ABA_DESIGN.md Phase 3, GR(1) case: O(|T_1|² · k)).
+// (the GR(1) case of the design write-up kept outside this repository:
+// O(|T_1|² · k)).
 //
 // The classifier is AST-only; it does not touch the type spaces.
 

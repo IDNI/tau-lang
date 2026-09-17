@@ -154,7 +154,7 @@ cli::options tau_options() {
 	opts["ltl-alg"] = cli::option("ltl-alg", 'L', "")
 		.set_description("omcat synthesis algorithm: A, B, D or auto "
 			"(default: TAU_LTL_ALG or auto)");
-	opts["ltl-qe-max-vars"] = cli::option("ltl-qe-max-vars", 'K', "0")
+	opts["ltl-qe-max-vars"] = cli::option("ltl-qe-max-vars", 'k', "0")
 		.set_description("free-variable cap of the omcat QE fast path; "
 			"above 2 is not sound (0 = TAU_LTL_OMCAT_QE_MAX_VARS or 2)");
 	opts["ltl-hoa-max-states"] =
@@ -165,6 +165,15 @@ cli::options tau_options() {
 		cli::option("ltl-guard-max-cubes", 'U', "512")
 		.set_description("cap the DNF cubes a HOA guard may expand into "
 			"in the Algorithm D game (default 512; 0 = unlimited)");
+	opts["ltl-refinement-rounds"] =
+		cli::option("ltl-refinement-rounds", 'D', "64")
+		.set_description("cap the ABA-oracle refinement rounds of a "
+			"realizability check; the cap answers UNKNOWN (default 64; "
+			"0 = unlimited)");
+	opts["ltl-window-max-paths"] =
+		cli::option("ltl-window-max-paths", 'O', "4096")
+		.set_description("cap the strategy paths the multi-step window "
+			"oracle examines per check (default 4096; 0 = unlimited)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
 		.set_description("tree-node count floor before gc may trigger "
 			"(default 256)");
@@ -367,6 +376,8 @@ int main(int argc, char** argv) {
 	tau_api::set_ltl_qe_max_vars(optnum("ltl-qe-max-vars"));
 	tau_api::set_ltl_hoa_max_states(optnum("ltl-hoa-max-states"));
 	tau_api::set_ltl_guard_max_cubes(optnum("ltl-guard-max-cubes"));
+	tau_api::set_ltl_max_refinement_rounds(optnum("ltl-refinement-rounds"));
+	tau_api::set_ltl_window_max_paths(optnum("ltl-window-max-paths"));
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));

@@ -131,14 +131,41 @@ TEST_SUITE("Tau API - runtime limits") {
 
 	TEST_CASE("ltl game caps write their globals verbatim") {
 		const size_t s1 = ltl_hoa_max_states, s2 = ltl_guard_max_cubes;
+		const size_t s3 = ltl_max_refinement_rounds, s4 = ltl_window_max_paths;
 		tau_api::set_ltl_hoa_max_states(77);
 		CHECK( ltl_hoa_max_states == 77 );
 		tau_api::set_ltl_hoa_max_states(0);
 		CHECK( ltl_hoa_max_states == 0 );
 		tau_api::set_ltl_guard_max_cubes(5);
 		CHECK( ltl_guard_max_cubes == 5 );
+		// The two caps promoted from header constants ship at their old
+		// values and are plain 0-is-unlimited counts.
+		CHECK( s3 == 64 );
+		CHECK( s4 == 4096 );
+		tau_api::set_ltl_max_refinement_rounds(9);
+		CHECK( ltl_max_refinement_rounds == 9 );
+		tau_api::set_ltl_max_refinement_rounds(0);
+		CHECK( ltl_max_refinement_rounds == 0 );
+		tau_api::set_ltl_window_max_paths(11);
+		CHECK( ltl_window_max_paths == 11 );
 		ltl_hoa_max_states = s1;
 		ltl_guard_max_cubes = s2;
+		ltl_max_refinement_rounds = s3;
+		ltl_window_max_paths = s4;
+	}
+
+	// Both new caps can change a verdict (decided vs UNKNOWN), so the memos
+	// must see them move.
+	TEST_CASE("refinement and window caps are part of the budget fingerprint") {
+		const size_t base = verdict_budget_fingerprint();
+		const size_t s3 = ltl_max_refinement_rounds, s4 = ltl_window_max_paths;
+		tau_api::set_ltl_max_refinement_rounds(s3 + 1);
+		CHECK( verdict_budget_fingerprint() != base );
+		ltl_max_refinement_rounds = s3;
+		tau_api::set_ltl_window_max_paths(s4 + 1);
+		CHECK( verdict_budget_fingerprint() != base );
+		ltl_window_max_paths = s4;
+		CHECK( verdict_budget_fingerprint() == base );
 	}
 
 	// The verdict memos are keyed on the formula; the budget fingerprint

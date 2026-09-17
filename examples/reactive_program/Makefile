@@ -1,26 +1,22 @@
-# Build the reactive-program example.
-#
-# Dependencies:
-#   - `tau_codegen` on PATH (built from this repo).
-#   - g++ with C++17 support.
-#
-# The generated header is pure C++17; no runtime link to libTAU is required
-# for propositional specs.  Specs with data atoms (qlt, bv arithmetic, etc.)
-# need `-lTAU` at link time — see the tau-lang manual for details.
-
-TAU_CODEGEN ?= tau_codegen
-CXX         ?= g++
-CXXFLAGS    ?= -O3 -flto -std=c++17 -Wall
+# Compile a Tau specification into a standalone executable with the `compile`
+# verb of the tau binary. `tau compile <spec.tau> -o <exe>` emits a small
+# CMake project next to the spec (`spec.tau.build/`: one main.cpp driving the
+# synthesized strategy through the same run loop `tau spec.tau` uses, linked
+# against the emitting build's libTAU) and builds it; `-c <compiler>` picks
+# the C++ compiler (default: $TAU_CXX, else clang++ when on PATH, else
+# cmake's default). The produced program reads its inputs and prints its
+# outputs exactly like the interpreter does, and exits when stdin closes.
+TAU ?= tau
 
 all: sim
 
-program.h: spec.tau
-	$(TAU_CODEGEN) $< -o $@
+sim: spec.tau
+	$(TAU) compile $< -o $@
 
-sim: main.cpp program.h
-	$(CXX) $(CXXFLAGS) main.cpp -o $@
+run: sim
+	./sim
 
 clean:
-	rm -f program.h sim
+	rm -rf sim spec.tau.build
 
-.PHONY: all clean
+.PHONY: all run clean

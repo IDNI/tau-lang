@@ -375,8 +375,11 @@ inline std::vector<qlt_type3> enumerate_qlt_T3(const std::vector<rational>& cons
 // enumeration.  For each (b, σ), the system picks a concrete y (any
 // rational) producing next memory ρ' = type of y.
 //
-// This is the core operator referenced in LTL_ABA_DESIGN.md's Algorithm
-// D Phase 3; the μ/ν fixpoints over 2^{T_1} assemble from it.
+// This is the controllable-predecessor operator of the fixpoint formulation
+// of Algorithm D (the design write-up is kept outside this repository); the
+// μ/ν fixpoints over 2^{T_1} assemble from it. Not used by the shipped
+// solver, which runs Zielonka on the explicit product game
+// (algorithm_d_game.h); exercised by the unit tests only.
 // ────────────────────────────────────────────────────────────────────────
 
 /**

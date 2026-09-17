@@ -91,7 +91,11 @@ enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	// LTL(ABA) synthesis knobs (ltl_aba.h); ltl_alg_opt takes a word
 	// (A/B/D/auto), the others a count.
 	ltl_timeout_opt, ltl_alg_opt, ltl_qe_max_vars_opt,
-	ltl_hoa_max_states_opt, ltl_guard_max_cubes_opt };
+	ltl_hoa_max_states_opt, ltl_guard_max_cubes_opt,
+	ltl_refinement_rounds_opt, ltl_window_max_paths_opt,
+	// Boolean, like the first group: the semantic (winning-region) fallback
+	// of the temporal pointwise revision (`-Z --pwr-semantic`).
+	pwr_semantic_opt };
 
 // Logic fragment: determines which operators are available
 enum logic_fragment { fragment_ltl, fragment_ctl_star };

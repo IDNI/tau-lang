@@ -4,8 +4,10 @@
 // Run:    make run
 //
 // What this demonstrates:
-//   1. Synthesise spec.tau via `tau_codegen --open o_p0` to emit
-//      program.h. The emitted class gains:
+//   1. Synthesise spec.tau through the library (`build_program_desc` +
+//      `emit_program`, src/cpp_codegen.h; the standalone `tau_codegen` CLI
+//      and its `--open` flag are gone -- open streams are declared in the
+//      spec / interpreter API) to emit program.h. The emitted class gains:
 //        - oracle_callback typedef
 //        - register_open_oracle / unregister_open_oracle methods
 //        - open_streams() / open_streams_count() static metadata

@@ -15,7 +15,7 @@
 	4. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
    1. [Run a spec with the interpreter (`tau`)](#run-a-spec-with-the-interpreter-tau)
-   2. [Compile a spec to C++ (`tau_codegen`)](#compile-a-spec-to-c-tau_codegen)
+   2. [Compile a spec to an executable (`tau compile`)](#compile-a-spec-to-an-executable-tau-compile)
 4. [The Tau Language](#the-tau-language)
     1. [Tau specifications](#tau-specifications)
     2. [Full LTL operators](#full-ltl-operators)
@@ -199,9 +199,9 @@ execute Tau specifications. The `tau` executable is located in either `build-Rel
 or `build-Debug` or `build-RelWithDebInfo` (or in `build/<build type>` when building
 with presets).
 
-The same build also produces the `tau_codegen` executable, which compiles a
-realizable tau specification to a self-contained C++17 program header
-(see [Synthesize a C++ program from a spec](#synthesize-a-c-program-from-a-spec)).
+The same binary also carries the `compile` verb, which turns a realizable
+specification into a standalone executable (see
+[Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
 
 ## **Selecting Boolean algebras (`-DTAU_BAS=`)**
 
@@ -244,8 +244,9 @@ Tau-lang offers two ways to execute a specification:
 
 1. **Interpret** the spec directly — solve each time step on the fly.
    Use `tau`.  Best for iteration and REPL use.
-2. **Compile** the spec to a C++17 state machine ahead of time.
-   Use `tau_codegen`.  Best for high-throughput deployment.
+2. **Compile** the spec to a standalone executable ahead of time.
+   Use `tau compile`.  Best for deployment: the synthesis happens once, at
+   compile time, and the program only steps the strategy.
 
 Both use the same spec language.  You can start with the interpreter while
 authoring a spec and switch to the compiler for production.
@@ -267,44 +268,54 @@ Full [command-line reference](#command-line-interface).  The interpreter is
 the right choice when you want to iterate on a spec, inspect intermediate
 results, or run short jobs from the shell.
 
-## Compile a spec to C++ (`tau_codegen`)
+## Compile a spec to an executable (`tau compile`)
 
-`tau_codegen` compiles a realizable tau specification to a standalone
-C++17 header.  The generated code is a pure `switch/case` state machine
-with no runtime dependency on libTAU for propositional specs, and compiles
-with `g++ -O3 -flto -std=c++17`.
+`tau compile` parses a specification, runs the same LTL(ABA) synthesis
+pipeline as the interpreter, and turns the synthesized strategy into a
+standalone executable: it emits a small CMake project next to the spec
+(`<spec>.build/`, one `main.cpp` that drives the strategy through the same run
+loop `tau <spec>` uses, linked against the emitting build's libTAU), builds it,
+and copies the program to the requested path.
 
 ```sh
 # 1. Write a spec (mirror-input example).
-echo -n 'G(o1[t]:bv = i1[t]:bv)' > spec.tau
+echo 'G(o1[t]:bv = i1[t]:bv).' > spec.tau
 
-# 2. Synthesize + emit a C++ program header in one command.
-tau_codegen spec.tau -o program.h
+# 2. Synthesize, emit and build in one command.
+tau compile spec.tau -o sim
 
-# 3. Compile your application against it.
-g++ -O3 -flto -std=c++17 main.cpp -o sim
+# 3. Run it: it reads inputs and prints outputs like the interpreter does
+#    and exits when its input closes.
 ./sim
 ```
 
-Full worked example: `examples/reactive_program/`.
+| Option | Description |
+|--------|-------------|
+| `-o, --output <path>` | executable path (default: the spec file path without extension) |
+| `-c, --cxx <compiler>` | C++ compiler for the emitted project (default: `TAU_CXX`, else `clang++` when on PATH, else cmake's default) |
 
-**Performance**: generated programs run at billions of steps per second
-(see `test_cpp_codegen_bench`).
+The exit code is `0` when the program was built and `1` on any failure; the
+reason (parse error, UNREALIZABLE, no verdict from the synthesis backend, a
+`cmake` configure or build failure) is in the `compile failed: …` message,
+not in a dedicated code.  A spec whose strategy cannot be executed (an
+Algorithm-B verdict over the `qlt` type, see the synthesis algorithms below)
+is refused the same way.
 
-**Correctness**: synthesis produces a program whose behavior is provably
-consistent with the spec on every input trace.  Unrealizable specs are
-rejected up front by `tau_codegen`.
+Full worked example: `examples/reactive_program/` (the `Makefile` runs
+`tau compile`; its `main.cpp` documents the shape of the emitted
+`tau_program` class, which the library API `build_program_desc` +
+`emit_program` in `src/cpp_codegen.h` produces).
 
-`tau_codegen` is a one-shot compiler: it parses the input Tau spec, runs the
-same LTL(ABA) synthesis pipeline as the interpreter, and emits a C++ strategy
-header.  Pointwise revision (PWR) happens before code generation: a spec
-already produced by PWR can be passed to `tau_codegen`, synthesized, emitted,
-compiled, and stepped like any other realizable spec.  Runtime PWR/spec
-patching remains the interpreter's responsibility, not a feature of generated
-C++ headers.
+**Correctness**: synthesis produces a program whose behaviour is consistent
+with the spec on every input trace.  Unrealizable specs are rejected up front.
 
-See the [command-line reference](#command-line-interface) for full details
-on both `tau` and `tau_codegen` options.
+Pointwise revision (PWR) happens before code generation: a spec already
+produced by PWR can be compiled and stepped like any other realizable spec.
+Runtime PWR/spec patching remains the interpreter's responsibility, not a
+feature of compiled programs.
+
+See the [command-line reference](#command-line-interface) for the `tau`
+options.
 
 ---
 
@@ -749,11 +760,30 @@ with a CLI flag, a REPL option and an `api::set_*` setter each (see the CLI
 and REPL option tables); the environment variables above remain as fallbacks
 for scripts that already set them. Two more LTL(ABA) caps have no
 environment form: `--ltl-hoa-max-states` (largest strategy accepted from
-`ltlsynt`, default 2^22) and `--ltl-guard-max-cubes` (DNF cubes a HOA guard
-may expand into in the Algorithm D game, default 512). The `qlt` algebra
-declares `--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at
-most 30) and `nlang` declares `--nlang-http-timeout` (seconds per LLM
-request, default 15).
+`ltlsynt`, default 2^22), `--ltl-guard-max-cubes` (DNF cubes a HOA guard
+may expand into in the Algorithm D game, default 512),
+`--ltl-refinement-rounds` (ABA-oracle refinement rounds per realizability
+check, default 64) and `--ltl-window-max-paths` (paths the window oracle
+examines per check, default 4096). The `qlt` algebra declares `--qlt-t3-cap`
+(data atoms its T3 encodings accept, default 20, at most 30) and
+`--qlt-const-output-max` (constant-output assignments the fast path in front
+of Algorithm B enumerates, default 100), and `nlang` declares
+`--nlang-http-timeout` (seconds per LLM request, default 15).
+
+**Other environment variables.** Three Boolean switches keep an environment
+fallback beside their option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
+value other than `0` enables, `0` disables; read once, then it overrides
+`--ba-component-factoring` / `set factoring`), `TAU_BV_CASE_SPLIT` (`0`
+disables, any other value enables; overrides `bv-case-split` in both
+directions) and `TAU_BV_QF_DECISION` (a value other than `0` enables the
+quantifier-free bitvector decision; `bv-quantifier-free-decision` enables it
+too). The nlang oracle reads `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`),
+`TAU_LLM_ENDPOINT` and `TAU_LLM_MODEL`. Two diagnostic gates change logging
+only, never a verdict: `TAU_LEAN_DECIDE_CROSSCHECK` re-decides the lean
+constant tests through the full path and reports disagreements, and
+`TAU_PHI_DELTA_CROSSCHECK=1` shadows the ABA oracle with the closed-form
+Φ_Δ of the atomless algebra on matching shapes. `TAU_CODEGEN_RUN_SDK_LINK_TEST`
+opts the codegen test suite into a minutes-long real `cmake` build.
 
 **Execution**: when the interpreter pipeline is given a realizable LTL formula,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
@@ -821,9 +851,13 @@ individual shifts.
   operands (`-T`, `-F`) are evaluated; `- φ` over a data formula is refused with
   an error because the input/output role swap it requires is not implemented
   (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
-- **nlang_ba needs DEEPSEEK_API_KEY**: without the key every emptiness and
-  universality question over `nlang` elements is answered `false` and cached
-  for the process lifetime, so verdicts over `nlang` are not reliable.
+- **nlang needs an LLM API key**: the oracle reads `TAU_LLM_API_KEY` (falling
+  back to `OPENAI_API_KEY`), with `TAU_LLM_ENDPOINT` (default
+  `https://api.openai.com/v1`) and `TAU_LLM_MODEL` optional and each HTTP
+  request capped by the `nlang-http-timeout` option (15 s). Without a key
+  every emptiness, universality and equivalence question over `nlang`
+  elements is answered `false` (not cached), a warning is printed once, and
+  verdicts over `nlang` are not reliable.
 - **fall/fex BF quantifiers**: these parse correctly but are not supported in
   LTL synthesis (only in safety/always formulas).
 - **Input-only atoms**: formulas consisting entirely of input constraints (no
@@ -1944,7 +1978,7 @@ The Tau Language currently supports the following base types:
 3. `bv[n]`: the type of bitvectors of bit width `n`,
 4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
 5. `qint`: the Boolean algebra of right-closed, left-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
-6. `nlang`: the Natural Language Boolean Algebra (requires `DEEPSEEK_API_KEY`), and
+6. `nlang`: the Natural Language Boolean Algebra (its oracle needs `TAU_LLM_API_KEY` or `OPENAI_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
 In addition, user-defined type names — aliases of base types and tuple
@@ -2071,7 +2105,7 @@ Inside `{...}:hsb`, `&`, `|` and `~` combine constraints; every `&`/`|`
 combination must be parenthesised.  The same combinations are also available
 through the Boolean algebra operations at the formula level.
 
-The test suite (`tests/unit/boolean_algebras/test_hsb.cpp`) covers Fourier-Motzkin elimination,
+The test suite (`src/boolean_algebras/hsb/tests/test_hsb.cpp`) covers Fourier-Motzkin elimination,
 complement closure, splitter, Boolean combinations, parser, dispatcher
 integration, and LTL(hsb) realizability.
 
@@ -2089,11 +2123,15 @@ connectives:
 - `{ A }:nlang & { B }:nlang` produces `"(A) and (B)"`
 - `~{ A }:nlang` produces `"not (A)"`
 
-The DeepSeek API (via the `DEEPSEEK_API_KEY` environment variable) serves as the
-semantic oracle for equality, emptiness, and universality tests.  Without a valid
-API key every emptiness and universality question is answered `false` (and the
-answer is cached for the process lifetime), so verdicts over `nlang` elements are
-not reliable without the key.
+An OpenAI-compatible chat completion endpoint serves as the semantic oracle
+for equality, emptiness, and universality tests: the key is read from
+`TAU_LLM_API_KEY` (or `OPENAI_API_KEY`), the base URL from `TAU_LLM_ENDPOINT`
+(default `https://api.openai.com/v1`) and the model from `TAU_LLM_MODEL`
+(unset: the endpoint's default); each request is capped by the
+`nlang-http-timeout` option (15 s).  Without a key every emptiness,
+universality and equivalence question is answered `false` (a warning is
+printed once; the default is not cached), so verdicts over `nlang` elements
+are not reliable without the key.
 
 Elements are written as natural language strings inside `{...}:nlang`:
 
@@ -2108,7 +2146,8 @@ structural layer: `nothing` and `everything` denote bottom and top, and
 `not (φ)`, `(φ) and (ψ)`, `(φ) or (ψ)` compose phrases (this is the canonical
 form the Boolean operations print).  Any other text is a single atom.
 
-**Requirement**: `DEEPSEEK_API_KEY` must be set in the environment.
+**Requirement**: `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) must be set in the
+environment for the oracle to answer.
 
 #### `bv` — bit width and unification
 
@@ -2515,18 +2554,18 @@ function of the same name.
 
 # **Command line interface**
 
-Tau-lang ships two executables:
+Tau-lang ships one executable, `tau`, with two roles:
 
-- **`tau`** — the interactive / interpreter executable.  Runs a specification
-  by solving each time step through the core solver pipeline.  Best for REPL
-  use, spec authoring, and executing specifications dynamically.
-- **`tau_codegen`** — the ahead-of-time compiler.  Reads a specification,
-  invokes the synthesis pipeline, and emits a standalone C++17 header that
-  implements a synthesized state-machine program.  Best for deploying
-  realized specs at memory-bandwidth speed (billions of steps per second).
+- **interpreter / REPL** — runs a specification by solving each time step
+  through the core solver pipeline.  Best for REPL use, spec authoring, and
+  executing specifications dynamically.
+- **`tau compile`** — the ahead-of-time compiler.  Reads a specification
+  file, invokes the synthesis pipeline once, and builds a standalone
+  executable that steps the synthesized strategy (see
+  [`tau compile`](#tau-compile--synthesis-to-executable-compiler)).
 
-Both executables share the same input spec format.  Use whichever matches
-your deployment story.
+Both roles share the same spec format.  Use whichever matches your deployment
+story.
 
 ## `tau` — interpreter and REPL
 
@@ -2582,14 +2621,13 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 |-------------------------------|----------------------------------------------------------------------------------------|
 | -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (0 = unlimited) |
-| -W, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
+| -Z, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
 | -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
-| -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
 | -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
 | -P, --max-def-passes          | cap definition-expansion passes (0 = unlimited)                                        |
@@ -2603,9 +2641,11 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
 | -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
-| -K, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
+| -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
 | -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
+| -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
+| -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -2626,48 +2666,26 @@ and `--bv-blasting` are on. In a build without bv, `--bv-blasting`,
 `--bv-quantifier-free-decision`, `--bv-widening` and `--bv-max-width` are
 not recognized options at all.
 
-## `tau_codegen` — synthesis-to-C++ compiler
-
-Compiles a tau specification to a standalone C++17 header containing a
-synthesized program expressed as a `switch/case` state machine.  The generated
-code is a pure switch/case with no runtime dependency on libTAU for
-propositional specs, and compiles with `g++ -O3 -flto -std=c++17`.
+## `tau compile` — synthesis-to-executable compiler
 
 ```bash
-tau_codegen [ <spec_file> | - ] [ -o <output.h> ] [ --class <Name> ] [ --open <stream>[,<stream>...] ]
+tau compile <spec.tau> [ -o <exe> ] [ -c <c++ compiler> ]
 ```
 
-| Option              | Description                                                    |
-|---------------------|----------------------------------------------------------------|
-| -h, --help          | show usage and exit                                            |
-| `<spec_file>`       | path to a `.tau` specification; use `-` or omit for stdin      |
-| -o `<output.h>`     | emit to this file; omitted means write to stdout               |
-| --class `<Name>`    | class identifier for the emitted program; default `TauProgram` |
-| --open `<streams>`  | comma-separated output streams to expose as oracle-resolved at runtime (V1: registration API only) |
+Parses the spec file (a file argument, not stdin), synthesizes it, emits
+`<spec.tau>.build/` (a `main.cpp` driving the strategy plus a `CMakeLists.txt`
+that links the emitting build's prebuilt libTAU and its algebra libraries
+with the same compile definitions), runs `cmake` configure and build, and
+places the program at `-o <exe>` (default: the spec path without its
+extension).  The program behaves like `tau <spec.tau>`: it reads inputs,
+prints outputs, and exits when its input closes.  Exit code `0` on success,
+`1` on every failure, with the reason in the `compile failed:` message (see
+[Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
 
-Exit codes:
-
-| Code | Meaning                                                           |
-|------|-------------------------------------------------------------------|
-| 0    | success; header written                                           |
-| 1    | parse error or I/O error                                          |
-| 2    | usage error (unknown flag, missing argument)                      |
-| 3    | specification is UNREALIZABLE                                     |
-| 4    | UNKNOWN: the synthesis backend failed or timed out                |
-| 5    | REALIZABLE, but the strategy cannot be compiled into a program over the declared streams |
-
-Example session:
-
-```bash
-echo -n 'G(o1[t]:bv = i1[t]:bv)' > spec.tau
-tau_codegen spec.tau -o program.h --class Echo
-g++ -O3 -flto -std=c++17 driver.cpp -o sim
-./sim
-```
-
-See `examples/reactive_program/` for a fully worked Makefile example and
-`examples/declare_open_codegen/` for a program with an oracle-resolved (`--open`)
-output stream.
+Emitting a C++ *header* with the synthesized class (`tau_program`, with the
+`declare_open` oracle-callback surface shown in `examples/declare_open_codegen/`)
+is a library operation: `build_program_desc` + `emit_program` in
+`src/cpp_codegen.h`; there is no CLI flag for it.
 
 ## When to use which
 
@@ -2676,9 +2694,9 @@ output stream.
 | Interactive spec authoring / debugging                  | `tau` REPL  |
 | One-off running of a spec against inputs                | `tau`       |
 | Checking satisfiability / realizability of a spec       | `tau`       |
-| Deploying a realized spec at high throughput            | `tau_codegen` |
-| Integrating the synthesized behavior into a C++ project | `tau_codegen` |
-| Specs with data atoms requiring runtime witness search  | both: `tau_codegen` emits stubs, `tau` / `libTAU` resolves at runtime |
+| Deploying a realized spec as one binary                 | `tau compile` |
+| Integrating the synthesized behaviour into a C++ project | the `cpp_codegen.h` library API (`emit_program`) |
+| Specs with data atoms requiring runtime witness search  | both: the compiled program solves witnesses per step through libTAU, as the interpreter does |
 
 # **The Tau REPL**
 
@@ -2763,6 +2781,11 @@ tau-algebra constant tests: a constant whose clauses share no variables is
 decided per component, each decision remembered across steps, instead of as a
 whole. It's on by default (the REPL starts with the value of the
 `-K, --ba-component-factoring` command line option).
+
+* `Z|pwrsemantic`: Can be on/off. Enables the semantic (winning-region)
+fallback of the temporal pointwise revision, the mode that re-solves the
+revised specification as an Algorithm D game over the `qlt` type
+(`-Z, --pwr-semantic`). It's off by default.
 
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
@@ -2863,6 +2886,15 @@ strategy (`--ltl-hoa-max-states`). 4194304 by default; 0 = unlimited.
 * `ltlguardmaxcubes`: cap on the DNF cubes a HOA guard may expand into in the
 Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default; 0 =
 unlimited.
+
+* `ltlrefinementrounds`: cap on the ABA-oracle refinement rounds of one
+realizability check, each round blocking an infeasible strategy edge and
+re-running `ltlsynt` (`--ltl-refinement-rounds`). 64 by default; 0 =
+unlimited. On the cap the verdict is an error (UNKNOWN), never a false answer.
+
+* `ltlwindowmaxpaths`: cap on the strategy paths the multi-step window oracle
+examines per check (`--ltl-window-max-paths`). 4096 by default; 0 =
+unlimited; a hit cap likewise answers UNKNOWN.
 
 Changing any of these, or the two temporal-normalization caps, between two
 queries drops the verdict memos, so the next `sat`/`realizable` is decided
@@ -3283,8 +3315,8 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 
 | Header | Purpose |
 |--------|---------|
-| `src/omcat_types.h` | Rational `Rat` type. `QltType1`/`QltType2`/`QltType3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. `Pre_over_T1` controllable-predecessor operator; `nu_fixpoint`/`mu_fixpoint` over 2^{T_1}; `reachable_from` BFS. |
-| `src/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings; `collect_qlt_constants(fm)` harvesting named constants from a formula. |
+| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. `Pre_over_T1`, `nu_fixpoint`/`mu_fixpoint` over 2^{T_1} and `reachable_from` are staged helpers that Algorithm D does not use yet. |
+| `src/boolean_algebras/qlt/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings (at most 18 fractional digits); `collect_qlt_constants(fm)` harvesting named constants from a formula. |
 | `src/omcat_oracle_cache.h` | Thread-safe runtime cache for atomic oracle answers (tp(m,x) and achievability-set A_{ρ,J}). |
 
 ## Supporting infrastructure
@@ -3387,10 +3419,14 @@ This is a short list of known issues that will be fixed in a subsequent release:
     `G(phi_A && phi_B)`; with **different** BA types each `G` part is normalized
     independently — both forms work.
   * Mealy strategies with any number of states are executable.
-  * `S` (since) and `T` (trigger) past LTL operators are compiled away to auxiliary
-    variables; ltlsynt integration for pure past operators is pending.
-  * `nlang` type requires `DEEPSEEK_API_KEY` to be set; without it every oracle
-    question is answered `false` and cached, so verdicts are not reliable.
+  * `S` (since) and `T` (trigger) past LTL operators are decided through the
+    ppLTLTT temporal-tester encoding on the synthesis path and compiled away
+    to auxiliary output variables for pure-past execution; the tester
+    integration is complete, the compile-away pass's `aux_pairs` output is
+    unused.
+  * `nlang` type requires `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`) to be set;
+    without it every oracle question is answered `false` (not cached), so
+    verdicts are not reliable.
   * **Algorithm A** is intentionally restricted to pure-output formulas. If
     input variables are present, the dispatcher uses Algorithm B.
 
@@ -3410,10 +3446,13 @@ This is a short list of known issues that will be fixed in a subsequent release:
   over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
   are supported, the dedicated DLO QE path handles the `qlt` ω-categorical theory,
   and the data oracle is cross-validated against cvc5 LRA in `test_qlt_oracle`.
-* **Algorithm D Phase 2/3**: Algorithm D currently solves the product game for
-  safety/reachability objectives.  Extension to the full μ/ν fixpoint parity-game
-  formulation (T₃×Q pre-derivation) is planned — this requires derivation of the
-  T₃×Q game from the book's §6.7 algorithm and is blocked on interactive design.
+* **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
+  game (Zielonka's recursive algorithm over priorities derived from the Büchi,
+  co-Büchi or parity acceptance `ltlsynt` prints) for output-only `qlt`
+  formulas.  The separate μ/ν fixpoint formulation over 2^{T₁} in
+  `src/omcat_types.h` (`Pre_over_T1`, `nu_fixpoint`, `mu_fixpoint`) is staged
+  and not used by the solver; extending D to input-bearing formulas (the T₂
+  dimension in the environment states) is the open design item.
 * **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
   T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
   BDD-based type encoding: the type of a BA element relative to the formula's

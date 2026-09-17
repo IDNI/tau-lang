@@ -41,6 +41,26 @@ inline size_t ltl_hoa_max_states = size_t(1) << 22;
 inline size_t ltl_guard_max_cubes = 512;
 
 /**
+ * @brief Cap on the ABA-oracle refinement rounds of `is_ltl_aba_realizable`:
+ * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. On
+ * the cap the verdict is UNKNOWN (an error), never a false answer.
+ *
+ * Runtime parameter by policy (`--ltl-refinement-rounds`, REPL
+ * `set ltlrefinementrounds`, `api::set_ltl_max_refinement_rounds`);
+ * 0 = unlimited.
+ */
+inline size_t ltl_max_refinement_rounds = 64;
+
+/**
+ * @brief Cap on the strategy paths the window oracle examines per check
+ * (`window_infeasible_paths`); a hit cap yields UNKNOWN, never a verdict.
+ *
+ * Runtime parameter by policy (`--ltl-window-max-paths`, REPL
+ * `set ltlwindowmaxpaths`, `api::set_ltl_window_max_paths`); 0 = unlimited.
+ */
+inline size_t ltl_window_max_paths = 4096;
+
+/**
  * @brief Hard bound on the atomic propositions of a synthesis game whose
  * assignments are enumerated as `1 << n`: a signed shift is undefined at
  * 31 and the enumeration is hopeless long before. Not tunable.

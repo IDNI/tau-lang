@@ -2084,7 +2084,8 @@ static window_oracle_result window_infeasible_paths(
 	std::function<void(int, size_t)> dfs = [&](int state, size_t depth) {
 		if (cap_hit) return;
 		if (depth == (size_t)W) {
-			if (examined >= cap) { cap_hit = true; return; }
+			// cap == 0 means unlimited (ltl_window_max_paths).
+			if (cap && examined >= cap) { cap_hit = true; return; }
 			++examined;
 			check_path(path);
 			return;

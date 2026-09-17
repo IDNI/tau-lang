@@ -31,6 +31,7 @@
 #include "boolean_algebras/qlt/omcat_constants.h"
 #include "boolean_algebras/qlt/qlt.h"
 #include "ltl_aba_limits.h"
+#include <limits>
 // Unlike ltl_aba.h / normalizer.h, definitions.h only reaches io_context.h,
 // so it is safe to include directly here -- needed by the LA-10 constant-
 // output witness builder to resolve a freshly-parsed atom's io_vars.
@@ -455,9 +456,15 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 	std::vector<std::string> out_vec(out_names.begin(), out_names.end());
 	int n_out = (int)out_vec.size();
 	unsigned long long total_u = 1;
-	const unsigned long long CAP = 100ULL;
+	// Runtime parameter qlt_const_output_max (qlt.h; option
+	// qlt-const-output-max); 0 = unlimited, bounded here only by the
+	// arithmetic itself.
+	const unsigned long long CAP = qlt_const_output_max
+		? (unsigned long long) qlt_const_output_max
+		: std::numeric_limits<unsigned long long>::max() / 2;
 	for (int i = 0; i < n_out; ++i) {
 		if (total_u > CAP) return std::nullopt;
+		if (total_u > CAP / (unsigned long long) T1_size) return std::nullopt;
 		total_u *= (unsigned long long)T1_size;
 		if (total_u > CAP) return std::nullopt;
 	}
@@ -667,13 +674,9 @@ solve_ltl_aba_algorithm_b(
 	int K       = (int)atoms.size();
 	int T1_size = 2 * (int)constants.size() + 1;
 
-	// Compute D-bitmask per T₃ type.
-	std::vector<int> type_A(n_types, 0);
-	for (int i = 0; i < K; ++i)
-		for (int t = 0; t < n_types; ++t) {
-			auto h = qlt_atom_holds_in_type3<node>(atoms[i].first, T3[t], constants);
-			if (h != false) type_A[t] |= (1 << i);
-		}
+	// D-bitmask per T₃ type: the one helper Algorithm A and the semantic
+	// PWR use (LS-12); B kept an inline copy until 2026-09-17.
+	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
 
 	// Build T₂ lookup: (pos_m, pos_x, rel_mx) → T₂ index.
 	std::map<std::tuple<int,int,int>, int> t2_lookup;

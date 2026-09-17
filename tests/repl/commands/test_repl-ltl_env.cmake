@@ -95,3 +95,24 @@ add_test(NAME "test_repl-ltl_env-nlang_http_timeout_option"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set nlang-http-timeout 3\"")
 set_tests_properties("test_repl-ltl_env-nlang_http_timeout_option" PROPERTIES
 	PASS_REGULAR_EXPRESSION "nlang-http-timeout: *3")
+add_test(NAME "test_repl-ltl_env-refinement_rounds_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-refinement-rounds 5 -e \"get ltlrefinementrounds\"")
+set_tests_properties("test_repl-ltl_env-refinement_rounds_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlrefinementrounds: *5")
+add_test(NAME "test_repl-ltl_env-window_max_paths_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --ltl-window-max-paths 0 -e \"get ltlwindowmaxpaths\"")
+set_tests_properties("test_repl-ltl_env-window_max_paths_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlwindowmaxpaths: *unlimited")
+add_test(NAME "test_repl-ltl_env-pwr_semantic_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --pwr-semantic -e \"get pwrsemantic\"")
+set_tests_properties("test_repl-ltl_env-pwr_semantic_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "pwrsemantic: *on")
+add_test(NAME "test_repl-ltl_env-qlt_const_output_max_flag"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --qlt-const-output-max 3 -e \"get qlt-const-output-max\"")
+set_tests_properties("test_repl-ltl_env-qlt_const_output_max_flag" PROPERTIES
+	PASS_REGULAR_EXPRESSION "qlt-const-output-max: *3")
+# The -K short flag belongs to --ba-component-factoring; --ltl-qe-max-vars is -k.
+add_test(NAME "test_repl-ltl_env-qe_short_flag_is_lowercase_k"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -k 3 -e \"get ltlqemaxvars\"")
+set_tests_properties("test_repl-ltl_env-qe_short_flag_is_lowercase_k" PROPERTIES
+	PASS_REGULAR_EXPRESSION "ltlqemaxvars: *3")

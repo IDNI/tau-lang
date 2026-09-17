@@ -1,7 +1,10 @@
-// Minimal driver for a synthesized reactive program.
-//
-// Build:  make
-// Run:    ./sim
+// Reference shape of a host driving a synthesized reactive program through
+// the emitted `tau_program` class (cpp_codegen's emit_program output). The
+// standalone header this file includes is produced by the library API
+// (`build_program_desc` + `emit_program`, src/cpp_codegen.h), not by a CLI
+// flag: the `tau compile` verb (see the Makefile) emits and builds a complete
+// executable instead. Keep this file as the documented consumer of the
+// emitted class; `make` builds the `tau compile` executable.
 
 #include "program.h"
 #include <cstdio>

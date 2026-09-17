@@ -310,6 +310,18 @@ struct api {
 	 */
 	static void set_ltl_guard_max_cubes(size_t n);
 	/**
+	 * @brief Cap on the ABA-oracle refinement rounds of a realizability
+	 * check (`ltl_max_refinement_rounds`); on the cap the verdict is
+	 * UNKNOWN. Default 64; 0 = unlimited.
+	 */
+	static void set_ltl_max_refinement_rounds(size_t n);
+	/**
+	 * @brief Cap on the strategy paths the multi-step window oracle
+	 * examines per check (`ltl_window_max_paths`); a hit cap yields
+	 * UNKNOWN. Default 4096; 0 = unlimited.
+	 */
+	static void set_ltl_window_max_paths(size_t n);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */
