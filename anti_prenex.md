@@ -183,7 +183,7 @@ term representation, per component (PREPARE_TERMS):
 | `expand_count` | cases built so far in this component, written by `EXPAND` and `DECOMPOSE_ARMS` and read against `expand_max`. Reset to 0 at component setup (§5) |
 | `accept_growth` | growth factor of the per-component SIZE ACCEPTANCE (§5): a component push whose result exceeds `max(γ·\|input\|, accept_floor)` is discarded for the re-wrapped input (inv. 3). `γ = 16`. Neither taint nor flush attaches (cache scope, below) |
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires — moderate growth is routine and often repaid downstream; the test exists for detonation (§5). `2²⁰` |
-| `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): once `Σ‖witnesses‖` exceeds this factor times `Σ‖TERM_OF(pinning conjunct)‖`, the pass admits no further pin. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
+| `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): a pin whose admission would push `Σ‖witnesses‖` past this factor times `Σ‖TERM_OF(pinning conjunct)‖` is refused. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
 | `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per block it is handed the block's binder node — `REWRAP(matrix, X)`, the run head with its variables outermost first and the matrix below (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL`, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified |
@@ -418,7 +418,9 @@ TRY_WITNESS(x, ψ, ctx = ⊥) → formula | ⊥:
     return ⊥
 
 TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
-    // A SPINE is a flattened conjunction (Q = ∃) or disjunction (Q = ∀); a
+    // A SPINE is a flattened conjunction (Q = ∃) or disjunction (Q = ∀), and
+    // ANY OTHER NODE is a one-member spine, so a lone pin or a bare case pin
+    // fires like one among siblings; a
     // PIN is a spine member ≡ x = t (∃) or ≡ x ≠ t (∀) — TRY_WITNESS's
     // SPELLED match (nothing is BDD-backed at phase 2, §3), negated for ∀,
     // strict, so the member is dropped. For a spine S reached from Φ's
@@ -443,30 +445,31 @@ TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
     // a unit.
     D ← ∅ ; flipped ← false ; n ← Φ    // D: path-bound vars barred from FV(t)
     loop:
-        if n is a spine:
-            if some member is a pin with x ∉ FV(t) and FV(t) ∩ D = ∅:
-                // (b) holds free of charge: every node the descent visits
-                //   contains ALL free occurrences of x
-                return Φ with, at n: the pin dropped, x ← t in the members
-            if some member is a CASE PIN for x (∨-of-branches for ∃, dualized
-                    for ∀; every branch pins x, x ∉ FV(tᵢ); ≤ K″ branches —
-                    the case_max constant, read bare: phase 2 predates any
-                    ctx) and FV(that member) ∩ D = ∅:
-                // the WHOLE member must avoid D, not only the tᵢ: past a kind
-                //   flip the branch CHOICE may not depend on the inner
-                //   variable — ∃x∀y.((y = 0 ∧ x = 0) ∨ (y ≠ 0 ∧ x = 1)) is F,
-                //   its rewrite ∀y.(y = 0 ∨ y ≠ 0) is T, tᵢ constant. Before
-                //   the flip the binders commute above Qx, and the member may
-                //   use them, like t in the plain pin
-                return Φ with, at n: the spine replaced by
-                    ⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus the member))[x ← tᵢ]
-                    // connectives and pin sense in the ∀ form under ¬∃x¬, as
-                    //   above; the rewrite is local to S, like the plain one
-            if x free in ≥ 2 members: return ⊥
-            n ← the one member holding x
-        else if n is the other connective (∨ for ∃, ∧ for ∀):
-            if x free in ≥ 2 children: return ⊥     // x-free siblings ride
-            n ← the one child holding x             //   along outside Qx
+        S ← the members of n if n is a spine, else [n]   // any other node is
+                                                         //   a one-member spine
+        if some member of S is a pin with x ∉ FV(t) and FV(t) ∩ D = ∅:
+            // (b) holds free of charge: every node the descent visits
+            //   contains ALL free occurrences of x
+            return Φ with, at n: the pin dropped, x ← t in the members
+                // on a one-member spine the join is empty: T for ∃, F for ∀
+        if some member of S is a CASE PIN for x (∨-of-branches for ∃, dualized
+                for ∀; every branch pins x, x ∉ FV(tᵢ); ≤ K″ branches —
+                the case_max constant, read bare: phase 2 predates any
+                ctx) and FV(that member) ∩ D = ∅:
+            // the WHOLE member must avoid D, not only the tᵢ: past a kind
+            //   flip the branch CHOICE may not depend on the inner
+            //   variable — ∃x∀y.((y = 0 ∧ x = 0) ∨ (y ≠ 0 ∧ x = 1)) is F,
+            //   its rewrite ∀y.(y = 0 ∨ y ≠ 0) is T, tᵢ constant. Before
+            //   the flip the binders commute above Qx, and the member may
+            //   use them, like t in the plain pin
+            return Φ with, at n: the spine replaced by
+                ⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus the member))[x ← tᵢ]
+                // connectives and pin sense in the ∀ form under ¬∃x¬, as
+                //   above; the rewrite is local to S, like the plain one; a
+                //   bare case pin — n the member itself — carries nothing
+        if n is a spine or the other connective (∨ for ∃, ∧ for ∀):
+            if x free in ≥ 2 members: return ⊥      // x-free siblings ride
+            n ← the one member holding x            //   along outside Qx
         else if n = Q′v.χ:
             if Q′ ≠ Q: flipped ← true
             if flipped: D ← D ∪ {v}    // Q-kind vars before the flip commute
@@ -542,7 +545,9 @@ TO_NNF(φ):
     // ¬ down to the atoms, at most one per atom (inv. 4). Phase 1 rebuilds
     // the raw input bottom-up in one memoized pass; from phase 3 on every
     // node is in NNF already and the only work is NEG, cached on the node
-    // as neg(φ) (§1).
+    // as neg(φ) (§1) — written by NEG's entry on first demand; the walk
+    // keeps each ¬ψ it rewrites in passing in its own per-node memo, so a
+    // later demand for neg(ψ) is one lookup there, never a recomputation.
     ¬ψ ↦ NEG(ψ)      atom ↦ atom      ∧ / ∨ ↦ re-emitted through the joins over
                                        //   the normalised members — phase 1
                                        //   canonicalises the raw input's chains
@@ -601,8 +606,9 @@ set by phase 1 alone, which ESTABLISHES invariant 6: with it every atom goes
 through `SIMPLIFY_ATOM`, and the traversal also descends into reference
 arguments, recursively, running each through `SIMPLIFY_TERM` — a reference's
 arguments are always terms, only the reference itself can be a formula.
-Elsewhere only the atoms propagation rewrote are re-simplified, and arguments
-are left alone: they are simplified already (§1)), `FOLD_DEGENERATE_BINDERS` (drop a binder over a
+Elsewhere only the atoms propagation rewrote are re-simplified, and an argument
+is touched only by a pin's substitution, which re-simplifies what it changed
+(§1)), `FOLD_DEGENERATE_BINDERS` (drop a binder over a
 constant scope or an absent variable — formula binders and functional
 quantifiers alike; the term constructor applies the same rules when the
 symbolic `∀_Y f`/`∃_Y f` term is formed: a subscript not free in `f` is
@@ -619,12 +625,13 @@ every graceful exit of invariant 3; the kind defaults to `∃` and the dualised
 — `REWRAP` narrows nothing, every caller narrows for itself) are primitives.
 So are the two aggressive normalisers of invariant 6:
 
-- `SIMPLIFY_TERM(t, order = ∅)` — constant folding, absorption and complement
-  laws, per-path contradiction, and reduction to the canonical form of the BDD
-  backing `t`. Per-path contradiction is `prop:xfx` — `x·f(x) = x·f(1)`,
-  `x′·f(x) = x′·f(0)` — so a sub-term under a literal is reduced by that
-  literal's assignment. It is what stops nested Boole normal forms from
-  compounding as substitutions stack terms inside terms.
+- `SIMPLIFY_TERM(t, order = ∅)` — constant folding, complement laws, per-path
+  contradiction, and reduction to the canonical form of the BDD backing `t`.
+  Per-path contradiction is `prop:xfx` — `x·f(x) = x·f(1)`, `x′·f(x) =
+  x′·f(0)` — so a sub-term under a literal is reduced by that literal's
+  assignment; absorption is its literal instance (`x ∪ x·c = x`), and a
+  compound one (`ab ∪ ab·c`) stays as written. It is what stops nested Boole
+  normal forms from compounding as substitutions stack terms inside terms.
 - `SIMPLIFY_ATOM(a, order = ∅)` — `SIMPLIFY_TERM` on both sides, then fold a
   constant-only atom to `T`/`F`. With no BDD-backed side — the initial
   phase-1 effort, phases 2 and 5, and every plain atom of the push, order
@@ -828,9 +835,13 @@ unequal until `y := a` turns `f` into `a`.
   the pass, the environment kept idempotent (a new witness rewritten by the
   pins in force, the ranges in force rewritten by the new pin). Then REWRITE
   every conjunct under the environment the match ended with: the equations
-  at the conjunction — a pinning one under the environment MINUS ITS OWN
-  PIN, so it stays and keeps constraining its variable, while every other
-  pin does reach it — and the rest as the traversal meets them. So the
+  at the conjunction — a pinning one under the environment RE-DERIVED
+  WITHOUT IT, the match rerun over the other candidates with its variable
+  barred from being pinned, so it stays and keeps constraining its variable
+  while every other pin reaches it (its own entry merely removed from the
+  final environment would not do: a later admission can fold that pin into
+  another's range, and the conjunct would meet its own equation and fold to
+  `T`) — and the rest as the traversal meets them. So the
   result does not depend on the order of the equations, and the example
   above folds whichever conjunct sorts first. Not a fixpoint: nothing is
   re-matched after the rewrite, and a pin that only surfaces once the sweep
@@ -839,17 +850,21 @@ unequal until `y := a` turns `f` into `a`.
   sibling's whole ∧/∨ structure — a disjunctive sibling's members included —
   and INTO binder units (§4), a pin suspended under a binder over its variable
   or over a variable of its witness; temporal operators are opaque to both
-  passes, as they are to `[atm ↦ T/F]`; references are opaque — their
-  arguments only under `ref_args`, and then through `SIMPLIFY_TERM`, never
-  through a pin. Each atom the pass rewrites is re-emitted through
+  passes, as they are to `[atm ↦ T/F]`; a reference never matches — it is
+  no equation — but a pin's substitution reaches its arguments like any
+  other occurrence and re-simplifies an argument it changed, once (§1);
+  under `ref_args` every argument goes through `SIMPLIFY_TERM`, changed or
+  not. Each atom the pass rewrites is re-emitted through
   `SIMPLIFY_ATOM`. §8 leans on the depth — a case inherits `D`'s members
   already specialised at ψ's construction — and on the CHAINED pin, which,
   propagated or not, is the one growth channel the `EXPAND` measure cannot
   rule out.
 - **The environment is CAPPED.** A witness on its own is smaller than the
-  equation it came from; what grows is the CHAINING of ranges. Once
-  `Σ‖witnesses‖` exceeds `propagate_growth · Σ‖TERM_OF(pinning conjunct)‖` over
-  the environment, no further pin is admitted in this pass — precision, never
+  equation it came from; what grows is the CHAINING of ranges. A pin is
+  admitted only if, with it in and the ranges rewritten by it,
+  `Σ‖witnesses‖` stays within `propagate_growth · Σ‖TERM_OF(pinning
+  conjunct)‖` over the environment; a pin that would cross the line is
+  refused and the match goes on to the next candidate — precision, never
   soundness (§1 ctx table).
 
 A heuristic, not a monotone gain: a `t` larger than `y` enlarges terms, and

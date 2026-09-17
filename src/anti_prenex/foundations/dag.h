@@ -110,9 +110,8 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * A connective chain is stored as a BINARY spine, and every node of that
  * spine counts like any other node, so a chain of `k` members costs
- * `k−1 + Σ|members|`. This deviates on purpose from an n-ary reading of the
- * spec's `|φ|`: it keeps the count a plain `1 + Σ|children|` and independent
- * of the nesting direction.
+ * `k−1 + Σ|members|` (§1): the count stays a plain `1 + Σ|children|`,
+ * independent of the nesting direction.
  *
  * It is a TREE count over a hash-consed DAG: a shared subtree counts once per
  * place it appears. It is the sort key of push step 2d (§6,

@@ -52,6 +52,13 @@ bool holds_var(tref n, const char* name) {
 	return ap::fv_meets<node_t>(n, ap::block{ fvar(name) });
 }
 
+/// The same for a PARSED formula, whose variables are not the ones `fvar`
+/// builds: the variable is parsed the way the formula was.
+bool holds_parsed_var(tref n, const char* name) {
+	const tref v = tau::trim(tau::get(name, parse_bf()));
+	return ap::fv_meets<node_t>(n, ap::block{ v });
+}
+
 /// Invariant 4 over a whole formula: no fused negated atom anywhere.
 bool no_fused_atoms(tref n) {
 	bool clean = true;
@@ -498,6 +505,56 @@ TEST_CASE("S12: reference arguments only under `ref_args`") {
 	CHECK(is_child<node_t>(got, tau::wff_ref));
 	CHECK(got != ref);
 	CHECK(are_nso_equivalent<node_t>(got, ref));
+}
+
+TEST_CASE("S12a: a reference INSIDE an atom's terms has its arguments "
+	"simplified under `ref_args` too") {
+	// A `bf_ref` is a leaf to the atom simplifier, so the propagation pass
+	// is what reaches its arguments (§3: the descent into reference
+	// arguments is recursive). `x & (x | y)` folds to `x`, and `y` — which
+	// `FV` counts inside an argument (§1) — disappears with it.
+	tref atom = tau::get("f(x & (x | y)) = 0", parse_wff());
+	REQUIRE(atom != nullptr);
+	REQUIRE(is_child<node_t>(atom, tau::bf_eq));
+	REQUIRE(holds_parsed_var(atom, "y"));
+	// Opaque by default: the same node.
+	CHECK(ap::simplify<node_t>(atom) == atom);
+	tref got = ap::simplify<node_t>(atom, {}, true);
+	INFO("ref_args: ", tau::get(got).to_str());
+	CHECK(got != atom);
+	CHECK(is_child<node_t>(got, tau::bf_eq));
+	CHECK(holds_parsed_var(got, "x"));
+	CHECK(!holds_parsed_var(got, "y"));
+	// The same under a `¬`, and for a reference nested in another's
+	// argument.
+	tref negated = tau::get("!(f(x & (x | y)) = 0)", parse_wff());
+	REQUIRE(negated != nullptr);
+	tref ngot = ap::simplify<node_t>(negated, {}, true);
+	INFO("negated: ", tau::get(ngot).to_str());
+	CHECK(is_child<node_t>(ngot, tau::wff_neg));
+	CHECK(!holds_parsed_var(ngot, "y"));
+	tref nested = tau::get("g(f(x & (x | y))) = 0", parse_wff());
+	REQUIRE(nested != nullptr);
+	tref nested_got = ap::simplify<node_t>(nested, {}, true);
+	INFO("nested: ", tau::get(nested_got).to_str());
+	CHECK(!holds_parsed_var(nested_got, "y"));
+}
+
+TEST_CASE("S12d: a pin that reaches a reference argument re-simplifies it") {
+	// The substitution enters a reference argument (§1: it reaches every
+	// occurrence), and invariant 6 asks the argument it changed to be
+	// re-simplified. `y ↦ a·b` turns `y & (y' | c)` into `ab & ((ab)' | c)`,
+	// which the construction hooks leave alone and SIMPLIFY_TERM's per-path
+	// contradiction folds to `abc`. Without `ref_args`: only the pin
+	// touches the argument.
+	tref phi = tau::get("y = a & b && f(y & (y' | c)) = 0", parse_wff());
+	REQUIRE(phi != nullptr);
+	tref got = ap::simplify<node_t>(phi);
+	INFO("got: ", tau::get(got).to_str());
+	CHECK(holds_parsed_var(got, "y"));      // the pinning conjunct stays
+	CHECK(holds_parsed_var(got, "c"));
+	auto is_or = [](tref m) { return tau::get(m).is(tau::bf_or); };
+	CHECK(tau::get(got).find_top(is_or) == nullptr);
 }
 
 // --- the exclusion of a leaf's own pin ---------------------------------------------------

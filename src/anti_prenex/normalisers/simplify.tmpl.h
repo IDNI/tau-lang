@@ -68,6 +68,17 @@ tref term_key(tref var) {
 	return tree<node>::get(tree<node>::bf, var);
 }
 
+/// The argument hook of every substitution in this file (§1, invariant 6):
+/// a reference argument the substitution changed is re-simplified once, in
+/// the PLAIN regime — an argument is the inside of a leaf, never BDD-backed,
+/// whatever the live order. One `std::function`, built once.
+template <NodeType node>
+const typename tree<node>::argument_hook& resimplify_argument() {
+	static const typename tree<node>::argument_hook hook =
+		[](tref a) { return simplify_term<node>(a); };
+	return hook;
+}
+
 } // namespace detail
 
 // --- the pin match ---------------------------------------------------------------
@@ -107,10 +118,10 @@ std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 {
 	using tau = tree<node>;
 	const tref key = term_key<node>(y);
-	const tref f0 = simplify_term<node>(
-		tau::get(f).substitute(key, _0<node>(type), order), order);
-	const tref f1 = simplify_term<node>(
-		tau::get(f).substitute(key, _1<node>(type), order), order);
+	const tref f0 = simplify_term<node>(tau::get(f).substitute(key,
+		_0<node>(type), order, resimplify_argument<node>()), order);
+	const tref f1 = simplify_term<node>(tau::get(f).substitute(key,
+		_1<node>(type), order, resimplify_argument<node>()), order);
 	// `usable`: `y` gone from both cofactors. Where it is not, `y` still
 	// hides in a subterm the substitution did not reach and the record
 	// must not be used (§1, the leaf hazard).
@@ -318,11 +329,20 @@ private:
 	/// §3: an atom rewritten by the environment `e` and re-emitted through
 	/// `SIMPLIFY_ATOM` — which unwraps one `¬` itself — whenever the
 	/// environment changed it, or always in `ref_args` mode, which is what
-	/// establishes invariant 6 in phase 1.
+	/// establishes invariant 6 in phase 1. A pin reaches a reference
+	/// argument like any other occurrence, and an argument it changed is
+	/// re-simplified by the substitution itself (`resimplify_argument`).
+	/// In `ref_args` mode EVERY argument of a reference inside the atom's
+	/// terms goes through `SIMPLIFY_TERM` besides (§3: the descent into
+	/// reference arguments is recursive): a reference is a leaf to the
+	/// atom simplifier, so nothing else reaches them, and a simplified
+	/// argument may let two leaves merge.
 	tref rewrite_under(const environment& e, tref a) {
 		const tref bare = tau::trim_right_sibling(a);
-		const tref res = e.changes.empty() ? bare
-			: tau::get(bare).substitute(e.changes, order);
+		tref res = e.changes.empty() ? bare
+			: tau::get(bare).substitute(e.changes, order,
+				resimplify_argument<node>());
+		if (ref_args) res = simplify_reference_arguments(res);
 		if (res != bare || ref_args)
 			return simplify_atom<node>(res, order);
 		return bare;
@@ -374,9 +394,11 @@ private:
 		return rewrite_under(e, leaf);
 	}
 
-	/// `ref_args` mode: every `bf` argument of a reference through
-	/// `SIMPLIFY_TERM`, never through a pin (§3). Post-order, so a
-	/// reference nested inside an argument is finished first.
+	/// `ref_args` mode: every `bf` argument of a reference below `n`
+	/// through `SIMPLIFY_TERM`, changed by a pin or not (§3). `n` is a
+	/// `wff_ref` node, or an atom whose terms may hold a `bf_ref`
+	/// (`rewrite_under`). Post-order, so a reference nested inside an
+	/// argument is finished first.
 	tref simplify_reference_arguments(tref n) {
 		auto f = [this](tref m) {
 			const tau& t = tau::get(m);
@@ -429,7 +451,8 @@ private:
 		// environment stays idempotent.
 		tref w = p->witness;
 		if (!e.changes.empty()) w = simplify_term<node>(
-			tau::get(w).substitute(e.changes, order), order);
+			tau::get(w).substitute(e.changes, order,
+				resimplify_argument<node>()), order);
 		// and every range in force rewritten by the new pin.
 		subtree_map<node, tref> one;
 		one.emplace(key, w);
@@ -438,7 +461,8 @@ private:
 		for (size_t i = 0; i < e.pins.size(); ++i) {
 			tref r = e.pins[i].witness;
 			if (e.pins[i].active) {
-				r = tau::get(r).substitute(one, order);
+				r = tau::get(r).substitute(one, order,
+					resimplify_argument<node>());
 				if (r != e.pins[i].witness)
 					r = simplify_term<node>(r, order);
 			}
@@ -449,9 +473,11 @@ private:
 			new_witness_sum += mem_size<node>(r);
 			rewritten.emplace_back(i, r);
 		}
-		// THE CAP (§3), measured after the insertion: once the ranges
-		// outgrow the equations that licensed them, no further pin is
-		// admitted in this pass. Precision, never soundness.
+		// THE CAP (§3), measured with this pin in and the ranges
+		// rewritten by it: a pin that would push the ranges past the
+		// factor times the equations that licensed them is refused, and
+		// the match goes on to the next candidate. Precision, never
+		// soundness.
 		const size_t new_atom_sum = e.atom_sum
 			+ mem_size<node>(term_of<node>(atom, order));
 		if (new_witness_sum > propagate_growth * new_atom_sum) return {};

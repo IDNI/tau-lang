@@ -22,9 +22,13 @@
  * WHAT IT MAY TOUCH (§4): the substitution descends through a sibling's whole
  * ∧/∨ structure and INTO a binder unit's body, with a pin SUSPENDED under a
  * binder over its variable or over a variable of its witness. Temporal
- * operators are opaque to both passes. So are references — their arguments
- * only under `ref_args`, and then through `SIMPLIFY_TERM`, never through a
- * pin. The pinning conjunct STAYS, rewritten by every pin but its OWN: `y` is
+ * operators are opaque to both passes. A reference — a formula-level one or
+ * one inside an atom's terms — is no equation and never matches; a pin's
+ * substitution reaches its arguments like any other occurrence (§1: it
+ * reaches every occurrence) and re-simplifies the argument it changed, once,
+ * through `SIMPLIFY_TERM`, so no argument is left dirty (invariant 6). Under
+ * `ref_args` every argument goes through `SIMPLIFY_TERM`, changed or not. The
+ * pinning conjunct STAYS, rewritten by every pin but its OWN: `y` is
  * free, so the conjunct still constrains it, and for a weak pin it is what
  * keeps the residual `p = 0`, while its own pin would fold it to `T`.
  */

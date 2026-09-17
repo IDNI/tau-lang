@@ -254,15 +254,16 @@ tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
 // --- the two aggressive normalisers of invariant 6 --------------------------------
 
 /**
- * @brief §3 `SIMPLIFY_TERM(t, order = ∅)`: constant folding, absorption and
- * complement laws, per-path contradiction, and reduction to the canonical
- * form of the BDD backing `t`.
+ * @brief §3 `SIMPLIFY_TERM(t, order = ∅)`: constant folding, complement
+ * laws, per-path contradiction, and reduction to the canonical form of the
+ * BDD backing `t`.
  *
  * Per-path contradiction is the rule `prop:xfx` — `x·f(x) = x·f(1)` and
  * `x′·f(x) = x′·f(0)` — so a subterm under a literal is reduced by that
- * literal's assignment.
+ * literal's assignment. Absorption is its literal instance (`x ∪ x·c = x`);
+ * a compound one (`ab ∪ ab·c`) stays as written.
  *
- * All four laws come from the existing `syntactic_path_simplification`
+ * All three laws come from the existing `syntactic_path_simplification`
  * (heuristics/). A plain term goes through it whole. For a term under the
  * live order the representation is re-established first: a BDD-backed term is
  * already canonical over `P`, while a plain combination of BDD-backed
