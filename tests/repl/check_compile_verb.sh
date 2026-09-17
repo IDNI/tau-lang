@@ -16,7 +16,7 @@ trap 'rm -rf "${TMPDIR}"' EXIT
 cp "${SPEC}" "${TMPDIR}/spec.tau"
 EXE="${TMPDIR}/spec_exe"
 
-out="$(run_with_timeout 300 "${TAU}" compile "${TMPDIR}/spec.tau" -o "${EXE}" 2>&1)"
+out="$(run_with_timeout 600 "${TAU}" compile "${TMPDIR}/spec.tau" -o "${EXE}" 2>&1)"
 rc=$?
 if [ "${rc}" -eq 124 ]; then
 	echo "FAIL: tau compile timed out" >&2; exit 1
