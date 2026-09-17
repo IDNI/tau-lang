@@ -312,8 +312,12 @@ TEST_SUITE("LTL fuzz (property-based)") {
 	// and tau's semantics coincide with Spot's propositional one: every
 	// disagreement is a real one, so none is tolerated and each is a
 	// failure that names the formula.
+	// The atoms are typed bv[1], so a pack without bv parses none of them
+	// and the case would check nothing; skip it there rather than fail on
+	// the `checked > 0` guard below.
 	TEST_CASE("CROSS-bv1: tau verdict matches Spot over two-element atoms"
-		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0)) {
+		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0
+			|| !pack_owns_ba_type_name<node_t>("bv"))) {
 		uint64_t seed  = get_env_uint("TAU_FUZZ_SEED",  45);
 		int      count = get_env_int ("TAU_FUZZ_COUNT", 300) / 3;
 		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
