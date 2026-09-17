@@ -511,6 +511,24 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 			else ++it;
 		auto opt_h = build_halfspace(lhs);
 		if (!opt_h) return std::nullopt;
+		// Strictness is canonical in this algebra (hsb.h): a half-space
+		// whose leading coefficient is positive is open, one whose leading
+		// coefficient is negative is closed, and the other two sets are not
+		// elements of the algebra at all. The operator in the source text
+		// is therefore honoured only when it agrees with that rule; when it
+		// does not, say so rather than silently reading the other set.
+		const bool wrote_strict = (hs_child | tt::nonterminal) == type::hs_lt;
+		if (wrote_strict != opt_h->is_strict()) {
+			LOG_WARNING << "[hsb] a half-space written "
+				<< (wrote_strict ? "strict (`<`)" : "closed (`<=`)")
+				<< " but the lex-half-open algebra has only the "
+				<< (opt_h->is_strict() ? "open" : "closed")
+				<< " set for this normal vector (the leading coefficient "
+				<< (opt_h->is_strict() ? "is positive" : "is negative")
+				<< "); reading it as `" << opt_h->to_string() << "`. Flip the "
+				"comparison to name the other bound, e.g. `1 <= x[0]` "
+				"is the closed set x[0] >= 1.";
+		}
 		return hsb::mk_hs(*opt_h);
 	}
 	default:

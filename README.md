@@ -2093,25 +2093,39 @@ data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).
 |-------|---------|
 | `top`, `{ top }` | Universe (ℝ^d) |
 | `bot`, `bottom`, `{ bot }` | Empty set |
-| `x[0] < 0` | Single open halfspace |
-| `x[0] <= 0` | Single closed halfspace |
+| `x[0] < 0` | Single open halfspace (x[0] < 0) |
+| `0 <= x[0]` | Single closed halfspace (x[0] >= 0): read as `-x[0] <= 0` |
 | `x[0] < 1` | Constant bound: read as `x[0] - 1 < 0` |
-| `x[0] <= x[1]` | Variable bound: read as `x[0] - x[1] <= 0` |
+| `x[1] <= x[0]` | Variable bound (x[0] >= x[1]): read as `-x[0] + x[1] <= 0` |
 | `x[0]*0.5 + 0.7 < 0` | Halfspace with coefficient and bias |
 | `0.5*x[0] + -0.3*x[1] + 0.7 < 0` | Multivariate halfspace |
-| `2*x[0] <= x[1] - 1` | Linear expressions on both sides: read as `2*x[0] - x[1] + 1 <= 0` |
+| `2*x[0] < x[1] - 1` | Linear expressions on both sides: read as `2*x[0] - x[1] + 1 < 0` |
 | `(x[0] < 0 & x[1] < 0)` | Conjunction of halfspaces (parentheses required) |
 | `((x[0] < 0 & x[1] < 0) \| ~(x[2] < 0))` | Disjunction and negation |
 
 Coefficients can appear before (`0.5*x[0]`) or after (`x[0]*0.5`) the variable.
 Both sides of a half-space are linear expressions (`linexpr < linexpr` or
 `linexpr <= linexpr`); the parser moves the right-hand side to the left, so
-`x[0] < 1` is `x[0] - 1 < 0`, `x[0] <= x[1]` is `x[0] - x[1] <= 0`, and
+`x[0] < 1` is `x[0] - 1 < 0`, `x[1] <= x[0]` is `-x[0] + x[1] <= 0`, and
 `x[0] + x[1] < x[1] + 3` is `x[0] - 3 < 0`. A comparison whose variables all
 cancel (`x[0] < x[0]`, `1 < 2`) is rejected. Coefficients and biases are
 unsigned numbers written as integers, decimals (`0.5`) or fractions (`1/2`);
 a leading `-` negates a term, and a fraction with a zero denominator is
 rejected.
+
+**Strictness is canonical, not chosen by the operator.** The algebra is the
+Boolean algebra of *lex-half-open* polyhedra: for a normal vector `w` whose
+first non-zero coefficient is positive the algebra contains only the open
+half-space `⟨w,x⟩ + b < 0`, and for a negative leading coefficient only the
+closed one `⟨w,x⟩ + b <= 0`; the complement of an element flips both the
+sign and the strictness, which is what keeps the family closed under the
+Boolean operations. So `x[0] < 1` (open, x[0] < 1) and `1 <= x[0]` (closed,
+x[0] >= 1) are elements, while the closed set x[0] <= 1 and the open set
+x[0] > 1 are not. When the operator you write disagrees with the canonical
+strictness (`x[0] <= 1`, `1 < x[0]`) the literal parses as the element the
+algebra does have (`x[0] - 1 < 0`, `-x[0] + 1 <= 0`) and a warning names
+the set that was read; the printed form of an element always shows its
+canonical operator.
 Inside `{...}:hsb`, `&`, `|` and `~` combine constraints; every `&`/`|`
 combination must be parenthesised.  The same combinations are also available
 through the Boolean algebra operations at the formula level.

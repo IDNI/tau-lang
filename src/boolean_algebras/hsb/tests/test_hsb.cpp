@@ -1240,6 +1240,29 @@ TEST_SUITE("hsb — parser") {
 		CHECK(std::get<hsb>(e->first) == std::get<hsb>(f->first));
 	}
 
+	// The operator is honoured when it agrees with the canonical strictness
+	// (negative leading coefficient => closed); otherwise the element the
+	// algebra does have is read, and it prints with its canonical operator.
+	TEST_CASE("a closed half-space needs the variable on the right") {
+		auto a = parse_hsb<bas_pack>("1 <= x[0]");
+		REQUIRE(a.has_value());
+		const hsb& h = std::get<hsb>(a->first);
+		CHECK(h.to_string().find("<= 0") != std::string::npos);
+		auto b = parse_hsb<bas_pack>("-x[0] + 1 <= 0");
+		REQUIRE(b.has_value());
+		CHECK(h == std::get<hsb>(b->first));
+		// `1 < x[0]` (open, not an element) reads as the same closed set
+		auto c = parse_hsb<bas_pack>("1 < x[0]");
+		REQUIRE(c.has_value());
+		CHECK(h == std::get<hsb>(c->first));
+		// and `x[0] <= 1` (closed, not an element) as the open x[0] < 1
+		auto d = parse_hsb<bas_pack>("x[0] <= 1");
+		auto e = parse_hsb<bas_pack>("x[0] < 1");
+		REQUIRE(d.has_value()); REQUIRE(e.has_value());
+		CHECK(std::get<hsb>(d->first) == std::get<hsb>(e->first));
+		CHECK(std::get<hsb>(e->first).to_string().find(" < 0") != std::string::npos);
+	}
+
 	TEST_CASE("a half-space whose variables all cancel does not parse") {
 		// `x[0] < x[0]` is `0 < 0`: no dimension is left, so build_halfspace
 		// refuses it the way it refuses a bare constant comparison.
