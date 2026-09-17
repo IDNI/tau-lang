@@ -229,7 +229,8 @@ template <NodeType node> tref build_var_name(size_t sid);
 /** @brief Build a variable-name node from @p name. */
 template <NodeType node> tref build_var_name(const std::string& name);
 /** @brief Build a variable-name node with auto-generated name from @p index. */
-template <NodeType node> tref build_var_name_indexed(size_t index);
+template <NodeType node> tref build_var_name_indexed(size_t index,
+	const std::string& prefix = "i");
 /** @brief Build a canonised I/O variable from @p name. */
 template <NodeType node> tref build_canonized_io_var(const std::string& name);
 /** @brief Build a typed variable with name node @p var_name_node. */

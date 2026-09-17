@@ -1203,6 +1203,17 @@ TEST_SUITE("hsb — parser") {
 		CHECK(std::get<hsb>(r->first) == hsb::bottom());
 	}
 
+	// A zero denominator used to parse as +inf and build an unbounded
+	// half-space; parse_unum yields NaN and build_halfspace refuses it.
+	// (hsb literals are half-spaces in the `linexpr < 0` form, so the bias
+	// carries the fraction.)
+	TEST_CASE("a literal with a zero denominator does not parse") {
+		auto r = parse_hsb<bas_pack>("x[0] + 1/0 < 0");
+		CHECK_FALSE(r.has_value());
+		auto ok = parse_hsb<bas_pack>("x[0] + 1/2 < 0");
+		CHECK(ok.has_value());
+	}
+
 	TEST_CASE("parse single constraint: x[0] < 0") {
 		auto r = parse_hsb<bas_pack>("x[0] < 0");
 		REQUIRE(r.has_value());

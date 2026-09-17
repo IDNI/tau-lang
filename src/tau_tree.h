@@ -873,7 +873,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Build a variable-name node from @p name. */
 	static tref build_var_name(const std::string& name);
 	/** @brief Build a variable-name node with auto-generated name from @p index. */
-	static tref build_var_name_indexed(size_t index);
+	/// `<prefix><index>` as a var_name node; "i" for input streams, "o" for
+	/// output streams (the out-var builders below pass "o").
+	static tref build_var_name_indexed(size_t index,
+		const std::string& prefix = "i");
 	/** @brief Build a canonised I/O variable from @p name. */
 	static tref build_canonized_io_var(const std::string& name);
 	/** @brief Build a generic typed variable with type @p type_id. */

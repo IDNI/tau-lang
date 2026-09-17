@@ -871,9 +871,13 @@ tref build_var_name(const std::string& name) {
 }
 
 template <NodeType node>
-tref build_var_name_indexed(size_t index) {
+tref build_var_name_indexed(size_t index, const std::string& prefix) {
+	// Both the direction bit and the name prefix classify a stream (the
+	// LTL layer's is_pure_input_atom falls back to the prefix), so an
+	// output built here used to carry an INPUT name `i<n>` -- the out-var
+	// builders pass "o".
 	std::stringstream name;
-	return build_var_name<node>((name << "i" << index, name.str()));
+	return build_var_name<node>((name << prefix << index, name.str()));
 }
 
 template <NodeType node>
@@ -1027,7 +1031,7 @@ tref build_out_var_at_n(const std::string& name, int_t pos, size_t type_id) {
 template <NodeType node>
 tref build_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id) {
 	return build_out_var_at_n<node>(
-		build_var_name_indexed<node>(index), pos, type_id);
+		build_var_name_indexed<node>(index, "o"), pos, type_id);
 }
 
 template <NodeType node>
@@ -1043,7 +1047,7 @@ tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t) {
 template <NodeType node>
 tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t) {
 	return build_out_var_at_t<node>(
-		build_var_name_indexed<node>(index), type_id, t);
+		build_var_name_indexed<node>(index, "o"), type_id, t);
 }
 
 template <NodeType node>
@@ -1064,7 +1068,7 @@ tref build_out_var_at_t_minus(const std::string& name, size_t shift, size_t type
 template <NodeType node>
 tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t) {
 	return build_out_var_at_t_minus<node>(
-		build_var_name_indexed<node>(index), shift, type_id, t);
+		build_var_name_indexed<node>(index, "o"), shift, type_id, t);
 }
 
 template <NodeType node>
@@ -1637,8 +1641,10 @@ tref tree<node>::build_var_name(const std::string& name) {
 }
 
 template <NodeType node>
-tref tree<node>::build_var_name_indexed(size_t index) {
-	return tau_lang::build_var_name_indexed<node>(index);
+tref tree<node>::build_var_name_indexed(size_t index,
+	const std::string& prefix)
+{
+	return tau_lang::build_var_name_indexed<node>(index, prefix);
 }
 
 template <NodeType node>

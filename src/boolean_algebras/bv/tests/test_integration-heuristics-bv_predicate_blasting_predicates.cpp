@@ -407,9 +407,48 @@ TEST_SUITE("bvcast") {
 	}
 }
 
+// The comparison dispatch of wff_predicate_blasting: every surface operator
+// on ground bitvectors is blasted and decided. lt/gt/lteq/gteq/nlt/ngt/
+// nlteq/ngteq/neq_predicate had no coverage in the full suite (2026-09-16)
+// because nothing exercised the non-`=` operators through the blaster.
+TEST_SUITE("bv predicate blasting: every comparison operator") {
+	using node = node_t;
+	static bool blasted_is_T(const char* spec) {
+		tref fm = get_nso_rr<node>(tau::get(spec)).value().main->get();
+		tref blasted = bv_predicate_blasting<node>(fm);
+		REQUIRE(blasted != nullptr);
+		auto n = normalizer<node>(blasted);
+		REQUIRE(n.has_value());
+		return tau::get(n.value()).equals_T();
+	}
+	TEST_CASE("< and !< on ground values") {
+		CHECK( blasted_is_T("ex x (x = { 2 }:bv[3] && x < { 3 }:bv[3]).") );
+		CHECK_FALSE( blasted_is_T("ex x (x = { 3 }:bv[3] && x < { 3 }:bv[3]).") );
+		CHECK( blasted_is_T("ex x (x = { 3 }:bv[3] && x !< { 3 }:bv[3]).") );
+	}
+	TEST_CASE("> and !> on ground values") {
+		CHECK( blasted_is_T("ex x (x = { 5 }:bv[3] && x > { 3 }:bv[3]).") );
+		CHECK_FALSE( blasted_is_T("ex x (x = { 3 }:bv[3] && x > { 3 }:bv[3]).") );
+		CHECK( blasted_is_T("ex x (x = { 3 }:bv[3] && x !> { 3 }:bv[3]).") );
+	}
+	TEST_CASE("<= and >= and their negations") {
+		CHECK( blasted_is_T("ex x (x = { 3 }:bv[3] && x <= { 3 }:bv[3]).") );
+		CHECK( blasted_is_T("ex x (x = { 3 }:bv[3] && x >= { 3 }:bv[3]).") );
+		CHECK_FALSE( blasted_is_T("ex x (x = { 4 }:bv[3] && x <= { 3 }:bv[3]).") );
+		CHECK( blasted_is_T("ex x (x = { 4 }:bv[3] && x !<= { 3 }:bv[3]).") );
+		CHECK( blasted_is_T("ex x (x = { 2 }:bv[3] && x !>= { 3 }:bv[3]).") );
+		CHECK_FALSE( blasted_is_T("ex x (x = { 3 }:bv[3] && x !>= { 3 }:bv[3]).") );
+	}
+	TEST_CASE("!= keeps the comparison and decides it") {
+		CHECK( blasted_is_T("ex x (x = { 2 }:bv[3] && x != { 3 }:bv[3]).") );
+		CHECK_FALSE( blasted_is_T("ex x (x = { 3 }:bv[3] && x != { 3 }:bv[3]).") );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
 	}
 }
+

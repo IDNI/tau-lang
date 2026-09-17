@@ -855,3 +855,9 @@ TEST_CASE("bare integer at long long max is rejected, not overflowed") {
 }
 
 } // TEST_SUITE qint — parse tree evaluation
+
+// The qint simplifiers are identities and had no caller in the suite.
+TEST_CASE("simplify_qint_symbol/term are identities") {
+	CHECK(idni::tau_lang::simplify_qint_symbol(nullptr) == nullptr);
+	CHECK(idni::tau_lang::simplify_qint_term(nullptr) == nullptr);
+}

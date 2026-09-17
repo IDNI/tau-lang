@@ -1273,3 +1273,48 @@ TEST_SUITE("atm_formula_order_for_quant_elim stability") {
 			if (comp(p, q)) CHECK( !comp(q, p) );
 	}
 }
+
+// Three normalizer helpers with no caller in the suite (coverage 2026-09-16).
+TEST_SUITE("normalizer helpers") {
+	static tau::get_options wff_opts() {
+		tau::get_options o; o.parse.start = tau::wff; o.reget_with_hooks = false;
+		return o;
+	}
+	static tau::get_options bf_opts() {
+		tau::get_options o; o.parse.start = tau::bf; o.reget_with_hooks = false;
+		return o;
+	}
+	TEST_CASE("is_nso_equivalent_to_any_of finds an equivalent formula in a list") {
+		using node = node_t;
+		tref a = tau::get("x = 0 && y = 0", wff_opts());
+		tref b = tau::get("y = 0 && x = 0", wff_opts());
+		tref c = tau::get("x = 0 || y = 0", wff_opts());
+		trefs previous{ c };
+		CHECK_FALSE( is_nso_equivalent_to_any_of<node>(a, previous) );
+		previous.push_back(b);
+		CHECK( is_nso_equivalent_to_any_of<node>(a, previous) );
+	}
+
+	TEST_CASE("is_bf_same_to_any_of compares Boolean functions, not trees") {
+		using node = node_t;
+		tref a = tau::get("x & y", bf_opts());
+		tref b = tau::get("y & x", bf_opts());
+		tref c = tau::get("x | y", bf_opts());
+		trefs previous{ c };
+		CHECK_FALSE( is_bf_same_to_any_of<node>(a, previous) );
+		previous.push_back(b);
+		CHECK( is_bf_same_to_any_of<node>(a, previous) );
+	}
+
+	TEST_CASE("build_shift_from_shift rewrites the offset of a shift node") {
+		using node = node_t;
+		tref s = tau::build_shift(std::string("n"), 1);
+		// (step == offset unwraps the shift's CAPTURE child; the helper is
+		// written for rewriter patterns, so a shift over a plain variable
+		// has no capture to return there -- not exercised here.)
+		// step > offset: a shift by step - offset
+		tref moved = build_shift_from_shift<node>(s, 3);
+		REQUIRE( tau::get(moved).is(tau::shift) );
+		CHECK( tau::get(moved)[1].get_num() == 2 );
+	}
+}

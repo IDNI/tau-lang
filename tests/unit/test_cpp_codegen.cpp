@@ -192,3 +192,16 @@ TEST_SUITE("cpp_codegen trivial solution (LG-5)") {
 	}
 
 } // TEST_SUITE("cpp_codegen trivial solution (LG-5)")
+
+// guard_to_cpp had no caller anywhere in the suite (coverage 2026-09-16):
+// pin the token mapping it performs on HOA guard labels.
+TEST_SUITE("cpp_codegen guard_to_cpp") {
+	TEST_CASE("maps HOA guard syntax to a C++ expression over ap[]") {
+		CHECK(codegen_detail::guard_to_cpp("0") == "ap[0]");
+		CHECK(codegen_detail::guard_to_cpp("!0") == "!ap[0]");
+		CHECK(codegen_detail::guard_to_cpp("0 & !1") == "ap[0]&&!ap[1]");
+		CHECK(codegen_detail::guard_to_cpp("(0 | 1) & 12") == "(ap[0]||ap[1])&&ap[12]");
+		CHECK(codegen_detail::guard_to_cpp("t") == "true");
+		CHECK(codegen_detail::guard_to_cpp("f") == "false");
+	}
+}

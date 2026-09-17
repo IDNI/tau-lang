@@ -1364,3 +1364,39 @@ TEST_CASE("bot and top have different hashes") {
 }
 
 } // TEST_SUITE hash
+
+// Endpoint membership helpers and the identity simplifiers had no caller in
+// the suite (coverage 2026-09-16).
+TEST_SUITE("qlt endpoint helpers") {
+	static qlt_rational r(long long p, long long q = 1) { return qlt_rational(p, q); }
+	TEST_CASE("qlt_above_lo: closed vs open lower bounds and -inf") {
+		qlt_endpoint closed{ r(1), qlt_bound::CLOSED };
+		qlt_endpoint open{ r(1), qlt_bound::OPEN };
+		CHECK(qlt_above_lo(closed, r(1)));
+		CHECK_FALSE(qlt_above_lo(open, r(1)));
+		CHECK(qlt_above_lo(open, r(3, 2)));
+		CHECK_FALSE(qlt_above_lo(closed, r(0)));
+		qlt_endpoint ninf{ qlt_rational::make_neg_inf(), qlt_bound::OPEN };
+		CHECK(qlt_above_lo(ninf, r(-1000)));
+		// A symbolic endpoint or value is undecidable: reported as not above.
+		qlt_endpoint sym{ qlt_rational::make_sym("c"), qlt_bound::CLOSED };
+		CHECK_FALSE(qlt_above_lo(sym, r(0)));
+		CHECK_FALSE(qlt_above_lo(closed, qlt_rational::make_sym("c")));
+	}
+	TEST_CASE("qlt_below_hi: closed vs open upper bounds and +inf") {
+		qlt_endpoint closed{ r(1), qlt_bound::CLOSED };
+		qlt_endpoint open{ r(1), qlt_bound::OPEN };
+		CHECK(qlt_below_hi(closed, r(1)));
+		CHECK_FALSE(qlt_below_hi(open, r(1)));
+		CHECK(qlt_below_hi(open, r(1, 2)));
+		CHECK_FALSE(qlt_below_hi(closed, r(2)));
+		qlt_endpoint pinf{ qlt_rational::make_pos_inf(), qlt_bound::OPEN };
+		CHECK(qlt_below_hi(pinf, r(1000)));
+		qlt_endpoint sym{ qlt_rational::make_sym("c"), qlt_bound::CLOSED };
+		CHECK_FALSE(qlt_below_hi(sym, r(0)));
+	}
+	TEST_CASE("simplify_qlt_symbol/term are identities") {
+		CHECK(simplify_qlt_symbol(nullptr) == nullptr);
+		CHECK(simplify_qlt_term(nullptr) == nullptr);
+	}
+}

@@ -1020,3 +1020,82 @@ TEST_SUITE("get_free_vars cache") {
 		CHECK(names(get_free_vars<node_t>(F)) == minus);
 	}
 }
+
+// ── builders with no caller in the suite (coverage 2026-09-16) ──────────────
+TEST_SUITE("tree::cold builders") {
+	TEST_CASE("indexed io-var builders name streams by index, direction and shift") {
+		const size_t ty = tau::get(tau::build_variable("x", 0)).get_ba_type();
+		tref i_t   = tau::build_in_var_at_t_indexed(1, ty);
+		tref i_tm2 = tau::build_in_var_at_t_minus_indexed(1, 2, ty);
+		tref i_n3  = tau::build_in_var_at_n_indexed(1, 3, ty);
+		tref o_t   = tau::build_out_var_at_t_indexed(2, ty);
+		tref o_tm1 = tau::build_out_var_at_t_minus_indexed(2, 1, ty);
+		tref o_n0  = tau::build_out_var_at_n_indexed(2, 0, ty);
+		for (tref v : {i_t, i_tm2, i_n3, o_t, o_tm1, o_n0}) REQUIRE(v != nullptr);
+		// The printed form carries the type suffix; compare the stream part.
+		auto stream = [](tref v) {
+			std::string s = tau::get(v).to_str();
+			auto colon = s.find(':');
+			return colon == std::string::npos ? s : s.substr(0, colon);
+		};
+		CHECK(stream(i_t)   == "i1[t]");
+		CHECK(stream(i_tm2) == "i1[t-2]");
+		CHECK(stream(i_n3)  == "i1[3]");
+		// The out-var builders used to reuse the "i" prefix of the in-var
+		// ones, producing an output stream with an input name.
+		CHECK(stream(o_t)   == "o2[t]");
+		CHECK(stream(o_tm1) == "o2[t-1]");
+		CHECK(stream(o_n0)  == "o2[0]");
+		CHECK(tau::get(tau::build_var_name_indexed(7)).is(tau::var_name));
+		CHECK(tau::get(tau::build_var_name_indexed(7)).to_str() == "i7");
+		CHECK(tau::get(tau::build_var_name_indexed(7, "o")).to_str() == "o7");
+	}
+
+	TEST_CASE("constant-time-constraint builders match the parsed forms") {
+		// A ctnvar node comes out of a parsed constraint; the builders
+		// rebuild each comparison around it.
+		tau::get_options o; o.parse.start = tau::wff; o.reget_with_hooks = false;
+		tref parsed = tau::get("[n = 2]", o);
+		REQUIRE(parsed != nullptr);
+		using tt = tau::traverser;
+		tref ctnvar = tt(parsed) | tau::constraint | tau::ctn_eq | tau::ctnvar | tt::ref;
+		tref two    = tt(parsed) | tau::constraint | tau::ctn_eq | tau::num | tt::ref;
+		REQUIRE(ctnvar != nullptr);
+		REQUIRE(two != nullptr);
+		// `=` and `!=` are desugared by the hooks into the two-sided
+		// forms, the four order comparisons are kept as single nodes.
+		CHECK(tau::get(tau::build_wff_ctn_eq(ctnvar, two)).to_str()   == "[n <= 2] && [n >= 2]");
+		CHECK(tau::get(tau::build_wff_ctn_neq(ctnvar, two)).to_str()  == "[n < 2] || [n > 2]");
+		CHECK(tau::get(tau::build_wff_ctn_lt(ctnvar, two)).to_str()   == "[n < 2]");
+		CHECK(tau::get(tau::build_wff_ctn_lteq(ctnvar, two)).to_str() == "[n <= 2]");
+		CHECK(tau::get(tau::build_wff_ctn_gt(ctnvar, two)).to_str()   == "[n > 2]");
+		CHECK(tau::get(tau::build_wff_ctn_gteq(ctnvar, two)).to_str() == "[n >= 2]");
+	}
+
+	TEST_CASE("derived Boolean-function builders") {
+		tref x = tau::build_bf_variable("x");
+		tref y = tau::build_bf_variable("y");
+		REQUIRE(tau::build_bf_nand(x, y) != nullptr);
+		REQUIRE(tau::build_bf_nor(x, y) != nullptr);
+		REQUIRE(tau::build_bf_xnor(x, y) != nullptr);
+		REQUIRE(tau::build_bf_ngteq(x, y) != nullptr);
+		REQUIRE(tau::build_bf_eq_1(x) != nullptr);
+		// nand/nor/xnor are their own node kinds with their own spelling
+		CHECK(tau::get(tau::build_bf_nand(x, y)).to_str() == "x!&y");
+		CHECK(tau::get(tau::build_bf_nor(x, y)).to_str()  == "x!|y");
+		CHECK(tau::get(tau::build_bf_xnor(x, y)).to_str() == "x!^y");
+		// `!>=` folds through the hooks into the residual-is-nonzero form.
+		CHECK(tau::get(tau::build_bf_ngteq(x, y)).to_str() == "yx' != 0");
+		// typed zero (the builder asserts a real BA type id, so ask for tau's)
+		tref f = tau::build_bf_f_type(tau_type_id<node_t>());
+		REQUIRE(f != nullptr);
+		CHECK(tau::get(f).equals_0());
+	}
+
+	TEST_CASE("semantic negation folds on constants, as the hooks define") {
+		// `- T` is `F` and `- F` is `T`; a non-constant operand is refused
+		// later by the LTL layer (the role swap is not implemented).
+		CHECK(tau::get(tau::build_wff_semantic_neg(tau::_T())).equals_F());
+		CHECK(tau::get(tau::build_wff_semantic_neg(tau::_F())).equals_T());
+	}
+}

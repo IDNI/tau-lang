@@ -4000,11 +4000,14 @@ TEST_SUITE("[Adversarial: SBF type]") {
 // ── §29  Algorithm A: binary T_3 encoding end-to-end ─────────────────────────
 //
 // Forces TAU_LTL_ALG=A for each test via RAII guard; env var is restored after.
-// Algorithm A is applicable iff all atoms are qlt-typed with lookback ≤ 1.
+// Algorithm A is applicable iff all atoms are qlt-typed with lookback ≤ 1,
+// single-io_var comparison sides, one output variable, and every atom
+// classifiable in some T_3 type (algorithm_a_skeleton.h: the D_i + R_ρ
+// encoding, ⌈log₂|T_1|⌉ R-bits for the memory type plus one D-bit per atom;
+// it replaced the older binary T_3 "Q-bit" encoding).
 //
-// 0-constant formulas → 13 T_3 types, 4 Q-bits (q_0..q_3), small formula.
-// 1-constant formulas → 75 T_3 types, 7 Q-bits (q_0..q_6), larger but fast.
-TEST_SUITE("[Algorithm A: binary T3 encoding]") {
+// 0-constant formulas → 13 T_3 types, |T_1| = 1; 1-constant → |T_1| = 3.
+TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
 
     struct alg_a_guard {
         alg_a_guard()  { setenv("TAU_LTL_ALG", "A", 1); }

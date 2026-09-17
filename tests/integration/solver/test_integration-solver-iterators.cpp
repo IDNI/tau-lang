@@ -284,3 +284,21 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( count == 49 );
 	}
 }
+
+// var_free_holds decides a variable-free equation; the full-LTL refusal of
+// solve() used to be a DEBUG-only assertion and is a runtime error now.
+TEST_SUITE("solver guards") {
+	TEST_CASE("var_free_holds on constant equations") {
+		tref t = get_nso_rr<node_t>(tau::get("1 = 1.")).value().main->get();
+		tref f = get_nso_rr<node_t>(tau::get("1 = 0.")).value().main->get();
+		CHECK( var_free_holds<node_t>(t) );
+		CHECK_FALSE( var_free_holds<node_t>(f) );
+	}
+	TEST_CASE("solve refuses a formula with a full-LTL operator") {
+		tref fm = get_nso_rr<node_t>(
+			tau::get("(x = 1) U (y = 0).")).value().main->get();
+		REQUIRE( fm != nullptr );
+		auto r = solve<node_t>(fm, solver_options{});
+		CHECK_FALSE( r.has_value() );
+	}
+}

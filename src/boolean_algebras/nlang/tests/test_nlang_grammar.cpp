@@ -407,3 +407,13 @@ TEST_CASE("nlang: splitter on a disjunction returns its left branch") {
 	nlang_ba s = nlang_splitter(val, splitter_type::upper);
 	CHECK( s == a );
 }
+
+// nlang_splitter_one had no caller in the suite: it is the fixed contingent
+// proposition the generic splitter machinery falls back to.
+TEST_CASE("nlang_splitter_one is neither top nor bottom") {
+	using namespace idni::tau_lang;
+	auto s = nlang_splitter_one();
+	CHECK_FALSE(is_nlang_one(s));
+	CHECK_FALSE(is_nlang_zero(s));
+	CHECK(s.to_string() == "it is raining");
+}

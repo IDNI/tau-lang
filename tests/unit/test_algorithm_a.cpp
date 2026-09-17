@@ -163,3 +163,42 @@ TEST_SUITE("build_algorithm_a_skeleton") {
 		CHECK(b.formula.find("X(") == std::string::npos);
 	}
 }
+
+#include "boolean_algebras/qlt/omcat_constants.h"
+
+// neg_atom's K == 0 arm and parse_rat_literal's rejection paths had no
+// caller in the whole suite (coverage 2026-09-16); pin them directly.
+TEST_SUITE("alg_a helpers and rational literals") {
+	TEST_CASE("neg_atom with no data atoms collapses to the R-bit encoding") {
+		CHECK(neg_atom(0, 0, 0, 1) == "!(" + r_encode(0, 1) + ")");
+		CHECK(neg_atom(1, 0, 0, 2) == "!(" + r_encode(1, 2) + ")");
+		// With K > 0 the D-pattern is conjoined.
+		CHECK(neg_atom(0, 1, 1, 1) == "!(" + r_encode(0, 1) + " & " + d_pattern(1, 1) + ")");
+	}
+
+	TEST_CASE("parse_rat_literal accepts p/q, decimals and integers") {
+		auto r = parse_rat_literal("3/4");
+		CHECK(r.p == 3); CHECK(r.q == 4);
+		r = parse_rat_literal("0.25");
+		CHECK(r.p == 25); CHECK(r.q == 100);
+		r = parse_rat_literal("-1.5");
+		CHECK(r.p == -15); CHECK(r.q == 10);
+		r = parse_rat_literal("7");
+		CHECK(r.p == 7); CHECK(r.q == 1);
+	}
+
+	TEST_CASE("parse_rat_literal refuses what it cannot represent exactly") {
+		// A zero denominator and garbage yield the {0, 0} sentinel.
+		CHECK(parse_rat_literal("1/0").q == 0);
+		CHECK(parse_rat_literal("abc").q == 0);
+		// 19 fractional digits overflowed `denom *= 10` silently; now the
+		// sentinel is returned instead of a garbage rational.
+		CHECK(parse_rat_literal("0.1234567890123456789").q == 0);
+		// 18 digits are still exact.
+		auto r = parse_rat_literal("0.123456789012345678");
+		CHECK(r.q == 1000000000000000000LL);
+		CHECK(r.p == 123456789012345678LL);
+		// An integer part too large to scale is refused as well.
+		CHECK(parse_rat_literal("9223372036854775807.5").q == 0);
+	}
+}
