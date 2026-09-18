@@ -155,11 +155,11 @@ term representation, per component (PREPARE_TERMS):
         emission) leaves the decision set — and the chain wrapped onto every
         leaf; a chain touching no decision variable is one canonical leaf,
         put through the constructor. Orders alive together agree on their
-        common keys — the sub-order, and normally a chain's own order; where
-        a chain's order re-ranks a live key the library drops its memos and
-        rebuilds. Under keep_functional, deep block nesting stacks quantifier
-        chains at the leaves — linear per level, amortised by hash-consing,
-        inherent to symbolic mode.
+        common keys — the live order and the sub-order. A chain's own order
+        exists at entry alone (`RESOLVE_FUNCTIONAL_PLAIN`, §3), before any
+        order is live. Under keep_functional, deep block nesting stacks
+        quantifier chains at the leaves — linear per level, amortised by
+        hash-consing, inherent to symbolic mode.
       - LEAF HAZARD: a block variable may occur inside a leaf (a reference
         argument), where cofactoring does not reach — a leaf is opaque, its
         Shannon expansion may not be assumed — so a leaf-x makes f₀/f₁ not
@@ -186,11 +186,10 @@ term representation, per component (PREPARE_TERMS):
 | `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): a pin whose admission would push `Σ‖witnesses‖` past this factor times `Σ‖TERM_OF(pinning conjunct)‖` is refused. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
-| `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per block it is handed the block's binder node — `REWRAP(matrix, X)`, the run head with its variables outermost first and the matrix below (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL`, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified |
+| `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per block it is handed the block's binder node — `REWRAP(matrix, X)`, the run head with its variables outermost first and the matrix below (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a component's close, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
-| `quant_memo` | functional-quantifier chain over a PLAIN body → term, GLOBAL and order-independent — the key IS the query (`ASK`'s convention) and names term, kinds, and quantified set in one node; entries are pure functions of it. Used by `SETTLE_FUNCTIONAL`/`RESOLVE_FUNCTIONAL` only; `DISCHARGE` keeps no table (keep mode emits the chain, non-keep mode is one BDD quantification covered by the library's own memos) |
-| `cof_memo` | `(settled term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`; consumers: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `SETTLE_FUNCTIONAL(TERM_OF(·), ctx)`, before calling `COF`. Pure functions of the key — the settled term already reflects `keep_functional` |
+| `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`; consumers: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
 | `atoms_memo` | `formula node → the atoms reachable in it through ∧, ∨ and ¬ alone` — units, references and temporal operators are opaque (§4), so a reference's formula argument contributes none — GLOBAL, purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query built on plain (converted) terms — a BDD-backed term is a node of one order (§3 `PREPARE_TERMS`). GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
@@ -218,12 +217,11 @@ shared across `ANTI_PRENEX` runs, components, and blocks — exactly when its ke
 names everything its entries depend on. The variable set is explicit: the
 ordered `X` of `push_memo`/`elim_memo` fixes the type, every atom's block
 subset (`FV(atm) ∩ P = FV(atm) ∩ X`), and the relative prios; `cof_memo`
-carries its `x`; `quant_memo`'s key is the query itself; `atoms_memo` is
-purely structural; `solver_memo` and `qbf_memo` involve none.
-`keep_functional` joins `push_memo`'s and `elim_memo`'s keys alone — their
-entries embed `DISCHARGE`'s output, which the flag switches — while
-`cof_memo`'s settled-term key is formed by each caller after
-`SETTLE_FUNCTIONAL` applied the mode. Every tie-break is the content order (§1), so no entry embeds
+carries its `x`; `atoms_memo` is purely structural; `solver_memo` and
+`qbf_memo` involve none. `keep_functional` joins `push_memo`'s and
+`elim_memo`'s keys alone — their entries embed `DISCHARGE`'s output, which
+the flag switches — while `cof_memo`'s key is the term as it arrives, a kept
+chain included. Every tie-break is the content order (§1), so no entry embeds
 construction history. Five knobs sit in no key — the solver configuration,
 `qbf_node_max`, `expand_max`, `accept_growth` and `accept_floor` — and are
 handled three ways. TAINT: a computation that hit a budget — an `expand_max`
@@ -348,7 +346,12 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK on a NODE, pu
                                        //   the canonical query keys (ASK,
                                        //   DECIDE_FINITE) collide across
                                        //   alpha-variants
- 1. φ ← TO_NNF(φ) ; φ ← SIMPLIFY(φ, ref_args = true)
+ 1. φ ← RESOLVE_FUNCTIONAL_PLAIN(φ, keep_functional)
+                                       // every chain PRESENT in the input,
+                                       //   the callback asked (§3); from
+                                       //   here on a chain is a kept or a
+                                       //   stuck one, and it stays
+    φ ← TO_NNF(φ) ; φ ← SIMPLIFY(φ, ref_args = true)
                                        // the ONE ref_args caller: canonical
                                        //   entry state for reference
                                        //   arguments; from here on only
@@ -357,10 +360,7 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK on a NODE, pu
  2. φ ← ELIMINATE_BY_SUBSTITUTION(φ) ; φ ← SIMPLIFY(φ)
  3. φ ← NORMALIZE_OPERATORS(φ)
  4. φ ← PROCESS_ALL_BLOCKS(φ, keep_functional)
- 5. φ ← RESOLVE_FUNCTIONAL(φ, ∅, keep_functional)  // every chain the callback
-                                                  //   does not keep (§3); no
-                                                  //   order is live here
-    φ ← SIMPLIFY(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
+ 5. φ ← SIMPLIFY(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
     return CANONICALISE_BINDER_IDS(φ)
 ```
 
@@ -383,7 +383,7 @@ TRY_WITNESS(x, ψ, ctx = ⊥) → formula | ⊥:
     // straddle NORMALIZE_OPERATORS, so the SPELLED match is spelling-agnostic:
     // x = t | t = x | x + t = 0 | …, and g ≠ 0 may still occur at phase 2.
     // On BDD-backed conjuncts — phase 4, ctx present — the match reads COF
-    // (§6) on the conjunct's SETTLED term, SETTLE_FUNCTIONAL(TERM_OF(c), ctx)
+    // (§6) on the conjunct's term, TERM_OF(c)
     // — cof_memo's key (§1), which every pin site forms itself: a
     // positive f = 0 PINS x iff usable ∧ f₀ ∪ f₁ = 1. Boole's expansion
     // f = x′f₀ ∪ xf₁ puts the zeros of f at f₀ ≤ x ≤ f₁′, an interval
@@ -410,7 +410,7 @@ TRY_WITNESS(x, ψ, ctx = ⊥) → formula | ⊥:
     // entry already. The result is SIMPLIFIED here (inv. 6): a formula
     // built by substitution, handed to every caller ready to recurse into.
     if some top-level conjunct of ψ pins x — the spelled match, or, with ctx,
-            COF(SETTLE_FUNCTIONAL(TERM_OF(c), ctx), x, ctx).pin on an
+            COF(TERM_OF(c), x, ctx).pin on an
             equation conjunct c:
         c ← a strict pin among them, else the pin of smallest ‖f₁′‖
         return SIMPLIFY(ψ with x replaced by c's witness in EVERY conjunct,
@@ -616,7 +616,7 @@ dropped, a repeated subscript is kept at its innermost occurrence, each
 same-kind run sits in content order outermost first — one node per SET per
 kind — an adjoining same-kind run of `f` is merged into it, and a chain
 binding every free variable of a PLAIN `f` is folded to its constant unless a
-subscript hides in a leaf — the `quant_memo` key), `NORM_EQUATION(atom, order)`
+subscript hides in a leaf), `NORM_EQUATION(atom, order)`
 (`l = r ↦ l + r = 0`, descending through one `¬`), `TERM_OF(atom, order)` (for
 an atom `l = r`, the term `l + r`, read through one `¬`) and
 `REWRAP(φ, X, kind = ∃)` (re-attach the block around `φ`, in `X`'s order —
@@ -657,49 +657,63 @@ The remaining primitives are defined by their contracts alone:
   `DECIDE_FINITE` (§7). An outer binder's id strictly exceeds every id below
   it — siblings may share one — and that strict decrease is what makes
   `[x ← t]` capture-safe.
-- `RESOLVE_FUNCTIONAL(φ, order, kf)` — resolves every functional-quantifier
-  chain of `φ` that the callback `kf` does not keep. `order` is the live
-  order, empty when none is live (phase 5); every BDD-backed term in `φ`
-  belongs to it.
+- `RESOLVE_FUNCTIONAL_PLAIN(φ, kf)` — resolves every functional-quantifier
+  chain PRESENT in `φ` that the callback `kf` does not keep: the input's own
+  chains, at entry (phase 1), before any order is live. No term of `φ` is
+  BDD-backed.
 
-  The unit of work is the MAXIMAL chain at its top, any mix of `∀`/`∃`. The
-  chains nested inside its body, and those inside the leaves of a BDD-backed
-  term, are resolved first — "innermost first" means NESTED, never adjacent
-  binders, and a BDD-backed term's chains sit in its leaves and are reached
-  there.
+  The unit of work is the MAXIMAL chain at its top, any mix of `∀`/`∃`,
+  found anywhere — under binders, in reference arguments, in chain bodies.
+  The chains nested inside its body are resolved first: "innermost first"
+  means NESTED, never adjacent binders. Per chain: canonicalise through the
+  term constructor (absent subscripts dropped, a repeated one kept
+  innermost, same-kind runs in content order, an adjoining run merged, a
+  closed plain chain folded), then ask `kf` ONCE, on the canonical chain's
+  NODE — prefix outermost first with kinds, the body below it, for the
+  callback to read. Kept ⇒ the whole chain stays. Else the body is built as
+  a BDD over the CHAIN'S OWN order, innermost subscript lowest, and handed to
+  the chain step (below) with that order as the live one; what comes back
+  is spelled PLAIN before the pass moves on — a node minted under a chain's
+  order belongs to no live order — and a chain nothing of which resolved is
+  the node as written. Chain orders re-rank a subscript from chain to chain,
+  so the library's tables clear between chains; nothing is cached yet, which
+  is why the chain's own order lives here alone.
 
-  Per chain: canonicalise through the term constructor first (absent
-  subscripts dropped, a repeated one kept innermost, same-kind runs in content
-  order, an adjoining run merged, a closed plain chain folded), then ask `kf`
-  ONCE, on the canonical chain's NODE — prefix outermost first with kinds,
-  and the body below it, for the callback to read. Kept ⇒ the whole chain
-  stays.
+  After this pass a chain in `φ` is a kept one or a stuck one, and both
+  stay: no later step resolves a chain it finds in a leaf.
 
-  LIVE PATH: the body BDD-backed under the live order and every subscript a
-  key of it (keep mode's whole-block emission, §7 `DISCHARGE`), and the prefix
-  one kind or nested by rank ⇒ ONE quantification of the stored BDD under the
-  live order; the result is emitted under the live order, plain when nothing
-  branches.
+- `RESOLVE_FUNCTIONAL_BDD(φ, order, kf)` — the component's close (§5):
+  resolves every functional-quantifier chain in the TREE of `φ` that `kf`
+  does not keep. `order` is the live order; every BDD-backed term of `φ`
+  belongs to it, and every chain met sits over a BDD-backed body with its
+  subscripts among the decision variables — keep mode's whole-block emission
+  `Q_X (bf(BDD_ID))`, `X ⊆ P` (§7 `DISCHARGE`). A chain over a plain body is
+  one whose BDD did not branch — its subscripts occur in leaves alone — and
+  it stays as it is. Leaves are never entered: a chain in a leaf is an inner
+  block's kept emission or a stuck one, both decided.
 
-  GENERAL PATH: the body is built as a BDD over the CHAIN'S OWN order,
-  innermost subscript lowest — a stored BDD not legal under it is spelled
-  first — and one `bdd_quant` takes the full, possibly alternating, prefix.
-  The result is spelled PLAIN: a node minted under the chain's order would
-  belong to the wrong order.
+  Same unit of work, same canonicalise-then-ask as above; kept ⇒ the whole
+  chain stays. Else THE CHAIN STEP: ONE quantification of the stored BDD
+  under the live order — `bdd_ex`/`bdd_all` for a prefix of one kind,
+  `bdd_quant` for a mixed one, nested by the ranks it runs under (an
+  emission is one kind; an entry chain's order nests by construction) —
+  emitted under the live order, plain when nothing branches.
 
   LEAF HAZARD: a subscript hiding in a leaf — a reference argument, a
-  foreign-typed subterm — stays in place, and the OTHER subscripts are still
-  resolved around it: one pass per maximal stretch of resolvable subscripts,
-  innermost stretch first, the hidden binder rebuilt over the stretch's
-  result.
+  foreign-typed subterm — is reached by no quantification and STAYS. The
+  others are taken from the prefix by the STUCK RULE, innermost first: the
+  first hidden subscript opens a stuck run of its kind; an outer subscript
+  of that kind is still quantified (it commutes into the run) or joins the
+  run when hidden; the first subscript of the OTHER kind blocks everything
+  outward. The kept prefix, in its order, is re-attached over the quantified
+  body through the constructor. A choice of size, not of soundness —
+  crossing an alternation by cofactors is legal, and duplicates the stuck
+  chain — and a choice per NEST: a stuck chain nested deeper in the body was
+  slid onto the leaves by the build (§1 transparency), where an outer
+  subscript's quantification crosses it.
 
-  The chain's order normally shares no key with the live order; where it
-  re-ranks one — a settled sub-block's emission variable — the library drops
-  its memos and rebuilds, correct and only slower.
-
-  Sites: `SETTLE_FUNCTIONAL` (per term, non-keep), the component's close
-  before the finish (§5), the query builders (§7) and phase 5. Its memo is
-  `quant_memo`.
+  Neither resolver has a memo of its own: the entry pass runs once, and the
+  close's quantifications are covered by the library's memos.
 - `φ[x ← t]` and `φ[atm ↦ T/F]` — capture-aware substitution, each returning
   an untouched subtree by one cached test, `FV` and `atoms_memo` (§10);
   `[x ← t]` descends into units (§4) and re-simplifies what it touches
@@ -999,7 +1013,7 @@ PUSH_EX_BLOCK(body, X, kf):
         ctx.expand_count ← 0                      // the one component-scoped
                                                   //   counter (§1, ctx table)
         ctx.push_memo, ctx.elim_memo, ctx.cof_memo, ctx.atoms_memo,
-            ctx.quant_memo, ctx.solver_memo, ctx.qbf_memo
+            ctx.solver_memo, ctx.qbf_memo
             ← the global tables                   // cross-run, never reset (§1)
         ctx.taint_count ← the global counter      // likewise (§1, cache scope)
         body ← PREPARE_TERMS(body, P, ctx.order)  // BDD-back both sides of every
@@ -1021,11 +1035,12 @@ PUSH_EX_BLOCK(body, X, kf):
             dep  ← ⋀ { c ∈ conjuncts of prev : FV(c) ∩ P ≠ ∅ }
             body ← SIMPLIFIED_AND_JOIN(REWRAP(dep, P ∩ FV(dep)),
                                        the conjuncts of prev not in dep)
-        // The component's close: RESOLVE_FUNCTIONAL first, while the terms
-        //   are still BDDs — a whole-block chain over P's own BDD resolves by
-        //   one bdd_quant on the stored BDD — then FINISH_TERMS, which
-        //   spells every remaining backed term, chains intact
-        body ← RESOLVE_FUNCTIONAL(body, ctx.order, kf)
+        // The component's close: RESOLVE_FUNCTIONAL_BDD first, while the
+        //   terms are still BDDs — a whole-block chain over P's own BDD
+        //   resolves by one quantification of the stored BDD, a subscript
+        //   hidden in a leaf stays (§3) — then FINISH_TERMS, which spells
+        //   every remaining backed term, chains intact
+        body ← RESOLVE_FUNCTIONAL_BDD(body, ctx.order, kf)
         body ← FINISH_TERMS(body)                 // PREPARE_TERMS' inverse (§3)
     return body
 ```
@@ -1163,7 +1178,7 @@ TRY_FAST_PATHS(φ, X, ctx) → formula | ⊥:
         // through the ∧/∨ skeleton, c.free unconstrained. The ∀_X f=0 half
         // — one atom per component of P, §7 — is emitted ONCE at the top:
         // an X-free clause needs it, every other clause implies it, and §7
-        // discharges it once (quant_memo) however
+        // discharges it once — the library's memos — however
         // many leaves carry P. WHY: a decomposition's positive arm and
         // EXPAND's exclusive cases leave exactly such a top-level literal,
         // which would otherwise refute 2a and force an expansion. The push
@@ -1364,7 +1379,7 @@ FOLD_DECIDED(C, X, ctx) → conjunct list | F:
     // tree conjunct (§1) is read literal-wise.
     for each (¬)equation conjunct c of C, and each literal c of a negative
             tree conjunct t of C:
-        f ← SETTLE_FUNCTIONAL(TERM_OF(c), ctx)
+        f ← TERM_OF(c)
         x̂ ← the highest-prio variable of FV(f) ∩ X ; if none: continue
         (f₀, f₁, p, usable, _) ← COF(f, x̂, ctx)
         if usable and p is a nonzero constant:
@@ -1374,15 +1389,6 @@ FOLD_DECIDED(C, X, ctx) → conjunct list | F:
                                                  //   a tree folded to T is
                                                  //   dropped
     return C
-
-SETTLE_FUNCTIONAL(f, ctx):                       // 2f
-    if ctx.keep_functional: return f             // ch. 6 needs ∀ₓ/∃ₓ symbolic
-    if f carries a functional quantifier:
-        f ← SIMPLIFY_TERM(RESOLVE_FUNCTIONAL(f, ctx.order, keep nothing))
-                     // the resolver enters a backed term's leaves itself (§3)
-                     //   and works through quant_memo (§1: the key is the
-                     //   chain over its plain body)
-    return f
 ```
 
 ```
@@ -1453,7 +1459,7 @@ DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
     // always fits and exhaustion can only re-wrap the second (inv. 3).
     // Smaller arm first — ∃'s T short-circuit never builds the second; an
     // arm that folds to a constant is no case and charges nothing.
-    f ← a is an equation ? SETTLE_FUNCTIONAL(TERM_OF(a), ctx) : ⊥
+    f ← a is an equation ? TERM_OF(a) : ⊥
                                                   // cof_memo's key (§1), formed
                                                   //   by the caller at every
                                                   //   pin site
@@ -1745,9 +1751,9 @@ POSITIVE_CONDITION(comps, ctx) → formula:
     // disjoint decision supports:
     //     ∀_X f = ⋃_k ∀_{X_k} F_k       — any BA
     // so ∀_X f = 0 is one atom per component, each discharged over its own
-    // variables on its own term and memoized under its own key
-    // (quant_memo): a clause that changed one component's positives keeps
-    // every other component's entry, and the atoms emitted are the
+    // variables on its own term and memoized under its own key (the
+    // library's memos, §1): a clause that changed one component's positives
+    // keeps every other component's entry, and the atoms emitted are the
     // smallest the identity allows — the shape unit elimination and the
     // pin tests consume. Exact by thm:boole-const per component. pos holds
     // even where it folds to T (no positives ⇒ f = 0 vacuously).
@@ -1852,11 +1858,11 @@ DISCHARGE(∃X.atom, ctx):
         same-kind segments merged, a chain with no free variable but its
         own folded to its constant). A WHOLE-BLOCK emission is X-free and
         keeps its BDD body until the component's close, where
-        RESOLVE_FUNCTIONAL is one bdd_quant on the stored BDD and the finish
-        spells what is kept; a settled SUB-block's emission still has free
-        block variables and SIMPLIFY re-backs it over them, the chain slid
-        onto its leaves (§1), so every equation touching the block stays
-        BDD-backed.
+        RESOLVE_FUNCTIONAL_BDD is one quantification of the stored BDD and
+        the finish spells what is kept; a settled SUB-block's emission still
+        has free block variables and SIMPLIFY re-backs it over them, the
+        chain slid onto its leaves (§1), so every equation touching the
+        block stays BDD-backed.
     else: one BDD quantification over ctx.order; emit SIMPLIFY_ATOM of the
           result. For |X| = 1: two substitutions and a meet/join (lem:xelim),
           no traversal.
@@ -1898,12 +1904,12 @@ that returns such a conjunct to the solver.
 ```
 ELIMINATE_BITVECTOR_CLAUSE(clause, X, ctx):
  1. // opaque? = unreadable for BOTH engines: a conjunct with a reference in its
-    // terms, a binder unit whose body is not bv-translatable (a reference or
-    // foreign type inside), or an IMPURE conjunct carrying a functional
-    // quantifier that RESOLVE_FUNCTIONAL (§3) cannot resolve — a subscript
-    // hidden in a reference argument; the solver has no term-level binder.
-    // Every query below is built on RESOLVED terms: a query is a decision,
-    // so resolving is always allowed there.
+    // terms, a binder unit whose body is not bv-translatable (a reference, a
+    // foreign type or a functional quantifier inside), or an IMPURE conjunct
+    // carrying a functional quantifier — a chain reaching this point is a
+    // kept or a stuck one (§3), and the solver has no term-level binder.
+    // No query below resolves anything: a PURE conjunct carrying a chain is
+    // the finite side's (step 3), and the solver path never sees one.
     // A binder unit with a translatable body is swallowed whole into a query
     // below — how a clause that re-wrapped open gets decided once enclosing
     // blocks close it (§4).
@@ -1933,24 +1939,21 @@ ELIMINATE_BITVECTOR_CLAUSE(clause, X, ctx):
     // UNSATISFIABILITY does not distribute — the sides may share free
     // variables satisfiable only under incompatible assignments, and one
     // joint ask restores the pre-split single-query precision. frozen is
-    // excluded: unsat of a sub-conjunction already decides. b's functional
-    // quantifiers are resolved first (RESOLVE_FUNCTIONAL, §3, under the live
-    // order, keeping nothing — a query is a decision); skipped only when one
-    // cannot be — the solver has no term-level binder.
+    // excluded: unsat of a sub-conjunction already decides. Skipped when b
+    // carries a functional quantifier — a kept or a stuck chain (§3), and
+    // the solver has no term-level binder.
     if a is a surviving binder and b ∉ {T, F} and FV(a) ∩ FV(b) ≠ ∅
-       and RESOLVE_FUNCTIONAL(b, ctx.order, keep nothing) carries no
-           functional quantifier:
-        if ASK(∃Z.(a ∧ RESOLVE_FUNCTIONAL(b, ctx.order, keep nothing)), ctx)
-                = unsat: return F
+       and b carries no functional quantifier:
+        if ASK(∃Z.(a ∧ b), ctx) = unsat: return F
  7. return SIMPLIFIED_AND_JOIN(frozen, b, a)
 ```
 
 ```
 SOLVE_ARITHMETIC(clause, X, ctx):                     // the solver path
- 1. q ← ∃X.RESOLVE_FUNCTIONAL(clause, ctx.order, keep nothing)
-                      // functional quantifiers resolved first (§3; step 1
-                      //   froze the unresolvable ones), keeping nothing — a
-                      //   query is a decision.
+ 1. q ← ∃X.clause     // no functional quantifier is present: step 1 froze
+                      //   every impure conjunct carrying one and step 3 sent
+                      //   every pure one to the finite side; one here is a
+                      //   caller mistake, asserted.
                       // binder units enter q as written — the solver accepts
                       //   quantified bv formulas; alternation depth = how many
                       //   enclosing blocks re-wrapped (§4)
@@ -2325,7 +2328,7 @@ algorithm's:
   later one reads the memo. That is what makes the acceptance comparison, the
   sort keys, and every `X ∩ FV` test in this document O(1).
 - **The result tables are caches, never premises.** `push_memo`, `elim_memo`,
-  `quant_memo`, `cof_memo`, `solver_memo` and `qbf_memo` (§1) may be absent
+  `cof_memo`, `solver_memo` and `qbf_memo` (§1) may be absent
   altogether — a build without caching, the Debug build — so no result may
   depend on a hit: a miss costs time and nothing else. The structural facets
   are not caches and always exist: `|·|`, `neg`, the negative-tree flag, and
