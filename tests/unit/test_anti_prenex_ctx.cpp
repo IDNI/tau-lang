@@ -225,12 +225,12 @@ TEST_CASE("pair keys: the hashers hash CONTENT, and agree with their equality") 
 // --- the gated result tables ------------------------------------------------------
 
 TEST_CASE("memoised on a gated table: one call with the table, two without") {
-	tref k = mk_atom("g1"), v = mk_atom("g2");
+	tref k = mk_atom("g1");
 	size_t calls = 0;
-	auto compute = [&] { ++calls; return v; };
+	auto compute = [&] { ++calls; return true; };
 
-	CHECK(ap::memoised<node_t, ap::table::quant_memo>(k, compute) == v);
-	CHECK(ap::memoised<node_t, ap::table::quant_memo>(k, compute) == v);
+	CHECK(ap::memoised<node_t, ap::table::qbf_memo>(k, compute) == true);
+	CHECK(ap::memoised<node_t, ap::table::qbf_memo>(k, compute) == true);
 	// The result is the same either way — no result may depend on a hit.
 #ifdef TAU_CACHE
 	CHECK(calls == 1);
@@ -339,13 +339,13 @@ TEST_CASE("taint is transitive through nesting") {
 }
 
 TEST_CASE("a table that is not taint_aware caches across a taint") {
-	// quant_memo's entries are pure functions of the key (§1), so a budget
-	// hit elsewhere in the computation cannot invalidate them.
-	tref k = mk_atom("t7"), v = mk_atom("t8");
+	// qbf_memo's entries are mathematical truths (§1), so a budget hit
+	// elsewhere in the computation cannot invalidate them.
+	tref k = mk_atom("t7");
 	size_t calls = 0;
-	auto tainting = [&] { ++calls; ap::taint<node_t>(); return v; };
-	ap::memoised<node_t, ap::table::quant_memo>(k, tainting);
-	ap::memoised<node_t, ap::table::quant_memo>(k, tainting);
+	auto tainting = [&] { ++calls; ap::taint<node_t>(); return true; };
+	ap::memoised<node_t, ap::table::qbf_memo>(k, tainting);
+	ap::memoised<node_t, ap::table::qbf_memo>(k, tainting);
 	CHECK(calls == 1);
 }
 
@@ -363,7 +363,6 @@ TEST_CASE("flush clears the solver-dependent tables and nothing else") {
 	ap::store<node_t, ap::table::push_memo>({ k, false }, v);
 	ap::store<node_t, ap::table::elim_memo>({ k, true }, v);
 	ap::store<node_t, ap::table::qbf_memo>(k, true);
-	ap::store<node_t, ap::table::quant_memo>(k, v);
 	ap::store<node_t, ap::table::cof_memo>({ k, v }, ap::cof_entry{ v, v, v, true, true });
 	ap::store<node_t, ap::table::size_memo>(k, 5);
 
@@ -377,7 +376,6 @@ TEST_CASE("flush clears the solver-dependent tables and nothing else") {
 	// Exempt: mathematical truths, pure functions of the key, and the
 	// structural facets.
 	CHECK(*ap::lookup<node_t, ap::table::qbf_memo>(k) == true);
-	CHECK(*ap::lookup<node_t, ap::table::quant_memo>(k) == v);
 	CHECK(ap::find<node_t, ap::table::cof_memo>({ k, v }) != nullptr);
 	CHECK(*ap::find<node_t, ap::table::size_memo>(k) == 5);
 }
