@@ -135,6 +135,8 @@ private:
 	static tref wff_sometimes  (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_always` (universal-temporal) nodes.
 	static tref wff_always     (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Hook for the binary temporal nodes `U`, `R`, `W`, `S`, `T`.
+	static tref wff_binary_temporal(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_A` (universal path quantifier) nodes.
 	static tref wff_A          (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_E` (existential path quantifier) nodes.

@@ -868,6 +868,7 @@ static bool guard_is_aba_feasible(
 				products = std::move(next);
 			}
 			if (blown) {
+				ltl_verdict_incomplete = true;
 				LOG_WARNING << "[ltl_aba] mixed-type coverage "
 					"expansion exceeded "
 					<< max_cover_products
@@ -1063,6 +1064,7 @@ static void extend_consistency_positive_k_ary_walk(
 			if (max_consistency_subsets
 				&& checks_spent >= max_consistency_subsets) {
 				cap_fired = true;
+				ltl_verdict_incomplete = true;
 				LOG_WARNING << "[ltl_aba] k-ary consistency "
 					"walk capped after "
 					<< checks_spent << " subset checks "
@@ -1142,6 +1144,7 @@ static void extend_consistency_positive_k_ary_mus(
 	size_t checks_spent = 0;
 	bool cap_fired = false;
 	auto warn_capped = [&]() {
+		ltl_verdict_incomplete = true;
 		if (cap_fired) return;
 		cap_fired = true;
 		LOG_WARNING << "[ltl_aba] k-ary consistency "
@@ -1598,6 +1601,78 @@ static void add_consistency_constraints(
 					skeleton += " && " + c;
 					if (out_constraints) out_constraints->push_back(c);
 				}
+			}
+		}
+	}
+
+	// Input facts beyond pairs: a single input atom that is valid or
+	// unsatisfiable, and an infeasible valuation of three or more input
+	// atoms of one type, are also impossible environment moves. Without
+	// them ltlsynt lets the environment play them, and a tautology over
+	// inputs comes back UNREALIZABLE.
+	{
+		auto assume = [&](const std::string& c) {
+			if (input_assumptions.find(c) != std::string::npos) return;
+			if (!input_assumptions.empty()) input_assumptions += " && ";
+			input_assumptions += c;
+			if (out_constraints) out_constraints->push_back(c);
+		};
+		std::map<size_t, std::vector<size_t>> groups;
+		for (size_t i = 0; i < atoms.size(); ++i) {
+			if (!is_pure_input_atom<node>(atoms[i].first)) continue;
+			const auto& p = atoms[i].second;
+			if (!aba_existential_feasible<node>(atoms[i].first))
+				assume("G(!" + p + ")");
+			else if (!aba_existential_feasible<node>(
+					tau::build_wff_neg(atoms[i].first)))
+				assume("G(" + p + ")");
+			groups[find_ba_type<node>(atoms[i].first)].push_back(i);
+		}
+		// 2^n valuations per group; beyond the subset cap the rest is
+		// left to the verdict-incomplete flag
+		for (auto& [type, g] : groups) {
+			if (g.size() < 3) continue;
+			const size_t n = g.size();
+			if (n >= 20 || (max_consistency_subsets
+				&& (size_t{1} << n) > max_consistency_subsets))
+			{
+				LOG_WARNING << "[ltl_aba] " << n << " input atoms of one "
+					"type exceed the consistency subset cap (--max-"
+					"consistency-subsets / `set maxsubsets`); their joint "
+					"valuations are not assumed, and an UNREALIZABLE "
+					"verdict is reported as undecided\n";
+				ltl_verdict_incomplete = true;
+				continue;
+			}
+			auto lit = [&](size_t k, bool pos) {
+				return pos ? atoms[g[k]].first
+					: tau::build_wff_neg(atoms[g[k]].first);
+			};
+			for (size_t v = 0; v < (size_t{1} << n); ++v) {
+				// a valuation already excluded by a single or a pair
+				// needs no clause of its own
+				bool covered = false;
+				for (size_t a = 0; a < n && !covered; ++a) {
+					if (!aba_existential_feasible<node>(lit(a, v >> a & 1)))
+						covered = true;
+					for (size_t b = a + 1; b < n && !covered; ++b)
+						if (!aba_existential_feasible<node>(
+							tau::build_wff_and(lit(a, v >> a & 1),
+								lit(b, v >> b & 1))))
+							covered = true;
+				}
+				if (covered) continue;
+				tref all = lit(0, v & 1);
+				std::string text = (v & 1) ? atoms[g[0]].second
+					: "!(" + atoms[g[0]].second + ")";
+				for (size_t k = 1; k < n; ++k) {
+					bool pos = v >> k & 1;
+					all = tau::build_wff_and(all, lit(k, pos));
+					text += " && " + (pos ? atoms[g[k]].second
+						: "!(" + atoms[g[k]].second + ")");
+				}
+				if (!aba_existential_feasible<node>(all))
+					assume("G(!(" + text + "))");
 			}
 		}
 	}

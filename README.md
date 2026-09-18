@@ -793,11 +793,17 @@ work for any number of states.
 
 ### Operator precedence
 
-LTL operators bind less tightly than propositional connectives:
+The binary temporal operators bind tighter than every propositional
+connective, `!` included; the prefix operators `F` and `G` bind loosest:
 
 ```
-!  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F  >  G  >  U  >  R  >  W  >  S  >  T
+U, R, W, S, T  >  !  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F, G
 ```
+
+So `!a U b` is `!(a U b)`, `a && b U c` is `a && (b U c)`, and `G a && b` is
+`G (a && b)`.  Mixing binary temporal operators without parentheses is best
+avoided: `a U b R c` groups as `a U (b R c)` but `a R b U c` as `(a R b) U c`.
+The printer always parenthesises such operands.
 
 In the CTL\* fragment the prefix operators `A`, `E` and `-` sit at the level
 of `F` and `G`.
@@ -846,10 +852,9 @@ individual shifts.
 - **Spec terminator**: in specification files and in programs passed to the
   parser every statement ends with `.` (a period), e.g. `G (o1[t] = 1).`; the
   argument of a single REPL command (`sat G (o1[t] = 1)`) may omit it.
-- **Semantic negation (`-`)**: parses in the CTL\* fragment, but only constant
-  operands (`-T`, `-F`) are evaluated; `- φ` over a data formula is refused with
-  an error because the input/output role swap it requires is not implemented
-  (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
+- **Semantic negation (`-`)**: `- φ` is decided only where it sits under
+  Boolean connectives; under a temporal operator or a path quantifier it is
+  refused (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
 - **nlang needs an LLM API key**: the oracle reads `TAU_LLM_API_KEY` (falling
   back to `OPENAI_API_KEY`), with `TAU_LLM_ENDPOINT` (default
   `https://api.openai.com/v1`) and `TAU_LLM_MODEL` optional and each HTTP
@@ -890,19 +895,26 @@ The CTL\* fragment extends the LTL grammar with path quantifiers:
 | **A** (for-all paths) | `A φ` | φ holds on every path from the current state |
 | **E** (exists path) | `E φ` | φ holds on at least one path from the current state |
 
-`A` and `E` quantify over the tree of possible strategy executions, not over
-individual traces.  Not every placement is supported by the encoding:
+`A` and `E` quantify over the tree of possible strategy executions, one
+branch per input sequence, not over individual traces.  Not every placement
+is supported by the encoding:
 
-- `E χ` in positive polarity is encoded through a fresh witness output; the
-  encoding is sound for REALIZABLE verdicts and may be over-strict (an
-  UNREALIZABLE answer can be incomplete).
+- `E χ` in positive polarity is encoded through a fresh witness output.  A
+  REALIZABLE verdict is always right.  When inputs are involved the witness is
+  stricter than `E` (it demands χ on every input branch), so an unrealizable
+  encoding is reported as UNKNOWN rather than UNREALIZABLE; without inputs the
+  encoding is exact.
 - `A χ` in positive polarity inside a universal context (under `&&`, `G` or
   another `A`) reduces to `χ` itself.
-- `A` or `E` in negative polarity (under `!`, on the left of `->`, on either
-  side of `<->`/`^^`, in the guard of `?:`), `A` under an existential or
-  eventual context (`||`, `F`, `U`, ...) and `- φ` over a data formula are
-  refused with an error.  The rewrite `A φ ≡ ¬E¬φ` is deliberately not used:
-  in this encoding it imposed no constraint at all.
+- `A` or `E` in negative polarity (under `!`, on the left of `->`) is first
+  rewritten through its dual (`!A χ = E !χ`, `!E χ = A !χ`).
+- Anything that still has no sound encoding -- `A` under an existential or
+  eventual context (`||`, `F`, `U`, ...), `A`/`E` on either side of
+  `<->`/`^^` or in the guard of `?:` -- is refused with an error.
+
+`sat` of a CTL\* formula is `sat` of its encoding, so `sat A φ` and `sat φ`
+agree; `realizable` decides realizability.  `valid` does not decide formulas
+with `A`, `E` or `-` and reports UNKNOWN.
 
 ### Semantic negation (`-`)
 
@@ -917,10 +929,12 @@ distinct from syntactic negation (`!`):
 `- φ` is a strategy-level statement: it asserts that the specification φ is
 **unrealizable** — no matter what the system does, the environment can always
 violate φ.  This differs from `! φ`, which simply flips the truth value of φ on
-a single trace.  In the current implementation only constant operands (`-T`,
-`-F`) are evaluated; `- φ` over a formula with stream variables parses but is
-refused with an error, because deciding it would require swapping the roles of
-inputs and outputs, which is not implemented.
+a single trace.  Where `- φ` sits under Boolean connectives only, it is a
+closed statement about φ's own game and is decided by the realizability
+verdict of φ (`- φ` is true exactly when `realizable φ` is false, and undecided
+when that is).  Under a temporal operator or a path quantifier it would mean
+"φ is unrealizable from this point on", which needs the input and output roles
+swapped; that is not implemented and is refused with an error.
 
 ### Examples
 
@@ -934,18 +948,23 @@ A F(o1[t] = 1).
 -- There exists a path where the output is always 0
 E G(o1[t] = 0).
 
--- Semantic negation over a data formula parses but is refused:
--- "semantic negation (-) over data formulas is not implemented"
-- G(o1[t] = i1[t]).
+-- The environment cannot be forced to raise i1: true
+-(F i1[t] = 1).
+
+-- Refused: semantic negation under a temporal operator
+G (-(o1[t] = i1[t])).
 ```
 
 ### Reduction to LTL
 
-CTL\* formulas are reduced to LTL synthesis problems via the
-Bloem/Schewe/Khalimov witness-output encoding.  Each existential path choice
-is encoded as an additional witness output variable, allowing the existing
-`ltlsynt`-based pipeline to handle the branching-time property, within the
-placement restrictions listed above.
+CTL\* formulas are reduced to LTL synthesis problems with a restricted form
+of the Bloem/Schewe/Khalimov witness-output encoding (arXiv:1711.10636): each
+existential path choice becomes an additional witness output, allowing the
+existing `ltlsynt`-based pipeline to handle the branching-time property.  The
+paper's direction outputs, which pin the witness to one input branch, are not
+used; that is why the encoding is stricter than `E` when inputs are involved.
+The `fragment ctl_star` switch is a REPL setting: specification files and the
+API accept `A`, `E` and `-` without it.
 
 ## **Satisfiability and execution**
 

@@ -104,11 +104,11 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	if (partial_out) partial_out->atoms = sol.atoms;
 
 	// Split into maximal top-level conjuncts and pick out the ones whose
-	// atoms are all positional (max-position hoisting); throws for the two
+	// atoms are all positional (max-position hoisting); an error for the two
 	// temporary refusals -- a conjunct mixing positional and relative-time
 	// atoms, or a positional atom under F/U/R/W/S/T (see the function doc).
-	std::vector<tref> hoist_conjuncts =
-		collect_hoist_conjuncts<node>(fm, sol.atoms);
+	TAU_TRY(std::vector<tref> hoist_conjuncts,
+		collect_hoist_conjuncts<node>(fm, sol.atoms));
 
 	// Past operators (S, T) require the ppLTLTT temporal tester encoding
 	// in the default path.  Algorithm A/B/D use ltl_skeleton() which
@@ -249,76 +249,21 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	return r.with_value(std::move(sol));
 }
 
-// ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
-
+// The oracle part of the realizability check, shared with execution: checks
+// every edge of sol's strategy against the ABA (and the window oracle for
+// relations spanning several steps), blocks an infeasible edge and
+// re-synthesizes, until a strategy passes (true, sol holds it) or ltlsynt
+// finds none (false). An error is undecided.
 template <NodeType node>
-result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
+	bool output)
+{
 	result<bool> r;
-	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
-
-	// This function is called directly by api::realizable as well as by
-	// is_tau_formula_sat, so -- like is_tau_formula_sat does for its own
-	// callers -- it brands every undecided exit UNKNOWN itself rather than
-	// leaving it to whichever caller happens to print the report.
 	auto backend_failed = [&]() -> result<bool> {
 		return r.with_error(code::solver_error,
 			"UNKNOWN: the synthesis backend failed or produced no "
 			"verdict; realizability could not be decided");
 	};
-
-	// LT-5 / IN-1 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
-	// here was not handled by reduce_ctl_star_to_ltl (direct callers such
-	// as preferences.h skip the reduction entirely). None has a
-	// propositional encoding -- the skeleton would flatten it to "1" --
-	// and A/E left in place could bounce back into is_tau_formula_sat's
-	// CTL* branch forever. Refuse rather than answer wrongly.
-	if (has_ctl_star_operators<node>(fm)) {
-		return r.with_error(code::solver_error,
-		    "CTL* operators (A / E / semantic negation) reached the LTL "
-		    "realizability check without a CTL* reduction; route the "
-		    "formula through is_tau_formula_sat");
-	}
-
-	// Safety fast-path: if the formula has no full-LTL operators AND
-	// no Boolean combinations of models, it is a pure G/safety formula
-	// the safety pipeline can decide on its own.  In that case the
-	// entire six-phase LTL pipeline (data-atom extraction →
-	// propositional skeleton → ltlsynt subprocess → HOA parse → ABA
-	// oracle on every transition) reduces to a single
-	// is_tau_formula_sat call.  Skipping ltlsynt (5–50 ms per call) on
-	// pure safety specs is the largest single per-call win on the
-	// synthesis hot path.
-	//
-	// The Boolean-combs-of-models guard is what prevents an infinite
-	// recursion with is_tau_formula_sat: that function routes formulas
-	// like `(G A) || (G B)` here precisely because it can't handle
-	// them itself.  Without the guard, this fast-path would route back.
-	auto no_bool_combs = [&] {
-		auto nbc = has_no_boolean_combs_of_models<node>(fm);
-		return nbc.has_value() && nbc.value();
-	};
-	if (!realizability_has_game_operators<node>(fm) && no_bool_combs()) {
-		LOG_DEBUG << "[ltl_aba] safety fast-path "
-		             "(no full-LTL operators, single G)";
-		// An error here (e.g. transform_to_execution's multiple-sometimes
-		// refusal) is undecided, not a decided "not realizable" -- do not
-		// let has_value()==false collapse silently into `false`.
-		auto sat_opt = r.merge_take(is_tau_formula_sat<node>(fm, start_time, output));
-		if (!sat_opt) return backend_failed();
-		return r.with_value(*sat_opt);
-	}
-
-	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm));
-	if (!maybe_opt) return backend_failed();
-	auto maybe = std::move(*maybe_opt);
-	LOG_DEBUG << "[ltl_aba] solve_ltl_aba returned: " << maybe.has_value();
-
-	if (!maybe) {
-		if (output) LOG_DEBUG << "[ltl_aba] UNREALIZABLE (propositional)";
-		return r.with_value(false);
-	}
-
-	auto& sol = *maybe;
 	LOG_DEBUG << "[ltl_aba] atoms=" << sol.atoms.size()
 	          << " states=" << sol.aut.num_states;
 
@@ -415,14 +360,104 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
 		if (!ltlsynt_opt) return backend_failed();
 		auto& [ok, hoa] = *ltlsynt_opt;
-		if (!ok) {
-			if (output) LOG_INFO << "[ltl_aba] UNREALIZABLE (ABA-refined)";
-			return r.with_value(false);
-		}
+		if (!ok) return r.with_value(false);
 		auto aut_opt = r.merge_take(parse_hoa(hoa));
 		if (!aut_opt) return backend_failed();
 		sol.aut = std::move(*aut_opt);
 	}
+}
+
+// ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
+
+template <NodeType node>
+result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+	result<bool> r;
+	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
+
+	// This function is called directly by api::realizable as well as by
+	// is_tau_formula_sat, so -- like is_tau_formula_sat does for its own
+	// callers -- it brands every undecided exit UNKNOWN itself rather than
+	// leaving it to whichever caller happens to print the report.
+	auto backend_failed = [&]() -> result<bool> {
+		return r.with_error(code::solver_error,
+			"UNKNOWN: the synthesis backend failed or produced no "
+			"verdict; realizability could not be decided");
+	};
+
+	// LT-5 / IN-1 backstop: a `wff_semantic_neg`, `A` or `E` that reaches
+	// here was not handled by reduce_ctl_star_to_ltl (direct callers such
+	// as preferences.h skip the reduction entirely). None has a
+	// propositional encoding -- the skeleton would flatten it to "1" --
+	// and A/E left in place could bounce back into is_tau_formula_sat's
+	// CTL* branch forever. Refuse rather than answer wrongly.
+	if (has_ctl_star_operators<node>(fm)) {
+		return r.with_error(code::solver_error,
+		    "CTL* operators (A / E / semantic negation) reached the LTL "
+		    "realizability check without a CTL* reduction; route the "
+		    "formula through is_tau_formula_sat");
+	}
+
+	// Safety fast-path: if the formula has no full-LTL operators AND
+	// no Boolean combinations of models, it is a pure G/safety formula
+	// the safety pipeline can decide on its own.  In that case the
+	// entire six-phase LTL pipeline (data-atom extraction →
+	// propositional skeleton → ltlsynt subprocess → HOA parse → ABA
+	// oracle on every transition) reduces to a single
+	// is_tau_formula_sat call.  Skipping ltlsynt (5–50 ms per call) on
+	// pure safety specs is the largest single per-call win on the
+	// synthesis hot path.
+	//
+	// The Boolean-combs-of-models guard is what prevents an infinite
+	// recursion with is_tau_formula_sat: that function routes formulas
+	// like `(G A) || (G B)` here precisely because it can't handle
+	// them itself.  Without the guard, this fast-path would route back.
+	auto no_bool_combs = [&] {
+		auto nbc = has_no_boolean_combs_of_models<node>(fm);
+		return nbc.has_value() && nbc.value();
+	};
+	if (!realizability_has_game_operators<node>(fm) && no_bool_combs()) {
+		LOG_DEBUG << "[ltl_aba] safety fast-path "
+		             "(no full-LTL operators, single G)";
+		// An error here (e.g. transform_to_execution's multiple-sometimes
+		// refusal) is undecided, not a decided "not realizable" -- do not
+		// let has_value()==false collapse silently into `false`.
+		auto sat_opt = r.merge_take(is_tau_formula_sat<node>(fm, start_time, output));
+		if (!sat_opt) return backend_failed();
+		return r.with_value(*sat_opt);
+	}
+
+	// a nested call (the safety fast path above) keeps the caller's flag
+	const bool outer_incomplete = ltl_verdict_incomplete;
+	ltl_verdict_incomplete = false;
+	struct restore_flag {
+		bool outer;
+		~restore_flag() { ltl_verdict_incomplete |= outer; }
+	} restore{ outer_incomplete };
+	auto unrealizable = [&](const char* how) {
+		if (ltl_verdict_incomplete) {
+			if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << how
+				<< ", but a consistency cap gave up)";
+			return r.with_error(code::solver_error, std::string(
+				"UNKNOWN: unrealizable only because a consistency cap "
+				"(--max-consistency-subsets / --max-cover-products) "
+				"skipped checks; realizability could not be decided"));
+		}
+		if (output) LOG_INFO << "[ltl_aba] UNREALIZABLE (" << how << ")";
+		return r.with_value(false);
+	};
+
+	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm));
+	if (!maybe_opt) return backend_failed();
+	auto maybe = std::move(*maybe_opt);
+	LOG_DEBUG << "[ltl_aba] solve_ltl_aba returned: " << maybe.has_value();
+
+	if (!maybe) return unrealizable("propositional");
+
+	auto refined = r.merge_take(
+		refine_ltl_aba_solution<node>(*maybe, output));
+	if (!refined) return r;
+	if (!*refined) return unrealizable("ABA-refined");
+	return r.with_value(true);
 }
 
 // ── Multi-state Mealy → safety formula ───────────────────────────────────────
@@ -457,6 +492,24 @@ static tref build_state_bit_eq(const std::string& name, int shift, bool set)
 					 : build_bf_f_type<node>(tid));
 }
 
+// Exactly one of the state bits `sv` is set at the current step.
+template <NodeType node>
+static tref mealy_one_hot(const std::vector<std::string>& sv) {
+	using tau = tree<node>;
+	const int k = (int)sv.size();
+	tref at_least = tau::_F();
+	for (int i = 0; i < k; ++i)
+		at_least = tau::build_wff_or(at_least, build_state_bit_eq<node>(sv[i], 0, true));
+	tref at_most = tau::_T();
+	for (int i = 0; i < k; ++i)
+		for (int j = i + 1; j < k; ++j)
+			at_most = tau::build_wff_and(at_most,
+			    tau::build_wff_neg(
+			        tau::build_wff_and(build_state_bit_eq<node>(sv[i], 0, true),
+			                          build_state_bit_eq<node>(sv[j], 0, true))));
+	return tau::build_wff_and(at_least, at_most);
+}
+
 template <NodeType node>
 static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 {
@@ -471,19 +524,7 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 		sv.push_back("o__ltl_ms" + std::to_string(i) + "__");
 
 	// ── (a) One-hot constraint at the current step ────────────────────────
-	tref at_least = tau::_F();
-	for (int i = 0; i < k; ++i)
-		at_least = tau::build_wff_or(at_least, build_state_bit_eq<node>(sv[i], 0, true));
-
-	tref at_most = tau::_T();
-	for (int i = 0; i < k; ++i)
-		for (int j = i + 1; j < k; ++j)
-			at_most = tau::build_wff_and(at_most,
-			    tau::build_wff_neg(
-			        tau::build_wff_and(build_state_bit_eq<node>(sv[i], 0, true),
-			                          build_state_bit_eq<node>(sv[j], 0, true))));
-
-	tref one_hot = tau::build_wff_and(at_least, at_most);
+	tref one_hot = mealy_one_hot<node>(sv);
 
 	// ── (b) Transition rules with lookback-1 ──────────────────────────────
 	// For each source state s:
@@ -528,96 +569,53 @@ static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 	return tau::build_wff_always(body);
 }
 
-// Build the fixed-time initial-state and initial-output conditions for a
-// multi-state Mealy encoding.  These are returned separately so the caller
-// can combine them with the safety formula AFTER normalisation (normalising
-// them together can cause the solver to report unsatisfiability at step 0).
-//
-// Returned pair: { sv[initial_state][0]={1},  init_out_disjunction }
-// init_out_disjunction = ∨_e ( guard_e(t=0) ∧ sv[dst_e][1]={1} )
-// If the initial state has no outgoing edges (shouldn't happen for a
-// realizable formula), the second element is nullptr.
+// Fixed-time constraints for the steps 0 .. warmup-1, which run before the
+// interpreter enforces the G body of encode_mealy_as_safety: the machine is
+// in its initial state before step 0 and takes exactly one transition per
+// step, so sv[·][t] is the state after step t, as in the G body. A guard
+// literal over an atom that would read a negative time is dropped (the
+// strategy's choice cannot depend on it at that step): for the cube and DNF
+// labels ltlsynt emits that is the existential projection of the guard.
 template <NodeType node>
-static std::pair<tref,tref>
-encode_mealy_initial_conditions(const ltl_aba_solution<node>& sol,
-                                const std::vector<std::string>& sv)
+static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
+                                const std::vector<std::string>& sv,
+                                int_t warmup)
 {
 	using tau = tree<node>;
 	const auto& aut = sol.aut;
-	const int k     = (int)sv.size();
+	const int k      = (int)sv.size();
 	const int init_s = aut.initial_state;
-	if (init_s < 0 || init_s >= k) return {nullptr, nullptr};
-
-	// (1) sv[initial_state][0] = {1}
-	tref sv_tmpl = build_state_bit_eq<node>(sv[init_s], 0, true);
-	auto sv_io   = tau::get(sv_tmpl).select_top(is_child<node, tau::io_var>);
-	tref init_sv = fm_at_time_point<node>(sv_tmpl, sv_io, 0);
-
-	// (2) ∨_e ( guard_e(t=0) ∧ sv[dst_e][1]={1} )
-	tref init_out = nullptr;
-	for (const auto& e : aut.edges[init_s]) {
-		if (e.dst < 0 || e.dst >= k) continue;
-		tref gfm   = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
-		auto gvars = tau::get(gfm).select_top(is_child<node, tau::io_var>);
-		tref g0    = fm_at_time_point<node>(gfm, gvars, 0);
-		tref sv_t  = build_state_bit_eq<node>(sv[e.dst], 0, true);
-		auto sv_t_io = tau::get(sv_t).select_top(is_child<node, tau::io_var>);
-		tref sv1   = fm_at_time_point<node>(sv_t, sv_t_io, 1);
-		tref edge  = tau::build_wff_and(g0, sv1);
-		init_out   = init_out ? tau::build_wff_or(init_out, edge) : edge;
+	if (init_s < 0 || init_s >= k) return nullptr;
+	auto at = [](tref fm, int_t t) {
+		auto io = tau::get(fm).select_top(is_child<node, tau::io_var>);
+		return fm_at_time_point<node>(fm, io, t);
+	};
+	tref all = tau::_T();
+	for (int_t t = 0; t < std::max<int_t>(warmup, 1); ++t) {
+		std::vector<std::pair<tref, std::string>> atoms_t;
+		for (const auto& a : sol.atoms)
+			if (max_atom_lookback<node>({a}) <= t) atoms_t.push_back(a);
+		auto edges_from = [&](int s) {
+			tref d = tau::_F();
+			for (const auto& e : aut.edges[s]) {
+				if (e.dst < 0 || e.dst >= k) continue;
+				d = tau::build_wff_or(d, tau::build_wff_and(
+					guard_to_aba<node>(e.guard_label, aut.aps, atoms_t),
+					build_state_bit_eq<node>(sv[e.dst], 0, true)));
+			}
+			return d;
+		};
+		tref step = tau::_T();
+		if (t == 0) step = edges_from(init_s);
+		else for (int s = 0; s < k; ++s)
+			step = tau::build_wff_and(step, tau::build_wff_or(
+				tau::build_wff_neg(
+					build_state_bit_eq<node>(sv[s], -1, true)),
+				edges_from(s)));
+		all = tau::build_wff_and(all,
+			at(tau::build_wff_and(step, mealy_one_hot<node>(sv)), t));
 	}
-
-	return {init_sv, init_out};
-}
-
-// ── encode_solution_as_safety ────────────────────────────────────────────────
-// Encodes an already-synthesised ltl_aba_solution as an always(phi) safety formula.
-
-template <NodeType node>
-static tref encode_solution_as_safety(const ltl_aba_solution<node>& sol) {
-	using tau = tree<node>;
-
-	// Purely propositional: realizable but no data constraints to encode.
-	if (sol.atoms.empty()) return tau::_T();
-
-	const auto& aut = sol.aut;
-
-	// Trivially realizable: empty automaton.
-	if (aut.num_states == 0) return tau::_T();
-
-	if (aut.num_states > 1) {
-		LOG_INFO << "[ltl_aba] Multi-state strategy ("
-		         << aut.num_states
-		         << " states) — encoding with auxiliary one-hot state bits";
-		return encode_mealy_as_safety<node>(sol);
-	}
-
-	// Single-state strategy: the self-loop guard is the perpetual output constraint.
-	if (aut.edges.empty() || aut.edges[0].empty())
-		return tau::build_wff_always(tau::_T());
-
-	// Build the disjunction of ABA guard formulas over all edges from state 0.
-	tref combined = tau::_F();
-	for (const auto& e : aut.edges[0]) {
-		tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
-		auto norm_guard_r = normalize_non_temp<node>(guard_fm);
-		if (!norm_guard_r.has_value()) {
-			LOG_ERROR << "[ltl_aba] encode_solution_as_safety: "
-				"normalization of a guard formula failed";
-			return nullptr;
-		}
-		combined = tau::build_wff_or(combined, norm_guard_r.value());
-	}
-	auto simplified_r = normalize_non_temp<node>(combined);
-	if (!simplified_r.has_value()) {
-		LOG_ERROR << "[ltl_aba] encode_solution_as_safety: "
-			"final normalization failed";
-		return nullptr;
-	}
-	tref simplified = simplified_r.value();
-	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula result: always("
-	          << LOG_FM(simplified) << ")";
-	return tau::build_wff_always(simplified);
+	return all;
 }
 
 // ── ltl_to_safety_formula ─────────────────────────────────────────────────────
@@ -639,10 +637,46 @@ ltl_to_safety_formula_full(tref fm) {
 	// Fast path: if all LTL operators are past (S/T), compile them away and
 	// return G(curr && rhs) safety invariants for each S operator.
 	// No Mealy synthesis is needed on this path; the returned solution is empty.
+	// Wraps each top-level conjunct in G unless it already is one.
+	std::function<tref(tref)> wrap_always = [&](tref n) -> tref {
+		trefs kids;
+		{
+			// Read the children out BEFORE recursing: the
+			// recursive calls build nodes, and nothing here
+			// should depend on a reference into the tree
+			// store surviving that.
+			const auto& nt_ = tau::get(n);
+			if (nt_.equals_T()) return n;
+			if (!nt_.has_child())
+				return tau::build_wff_always(n);
+			auto k = nt_[0].value.nt;
+			if (k == tau::wff_always) return n;
+			if (k != tau::wff_and)
+				return tau::build_wff_always(n);
+			const auto& op = nt_[0];
+			for (size_t i = 0; i < op.children_size(); ++i)
+				kids.push_back(op.child(i));
+		}
+		if (kids.empty()) return tau::build_wff_always(n);
+		tref acc = nullptr;
+		for (tref k : kids) {
+			tref w = wrap_always(k);
+			acc = acc ? tau::build_wff_and(acc, w) : w;
+		}
+		return acc;
+	};
+
 	{
 		auto [compiled_fast, safety_fm, init_fm, _aux, unanchored_aux] =
 			compile_since_trigger<node>(fm);
-		if (!realizability_has_game_operators<node>(compiled_fast)) {
+		// The compiled invariants read their auxiliaries at t-1, which
+		// makes step 0 a warm-up step the interpreter does not enforce.
+		// That matches the spec only when it has a lookback of its own;
+		// otherwise the Mealy route, whose past-operator testers start at
+		// step 0, executes it.
+		if (!realizability_has_game_operators<node>(compiled_fast)
+			&& body_max_lookback<node>(fm) > 0)
+		{
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: "
 			          << "pure past-LTL, returning safety formula";
 			// LT-2: the compiled formula used to be DISCARDED here, so the
@@ -659,33 +693,6 @@ ltl_to_safety_formula_full(tref fm) {
 			// children.  Reading only first()/second() dropped every conjunct
 			// past the second — silently, straight out of the executed safety
 			// formula.
-			std::function<tref(tref)> wrap_always = [&](tref n) -> tref {
-				trefs kids;
-				{
-					// Read the children out BEFORE recursing: the
-					// recursive calls build nodes, and nothing here
-					// should depend on a reference into the tree
-					// store surviving that.
-					const auto& nt_ = tau::get(n);
-					if (nt_.equals_T()) return n;
-					if (!nt_.has_child())
-						return tau::build_wff_always(n);
-					auto k = nt_[0].value.nt;
-					if (k == tau::wff_always) return n;
-					if (k != tau::wff_and)
-						return tau::build_wff_always(n);
-					const auto& op = nt_[0];
-					for (size_t i = 0; i < op.children_size(); ++i)
-						kids.push_back(op.child(i));
-				}
-				if (kids.empty()) return tau::build_wff_always(n);
-				tref acc = nullptr;
-				for (tref k : kids) {
-					tref w = wrap_always(k);
-					acc = acc ? tau::build_wff_and(acc, w) : w;
-				}
-				return acc;
-			};
 			tref obligation = wrap_always(compiled_fast);
 			tref out = tau::build_wff_and(obligation,
 			           tau::build_wff_and(safety_fm, init_fm));
@@ -695,6 +702,11 @@ ltl_to_safety_formula_full(tref fm) {
 		}
 	}
 
+	// A pure-past spec rerouted here (no lookback of its own) is an
+	// invariant, as on the fast path: every step, not only step 0.
+	if (!realizability_has_game_operators<node>(
+		std::get<0>(compile_since_trigger<node>(fm))))
+		fm = wrap_always(fm);
 	auto maybe_r = solve_ltl_aba<node>(fm);
 	if (!maybe_r.has_value()) {
 		// This function's tuple return has no report channel of its
@@ -711,6 +723,17 @@ ltl_to_safety_formula_full(tref fm) {
 	}
 
 	auto& sol = *maybe;
+	// Execute the strategy the realizability check accepts, not ltlsynt's
+	// first one, which may take an edge the ABA rules out.
+	if (sol.executable) {
+		auto refined = refine_ltl_aba_solution<node>(sol, false);
+		if (!refined.has_value() || !refined.value()) {
+			if (!refined.has_value()) refined.print();
+			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "
+				"survives the ABA refinement";
+			return {nullptr, std::nullopt, {}};
+		}
+	}
 
 	// LT-6: Algorithm B decides realizability by a route whose strategy is
 	// not expressible over the user's data atoms (the P_σ / D-bit
@@ -863,9 +886,35 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 		maybe = std::move(maybe_r.value());
 	} catch (const std::runtime_error& e) {
 		out << "REFUSED: " << e.what() << "\n";
-		return r.with_value(false);
+		return r.with_error(code::solver_error,
+			std::string("UNKNOWN: ") + e.what());
 	}
 	if (maybe) sol = std::move(*maybe);
+
+	// The trace below is the first ltlsynt round and its per-edge oracle
+	// checks; the verdict comes from is_ltl_aba_realizable, the procedure
+	// `realizable` runs (window oracle, refinement rounds), so the two
+	// commands cannot disagree.
+	auto verdict = [&]() -> result<bool> {
+		auto real = is_ltl_aba_realizable<node>(fm, 0, false);
+		if (!real.has_value()) {
+			r.merge(std::move(real));
+			return r.with_error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed or produced no "
+				"verdict; realizability could not be decided");
+		}
+		// what `run` executes: the refined strategy's encoding
+		if (real.value()) {
+			auto [safety, _sol, _aux] =
+				ltl_to_safety_formula_full<node>(fm);
+			if (safety) out << "\nSafety formula: "
+				<< tau::get(safety).to_str() << "\n";
+			else out << "\nThe strategy is not executable\n";
+		}
+		out << "\n" << (real.value() ? "REALIZABLE" : "UNREALIZABLE")
+			<< "\n";
+		return r.with_value(real.value());
+	};
 
 	out << "\nData atoms (" << sol.atoms.size() << "):\n";
 	for (auto& [f, name] : sol.atoms)
@@ -902,8 +951,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 	out << "\nLTL skeleton: " << sol.skeleton << "\n";
 
 	if (!maybe) {
-		out << "\nUNREALIZABLE\n";
-		return r.with_value(false);
+		out << "\nFirst round: ltlsynt found no strategy\n";
+		return verdict();
 	}
 
 	const hoa_automaton& aut = sol.aut;
@@ -957,17 +1006,12 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 			}
 		}
 		if (!all_feasible) {
-			out << "\nUNREALIZABLE (ABA-infeasible transition)\n";
-			return r.with_value(false);
+			out << "\nFirst round: ABA-infeasible transition\n";
+			return verdict();
 		}
 	}
 
-	// A pure past-LTL formula's safety formula is the full ppLTLTT/Mealy encoding here, not a compiled-away shortcut.
-	tref safety = encode_solution_as_safety<node>(sol);
-	out << "\nSafety formula: " << tau::get(safety).to_str() << "\n";
-
-	out << "\nREALIZABLE\n";
-	return r.with_value(true);
+	return verdict();
 }
 
 // ── CTL* operators detection ─────────────────────────────────────────────────
@@ -1014,8 +1058,12 @@ bool has_ctl_star_operators(tref fm) {
 //      path from an inner node is a suffix of a root path.
 //   4. Everything else -- A or E in negative polarity (under ¬, on the left
 //      of →, either side of ↔/⊕, in a conditional's guard), A under an
-//      existential/eventual context (∨, F, sometimes, U, ...), and `-φ` --
-//      has no sound encoding here and is REFUSED with a result<T> error.
+//      existential/eventual context (∨, F, sometimes, U, ...), and `-φ`
+//      under a temporal operator or a path quantifier -- has no sound
+//      encoding here and is REFUSED with a result<T> error. The caller
+//      (reduce_ctl_star_to_ltl) first folds Boolean-context `-φ` to
+//      constants and, on a refusal, retries on the NNF form, where
+//      ¬A χ = E ¬χ and ¬E χ = A ¬χ turn negative quantifiers positive.
 //      LA-N2: the previous `A χ ≡ ¬E¬χ` rewrite produced `¬w ∧ G(w → ¬χ)`,
 //      which every strategy satisfies by holding w false, so `A` imposed
 //      nothing and `A (F i1 = 1)` came out REALIZABLE.
@@ -1108,24 +1156,15 @@ static result<tref> translate_ctl_star(tref fm,
 			witnesses, true, true);
 	}
 
-	// Handle semantic negation -φ: unrealizability check.
-	//
-	// -φ means "φ is not realizable by the system", i.e. the environment can
-	// force ¬φ.  Deciding it needs the input/output roles to be swapped for
-	// the subformula, which is NOT implemented (LT-5): the case used to call
-	// `apply_semantic_negation`, which only re-wraps the node — and without
-	// translating the children, so any E/A inside survived too.  The
-	// surviving node then reached `skeleton_wff`'s default case and, because
-	// it contains io_vars, came out as the propositional constant "1", so
-	// every non-constant `-φ` was answered REALIZABLE regardless of φ.
-	//
-	// Refuse rather than answer wrongly.  The hooks fold `-T`/`-F` before
-	// anything gets here, so constant semantic negations still work.
+	// A `-φ` still here sits under a temporal operator or a path
+	// quantifier (reduce_ctl_star_to_ltl folds the Boolean-context ones
+	// first): it would mean "φ is unrealizable from this history on",
+	// which needs the input/output role swap and has no encoding.
 	if (nt == tau::wff_semantic_neg) {
 		return r.with_error(code::solver_error,
-		    "semantic negation (-) over data formulas is not implemented: "
-		    "the input/output role swap it requires has no implementation, "
-		    "and answering it as propositional TRUE would be unsound");
+		    "semantic negation (-) under a temporal operator or a path "
+		    "quantifier is not implemented: it needs the input/output "
+		    "role swap from that history on");
 	}
 
 	// For all other nodes, recursively translate children
@@ -1243,16 +1282,112 @@ bool has_semantic_negation(tref fm) {
 	}) != nullptr;
 }
 
+// Folds every `-ψ` reached from the root through Boolean connectives only.
+// There `-ψ` is a closed statement about ψ's own game ("ψ has no winning
+// system strategy"), so by determinacy it is the negated realizability
+// verdict of ψ. A `-ψ` under a temporal operator or a path quantifier is
+// left in place: it would mean "unrealizable from this history on", and
+// translate_ctl_star refuses it.
+template <NodeType node>
+static result<tref> resolve_semantic_negations(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	if (!has_semantic_negation<node>(fm)) return r.with_value(fm);
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return r.with_value(fm);
+	const auto& op = t[0];
+	auto nt = op.value.nt;
+	if (nt == tau::wff_semantic_neg) {
+		TAU_TRY(bool real, is_ctl_star_realizable<node>(
+			op.child(0), 0, false));
+		return r.with_value(real ? tau::_F() : tau::_T());
+	}
+	switch (nt) {
+	case tau::wff_neg: {
+		TAU_TRY(auto a, resolve_semantic_negations<node>(op.child(0)));
+		return r.with_value(tau::build_wff_neg(a));
+	}
+	case tau::wff_and: case tau::wff_or: case tau::wff_imply:
+	case tau::wff_rimply: case tau::wff_equiv: case tau::wff_xor: {
+		TAU_TRY(auto a, resolve_semantic_negations<node>(op.child(0)));
+		TAU_TRY(auto b, resolve_semantic_negations<node>(op.child(1)));
+		switch (nt) {
+		case tau::wff_and:    return r.with_value(tau::build_wff_and(a, b));
+		case tau::wff_or:     return r.with_value(tau::build_wff_or(a, b));
+		case tau::wff_imply:  return r.with_value(tau::build_wff_imply(a, b));
+		case tau::wff_rimply: return r.with_value(tau::build_wff_rimply(a, b));
+		case tau::wff_equiv:  return r.with_value(tau::build_wff_equiv(a, b));
+		default:              return r.with_value(tau::build_wff_xor(a, b));
+		}
+	}
+	case tau::wff_conditional: {
+		TAU_TRY(auto c, resolve_semantic_negations<node>(op.child(0)));
+		TAU_TRY(auto a, resolve_semantic_negations<node>(op.child(1)));
+		TAU_TRY(auto b, resolve_semantic_negations<node>(op.child(2)));
+		return r.with_value(tau::build_wff_conditional(c, a, b));
+	}
+	default:
+		return r.with_value(fm);
+	}
+}
+
+template <NodeType node>
+result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
+	result<bool> r;
+	if (!has_ctl_star_operators<node>(fm))
+		return is_ltl_aba_realizable<node>(fm, start_time, output);
+	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
+	TAU_TRY(bool real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
+		start_time, output));
+	// A witness certifies E χ by forcing χ on every path from its state,
+	// which is exact only on a single-path computation tree, i.e. when no
+	// input is involved. With inputs an UNREALIZABLE reduction does not
+	// make fm unrealizable.
+	if (!real && !reduction.witnesses.empty()
+		&& atom_has_any_input<node>(fm))
+	{
+		return r.with_error(code::solver_error,
+			"UNKNOWN: the CTL* reduction is unrealizable, but its E "
+			"witnesses range over every input branch, which is "
+			"stricter than E; realizability could not be decided");
+	}
+	return r.with_value(real);
+}
+
 template <NodeType node>
 result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 	using tau = tree<node>;
 	result<ctl_star_reduction<node>> r;
+
+	// Resolved before the counter reset: deciding a `-ψ` runs a reduction
+	// of its own.
+	TAU_TRY(fm, resolve_semantic_negations<node>(fm));
 	ctl_star_detail::reset_witness_counter();
 
 	std::vector<std::pair<std::string, tref>> constraints;
 	std::vector<std::string> witnesses;
 
-	TAU_TRY(auto translated, translate_ctl_star<node>(fm, constraints, witnesses));
+	auto translated_r = translate_ctl_star<node>(fm, constraints, witnesses);
+	if (!translated_r.has_value()) {
+		// A or E in negative polarity has a positive dual (¬A χ = E ¬χ,
+		// ¬E χ = A ¬χ); the NNF form is equivalent, so a successful
+		// translation of it is as sound as one of fm.
+		tref nnf = to_nnf<node>(fm);
+		if (nnf && nnf != fm) {
+			constraints.clear();
+			witnesses.clear();
+			ctl_star_detail::reset_witness_counter();
+			auto nnf_r = translate_ctl_star<node>(nnf, constraints,
+				witnesses);
+			if (nnf_r.has_value()) translated_r = std::move(nnf_r);
+		}
+	}
+	if (!translated_r.has_value()) {
+		r.merge(std::move(translated_r));
+		return r.with_error(code::solver_error,
+			"the CTL* formula has no sound reduction to LTL");
+	}
+	tref translated = translated_r.value();
 
 	// Build the conjunction: translated_root ∧ constraint_1 ∧ ... ∧ constraint_n
 	tref result = translated;
@@ -1269,25 +1404,6 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 
 	return r.with_value(ctl_star_reduction<node>{result, witnesses,
 		std::move(witness_types)});
-}
-
-// ── Semantic negation implementation ─────────────────────────────────────────
-//
-// -φ means "there is no winning system strategy satisfying φ", i.e. the
-// environment wins for ¬φ.  In synthesis terms: swap the input/output roles
-// and synthesize ¬φ.
-//
-// NOT IMPLEMENTED (LT-5).  This function is an AST constructor and nothing
-// more: it wraps `fm` in a `wff_semantic_neg` node.  The previous comment
-// claimed "the actual role swap happens at the synthesis call site" — there is
-// no such site anywhere in src/, which is exactly why every non-constant `-φ`
-// used to be decided as propositional TRUE.  `translate_ctl_star` and
-// `is_ltl_aba_realizable` now reject a surviving `wff_semantic_neg` instead.
-
-template <NodeType node>
-tref apply_semantic_negation(tref fm) {
-	using tau = tree<node>;
-	return tau::build_wff_semantic_neg(fm);
 }
 
 } // namespace idni::tau_lang

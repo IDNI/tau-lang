@@ -344,17 +344,13 @@ tref guard_to_aba(const std::string& guard_label,
 
 // ── CTL* → LTL reduction (Bloem/Schewe/Khalimov, arXiv:1711.10636) ──────────
 //
-// The reduction works bottom-up on state subformulas:
-//   - E χ introduces a fresh witness output variable w and adds G(w → χ_LTL)
-//   - A χ is rewritten to ¬E¬χ first
-// The result is a pure LTL formula over I ∪ O ∪ W (witnesses).
-
-/// @brief State subformula context for CTL* reduction.
-struct ctl_star_witness {
-    tref original;       // the E χ subformula
-    std::string name;    // fresh witness output name, e.g. "w_0"
-    tref path_formula;   // the inner path formula χ
-};
+// A restricted form of the reduction, without the paper's direction outputs:
+//   - positive E χ becomes a fresh witness output w with G(w → χ');
+//   - positive A χ reachable only through ∧ / G / A becomes χ';
+//   - A/E in negative polarity are rewritten through their NNF duals first;
+//   - every other placement is refused.
+// The result is a pure LTL formula over I ∪ O ∪ W (witnesses); see
+// translate_ctl_star in ltl_aba_builders.tmpl.h for the soundness argument.
 
 /**
  * @brief Result of reducing a CTL* formula to an LTL synthesis problem.
@@ -374,9 +370,9 @@ template <NodeType node>
 struct ctl_star_reduction {
     tref ltl_formula;                    // reduced LTL formula
     std::vector<std::string> witnesses;  // witness output variable names
-    // IN-R6: BA type id per witness (index-aligned with `witnesses`);
-    // currently always the default bv type. The interpreter uses these to
-    // register each witness as an internal output stream.
+    // IN-R6: BA type id per witness (index-aligned with `witnesses`): the
+    // pack's Boolean carrier (pack_bool_carrier_type). The interpreter uses
+    // these to register each witness as an internal output stream.
     std::vector<size_t> witness_types;
 };
 
@@ -410,22 +406,37 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm);
 template <NodeType node>
 bool has_ctl_star_operators(tref fm);
 
+/**
+ * @brief True iff @p atom contains an input io_var anywhere.
+ * @tparam node Tree node type.
+ * @param atom Atom or formula to inspect.
+ * @return `true` iff an input stream variable occurs in @p atom.
+ */
+template <NodeType node>
+bool atom_has_any_input(tref atom);
+
+/**
+ * @brief Decide realizability of a formula that may contain CTL* operators.
+ *
+ * Reduces A / E / `-` with reduce_ctl_star_to_ltl first when present, then
+ * runs is_ltl_aba_realizable on the result.
+ * @tparam node Tree node type.
+ * @param fm Formula to decide.
+ * @param start_time Time point the check starts at.
+ * @param output Whether to print the verdict trace.
+ * @return `true` iff @p fm is realizable, or an error when undecided.
+ */
+template <NodeType node>
+result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output);
+
 // ── Semantic negation ─────────────────────────────────────────────────────────
 //
-// Semantic negation -φ means "φ is unrealizable by the system", i.e. the
-// environment can force ¬φ.  Deciding it means swapping the input/output roles
-// for the subformula and checking realizability of ¬φ.
-//
-// THAT ROLE SWAP IS NOT IMPLEMENTED (LT-5).  `apply_semantic_negation` only
-// re-wraps its argument in a `wff_semantic_neg` node; the header used to claim
-// the swap happened "at the synthesis call site", but no such site exists.
-// The surviving node then reached `skeleton_wff`'s default case which, because
-// the subformula contains io_vars, emitted the propositional constant "1" — so
-// every non-constant `-φ` was silently decided REALIZABLE regardless of φ.
-//
-// Until the swap exists, a `wff_semantic_neg` that survives constant folding
-// is REJECTED (a `result<T>` error) rather than answered wrongly.  The
-// hook-level folding of `-T` → F and `-F` → T is unaffected and keeps working.
+// Semantic negation -φ means "φ is unrealizable by the system". A `-φ`
+// reached from the root through Boolean connectives only is a closed
+// statement about φ's own game, decided by φ's realizability verdict
+// (determinacy) before the CTL* translation runs. A `-φ` under a temporal
+// operator or a path quantifier would need the input/output role swap from
+// that history on, which is not implemented: it is refused.
 
 /**
  * @brief True iff the formula contains a `wff_semantic_neg` node.
@@ -435,18 +446,6 @@ bool has_ctl_star_operators(tref fm);
  */
 template <NodeType node>
 bool has_semantic_negation(tref fm);
-
-/**
- * @brief Wrap a formula in a `wff_semantic_neg` node.
- *
- * THE ROLE SWAP IS NOT IMPLEMENTED (LT-5): this function is an AST
- * constructor and nothing more (see the section comment above).
- * @tparam node Tree node type.
- * @param fm Formula to wrap.
- * @return `-fm` as a `wff_semantic_neg` node.
- */
-template <NodeType node>
-tref apply_semantic_negation(tref fm);
 
 // ── Explain pipeline ─────────────────────────────────────────────────────────
 
@@ -562,20 +561,23 @@ template <NodeType node>
 static tref encode_mealy_as_safety(const ltl_aba_solution<node>& sol);
 
 /**
- * @brief Initial-state conditions for the encoding above: {init bits,
- * first-step output constraint}.
+ * @brief Fixed-time constraints for the warm-up steps of a multi-state Mealy
+ * encoding.
  *
- * The second element is nullptr when the initial state has no outgoing
- * edge.
+ * Steps 0 .. warmup-1 run before the interpreter enforces the G body of
+ * encode_mealy_as_safety; these constraints make the machine start in its
+ * initial state before step 0 and take one transition per step there.
  * @tparam node Tree node type.
  * @param sol Strategy solution being encoded.
  * @param sv Names of the one-hot state-bit streams.
- * @return {init bits, first-step output constraint}.
+ * @param warmup Number of steps before the G body is enforced.
+ * @return The conjunction of the per-step constraints, or nullptr when the
+ * initial state is out of range.
  */
 template <NodeType node>
-static std::pair<tref,tref>
-encode_mealy_initial_conditions(const ltl_aba_solution<node>& sol,
-                                const std::vector<std::string>& sv);
+static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
+                                const std::vector<std::string>& sv,
+                                int_t warmup);
 
 /**
  * @brief Convert a realizable LTL formula to a tau-lang safety formula

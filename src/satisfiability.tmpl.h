@@ -2119,15 +2119,22 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 				"produced no verdict; satisfiability could not "
 				"be decided");
 		}
-		auto realizable = is_ltl_aba_realizable<node>(
+		// The reduction is plain LTL, so its satisfiability follows the
+		// same rules as any other LTL formula: sat(A χ) = sat(χ). An E
+		// witness strengthens the formula unless no input is involved
+		// (single-path tree), so otherwise only a true verdict carries
+		// over to fm and a false one leaves it undecided.
+		auto reduced = is_tau_formula_sat<node>(
 			reduction->ltl_formula, start_time, output);
-		if (realizable.has_value()) memoize(realizable.value());
+		if (!reduced.has_value()) r.merge(std::move(reduced));
+		else if (reduced.value() || reduction->witnesses.empty()
+			|| !atom_has_any_input<node>(fm))
+			memoize(reduced.value());
 		else {
-			r.merge(std::move(realizable));
-			r.error(code::solver_error,
-				"UNKNOWN: the synthesis backend failed or "
-				"produced no verdict; satisfiability could not "
-				"be decided");
+#ifdef TAU_CACHE
+			undecided.emplace(std::make_pair(fm, start_time), true);
+#endif // TAU_CACHE
+			mark_undecided();
 		}
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -2154,7 +2161,14 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// decides sat true, but unrealizable must not decide sat
 		// false -- it leaves sat undecided instead.
 		auto realizable = is_ltl_aba_realizable<node>(fm, start_time, output);
-		if (realizable.has_value() && realizable.value())
+		if (!realizable.has_value()) {
+			// no verdict at all, not an unrealizable one
+			r.merge(std::move(realizable));
+			return r.with_assert_check_error(code::solver_error,
+				"UNKNOWN: the synthesis backend failed or produced no "
+				"verdict; satisfiability could not be decided");
+		}
+		if (realizable.value())
 			memoize(true);
 		else {
 #ifdef TAU_CACHE
@@ -2207,10 +2221,20 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	if (!f1 || !f2) {
 		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
 	}
+	if (has_ctl_star_operators<node>(f1) || has_ctl_star_operators<node>(f2))
+		return r.with_error(code::unsupported_operation,
+			"implication between formulas with CTL* operators cannot "
+			"be decided");
 	TAU_TRY(tref f1n, normalize<node>(f1));
 	TAU_TRY(tref f2n, normalize<node>(f2));
 	TAU_TRY(tref imp_check, normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
+	// transform_to_execution decides the safety fragment only; anything
+	// sat routes to the LTL pipeline would be misread as unsatisfiable
+	if (sat_has_ltl_operators<node>(imp_check))
+		return r.with_error(code::unsupported_operation,
+			"implication between full-LTL formulas cannot be decided "
+			"by the safety pipeline");
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
 	for (tref c : expression_paths<node>(imp_check)) {
@@ -2238,6 +2262,11 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	TAU_TRY_OR(tref equiv_check, normalize_with_temp_simp<node>(
 			tau::build_wff_neg(tau::build_wff_equiv(f1n, f2n))),
 		code::internal_error, "Normalization of the equivalence check failed");
+	if (has_ctl_star_operators<node>(equiv_check)
+		|| sat_has_ltl_operators<node>(equiv_check))
+		return r.with_error(code::unsupported_operation,
+			"equivalence of full-LTL or CTL* formulas cannot be decided "
+			"by the safety pipeline");
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
 	for (const auto& c : expression_paths<node>(equiv_check)) {
@@ -2277,11 +2306,10 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		return r.with_assert_check_value(tau::_T());
 	}
 	if (fv < 0) {
-		TAU_TRY_OR(bool v, is_tau_impl<node>(tau::_T(), fm),
-			code::internal_error,
-			"is_tau_impl returned neither a value nor an error "
-			"while checking validity");
-		if (v) {
+		// an undecided validity only means no simplification here
+		if (auto v = is_tau_impl<node>(tau::_T(), fm);
+			v.has_value() && v.value())
+		{
 			return r.with_assert_check_value(tau::_T());
 		}
 	}

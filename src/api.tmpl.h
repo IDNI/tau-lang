@@ -912,7 +912,7 @@ result<bool> api<node>::realizable(tref fm) {
 	// realizability only when no input stream is involved: over inputs it
 	// answered `(o1:bv[1] = 1) && (i1:bv[1] = 0)` REALIZABLE, although the
 	// environment owns i1 (found by the CROSS-bv1 fuzz suite).
-	if (!atom_has_any_input<node>(fm))
+	if (!atom_has_any_input<node>(fm) && !has_ctl_star_operators<node>(fm))
 		if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
 			return r.with_assert_check_value(fast.value());
 		}
@@ -936,7 +936,9 @@ result<bool> api<node>::realizable(tref fm) {
 	tref target = (realizability_has_game_operators<node>(fm)
 		&& tau::get(nf).find_top(is_quantifier<node>))
 		? fm : nf;
-	if (realizability_has_game_operators<node>(fm)) {
+	if (has_ctl_star_operators<node>(fm)) {
+		r = is_ctl_star_realizable<node>(target, 0, true);
+	} else if (realizability_has_game_operators<node>(fm)) {
 		// is_tau_formula_sat now answers satisfiability only,
 		// where an unrealizable full-LTL formula is undecided
 		// rather than false; realizable() needs the real
@@ -1049,6 +1051,27 @@ template <NodeType node>
 result<bool> api<node>::valid_spec(tref fm) {
 	result<bool> r;
 	TAU_TRY(fm, simplify(fm));
+	// Validity of a CTL* formula quantifies over every computation tree,
+	// which no procedure here decides; is_tau_impl would read the opaque
+	// A / E / - nodes as "not valid".
+	if (has_ctl_star_operators<node>(fm)) {
+		return r.with_error(code::solver_error,
+			"UNKNOWN: validity of a formula with CTL* operators "
+			"(A / E / semantic negation) cannot be decided");
+	}
+	// valid(φ) = ¬sat(¬φ). For formulas sat routes to the LTL pipeline,
+	// sat decides T one way only, so validity is F when ¬φ is satisfiable,
+	// T when sat(¬φ) is decided F, and undecided otherwise.
+	if (sat_has_ltl_operators<node>(fm)) {
+		auto s = sat(tau::build_wff_neg(fm));
+		if (!s.has_value()) {
+			r.merge(std::move(s));
+			return r.with_error(code::solver_error,
+				"UNKNOWN: validity of this full-LTL formula could not "
+				"be decided");
+		}
+		return r.with_assert_check_value(!s.value());
+	}
 	// whole-query BA fast path; falls through when undecided.
 	if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value()) {
 		return r.with_assert_check_value(fast.value());

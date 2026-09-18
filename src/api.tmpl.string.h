@@ -473,7 +473,11 @@ result<std::map<stream_at, std::string>> api<node>::step(
 			return r.with_assert_check_error(code::invalid_output_stream,
 				"No Boolean algebra element assigned to output");
 		}
-		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
+		// the step has already advanced time_point: label by the
+		// output's own time
+		const int_t out_t = get_io_time_point<node>(tau::trim(out));
+		if (out_t < 0) continue;
+		outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
 	}
 
 	// Run update if update stream is present and unequal to 0
@@ -536,7 +540,11 @@ result<std::map<stream_at, std::string>> api<node>::step(
 			return r.with_assert_check_error(code::invalid_output_stream,
 				"No Boolean algebra element assigned to output");
 		}
-		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
+		// the step has already advanced time_point: label by the
+		// output's own time
+		const int_t out_t = get_io_time_point<node>(tau::trim(out));
+		if (out_t < 0) continue;
+		outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
 	}
 
 	// Run update if update stream is present and unequal to 0
