@@ -2607,7 +2607,7 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
 | -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (0 = unlimited) |
 | -Z, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
-| -t, --step-definitional-propagation | propagate the constants a step formula determines before its paths are enumerated, one path instead of 2^k for k guards reading them (off by default) |
+| -t, --step-definitional-propagation | propagate the constants a step formula determines before its paths are enumerated, one path instead of 2^k for k guards reading them (on by default) |
 | -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
@@ -2644,7 +2644,7 @@ against constants, enabled by default), `--bv-case-split-max-tests` (cap
 the constants a quantified bitvector variable may be tested against for the
 case split, 0 = unlimited), `--bv-definitional-elimination` (eliminate
 existentially quantified bitvector variables that a total definition in
-their scope determines, before the case split; off by default) with its
+their scope determines, before the case split; on by default) with its
 caps `--bv-defelim-max-clauses`, `--bv-defelim-max-atoms`,
 `--bv-defelim-max-subset` and `--bv-defelim-max-rounds` (flattened clauses
 per conjunct, guard atoms per propositional check, clause-subset size and
@@ -2788,7 +2788,7 @@ top-level `o = c` with `c` a constant and repeats until no new constant
 appears, carrying the values into the solution. A guard reading a value the
 same step computes then folds instead of forking the enumeration, so a step
 with `k` such guards solves one path instead of up to `2^k`. An identity on
-the solution set (`-t, --step-definitional-propagation`). It's off by default.
+the solution set (`-t, --step-definitional-propagation`). It's on by default.
 
 * `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
 benchmarks after each command. It's on by default.
@@ -2928,7 +2928,7 @@ split to apply, mirroring `--bv-case-split-max-tests`; unlimited by default),
 bitvector variable that a total definition in its scope determines -- a bare
 equation, or clauses `D_i || x = c_i` whose guards cover every case -- where
 it is read, and drop its binder, before the case split; mirroring
-`--bv-definitional-elimination`, off by default) with its caps
+`--bv-definitional-elimination`, on by default) with its caps
 `bv-defelim-max-clauses`, `bv-defelim-max-atoms`, `bv-defelim-max-subset` and
 `bv-defelim-max-rounds` (mirroring the command line options of the same
 names), `bv-quantifier-free-decision` (decide a closed bitvector formula whose

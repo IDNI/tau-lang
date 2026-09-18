@@ -113,10 +113,10 @@ struct interpreter {
 	 * the step normalizes the formula once, substitutes every top-level
 	 * `o = c` with c a constant and repeats until no new constant appears,
 	 * carrying the values into the solution; an identity on the solution
-	 * set. Off by default; set via `--step-definitional-propagation`, the
-	 * REPL option `stepprop` or `api::set_step_definitional_propagation`.
+	 * set. On by default; disabled via `--step-definitional-propagation=false`,
+	 * the REPL option `stepprop` or `api::set_step_definitional_propagation`.
 	 */
-	static inline bool definitional_propagation = false;
+	static inline bool definitional_propagation = true;
 
 	/**
 	 * @brief Adaptive tree-node gc trigger knobs.

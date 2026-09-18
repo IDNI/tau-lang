@@ -28,11 +28,13 @@ namespace idni::tau_lang {
 
 /// Elimination of definitional existentials before the case split (see
 /// `bv_eliminate_definitional_existentials` in
-/// boolean_algebras/bv/heuristics/bv_definitional_elimination.tmpl.h). Off
-/// by default; an identity on the formula. Enabled via
-/// `--bv-definitional-elimination` or the REPL option
-/// `bv-definitional-elimination` (GitHub #124).
-inline bool bv_definitional_elimination = false;
+/// boolean_algebras/bv/heuristics/bv_definitional_elimination.tmpl.h). On by
+/// default: it is an identity on the formula, and it is what keeps the
+/// closure of a run whose outputs are defined from each other linear in
+/// the guarded blocks reading them (GitHub #124). Disabled via
+/// `--bv-definitional-elimination=false` or the REPL option
+/// `bv-definitional-elimination`.
+inline bool bv_definitional_elimination = true;
 
 /// Cap on the clauses a conjunct mentioning the variable may be flattened
 /// into (`D || (A && B)` distributes to `(D || A), (D || B)`, exponential in

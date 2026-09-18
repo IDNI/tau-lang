@@ -334,7 +334,7 @@ struct api {
 	static void set_pwr_semantic_fallback(bool on);
 	/**
 	 * @brief Propagate the constants a step formula determines before its
-	 * paths are enumerated (`interpreter::definitional_propagation`); OFF
+	 * paths are enumerated (`interpreter::definitional_propagation`); ON
 	 * by default.
 	 */
 	static void set_step_definitional_propagation(bool on);

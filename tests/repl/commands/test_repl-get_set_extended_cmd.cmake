@@ -78,9 +78,9 @@ add_repl_test(set_cmd-lgrsmaxvars           "set lgrsmaxvars 3"      "lgrsmaxvar
 add_repl_test(set_cmd-lgrsmaxvars_unlimited "set lgrsmaxvars 0"      "lgrsmaxvars: *unlimited")
 add_repl_test(help_set_lists_lgrsmaxvars    "help set"               "lgrsmaxvars")
 # GitHub #126: the step's definitional propagation is a Boolean option.
-add_repl_test(get_cmd-stepprop              "get stepprop"           "stepprop: *off")
-add_repl_test(set_cmd-stepprop_on           "set stepprop on"        "stepprop: *on")
+add_repl_test(get_cmd-stepprop              "get stepprop"           "stepprop: *on")
+add_repl_test(set_cmd-stepprop_off          "set stepprop off"       "stepprop: *off")
 add_repl_test(enable_cmd-stepprop           "enable stepprop. get stepdefinitionalpropagation" "stepprop: *on")
 add_repl_test(disable_cmd-stepprop          "enable stepprop. disable stepprop. get stepprop" "stepprop: *off")
-add_repl_test(toggle_cmd-stepprop           "toggle stepprop. get stepprop" "stepprop: *on")
+add_repl_test(toggle_cmd-stepprop           "toggle stepprop. get stepprop" "stepprop: *off")
 add_repl_test(help_set_lists_stepprop       "help set"               "stepprop")

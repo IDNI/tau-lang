@@ -88,9 +88,9 @@ cli::options tau_options() {
 		.set_description("enable the semantic (winning-region) fallback "
 			"of the temporal pointwise revision (off by default)");
 	opts["step-definitional-propagation"] =
-		cli::option("step-definitional-propagation", 't', false)
+		cli::option("step-definitional-propagation", 't', true)
 		.set_description("propagate the constants a step formula determines "
-			"before its paths are enumerated (disabled by default)");
+			"before its paths are enumerated (enabled by default)");
 	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
 		.set_description("cap the revision alternatives kept per "
 			"specification part, dropping middle preference tiers "

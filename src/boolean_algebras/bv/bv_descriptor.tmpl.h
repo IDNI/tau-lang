@@ -346,7 +346,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 				nullptr, nullptr,
 				"eliminate existentially quantified bitvector variables "
 				"that a total definition determines, before the case "
-				"split (disabled by default)" },
+				"split (enabled by default)" },
 			{ "defelim-max-clauses", ba_option_kind::count,
 				nullptr, nullptr,
 				get_defelim_max_clauses_option,

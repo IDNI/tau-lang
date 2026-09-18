@@ -11,8 +11,10 @@ add_repl_test(ba_options-found "set bv-blasting off. get bv-blasting"
 	"bv-blasting: off")
 
 # GitHub #124: the definitional elimination and its caps are bv-declared.
-add_repl_test(ba_options-defelim_flag "set bv-definitional-elimination on. get bv-definitional-elimination"
+add_repl_test(ba_options-defelim_flag "get bv-definitional-elimination"
 	"bv-definitional-elimination: on")
+add_repl_test(ba_options-defelim_flag_off "set bv-definitional-elimination off. get bv-definitional-elimination"
+	"bv-definitional-elimination: off")
 add_repl_test(ba_options-defelim_count "set bv-defelim-max-atoms 5. get bv-defelim-max-atoms"
 	"bv-defelim-max-atoms: *5")
 add_repl_test(ba_options-defelim_rounds_unlimited "set bv-defelim-max-rounds 0. get bv-defelim-max-rounds"
