@@ -16,9 +16,9 @@ def main():
 	opts.output_remaps["o"] = o_stream
 
 	# Make the interpreter for a given specification as string
-	maybe_i = tau.get_interpreter("o[t] = i[t].", opts)
-	assert maybe_i is not None, "Failed to create interpreter"
-	i = maybe_i
+	r = tau.get_interpreter("o[t] = i[t].", opts)
+	assert r, f"Failed to create interpreter: {r.report.errors}"
+	i = r.value
 
 	step = 0
 	while step < 3:
@@ -26,8 +26,8 @@ def main():
 		step += 1
 
 		# Step the interpreter and retrieve outputs
-		maybe_outputs = tau.step(i)
-		assert maybe_outputs is not None, "Failed to step interpreter"
+		res = tau.step(i)
+		assert res, f"Failed to step interpreter: {res.report.errors}"
 		# outputs = maybe_outputs
 
 	o_values = o_stream.get_values()
