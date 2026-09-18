@@ -227,6 +227,27 @@ TEST_SUITE("Tau API - string - execution") {
 		auto maybe_i = tau_api::get_interpreter("o[t]:tau = i[t]:sbf");
 		CHECK(!maybe_i.has_value());
 	}
+
+	TEST_CASE("reset_definitions lets a stream be retyped") {
+		tau_api::reset_definitions();
+		auto first = tau_api::get_interpreter("o7[t]:sbf = i7[t]:sbf.");
+		REQUIRE(first.has_value());
+		CHECK(!tau_api::get_interpreter("o7[t]:tau = o7[t]:tau.")
+			.has_value());
+
+		tau_api::reset_definitions();
+		CHECK(tau_api::get_interpreter("o7[t]:tau = o7[t]:tau.")
+			.has_value());
+
+		// The interpreter built before the reset keeps its own streams.
+		auto& i = first.value();
+		auto inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(inputs.size() == 1);
+		std::map<stream_at, std::string> assigned;
+		for (const auto& at : inputs) assigned[at] = "1";
+		CHECK(tau_api::step(i, assigned).has_value());
+		tau_api::reset_definitions();
+	}
 #endif // TAU_PACK_HAS_BA_SBF
 
 

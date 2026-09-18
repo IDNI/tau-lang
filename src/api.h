@@ -436,6 +436,12 @@ struct api {
 	///         from failure), or a structured error if either argument is
 	///         nullptr.
 	static result<size_t> add_definition(tref head, tref body);
+	/// Drop every registered definition, stream declaration and stream
+	/// type. Stream types are process-global and the first spec that
+	/// types a stream pins it, so a host compiling specs that type the
+	/// same stream differently (o5:bv[16], then o5:bv[24]) must reset in
+	/// between. Interpreters already built keep their own I/O context.
+	static void reset_definitions();
 
 	// -----------------------------------------------------------------------
 	// Querying

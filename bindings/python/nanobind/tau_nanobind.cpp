@@ -132,6 +132,11 @@ NB_MODULE(tau, m) {
 	m.def("set_colors", [](bool state) { tau_api::set_colors(state); },
 		"state"_a, "Enable or disable ANSI colour in engine output.");
 
+	m.def("reset_definitions", []() { tau_api::reset_definitions(); },
+		"Drop all registered definitions, stream declarations and stream "
+		"types, so the next spec may type a stream differently. "
+		"Interpreters already built keep their own streams.");
+
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")
 		.def(nb::init<const std::string&, size_t>())

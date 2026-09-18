@@ -446,6 +446,11 @@ result<size_t> api<node>::add_definition(tref head, tref body) {
 }
 
 template <NodeType node>
+void api<node>::reset_definitions() {
+	definitions<node>::instance().clear();
+}
+
+template <NodeType node>
 result<tref> api<node>::get_definition(const std::string& definition, bool simplified) {
 	result<tref> r;
 	DBG(TAU_LOG_TRACE << "get_definition/definition: " << definition;)
