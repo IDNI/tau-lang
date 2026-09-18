@@ -2,7 +2,7 @@
 
 // End-to-end tests for src/anti_prenex/anti_prenex.h: the whole pipeline on
 // one formula, with phase 4 the identity. Spec: anti_prenex.md §3
-// (ANTI_PRENEX's phase list, TRY_WITNESS_DEEP, RESOLVE_FUNCTIONAL,
+// (ANTI_PRENEX's phase list, TRY_WITNESS_DEEP, RESOLVE_FUNCTIONAL_PLAIN,
 // NORMALIZE_OPERATORS), §1's `keep_functional` row, invariant 4.
 //
 // What the cases claim, observed through node identity, `are_nso_equivalent`
@@ -15,7 +15,7 @@
 //     the output.
 //  4. phase 2 is visible end to end — a pin deletes its binder — while the
 //     spec's counterexamples keep theirs.
-//  5. phase 5 resolves a functional-quantifier chain under the default
+//  5. phase 1 resolves a functional-quantifier chain under the default
 //     callback and keeps it under a keep-all one, which is handed the chain
 //     NODE (its prefix read off with `strip_chain`).
 //  6. §3's entry test: a formula with NO QUANTIFIER of either kind — formula
@@ -201,12 +201,12 @@ TEST_CASE("P3: the spec's counterexamples keep their binders") {
 	CHECK(holds(g, tau::wff_all));
 }
 
-// --- 3. phase 5 and the callback --------------------------------------------------
+// --- 3. phase 1 and the callback --------------------------------------------------
 
-TEST_CASE("P4: a functional-quantifier chain is resolved at phase 5, or kept") {
+TEST_CASE("P4: a functional-quantifier chain is resolved at phase 1, or kept") {
 	tref x = bvar("x"), b = bvar("b"), y = tau::trim(bvar("y"));
 	// `∀_y (y ∪ z)` inside a term, under a binder with no pin, so nothing
-	// but phase 5 touches the chain.
+	// but phase 1 touches the chain.
 	const tref chain = tb::build_functional_quantifiers(
 		{{ y, tb::all }}, lor(bvar("y"), bvar("z")));
 	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
@@ -247,7 +247,7 @@ TEST_CASE("P5: without a quantifier the input comes back as the same node") {
 	const tref plain = conj(eq0(lor(a, a)), neq(a, bvar("b")));
 	CHECK(pipeline(plain) == plain);
 	// A FUNCTIONAL quantifier is a quantifier for §3's entry test: phase 0
-	// canonicalises its subscript and phase 5 resolves its chain, so this
+	// canonicalises its subscript and phase 1 resolves its chain, so this
 	// one DOES enter the pipeline and comes out resolved.
 	const tref chain = tb::build_functional_quantifiers(
 		{{ y, tb::all }}, lor(bvar("y"), bvar("z")));

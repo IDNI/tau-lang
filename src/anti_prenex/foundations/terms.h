@@ -13,9 +13,10 @@
  * is the LEAF HAZARD: a variable of `P` may also occur inside a leaf, where
  * no quantification reaches it.
  *
- * The primitives declared here are §3's `PREPARE_TERMS`, `RESOLVE_FUNCTIONAL`,
- * `SIMPLIFY_TERM`, `SIMPLIFY_ATOM`, `TERM_OF` and `NORM_EQUATION`, plus the
- * in-memory term size `‖·‖` (§1, §10).
+ * The primitives declared here are §3's `PREPARE_TERMS`,
+ * `RESOLVE_FUNCTIONAL_PLAIN`, `RESOLVE_FUNCTIONAL_BDD`, `SIMPLIFY_TERM`,
+ * `SIMPLIFY_ATOM`, `TERM_OF` and `NORM_EQUATION`, plus the in-memory term size
+ * `‖·‖` (§1, §10).
  *
  * THE LIBRARY UNDERNEATH is `tau_term_bdd_handle<node>` (aliased
  * `term_handle`) and the `tau_term_bdd<node>` below it. `build(term, order)`
@@ -91,7 +92,7 @@ namespace idni::tau_lang::anti_prenexing {
 //   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X, order)
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
-//   RESOLVE_FUNCTIONAL     resolve_functional_quantifiers (below)
+//   RESOLVE_FUNCTIONAL_*   resolve_functional_quantifiers_plain / _bdd (below)
 //   φ[x ← t]  /  f[x ← t]  tree<node>::substitute(φ, bf(x), t, order, hook)
 //
 // BDD-BACKED: the term is a `bf(BDD_ID)` node, i.e. it is backed by a BDD
@@ -113,8 +114,8 @@ namespace idni::tau_lang::anti_prenexing {
 // ∀_X / ∃_X: `quantify_over` is the one entry point. A block is
 // kind-homogeneous, so a block quantification never needs the library's
 // mixed-prefix `bdd_quant` — only an alternating functional-quantifier chain
-// does (the resolver below) — and callers that hold a kind
-// (`SETTLE_FUNCTIONAL`, `DISCHARGE`) pass it through.
+// does (the resolvers below) — and a caller that holds a kind (`DISCHARGE`)
+// passes it through.
 //
 // SYMBOLIC ∀_Y / ∃_Y: the library's chain CONSTRUCTOR is the one builder; it
 // takes `quants` outermost first, and a block `Y` of one kind gives all pairs
@@ -180,7 +181,8 @@ template <NodeType node>
 tref quantify_over(quantifier<node> kind, tref f, const block& X,
 	const var_order<node>& order);
 
-/// The term carries a functional quantifier (`SETTLE_FUNCTIONAL`'s test, §6).
+/// The term carries a functional quantifier, a BDD-backed term's leaves
+/// included: §7's opacity test, which freezes what the solver cannot read.
 template <NodeType node>
 bool carries_functional_quantifier(tref f);
 
@@ -188,8 +190,8 @@ bool carries_functional_quantifier(tref f);
  * @brief The MAXIMAL functional-quantifier chain hanging off the `bf` node
  * @p n (§1, §3): its prefix OUTERMOST FIRST with the kinds, and the body it
  * sits on. An empty prefix — and @p n itself — when @p n is no chain. The
- * whole nest is taken, kinds mixed freely, because that is the resolver's ONE
- * unit of work (below).
+ * whole nest is taken, kinds mixed freely, because that is the ONE unit of
+ * work of the two resolvers (below).
  *
  * It is also how a `keep_functional_fn` (fwd.h) reads the chain NODE it is
  * handed: prefix and body come off the node with this one call.
@@ -197,58 +199,75 @@ bool carries_functional_quantifier(tref f);
 template <NodeType node>
 std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n);
 
+// --- the two resolvers (RESOLVE_FUNCTIONAL_PLAIN, RESOLVE_FUNCTIONAL_BDD) --------
+//
+// THE UNIT OF WORK IS THE MAXIMAL CHAIN, any mix of `∀` and `∃`, taken at its
+// TOP and quantified in ONE pass. Both resolvers canonicalise its prefix
+// through the library's constructor — which drops a degenerate or shadowed
+// subscript, sorts each same-kind run into content order, merges an adjoining
+// run of the body and folds a closed plain chain — and then ask `keep` ONCE, on
+// that canonical chain's NODE: the prefix outermost first with the kinds, and
+// the body below it, both read off with `strip_chain` (above). A yes keeps the
+// whole chain, and nothing inside it is looked at again.
+//
+// THE STUCK RULE says what a chain resolves into. A subscript sitting inside a
+// LEAF — in a reference argument, in a foreign-typed subterm — is reached by no
+// quantification (§1 LEAF HAZARD) and stays. The rest are decided INNERMOST
+// FIRST: ahead of the first hidden subscript every subscript is quantified; the
+// first hidden one opens a stuck run of ITS KIND, into which an outer subscript
+// of that kind still commutes — quantified when it is not hidden, joining the
+// run when it is — and the first subscript of the OTHER kind blocks, staying
+// along with everything outward of it. So `∃x ∀y (x·r(y))` resolves nothing,
+// `∀y ∃x (x·r(y))` gives `∀y r(y)`, and `∃x ∃y (x·y·r(y))` gives
+// `∃y (y·r(y))`. What is taken is ONE quantification, and the prefix left over
+// is re-attached over the result through the constructor. A choice of SIZE, not
+// of soundness: crossing an alternation by cofactors is legal, and duplicates
+// the stuck chain.
+//
+// Neither resolver has a memo of its own: the entry pass runs once, and the
+// close's quantifications are covered by the library's memos.
+
 /**
- * @brief §3 `RESOLVE_FUNCTIONAL(φ, order, kf)`: resolve the
- * functional-quantifier chains of `n` that `keep` does not keep. This is the
- * engine behind both `RESOLVE_FUNCTIONAL` and `SETTLE_FUNCTIONAL` (§3, §6).
+ * @brief §3 `RESOLVE_FUNCTIONAL_PLAIN(φ, kf)`: resolve the
+ * functional-quantifier chains of `n` that `keep` does not keep, at ENTRY
+ * (phase 1), before any order is live.
  *
- * `n` may be a `bf` term or a `wff` formula. Chains are found everywhere:
- * under binders, in reference arguments, in chain bodies and, for a
- * BDD-backed term, in its LEAVES. `order` is the LIVE order, empty when none
- * is live; every `BDD_ID` that `n` carries must belong to it (Debug-asserted).
+ * `n` may be a `bf` term or a `wff` formula, and nothing in it is BDD-backed
+ * (Debug-asserted). Chains are found everywhere — under binders, in reference
+ * arguments, in chain bodies — and what is resolved before a chain is what sits
+ * NESTED inside it, never an adjacent binder.
  *
- * THE UNIT OF WORK IS THE MAXIMAL CHAIN, any mix of `∀` and `∃`, taken at its
- * TOP and quantified in ONE pass. What is resolved before it is what sits
- * NESTED inside it — a chain in its body, a chain in the leaves of a
- * BDD-backed body — never an adjacent binder.
+ * The body of a chain to resolve is built as a BDD over the CHAIN'S OWN order,
+ * its innermost subscript lowest, and what comes back is spelled PLAIN before
+ * the pass moves on: a node minted under a chain's order belongs to no live
+ * order. A body whose BDD does not branch holds every subscript in a leaf, and
+ * that chain stays as it is.
  *
- * Per chain: the prefix is canonicalised through the library's constructor,
- * which drops a degenerate or shadowed subscript, sorts each same-kind run
- * into content order, merges an adjoining run of the body, and folds a closed
- * plain chain. `keep` is then asked ONCE, on that canonical chain's NODE —
- * the prefix outermost first with the kinds, and the body below it, both read
- * off with `strip_chain` (above); a yes keeps the whole chain, and nothing
- * inside it is looked at again.
- *
- * LIVE PATH — the body BDD-backed under `order`, every subscript a key of
- * `order`, none of them hidden in a leaf, and the prefix of one kind or nested
- * by the live ranks: this is keep mode's whole-block emission
- * `Q_X (bf(BDD_ID))` (§7 `DISCHARGE`). ONE quantification of the stored
- * reference under the LIVE order settles it where it lies, and the result is
- * emitted like every other term — plain when nothing branches, which is the
- * usual whole-block outcome.
- *
- * GENERAL PATH — the body built as a BDD over the CHAIN'S OWN order, its
- * innermost subscript lowest, and ONE quantification by the full, possibly
- * alternating, prefix. A stored BDD that is not legal under that order is
- * spelled out first, a `BDD_ID` being a node of ONE order. The result of this
- * path is PLAIN, because a `BDD_ID` minted under the chain's order would be a
- * node of the wrong one.
- *
- * LEAF HAZARD (§1) — a subscript inside a leaf, in a reference argument or in
- * a foreign-typed subterm, is reached by no quantification. It STAYS, and the
- * OTHER subscripts are resolved around it: one pass per maximal stretch of
- * resolvable subscripts, innermost stretch first, with the hidden binder
- * re-attached over the running result. A prefix hidden throughout comes back
- * as the chain it was, over the body its own inner chains already resolved.
- * That is the spec's "partial" resolution.
- *
- * Memoised per node for the whole call, the recursive resolutions included.
- * Layer 3 wires the cross-call `quant_memo` (§1: the key IS the chain over its
- * plain body).
+ * After this pass a chain is a kept one or a stuck one, and both stay: no later
+ * step resolves a chain it finds in a leaf.
  */
 template <NodeType node>
-tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
+tref resolve_functional_quantifiers_plain(tref n,
+	const keep_functional_fn<node>& keep = keep_no_functional<node>);
+
+/**
+ * @brief §3 `RESOLVE_FUNCTIONAL_BDD(φ, order, kf)`: the same for a component's
+ * CLOSE (§5), where `order` is the LIVE order and every BDD-backed term of `n`
+ * belongs to it (Debug-asserted).
+ *
+ * A chain met here sits over a BDD-backed body with its subscripts among the
+ * decision variables — keep mode's whole-block emission `Q_X (bf(BDD_ID))`,
+ * `X ⊆ P` (§7 `DISCHARGE`) — so ONE quantification of the STORED BDD under the
+ * live order settles it where it lies, and the result is emitted like every
+ * other term: plain when nothing branches, which is the usual whole-block
+ * outcome. A chain over a PLAIN body is one whose BDD did not branch, every
+ * subscript of it in a leaf, and it stays as it is.
+ *
+ * LEAVES ARE NEVER ENTERED: a chain in a leaf is an inner block's kept emission
+ * or a stuck one, and both are decided.
+ */
+template <NodeType node>
+tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
 	const keep_functional_fn<node>& keep = keep_no_functional<node>);
 
 // --- the two aggressive normalisers of invariant 6 --------------------------------

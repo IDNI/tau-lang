@@ -37,6 +37,8 @@
 // normal_forms.h, which declares what its body uses before the body.
 #include "normal_forms.h"
 
+#include <optional>
+
 namespace idni::tau_lang::anti_prenexing {
 
 namespace terms_detail {
@@ -64,27 +66,24 @@ bool one_kind(const typename tbdd<node>::quants& q) {
 	return true;
 }
 
-/// The prefix nests along @p o: each subscript ranks strictly below the one
-/// outside it. `bdd_quant`'s precondition for a MIXED prefix.
-template <NodeType node>
-bool nested_by_rank(const typename tbdd<node>::quants& q,
-	const var_order<node>& o)
-{
-	for (size_t i = 1; i < q.size(); ++i)
-		if (!tbdd<node>::less_then(q[i].first, q[i - 1].first, o))
-			return false;
-	return true;
-}
-
 /// ONE quantification of @p x by the WHOLE prefix @p q under @p o. A prefix of
 /// one kind is a set quantification whose members commute, so it goes through
 /// `bdd_ex` / `bdd_all`, which sort the set themselves and share the library's
-/// set memo; a mixed prefix goes through `bdd_quant` and needs @p o to nest it.
+/// set memo; a mixed prefix goes through `bdd_quant`, whose own precondition is
+/// that @p o NESTS it — each subscript ranking strictly below the one outside
+/// it, which the caller's order does by construction.
 template <NodeType node>
 bref<node> quantify_prefix(bref<node> x, const typename tbdd<node>::quants& q,
 	const var_order<node>& o)
 {
-	if (!one_kind<node>(q)) return tbdd<node>::bdd_quant(x, q, o);
+	if (!one_kind<node>(q)) {
+#ifdef DEBUG
+		for (size_t i = 1; i < q.size(); ++i)
+			assert(tbdd<node>::less_then(q[i].first,
+				q[i - 1].first, o));
+#endif
+		return tbdd<node>::bdd_quant(x, q, o);
+	}
 	trefs ys;
 	ys.reserve(q.size());
 	for (size_t i = 0; i < q.size(); ++i) ys.push_back(q[i].first);
@@ -93,142 +92,113 @@ bref<node> quantify_prefix(bref<node> x, const typename tbdd<node>::quants& q,
 		: tbdd<node>::bdd_ex(x, ys, o);
 }
 
-/// A subscript of @p subs sits in a LEAF of @p x, where no quantification
-/// reaches it: the §1 leaf hazard.
+#ifdef DEBUG
+/// Every `BDD_ID` of @p t is a BDD under @p order: the contract both resolvers
+/// have on their input (terms.h), which an EMPTY @p order turns into "no
+/// `BDD_ID` at all", a stored BDD always branching. The LEAVES of a stored BDD
+/// are not entered — they are terms of the BDD universe, not nodes of this
+/// tree, and a `BDD_ID` inside one is what `convert_to_tau_terms` is total for.
 template <NodeType node>
-bool hides_subscript(bref<node> x, const var_order<node>& subs) {
-	for (tref v : thandle<node>::get_free_leaf_vars(x.b))
-		if (subs.contains(v)) return true;
-	return false;
+bool stored_bdds_under_order(tref t, const var_order<node>& order) {
+	using tau = tree<node>;
+	bool ok = true;
+	auto check = [&](tref m) {
+		if (!tau::get(m).is(tau::BDD_ID)) return true;
+		if (!tbdd<node>::is_ordered(
+			thandle<node>::convert_to_handle(m).get(), order))
+			ok = false;
+		return false;   // nothing below it is a node of this tree
+	};
+	pre_order<node>(t).visit_unique(check);
+	return ok;
 }
+#endif
+
+/// What the chain step hands back: the stored BDD quantified over the
+/// subscripts it took, and the prefix that STAYS over it, outermost first. An
+/// empty `kept` is a chain that resolved whole.
+template <NodeType node>
+struct chain_result {
+	bref<node> b;
+	typename tbdd<node>::quants kept;
+};
 
 /**
- * @brief Resolve ONE canonical chain: the prefix @p q, outermost first, over
- * the body @p body, whose own chains are resolved already. @p order is the
- * live order. Returns the chain itself when every subscript hides in a leaf.
+ * @brief THE CHAIN STEP (§3): ONE quantification of the STORED BDD @p s by
+ * those subscripts of the canonical prefix @p q — outermost first — that the
+ * §1 LEAF HAZARD leaves reachable. @p order is the order @p s is built over,
+ * and every subscript is a key of it.
+ *
+ * A subscript occurring in a LEAF of @p s is reached by no quantification and
+ * stays. THE STUCK RULE decides the rest, INNERMOST FIRST: ahead of the first
+ * hidden subscript every subscript is quantified; the first hidden one opens a
+ * stuck run of ITS KIND, into which an outer subscript of that kind still
+ * commutes — quantified when it is not hidden, joining the run when it is —
+ * and the first subscript of the OTHER kind blocks, staying along with
+ * everything outward of it. What is taken is quantified in ONE pass, and
+ * `std::nullopt` says nothing was, which leaves the chain as it is.
+ *
+ * A choice of size, not of soundness: crossing an alternation by cofactors is
+ * legal and duplicates the stuck chain.
  */
 template <NodeType node>
-tref resolve_chain(const typename tbdd<node>::quants& q, tref body,
+std::optional<chain_result<node>> resolve_chain(
+	const typename tbdd<node>::quants& q, bref<node> s,
 	const var_order<node>& order)
 {
 	using tau = tree<node>;
-	const var_order<node> o = chain_order<node>(q);
-	const size_t ty = find_ba_type<node>(body);
-	// THE LIVE PATH: keep mode's whole-block emission `Q_X (bf(BDD_ID))`
-	// (§7 `DISCHARGE`). The subscripts are decision variables of the stored
-	// BDD, so ONE quantification under the LIVE order settles the chain
-	// where it lies, and the result is a BDD under that order — emitted
-	// like every other term, plain when nothing branches, which is the
-	// usual whole-block outcome.
-	if (thandle<node>::is_bdd_backed(body)) {
-		bref<node> s = thandle<node>::convert_to_handle(body).get();
-		bool live = !order.empty();
-		for (size_t i = 0; live && i < q.size(); ++i)
-			if (!order.contains(q[i].first)) live = false;
-		if (live) {
-			DBG(assert(tbdd<node>::is_ordered(s, order));)
-			if (!hides_subscript<node>(s, o)
-				&& (one_kind<node>(q)
-					|| nested_by_rank<node>(q, order)))
-				return thandle<node>::convert_to_tau_node_or_term(
-					thandle<node>(
-						quantify_prefix<node>(s, q, order)),
-					ty);
-		}
-	}
-	// THE GENERAL PATH, over the chain's OWN order. A stored BDD that is
-	// not legal under it is spelled out first, a `BDD_ID` being a node of
-	// ONE order.
-	bref<node> b;
-	if (thandle<node>::is_bdd_backed(body)) {
-		bref<node> s = thandle<node>::convert_to_handle(body).get();
-		b = tbdd<node>::is_ordered(s, o) ? s
-			: tbdd<node>::build_bdd(
-				thandle<node>::convert_to_tau_terms(body), o);
-	} else b = tbdd<node>::build_bdd(body, o);
-	// The subscripts the quantification cannot reach, read off the leaves.
-	trefs lfv = thandle<node>::get_free_leaf_vars(b.b);
-	std::vector<bool> hidden(q.size(), false);
-	bool partial = false;
+#ifdef DEBUG
+	assert(!q.empty());
+	assert(tbdd<node>::is_ordered(s, order));
+	for (const auto& qi : q) assert(order.contains(qi.first));
+#endif
+	// The subscripts no quantification reaches, read off the leaves.
+	trefs lfv = thandle<node>::get_free_leaf_vars(s.b);
+	std::vector<bool> hidden(q.size());
 	for (size_t i = 0; i < q.size(); ++i)
-		if (std::binary_search(lfv.begin(), lfv.end(), q[i].first,
-			tau::subtree_less))
-			hidden[i] = partial = true;
-	// PLAIN on this path: the chain's order is not the live one, so a
-	// `BDD_ID` minted under it would be a node of the wrong order.
-	if (!partial)
-		return tbdd<node>::to_tau_term(
-			quantify_prefix<node>(b, q, o), ty);
-	// PARTIAL (§3 LEAF HAZARD): a hidden subscript stays in place and the
-	// OTHER subscripts are resolved around it. From the INNERMOST subscript
-	// outward: a hidden one is re-attached over the running result through
-	// the constructor, and a maximal STRETCH of resolvable ones is one
-	// pass. Building the stretch's BDD slides a re-attached chain onto the
-	// leaves (the library's chain case), where the quantification leaves it
-	// alone. A prefix that hides throughout re-attaches whole, which is the
-	// canonical chain again.
-	tref r = thandle<node>::is_bdd_backed(body)
-		? thandle<node>::convert_to_tau_terms(body) : body;
-	for (size_t e = q.size(); e-- > 0; ) {
-		if (hidden[e]) {
-			r = tbdd<node>::build_functional_quantifiers(
-				typename tbdd<node>::quants{ q[e] }, r);
-			continue;
-		}
-		size_t first = e;
-		while (first > 0 && !hidden[first - 1]) --first;
-		const typename tbdd<node>::quants st(q.begin() + first,
-			q.begin() + e + 1);
-		const var_order<node> so = chain_order<node>(st);
-		r = tbdd<node>::to_tau_term(
-			quantify_prefix<node>(tbdd<node>::build_bdd(r, so),
-				st, so), ty);
-		e = first;
+		hidden[i] = std::binary_search(lfv.begin(), lfv.end(),
+			q[i].first, tau::subtree_less);
+	// THE STUCK RULE, innermost first: a hidden subscript opens a stuck run
+	// of its kind or joins the open one, a subscript of the open run's kind
+	// commutes into it and is taken, and one of the other kind ends the walk
+	// with everything outward of it left standing.
+	std::vector<bool> taken(q.size(), false);
+	bool stuck = false;                        // is a stuck run open,
+	quantifier<node> run = tbdd<node>::ex;     // and of which kind
+	for (size_t i = q.size(); i-- > 0; ) {
+		if (stuck && q[i].second != run) break;
+		if (hidden[i]) stuck = true, run = q[i].second;
+		else taken[i] = true;
 	}
-	return r;
+	// Both keep the prefix's own order, outermost first.
+	typename tbdd<node>::quants e, kept;
+	for (size_t i = 0; i < q.size(); ++i)
+		(taken[i] ? e : kept).push_back(q[i]);
+	if (e.empty()) return std::nullopt;
+	return chain_result<node>{ quantify_prefix<node>(s, e, order),
+		std::move(kept) };
 }
 
 /**
- * @brief The resolver's worker: @p memo is shared with every recursive call,
- * so a body — or a leaf — reached from two chains is resolved once per
+ * @brief `RESOLVE_FUNCTIONAL_PLAIN`'s worker: @p memo is shared with every
+ * recursive call, so a body reached from two chains is resolved once per
  * public call.
  */
 template <NodeType node>
-tref resolve_chains(tref n, const var_order<node>& order,
-	const keep_functional_fn<node>& keep,
+tref resolve_plain_chains(tref n, const keep_functional_fn<node>& keep,
 	subtree_unordered_map<node, tref>& memo)
 {
 	using tau = tree<node>;
 	n = tau::trim_right_sibling(n);
 	if (auto it = memo.find(n); it != memo.end()) return it->second;
-	// What this pass produced: a chain `keep` accepted, a chain the leaf
-	// hazard left standing, a re-emitted BDD-backed term and a quantified
-	// result. All of them are resolved already — the traversal refuses to
-	// enter one, so a kept chain's inner binders are never looked at.
+	// What this pass produced: a chain `keep` accepted, a chain the stuck
+	// rule left standing, and a quantified result. All of them are resolved
+	// already — the traversal refuses to enter one, so a kept chain's inner
+	// binders are never looked at.
 	subtree_unordered_set<node> done;
 	auto f = [&](tref m) -> tref {
 		const tau& tm = tau::get(m);
 		if (!tm.is(tau::bf)) return m;
-		// A BDD-backed term keeps its chains in the LEAVES, not in the
-		// tree, and that is exactly SETTLE_FUNCTIONAL's input (§6:
-		// `TERM_OF` of a prepared equation): resolve them there and
-		// re-emit. A leaf whose chain is kept or hazardous comes back
-		// as it was, and one that came to hold a decision variable is
-		// re-canonicalised by `map_leaves`.
-		if (thandle<node>::is_bdd_backed(m)) {
-			bref<node> s = thandle<node>::convert_to_handle(m).get();
-			DBG(assert(tbdd<node>::is_ordered(s, order));)
-			auto in_leaf = [&](tref leaf) {
-				return resolve_chains<node>(leaf, order, keep,
-					memo);
-			};
-			bref<node> r = tbdd<node>::map_leaves(s, in_leaf, order);
-			tref e = r == s ? m
-				: thandle<node>::convert_to_tau_node_or_term(
-					thandle<node>(r), find_ba_type<node>(m));
-			done.insert(e);
-			return e;
-		}
 		if (!tm.child_is(tau::bf_fall) && !tm.child_is(tau::bf_fex))
 			return m;    // a chain may still sit deeper: descend
 		// THE WHOLE NEST at once, its BODY resolved first — what comes
@@ -236,7 +206,7 @@ tref resolve_chains(tref n, const var_order<node>& order,
 		// adjacent binder.
 		auto [q0, b0] = strip_chain<node>(m);
 		tref c = tbdd<node>::build_functional_quantifiers(q0,
-			resolve_chains<node>(b0, order, keep, memo));
+			resolve_plain_chains<node>(b0, keep, memo));
 		// Canonical now: a degenerate or shadowed subscript is gone,
 		// each run is in content order, an adjoining run of the body is
 		// merged in, and a closed plain chain is already folded. `keep`
@@ -245,8 +215,22 @@ tref resolve_chains(tref n, const var_order<node>& order,
 		auto [q, body] = strip_chain<node>(c);
 		if (q.empty()) return done.insert(c), c;
 		if (keep(c)) return done.insert(c), c;
-		tref r = resolve_chain<node>(q, body, order);
-		return done.insert(r), r;
+		// The body over the CHAIN'S OWN order, innermost subscript
+		// lowest: nothing is BDD-backed here, so there is nothing to
+		// spell out first, and a chain of the body that survived is slid
+		// onto the leaves by the build (§1 transparency), where the
+		// quantification leaves it alone. A build that does not BRANCH
+		// has every subscript in a leaf and settles the chain as it is.
+		const var_order<node> o = chain_order<node>(q);
+		bref<node> b = tbdd<node>::build_bdd(body, o);
+		if (tbdd<node>::leaf(b)) return done.insert(c), c;
+		auto r = resolve_chain<node>(q, b, o);
+		if (!r) return done.insert(c), c;
+		// PLAIN again before the pass moves on: a `BDD_ID` minted under
+		// a chain's order would be a node of no live order.
+		tref e = tbdd<node>::to_tau_term(r->b, find_ba_type<node>(body));
+		tref res = tbdd<node>::build_functional_quantifiers(r->kept, e);
+		return done.insert(res), res;
 	};
 	auto visit = [&done](tref m) { return !done.contains(m); };
 	tref r = pre_order<node>(n).apply_unique(f, visit);
@@ -385,13 +369,71 @@ std::pair<typename tau_term_bdd<node>::quants, tref> strip_chain(tref n) {
 }
 
 template <NodeType node>
-tref resolve_functional_quantifiers(tref n, const var_order<node>& order,
+tref resolve_functional_quantifiers_plain(tref n,
 	const keep_functional_fn<node>& keep)
 {
+	using namespace terms_detail;
+	// The EMPTY order is the contract: no term of `n` is BDD-backed.
+	DBG(assert(stored_bdds_under_order<node>(n, var_order<node>{}));)
 	// One memo for the whole call, shared with every recursive resolution:
-	// a body, or a leaf, reached from two chains is resolved once.
+	// a body reached from two chains is resolved once.
 	subtree_unordered_map<node, tref> memo;
-	return terms_detail::resolve_chains<node>(n, order, keep, memo);
+	return resolve_plain_chains<node>(n, keep, memo);
+}
+
+template <NodeType node>
+tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
+	const keep_functional_fn<node>& keep)
+{
+	using tau = tree<node>;
+	using namespace terms_detail;
+	n = tau::trim_right_sibling(n);
+	DBG(assert(stored_bdds_under_order<node>(n, order));)
+	// What this pass produced: a chain `keep` accepted, a chain the stuck
+	// rule left standing, and a quantified result, plus every BDD-backed
+	// term met on the way. All of them are decided — the traversal refuses
+	// to enter one.
+	subtree_unordered_set<node> done;
+	auto f = [&](tref m) -> tref {
+		const tau& tm = tau::get(m);
+		if (!tm.is(tau::bf)) return m;
+		// A BDD-backed term keeps its chains in the LEAVES, and a leaf
+		// is never entered: a chain there is an inner block's kept
+		// emission or a stuck one, and both are decided (§3).
+		if (thandle<node>::is_bdd_backed(m)) return done.insert(m), m;
+		if (!tm.child_is(tau::bf_fall) && !tm.child_is(tau::bf_fex))
+			return m;    // a chain may still sit deeper: descend
+		// THE WHOLE NEST at once, canonicalised through the
+		// constructor. Its body is not resolved first: at the close a
+		// body is either BDD-backed or the chain stays whole.
+		auto [q0, b0] = strip_chain<node>(m);
+		tref c = tbdd<node>::build_functional_quantifiers(q0, b0);
+		// `keep` sees that canonical chain NODE, ONCE — prefix and body
+		// come off it with `strip_chain` (§3) — and its yes keeps the
+		// whole chain.
+		auto [q, body] = strip_chain<node>(c);
+		if (q.empty()) return done.insert(c), c;
+		if (keep(c)) return done.insert(c), c;
+		// A PLAIN body is one whose BDD did not branch: every subscript
+		// sits in a leaf, so nothing of the chain resolves.
+		if (!thandle<node>::is_bdd_backed(body))
+			return done.insert(c), c;
+		// The subscripts are decision variables of the stored BDD, so
+		// ONE quantification under the LIVE order settles the chain
+		// where it lies, and the result is emitted like every other
+		// term: plain when nothing branches, which is the usual
+		// whole-block outcome.
+		bref<node> s = thandle<node>::convert_to_handle(body).get();
+		auto r = resolve_chain<node>(q, s, order);
+		if (!r) return done.insert(c), c;
+		tref e = thandle<node>::convert_to_tau_node_or_term(
+			thandle<node>(r->b), find_ba_type<node>(body));
+		// The prefix the stuck rule left, re-attached in its order.
+		tref res = tbdd<node>::build_functional_quantifiers(r->kept, e);
+		return done.insert(res), res;
+	};
+	auto visit = [&done](tref m) { return !done.contains(m); };
+	return pre_order<node>(n).apply_unique(f, visit);
 }
 
 // --- the two aggressive normalisers of invariant 6 --------------------------------

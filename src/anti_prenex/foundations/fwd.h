@@ -63,9 +63,11 @@ template <NodeType node>
 using var_order = typename term_handle<node>::order;
 
 /// §1 `keep_functional`: the ONE callback `ANTI_PRENEX` takes, a pure
-/// predicate on a NODE, asked once per site. Per CHAIN (`RESOLVE_FUNCTIONAL`,
-/// §3) it is handed the canonical chain's term node — prefix outermost first
-/// with the kinds, body below it, both read off with `strip_chain` (terms.h).
+/// predicate on a NODE, asked once per site. Per CHAIN
+/// (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a
+/// component's close, §3) it is handed the canonical chain's term node —
+/// prefix outermost first with the kinds, body below it, both read off with
+/// `strip_chain` (terms.h).
 /// Per BLOCK (§5) it is handed the block's binder node `REWRAP(matrix, X)`,
 /// the run head with its variables outermost first over the matrix. A node,
 /// rather than a prefix or a variable list, so that the policy can look at

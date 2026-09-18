@@ -7,7 +7,7 @@
  * the entry means; the comments here say how it is built.
  *
  * Every phase is ONE call into the module below it —
- * `canonicalise_binder_ids`, `resolve_functional_quantifiers`,
+ * `canonicalise_binder_ids`, `resolve_functional_quantifiers_plain`,
  * `fold_degenerate_binders` (foundations), `to_canonically_factored_nnf`,
  * `simplify`, `normalize_operators` (normalisers) and
  * `eliminate_by_substitution` (witness) — and this file adds nothing of its
@@ -20,9 +20,9 @@
  * runs end to end around it with every other phase the spec's.
  *
  * THE PLAIN REGIME THROUGHOUT: phases 1, 2 and 5 pass the EMPTY order, where
- * nothing is BDD-backed (§3) — `simplify`'s propagation guard is vacuous and
- * `resolve_functional_quantifiers` has no live order to quantify under. A
- * live order exists only inside a component (§5).
+ * nothing is BDD-backed (§3) — `simplify`'s propagation guard is vacuous, and
+ * the chain resolver phase 1 opens with is the plain one, which takes no order
+ * at all. A live order exists only inside a component (§5).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_TMPL_H__
@@ -37,7 +37,7 @@ namespace anti_prenex_detail {
 /// Does `phi` carry a QUANTIFIER anywhere — a formula binder (`wff_ex` /
 /// `wff_all`) or a term-level FUNCTIONAL one (`bf_fex` / `bf_fall`)? §3's
 /// entry test names both: phase 0 canonicalises a chain's subscripts and
-/// phase 5 resolves its chains, so a formula whose only quantifier is a chain
+/// phase 1 resolves its chains, so a formula whose only quantifier is a chain
 /// still has work waiting. One `find_top` search, which enters everything —
 /// a quantifier under a temporal operator or inside a reference argument
 /// counts.
@@ -66,10 +66,13 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	// 0. Binder ids by depth: it makes every later substitution
 	//    capture-safe and lets alpha-variants share one node (§3).
 	phi = canonicalise_binder_ids<node>(phi);
-	// 1. NNF, then the ONE `ref_args` call of the run: the canonical entry
-	//    state for reference arguments, which establishes invariant 6.
-	//    From here on only substitution dirties one, and it re-simplifies
-	//    what it touched (§1).
+	// 1. Every chain PRESENT in the input that the callback does not keep,
+	//    before any order is live: from here on a chain is a kept or a
+	//    stuck one, and it stays (§3). Then NNF and the ONE `ref_args` call
+	//    of the run: the canonical entry state for reference arguments,
+	//    which establishes invariant 6. From here on only substitution
+	//    dirties one, and it re-simplifies what it touched (§1).
+	phi = resolve_functional_quantifiers_plain<node>(phi, kf);
 	phi = to_canonically_factored_nnf<node>(phi);
 	phi = simplify<node>(phi, {}, true);
 	// 2. The deep witness pass, then the global simplification it leaves
@@ -81,10 +84,8 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	phi = normalize_operators<node>(phi);
 	// 4. `PROCESS_ALL_BLOCKS(φ, keep_functional)` — the identity here
 	//    (§3, §4).
-	// 5. Every chain the callback does not keep, under NO live order, and
-	//    the close: simplify, drop the binders that bind nothing, and
+	// 5. The close: simplify, drop the binders that bind nothing, and
 	//    canonicalise the ids again (§3).
-	phi = resolve_functional_quantifiers<node>(phi, {}, kf);
 	phi = simplify<node>(phi);
 	phi = fold_degenerate_binders<node>(phi);
 	return canonicalise_binder_ids<node>(phi);
