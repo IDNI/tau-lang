@@ -67,6 +67,9 @@ add_repl_test(ctl_star-sat_semneg_unrealizable_body
 	"fragment ctl_star. sat -(F i1[t] = 1)" ": T")
 add_repl_test(ctl_star-sat_semneg_realizable_body
 	"fragment ctl_star. sat -(always o1[t] = 1)" ": F")
+# a past-free -ψ under a temporal operator is the same constant
+add_repl_test(ctl_star-sat_semneg_under_G
+	"fragment ctl_star. sat G (-(F i1[t] = 1))" ": T")
 add_repl_test(ctl_star-sat_always_A_output
 	"fragment ctl_star. sat always (A (o1[t] = 1))" ": T")
 # unsound placements are refused with a diagnostic, not answered
@@ -93,9 +96,9 @@ add_repl_test(ltl_cmd-ctl_star_A_F_output_reduced
 add_repl_test_fail(ltl_cmd-ctl_star_A_F_input_unrealizable
 	"fragment ctl_star. ltl A (F i1[t] = 1)" "UNREALIZABLE")
 add_repl_test_fail(ltl_cmd-ctl_star_semneg_refused
-	"fragment ctl_star. ltl G (-(F o1[t] = 1))" "UNKNOWN")
+	"fragment ctl_star. ltl G (-(o1[t] = o1[t-1]))" "UNKNOWN")
 add_test(NAME "test_repl-ltl_cmd-ctl_star_semneg_not_realizable"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl G (-(F o1[t] = 1))\""
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl G (-(o1[t] = o1[t-1]))\""
 )
 set_tests_properties("test_repl-ltl_cmd-ctl_star_semneg_not_realizable" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"

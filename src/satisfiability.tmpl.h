@@ -2054,9 +2054,9 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	}
 	auto mark_undecided = [&]() {
 		r.error(code::unsupported_operation,
-			"satisfiability of this formula is not supported "
-			"yet: LTL satisfiability is not implemented; the "
-			"formula is not realizable");
+			"UNKNOWN: the CTL* encoding is unrealizable, but its E "
+			"witnesses range over every input branch, which is "
+			"stricter than E; satisfiability could not be decided");
 	};
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, bool,
@@ -2154,28 +2154,18 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// constraints.
 	if (sat_has_ltl_operators<node>(fm)) {
 		auto _s = r.open("ltl_realizability");
-		// realizable(fm) => sat(fm): a program satisfying fm against
-		// every environment gives a trace that satisfies fm. There is
-		// no satisfiability procedure for full-LTL here, so this
-		// realizability check is a sound one-way shortcut: realizable
-		// decides sat true, but unrealizable must not decide sat
-		// false -- it leaves sat undecided instead.
+		// A specification is satisfiable when it can be executed
+		// indefinitely whatever the inputs (README "Satisfiability"):
+		// for full LTL that is realizability, decided both ways.
 		auto realizable = is_ltl_aba_realizable<node>(fm, start_time, output);
 		if (!realizable.has_value()) {
-			// no verdict at all, not an unrealizable one
+			// no verdict at all
 			r.merge(std::move(realizable));
 			return r.with_assert_check_error(code::solver_error,
 				"UNKNOWN: the synthesis backend failed or produced no "
 				"verdict; satisfiability could not be decided");
 		}
-		if (realizable.value())
-			memoize(true);
-		else {
-#ifdef TAU_CACHE
-			undecided.emplace(std::make_pair(fm, start_time), true);
-#endif // TAU_CACHE
-			mark_undecided();
-		}
+		memoize(realizable.value());
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}

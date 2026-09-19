@@ -852,9 +852,9 @@ individual shifts.
 - **Spec terminator**: in specification files and in programs passed to the
   parser every statement ends with `.` (a period), e.g. `G (o1[t] = 1).`; the
   argument of a single REPL command (`sat G (o1[t] = 1)`) may omit it.
-- **Semantic negation (`-`)**: `- φ` is decided only where it sits under
-  Boolean connectives; under a temporal operator or a path quantifier it is
-  refused (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
+- **Semantic negation (`-`)**: `- φ` under a temporal operator or a path
+  quantifier is refused when φ reads the past (lookback, `S`/`T`, a
+  fixed-time atom) (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
 - **nlang needs an LLM API key**: the oracle reads `TAU_LLM_API_KEY` (falling
   back to `OPENAI_API_KEY`), with `TAU_LLM_ENDPOINT` (default
   `https://api.openai.com/v1`) and `TAU_LLM_MODEL` optional and each HTTP
@@ -913,7 +913,7 @@ is supported by the encoding:
   `<->`/`^^` or in the guard of `?:` -- is refused with an error.
 
 `sat` of a CTL\* formula is `sat` of its encoding, so `sat A φ` and `sat φ`
-agree; `realizable` decides realizability.  `valid` does not decide formulas
+agree.  `valid` does not decide formulas
 with `A`, `E` or `-` and reports UNKNOWN.
 
 ### Semantic negation (`-`)
@@ -932,9 +932,11 @@ violate φ.  This differs from `! φ`, which simply flips the truth value of φ 
 a single trace.  Where `- φ` sits under Boolean connectives only, it is a
 closed statement about φ's own game and is decided by the realizability
 verdict of φ (`- φ` is true exactly when `realizable φ` is false, and undecided
-when that is).  Under a temporal operator or a path quantifier it would mean
-"φ is unrealizable from this point on", which needs the input and output roles
-swapped; that is not implemented and is refused with an error.
+when that is).  Under a temporal operator or a path quantifier it means "φ is
+unrealizable from this point on": when φ reads no past (no lookback, no `S`/`T`,
+no fixed-time atom) that is the same game at every point and `- φ` folds the
+same way; otherwise the answer depends on the history and the formula is
+refused with an error.
 
 ### Examples
 
@@ -951,8 +953,11 @@ E G(o1[t] = 0).
 -- The environment cannot be forced to raise i1: true
 -(F i1[t] = 1).
 
--- Refused: semantic negation under a temporal operator
-G (-(o1[t] = i1[t])).
+-- Past-free, so the same at every step: true
+G (-(F i1[t] = 1)).
+
+-- Refused: the game from each step depends on the previous o1
+G (-(o1[t] = o1[t-1])).
 ```
 
 ### Reduction to LTL
@@ -994,6 +999,12 @@ all i1[t-2] ex o2[t-1] all i1[t] ex o1[t] o1[t] = i1[t] && ( i1[t-2] = 1 -> o2[t
 This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
 Further resources concerning the details can be found in the [theory section](#the-theory-behind-the-tau-language).
+
+For full LTL (`U`, `R`, `W`, `S`, `T`, nested temporal operators) the same
+notion is realizability: `sat` and `realizable` decide it through the LTL(ABA)
+synthesis pipeline and agree in both directions.  `valid φ` is `unsat ! φ`.
+A verdict that cannot be decided (backend failure, a resource cap that gave
+up, an `E` over inputs in the CTL\* fragment) is reported as UNKNOWN.
 
 ### Execution
 

@@ -1157,14 +1157,15 @@ static result<tref> translate_ctl_star(tref fm,
 	}
 
 	// A `-φ` still here sits under a temporal operator or a path
-	// quantifier (reduce_ctl_star_to_ltl folds the Boolean-context ones
-	// first): it would mean "φ is unrealizable from this history on",
-	// which needs the input/output role swap and has no encoding.
+	// quantifier and φ reads the past (resolve_semantic_negations folds
+	// every other one): "φ is unrealizable from this history on" then
+	// depends on the history, which no encoding here tracks.
 	if (nt == tau::wff_semantic_neg) {
 		return r.with_error(code::solver_error,
-		    "semantic negation (-) under a temporal operator or a path "
-		    "quantifier is not implemented: it needs the input/output "
-		    "role swap from that history on");
+		    "semantic negation (-) of a formula reading the past (lookback, "
+		    "S / T, a fixed-time atom) under a temporal operator or a path "
+		    "quantifier is not implemented: its game depends on the "
+		    "history");
 	}
 
 	// For all other nodes, recursively translate children
@@ -1282,14 +1283,16 @@ bool has_semantic_negation(tref fm) {
 	}) != nullptr;
 }
 
-// Folds every `-ψ` reached from the root through Boolean connectives only.
-// There `-ψ` is a closed statement about ψ's own game ("ψ has no winning
-// system strategy"), so by determinacy it is the negated realizability
-// verdict of ψ. A `-ψ` under a temporal operator or a path quantifier is
-// left in place: it would mean "unrealizable from this history on", and
-// translate_ctl_star refuses it.
+// Folds `-ψ` to a constant where it is one. Reached from the root through
+// Boolean connectives only, `-ψ` is a closed statement about ψ's own game
+// ("ψ has no winning system strategy"), so by determinacy it is the negated
+// realizability verdict of ψ. Under a temporal operator or a path quantifier
+// it means "ψ is unrealizable from this history on", which is the same game
+// whatever the history when ψ reads no past (no lookback, no S / T, no
+// fixed-time atom); any other `-ψ` is left in place and translate_ctl_star
+// refuses it.
 template <NodeType node>
-static result<tref> resolve_semantic_negations(tref fm) {
+static result<tref> resolve_semantic_negations(tref fm, bool nested = false) {
 	using tau = tree<node>;
 	result<tref> r;
 	if (!has_semantic_negation<node>(fm)) return r.with_value(fm);
@@ -1298,37 +1301,37 @@ static result<tref> resolve_semantic_negations(tref fm) {
 	const auto& op = t[0];
 	auto nt = op.value.nt;
 	if (nt == tau::wff_semantic_neg) {
-		TAU_TRY(bool real, is_ctl_star_realizable<node>(
-			op.child(0), 0, false));
+		tref body = op.child(0);
+		auto reads_past = [&] {
+			return body_max_lookback<node>(body) > 0
+				|| has_past_operators<node>(body)
+				|| tau::get(body).find_top([](tref n) {
+					return is_aba_comparison<node>(n)
+						&& has_io_var<node>(n)
+						&& atom_is_positional<node>(n); });
+		};
+		if (nested && reads_past()) return r.with_value(fm);
+		TAU_TRY(bool real, is_ctl_star_realizable<node>(body, 0, false));
 		return r.with_value(real ? tau::_F() : tau::_T());
 	}
-	switch (nt) {
-	case tau::wff_neg: {
-		TAU_TRY(auto a, resolve_semantic_negations<node>(op.child(0)));
-		return r.with_value(tau::build_wff_neg(a));
+	// data quantifiers bind variables a folded body would lose
+	if (nt == tau::wff_ex || nt == tau::wff_all) return r.with_value(fm);
+	const bool boolean = nt == tau::wff_neg || nt == tau::wff_and
+		|| nt == tau::wff_or || nt == tau::wff_imply
+		|| nt == tau::wff_rimply || nt == tau::wff_equiv
+		|| nt == tau::wff_xor || nt == tau::wff_conditional;
+	trefs ch;
+	bool changed = false;
+	for (size_t i = 0; i < op.children_size(); ++i) {
+		tref c = op.child(i);
+		if (!tau::get(c).is(tau::wff)) return r.with_value(fm);
+		TAU_TRY(tref f, resolve_semantic_negations<node>(c,
+			nested || !boolean));
+		changed |= f != c;
+		ch.push_back(f);
 	}
-	case tau::wff_and: case tau::wff_or: case tau::wff_imply:
-	case tau::wff_rimply: case tau::wff_equiv: case tau::wff_xor: {
-		TAU_TRY(auto a, resolve_semantic_negations<node>(op.child(0)));
-		TAU_TRY(auto b, resolve_semantic_negations<node>(op.child(1)));
-		switch (nt) {
-		case tau::wff_and:    return r.with_value(tau::build_wff_and(a, b));
-		case tau::wff_or:     return r.with_value(tau::build_wff_or(a, b));
-		case tau::wff_imply:  return r.with_value(tau::build_wff_imply(a, b));
-		case tau::wff_rimply: return r.with_value(tau::build_wff_rimply(a, b));
-		case tau::wff_equiv:  return r.with_value(tau::build_wff_equiv(a, b));
-		default:              return r.with_value(tau::build_wff_xor(a, b));
-		}
-	}
-	case tau::wff_conditional: {
-		TAU_TRY(auto c, resolve_semantic_negations<node>(op.child(0)));
-		TAU_TRY(auto a, resolve_semantic_negations<node>(op.child(1)));
-		TAU_TRY(auto b, resolve_semantic_negations<node>(op.child(2)));
-		return r.with_value(tau::build_wff_conditional(c, a, b));
-	}
-	default:
-		return r.with_value(fm);
-	}
+	if (!changed) return r.with_value(fm);
+	return r.with_value(tau::get(t.value, tau::get(op.value, ch)));
 }
 
 template <NodeType node>

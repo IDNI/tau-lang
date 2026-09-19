@@ -800,11 +800,22 @@ TEST_SUITE("CTL* semantics - semantic negation") {
 			== std::optional<bool>(true));
 	}
 
-	// Under a temporal operator `-` would mean "unrealizable from here on",
-	// which needs the input/output role swap: refused, never answered.
-	TEST_CASE("[CTLS-SEM-08] -φ under G or A is refused") {
-		CHECK_FALSE(ctl_sat("G (-(o1[t] = i1[t])).").has_value());
-		CHECK_FALSE(ctl_sat("A (-(F o1[t] = 1)).").has_value());
+	// Under a temporal operator `-` means "unrealizable from this history
+	// on": the same game at every history when ψ reads no past, so it folds
+	// like a top-level `-`.
+	TEST_CASE("[CTLS-SEM-08] past-free -φ under G / A / F folds") {
+		CHECK(ctl_sat("G (-(F i1[t] = 1)).") == std::optional<bool>(true));
+		CHECK(ctl_sat("G (-(o1[t] = i1[t])).") == std::optional<bool>(false));
+		CHECK(ctl_sat("A (-(F o1[t] = 1)).") == std::optional<bool>(false));
+		CHECK(ctl_sat("(G (o2[t] = 1)) && (F (-(F i1[t] = 1))).")
+			== std::optional<bool>(true));
+	}
+
+	// With lookback or a fixed-time atom the game depends on the history:
+	// refused, never answered.
+	TEST_CASE("[CTLS-SEM-09] -φ reading the past under G is refused") {
+		CHECK_FALSE(ctl_sat("G (-(o1[t] = o1[t-1])).").has_value());
+		CHECK_FALSE(ctl_sat("G (-(o1[0] = 1)).").has_value());
 	}
 
 } // TEST_SUITE("CTL* semantics - semantic negation")

@@ -1820,6 +1820,25 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 		<< " step=" << time_point;
 }
 
+// fm with every input stream read as an output: satisfiable exactly when
+// some input sequence lets fm hold.
+template <NodeType node>
+static tref inputs_as_outputs(tref fm) {
+	using tau = tree<node>;
+	subtree_map<node, tref> flip;
+	for (tref v : tau::get(fm).select_all([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::io_var) && t.is_input_variable(); }))
+	{
+		const auto& t = tau::get(v);
+		trefs ch;
+		for (size_t i = 0; i < t.children_size(); ++i)
+			ch.push_back(t.child(i));
+		flip.emplace(v, tau::get(node::output_variable(), ch));
+	}
+	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
+}
+
 template <NodeType node>
 std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 	LOG_TRACE << "get_ubt_ctn_at begin \n";
@@ -2823,13 +2842,27 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				// Dead alternative: the conjunction with the
 				// update is pointwise unsatisfiable.
 				if (tau::get(bodies[i]).equals_F()) continue;
+				tref alt = build_wff_and<node>(
+					build_wff_always<node>(bodies[i]),
+					build_wff_and<node>(upd_sometime));
+				// Also dead when no input sequence lets it hold
+				// over time (each step solvable, the run not):
+				// step() would pick it while it still solves a
+				// step and then switch, satisfying neither it
+				// nor the update. One that needs the inputs'
+				// cooperation stays, as the preferred choice at
+				// the steps where they cooperate.
+				if (auto live = is_tau_formula_sat<node>(
+					inputs_as_outputs<node>(alt), start_time);
+					live.has_value() && !live.value())
+				{
+					LOG_DEBUG << "pwr: alternative with no "
+						"execution under any input dropped: "
+						<< LOG_FM(alt) << "\n";
+					continue;
+				}
 				new_alts.push_back(with_spec_sometimes(
-					build_wff_and<node>(
-						build_wff_always<node>(
-							bodies[i]),
-						build_wff_and<node>(
-							upd_sometime)),
-					alt_sometimes[i]));
+					alt, alt_sometimes[i]));
 			}
 			if (!plain_ok) {
 				// I1: instead of embedding the guarded

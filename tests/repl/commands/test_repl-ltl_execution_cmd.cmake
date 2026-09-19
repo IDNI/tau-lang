@@ -36,3 +36,11 @@ add_ltl_run_test(pure_past_step_zero
 	"run G((o1[t]:bv[1] = 1) <-> ((i1[t]:bv[1] = 1) S (i2[t]:bv[1] = 1))).\\n1\\n0\\n1\\nq\\nq\\n"
 	"o1\\[0\\] := 1"
 	"o1\\[0\\] := 0|unsat")
+
+# a revision alternative that no input sequence lets hold over time is
+# dropped: after G(o1 = 1) the run stays on the update instead of
+# alternating between it and a dead alternative
+add_ltl_run_test(revision_drops_dead_alternative
+	"run G(u[t] = i1[t] && (o1[t] != o1[t-1])).\\nF.\\nF.\\nG(o1[t] = 1).\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	"o1\\[4\\] := T\n(.*\n)*o1\\[5\\] := T"
+	"o1\\[4\\] := F|o1\\[5\\] := F|unsat")
