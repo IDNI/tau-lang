@@ -852,9 +852,8 @@ individual shifts.
 - **Spec terminator**: in specification files and in programs passed to the
   parser every statement ends with `.` (a period), e.g. `G (o1[t] = 1).`; the
   argument of a single REPL command (`sat G (o1[t] = 1)`) may omit it.
-- **Semantic negation (`-`)**: `- φ` under a temporal operator or a path
-  quantifier is refused when φ reads the past (lookback, `S`/`T`, a
-  fixed-time atom) (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
+- **Semantic negation (`-`)**: `- φ` under a temporal operator reads φ as
+  started fresh at that point (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
 - **nlang needs an LLM API key**: the oracle reads `TAU_LLM_API_KEY` (falling
   back to `OPENAI_API_KEY`), with `TAU_LLM_ENDPOINT` (default
   `https://api.openai.com/v1`) and `TAU_LLM_MODEL` optional and each HTTP
@@ -899,11 +898,13 @@ The CTL\* fragment extends the LTL grammar with path quantifiers:
 branch per input sequence, not over individual traces.  Not every placement
 is supported by the encoding:
 
-- `E χ` in positive polarity is encoded through a fresh witness output.  A
-  REALIZABLE verdict is always right.  When inputs are involved the witness is
-  stricter than `E` (it demands χ on every input branch), so an unrealizable
-  encoding is reported as UNKNOWN rather than UNREALIZABLE; without inputs the
-  encoding is exact.
+- `E χ` in positive polarity is encoded through a fresh witness output.  When
+  the specification has inputs, the witness path is pinned by one *direction*
+  output per input stream, which names the value that path takes next, and the
+  constraint is read one step later, where "the path follows the directions"
+  is a plain `always`.  The encoding is then exact.  A past operator (`S`,
+  `T`) inside χ has no such form: that witness keeps the all-paths encoding,
+  which is stricter than `E`, so an unrealizable result is reported as UNKNOWN.
 - `A χ` in positive polarity inside a universal context (under `&&`, `G` or
   another `A`) reduces to `χ` itself.
 - `A` or `E` in negative polarity (under `!`, on the left of `->`) is first
@@ -929,14 +930,13 @@ distinct from syntactic negation (`!`):
 `- φ` is a strategy-level statement: it asserts that the specification φ is
 **unrealizable** — no matter what the system does, the environment can always
 violate φ.  This differs from `! φ`, which simply flips the truth value of φ on
-a single trace.  Where `- φ` sits under Boolean connectives only, it is a
-closed statement about φ's own game and is decided by the realizability
-verdict of φ (`- φ` is true exactly when `realizable φ` is false, and undecided
-when that is).  Under a temporal operator or a path quantifier it means "φ is
-unrealizable from this point on": when φ reads no past (no lookback, no `S`/`T`,
-no fixed-time atom) that is the same game at every point and `- φ` folds the
-same way; otherwise the answer depends on the history and the formula is
-refused with an error.
+a single trace.  `- φ` is a closed statement about φ's own game and is decided
+by the realizability verdict of φ: it is true exactly when `realizable φ` is
+false, and undecided when that is.  Under a temporal operator or a path
+quantifier it means "φ is unrealizable from this point on", read as φ started
+fresh there — as a specification installed by a revision reads its own
+lookback, what precedes its start is warm-up.  That game is the same at every
+point, so `- φ` folds to the same constant wherever it sits.
 
 ### Examples
 
@@ -953,21 +953,25 @@ E G(o1[t] = 0).
 -- The environment cannot be forced to raise i1: true
 -(F i1[t] = 1).
 
--- Past-free, so the same at every step: true
+-- The same game at every step: true
 G (-(F i1[t] = 1)).
 
--- Refused: the game from each step depends on the previous o1
-G (-(o1[t] = o1[t-1])).
+-- There exists a branch where the environment raises i1
+E (F i1[t] = 1).
 ```
 
 ### Reduction to LTL
 
-CTL\* formulas are reduced to LTL synthesis problems with a restricted form
-of the Bloem/Schewe/Khalimov witness-output encoding (arXiv:1711.10636): each
-existential path choice becomes an additional witness output, allowing the
-existing `ltlsynt`-based pipeline to handle the branching-time property.  The
-paper's direction outputs, which pin the witness to one input branch, are not
-used; that is why the encoding is stricter than `E` when inputs are involved.
+CTL\* formulas are reduced to LTL synthesis problems with the
+Bloem/Schewe/Khalimov witness-output encoding (arXiv:1711.10636): each
+existential path choice becomes a witness output, with one direction output
+per input stream pinning the path it witnesses, so the existing
+`ltlsynt`-based pipeline handles the branching-time property.  The witness
+constraint is stated one step after the witness, where "the path follows the
+directions" needs no next-step operator: the path formula is rewritten by its
+one-step expansion laws (`G φ = φ ∧ X G φ`, `φ U ψ = ψ ∨ (φ ∧ X(φ U ψ))`, …)
+and its present part is read back through lookback.  The witness and direction
+streams are internal: they use the reserved `w_` prefix and are never printed.
 The `fragment ctl_star` switch is a REPL setting: specification files and the
 API accept `A`, `E` and `-` without it.
 

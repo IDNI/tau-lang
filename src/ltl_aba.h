@@ -374,6 +374,10 @@ struct ctl_star_reduction {
     // pack's Boolean carrier (pack_bool_carrier_type). The interpreter uses
     // these to register each witness as an internal output stream.
     std::vector<size_t> witness_types;
+    // false when an E witness was encoded without direction outputs while
+    // the formula has inputs (a past operator inside χ): the encoding is
+    // then stricter than E, so an unrealizable verdict is undecided.
+    bool exact = true;
 };
 
 /**

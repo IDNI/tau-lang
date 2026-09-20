@@ -2109,6 +2109,10 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// CTL* formulas: reduce to LTL first, then check realizability
 	if (has_ctl_star_operators<node>(fm)) {
 		auto _s = r.open("ctl_star_reduction");
+		// same reason as in is_ctl_star_realizable: the witness
+		// constraints are decided over the formula's own atoms
+		if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
+			fm = nf.value();
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
 		// a backend that gave no verdict leaves satisfiability unknown,
 		// which is not the "not implemented" case mark_undecided states
@@ -2121,14 +2125,13 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		}
 		// The reduction is plain LTL, so its satisfiability follows the
 		// same rules as any other LTL formula: sat(A χ) = sat(χ). An E
-		// witness strengthens the formula unless no input is involved
-		// (single-path tree), so otherwise only a true verdict carries
-		// over to fm and a false one leaves it undecided.
+		// witness encoded without directions strengthens the formula,
+		// so then only a true verdict carries over to fm and a false
+		// one leaves it undecided.
 		auto reduced = is_tau_formula_sat<node>(
 			reduction->ltl_formula, start_time, output);
 		if (!reduced.has_value()) r.merge(std::move(reduced));
-		else if (reduced.value() || reduction->witnesses.empty()
-			|| !atom_has_any_input<node>(fm))
+		else if (reduced.value() || reduction->exact)
 			memoize(reduced.value());
 		else {
 #ifdef TAU_CACHE

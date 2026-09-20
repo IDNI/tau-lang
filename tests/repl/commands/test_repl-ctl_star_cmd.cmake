@@ -56,9 +56,13 @@ add_repl_test(ctl_star-realizable_A_always_output
 	"fragment ctl_star. realizable A (always o1[t] = 1)" ": T")
 add_repl_test(ctl_star-realizable_E_F_output
 	"fragment ctl_star. realizable E (F o1[t] = 1)" ": T")
-# the witness is stricter than E over input branches: undecided, not F
-add_repl_test_fail(ctl_star-realizable_E_F_input_undecided
-	"fragment ctl_star. realizable E (F i1[t] = 1)" "could not be decided")
+# direction outputs pin the witness path, so E over inputs is decided
+add_repl_test(ctl_star-realizable_E_F_input
+	"fragment ctl_star. realizable E (F i1[t] = 1)" ": T")
+# a past operator under E keeps the all-paths encoding: undecided, not F
+add_repl_test_fail(ctl_star-realizable_E_since_undecided
+	"fragment ctl_star. realizable E ((i1[t] = 1) S (i1[t] = 0))"
+	"could not be decided")
 # negative A / E are decided through their duals
 add_repl_test(ctl_star-sat_neg_A_through_dual
 	"fragment ctl_star. sat !(A (F o1[t] = 1))" ": T")
@@ -89,18 +93,18 @@ add_repl_test_fail(fragment_gate-qelim_blocks_A_by_default
 # CTL*-bodied definition is already rejected at definition time, so that
 # gate is defense-in-depth with no black-box reproducer.)
 
-# IN-R3 / LA-M3: in the ctl_star fragment, `ltl` reduces A and refuses -,
-# instead of printing "skeleton: 1" REALIZABLE (P3 / P10)
+# IN-R3 / LA-M3: in the ctl_star fragment, `ltl` reduces A and reports an
+# undecided E, instead of printing "skeleton: 1" REALIZABLE (P3 / P10)
 add_repl_test(ltl_cmd-ctl_star_A_F_output_reduced
 	"fragment ctl_star. ltl A (F o1[t] = 1)" "CTL\\* reduced to LTL")
 add_repl_test_fail(ltl_cmd-ctl_star_A_F_input_unrealizable
 	"fragment ctl_star. ltl A (F i1[t] = 1)" "UNREALIZABLE")
-add_repl_test_fail(ltl_cmd-ctl_star_semneg_refused
-	"fragment ctl_star. ltl G (-(o1[t] = o1[t-1]))" "UNKNOWN")
-add_test(NAME "test_repl-ltl_cmd-ctl_star_semneg_not_realizable"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl G (-(o1[t] = o1[t-1]))\""
+add_repl_test_fail(ltl_cmd-ctl_star_e_over_past_undecided
+	"fragment ctl_star. ltl E ((i1[t] = 1) S (i1[t] = 0))" "UNKNOWN")
+add_test(NAME "test_repl-ltl_cmd-ctl_star_e_over_past_not_realizable"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl E ((i1[t] = 1) S (i1[t] = 0))\""
 )
-set_tests_properties("test_repl-ltl_cmd-ctl_star_semneg_not_realizable" PROPERTIES
+set_tests_properties("test_repl-ltl_cmd-ctl_star_e_over_past_not_realizable" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"
 	FAIL_REGULAR_EXPRESSION "skeleton: 1|^REALIZABLE")
 

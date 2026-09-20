@@ -825,6 +825,7 @@ template <NodeType node>
 result<bool> ltl_explain(tref fm, std::ostream& out) {
 	using tau = tree<node>;
 	result<bool> r;
+	bool exact_reduction = true;
 
 	// IN-R3: `ltl` used to hand A/E/- straight to the skeleton, where the
 	// tester variant flattened them to "1". Reduce like is_tau_formula_sat
@@ -839,6 +840,11 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 	// UNKNOWN-branded summary (same shape as is_tau_formula_sat's CTL*
 	// branch, satisfiability.tmpl.h), and the caller (ltl_cmd) prints the
 	// whole report exactly once.
+	// The verdict below comes from the same procedure `realizable` runs,
+	// which decides the normalized formula and reduces after it: do both in
+	// that order here, or the two commands answer from different atoms.
+	if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
+		fm = nf.value();
 	if (has_ctl_star_operators<node>(fm)) {
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(fm);
 		if (!reduction_r.has_value()) {
@@ -852,6 +858,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 		out << "CTL* reduced to LTL: "
 			<< tau::get(reduction.ltl_formula).to_str() << "\n";
 		fm = reduction.ltl_formula;
+		exact_reduction = reduction.exact;
 	}
 
 	if (!realizability_has_game_operators<node>(fm)) {
@@ -902,6 +909,13 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the synthesis backend failed or produced no "
 				"verdict; realizability could not be decided");
+		}
+		if (!real.value() && !exact_reduction) {
+			return r.with_error(code::solver_error,
+				"UNKNOWN: the CTL* reduction is unrealizable, but an E "
+				"witness over a past operator ranges over every input "
+				"branch, which is stricter than E; realizability could "
+				"not be decided");
 		}
 		// what `run` executes: the refined strategy's encoding
 		if (real.value()) {
@@ -1088,6 +1102,87 @@ inline void reset_witness_counter() {
 
 } // namespace ctl_star_detail
 
+// One-step unfolding: `shift_one_step(χ)` read at t+1 says what χ says at t.
+// Each temporal case is the expansion law of its operator (`G φ = φ ∧ X G φ`,
+// `φ U ψ = ψ ∨ (φ ∧ X(φ U ψ))`, ...) with the now-part shifted one step into
+// the past and the future part left where it is, so no next-step operator is
+// needed. Atoms shift their lookback by one; a fixed-time atom names the same
+// step whatever the position, so it stays. Past operators have no lookback
+// form here and are refused.
+template <NodeType node>
+static result<tref> shift_one_step(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return r.with_value(fm);
+	const auto& op = t[0];
+	const auto nt = op.value.nt;
+	auto N = [&](tref x) { return shift_one_step<node>(x); };
+	switch (nt) {
+	case tau::wff_t: case tau::wff_f: return r.with_value(fm);
+	case tau::wff_neg: {
+		TAU_TRY(tref a, N(op.child(0)));
+		return r.with_value(tau::build_wff_neg(a));
+	}
+	case tau::wff_and: case tau::wff_or: case tau::wff_imply:
+	case tau::wff_rimply: case tau::wff_equiv: case tau::wff_xor: {
+		TAU_TRY(tref a, N(op.child(0)));
+		TAU_TRY(tref b, N(op.child(1)));
+		switch (nt) {
+		case tau::wff_and:    return r.with_value(tau::build_wff_and(a, b));
+		case tau::wff_or:     return r.with_value(tau::build_wff_or(a, b));
+		case tau::wff_imply:  return r.with_value(tau::build_wff_imply(a, b));
+		case tau::wff_rimply: return r.with_value(tau::build_wff_rimply(a, b));
+		case tau::wff_equiv:  return r.with_value(tau::build_wff_equiv(a, b));
+		default:              return r.with_value(tau::build_wff_xor(a, b));
+		}
+	}
+	case tau::wff_conditional: {
+		TAU_TRY(tref c, N(op.child(0)));
+		TAU_TRY(tref a, N(op.child(1)));
+		TAU_TRY(tref b, N(op.child(2)));
+		return r.with_value(tau::build_wff_conditional(c, a, b));
+	}
+	case tau::wff_always: {     // G φ = φ ∧ X G φ
+		TAU_TRY(tref a, N(op.child(0)));
+		return r.with_value(tau::build_wff_and(a, fm));
+	}
+	case tau::wff_sometimes: {  // F φ = φ ∨ X F φ
+		TAU_TRY(tref a, N(op.child(0)));
+		return r.with_value(tau::build_wff_or(a, fm));
+	}
+	case tau::wff_until: {      // φ U ψ = ψ ∨ (φ ∧ X(φ U ψ))
+		TAU_TRY(tref a, N(op.child(0)));
+		TAU_TRY(tref b, N(op.child(1)));
+		return r.with_value(tau::build_wff_or(b,
+			tau::build_wff_and(a, fm)));
+	}
+	case tau::wff_weak_until: { // φ W ψ = ψ ∨ (φ ∧ X(φ W ψ))
+		TAU_TRY(tref a, N(op.child(0)));
+		TAU_TRY(tref b, N(op.child(1)));
+		return r.with_value(tau::build_wff_or(b,
+			tau::build_wff_and(a, fm)));
+	}
+	case tau::wff_release: {    // φ R ψ = ψ ∧ (φ ∨ X(φ R ψ))
+		TAU_TRY(tref a, N(op.child(0)));
+		TAU_TRY(tref b, N(op.child(1)));
+		return r.with_value(tau::build_wff_and(b,
+			tau::build_wff_or(a, fm)));
+	}
+	case tau::wff_since: case tau::wff_trigger:
+		return r.with_error(code::unsupported_operation,
+			"a past operator (S / T) under E has no one-step unfolding: "
+			"the witness path cannot be pinned by directions");
+	case tau::wff_ex: case tau::wff_all:
+		return r.with_error(code::unsupported_operation,
+			"a data quantifier under E has no one-step unfolding");
+	default: {
+		auto io = tau::get(fm).select_top(is_child<node, tau::io_var>);
+		return r.with_value(shift_io_vars_in_fm<node>(fm, io, 1));
+	}
+	}
+}
+
 // Recursive bottom-up translation of a CTL* state/path formula to LTL.
 // Witness constraints are accumulated in `constraints` (each is a G(w → χ) pair).
 // New witness output names are accumulated in `witnesses`.
@@ -1098,6 +1193,9 @@ template <NodeType node>
 static result<tref> translate_ctl_star(tref fm,
 		std::vector<std::pair<std::string, tref>>& constraints,
 		std::vector<std::string>& witnesses,
+		std::vector<size_t>& witness_types,
+		const std::vector<std::pair<std::string, size_t>>& inputs,
+		bool& exact,
 		bool positive = true, bool universal = true) {
 	using tau = tree<node>;
 	result<tref> r;
@@ -1118,23 +1216,62 @@ static result<tref> translate_ctl_star(tref fm,
 		// Recursively translate the inner path formula (positive,
 		// but no longer a universal context: w marks SOME state).
 		TAU_TRY(auto translated_inner, translate_ctl_star<node>(
-			inner, constraints, witnesses, true, false));
+			inner, constraints, witnesses, witness_types, inputs,
+			exact, true, false));
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
-		witnesses.push_back(wname);
 		// Build witness as a wff: (o_w_i[t] = 1) serves as the
 		// propositional witness for the E-subformula.
 		// We use the Boolean carrier's type for the witness output.
 		size_t carrier_tid = get_ba_type_id<node>(
 			pack_bool_carrier_type<node>());
+		witnesses.push_back(wname);
+		witness_types.push_back(carrier_tid);
+		tref bf_one = build_bf_t_type<node>(carrier_tid);
 		tref w_bf = build_out_var_at_t<node>(
 			build_var_name<node>(wname), carrier_tid, "t");
-		tref bf_one = build_bf_t_type<node>(carrier_tid);
 		tref witness_wff = tau::build_bf_eq(w_bf, bf_one);
-		// Add constraint: G(witness → translated_path)
-		tref implication = tau::build_wff_imply(witness_wff, translated_inner);
-		tref always_constraint = tau::build_wff_always(implication);
-		constraints.emplace_back(wname, always_constraint);
+
+		// With inputs, the witness path has to be pinned, or the
+		// constraint would range over every input branch and the
+		// witness would certify A χ. One direction output per input
+		// stream names the value the witness path takes next, and the
+		// constraint moves one step later (shift_one_step), where
+		// "the path follows the directions from here on" is a plain
+		// always: G(w[t-1] -> (G follow -> N(χ))).
+		auto next_r = inputs.empty() ? result<tref>{}
+			: shift_one_step<node>(translated_inner);
+		if (!inputs.empty() && next_r.has_value()) {
+			tref follow = tau::_T();
+			for (const auto& [iname, itype] : inputs) {
+				std::string dname = wname + "_d_" + iname;
+				witnesses.push_back(dname);
+				witness_types.push_back(itype);
+				follow = tau::build_wff_and(follow,
+					tau::build_bf_eq(
+						build_in_var_at_t<node>(
+							build_var_name<node>(iname),
+							itype, "t"),
+						build_out_var_at_t_minus<node>(
+							dname, 1, itype)));
+			}
+			tref w_prev = tau::build_bf_eq(
+				build_out_var_at_t_minus<node>(wname, 1, carrier_tid),
+				bf_one);
+			constraints.emplace_back(wname, tau::build_wff_always(
+				tau::build_wff_imply(w_prev,
+					tau::build_wff_imply(
+						tau::build_wff_always(follow),
+						next_r.value()))));
+			return r.with_value(witness_wff);
+		}
+		// No input to steer (the tree is a single path, so A χ and
+		// E χ agree), or χ has no one-step unfolding (a past operator
+		// inside): the all-paths encoding, exact in the first case and
+		// stricter than E in the second.
+		if (!inputs.empty()) exact = false;
+		constraints.emplace_back(wname, tau::build_wff_always(
+			tau::build_wff_imply(witness_wff, translated_inner)));
 		return r.with_value(witness_wff);
 	}
 
@@ -1153,7 +1290,7 @@ static result<tref> translate_ctl_star(tref fm,
 				"refusing rather than answering vacuously");
 		}
 		return translate_ctl_star<node>(t[0].child(0), constraints,
-			witnesses, true, true);
+			witnesses, witness_types, inputs, exact, true, true);
 	}
 
 	// A `-φ` still here sits under a temporal operator or a path
@@ -1224,7 +1361,8 @@ static result<tref> translate_ctl_star(tref fm,
 	new_children.reserve(nch);
 	for (size_t i = 0; i < nch; ++i) {
 		TAU_TRY(auto child, translate_ctl_star<node>(op.child(i),
-			constraints, witnesses, ctx[i].first, ctx[i].second));
+			constraints, witnesses, witness_types, inputs, exact,
+			ctx[i].first, ctx[i].second));
 		new_children.push_back(child);
 	}
 
@@ -1283,16 +1421,14 @@ bool has_semantic_negation(tref fm) {
 	}) != nullptr;
 }
 
-// Folds `-ψ` to a constant where it is one. Reached from the root through
-// Boolean connectives only, `-ψ` is a closed statement about ψ's own game
-// ("ψ has no winning system strategy"), so by determinacy it is the negated
-// realizability verdict of ψ. Under a temporal operator or a path quantifier
-// it means "ψ is unrealizable from this history on", which is the same game
-// whatever the history when ψ reads no past (no lookback, no S / T, no
-// fixed-time atom); any other `-ψ` is left in place and translate_ctl_star
-// refuses it.
+// Folds every `-ψ` to a constant. `-ψ` is a closed statement about ψ's own
+// game ("ψ has no winning system strategy"), decided by determinacy from ψ's
+// realizability verdict. Under a temporal operator or a path quantifier it
+// reads as "ψ, started fresh here, is unrealizable" -- the same game at every
+// point, as a specification that starts later (a revision) reads its own
+// lookback: what precedes its start is warm-up.
 template <NodeType node>
-static result<tref> resolve_semantic_negations(tref fm, bool nested = false) {
+static result<tref> resolve_semantic_negations(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
 	if (!has_semantic_negation<node>(fm)) return r.with_value(fm);
@@ -1301,32 +1437,18 @@ static result<tref> resolve_semantic_negations(tref fm, bool nested = false) {
 	const auto& op = t[0];
 	auto nt = op.value.nt;
 	if (nt == tau::wff_semantic_neg) {
-		tref body = op.child(0);
-		auto reads_past = [&] {
-			return body_max_lookback<node>(body) > 0
-				|| has_past_operators<node>(body)
-				|| tau::get(body).find_top([](tref n) {
-					return is_aba_comparison<node>(n)
-						&& has_io_var<node>(n)
-						&& atom_is_positional<node>(n); });
-		};
-		if (nested && reads_past()) return r.with_value(fm);
-		TAU_TRY(bool real, is_ctl_star_realizable<node>(body, 0, false));
+		TAU_TRY(bool real, is_ctl_star_realizable<node>(
+			op.child(0), 0, false));
 		return r.with_value(real ? tau::_F() : tau::_T());
 	}
 	// data quantifiers bind variables a folded body would lose
 	if (nt == tau::wff_ex || nt == tau::wff_all) return r.with_value(fm);
-	const bool boolean = nt == tau::wff_neg || nt == tau::wff_and
-		|| nt == tau::wff_or || nt == tau::wff_imply
-		|| nt == tau::wff_rimply || nt == tau::wff_equiv
-		|| nt == tau::wff_xor || nt == tau::wff_conditional;
 	trefs ch;
 	bool changed = false;
 	for (size_t i = 0; i < op.children_size(); ++i) {
 		tref c = op.child(i);
 		if (!tau::get(c).is(tau::wff)) return r.with_value(fm);
-		TAU_TRY(tref f, resolve_semantic_negations<node>(c,
-			nested || !boolean));
+		TAU_TRY(tref f, resolve_semantic_negations<node>(c));
 		changed |= f != c;
 		ch.push_back(f);
 	}
@@ -1339,20 +1461,24 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 	result<bool> r;
 	if (!has_ctl_star_operators<node>(fm))
 		return is_ltl_aba_realizable<node>(fm, start_time, output);
+	// The reduction's witness constraints are decided over the atoms the
+	// formula has: a contradiction the atoms still spell out separately
+	// (`o1 = i1`, `o1 = 0`, `i1 = 1`) is one the oracle need not catch, so
+	// normalize first, as api::realizable does before calling here.
+	if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
+		fm = nf.value();
 	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
 	TAU_TRY(bool real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
 		start_time, output));
-	// A witness certifies E χ by forcing χ on every path from its state,
-	// which is exact only on a single-path computation tree, i.e. when no
-	// input is involved. With inputs an UNREALIZABLE reduction does not
-	// make fm unrealizable.
-	if (!real && !reduction.witnesses.empty()
-		&& atom_has_any_input<node>(fm))
-	{
+	// An E witness encoded without directions forces χ on every path from
+	// its state, which is stricter than E; an unrealizable reduction then
+	// says nothing about fm.
+	if (!real && !reduction.exact) {
 		return r.with_error(code::solver_error,
-			"UNKNOWN: the CTL* reduction is unrealizable, but its E "
-			"witnesses range over every input branch, which is "
-			"stricter than E; realizability could not be decided");
+			"UNKNOWN: the CTL* reduction is unrealizable, but an E "
+			"witness over a past operator ranges over every input "
+			"branch, which is stricter than E; realizability could "
+			"not be decided");
 	}
 	return r.with_value(real);
 }
@@ -1367,10 +1493,26 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 	TAU_TRY(fm, resolve_semantic_negations<node>(fm));
 	ctl_star_detail::reset_witness_counter();
 
+	// One direction output per input stream is what pins an E witness to
+	// one branch; the streams are collected once, by name, so every E
+	// steers the same tree.
+	std::vector<std::pair<std::string, size_t>> inputs;
+	for (tref v : tau::get(fm).select_all(is_child<node, tau::io_var>)) {
+		tref iov = tau::trim(v);
+		if (!tau::get(iov).is_input_variable()) continue;
+		std::string name = get_var_name<node>(iov);
+		if (std::ranges::none_of(inputs, [&](const auto& p) {
+			return p.first == name; }))
+			inputs.emplace_back(name, tau::get(v).get_ba_type());
+	}
+
 	std::vector<std::pair<std::string, tref>> constraints;
 	std::vector<std::string> witnesses;
+	std::vector<size_t> witness_types;
+	bool exact = true;
 
-	auto translated_r = translate_ctl_star<node>(fm, constraints, witnesses);
+	auto translated_r = translate_ctl_star<node>(fm, constraints, witnesses,
+		witness_types, inputs, exact);
 	if (!translated_r.has_value()) {
 		// A or E in negative polarity has a positive dual (¬A χ = E ¬χ,
 		// ¬E χ = A ¬χ); the NNF form is equivalent, so a successful
@@ -1379,9 +1521,11 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 		if (nnf && nnf != fm) {
 			constraints.clear();
 			witnesses.clear();
+			witness_types.clear();
+			exact = true;
 			ctl_star_detail::reset_witness_counter();
 			auto nnf_r = translate_ctl_star<node>(nnf, constraints,
-				witnesses);
+				witnesses, witness_types, inputs, exact);
 			if (nnf_r.has_value()) translated_r = std::move(nnf_r);
 		}
 	}
@@ -1398,15 +1542,8 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 		result = tau::build_wff_and(result, constraint);
 	}
 
-	// IN-R6: every witness is built over the Boolean carrier's type (see
-	// the wff_E case in translate_ctl_star, which builds w_bf over the
-	// same pack_bool_carrier_type<node>()); record the type ids so the
-	// interpreter can register the streams without re-deriving them.
-	std::vector<size_t> witness_types(witnesses.size(),
-		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
-
 	return r.with_value(ctl_star_reduction<node>{result, witnesses,
-		std::move(witness_types)});
+		std::move(witness_types), exact});
 }
 
 } // namespace idni::tau_lang

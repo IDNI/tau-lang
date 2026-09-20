@@ -800,10 +800,10 @@ TEST_SUITE("CTL* semantics - semantic negation") {
 			== std::optional<bool>(true));
 	}
 
-	// Under a temporal operator `-` means "unrealizable from this history
-	// on": the same game at every history when ψ reads no past, so it folds
-	// like a top-level `-`.
-	TEST_CASE("[CTLS-SEM-08] past-free -φ under G / A / F folds") {
+	// Under a temporal operator `-` means "unrealizable from here on", read
+	// as ψ started fresh at that point: the same game everywhere, so it
+	// folds like a top-level `-`.
+	TEST_CASE("[CTLS-SEM-08] -φ under G / A / F folds") {
 		CHECK(ctl_sat("G (-(F i1[t] = 1)).") == std::optional<bool>(true));
 		CHECK(ctl_sat("G (-(o1[t] = i1[t])).") == std::optional<bool>(false));
 		CHECK(ctl_sat("A (-(F o1[t] = 1)).") == std::optional<bool>(false));
@@ -811,11 +811,14 @@ TEST_SUITE("CTL* semantics - semantic negation") {
 			== std::optional<bool>(true));
 	}
 
-	// With lookback or a fixed-time atom the game depends on the history:
-	// refused, never answered.
-	TEST_CASE("[CTLS-SEM-09] -φ reading the past under G is refused") {
-		CHECK_FALSE(ctl_sat("G (-(o1[t] = o1[t-1])).").has_value());
-		CHECK_FALSE(ctl_sat("G (-(o1[0] = 1)).").has_value());
+	// "ψ from here on" reads ψ as a specification starting here, so what
+	// precedes is warm-up and the verdict does not depend on the history:
+	// a ψ with lookback or a fixed-time atom folds like any other.
+	TEST_CASE("[CTLS-SEM-09] -φ reading the past folds from a fresh start") {
+		CHECK(ctl_sat("G (-(o1[t] = o1[t-1])).") == std::optional<bool>(false));
+		CHECK(ctl_sat("G (-(o1[0] = 1)).") == std::optional<bool>(false));
+		CHECK(ctl_sat("G (-(always o1[t] != o1[t-1])).")
+			== std::optional<bool>(false));
 	}
 
 } // TEST_SUITE("CTL* semantics - semantic negation")
@@ -890,12 +893,31 @@ TEST_SUITE("CTL* semantics - A / E verdicts") {
 		    "(E (always o1[t] = 1)) <-> (always o1[t] = 1).").has_value());
 	}
 
-	// With inputs the witness demands χ on every input branch, which is
-	// stricter than E: an unrealizable encoding is not a verdict. In CTL*
-	// E(F i1=1) holds (the environment may raise i1).
-	TEST_CASE("[CTLS-AE-11] E(F i1=1) is undecided, not unrealizable") {
-		CHECK_FALSE(ctl_realizable("E (F i1[t] = 1).").has_value());
-		CHECK_FALSE(ctl_sat("E (F i1[t] = 1).") == std::optional<bool>(false));
+	// Direction outputs pin the witness path, so E over inputs is decided:
+	// the environment may raise i1, may hold it, and the two branches are
+	// independent.
+	TEST_CASE("[CTLS-AE-11] E over inputs is decided through the directions") {
+		CHECK(ctl_realizable("E (F i1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("E (always i1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("A (always (E (F i1[t] = 1))).")
+			== std::optional<bool>(true));
+		CHECK(ctl_realizable(
+		    "(E (always i1[t] = 1)) && (E (always i1[t] = 0))."
+		) == std::optional<bool>(true));
+		// no branch satisfies a contradiction
+		CHECK(ctl_realizable(
+		    "E (always (o1[t] = i1[t] && o1[t] = 0 && i1[t] = 1))."
+		) == std::optional<bool>(false));
+		CHECK(ctl_realizable(
+		    "(E (F o1[t] = 1)) && (always o1[t] = 0)."
+		) == std::optional<bool>(false));
+	}
+
+	// A past operator under E has no one-step unfolding, so that witness
+	// keeps the all-paths encoding and an unrealizable verdict is undecided.
+	TEST_CASE("[CTLS-AE-12] E over a past operator stays undecided") {
+		CHECK_FALSE(ctl_realizable("E ((i1[t] = 1) S (i1[t] = 0)).")
+			.has_value());
 	}
 
 } // TEST_SUITE("CTL* semantics - A / E verdicts")
