@@ -734,188 +734,215 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 9. SEMANTICS — realizability verdicts (LT-25), semantic negation (LT-5)
+// 9. SEMANTICS — sat / realizability verdicts, semantic negation
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// Everything above this point is parse / NNF / detection only: not one case
-// asserts a realizability verdict on an A / E / `-` formula, even though
-// `is_tau_formula_sat` routes every CTL* formula through
-// `reduce_ctl_star_to_ltl` → `is_ltl_aba_realizable` unconditionally.
-//
-// The gap hid LT-5: `apply_semantic_negation` only re-wraps its argument in
-// `wff_semantic_neg` (the promised role swap has no implementation), the
-// surviving node reaches `skeleton_wff`'s default case, and — because it
-// contains io_vars — is emitted as the propositional constant "1".  Every
-// non-constant `-φ` therefore came back REALIZABLE regardless of φ.
-//
-// Semantic negation is now a hard error instead of a silent TRUE.  These
-// cases pin that, plus the verdicts that DO have a working reduction.
+// `sat` of a CTL* formula is `sat` of its LTL reduction, so it follows the
+// one-way LTL rule (realizable decides T, unrealizable leaves it undecided)
+// and sat(A χ) agrees with sat(χ). Realizability is asked through
+// is_ctl_star_realizable, which also reduces first.
 
-TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE") {
+namespace {
 
-	// A `-φ` over data atoms has no implementation.  It must fail loudly.
-	TEST_CASE("[CTLS-SEM-01] -(always o1=1) is rejected, not REALIZABLE") {
-		tref fm = create_spec("-(always o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		CHECK(!sat.has_value());
-		CHECK(sat.has_error());
+std::optional<bool> ctl_sat(const char* src) {
+	tref fm = create_spec(src);
+	REQUIRE(fm != nullptr);
+	auto r = is_tau_formula_sat<node_t>(fm);
+	if (!r.has_value()) return std::nullopt;
+	return r.value();
+}
+
+std::optional<bool> ctl_realizable(const char* src) {
+	tref fm = create_spec(src);
+	REQUIRE(fm != nullptr);
+	auto r = is_ctl_star_realizable<node_t>(fm, 0, false);
+	if (!r.has_value()) return std::nullopt;
+	return r.value();
+}
+
+} // namespace
+
+TEST_SUITE("CTL* semantics - semantic negation") {
+
+	// In a Boolean context `-φ` is the negated realizability verdict of φ.
+	TEST_CASE("[CTLS-SEM-01] -(always o1=1) is F: the body is realizable") {
+		CHECK(ctl_sat("-(always o1[t] = 1).") == std::optional<bool>(false));
 	}
 
-	// Same for a semantic negation buried inside a Boolean context: the node
-	// survives translation and reaches the skeleton either way.
-	TEST_CASE("[CTLS-SEM-02] -(F o1=1) && G(o1=0) is rejected") {
-		tref fm = create_spec("-(F o1[t] = 1) && G (o1[t] = 0).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		CHECK(!sat.has_value());
-		CHECK(sat.has_error());
+	TEST_CASE("[CTLS-SEM-02] -(F o1=1) && G(o1=0) is F") {
+		CHECK(ctl_sat("(-(F o1[t] = 1)) && (G (o1[t] = 0)).")
+			== std::optional<bool>(false));
 	}
 
-	// Double semantic negation is still a semantic negation.
-	TEST_CASE("[CTLS-SEM-03] --(o1=1) is rejected") {
-		tref fm = create_spec("--(o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		CHECK(!sat.has_value());
-		CHECK(sat.has_error());
+	TEST_CASE("[CTLS-SEM-03] --(o1=1) is T: -(o1=1) is F, and F is unrealizable") {
+		CHECK(ctl_sat("--(o1[t] = 1).") == std::optional<bool>(true));
 	}
 
-	// Constant folding happens in the hooks, BEFORE any of this, so the
-	// constant cases keep a real verdict — and the verdict must be the
-	// folded one (-T ≡ F, -F ≡ T), not an error.
 	TEST_CASE("[CTLS-SEM-04] -T is UNREALIZABLE (folded to F)") {
-		tref fm = create_spec("-T.");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK_FALSE(sat.value());
+		CHECK(ctl_sat("-T.") == std::optional<bool>(false));
 	}
 
 	TEST_CASE("[CTLS-SEM-05] -F is REALIZABLE (folded to T)") {
-		tref fm = create_spec("-F.");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(ctl_sat("-F.") == std::optional<bool>(true));
 	}
 
-} // TEST_SUITE("CTL* semantics - semantic negation is not silently TRUE")
-
-
-TEST_SUITE("CTL* semantics - A / E realizability verdicts") {
-
-	// The A / E reduction (translate_ctl_star): positive `E χ` becomes a
-	// fresh witness output w plus G(w → χ) -- sound for synthesis, possibly
-	// over-strict; positive `A χ` in a universal context (root, ∧, G)
-	// reduces to χ itself; every other placement is REFUSED with a
-	// result<T> error (LA-N2: the old `A χ ≡ ¬E¬χ` rewrite was vacuous,
-	// any strategy satisfied `¬w ∧ G(w → ¬χ)` by holding w false, so
-	// `A (F i1 = 1)` came out REALIZABLE).  Both directions are pinned.
-	TEST_CASE("[CTLS-AE-01] E(always o1=1) is REALIZABLE") {
-		tref fm = create_spec("E (always o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+	// The environment owns i1, so F i1 = 1 is unrealizable and its semantic
+	// negation holds.
+	TEST_CASE("[CTLS-SEM-06] -(F i1=1) is T") {
+		CHECK(ctl_sat("-(F i1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("-(F i1[t] = 1).") == std::optional<bool>(true));
 	}
 
-	TEST_CASE("[CTLS-AE-02] A(always o1=1) is REALIZABLE") {
-		tref fm = create_spec("A (always o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+	TEST_CASE("[CTLS-SEM-07] -(F i1=1) && G(o1=1) is T, -(F o1=1) || G(o1=0) is T") {
+		CHECK(ctl_sat("(-(F i1[t] = 1)) && (G (o1[t] = 1)).")
+			== std::optional<bool>(true));
+		CHECK(ctl_sat("(-(F o1[t] = 1)) || (G (o1[t] = 0)).")
+			== std::optional<bool>(true));
 	}
 
-	TEST_CASE("[CTLS-AE-03] E(F o1=1) is REALIZABLE") {
-		tref fm = create_spec("E (F o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+	// Under a temporal operator `-` means "unrealizable from here on", read
+	// as ψ started fresh at that point: the same game everywhere, so it
+	// folds like a top-level `-`.
+	TEST_CASE("[CTLS-SEM-08] -φ under G / A / F folds") {
+		CHECK(ctl_sat("G (-(F i1[t] = 1)).") == std::optional<bool>(true));
+		CHECK(ctl_sat("G (-(o1[t] = i1[t])).") == std::optional<bool>(false));
+		CHECK(ctl_sat("A (-(F o1[t] = 1)).") == std::optional<bool>(false));
+		CHECK(ctl_sat("(G (o2[t] = 1)) && (F (-(F i1[t] = 1))).")
+			== std::optional<bool>(true));
 	}
 
-	// LA-N2: A now constrains χ. An input can never be forced, so
-	// `A (F i1 = 1)` and `A (always i1 = 1)` are UNREALIZABLE exactly like
-	// their LTL bodies (test_ltl_negative pins `F (i1 = 1)`).
-	TEST_CASE("[CTLS-AE-05] A(F i1=1) is UNREALIZABLE") {
-		tref fm = create_spec("A (F i1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK_FALSE(sat.value());
+	// "ψ from here on" reads ψ as a specification starting here, so what
+	// precedes is warm-up and the verdict does not depend on the history:
+	// a ψ with lookback or a fixed-time atom folds like any other.
+	TEST_CASE("[CTLS-SEM-09] -φ reading the past folds from a fresh start") {
+		CHECK(ctl_sat("G (-(o1[t] = o1[t-1])).") == std::optional<bool>(false));
+		CHECK(ctl_sat("G (-(o1[0] = 1)).") == std::optional<bool>(false));
+		CHECK(ctl_sat("G (-(always o1[t] != o1[t-1])).")
+			== std::optional<bool>(false));
 	}
 
-	TEST_CASE("[CTLS-AE-06] A(always i1=1) is UNREALIZABLE") {
-		tref fm = create_spec("A (always i1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK_FALSE(sat.value());
+} // TEST_SUITE("CTL* semantics - semantic negation")
+
+
+TEST_SUITE("CTL* semantics - A / E verdicts") {
+
+	TEST_CASE("[CTLS-AE-01] E(always o1=1) is realizable and sat") {
+		CHECK(ctl_sat("E (always o1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("E (always o1[t] = 1).") == std::optional<bool>(true));
 	}
 
-	TEST_CASE("[CTLS-AE-07] A(F o1=1) is REALIZABLE") {
-		tref fm = create_spec("A (F o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+	TEST_CASE("[CTLS-AE-02] A(always o1=1) is realizable and sat") {
+		CHECK(ctl_sat("A (always o1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("A (always o1[t] = 1).") == std::optional<bool>(true));
+	}
+
+	TEST_CASE("[CTLS-AE-03] E(F o1=1) is realizable") {
+		CHECK(ctl_realizable("E (F o1[t] = 1).") == std::optional<bool>(true));
+	}
+
+	// With no inputs the computation tree is one path and the witness
+	// encoding is exact, so a quantified conjunct cannot hide a
+	// contradictory one.
+	TEST_CASE("[CTLS-AE-04] E(always o1=1) && G(o1=1) && G(o1=0) is unrealizable") {
+		CHECK(ctl_realizable(
+		    "(E (always o1[t] = 1)) && ((G (o1[t] = 1)) && (G (o1[t] = 0)))."
+		) == std::optional<bool>(false));
+	}
+
+	// An input can never be forced. sat(A χ) agrees with sat(χ): the LTL
+	// rule leaves an unrealizable full-LTL formula undecided, the safety
+	// pipeline decides G.
+	TEST_CASE("[CTLS-AE-05] A(F i1=1) is unrealizable, its sat undecided like F i1=1") {
+		CHECK(ctl_realizable("A (F i1[t] = 1).") == std::optional<bool>(false));
+		CHECK(ctl_sat("A (F i1[t] = 1).") == ctl_sat("F (i1[t] = 1)."));
+	}
+
+	TEST_CASE("[CTLS-AE-06] A(always i1=1) is unrealizable and unsat") {
+		CHECK(ctl_realizable("A (always i1[t] = 1).") == std::optional<bool>(false));
+		CHECK(ctl_sat("A (always i1[t] = 1).") == std::optional<bool>(false));
+	}
+
+	TEST_CASE("[CTLS-AE-07] A(F o1=1) is realizable") {
+		CHECK(ctl_realizable("A (F o1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_sat("A (F o1[t] = 1).") == std::optional<bool>(true));
 	}
 
 	// A under G is still a universal context: G(A φ) ≡ G φ over a tree.
-	TEST_CASE("[CTLS-AE-08] always(A(o1=1)) is REALIZABLE, always(A(i1=1)) is not") {
-		tref fm = create_spec("always (A (o1[t] = 1)).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
-		tref fm2 = create_spec("always (A (i1[t] = 1)).");
-		REQUIRE(fm2 != nullptr);
-		auto sat2 = is_tau_formula_sat<node_t>(fm2);
-		REQUIRE(sat2.has_value());
-		CHECK_FALSE(sat2.value());
+	TEST_CASE("[CTLS-AE-08] always(A(o1=1)) is realizable, always(A(i1=1)) is not") {
+		CHECK(ctl_realizable("always (A (o1[t] = 1)).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("always (A (i1[t] = 1)).") == std::optional<bool>(false));
 	}
 
 	// Placements with no sound encoding are refused, never answered.
 	TEST_CASE("[CTLS-AE-09] A under F / || is refused") {
-		tref fm = create_spec("F (A (o1[t] = 1)).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		CHECK(!sat.has_value());
-		CHECK(sat.has_error());
-		tref fm2 = create_spec("(A (o1[t] = 1)) || (always o1[t] = 0).");
-		REQUIRE(fm2 != nullptr);
-		auto sat2 = is_tau_formula_sat<node_t>(fm2);
-		CHECK(!sat2.has_value());
-		CHECK(sat2.has_error());
+		CHECK_FALSE(ctl_sat("F (A (o1[t] = 1)).").has_value());
+		CHECK_FALSE(ctl_sat("(A (o1[t] = 1)) || (always o1[t] = 0).").has_value());
 	}
 
-	TEST_CASE("[CTLS-AE-10] E in negative polarity is refused") {
-		tref fm = create_spec("(E (always o1[t] = 1)) -> (always o1[t] = 0).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		CHECK(!sat.has_value());
-		CHECK(sat.has_error());
-		tref fm2 = create_spec("(E (always o1[t] = 1)) <-> (always o1[t] = 1).");
-		REQUIRE(fm2 != nullptr);
-		auto sat2 = is_tau_formula_sat<node_t>(fm2);
-		CHECK(!sat2.has_value());
-		CHECK(sat2.has_error());
+	// E / A in negative polarity go through their NNF duals.
+	TEST_CASE("[CTLS-AE-10] negative A / E are decided through the duals") {
+		// !A(F o1=1) = E(G o1!=1): realizable (hold o1 at 0)
+		CHECK(ctl_realizable("!(A (F o1[t] = 1)).") == std::optional<bool>(true));
+		// !E(G o1=1) = A(F o1!=1) = F o1!=1: realizable
+		CHECK(ctl_realizable("!(E (always o1[t] = 1)).") == std::optional<bool>(true));
+		// (E G o1=1) -> G o1=0 = A(F o1!=1) || G o1=0: A under || stays refused
+		CHECK_FALSE(ctl_realizable(
+		    "(E (always o1[t] = 1)) -> (always o1[t] = 0).").has_value());
+		// both-polarity connectives stay refused
+		CHECK_FALSE(ctl_realizable(
+		    "(E (always o1[t] = 1)) <-> (always o1[t] = 1).").has_value());
 	}
 
-	// A / E must not make an outright contradictory conjunct disappear: the
-	// non-quantified half of the spec is still enforced.
-	// Explicit parens throughout: a temporal quantifier (and `E`) scopes over
-	// the rest of a conjunction, so `E X && Y` would otherwise parse as
-	// `E (X && Y)` and the case would be testing a different formula.
-	TEST_CASE("[CTLS-AE-04] E(always o1=1) && G(o1=1) && G(o1=0) is UNREALIZABLE") {
-		tref fm = create_spec(
-		    "(E (always o1[t] = 1)) && ((G (o1[t] = 1)) && (G (o1[t] = 0))).");
-		REQUIRE(fm != nullptr);
-		auto sat = is_tau_formula_sat<node_t>(fm);
-		REQUIRE(sat.has_value());
-		CHECK_FALSE(sat.value());
+	// Direction outputs pin the witness path, so E over inputs is decided:
+	// the environment may raise i1, may hold it, and the two branches are
+	// independent.
+	TEST_CASE("[CTLS-AE-11] E over inputs is decided through the directions") {
+		CHECK(ctl_realizable("E (F i1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("E (always i1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("A (always (E (F i1[t] = 1))).")
+			== std::optional<bool>(true));
+		CHECK(ctl_realizable(
+		    "(E (always i1[t] = 1)) && (E (always i1[t] = 0))."
+		) == std::optional<bool>(true));
+		// no branch satisfies a contradiction
+		CHECK(ctl_realizable(
+		    "E (always (o1[t] = i1[t] && o1[t] = 0 && i1[t] = 1))."
+		) == std::optional<bool>(false));
+		CHECK(ctl_realizable(
+		    "(E (F o1[t] = 1)) && (always o1[t] = 0)."
+		) == std::optional<bool>(false));
 	}
 
-} // TEST_SUITE("CTL* semantics - A / E realizability verdicts")
+	// A past operator under E has no one-step unfolding, so that witness
+	// keeps the all-paths encoding and an unrealizable verdict is undecided.
+	TEST_CASE("[CTLS-AE-12] E over a past operator stays undecided") {
+		CHECK_FALSE(ctl_realizable("E ((i1[t] = 1) since (i1[t] = 0)).")
+			.has_value());
+	}
+
+} // TEST_SUITE("CTL* semantics - A / E verdicts")
+
+
+TEST_SUITE("CTL* printing") {
+
+	// The printed form re-parses to the same tree.
+	TEST_CASE("[CTLS-PRINT-01] semantic negation and path quantifiers round-trip") {
+		for (const char* src : {
+			"(-(always o1[t] = 1)) && (always o1[t] = 0).",
+			"-((always o1[t] = 1) && (always o1[t] = 0)).",
+			"(E (always o1[t] = 1)) && (always o1[t] = 0).",
+			"E ((always o1[t] = 1) && (always o1[t] = 0)).",
+			"-(o1[t] = 1).",
+			"!(-(F o1[t] = 1))." })
+		{
+			tref fm = create_spec(src);
+			REQUIRE(fm != nullptr);
+			std::string printed = tau::get(fm).to_str() + ".";
+			tref again = create_spec(printed.c_str());
+			REQUIRE(again != nullptr);
+			CHECK_MESSAGE(tau::get(fm) == tau::get(again),
+				src << " printed as " << printed);
+		}
+	}
+
+} // TEST_SUITE("CTL* printing")

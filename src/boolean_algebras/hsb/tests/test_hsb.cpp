@@ -1701,11 +1701,11 @@ TEST_SUITE("hsb — LTL integration") {
 			"G (o1[t]:hsb = {bot}:hsb) && F (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		{
-			// Full-LTL (has F) and unrealizable: no satisfiability
-			// procedure exists for this fragment, so sat is
-			// undecided (an error), never a decided false.
+			// Full-LTL (has F) and unrealizable: sat is realizability
+			// (README "Satisfiability"), so it decides false.
 			auto sat = is_tau_formula_sat<node_t>(fm);
-			CHECK_FALSE(sat.has_value());
+			REQUIRE(sat.has_value());
+			CHECK_FALSE(sat.value());
 		}
 	}
 

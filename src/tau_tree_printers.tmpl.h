@@ -402,7 +402,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	auto is_to_wrap = [](size_t nt, size_t pt, bool right = false) {
 		static const std::set<size_t> no_wrap_for = {
 			bf_ref, bf_neg, ba_constant, bf_t,
-			bf_f, wff_ref, wff_neg, wff_semantic_neg, wff_t, wff_f, constraint, capture,
+			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start, bf_min, bf_max
 		};
 		// priority map (lower number = higher priority)
@@ -435,11 +435,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ wff_sometimes,      380 },
 			{ wff_A,              377 },
 			{ wff_E,              378 },
-			{ wff_until,          382 },
-			{ wff_release,        383 },
-			{ wff_weak_until,     384 },
-			{ wff_since,          385 },
-			{ wff_trigger,        386 },
+			// `-` binds like A / E / F / G in the grammar, not like `!`
+			{ wff_semantic_neg,   379 },
 			{ wff_always,         390 },
 			{ wff_conditional,    400 },
 			{ wff_ex,             430 },
@@ -450,7 +447,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ wff_and,            480 },
 			{ wff_xor,            490 },
 			{ wff_neg,            500 },
-			{ wff_semantic_neg,   501 },
+			// the grammar binds U / R / W / S / T tighter than `!`
+			{ wff_until,          501 },
+			{ wff_release,        501 },
+			{ wff_weak_until,     501 },
+			{ wff_since,          501 },
+			{ wff_trigger,        501 },
 			{ bf_interval,        501 },
 			{ bf_eq,              502 },
 			{ bf_neq,             503 },
@@ -490,8 +492,17 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_max,             900 },
 		};
 
+		// their relative binding and associativity are not worth relying
+		// on: a binary temporal operand, or a negated one, is always wrapped
+		static const std::set<size_t> binary_temporal = {
+			wff_until, wff_release, wff_weak_until, wff_since, wff_trigger };
+		if (binary_temporal.contains(pt)
+			&& (binary_temporal.contains(nt) || nt == wff_neg))
+			return true;
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
 			return false;
+		// `-5 = x` would re-parse with `-5` as a literal
+		if (pt == wff_semantic_neg) return true;
 		auto p_it = prio.find(pt);
 		auto n_it = prio.find(nt);
 		if (p_it == prio.end() || n_it == prio.end()) {

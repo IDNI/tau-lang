@@ -18,12 +18,10 @@ set_tests_properties("test_repl-ctl_star-normalize_U_not_sometimes" PROPERTIES
 	PASS_REGULAR_EXPRESSION "%1"
 	FAIL_REGULAR_EXPRESSION "sometimes")
 
-# U's target is a contradiction, so the formula is unrealizable; sat has no
-# satisfiability procedure for full-LTL content, so the verdict is undecided
-# (was T: the target was dropped), not a decided F.
+# U's target is a contradiction: normalization folds it to F and φ U F = F
+# (the target used to be dropped, answering T)
 add_repl_test(ctl_star-sat_U_contradictory_target
-	"sat (o1[t] = 1) until (o1[t] = 0 && o1[t] = 1)"
-	"satisfiability of this formula is not supported")
+	"sat (o1[t] = 1) until (o1[t] = 0 && o1[t] = 1)" ": F")
 
 # F over an input is unrealizable: the environment can keep i1 at 0.
 add_repl_test(ctl_star-realizable_F_input_unrealizable "realizable F i1[t] = 1" ": F")
@@ -37,13 +35,45 @@ add_repl_test(ctl_star-sat_E_always_output_no_abort
 	"fragment ctl_star. sat E (always o1[t] = 1)" ": T")
 add_repl_test(ctl_star-sat_A_sometimes_contradiction_no_abort
 	"fragment ctl_star. sat A (sometimes (o1[t] = 1 && o1[t] = 0))" ": F")
-# valid used to abort the Debug REPL on this input (P11); it answers now
+# validity over computation trees has no procedure: UNKNOWN, never a verdict
+# (it used to answer F for the tautology A G p -> A F p)
 add_repl_test_fail(ctl_star-valid_A_always_no_abort
-	"fragment ctl_star. valid A (always o1[t] = 1)" ": [TF]")
+	"fragment ctl_star. valid A (always o1[t] = 1)" "cannot be decided")
+add_test(NAME "test_repl-ctl_star-valid_tautology_not_F"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. valid (A (always o1[t] = 1)) -> (A (F o1[t] = 1))\"")
+set_tests_properties("test_repl-ctl_star-valid_tautology_not_F" PROPERTIES
+	PASS_REGULAR_EXPRESSION "cannot be decided"
+	FAIL_REGULAR_EXPRESSION "%1: F")
 
-# CTL* verdicts through the api path (IN-R7): A constrains its body
-add_repl_test(ctl_star-sat_A_F_input "fragment ctl_star. sat A (F i1[t] = 1)" ": F")
+# CTL* verdicts through the api path (IN-R7): A constrains its body.
+# realizable decides realizability; sat of A χ agrees with sat of χ.
+add_repl_test(ctl_star-realizable_A_F_input
+	"fragment ctl_star. realizable A (F i1[t] = 1)" ": F")
+add_repl_test(ctl_star-sat_A_F_input_like_its_body
+	"fragment ctl_star. sat A (F i1[t] = 1)" ": T")
 add_repl_test(ctl_star-sat_A_F_output "fragment ctl_star. sat A (F o1[t] = 1)" ": T")
+add_repl_test(ctl_star-realizable_A_always_output
+	"fragment ctl_star. realizable A (always o1[t] = 1)" ": T")
+add_repl_test(ctl_star-realizable_E_F_output
+	"fragment ctl_star. realizable E (F o1[t] = 1)" ": T")
+# direction outputs pin the witness path, so E over inputs is decided
+add_repl_test(ctl_star-realizable_E_F_input
+	"fragment ctl_star. realizable E (F i1[t] = 1)" ": T")
+# a past operator under E keeps the all-paths encoding: undecided, not F
+add_repl_test_fail(ctl_star-realizable_E_since_undecided
+	"fragment ctl_star. realizable E ((i1[t] = 1) since (i1[t] = 0))"
+	"could not be decided")
+# negative A / E are decided through their duals
+add_repl_test(ctl_star-sat_neg_A_through_dual
+	"fragment ctl_star. sat !(A (F o1[t] = 1))" ": T")
+# semantic negation in a Boolean context is the negated realizability
+add_repl_test(ctl_star-sat_semneg_unrealizable_body
+	"fragment ctl_star. sat -(F i1[t] = 1)" ": T")
+add_repl_test(ctl_star-sat_semneg_realizable_body
+	"fragment ctl_star. sat -(always o1[t] = 1)" ": F")
+# a past-free -ψ under a temporal operator is the same constant
+add_repl_test(ctl_star-sat_semneg_under_G
+	"fragment ctl_star. sat G (-(F i1[t] = 1))" ": T")
 add_repl_test(ctl_star-sat_always_A_output
 	"fragment ctl_star. sat always (A (o1[t] = 1))" ": T")
 # unsound placements are refused with a diagnostic, not answered
@@ -63,18 +93,18 @@ add_repl_test_fail(fragment_gate-qelim_blocks_A_by_default
 # CTL*-bodied definition is already rejected at definition time, so that
 # gate is defense-in-depth with no black-box reproducer.)
 
-# IN-R3 / LA-M3: in the ctl_star fragment, `ltl` reduces A and refuses -,
-# instead of printing "skeleton: 1" REALIZABLE (P3 / P10)
+# IN-R3 / LA-M3: in the ctl_star fragment, `ltl` reduces A and reports an
+# undecided E, instead of printing "skeleton: 1" REALIZABLE (P3 / P10)
 add_repl_test(ltl_cmd-ctl_star_A_F_output_reduced
 	"fragment ctl_star. ltl A (F o1[t] = 1)" "CTL\\* reduced to LTL")
 add_repl_test_fail(ltl_cmd-ctl_star_A_F_input_unrealizable
 	"fragment ctl_star. ltl A (F i1[t] = 1)" "UNREALIZABLE")
-add_repl_test_fail(ltl_cmd-ctl_star_semneg_refused
-	"fragment ctl_star. ltl -(F o1[t] = 1)" "UNKNOWN")
-add_test(NAME "test_repl-ltl_cmd-ctl_star_semneg_not_realizable"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl -(F o1[t] = 1)\""
+add_repl_test_fail(ltl_cmd-ctl_star_e_over_past_undecided
+	"fragment ctl_star. ltl E ((i1[t] = 1) since (i1[t] = 0))" "UNKNOWN")
+add_test(NAME "test_repl-ltl_cmd-ctl_star_e_over_past_not_realizable"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"fragment ctl_star. ltl E ((i1[t] = 1) since (i1[t] = 0))\""
 )
-set_tests_properties("test_repl-ltl_cmd-ctl_star_semneg_not_realizable" PROPERTIES
+set_tests_properties("test_repl-ltl_cmd-ctl_star_e_over_past_not_realizable" PROPERTIES
 	PASS_REGULAR_EXPRESSION "UNKNOWN"
 	FAIL_REGULAR_EXPRESSION "skeleton: 1|^REALIZABLE")
 

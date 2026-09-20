@@ -55,6 +55,11 @@ tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::bf_neq:           return wff_neq(v, ch, len, r);
 	case tau::wff_sometimes:    return wff_sometimes(v, ch, len, r);
 	case tau::wff_always:       return wff_always(v, ch, len, r);
+	case tau::wff_until:
+	case tau::wff_release:
+	case tau::wff_weak_until:
+	case tau::wff_since:
+	case tau::wff_trigger:      return wff_binary_temporal(v, ch, len, r);
 	case tau::wff_A:            return wff_A(v, ch, len, r);
 	case tau::wff_E:            return wff_E(v, ch, len, r);
 	case tau::wff_semantic_neg: return wff_semantic_neg(v, ch, len, r);

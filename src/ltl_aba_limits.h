@@ -190,6 +190,15 @@ inline size_t ltl_qe_max_vars() {
 	return cap;
 }
 
+/**
+ * @brief Set when a cap of the synthesis pipeline gave up on a check whose
+ * skipped part could make an UNREALIZABLE verdict wrong.
+ *
+ * Per thread; is_ltl_aba_realizable clears it on entry and reports an
+ * UNREALIZABLE result as undecided when it is set.
+ */
+inline thread_local bool ltl_verdict_incomplete = false;
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__LTL_ABA_LIMITS_H__

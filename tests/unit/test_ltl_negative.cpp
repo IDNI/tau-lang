@@ -169,9 +169,9 @@ TEST_SUITE("NEG-CONSIST: determinism — same verdict on repeated evaluation") {
 		tref fm = spec_parse(formula);
 		if (!fm) return true; // parse failure is deterministically skipped
 		auto r0 = is_tau_formula_sat<node_t>(fm);
-		// A full-LTL formula with no satisfiability procedure returns
-		// an undecided error every time -- that is stable, not an
-		// inconsistency, so compare has_value() first before value().
+		// An undecided formula returns an error every time -- that is
+		// stable, not an inconsistency, so compare has_value() first
+		// before value().
 		for (int i = 1; i < n; ++i) {
 			auto r = is_tau_formula_sat<node_t>(fm);
 			if (r.has_value() != r0.has_value()) return false;

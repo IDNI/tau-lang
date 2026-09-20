@@ -499,12 +499,19 @@ NB_MODULE(tau, m) {
 		   const std::map<stream_at, std::string>& inputs,
 		   const std::optional<std::string>& u_str)
 		{
-			auto result = to_py_result(tau_api::step(i, inputs));
+			// parsed before the step, so a bad revision takes no step
+			std::optional<idni::tref> u;
 			if (u_str.has_value() && !u_str->empty()) {
-				auto u = tau_api::get_formula(*u_str);
-				if (u.has_value()) i.update(u.value());
+				auto parsed = tau_api::get_formula(*u_str);
+				if (!parsed.has_value())
+					throw std::invalid_argument(
+						"could not parse the revision: " + *u_str);
+				u = parsed.value();
 			}
+			auto result = to_py_result(tau_api::step(i, inputs));
+			if (u) i.update(*u);
 			return result;
 		}, "interpreter"_a, "inputs"_a, "u"_a = std::nullopt,
-		"Step then (if `u` is provided) apply PWR with revision `u`.");
+		"Step then (if `u` is provided) apply PWR with revision `u`; "
+		"raises ValueError when `u` does not parse.");
 }

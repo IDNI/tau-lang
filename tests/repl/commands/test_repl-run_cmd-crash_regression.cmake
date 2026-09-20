@@ -7,4 +7,4 @@
 #
 
 add_repl_test_fail(run_cmd-no_crash_on_positional_under_temporal
-	"run F (o1[5]:bv[8] = {1}:bv[8])." "refused")
+	"run F (o1[5]:bv[8] = {1}:bv[8])." "not yet supported")

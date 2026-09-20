@@ -280,27 +280,14 @@ struct interpreter {
 	// automaton then no longer describes the running spec, and the
 	// strategy introspection below (visualise_mealy_dot, determinise,
 	// boundary_traces) reports nothing rather than a stale machine.
-	// The solution itself is kept because reset() still needs it to
-	// re-seed the aux state bits of the original spec parts.
 	bool strategy_stale() const { return cached_solution_stale_; }
 
 	// Reset the interpreter back to time t=0. Clears `memory`,
 	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
-	// the multi-state Mealy initial-state bits (see
-	// seed_mealy_initial_state) and the inner-S auxiliary anchors (see
-	// seed_since_aux_bits). The spec (`original_spec`, `ubt_ctn`,
-	// `cached_solution`, IO streams) is preserved — only the execution
-	// snapshot is reset.
+	// the inner-S auxiliary anchors (see seed_since_aux_bits). The spec
+	// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
+	// preserved — only the execution snapshot is reset.
 	void reset();
-
-	// Pre-populate `memory` with the multi-state Mealy strategy's initial
-	// one-hot state-bit values ms_j[t = formula_time_point - 1], so the
-	// first non-auto-continued step sees correct lookback values. No-op
-	// unless `cached_solution` is a multi-state strategy and lookback is
-	// at least 1. Called by make_interpreter and by reset() (AP2-3: a
-	// reset() that only cleared `memory` lost this pre-population, so
-	// "back to t=0" was not the real t=0 state).
-	void seed_mealy_initial_state();
 
 	// LA-N3: pre-populate `memory` with bv-0 for every INNER (off-spine)
 	// S/T auxiliary `o__ltl_s<k>__` in `since_aux_anchor_`, at
@@ -631,6 +618,9 @@ private:
 	/// continuation is solvable at the current time point under the
 	/// current memory -- the one step() would execute (IN-M2).
 	std::optional<size_t> first_solvable_alternative(size_t part);
+	/// Whether alternative @p alt_idx of step_spec part @p part has a
+	/// solution at the current step under memory.
+	bool alternative_solvable(size_t part, size_t alt_idx);
 
 	/// @brief Thin wrapper over the free solution_with_max_update,
 	/// supplying this interpreter's own time_point.

@@ -116,7 +116,17 @@ inline auto is_wff_bdd_var = [](tref n) {
 		|| t.child_is(tau::wff_sometimes)
 		|| t.child_is(tau::wff_always)
 		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint);
+		|| t.child_is(tau::constraint)
+		// the other temporal and CTL* scopes are opaque literals too
+		// (kept in sync with is_temporal_quantifier)
+		|| t.child_is(tau::wff_until)
+		|| t.child_is(tau::wff_release)
+		|| t.child_is(tau::wff_weak_until)
+		|| t.child_is(tau::wff_since)
+		|| t.child_is(tau::wff_trigger)
+		|| t.child_is(tau::wff_A)
+		|| t.child_is(tau::wff_E)
+		|| t.child_is(tau::wff_semantic_neg);
 };
 
 /**
