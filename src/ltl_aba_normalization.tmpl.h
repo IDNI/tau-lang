@@ -1633,6 +1633,8 @@ static void add_consistency_constraints(
 		for (auto& [type, g] : groups) {
 			if (g.size() < 3) continue;
 			const size_t n = g.size();
+			// 2^n valuations: the cap bounds them, and the 20 keeps
+			// an unlimited cap (0) from enumerating a million
 			if (n >= 20 || (max_consistency_subsets
 				&& (size_t{1} << n) > max_consistency_subsets))
 			{

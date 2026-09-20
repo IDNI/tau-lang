@@ -51,3 +51,25 @@ add_repl_test(ltl_decisions-print_until_operand
 # a decided operand folds: φ U F = F
 add_repl_test(ltl_decisions-normalize_until_false_target
 	"normalize (o1[t] = 1) U (o2[t] = 1 && o2[t] = 0)" ": F")
+
+# a lookback guard binds each literal, not the whole operand: the
+# lookback-free conjunct of the G body holds from step 0, so the F cannot
+# witness there, and sat and realizable agree
+add_repl_test(ltl_decisions-per_literal_guard_sat
+	"sat (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": F")
+add_repl_test(ltl_decisions-per_literal_guard_realizable
+	"realizable (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": F")
+
+# a consistency cap that gave up cannot decide UNREALIZABLE
+add_repl_test_fail(ltl_decisions-consistency_cap_is_unknown
+	"set maxsubsets 1. realizable F ((i1[t] = i2[t]) || (i2[t] != i3[t]) || (i1[t] != i3[t]))"
+	"could not be decided")
+
+# a binary temporal or negated operand of U is wrapped, so the print
+# re-parses as the same tree
+add_repl_test(ltl_decisions-print_wraps_negated_until_operand
+	"qelim (!((o1[t] = 1) && (o3[t] = 1))) U (o2[t] = 1)"
+	"\\(!\\(o1\\[t\\]:tau = 1 && o3\\[t\\]:tau = 1\\)\\) U o2")
+add_repl_test(ltl_decisions-print_wraps_nested_until
+	"qelim ((o1[t] = 1) U (o2[t] = 1)) U (o3[t] = 1)"
+	"\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1\\) U o3")
