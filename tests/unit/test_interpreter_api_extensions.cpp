@@ -128,28 +128,27 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 			[](const std::string&) { return std::string(); }));
 	}
 
-	// AP2-3 + AP2-20: a multi-state Mealy strategy's initial state bits
-	// are pre-populated into memory by make_interpreter; reset() must
-	// re-seed them (it used to just clear memory, so "back to t=0" was
-	// not the real t=0 state), and current_state()'s aux-bit scan must
-	// survive stepping (IN-N12 guard). Requires ltlsynt on PATH, like
-	// every genuine-synthesis test in this repo.
-	TEST_CASE("[IAX-MEALY-06] reset re-seeds multi-state initial memory") {
+	// AP2-3 + AP2-20: reset() takes a multi-state Mealy run back to the
+	// real t=0 state: the warm-up constraint starts the machine in its
+	// initial state, so no state bit is pre-populated, and the first step
+	// after the reset lands in the same state as the first step did.
+	// Requires ltlsynt on PATH, like every genuine-synthesis test here.
+	TEST_CASE("[IAX-MEALY-06] reset replays a multi-state run from t=0") {
 		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
 		if (!i.has_value()) return; // ltlsynt unavailable: nothing to pin
 		if (!i->cached_solution
 			|| i->cached_solution->aut.num_states <= 1)
-			return; // single-state strategy: pre-population n/a
-		REQUIRE_FALSE(i->memory.empty());
-		const size_t seeded = i->memory.size();
-		const int s0 = i->current_state();
-		(void)i->step();
+			return; // single-state strategy: nothing to replay
+		CHECK(i->memory.empty());
+		auto first = i->step();
+		REQUIRE(first.has_value());
+		const int s1 = i->current_state();
 		i->reset();
 		REQUIRE(i->time_point == 0);
-		// The ms-bit pre-population survived the reset...
-		REQUIRE(i->memory.size() == seeded);
-		// ...and the reported state is the strategy's initial state again.
-		REQUIRE(i->current_state() == s0);
+		CHECK(i->memory.empty());
+		auto again = i->step();
+		REQUIRE(again.has_value());
+		CHECK(i->current_state() == s1);
 	}
 
 	// IN-N2: the LTL aux state bits (o__ltl_ms*) are encoding artefacts;

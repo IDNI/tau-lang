@@ -775,10 +775,14 @@ post_normalization:
 			LOG_ERROR << "Tau specification refused: " << e.what() << "\n";
 			return r.with_assert_check_error(code::internal_error, e.what());
 		}
+		// unrealizable, undecided or not encodable as a safety formula;
+		// `realizable` tells which
 		if (!safety_spec) {
-			LOG_ERROR << "Tau specification is unsat (not LTL-realizable)\n";
+			LOG_ERROR << "Tau specification is not executable: no "
+				"strategy was synthesised (see `realizable`)\n";
 			return r.with_assert_check_error(code::unsat,
-				"Tau specification is unsat (not LTL-realizable)");
+				"Tau specification is not executable: no strategy "
+				"was synthesised (see `realizable`)");
 		}
 		ltl_sol = std::move(sol_opt);
 		since_aux_anchor = std::move(unanchored_aux);
@@ -823,65 +827,31 @@ post_normalization:
 		i.since_aux_anchor_ = since_aux_anchor;
 		i.seed_since_aux_bits();
 
-		// For multi-state Mealy strategies we need two things:
-		//
-		// (1) Pre-populate memory with initial state bit values
-		//     so that the first non-auto-continued step sees the
-		//     correct lookback values (ms_j[t = formula_time_point-1]).
-		//
-		// (2) Add the initial output constraint (init_out) as a bare
-		//     ubt_ctn entry so that the auto-continued step 0 emits a
-		//     valid output for o1[t=0] (instead of the default zero).
-		//     This mirrors how S-operator initial conditions work: they
-		//     are added as non-G entries in ubt_ctn and are handled by
-		//     get_ubt_ctn_at's QE loop, which retains time-0 vars and
-		//     existentially eliminates time>0 vars.
-		//
-		// Note: init_sv (the carrier equation ms_j[t=0]={1}) is
-		// intentionally NOT added to ubt_ctn: a raw carrier io_var equation
-		// is not handled by solution_with_max_update the way an ordered
-		// theory's constraints are, and memory pre-population achieves the
-		// same goal safely.
+		// A multi-state Mealy strategy's G body (encode_mealy_as_safety)
+		// is enforced from formula_time_point on; the warm-up steps before
+		// it get a fixed-time entry that starts the machine in its initial
+		// state and takes one transition per step. It is a bare ubt_ctn
+		// part, which get_ubt_ctn_at instantiates per step (past times from
+		// memory, future ones eliminated).
 		if constexpr (pack_can_host_bool<node>())
 		if (ltl_sol && ltl_sol->aut.num_states > 1
 				&& i.formula_time_point >= 1) {
-			const int k      = ltl_sol->aut.num_states;
-			const int init_s = ltl_sol->aut.initial_state;
-			if (init_s >= 0 && init_s < k) {
-				std::vector<std::string> sv_names;
-				for (int j = 0; j < k; ++j)
-					sv_names.push_back(
-						"o__ltl_ms" + std::to_string(j) + "__");
-
-				// (1) Memory pre-population — shared with
-				// reset(), which must re-seed the same values.
-				i.seed_mealy_initial_state();
-
-				// (2) Initial output constraint: encode_mealy_initial_conditions
-				// returns init_out = ∨_e (guard_e(t=0) ∧ ms_dst[t=1]=1).
-				// After get_ubt_ctn_at's QE, the time-1 state bits are
-				// eliminated and only the output constraint at t=0 remains.
-				// This forces step 0 to emit a valid initial output.
-				auto [init_sv, init_out] =
-					encode_mealy_initial_conditions<node>(*ltl_sol, sv_names);
-				if (init_out) {
-					// One single-alternative continuation part;
-					// ubt_ctn holds a htrefs (alternatives) per
-					// part since the factored-revision redesign.
-					// IN-N11: it needs its matching entry in
-					// original_spec -- without one, update()'s
-					// size invariant failed (Debug abort on any
-					// update of a multi-state Mealy spec) and
-					// in Release every later update paired
-					// parts with the wrong continuations. No
-					// representative: the initial-output
-					// constraint is never revised.
-					i.ubt_ctn.push_back(htrefs{
-						tree<node>::geth(init_out) });
-					i.original_spec.emplace_back(htrefs{
-						tree<node>::geth(init_out) }, nullptr);
-					i.compute_lookback_and_initial();
-				}
+			const int k = ltl_sol->aut.num_states;
+			std::vector<std::string> sv_names;
+			for (int j = 0; j < k; ++j)
+				sv_names.push_back(
+					"o__ltl_ms" + std::to_string(j) + "__");
+			if (tref warmup = encode_mealy_warmup<node>(*ltl_sol,
+				sv_names, i.formula_time_point))
+			{
+				// IN-N11: every ubt_ctn part needs its original_spec
+				// entry; the warm-up part is never revised, so it has
+				// no representative.
+				i.ubt_ctn.push_back(htrefs{
+					tree<node>::geth(warmup) });
+				i.original_spec.emplace_back(htrefs{
+					tree<node>::geth(warmup) }, nullptr);
+				i.compute_lookback_and_initial();
 			}
 		}
 
@@ -1476,7 +1446,11 @@ interpreter<node>::step(const assignment<node>& values)
 		if (tt(var) | tau::variable | tau::io_var) {
 			DBG(LOG_TRACE << LOG_FM_TREE(value));
 			assert(tau::get(value).is(tau::bf));
-			if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
+			// a negative time is a lookback coordinate before the run
+			// started: not a value any step produced
+			if (const int_t vt = get_io_time_point<node>(tau::trim(var));
+				vt >= 0 && vt <= (int_t)time_point)
+			{
 				memory.emplace(var, value);
 				// Exclude temporary streams in solution
 				if (!is_excluded_output(tau::trim(var)))
@@ -1844,6 +1818,25 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 		<< " M=" << m_pre << "->" << m_post
 		<< " keep=" << keep.size() << " " << dt_us << "us"
 		<< " step=" << time_point;
+}
+
+// fm with every input stream read as an output: satisfiable exactly when
+// some input sequence lets fm hold.
+template <NodeType node>
+static tref inputs_as_outputs(tref fm) {
+	using tau = tree<node>;
+	subtree_map<node, tref> flip;
+	for (tref v : tau::get(fm).select_all([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::io_var) && t.is_input_variable(); }))
+	{
+		const auto& t = tau::get(v);
+		trefs ch;
+		for (size_t i = 0; i < t.children_size(); ++i)
+			ch.push_back(t.child(i));
+		flip.emplace(v, tau::get(node::output_variable(), ch));
+	}
+	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
 }
 
 template <NodeType node>
@@ -2849,13 +2842,27 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				// Dead alternative: the conjunction with the
 				// update is pointwise unsatisfiable.
 				if (tau::get(bodies[i]).equals_F()) continue;
+				tref alt = build_wff_and<node>(
+					build_wff_always<node>(bodies[i]),
+					build_wff_and<node>(upd_sometime));
+				// Also dead when no input sequence lets it hold
+				// over time (each step solvable, the run not):
+				// step() would pick it while it still solves a
+				// step and then switch, satisfying neither it
+				// nor the update. One that needs the inputs'
+				// cooperation stays, as the preferred choice at
+				// the steps where they cooperate.
+				if (auto live = is_tau_formula_sat<node>(
+					inputs_as_outputs<node>(alt), start_time);
+					live.has_value() && !live.value())
+				{
+					LOG_DEBUG << "pwr: alternative with no "
+						"execution under any input dropped: "
+						<< LOG_FM(alt) << "\n";
+					continue;
+				}
 				new_alts.push_back(with_spec_sometimes(
-					build_wff_and<node>(
-						build_wff_always<node>(
-							bodies[i]),
-						build_wff_and<node>(
-							upd_sometime)),
-					alt_sometimes[i]));
+					alt, alt_sometimes[i]));
 			}
 			if (!plain_ok) {
 				// I1: instead of embedding the guarded
@@ -2952,28 +2959,33 @@ std::optional<size_t> interpreter<node>::first_solvable_alternative(
 	size_t part)
 {
 	if (part >= step_spec.size()) return {};
-	const trefs& part_alts = step_spec[part];
-	for (size_t alt_idx = 0; alt_idx < part_alts.size(); ++alt_idx) {
-		// The substitution commutes with path enumeration, and
-		// enumerating the raw formula's paths first multiplies the
-		// path count by the absolute run prefix that memory already
-		// decides (GitHub #115).
-		tref alt_at_t = update_to_time_point(part_alts[alt_idx],
-			formula_time_point);
-		alt_at_t = syntactic_formula_simplification<node>(
-			rewriter::replace<node>(alt_at_t, memory));
-		if (!mentions_ltl_state_var<node>(alt_at_t)) {
-			subtree_map<node, tref> propagated;
-			alt_at_t = propagate_step_definitions<node>(alt_at_t, propagated);
-		}
-		for (tref path : expression_paths<node>(alt_at_t)) {
-			auto normalized = normalize_non_temp<node>(path);
-			if (!normalized.has_value()) continue;
-			if (solution_with_max_update(normalized.value()))
-				return alt_idx;
-		}
-	}
+	for (size_t alt_idx = 0; alt_idx < step_spec[part].size(); ++alt_idx)
+		if (alternative_solvable(part, alt_idx)) return alt_idx;
 	return {};
+}
+
+template <NodeType node>
+bool interpreter<node>::alternative_solvable(size_t part, size_t alt_idx) {
+	const trefs& part_alts = step_spec[part];
+	// The substitution commutes with path enumeration, and
+	// enumerating the raw formula's paths first multiplies the
+	// path count by the absolute run prefix that memory already
+	// decides (GitHub #115).
+	tref alt_at_t = update_to_time_point(part_alts[alt_idx],
+		formula_time_point);
+	alt_at_t = syntactic_formula_simplification<node>(
+		rewriter::replace<node>(alt_at_t, memory));
+	if (!mentions_ltl_state_var<node>(alt_at_t)) {
+		subtree_map<node, tref> propagated;
+		alt_at_t = propagate_step_definitions<node>(alt_at_t, propagated);
+	}
+	for (tref path : expression_paths<node>(alt_at_t)) {
+		auto normalized = normalize_non_temp<node>(path);
+		if (!normalized.has_value()) continue;
+		if (solution_with_max_update(normalized.value()))
+			return true;
+	}
+	return false;
 }
 
 template <NodeType node>
@@ -3037,12 +3049,8 @@ void interpreter<node>::reset() {
 	// Recompute lookback from ubt_ctn (unchanged) so calculate_initial_spec
 	// will rebuild step_spec on the next step().
 	compute_lookback_and_initial();
-	// AP2-3: make_interpreter pre-populated `memory` with the multi-state
-	// Mealy initial one-hot state bits; a reset() that only cleared
-	// `memory` lost them, so the first steps after reset missed their
-	// state-bit lookback values.
-	seed_mealy_initial_state();
-	// LA-N3: same for the inner-S auxiliary anchors.
+	// LA-N3: make_interpreter pre-populated `memory` with the inner-S
+	// auxiliary anchors; a reset() that only cleared `memory` lost them.
 	seed_since_aux_bits();
 }
 
@@ -3110,20 +3118,6 @@ void interpreter<node>::seed_aux_lookback_bits(
 			it->second, formula_time_point)});
 		memory.emplace(mem_key, bit ? bv_one_val : bv_zero_val);
 	}
-}
-
-template <NodeType node>
-void interpreter<node>::seed_mealy_initial_state() {
-	if (!(cached_solution && cached_solution->aut.num_states > 1
-			&& formula_time_point >= 1)) return;
-	const int k      = cached_solution->aut.num_states;
-	const int init_s = cached_solution->aut.initial_state;
-	if (init_s < 0 || init_s >= k) return;
-	std::map<std::string, int> bits;
-	for (int j = 0; j < k; ++j)
-		bits.emplace("o__ltl_ms" + std::to_string(j) + "__",
-			j == init_s ? 1 : 0);
-	seed_aux_lookback_bits(bits);
 }
 
 template <NodeType node>

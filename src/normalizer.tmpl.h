@@ -312,6 +312,37 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 	return form;
 }
 
+// Replaces each maximal temporal-free wff below a temporal or CTL* operator
+// by T or F when normalize_non_temp decides it, and leaves it untouched
+// otherwise; rebuilding through the hooks then applies the constant-operand
+// laws (`φ U F = F`, `F W ψ = ψ`, ...). Data quantifiers are not entered.
+template <NodeType node>
+tref fold_constant_temporal_operands(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (!t.is(tau::wff) || !t.has_child()) return fm;
+	if (!t.find_top(is_temporal_quantifier<node>)) {
+		auto n = normalize_non_temp<node>(fm);
+		if (n.has_value() && n.value()) {
+			if (tau::get(n.value()).equals_T()) return tau::_T();
+			if (tau::get(n.value()).equals_F()) return tau::_F();
+		}
+		return fm;
+	}
+	const auto& op = t[0];
+	if (op.value.nt == tau::wff_ex || op.value.nt == tau::wff_all) return fm;
+	trefs ch;
+	bool changed = false;
+	for (size_t i = 0; i < op.children_size(); ++i) {
+		tref c = op.child(i);
+		tref f = fold_constant_temporal_operands<node>(c);
+		changed |= f != c;
+		ch.push_back(f);
+	}
+	if (!changed) return fm;
+	return tau::get(t.value, tau::get(op.value, ch));
+}
+
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 /** @internal @copydoc normalize @endinternal */
 template <NodeType node>
@@ -368,10 +399,16 @@ result<tref> normalize(tref form) {
 				// in the ltl_aba pipeline (which normalizes its own
 				// data atoms) -- leave them untouched here, exactly as
 				// normalize_temporal_quantifiers already does.
-				if (!is_aw && !is_child<node>(temp, tau::wff_sometimes))
+				if (!is_aw && !is_child<node>(temp, tau::wff_sometimes)) {
+					if (tref f = fold_constant_temporal_operands<node>(temp);
+						f != temp)
+						changes.emplace(temp, f);
 					continue;
+				}
 				// Remove temporal quantifier
 				tref f = tau::trim2(temp);
+				if (tau::get(f).find_top(is_temporal_quantifier<node>))
+					f = fold_constant_temporal_operands<node>(f);
 				f = eliminate_arithmetic_and_quantifiers<node>(f);
 				// Add quantifier again and save as change
 				if (is_aw) changes.emplace(temp, tau::build_wff_always(f));

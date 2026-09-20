@@ -274,31 +274,18 @@ static int_t body_max_lookback(tref body) {
 	return get_max_shift<node>(io_vars, false);
 }
 
-// Each lookback depth k some G/F/U/R/W operand in `fm` reads; a rule is
-// inactive before the past it reads exists, so each k gets a step guard.
+// A literal reading lookback k has no value before step k: it is not
+// enforced there where it must hold, and cannot witness there where it
+// must be found (see skel_ctx). Each such k under a temporal operator gets
+// a step guard.
 template <NodeType node>
 static std::set<int_t> collect_step_guards(tref fm) {
 	using tau = tree<node>;
 	std::set<int_t> ks;
-	for (tref n : tau::get(fm).select_all(is_temporal_op<node>)) {
-		const auto& inner = tau::get(n)[0];
-		switch (inner.value.nt) {
-		case tau::wff_always:
-		case tau::wff_sometimes:
-			if (int_t k = body_max_lookback<node>(inner.first()); k > 0)
-				ks.insert(k);
-			break;
-		case tau::wff_until:
-		case tau::wff_release:
-		case tau::wff_weak_until:
-			if (int_t k = body_max_lookback<node>(inner.first()); k > 0)
-				ks.insert(k);
-			if (int_t k = body_max_lookback<node>(inner.second()); k > 0)
-				ks.insert(k);
-			break;
-		default: break;
-		}
-	}
+	for (tref op : tau::get(fm).select_all(is_temporal_op<node>))
+		for (tref a : tau::get(op).select_all([](tref n) {
+			return is_aba_comparison<node>(n) && has_io_var<node>(n); }))
+			if (int_t k = body_max_lookback<node>(a); k > 0) ks.insert(k);
 	return ks;
 }
 
@@ -355,22 +342,25 @@ static tref find_positional_under_temporal_op(
 // A leaf conjunct with a positional atom must be hoistable alone: mixing it
 // with relative-time content is fine as long as each ends up its own leaf
 // (a wff_and body under G splits into separate conjuncts); reaching a
-// positional atom through F/U/R/W/S/T is still a hard error; conjuncts
+// positional atom through F/U/R/W/S/T is refused (an error); conjuncts
 // without positional content are left untouched.
 // Returns the conjuncts to hoist, in discovery order.
 template <NodeType node>
-static std::vector<tref> collect_hoist_conjuncts(
+static result<std::vector<tref>> collect_hoist_conjuncts(
     tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	using tau = tree<node>;
+	result<std::vector<tref>> r;
 	bool any_positional = false;
 	for (auto& [a, name] : atoms)
 		if (atom_is_positional<node>(a)) { any_positional = true; break; }
-	if (!any_positional) return {};
+	if (!any_positional) return r.with_value(std::vector<tref>{});
 
 	std::vector<tref> hoist;
+	std::string refusal;
 	std::function<void(tref)> walk = [&](tref n) {
+		if (!refusal.empty()) return;
 		const auto& t = tau::get(n);
 		if (t.has_child()) {
 			const auto& op = t[0];
@@ -392,22 +382,28 @@ static std::vector<tref> collect_hoist_conjuncts(
 			else has_nonpos = true;
 		}
 		if (!has_pos) return; // no positional content -- not this pass's concern
-		if (has_nonpos)
-			throw std::runtime_error(
+		if (has_nonpos) {
+			refusal =
 				"conjunct '" + tau::get(n).to_str() + "' mixes a positional "
 				"atom with relative-time content in the same conjunct; not "
 				"yet supported (no single evaluation step is defined for "
-				"the mix)");
-		if (tref bad = find_positional_under_temporal_op<node>(n, atoms))
-			throw std::runtime_error(
+				"the mix)";
+			return;
+		}
+		if (tref bad = find_positional_under_temporal_op<node>(n, atoms)) {
+			refusal =
 				"positional atom under '" + tau::get(bad).to_str() + "' "
 				"is not yet supported (a temporal operator gives a "
 				"fixed-position fact recurring semantics that has not "
-				"been derived from the interpreter yet)");
+				"been derived from the interpreter yet)";
+			return;
+		}
 		hoist.push_back(n);
 	};
 	walk(fm);
-	return hoist;
+	if (!refusal.empty())
+		return r.with_error(code::unsupported_operation, refusal);
+	return r.with_value(std::move(hoist));
 }
 
 // ── Propositional LTL skeleton (LT-16(c): ONE walker) ───────────────────────
@@ -417,14 +413,29 @@ static std::vector<tref> collect_hoist_conjuncts(
 // silently miss the other (that is how IN-R3 happened).  It is now a thin
 // wrapper delegating to the tester-emitting walker with a scratch vector.
 // Every ltl_skeleton call site is gated on !has_past, so past content
-// reaching this entry keeps LT-12's loud refusal: the whole skeleton
-// becomes "0" rather than a partial formula ltlsynt would misread.
+// reaching this entry is refused (LT-12) rather than emitted as a partial
+// formula ltlsynt would misread.
+
+// Where a subformula sits: `pos` its polarity, `univ` whether it must hold
+// at every position of its scope (an obligation, as in a G body) or at some
+// (a witness, as in an F body), both read after negations, and whether a
+// temporal operator encloses it. `!G φ = F !φ`, so an operator gives its
+// operands a mode from its own polarity.
+struct skel_ctx {
+	bool pos = true;
+	bool univ = true;
+	bool temporal = false;
+	skel_ctx neg() const { return { !pos, univ, temporal }; }
+	skel_ctx scope(bool operand_univ) const {
+		return { pos, pos ? operand_univ : !operand_univ, true };
+	}
+};
 
 template <NodeType node>
 static result<std::string> skeleton_str_with_testers(
     tref n,
     const std::vector<std::pair<tref, std::string>>& atoms,
-    std::vector<past_temporal_tester>& testers);
+    std::vector<past_temporal_tester>& testers, skel_ctx c = {});
 
 template <NodeType node>
 static result<std::string> skeleton_str(
@@ -435,17 +446,17 @@ static result<std::string> skeleton_str(
 	std::vector<past_temporal_tester> testers;
 	TAU_TRY(auto s, skeleton_str_with_testers<node>(n, atoms, testers));
 	if (!testers.empty()) {
-		LOG_ERROR << "skeleton_str: past operator (S/T) reached the "
-			"non-tester LTL skeleton";
-		return r.with_value("0");
+		return r.with_error(code::solver_error,
+			"skeleton_str: past operator (S/T) reached the "
+			"non-tester LTL skeleton");
 	}
 	// ltl_skeleton's callers never drive a __step_ge prop: an undriven one
 	// left in the string is an unbound atomic proposition ltlsynt cannot
 	// parse, so refuse the same way the tester case does.
 	if (!collect_step_guards<node>(n).empty()) {
-		LOG_ERROR << "skeleton_str: a lookback needing a step guard "
-			"reached the non-driving LTL skeleton";
-		return r.with_value("0");
+		return r.with_error(code::solver_error,
+			"skeleton_str: a lookback needing a step guard "
+			"reached the non-driving LTL skeleton");
 	}
 	return r.with_value(std::move(s));
 }
@@ -490,12 +501,17 @@ static std::string step_guard_prop(int_t k) {
 	return "__step_ge" + std::to_string(k);
 }
 
-// A lookback-k operand is inactive before step k: an obligation holds
-// vacuously there, a witness cannot fire there.
-static std::string step_guarded(int_t k, const std::string& s, bool witness) {
-	if (k <= 0) return s;
+// Guards a literal reading lookback k (the safety engine's rule: a clause is
+// active from the deepest lookback it reads): as an obligation it holds
+// vacuously before step k, as a witness it cannot fire there. The atom's
+// text sits under the literal's negation, so the guard is chosen for the
+// effective literal: `g -> p` when polarity and mode agree, `g & p` else.
+static std::string step_guarded(int_t k, const std::string& p,
+	const skel_ctx& c)
+{
+	if (k <= 0 || !c.temporal) return p;
 	std::string g = step_guard_prop(k);
-	return "(" + g + (witness ? " & " : " -> ") + s + ")";
+	return "(" + g + (c.pos == c.univ ? " -> " : " & ") + p + ")";
 }
 
 // Skeleton generation with temporal tester collection.
@@ -506,17 +522,17 @@ template <NodeType node>
 static result<std::string> skeleton_wff_with_testers(
     tref n,
     const std::vector<std::pair<tref, std::string>>& atoms,
-    std::vector<past_temporal_tester>& testers);
+    std::vector<past_temporal_tester>& testers, skel_ctx c);
 
 template <NodeType node>
 static result<std::string> skeleton_str_with_testers(
     tref n,
     const std::vector<std::pair<tref, std::string>>& atoms,
-    std::vector<past_temporal_tester>& testers)
+    std::vector<past_temporal_tester>& testers, skel_ctx c)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	if (t.is(tau::wff)) return skeleton_wff_with_testers<node>(n, atoms, testers);
+	if (t.is(tau::wff)) return skeleton_wff_with_testers<node>(n, atoms, testers, c);
 	result<std::string> r;
 	auto prop = find_prop<node>(n, atoms);
 	return r.with_value(prop.empty() ? "1" : prop); // LT-11
@@ -526,7 +542,7 @@ template <NodeType node>
 static result<std::string> skeleton_wff_with_testers(
     tref n,
     const std::vector<std::pair<tref, std::string>>& atoms,
-    std::vector<past_temporal_tester>& testers)
+    std::vector<past_temporal_tester>& testers, skel_ctx c)
 {
 	using tau = tree<node>;
 	result<std::string> r;
@@ -536,70 +552,103 @@ static result<std::string> skeleton_wff_with_testers(
 	const auto& inner = t[0];
 
 	auto prop = find_prop<node>(n, atoms);
-	if (!prop.empty()) { return r.with_value(prop); }
+	if (!prop.empty())
+		return r.with_value(step_guarded(body_max_lookback<node>(n), prop, c));
 
-	// A rule reading a lookback-k body has no fact to read before step k:
-	// under G it must not be enforced there (vacuous), under F it cannot
-	// witness there (excluded) -- see step_guard_prop / body_max_lookback.
+	auto sk = [&](tref x, skel_ctx cx) {
+		return skeleton_str_with_testers<node>(x, atoms, testers, cx);
+	};
+	// A connective using an operand in both polarities is expanded when a
+	// guarded literal is inside, so each occurrence gets its own guard.
+	auto has_lookback_atom = [&](tref x) {
+		return c.temporal && tau::get(x).find_top([&](tref m) {
+			return is_aba_comparison<node>(m) && has_io_var<node>(m)
+				&& body_max_lookback<node>(m) > 0; }) != nullptr;
+	};
+
 	switch (nt) {
 	case tau::wff_t: return r.with_value("1");
 	case tau::wff_f: return r.with_value("0");
 	case tau::wff_neg: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
+		TAU_TRY(auto phi, sk(inner.first(), c.neg()));
 		return r.with_value("!" + phi);
 	}
 	case tau::wff_and: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
+		TAU_TRY(auto phi, sk(inner.first(), c));
+		TAU_TRY(auto psi, sk(inner.second(), c));
 		return r.with_value("(" + phi + " & " + psi + ")");
 	}
 	case tau::wff_or: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
+		TAU_TRY(auto phi, sk(inner.first(), c));
+		TAU_TRY(auto psi, sk(inner.second(), c));
 		return r.with_value("(" + phi + " | " + psi + ")");
 	}
-	case tau::wff_xor: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		return r.with_value("(" + phi + " ^ " + psi + ")");
-	}
 	case tau::wff_imply: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
+		TAU_TRY(auto phi, sk(inner.first(), c.neg()));
+		TAU_TRY(auto psi, sk(inner.second(), c));
 		return r.with_value("(" + phi + " -> " + psi + ")");
 	}
+	case tau::wff_rimply: {
+		TAU_TRY(auto phi, sk(inner.second(), c.neg()));
+		TAU_TRY(auto psi, sk(inner.first(), c));
+		return r.with_value("(" + phi + " -> " + psi + ")");
+	}
+	case tau::wff_xor:
 	case tau::wff_equiv: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		return r.with_value("(" + phi + " <-> " + psi + ")");
+		tref a = inner.first(), b = inner.second();
+		if (!has_lookback_atom(a) && !has_lookback_atom(b)) {
+			TAU_TRY(auto phi, sk(a, c));
+			TAU_TRY(auto psi, sk(b, c));
+			return r.with_value("(" + phi + (nt == tau::wff_xor
+				? " ^ " : " <-> ") + psi + ")");
+		}
+		// a <-> b = (a & b) | (!a & !b);  a ^ b = (a & !b) | (!a & b)
+		TAU_TRY(auto ap, sk(a, c));
+		TAU_TRY(auto an, sk(a, c.neg()));
+		TAU_TRY(auto bp, sk(b, c));
+		TAU_TRY(auto bn, sk(b, c.neg()));
+		if (nt == tau::wff_equiv)
+			return r.with_value("((" + ap + " & " + bp + ") | (!"
+				+ an + " & !" + bn + "))");
+		return r.with_value("((" + ap + " & !" + bn + ") | (!"
+			+ an + " & " + bp + "))");
+	}
+	case tau::wff_conditional: {
+		tref cnd = inner.first();
+		TAU_TRY(auto then_s, sk(inner.second(), c));
+		TAU_TRY(auto else_s, sk(inner.third(), c));
+		if (!has_lookback_atom(cnd)) {
+			TAU_TRY(auto cs, sk(cnd, c));
+			return r.with_value("((" + cs + " -> " + then_s + ") & (!"
+				+ cs + " -> " + else_s + "))");
+		}
+		// c ? x : y = (c & x) | (!c & y)
+		TAU_TRY(auto cp, sk(cnd, c));
+		TAU_TRY(auto cn, sk(cnd, c.neg()));
+		return r.with_value("((" + cp + " & " + then_s + ") | (!" + cn
+			+ " & " + else_s + "))");
 	}
 	case tau::wff_always: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		return r.with_value("G(" + step_guarded(body_max_lookback<node>(inner.first()), phi, false) + ")");
+		TAU_TRY(auto phi, sk(inner.first(), c.scope(true)));
+		return r.with_value("G(" + phi + ")");
 	}
 	case tau::wff_sometimes: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		return r.with_value("F(" + step_guarded(body_max_lookback<node>(inner.first()), phi, true) + ")");
+		TAU_TRY(auto phi, sk(inner.first(), c.scope(false)));
+		return r.with_value("F(" + phi + ")");
 	}
 	case tau::wff_until: {
-		TAU_TRY(auto phi0, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi0, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		std::string phi = step_guarded(body_max_lookback<node>(inner.first()), phi0, false);
-		std::string psi = step_guarded(body_max_lookback<node>(inner.second()), psi0, true);
+		TAU_TRY(auto phi, sk(inner.first(), c.scope(true)));
+		TAU_TRY(auto psi, sk(inner.second(), c.scope(false)));
 		return r.with_value("(" + phi + " U " + psi + ")");
 	}
 	case tau::wff_release: {
-		TAU_TRY(auto phi0, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi0, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		std::string phi = step_guarded(body_max_lookback<node>(inner.first()), phi0, true);
-		std::string psi = step_guarded(body_max_lookback<node>(inner.second()), psi0, false);
+		TAU_TRY(auto phi, sk(inner.first(), c.scope(false)));
+		TAU_TRY(auto psi, sk(inner.second(), c.scope(true)));
 		return r.with_value("(" + phi + " R " + psi + ")");
 	}
 	case tau::wff_weak_until: {
-		TAU_TRY(auto phi0, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi0, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		std::string phi = step_guarded(body_max_lookback<node>(inner.first()), phi0, false);
-		std::string psi = step_guarded(body_max_lookback<node>(inner.second()), psi0, true);
+		TAU_TRY(auto phi, sk(inner.first(), c.scope(true)));
+		TAU_TRY(auto psi, sk(inner.second(), c.scope(false)));
 		return r.with_value("(" + phi + " W " + psi + ")");
 	}
 
@@ -616,8 +665,8 @@ static result<std::string> skeleton_wff_with_testers(
 	// The G(X(s) <-> ...) constraint updates the state variable for
 	// the next step.  !s at t=0 encodes (φ S ψ)(−1) = false.
 	case tau::wff_since: {
-		TAU_TRY(auto phi_skel, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi_skel, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
+		TAU_TRY(auto phi_skel, sk(inner.first(), c));
+		TAU_TRY(auto psi_skel, sk(inner.second(), c));
 		std::string svar = "__past_s" + std::to_string(testers.size());
 		// Transition: next-step state = current evaluation of the S recurrence
 		std::string eval = "(" + psi_skel + " | (" + phi_skel + " & " + svar + "))";
@@ -627,8 +676,8 @@ static result<std::string> skeleton_wff_with_testers(
 	}
 	case tau::wff_trigger: {
 		// φ T ψ = ¬(¬φ S ¬ψ)
-		TAU_TRY(auto phi_skel, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto psi_skel, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
+		TAU_TRY(auto phi_skel, sk(inner.first(), c));
+		TAU_TRY(auto psi_skel, sk(inner.second(), c));
 		std::string svar = "__past_t" + std::to_string(testers.size());
 		// State tracks ¬φ S ¬ψ from the previous step
 		std::string neg_eval = "(!" + psi_skel + " | (!" + phi_skel + " & " + svar + "))";
@@ -637,17 +686,6 @@ static result<std::string> skeleton_wff_with_testers(
 		return r.with_value("(!" + neg_eval + ")");
 	}
 
-	case tau::wff_rimply: {
-		TAU_TRY(auto phi, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		TAU_TRY(auto psi, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		return r.with_value("(" + phi + " -> " + psi + ")");
-	}
-	case tau::wff_conditional: {
-		TAU_TRY(auto cond, skeleton_str_with_testers<node>(inner.first(), atoms, testers));
-		TAU_TRY(auto then_s, skeleton_str_with_testers<node>(inner.second(), atoms, testers));
-		TAU_TRY(auto else_s, skeleton_str_with_testers<node>(inner.third(), atoms, testers));
-		return r.with_value("((" + cond + " -> " + then_s + ") & (!" + cond + " -> " + else_s + "))");
-	}
 	case tau::wff_A:
 	case tau::wff_E:
 	case tau::wff_semantic_neg:
@@ -664,12 +702,20 @@ static result<std::string> skeleton_wff_with_testers(
 	default: {
 		if (has_io_var<node>(n)) {
 			auto p2 = find_prop<node>(n, atoms);
-			return r.with_value(p2.empty() ? "1" : p2);
+			if (!p2.empty()) return r.with_value(step_guarded(
+				body_max_lookback<node>(n), p2, c));
+			// e.g. a data quantifier under a temporal operator: no
+			// proposition stands for it, and a constant would decide it
+			return r.with_error(code::unsupported_operation,
+				std::string("the LTL skeleton has no proposition for a ")
+				+ node::name(nt) + " over streams under a temporal "
+				"operator; realizability could not be decided");
 		}
 		auto normalized = normalize_non_temp<node>(n);
 		if (!normalized.has_value()) {
-			LOG_ERROR << "skeleton_wff_with_testers: normalization failed";
-			return r.with_value("0");
+			r.merge(std::move(normalized));
+			return r.with_error(code::solver_error,
+				"skeleton_wff_with_testers: normalization failed");
 		}
 		return r.with_value(tree<node>::get(normalized.value()).equals_F() ? "0" : "1");
 	}

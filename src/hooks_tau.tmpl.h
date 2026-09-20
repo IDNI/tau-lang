@@ -38,6 +38,38 @@ tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref 
 	return tau::get_raw(v, ch, len, r);
 }
 
+// Constant-operand laws that need no other temporal operator on the result.
+template <NodeType node>
+tref get_hook<node>::wff_binary_temporal(const node& v, const tref* ch,
+	size_t len, tref r)
+{
+	HOOK_LOGGING(log("wff_binary_temporal", v, ch, len, r);)
+	const auto nt = logic_operator(ch).get_type();
+	const bool l_t = arg1(ch).is(tau::wff_t), l_f = arg1(ch).is(tau::wff_f);
+	const bool r_t = arg2(ch).is(tau::wff_t), r_f = arg2(ch).is(tau::wff_f);
+	auto rhs = [&]() { return tau::get(arg2_fm(ch).get(), r); };
+	switch (nt) {
+	case tau::wff_until:      // φ U T = T, φ U F = F, F U ψ = ψ
+	case tau::wff_since:      // φ S T = T, φ S F = F, F S ψ = ψ
+		if (r_t) return bare_wff_T<node>(r);
+		if (r_f) return bare_wff_F<node>(r);
+		if (l_f) return rhs();
+		break;
+	case tau::wff_release:    // φ R T = T, φ R F = F, T R ψ = ψ
+	case tau::wff_trigger:    // φ T T = T, φ T F = F, T T ψ = ψ
+		if (r_t) return bare_wff_T<node>(r);
+		if (r_f) return bare_wff_F<node>(r);
+		if (l_t) return rhs();
+		break;
+	case tau::wff_weak_until: // φ W T = T, T W ψ = T, F W ψ = ψ
+		if (r_t || l_t) return bare_wff_T<node>(r);
+		if (l_f) return rhs();
+		break;
+	default: break;
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
 template <NodeType node>
 tref get_hook<node>::wff_A(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_A", v, ch, len, r);)

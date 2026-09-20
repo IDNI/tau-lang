@@ -154,7 +154,10 @@ inline std::pair<std::string, int> run_cmd(const std::string& cmd) {
 	std::array<char, 4096> buf;
 	std::string result;
 	FILE* raw = popen(cmd.c_str(), "r");
-	if (!raw) throw std::runtime_error("popen() failed for: " + cmd);
+	if (!raw) {
+		LOG_ERROR << "[ltl_aba] popen() failed for: " << cmd;
+		return {"", -1};
+	}
 	while (fgets(buf.data(), static_cast<int>(buf.size()), raw))
 		result += buf.data();
 	int status = pclose(raw);
@@ -275,7 +278,13 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 	case spot_exit_kind::ok:
 		break;
 	}
-	if (out.empty() || out.substr(0, 12) == "UNREALIZABLE") {
+	if (out.empty()) {
+		LOG_ERROR << "[ltl_aba] ltlsynt exited normally with no output; "
+		             "the realizability of this specification is UNKNOWN\n";
+		return r.with_error(code::solver_error,
+			"ltlsynt produced no verdict (empty output)");
+	}
+	if (out.substr(0, 12) == "UNREALIZABLE") {
 		// Q40-UX3: on UNREAL, optionally produce env counter-strategy.
 		// By determinacy of ω-regular two-player games, UNREAL means
 		// ∃env.∀sys.¬φ.  So swapping roles (ins↔outs) and negating the

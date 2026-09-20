@@ -39,10 +39,9 @@ TEST_SUITE("interpreter") {
 		});
 		REQUIRE(maybe_outputs.has_value());
 		auto outputs = maybe_outputs.value();
-		// the output for the input consumed at the input's time point is
-		// reported one time point ahead
-		REQUIRE(outputs.contains({ "o", 1 }));
-		CHECK(outputs.at({ "o", 1 }) == "T");
+		// the output is reported at its own time point, the step's
+		REQUIRE(outputs.contains({ "o", 0 }));
+		CHECK(outputs.at({ "o", 0 }) == "T");
 		// after a successful step the interpreter has moved on to the
 		// next time point
 		CHECK(i.time_point == 1);
@@ -96,7 +95,7 @@ TEST_SUITE("interpreter") {
 			{ { "i2", 0 }, "T" }
 		});
 		REQUIRE(maybe_outputs.has_value());
-		CHECK(maybe_outputs.value().at({ "o", 1 }) == "T");
+		CHECK(maybe_outputs.value().at({ "o", 0 }) == "T");
 	}
 
 	TEST_CASE("a bare-reparsed output var (no ctx-aware resolve_io_vars "
