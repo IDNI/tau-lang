@@ -205,9 +205,14 @@ What algebras stand on, and no algebra itself — no manifest, no descriptor, no
   symbol table; core's `tau_bdd.h` uses it directly, so it is in `tau.h`
 - `cvc5/` — the CVC5 wrapper bv and hsb share; deliberately **out** of `tau.h`,
   so an out-of-tree BA needs no CVC5 headers to include it
+- `spot/` — the Spot wrapper for `ltlsynt`, `autfilt` and `ltlfilt`. LTL
+  synthesis runs these tools as processes, so this backend links no library
 
 A backend is compiled and linked only when a pack member asks for it, through
 that BA's `TAU_BA_REQUIRES_PACKAGES` / `TAU_BA_LINK_LIBS`.
+
+A backend serves an engine as well as an algebra. The Spot backend serves LTL
+synthesis, and no BA asks for it.
 
 The BAs of a build are its **pack**, chosen at configure time with
 `-DTAU_BAS=` (default `tau,qint,qlt,nlang,bv,sbf,hsb`). `cmake/tau_bas.cmake`

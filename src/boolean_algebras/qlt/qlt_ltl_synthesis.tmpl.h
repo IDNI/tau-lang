@@ -40,21 +40,12 @@
 // so it is safe here; needed for `result<...>` before ltl_aba_result.h.
 #include "tau_diagnostics.h"
 #include "ltl_aba_result.h"
+// Generic LTL-over-strings backend (ltlsynt/autfilt/ltlfilt); no tau tree
+// type, so it carries none of normalizer.h's include weight and is safe
+// here. Gives is_tautology(), the ltlfilt fast path below.
+#include "backends/spot/spot.h"
 
 namespace idni::tau_lang {
-
-// Defined in the LTL template files, which follow this one.
-std::pair<std::string, int> run_cmd(const std::string& cmd);
-
-// LT-21: exec'd directly (no shell, no escaping, no popen-throw) by
-// constant_output_realizable, which can call it up to CAP times per gate.
-// Declared without the real definition's default argument (ltl_aba_synthesis.tmpl.h)
-// to avoid a "redefinition of default argument" diagnostic; callers here pass
-// timeout_sec explicitly instead. Not static: the definition is inline in a
-// header a unit may never include, and gcc rejects a static function that a
-// unit declares but never defines.
-std::pair<std::string, int> spawn_capture(
-	const std::vector<std::string>& argv, int timeout_sec);
 
 result<std::pair<bool, std::string>> call_ltlsynt(const std::string& formula,
 	const std::vector<std::string>& input_props,
@@ -524,13 +515,11 @@ static std::optional<std::map<std::string, int>> constant_output_realizable(
 			if (!maybe_taut) continue;
 		}
 
-		// LT-21: exec directly (no shell, no escaping, no popen-throw)
-		// -- this fast path runs up to CAP times on the default
-		// Algorithm-B gate, and run_cmd threw uncaught on popen
-		// failure.
-		auto [out, rc] = spawn_capture({ "ltlfilt", "-f", phi }, 0);
-		while (!out.empty() && std::isspace((unsigned char)out.back())) out.pop_back();
-		if (rc == 0 && out == "1") {
+		// This fast path runs up to CAP times on the default
+		// Algorithm-B gate; any ltlfilt failure just means "not proven
+		// a tautology", not an error worth reporting up.
+		auto taut = is_tautology(phi, 0);
+		if (taut.has_value() && taut.value()) {
 			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
 			          << "(combo=" << combo << ")";
 			return var_pos;
@@ -934,9 +923,15 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 						+ lit + "}:qlt";
 					typename tree<node>::get_options opts;
 					opts.parse.start = tree<node>::wff;
-					tref eq = tree<node>::get(expr,
-						std::move(opts));
-					if (!eq) { built_ok = false; break; }
+					// A failed parse stays inside the
+					// fail-safe fallback below, so merge
+					// the report without an early return.
+					auto eq_opt = r.merge_take(tree<node>::get(
+						expr, std::move(opts)));
+					if (!eq_opt || !*eq_opt) {
+						built_ok = false; break;
+					}
+					tref eq = *eq_opt;
 					eq = resolve_io_vars<node>(
 						*definitions<node>::instance()
 							.get_io_context(), eq);
