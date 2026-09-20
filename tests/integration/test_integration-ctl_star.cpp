@@ -36,11 +36,11 @@ TEST_SUITE("CTL* parsing - A operator") {
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_U") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 U o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_R") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 R o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 release o2[t] = 0)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_or") {
@@ -64,7 +64,7 @@ TEST_SUITE("CTL* parsing - A operator") {
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_W") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 W o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 weak_until o2[t] = 0)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_xor") {
@@ -115,11 +115,11 @@ TEST_SUITE("CTL* parsing - E operator") {
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_U") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 U o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_R") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 R o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 release o2[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_and") {
@@ -139,7 +139,7 @@ TEST_SUITE("CTL* parsing - E operator") {
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_W") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 W o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_xor") {
@@ -210,11 +210,11 @@ TEST_SUITE("CTL* parsing - semantic negation") {
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_U") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 U o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_R") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 R o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 release o2[t] = 0)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_imply") {
@@ -340,63 +340,63 @@ TEST_SUITE("CTL* parsing - nested quantifiers") {
 
 TEST_SUITE("CTL* parsing - combined with LTL") {
 	TEST_CASE("parse_A_U") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 U o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_U") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 U o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_W") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 W o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 weak_until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_W") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 W o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_R") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 R o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 release o2[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_R") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1 R o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1 release o2[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_S") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 S o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 since o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_S") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 S o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 since o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_T") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 T o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 trigger o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_T") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 T o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 trigger o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_U") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 U o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_W") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 W o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 weak_until o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_R") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 R o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 release o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_S") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 S o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 since o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_T") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 T o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 trigger o1[t] = 1)."));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_G_F") {

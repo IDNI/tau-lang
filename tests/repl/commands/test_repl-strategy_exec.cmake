@@ -36,16 +36,16 @@ add_repl_test(strategy_exec-exec_f_03_f_o1_eq_tau_top_3steps
 
 # EXEC-U: Until / Weak-until
 add_repl_test(strategy_exec-exec_u_01_o1_eq0_until_o1_eq1_4steps
-	"o1:tau := out console. run 4 steps (o1[t] = 0) U (o1[t] = 1)."
+	"o1:tau := out console. run 4 steps (o1[t] = 0) until (o1[t] = 1)."
 	"(o1\\[0\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := T[^0-9A-Za-z])") # :149
 # Weak until: all-F (no T at all) is legal, unlike U-01.
 # alternative is why this differs from U-01.
 add_repl_test(strategy_exec-exec_u_02_o1_eq0_wuntil_o1_eq1_4steps
-	"o1:tau := out console. run 4 steps (o1[t] = 0) W (o1[t] = 1)."
+	"o1:tau := out console. run 4 steps (o1[t] = 0) weak_until (o1[t] = 1)."
 	"(o1\\[0\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := T[^0-9A-Za-z]|o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z].*o1\\[2\\] := F[^0-9A-Za-z].*o1\\[3\\] := F[^0-9A-Za-z])") # :168
 # Source asserts ONLY vals[0] and vals[1]; step 2 onward is explicitly free.
 add_repl_test(strategy_exec-exec_u_03_o1_eq0_wuntil_i1_eq1_4steps
-	"i1:tau := in file(\\\"${SE_FFTT}\\\"). o1:tau := out console. run 4 steps (o1[t] = 0) W (i1[t] = 1)."
+	"i1:tau := in file(\\\"${SE_FFTT}\\\"). o1:tau := out console. run 4 steps (o1[t] = 0) weak_until (i1[t] = 1)."
 	"o1\\[0\\] := F[^0-9A-Za-z].*o1\\[1\\] := F[^0-9A-Za-z]") # :182
 
 # EXEC-GF: G(F(phi)) liveness -- EXISTENTIAL in the source (found_F / found_T)
@@ -111,7 +111,7 @@ add_repl_test(strategy_exec-exec_ms_02_g_f_o1_eq1_8steps_windows
 	"(o1\\[0\\] := T[^0-9A-Za-z]|o1\\[1\\] := T[^0-9A-Za-z]).*(o1\\[2\\] := T[^0-9A-Za-z]|o1\\[3\\] := T[^0-9A-Za-z]).*(o1\\[4\\] := T[^0-9A-Za-z]|o1\\[5\\] := T[^0-9A-Za-z]).*(o1\\[6\\] := T[^0-9A-Za-z]|o1\\[7\\] := T[^0-9A-Za-z])") # :425
 # Source asserts ONLY vals[0] == "T" (the `right_held_at_step0` flag).
 add_repl_test(strategy_exec-exec_ms_03_o1_eq0_release_o1_eq1_5steps
-	"o1:tau := out console. run 5 steps (o1[t] = 0) R (o1[t] = 1)."
+	"o1:tau := out console. run 5 steps (o1[t] = 0) release (o1[t] = 1)."
 	"o1\\[0\\] := T[^0-9A-Za-z]") # :438
 
 # EXEC-VER: semantic self-verification (same shapes as above)

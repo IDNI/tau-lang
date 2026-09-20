@@ -51,7 +51,7 @@ TEST_SUITE("GR(1) fragment classifier") {
 	}
 
 	TEST_CASE("(phi U psi) alone is NOT GR(1)") {
-		tref fm = parse("((o1[t] = 1) U (o1[t] = 0)).");
+		tref fm = parse("((o1[t] = 1) until (o1[t] = 0)).");
 		REQUIRE(fm);
 		CHECK_FALSE(is_gr1_fragment<node_t>(fm));
 	}

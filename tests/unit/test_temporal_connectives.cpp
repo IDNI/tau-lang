@@ -250,35 +250,35 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 	// an equivalent one.
 
 	TEST_CASE("until is U") {
-		tref a = parse_spec("(o1[t] = 1) U (o2[t] = 1).");
+		tref a = parse_spec("(o1[t] = 1) until (o2[t] = 1).");
 		tref b = parse_spec("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("release is R") {
-		tref a = parse_spec("(o1[t] = 1) R (o2[t] = 1).");
+		tref a = parse_spec("(o1[t] = 1) release (o2[t] = 1).");
 		tref b = parse_spec("(o1[t] = 1) release (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("weak_until is W") {
-		tref a = parse_spec("(o1[t] = 1) W (o2[t] = 1).");
+		tref a = parse_spec("(o1[t] = 1) weak_until (o2[t] = 1).");
 		tref b = parse_spec("(o1[t] = 1) weak_until (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("since is S") {
-		tref a = parse_spec("(o1[t] = 1) S (o2[t] = 1).");
+		tref a = parse_spec("(o1[t] = 1) since (o2[t] = 1).");
 		tref b = parse_spec("(o1[t] = 1) since (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("trigger is T") {
-		tref a = parse_spec("(o1[t] = 1) T (o2[t] = 1).");
+		tref a = parse_spec("(o1[t] = 1) trigger (o2[t] = 1).");
 		tref b = parse_spec("(o1[t] = 1) trigger (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
@@ -286,7 +286,7 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 
 	TEST_CASE("word forms nest and mix with letter forms") {
 		tref a = parse_spec(
-		    "G ((o1[t] = 1) U ((o2[t] = 1) S (o3[t] = 1))).");
+		    "G ((o1[t] = 1) until ((o2[t] = 1) since (o3[t] = 1))).");
 		tref b = parse_spec(
 		    "G ((o1[t] = 1) until ((o2[t] = 1) since (o3[t] = 1))).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
@@ -300,14 +300,14 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 		// variable name -- it never gets split as the "until" operator
 		// plus a dangling remainder.
 		CHECK(sat_str_with_io_def(
-		    "until_x := out console. until_x[t] = 1 U (o1[t] = 1)."));
+		    "until_x := out console. until_x[t] = 1 until (o1[t] = 1)."));
 		CHECK(sat_str_with_io_def(
-		    "release_x := out console. release_x[t] = 1 R (o1[t] = 1)."));
+		    "release_x := out console. release_x[t] = 1 release (o1[t] = 1)."));
 		CHECK(sat_str_with_io_def(
-		    "weak_until_x := out console. weak_until_x[t] = 1 W (o1[t] = 1)."));
+		    "weak_until_x := out console. weak_until_x[t] = 1 weak_until (o1[t] = 1)."));
 		CHECK(sat_str_with_io_def(
-		    "since_x := out console. since_x[t] = 1 S (o1[t] = 1)."));
+		    "since_x := out console. since_x[t] = 1 since (o1[t] = 1)."));
 		CHECK(sat_str_with_io_def(
-		    "trigger_x := out console. trigger_x[t] = 1 T (o1[t] = 1)."));
+		    "trigger_x := out console. trigger_x[t] = 1 trigger (o1[t] = 1)."));
 	}
 }

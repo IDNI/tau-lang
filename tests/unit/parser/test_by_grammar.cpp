@@ -116,55 +116,55 @@ TEST_CASE("[SHAPE-A-27] !(!(!A1))") { tref fm = spec("! (! (! (o1[t]:qlt > {0}:q
 TEST_SUITE("SHAPE-B: Binary temporal with atomic operands") {
 
 TEST_CASE("[SHAPE-B-01] F((A1 U A2) U A3) — left-nested U at depth 3") {
-	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) U (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) until (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-02] F(A1 U (A2 U A3)) — right-assoc U") {
-	tref fm = spec("F ((o1[t]:qlt > {0}:qlt) U ((o2[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("F ((o1[t]:qlt > {0}:qlt) until ((o2[t]:qlt > {0}:qlt) until (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-03] G(A1 U A2) — U under G") {
-	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)).");
+	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-04] F((A1 R A2) R A3) — left-nested R") {
-	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) R (o2[t]:qlt > {0}:qlt)) R (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) release (o2[t]:qlt > {0}:qlt)) release (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-05] G(A1 R (A2 R A3)) — right-assoc R under G") {
-	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) R ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) release ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-06] F((A1 W A2) W A3) — left-nested W") {
-	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt)) W (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt)) weak_until (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-07] G(A1 W (A2 W A3)) — right-assoc W under G") {
-	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) W ((o2[t]:qlt > {0}:qlt) W (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) weak_until ((o2[t]:qlt > {0}:qlt) weak_until (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-08] F((A1 S A2) S A3) — left-nested S (Since)") {
-	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) S (o2[t]:qlt > {0}:qlt)) S (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt > {0}:qlt)) since (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-09] G(A1 S (A2 S A3)) — right-assoc S under G") {
-	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) S ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) since ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-10] F((A1 T A2) T A3) — left-nested T (Trigger)") {
-	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) T (o2[t]:qlt > {0}:qlt)) T (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) trigger (o2[t]:qlt > {0}:qlt)) trigger (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-11] G(A1 T (A2 T A3)) — right-assoc T under G") {
-	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) T ((o2[t]:qlt > {0}:qlt) T (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("G ((o1[t]:qlt > {0}:qlt) trigger ((o2[t]:qlt > {0}:qlt) trigger (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-12] (A1 U A2) S ((A2 R A3) T A1) — all five binary temporal ops") {
-	tref fm = spec("((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) S (((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt)) T (o1[t]:qlt > {0}:qlt)).");
+	tref fm = spec("((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) since (((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt)) trigger (o1[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 TEST_CASE("[SHAPE-B-13] F((A1 U A2) S (A2 R A3)) — mixed temporal at depth 3") {
-	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) S ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("F (((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) since ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
@@ -256,7 +256,7 @@ TEST_CASE("[SHAPE-D-08] bf_ngt: F(F(F(o1 !> {1}:qlt)))") { tref fm = spec("F (F 
 TEST_CASE("[SHAPE-D-09] bf_gteq: F(F(F(o1 >= {0}:qlt)))") { tref fm = spec("F (F (F (o1[t]:qlt >= {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-10] bf_ngteq: F(F(F(o1 !>= {1}:qlt)))") { tref fm = spec("F (F (F (o1[t]:qlt !>= {1}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-11] bf_eq nested: G(F(o1 = {0}:qlt))") { tref fm = spec("G (F (o1[t]:qlt = {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-D-12] bf_gt in U: G(A2 U (o1>{0}:qlt))") { tref fm = spec("G ((o2[t]:qlt > {0}:qlt) U (o1[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-D-12] bf_gt in U: G(A2 until (o1>{0}:qlt))") { tref fm = spec("G ((o2[t]:qlt > {0}:qlt) until (o1[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-D
 
@@ -269,7 +269,7 @@ TEST_SUITE("SHAPE-E: BF interval bf<=bf<=bf") {
 TEST_CASE("[SHAPE-E-01] F(F(F({0}<=o1<={1}:qlt)))") { tref fm = spec("F (F (F ({0}:qlt <= o1[t]:qlt <= {1}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-E-02] G({0}<=o1<={1}:qlt)") { tref fm = spec("G ({0}:qlt <= o1[t]:qlt <= {1}:qlt)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-E-03] F(G(F({-1}<=o1<={2}:qlt)))") { tref fm = spec("F (G (F ({-1}:qlt <= o1[t]:qlt <= {2}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-E-04] interval U interval") { tref fm = spec("({0}:qlt <= o1[t]:qlt <= {1}:qlt) U ({0}:qlt <= o2[t]:qlt <= {1}:qlt)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-E-04] interval until interval") { tref fm = spec("({0}:qlt <= o1[t]:qlt <= {1}:qlt) until ({0}:qlt <= o2[t]:qlt <= {1}:qlt)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-E-05] G(interval && interval)") { tref fm = spec("G (({0}:qlt <= o1[t]:qlt <= {1}:qlt) && ({0}:qlt <= o2[t]:qlt <= {1}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-E
@@ -287,7 +287,7 @@ TEST_CASE("[SHAPE-F-03] bf_xor: F(F(F(o1={X^Y}:sbf)))") { tref fm = spec("F (F (
 TEST_CASE("[SHAPE-F-04] bf_and of constants: G(F(o1={X|Z}&{X&Y}:sbf))") { tref fm = spec("G (F (o1[t]:sbf = ({X | Z}:sbf & {X & Y}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-F-05] bf_or of constants: G(F(o1={X&Y}|{Y&Z}:sbf))") { tref fm = spec("G (F (o1[t]:sbf = ({X & Y}:sbf | {Y & Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-F-06] bf_xor of constants: G(F(o1={X&Y}^{X|Z}:sbf))") { tref fm = spec("G (F (o1[t]:sbf = ({X & Y}:sbf ^ {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-F-07] bf_or in U at depth 3") { tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) U (G (F (o2[t]:sbf = {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-F-07] bf_or in until at depth 3") { tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) until (G (F (o2[t]:sbf = {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-F
 
@@ -300,7 +300,7 @@ TEST_SUITE("SHAPE-G: BF complement postfix") {
 TEST_CASE("[SHAPE-G-01] F(F(F(o1={X}:sbf')))") { tref fm = spec("F (F (F (o1[t]:sbf = {X}:sbf')))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-G-02] G(o1={X&Y}:sbf')") { tref fm = spec("G (o1[t]:sbf = {X & Y}:sbf')."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-G-03] G(F(o1={X|Z}:sbf'))") { tref fm = spec("G (F (o1[t]:sbf = {X | Z}:sbf'))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-G-04] (o1={X}:sbf') U (o2={Y&Z}:sbf')") { tref fm = spec("(o1[t]:sbf = {X}:sbf') U (o2[t]:sbf = {Y & Z}:sbf')."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-G-04] (o1={X}:sbf') until (o2={Y&Z}:sbf')") { tref fm = spec("(o1[t]:sbf = {X}:sbf') until (o2[t]:sbf = {Y & Z}:sbf')."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-G
 
@@ -313,7 +313,7 @@ TEST_SUITE("SHAPE-H: BF shift operators in bv constants") {
 TEST_CASE("[SHAPE-H-01] F(F(F(o1:bv[8] = {#b10110101}>>{2}:bv[8])))") { tref fm = spec("F (F (F (o1[t]:bv[8] = {#b10110101}:bv[8] >> {2}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-H-02] G(F(o1:bv[8] = {#b00001111}<<{1}:bv[8]))") { tref fm = spec("G (F (o1[t]:bv[8] = {#b00001111}:bv[8] << {1}:bv[8]))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-H-03] (o1:bv[8]={#b11110000}>>{1}) U (o2:bv[8]={#b10110101}<<{2})") {
-	tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8] >> {1}:bv[8]) U (o2[t]:bv[8] = {#b10110101}:bv[8] << {2}:bv[8]).");
+	tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8] >> {1}:bv[8]) until (o2[t]:bv[8] = {#b10110101}:bv[8] << {2}:bv[8]).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
@@ -331,7 +331,7 @@ TEST_CASE("[SHAPE-I-01] F(F(F((fall x o1&x)={0}:bv[8]))) parses") { tref fm = sp
 TEST_CASE("[SHAPE-I-02] G((fall x o1&x)={0}:bv[8]) parses") { tref fm = spec("G ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])."); REQUIRE(fm != nullptr); }
 TEST_CASE("[SHAPE-I-03] F(F(F((fex x o1&x)=o1:bv[8]))) parses") { tref fm = spec("F (F (F ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])))."); REQUIRE(fm != nullptr); }
 TEST_CASE("[SHAPE-I-04] G((fex x o1&x)=o1:bv[8]) parses") { tref fm = spec("G ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])."); REQUIRE(fm != nullptr); }
-TEST_CASE("[SHAPE-I-05] ((fall x o1&x)={0}) U ((fex y o2&y)=o2) parses") { tref fm = spec("((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]) U ((fex y (o2[t]:bv[8] & y:bv[8])) = o2[t]:bv[8])."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-05] ((fall x o1&x)={0}) until ((fex y o2&y)=o2) parses") { tref fm = spec("((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]) until ((fex y (o2[t]:bv[8] & y:bv[8])) = o2[t]:bv[8])."); REQUIRE(fm != nullptr); }
 TEST_CASE("[SHAPE-I-06] G(F((fall x o1&x)={0}:bv[8])) parses") { tref fm = spec("G (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]))."); REQUIRE(fm != nullptr); }
 
 } // SHAPE-I
@@ -363,7 +363,7 @@ TEST_CASE("[SHAPE-K-03] G(F T)") { tref fm = spec("G (F T)."); REQUIRE(fm != nul
 TEST_CASE("[SHAPE-K-04] T U T") { tref fm = spec("T U T."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-K-05] T U (A1 U T)") { tref fm = spec("T U ((o1[t]:qlt > {0}:qlt) U T)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-K-06] G(A1 && T)") { tref fm = spec("G ((o1[t]:qlt > {0}:qlt) && T)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-K-07] G((A1 U A2) && T)") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) && T)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-K-07] G((A1 U A2) && T)") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) && T)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 // wff_f: standalone F parses as boolean false
 TEST_CASE("[SHAPE-K-08] F(F(F)) UNREALIZABLE — innermost F is wff_f") { tref fm = spec("F (F (F))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
 TEST_CASE("[SHAPE-K-09] G(A1 && (T U T))") { tref fm = spec("G ((o1[t]:qlt > {0}:qlt) && (T U T))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
@@ -380,7 +380,7 @@ TEST_CASE("[SHAPE-L-01] F(F(A1?A2:A3))") { tref fm = spec("F (F ((o1[t]:qlt > {0
 TEST_CASE("[SHAPE-L-02] G(A1?A2:A3)") { tref fm = spec("G ((o1[t]:qlt > {0}:qlt) ? (o2[t]:qlt > {0}:qlt) : (o3[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-L-03] F(A1? F(A2):G(A3)) — nested operators in branches") { tref fm = spec("F ((o1[t]:qlt > {0}:qlt) ? (F (o2[t]:qlt > {0}:qlt)) : (G (o3[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-L-04] G(A1?G(F(A2)):F(G(A3))) — depth-3 in branches") { tref fm = spec("G ((o1[t]:qlt > {0}:qlt) ? (G (F (o2[t]:qlt > {0}:qlt))) : (F (G (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-L-05] ternary U ternary") { tref fm = spec("((o1[t]:qlt > {0}:qlt) ? (o2[t]:qlt > {0}:qlt) : (o3[t]:qlt > {0}:qlt)) U ((o2[t]:qlt > {0}:qlt) ? (o3[t]:qlt > {0}:qlt) : (o1[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-L-05] ternary until ternary") { tref fm = spec("((o1[t]:qlt > {0}:qlt) ? (o2[t]:qlt > {0}:qlt) : (o3[t]:qlt > {0}:qlt)) until ((o2[t]:qlt > {0}:qlt) ? (o3[t]:qlt > {0}:qlt) : (o1[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-L
 
@@ -393,32 +393,32 @@ TEST_SUITE("SHAPE-M: All BA types at depth 3") {
 // tau type
 TEST_CASE("[SHAPE-M-01] tau: F(F(F(o1:tau={T.})))") { tref fm = spec("F (F (F (o1[t]:tau = {T.}:tau)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-02] tau: G(F(o1:tau={T.}))") { tref fm = spec("G (F (o1[t]:tau = {T.}:tau))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-03] tau: (o1:tau={T.}) U (G(F(o1:tau={T.})))") { tref fm = spec("(o1[t]:tau = {T.}:tau) U (G (F (o1[t]:tau = {T.}:tau)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-M-03] tau: (o1:tau={T.}) until (G(F(o1:tau={T.})))") { tref fm = spec("(o1[t]:tau = {T.}:tau) until (G (F (o1[t]:tau = {T.}:tau)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // sbf type
 TEST_CASE("[SHAPE-M-04] sbf: F(F(F(o1={X|(Y&Z)}:sbf)))") { tref fm = spec("F (F (F (o1[t]:sbf = {X | (Y & Z)}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-05] sbf: G(F(F(o1={X&Y}:sbf)))") { tref fm = spec("G (F (F (o1[t]:sbf = {X & Y}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-06] sbf: (o1={X&Y}) U (G(F(o2={X|Z})))") { tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) U (G (F (o2[t]:sbf = {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-M-06] sbf: (o1={X&Y}) until (G(F(o2={X|Z})))") { tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) until (G (F (o2[t]:sbf = {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // bv type
 TEST_CASE("[SHAPE-M-07] bv: F(F(F(o1={#b10110101}:bv[8])))") { tref fm = spec("F (F (F (o1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-08] bv: G(F(F(o1={#b00001111}:bv[8])))") { tref fm = spec("G (F (F (o1[t]:bv[8] = {#b00001111}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-09] bv: (o1={#b11110000}) U (G(F(o2={#b10110101})))") { tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8]) U (G (F (o2[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-M-09] bv: (o1={#b11110000}) until (G(F(o2={#b10110101})))") { tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8]) until (G (F (o2[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // dyadic type
 TEST_CASE("[SHAPE-M-10] dyadic: F(F(F(o1={[1/4,3/4)})))") { tref fm = spec("F (F (F (o1[t]:qint = {[1/4, 3/4)}:qint)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-11] dyadic: G(F(o1={[-1,0)|[1,2)}))") { tref fm = spec("G (F (o1[t]:qint = {[-1, 0) | [1, 2)}:qint))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-12] dyadic: (o1={[0,1)}) U (G(F(o2={[1/4,3/4)})))") { tref fm = spec("(o1[t]:qint = {[0, 1)}:qint) U (G (F (o2[t]:qint = {[1/4, 3/4)}:qint)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-M-12] dyadic: (o1={[0,1)}) until (G(F(o2={[1/4,3/4)})))") { tref fm = spec("(o1[t]:qint = {[0, 1)}:qint) until (G (F (o2[t]:qint = {[1/4, 3/4)}:qint)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // qlt type (Q,<-ordered dense linear order — NOT a Boolean algebra, but an omega-categorical theory)
 TEST_CASE("[SHAPE-M-13] qlt: F(F(F(o1>{0}:qlt)))") { tref fm = spec("F (F (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-14] qlt: G(F(o1={(0,1)}:qlt))") { tref fm = spec("G (F (o1[t]:qlt = {(0, 1)}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-15] qlt: (o1={1/2}) U (G(F(o2>{0})))") { tref fm = spec("(o1[t]:qlt = {1/2}:qlt) U (G (F (o2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-M-15] qlt: (o1={1/2}) until (G(F(o2>{0})))") { tref fm = spec("(o1[t]:qlt = {1/2}:qlt) until (G (F (o2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // nlang type
 TEST_CASE("[SHAPE-M-16] nlang: F(F(F(o1={it is raining}:nlang)))") { tref fm = spec("F (F (F (o1[t]:nlang = {it is raining}:nlang)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-17] nlang: G(F(o1={the sun is shining}:nlang))") { tref fm = spec("G (F (o1[t]:nlang = {the sun is shining}:nlang))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-18] nlang: (o1={it is raining}) U (G(F(o2={the sun is shining})))") { tref fm = spec("(o1[t]:nlang = {it is raining}:nlang) U (G (F (o2[t]:nlang = {the sun is shining}:nlang)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-M-18] nlang: (o1={it is raining}) until (G(F(o2={the sun is shining})))") { tref fm = spec("(o1[t]:nlang = {it is raining}:nlang) until (G (F (o2[t]:nlang = {the sun is shining}:nlang)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-M
 
@@ -434,8 +434,8 @@ TEST_CASE("[SHAPE-N-03] F(F(F(o1[t-3]>{0}:qlt)))") { tref fm = spec("F (F (F (o1
 TEST_CASE("[SHAPE-N-04] G(F(o1[t-1]>{0}:qlt))") { tref fm = spec("G (F (o1[t-1]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-N-05] G(F(o1[t-2]>{0}:qlt))") { tref fm = spec("G (F (o1[t-2]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-N-06] G(F(o1[t-3]>{0}:qlt))") { tref fm = spec("G (F (o1[t-3]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-N-07] (o1[t-1]>{0}) U (F(o1[t-2]>{0}))") { tref fm = spec("(o1[t-1]:qlt > {0}:qlt) U (F (o1[t-2]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-N-08] F(F((o1[t-1]>{0}) S (o1[t-2]>{0}))) — S with lookback") { tref fm = spec("F (F ((o1[t-1]:qlt > {0}:qlt) S (o1[t-2]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-N-07] (o1[t-1]>{0}) until (F(o1[t-2]>{0}))") { tref fm = spec("(o1[t-1]:qlt > {0}:qlt) until (F (o1[t-2]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-N-08] F(F((o1[t-1]>{0}) since (o1[t-2]>{0}))) — S with lookback") { tref fm = spec("F (F ((o1[t-1]:qlt > {0}:qlt) since (o1[t-2]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-N-09] F(F(F(o1[t-1]={X&Y}:sbf))) — sbf+lookback") { tref fm = spec("F (F (F (o1[t-1]:sbf = {X & Y}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-N-10] G(F(o1[t-1]={#b10110101}:bv[8])) — bv+lookback") { tref fm = spec("G (F (o1[t-1]:bv[8] = {#b10110101}:bv[8]))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
@@ -450,9 +450,9 @@ TEST_SUITE("SHAPE-O: UNREALIZABLE depth-3") {
 TEST_CASE("[SHAPE-O-01] F(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
 TEST_CASE("[SHAPE-O-02] G(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
 TEST_CASE("[SHAPE-O-03] F(F(G(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (G (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
-TEST_CASE("[SHAPE-O-04] F((i1>{0}) U (F(i2>{0}))) UNREALIZABLE") { tref fm = spec("F ((i1[t]:qlt > {0}:qlt) U (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-04] F((i1>{0}) until (F(i2>{0}))) UNREALIZABLE") { tref fm = spec("F ((i1[t]:qlt > {0}:qlt) until (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
 TEST_CASE("[SHAPE-O-05] G(F(F(i1={#b10110101}:bv[8]))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
-TEST_CASE("[SHAPE-O-06] (i1>{0}) U (F(F(i2>{0}))) UNREALIZABLE") { tref fm = spec("(i1[t]:qlt > {0}:qlt) U (F (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
+TEST_CASE("[SHAPE-O-06] (i1>{0}) until (F(F(i2>{0}))) UNREALIZABLE") { tref fm = spec("(i1[t]:qlt > {0}:qlt) until (F (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(realizable(fm)); }
 
 } // SHAPE-O
 
@@ -462,17 +462,17 @@ TEST_CASE("[SHAPE-O-06] (i1>{0}) U (F(F(i2>{0}))) UNREALIZABLE") { tref fm = spe
 
 TEST_SUITE("SHAPE-P: Mixed operator nesting") {
 
-TEST_CASE("[SHAPE-P-01] F((A1 U A2) && (A2 R A3))") { tref fm = spec("F (((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-P-02] G((A1||A2) U A3)") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) || (o2[t]:qlt > {0}:qlt)) U (o3[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-P-03] F(!A1 U G(A2&&A3))") { tref fm = spec("F ((! (o1[t]:qlt > {0}:qlt)) U (G ((o2[t]:qlt > {0}:qlt) && (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-01] F((A1 U A2) && (A2 R A3))") { tref fm = spec("F (((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-02] G((A1||A2) U A3)") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) || (o2[t]:qlt > {0}:qlt)) until (o3[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-03] F(!A1 U G(A2&&A3))") { tref fm = spec("F ((! (o1[t]:qlt > {0}:qlt)) until (G ((o2[t]:qlt > {0}:qlt) && (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-P-04] F(A1) && G(A2) && F(A3)") { tref fm = spec("(F (o1[t]:qlt > {0}:qlt)) && (G (o2[t]:qlt > {0}:qlt)) && (F (o3[t]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-P-05] F((A1 S A2) U G(!A3))") { tref fm = spec("F (((o1[t]:qlt > {0}:qlt) S (o2[t]:qlt > {0}:qlt)) U (G (! (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-P-06] G((A1 W A2) && F(A3||A1))") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt)) && (F ((o3[t]:qlt > {0}:qlt) || (o1[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-05] F((A1 S A2) U G(!A3))") { tref fm = spec("F (((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt > {0}:qlt)) until (G (! (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-06] G((A1 W A2) && F(A3||A1))") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt)) && (F ((o3[t]:qlt > {0}:qlt) || (o1[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-P-07] F((F(A1)->F(A2)) && (F(A3)->F(A1)))") { tref fm = spec("F (((F (o1[t]:qlt > {0}:qlt)) -> (F (o2[t]:qlt > {0}:qlt))) && ((F (o3[t]:qlt > {0}:qlt)) -> (F (o1[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-P-08] F(F(A1) <-> G(F(A2&&A3)))") { tref fm = spec("F ((F (o1[t]:qlt > {0}:qlt)) <-> (G (F ((o2[t]:qlt > {0}:qlt) && (o3[t]:qlt > {0}:qlt)))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-P-09] G(F(B1:sbf)) && F(G(F(o2:bv[8])))") { tref fm = spec("(G (F (o1[t]:sbf = {X | (Y & Z)}:sbf))) && (F (G (F (o2[t]:bv[8] = {#b10110101}:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-P-10] (A1[t-1] S A2[t-2]) U G(F(A3[t-3]))") { tref fm = spec("((o1[t-1]:qlt > {0}:qlt) S (o2[t-2]:qlt > {0}:qlt)) U (G (F (o3[t-3]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-P-11] F(A1 ? F(A2 U A3) : G(A3 W A2))") { tref fm = spec("F ((o1[t]:qlt > {0}:qlt) ? (F ((o2[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))) : (G ((o3[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-10] (A1[t-1] S A2[t-2]) U G(F(A3[t-3]))") { tref fm = spec("((o1[t-1]:qlt > {0}:qlt) since (o2[t-2]:qlt > {0}:qlt)) until (G (F (o3[t-3]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-P-11] F(A1 ? F(A2 U A3) : G(A3 W A2))") { tref fm = spec("F ((o1[t]:qlt > {0}:qlt) ? (F ((o2[t]:qlt > {0}:qlt) until (o3[t]:qlt > {0}:qlt))) : (G ((o3[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-P-12] F(F(F(A1))) && G(G(G(A2))) && F(G(F(A3)))") { tref fm = spec("(F (F (F (o1[t]:qlt > {0}:qlt)))) && (G (G (G (o2[t]:qlt > {0}:qlt)))) && (F (G (F (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-P
@@ -495,114 +495,114 @@ TEST_SUITE("SHAPE-Q: Boolean combos of temporals as temporal operands") {
 // ─── wff_until with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-01] ((F A1) || (A1 U A2)) U (A2 S A3) — || of unary+U as U-left") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) U ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt))) until ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-02] (G A1) && (A2 R A3) — && of G+R as U-left, A1 as right") {
-	tref fm = spec("((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))) U (o1[t]:qlt > {0}:qlt).");
+	tref fm = spec("((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))) until (o1[t]:qlt > {0}:qlt).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-03] A1 U ((F A2) ^^ (A2 W A3)) — ^^ of F+W as U-right") {
-	tref fm = spec("(o1[t]:qlt > {0}:qlt) U ((F (o2[t]:qlt > {0}:qlt)) ^^ ((o2[t]:qlt > {0}:qlt) W (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("(o1[t]:qlt > {0}:qlt) until ((F (o2[t]:qlt > {0}:qlt)) ^^ ((o2[t]:qlt > {0}:qlt) weak_until (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-04] (F A1 -> G A2) U (A2 S A3) — -> of unary as U-left") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) -> (G (o2[t]:qlt > {0}:qlt))) U ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt)).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) -> (G (o2[t]:qlt > {0}:qlt))) until ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-05] (A1 U A2 <- F A3) U (G A1 && A2 R A3) — <- and && combos") {
-	tref fm = spec("((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt) <- (F (o3[t]:qlt > {0}:qlt))) U ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt) <- (F (o3[t]:qlt > {0}:qlt))) until ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-06] (F A1 <-> A1 U A2) U (G A2 || A2 S A3) — <-> and || as U operands") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) <-> ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) U ((G (o2[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) <-> ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt))) until ((G (o2[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 // ─── wff_release with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-07] ((F A1) || (A2 U A3)) R ((G A1) && (A2 W A3))") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))) R ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) W (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) until (o3[t]:qlt > {0}:qlt))) release ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) weak_until (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-08] (G A1 ^^ A1 U A2) R (F A3 -> A2 R A3) — ^^ and -> as R operands") {
-	tref fm = spec("((G (o1[t]:qlt > {0}:qlt)) ^^ ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) R ((F (o3[t]:qlt > {0}:qlt)) -> ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((G (o1[t]:qlt > {0}:qlt)) ^^ ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt))) release ((F (o3[t]:qlt > {0}:qlt)) -> ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 // ─── wff_weak_until with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-09] ((F A1) && (A2 S A3)) W ((G A2) || (A1 T A3))") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))) W ((G (o2[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) T (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt))) weak_until ((G (o2[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) trigger (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-10] (F A1 <- A1 R A2) W (G A3 <-> A2 U A3) — <- and <-> as W operands") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) <- ((o1[t]:qlt > {0}:qlt) R (o2[t]:qlt > {0}:qlt))) W ((G (o3[t]:qlt > {0}:qlt)) <-> ((o2[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) <- ((o1[t]:qlt > {0}:qlt) release (o2[t]:qlt > {0}:qlt))) weak_until ((G (o3[t]:qlt > {0}:qlt)) <-> ((o2[t]:qlt > {0}:qlt) until (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 // ─── wff_since with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-11] ((A1 U A2) || F A3) S ((G A1) && (A2 R A3)) — || and && as S operands") {
-	tref fm = spec("(((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) || (F (o3[t]:qlt > {0}:qlt))) S ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("(((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) || (F (o3[t]:qlt > {0}:qlt))) since ((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-12] (F A1 ^^ G A2) S (A1 W A2 -> F A3) — ^^ and -> as S operands") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) ^^ (G (o2[t]:qlt > {0}:qlt))) S (((o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt)) -> (F (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) ^^ (G (o2[t]:qlt > {0}:qlt))) since (((o1[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt)) -> (F (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 // ─── wff_trigger with boolean-combo operands ───────────────────────────────────
 
 TEST_CASE("[SHAPE-Q-13] ((F A1) || (A2 W A3)) T ((G A2) && (A1 U A3))") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) W (o3[t]:qlt > {0}:qlt))) T ((G (o2[t]:qlt > {0}:qlt)) && ((o1[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) || ((o2[t]:qlt > {0}:qlt) weak_until (o3[t]:qlt > {0}:qlt))) trigger ((G (o2[t]:qlt > {0}:qlt)) && ((o1[t]:qlt > {0}:qlt) until (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-14] (G A1 <- A1 S A2) T (F A3 <-> A2 T A3) — <- and <-> as T operands") {
-	tref fm = spec("((G (o1[t]:qlt > {0}:qlt)) <- ((o1[t]:qlt > {0}:qlt) S (o2[t]:qlt > {0}:qlt))) T ((F (o3[t]:qlt > {0}:qlt)) <-> ((o2[t]:qlt > {0}:qlt) T (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("((G (o1[t]:qlt > {0}:qlt)) <- ((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt > {0}:qlt))) trigger ((F (o3[t]:qlt > {0}:qlt)) <-> ((o2[t]:qlt > {0}:qlt) trigger (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 // ─── Depth-3: G/F wrapping boolean combos of temporals ───────────────────
 
 TEST_CASE("[SHAPE-Q-15] G(((F A1) || (A1 U A2)) U (A2 S A3)) — user example wrapped in G") {
-	tref fm = spec("G (((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) U ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))).");
+	tref fm = spec("G (((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt))) until ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-16] F(((G A1) && (A2 R A3)) W ((A1 U A2) || F A3)) — wrapped in F") {
-	tref fm = spec("F ((((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt)))) W (((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) || (F (o3[t]:qlt > {0}:qlt)))).");
+	tref fm = spec("F ((((G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt)))) weak_until (((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) || (F (o3[t]:qlt > {0}:qlt)))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-17] F(((F A1 || A1 U A2) U (A2 S A3)) && G(A1 W A2)) — combo inside F at depth 3") {
-	tref fm = spec("F ((((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) U ((o2[t]:qlt > {0}:qlt) S (o3[t]:qlt > {0}:qlt))) && (G ((o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt)))).");
+	tref fm = spec("F ((((F (o1[t]:qlt > {0}:qlt)) || ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt))) until ((o2[t]:qlt > {0}:qlt) since (o3[t]:qlt > {0}:qlt))) && (G ((o1[t]:qlt > {0}:qlt) weak_until (o2[t]:qlt > {0}:qlt)))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-18] sbf type: ((F B1) || (B1 U B2)) U (B2 S B1) — sbf version of user pattern") {
-	tref fm = spec("((F (o1[t]:sbf = {X | (Y & Z)}:sbf)) || ((o1[t]:sbf = {X | (Y & Z)}:sbf) U (o2[t]:sbf = {X & Y}:sbf))) U ((o2[t]:sbf = {X & Y}:sbf) S (o1[t]:sbf = {X | (Y & Z)}:sbf)).");
+	tref fm = spec("((F (o1[t]:sbf = {X | (Y & Z)}:sbf)) || ((o1[t]:sbf = {X | (Y & Z)}:sbf) until (o2[t]:sbf = {X & Y}:sbf))) until ((o2[t]:sbf = {X & Y}:sbf) since (o1[t]:sbf = {X | (Y & Z)}:sbf)).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 // ─── Multi-level boolean combinations feeding into temporal ──────────────
 
 TEST_CASE("[SHAPE-Q-19] ((F A1 && G A2) || (A1 U A2)) U ((A2 R A3) ^^ F A1)") {
-	tref fm = spec("(((F (o1[t]:qlt > {0}:qlt)) && (G (o2[t]:qlt > {0}:qlt))) || ((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt))) U (((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt)) ^^ (F (o1[t]:qlt > {0}:qlt))).");
+	tref fm = spec("(((F (o1[t]:qlt > {0}:qlt)) && (G (o2[t]:qlt > {0}:qlt))) || ((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt))) until (((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt)) ^^ (F (o1[t]:qlt > {0}:qlt))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
 TEST_CASE("[SHAPE-Q-20] (F A1 -> G A2) U ((G A3 <- A1 R A2) S (F A3 <-> G A1))") {
-	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) -> (G (o2[t]:qlt > {0}:qlt))) U (((G (o3[t]:qlt > {0}:qlt)) <- ((o1[t]:qlt > {0}:qlt) R (o2[t]:qlt > {0}:qlt))) S ((F (o3[t]:qlt > {0}:qlt)) <-> (G (o1[t]:qlt > {0}:qlt)))).");
+	tref fm = spec("((F (o1[t]:qlt > {0}:qlt)) -> (G (o2[t]:qlt > {0}:qlt))) until (((G (o3[t]:qlt > {0}:qlt)) <- ((o1[t]:qlt > {0}:qlt) release (o2[t]:qlt > {0}:qlt))) since ((F (o3[t]:qlt > {0}:qlt)) <-> (G (o1[t]:qlt > {0}:qlt)))).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
@@ -666,7 +666,7 @@ TEST_CASE("[SHAPE-R-10] bf_mod: G(F(o1%{5}={2}:bv[8]))") {
 }
 
 TEST_CASE("[SHAPE-R-11] arithmetic in U: (o1+{2}={5}) U (o2*{3}={6}:bv[8]) REALIZABLE") {
-	tref fm = spec("(o1[t]:bv[8] + {2}:bv[8] = {5}:bv[8]) U (o2[t]:bv[8] * {3}:bv[8] = {6}:bv[8]).");
+	tref fm = spec("(o1[t]:bv[8] + {2}:bv[8] = {5}:bv[8]) until (o2[t]:bv[8] * {3}:bv[8] = {6}:bv[8]).");
 	REQUIRE(fm != nullptr); CHECK(sat(fm));
 }
 
@@ -687,13 +687,13 @@ TEST_SUITE("SHAPE-S: BF constants 1 and 0") {
 TEST_CASE("[SHAPE-S-01] F(F(F(o1:sbf = 1))) — bf_t in sbf") { tref fm = spec("F (F (F (o1[t]:sbf = 1)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-S-02] G(F(o1:sbf = 1)) — bf_t in G(F(...))") { tref fm = spec("G (F (o1[t]:sbf = 1))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-S-03] G(F(o1:bv[8] = 1:bv[8])) — typed bf_t in bv") { tref fm = spec("G (F (o1[t]:bv[8] = 1:bv[8]))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-S-04] (o1:sbf = 1) U (o2:sbf = 1) — bf_t on both sides of U") { tref fm = spec("(o1[t]:sbf = 1) U (o2[t]:sbf = 1)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-S-04] (o1:sbf = 1) until (o2:sbf = 1) — bf_t on both sides of U") { tref fm = spec("(o1[t]:sbf = 1) until (o2[t]:sbf = 1)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // bf_f (0) — bottom element
 TEST_CASE("[SHAPE-S-05] F(F(F(o1:sbf = 0))) — bf_f in sbf") { tref fm = spec("F (F (F (o1[t]:sbf = 0)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-S-06] G(F(o1:sbf = 0)) — bf_f in G(F(...))") { tref fm = spec("G (F (o1[t]:sbf = 0))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-S-07] G(F(o1:bv[8] = 0:bv[8])) — typed bf_f in bv") { tref fm = spec("G (F (o1[t]:bv[8] = 0:bv[8]))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-S-08] (o1:sbf = 0) S (o2:sbf = 1) — bf_f and bf_t in S") { tref fm = spec("(o1[t]:sbf = 0) S (o2[t]:sbf = 1)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+TEST_CASE("[SHAPE-S-08] (o1:sbf = 0) since (o2:sbf = 1) — bf_f and bf_t in S") { tref fm = spec("(o1[t]:sbf = 0) since (o2[t]:sbf = 1)."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 } // SHAPE-S
 

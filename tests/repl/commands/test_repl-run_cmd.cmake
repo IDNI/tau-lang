@@ -98,21 +98,21 @@ add_repl_test(run_cmd-ltl_correctness-adv_gf_05_o_eq_1_named
 
 # ── ADV-U: (o=1) U (o=0) -- right (F) eventually appears (check_U) ─────────────
 add_repl_test(run_cmd-ltl_correctness-adv_u_01_bottom
-	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) U (o1[t] = 0)."
+	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) until (o1[t] = 0)."
 	"o1\\[[0-9]+\\] := F")
 add_repl_test(run_cmd-ltl_correctness-adv_u_02_top
-	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) U (o1[t] = 0)."
+	"i1:tau := in file(\\\"${TOP}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) until (o1[t] = 0)."
 	"o1\\[[0-9]+\\] := F")
 add_repl_test(run_cmd-ltl_correctness-adv_u_03_alt
-	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) U (o1[t] = 0)."
+	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) until (o1[t] = 0)."
 	"o1\\[[0-9]+\\] := F")
 
 # ── ADV-W: weak until -- right value appears (check_W) ────────────────────────
 add_repl_test(run_cmd-ltl_correctness-adv_w_01_o1_until_o0_bottom
-	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) W (o1[t] = 0)."
+	"i1:tau := in file(\\\"${BOT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 1) weak_until (o1[t] = 0)."
 	"o1\\[[0-9]+\\] := F")
 add_repl_test(run_cmd-ltl_correctness-adv_w_02_o0_until_o1_alt
-	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 0) W (o1[t] = 1)."
+	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 6 steps (o1[t] = 0) weak_until (o1[t] = 1)."
 	"o1\\[[0-9]+\\] := T")
 
 # ── ADV-SBF / ADV-BV: no input; every output is non-empty ─────────────────────
@@ -310,19 +310,19 @@ add_repl_test(run_cmd-ltl_aba_execution-g5_05_g_mirror_and_f_const_5steps
 
 # ── Group 6: U R W formulas (tau, no input) ────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g6_01_u_4steps
-	"o1:tau := out console. run 4 steps (o1[t]:tau = 1) U (o1[t]:tau = 0)."
+	"o1:tau := out console. run 4 steps (o1[t]:tau = 1) until (o1[t]:tau = 0)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g6_02_u_5steps
-	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) U (o1[t]:tau = 0)."
+	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) until (o1[t]:tau = 0)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g6_03_r_4steps
-	"o1:tau := out console. run 4 steps (o1[t]:tau = 0) R (o1[t]:tau = 1)."
+	"o1:tau := out console. run 4 steps (o1[t]:tau = 0) release (o1[t]:tau = 1)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g6_04_w_5steps
-	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) W (o1[t]:tau = 0)."
+	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) weak_until (o1[t]:tau = 0)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g6_05_w_5steps_variant
-	"o1:tau := out console. run 5 steps (o1[t]:tau = 0) W (o1[t]:tau = 1)."
+	"o1:tau := out console. run 5 steps (o1[t]:tau = 0) weak_until (o1[t]:tau = 1)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
 
 # ── Group 7: sbf G constant outputs (no input) ─────────────────────────────
@@ -384,10 +384,10 @@ add_repl_test(run_cmd-ltl_aba_execution-g10_02_sbf_f_compound_5steps
 	"o1:sbf := out console. run 5 steps F (o1[t]:sbf = {X | (Y & Z)}:sbf)."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g10_03_sbf_u_4steps
-	"o1:sbf := out console. run 4 steps (o1[t]:sbf = {X & Y}:sbf) U (o1[t]:sbf = {X | Z}:sbf)."
+	"o1:sbf := out console. run 4 steps (o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf)."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g10_04_sbf_w_5steps
-	"o1:sbf := out console. run 5 steps (o1[t]:sbf = {X | (Y & Z)}:sbf) W (o1[t]:sbf = {X & Y}:sbf)."
+	"o1:sbf := out console. run 5 steps (o1[t]:sbf = {X | (Y & Z)}:sbf) weak_until (o1[t]:sbf = {X & Y}:sbf)."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g10_05_sbf_gf_6steps
 	"o1:sbf := out console. run 6 steps G (F (o1[t]:sbf = {X & Y}:sbf))."
@@ -429,16 +429,16 @@ add_repl_test(run_cmd-ltl_aba_execution-g12_05_bv_f_b10110101_4steps
 	"o1:bv[8] := out console. run 4 steps F (o1[t]:bv[8] = {#b10110101}:bv[8])."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g12_06_bv_u_5steps
-	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8])."
+	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8])."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g12_07_bv_gf_255_6steps
 	"o1:bv[8] := out console. run 6 steps G (F (o1[t]:bv[8] = {255}:bv[8]))."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g12_08_bv_w_4steps
-	"o1:bv[8] := out console. run 4 steps (o1[t]:bv[8] = {5}:bv[8]) W (o1[t]:bv[8] = {#b10110101}:bv[8])."
+	"o1:bv[8] := out console. run 4 steps (o1[t]:bv[8] = {5}:bv[8]) weak_until (o1[t]:bv[8] = {#b10110101}:bv[8])."
 	"o1\\[0\\] := ")
 add_repl_test(run_cmd-ltl_aba_execution-g12_09_bv_r_5steps
-	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) R (o1[t]:bv[8] = {#b11110000}:bv[8])."
+	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) release (o1[t]:bv[8] = {#b11110000}:bv[8])."
 	"o1\\[0\\] := ")
 # G12.10: unblocked by the scoped joint solve in step(); shape-nonempty.
 add_repl_test(run_cmd-ltl_aba_execution-g12_10_bv_alternating_6steps

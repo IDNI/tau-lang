@@ -107,7 +107,7 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 	}
 
 	TEST_CASE("[SPWR-L-02] Until with compatible update") {
-		tref s = spec("(o1[t] = 0) U (o1[t] = 1).");
+		tref s = spec("(o1[t] = 0) until (o1[t] = 1).");
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
@@ -117,7 +117,7 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 	}
 
 	TEST_CASE("[SPWR-L-03] Release with compatible update") {
-		tref s = spec("(o1[t] = 1) R (o1[t] = 0).");
+		tref s = spec("(o1[t] = 1) release (o1[t] = 0).");
 		tref u = spec("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);

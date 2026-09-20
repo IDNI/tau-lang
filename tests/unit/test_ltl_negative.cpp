@@ -141,7 +141,7 @@ TEST_SUITE("NEG-UNREAL: known-UNREALIZABLE formulas return false") {
 	}
 
 	TEST_CASE("NEG-UNREAL-08: F(input=0) U F(input=1) — both unrealizable") {
-		CHECK_FALSE(realizable("(F (i1[t] = 0)) U (F (i1[t] = 1))."));
+		CHECK_FALSE(realizable("(F (i1[t] = 0)) until (F (i1[t] = 1))."));
 	}
 
 	// Temporal contradictions
@@ -197,15 +197,15 @@ TEST_SUITE("NEG-CONSIST: determinism — same verdict on repeated evaluation") {
 	}
 
 	TEST_CASE("NEG-CONSIST-05: Until formula is stable") {
-		CHECK(consistent("((o1[t] = 0) U (o1[t] = 1))."));
+		CHECK(consistent("((o1[t] = 0) until (o1[t] = 1))."));
 	}
 
 	TEST_CASE("NEG-CONSIST-06: W (weak until) formula is stable") {
-		CHECK(consistent("((o1[t] = 0) W (i1[t] = 1))."));
+		CHECK(consistent("((o1[t] = 0) weak_until (i1[t] = 1))."));
 	}
 
 	TEST_CASE("NEG-CONSIST-07: R (release) formula is stable") {
-		CHECK(consistent("((o1[t] = 0) R (o1[t] = 1))."));
+		CHECK(consistent("((o1[t] = 0) release (o1[t] = 1))."));
 	}
 
 	TEST_CASE("NEG-CONSIST-08: contradiction is stable (always false)") {
@@ -217,7 +217,7 @@ TEST_SUITE("NEG-CONSIST: determinism — same verdict on repeated evaluation") {
 	}
 
 	TEST_CASE("NEG-CONSIST-10: mixed i/o U formula is stable") {
-		CHECK(consistent("((o1[t] = 0) U (i1[t] = 1))."));
+		CHECK(consistent("((o1[t] = 0) until (i1[t] = 1))."));
 	}
 }
 

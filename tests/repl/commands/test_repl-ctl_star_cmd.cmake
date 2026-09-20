@@ -11,9 +11,9 @@ include(add_repl_test)
 
 # the right operand of U survives normalization
 add_repl_test(ctl_star-normalize_keeps_U_rhs
-	"normalize (o1[t] = 1) U (o1[t] = 0)" "U")
+	"normalize (o1[t] = 1) until (o1[t] = 0)" "U")
 add_test(NAME "test_repl-ctl_star-normalize_U_not_sometimes"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"normalize (o1[t] = 1) U (o1[t] = 0)\"")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"normalize (o1[t] = 1) until (o1[t] = 0)\"")
 set_tests_properties("test_repl-ctl_star-normalize_U_not_sometimes" PROPERTIES
 	PASS_REGULAR_EXPRESSION "%1"
 	FAIL_REGULAR_EXPRESSION "sometimes")
@@ -22,7 +22,7 @@ set_tests_properties("test_repl-ctl_star-normalize_U_not_sometimes" PROPERTIES
 # satisfiability procedure for full-LTL content, so the verdict is undecided
 # (was T: the target was dropped), not a decided F.
 add_repl_test(ctl_star-sat_U_contradictory_target
-	"sat (o1[t] = 1) U (o1[t] = 0 && o1[t] = 1)"
+	"sat (o1[t] = 1) until (o1[t] = 0 && o1[t] = 1)"
 	"satisfiability of this formula is not supported")
 
 # F over an input is unrealizable: the environment can keep i1 at 0.

@@ -148,7 +148,7 @@ TEST_SUITE("Strategy execution: Until") {
 	// first T, the U obligation is discharged and subsequent values are free.
 	TEST_CASE("[EXEC-U-01] (o1=0) U (o1=1):tau — at least one step is T") {
 		bdd_init<Bool>();
-		auto o1 = run_no_input("(o1[t] = 0) U (o1[t] = 1).", 4);
+		auto o1 = run_no_input("(o1[t] = 0) until (o1[t] = 1).", 4);
 		auto vals = o1->get_values();
 		REQUIRE(!vals.empty());
 		// The strategy must eventually satisfy o1=1 (T)
@@ -167,7 +167,7 @@ TEST_SUITE("Strategy execution: Until") {
 	// all pre-T steps are F.
 	TEST_CASE("[EXEC-U-02] (o1=0) W (o1=1):tau — all steps before T are F") {
 		bdd_init<Bool>();
-		auto o1 = run_no_input("(o1[t] = 0) W (o1[t] = 1).", 4);
+		auto o1 = run_no_input("(o1[t] = 0) weak_until (o1[t] = 1).", 4);
 		auto vals = o1->get_values();
 		REQUIRE(!vals.empty());
 		for (size_t i = 0; i < vals.size(); ++i) {
@@ -182,7 +182,7 @@ TEST_SUITE("Strategy execution: Until") {
 	TEST_CASE("[EXEC-U-03] (o1=0):tau W (i1=1):tau — output F until input T") {
 		bdd_init<Bool>();
 		strings i1_vals = {"F.", "F.", "T.", "T."};
-		auto o1 = run_with_i1("(o1[t] = 0) W (i1[t] = 1).", i1_vals, 4);
+		auto o1 = run_with_i1("(o1[t] = 0) weak_until (i1[t] = 1).", i1_vals, 4);
 		auto vals = o1->get_values();
 		REQUIRE(vals.size() >= 2);
 		// Steps 0,1: input=F so right (i1=1) is false. Left (o1=0) must hold.
@@ -437,7 +437,7 @@ TEST_SUITE("Strategy execution: multi-state Mealy") {
 	// when left (F) first holds. Simplest strategy: o1=T always (right always holds).
 	TEST_CASE("[EXEC-MS-03] (o1=0) R (o1=1):tau — every step satisfies right (T)") {
 		bdd_init<Bool>();
-		auto o1 = run_no_input("(o1[t] = 0) R (o1[t] = 1).", 5);
+		auto o1 = run_no_input("(o1[t] = 0) release (o1[t] = 1).", 5);
 		auto vals = o1->get_values();
 		REQUIRE(!vals.empty());
 		// Right (o1=1, T) must hold at all steps up to and including when left holds.

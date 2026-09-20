@@ -70,7 +70,7 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 	}
 
 	TEST_CASE("[IN-RT4-U] U: zeros until the release, never a stray value") {
-		auto v = drive("(o1[t] = 0) U (o1[t] = 1).", 3, [](size_t) { return "T."; });
+		auto v = drive("(o1[t] = 0) until (o1[t] = 1).", 3, [](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
 		size_t first_one = v.size();
 		for (size_t k = 0; k < v.size(); ++k)
@@ -81,20 +81,20 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 	}
 
 	TEST_CASE("[IN-RT4-W] W: the left side holds while the input release never comes") {
-		auto v = drive("(o1[t] = 1) W (i1[t] = 1).", 3, [](size_t) { return "F."; });
+		auto v = drive("(o1[t] = 1) weak_until (i1[t] = 1).", 3, [](size_t) { return "F."; });
 		REQUIRE(v.size() == 3);
 		for (auto& x : v) CHECK(x == "T");
 	}
 
 	TEST_CASE("[IN-RT4-R] R: the released side holds up to and including the release") {
 		// (o1=1) R (o1=1): o1 must be 1 at every step.
-		auto v = drive("(o1[t] = 1) R (o1[t] = 1).", 3, [](size_t) { return "T."; });
+		auto v = drive("(o1[t] = 1) release (o1[t] = 1).", 3, [](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
 		for (auto& x : v) CHECK(x == "T");
 	}
 
 	TEST_CASE("[IN-RT4-S] past: always(o2=1) beside a Since obligation executes") {
-		auto v = drive("always (o1[t] = 1) && ((o1[t] = 1) S (o1[t] = 1)).", 3,
+		auto v = drive("always (o1[t] = 1) && ((o1[t] = 1) since (o1[t] = 1)).", 3,
 			[](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
 		for (auto& x : v) CHECK(x == "T");

@@ -1,9 +1,9 @@
 # Satisfiability and realizability of temporal formulas.
 #
 # See demos/README.md for how to run this script.
-## Formulas using U/R/W/S/T or nested liveness (G (F ...)) are decided by
-## calling ltlsynt (from Spot). Without ltlsynt on the PATH those verdicts
-## come back UNKNOWN.
+## Formulas using until/release/weak_until/since/trigger or nested liveness
+## (G (F ...)) are decided by calling ltlsynt (from Spot). Without ltlsynt on
+## the PATH those verdicts come back UNKNOWN.
 
 # A temporal formula describes a reactive system: at each time point the
 # environment picks the input streams i1, i2, ..., and the system answers
@@ -12,8 +12,8 @@
 # Two pipelines decide temporal formulas. Boolean combinations of top-level
 # always/sometimes statements over non-temporal bodies are the safety
 # fragment, decided by Tau's own safety pipeline; the binary operators
-# U/R/W/S/T and nested liveness such as G (F phi) are decided by reactive
-# synthesis through ltlsynt.
+# until/release/weak_until/since/trigger and nested liveness such as
+# G (F phi) are decided by reactive synthesis through ltlsynt.
 
 # In the safety fragment, sat asks for the existence of a satisfying
 # execution. Both of these hold on some trace -- the second one on any
@@ -68,7 +68,7 @@ realizable (G ((i1[t] = 1) -> F ((o1[t] = 1)))) && (G ((i2[t] = 1) -> F ((o2[t] 
 
 # Weak until and persistence:
 
-realizable ((o1[t] = 1) W (i1[t] = 1))
+realizable ((o1[t] = 1) weak_until (i1[t] = 1))
 realizable F (G ((o1[t] = 1)))
 
 # First-order quantifiers compose with the temporal operators. Whatever

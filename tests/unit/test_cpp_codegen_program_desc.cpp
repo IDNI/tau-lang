@@ -1216,7 +1216,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("build_program_desc: ppLTLTT past-operator DFA tester props "
 	          "are excluded from Outputs, not emitted as unkeyable flags") {
 		tref fm = wff(
-			"(o1[t]:bv[1] = {1}:bv[1]) S (o2[t]:bv[1] = {1}:bv[1])");
+			"(o1[t]:bv[1] = {1}:bv[1]) since (o2[t]:bv[1] = {1}:bv[1])");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());

@@ -245,16 +245,16 @@ TEST_SUITE("LTL correctness: equivalences") {
 	// φ U ψ realizability implies φ W ψ realizability (W is weaker)
 	TEST_CASE("[EQUIV-06] (o=1) U (o=0) realizable → (o=1) W (o=0) realizable") {
 		bdd_init<Bool>();
-		bool u = realizable("(o1[t] = 1) U (o1[t] = 0).");
-		bool w = realizable("(o1[t] = 1) W (o1[t] = 0).");
+		bool u = realizable("(o1[t] = 1) until (o1[t] = 0).");
+		bool w = realizable("(o1[t] = 1) weak_until (o1[t] = 0).");
 		CHECK(u); // U is realizable
 		CHECK(w); // W must also be realizable (W is weaker — fewer obligations)
 	}
 
 	TEST_CASE("[EQUIV-07] (o=0) U (o=1) realizable → (o=0) W (o=1) realizable") {
 		bdd_init<Bool>();
-		bool u = realizable("(o1[t] = 0) U (o1[t] = 1).");
-		bool w = realizable("(o1[t] = 0) W (o1[t] = 1).");
+		bool u = realizable("(o1[t] = 0) until (o1[t] = 1).");
+		bool w = realizable("(o1[t] = 0) weak_until (o1[t] = 1).");
 		CHECK(u);
 		CHECK(w);
 	}
@@ -262,8 +262,8 @@ TEST_SUITE("LTL correctness: equivalences") {
 	// φ R ψ ≡ ¬(¬φ U ¬ψ) — release/until duality
 	TEST_CASE("[EQUIV-08] (o=0) R (o=1) ≡ ¬(¬(o=0) U ¬(o=1)): same realizability") {
 		bdd_init<Bool>();
-		bool r1 = realizable("(o1[t] = 0) R (o1[t] = 1).");
-		bool r2 = realizable("! (! (o1[t] = 0)) U (! (o1[t] = 1)).");
+		bool r1 = realizable("(o1[t] = 0) release (o1[t] = 1).");
+		bool r2 = realizable("! (! (o1[t] = 0)) until (! (o1[t] = 1)).");
 		CHECK(r1 == r2);
 	}
 
@@ -590,31 +590,31 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 
 	TEST_CASE("[ADV-U-01] (o=1) U (o=0):tau — bottom inputs: left until right") {
 		bdd_init<Bool>();
-		auto vals = run_with_i1("(o1[t] = 1) U (o1[t] = 0).", adv_bottom, 6);
+		auto vals = run_with_i1("(o1[t] = 1) until (o1[t] = 0).", adv_bottom, 6);
 		CHECK(check_U(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-U-02] (o=1) U (o=0):tau — top inputs: left until right") {
 		bdd_init<Bool>();
-		auto vals = run_with_i1("(o1[t] = 1) U (o1[t] = 0).", adv_top, 6);
+		auto vals = run_with_i1("(o1[t] = 1) until (o1[t] = 0).", adv_top, 6);
 		CHECK(check_U(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-U-03] (o=1) U (o=0):tau — alternating inputs: left until right") {
 		bdd_init<Bool>();
-		auto vals = run_with_i1("(o1[t] = 1) U (o1[t] = 0).", adv_alt, 6);
+		auto vals = run_with_i1("(o1[t] = 1) until (o1[t] = 0).", adv_alt, 6);
 		CHECK(check_U(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-W-01] (o=1) W (o=0):tau — bottom inputs: left until right or forever") {
 		bdd_init<Bool>();
-		auto vals = run_with_i1("(o1[t] = 1) W (o1[t] = 0).", adv_bottom, 6);
+		auto vals = run_with_i1("(o1[t] = 1) weak_until (o1[t] = 0).", adv_bottom, 6);
 		CHECK(check_W(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-W-02] (o=0) W (o=1):tau — alternating inputs: left until right or forever") {
 		bdd_init<Bool>();
-		auto vals = run_with_i1("(o1[t] = 0) W (o1[t] = 1).", adv_alt, 6);
+		auto vals = run_with_i1("(o1[t] = 0) weak_until (o1[t] = 1).", adv_alt, 6);
 		CHECK(check_W(vals, "F", "T"));
 	}
 
@@ -701,7 +701,7 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	TEST_CASE("[TRG-EXEC-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) — ψ at every step") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
-		    "(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		    "(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v == "3/4");
 		std::vector<bool> phi, psi;
@@ -721,7 +721,7 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	TEST_CASE("[TRG-EXEC-02] (o1>{1/2}:qlt) T (o1={3/4}:qlt) — ψ at t=0") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
-		    "(o1[t]:qlt > {1/2}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		    "(o1[t]:qlt > {1/2}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		CHECK(vals[0] == "3/4");   // t = 0 edge: inverted encoding forces ≠ 3/4
 		for (auto& v : vals) CHECK(v == "3/4");
@@ -737,7 +737,7 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/2", "1/4", "1/2"};
 		auto vals = run_qlt_with_i1(
-		    "(i1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", i1_vals, 4);
+		    "(i1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", i1_vals, 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v == "3/4");
 		std::vector<bool> phi, psi;
@@ -752,7 +752,7 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 
 	TEST_CASE("[TRG-SAT-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) is REALIZABLE") {
 		bdd_init<Bool>();
-		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	// Violating requirement rejected: the T forces ψ at every step, the second
@@ -760,7 +760,7 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	TEST_CASE("[TRG-SAT-02] (φ T ψ) && G(¬ψ) is UNREALIZABLE") {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
-		    "(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt) "
+		    "(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt) "
 		    "&& G (o1[t]:qlt != {3/4}:qlt)."));
 	}
 
@@ -769,13 +769,13 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	TEST_CASE("[TRG-SAT-03] (o1={1/4}:qlt) T (i1={3/4}:qlt) is UNREALIZABLE") {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
-		    "(o1[t]:qlt = {1/4}:qlt) T (i1[t]:qlt = {3/4}:qlt)."));
+		    "(o1[t]:qlt = {1/4}:qlt) trigger (i1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	// Duality: φ T ψ ≡ ¬(¬φ S ¬ψ) — both must get the same verdict.
 	TEST_CASE("[TRG-SAT-04] φ T ψ ≡ ¬(¬φ S ¬ψ): same realizability") {
 		bdd_init<Bool>();
-		bool r1 = realizable("(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).");
+		bool r1 = realizable("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).");
 		bool r2 = realizable("! ((! (o1[t]:qlt = {1/4}:qlt)) "
 		                     "S (! (o1[t]:qlt = {3/4}:qlt))).");
 		CHECK(r1 == r2);
@@ -816,7 +816,7 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	TEST_CASE("[LT2-EXEC-01] !((o1={1/4}:qlt) S (o1={3/4}:qlt)) never emits ψ") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
-		    "! ((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt)).", 4);
+		    "! ((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)).", 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v != "3/4");
 	}
@@ -848,8 +848,8 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(
-		    "((i1[t]:qlt = {3/4}:qlt) S (i1[t]:qlt = {3/4}:qlt)) "
-		    "|| ((o1[t]:qlt = {1/2}:qlt) S (o1[t]:qlt = {1/2}:qlt)).",
+		    "((i1[t]:qlt = {3/4}:qlt) since (i1[t]:qlt = {3/4}:qlt)) "
+		    "|| ((o1[t]:qlt = {1/2}:qlt) since (o1[t]:qlt = {1/2}:qlt)).",
 		    i1_vals, 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v == "1/2");
@@ -869,7 +869,7 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	TEST_CASE("[LT2-EXEC-03] conjunct spine keeps the outer treatment") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
-		    "((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt)) "
+		    "((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)) "
 		    "&& always (o1[t]:qlt != {1/2}:qlt) "
 		    "&& always (o1[t]:qlt != {1/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
@@ -885,10 +885,10 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	TEST_CASE("[LT2-SAT-01] both LT-2 shapes are REALIZABLE") {
 		bdd_init<Bool>();
 		CHECK(realizable(
-		    "! ((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt))."));
+		    "! ((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt))."));
 		CHECK(realizable(
-		    "((i1[t]:qlt = {3/4}:qlt) S (i1[t]:qlt = {3/4}:qlt)) "
-		    "|| ((o1[t]:qlt = {1/2}:qlt) S (o1[t]:qlt = {1/2}:qlt))."));
+		    "((i1[t]:qlt = {3/4}:qlt) since (i1[t]:qlt = {3/4}:qlt)) "
+		    "|| ((o1[t]:qlt = {1/2}:qlt) since (o1[t]:qlt = {1/2}:qlt))."));
 	}
 
 } // TEST_SUITE "LTL correctness: S under negation / disjunction (LT-2)"
@@ -956,7 +956,7 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 		bdd_init<Bool>();
 		const strings i1_vals = {"0", "0", "0", "0"};
 		auto vals = run_qlt_with_i1(
-		    "(i1[t]:qlt = {0}:qlt) U (o1[t]:qlt = {1}:qlt).",
+		    "(i1[t]:qlt = {0}:qlt) until (o1[t]:qlt = {1}:qlt).",
 		    i1_vals, 4);
 		REQUIRE(!vals.empty());
 		for (auto& v : vals) CHECK(v == "1");
@@ -1000,7 +1000,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 		const strings i1_vals = {"0", "0", "0", "0"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
-		    "(((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt)) "
+		    "(((o1[t]:qlt = {0}:qlt) since (i1[t]:qlt = {1}:qlt)) "
 		    "|| (o1[t]:qlt = {1}:qlt))).", i1_vals, 4);
 		CHECK(vals.size() < 4); // ψ never held: no complete violating trace
 	}
@@ -1019,7 +1019,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 		const strings i1_vals = {"1", "1", "1", "1"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
-		    "(((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt)) "
+		    "(((o1[t]:qlt = {0}:qlt) since (i1[t]:qlt = {1}:qlt)) "
 		    "|| (o1[t]:qlt = {1}:qlt))).", i1_vals, 4);
 		CHECK(vals.size() < 4);
 	}
@@ -1033,7 +1033,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 		const strings i1_vals = {"1", "1", "1", "1"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
-		    "(! ((o1[t]:qlt = {1}:qlt) T (i1[t]:qlt = {1}:qlt)))).",
+		    "(! ((o1[t]:qlt = {1}:qlt) trigger (i1[t]:qlt = {1}:qlt)))).",
 		    i1_vals, 4);
 		CHECK(vals.size() < 4);
 	}
@@ -1050,7 +1050,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
 		    "(((o1[t]:qlt = {0}:qlt) S "
-		    "((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt))) "
+		    "((o1[t]:qlt = {0}:qlt) since (i1[t]:qlt = {1}:qlt))) "
 		    "|| (o1[t]:qlt = {1}:qlt))).", i1_zero, 4);
 		CHECK(vals.size() < 4);
 
@@ -1058,7 +1058,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 		auto vals2 = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
 		    "(((o1[t]:qlt = {0}:qlt) S "
-		    "((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt))) "
+		    "((o1[t]:qlt = {0}:qlt) since (i1[t]:qlt = {1}:qlt))) "
 		    "|| (o1[t]:qlt = {1}:qlt))).", i1_one, 4);
 		CHECK(vals2.size() < 4);
 	}
@@ -1070,7 +1070,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	TEST_CASE("[LAN3-EXEC-06] realizable inner S executes under the anchor") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
-		    "always (((o1[t]:qlt = {0}:qlt) S (o1[t]:qlt = {0}:qlt)) "
+		    "always (((o1[t]:qlt = {0}:qlt) since (o1[t]:qlt = {0}:qlt)) "
 		    "|| (o1[t]:qlt = {1}:qlt)).", 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK((v == "0" || v == "1"));
@@ -1083,11 +1083,11 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
-		    "(((o1[t]:qlt = {0}:qlt) S (i1[t]:qlt = {1}:qlt)) "
+		    "(((o1[t]:qlt = {0}:qlt) since (i1[t]:qlt = {1}:qlt)) "
 		    "|| (o1[t]:qlt = {1}:qlt)))."));
 		CHECK_FALSE(realizable(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
-		    "(! ((o1[t]:qlt = {1}:qlt) T (i1[t]:qlt = {1}:qlt))))."));
+		    "(! ((o1[t]:qlt = {1}:qlt) trigger (i1[t]:qlt = {1}:qlt))))."));
 	}
 
 	// Regression guard: an OUTERMOST S keeps its free auxiliary (its anchor
@@ -1097,7 +1097,7 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	TEST_CASE("[LAN3-EXEC-05] outermost S: the φ-chain survives the anchor") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
-		    "(o1[t]:qlt = {0}:qlt) S (o1[t]:qlt = {3/4}:qlt).", 4);
+		    "(o1[t]:qlt = {0}:qlt) since (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		CHECK(vals[0] == "3/4"); // ψ@0
 		// Semantic check, straight from the S definition: at every step,

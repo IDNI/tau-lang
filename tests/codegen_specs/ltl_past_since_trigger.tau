@@ -1,1 +1,1 @@
-((o1[t]:qlt > {0}:qlt) U (o2[t]:qlt > {0}:qlt)) S (((o2[t]:qlt > {0}:qlt) R (o3[t]:qlt > {0}:qlt)) T (o1[t]:qlt > {0}:qlt)).
+((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt > {0}:qlt)) since (((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt)) trigger (o1[t]:qlt > {0}:qlt)).

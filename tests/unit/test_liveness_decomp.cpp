@@ -61,7 +61,7 @@ TEST_SUITE("liveness decomposition") {
 	}
 
 	TEST_CASE("non-GR(1): U") {
-		tref fm = parse("((o1[t] = 1) U (o1[t] = 0)).");
+		tref fm = parse("((o1[t] = 1) until (o1[t] = 0)).");
 		REQUIRE(fm);
 		auto d = decompose_liveness<node_t>(fm);
 		CHECK_FALSE(d.is_gr1);

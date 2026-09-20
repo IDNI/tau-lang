@@ -92,7 +92,7 @@ set_tests_properties("test_repl-limit_effect-specsizewarn_off_by_default" PROPER
 # worst a false UNREALIZABLE, never an error). Needs a live ltlsynt on PATH
 # (same as the other `sat`-on-full-LTL tests).
 add_test(NAME "test_repl-limit_effect-maxsubsets_giveup"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) U (o3[t] = 1)) && ((o1[t] & o2[t] = 0) U (o3[t] = 1)) && ((o1[t] = o2[t]) U (o3[t] = 1))\" 2>&1")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
 set_tests_properties("test_repl-limit_effect-maxsubsets_giveup" PROPERTIES
 	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")
 
@@ -100,7 +100,7 @@ set_tests_properties("test_repl-limit_effect-maxsubsets_giveup" PROPERTIES
 # chosen strategy afterward, so the verdict stays the true T even on the
 # spec that used to hit the capped-walk worst case.
 add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_recovered"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) U (o3[t] = 1)) && ((o1[t] & o2[t] = 0) U (o3[t] = 1)) && ((o1[t] = o2[t]) U (o3[t] = 1))\" 2>&1")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
 set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_recovered" PROPERTIES
 	PASS_REGULAR_EXPRESSION ": T")
 
@@ -109,24 +109,24 @@ set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_recovered
 # fires and the answer is still T. Two tests on the same command line: a
 # single regex bridging both markers is the pinned ctest-backtracking trap.
 add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_correct"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] = o2[t]) U (o4[t] = 1)) && ((o2[t] = o3[t]) U (o4[t] = 1)) && ((o3[t] = o1[t]) U (o4[t] = 1))\" 2>&1")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))\" 2>&1")
 set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_correct" PROPERTIES
 	PASS_REGULAR_EXPRESSION ": T")
 add_test(NAME "test_repl-limit_effect-maxsubsets_capped_verdict_correct_warns"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] = o2[t]) U (o4[t] = 1)) && ((o2[t] = o3[t]) U (o4[t] = 1)) && ((o3[t] = o1[t]) U (o4[t] = 1))\" 2>&1")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --max-consistency-subsets 1 -e \"sat ((o1[t] = o2[t]) until (o4[t] = 1)) && ((o2[t] = o3[t]) until (o4[t] = 1)) && ((o3[t] = o1[t]) until (o4[t] = 1))\" 2>&1")
 set_tests_properties("test_repl-limit_effect-maxsubsets_capped_verdict_correct_warns" PROPERTIES
 	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")
 
 # Under the shipped default (4096) the same workload completes silently
 # with the same verdict.
 add_test(NAME "test_repl-limit_effect-maxsubsets_default_completes"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat ((o1[t] | o2[t] = 1) U (o3[t] = 1)) && ((o1[t] & o2[t] = 0) U (o3[t] = 1)) && ((o1[t] = o2[t]) U (o3[t] = 1))\" 2>&1")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
 set_tests_properties("test_repl-limit_effect-maxsubsets_default_completes" PROPERTIES
 	FAIL_REGULAR_EXPRESSION "consistency walk capped"
 	PASS_REGULAR_EXPRESSION ": T")
 
 # The same cap reached through the REPL `set` instead of the CLI flag.
 add_test(NAME "test_repl-limit_effect-maxsubsets_via_set"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set maxsubsets 1. sat ((o1[t] | o2[t] = 1) U (o3[t] = 1)) && ((o1[t] & o2[t] = 0) U (o3[t] = 1)) && ((o1[t] = o2[t]) U (o3[t] = 1))\" 2>&1")
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set maxsubsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))\" 2>&1")
 set_tests_properties("test_repl-limit_effect-maxsubsets_via_set" PROPERTIES
 	PASS_REGULAR_EXPRESSION "k-ary consistency walk capped after 1 subset checks")

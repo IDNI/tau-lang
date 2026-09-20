@@ -125,7 +125,7 @@ TEST_SUITE("qlt_realizability") {
 	}
 
 	TEST_CASE("QR-10: (o1>{0}:qlt) U (o1={1/2}:qlt) is REALIZABLE") {
-		CHECK(realizable("(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)."));
 	}
 
 	TEST_CASE("QR-11: G(o1={1/2}:qlt || o1={2/3}:qlt) is REALIZABLE") {
@@ -137,7 +137,7 @@ TEST_SUITE("qlt_realizability") {
 	}
 
 	TEST_CASE("QR-13: (o1={1/4}:qlt) S (o1={3/4}:qlt) is REALIZABLE") {
-		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	TEST_CASE("QR-14: G(o1[t-1]<o1[t]:qlt) is REALIZABLE (strictly increasing)") {
@@ -175,17 +175,17 @@ TEST_SUITE("qlt_realizability") {
 	TEST_CASE("QR-23: REALIZABLE: (o1>{0}:qlt) U (o1<{0}:qlt) (U is satisfied at t=0 by outputting o1<0)") {
 		// Semantics: p U q satisfied if q holds at t=0 (no requirement on p at t=0).
 		// System can output o1 = -1 at t=0, satisfying o1<0 immediately.
-		CHECK(realizable("(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt > {0}:qlt) until (o1[t]:qlt < {0}:qlt)."));
 	}
 
 	TEST_CASE("QR-27: UNREALIZABLE: (o1={1/2}:qlt) S (o1={1/3}:qlt) && G(o1!={1/3}:qlt)") {
-		CHECK_FALSE(realizable("(o1[t]:qlt = {1/2}:qlt) S (o1[t]:qlt = {1/3}:qlt) && G (o1[t]:qlt != {1/3}:qlt)."));
+		CHECK_FALSE(realizable("(o1[t]:qlt = {1/2}:qlt) since (o1[t]:qlt = {1/3}:qlt) && G (o1[t]:qlt != {1/3}:qlt)."));
 	}
 
 	TEST_CASE("QR-28: REALIZABLE: (o1>0) R (o1<0) — o1<0 always satisfies the release") {
 		// p R q: q holds until p releases it. If p never holds, q must hold forever.
 		// Strategy: output a negative value forever. Then o1>0 never holds, and o1<0 always.
-		CHECK(realizable("(o1[t]:qlt > {0}:qlt) R (o1[t]:qlt < {0}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt > {0}:qlt) release (o1[t]:qlt < {0}:qlt)."));
 	}
 
 	TEST_CASE("QR-29: UNREALIZABLE: G(o1>o1[t-1]) && G(o1<o1[t-1]) (strictly greater and less)") {
@@ -197,15 +197,15 @@ TEST_SUITE("qlt_realizability") {
 	}
 
 	TEST_CASE("QR-31: REALIZABLE: (o1={1/2}:qlt) W (o1={2/3}:qlt) (weak until)") {
-		CHECK(realizable("(o1[t]:qlt = {1/2}:qlt) W (o1[t]:qlt = {2/3}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt = {1/2}:qlt) weak_until (o1[t]:qlt = {2/3}:qlt)."));
 	}
 
 	TEST_CASE("QR-32: REALIZABLE: G(o1!=o1[t-1]:qlt) (always change — dense Q has infinite choices)") {
 		CHECK(realizable("G (o1[t]:qlt != o1[t-1]:qlt)."));
 	}
 
-	TEST_CASE("QR-33: REALIZABLE: (o1=i1[t-2]) U (o1=i1[t-1])") {
-		CHECK(realizable("(o1[t]:qlt = i1[t-2]:qlt) U (o1[t]:qlt = i1[t-1]:qlt)."));
+	TEST_CASE("QR-33: REALIZABLE: (o1=i1[t-2]) until (o1=i1[t-1])") {
+		CHECK(realizable("(o1[t]:qlt = i1[t-2]:qlt) until (o1[t]:qlt = i1[t-1]:qlt)."));
 	}
 
 	TEST_CASE("QR-34: REALIZABLE: F(G(o1={1/2}:qlt)) (eventually always constant)") {
@@ -217,7 +217,7 @@ TEST_SUITE("qlt_realizability") {
 	}
 
 	TEST_CASE("QR-36: REALIZABLE: (o1>{1/4}:qlt) S (o1<{3/4}:qlt) (since — o1<3/4 at t=0)") {
-		CHECK(realizable("(o1[t]:qlt > {1/4}:qlt) S (o1[t]:qlt < {3/4}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt > {1/4}:qlt) since (o1[t]:qlt < {3/4}:qlt)."));
 	}
 
 	TEST_CASE("QR-37: REALIZABLE: G(o1[t-1]={1/2}:qlt -> o1={2/3}:qlt) (conditional implication)") {
@@ -229,7 +229,7 @@ TEST_SUITE("qlt_realizability") {
 	}
 
 	TEST_CASE("QR-40: REALIZABLE: (o1={1/2}:qlt) R (o1={2/3}:qlt) (release — 2/3 always satisfies)") {
-		CHECK(realizable("(o1[t]:qlt = {1/2}:qlt) R (o1[t]:qlt = {2/3}:qlt)."));
+		CHECK(realizable("(o1[t]:qlt = {1/2}:qlt) release (o1[t]:qlt = {2/3}:qlt)."));
 	}
 
 } // TEST_SUITE "qlt_realizability"
@@ -323,7 +323,7 @@ TEST_SUITE("qlt_execution") {
 	//
 	TEST_CASE("QE-09: (o1>{0}:qlt) U (o1={1/2}:qlt) eventually reaches 1/2") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt).", 5);
+		auto vals = run_qlt_no_input("(o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		bool reached = false;
 		for (size_t i = 0; i < vals.size(); ++i) {
@@ -357,7 +357,7 @@ TEST_SUITE("qlt_execution") {
 
 	TEST_CASE("QE-12: (o1={1/4}:qlt) S (o1={3/4}:qlt) — outputs 3/4 at t=0") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt).", 4);
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		// At t=0, no past => second operand must hold: output must be 3/4
 		CHECK(vals[0] == "3/4");
@@ -384,7 +384,7 @@ TEST_SUITE("qlt_execution") {
 	//
 	TEST_CASE("QE-15: (o1={1/2}:qlt) W (o1={2/3}:qlt) weak until pattern") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) W (o1[t]:qlt = {2/3}:qlt).", 5);
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) weak_until (o1[t]:qlt = {2/3}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		bool reached = false;
 		for (size_t i = 0; i < vals.size(); ++i) {
@@ -435,7 +435,7 @@ TEST_SUITE("qlt_execution") {
 
 	TEST_CASE("QE-20: (o1={1/2}:qlt) R (o1={2/3}:qlt) release pattern") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) R (o1[t]:qlt = {2/3}:qlt).", 5);
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) release (o1[t]:qlt = {2/3}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		// Before first 1/2 appears, all must be 2/3
 		bool saw_half = false;
@@ -446,7 +446,7 @@ TEST_SUITE("qlt_execution") {
 	}
 	TEST_CASE("QE-21: (o1={1/4}:qlt) T (o1={3/4}:qlt) — trigger forces 3/4 at t=0") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		// T is the past dual of S: the second operand must hold at t=0
 		// (and, since specs must always hold, G(phi T psi) = G(psi)).
@@ -455,7 +455,7 @@ TEST_SUITE("qlt_execution") {
 
 	TEST_CASE("QE-22: (o1={3/4}:qlt) T (o1={3/4}:qlt) — realizable, constant 3/4") {
 		bdd_init<Bool>();
-		auto vals = run_qlt_no_input("(o1[t]:qlt = {3/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {3/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v == "3/4");
 	}
@@ -531,11 +531,11 @@ TEST_SUITE("bv_realizability") {
 	}
 
 	TEST_CASE("BR-08: (o1={#b00001111}:bv[8]) U (o1={#b11110000}:bv[8]) is REALIZABLE") {
-		CHECK(realizable("(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8])."));
+		CHECK(realizable("(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8])."));
 	}
 
 	TEST_CASE("BR-09: (o1={#b10101010}:bv[8]) S (o1={#b01010101}:bv[8]) is REALIZABLE") {
-		CHECK(realizable("(o1[t]:bv[8] = {#b10101010}:bv[8]) S (o1[t]:bv[8] = {#b01010101}:bv[8])."));
+		CHECK(realizable("(o1[t]:bv[8] = {#b10101010}:bv[8]) since (o1[t]:bv[8] = {#b01010101}:bv[8])."));
 	}
 
 	TEST_CASE("BR-10: G(o1=o1[t-1]:bv[8]) is REALIZABLE (constant output)") {
@@ -555,7 +555,7 @@ TEST_SUITE("bv_realizability") {
 	}
 
 	TEST_CASE("BR-14: UNREALIZABLE: (o1={#b00000000}:bv[8]) U (o1={#b11111111}:bv[8]) && G(o1!={#b11111111}:bv[8])") {
-		CHECK_FALSE(realizable("(o1[t]:bv[8] = {#b00000000}:bv[8]) U (o1[t]:bv[8] = {#b11111111}:bv[8]) && G (o1[t]:bv[8] != {#b11111111}:bv[8])."));
+		CHECK_FALSE(realizable("(o1[t]:bv[8] = {#b00000000}:bv[8]) until (o1[t]:bv[8] = {#b11111111}:bv[8]) && G (o1[t]:bv[8] != {#b11111111}:bv[8])."));
 	}
 
 	TEST_CASE("BR-15: UNREALIZABLE: G(o1=i1[t-1]:bv[8]) && G(i1[t]:bv[8]!=i1[t-1]:bv[8]) (adversary constant i)") {
@@ -575,7 +575,7 @@ TEST_SUITE("bv_realizability") {
 	}
 
 	TEST_CASE("BR-19: REALIZABLE: (o1={5}:bv[8]) R (o1={#b00001111}:bv[8])") {
-		CHECK(realizable("(o1[t]:bv[8] = {5}:bv[8]) R (o1[t]:bv[8] = {#b00001111}:bv[8])."));
+		CHECK(realizable("(o1[t]:bv[8] = {5}:bv[8]) release (o1[t]:bv[8] = {#b00001111}:bv[8])."));
 	}
 
 	TEST_CASE("BR-20: REALIZABLE: G(o1!=i1[t-1]:bv[8]) (avoid previous input)") {
@@ -651,14 +651,14 @@ TEST_SUITE("bv_execution") {
 
 	TEST_CASE("BE-09: (o1={#b00001111}:bv[8]) U (o1={#b11110000}:bv[8]) until pattern") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8]).", 5);
+		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
 	TEST_CASE("BE-10: (o1={#b10101010}:bv[8]) W (o1={#b01010101}:bv[8]) weak until") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b10101010}:bv[8]) W (o1[t]:bv[8] = {#b01010101}:bv[8]).", 5);
+		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b10101010}:bv[8]) weak_until (o1[t]:bv[8] = {#b01010101}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
@@ -690,7 +690,7 @@ TEST_SUITE("grammar_fuzz") {
 	}
 
 	TEST_CASE("GF-06: Nested U qlt: (o1={1/4}:qlt) U ((o1={1/2}:qlt) U (o1={3/4}:qlt))") {
-		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) U ((o1[t]:qlt = {1/2}:qlt) U (o1[t]:qlt = {3/4}:qlt))."));
+		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) until ((o1[t]:qlt = {1/2}:qlt) until (o1[t]:qlt = {3/4}:qlt))."));
 	}
 
 	TEST_CASE("GF-07: qlt lookback: G(o1[t]!=o1[t-2] && o1[t]!=o1[t-1])") {
@@ -741,7 +741,7 @@ TEST_SUITE("grammar_fuzz") {
 		auto o2 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", qlt_type_id<node_t>(), o1);
 		ctx.add_output("o2", qlt_type_id<node_t>(), o2);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G ((o1[t]:qlt > {1/4}:qlt) S (o2[t]:qlt < {3/4}:qlt))."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G ((o1[t]:qlt > {1/4}:qlt) since (o2[t]:qlt < {3/4}:qlt))."));
 		CHECK(nso.has_value());
 		if (nso.has_value()) {
 			tref fm = nso.value().main->get();

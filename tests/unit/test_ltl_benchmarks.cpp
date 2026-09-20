@@ -113,7 +113,7 @@ TEST_SUITE("LTL literature benchmarks") {
 		// (Strong U would be UNREAL — env can withhold i1 = 1 indefinitely.)
 		if (skip_benchmarks()) return;
 		CHECK(realizable(
-			"((o1[t] = 1) W (i1[t] = 1))."
+			"((o1[t] = 1) weak_until (i1[t] = 1))."
 		));
 	}
 

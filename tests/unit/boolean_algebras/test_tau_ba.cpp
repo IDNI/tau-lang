@@ -836,7 +836,7 @@ TEST_CASE("G(o1=T) | G(o1=F) is not zero") {	auto a = from_spec("G (o1[t]:tau = 
 	CHECK((a | b).is_zero() == false);
 }
 
-TEST_CASE("tau_ba conjunction with T is identity") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
+TEST_CASE("tau_ba conjunction with trigger is identity") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto and_T = a & tau_one();
 	CHECK(and_T.is_zero() == a.is_zero());
 }
@@ -846,7 +846,7 @@ TEST_CASE("tau_ba disjunction with F is identity") {	auto a = from_spec("G (o1[t
 	CHECK(or_F.is_zero() == a.is_zero());
 }
 
-TEST_CASE("tau_ba and T does not change one-ness") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
+TEST_CASE("tau_ba and trigger does not change one-ness") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto and_T = a & tau_one();
 	CHECK(and_T.is_one() == a.is_one());
 }

@@ -1,1 +1,1 @@
-(o1[t]:sbf = {X & Y}:sbf) U (G (F (o2[t]:sbf = {X | Z}:sbf))).
+(o1[t]:sbf = {X & Y}:sbf) until (G (F (o2[t]:sbf = {X | Z}:sbf))).

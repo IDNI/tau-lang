@@ -875,11 +875,11 @@ State: 1
 		CHECK(alg_d_realizable("G (o1[t]:qlt > o1[t-1]:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-28] G(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
+	TEST_CASE("[ALG-D-28] G(o1[t]:qlt > {0}:qlt) until (o1[t]:qlt < {0}:qlt) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		// G(y>0) U (y<0): the U releases when y<0; achievable since DLO has both
 		// positive and negative elements
 		CHECK(alg_d_realizable(
-			"(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt)."));
+			"(o1[t]:qlt > {0}:qlt) until (o1[t]:qlt < {0}:qlt)."));
 	}
 
 	TEST_CASE("[ALG-D-29] ALG-D-gate falls through for non-qlt formula") {

@@ -30,14 +30,18 @@ sometimes o2[t] = 1
 <> o2[t] = 1
 F (o2[t] = 1)
 
-# The binary temporal operators are infix: U (until), R (release), W (weak
-# until), and the past operators S (since) and T (trigger):
+# The binary temporal operators are infix: until, release, weak_until, and
+# the past operators since and trigger. Each also has a one-letter spelling
+# -- U, R, W, S and T -- which parses to the same formula, so the second
+# line below lands in the slot of the first, and prints back with the
+# letter:
 
+(o1[t] = 1) until (i1[t] = 1)
 (o1[t] = 1) U (i1[t] = 1)
-(o1[t] = 1) R (i1[t] = 1)
-(o1[t] = 1) W (i1[t] = 1)
-(o1[t] = 1) S (i1[t] = 1)
-(o1[t] = 1) T (i1[t] = 1)
+(o1[t] = 1) release (i1[t] = 1)
+(o1[t] = 1) weak_until (i1[t] = 1)
+(o1[t] = 1) since (i1[t] = 1)
+(o1[t] = 1) trigger (i1[t] = 1)
 
 # The infix operators bind tighter than && and ||, so a compound operand
 # wants its own parentheses, just as with the prefix operators below.
@@ -67,19 +71,20 @@ whatis {181}:bv[8]
 
 n F ((o1[t] = 1) && (ex y (o2[t] = y)))
 
-# Under U and T, a duplicated conjunct is dropped:
+# Under until and trigger, a duplicated conjunct is dropped:
 
-n (o1[t] = 1 && o1[t] = 1) U (o2[t] = 1)
-n ((o1[t] = 1 && o1[t] = 1)) T (o2[t] = 1)
+n (o1[t] = 1 && o1[t] = 1) until (o2[t] = 1)
+n ((o1[t] = 1 && o1[t] = 1)) trigger (o2[t] = 1)
 
-# Under R, the tautologous right-hand side collapses to T:
+# Under release, the tautologous right-hand side collapses to T:
 
-n (o1[t] = 0) R (o2[t] o2[t]' = 0)
+n (o1[t] = 0) release (o2[t] o2[t]' = 0)
 
-# Under W and S, the non-temporal quantifiers are eliminated outright:
+# Under weak_until and since, the non-temporal quantifiers are eliminated
+# outright:
 
-n (all x (o1[t] x = 0)) W (o2[t] = 1)
-n (ex y (o1[t] = y && o2[t] = 1)) S (o3[t] = 1)
+n (all x (o1[t] x = 0)) weak_until (o2[t] = 1)
+n (ex y (o1[t] = y && o2[t] = 1)) since (o3[t] = 1)
 
 # The canonical form writes a term equal to 1 as its complement equal to 0:
 

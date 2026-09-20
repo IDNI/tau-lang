@@ -69,7 +69,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 	TEST_CASE("PERF-F03: (o=0) U (o=1) simple until — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
-		double sec = timed_realizable("((o1[t] = 0)) U ((o1[t] = 1)).", &r);
+		double sec = timed_realizable("((o1[t] = 0)) until ((o1[t] = 1)).", &r);
 		MESSAGE("(o=0) U (o=1): " << sec << "s, result=" << r);
 		CHECK(r == true);
 		CHECK(sec < 5.0);
@@ -105,7 +105,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 	TEST_CASE("PERF-F07: (o=1) R (o=0) release — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
-		double sec = timed_realizable("((o1[t] = 1)) R ((o1[t] = 0)).", &r);
+		double sec = timed_realizable("((o1[t] = 1)) release ((o1[t] = 0)).", &r);
 		MESSAGE("(o=1) R (o=0): " << sec << "s, result=" << r);
 		CHECK(r == true);
 		CHECK(sec < 5.0);
@@ -114,7 +114,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 	TEST_CASE("PERF-F08: (o=0) W (o=1) weak until — < 5s" * doctest::skip(!ltlsynt_available())) {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
-		double sec = timed_realizable("((o1[t] = 0)) W ((o1[t] = 1)).", &r);
+		double sec = timed_realizable("((o1[t] = 0)) weak_until ((o1[t] = 1)).", &r);
 		MESSAGE("(o=0) W (o=1): " << sec << "s, result=" << r);
 		CHECK(r == true);
 		CHECK(sec < 5.0);
@@ -154,7 +154,7 @@ TEST_SUITE("LTL perf (performance regression)") {
 		if (skip_perf()) { MESSAGE("TAU_LTL_SKIP_PERF=1 — skipped"); return; }
 		bool r;
 		double sec = timed_realizable(
-			"(((o1[t] = 0)) U ((o1[t] = 1))) || (G (o1[t] = 0)).", &r);
+			"(((o1[t] = 0)) until ((o1[t] = 1))) || (G (o1[t] = 0)).", &r);
 		MESSAGE("(o=0 U o=1)||G(o=0): " << sec << "s, result=" << r);
 		CHECK(r == true);
 		CHECK(sec < 15.0);

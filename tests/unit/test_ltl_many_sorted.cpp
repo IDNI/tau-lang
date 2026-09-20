@@ -64,7 +64,7 @@ TEST_CASE("[MS-0003] qlt+bv: UNREAL — contradictory implication forces impossi
 }
 
 TEST_CASE("[MS-0004] qlt+bv: Until across types") {
-	const char* fm = "(o1[t]:qlt > {0}:qlt) U (o2[t]:bv[8] = {#b00001111}:bv[8]).";
+	const char* fm = "(o1[t]:qlt > {0}:qlt) until (o2[t]:bv[8] = {#b00001111}:bv[8]).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -158,7 +158,7 @@ TEST_CASE("[MS-0017] bv+sbf: G conjunction both constant") {
 }
 
 TEST_CASE("[MS-0018] bv+sbf: Until bv holds until sbf achieved") {
-	const char* fm = "(o1[t]:bv[8] = {#b10110101}:bv[8]) U (o2[t]:sbf = {X}:sbf).";
+	const char* fm = "(o1[t]:bv[8] = {#b10110101}:bv[8]) until (o2[t]:sbf = {X}:sbf).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -184,7 +184,7 @@ TEST_CASE("[MS-0021] bv+hsb: F conjunction") {
 }
 
 TEST_CASE("[MS-0022] bv+hsb: Until across types") {
-	const char* fm = "(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o2[t]:hsb != {bot}:hsb).";
+	const char* fm = "(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o2[t]:hsb != {bot}:hsb).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -258,7 +258,7 @@ TEST_CASE("[MS-0032] sbf+qint: G conjunction") {
 }
 
 TEST_CASE("[MS-0033] sbf+qint: Until across types") {
-	const char* fm = "(o1[t]:sbf = {X & Y}:sbf) U (o2[t]:qint = {[1/4, 3/4)}:qint).";
+	const char* fm = "(o1[t]:sbf = {X & Y}:sbf) until (o2[t]:qint = {[1/4, 3/4)}:qint).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -304,7 +304,7 @@ TEST_CASE("[MS-0039] hsb+qint: G conjunction") {
 }
 
 TEST_CASE("[MS-0040] hsb+qint: Until across types") {
-	const char* fm = "(o1[t]:hsb != {bot}:hsb) U (o2[t]:qint = {[-1, 0) | [1, 2)}:qint).";
+	const char* fm = "(o1[t]:hsb != {bot}:hsb) until (o2[t]:qint = {[-1, 0) | [1, 2)}:qint).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -358,7 +358,7 @@ TEST_CASE("[MS-0047] qlt+bv: G(F) liveness on both types alternating") {
 }
 
 TEST_CASE("[MS-0048] sbf+bv: Until across types") {
-	const char* fm = "(o1[t]:sbf = {X}:sbf) U (o2[t]:bv[8] != {0}:bv[8]).";
+	const char* fm = "(o1[t]:sbf = {X}:sbf) until (o2[t]:bv[8] != {0}:bv[8]).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -406,7 +406,7 @@ TEST_CASE("[MS-0054] qlt+bv+sbf: F liveness three types") {
 }
 
 TEST_CASE("[MS-0055] qlt+bv+sbf: Until on qlt with G on bv+sbf") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X ^ Y}:sbf)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X ^ Y}:sbf)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -456,7 +456,7 @@ TEST_CASE("[MS-0062] qlt+bv+hsb: implication from qlt to bv with hsb") {
 }
 
 TEST_CASE("[MS-0063] qlt+bv+hsb: Until on qlt, F on bv+hsb") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {#b10110101}:bv[8])) && (F (o3[t]:hsb = {top}:hsb)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {#b10110101}:bv[8])) && (F (o3[t]:hsb = {top}:hsb)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -500,7 +500,7 @@ TEST_CASE("[MS-0069] qlt+bv+qint: implication chain across three types") {
 }
 
 TEST_CASE("[MS-0070] qlt+bv+qint: Until on bv with G on qlt+qint") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) U (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:qint = {[1/4, 3/4)}:qint)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {255}:bv[8])) && (F (o3[t]:qint = {[1/4, 3/4)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -538,7 +538,7 @@ TEST_CASE("[MS-0075] qlt+bv+tau: implication from qlt to tau with bv guard") {
 }
 
 TEST_CASE("[MS-0076] qlt+bv+tau: Until on qlt with G on bv+tau") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {1}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt < {1}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -576,7 +576,7 @@ TEST_CASE("[MS-0081] qlt+sbf+hsb: implication from sbf to hsb") {
 }
 
 TEST_CASE("[MS-0082] qlt+sbf+hsb: Until on sbf with G on qlt+hsb") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) U (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o3[t]:hsb = {top}:hsb)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o3[t]:hsb = {top}:hsb)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -608,7 +608,7 @@ TEST_CASE("[MS-0086] qlt+sbf+qint: UNREAL — sbf contradiction") {
 }
 
 TEST_CASE("[MS-0087] qlt+sbf+qint: Until on qlt with G on sbf+qint") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:sbf = {X}:sbf && o3[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:sbf = {X}:sbf && o3[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -672,7 +672,7 @@ TEST_CASE("[MS-0096] qlt+hsb+qint: UNREAL — qlt contradiction") {
 }
 
 TEST_CASE("[MS-0097] qlt+hsb+qint: Until on qlt with G on hsb+qint") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:hsb = {top}:hsb && o3[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:hsb = {top}:hsb && o3[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -750,7 +750,7 @@ TEST_CASE("[MS-0108] bv+sbf+hsb: UNREAL — bv contradiction") {
 }
 
 TEST_CASE("[MS-0109] bv+sbf+hsb: Until on bv with G on sbf+hsb") {
-	const char* fm = "((o1[t]:bv[8] = {42}:bv[8]) U (o1[t]:bv[8] = {255}:bv[8])) && (G (o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb)).";
+	const char* fm = "((o1[t]:bv[8] = {42}:bv[8]) until (o1[t]:bv[8] = {255}:bv[8])) && (G (o2[t]:sbf = {X}:sbf && o3[t]:hsb = {top}:hsb)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -802,7 +802,7 @@ TEST_CASE("[MS-0116] bv+sbf+tau: F liveness three types") {
 }
 
 TEST_CASE("[MS-0117] bv+sbf+tau: Until on bv with G on sbf+tau") {
-	const char* fm = "((o1[t]:bv[8] = {42}:bv[8]) U (o1[t]:bv[8] = {255}:bv[8])) && (G (o2[t]:sbf = {X}:sbf && o3[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:bv[8] = {42}:bv[8]) until (o1[t]:bv[8] = {255}:bv[8])) && (G (o2[t]:sbf = {X}:sbf && o3[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -926,7 +926,7 @@ TEST_CASE("[MS-0134] qlt+bv+sbf+hsb: implication chain across four types") {
 }
 
 TEST_CASE("[MS-0135] qlt+bv+sbf+hsb: Until on qlt with G on bv+sbf+hsb") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X | (Y & Z)}:sbf && o4[t]:hsb = {top}:hsb)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X | (Y & Z)}:sbf && o4[t]:hsb = {top}:hsb)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -956,7 +956,7 @@ TEST_CASE("[MS-0139] qlt+bv+sbf+hsb: input-output") {
 }
 
 TEST_CASE("[MS-0140] qlt+bv+sbf+hsb: Until on qlt with G on rest") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -988,7 +988,7 @@ TEST_CASE("[MS-0144] qlt+bv+sbf+qint: implication chain") {
 }
 
 TEST_CASE("[MS-0145] qlt+bv+sbf+qint: Until on sbf") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) U (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o4[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (F (o4[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1038,7 +1038,7 @@ TEST_CASE("[MS-0152] qlt+bv+sbf+tau: implication chain") {
 }
 
 TEST_CASE("[MS-0153] qlt+bv+sbf+tau: Until on qlt, F on bv") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {42}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (F (o2[t]:bv[8] = {42}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1082,7 +1082,7 @@ TEST_CASE("[MS-0159] qlt+bv+hsb+qint: implication") {
 }
 
 TEST_CASE("[MS-0160] qlt+bv+hsb+qint: Until on qlt with G on rest") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[-1, 0) | [1, 2)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1146,7 +1146,7 @@ TEST_CASE("[MS-0169] qlt+bv+qint+tau: UNREAL — qlt contradiction") {
 }
 
 TEST_CASE("[MS-0170] qlt+bv+qint+tau: Until on qlt with G on rest") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:qint = {[0, 1)}:qint && o4[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1184,7 +1184,7 @@ TEST_CASE("[MS-0175] qlt+sbf+hsb+qint: F liveness four types") {
 }
 
 TEST_CASE("[MS-0176] qlt+sbf+hsb+qint: Until on sbf with G on rest") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) U (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1314,7 +1314,7 @@ TEST_CASE("[MS-0194] qlt+bv+sbf+hsb+qint: implication chain") {
 }
 
 TEST_CASE("[MS-0195] qlt+bv+sbf+hsb+qint: Until on qlt with G on rest") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1376,7 +1376,7 @@ TEST_CASE("[MS-0204] qlt+bv+sbf+hsb+tau: input-output") {
 }
 
 TEST_CASE("[MS-0205] qlt+bv+sbf+hsb+tau: Until on qlt with G on rest") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1402,7 +1402,7 @@ TEST_CASE("[MS-0208] qlt+bv+sbf+qint+tau: UNREAL — qlt G+F contradiction") {
 }
 
 TEST_CASE("[MS-0209] qlt+bv+sbf+qint+tau: Until on sbf with G on rest") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) U (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1434,7 +1434,7 @@ TEST_CASE("[MS-0213] qlt+bv+hsb+qint+tau: UNREAL — bv contradiction") {
 }
 
 TEST_CASE("[MS-0214] qlt+bv+hsb+qint+tau: Until on qlt with G on rest") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:hsb = {top}:hsb && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1527,7 +1527,7 @@ TEST_CASE("[MS-0227] 6-type: implication chain across all six") {
 }
 
 TEST_CASE("[MS-0228] 6-type: Until on qlt with G on five") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1551,7 +1551,7 @@ TEST_CASE("[MS-0231] 6-type: input-output across six types") {
 }
 
 TEST_CASE("[MS-0232] 6-type: Until on qlt with G on five") {
-	const char* fm = "((o1[t]:qlt > {0}:qlt) U (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
+	const char* fm = "((o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt)) && (G (o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1569,7 +1569,7 @@ TEST_CASE("[MS-0234] 6-type: UNREAL — bv always 42 but F needs 0") {
 }
 
 TEST_CASE("[MS-0235] 6-type: Until on bv with G on five") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) U (o2[t]:bv[8] = {0}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {0}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1587,7 +1587,7 @@ TEST_CASE("[MS-0237] 6-type: mixed temporal operators across all types") {
 }
 
 TEST_CASE("[MS-0238] 6-type: Until on sbf with F on bv and G on rest") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && (F (o2[t]:bv[8] = {#b10110101}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) U (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) && (F (o2[t]:bv[8] = {#b10110101}:bv[8])) && ((o3[t]:sbf = {X & Y}:sbf) until (o3[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1623,7 +1623,7 @@ TEST_CASE("[MS-0243] 6-type: mixed F and G with diverse constants") {
 }
 
 TEST_CASE("[MS-0244] 6-type: Until on bv with G on five") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) U (o2[t]:bv[8] = {255}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt)) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {255}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1647,7 +1647,7 @@ TEST_CASE("[MS-0247] 6-type: UNREAL — qlt always positive but F needs negative
 }
 
 TEST_CASE("[MS-0248] 6-type: G(F) mixed with Until across types") {
-	const char* fm = "(G (F (o1[t]:qlt > {1/2}:qlt))) && ((o2[t]:bv[8] = {42}:bv[8]) U (o2[t]:bv[8] = {255}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
+	const char* fm = "(G (F (o1[t]:qlt > {1/2}:qlt))) && ((o2[t]:bv[8] = {42}:bv[8]) until (o2[t]:bv[8] = {255}:bv[8])) && (G (o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }
@@ -1659,7 +1659,7 @@ TEST_CASE("[MS-0249] 6-type: complex implication with disjunction and negation")
 }
 
 TEST_CASE("[MS-0250] 6-type: comprehensive six-type with varied temporal ops") {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o6[t]:tau = {T.}:tau)) && (F (o2[t]:bv[8] = {#b10110101}:bv[8])) && ((o5[t]:qint = {[0, 1)}:qint) U (o5[t]:qint = {[1/4, 3/4)}:qint)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt && o3[t]:sbf = {X & Y}:sbf && o4[t]:hsb = {top}:hsb && o6[t]:tau = {T.}:tau)) && (F (o2[t]:bv[8] = {#b10110101}:bv[8])) && ((o5[t]:qint = {[0, 1)}:qint) until (o5[t]:qint = {[1/4, 3/4)}:qint)).";
 	REQUIRE(spec(fm) != nullptr);
 	CHECK(realizable(fm));
 }

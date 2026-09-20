@@ -451,9 +451,9 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 
 TEST_SUITE("LTL Execution (tau): U R W formulas") {
 
-	TEST_CASE("(o1[t]:tau = 1) U (o1[t]:tau = 0) – 4 steps") {
+	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 4 steps") {
 		bdd_init<Bool>();
-		auto spec = create_spec("(o1[t]:tau = 1) U (o1[t]:tau = 0).");
+		auto spec = create_spec("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -462,9 +462,9 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	TEST_CASE("(o1[t]:tau = 1) U (o1[t]:tau = 0) – 5 steps (no input vars)") {
+	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 5 steps (no input vars)") {
 		bdd_init<Bool>();
-		auto spec = create_spec("(o1[t]:tau = 1) U (o1[t]:tau = 0).");
+		auto spec = create_spec("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -473,9 +473,9 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	TEST_CASE("(o1[t]:tau = 0) R (o1[t]:tau = 1) – 4 steps (release)") {
+	TEST_CASE("(o1[t]:tau = 0) release (o1[t]:tau = 1) – 4 steps (release)") {
 		bdd_init<Bool>();
-		auto spec = create_spec("(o1[t]:tau = 0) R (o1[t]:tau = 1).");
+		auto spec = create_spec("(o1[t]:tau = 0) release (o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -484,9 +484,9 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	TEST_CASE("(o1[t]:tau = 1) W (o1[t]:tau = 0) – 5 steps (weak until)") {
+	TEST_CASE("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0) – 5 steps (weak until)") {
 		bdd_init<Bool>();
-		auto spec = create_spec("(o1[t]:tau = 1) W (o1[t]:tau = 0).");
+		auto spec = create_spec("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -495,9 +495,9 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	TEST_CASE("(o1[t]:tau = 0) W (o1[t]:tau = 1) – 5 steps weak until (no input vars)") {
+	TEST_CASE("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1) – 5 steps weak until (no input vars)") {
 		bdd_init<Bool>();
-		auto spec = create_spec("(o1[t]:tau = 0) W (o1[t]:tau = 1).");
+		auto spec = create_spec("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -773,7 +773,7 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:sbf = {X & Y}:sbf) U (o1[t]:sbf = {X | Z}:sbf).");
+			"(o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
@@ -786,7 +786,7 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:sbf = {X | (Y & Z)}:sbf) W (o1[t]:sbf = {X & Y}:sbf).");
+			"(o1[t]:sbf = {X | (Y & Z)}:sbf) weak_until (o1[t]:sbf = {X & Y}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
@@ -959,7 +959,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8]).");
+			"(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
@@ -984,7 +984,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:bv[8] = {5}:bv[8]) W (o1[t]:bv[8] = {#b10110101}:bv[8]).");
+			"(o1[t]:bv[8] = {5}:bv[8]) weak_until (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
@@ -999,7 +999,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:bv[8] = {#b00001111}:bv[8]) R (o1[t]:bv[8] = {#b11110000}:bv[8]).");
+			"(o1[t]:bv[8] = {#b00001111}:bv[8]) release (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());

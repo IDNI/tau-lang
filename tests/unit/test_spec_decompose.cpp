@@ -61,7 +61,7 @@ TEST_SUITE("decomposed_spec decomposition") {
 	}
 
 	TEST_CASE("U reactive") {
-		tref fm = parse("((o1[t] = 1) U (o1[t] = 0)).");
+		tref fm = parse("((o1[t] = 1) until (o1[t] = 0)).");
 		REQUIRE(fm);
 		auto s = decompose_spec<node_t>(fm);
 		CHECK(s.reactive  != nullptr);
@@ -90,7 +90,7 @@ TEST_SUITE("decomposed_spec decomposition") {
 	TEST_CASE("[GR-RT4c] top-level sometimes / S / A / E are reactive") {
 		for (const char* src : {
 			"sometimes ((o1[t] = 1)).",
-			"((o1[t] = 1) S (o1[t] = 0)).",
+			"((o1[t] = 1) since (o1[t] = 0)).",
 			"A ((o1[t] = 1)).",
 			"E ((o1[t] = 1))." })
 		{

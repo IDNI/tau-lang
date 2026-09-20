@@ -16,8 +16,8 @@ add_repl_test(realizable_bv1-output_conjunct_is_realizable
 add_repl_test(realizable_bv1-input_tautology_under_F
 	"realizable F ((i1[t]:bv[1] = 0) || (i1[t]:bv[1] = 1))" ": T")
 add_repl_test(realizable_bv1-input_tautology_under_U
-	"realizable (o1[t]:bv[1] = 1) U ((i1[t]:bv[1] = 0) || (i1[t]:bv[1] = 1))" ": T")
+	"realizable (o1[t]:bv[1] = 1) until ((i1[t]:bv[1] = 0) || (i1[t]:bv[1] = 1))" ": T")
 add_repl_test(realizable_bv1-input_contradiction_under_F
 	"realizable F ((i1[t]:bv[1] = 0) && (i1[t]:bv[1] = 1))" ": F")
 add_repl_test(realizable_bv1-weak_until_tautology
-	"realizable ((i1[t]:bv[1] = 0)) W ((i1[t]:bv[1] = 1))" ": T")
+	"realizable ((i1[t]:bv[1] = 0)) weak_until ((i1[t]:bv[1] = 1))" ": T")

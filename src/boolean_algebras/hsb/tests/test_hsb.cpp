@@ -2555,7 +2555,7 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"(o1[t]:hsb = {top}:hsb) U (o2[t]:bv[8] = {255}:bv[8]).");
+			"(o1[t]:hsb = {top}:hsb) until (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		{
 			auto sat = is_tau_formula_sat<node_t>(fm);
@@ -2795,7 +2795,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"(o_admit[t]:hsb != {bot}:hsb) U (o_tick[t]:sbf = {tick}:sbf).");
+			"(o_admit[t]:hsb != {bot}:hsb) until (o_tick[t]:sbf = {tick}:sbf).");
 		REQUIRE(fm != nullptr);
 		{
 			auto sat = is_tau_formula_sat<node_t>(fm);

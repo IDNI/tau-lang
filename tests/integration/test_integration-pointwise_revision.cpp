@@ -520,12 +520,12 @@ TEST_CASE("pwr/nested-until: U-of-U spec revised by U-of-U update"
 	bdd_init<Bool>();
 	auto spec = create_spec(
 		"always u[t] = i3[t] "
-		"&& (((o1[t]:sbf = {X}:sbf) U (o1[t]:sbf = {Y}:sbf)) "
+		"&& (((o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)) "
 		"     U (o2[t]:sbf = {Z}:sbf)).");
 	strings i3_values = {
 		"F",
 		"F",
-		"((o1[t]:sbf = {Y}:sbf) U (o1[t]:sbf = {X}:sbf)) "
+		"((o1[t]:sbf = {Y}:sbf) until (o1[t]:sbf = {X}:sbf)) "
 		"  U (o2[t]:sbf = {W}:sbf)",
 		"F"
 	};

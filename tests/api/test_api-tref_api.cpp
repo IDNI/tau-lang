@@ -598,7 +598,7 @@ TEST_SUITE("Tau API - tref - procedures") {
 			"always o1[t] = 0",
 			"sometimes o1[t] = 0",
 			"F (o1[t] = 1)",
-			"(o1[t] = 0) U (o1[t] = 1)",
+			"(o1[t] = 0) until (o1[t] = 1)",
 		};
 		for (const char* fm_str : formulas) {
 			auto fm_r = tau_api::get_formula(fm_str);
