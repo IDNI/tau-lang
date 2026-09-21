@@ -1059,11 +1059,14 @@ result<bool> api<node>::valid_spec(tref fm) {
 			"UNKNOWN: validity of a formula with CTL* operators "
 			"(A / E / semantic negation) cannot be decided");
 	}
-	// valid(φ) = ¬sat(¬φ). For formulas sat routes to the LTL pipeline,
-	// sat decides T one way only, so validity is F when ¬φ is satisfiable,
-	// T when sat(¬φ) is decided F, and undecided otherwise.
+	// valid(φ) holds when no trace violates φ. sat of full LTL is
+	// realizability, a game against the inputs, so it is asked about ¬φ
+	// with every input read as an output: with no input left, realizable
+	// is "some trace satisfies". This keeps valid φ implying sat φ, which
+	// unsat(¬φ) alone would not (¬φ unrealizable does not make φ
+	// realizable).
 	if (sat_has_ltl_operators<node>(fm)) {
-		auto s = sat(tau::build_wff_neg(fm));
+		auto s = sat(inputs_as_outputs<node>(tau::build_wff_neg(fm)));
 		if (!s.has_value()) {
 			r.merge(std::move(s));
 			return r.with_error(code::solver_error,

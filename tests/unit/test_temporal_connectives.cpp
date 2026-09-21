@@ -311,3 +311,42 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 		    "trigger_x := out console. trigger_x[t] = 1 trigger (o1[t] = 1)."));
 	}
 }
+
+// valid of a full-LTL formula is trace validity: the negation, with every
+// input stream read as an output, has no execution.  It therefore implies
+// sat, which is realizability: a formula no trace violates is realized by
+// any strategy.
+TEST_SUITE("temporal connectives — valid of full LTL is trace validity") {
+	static std::optional<bool> valid_str(const char* spec) {
+		tref fm = parse_spec(spec);
+		REQUIRE(fm != nullptr);
+		auto r = api<node_t>::valid(fm);
+		if (!r.has_value()) return std::nullopt;
+		return r.value();
+	}
+
+	TEST_CASE("G F over an input is not valid: the inputs can stay 0") {
+		CHECK(valid_str("G (F (i1[t] = 1)).") == std::optional<bool>(false));
+		CHECK(sat_str("G (F (i1[t] = 1)).") == false);
+	}
+
+	TEST_CASE("until reaching an input is not valid") {
+		CHECK(valid_str("(o1[t] = 1) until (i1[t] = 1).")
+			== std::optional<bool>(false));
+	}
+
+	TEST_CASE("G F phi -> F phi is valid, over an input too") {
+		CHECK(valid_str("(G (F (i1[t] = 1))) -> (F (i1[t] = 1)).")
+			== std::optional<bool>(true));
+	}
+
+	TEST_CASE("phi U psi -> F psi is valid") {
+		CHECK(valid_str("((o1[t] = 1) until (o2[t] = 1)) -> (F (o2[t] = 1)).")
+			== std::optional<bool>(true));
+	}
+
+	TEST_CASE("valid stays F where the negation has an execution") {
+		CHECK(valid_str("(o1[t] = 1) until (o2[t] = 1).")
+			== std::optional<bool>(false));
+	}
+}

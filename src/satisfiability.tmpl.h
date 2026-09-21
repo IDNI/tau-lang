@@ -2043,6 +2043,32 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 // side effects (and stores the verdict for others). Never share a cvc5
 // solver or ltlsynt session across calls -- the result cache is the only
 // safe port.
+// fm with every input stream read as an output: satisfiable exactly when
+// some input sequence lets fm hold, i.e. when some trace satisfies it.
+// The stream is renamed as well as re-tagged: resolve_io_vars stamps every
+// io_var from the io context and then the name prefix, so a stream still
+// called i1 would be read as an input again on any path that parses or
+// normalizes the formula. The new name is an output by prefix and is
+// registered nowhere.
+template <NodeType node>
+tref inputs_as_outputs(tref fm) {
+	using tau = tree<node>;
+	subtree_map<node, tref> flip;
+	for (tref v : tau::get(fm).select_all([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::io_var) && t.is_input_variable(); }))
+	{
+		const auto& t = tau::get(v);
+		trefs ch;
+		ch.push_back(build_var_name<node>(
+			"o_in_" + get_var_name<node>(v)));
+		for (size_t i = 1; i < t.children_size(); ++i)
+			ch.push_back(t.child(i));
+		flip.emplace(v, tau::get(node::output_variable(), ch));
+	}
+	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
+}
+
 template <NodeType node>
 result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	const bool output)

@@ -1820,25 +1820,6 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 		<< " step=" << time_point;
 }
 
-// fm with every input stream read as an output: satisfiable exactly when
-// some input sequence lets fm hold.
-template <NodeType node>
-static tref inputs_as_outputs(tref fm) {
-	using tau = tree<node>;
-	subtree_map<node, tref> flip;
-	for (tref v : tau::get(fm).select_all([](tref n) {
-		const auto& t = tau::get(n);
-		return t.is(tau::io_var) && t.is_input_variable(); }))
-	{
-		const auto& t = tau::get(v);
-		trefs ch;
-		for (size_t i = 0; i < t.children_size(); ++i)
-			ch.push_back(t.child(i));
-		flip.emplace(v, tau::get(node::output_variable(), ch));
-	}
-	return flip.empty() ? fm : rewriter::replace<node>(fm, flip);
-}
-
 template <NodeType node>
 std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 	LOG_TRACE << "get_ubt_ctn_at begin \n";

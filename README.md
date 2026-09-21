@@ -1006,7 +1006,10 @@ Further resources concerning the details can be found in the [theory section](#t
 
 For full LTL (`U`, `R`, `W`, `S`, `T`, nested temporal operators) the same
 notion is realizability: `sat` and `realizable` decide it through the LTL(ABA)
-synthesis pipeline and agree in both directions.  `valid φ` is `unsat ! φ`.
+synthesis pipeline and agree in both directions.  `valid φ` holds when no
+trace violates φ: it is `unsat ! φ` with every input stream read as an output,
+so that `valid φ` implies `sat φ` (`G (F i1[t] = 1)` is neither valid nor
+satisfiable: the inputs can stay 0, and the system cannot make them 1).
 A verdict that cannot be decided (backend failure, a resource cap that gave
 up, an `E` over inputs in the CTL\* fragment) is reported as UNKNOWN.
 

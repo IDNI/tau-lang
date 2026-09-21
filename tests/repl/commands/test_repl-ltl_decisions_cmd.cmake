@@ -34,6 +34,17 @@ add_repl_test(ltl_decisions-valid_negated_until_F
 	"valid !((o1[t] = 1) until (o2[t] = 1))" ": F")
 add_repl_test(ltl_decisions-valid_G_F_no_abort "valid G (F o1[t] = 1)" ": F")
 
+# valid is trace validity: F when some input sequence and some outputs
+# violate the formula, so valid never holds where sat answers F
+add_repl_test(ltl_decisions-valid_G_F_input_F
+	"valid G (F (i1[t] = 1))" ": F")
+add_repl_test(ltl_decisions-valid_until_input_F
+	"valid (o1[t] = 1) until (i1[t] = 1)" ": F")
+add_repl_test(ltl_decisions-valid_nested_implication_input_T
+	"valid (G (F (i1[t] = 1))) -> (F (i1[t] = 1))" ": T")
+add_repl_test(ltl_decisions-valid_until_implies_F_T
+	"valid ((o1[t] = 1) until (o2[t] = 1)) -> (F (o2[t] = 1))" ": T")
+
 # normal forms keep U / R / W / S / T and CTL* scopes as opaque literals
 add_repl_test(ltl_decisions-dnf_keeps_until
 	"dnf (o1[t] = 1 || o2[t] = 1) until (o3[t] = 1)"
@@ -73,3 +84,11 @@ add_repl_test(ltl_decisions-print_wraps_negated_until_operand
 add_repl_test(ltl_decisions-print_wraps_nested_until
 	"qelim ((o1[t] = 1) until (o2[t] = 1)) until (o3[t] = 1)"
 	"\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1\\) U o3")
+
+# a negation over a disjunction with a full-LTL disjunct is kept as is:
+# the temporal path split used to turn !(X || Y) into !X || !Y
+add_repl_test(ltl_decisions-normalize_keeps_negated_disjunction
+	"normalize !(((o1[t] = 1) until (o2[t] = 1)) || (G (o3[t] = 1)))"
+	"!\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1 \\|\\| \\(always o3\\[t\\]:tau = 1\\)\\)")
+add_repl_test(ltl_decisions-sat_negated_disjunction_F
+	"sat !((!((o1[t] = 1) until (o2[t] = 1))) || (F (o2[t] = 1)))" ": F")

@@ -1684,6 +1684,22 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>)) {
 		return r.with_assert_check_value(fm);
 	}
+	// A full-LTL or CTL* operator is left untouched above, so a negation
+	// over it is still in place and the temporal layer is not in DNF:
+	// expression_paths would fork below that negation and turn
+	// !(X || Y) into !X || !Y. The LTL pipeline owns such a formula and
+	// pushes its negations itself.
+	if (tau::get(fm).find_top([](tref n) {
+		const auto& t = tau::get(n);
+		if (!t.has_child()) return false;
+		const auto nt = t[0].value.nt;
+		return nt == tau::wff_until || nt == tau::wff_release
+			|| nt == tau::wff_weak_until || nt == tau::wff_since
+			|| nt == tau::wff_trigger || nt == tau::wff_A
+			|| nt == tau::wff_E || nt == tau::wff_semantic_neg; }))
+	{
+		return r.with_assert_check_value(fm);
+	}
 	tref nn = tau::_F();
 	// The temporal layer of a formula is in DNF
 	for (tref clause : expression_paths<node>(fm)) {
