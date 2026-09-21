@@ -43,8 +43,10 @@
 #include "normalisers/simplify.h"
 // layer 2 — witness
 #include "witness/witness.h"
-// layer 3 — shared/parts.h, cofactors.h; eliminate/conditions.h,
-//           eliminate_block.h, atomless.h
+// layer 3 — the elimination core
+#include "shared/parts.h"
+#include "shared/cofactors.h"
+// layer 3 — eliminate/conditions.h, eliminate_block.h, atomless.h
 // layer 4 — push/push.h; driver/blocks.h, component.h
 // layers 5–6 — the remaining push steps (declared in push/push.h)
 // layers 7–8 — eliminate/finite.h, bitvector.h
