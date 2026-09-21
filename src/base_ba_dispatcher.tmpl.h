@@ -5,21 +5,24 @@
 
 #include "boolean_algebras/ba_descriptor.h"
 #include "boolean_algebras/ba_pack_traits.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
 // Parse a plain Bool constant ("0"/"false"/"F" or "1"/"true"/"T").
 template <typename... BAs>
 requires BAsPack<BAs...>
-inline std::optional<typename node<BAs...>::constant_with_type> parse_bool(
+inline result<typename node<BAs...>::constant_with_type> parse_bool(
 		const std::string& src) {
+	result<typename node<BAs...>::constant_with_type> r;
 	if (src == "0" || src == "false" || src == "F")
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ Bool(false) }, ba_descriptor<Bool, node<BAs...>>::type_tree() };
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			std::variant<BAs...>{ Bool(false) }, ba_descriptor<Bool, node<BAs...>>::type_tree() });
 	if (src == "1" || src == "true" || src == "T")
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ Bool(true) }, ba_descriptor<Bool, node<BAs...>>::type_tree() };
-	return {};
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			std::variant<BAs...>{ Bool(true) }, ba_descriptor<Bool, node<BAs...>>::type_tree() });
+	r.error(code::parse_error, "not a valid Bool literal", {{label::value, src}});
+	return r;
 }
 
 } // namespace idni::tau_lang
@@ -81,7 +84,7 @@ bool base_ba_dispatcher<BAs...>::is_syntactic_zero(
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool base_ba_dispatcher<BAs...>::is_one(const std::variant<BAs...>& elem) {
+result<bool> base_ba_dispatcher<BAs...>::is_one(const std::variant<BAs...>& elem) {
 	return std::visit([](const auto& x) {
 		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::is_one(x);
 	}, elem);
@@ -89,7 +92,7 @@ bool base_ba_dispatcher<BAs...>::is_one(const std::variant<BAs...>& elem) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool base_ba_dispatcher<BAs...>::is_zero(const std::variant<BAs...>& elem) {
+result<bool> base_ba_dispatcher<BAs...>::is_zero(const std::variant<BAs...>& elem) {
 	return std::visit([](const auto& x) {
 		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::is_zero(x);
 	}, elem);
@@ -97,7 +100,7 @@ bool base_ba_dispatcher<BAs...>::is_zero(const std::variant<BAs...>& elem) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool base_ba_dispatcher<BAs...>::is_closed(const std::variant<BAs...>& elem) {
+result<bool> base_ba_dispatcher<BAs...>::is_closed(const std::variant<BAs...>& elem) {
 	return std::visit([](const auto& x) {
 		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::is_closed(x);
 	}, elem);
@@ -153,7 +156,7 @@ tref base_ba_dispatcher<BAs...>::default_type() {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string base_ba_dispatcher<BAs...>::one(const tref type_tree) {
+result<std::string> base_ba_dispatcher<BAs...>::one(const tref type_tree) {
 	std::optional<std::string> out;
 	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
 		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
@@ -169,13 +172,16 @@ std::string base_ba_dispatcher<BAs...>::one(const tref type_tree) {
 			? (out = ba_descriptor<BAs, node_t>::literal_one(carrier), true)
 			: false) || ...);
 	}
-	if (!out) throw std::runtime_error("unsupported type for one");
-	return *out;
+	result<std::string> r;
+	if (!out)
+		return r.with_assert_check_error(code::unsupported_operation,
+			"unsupported type for one");
+	return r.with_assert_check_value(*out);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
+result<std::string> base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
 	std::optional<std::string> out;
 	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
 		? (out = ba_descriptor<BAs, node_t>::literal_zero(type_tree), true)
@@ -187,8 +193,11 @@ std::string base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
 			? (out = ba_descriptor<BAs, node_t>::literal_zero(carrier), true)
 			: false) || ...);
 	}
-	if (!out) throw std::runtime_error("unsupported type for zero");
-	return *out;
+	result<std::string> r;
+	if (!out)
+		return r.with_assert_check_error(code::unsupported_operation,
+			"unsupported type for zero");
+	return r.with_assert_check_value(*out);
 }
 
 template <typename... BAs>
@@ -286,9 +295,9 @@ tref base_ba_dispatcher<BAs...>::simplify_symbol(tref symbol) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref base_ba_dispatcher<BAs...>::simplify_term(tref term) {
+result<tref> base_ba_dispatcher<BAs...>::simplify_term(tref term) {
 	const size_t ba_type = tau::get(term).get_ba_type();
-	tref out = term;
+	result<tref> out{term};
 	(void)((ba_descriptor<BAs, node_t>::owns_type(ba_type)
 		? (out = ba_descriptor<BAs, node_t>::simplify_term(term), true)
 		: false) || ...);
@@ -303,7 +312,7 @@ struct ba_constants_parse;
 // whose tau_ba alternative has a const member, so it is not assignable.
 template <typename node_t, typename First, typename... Rest>
 struct ba_constants_parse_one {
-	static std::optional<typename node_t::constant_with_type> get(
+	static result<typename node_t::constant_with_type> get(
 		const std::string& src, tref type_tree)
 	{
 		if (ba_descriptor<First, node_t>::matches_type(type_tree))
@@ -311,7 +320,10 @@ struct ba_constants_parse_one {
 		if constexpr (sizeof...(Rest) > 0)
 			return ba_constants_parse_one<node_t, Rest...>::get(
 				src, type_tree);
-		return std::nullopt;
+		// No BA in the pack owns this type -- distinct from a parse
+		// failure: a malformed result (no value, no error), never an
+		// error node saying the input itself was bad.
+		return result<typename node_t::constant_with_type>{};
 	}
 };
 
@@ -319,7 +331,7 @@ template <typename... BAs>
 struct ba_constants_parse<node<BAs...>> {
 	using node_t = node<BAs...>;
 
-	static std::optional<typename node_t::constant_with_type> get(
+	static result<typename node_t::constant_with_type> get(
 		const std::string& src, tref type_tree)
 	{
 		return ba_constants_parse_one<node_t, BAs...>::get(src, type_tree);
@@ -327,7 +339,7 @@ struct ba_constants_parse<node<BAs...>> {
 };
 
 template <NodeType node>
-std::optional<typename node::constant_with_type> ba_constants<node>::get(
+result<typename node::constant_with_type> ba_constants<node>::get(
 	const std::string& constant_source, tref type_tree,
 	[[maybe_unused]] const std::string options)
 {

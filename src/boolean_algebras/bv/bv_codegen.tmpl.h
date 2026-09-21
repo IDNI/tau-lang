@@ -71,7 +71,13 @@ static std::optional<bv> bv_single_equality_constant(tref var, tref conj) {
 template <NodeType node>
 static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	using tau = tree<node>;
-	size_t width = get_bv_size<node>(tau::get(var).get_ba_type_tree());
+	// Advisory drop: ba_has_codegen_witness fixes this member to
+	// std::optional<std::string>, shared with sbf and qlt.
+	auto type_tree_r = tau::get(var).get_ba_type_tree();
+	if (!type_tree_r.has_value()) return std::nullopt;
+	auto width_r = get_bv_size<node>(type_tree_r.value());
+	if (!width_r.has_value()) return std::nullopt;
+	size_t width = width_r.value();
 	if (auto value = bv_single_equality_constant<node>(var, conj); value)
 		return bv_witness_expr<node>(*value, width);
 	auto sol = solve_bv<node>(conj);
@@ -88,8 +94,13 @@ template <NodeType node>
 static std::optional<std::string> bv_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;
 	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
-	size_t width = get_bv_size<node>(tau::get(cst).get_ba_type_tree());
-	return bv_witness_expr<node>(std::get<bv>(tau::get(cst).get_ba_constant()), width);
+	// Advisory drop: ba_has_codegen_constant_expr fixes this member to
+	// std::optional<std::string>, shared with sbf and qlt.
+	auto type_tree_r = tau::get(cst).get_ba_type_tree();
+	if (!type_tree_r.has_value()) return std::nullopt;
+	auto width_r = get_bv_size<node>(type_tree_r.value());
+	if (!width_r.has_value()) return std::nullopt;
+	return bv_witness_expr<node>(std::get<bv>(tau::get(cst).get_ba_constant()), width_r.value());
 }
 
 } // namespace idni::tau_lang

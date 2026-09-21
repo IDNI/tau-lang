@@ -220,7 +220,10 @@ uint64_t node<BAs...>::hashit() const {
 	// content-derived says so with hash_constant on its descriptor (see
 	// ba_has_hash_constant_v); every other BA falls back to std::hash<BA>.
 	if (nt == type::ba_constant && data != 0) {
-		const auto c = tau_lang::ba_constants<node>::get(data);
+		// Advisory drop: the constructor is noexcept and has no report channel;
+		// a miss folds to alternative 0, and node equality compares raw data.
+		const auto c = tau_lang::ba_constants<node>::get(data)
+			.value_or(node<BAs...>::constant{});
 		hash_combine(seed, c.index(), std::visit([](const auto& v) {
 			using BA = std::decay_t<decltype(v)>;
 			if constexpr (ba_has_hash_constant_v<node, BA>)

@@ -390,9 +390,9 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx);
 // ADT tuple stream reader/writer
 //
 // One physical stream (console/file/in-memory) carries a JSON-like tuple
-// literal per time point for a tuple-typed io stream (design doc
-// private/2026-08-05-adt-design.md, section 4), while the flattened formula
-// only ever sees the flat member io vars (`p.a`, `p.b`, ...). These classes
+// literal per time point for a tuple-typed io stream, while the flattened
+// formula only ever sees the flat member io vars (`p.a`, `p.b`, ...). These
+// classes
 // bridge the two: `adt_tuple_reader`/`adt_tuple_writer` own the ONE physical
 // stream and know the stream's `adt_stream_layout`; `adt_member_input_stream`/
 // `adt_member_output_stream` are thin per-member adapters -- ordinary

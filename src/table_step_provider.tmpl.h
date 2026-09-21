@@ -238,11 +238,12 @@ trefs table_step_provider<node>::live_probe_atoms() const {
 }
 
 template <NodeType node>
-std::optional<solution<node>> table_step_provider<node>::produce(
+result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	const trefs&, const assignment<node>& memory,
 	size_t time_point, size_t formula_time_point)
 {
 	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
 
 	// Guard bits: one per baked input atom, evaluated fresh against the
 	// memory the interpreter just committed this step's raw inputs into,
@@ -252,13 +253,20 @@ std::optional<solution<node>> table_step_provider<node>::produce(
 	const size_t n = input_atoms_.size();
 	const size_t m = step_guard_ks_.size();
 	auto ap = std::make_unique<bool[]>(n + m ? n + m : 1);
-	for (size_t k = 0; k < n; ++k)
-		ap[k] = evaluate_atom<node>(input_atoms_[k].second->get(), memory,
-			formula_time_point);
+	for (size_t k = 0; k < n; ++k) {
+		auto ev = r.merge_take(evaluate_atom<node>(
+			input_atoms_[k].second->get(), memory, formula_time_point));
+		// An undecided guard atom cannot be defaulted to false: the
+		// table strategy would then pick an edge on a guess instead
+		// of the atom's actual truth.
+		if (!ev) return r.with_assert_check_error(code::internal_error,
+			"a table-strategy guard atom could not be decided");
+		ap[k] = *ev;
+	}
 	for (size_t k = 0; k < m; ++k)
 		ap[n + k] = time_point >= (size_t)step_guard_ks_[k];
 	const codegen::edge* e = codegen::strategy_step(strat_, state_, ap.get());
-	if (!e) return std::nullopt;
+	if (!e) return r.with_assert_check_value(std::nullopt);
 
 	solution<node> result;
 	const size_t carrier_tid =
@@ -331,18 +339,45 @@ std::optional<solution<node>> table_step_provider<node>::produce(
 			tref current = rewriter::replace<node>(conj, memory);
 			auto normalized = normalize_non_temp<node>(current);
 			if (normalized.has_value()) current = normalized.value();
+			else {
+				// Folded through the rejected-candidate pattern, so an
+				// unnormalized fallback formula never turns this edge's
+				// witness solve into a hard failure.
+				auto sc = r.open("rejected candidate");
+				r.info("the witness conjunction did not normalize",
+					{{label::value, truncate_for_message(
+						tau::get(current).to_str())}});
+				report rep = std::move(normalized).report();
+				rep.demote_errors_to_warnings();
+				r.append(std::move(rep));
+			}
 			auto ws_r = solution_with_max_update<node>(current, time_point);
-			ws = ws_r.has_value()
-				? std::optional<solution<node>>(ws_r.value())
-				: std::nullopt;
+			if (ws_r.has_value()) ws = std::move(ws_r).value();
+			else {
+				// No fallback is left once this solve fails --
+				// unlike the normalization above, this is the
+				// edge's only attempt at a witness, so the
+				// report stays an error.
+				auto sc = r.open("rejected candidate");
+				r.info("the witness conjunction did not solve",
+					{{label::value, truncate_for_message(
+						tau::get(current).to_str())}});
+				r.append(std::move(ws_r).report());
+				ws = std::nullopt;
+			}
 		}
-		if (!ws) return std::nullopt;
+		// Reached only when the general path above ran and its solve
+		// failed (the eligible direct-decode-succeeded path skips this
+		// block entirely): a genuine failure to find a witness, kept
+		// as the error already appended above.
+		if (!ws) return r.with_assert_check_error(code::internal_error,
+			"no witness could be computed for the strategy edge");
 		for (const auto& [var, value] : ws.value())
 			result.emplace(var, value);
 	}
 
 	state_ = e->dst;
-	return result;
+	return r.with_assert_check_value(std::move(result));
 }
 
 template <NodeType node>

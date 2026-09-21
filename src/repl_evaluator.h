@@ -333,7 +333,7 @@ private:
 	tref invalid_argument() const;
 
 	/// @brief Parse @p src as a CLI command and return the resulting tree.
-	tref make_cli(const std::string& src);
+	result<tref> make_cli(const std::string& src);
 
 	/// @brief Update the charvar option to @p value and return the old value.
 	bool update_charvar(bool value);

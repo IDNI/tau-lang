@@ -27,6 +27,7 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 #include "eliminability.h"
 #include "block_atom_profile.h"
 #include "block_squeeze.h"
@@ -87,7 +88,7 @@ inline size_t max_blast_reentry_depth = 0;
  * @endcode
  */
 template <NodeType node>
-tref anti_prenex(tref formula);
+result<tref> anti_prenex(tref formula);
 
 /** @brief The pipeline with an explicit eliminability analysis; see above. */
 // Note: no default argument for `el` here -- function templates cannot
@@ -97,7 +98,7 @@ tref anti_prenex(tref formula);
 // one-argument overload above plays the role of the default, calling through
 // with eliminability<node>::arith_only().
 template <NodeType node>
-tref anti_prenex(tref formula, const eliminability<node>& el);
+result<tref> anti_prenex(tref formula, const eliminability<node>& el);
 
 /**
  * @brief Decide or blast bitvector-typed quantifier scopes.
@@ -119,7 +120,7 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
  * possible; every other quantifier is preserved.
  */
 template<NodeType node>
-tref resolve_quantifiers(tref formula);
+result<tref> resolve_quantifiers(tref formula);
 
 /**
  * @brief Last-resort complete elimination, one quantifier at a time, by
@@ -144,7 +145,7 @@ tref resolve_quantifiers(tref formula);
  * discharge eliminated; anything else survives quantified.
  */
 template<NodeType node>
-tref complete_quantifier_elimination(tref formula);
+result<tref> complete_quantifier_elimination(tref formula);
 
 } // namespace idni::tau_lang
 

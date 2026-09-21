@@ -6,7 +6,7 @@
 //   - Semantic per-step formula ((∃o. α∧β) → α) ∧ β at atomic leaves
 //   - REAL checks at temporal operator nodes for commitment-side selection
 //   - And-distribution into invariant slots for clause-level granularity
-//   - Semantic optimal mode fallback (pwr-ltl.tex §11): winning-region
+//   - Semantic optimal mode fallback: winning-region
 //     revision via Algorithm D when fast mode drops a clause
 //
 // On safety inputs G(α) * G(β), this produces exactly the old per-step
@@ -477,15 +477,13 @@ tref and_distribute(tref fm) {
 	using tau = tree<node>;
 	auto op = get_temporal_op<node>(fm);
 	if (op == temporal_op::NONE) {
-		// LS-1: only the ROOT operator used to be inspected, so a top-level
-		// conjunction came straight back unchanged.  `pointwise_revision_
-		// temporal` calls this once on the whole spec BEFORE
-		// `gather_top_conjuncts`, and the interpreter feeds it exactly the
-		// shape `unsqueeze_always` produces — `G(∧ inners) ∧ (∧ rest)` —
-		// whenever any non-always clause exists.  A spec like
-		// `G(a ∧ b) ∧ F(c)` was therefore never distributed and its whole
-		// G-block was revised or dropped wholesale, contrary to pwr-ltl §3
-		// Step 0.  Recurse through the conjunction instead.
+		// LS-1: `pointwise_revision_temporal` calls this once on the whole
+		// spec BEFORE `gather_top_conjuncts`, and the interpreter feeds it
+		// the shape `unsqueeze_always` produces, `G(∧ inners) ∧ (∧ rest)`,
+		// whenever any non-always clause exists.  Recurse through the
+		// conjunction: a root-only check leaves `G(a ∧ b) ∧ F(c)`
+		// undistributed, and its whole G-block is then revised or dropped
+		// wholesale.
 		const auto& t = tau::get(fm);
 		if (!t.has_child() || t[0].value.nt != tau::wff_and) return fm;
 		std::vector<tref> conjs;
@@ -575,7 +573,7 @@ tref and_distribute(tref fm) {
 /**
  * @brief Top-level pointwise revision: spec * update.
  *
- * Steps 0-5 from pwr-ltl.tex § The pointwise revision algorithm.
+ * Steps 0-5 of the pointwise revision algorithm.
  *
  * Both inputs must already be normalized (the interpreter does this before
  * calling); the result is the verified assembly, or `update` alone when the
@@ -652,7 +650,7 @@ tref pointwise_revision_temporal(
 			tref r = revise<node>(sc, best, update, start_time,
 				&memo);
 
-			// Optimal mode fallback (pwr-ltl.tex §11): if fast mode
+			// Optimal mode fallback: if fast mode
 			// returned the update clause unchanged (dropped the spec
 			// clause), try semantic winning-region revision.
 			// PW-N5: structural comparison -- revise() rebuilds nodes,

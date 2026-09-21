@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "splitter_types.h"
+#include "tau_diagnostics.h"
 #include "utility/tree_types.h"
 
 namespace idni::tau_lang {
@@ -141,7 +142,7 @@ template <typename Node, typename BA>
 concept ba_has_preprocess = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::preprocess(f) }
-			-> std::convertible_to<tref>; };
+			-> std::same_as<result<tref>>; };
 
 template <typename Node, typename BA>
 concept ba_has_case_split_quantifiers = ba_has_descriptor_v<Node, BA>
@@ -159,7 +160,7 @@ template <typename Node, typename BA>
 concept ba_has_widen_arithmetic = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) {
 		{ ba_descriptor<BA, Node>::widen_arithmetic(f) }
-			-> std::convertible_to<tref>; };
+			-> std::same_as<result<tref>>; };
 
 template <typename Node, typename BA>
 concept ba_has_widening_state = ba_has_descriptor_v<Node, BA>
@@ -360,7 +361,10 @@ concept ba_descriptor_complete =
  && requires(size_t n) {
         { ba_descriptor<BA, Node>::owns_type(n) }
             -> std::convertible_to<bool>;                            }
-	// constants and closedness
+	// constants and closedness -- is_syntactic_one/zero stay plain bool
+	// (purely syntactic, cannot fail); is_one/is_zero/is_closed can run a
+	// full decision procedure, so each returns a result carrying why a
+	// failed decision could not be made
  && requires(const BA& x) {
         { ba_descriptor<BA, Node>::is_syntactic_one(x) }
             -> std::convertible_to<bool>;                            }
@@ -369,13 +373,13 @@ concept ba_descriptor_complete =
             -> std::convertible_to<bool>;                            }
  && requires(const BA& x) {
         { ba_descriptor<BA, Node>::is_one(x) }
-            -> std::convertible_to<bool>;                            }
+            -> std::same_as<result<bool>>;                           }
  && requires(const BA& x) {
         { ba_descriptor<BA, Node>::is_zero(x) }
-            -> std::convertible_to<bool>;                            }
+            -> std::same_as<result<bool>>;                           }
  && requires(const BA& x) {
         { ba_descriptor<BA, Node>::is_closed(x) }
-            -> std::convertible_to<bool>;                            }
+            -> std::same_as<result<bool>>;                           }
 	// literals
  && requires(tref t) {
         { ba_descriptor<BA, Node>::literal_one(t) }
@@ -390,14 +394,18 @@ concept ba_descriptor_complete =
         ba_descriptor<BA, Node>::splitter(x, st);                    })
  && (!ba_descriptor<BA, Node>::atomless || requires(tref t) {
         ba_descriptor<BA, Node>::splitter_one(t);                    })
-	// symbol and term simplification
+	// symbol and term simplification -- simplify_term can run a bounded
+	// rewrite loop that gives up, so its result carries why
  && requires(tref t) {
         ba_descriptor<BA, Node>::simplify_symbol(t);                 }
  && requires(tref t) {
-        ba_descriptor<BA, Node>::simplify_term(t);                   }
-	// parsing
+        { ba_descriptor<BA, Node>::simplify_term(t) }
+            -> std::same_as<result<tref>>;                           }
+	// parsing: a `result` carries the parsed constant, or, on refusal, a
+	// report explaining why -- never a bare empty optional
  && requires(const std::string& src, tref t) {
-        ba_descriptor<BA, Node>::parse(src, t);                      };
+        { ba_descriptor<BA, Node>::parse(src, t) }
+            -> std::same_as<result<typename Node::constant_with_type>>;  };
 
 /** @internal @brief Fold of `ba_descriptor_complete` over the pack. */
 template <typename Node, std::size_t... Is>

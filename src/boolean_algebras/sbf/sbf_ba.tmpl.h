@@ -2,6 +2,7 @@
 
 #include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/sbf/parser/sbf_parser.generated.h"
+#include "tau_diagnostics.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "sbf_ba"
@@ -76,31 +77,33 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
+result<typename node<BAs...>::constant_with_type> parse_sbf(
 	const std::string& src)
 {
 	bdd_init<Bool>(); // ensure BDD is initialized (inline-static initializer may be elided by LTO)
 	static std::map<size_t, std::variant<BAs...>> cache;
 
+	result<typename node<BAs...>::constant_with_type> r;
+
 	// check source cache
 	auto sid = dict(src);
 	if (auto cn = cache.find(sid); cn != cache.end())
-		return typename node<BAs...>::constant_with_type{ cn->second, sbf_type<node<BAs...>>() };
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			cn->second, sbf_type<node<BAs...>>() });
 	//parse the source
-	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
-	if (!result.found) {
-		auto msg = result.parse_error
-			.to_str(sbf_parser::error::info_lvl::INFO_BASIC);
-		LOG_ERROR << "[sbf] " << msg << "\n";
-		return {}; // Syntax error
+	auto parsed = sbf_parser::instance().parse(src.c_str(), src.size());
+	if (!parsed.found) {
+		r.error(code::parse_error, parsed.parse_error
+			.to_str(sbf_parser::error::info_lvl::INFO_BASIC));
+		return r;
 	}
 	// get the sbf_constant node
-	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
+	auto t = sbf_parser::tree::traverser(parsed.get_shaped_tree2())
 							| sbf_parser::sbf;
 	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
-	return typename node<BAs...>::constant_with_type{
+	return r.with_value(typename node<BAs...>::constant_with_type{
 		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
-		sbf_type<node<BAs...>>() };
+		sbf_type<node<BAs...>>() });
 }
 
 } // namespace idni::tau_lang

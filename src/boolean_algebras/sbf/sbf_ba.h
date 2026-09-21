@@ -14,6 +14,7 @@
 
 #include "backends/bdds/bdd_handle.h"
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -49,10 +50,10 @@ inline sbf_ba sbf_splitter_one() { return bdd_handle<Bool>::htrue->splitter(spli
 /** @brief Normalise an SBF element (identity — BDDs are already canonical). */
 inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
 
-/** @brief Parse @p src as an SBF constant; return `nullopt` on failure. */
+/** @brief Parse @p src as an SBF constant; the result reports why on failure. */
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
+result<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
 /** @brief Return `true` if @p x is the SBF one (BDD `true`). */
 inline bool is_sbf_one(const sbf_ba& x) { return x->is_one(); }
 

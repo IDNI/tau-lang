@@ -162,7 +162,7 @@ struct program_desc {
  * classify_output_field(); witness values come from codegen_witness,
  * atom templates from codegen_constant_expr (real, non-carrier BAs only).
  *
- * Throws std::runtime_error when `revisable` combines with a witness-kind
+ * The report carries an error when `revisable` combines with a witness-kind
  * output, a witness owner declines codegen_witness for a feasible edge, an
  * atom's operand is an unsupported shape or declines codegen_constant_expr,
  * or an io variable is untyped.
@@ -179,10 +179,10 @@ struct program_desc {
  * @param revisable Whether the strategy table is runtime-replaceable.
  * @param open_streams Output stream names exposed as oracle-resolved.
  * @param stream_ctx io_context the spec was parsed against, or null.
- * @return The description, or `std::nullopt` when none could be built.
+ * @return The description, or an error report when none could be built.
  */
 template <NodeType node>
-std::optional<program_desc> build_program_desc(
+result<program_desc> build_program_desc(
     const ltl_aba_solution<node>& sol,
     const std::string& class_name = "tau_program",
     bool revisable = false,
@@ -224,7 +224,7 @@ program_desc build_program_desc_prop(
  * @param d Program description to emit.
  * @param out Stream receiving the generated source.
  */
-void emit_program(const program_desc& d, std::ostream& out);
+result<bool> emit_program(const program_desc& d, std::ostream& out);
 
 } // namespace idni::tau_lang
 

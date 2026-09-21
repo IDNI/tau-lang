@@ -251,7 +251,9 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 		// 2. Create an interpreter (Mealy machine) via the high-level API
 		auto interp_opt = tau_api::get_interpreter(std::string(formula));
 		if (!interp_opt.has_value()) {
-			g_last_error = "failed to create interpreter";
+			std::ostringstream oss;
+			oss << interp_opt.report();
+			g_last_error = "internal: " + oss.str();
 			return TAU_LTL_SYNTH_INTERNAL_ERR;
 		}
 
@@ -308,7 +310,9 @@ extern "C" const char* tau_lang_mealy_step(int64_t handle,
 		auto result = tau_api::step(interp, std::move(inputs),
 			/*interactive=*/false);
 		if (!result.has_value()) {
-			g_last_error = "step failed or no output";
+			std::ostringstream oss;
+			oss << result.report();
+			g_last_error = "internal: " + oss.str();
 			return nullptr;
 		}
 
@@ -372,8 +376,14 @@ extern "C" const char* tau_lang_mealy_input_vars(int64_t handle) {
 		auto& interp = *it->second;
 
 		auto needed = tau_api::get_inputs_for_step(interp);
+		if (!needed.has_value()) {
+			std::ostringstream oss;
+			oss << needed.report();
+			g_last_error = "internal: " + oss.str();
+			return nullptr;
+		}
 		std::vector<std::string> input_names;
-		for (const auto& sa : needed) {
+		for (const auto& sa : needed.value()) {
 			input_names.push_back(sa.name);
 		}
 

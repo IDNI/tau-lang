@@ -4,6 +4,9 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_TMPL_H__
 
 #include "boolean_algebras/hsb/hsb.h"
+#include "tau_diagnostics.h"
+
+#include <sstream>
 
 namespace idni::tau_lang {
 
@@ -463,33 +466,31 @@ inline std::optional<hsb_halfspace> build_halfspace(const linexpr_result& le) {
 	return h;
 }
 
-inline std::optional<tref> eval_parse_tree(const tt& t) {
+inline result<tref> eval_parse_tree(const tt& t) {
+	result<tref> r;
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
-	case type::hsb_top:   return hsb::mk_top();
-	case type::hsb_bot:   return hsb::mk_bot();
+	case type::hsb_top:   return r.with_value(hsb::mk_top());
+	case type::hsb_bot:   return r.with_value(hsb::mk_bot());
 	case type::hsb_not: {
-		auto inner = eval_parse_tree(n | tt::only_child);
-		if (!inner) return std::nullopt;
+		TAU_TRY(auto inner, eval_parse_tree(n | tt::only_child));
 		// reuse short-circuit logic from operator~
-		return (~hsb(*inner)).root_ref();
+		return r.with_value((~hsb(inner)).root_ref());
 	}
 	case type::hsb_paren:
 		return eval_parse_tree(n | tt::only_child);
 	case type::hsb_and: {
 		auto ch = (n | tt::children)();
-		auto l = eval_parse_tree(ch[0]);
-		auto r = eval_parse_tree(ch[1]);
-		if (!l || !r) return std::nullopt;
-		return (hsb(*l) & hsb(*r)).root_ref();
+		TAU_TRY(auto l, eval_parse_tree(ch[0]));
+		TAU_TRY(auto rhs, eval_parse_tree(ch[1]));
+		return r.with_value((hsb(l) & hsb(rhs)).root_ref());
 	}
 	case type::hsb_or: {
 		auto ch = (n | tt::children)();
-		auto l = eval_parse_tree(ch[0]);
-		auto r = eval_parse_tree(ch[1]);
-		if (!l || !r) return std::nullopt;
-		return (hsb(*l) | hsb(*r)).root_ref();
+		TAU_TRY(auto l, eval_parse_tree(ch[0]));
+		TAU_TRY(auto rhs, eval_parse_tree(ch[1]));
+		return r.with_value((hsb(l) | hsb(rhs)).root_ref());
 	}
 	case type::hsb_hs: {
 		// `lhs op rhs` with both sides linear expressions; the half-space
@@ -499,7 +500,7 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 		// nothing.
 		auto hs_child = (n | tt::only_child) | tt::only_child;
 		auto ch       = (hs_child | tt::children)();
-		if (ch.size() < 2) return std::nullopt;
+		if (ch.size() < 2) return r;
 		linexpr_result lhs = eval_linexpr(ch[0]);
 		linexpr_result rhs = eval_linexpr(ch[1]);
 		for (auto& [i, c] : rhs.coeffs) lhs.coeffs[i] -= c;
@@ -510,7 +511,7 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 				it = lhs.coeffs.erase(it);
 			else ++it;
 		auto opt_h = build_halfspace(lhs);
-		if (!opt_h) return std::nullopt;
+		if (!opt_h) return r;
 		// Strictness is canonical in this algebra (hsb.h): a half-space
 		// whose leading coefficient is positive is open, one whose leading
 		// coefficient is negative is closed, and the other two sets are not
@@ -519,7 +520,8 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 		// exist would silently change the set the user wrote.
 		const bool wrote_strict = (hs_child | tt::nonterminal) == type::hs_lt;
 		if (wrote_strict != opt_h->is_strict()) {
-			LOG_ERROR << "[hsb] the half-space written "
+			std::ostringstream oss;
+			oss << "the half-space written "
 				<< (wrote_strict ? "strict (`<`)" : "closed (`<=`)")
 				<< " is not an element of the lex-half-open algebra: with "
 				<< (opt_h->is_strict() ? "a positive" : "a negative")
@@ -529,12 +531,13 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
 				"set, or put the leading variable on the other side of "
 				"the comparison to name the other bound (e.g. `x[0] < 1` "
 				"is open, `1 <= x[0]` is closed).";
-			return std::nullopt;
+			r.error(code::parse_error, oss.str());
+			return r;
 		}
-		return hsb::mk_hs(*opt_h);
+		return r.with_value(hsb::mk_hs(*opt_h));
 	}
 	default:
-		return std::nullopt;
+		return r;
 	}
 }
 
@@ -550,26 +553,43 @@ inline std::optional<tref> eval_parse_tree(const tt& t) {
  * @tparam BAs  The full BA-pack used in the tau `node<BAs...>` type.
  * @param  src  Source string in hsb syntax (without surrounding `{}`).
  * @returns     A `constant_with_type` variant wrapping the parsed `hsb` value
- *              on success, or `std::nullopt` if the string does not conform to
- *              the hsb grammar.
+ *              on success, or a report explaining the refusal on failure.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type>
+result<typename node<BAs...>::constant_with_type>
 parse_hsb(const std::string& src) {
-	auto result = hsb_parser::instance().parse(src.c_str(), src.size());
-	if (!result.found) return std::nullopt;
+	result<typename node<BAs...>::constant_with_type> r;
+	auto parsed = hsb_parser::instance().parse(src.c_str(), src.size());
+	if (!parsed.found) {
+		r.error(code::parse_error, parsed.parse_error
+			.to_str(hsb_parser::error::info_lvl::INFO_BASIC));
+		return r;
+	}
 
-	auto t = hsb_parser::tree::traverser(result.get_shaped_tree2())
+	auto t = hsb_parser::tree::traverser(parsed.get_shaped_tree2())
 		| hsb_parser::hsb;
-	if (!t.has_value()) return std::nullopt;
+	if (!t.has_value()) {
+		r.error(code::parse_error, "No hsb value in parse tree");
+		return r;
+	}
 
-	auto tval = hsb_grammar_detail::eval_parse_tree(t);
-	if (!tval) return std::nullopt;
+	// TAU_TRY_OR_ATTR evaluates its attr list before the call, so it would
+	// intern the source text on every successful parse. Attach it by hand,
+	// only in the error branch.
+	auto hsb_child = hsb_grammar_detail::eval_parse_tree(t);
+	const bool hsb_child_well_formed = hsb_child.is_well_formed();
+	auto hsb_tval_opt = r.merge_take(std::move(hsb_child));
+	if (!hsb_tval_opt && !hsb_child_well_formed && !r.has_error()) {
+		r.error(code::parse_error, "failed to parse an hsb constant",
+			{{label::value, src}});
+	}
+	if (!hsb_tval_opt) return r;
+	tref tval = std::move(*hsb_tval_opt);
 
-	return typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ hsb(*tval) },
-		hsb_type<node<BAs...>>() };
+	return r.with_value(typename node<BAs...>::constant_with_type{
+		std::variant<BAs...>{ hsb(tval) },
+		hsb_type<node<BAs...>>() });
 }
 
 } // namespace idni::tau_lang

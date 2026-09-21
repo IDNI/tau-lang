@@ -318,11 +318,11 @@ int main(int argc, char** argv) {
 		TAU_LOG_INFO << "tau compile: " << spec_file;
 		auto res = compile_spec<node_t>(src, out_exe, build_dir,
 			cmd.get<std::string>("cxx"));
-		if (!res.ok()) {
-			TAU_LOG_ERROR << "compile failed: " << res.error;
+		if (!res.has_value()) {
+			res.print();
 			return 1;
 		}
-		TAU_LOG_INFO << "compiled: " << res.exe_path;
+		TAU_LOG_INFO << "compiled: " << res.value().exe_path;
 		return 0;
 	}
 

@@ -472,13 +472,13 @@ result<tref> normalizer(tref fm);
  * // together and the (now redundant) temporal wrapper is dropped entirely.
  * tref fm = get_nso_rr(
  *     "(always x = 0) && (always x = 0).").value().main->get();
- * tref res = normalize_temporal_quantifiers<node_t>(fm);
+ * tref res = normalize_temporal_quantifiers<node_t>(fm).value();
  * // tau::get(res).to_str() == "x = 0"
  * CHECK( !tau::get(res).child_is(tau::wff_always) );
  * @endcode
  */
 template <NodeType node, bool normalize_scopes = true>
-tref normalize_temporal_quantifiers(tref fm);
+result<tref> normalize_temporal_quantifiers(tref fm);
 
 } // namespace idni::tau_lang
 

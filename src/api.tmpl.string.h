@@ -1,6 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
+// api<node>::apply_preferences wraps the free apply_preferences<node>
+// function; preferences.h's own #include "api.h" is a no-op here (the
+// api.h guard is already set, and the class is fully declared by now).
+#include "preferences.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -60,7 +64,6 @@ result<std::string> api<node>::apply_defs(
 	for (const std::string& def : defs) {
 		auto d = r.merge_take(get_definition(def));
 		if (!d) {
-			TAU_LOG_ERROR << "Failed to parse definition: " << def;
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
@@ -283,8 +286,12 @@ std::map<std::string, std::string> serialize_solution(
 		size_t t = find_ba_type<node>(var);
 		if (t == 0) t = fallback_type;
 		std::stringstream ss;
-		s.emplace(tau::get(var).to_str(), serialize_constant<node>(ss, val, t)
-			? ss.str() : tau::get(val).to_str());
+		auto ser = serialize_constant<node>(ss, val, t);
+		// Advisory drop: type inference guarantees a literal, and the
+		// raw to_str() is the existing fallback for non-BA elements.
+		s.emplace(tau::get(var).to_str(),
+			ser.has_value() && ser.value() ? ss.str()
+							 : tau::get(val).to_str());
 	}
 	return s;
 }
@@ -339,7 +346,6 @@ result<interpreter<node>> api<node>::get_interpreter(
 	tau_spec<node> spec;
 	if (!spec.parse(specification)) {
 		for (const auto& error : spec.errors()) {
-			TAU_LOG_ERROR << error;
 			r.error(code::parse_error, error);
 		}
 		if (!r.has_error()) r.error(code::parse_error, messages::failed_to_parse_spec);
@@ -362,7 +368,14 @@ size_t api<node>::spec_revision(const interpreter<node>& i) {
 }
 
 template <NodeType node>
-std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
+result<std::vector<stream_at>> api<node>::get_inputs_for_step(
+	interpreter<node>& i)
+{
+	result<std::vector<stream_at>> r;
+	if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::failed_to_calculate_initial_spec);
+	}
 	// Build the set of input variables needed at the current time point,
 	// filter to those within the spec's lookback window, and return
 	// as (name, time_point) pairs.
@@ -372,7 +385,7 @@ std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 		DBG(TAU_LOG_TRACE << "get_inputs_for_step/input: " << TAU_LOG_FM_DUMP(var);)
 		inputs.emplace_back(get_var_name<node>(var), i.time_point);
 	}
-	return inputs;
+	return r.with_assert_check_value(std::move(inputs));
 }
 
 template <NodeType node>
@@ -385,7 +398,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 	auto& ctx = i.ctx;
 
-	if (!i.calculate_initial_spec()) {
+	if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 		return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 	}
 
@@ -402,10 +415,9 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		auto it = std::find_if(ctx.inputs.begin(), ctx.inputs.end(),
 					has_var_name_sid);
 		if (it == ctx.inputs.end()) {
-			TAU_LOG_ERROR << "Input stream " << in.name
-						<< " not found in context";
 			return r.with_assert_check_error(code::invalid_input_stream,
-				"Input stream not found in context");
+				"Input stream not found in context",
+				{{label::name, in.name}, {label::time_point, in.time_point}});
 		}
 		DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
 		step_inputs.emplace_back(
@@ -424,19 +436,27 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		const std::string& input_value =
 					inputs[step_input_map[step_input]];
 		size_t type_id = i.ctx.type_of(canonize<node>(step_input));
-		auto cnst = ba_constants<node>::get(input_value,
-					get_ba_type_tree<node>(type_id));
+		auto cnst = r.merge_take(ba_constants<node>::get(input_value,
+					get_ba_type_tree<node>(type_id)));
 		if (!cnst) {
-			TAU_LOG_ERROR << "Failed to parse input value "
-								<< input_value;
-			return r.with_assert_check_error(code::parse_error, "Failed to parse input value");
+			const stream_at& sa = step_input_map[step_input];
+			auto type_name = r.merge_take(get_ba_type_name<node>(type_id));
+			return r.with_assert_check_error(code::parse_error,
+				"Failed to parse input value",
+				{{label::name, sa.name},
+				 {label::value, truncate_for_message(input_value)},
+				 {label::type_name, type_name.value_or(std::string("INVALID"))},
+				 {label::time_point, sa.time_point}});
 		}
 		tref c = build_bf_ba_constant<node>(cnst.value().first, type_id);
-		if (has_open_tau_fm_in_constant<node>(c)) {
-			TAU_LOG_ERROR <<"Constant contains an open tau formula: "
-								<< input_value;
+		TAU_TRY(bool is_open, has_open_tau_fm_in_constant<node>(c));
+		if (is_open) {
+			const stream_at& sa = step_input_map[step_input];
 			return r.with_assert_check_error(code::invalid_argument,
-				"Constant contains an open tau formula");
+				"the constant contains an open tau formula",
+				{{label::name, sa.name},
+				 {label::value, truncate_for_message(input_value)},
+				 {label::time_point, sa.time_point}});
 		}
 		values[step_input] = c;
 		DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
@@ -455,10 +475,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	auto& [output, auto_continue] = *step_v;
 
 	// Write output values so they are recorded for subsequent steps
-	if (!i.write(output.value())) {
-		TAU_LOG_ERROR << "Failed to write outputs";
-		return r.with_assert_check_error(code::io_error, "Failed to write outputs");
-	}
+	if (!r.merge_take(i.write(output.value())))
+		return r;
 
 	// Build outputs for the step
 	std::map<stream_at, std::string> outputs;
@@ -467,11 +485,13 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
 		std::stringstream ss;
-		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
-			TAU_LOG_ERROR << "No Boolean algebra element assigned "
-				"to output '" << TAU_TO_STR(out) << "'";
+		auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
+		if (!ser) return r;
+		if (!*ser) {
 			return r.with_assert_check_error(code::invalid_output_stream,
-				"No Boolean algebra element assigned to output");
+				"No Boolean algebra element assigned to output",
+				{{label::name, get_var_name<node>(out)},
+				 {label::time_point, i.time_point}});
 		}
 		// the step has already advanced time_point: label by the
 		// output's own time
@@ -480,9 +500,11 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
 	}
 
-	// Run update if update stream is present and unequal to 0
+	// Run update if update stream is present and unequal to 0. Only the
+	// report is wanted here -- step()'s own value is the outputs map, not
+	// the embedded revision's verdict -- so merge it in and drop the value.
 	if (tref update = get_update<node>(i, output.value()); update)
-		i.update(update);
+		r.merge(i.update(update));
 	else warn_if_update_dropped<node>(i, output.value());
 
 	if (interactive && !auto_continue) {
@@ -502,7 +524,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	using tau [[maybe_unused]] = tree<node>;
 
 	result<std::map<stream_at, std::string>> r;
-	if (!i.calculate_initial_spec()) {
+	if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 		return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 	}
 
@@ -518,10 +540,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	auto& [output, auto_continue] = *step_v;
 
 	// Write output values
-	if (!i.write(output.value())) {
-		TAU_LOG_ERROR << "Failed to write outputs";
-		return r.with_assert_check_error(code::io_error, "Failed to write outputs");
-	}
+	if (!r.merge_take(i.write(output.value())))
+		return r;
 
 	// Build outputs for the step. AP1-12: serialize via
 	// serialize_constant like the with-inputs overload -- raw to_str()
@@ -534,11 +554,13 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
 		std::stringstream ss;
-		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
-			TAU_LOG_ERROR << "No Boolean algebra element assigned "
-				"to output '" << TAU_TO_STR(out) << "'";
+		auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
+		if (!ser) return r;
+		if (!*ser) {
 			return r.with_assert_check_error(code::invalid_output_stream,
-				"No Boolean algebra element assigned to output");
+				"No Boolean algebra element assigned to output",
+				{{label::name, get_var_name<node>(out)},
+				 {label::time_point, i.time_point}});
 		}
 		// the step has already advanced time_point: label by the
 		// output's own time
@@ -547,9 +569,11 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
 	}
 
-	// Run update if update stream is present and unequal to 0
+	// Run update if update stream is present and unequal to 0. Only the
+	// report is wanted here -- step()'s own value is the outputs map, not
+	// the embedded revision's verdict -- so merge it in and drop the value.
 	if (tref update = get_update<node>(i, output.value()); update)
-		i.update(update);
+		r.merge(i.update(update));
 	else warn_if_update_dropped<node>(i, output.value());
 
 	if (!auto_continue) {
@@ -563,10 +587,57 @@ result<std::map<stream_at, std::string>> api<node>::step(
 template <NodeType node>
 result<bool> api<node>::run(interpreter<node>& i, bool quit_on_idle) {
 	result<bool> r;
-	if (i.run_loop(0, quit_on_idle)) r = true;
-	else r.error(code::runtime_error, "Execution stopped on a failed step");
+	auto ran = r.merge_take(i.run_loop(0, quit_on_idle));
+	if (!ran || !*ran)
+		r.error(code::runtime_error, "Execution stopped on a failed step");
+	else r = true;
 	DBG(assert(r.is_well_formed());)
 	return r;
+}
+
+template <NodeType node>
+result<bool> api<node>::can_extend(interpreter<node>& i,
+	const std::string& psi)
+{
+	result<bool> r;
+	TAU_TRY(tref formula, get_formula(psi));
+	auto verdict = r.merge_take(i.can_extend(formula));
+	if (!verdict) return r;
+	return r.with_assert_check_value(*verdict);
+}
+
+template <NodeType node>
+result<bool> api<node>::update(interpreter<node>& i, const std::string& psi) {
+	result<bool> r;
+	TAU_TRY(tref formula, get_formula(psi));
+	auto verdict = r.merge_take(i.update(formula));
+	if (!verdict) return r;
+	return r.with_assert_check_value(*verdict);
+}
+
+template <NodeType node>
+result<std::vector<assignment<node>>> api<node>::admissible_outputs(
+	interpreter<node>& i, size_t max_results)
+{
+	result<std::vector<assignment<node>>> r;
+	auto outputs = r.merge_take(i.admissible_outputs(max_results));
+	if (!outputs) return r;
+	return r.with_assert_check_value(std::move(*outputs));
+}
+
+template <NodeType node>
+std::string api<node>::approval_hash(const interpreter<node>& i) {
+	return i.committed_approval_hash;
+}
+
+template <NodeType node>
+result<std::string> api<node>::apply_preferences(const std::string& spec,
+	const preference_order& po)
+{
+	result<std::string> r;
+	TAU_TRY(tref parsed, get_spec(spec));
+	tref strengthened = ::idni::tau_lang::apply_preferences<node>(parsed, po);
+	return r.with_assert_check_value(to_str(strengthened));
 }
 
 template <NodeType node>

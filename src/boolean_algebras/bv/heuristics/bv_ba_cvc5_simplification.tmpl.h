@@ -246,15 +246,15 @@ tref cvc5_tree_to_tau_tree(bv n,
 }
 
 template<NodeType node>
-tref bv_ba_cvc5_simplification(tref term) {
+result<tref> bv_ba_cvc5_simplification(tref term) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	result<tref> r;
 	subtree_map<node, bv> vars, free_vars;
-	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
-	if (!bv_term) return nullptr; // Unable to transform to bv (returning null)
-	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.value().toString() << "\n";)
-	auto simplified_bv = normalize_bv(bv_term.value());
+	TAU_TRY(auto bv_term, bv_eval_node<node>(tt(term), vars, free_vars));
+	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.toString() << "\n";)
+	auto simplified_bv = normalize_bv(bv_term);
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
 	// build reverse lookup so cvc5_tree_to_tau_tree can recover original tau nodes
 	std::map<std::string, tref> var_map;
@@ -271,7 +271,10 @@ tref bv_ba_cvc5_simplification(tref term) {
 			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
 #endif // DEBUG
 
-	return simplified_term;
+	// cvc5_tree_to_tau_tree declines (nullptr) for an untranslatable
+	// back-shape; that is this function's own decline too, not a value.
+	if (!simplified_term) return r;
+	return r.with_value(simplified_term);
 }
 
 } // namespace idni::tau_lang

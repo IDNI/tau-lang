@@ -36,7 +36,11 @@ bool is_bv_type_family(tref t) {
 
 template<NodeType node>
 bool is_bv_type_family(size_t ba_type_id) {
-	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
+	auto t = ba_types<node>::type_tree(ba_type_id);
+	// Advisory drop: owns_type (ba_descriptor_complete) fixes this to bool,
+	// so an out-of-range id reads the same as "not a bv type".
+	if (!t.has_value()) return false;
+	return is_bv_type_family<node>(t.value());
 }
 
 template<NodeType node>
@@ -46,22 +50,23 @@ bool is_tref_bv_type_family(tref t) {
 }
 
 template <NodeType node>
-size_t get_bv_width(tref t) {
+result<size_t> get_bv_width(tref t) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	DBG(assert(is_bv_type_family<node>(t)));
 	size_t num = tt(t) | tau::type | tau::subtype | tau::num | tt::num;
-	DBG(assert(num && "bv type must have explicit bitwidth");)
-	if (!num) throw std::logic_error(
-		"get_bv_width: bv type has no explicit bitwidth");
-	return num;
+	if (!num) {
+		result<size_t> r;
+		return r.with_assert_check_error(code::type_error,
+			"get_bv_width: bv type has no explicit bitwidth");
+	}
+	return result<size_t>{num};
 }
 
 template <NodeType node>
-size_t get_bv_width(size_t ba_type_id) {
-	tref t = ba_types<node>::type_tree(ba_type_id);
-	DBG(assert(is_bv_type_family<node>(t)));
+result<size_t> get_bv_width(size_t ba_type_id) {
+	result<size_t> r;
+	TAU_TRY(tref t, ba_types<node>::type_tree(ba_type_id));
 	return get_bv_width<node>(t);
 }
 

@@ -59,25 +59,25 @@ struct base_ba_dispatcher {
 	static bool is_syntactic_zero(const std::variant<BAs...>& elem);
 
 	/**
-	 * @brief Checks if the element is the semantically one (true) value.
+	 * @brief Checks if the element is the semantically one (true) value;
+	 * the result reports why on a decision failure.
 	 * @param elem The Boolean algebra element.
-	 * @return True if the element is semantic one, false otherwise.
 	 */
-	static bool is_one(const std::variant<BAs...>& elem);
+	static result<bool> is_one(const std::variant<BAs...>& elem);
 
 	/**
-	 * @brief Checks if the element is semantically zero (false) value.
+	 * @brief Checks if the element is semantically zero (false) value;
+	 * the result reports why on a decision failure.
 	 * @param elem The Boolean algebra element.
-	 * @return True if the element is semantically zero, false otherwise.
 	 */
-	static bool is_zero(const std::variant<BAs...>& elem);
+	static result<bool> is_zero(const std::variant<BAs...>& elem);
 
 	/**
-	 * @brief Checks if the Boolean algebra element is closed.
+	 * @brief Checks if the Boolean algebra element is closed; the result
+	 * reports why on a decision failure.
 	 * @param elem The Boolean algebra element.
-	 * @return True if closed, false otherwise.
 	 */
-	static bool is_closed(const std::variant<BAs...>& elem);
+	static result<bool> is_closed(const std::variant<BAs...>& elem);
 
 	/**
 	 * @brief Returns the supported Boolean algebra type names.
@@ -115,14 +115,14 @@ struct base_ba_dispatcher {
 	 * @param type_tree The type reference.
 	 * @return String representation of one.
 	 */
-	static std::string one(const tref type_tree);
+	static result<std::string> one(const tref type_tree);
 
 	/**
 	 * @brief Returns the string representation of the zero (false) value for a given type.
 	 * @param type_tree The type reference.
 	 * @return String representation of zero.
 	 */
-	static std::string zero(const tref type_tree);
+	static result<std::string> zero(const tref type_tree);
 
 	/**
 	 * @brief Splits the element using the specified splitter type.
@@ -170,11 +170,11 @@ struct base_ba_dispatcher {
 	static tref simplify_symbol(tref symbol);
 
 	/**
-	 * @brief Simplifies a term tref for the Boolean algebra.
+	 * @brief Simplifies a term tref for the Boolean algebra; the result
+	 * reports why on a failure to simplify.
 	 * @param term The term tref.
-	 * @return The simplified tref.
 	 */
-	static tref simplify_term(tref term);
+	static result<tref> simplify_term(tref term);
 };
 
 

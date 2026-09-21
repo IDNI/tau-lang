@@ -35,11 +35,13 @@ const std::vector<std::string>& tau_spec<node>::errors() const {
 }
 
 template <NodeType node>
-tref tau_spec<node>::get() {
-	auto fail = [&]() -> tref {
+result<tref> tau_spec<node>::get() {
+	result<tref> r;
+	auto fail = [&](std::string_view msg) -> result<tref> {
 		DBG(for (const auto& error : errors())
 		 	TAU_LOG_TRACE << "[tau] " << error;)
-		return nullptr;
+		r.error(code::parse_error, msg);
+		return std::move(r);
 	};
 
 	// A get() while a continuation is pending IS an error for the caller
@@ -51,18 +53,25 @@ tref tau_spec<node>::get() {
 			errors_.push_back(eof_msg_.value());
 			eof_error_reported_ = true;
 		}
-		return fail();
+		return fail(messages::failed_to_parse_spec);
 	}
-	if (!errors_.empty()) return fail();
+	if (!errors_.empty()) return fail(messages::failed_to_parse_spec);
 
-	tref ptree = build_parse_tree();
-	if (!ptree) return fail();
+	TAU_TRY(tref ptree, build_parse_tree());
 
 	auto opts = get_options(); // transform to tau tree
-	tref spec = tau::get(tau_parser::tree::get(ptree), opts);
+	auto parsed = r.merge_take(tau::get(tau_parser::tree::get(ptree), opts));
+	if (!parsed) {
+		// tau::get already attached its own error to r via merge;
+		// errors_ still gets a matching entry for tau_spec's own
+		// error surface (spec.errors()).
+		errors_.push_back("spec failed to transform to tau tree");
+		return r;
+	}
+	tref spec = *parsed;
 	if (!spec) {
 		errors_.push_back("spec failed to transform to tau tree");
-		return fail();
+		return fail("spec failed to transform to tau tree");
 	}
 
 	using tt = tau::traverser;
@@ -86,7 +95,7 @@ tref tau_spec<node>::get() {
 	spec = result.first;
 	if (!spec) {
 		errors_.push_back("type inference failed");
-		return fail();
+		return fail("type inference failed");
 	}
 	defs.get_io_context()->update_types(result.second);
 	defs.set_global_scope(std::move(result.second));
@@ -94,10 +103,10 @@ tref tau_spec<node>::get() {
 	spec = canonize_quantifier_ids<node>(tau::reget(spec));
 	if (!spec) {
 		errors_.push_back("simplification failed (reget)");
-		return fail();
+		return fail("simplification failed (reget)");
 	}
 	DBG(TAU_LOG_TRACE << "simplified spec: " << TAU_LOG_FM_DUMP(spec);)
-	return spec;
+	return r.with_value(spec);
 }
 
 template <NodeType node>
@@ -184,7 +193,10 @@ bool tau_spec<node>::add(tref expr) {
 
 template <NodeType node>
 std::optional<rr<node>> tau_spec<node>::get_nso_rr() {
-	tref spec = get();
+	// std::optional cannot carry get()'s report; get_applied() and the
+	// REPL dispatch chain built on it (repl_evaluator.tmpl.h) read
+	// spec.errors() instead, which get() still populates on failure.
+	tref spec = get().value_or(nullptr);
 	if (!spec) return {};
 	return tau_lang::get_nso_rr<node>(spec);
 }
@@ -290,15 +302,19 @@ bool tau_spec<node>::parse_with_prev_part(size_t part) {
 }
 
 template <NodeType node>
-tref tau_spec<node>::build_parse_tree() {
+result<tref> tau_spec<node>::build_parse_tree() {
 	using ptree = tau_parser::tree;
+	result<tref> r;
 	trefs defs;
 	tref main = nullptr;
 
 	typename tau::get_options opts = get_options();
 	opts.infer_ba_types = false; // disable type inference for printer
-	auto ptree_to_str = [&opts](tref n) {
-		tref tn = tau::get(ptree::get(n), opts);
+	// Feeds a display-only string, so its own signature stays fixed; it
+	// merges the parse call's report into the enclosing r instead.
+	auto ptree_to_str = [&opts, &r](tref n) {
+		tref tn = r.merge_take(tau::get(ptree::get(n), opts))
+			.value_or(nullptr);
 		return tn ? TAU_TO_STR(tn) : ptree::get(n).print_in_line_to_str();
 	};
 
@@ -320,7 +336,8 @@ tref tau_spec<node>::build_parse_tree() {
 						<< "\" and \""
 						<<ptree_to_str(c) << "\"";
 					errors_.push_back(ss.str());
-					return nullptr;
+					r.error(code::parse_error, "Multiple main formulas");
+					return r;
 				}
 			} else defs.push_back(c);
 		}
@@ -329,7 +346,8 @@ tref tau_spec<node>::build_parse_tree() {
 		errors_.push_back("No main formula");
 		DBG(TAU_LOG_TRACE << "definitions: " << defs.size();)
 		DBG(for (auto c : defs) TAU_LOG_TRACE << "def: " << LOG_FM_DUMP(c);)
-		return nullptr;
+		r.error(code::parse_error, "No main formula");
+		return r;
 	}
 	// build spec parse tree from parsed parts
 	auto pnode = [](const auto& literal) -> tau_parser::pnode {
@@ -337,14 +355,14 @@ tref tau_spec<node>::build_parse_tree() {
 	};
 	auto spec = pnode(tau::spec);
 	if (defs.empty()) {
-		if (!main) return ptree::get(spec); // nothing
-		else return ptree::get(spec, main); // only main formula
+		if (!main) return r.with_value(ptree::get(spec)); // nothing
+		else return r.with_value(ptree::get(spec, main)); // only main formula
 	}
-	if (!main) return ptree::get(spec, // with definitions
-		ptree::get(pnode(tau::definitions), defs));
-	else return ptree::get(spec, // with definitions
+	if (!main) return r.with_value(ptree::get(spec, // with definitions
+		ptree::get(pnode(tau::definitions), defs)));
+	else return r.with_value(ptree::get(spec, // with definitions
 		ptree::get(pnode(tau::definitions), defs),
-		main);
+		main));
 }
 
 } // namespace idni::tau_lang

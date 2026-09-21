@@ -4,7 +4,8 @@
  *
  * Lifts the BA operators (AND, OR, XOR, NOT, bool comparisons) to
  * `std::variant<BAs...>` by dispatching to the active alternative.
- * Throws `std::logic_error` if the two operands hold different alternatives.
+ * If the two operands hold different alternatives, a debug or devel build
+ * asserts. A release build returns a default-constructed variant.
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
@@ -29,7 +30,8 @@ std::variant<BAs...> operator&(const std::variant<BAs...>& l,
 		[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l & r;},
 		[](const auto&, const auto&) -> std::variant<BAs...> {
-			throw std::logic_error("wrong types");}
+			DBG(assert(false && "variant operator&: mismatched alternatives");)
+			return std::variant<BAs...>{};}
 	), l, r);
 }
 
@@ -43,7 +45,8 @@ std::variant<BAs...> operator|(const std::variant<BAs...>& l,
 		[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l | r;},
 		[](const auto&, const auto&) -> std::variant<BAs...> {
-			throw std::logic_error("wrong types");}
+			DBG(assert(false && "variant operator|: mismatched alternatives");)
+			return std::variant<BAs...>{};}
 	), l, r);
 }
 
@@ -57,7 +60,8 @@ std::variant<BAs...> operator^(const std::variant<BAs...>& l,
 		[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l ^ r;},
 		[](const auto&, const auto&) -> std::variant<BAs...> {
-			throw std::logic_error("wrong types");}
+			DBG(assert(false && "variant operator^: mismatched alternatives");)
+			return std::variant<BAs...>{};}
 	), l, r);
 }
 

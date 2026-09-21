@@ -138,16 +138,14 @@ static rewriter::rules bit_rules(size_t bitwidth) {
 }
 
 template<NodeType node>
-tref bit(tref operand, int_t bit) {
-	auto bitwidth = get_bv_type_bitwidth<node>(operand);
-	// HE-9: width 0 (untyped operand) would index a 0-length mask string
-	// and wrap `bitwidth - 1` loops to ~SIZE_MAX; refuse instead.
-	if (bitwidth == 0) return nullptr;
+result<tref> bit(tref operand, int_t bit) {
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(operand));
 	auto rules = bit_rules<node>(bitwidth);
 	auto call = make_bit_call_from_index<node>(operand, bit);
 	auto rr = make_rr<node>(rules, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto applied, nso_rr_apply(rr));
+	return r.with_value(applied);
 }
 
 //
@@ -189,12 +187,12 @@ static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
+static result<rewriter::rule> bvshl_by_one_rule(size_t bitwidth) {
 	using tau = tree<node>;
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		return it->second;
+		return result<rewriter::rule>(it->second);
 	}
 
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -204,12 +202,16 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	// original variable shifted by one. Note that bit<node>(x, i) yields the
 	// masked value x & 2^i, so bits at different positions are related by
 	// equivalence of their zero tests, not by equality of the masked values.
-	auto body = tau::build_bf_eq_0(bit<node>(shifted, 0));
+	result<rewriter::rule> r;
+	TAU_TRY(auto shifted0, bit<node>(shifted, 0));
+	auto body = tau::build_bf_eq_0(shifted0);
 	for (size_t i = 0; i < bitwidth - 1; ++i) {
+		TAU_TRY(auto base_i, bit<node>(base, i));
+		TAU_TRY(auto shifted_i1, bit<node>(shifted, i + 1));
 		body = tau::build_wff_and(body,
 			tau::build_wff_equiv(
-				tau::build_bf_eq_0(bit<node>(base, i)),
-				tau::build_bf_eq_0(bit<node>(shifted, i + 1))));
+				tau::build_bf_eq_0(base_i),
+				tau::build_bf_eq_0(shifted_i1)));
 	}
 	auto rule = make_rule<node>(header, body);
 
@@ -220,21 +222,18 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 #endif // DEBUG
 
 	cache[bitwidth] = rule;
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvshl_by_one(tref base, tref shifted) {
-	auto bitwidth = get_bv_type_bitwidth<node>(base);
-	// HE-9: width 0 (untyped operand) would index a 0-length mask string
-	// and wrap `bitwidth - 1` loops to ~SIZE_MAX; refuse instead.
-	if (bitwidth == 0) return nullptr;
-	rewriter::rules rules;
-	auto rule = bvshl_by_one_rule<node>(bitwidth);
+result<tref> bvshl_by_one(tref base, tref shifted) {
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(base));
+	TAU_TRY(auto rule, bvshl_by_one_rule<node>(bitwidth));
 	auto call = make_bvshl_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto applied, nso_rr_apply(rr));
+	return r.with_value(applied);
 }
 
 /**
@@ -267,12 +266,12 @@ static tref make_bvshr_by_one_call(tref base, tref shifted) {
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvshr_by_one_rule(size_t bitwidth) {
+static result<rewriter::rule> bvshr_by_one_rule(size_t bitwidth) {
 	using tau = tree<node>;
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		return it->second;
+		return result<rewriter::rule>(it->second);
 	}
 
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -281,12 +280,16 @@ static rewriter::rule bvshr_by_one_rule(size_t bitwidth) {
 	// the leftest bit is zero, the rest of the bits are the same as the
 	// original variable shifted by one. Bits at different positions are
 	// related by equivalence of their zero tests (see bvshl_by_one_rule).
-	auto body = tau::build_bf_eq_0(bit<node>(shifted, bitwidth - 1));
+	result<rewriter::rule> r;
+	TAU_TRY(auto shifted_top, bit<node>(shifted, bitwidth - 1));
+	auto body = tau::build_bf_eq_0(shifted_top);
 	for (size_t i = 1; i < bitwidth; ++i) {
+		TAU_TRY(auto base_i, bit<node>(base, i));
+		TAU_TRY(auto shifted_i1, bit<node>(shifted, i - 1));
 		body = tau::build_wff_and(body,
 			tau::build_wff_equiv(
-				tau::build_bf_eq_0(bit<node>(base, i)),
-				tau::build_bf_eq_0(bit<node>(shifted, i - 1))));
+				tau::build_bf_eq_0(base_i),
+				tau::build_bf_eq_0(shifted_i1)));
 	}
 	auto rule = make_rule<node>(header, body);
 
@@ -297,20 +300,18 @@ static rewriter::rule bvshr_by_one_rule(size_t bitwidth) {
 #endif // DEBUG
 
 	cache[bitwidth] = rule;
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvshr_by_one(tref base, tref shifted) {
-	auto bitwidth = get_bv_type_bitwidth<node>(base);
-	// HE-9: width 0 (untyped operand) would index a 0-length mask string
-	// and wrap `bitwidth - 1` loops to ~SIZE_MAX; refuse instead.
-	if (bitwidth == 0) return nullptr;
-	auto rule = bvshr_by_one_rule<node>(bitwidth);
+result<tref> bvshr_by_one(tref base, tref shifted) {
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(base));
+	TAU_TRY(auto rule, bvshr_by_one_rule<node>(bitwidth));
 	auto call = make_bvshr_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto applied, nso_rr_apply(rr));
+	return r.with_value(applied);
 }
 
 //
@@ -568,14 +569,16 @@ static tref make_bvshl_call(tref base, tref count /* bv constant */, tref shifte
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvshl_rule(tref count /* bv constant */) {
+static result<rewriter::rule> bvshl_rule(tref count /* bv constant */) {
 	using tau = tree<node>;
 
 	static std::map<std::pair<size_t, size_t>, rewriter::rule> cache;
-	auto bitwidth = get_bv_type_bitwidth<node>(count);
+	result<rewriter::rule> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(count));
 	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
 	auto key = std::make_pair(bitwidth, offset);
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	if (auto it = cache.find(key); it != cache.end())
+		return r.with_value(it->second);
 	// If the shift is greater or equal to the bitwidth, the result is always zero
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -591,7 +594,7 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 #endif // DEBUG
 
 		cache.emplace(key, rule);
-		return rule;
+		return r.with_value(rule);
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
 	// Iterate over destination bits j: shifted[j] = 0 for j < offset (low bits
@@ -600,13 +603,15 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 	// (see bvshl_by_one_rule).
 	tref body = nullptr;
 	for (size_t j = 0; j < bitwidth; ++j) {
+		TAU_TRY(auto shifted_j, bit<node>(shifted, j));
 		tref shift_eq;
 		if (j < offset) {
-			shift_eq = tau::build_bf_eq_0(bit<node>(shifted, j));
+			shift_eq = tau::build_bf_eq_0(shifted_j);
 		} else {
+			TAU_TRY(auto base_j, bit<node>(base, j - offset));
 			shift_eq = tau::build_wff_equiv(
-				tau::build_bf_eq_0(bit<node>(shifted, j)),
-				tau::build_bf_eq_0(bit<node>(base, j - offset)));
+				tau::build_bf_eq_0(shifted_j),
+				tau::build_bf_eq_0(base_j));
 		}
 		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
 	}
@@ -619,23 +624,24 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 #endif // DEBUG
 
 	cache.emplace(key, rule);
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvshl(tref base, tref count, tref shifted) {
+result<tref> bvshl(tref base, tref count, tref shifted) {
 	using tau = tree<node>;
 
+	result<tref> r;
 	// The shift amount must be a constant whose value is extractable
 	if (!tau::get(tau::trim(count)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(count))
 		|| !get_bv_constant_value<node>(tau::trim(count)))
-		return nullptr;
-	auto rule = bvshl_rule<node>(count);
+		return r.with_value(nullptr);
+	TAU_TRY(auto rule, bvshl_rule<node>(count));
 	auto call = make_bvshl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto applied, nso_rr_apply(rr));
+	return r.with_value(applied);
 }
 
 /**
@@ -670,14 +676,16 @@ static tref make_bvshr_call(tref base, tref count /* bv constant */, tref shifte
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvshr_rule(tref count /* bv constant */) {
+static result<rewriter::rule> bvshr_rule(tref count /* bv constant */) {
 	using tau = tree<node>;
 
 	static std::map<std::pair<size_t, size_t>, rewriter::rule> cache;
-	auto bitwidth = get_bv_type_bitwidth<node>(count);
+	result<rewriter::rule> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(count));
 	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
 	auto key = std::make_pair(bitwidth, offset);
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	if (auto it = cache.find(key); it != cache.end())
+		return r.with_value(it->second);
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bvshr_call<node>(base, count, shifted);
@@ -693,7 +701,7 @@ static rewriter::rule bvshr_rule(tref count /* bv constant */) {
 #endif // DEBUG
 
 		cache.emplace(key, rule);
-		return rule;
+		return r.with_value(rule);
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
 	// Iterate over destination bits j: shifted[j] = base[j + offset] for j < bitwidth - offset
@@ -703,13 +711,15 @@ static rewriter::rule bvshr_rule(tref count /* bv constant */) {
 	// tests (see bvshl_by_one_rule).
 	tref body = nullptr;
 	for (size_t j = 0; j < bitwidth; ++j) {
+		TAU_TRY(auto shifted_j, bit<node>(shifted, j));
 		tref shift_eq;
 		if (j + offset >= bitwidth) {
-			shift_eq = tau::build_bf_eq_0(bit<node>(shifted, j));
+			shift_eq = tau::build_bf_eq_0(shifted_j);
 		} else {
+			TAU_TRY(auto base_j, bit<node>(base, j + offset));
 			shift_eq = tau::build_wff_equiv(
-				tau::build_bf_eq_0(bit<node>(shifted, j)),
-				tau::build_bf_eq_0(bit<node>(base, j + offset)));
+				tau::build_bf_eq_0(shifted_j),
+				tau::build_bf_eq_0(base_j));
 		}
 		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
 	}
@@ -722,23 +732,24 @@ static rewriter::rule bvshr_rule(tref count /* bv constant */) {
 #endif // DEBUG
 
 	cache.emplace(key, rule);
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvshr(tref base, tref count, tref shifted) {
+result<tref> bvshr(tref base, tref count, tref shifted) {
 	using tau = tree<node>;
 
+	result<tref> r;
 	// The shift amount must be a constant whose value is extractable
 	if (!tau::get(tau::trim(count)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(count))
 		|| !get_bv_constant_value<node>(tau::trim(count)))
-		return nullptr;
-	auto rule = bvshr_rule<node>(count);
+		return r.with_value(nullptr);
+	TAU_TRY(auto rule, bvshr_rule<node>(count));
 	auto call = make_bvshr_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto applied, nso_rr_apply(rr));
+	return r.with_value(applied);
 }
 
 //
@@ -787,31 +798,35 @@ static tref make_bvcast_call(tref src, tref result) {
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvcast_rule(size_t src_width, size_t target_width) {
+static result<rewriter::rule> bvcast_rule(size_t src_width, size_t target_width) {
 	using tau = tree<node>;
 
 	static std::map<std::pair<size_t, size_t>, rewriter::rule> cache;
 	if (auto it = cache.find({ src_width, target_width }); it != cache.end()) {
-		return it->second;
+		return result<rewriter::rule>(it->second);
 	}
 
 	auto src = tau::build_bf_variable(bv_type_id<node>(src_width));
-	auto result = tau::build_bf_variable(bv_type_id<node>(target_width));
-	auto head = make_bvcast_call<node>(src, result);
+	auto res = tau::build_bf_variable(bv_type_id<node>(target_width));
+	auto head = make_bvcast_call<node>(src, res);
 	auto min_width = std::min(src_width, target_width);
 	tref body = nullptr;
+	result<rewriter::rule> r;
 
 	// Constrain shared bits: (bit i of src == 0) <-> (bit i of result == 0)
 	for (size_t i = 0; i < min_width; ++i) {
-		auto src_bit_zero = tau::build_bf_eq_0(bit<node>(src, i));
-		auto res_bit_zero = tau::build_bf_eq_0(bit<node>(result, i));
+		TAU_TRY(auto src_bit_i, bit<node>(src, i));
+		TAU_TRY(auto res_bit_i, bit<node>(res, i));
+		auto src_bit_zero = tau::build_bf_eq_0(src_bit_i);
+		auto res_bit_zero = tau::build_bf_eq_0(res_bit_i);
 		auto bit_eq = tau::build_wff_equiv(src_bit_zero, res_bit_zero);
 		body = body ? tau::build_wff_and(body, bit_eq) : bit_eq;
 	}
 
 	// For zero-extension: constrain extended bits to zero
 	for (size_t i = min_width; i < target_width; ++i) {
-		auto res_bit_zero = tau::build_bf_eq_0(bit<node>(result, i));
+		TAU_TRY(auto res_bit_i, bit<node>(res, i));
+		auto res_bit_zero = tau::build_bf_eq_0(res_bit_i);
 		body = body ? tau::build_wff_and(body, res_bit_zero) : res_bit_zero;
 	}
 
@@ -824,25 +839,26 @@ static rewriter::rule bvcast_rule(size_t src_width, size_t target_width) {
 #endif // DEBUG
 
 	cache[{ src_width, target_width }] = rule;
-	return rule;
+	return r.with_value(rule);
 }
 
 /**
  * @brief Computes a predicate constraining result to be the cast of src.
  * @tparam node Node type
  * @param src Source bitvector
- * @param result Result bitvector (fresh variable of target type)
+ * @param res Result bitvector (fresh variable of target type)
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref bvcast(tref src, tref result) {
-	auto src_width = get_bv_type_bitwidth<node>(src);
-	auto target_width = get_bv_type_bitwidth<node>(result);
-	auto rule = bvcast_rule<node>(src_width, target_width);
-	auto call = make_bvcast_call<node>(src, result);
+result<tref> bvcast(tref src, tref res) {
+	result<tref> r;
+	TAU_TRY(auto src_width, get_bv_type_bitwidth<node>(src));
+	TAU_TRY(auto target_width, get_bv_type_bitwidth<node>(res));
+	TAU_TRY(auto rule, bvcast_rule<node>(src_width, target_width));
+	auto call = make_bvcast_call<node>(src, res);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto applied, nso_rr_apply(rr));
+	return r.with_value(applied);
 }
 
 } // namespace idni::tau_lang

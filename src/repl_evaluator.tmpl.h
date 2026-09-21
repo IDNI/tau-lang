@@ -344,17 +344,11 @@ void repl_evaluator<BAs...>::print_benchmarks(const result<T>& res) const {
 	if (opt.print_benchmarks) print_benchmarks(res.report());
 }
 
-// Benchmarks stay plain text: the parser's global TC colorizes
-// report::print() output unconditionally, ignoring this session's own
-// color setting, which would corrupt a piped or logged benchmark stream.
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::print_benchmarks(const report& rep) const {
 	if (!opt.print_benchmarks) return;
-	bool was_enabled = idni::TC.enabled;
-	idni::TC.disable();
 	rep.print(err);
-	idni::TC.set(was_enabled);
 }
 
 template <typename... BAs>
@@ -718,7 +712,16 @@ tref repl_evaluator<BAs...>::whatis_cmd(const tt& n) {
 	out << "node type: " << node_type;
 	if (type == tau::bf || type == tau::wff) {
 		size_t ba_type = tau::get(value).get_ba_type();
-		if (ba_type) out << "  BA type: " << ba_types<node>::name(ba_type);
+		if (ba_type) {
+			auto nm = ba_types<node>::name(ba_type);
+			if (nm.has_value())
+				out << "  BA type: " << nm.value();
+			else if (nm.has_error()) {
+				// end the partial "node type: ..." line before the report.
+				out << "\n";
+				nm.report().print(out);
+			}
+		}
 	}
 	out << "\n";
 	return value;
@@ -868,10 +871,7 @@ void repl_evaluator<BAs...>::continue_running(
 			if (produced && running->steps_to_run != 0) {
 				++running->steps_done;
 				if (opt.print_benchmarks) {
-					bool was_enabled = idni::TC.enabled;
-					idni::TC.disable();
 					st.report().print(out);
-					idni::TC.set(was_enabled);
 				}
 				out << "\n";
 				first = false;
@@ -881,10 +881,7 @@ void repl_evaluator<BAs...>::continue_running(
 				// A genuine step failure, not a wait for input
 				// (including a synthesis backend failure mid-run):
 				// report it and end the run.
-				bool was_enabled = idni::TC.enabled;
-				idni::TC.disable();
 				st.print(err);
-				idni::TC.set(was_enabled);
 				s.close();
 				running.reset();
 				error = true;
@@ -916,9 +913,9 @@ void repl_evaluator<BAs...>::continue_running(
 						running->interp.ctx, var); layout)
 				{
 					// One physical stream/prompt for the WHOLE tuple
-					// literal (design doc sec. 4) -- label with the
-					// stream's own root name, not this member's dotted
-					// name, plus a wire-shaped hint of what to type.
+					// literal -- label with the stream's own root name,
+					// not this member's dotted name, plus a wire-shaped
+					// hint of what to type.
 					// type_tree stays null: a tuple literal isn't a single
 					// BA type, so stream_value_incomplete (below) skips
 					// its type-specific incomplete-value checks for it.
@@ -926,7 +923,13 @@ void repl_evaluator<BAs...>::continue_running(
 						<< "] := " << adt_wire_hint<node>(*layout) << " ";
 				} else {
 					size_t tid = running->interp.ctx.type_of(var);
-					std::string type_name = get_ba_type_name<node>(tid);
+					auto tn = get_ba_type_name<node>(tid);
+					std::string type_name;
+					if (tn.has_value())
+						type_name = tn.value();
+					else if (tn.has_error()) {
+						tn.report().print(out);
+					}
 					if (!type_name.empty() && type_name.front() == ':')
 						type_name.erase(0, 1);
 					lbl << get_var_name<node>(var) << "[" << tp << "] : "
@@ -941,8 +944,10 @@ void repl_evaluator<BAs...>::continue_running(
 		// Ended before budget (e.g. input EOF): stop, do not prompt.
 			if (running->steps_to_run != 0) return;
 			// no awaiting stream -> rejected value (re-ask) or end of run
-			if (first && retry) pending = *retry;
-			else pending = { pending_request::continue_or_quit,
+			if (first && retry) {
+				st.print(out);
+				pending = *retry;
+			} else pending = { pending_request::continue_or_quit,
 				"continue? [Enter]/[q]: ", nullptr };
 			reprompt();
 			return; // suspend: wait for the answer
@@ -952,10 +957,7 @@ void repl_evaluator<BAs...>::continue_running(
 		// before the next "Execution step"), then a blank line
 		++running->steps_done;
 		if (opt.print_benchmarks) {
-			bool was_enabled = idni::TC.enabled;
-			idni::TC.disable();
 			st.report().print(out);
-			idni::TC.set(was_enabled);
 		}
 		out << "\n";
 		first = false;
@@ -1061,10 +1063,21 @@ void print_solver_cmd_solution(std::ostream& out,
 		size_t t = find_ba_type<node>(var);
 		if (t == 0) t = type_id;
 		std::stringstream ss;
-		if (!serialize_constant<node>(ss, value, t))
+		auto ser = serialize_constant<node>(ss, value, t);
+		if (ser.has_error()) {
+			ser.report().print(out);
+		}
+		if (!ser.has_value() || !ser.value())
 			print_binding<node>(out, var, value);
-		else out << "\t" << tau::get(var).to_str() << " := { "
-			<< ss.str() << " }" << ba_types<node>::name(t) << "\n";
+		else {
+			auto nm = ba_types<node>::name(t);
+			if (nm.has_value())
+				out << "\t" << tau::get(var).to_str() << " := { "
+					<< ss.str() << " }" << nm.value() << "\n";
+			else if (nm.has_error()) {
+				nm.report().print(out);
+			}
+		}
 	}
 	out << "}\n";
 }
@@ -1369,7 +1382,8 @@ void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
 // make a nso_rr from the given tau source and binder.
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
+result<tref> repl_evaluator<BAs...>::make_cli(const std::string& src) {
+	result<tref> r;
 	// Remove ascii char 22 only. '#' comments are handled by the grammar;
 	// a manual strip here was brace-blind and swallowed {#b...} constants.
 	std::string filt;
@@ -1384,7 +1398,6 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	tau_parser::result result = tau_parser::instance()
 		.parse(filt.c_str(), filt.size(),
 			{ .start = tau::cli, .dynamic_ctx = &names });
-	auto fail = [this]() { return error = true, nullptr; };
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
@@ -1394,9 +1407,13 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 			std::string hint = classify_parse_error<node>(filt);
 			TAU_LOG_ERROR << "[repl] " << msg
 				<< (hint.empty() ? "" : "\nhint: " + hint) << "\n";
-			return fail();
+			error = true;
+			// The parser's own diagnostic is already shown above; r
+			// only needs to stay well-formed for its caller.
+			r.error(code::parse_error, messages::failed_to_parse_spec);
+			return r;
 		}
-		return nullptr; // Unexpected eof, continue with reading input
+		return r.with_value(nullptr); // Unexpected eof, continue with reading input
 	}
 	auto t = result.get_shaped_tree2();
 	auto& defs = definitions<node>::instance();
@@ -1409,9 +1426,18 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		.context = defs.get_io_context(),
 		.session_type_defs = &type_defs
 	};
-	auto bound = tau::get(tau_parser::tree::get(t), opts);
-	if (!bound) return fail();
-	return bound;
+	tref bound = r.merge_take(tau::get(tau_parser::tree::get(t), opts))
+		.value_or(nullptr);
+	if (!bound) {
+		error = true;
+		if (!r.has_error())
+			r.error(code::parse_error, messages::failed_to_parse_spec);
+		// eval()'s own result<int> return carries REPL quit codes, not
+		// this report, so print it here where it still has a value.
+		r.print(err);
+		return r;
+	}
+	return r.with_value(bound);
 }
 
 /**
@@ -1781,8 +1807,10 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		try {
 			size_t pos = 0;
 			double d = std::stod(v, &pos);
-			if (pos != v.size())
-				throw std::invalid_argument(v);
+			if (pos != v.size()) {
+				TAU_LOG_ERROR << "Invalid value: expected a number\n";
+				return {};
+			}
 			return d;
 		} catch (const std::exception&) {
 			TAU_LOG_ERROR << "Invalid value: expected a number\n";
@@ -2280,7 +2308,9 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 		return idni::diagnostics::result<int>(0);
 	}
 	error = false;
-	tref cli = make_cli(src);
+	// make_cli() already prints its own report (see its own comment);
+	// eval()'s result<int> return carries REPL quit codes, not a report.
+	tref cli = make_cli(src).value_or(nullptr);
 	// Pin the parsed command line for the whole evaluation: a `run` among
 	// its commands steps the interpreter, which calls maybe_gc(), and the
 	// commands still queued behind it live in this very tree. A line that

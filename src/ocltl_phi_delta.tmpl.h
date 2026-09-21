@@ -157,12 +157,16 @@ inline bool ocltl_phi_delta_direct(const ocltl_phi_delta_dims& dims,
 
 namespace ocltl_phi_delta_detail {
 
-// Throws once `deadline` has passed; a no-op when there is none.
-inline void check_deadline(
+// Reports code::solver_error once `deadline` has passed; succeeds otherwise.
+inline result<bool> check_deadline(
 	const std::optional<std::chrono::steady_clock::time_point>& deadline)
 {
+	result<bool> r;
 	if (deadline && std::chrono::steady_clock::now() > *deadline)
-		throw ocltl_phi_delta_timeout{};
+		return r.with_assert_check_error(code::solver_error,
+			"ocltl phi_delta build timed out",
+			{{label::timeout, 1}});
+	return r.with_assert_check_value(true);
 }
 
 // A fixed namespace shared by every build call, so repeated builds of the
@@ -182,42 +186,54 @@ inline size_t node_table_size() {
 	return bdd<Bool, ocltl_phi_delta_bdd_options>::V.size();
 }
 
-// Throws once the node ceiling is already reached, before doing more work.
-inline void check_node_ceiling(size_t max_nodes) {
+// Reports code::solver_error once the node ceiling is reached.
+inline result<bool> check_node_ceiling(size_t max_nodes) {
+	result<bool> r;
 	size_t n = node_table_size();
 	if (n > max_nodes)
-		throw ocltl_phi_delta_limit_exceeded{ "nodes", max_nodes, n };
+		return r.with_assert_check_error(code::solver_error,
+			"ocltl phi_delta node ceiling exceeded",
+			{{label::limit, max_nodes},
+			 {label::actual, n}});
+	return r.with_assert_check_value(true);
 }
 
-// Throws when `total_vars` exceeds the variable ceiling.
-inline void check_var_ceiling(size_t total_vars, size_t max_vars) {
+// Reports code::solver_error when `total_vars` exceeds the ceiling.
+inline result<bool> check_var_ceiling(size_t total_vars, size_t max_vars) {
+	result<bool> r;
 	if (total_vars > max_vars)
-		throw ocltl_phi_delta_limit_exceeded{ "vars", max_vars, total_vars };
+		return r.with_assert_check_error(code::solver_error,
+			"ocltl phi_delta variable ceiling exceeded",
+			{{label::limit, max_vars},
+			 {label::actual, total_vars}});
+	return r.with_assert_check_value(true);
 }
 
-inline ocltl_phi_delta_bdd iff(const ocltl_phi_delta_bdd& a,
+inline result<ocltl_phi_delta_bdd> iff(const ocltl_phi_delta_bdd& a,
 	const ocltl_phi_delta_bdd& b, size_t max_nodes)
 {
-	check_node_ceiling(max_nodes);
-	return ~(a ^ b);
+	result<ocltl_phi_delta_bdd> r;
+	if (!r.merge_take(check_node_ceiling(max_nodes))) return r;
+	return r.with_assert_check_value(~(a ^ b));
 }
 
 // Left-fold AND over `v`; every element here is a distinct fresh tau-bit
 // literal, so the result is the same chain regardless of fold order.
-inline ocltl_phi_delta_bdd and_fold(
+inline result<ocltl_phi_delta_bdd> and_fold(
 	const std::vector<ocltl_phi_delta_bdd>& v, size_t max_nodes)
 {
-	ocltl_phi_delta_bdd r = bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
+	result<ocltl_phi_delta_bdd> r;
+	ocltl_phi_delta_bdd acc = bdd_handle<Bool, ocltl_phi_delta_bdd_options>::htrue;
 	for (const auto& x : v) {
-		check_node_ceiling(max_nodes);
-		r = r & x;
+		if (!r.merge_take(check_node_ceiling(max_nodes))) return r;
+		acc = acc & x;
 	}
-	return r;
+	return r.with_assert_check_value(std::move(acc));
 }
 
 } // namespace ocltl_phi_delta_detail
 
-inline ocltl_phi_delta_result ocltl_build_phi_delta(
+inline result<ocltl_phi_delta_result> ocltl_build_phi_delta(
 	const ocltl_phi_delta_dims& dims,
 	const std::vector<ocltl_delta_atom>& atoms,
 	std::optional<std::chrono::steady_clock::time_point> deadline,
@@ -225,6 +241,7 @@ inline ocltl_phi_delta_result ocltl_build_phi_delta(
 	std::optional<bool> force_sigma_major)
 {
 	using namespace ocltl_phi_delta_detail;
+	result<ocltl_phi_delta_result> r;
 
 	const size_t K = dims.k();
 	const size_t k_sigma = dims.d_m + dims.d_x;
@@ -233,7 +250,8 @@ inline ocltl_phi_delta_result ocltl_build_phi_delta(
 	const size_t sigma_n = size_t{1} << k_sigma;
 	const size_t rho_n = size_t{1} << k_rho;
 
-	check_var_ceiling(tau_n + sigma_n + rho_n + atoms.size(), limits.max_vars);
+	if (!r.merge_take(check_var_ceiling(tau_n + sigma_n + rho_n + atoms.size(), limits.max_vars)))
+		return r;
 
 	const std::string& ns = phi_delta_namespace();
 	// the smaller of sigma's/rho's fiber count gets contiguous tau-bit ids.
@@ -242,17 +260,21 @@ inline ocltl_phi_delta_result ocltl_build_phi_delta(
 	// tau's mask bits: bit A stands for "minterm A is zero"; its low k_sigma bits are B, its high k_rho bits are C.
 	std::vector<int_t> tau_ids(tau_n);
 	std::vector<ocltl_phi_delta_bdd> tau_bits(tau_n);
-	auto mint_tau = [&](size_t A) {
-		check_node_ceiling(limits.max_nodes);
+	auto mint_tau = [&](size_t A) -> bool {
+		if (!r.merge_take(check_node_ceiling(limits.max_nodes)))
+			return false;
 		tau_ids[A] = var_dict(ns + "tau$" + std::to_string(A));
 		tau_bits[A] = bit_var(tau_ids[A]);
+		return true;
 	};
 	if (sigma_major) {
 		for (size_t B = 0; B < sigma_n; ++B)
-			for (size_t C = 0; C < rho_n; ++C) mint_tau(B | (C << k_sigma));
+			for (size_t C = 0; C < rho_n; ++C)
+				if (!mint_tau(B | (C << k_sigma))) return r;
 	} else {
 		for (size_t C = 0; C < rho_n; ++C)
-			for (size_t B = 0; B < sigma_n; ++B) mint_tau(B | (C << k_sigma));
+			for (size_t B = 0; B < sigma_n; ++B)
+				if (!mint_tau(B | (C << k_sigma))) return r;
 	}
 
 	std::vector<int_t> sigma_ids(sigma_n);
@@ -284,44 +306,58 @@ inline ocltl_phi_delta_result ocltl_build_phi_delta(
 	// tau is valid iff not every sigma bit is set.
 	std::vector<ocltl_phi_delta_bdd> sigma_bit_vars(sigma_n);
 	for (size_t B = 0; B < sigma_n; ++B) sigma_bit_vars[B] = bit_var(sigma_ids[B]);
-	check_node_ceiling(limits.max_nodes);
-	relation = relation & ~and_fold(sigma_bit_vars, limits.max_nodes);
+	if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
+	{
+		auto all_sigma = r.merge_take(and_fold(sigma_bit_vars, limits.max_nodes));
+		if (!all_sigma) return r;
+		relation = relation & ~*all_sigma;
+	}
 
 	// build every fiber of the major dimension before touching any tau bit again.
 	if (sigma_major) {
 		for (size_t B = 0; B < sigma_n; ++B) {
-			check_deadline(deadline);
-			check_node_ceiling(limits.max_nodes);
-			relation = relation & iff(bit_var(sigma_ids[B]),
-				and_fold(sigma_fiber_bits(B), limits.max_nodes), limits.max_nodes);
+			if (!r.merge_take(check_deadline(deadline))) return r;
+			if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
+			auto fiber = r.merge_take(and_fold(sigma_fiber_bits(B), limits.max_nodes));
+			if (!fiber) return r;
+			auto eq = r.merge_take(iff(bit_var(sigma_ids[B]), *fiber, limits.max_nodes));
+			if (!eq) return r;
+			relation = relation & *eq;
 		}
 	} else {
 		for (size_t C = 0; C < rho_n; ++C) {
-			check_deadline(deadline);
-			check_node_ceiling(limits.max_nodes);
-			relation = relation & iff(bit_var(rho_ids[C]),
-				and_fold(rho_fiber_bits(C), limits.max_nodes), limits.max_nodes);
+			if (!r.merge_take(check_deadline(deadline))) return r;
+			if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
+			auto fiber = r.merge_take(and_fold(rho_fiber_bits(C), limits.max_nodes));
+			if (!fiber) return r;
+			auto eq = r.merge_take(iff(bit_var(rho_ids[C]), *fiber, limits.max_nodes));
+			if (!eq) return r;
+			relation = relation & *eq;
 		}
 	}
 
 	// D_i is atom i's minterm-support conjunction, negated for "!= 0" atoms.
 	std::vector<int_t> delta_ids(atoms.size());
 	for (size_t i = 0; i < atoms.size(); ++i) {
-		check_deadline(deadline);
+		if (!r.merge_take(check_deadline(deadline))) return r;
 		const ocltl_delta_atom& atom = atoms[i];
 		std::vector<bool> supp = ocltl_term_support(atom.term, K);
 		std::vector<ocltl_phi_delta_bdd> support;
 		support.reserve(tau_n / 2);
 		for (size_t A = 0; A < tau_n; ++A) {
 			if (supp[A]) support.push_back(tau_bits[A]);
-			if ((A & 0x3ff) == 0) check_deadline(deadline);
+			if ((A & 0x3ff) == 0)
+				if (!r.merge_take(check_deadline(deadline))) return r;
 		}
 		int_t id = var_dict(ns + "delta$" + std::to_string(i));
 		delta_ids[i] = id;
-		ocltl_phi_delta_bdd eq_zero = and_fold(support, limits.max_nodes);
-		check_node_ceiling(limits.max_nodes);
-		relation = relation & iff(bit_var(id),
-			atom.negate ? ~eq_zero : eq_zero, limits.max_nodes);
+		auto eq_zero_r = r.merge_take(and_fold(support, limits.max_nodes));
+		if (!eq_zero_r) return r;
+		if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
+		auto eq = r.merge_take(iff(bit_var(id),
+			atom.negate ? ~*eq_zero_r : *eq_zero_r, limits.max_nodes));
+		if (!eq) return r;
+		relation = relation & *eq;
 	}
 
 	ocltl_phi_delta_stats stats;
@@ -334,23 +370,29 @@ inline ocltl_phi_delta_result ocltl_build_phi_delta(
 	// build each minor-dimension fiber, then immediately project its tau bits away.
 	if (sigma_major) {
 		for (size_t C = 0; C < rho_n; ++C) {
-			check_deadline(deadline);
-			check_node_ceiling(limits.max_nodes);
-			relation = relation & iff(bit_var(rho_ids[C]),
-				and_fold(rho_fiber_bits(C), limits.max_nodes), limits.max_nodes);
+			if (!r.merge_take(check_deadline(deadline))) return r;
+			if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
+			auto fiber = r.merge_take(and_fold(rho_fiber_bits(C), limits.max_nodes));
+			if (!fiber) return r;
+			auto eq = r.merge_take(iff(bit_var(rho_ids[C]), *fiber, limits.max_nodes));
+			if (!eq) return r;
+			relation = relation & *eq;
 			for (size_t B = 0; B < sigma_n; ++B) {
-				check_node_ceiling(limits.max_nodes);
+				if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
 				relation = relation->ex(tau_ids[B | (C << k_sigma)]);
 			}
 		}
 	} else {
 		for (size_t B = 0; B < sigma_n; ++B) {
-			check_deadline(deadline);
-			check_node_ceiling(limits.max_nodes);
-			relation = relation & iff(bit_var(sigma_ids[B]),
-				and_fold(sigma_fiber_bits(B), limits.max_nodes), limits.max_nodes);
+			if (!r.merge_take(check_deadline(deadline))) return r;
+			if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
+			auto fiber = r.merge_take(and_fold(sigma_fiber_bits(B), limits.max_nodes));
+			if (!fiber) return r;
+			auto eq = r.merge_take(iff(bit_var(sigma_ids[B]), *fiber, limits.max_nodes));
+			if (!eq) return r;
+			relation = relation & *eq;
 			for (size_t C = 0; C < rho_n; ++C) {
-				check_node_ceiling(limits.max_nodes);
+				if (!r.merge_take(check_node_ceiling(limits.max_nodes))) return r;
 				relation = relation->ex(tau_ids[B | (C << k_sigma)]);
 			}
 		}
@@ -363,7 +405,7 @@ inline ocltl_phi_delta_result ocltl_build_phi_delta(
 	result.delta_vars = std::move(delta_ids);
 	stats.nodes_after_projection = ocltl_bdd_node_count(relation);
 	result.stats = stats;
-	return result;
+	return r.with_assert_check_value(std::move(result));
 }
 
 inline size_t ocltl_bdd_node_count(const ocltl_phi_delta_bdd& f) {

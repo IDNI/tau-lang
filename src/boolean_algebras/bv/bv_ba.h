@@ -43,6 +43,7 @@
 #include "backends/cvc5/cvc5_options.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
@@ -64,10 +65,11 @@ using solution = subtree_map<node, tref>;
  *
  * @tparam node The type of node for which the bit-vector size is queried.
  * @param b The tref object representing the bit-vector.
- * @return The size of the bit-vector in bits.
+ * @return The size of the bit-vector in bits, or a report naming why it
+ * could not be determined.
  */
 template<NodeType node>
-size_t get_bv_size(const tref t);
+result<size_t> get_bv_size(const tref t);
 
 /// Opt-in: decide a closed bitvector formula whose binders are all of one
 /// kind quantifier-free (see `bv_formula_sat_status`). A formula with only
@@ -221,12 +223,13 @@ inline void config_cvc5_solver_alternating_quantifiers(cvc5::Solver& solver) {
  * by reference for performance; quantifier cases save and restore any shadowed
  * outer binding around their recursive call, so it is left unchanged on return.
  * @param free_vars Mapping from tree nodes to bitvector values for free variables (may be updated).
- * @return An optional with the the evaluated bitvector value of the node if possible and
- * an empty optional if not.
+ * @return The evaluated bitvector value; a value-less, error-less result
+ * when the node is not bv-translatable (an ordinary decline), or a report
+ * on a genuine internal failure.
  *
  */
 template <NodeType node>
-std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
+result<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv>& vars, subtree_map<node, bv>& free_vars);
 
 /**
@@ -244,7 +247,7 @@ using bv_eval_memo = subtree_unordered_map<node, std::unordered_map<size_t, bv>>
  * per quantifier entry) so memo entries don't leak across quantifier scopes.
  */
 template <NodeType node>
-std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
+result<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv>& vars, subtree_map<node, bv>& free_vars,
 	bv_eval_memo<node>& memo, size_t& ctx_counter, size_t ctx);
 
@@ -253,10 +256,11 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
  * @param form Root formula node.
  * @param vars Bound variable assignments.
  * @param free_vars Free variable assignments (updated in place).
- * @return Evaluated BV term, or `nullopt` on failure.
+ * @return Evaluated BV term; value-less and error-less on an ordinary
+ * decline, or a report on a genuine internal failure.
  */
 template <NodeType node>
-std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
+result<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 	subtree_map<node, bv>& free_vars);
 
 /** @brief Convert a cvc5 term tree @p n back into a Tau tree reference. */
@@ -443,7 +447,7 @@ std::optional<solution<node>> solve_bv(const trefs& form);
 /** @brief Extract a BV constant from a parse-tree node @p parse_tree with type @p type_tree. */
 template<typename...BAs>
 requires BAsPack<BAs...>
-std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
+result<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
 
 /**
  * @brief Parses a bit-vector constant from a string representation.
@@ -457,11 +461,11 @@ std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
  * @param src The string representation of the bit-vector constant to parse.
  * @param type_tree The type of the bit-vector.
  * @param base The numerical base to use for parsing (e.g., 2 for binary, 10 for decimal, 16 for hexadecimal). Defaults to 10.
- * @return std::optional<constant_with_type<BAs...>> The parsed bit-vector constant with type, or std::nullopt if parsing fails.
+ * @return The parsed bit-vector constant with type, or a report naming why parsing failed.
  */
 template<typename...BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
+result<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
 	tref type_tree);
 
 // -----------------------------------------------------------------------------
@@ -557,10 +561,10 @@ template <NodeType node> bool is_bv_type_family(tref t);
 template <NodeType node> bool is_bv_type_family(size_t ba_type_id);
 /** @brief Return `true` if node @p t carries a bitvector type. */
 template <NodeType node> bool is_tref_bv_type_family(tref t);
-/** @brief Return the bitwidth of the bitvector type tree @p t. */
-template <NodeType node> size_t get_bv_width(tref t);
-/** @brief Return the bitwidth encoded in type id @p ba_type_id. */
-template <NodeType node> size_t get_bv_width(size_t ba_type_id);
+/** @brief Checked bitwidth lookup: a type without an explicit bitwidth is a report. */
+template <NodeType node> result<size_t> get_bv_width(tref t);
+/** @brief Checked bitwidth lookup by type id. */
+template <NodeType node> result<size_t> get_bv_width(size_t ba_type_id);
 
 // Bitvector specific symbol simplification
 // term_add, term_sub, term_mul and term_shl fold a constant pair at the
@@ -617,8 +621,9 @@ template<NodeType node> tref term_max(tref symbol);
 /** @brief Apply all BV symbol-level simplifications to @p symbol. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);
 
-/** @brief Apply all BV term-level simplifications to @p term. */
-template<NodeType node> tref simplify_bv_term(tref term);
+/** @brief Apply all BV term-level simplifications to @p term; the result
+ *  reports why on a round-cap failure. */
+template<NodeType node> result<tref> simplify_bv_term(tref term);
 
 // (BA1-16: three never-defined declarations removed here:
 // canonize_associative_commutative_symbol, is_associative_and_commutative,

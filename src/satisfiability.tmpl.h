@@ -335,12 +335,11 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	if (t | tau::ctn_lt)
 		return is_left  ? to_ba(condition < time_point)
 				: to_ba(time_point < condition);
-	// The above is exhaustive for the possible children of a constraint. A
-	// plain assert is a no-op under NDEBUG and the nullptr it then returns
-	// flows into build_bf_xor at the create_initial call site, so fail loudly
-	// in every configuration instead.
-	LOG_ERROR << "Unrecognized constraint kind in " << TAU_TO_STR(constraint);
-	throw std::logic_error("Unrecognized constraint kind");
+	// The above is exhaustive for the possible children of a constraint;
+	// the grammar admits only these kinds, so an unrecognized one is a
+	// shape error caught in debug. Return _0 to keep the caller total.
+	DBG(assert(false && "Unrecognized constraint kind");)
+	return to_ba(false);
 }
 
 /**
@@ -390,9 +389,10 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	if (t | tau::ctn_lteq) return condition + 1 >= time_point;
 	if (t | tau::ctn_lt)   return condition >= time_point;
 
-	// The above is exhaustive for the possible children of a constraint.
-	LOG_ERROR << "Unrecognized constraint kind in "	<< TAU_TO_STR(constraint);
-	throw std::logic_error("Unrecognized constraint kind");
+	// The above is exhaustive for the possible children of a constraint;
+	// the grammar admits only these kinds.
+	DBG(assert(false && "Unrecognized constraint kind");)
+	return false;
 }
 
 template <NodeType node>
@@ -660,7 +660,7 @@ result<bool> is_run_satisfiable(tref fm) {
 		<< "is_run_satisfiable[fm]: " << LOG_FM(fm);)
 
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 
 	const auto& t = tau::get(fm);
@@ -889,9 +889,10 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
  * @param initials Set of `(variable name, time point)` pairs marking
  * positions predefined by explicit initial conditions.
  * @param time_point Time step at which unrolling starts.
- * @return A pair `(chi, steps)`: `chi` is the (placeholder-substituted)
- * formula at the fixpoint (or at the point where the step cap
- * `max_fixpoint_steps` was hit), and `steps` is the number of steps taken.
+ * @return A `result` carrying the pair `(chi, steps)`: `chi` is the
+ * (placeholder-substituted) formula at the fixpoint and `steps` is the
+ * number of steps taken. A failed result means the step cap
+ * (`max_fixpoint_steps`) was hit before a fixpoint was reached.
  * @endinternal
  *
  * @par Example
@@ -908,9 +909,10 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
  * sat/unsat outcomes of this overall code path).
  */
 template <NodeType node>
-std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
+result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	const trefs& io_vars, const auto& initials, int_t time_point)
 {
+	result<std::pair<tref, int_t>> r;
 	subtree_map<node, tref> pholder_to_st;
 	auto [chi_prev, cache] = build_initial_step_chi<node>(
 		chi_base, st, io_vars, time_point, pholder_to_st);
@@ -940,11 +942,12 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// Same contract as find_fixpoint_phi: a give-up yields no
 			// result rather than a partial chi.
-			LOG_ERROR << "find_fixpoint_chi: exceeded " << max_fixpoint_steps
-				<< " steps without reaching a fixpoint, giving up; "
-				"raise --max-fixpoint-steps (`set fixpointsteps`, "
-				"0 = unlimited) to decide this specification";
-			return { nullptr, step_num };
+			return r.with_error(code::solver_error,
+				"find_fixpoint_chi exceeded the fixpoint step limit "
+				"without reaching a fixpoint, giving up; raise "
+				"--max-fixpoint-steps (`set fixpointsteps`, "
+				"0 = unlimited) to decide this specification",
+				{{label::limit, max_fixpoint_steps}});
 		}
 		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
 
@@ -962,7 +965,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	LOG_DEBUG << "Unbounded continuation of Tau formula "
 		<< "reached fixpoint after " << step_num - 1 << " steps: "
 		<< trace_str;
-	return { chi_prev_replc, step_num - 1 };
+	return r.with_value(std::make_pair(chi_prev_replc, step_num - 1));
 }
 
 /**
@@ -1627,9 +1630,11 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * clauses, as returned by `transform_to_eventual_variables`.
  * @param output When `true`, print diagnostic fixpoint information via
  * `print_fixpoint_info`.
- * @return `F` if the flag can never be raised (the `sometimes` clause is
- * unsatisfiable given the always-part); otherwise a formula describing a
- * run in which the flag is raised, conjoined with `original_aw`.
+ * @return A `result<tref>` carrying `F` if the flag can never be raised
+ * (the `sometimes` clause is unsatisfiable given the always-part), or a
+ * formula describing a run in which the flag is raised, conjoined with
+ * `original_aw`. A failed result means a normalization cap or a fixpoint-
+ * or flag-search-step cap was hit before a verdict was reached.
  * @endinternal
  *
  * @par Example
@@ -1648,13 +1653,14 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * it, for both the sat and unsat outcomes.
  */
 template <NodeType node>
-tref to_unbounded_continuation(tref ubd_aw_continuation,
+result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	tref ev_var_flags, tref original_aw, const int_t start_time,
 	const int_t max_st_lookback, const bool output)
 {
 	LOG_DEBUG << "Begin to_unbounded_continuation";
 
 	using tau = tree<node>;
+	result<tref> r;
 	DBG({ auto nbc = has_no_boolean_combs_of_models<node>(ubd_aw_continuation);
 		assert(nbc.has_value() && nbc.value()); })
 	DBG(assert(is_child<node>(ev_var_flags, tau::wff_sometimes));)
@@ -1692,9 +1698,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	// guarded site below: continuing with `run = nullptr` would silently
 	// DROP the initial-run conjuncts and make the remaining search easier,
 	// i.e. answer satisfiable/realizable when it must not.
-	auto initial_run = make_initial_run<node>(ori_aw_ctn, max_st_lookback);
-	if (!initial_run) return nullptr;
-	tref run = initial_run.value();
+	TAU_TRY(tref run, make_initial_run<node>(ori_aw_ctn, max_st_lookback));
 	// Check if flag can be raised up to the highest initial condition + 2
 	// which corresponds to checking the sometimes statement up to time point
 	// of the highest initial condition + 1
@@ -1713,8 +1717,8 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 					tau::build_wff_and(run, current_flag)).value_or(nullptr);
 		// A cap violation surfaces as nullptr; propagate it rather than
 		// dereferencing it below.
-		if (!normed_run) return nullptr;
-		auto sat = is_run_satisfiable<node>(normed_run);
+		if (!normed_run) return r.with_value(nullptr);
+		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
 		if (sat.has_value() && sat.value()) {
 			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
 			LOG_DEBUG << LOG_FM(normed_run);
@@ -1723,7 +1727,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 				"Tau specification did not rely on fixpoint "
 				"finding, yielding the result: ",
 				TAU_TO_STR(res), output);
-			return res;
+			return r.with_value(res);
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
@@ -1732,7 +1736,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		// A cap violation surfaces as nullptr; return it immediately --
 		// falling into the next iteration's `equals_T()` check would
 		// silently restart from `current_aw`, masking the failure.
-		if (!run) return nullptr;
+		if (!run) return r.with_value(nullptr);
 	}
 	// Since flag could not be raised in the initial segment, we now check if it
 	// can be raised at all. To this end we calculate chi_inf
@@ -1749,14 +1753,15 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	LOG_TRACE << "chi base: " << LOG_FM(tau::build_wff_and(aw, st_flags));
 
 	// Find fixpoint of chi after highest initial condition
-	auto [chi_inf, steps] = find_fixpoint_chi<node>(aw, st_flags, io_vars,
-		initials, time_point + point_after_inits);
-	// A fixpoint-step give-up surfaces as nullptr; propagate it.
-	if (!chi_inf) return nullptr;
+	auto chi_fp = r.merge_take(find_fixpoint_chi<node>(aw, st_flags, io_vars,
+		initials, time_point + point_after_inits));
+	// A fixpoint-step give-up surfaces as an error on `r`; propagate it.
+	if (!chi_fp) return r;
+	auto [chi_inf, steps] = *chi_fp;
 	chi_inf = normalize_non_temp<node>(chi_inf).value_or(nullptr);
 	// A cap violation surfaces as nullptr; propagate it rather than
 	// dereferencing it below.
-	if (!chi_inf) return nullptr;
+	if (!chi_inf) return r.with_value(nullptr);
 
 	// LOG_TRACE << "Fixpoint chi after normalize: " << chi_inf;
 	if (tau::get(chi_inf).equals_F()) {
@@ -1765,7 +1770,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 			"fixpoint after " + std::to_string(steps) +
 			" steps, yielding the result: ",
 			TAU_TO_STR(tau::_F()), output);
-		return tau::_F();
+		return r.with_value(tau::_F());
 	}
 	chi_inf = transform_back_non_initials<node>(chi_inf, point_after_inits-1);
 	io_vars = tau::get(chi_inf).select_top(is_child<node, tau::io_var>);
@@ -1774,16 +1779,19 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 
 	LOG_TRACE << "Fm to check sat: "
 			<< LOG_FM(tau::build_wff_and(run, chi_inf_anchored));
-	auto run_sat = is_run_satisfiable<node>(
-		tau::build_wff_and(run, chi_inf_anchored));
-	if (!run_sat.has_value() || !run_sat.value())
+	auto run_sat = r.merge_take(is_run_satisfiable<node>(
+		tau::build_wff_and(run, chi_inf_anchored)));
+	// A real failure (as opposed to a legitimate "not satisfiable")
+	// propagates as an error instead of masquerading as the F verdict.
+	if (!run_sat) return r;
+	if (!*run_sat)
 	{
 		print_fixpoint_info(
 			"Temporal normalization of Tau specification reached "
 			"fixpoint after " + std::to_string(steps) +
 			" steps, yielding the result: ",
 			TAU_TO_STR(tau::_F()), output);
-		return tau::_F();
+		return r.with_value(tau::_F());
 	}
 	// Here we know that the formula is satisfiable at some point
 	// Since the initial segment is already checked we continue from there
@@ -1805,22 +1813,22 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		if (flag_search_bounded && i > flag_search_limit) {
 			// A bounded give-up is no verdict: it used to report F,
 			// which callers read as a proof of unsatisfiability. Surface
-			// it as nullptr (no result) so transform_to_execution
-			// reports an error instead.
-			LOG_ERROR << "to_unbounded_continuation: the eventual "
-				"variable flag could not be raised within "
-				<< max_flag_search_steps << " steps past the flag "
-				"boundary; giving up without a verdict. This is a "
-				"bounded failure, not a proof of unsatisfiability; "
-				"raise --max-flag-search-steps (`set flagsteps`, "
-				"0 = unlimited) to decide this specification.";
+			// it as an error instead.
 			print_fixpoint_info("Temporal normalization of Tau "
 				"specification gave up after " +
 				std::to_string(steps) + " fixpoint steps and " +
 				std::to_string(max_flag_search_steps) +
 				" flag search steps without a result",
 				"", output);
-			return nullptr;
+			return r.with_error(code::solver_error,
+				"to_unbounded_continuation could not raise the "
+				"eventual variable flag past the flag boundary within "
+				"the flag search step limit; giving up without a "
+				"verdict. This is a bounded failure, not a proof of "
+				"unsatisfiability; raise --max-flag-search-steps "
+				"(`set flagsteps`, 0 = unlimited) to decide this "
+				"specification.",
+				{{label::limit, max_flag_search_steps}});
 		}
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
 		run = tau::build_wff_and(run, current_aw);
@@ -1831,10 +1839,10 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 					tau::build_wff_and(run, current_flag)).value_or(nullptr);
 		// A cap violation surfaces as nullptr; propagate it rather than
 		// dereferencing it below.
-		if (!normed_run) return nullptr;
+		if (!normed_run) return r.with_value(nullptr);
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
-		auto sat = is_run_satisfiable<node>(normed_run);
+		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
 		if (sat.has_value() && sat.value()) {
 			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
 			LOG_DEBUG << LOG_FM(normed_run);
@@ -1844,7 +1852,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 				"reached fixpoint after "+std::to_string(steps)+
 				" steps, yielding the result: ",
 				TAU_TO_STR(res), output);
-			return res;
+			return r.with_value(res);
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
@@ -1853,7 +1861,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		// A cap violation surfaces as nullptr; return it immediately --
 		// this unbounded loop rebuilds `run` unconditionally next
 		// iteration, unlike the bounded loop above.
-		if (!run) return nullptr;
+		if (!run) return r.with_value(nullptr);
 	}
 }
 
@@ -1864,7 +1872,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	result<tref> r;
 	using tau = tree<node>;
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
 	// Make sure that no function/predicate symbol is still present
@@ -2000,20 +2008,12 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	{
 		auto _s = r.open("unbounded_continuation");
 		if (!tau::get(aw_after_ev).equals_F() && !st.empty()) {
-			tref ctn = to_unbounded_continuation<node>(
-					aw_after_ev, st[0], ubd_aw_fm, start_time,
-					ev_t.second, output);
 			// A bounded give-up (max_fixpoint_steps /
-			// max_flag_search_steps) or a normalization cap surfaces
-			// as nullptr: no verdict, so report an error rather than
-			// a formula the caller would read as sat or unsat.
-			if (!ctn) {
-				return r.with_assert_check_error(code::solver_error,
-					"the temporal normalization gave up before "
-					"reaching a result (see --max-fixpoint-steps / "
-					"--max-flag-search-steps, 0 = unlimited); the "
-					"specification could not be decided");
-			}
+			// max_flag_search_steps) or a normalization cap surfaces as
+			// an error here; `result<tref>` rejects `nullptr` as a value.
+			TAU_TRY(tref ctn, to_unbounded_continuation<node>(
+					aw_after_ev, st[0], ubd_aw_fm, start_time,
+					ev_t.second, output));
 			TAU_TRY_OR(res, normalize_non_temp<node>(ctn),
 				code::internal_error,
 				"Normalization of the unbounded continuation failed");
@@ -2050,7 +2050,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	result<bool> r;
 	using tau = tree<node>;
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	auto mark_undecided = [&]() {
 		r.error(code::unsupported_operation,
@@ -2119,9 +2119,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		if (!reduction.has_value()) {
 			r.merge(std::move(reduction));
 			return r.with_assert_check_error(code::solver_error,
-				"UNKNOWN: the synthesis backend failed or "
-				"produced no verdict; satisfiability could not "
-				"be decided");
+				messages::unknown_satisfiability_no_verdict);
 		}
 		// The reduction is plain LTL, so its satisfiability follows the
 		// same rules as any other LTL formula: sat(A χ) = sat(χ). An E
@@ -2212,7 +2210,7 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	result<bool> r;
 	using tau = tree<node>;
 	if (!f1 || !f2) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	if (has_ctl_star_operators<node>(f1) || has_ctl_star_operators<node>(f2))
 		return r.with_error(code::unsupported_operation,
@@ -2245,7 +2243,7 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	result<bool> r;
 	using tau = tree<node>;
 	if (!f1 || !f2) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	// Negate equivalence for unsat check
 	TAU_TRY_OR(tref f1n, normalize<node>(f1), code::internal_error,
@@ -2281,7 +2279,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	result<tref> r;
 	using tau = tree<node>;
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	LOG_DEBUG << "Start simp_tau_unsat_valid: " << LOG_FM(fm);
 	// Check if formula is valid. Validity distributes over conjunction, so

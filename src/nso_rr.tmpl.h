@@ -50,8 +50,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 		return it->second;
 #endif // TAU_CACHE
 
-	try {
-		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
+	auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
 							r, n, is_capture);
 		if (rule_counting) {
 			auto name = to_str<node>(r);
@@ -76,15 +75,6 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // TAU_CACHE
 
 		return nn;
-	} catch (const std::exception& e) {
-		// LOG_ERROR (not LOG_WARNING): a caught exception here is
-		// indistinguishable from a legitimate non-match to callers, so at
-		// least make it visible; rethrowing is avoided since this is called
-		// pervasively throughout normalization/solving and a single bad
-		// rule application should not abort the whole pipeline.
-		LOG_ERROR << e.what();
-		return n;
-	}
 }
 
 template <NodeType node>

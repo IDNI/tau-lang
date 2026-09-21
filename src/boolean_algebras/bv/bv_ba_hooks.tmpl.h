@@ -56,7 +56,10 @@ tref term_add(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width =  get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return add_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -65,7 +68,10 @@ tref term_add(tref symbol) {
 			// 1 + 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return add_consts(
 					make_bitvector_top_elem(width),
 					make_bitvector_top_elem(width),
@@ -83,7 +89,10 @@ tref term_add(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return add_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -137,7 +146,10 @@ tref term_sub(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width =  get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return sub_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -155,7 +167,10 @@ tref term_sub(tref symbol) {
 			// 0 - 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width =  get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return sub_consts(
 					make_bitvector_bottom_elem(width),
 					make_bitvector_top_elem(width),
@@ -164,7 +179,10 @@ tref term_sub(tref symbol) {
 			// 0 - {const}
 			if (c2.is_ba_constant() && c2.get_ba_type() > 0) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return sub_consts(
 					make_bitvector_bottom_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -185,7 +203,10 @@ tref term_sub(tref symbol) {
 				if (c2.is_ba_constant() && c2.get_ba_type() == type_id)
 					return sub_consts(neg_c1, std::get<bv>(c2.get_ba_constant()), type_id);
 				if (c2.is(tau::bf_t)) {
-					const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+					auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+					// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+					if (!width_r.has_value()) return nullptr;
+					const size_t width = width_r.value();
 					return sub_consts(neg_c1, make_bitvector_top_elem(width), type_id);
 				}
 				if (c2.is(tau::bf_f)) {
@@ -205,7 +226,10 @@ tref term_sub(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return sub_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -243,7 +267,10 @@ tref term_mul(tref symbol) {
 		// bv_widening, leave the node symbolic for the later elaboration
 		// pass instead of wrapping now.
 		if (bv_widening) {
-			const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+			auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+			// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+			if (!width_r.has_value()) return nullptr;
+			const size_t width = width_r.value();
 			auto nz = compare_bv_consts(c2, make_bitvector_bottom_elem(width));
 			if (!nz) return symbol;
 			if (*nz != 0) {
@@ -266,7 +293,10 @@ tref term_mul(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return mul_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -275,7 +305,10 @@ tref term_mul(tref symbol) {
 			// 1 * 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return mul_consts(
 					make_bitvector_top_elem(width),
 					make_bitvector_top_elem(width),
@@ -293,7 +326,10 @@ tref term_mul(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return mul_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -355,7 +391,10 @@ tref term_div(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return div_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -364,7 +403,10 @@ tref term_div(tref symbol) {
 			// 1 / 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return div_consts(
 					make_bitvector_top_elem(width),
 					make_bitvector_top_elem(width),
@@ -384,7 +426,10 @@ tref term_div(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return div_consts(
 					make_bitvector_bottom_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -402,7 +447,10 @@ tref term_div(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return div_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -453,7 +501,10 @@ tref term_mod(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return mod_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -479,7 +530,10 @@ tref term_mod(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return mod_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -527,7 +581,10 @@ tref term_shr(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shr_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -536,7 +593,10 @@ tref term_shr(tref symbol) {
 			// 1 >> 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shr_consts(
 					make_bitvector_top_elem(width),
 					make_bitvector_top_elem(width),
@@ -550,7 +610,10 @@ tref term_shr(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shr_consts(
 					make_bitvector_bottom_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -559,7 +622,10 @@ tref term_shr(tref symbol) {
 			// 0 >> 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shr_consts(
 					make_bitvector_bottom_elem(width),
 					make_bitvector_top_elem(width),
@@ -575,7 +641,10 @@ tref term_shr(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shr_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -631,7 +700,10 @@ tref term_shl(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shl_consts(
 					make_bitvector_top_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -640,7 +712,10 @@ tref term_shl(tref symbol) {
 			// 1 << 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shl_consts(
 					make_bitvector_top_elem(width),
 					make_bitvector_top_elem(width),
@@ -654,7 +729,10 @@ tref term_shl(tref symbol) {
 			if (size_t t = c2.get_ba_type();
 				c2.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shl_consts(
 					make_bitvector_bottom_elem(width),
 					std::get<bv>(c2.get_ba_constant()),
@@ -663,7 +741,10 @@ tref term_shl(tref symbol) {
 			// 0 << 1
 			if (c2.is(tau::bf_t)) {
 				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shl_consts(
 					make_bitvector_bottom_elem(width),
 					make_bitvector_top_elem(width),
@@ -679,7 +760,10 @@ tref term_shl(tref symbol) {
 			if (size_t t = c1.get_ba_type();
 				c1.is_ba_constant() && t > 0) {
 				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// Advisory drop: the rewrite hook returns tref with no report channel; a bitwidth failure leaves the term unrewritten.
+				if (!width_r.has_value()) return nullptr;
+				const size_t width = width_r.value();
 				return shl_consts(
 					std::get<bv>(c1.get_ba_constant()),
 					make_bitvector_top_elem(width),
@@ -922,8 +1006,12 @@ tref term_cast(tref symbol, size_t target_type_id) {
 		return symbol;
 	}
 
-	const size_t src_width = get_bv_width<node>(get_ba_type_tree<node>(src_type_id));
-	const size_t target_width = get_bv_width<node>(get_ba_type_tree<node>(target_type_id));
+	auto src_width_r = get_bv_width<node>(get_ba_type_tree<node>(src_type_id));
+	auto target_width_r = get_bv_width<node>(get_ba_type_tree<node>(target_type_id));
+	// Advisory drop: the hook returns tref with no report channel, so a bitwidth failure leaves the term unrewritten.
+	if (!src_width_r.has_value() || !target_width_r.has_value()) return nullptr;
+	const size_t src_width = src_width_r.value();
+	const size_t target_width = target_width_r.value();
 
 	bv src_value;
 

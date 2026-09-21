@@ -14,6 +14,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU__TAU_BA_H__
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 #include "splitter_types.h"
 #include "splitter.h"
 
@@ -142,18 +143,16 @@ struct tau_ba {
 	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Checks if the tau_ba is zero.
-	 *
-	 * @return True if zero, otherwise false.
+	 * @brief Checks if the tau_ba is zero; the result reports why on a
+	 * decision failure.
 	 */
-	bool is_zero() const;
+	result<bool> is_zero() const;
 
 	/**
-	 * @brief Checks if the tau_ba is one.
-	 *
-	 * @return True if one, otherwise false.
+	 * @brief Checks if the tau_ba is one; the result reports why on a
+	 * decision failure.
 	 */
-	bool is_one() const;
+	result<bool> is_one() const;
 
 	/**
 	 * @brief Type equivalent to tau_spec<BAs...>.
@@ -246,24 +245,24 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> tau_splitter_one();
 
 /**
- * @brief Checks if the tau_ba is closed.
+ * @brief Checks if the tau_ba is closed; the result reports why on a
+ * decision failure.
  *
  * @tparam BAs Variadic template parameters.
  * @param fm Reference to tau_ba.
- * @return True if closed, otherwise false.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_tau_closed(const tau_ba<BAs...>& fm);
+result<bool> is_tau_closed(const tau_ba<BAs...>& fm);
 
 /**
- * @brief Parse @p src as a Tau spec constant; return `nullopt` on failure.
+ * @brief Parse @p src as a Tau spec constant; the result reports why on failure.
  * @tparam BAs BA pack.
  * @param src Source string.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
+result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src);
 
 /** @brief Print the NSO recurrence-relation of a `tau_ba` to @p os. */

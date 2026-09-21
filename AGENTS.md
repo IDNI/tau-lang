@@ -17,11 +17,11 @@ to `build/<preset>` (e.g. `build/debug`, `build/release`).
 ```bash
 ./dev preset <PRESET> [run] [<CMAKE_OPTIONS>]
 
-./dev preset devel                     # Fast optimized build → build/devel/  (use for quick checks)
-./dev preset devel-tests               # Fast optimized build with all tests
+./dev preset devel                     # Unoptimized build, asserts live → build/devel/ (quick checks)
+./dev preset devel-tests               # Unoptimized build with all tests
 ./dev preset release                   # Release build → build/release/      (use for full verification)
 ./dev preset release-tests             # Release build with all tests
-./dev preset devel-tau                 # Fast optimized build of the tau CLI
+./dev preset devel-tau                 # Unoptimized build of the tau CLI
 ./dev preset release-tau               # Release build of the tau CLI
 ./dev preset relwithdebinfo            # → build/relwithdebinfo/
 ./dev clean [all]                      # Remove stray artifacts; `all` also removes build/ and build-*
@@ -31,6 +31,12 @@ to `build/<preset>` (e.g. `build/debug`, `build/release`).
 Debug (`-O0`) presets (`debug`, `debug-tests`, `debug-clang`, `debug-asan`, …)
 exist but are ONLY for gdb debugging sessions — never use them for building,
 verification, or test runs.
+
+The `devel` family builds with `-O0 -DDEBUG -g0`. It compiles fast and keeps
+`assert()` and every `DBG(...)` block live, but the binary runs slowly. Use it
+to catch an assert, not to measure or to verify. The `release` family builds
+with `-O3 -DNDEBUG`, which removes every `DBG(...)` block, so an assert never
+fires there. The `debug` family adds `-ggdb3` for a gdb session.
 
 Other presets: `{devel,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau,all}`,
 `coverage`, `release-packages-{deb,rpm}`, `release-mingw*`. Default preset is
@@ -67,7 +73,7 @@ output — compare with `matches_wff_mod_and_or` / `matches_bf_mod_and_or`
 ## Running Tests
 
 ```bash
-./dev preset devel-tests               # Fast check: build tests in build/devel/ (run single tests while iterating)
+./dev preset devel-tests               # Quick check: build tests in build/devel/ (run single tests while iterating)
 ./dev preset release-tests run         # Full verification: build + run all tests in build/release/
 
 # Run tests matching a pattern (test presets work from the project root)
@@ -361,6 +367,31 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
 - External dependencies (CVC5, Boost) are installed to `~/.tau/` by `./dev dep-cvc5.sh` and `./dev dep-boost.sh`.
 - The parser library is a git submodule at `external/parser/`.
 
+### Errors
+
+- The library raises no exception. Every error travels in a `result<T>` report.
+  `result<T>` lives in `external/parser/src/utility/diagnostics.h`. The tau
+  helpers and the `TAU_TRY` macros live in `src/tau_diagnostics.h`.
+- Never add a new `throw` site. Do not wrap a failed `result<T>` in an exception
+  for a caller that still throws.
+- A `result<T>` that reaches a function which still throws changes that
+  function. Give the function a `result<T>` return type and follow the cascade
+  to its callers.
+- Never lose a report. Merge each child report with `merge`, `merge_take`,
+  `TAU_TRY` or `TAU_TRY_OR`.
+- A message that a report carries does not also go to `LOG_ERROR` or
+  `LOG_WARNING`.
+- A null pointer is a legitimate value. Only an error in the report means
+  failure. Decide this at the definition of a function, never at a call site.
+- Never lower the severity of an error to make a value fit. One exception
+  applies. A search that tries several candidates and keeps the first success
+  may demote the losing candidates. Do this only where the buffered reports
+  fold into the successful result. Open a scope for each rejected candidate
+  with `report::open`. Name the rejected candidate in a `label::value` attr.
+  Pass the rendered tree through `truncate_for_message`. Put the result
+  directly in the attr. A losing candidate is not a failure of the
+  operation. A genuine failure stays an error.
+
 ### Comments
 
 - Comment only what the code cannot state itself. If the line below already
@@ -374,3 +405,8 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
   `tests/unit/parser/`), `AP-N` and `BA-N` are real test-case id conventions;
   do not invent lookalikes for code that has no id. A reference that resolves
   to nothing costs the next reader more than no reference at all.
+- **Check every reference before you commit.** A comment must not name a file,
+  a report, a ticket or an id that the repository does not hold. Grep for the
+  reference. Keep it only when the grep finds the target in this repository.
+  Delete it otherwise. A plan document or a review report outside the tree is
+  never a valid reference, because the next reader cannot open it.

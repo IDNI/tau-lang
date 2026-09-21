@@ -5,7 +5,7 @@
  * @brief ADT flattener: rewrites a parsed spec so every ADT construct
  * (member paths, tuple equalities/inequalities, quantifiers over tuple-typed
  * variables, alias annotations) is expanded into ordinary base-typed
- * variables and atoms, per `private/2026-08-05-adt-design.md` section 3.
+ * variables and atoms.
  *
  * Runs on the parsed spec tree right after parsing, before `infer_ba_types`
  * and before ref resolution: `parse -> adt_flatten -> infer_ba_types -> ...`.

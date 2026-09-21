@@ -42,7 +42,8 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
-	throw std::logic_error("nso_ba and: wrong types");
+	DBG(assert(false && "nso_ba and: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -79,7 +80,8 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
-	throw std::logic_error("nso_ba or: wrong types");
+	DBG(assert(false && "nso_ba or: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -112,7 +114,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	}
 	if (lt.is(tau::wff))
 		return tau::get(tau::build_wff_neg(lt.get()));
-	throw std::logic_error("nso_ba neg: wrong types");
+	DBG(assert(false && "nso_ba neg: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -149,7 +152,8 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
-	throw std::logic_error("nso_ba xor: wrong types");
+	DBG(assert(false && "nso_ba xor: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -170,11 +174,14 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	if (lt.equals_0()) return true;
 	if (lt.equals_1()) return false;
 
-	// more elaborate cases
-	if (lt[0].is_ba_constant()) return node::ba::is_zero(lt[0].get_ba_constant());
+	// more elaborate cases -- an undecided constant reads as "not zero",
+	// the same conservative answer a decision failure elsewhere in the
+	// pack falls back to; use node::ba::is_zero directly for the report.
+	if (lt[0].is_ba_constant())
+		return node::ba::is_zero(lt[0].get_ba_constant()).value_or(false);
 	if (lt.is(tau::bf))  return lt.equals_0();
 	if (lt.is(tau::wff)) return lt.equals_F();
-	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
+	DBG(assert(false && "nso_ba is_zero: wrong types");)
 	return false;
 }
 
@@ -188,11 +195,13 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	if (lt.equals_0()) return false;
 	if (lt.equals_1()) return true;
 
-	// more elaborate cases
-	if (lt[0].is_ba_constant()) return node::ba::is_one(lt[0].get_ba_constant());
+	// more elaborate cases -- an undecided constant reads as "not one";
+	// use node::ba::is_one directly for the report.
+	if (lt[0].is_ba_constant())
+		return node::ba::is_one(lt[0].get_ba_constant()).value_or(false);
 	if (lt.is(tau::bf))  return lt.equals_1();
 	if (lt.is(tau::wff)) return lt.equals_T();
-	DBG(throw std::logic_error("nso_ba is_one: wrong types");)
+	DBG(assert(false && "nso_ba is_one: wrong types");)
 	return false;
 }
 

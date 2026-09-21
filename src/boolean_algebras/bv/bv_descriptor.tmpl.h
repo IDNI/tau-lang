@@ -104,21 +104,29 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return is_bv_syntactic_zero(x);
 	}
 
-	static bool is_one(const bv& x) { return is_bv_syntactic_one(x); }
+	static result<bool> is_one(const bv& x) {
+		return result<bool>{is_bv_syntactic_one(x)};
+	}
 
-	static bool is_zero(const bv& x) { return is_bv_syntactic_zero(x); }
+	static result<bool> is_zero(const bv& x) {
+		return result<bool>{is_bv_syntactic_zero(x)};
+	}
 
-	static bool is_closed(const bv&) { return true; }
+	static result<bool> is_closed(const bv&) { return result<bool>{true}; }
 
 	/** @brief Width-dependent: the all-ones bitvector of this type's width. */
 	static std::string literal_one(tref type_tree) {
-		return make_bitvector_top_elem(get_bv_size<node_t>(type_tree)
-			).getBitVectorValue(10);
+		auto width = get_bv_size<node_t>(type_tree);
+		// Advisory drop: ba_descriptor_complete fixes this member to std::string.
+		if (!width.has_value()) return {};
+		return make_bitvector_top_elem(width.value()).getBitVectorValue(10);
 	}
 
 	static std::string literal_zero(tref type_tree) {
-		return make_bitvector_bottom_elem(get_bv_size<node_t>(type_tree)
-			).getBitVectorValue(10);
+		auto width = get_bv_size<node_t>(type_tree);
+		// Advisory drop: ba_descriptor_complete fixes this member to std::string.
+		if (!width.has_value()) return {};
+		return make_bitvector_bottom_elem(width.value()).getBitVectorValue(10);
 	}
 
 	static bv normalize(const bv& x) { return normalize_bv(x); }
@@ -127,12 +135,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 		return simplify_bv_symbol<node_t>(sym);
 	}
 
-	static tref simplify_term(tref term) {
+	static result<tref> simplify_term(tref term) {
 		return simplify_bv_term<node_t>(term);
 	}
 
 	/** @brief The one parse that needs the type tree: it carries the width. */
-	static std::optional<typename node_t::constant_with_type>
+	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref type_tree)
 	{
 		return parse_bv<PackBAs...>(src, type_tree);
@@ -143,9 +151,11 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	// `auto` return keeps the solution type out of the generic fold.
 
 	/** @brief Solve @p form with bv's own solver. */
-	// Exact arithmetic must see the widened atoms before cvc5 does.
+	// Exact arithmetic must see the widened atoms before cvc5 does. solve()
+	// stays a plain tref consumer (its own contract, unlike widen_arithmetic
+	// itself, is not result-carrying), so a widening failure collapses here.
 	static auto solve(tref form) -> decltype(solve_bv<node_t>(form)) {
-		form = widen_arithmetic(form);
+		form = widen_arithmetic(form).value_or(nullptr);
 		if (!form) return std::nullopt;
 		return solve_bv<node_t>(form);
 	}
@@ -168,7 +178,7 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 */
 	// Exact arithmetic must see the widened atoms before cvc5 does.
 	static std::optional<bool> sat_status(tref form) {
-		form = widen_arithmetic(form);
+		form = widen_arithmetic(form).value_or(nullptr);
 		if (!form) return std::nullopt;
 		auto status = bv_formula_sat_status<node_t>(form);
 		if (status == bv_sat_status::sat) return true;
@@ -179,11 +189,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	/**
 	 * @brief Predicate-blast @p n; returns it unchanged unless BOTH the
 	 * core master `preprocessing` switch and bv's own `bv_blasting` switch
-	 * are on.
+	 * are on. A blasting failure carries its own report rather than a
+	 * bare null tree.
 	 */
-	static tref preprocess(tref n) {
+	static result<tref> preprocess(tref n) {
 		return preprocessing && bv_blasting
-			? bv_predicate_blasting<node_t>(n) : n;
+			? bv_predicate_blasting<node_t>(n) : result<tref>{n};
 	}
 
 	/**
@@ -209,8 +220,8 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * @brief Elaborate bitvector arithmetic atoms to an overflow-free width;
 	 * returns @p fm unchanged when `bv_widening` is disabled.
 	 */
-	static tref widen_arithmetic(tref fm) {
-		return bv_widening ? widen_bv_arithmetic<node_t>(fm) : fm;
+	static result<tref> widen_arithmetic(tref fm) {
+		return bv_widening ? widen_bv_arithmetic<node_t>(fm) : result<tref>{fm};
 	}
 
 	/**
@@ -455,18 +466,21 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	 * never a bitwidth.
 	 */
 	static tref value_constant(size_t ba_type, size_t value) {
+		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
+		// Advisory drop: ba_has_value_constant fixes this member to tref.
+		if (!width.has_value()) return nullptr;
 		return tau::get(tau::bf, { tau::get_ba_constant(
-			make_bitvector_value(
-				get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type)),
-				value),
+			make_bitvector_value(width.value(), value),
 			ba_type) });
 	}
 
 	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */
 	static tref zero_constant(size_t ba_type) {
+		auto width = get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type));
+		// Advisory drop: ba_has_zero_constant fixes this member to tref.
+		if (!width.has_value()) return nullptr;
 		return tau::get(tau::bf, { tau::get_ba_constant(
-			make_bitvector_bottom_elem(
-				get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type))),
+			make_bitvector_bottom_elem(width.value()),
 			ba_type) });
 	}
 

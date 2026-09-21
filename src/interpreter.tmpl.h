@@ -93,9 +93,12 @@ std::shared_ptr<repl_pending_input_stream> find_repl_pending_input(
 }
 
 template <NodeType node>
-std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
+result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read(
 	const trefs& in_vars, size_t time_step)
 {
+	using read_result = std::pair<std::optional<assignment<node>>, bool>;
+	result<read_result> r;
+
 	DBG(LOG_TRACE   << "read begin\n"
 			<< "read[time_point]: " << time_point << "\n"
 			<< "read[in_vars]: { ";
@@ -124,78 +127,78 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 
 		auto it = inputs.find(vn);
 		if (it == inputs.end())  {
-			LOG_ERROR
-				<< "Failed to find input stream for stream '"
-				<< get_var_name<node>(var) << "'\n";
 			DBG(LOG_TRACE << "read[result]: {}\n"
 				<< "read end\n";)
 			DBG(LOG_TRACE << ctx;)
 			DBG(LOG_TRACE << dump_to_str());
-			return {};
+			return r.with_assert_check_error(code::invalid_input_stream,
+				"failed to find the input stream for the stream",
+				{{label::name, get_var_name<node>(var)}});
 		}
 		// AP2-7: query with the parameter, not the member -- the only
 		// caller passes time_point today, but a future lookback pre-read
 		// with time_step != time_point would read the wrong step.
 		auto maybe_line = it->second->get(time_step); // get a value from input stream
 		if (!maybe_line.has_value()) {
-			LOG_ERROR
-				<< "Failed to read from input stream '"
-				<< get_var_name<node>(var) << "'\n";
 			DBG(LOG_TRACE << "read[result]: {}\n"
 				<< "read end\n";)
-		       return {};
+			return r.with_assert_check_error(code::io_error,
+				"failed to read from the input stream",
+				{{label::name, get_var_name<node>(var)}});
 		}
 		std::string line = maybe_line.value();
 
-		if (line.empty()) return { value, true }; // no more inputs
+		if (line.empty()) // no more inputs
+			return r.with_assert_check_value(read_result{ value, true });
 		size_t type = ctx.type_of(vn);
 		if (type == 0) {
-			LOG_ERROR << "Failed to find type for "
-				  << get_var_name<node>(var);
-
 			DBG(LOG_TRACE << "read[result]: {}\n"
 				      << "read end\n";)
-
-			return {};
+			return r.with_assert_check_error(code::missing_type_information,
+				"failed to find the type for the stream",
+				{{label::name, get_var_name<node>(var)}});
 		}
-		auto cnst = ba_constants<node>::get(line,
-				get_ba_type_tree<node>(type));
+		auto cnst = r.merge_take(ba_constants<node>::get(line,
+				get_ba_type_tree<node>(type)));
 		if (!cnst) {
-			LOG_ERROR
-				<< "Failed to parse input value '"
-				<< line << "' for stream '"
-				<< get_var_name<node>(var)
-				<< get_ba_type_name<node>(type) << "'";
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
 				<< "read end";)
-
-			return {};
+			auto type_name = r.merge_take(get_ba_type_name<node>(type));
+			return r.with_assert_check_error(code::parse_error,
+				"failed to parse the input value for the stream",
+				{{label::value, truncate_for_message(line)},
+				 {label::name, get_var_name<node>(var)},
+				 {label::type_name, type_name.value_or(std::string("INVALID"))},
+				 {label::time_point,
+					get_io_time_point<node>(tau::trim(var))}});
 		}
 
 		tref wrapped_const = build_bf_ba_constant<node>(
-			cnst.value().first, type);
+			cnst->first, type);
 
 		DBG(LOG_TRACE << "read[wrapped_const]: " << LOG_FM(wrapped_const) << "\n";)
 
 		// Check that the input is a closed formula
-		if (has_open_tau_fm_in_constant<node>(wrapped_const)) {
+		TAU_TRY(bool is_open, has_open_tau_fm_in_constant<node>(wrapped_const));
+		if (is_open) {
 
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
 				<< "read end\n";)
-			return {};
+			return r;
 		}
 		value[var] = wrapped_const;
 	}
 
 	DBG(LOG_TRACE << "read end\n";)
 
-	return { value, false };
+	return r.with_assert_check_value(read_result{ value, false });
 }
 
 template <NodeType node>
-bool interpreter<node>::write(const assignment<node>& output_values) {
+result<bool> interpreter<node>::write(const assignment<node>& output_values) {
+	result<bool> r;
 	// Sort variables in output by time
 	trefs io_vars;
 	for (const auto& [var, _ ] : output_values) {
@@ -237,12 +240,13 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		assert(vn != nullptr);
 		DBG(LOG_TRACE << "write[canonized]: " << LOG_FM(vn));
 		std::stringstream ss;
-		if (!serialize_constant<node>(ss, output_values.find(io_var)->second,
-			ctx.type_of(vn)))
-		{
-			LOG_ERROR << "No Boolean algebra element assigned to "
-				"output '" << TAU_TO_STR(io_var) << "'";
-				return false;
+		auto ser = r.merge_take(serialize_constant<node>(ss,
+			output_values.find(io_var)->second, ctx.type_of(vn)));
+		if (!ser) return r;
+		if (!*ser) {
+			return r.with_assert_check_error(code::invalid_output_stream,
+				messages::no_ba_element_assigned_to_output,
+				{{label::value, TAU_TO_STR(io_var)}});
 		}
 		// Internal streams are never written, even when one was auto-added
 		// for them: collect_output_streams attaches a default console
@@ -258,23 +262,21 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 			// here by design.
 			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
-			LOG_ERROR << "Failed to find output stream for stream '"
-				<< TAU_TO_STR(io_var) << "'";
-			DBG(LOG_TRACE << ctx;)
-			DBG(LOG_TRACE << dump_to_str());
-			return false;
+			return r.with_assert_check_error(code::invalid_output_stream,
+				"failed to find the output stream for the stream",
+				{{label::value, TAU_TO_STR(io_var)}});
 		}
 		// write value to output stream
 		DBG(LOG_TRACE << "write/put(serialized_constant): " << ss.str();)
 		if (!it->second->put(ss.str(),
 			get_io_time_point<node>(tau::trim(io_var))))
 		{
-			LOG_ERROR << "Failed to write to output stream '"
-				<< get_var_name<node>(vn) << "'";
-			return false;
+			return r.with_assert_check_error(code::invalid_output_stream,
+				"failed to write to the output stream",
+				{{label::name, get_var_name<node>(vn)}});
 		}
 	}
-	return true; // success
+	return r.with_assert_check_value(true);
 }
 
 template<NodeType node>
@@ -622,7 +624,7 @@ result<interpreter<node>>
 {
 	result<interpreter<node>> r;
 	if (!spec) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	// Every io_var must carry its input/output classification before the
 	// spec is stepped: transform_io_var refuses an unclassified one. The
@@ -768,13 +770,8 @@ post_normalization:
 		tref safety_spec;
 		std::optional<ltl_aba_solution<node>> sol_opt;
 		std::vector<std::string> unanchored_aux;
-		try {
-			std::tie(safety_spec, sol_opt, unanchored_aux) =
-				ltl_to_safety_formula_full<node>(spec);
-		} catch (const std::exception& e) {
-			LOG_ERROR << "Tau specification refused: " << e.what() << "\n";
-			return r.with_assert_check_error(code::internal_error, e.what());
-		}
+		std::tie(safety_spec, sol_opt, unanchored_aux) =
+			ltl_to_safety_formula_full<node>(spec);
 		// unrealizable, undecided or not encodable as a safety formula;
 		// `realizable` tells which
 		if (!safety_spec) {
@@ -790,6 +787,10 @@ post_normalization:
 		TAU_TRY(tref nr, normalizer<node>(safety_spec));
 		spec = nr;
 	}
+	// One report per rejected clause, kept with the clause that lost it.
+	// Folded into r on return: demoted to warnings if another clause
+	// succeeds, kept as errors if none does.
+	std::vector<std::pair<tref, report>> clause_failures;
 	// For each spec clause, we check if it is executable
 	for (tref clause : expression_paths<node>(spec)) {
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
@@ -801,6 +802,8 @@ post_normalization:
 			auto ubd_ctn_part = get_executable_spec(clause_t);
 			if (!ubd_ctn_part.has_value()) {
 				// Need to try next clause
+				clause_failures.emplace_back(clause,
+					std::move(ubd_ctn_part).report());
 				executable = false; break;
 			}
 			ubt_ctn.push_back({ tree<node>::geth(ubd_ctn_part.value()) });
@@ -886,10 +889,25 @@ post_normalization:
 		DBG(LOG_TRACE << i.dump_to_str();)
 		// DBG(LOG_TRACE << ctx;)
 
+		// This clause won; the others' reports still fold in, demoted,
+		// so the report keeps why they lost without the result reading
+		// as a failure.
+		for (auto& [rej_clause, rep] : clause_failures) {
+			auto sc = r.open("rejected candidate");
+			r.info("the specification clause has no executable candidate",
+				{{label::value, truncate_for_message(TAU_TO_STR(rej_clause))}});
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
 		return r.with_assert_check_value(std::move(i));
 	}
 	// Given specification is not realizable
-	LOG_ERROR << "Tau specification is unsat\n";
+	for (auto& [rej_clause, rep] : clause_failures) {
+		auto sc = r.open("rejected candidate");
+		r.info("the specification clause has no executable candidate",
+			{{label::value, truncate_for_message(TAU_TO_STR(rej_clause))}});
+		r.append(std::move(rep));
+	}
 	return r.with_assert_check_error(code::unsat, "Tau specification is unsat");
 }
 
@@ -1081,16 +1099,29 @@ static bool mentions_ltl_state_var(tref part) {
  * the original ones. Returns @p part_at_t unchanged when the switch is off.
  */
 template <NodeType node>
-tref propagate_step_definitions(tref part_at_t,
+result<tref> propagate_step_definitions(tref part_at_t,
 	subtree_map<node, tref>& propagated)
 {
 	using tau = tree<node>;
-	if (!interpreter<node>::definitional_propagation) return part_at_t;
+	result<tref> r;
+	if (!interpreter<node>::definitional_propagation)
+		return r.with_assert_check_value(part_at_t);
 	// Every round substitutes at least one variable away, so the loop is
 	// bounded by the variables of the formula.
 	for (;;) {
 		auto pn = normalize_non_temp<node>(part_at_t);
-		if (!pn.has_value()) break;
+		if (!pn.has_value()) {
+			// A normalization failure just stops further rounds; the
+			// formula gathered so far is still a valid, weaker answer,
+			// so this round's report rides along demoted.
+			auto sc = r.open("rejected candidate");
+			r.info("the propagation round did not normalize",
+				{{label::value, truncate_for_message(TAU_TO_STR(part_at_t))}});
+			report rep = std::move(pn).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+			break;
+		}
 		part_at_t = pn.value();
 		subtree_map<node, tref> consts;
 		std::vector<tref> st{part_at_t};
@@ -1119,7 +1150,7 @@ tref propagate_step_definitions(tref part_at_t,
 		if (replaced == part_at_t) break;
 		part_at_t = syntactic_formula_simplification<node>(replaced);
 	}
-	return part_at_t;
+	return r.with_assert_check_value(part_at_t);
 }
 
 /**
@@ -1128,12 +1159,13 @@ tref propagate_step_definitions(tref part_at_t,
  */
 template <NodeType node>
 struct solve_step_provider : step_provider<node> {
-	std::optional<solution<node>> produce(
+	result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) override
 	{
 		using tau = tree<node>;
 		using tt = tau::traverser;
+		result<std::optional<solution<node>>> r;
 		// Local, provider-private view of memory: needed so a later spec_part
 		// solves against the earlier parts' committed values, exactly as the
 		// shared `memory` did when this loop ran inline in step(). The
@@ -1177,14 +1209,34 @@ struct solve_step_provider : step_provider<node> {
 				rewriter::replace<node>(part_at_t, local_memory));
 			// A state part is left to the solver as a constraint (above).
 			subtree_map<node, tref> propagated;
-			if (!state_part) part_at_t = propagate_step_definitions<node>(
-				part_at_t, propagated);
+			if (!state_part) {
+				TAU_TRY(part_at_t, propagate_step_definitions<node>(
+					part_at_t, propagated));
+			}
+			// One report per rejected path, kept with the path it was
+			// tried on. Folded into r once this spec_part settles,
+			// demoted so a solved part does not read as a failure.
+			std::vector<std::pair<tref, report>> path_diag;
+			auto fold_path_diag = [&] {
+				for (auto& [candidate, rep] : path_diag) {
+					auto sc = r.open("rejected candidate");
+					r.info("the step path did not solve",
+						{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+					rep.demote_errors_to_warnings();
+					r.append(std::move(rep));
+				}
+				path_diag.clear();
+			};
 			for (tref path : expression_paths<node>(part_at_t)) {
 				tref current = path;
 				// Simplify after updating stream variables
 				if (!state_part) {
 					auto normalized = normalize_non_temp<node>(current);
-					if (!normalized.has_value()) continue;
+					if (!normalized.has_value()) {
+						path_diag.emplace_back(current,
+							std::move(normalized).report());
+						continue;
+					}
 					current = normalized.value();
 				}
 				// The solver must never bind an input variable directly; a
@@ -1205,7 +1257,8 @@ struct solve_step_provider : step_provider<node> {
 					for (const auto& [k, mval] : local_memory)
 						keys_ss << " " << TAU_TO_STR(k);
 					LOG_ERROR << keys_ss.str() << "\n";
-					return std::nullopt;
+					fold_path_diag();
+					return r.with_assert_check_value(std::nullopt);
 				}
 				auto path_solution = solution_with_max_update<node>(
 					current, time_point);
@@ -1227,10 +1280,16 @@ struct solve_step_provider : step_provider<node> {
 					}
 					break;
 				}
+				path_diag.emplace_back(current,
+					std::move(path_solution).report());
 			}
-			if (!solved) return std::nullopt;
+			if (!solved) {
+				fold_path_diag();
+				return r.with_assert_check_value(std::nullopt);
+			}
+			fold_path_diag();
 		}
-		return result;
+		return r.with_assert_check_value(std::move(result));
 	}
 };
 
@@ -1339,7 +1398,12 @@ result<typename interpreter<node>::step_result>
 interpreter<node>::step(const assignment<node>& values)
 {
 	result<step_result> r;
-	if (!calculate_initial_spec()) {
+	// One report per rejected step-completion probe (fast-path decode,
+	// zero-default check), kept with the candidate it was tried on.
+	// Folded into r on return: demoted to warnings on a completed step,
+	// kept as errors when the step itself fails.
+	std::vector<std::pair<tref, report>> step_diag;
+	if (!r.merge_take(calculate_initial_spec()).value_or(false)) {
 		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
 	}
 	// Deferred from the previous step's tail -- see the note above its
@@ -1358,27 +1422,6 @@ interpreter<node>::step(const assignment<node>& values)
 		memory[var] = value;
 	}
 
-	// Engine-side declare_open: A3 v1 scaffolding only.
-	//
-	// Full engine-side dispatch (build F as tau-syntax string, call
-	// handler, validate, inject chosen value as tref into memory) is
-	// non-trivial because admissible_outputs() returns tref-keyed
-	// assignments, not string-keyed; the projection + serialisation
-	// + tau::parse round-trip needs careful integration with the
-	// existing solver machinery.
-	//
-	// V1 (this commit): just enforce re-entrance — set the flag during
-	// any handler that the host might call from inside its own dispatch
-	// path. Mutating method guards (declare_open, undeclare_open) check
-	// in_oracle_handler_ and refuse. The actual per-step dispatch
-	// remains in Session._dispatch_open_streams (Phase A2 Python side).
-	//
-	// V2 (deferred): full engine-side dispatch with tref injection.
-	if (!open_handlers_.empty()) {
-		DBG(LOG_DEBUG << "[declare_open] step with "
-			<< open_handlers_.size() << " open stream(s); "
-			<< "host-side dispatch (A2) is authoritative\n";)
-	}
 	bool has_this_stream = has_this_input_stream();
 	DBG(LOG_TRACE << "step/has_this_stream: " << has_this_stream << "\n";)
 	// If the "this" input stream is present, write the current spec into it
@@ -1390,7 +1433,7 @@ interpreter<node>::step(const assignment<node>& values)
 			// IN-M2: feed back the spec this step will actually follow
 			// (first solvable alternative per part), not the disjunction.
 			auto packed = node::ba::pack_tau_ba(unsqueeze_always(
-				executed_spec_fm(true)));
+				r.merge_take(executed_spec_fm(true)).value_or(nullptr)));
 			if (!packed) LOG_ERROR
 				<< "could not pack the executed spec for `this`";
 			else {
@@ -1420,7 +1463,8 @@ interpreter<node>::step(const assignment<node>& values)
 		auto sc = r.open("select_alternatives");
 		for (size_t part_idx = 0; part_idx < step_spec.size(); ++part_idx) {
 			const trefs& part_alts = step_spec[part_idx];
-			auto pick = first_solvable_alternative(part_idx);
+			auto pick = r.merge_take(first_solvable_alternative(part_idx))
+				.value_or(std::nullopt);
 			if (!pick) {
 				return r.with_assert_check_error(code::unsat, "Specification part has no "
 					"solvable alternative under the current memory");
@@ -1433,8 +1477,8 @@ interpreter<node>::step(const assignment<node>& values)
 	std::optional<solution<node>> produced;
 	{
 		auto sc = r.open("produce_step_solution");
-		produced = provider_->produce(flat_step_spec, memory,
-			time_point, formula_time_point);
+		produced = r.merge_take(provider_->produce(flat_step_spec, memory,
+			time_point, formula_time_point)).value_or(std::nullopt);
 	}
 	if (!produced) {
 		return r.with_assert_check_error(code::unsat, "Step provider found no solution for "
@@ -1516,7 +1560,11 @@ interpreter<node>::step(const assignment<node>& values)
 			tref grounded = update_to_time_point(h->get(), (int_t)time_point);
 			grounded = rewriter::replace<node>(grounded, memory);
 			auto normalized = normalize_non_temp<node>(grounded);
-			if (!normalized.has_value()) { direct_decode_ok = false; break; }
+			if (!normalized.has_value()) {
+				step_diag.emplace_back(grounded,
+					std::move(normalized).report());
+				direct_decode_ok = false; break;
+			}
 			direct_parts.push_back(normalized.value());
 		}
 		if (direct_decode_ok) {
@@ -1576,13 +1624,19 @@ interpreter<node>::step(const assignment<node>& values)
 				assignment<node> probe = memory;
 				probe[ot] = zero_term;
 				tref check = rewriter::replace<node>(direct_conj, probe);
+				report zero_default_diag;
 				auto normalized_check = normalize_non_temp<node>(check);
 				if (normalized_check.has_value()) {
 					check = normalized_check.value();
 					auto sat = is_non_temp_nso_satisfiable<node>(check);
 					default_ok = tau::get(check).equals_T()
 						|| (sat.has_value() && sat.value());
+					zero_default_diag.append(std::move(sat).report());
 				} else default_ok = false;
+				zero_default_diag.append(std::move(normalized_check).report());
+				if (!default_ok)
+					step_diag.emplace_back(ot,
+						std::move(zero_default_diag));
 			}
 			if (default_ok) {
 				memory.emplace(ot, zero_term);
@@ -1593,8 +1647,10 @@ interpreter<node>::step(const assignment<node>& values)
 	}
 	if (!zero_default_missing.empty() && direct_conj) {
 		auto sc = r.open("solve_zero_default_fallback");
-		if (auto fb = ::idni::tau_lang::solution_with_max_update<node>(
-			direct_conj, time_point); fb)
+		auto fb_r = ::idni::tau_lang::solution_with_max_update<node>(
+			direct_conj, time_point);
+		if (fb_r.has_value()) {
+			auto fb = r.merge_take(std::move(fb_r));
 			for (tref ot : zero_default_missing)
 				if (auto it = fb->find(ot); it != fb->end()
 					&& !global.contains(ot)) {
@@ -1604,9 +1660,23 @@ interpreter<node>::step(const assignment<node>& values)
 					memory.emplace(ot, value);
 					global.emplace(ot, value);
 				}
+		} else {
+			// A fallback miss is not a step failure; the missing
+			// witness is still caught, if it matters, further down.
+			report rep = std::move(fb_r).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
 	}
 	for (tref ot : zero_default_missing) {
 		if (global.contains(ot)) continue;
+		// The step itself fails, so the probes that forfeited stay errors.
+		for (auto& [candidate, rep] : step_diag) {
+			auto sc = r.open("rejected candidate");
+			r.info("the step-completion probe did not succeed",
+				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+			r.append(std::move(rep));
+		}
 		return r.with_assert_check_error(code::unsat, "No valid witness for an output stream "
 			"under the step's own constraints");
 	}
@@ -1636,6 +1706,16 @@ interpreter<node>::step(const assignment<node>& values)
 	// through that sweep via last_outputs_ (IN-M1), so a host may keep
 	// reading it while it feeds the next step.
 	last_outputs_ = global;
+	// The step completed; the forfeited probes' reports fold in demoted,
+	// so the report keeps why they forfeited without the step reading as
+	// failed.
+	for (auto& [candidate, rep] : step_diag) {
+		auto sc = r.open("rejected candidate");
+		r.info("the step-completion probe did not succeed",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+		rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
 	return r.with_assert_check_value(step_result{ global, auto_continue });
 }
 
@@ -1644,7 +1724,7 @@ result<typename interpreter<node>::step_result>
 interpreter<node>::step()
 {
 	result<step_result> r;
-	if (!calculate_initial_spec()) {
+	if (!r.merge_take(calculate_initial_spec()).value_or(false)) {
 		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
 	}
 	if (announced_step_ != (int_t)time_point) { // announce only once
@@ -1657,26 +1737,29 @@ interpreter<node>::step()
 		step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	LOG_TRACE << "interpreter::step/read";
-	std::optional<assignment<node>> values;
-	bool is_quit;
+	std::optional<std::pair<std::optional<assignment<node>>, bool>> read_v;
 	{
 		auto sc = r.open("read_step_inputs");
-		std::tie(values, is_quit) = read(step_inputs, time_point);
+		read_v = r.merge_take(read(step_inputs, time_point));
 	}
-	DBG(if (values.has_value())
-			for (auto [k, v] : values.value())
-				LOG_DEBUG << "Input: " << LOG_FM_DUMP(k) << " = " << LOG_FM_TREE(v) << "\n";)
-	// Empty input: clean end-of-inputs/quit signal
-	if (is_quit) {
-		return r.with_assert_check_error(code::invalid_state, "No more input: end of stream");
-	}
-	// Hard error reading/parsing an input (read() already logged it):
-	// stop like the quit case above, not a "successful", auto-continuing
+	// Hard error reading/parsing an input (its report is merged above):
+	// stop like the quit case below, not a "successful", auto-continuing
 	// empty step -- that made every caller's driver loop treat a read
 	// error as ordinary progress and keep looping on it instead of
 	// stopping. invalid_state, not io_error: a rejected input value is
 	// the same "awaiting a valid value" state as the quit case, and lets
 	// continue_running() re-prompt for it instead of ending the run.
+	if (!read_v) {
+		return r.with_assert_check_error(code::invalid_state, "Failed to read step input");
+	}
+	auto& [values, is_quit] = *read_v;
+	DBG(if (values.has_value())
+			for (auto [k, v] : values.value())
+				LOG_DEBUG << "Input: " << LOG_FM_DUMP(k) << " = " << LOG_FM_TREE(v) << "\n";)
+	// Empty input: clean end-of-inputs/quit signal
+	if (is_quit) {
+		return r.with_assert_check_error(code::invalid_state, "no more input; the stream has ended");
+	}
 	if (!values.has_value()) {
 		return r.with_assert_check_error(code::invalid_state, "Failed to read step input");
 	}
@@ -1840,7 +1923,8 @@ static tref inputs_as_outputs(tref fm) {
 }
 
 template <NodeType node>
-std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
+result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
+	result<std::vector<trefs>> r;
 	LOG_TRACE << "get_ubt_ctn_at begin \n";
 	LOG_TRACE << "get_ubt_ctn_at[t]: " << t << "\n";
 
@@ -1856,8 +1940,14 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 					update_to_time_point(h->get(), ut));
 			upd_ubt_ctn.push_back(std::move(part_alts));
 		}
-		return upd_ubt_ctn;
+		return r.with_assert_check_value(std::move(upd_ubt_ctn));
 	}
+	// One report per alternative dropped for failing to normalize, kept
+	// with the alternative it was tried on. Folded into r demoted, since
+	// another normalized alternative in the same part still makes the
+	// call succeed; a part left with none is a genuine failure instead.
+	std::vector<std::pair<tref, report>> dropped;
+	bool part_exhausted = false;
 	// Adjust ubt_ctn to time_point by eliminating inputs and outputs
 	// which are greater than current time_point in a time-compatible fashion
 	for (const htrefs& part : ubt_ctn) {
@@ -1890,28 +1980,41 @@ std::vector<trefs> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		auto normalized = normalize_non_temp<node>(step_ubt_ctn);
 		if (normalized.has_value())
 			part_alts.push_back(normalized.value());
+		else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
 		}
+		if (!part.empty() && part_alts.empty()) part_exhausted = true;
 		upd_ubt_ctn.push_back(std::move(part_alts));
 	}
 	LOG_TRACE << "get_ubt_ctn_at end \n";
-	return upd_ubt_ctn;
+	for (auto& [candidate, rep] : dropped) {
+		auto sc = r.open("rejected candidate");
+		r.info("the continuation alternative could not be normalized",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+		if (!part_exhausted) rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
+	if (part_exhausted) return r.with_assert_check_error(code::unsat,
+		"every alternative of a continuation part failed to normalize");
+	return r.with_assert_check_value(std::move(upd_ubt_ctn));
 }
 
 template <NodeType node>
-bool interpreter<node>::calculate_initial_spec() {
+result<bool> interpreter<node>::calculate_initial_spec() {
+	result<bool> r;
 	LOG_TRACE << "calculate_initial_spec begin \n";
-	if (final_system) return true;
+	if (final_system) return r.with_assert_check_value(true);
 	// Idempotent per time point: appear_within_lookback and step() both
 	// call this for the same time_point, and it must not redo the
 	// quantifier elimination in the initial segment twice.
-	if (step_spec_time_point_ == (int_t)time_point) return true;
+	if (step_spec_time_point_ == (int_t)time_point)
+		return r.with_assert_check_value(true);
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
 	LOG_TRACE << "calculate_initial_spec[initial_segment]: " << initial_segment << "\n";
 	LOG_TRACE << "calculate_initial_spec[time_point]: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
-		step_spec = get_ubt_ctn_at(time_point);
+		TAU_TRY(step_spec, get_ubt_ctn_at(time_point));
 		step_spec_time_point_ = (int_t)time_point;
 	} else if (time_point == initial_segment) {
 		// The continuation is used verbatim from here on. Its constant
@@ -1933,7 +2036,7 @@ bool interpreter<node>::calculate_initial_spec() {
 	}
 	LOG_TRACE << "calculate_initial_systems[result]: true";
 	LOG_TRACE << "calculate_initial_systems end";
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 template <NodeType node>
@@ -2008,14 +2111,23 @@ tref update_to_time_point(tref f, const int_t t) {
 }
 
 template <NodeType node>
-bool evaluate_atom(tref atom_ref, const assignment<node>& memory,
+result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 	size_t formula_time_point)
 {
 	using tau = tree<node>;
+	result<bool> r;
 	tref updated = update_to_time_point<node>(atom_ref, formula_time_point);
 	tref current = rewriter::replace<node>(updated, memory);
 	auto normalized = normalize_non_temp<node>(current);
-	return normalized.has_value() && tau::get(normalized.value()).equals_T();
+	// A normalization failure means the atom's truth could not be
+	// decided, not that it is false: merge the report undemoted and
+	// fail the call, so a caller cannot mistake "unknown" for "false".
+	if (!normalized.has_value()) {
+		r.append(std::move(normalized).report());
+		return r;
+	}
+	return r.with_assert_check_value(
+		tau::get(normalized.value()).equals_T());
 }
 
 template <NodeType node>
@@ -2057,7 +2169,7 @@ result<tref> interpreter<node>::get_executable_spec(
 {
 	result<tref> r;
 	if (!clause) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	LOG_TRACE << "get_executable_spec begin\n";
 	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
@@ -2123,9 +2235,10 @@ result<tref> interpreter<node>::get_executable_spec(
 }
 
 template <NodeType node>
-bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
+result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 	const size_t start_time)
 {
+	result<bool> r;
 	// Uninterpreted constants are solved per alternative here; a model is
 	// baked into the alternative it was solved on, so each alternative
 	// stays self-consistent even when the chosen values differ.
@@ -2153,6 +2266,10 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 	};
 	htrefs kept;
 	ctns.clear();
+	// One report per alternative get_executable_spec rejected, kept with
+	// the alternative it was tried on. Demoted when another alternative
+	// survives, kept as errors when none does.
+	std::vector<std::pair<tref, report>> dropped;
 	for (size_t idx = 0; idx < alts.size(); ++idx) {
 		const htref& alt = alts[idx];
 		if (idx != 0 && idx != alts.size() - 1) {
@@ -2199,6 +2316,8 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 				ctns.push_back(tree<node>::geth(
 					rewriter::replace<node>(alt->get(),
 						aw, tau::trim2(aw))));
+				dropped.emplace_back(alt->get(),
+					std::move(ctn_r).report());
 				continue;
 			}
 			// A dead alternative can never fire in step(); keep
@@ -2206,23 +2325,40 @@ bool interpreter<node>::compute_part_continuations(htrefs& alts, htrefs& ctns,
 			LOG_DEBUG << "update/dropping non-executable "
 				"specification alternative: "
 				<< LOG_FM(alt->get()) << "\n";
+			dropped.emplace_back(alt->get(), std::move(ctn_r).report());
 			continue;
 		}
 		// get_executable_spec may rewrite its tref& clause arg.
 		kept.push_back(tree<node>::geth(clause_t));
 		ctns.push_back(tree<node>::geth(ctn_r.value()));
 	}
-	if (kept.empty()) return false;
+	if (kept.empty()) {
+		for (auto& [candidate, rep] : dropped) {
+			auto sc = r.open("rejected candidate");
+			r.info("the alternative has no executable continuation",
+				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+			r.append(std::move(rep));
+		}
+		return r.with_assert_check_error(code::unsat,
+			"no alternative of the specification part has an "
+			"executable continuation");
+	}
+	for (auto& [candidate, rep] : dropped) {
+		auto sc = r.open("rejected candidate");
+		r.info("the alternative has no executable continuation",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+		rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
 	alts = std::move(kept);
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 // The I3/B10 semantic no-op checks in update()/pointwise_revision are
 // optimizations -- skipping them is always sound. They are restricted to
 // arithmetic-free formulas because is_tau_impl/are_tau_equivalent can hang
 // even on SMALL mixed lookback bv pairs (observed on bv_stress_check inputs
-// of ~100-200 chars; recorded as B11 in
-// private/review-pointwise-revision-2026-08-16.md).
+// of ~100-200 chars).
 template <NodeType node>
 static bool pwr_contains_arith_content(tref f) {
 	return tree<node>::get(f).find_top([](tref t) {
@@ -2232,9 +2368,10 @@ static bool pwr_contains_arith_content(tref f) {
 }
 
 template <NodeType node>
-std::optional<typename interpreter<node>::update_plan>
+result<typename interpreter<node>::update_plan>
 	interpreter<node>::plan_update(tref update)
 {
+	result<update_plan> r;
 	DBG(LOG_TRACE << "interpreter::plan_update(update = \"" << LOG_FM(update) << "\")";)
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
@@ -2244,24 +2381,17 @@ std::optional<typename interpreter<node>::update_plan>
 	tref shifted_update = shift_const_io_vars_in_fm<node>(
 						update, io_vars, time_point);
 	if (tau::get(shifted_update).equals_F()) {
-		LOG_WARNING << "No update performed: constant time position below 0 was found\n";
-		return {};
+		r.warning("the constant time position is below 0; no update was performed");
+		return r;
 	}
 	io_vars = tau::get(shifted_update)
 				.select_top(is_child<node, tau::io_var>);
 	if (!is_memory_access_valid(io_vars)) {
-		LOG_WARNING << "No update performed: invalid memory access was found\n";
-		return {};
+		r.warning("an invalid memory access was found; no update was performed");
+		return r;
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
-	{
-		auto nr = normalizer<node>(shifted_update);
-		if (!nr.has_value()) {
-			LOG_WARNING << "No update performed: normalization failed\n";
-			return {};
-		}
-		shifted_update = nr.value();
-	}
+	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
 	// The constant time positions in original_spec need to be replaced by
@@ -2281,6 +2411,12 @@ std::optional<typename interpreter<node>::update_plan>
 	}
 	// TODO: memory_spec = remove_happend_sometimes(memory_spec);
 
+	// One report per rejected candidate clause or benign optimization
+	// probe, kept with what it was tried on. Folded into r on return,
+	// demoted to warnings either way: no candidate accepted is still an
+	// ordinary rejection (update()/can_extend() read it as verdict
+	// false), not a failure of this call.
+	std::vector<std::pair<tref, report>> update_failures;
 	// For each clause of update, check if we can do pointwise revision
 	for (tref clause : expression_paths<node>(shifted_update)) {
 		auto current_spec = memory_spec;
@@ -2291,11 +2427,16 @@ std::optional<typename interpreter<node>::update_plan>
 		// builds -- a mismatch would silently pair parts with the
 		// wrong continuations below.
 		if (current_spec.size() != current_ubd_ctn.size()) {
-			LOG_ERROR << "interpreter::update: spec partition ("
-				<< current_spec.size() << ") and continuation "
-				"partition (" << current_ubd_ctn.size()
-				<< ") are out of step; refusing the update\n";
-			return {};
+			for (auto& [candidate, rep] : update_failures) {
+				auto sc = r.open("rejected candidate");
+				r.info("the update candidate was not accepted",
+					{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+				r.append(std::move(rep));
+			}
+			return r.with_assert_check_error(code::internal_error,
+				"interpreter::update found the spec partition and "
+				"the continuation partition out of step; refusing "
+				"the update");
 		}
 		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
 		auto upd_partition = create_spec_partition(clause, uf);
@@ -2390,14 +2531,20 @@ std::optional<typename interpreter<node>::update_plan>
 			// only need recomputing when the part was merged (B4).
 			bool need_recompute = part_merged[i];
 			if (!tau::get(collected_updates[i]).equals_T()) {
-				auto revision = pointwise_revision(
+				auto revision_r = pointwise_revision(
 					current_spec[i].first,
 					collected_updates[i], time_point);
 				// nullopt when no update clause yields a sat
 				// revision or the definitions in a clause do
 				// not settle; without a revised part the
 				// update cannot be accepted.
-				if (!revision) { update_valid = false; break; }
+				const bool revision_ok = revision_r.has_value()
+					&& revision_r.value().has_value();
+				htrefs revision;
+				if (revision_ok) revision = std::move(*revision_r.value());
+				update_failures.emplace_back(part_alts_fm<node>(
+					current_spec[i].first), std::move(revision_r).report());
+				if (!revision_ok) { update_valid = false; break; }
 				LOG_DEBUG << "update/pointwise revision on part: "
 					<< LOG_FM(part_alts_fm<node>(
 						current_spec[i].first)) << "\n";
@@ -2407,13 +2554,13 @@ std::optional<typename interpreter<node>::update_plan>
 				// (review B10). Restricted to bv-free
 				// formulas -- see pwr_contains_arith_content
 				// (B11).
-				bool unchanged = revision->size()
+				bool unchanged = revision.size()
 					== current_spec[i].first.size();
 				if (unchanged)
-					for (size_t k = 0; k < revision->size(); ++k)
+					for (size_t k = 0; k < revision.size(); ++k)
 						if (!tau::subtree_equals(
 							current_spec[i].first[k]->get(),
-							(*revision)[k]->get()))
+							revision[k]->get()))
 						{
 							unchanged = false;
 							break;
@@ -2422,26 +2569,31 @@ std::optional<typename interpreter<node>::update_plan>
 					tref old_fm = part_alts_fm<node>(
 						current_spec[i].first);
 					tref new_fm = part_alts_fm<node>(
-						*revision);
+						revision);
 					bool equivalent = false;
 					if (!pwr_contains_arith_content<node>(old_fm)
 						&& !pwr_contains_arith_content<node>(new_fm)) {
 						auto eq = are_tau_equivalent<node>(
 							old_fm, new_fm);
 						equivalent = eq.has_value() && eq.value();
+						update_failures.emplace_back(new_fm,
+							std::move(eq).report());
 					}
 					unchanged = equivalent;
 				}
 				if (!unchanged) {
 					current_spec[i].first =
-						std::move(*revision);
+						std::move(revision);
 					need_recompute = true;
 				}
 			}
 			if (!need_recompute) continue;
-			if (!compute_part_continuations(current_spec[i].first,
-				current_ubd_ctn[i], time_point))
-			{
+			tref part_before_cpc = part_alts_fm<node>(current_spec[i].first);
+			auto cpc_r = compute_part_continuations(current_spec[i].first,
+				current_ubd_ctn[i], time_point);
+			update_failures.emplace_back(part_before_cpc,
+				std::move(cpc_r).report());
+			if (!cpc_r.has_value()) {
 				update_valid = false;
 				break;
 			}
@@ -2454,6 +2606,8 @@ std::optional<typename interpreter<node>::update_plan>
 			auto new_ubd_ctn_r = get_executable_spec(clause_t, time_point);
 			upd.first = tree<node>::geth(clause_t);
 			if (!new_ubd_ctn_r.has_value()) {
+				update_failures.emplace_back(clause_t,
+					std::move(new_ubd_ctn_r).report());
 				update_valid = false;
 				break;
 			}
@@ -2496,8 +2650,8 @@ std::optional<typename interpreter<node>::update_plan>
 			if (!streams_ok) break;
 		}
 		if (!streams_ok) {
-			LOG_WARNING << "No update performed: stream collection "
-				"failed for the revised specification\n";
+			r.warning("stream collection failed for the revised "
+				"specification; no update was performed");
 			continue;
 		}
 
@@ -2513,35 +2667,63 @@ std::optional<typename interpreter<node>::update_plan>
 			this->output_stream_sources, new_outputs,
 			new_output_sources))
 		{
-			LOG_WARNING << "No update performed: output stream "
-				"rebuild failed for the revised specification\n";
+			r.warning("the output stream rebuild failed for the revised "
+				"specification; no update was performed");
 			continue;
 		}
 		if (!build_inputs(in_stream_ids, this->inputs,
 			this->input_stream_sources, new_inputs,
 			new_input_sources))
 		{
-			LOG_WARNING << "No update performed: input stream "
-				"rebuild failed for the revised specification\n";
+			r.warning("the input stream rebuild failed for the revised "
+				"specification; no update was performed");
 			continue;
 		}
 		tref updated_spec = spec_partition_fm(current_spec);
-		return update_plan(std::move(current_ubd_ctn),
+		// This clause is accepted; the others' reports still fold in,
+		// demoted, so the report keeps why they lost without the
+		// result reading as a failure.
+		for (auto& [candidate, rep] : update_failures) {
+			auto sc = r.open("rejected candidate");
+			r.info("the update candidate was not accepted",
+				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		return r.with_assert_check_value(update_plan(
+			std::move(current_ubd_ctn),
 			std::move(current_spec), std::move(uf),
 			std::move(new_inputs), std::move(new_outputs),
 			std::move(new_input_sources), std::move(new_output_sources),
-			TAU_TO_STR(updated_spec));
+			TAU_TO_STR(updated_spec)));
 	}
-	// No more clause left in update and all clauses are not realizable
-	LOG_WARNING << "No update performed: updated specification is unsat\n";
-	return {};
+	// No more clause left in update and all clauses are not realizable.
+	// Demote like the accepted-clause path above: no candidate accepted
+	// is the ordinary rejection update()/can_extend() read as verdict
+	// false, not a genuine failure of plan_update itself.
+	for (auto& [candidate, rep] : update_failures) {
+		auto sc = r.open("rejected candidate");
+		r.info("the update candidate was not accepted",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+		rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
+	r.warning("the updated specification is unsat; no update was performed");
+	return r;
 }
 
 template <NodeType node>
-bool interpreter<node>::update(tref update) {
+result<bool> interpreter<node>::update(tref update) {
 	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
-	auto plan = plan_update(update);
-	if (!plan) return false;
+	result<bool> r;
+	auto plan = r.merge_take(plan_update(update));
+	if (!plan) {
+		// plan_update's report already carries the reason: an
+		// internal_error (broken invariant) leaves r valueless; an
+		// ordinary rejection (warnings only) reports the verdict false.
+		if (!r.report().has_error()) r = false;
+		return r;
+	}
 	// I7: growth telemetry -- the only prior symptom of the revision
 	// doubling was the interpreter getting slower.
 	LOG_INFO << "Updated specification (" << plan->spec_str.size()
@@ -2572,22 +2754,44 @@ bool interpreter<node>::update(tref update) {
 	// before this revision; keep it for reset()'s re-seeding, but mark
 	// it stale for the introspection API.
 	if (cached_solution) cached_solution_stale_ = true;
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 template <NodeType node>
-bool interpreter<node>::can_extend(tref psi) {
+result<bool> interpreter<node>::can_extend(tref psi) {
 	// Dry-run update(): plan_update leaves the interpreter unchanged by
 	// construction (its build_inputs/build_outputs calls write only into
 	// the returned plan), so the two agree without a separate guard here.
-	if (psi == nullptr) return true;
-	return plan_update(psi).has_value();
+	result<bool> r;
+	if (psi == nullptr) return r.with_assert_check_value(true);
+	auto plan = r.merge_take(plan_update(psi));
+	if (!plan) {
+		if (!r.report().has_error()) r = false;
+		return r;
+	}
+	return r.with_assert_check_value(true);
 }
 
 template <NodeType node>
-std::optional<htrefs> interpreter<node>::pointwise_revision(
+result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 	const htrefs& alts_in, tref update, const int_t start_time)
 {
+	result<std::optional<htrefs>> r;
+	// One report per revision probe, kept with the clause it was tried
+	// on. A probe is a rejected candidate only when this call still
+	// returns a revised value; when no clause revises at all, the
+	// probes' reports are the genuine reason and stay errors.
+	std::vector<std::pair<tref, report>> pwr_diag;
+	auto fold_pwr_diag = [&](bool demote) {
+		for (auto& [candidate, rep] : pwr_diag) {
+			auto sc = r.open("rejected candidate");
+			r.info("the revision probe did not settle",
+				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+			if (demote) rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		pwr_diag.clear();
+	};
 	// Split any temporally disjunctive alternative into adjacent
 	// alternatives, so each carries a single temporal clause. This
 	// dissolves the old first-clause-only handling of disjunctive specs
@@ -2603,7 +2807,7 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 	// feeding it through anyway made the U-of-U revision diverge (the
 	// clause loop can neither classify nor discharge the nested untils).
 	// Delegate such pairs to the full temporal algorithm
-	// (pointwise_revision_temporal, pwr-ltl.tex §3), one alternative at a
+	// (pointwise_revision_temporal), one alternative at a
 	// time; its single revised formula becomes that alternative.
 	auto has_nested_temporal = [](tref f) {
 		return tree<node>::get(f).find_top([](tref m) {
@@ -2629,12 +2833,12 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			trefs out;
 			size_t failed = 0;
 			for (const htref& h : alts_in) {
-				tref r = pointwise_revision_temporal<node>(
+				tref rev = pointwise_revision_temporal<node>(
 					h->get(), update, start_time);
 				// IN-M6: nullptr (the revision could not be
 				// built) and F (the alternative is gone) are
 				// different outcomes; say which.
-				if (!r) {
+				if (!rev) {
 					++failed;
 					LOG_WARNING << "Pointwise revision of a "
 						"nested-temporal alternative could not "
@@ -2642,22 +2846,23 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 						<< "\n";
 					continue;
 				}
-				if (tau::get(r).equals_F()) {
+				if (tau::get(rev).equals_F()) {
 					LOG_DEBUG << "update/nested-temporal "
 						"alternative revised to F, dropped: "
 						<< LOG_FM(h->get()) << "\n";
 					continue;
 				}
-				out.push_back(r);
+				out.push_back(rev);
 			}
 			if (out.empty()) {
 				if (failed) LOG_WARNING << "No update performed: "
 					"the temporal revision could not be built "
 					"for any alternative\n";
-				return {};
+				return r.with_assert_check_value(std::nullopt);
 			}
 			// Same dedupe and cap as the factored path below.
-			return finalize_alternatives(out);
+			return r.with_assert_check_value(
+				std::optional<htrefs>(finalize_alternatives(out)));
 		}
 	}
 
@@ -2675,11 +2880,19 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 	};
 	{
 		auto ur = normalizer<node>(update);
-		if (!ur.has_value()) return {};
+		if (!ur.has_value()) {
+			pwr_diag.emplace_back(update, std::move(ur).report());
+			fold_pwr_diag(false);
+			return r.with_assert_check_value(std::nullopt);
+		}
+		pwr_diag.emplace_back(update, std::move(ur).report());
 		update = ur.value();
 	}
 	// If the update is T, nothing changes
-	if (tau::get(update).equals_T()) return to_htrefs(alts);
+	if (tau::get(update).equals_T()) {
+		fold_pwr_diag(true);
+		return r.with_assert_check_value(std::optional<htrefs>(to_htrefs(alts)));
+	}
 	// PW-R6: one satisfiability memo per factored revision — the clause,
 	// sometimes-conjunction and gate checks repeat identical hash-consed
 	// (formula, start_time) queries, each a subprocess on temporal
@@ -2707,11 +2920,14 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 			&& !pwr_contains_arith_content<node>(clause)) {
 			auto impl = is_tau_impl<node>(spec_fm, clause);
 			spec_implies_clause = impl.has_value() && impl.value();
+			pwr_diag.emplace_back(clause, std::move(impl).report());
 		}
 		if (spec_implies_clause) {
 			LOG_DEBUG << "pwr/update already implied by the "
 				"specification; keeping it unchanged\n";
-			return to_htrefs(alts);
+			fold_pwr_diag(true);
+			return r.with_assert_check_value(
+				std::optional<htrefs>(to_htrefs(alts)));
 		}
 
 		// TODO: call type inference algorithm in order to unify
@@ -2800,6 +3016,8 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 				// flattening above.
 				auto normalized_body = normalize_non_temp<node>(
 					bodies[i]);
+				pwr_diag.emplace_back(clause,
+					std::move(normalized_body).report());
 				bodies[i] = normalized_body.has_value()
 					? normalized_body.value() : nullptr;
 			}
@@ -2825,8 +3043,14 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 					"specification with the update "
 					"clause\n";
 				auto dr = normalize_with_temp_simp<node>(clause);
-				if (!dr.has_value()) return {};
-				return to_htrefs({ dr.value() });
+				pwr_diag.emplace_back(clause, std::move(dr).report());
+				if (!dr.has_value()) {
+					fold_pwr_diag(false);
+					return r.with_assert_check_value(std::nullopt);
+				}
+				fold_pwr_diag(true);
+				return r.with_assert_check_value(
+					std::optional<htrefs>(to_htrefs({ dr.value() })));
 			}
 			for (size_t i = 0; i < n; ++i) {
 				// Alternative without an always part under an
@@ -2885,10 +3109,12 @@ std::optional<htrefs> interpreter<node>::pointwise_revision(
 		}
 		htrefs result = finalize_alternatives(new_alts);
 		if (result.empty()) continue;
-		return result;
+		fold_pwr_diag(true);
+		return r.with_assert_check_value(std::optional<htrefs>(std::move(result)));
 	}
 	// No update clause yields a satisfiable revision
-	return {};
+	fold_pwr_diag(false);
+	return r.with_assert_check_value(std::nullopt);
 }
 
 template <NodeType node>
@@ -2925,19 +3151,6 @@ htrefs interpreter<node>::finalize_alternatives(const trefs& alts) {
 	return r;
 }
 
-// ── step(values, u) — combined step + optional PWR ────────────────────────────
-
-template <NodeType node>
-std::pair<std::optional<assignment<node>>, bool>
-interpreter<node>::step(const assignment<node>& values, std::optional<tref> u)
-{
-	auto step_r = step(values);
-	if (u.has_value() && u.value() != nullptr)
-		update(u.value());
-	if (!step_r.has_value()) return {};
-	return step_r.value();
-}
-
 // ── current_spec ──────────────────────────────────────────────────────────────
 
 template <NodeType node>
@@ -2955,42 +3168,68 @@ std::string interpreter<node>::current_spec() const {
 }
 
 template <NodeType node>
-std::optional<size_t> interpreter<node>::first_solvable_alternative(
+result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 	size_t part)
 {
-	if (part >= step_spec.size()) return {};
-	for (size_t alt_idx = 0; alt_idx < step_spec[part].size(); ++alt_idx)
-		if (alternative_solvable(part, alt_idx)) return alt_idx;
-	return {};
-}
-
-template <NodeType node>
-bool interpreter<node>::alternative_solvable(size_t part, size_t alt_idx) {
+	result<std::optional<size_t>> r;
+	if (part >= step_spec.size()) return r.with_assert_check_value(std::nullopt);
 	const trefs& part_alts = step_spec[part];
-	// The substitution commutes with path enumeration, and
-	// enumerating the raw formula's paths first multiplies the
-	// path count by the absolute run prefix that memory already
-	// decides (GitHub #115).
-	tref alt_at_t = update_to_time_point(part_alts[alt_idx],
-		formula_time_point);
-	alt_at_t = syntactic_formula_simplification<node>(
-		rewriter::replace<node>(alt_at_t, memory));
-	if (!mentions_ltl_state_var<node>(alt_at_t)) {
-		subtree_map<node, tref> propagated;
-		alt_at_t = propagate_step_definitions<node>(alt_at_t, propagated);
+	// One report per rejected probe, kept with the path it was tried on.
+	// A probe is a rejected candidate only once some alternative solves;
+	// when none does, the probes' reports are the genuine reason and
+	// stay errors.
+	std::vector<std::pair<tref, report>> probe_diag;
+	for (size_t alt_idx = 0; alt_idx < part_alts.size(); ++alt_idx) {
+		// The substitution commutes with path enumeration, and
+		// enumerating the raw formula's paths first multiplies the
+		// path count by the absolute run prefix that memory already
+		// decides (GitHub #115).
+		tref alt_at_t = update_to_time_point(part_alts[alt_idx],
+			formula_time_point);
+		alt_at_t = syntactic_formula_simplification<node>(
+			rewriter::replace<node>(alt_at_t, memory));
+		if (!mentions_ltl_state_var<node>(alt_at_t)) {
+			subtree_map<node, tref> propagated;
+			TAU_TRY(alt_at_t, propagate_step_definitions<node>(
+				alt_at_t, propagated));
+		}
+		// Probe each path; a failed probe only rules out this alternative.
+		for (tref path : expression_paths<node>(alt_at_t)) {
+			auto normalized = normalize_non_temp<node>(path);
+			if (!normalized.has_value()) {
+				probe_diag.emplace_back(path,
+					std::move(normalized).report());
+				continue;
+			}
+			auto sol = solution_with_max_update(normalized.value());
+			if (sol.has_value()) {
+				for (auto& [candidate, rep] : probe_diag) {
+					auto sc = r.open("rejected candidate");
+					r.info("the alternative's probe path did not solve",
+						{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+					rep.demote_errors_to_warnings();
+					r.append(std::move(rep));
+				}
+				return r.with_assert_check_value(alt_idx);
+			}
+			probe_diag.emplace_back(path, std::move(sol).report());
+		}
 	}
-	for (tref path : expression_paths<node>(alt_at_t)) {
-		auto normalized = normalize_non_temp<node>(path);
-		if (!normalized.has_value()) continue;
-		if (solution_with_max_update(normalized.value()))
-			return true;
+	for (auto& [candidate, rep] : probe_diag) {
+		auto sc = r.open("rejected candidate");
+		r.info("the alternative's probe path did not solve",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+		r.append(std::move(rep));
 	}
-	return false;
+	return r.with_assert_check_error(code::unsat,
+		"no alternative of the specification part solves under the "
+		"current memory");
 }
 
 template <NodeType node>
-tref interpreter<node>::executed_spec_fm(bool use_memory) {
-	if (!use_memory) return chosen_spec_fm();
+result<tref> interpreter<node>::executed_spec_fm(bool use_memory) {
+	result<tref> r;
+	if (!use_memory) return r.with_assert_check_value(chosen_spec_fm());
 	// Parts are parallel between original_spec (alternatives) and
 	// step_spec/ubt_ctn (their continuations, same order): a chosen
 	// continuation index selects the spec alternative it came from.
@@ -3000,12 +3239,21 @@ tref interpreter<node>::executed_spec_fm(bool use_memory) {
 	for (size_t i = 0; i < original_spec.size(); ++i) {
 		const htrefs& alts = original_spec[i].first;
 		std::optional<size_t> pick;
-		if (alts.size() > 1 && aligned) pick = first_solvable_alternative(i);
+		if (alts.size() > 1 && aligned) {
+			auto pick_r = first_solvable_alternative(i);
+			pick = pick_r.has_value() ? pick_r.value() : std::nullopt;
+			// Falling back to the disjunction below is this
+			// call's own accepted answer for an unsolvable part,
+			// so the probe's report rides along demoted into r.
+			report rep = std::move(pick_r).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
 		if (pick && *pick < alts.size())
 			part_fms.push_back(alts[*pick]->get());
 		else part_fms.push_back(part_alts_fm<node>(alts));
 	}
-	return tau::build_wff_and(part_fms);
+	return r.with_assert_check_value(tau::build_wff_and(part_fms));
 }
 
 // The use_memory=false arm of executed_spec_fm: reads chosen_alt_ only, so
@@ -3135,7 +3383,8 @@ void interpreter<node>::seed_since_aux_bits() {
 // ── current_state ─────────────────────────────────────────────────────────────
 
 template <NodeType node>
-int interpreter<node>::current_state() const {
+result<int> interpreter<node>::current_state() const {
+	result<int> r;
 	// If the spec needed Mealy synthesis (general LTL with future operators),
 	// the strategy state is encoded in auxiliary one-hot bits
 	// `o__ltl_ms<i>__` per `encode_mealy_as_safety`. Find the unique i with
@@ -3146,14 +3395,15 @@ int interpreter<node>::current_state() const {
 		// state to extract. The interpreter's snapshot identity is
 		// fully captured by (time_point, memory) via opaque audit hash;
 		// for state ID purposes we report 0 (the only state).
-		return 0;
+		return r.with_assert_check_value(0);
 	}
 
 	const int k = cached_solution->aut.num_states;
 	// At t=0 (no step yet committed), the encoding leaves the initial
 	// state unpinned — at_least + at_most force some ms[i]=1 but none is
 	// distinguished. Report the HOA-declared initial_state in this case.
-	if (time_point == 0) return cached_solution->aut.initial_state;
+	if (time_point == 0)
+		return r.with_assert_check_value(cached_solution->aut.initial_state);
 
 	// Find the auxiliary bit set to 1 at the most-recently committed step.
 	// `memory` holds the full history; we look up time_point - 1 because
@@ -3185,29 +3435,40 @@ int interpreter<node>::current_state() const {
 				|| !tau::get(ivn)[1].has_child()) continue;
 			if (get_io_time_point<node>(trimmed) != (int_t)lookup_t) continue;
 			const auto& v = tau::get(tau::trim(val));
-			if (v.is(tau::bf_t)) return i;
-			if (v.is_ba_constant()
-				&& node::ba::is_one(v.get_ba_constant())) return i;
+			if (v.is(tau::bf_t)) return r.with_assert_check_value(i);
+			if (v.is_ba_constant()) {
+				TAU_TRY(bool one, node::ba::is_one(v.get_ba_constant()));
+				if (one) return r.with_assert_check_value(i);
+			}
 		}
 	}
 	// No aux bit set — fall back to HOA initial state (shouldn't happen
 	// once t >= 1, but defensive against memory not yet populated for
 	// auxiliary variables on certain code paths).
-	return cached_solution->aut.initial_state;
+	return r.with_assert_check_value(cached_solution->aut.initial_state);
 }
 
 // ── admissible_outputs ────────────────────────────────────────────────────────
 
 template <NodeType node>
-std::vector<assignment<node>>
+result<std::vector<assignment<node>>>
 interpreter<node>::admissible_outputs(size_t max_results)
 {
+	result<std::vector<assignment<node>>> r;
 	std::vector<assignment<node>> results;
+	// A per-part normalization is a best-effort simplification only (the
+	// unnormalized form is a safe fallback). One report per part that
+	// failed to normalize, kept with the part it was tried on. Folded
+	// into r on return: demoted to warnings when enumeration finishes,
+	// kept as errors alongside a genuine solver error.
+	std::vector<std::pair<tref, report>> probe_diag;
 
 	// Lazy initialisation: ensure step_spec is populated for time_point.
 	// Mirrors what step() does at the top of its body.
-	if (!calculate_initial_spec()) return results;
-	if (step_spec.empty()) return results;
+	if (!r.merge_take(calculate_initial_spec()).value_or(false))
+		return r.with_assert_check_error(code::internal_error,
+			"Failed to calculate initial spec");
+	if (step_spec.empty()) return r.with_assert_check_value(results);
 
 	// Build the working spec form from step_spec, also substituting memory
 	// (mirrors step()'s line 515-520 update_to_time_point + replace).
@@ -3221,14 +3482,31 @@ interpreter<node>::admissible_outputs(size_t max_results)
 		// that alternative's. The disjunction is only the fallback
 		// when none is solvable (the step would fail anyway).
 		tref part = part_alts.size() == 1 ? part_alts[0] : nullptr;
-		if (!part)
-			if (auto pick = first_solvable_alternative(i))
-				part = part_alts[*pick];
+		if (!part) {
+			auto pick_r = first_solvable_alternative(i);
+			if (pick_r.has_value() && pick_r.value())
+				part = part_alts[*pick_r.value()];
+			else {
+				// The disjunction fallback below is this
+				// call's accepted answer for an unsolvable
+				// part (IN-M2), so the probe's report rides
+				// along demoted rather than failing the call.
+				auto sc = r.open("rejected candidate");
+				r.info("the part had no solvable alternative",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(tau::build_wff_or(part_alts)))}});
+				report rep = std::move(pick_r).report();
+				rep.demote_errors_to_warnings();
+				r.append(std::move(rep));
+			}
+		}
 		if (!part) part = tau::build_wff_or(part_alts);
 		tref updated = update_to_time_point(part, formula_time_point);
 		updated = rewriter::replace<node>(updated, memory);
 		auto normalized = normalize_non_temp<node>(updated);
 		if (normalized.has_value()) updated = normalized.value();
+		else probe_diag.emplace_back(updated,
+			std::move(normalized).report());
 		current_form = tau::build_wff_and(current_form, updated);
 	}
 
@@ -3242,13 +3520,41 @@ interpreter<node>::admissible_outputs(size_t max_results)
 			.splitter_one = node::ba::splitter_one(tau_type<node>()),
 			.mode = solver_mode::general
 		};
-		auto sol_r = solve<node>(current_form, opts);
-		if (!sol_r.has_value()) break;
+		auto solve_res = solve<node>(current_form, opts);
+		if (!solve_res.has_value()
+			&& report_has_code(solve_res.report(), code::unsat))
+		{
+			// Enumeration exhaustion: solve() reports ordinary
+			// code::unsat once the candidate space runs out. That is
+			// the normal way this loop ends, not a solver failure, so
+			// it folds in demoted -- like a rejected candidate --
+			// instead of failing the call and discarding results.
+			auto sc = r.open("rejected candidate");
+			r.info("no further solution over the current form",
+				{{label::value, truncate_for_message(TAU_TO_STR(current_form))}});
+			report rep = std::move(solve_res).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+			break;
+		}
+		auto sol = r.merge_take(std::move(solve_res));
+		if (!sol) {
+			// Any other error means the solver genuinely failed; the
+			// caller must be able to tell that apart from an
+			// exhausted enumeration.
+			for (auto& [candidate, rep] : probe_diag) {
+				auto sc = r.open("rejected candidate");
+				r.info("the output part did not normalize",
+					{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+				r.append(std::move(rep));
+			}
+			return r;
+		}
 
 		// Filter out aux/excluded outputs (o__ltl_ms*, o__ltl_s*, _e*, _f*)
 		// per the codebase's is_excluded_output convention.
 		assignment<node> filtered;
-		for (const auto& [var, val] : sol_r.value()) {
+		for (const auto& [var, val] : *sol) {
 			if (tt(var) | tau::variable | tau::io_var) {
 				if (is_excluded_output(tau::trim(var))) continue;
 			}
@@ -3261,7 +3567,7 @@ interpreter<node>::admissible_outputs(size_t max_results)
 		// so we don't accept the same internal assignment again.
 		tref block = tau::_F();
 		bool block_has_term = false;
-		for (const auto& [var, val] : sol_r.value()) {
+		for (const auto& [var, val] : *sol) {
 			tref xored = build_bf_xor<node>(var, val);
 			tref eq0 = tau::build_bf_eq_0(xored);
 			tref neq = tau::build_wff_neg(eq0);
@@ -3271,24 +3577,39 @@ interpreter<node>::admissible_outputs(size_t max_results)
 		if (!block_has_term) break;  // empty solution; nothing to block
 		current_form = tau::build_wff_and(current_form, block);
 	}
-	return results;
+	// Enumeration finished; the parts that failed to normalize still
+	// fold in demoted, so the report keeps why without the call reading
+	// as a failure.
+	for (auto& [candidate, rep] : probe_diag) {
+		auto sc = r.open("rejected candidate");
+		r.info("the output part did not normalize",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
+		rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
+	return r.with_assert_check_value(std::move(results));
 }
 
 // ── accumulator_state ─────────────────────────────────────────────────────────
 
 template <NodeType node>
-std::string interpreter<node>::accumulator_state(const std::string& name) const
+result<std::string> interpreter<node>::accumulator_state(const std::string& name) const
 {
-	// Per paper §5.4 Def 5.7, accumulators are spec-language variables
-	// realised as output streams. Their committed values live in `memory`
-	// at the most-recent time step.
-	if (memory.empty()) return "";
+	result<std::string> r;
+	// Accumulators are spec-language variables realised as output
+	// streams. Their committed values live in `memory` at the
+	// most-recent time step.
+	if (memory.empty()) return r.with_assert_check_value(std::string{});
 	const size_t lookup_t = time_point > 0 ? time_point - 1 : 0;
 
 	// Try both bare-name and `acc_<name>` conventions; spec authors may use
 	// either prefix.
 	const std::string candidates[] = {name, "acc_" + name};
 
+	// A skipped entry is a rejected candidate only once another entry
+	// serializes; when a matching entry exists but none serializes, type
+	// inference's literal guarantee was broken, and that stays an error.
+	std::vector<std::pair<tref, report>> skipped;
 	for (const auto& candidate : candidates) {
 		for (const auto& [var, val] : memory) {
 			tref trimmed = tau::trim(var);
@@ -3298,14 +3619,37 @@ std::string interpreter<node>::accumulator_state(const std::string& name) const
 			std::stringstream ss;
 			size_t ctype = ctx.type_of(trimmed);
 			if (ctype == 0) continue;
-			if (!serialize_constant<node>(ss, val, ctype)) continue;
+			auto ser = serialize_constant<node>(ss, val, ctype);
+			if (!ser.has_value() || !ser.value()) {
+				skipped.emplace_back(var, std::move(ser).report());
+				continue;
+			}
 			std::string s = ss.str();
 			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
 				s.pop_back();
-			return s;
+			for (auto& [candidate_var, rep] : skipped) {
+				auto sc = r.open("rejected candidate");
+				r.info("the accumulator entry did not serialize",
+					{{label::value, truncate_for_message(TAU_TO_STR(candidate_var))}});
+				rep.demote_errors_to_warnings();
+				r.append(std::move(rep));
+			}
+			return r.with_assert_check_value(s);
 		}
 	}
-	return "";
+	// No candidate matched memory at all: a genuinely absent accumulator,
+	// same as the empty-memory case above.
+	if (skipped.empty()) return r.with_assert_check_value(std::string{});
+	// A matching entry existed for every skip below; none serialized,
+	// which breaks type inference's literal guarantee. Kept as errors.
+	for (auto& [candidate_var, rep] : skipped) {
+		auto sc = r.open("rejected candidate");
+		r.info("the accumulator entry did not serialize",
+			{{label::value, truncate_for_message(TAU_TO_STR(candidate_var))}});
+		r.append(std::move(rep));
+	}
+	return r.with_assert_check_error(code::internal_error,
+		"no matching accumulator entry serialized to a literal");
 }
 
 // ── visualise_mealy_dot ───────────────────────────────────────────────────────
@@ -3383,7 +3727,7 @@ interpreter<node>::boundary_traces(int n, int max_length) const {
 	//
 	// "Simple path" rules out cycles, which is what we want for "extremal
 	// before-it-loops" traces. A separate cycle-discovery pass could be
-	// added later if the canonical §13.2 "longest delay before eventually
+	// added later if the canonical "longest delay before eventually
 	// fires" semantics requires it (cycles are the natural representation
 	// of unbounded delay).
 	std::vector<std::vector<int>> all_paths;
@@ -3436,61 +3780,6 @@ void interpreter<node>::commit_realiser(const std::string& approval_hash) {
 	committed_approval_hash = approval_hash;
 }
 
-// ── declare_open / undeclare_open / open_streams ────────────────────────────
-//
-// as-is and validated at step() time when the engine attempts to dispatch
-// the handler. Re-entrance check refuses to declare from inside a handler
-// invocation (would mutate dispatch table mid-call).
-
-template <NodeType node>
-void interpreter<node>::declare_open(const std::string& stream_name,
-                                     oracle_handler handler)
-{
-	if (in_oracle_handler_) {
-		throw std::runtime_error(
-			"declare_open: re-entrance violation — cannot declare from "
-			"inside an oracle_handler invocation (stream: " + stream_name + ")");
-	}
-	// The declared contract: throw if stream_name is not an output stream
-	// of the current spec. Silently accepting a typo'd name would mean
-	// the handler simply never fires.
-	bool known = false;
-	for (const auto& [var, _] : outputs)
-		if (get_var_name<node>(var) == stream_name) {
-			known = true;
-			break;
-		}
-	if (!known) throw std::runtime_error(
-		"declare_open: '" + stream_name
-		+ "' is not an output stream of the current spec");
-	if (open_handlers_.find(stream_name) == open_handlers_.end()) {
-		open_streams_order_.push_back(stream_name);
-	}
-	open_handlers_[stream_name] = std::move(handler);
-}
-
-template <NodeType node>
-void interpreter<node>::undeclare_open(const std::string& stream_name)
-{
-	if (in_oracle_handler_) {
-		throw std::runtime_error(
-			"undeclare_open: re-entrance violation — cannot undeclare from "
-			"inside an oracle_handler invocation (stream: " + stream_name + ")");
-	}
-	auto it = open_handlers_.find(stream_name);
-	if (it == open_handlers_.end()) return;  // no-op
-	open_handlers_.erase(it);
-	auto vit = std::find(open_streams_order_.begin(),
-	                     open_streams_order_.end(), stream_name);
-	if (vit != open_streams_order_.end()) open_streams_order_.erase(vit);
-}
-
-template <NodeType node>
-std::vector<std::string> interpreter<node>::open_streams() const
-{
-	return open_streams_order_;
-}
-
 // ── can_extend ────────────────────────────────────────────────────────────────
 
 template <NodeType node>
@@ -3509,7 +3798,7 @@ result<assignment<node>> solution_with_max_update(tref spec, size_t time_point)
 	using tau = tree<node>;
 	result<assignment<node>> r;
 	if (!spec) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	solver_options options = {
 		.splitter_one = node::ba::splitter_one(tau_type<node>()),
@@ -3591,7 +3880,7 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
 	// step_spec is read below for t == time_point; keep it current here too,
 	// since callers (e.g. get_inputs_for_step) may reach this before step().
-	if (!calculate_initial_spec()) return appeared;
+	if (!calculate_initial_spec().value_or(false)) return appeared;
 	auto check = [&](tref fm, size_t t) {
 		tref step_ubt_ctn = update_to_time_point(fm,
 			t < formula_time_point ? formula_time_point : t);
@@ -3676,7 +3965,7 @@ tref unpack_tau_constant(tref constant) {
 // B5 diagnostic: a rule arriving on a tau-typed input stream while the
 // update stream u solves to 0 vanishes silently -- the update trigger never
 // fires (solution_with_max_update cannot always maximize u, e.g. during the
-// initial segment; old review §2.9). Warn so the drop is visible instead of
+// initial segment). Warn so the drop is visible instead of
 // the caller believing the rule was applied.
 template <NodeType node>
 void warn_if_update_dropped(interpreter<node>& i,
@@ -3764,7 +4053,8 @@ result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	DBG(LOG_TRACE << "run[form]: " << LOG_FM(form));
 	TAU_TRY(interpreter<node> intrprtr,
 		interpreter<node>::make_interpreter(form, ctx));
-	if (!intrprtr.run_loop(steps)) {
+	auto ran = r.merge_take(intrprtr.run_loop(steps));
+	if (!ran || !*ran) {
 		return r.with_assert_check_error(code::runtime_error, "Execution stopped on a failed step");
 	}
 	DBG(LOG_TRACE << "run end\n";)
@@ -3772,11 +4062,12 @@ result<interpreter<node>> run(tref form, const io_context<node>& ctx,
 }
 
 template <NodeType node>
-bool interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
+result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 	const std::function<void(bool)>& idle_hook)
 {
 	using tau = tree<node>;
 	auto& intrprtr = *this;
+	result<bool> r;
 
 	LOG_INFO << "-----------------------------------------------------------------------------------------------------------";
 	LOG_INFO << "Please provide requested input, or press ENTER to terminate                                               |";
@@ -3788,10 +4079,13 @@ bool interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 		auto step_r = intrprtr.step();
 		if (!step_r.has_value()) {
 			// End of input is the normal exit. Every other failure
-			// must reach the caller, as in the REPL run loop.
+			// must reach the caller, as in the REPL run loop -- merged
+			// into r's own report rather than only printed, since
+			// every caller here already treats a valueless r the same
+			// as a `false` one.
 			if (step_awaiting_input(step_r.report())) break;
-			step_r.print(std::cerr);
-			return false;
+			r.merge(std::move(step_r));
+			return r;
 		}
 		auto& [output, auto_continue] = step_r.value();
 
@@ -3807,7 +4101,11 @@ bool interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 
 		// If the user provided empty input for an input stream, quit
 		if (!output.has_value()) break;
-		if (!intrprtr.write(output.value())) return false;
+		auto write_r = intrprtr.write(output.value());
+		if (!write_r.has_value()) {
+			r.merge(std::move(write_r));
+			return r;
+		}
 		// If there is no input, ask the user if execution should continue
 		if (!auto_continue && steps == 0) {
 			// -q: stop instead of prompting once the loop goes idle.
@@ -3842,14 +4140,18 @@ bool interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 				if (tref update = unpack_tau_constant<node>(
 					it->second); update != nullptr)
 				{
-					intrprtr.update(update);
+					[[maybe_unused]] auto verdict =
+						r.merge_take(intrprtr.update(update));
+					// A broken invariant, not an ordinary
+					// rejection, must stop the loop.
+					if (r.report().has_error()) return r;
 				}
 			}
 		}
 		warn_if_update_dropped(intrprtr, output.value());
 		if (steps != 0 && intrprtr.time_point == steps) break;
 	}
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 template <NodeType node>

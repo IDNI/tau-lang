@@ -100,8 +100,10 @@ using bit_slice_memo = std::unordered_map<std::pair<tref, size_t>,
  * into its raw (unregistered) variable and mask constant. Combining BDD
  * refs directly, one leaf at a time, avoids ever re-emitting such a term.
  * At a bv constant leaf, evaluates bit i directly to the T/F terminal.
- * Declines (returns std::nullopt) on anything else -- casts, unresolved
- * recurrence calls, non-bv content -- rather than guess.
+ * Declines (value holds std::nullopt) on anything else -- casts, unresolved
+ * recurrence calls, non-bv content -- rather than guess; a genuine failure
+ * (bit<node>'s own nso_rr_apply erroring) is a no-value result instead,
+ * its report merged in.
  *
  * Memoized by (t, i): a bvadd/bvsub accumulator's xor chain is shared
  * across every bit position, so naive re-slicing is O(width) per bit,
@@ -113,44 +115,51 @@ using bit_slice_memo = std::unordered_map<std::pair<tref, size_t>,
  * @param i Bit index (0 = least significant)
  * @param o Bit-level variable order (see quantify_aux_vars)
  * @param memo (t, i) -> BDD memo
- * @return The bit-i BDD, or std::nullopt if t cannot be sliced
+ * @return The bit-i BDD wrapped in std::optional (std::nullopt if t cannot
+ * be sliced), or no value at all with an error report on genuine failure
  */
 template<NodeType node>
-static std::optional<typename tau_term_bdd<node>::ref> bit_slice(tref t,
-	size_t i, const typename term_handle<node>::order& o,
+static result<std::optional<typename tau_term_bdd<node>::ref>> bit_slice(
+	tref t, size_t i, const typename term_handle<node>::order& o,
 	bit_slice_memo<node>& memo)
 {
 	using tau = tree<node>;
 	using tbdd = tau_term_bdd<node>;
 	using ref = typename tbdd::ref;
+	using opt_ref = std::optional<ref>;
 
+	result<opt_ref> r;
 	if (const auto it = memo.find(std::pair{t, i}); it != memo.end())
-		return it->second;
-	std::optional<ref> res;
+		return r.with_value(it->second);
+	opt_ref res;
 	switch (tau::get(t).get_type()) {
-		case tau::bf: res = bit_slice<node>(tau::trim(t), i, o, memo); break;
+		case tau::bf: {
+			TAU_TRY(res, bit_slice<node>(tau::trim(t), i, o, memo));
+			break;
+		}
 		case tau::bf_and: case tau::bf_or: case tau::bf_xor: {
 			const tau& tt = tau::get(t);
-			auto l = bit_slice<node>(tt.first(), i, o, memo);
-			auto r = l ? bit_slice<node>(tt.second(), i, o, memo)
-				: std::nullopt;
-			if (!l || !r) break;
-			if (tt.is(tau::bf_and)) res = tbdd::bdd_and(*l, *r, o);
-			else if (tt.is(tau::bf_or)) res = tbdd::bdd_or(*l, *r, o);
+			TAU_TRY(auto l, bit_slice<node>(tt.first(), i, o, memo));
+			if (!l) break;
+			TAU_TRY(auto rhs, bit_slice<node>(tt.second(), i, o, memo));
+			if (!rhs) break;
+			if (tt.is(tau::bf_and)) res = tbdd::bdd_and(*l, *rhs, o);
+			else if (tt.is(tau::bf_or)) res = tbdd::bdd_or(*l, *rhs, o);
 			else res = tbdd::bdd_or(
-				tbdd::bdd_and(*l, tbdd::bdd_not(*r), o),
-				tbdd::bdd_and(tbdd::bdd_not(*l), *r, o), o);
+				tbdd::bdd_and(*l, tbdd::bdd_not(*rhs), o),
+				tbdd::bdd_and(tbdd::bdd_not(*l), *rhs, o), o);
 			break;
 		}
 		case tau::bf_neg: {
-			auto c = bit_slice<node>(tau::get(t).first(), i, o, memo);
+			TAU_TRY(auto c, bit_slice<node>(tau::get(t).first(), i, o, memo));
 			if (c) res = tbdd::bdd_not(*c);
 			break;
 		}
 		case tau::variable: {
-			tref leaf = tau::trim(bit<node>(tau::get(tau::bf, t),
+			TAU_TRY(auto leaf_r, bit<node>(tau::get(tau::bf, t),
 				static_cast<int_t>(i)));
-			if (o.find(leaf) != o.end()) res = tbdd::from_bit(leaf);
+			tref leaf = tau::trim(leaf_r);
+			if (leaf && o.find(leaf) != o.end()) res = tbdd::from_bit(leaf);
 			break;
 		}
 		case tau::ba_constant: {
@@ -172,7 +181,7 @@ static std::optional<typename tau_term_bdd<node>::ref> bit_slice(tref t,
 		default: break;
 	}
 	memo.emplace(std::pair{t, i}, res);
-	return res;
+	return r.with_value(res);
 }
 
 /**
@@ -213,15 +222,22 @@ static std::optional<typename tau_term_bdd<node>::ref> build_wff_bdd(tref f,
 	auto zero_test = [&](tref t1, tref t2) -> std::optional<ref> {
 		if (!is_bv_type_family<node>(tau::get(t1).get_ba_type()))
 			return std::nullopt;
-		size_t bitwidth = get_bv_type_bitwidth<node>(t1);
-		if (bitwidth == 0) return std::nullopt;
+		auto bw = get_bv_type_bitwidth<node>(t1);
+		// build_wff_bdd stays optional-only, so a genuine get_bv_type_bitwidth
+		// failure has no report channel to travel out through here and folds
+		// into the same decline an ordinary "cannot slice" is.
+		if (!bw.has_value()) return std::nullopt;
+		size_t bitwidth = bw.value();
 		tref x = tau::build_bf_xor(t1, t2);
 		typename tbdd::refs bits;
 		bits.reserve(bitwidth);
 		for (size_t i = 0; i < bitwidth; ++i) {
 			auto s = bit_slice<node>(x, i, o, memo);
-			if (!s) return std::nullopt;
-			bits.push_back(tbdd::bdd_not(*s));
+			// build_wff_bdd stays optional-only, so a genuine bit_slice
+			// failure has no report channel to travel out through here and
+			// folds into the same decline an ordinary "cannot slice" is.
+			if (!s.has_value() || !*s) return std::nullopt;
+			bits.push_back(tbdd::bdd_not(**s));
 		}
 		return tbdd::bdd_and_many(std::move(bits), o);
 	};
@@ -395,7 +411,9 @@ static void collect_bdd_support(typename tau_term_bdd<node>::ref x,
  * @tparam node Node type
  * @param vars The auxiliary variables to quantify (innermost last)
  * @param subformula The formula to quantify over
- * @return The quantified formula
+ * @return The quantified formula, or (still a value, never an error) the
+ * best fallback reached so far on any of this function's several early-out
+ * paths; no value at all only on a genuine internal failure
  *
  * @par Example
  * This is internal plumbing shared by every `*_predicate` function
@@ -412,10 +430,11 @@ static void collect_bdd_support(typename tau_term_bdd<node>::ref x,
  * closes over.
  */
 template<NodeType node>
-static tref quantify_aux_vars(const trefs& vars, tref subformula) {
+static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	using tau = tree<node>;
 
-	if (vars.empty()) return subformula;
+	result<tref> r;
+	if (vars.empty()) return r.with_value(subformula);
 	int_t id = find_biggest_quant_id<node>(subformula);
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
@@ -483,7 +502,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 		return true;
 	};
 	pre_order<node>(result).visit_unique(has_stuck_aux);
-	if (!stuck) return result;
+	if (!stuck) return r.with_value(result);
 
 	// Collect every bv-typed variable occurring in the renamed body (aux
 	// images and any surviving free variables alike) and register each
@@ -505,8 +524,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	std::vector<std::pair<tref, size_t>> widths;
 	size_t max_bitwidth = 0;
 	for (tref w : occurring) {
-		size_t bw = get_bv_type_bitwidth<node>(w);
-		if (bw == 0) return result; // not actually bv-typed; bail out safely
+		TAU_TRY(size_t bw, get_bv_type_bitwidth<node>(w));
 		widths.emplace_back(w, bw);
 		max_bitwidth = std::max(max_bitwidth, bw);
 	}
@@ -517,7 +535,9 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	for (size_t i = 0; i < max_bitwidth; ++i)
 		for (const auto& [w, bw] : widths)
 			if (i < bw) {
-				tref b = tau::trim(bit<node>(tau::get(tau::bf, w), (int_t)i));
+				TAU_TRY(auto bit_r, bit<node>(tau::get(tau::bf, w),
+					(int_t)i));
+				tref b = tau::trim(bit_r);
 				bit_ord.emplace(b, rank++);
 				bit_owner.emplace(b, w);
 				if (aux_images.contains(w)) aux_bits.insert(b);
@@ -562,7 +582,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	conjunct_bdds.reserve(conjuncts.size());
 	for (tref c : conjuncts) {
 		auto cbdd = build_wff_bdd<node>(c, bit_ord, slice_memo);
-		if (!cbdd) return result; // decline path: keep today's result
+		if (!cbdd) return r.with_value(result); // decline path: keep today's result
 		conjunct_bdds.push_back(*cbdd);
 	}
 	std::vector<subtree_set<node>> supports(conjuncts.size());
@@ -807,17 +827,17 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 			new_members.push_back(c);
 		}
 		size_t estimate = new_members_estimate(new_members);
-		if (estimate > NODE_BUDGET) return result;
+		if (estimate > NODE_BUDGET) return r.with_value(result);
 		running = tbdd::bdd_and_many(std::move(batch), bit_ord);
-		if (over_budget_after_fold(running, estimate)) return result;
+		if (over_budget_after_fold(running, estimate)) return r.with_value(result);
 		if (!elim_at[j].empty()) {
 			running = tbdd::bdd_ex(running, elim_at[j], bit_ord);
-			if (over_budget(running)) return result;
+			if (over_budget(running)) return r.with_value(result);
 		}
 		batch_start = j + 1;
 	}
 	std::unordered_map<typename tbdd::ref, tref> wff_memo;
-	return bdd_to_wff<node>(running, wff_memo);
+	return r.with_value(bdd_to_wff<node>(running, wff_memo));
 }
 
 /**
@@ -839,17 +859,24 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
  * // and @ref bvadd for the arithmetic this rewrites in practice.
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(tref term, trefs& vars, subtree_map<node, tref>& changes) {
+static result<std::pair<tref /* predicate */, tref /* transformed */>> atomic_blasting(tref term, trefs& vars, subtree_map<node, tref>& changes) {
 	using tau = tree<node>;
+	using ret_t = std::pair<tref, tref>;
 
 	tref predicate = nullptr;
-	bool error = false;
+	result<ret_t> r;
 	auto type_id = tau::get(term).get_ba_type();
+
+	// Traversal control only, set directly from each step's own outcome
+	// (merge_take's optional, or a local decline condition) -- never
+	// derived by reading r's report back. Same abort shape as HEAD; the
+	// report carries the reason, not the decision.
+	bool unresolved = false;
 
 	// The result variable of an operation must carry that operation's own BA
 	// type, not the atomic's. Under a width-changing cast the two differ:
@@ -879,13 +906,22 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 		return it != changes.end() ? tau::get(tau::bf, it->second) : c;
 	};
 
-	// Conjoin a new constraint into the accumulated predicate; a nullptr
-	// constraint (failed blasting) is an error.
-	auto conjoin = [&](tref current) {
-		if (!current) { error = true; return; }
+	// Conjoin a new constraint into the accumulated predicate. merge_take
+	// always folds the child's report into r, so a genuine nso_rr_apply
+	// failure travels out with it already explained; a value-less decline
+	// gets its own note here since the child left none.
+	auto conjoin = [&](result<tref> current) {
+		auto v = r.merge_take(std::move(current));
+		if (!v) { unresolved = true; return; } // failure: child's report already merged
+		if (!*v) {
+			r.warning("bv predicate blasting: an arithmetic sub-term "
+				"declined to blast");
+			unresolved = true;
+			return;
+		}
 		predicate = predicate
-			? build_wff_and<node>(predicate, current)
-			: current;
+			? build_wff_and<node>(predicate, *v)
+			: *v;
 	};
 
 	auto f = [&](tref t) {
@@ -923,7 +959,11 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			}
 			case tau::bf_shl: case tau::bf_shr: {
 				auto [shiftand_raw, count] = get_arguments<node>(t);
-				if (!count) { error = true; break; }
+				if (!count) {
+					r.warning("bv predicate blasting: shift amount is not "
+						"a bitvector constant, declining to blast");
+					unresolved = true; break;
+				}
 				auto shiftand = lookup(shiftand_raw);
 				auto shifted = tau::build_variable(result_type_of(t));
 				auto bf_shifted = tau::get(tau::bf, shifted);
@@ -936,7 +976,11 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			}
 			case tau::bf_mul: {
 				auto [factor_raw, constant] = get_bvmul_arguments<node>(t);
-				if (!constant) { error = true; break; }
+				if (!constant) {
+					r.warning("bv predicate blasting: bvmul has no "
+						"constant factor, declining to blast");
+					unresolved = true; break;
+				}
 				auto factor = lookup(factor_raw);
 				auto product = tau::build_variable(result_type_of(t));
 				auto bf_product = tau::get(tau::bf, product);
@@ -947,7 +991,11 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			}
 			case tau::bf_div: case tau::bf_mod: {
 				auto [dividend_raw, divisor] = get_arguments<node>(t);
-				if (!divisor) { error = true; break; }
+				if (!divisor) {
+					r.warning("bv predicate blasting: divisor/modulus is "
+						"not a bitvector constant, declining to blast");
+					unresolved = true; break;
+				}
 				auto dividend = lookup(dividend_raw);
 				auto result = tau::build_variable(result_type_of(t));
 				auto bf_result = tau::get(tau::bf, result);
@@ -966,12 +1014,17 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				// lookup needed.
 				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
-				auto src_width = get_bv_type_bitwidth<node>(src);
-				auto target_width = get_bv_type_bitwidth<node>(result);
+				// Each width is checked on its own: two independent
+				// failures must not compare equal and be read as a
+				// same-size cast (f returns bool, so no TAU_TRY here).
+				auto src_width = r.merge_take(get_bv_type_bitwidth<node>(src));
+				if (!src_width) { unresolved = true; break; }
+				auto target_width = r.merge_take(get_bv_type_bitwidth<node>(result));
+				if (!target_width) { unresolved = true; break; }
 				// Same-size cast: just substitute with the source.
 				// src is a bf node while t (bf_cast) sits under a bf
 				// wrapper, so strip the bf level to avoid bf { bf {..} }.
-				if (src_width == target_width) {
+				if (*src_width == *target_width) {
 					changes[t] = tau::trim(src);
 					break;
 				}
@@ -1001,16 +1054,18 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			}
 		}
 		// The visitor contract is: return true to continue the traversal,
-		// false to abort it (we only abort on error).
-		return !error;
+		// false to abort it (we only abort once a subterm is unresolved).
+		return !unresolved;
 	};
 
 	post_order<node>(term).search_unique(f);
-	// If we have an unsupported operation, we return nullptr to indicate failure
-	if (error) return { nullptr, nullptr };
+	// A null pair means this whole atomic could not be blasted; with_value
+	// drops it in favor of r's own error when unresolved traces back to a
+	// genuine nso_rr_apply failure rather than an ordinary decline.
+	if (unresolved) return r.with_value(ret_t{ nullptr, nullptr });
 	// We reconstruct the original bf and wrap it
 	auto modified = rewriter::replace<node>(term, changes);
-	return { predicate, modified };
+	return r.with_value(ret_t{ predicate, modified });
 }
 
 /**
@@ -1035,26 +1090,29 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
  * tref fm = get_nso_rr(
  *     "x + { 1 }:bv[4] = { 5 }:bv[4].").value().main->get();
  * tref atomic = tau::trim(tau::get(fm)[0].get());
- * tref res = keep_comparison_predicate<node_t>(atomic);
+ * tref res = keep_comparison_predicate<node_t>(atomic).value_or(nullptr);
  * CHECK( res != nullptr );
  * @endcode
  * @endinternal
  */
 template<NodeType node>
-static tref keep_comparison_predicate(tref atomic) {
+static result<tref> keep_comparison_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
 	trefs vars;
-	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
-	if (!blasted) return nullptr;
+	result<tref> r;
+	TAU_TRY(auto blasting, atomic_blasting<node>(atomic, vars, changes));
+	auto [predicate, blasted] = blasting;
+	if (!blasted) return r.with_value(nullptr);
 
 	// If the atomic contains no blastable arithmetic, predicate is null and
 	// the (unchanged) atomic itself is the result.
 	auto wff_blasted = tau::get(tau::wff, blasted);
-	return quantify_aux_vars<node>(vars, predicate
+	TAU_TRY(auto quantified, quantify_aux_vars<node>(vars, predicate
 		? tau::build_wff_and(predicate, wff_blasted)
-		: wff_blasted);
+		: wff_blasted));
+	return r.with_value(quantified);
 }
 
 /**
@@ -1071,12 +1129,12 @@ static tref keep_comparison_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:70-72).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref eq_predicate(tref atomic) {
+static result<tref> eq_predicate(tref atomic) {
 	return keep_comparison_predicate<node>(atomic);
 }
 
@@ -1092,12 +1150,12 @@ static tref eq_predicate(tref atomic) {
  * // Dispatched for "!=" atoms; x != x is never satisfiable (see
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:546-547).
  * tref fm = get_nso_rr("ex x x:bv[4] != x:bv[4].").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
-static tref neq_predicate(tref atomic) {
+static result<tref> neq_predicate(tref atomic) {
 	return keep_comparison_predicate<node>(atomic);
 }
 
@@ -1115,28 +1173,31 @@ static tref neq_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:316-317).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref lt_predicate(tref atomic) {
+static result<tref> lt_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
 	trefs vars;
+	result<tref> r;
 
-	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
-	if (!blasted) return nullptr;
+	TAU_TRY(auto blasting, atomic_blasting<node>(atomic, vars, changes));
+	auto [predicate, blasted] = blasting;
+	if (!blasted) return r.with_value(nullptr);
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto applied = bvlt<node>(left, right);
-	if (!applied) return nullptr;
+	TAU_TRY(auto applied, bvlt<node>(left, right));
+	if (!applied) return r.with_value(nullptr);
 
-	return quantify_aux_vars<node>(vars, predicate
+	TAU_TRY(auto quantified, quantify_aux_vars<node>(vars, predicate
 		? tau::build_wff_and(predicate, applied)
-		: applied);
+		: applied));
+	return r.with_value(quantified);
 }
 
 /**
@@ -1151,28 +1212,31 @@ static tref lt_predicate(tref atomic) {
  * // Dispatched for ">" atoms; x > x is never satisfiable (see
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
  * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
-static tref gt_predicate(tref atomic) {
+static result<tref> gt_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
 	trefs vars;
+	result<tref> r;
 
-	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
-	if (!blasted) return nullptr;
+	TAU_TRY(auto blasting, atomic_blasting<node>(atomic, vars, changes));
+	auto [predicate, blasted] = blasting;
+	if (!blasted) return r.with_value(nullptr);
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto applied = bvgt<node>(left, right);
-	if (!applied) return nullptr;
+	TAU_TRY(auto applied, bvgt<node>(left, right));
+	if (!applied) return r.with_value(nullptr);
 
-	return quantify_aux_vars<node>(vars, predicate
+	TAU_TRY(auto quantified, quantify_aux_vars<node>(vars, predicate
 		? tau::build_wff_and(predicate, applied)
-		: applied);
+		: applied));
+	return r.with_value(quantified);
 }
 
 /**
@@ -1188,16 +1252,18 @@ static tref gt_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:415-417).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x <= { 3 }:bv[2]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref lteq_predicate(tref atomic) {
+static result<tref> lteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	auto inner = gt_predicate<node>(atomic);
-	return inner ? tau::build_wff_neg(inner) : nullptr;
+	result<tref> r;
+	TAU_TRY(auto inner, gt_predicate<node>(atomic));
+	if (!inner) return r.with_value(nullptr);
+	return r.with_value(tau::build_wff_neg(inner));
 }
 
 /**
@@ -1212,16 +1278,18 @@ static tref lteq_predicate(tref atomic) {
  * // Dispatched for ">=" atoms: all x, x >= x (see
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:389-391).
  * tref fm = get_nso_rr("all x x:bv[4] >= x:bv[4].").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref gteq_predicate(tref atomic) {
+static result<tref> gteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	auto inner = lt_predicate<node>(atomic);
-	return inner ? tau::build_wff_neg(inner) : nullptr;
+	result<tref> r;
+	TAU_TRY(auto inner, lt_predicate<node>(atomic));
+	if (!inner) return r.with_value(nullptr);
+	return r.with_value(tau::build_wff_neg(inner));
 }
 
 /**
@@ -1237,16 +1305,18 @@ static tref gteq_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:850-851).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[4] && x !< { 2 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref nlt_predicate(tref atomic) {
+static result<tref> nlt_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	auto inner = lt_predicate<node>(atomic);
-	return inner ? tau::build_wff_neg(inner) : nullptr;
+	result<tref> r;
+	TAU_TRY(auto inner, lt_predicate<node>(atomic));
+	if (!inner) return r.with_value(nullptr);
+	return r.with_value(tau::build_wff_neg(inner));
 }
 
 /**
@@ -1263,16 +1333,18 @@ static tref nlt_predicate(tref atomic) {
  * // TEST_SUITE("bvngt"), "bvngt: 2 !> 2 is T (equal case)").
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[4] && x !> { 2 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref ngt_predicate(tref atomic) {
+static result<tref> ngt_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	auto inner = gt_predicate<node>(atomic);
-	return inner ? tau::build_wff_neg(inner) : nullptr;
+	result<tref> r;
+	TAU_TRY(auto inner, gt_predicate<node>(atomic));
+	if (!inner) return r.with_value(nullptr);
+	return r.with_value(tau::build_wff_neg(inner));
 }
 
 /**
@@ -1288,14 +1360,13 @@ static tref ngt_predicate(tref atomic) {
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:433-434).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[2] && x !<= { 1 }:bv[2]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref nlteq_predicate(tref atomic) {
-	auto applied = gt_predicate<node>(atomic);
-	return applied;
+static result<tref> nlteq_predicate(tref atomic) {
+	return gt_predicate<node>(atomic);
 }
 
 /**
@@ -1312,14 +1383,13 @@ static tref nlteq_predicate(tref atomic) {
  * // TEST_SUITE("bvngteq"), "bvngteq: 0 !>= 1 is T").
  * tref fm = get_nso_rr(
  *     "ex x (x = { 0 }:bv[4] && x !>= { 1 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-static tref ngteq_predicate(tref atomic) {
-	auto applied = lt_predicate<node>(atomic);
-	return applied;
+static result<tref> ngteq_predicate(tref atomic) {
+	return lt_predicate<node>(atomic);
 }
 
 /**
@@ -1337,7 +1407,7 @@ static tref ngteq_predicate(tref atomic) {
  * // internally; see @ref bv_predicate_blasting for a worked example.
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
- * tref blasted = wff_predicate_blasting<node_t>(fm);
+ * tref blasted = wff_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
@@ -1363,8 +1433,10 @@ static bool has_non_bv_operand(tref atomic) {
 	auto check = [&](tref n) {
 		if (!is<node, tau::variable>(n)) return true;
 		size_t t = tau::get(n).get_ba_type();
-		if (!is_bv_type_family<node>(t)
-			|| get_bv_type_bitwidth<node>(n) == 0)
+		if (!is_bv_type_family<node>(t)) return bad = true, false;
+		// Advisory drop: search_unique's bool contract carries no report
+		// channel; a widthless bv type disqualifies the operand either way.
+		if (auto bw = get_bv_type_bitwidth<node>(n); !bw.has_value())
 			return bad = true, false;
 		return true;
 	};
@@ -1373,11 +1445,17 @@ static bool has_non_bv_operand(tref atomic) {
 }
 
 template<NodeType node>
-static tref wff_predicate_blasting(tref term) {
+static result<tref> wff_predicate_blasting(tref term) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
-	bool error = false;
+	result<tref> r;
+
+	// All-or-nothing: bv reasoning still needs every bv atom, so ANY atom
+	// that cannot be blasted, decline or failure, stops the whole walk
+	// (same shape as HEAD). Traversal control only, set directly from each
+	// atom's own outcome below -- never derived by reading r's report back.
+	bool unresolved = false;
 
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
@@ -1400,15 +1478,30 @@ static tref wff_predicate_blasting(tref term) {
 				// Decline cleanly (no change to this atom) rather than
 				// hand a mixed-type atom to machinery that assumes every
 				// operand is bv-typed -- see has_non_bv_operand.
-				if (has_non_bv_operand<node>(atomic)) return t;
-				auto blasted = blaster(atomic);
-				if (!blasted) return error = true, t;
+				if (has_non_bv_operand<node>(atomic)) {
+					r.warning("bv predicate blasting: atom has a "
+						"non-bv-typed or unwidthed operand, declining");
+					unresolved = true;
+					return t;
+				}
+				// merge_take always folds the blaster's report into r, so
+				// a genuine nso_rr_apply failure travels out with it
+				// already explained; a value-less decline gets its own
+				// note here since the child left none.
+				auto v = r.merge_take(blaster(atomic));
+				if (!v) { unresolved = true; return t; } // failure: child's report already merged
+				if (!*v) {
+					r.warning("bv predicate blasting: atom declined to "
+						"blast");
+					unresolved = true;
+					return t;
+				}
 				// The atomic being replaced sits under a wff node and
 				// the blasters return wff-level trees, so strip the
 				// wff wrapper to avoid wff { wff { ... } } nestings
 				// that defeat hook-based simplification.
-				changes[t] = tau::trim(blasted);
-				return blasted;
+				changes[t] = tau::trim(*v);
+				return *v;
 		};
 
 		// The ordering relations (<, >, <=, >=, their negations, and the
@@ -1417,20 +1510,14 @@ static tref wff_predicate_blasting(tref term) {
 		// bvlt/bvgt/... in bv_predicate_blasting_comparisons.tmpl.h).
 		// Other BA types (qlt, sbf, tau, hsb, nlang, ...) reuse these
 		// same node kinds for their own orderings, already resolved by
-		// their own ba_wff_hooks specialization.
-		// Blasting a non-bv atom here misreads its operand's bitwidth as
-		// 0 (get_bv_type_bitwidth logs an error and returns 0), which
-		// then underflows bitwidth-1 into a huge index and corrupts
-		// downstream state. Only dispatch to the bv blasters when at
-		// least one operand actually carries a bv BA-type.
+		// their own ba_wff_hooks specialization. Only dispatch to the bv
+		// blasters when at least one operand actually carries a bv BA-type.
 		auto is_bv_operands = [&]() {
 			// HE-10: the ordering blasters read the bitwidth from the
 			// LEFT operand, so the left one must actually carry the
 			// bv type -- an OR-gate admitted left-untyped/right-bv
-			// atoms whose width read 0 and underflowed bitwidth-1
-			// (the exact corruption the comment above describes).
-			// Declining such a half-typed atom to rebuild_default is
-			// conservative; type unification stamps both sides on
+			// atoms. Declining such a half-typed atom to rebuild_default
+			// is conservative; type unification stamps both sides on
 			// every real path.
 			tref l = tau::get(t).child(0);
 			return is_bv_type_family<node>(tau::get(l).get_ba_type());
@@ -1493,10 +1580,17 @@ static tref wff_predicate_blasting(tref term) {
 				// blast each comparison separately and conjoin the results.
 				tref lo_le_mid = tau::get(tau::bf_lteq, lo, mid);
 				tref mid_le_hi = tau::get(tau::bf_lteq, mid, hi);
-				tref left  = lteq_predicate<node>(lo_le_mid);
-				tref right = lteq_predicate<node>(mid_le_hi);
-				if (!left || !right) { error = true; break; }
-				changes[t] = tau::trim(tau::build_wff_and(left, right));
+				auto left  = r.merge_take(lteq_predicate<node>(lo_le_mid));
+				auto right = r.merge_take(lteq_predicate<node>(mid_le_hi));
+				// Failure: child reports already merged above.
+				if (!left || !right) { unresolved = true; break; }
+				if (!*left || !*right) {
+					r.warning("bv predicate blasting: interval bound "
+						"declined to blast");
+					unresolved = true;
+					break;
+				}
+				changes[t] = tau::trim(tau::build_wff_and(*left, *right));
 				break;
 			}
 			default: {
@@ -1505,22 +1599,25 @@ static tref wff_predicate_blasting(tref term) {
 			}
 		}
 		// The visitor contract is: return true to continue the traversal,
-		// false to abort it (we only abort on error).
-		return !error;
+		// false to abort it (we only abort once an atom cannot be blasted).
+		return !unresolved;
 	};
 
 	post_order<node>(term).search_unique(f);
 
-	if (error) {
+	if (unresolved) {
 		DBG(LOG_DEBUG << "Failed to compute predicate blasting in: " << LOG_FM(term);)
-		return nullptr;
+		// with_value: dropped in favor of a merged error on genuine
+		// failure; otherwise this is an ordinary decline, and the
+		// untouched term (not nullptr) is the legitimate value.
+		return r.with_value(term);
 	}
 
 	// quantify_aux_vars already anti-prenexes each blasted atomic's own
 	// freshly-introduced auxiliary quantifiers (scoped locally, so a
 	// still-unresolved genuinely bv-typed quantifier elsewhere in `term`
 	// is left untouched); nothing further to do here.
-	return changes.find(term) != changes.end() ? changes[term] : term;
+	return r.with_value(changes.find(term) != changes.end() ? changes[term] : term);
 }
 
 /**
@@ -1530,12 +1627,13 @@ static tref wff_predicate_blasting(tref term) {
  *
  * @tparam node Node type
  * @param term The formula to blast
- * @return The formula with predicates blasted, or nullptr on error
+ * @return The formula with predicates blasted, or @p term unchanged (still
+ *         a value, all-or-nothing) when some atom could not be blasted;
+ *         no value at all when a genuine internal failure occurred.
  */
 template<NodeType node>
-inline tref bv_predicate_blasting(tref term) {
-	auto ret = wff_predicate_blasting<node>(term);
-	return ret;
+inline result<tref> bv_predicate_blasting(tref term) {
+	return wff_predicate_blasting<node>(term);
 }
 
 } // namespace idni::tau_lang

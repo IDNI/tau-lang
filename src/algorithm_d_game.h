@@ -145,17 +145,17 @@ static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
 //
 // The evaluator above answers "does this label hold under this assignment".
 // Consumers that must EMIT code for a label (tau_codegen) or reason about it
-// symbolically (the ABA oracle) need its cubes instead, and both used to
-// hand-lex it — identically wrongly.  The digit loop
+// symbolically (the ABA oracle) need its cubes instead, and both must call
+// `to_dnf` rather than hand-lex the label.  The digit loop
 // `for (char c : idx_str) if (isdigit(c)) idx = idx*10+(c-'0')` SKIPS '|', '('
-// and ')' instead of rejecting them, so `0|1` was read as the single literal
-// `1` (wrong AP, other disjunct lost) and `(0|1)` was dropped entirely,
-// silently widening the guard to `true`.  Spot prints strategy edge labels as
+// and ')' instead of rejecting them, so it reads `0|1` as the single literal
+// `1` (wrong AP, other disjunct lost) and drops `(0|1)` entirely, which
+// silently widens the guard to `true`.  Spot prints strategy edge labels as
 // sums of products, so those shapes are the normal case, not a corner (LG-4).
 //
 // `to_dnf` returns nullopt when the label does not parse or the expansion
 // exceeds `max_cubes`.  Callers must REFUSE the edge in that case: falling
-// back to a partial reading is exactly the defect this replaces.
+// back to a partial reading silently widens the guard to `true`.
 
 /// @brief One literal of a guard cube: AP index and polarity.
 struct lit { int ap; bool pos; };
@@ -580,17 +580,16 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
  * @brief Run ltlsynt on `phi_prop` and parse `--print-game-hoa` into a
  * synth_game.
  *
- * DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
- * `write_tempfile` + `spawn_capture`, which live in that header and are
- * included after this one; the callers below need only this declaration.
- * Not spelled inline here: a unit that includes this header without the
- * definition (the qlt plugin's own) would declare an inline function it
- * never defines, which gcc rejects; the definition is inline and is
- * emitted by every unit that includes it.
+ * DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs the Spot
+ * backend (backends/spot/spot.h), included after this one; the callers
+ * below need only this declaration. Not spelled inline here: a unit that
+ * includes this header without the definition (the qlt plugin's own) would
+ * declare an inline function it never defines, which gcc rejects; the
+ * definition is inline and is emitted by every unit that includes it.
  *
- * An error result means the subprocess produced no verdict (see
- * classify_spot_exit); the caller merges it into its own result rather
- * than reading it as an empty, definitively unrealizable game.
+ * An error result means the subprocess produced no verdict; the caller
+ * merges it into its own result rather than reading it as an empty,
+ * definitively unrealizable game.
  * @param phi_prop Propositional LTL formula in Spot syntax.
  * @param ins Input proposition names.
  * @param outs Output proposition names.
@@ -778,14 +777,11 @@ inline product_game build_product_game(
 			feasible[pm][py][type_A[t]] = true;
 	}
 
-	// §14 / Batch O7: precise environment edges.  An env edge used to be
-	// added whenever its guard was satisfiable by ANY propositional
-	// assignment — no feasibility filter — so the product game let the
-	// environment "move" into states the real environment cannot reach
-	// (the guard's D-content is data, and data feasibility from ρ is the
-	// same fact regardless of which player owns the state).  Those phantom
-	// moves are why textbook dead-end semantics used to flip ALG-D-28 and
-	// why the opponent attractor was refused in zielonka_win_player1.
+	// Batch O7: precise environment edges.  An env edge exists only when its
+	// guard's D-pattern is feasible from ρ, not merely when the guard is
+	// satisfiable by any propositional assignment (the guard's D-content is
+	// data, and data feasibility from ρ is the same fact regardless of which
+	// player owns the state).
 	// Filter: an env edge from (q, ρ) exists iff its guard admits an
 	// assignment whose D-pattern is feasible from ρ to SOME ρ' (the memory
 	// still updates on sys moves only, so the env target keeps ρ).
@@ -837,7 +833,7 @@ inline product_game build_product_game(
 					// satisfying assignment instead of
 					// re-testing the key 2^n_aps times.
 					if (G.player[q] != 1) {
-						// §14: same feasibility filter as
+						// Same feasibility filter as
 						// the transition site below.
 						if (!env_edge_reachable(rho,
 							guard)) continue;
@@ -944,12 +940,12 @@ inline product_game build_product_game(
 			} else {
 				// Env (player 0): rho unchanged (memory updates on
 				// sys moves).  Env observes (but does not control)
-				// output APs; §14 filters its edges by the same T3
-				// feasibility the sys edges use, since a guard's
-				// data content is player-independent.
+				// output APs, and its edges are filtered by the
+				// same T3 feasibility the sys edges use, since a
+				// guard's data content is player-independent.
 				for (int j = 0; j < (int)G.trans[q].size(); ++j) {
 					const auto& [guard, nq, ec] = G.trans[q][j];
-					// §14: only edges whose D-content is
+					// Only edges whose D-content is
 					// feasible from rho exist for the real
 					// environment.
 					if (!env_edge_reachable(rho, guard))
@@ -1104,7 +1100,7 @@ static std::pair<StateSet,StateSet> solve(
 /**
  * @brief Returns the set of states where player 1 (sys) wins.
  *
- * LG-32 / AL-R1 / §14 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
+ * LG-32 / AL-R1 (Batch O7): TEXTBOOK dead-end semantics.  Parity-game
  * semantics say the player who cannot move LOSES the finite play, while
  * `solve` scores every state by its priority's parity — so dead ends are
  * decided here, BEFORE the parity recursion, the standard way:
@@ -1121,14 +1117,6 @@ static std::pair<StateSet,StateSet> solve(
  * least one in-subgame successor by the same rules, so `solve`'s internal
  * restriction to V creates no fresh dead ends.
  *
- * History: this replaces the prune-own-suicidal-edges + one-shot-override
- * patch, which deliberately REFUSED the opponent attractor because
- * `build_product_game`'s environment edges were over-approximated (any
- * satisfiable guard, no data feasibility) — a phantom env move could then
- * "force" sys into a dead end no real environment can reach, flipping the
- * realizable ALG-D-28.  §14 made the env edges precise (the same T3
- * feasibility filter the sys edges use), so the refusal's reason is gone
- * and the textbook rule is exactly right.
  * @param pg Product game to solve.
  * @return Indices of the product states won by player 1.
  */
@@ -1221,9 +1209,8 @@ inline std::set<int> zielonka_win_player1(const product_game& pg) {
  * @param type_A D_pattern bitmask for each T3 type.
  * @param K number of D propositions.
  * @param init_rho the fixed initial memory type -- pass
- *   initial_memory(constants) (LG-12: the exists-rho_0 loop this replaces
- *   let the system win by asserting a phantom previous output; see the
- *   convention block at initial_memory).
+ *   initial_memory(constants), which returns the fixed t = 0 memory type
+ *   (LG-12: see the convention block at initial_memory).
  * @return `true` iff player 1 wins from (G.init, init_rho); `false` for an
  * empty formula, an empty T_1 or an empty game; an error result when
  * ltlsynt gave no verdict.
@@ -1251,8 +1238,8 @@ inline result<bool> solve_algorithm_d(
 	// construction (too many APs), not an UNREALIZABLE verdict.
 	product_game pg = build_product_game(G, T1_size, T3, type_A, K, init_rho);
 	if (pg.n_states == 0) {
-		return r.with_error(code::solver_error, "Algorithm D: the "
-			"product game could not be built; no verdict");
+		return r.with_error(code::solver_error,
+			messages::algorithm_d_no_verdict);
 	}
 
 	// Solve parity game with Zielonka
@@ -1322,8 +1309,8 @@ inline result<alg_d_result> solve_algorithm_d_full(
 	result.product_game = build_product_game(
 		result.synth_game, T1_size, T3, type_A, K, init_rho);
 	if (result.product_game.n_states == 0) {
-		return r.with_error(code::solver_error, "Algorithm D: the "
-			"product game could not be built; no verdict");
+		return r.with_error(code::solver_error,
+			messages::algorithm_d_no_verdict);
 	}
 
 	result.winning_region = zielonka_win_player1(result.product_game);

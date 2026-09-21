@@ -1,7 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+// This module binds the public api (src/api.h) and nothing else. Every entry
+// point forwards to an api<node> method. If the api does not cover a
+// capability, add it to the api first, and then bind it here.
+
 #include <nanobind/nanobind.h>
-#include <stdexcept>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/map.h>
@@ -125,6 +128,10 @@ bool leak_warnings() {
 }
 
 NB_MODULE(tau, m) {
+	m.doc() = "Python bindings for the Tau public api (src/api.h). "
+		"The module binds api methods only. Add a missing "
+		"capability to the api first, and then bind it here.";
+
 	nb::set_leak_warnings(leak_warnings());
 
 	// The CLI's --color, for embedders. report fields are always plain
@@ -230,7 +237,7 @@ NB_MODULE(tau, m) {
 		.def_ro("edges", &HoaAutomaton::edges)
 		.def_ro("state_accepting", &HoaAutomaton::state_accepting);
 
-	// Operator-preference types (plan v10 §6 row A1).
+	// Operator-preference types.
 	using PreferenceEntry = idni::tau_lang::preference_entry;
 	using PreferenceOrder = idni::tau_lang::preference_order;
 	nb::class_<PreferenceEntry>(m, "PreferenceEntry")
@@ -266,7 +273,7 @@ NB_MODULE(tau, m) {
 		return out;
 	};
 
-	// Interpreter — base bindings + the 11 new methods (plan v10 §14).
+	// Interpreter bindings.
 	nb::class_<interpreter_t>(m, "interpreter")
 		.def(nb::init<interpreter_t&&>())
 		.def_ro("time_point", &interpreter_t::time_point)
@@ -279,17 +286,24 @@ NB_MODULE(tau, m) {
 		"Follows every applied update; not the `u` stream, which "
 		"carries the incoming revision rather than the merged result.")
 
-		// ── Inspection (plan §14) ────────────────────────────────────
+		// ── Inspection ──────────────────────────────────────────────
 		.def("reset", &interpreter_t::reset,
 			"Reset the interpreter to time t=0 (preserving spec / streams / cached_solution).")
-		.def("current_state", &interpreter_t::current_state,
-			"Opaque Mealy-state index (0 if no Mealy strategy).")
-		.def("accumulator_state", &interpreter_t::accumulator_state,
+		.def("current_state",
+			[](const interpreter_t& i) {
+				return to_py_result(i.current_state());
+			},
+			"Opaque Mealy-state index (0 if no Mealy strategy). "
+			"Returns a result carrying the value and the report.")
+		.def("accumulator_state",
+			[](const interpreter_t& i, const std::string& name) {
+				return to_py_result(i.accumulator_state(name));
+			},
 			"name"_a,
 			"Read-only observability of a Def 5.7 accumulator by name.")
 		.def("committed_approval_hash",
 			[](const interpreter_t& i) {
-				return i.committed_approval_hash;
+				return tau_api::approval_hash(i);
 			},
 			"Operator-approval hash recorded by commit_realiser (empty if no commit).")
 
@@ -306,55 +320,28 @@ NB_MODULE(tau, m) {
 			"approval_hash"_a,
 			"Record an operator-approval hash on the interpreter (Approach A3).")
 
-		// ── declare_open: oracle-resolved output streams ──────────────
-		.def("declare_open",
-			[](interpreter_t& i, const std::string& stream_name,
-			   nb::callable py_handler) {
-				i.declare_open(stream_name,
-					[py_handler](const std::string& formula) {
-						nb::gil_scoped_acquire gil;
-						nb::object result = py_handler(formula);
-						return nb::cast<std::string>(result);
-					});
-			},
-			"stream_name"_a, "handler"_a,
-			"Declare an output stream as oracle-resolved. "
-			"the registered handler receives a tau "
-			"data formula F characterising admissible values, returns a "
-			"satisfying assignment as a string. v1: registration only; "
-			"engine-side dispatch in step() is a follow-up.")
-		.def("undeclare_open", &interpreter_t::undeclare_open,
-			"stream_name"_a,
-			"Remove a prior declare_open registration.")
-		.def("open_streams", &interpreter_t::open_streams,
-			"List currently-declared open streams (declaration order).")
-
 		// ── PWR / runtime methods ────────────────────────────────────
 		.def("can_extend",
 			[](interpreter_t& i, const std::string& psi_str) {
-				auto psi = tau_api::get_formula(psi_str);
-				// A parse failure is not "cannot extend": raise, the
-				// way every other error path of this module does.
-				if (!psi.has_value())
-					throw std::invalid_argument(
-						"can_extend: `" + psi_str
-						+ "` is not a formula: "
-						+ make_py_report(psi.report()).text);
-				return i.can_extend(psi.value());
+				return to_py_result(tau_api::can_extend(i, psi_str));
 			}, "psi"_a,
 			"Per-revision realisability pre-check via syntactic PWR. "
-			"Raises ValueError when `psi` does not parse.")
+			"Returns a result carrying the verdict and the report.")
 		.def("admissible_outputs",
 			[assignment_to_dict](interpreter_t& i,
 			                     size_t max_results)
-			-> std::vector<std::map<std::string, std::string>>
 			{
-				auto results = i.admissible_outputs(max_results);
-				std::vector<std::map<std::string, std::string>> out;
-				out.reserve(results.size());
-				for (const auto& asgn : results)
-					out.push_back(assignment_to_dict(i, asgn));
-				return out;
+				auto r = tau_api::admissible_outputs(i, max_results)
+					.transform([&assignment_to_dict, &i](
+						std::vector<idni::tau_lang::assignment<node_t>>&& outputs)
+					{
+						std::vector<std::map<std::string, std::string>> out;
+						out.reserve(outputs.size());
+						for (const auto& asgn : outputs)
+							out.push_back(assignment_to_dict(i, asgn));
+						return out;
+					});
+				return to_py_result(std::move(r));
 			}, "max_results"_a = 1024,
 			"Enumerate output assignments admissible at the current step (non-advancing).")
 
@@ -362,63 +349,41 @@ NB_MODULE(tau, m) {
 		// fires between turns (via the user's call cadence), never mid-token.
 		.def("update",
 			[](interpreter_t& i, const std::string& psi_str) {
-				auto psi = tau_api::get_formula(psi_str);
-				if (!psi.has_value())
-					throw std::invalid_argument(
-						"update: `" + psi_str
-						+ "` is not a formula: "
-						+ make_py_report(psi.report()).text);
-				// interpreter::update reports a rejected revision (an
-				// unsat or ill-typed result) as false; pass that on
-				// instead of the unconditional True this used to return.
-				return i.update(psi.value());
+				// The interpreter's own verdict travels through: a
+				// rejected (unsat or ill-typed) revision reads False.
+				return to_py_result(tau_api::update(i, psi_str));
 			}, "psi"_a,
 			"Apply pointwise revision: merge the running spec with `psi`. "
-			"Returns False when the revision was rejected (the running "
-			"spec is left unchanged); raises ValueError when `psi` does "
-			"not parse.");
+			"Returns a result carrying the interpreter's verdict and "
+			"the report; the value is False when the revision was "
+			"rejected and the running spec is left unchanged.");
 
 	// REAL oracle — check realisability of a spec or LTL formula.
 	m.def("is_realizable",
-		[](const std::string& spec_str) -> bool {
-			auto spec = tau_api::get_spec(spec_str);
-			if (!spec.has_value()) {
-				// Try formula parse as fallback (LTL-only inputs).
-				spec = tau_api::get_formula(spec_str);
-				if (!spec.has_value())
-					throw std::invalid_argument(
-						"is_realizable: `" + spec_str
-						+ "` is neither a spec nor a formula: "
-						+ make_py_report(spec.report()).text);
-			}
+		[](const std::string& spec_str) {
+			idni::tau_lang::result<bool> r;
+			auto fm = r.merge_take(tau_api::get_spec(spec_str));
 			// A backend failure (ltlsynt missing or timed out, an
-			// undecidable shape) is not UNREALIZABLE: raise instead of
-			// returning False.
-			auto r = tau_api::realizable(spec.value());
-			if (!r.has_value())
-				throw std::runtime_error(
-					"is_realizable: no verdict: "
-					+ make_py_report(r.report()).text);
-			return r.value();
+			// undecidable shape) is not UNREALIZABLE: the result stays
+			// valueless instead of degrading to False.
+			if (fm) {
+				auto verdict = r.merge_take(tau_api::realizable(*fm));
+				if (verdict) r = *verdict;
+			}
+			return to_py_result(std::move(r));
 		}, "spec"_a,
 		"Check realisability of a tau spec / LTL formula (REAL oracle). "
-		"Raises ValueError when the input does not parse and "
-		"RuntimeError when the backend gives no verdict.");
+		"Returns a result carrying the verdict and the report; the "
+		"result has no value when the input does not parse or the "
+		"backend gives no verdict.");
 
-	// Free function: apply_preferences (plan v10 §6 row A1).
+	// Free function: apply_preferences.
 	m.def("apply_preferences",
-		[](const std::string& spec_str, const PreferenceOrder& po)
-		-> std::string
-		{
-			using tau_t = idni::tau_lang::tree<node_t>;
-			auto spec = tau_api::get_spec(spec_str);
-			if (!spec.has_value()) return "";
-			idni::tref strengthened = idni::tau_lang::apply_preferences<
-				node_t>(spec.value(), po);
-			if (strengthened == nullptr) return "";
-			return tau_t::get(strengthened).to_str();
+		[](const std::string& spec_str, const PreferenceOrder& po) {
+			return to_py_result(tau_api::apply_preferences(spec_str, po));
 		}, "spec"_a, "po"_a,
-		"Strengthen a spec with operator preferences (lex-priority).");
+		"Strengthen a spec with operator preferences (lex-priority). "
+		"Returns a result carrying the strengthened spec and the report.");
 
 	// Diagnostics
 	nb::class_<py_report>(m, "report",
@@ -469,13 +434,15 @@ NB_MODULE(tau, m) {
 		[](const std::string& spec, interpreter_options& opts) {
 			return to_py_result(tau_api::get_interpreter(spec, opts));
 		}, "specification"_a, "options"_a,
-		"Create an interpreter from a specification string with options.");
+		"Create an interpreter from a specification string with "
+		"options. Returns a result carrying the value and report.");
 
 	m.def("get_inputs_for_step",
 		[](interpreter_t& i) {
-			return tau_api::get_inputs_for_step(i);
+			return to_py_result(tau_api::get_inputs_for_step(i));
 		}, "interpreter"_a,
-		"Get the inputs needed for the next step.");
+		"Get the inputs needed for the next step. "
+		"Returns a result carrying the value and report.");
 
 	m.def("step",
 		[](interpreter_t& i,
@@ -483,35 +450,14 @@ NB_MODULE(tau, m) {
 		{
 			return to_py_result(tau_api::step(i, inputs));
 		}, "interpreter"_a, "inputs"_a,
-		"Step the interpreter with given inputs.");
+		"Step the interpreter with given inputs. "
+		"Returns a result carrying the value and report.");
 
 	m.def("step",
 		[](interpreter_t& i) {
 			return to_py_result(tau_api::step(i));
 		}, "interpreter"_a,
-		"Step the interpreter without inputs (uses remapped streams).");
+		"Step the interpreter without inputs (uses remapped streams). "
+		"Returns a result carrying the value and report.");
 
-	// step + optional PWR (plan v10 §14 step(inputs, optional<formula> u)).
-	// Returns the step's output map; PWR fires AFTER the step (F6-compliant:
-	// between turns, never mid-token).
-	m.def("step_with_pwr",
-		[](interpreter_t& i,
-		   const std::map<stream_at, std::string>& inputs,
-		   const std::optional<std::string>& u_str)
-		{
-			// parsed before the step, so a bad revision takes no step
-			std::optional<idni::tref> u;
-			if (u_str.has_value() && !u_str->empty()) {
-				auto parsed = tau_api::get_formula(*u_str);
-				if (!parsed.has_value())
-					throw std::invalid_argument(
-						"could not parse the revision: " + *u_str);
-				u = parsed.value();
-			}
-			auto result = to_py_result(tau_api::step(i, inputs));
-			if (u) i.update(*u);
-			return result;
-		}, "interpreter"_a, "inputs"_a, "u"_a = std::nullopt,
-		"Step then (if `u` is provided) apply PWR with revision `u`; "
-		"raises ValueError when `u` does not parse.");
 }

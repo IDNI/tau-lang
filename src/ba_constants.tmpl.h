@@ -33,9 +33,9 @@ template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	// BA2-5: after cleanup() the C/T pools are out of sync by design
 	// (atexit ordering); interning then would alias fresh constants
-	// with stale trees. Fail loudly instead.
-	if (poisoned) throw std::logic_error(
-		"ba_constants::get called after cleanup()");
+	// with stale trees. Poisoning is a programming error, not a reportable
+	// input failure, so it is caught by the debug assert only.
+	DBG(assert(!poisoned && "ba_constants::get called after cleanup()");)
 	// No tracing here: this runs for every constant the bv evaluation
 	// hooks fold during a step, and the pool lookup is index-backed.
 	auto p = std::make_pair(constant, type_id);
@@ -56,16 +56,17 @@ tref ba_constants<node>::get(const constant& constant, tref type_tree) {
 }
 
 template <NodeType node>
-typename ba_constants<node>::constant ba_constants<node>::get(
+result<typename ba_constants<node>::constant> ba_constants<node>::get(
 	size_t constant_id)
 {
-	// constant_id == 0 underflows to SIZE_MAX below; the DBG-only asserts
-	// caught both that and an out-of-range id in debug, but release had
-	// no check at all -- an unchecked, likely huge, out-of-bounds access.
-	if (constant_id == 0 || constant_id > C().size())
-		throw std::logic_error("ba_constants::get: invalid constant_id "
-			+ std::to_string(constant_id));
-	return C()[constant_id - 1].first;
+	// constant_id == 0 underflows to SIZE_MAX below, so validate it here.
+	if (constant_id == 0 || constant_id > C().size()) {
+		result<constant> r;
+		return r.with_assert_check_error(code::out_of_range,
+			"the Boolean-algebra constant id is invalid",
+			{{label::actual, constant_id}, {label::limit, C().size()}});
+	}
+	return result<constant>{C()[constant_id - 1].first};
 }
 
 template <NodeType node>

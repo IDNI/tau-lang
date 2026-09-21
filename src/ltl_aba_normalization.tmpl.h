@@ -409,9 +409,11 @@ static bool aba_existential_feasible(tref fm) {
 				static bool warned = false;
 				if (!warned) {
 					warned = true;
+					auto nm = get_ba_type_name<node>(
+						tree<node>::get(v).get_ba_type());
+					// Advisory drop: LOG_WARNING stream chain contract cannot abort the line.
 					TAU_LOG_WARNING << "[ltl_aba] a "
-						<< get_ba_type_name<node>(
-							tree<node>::get(v).get_ba_type())
+						<< (nm.has_value() ? nm.value() : std::string("INVALID"))
 						<< " output atom is taken as feasible: the "
 						"algebra declares its outputs always "
 						"satisfiable, so the emptiness of its "
@@ -822,7 +824,7 @@ static bool guard_is_aba_feasible(
 			covered = !aba_existential_feasible<node>(uncovered);
 		}
 		if (!covered && !single_type) {
-			// §13 / Batch O8: exact coverage for MIXED-type guards.
+			// Batch O8: exact coverage for MIXED-type guards.
 			// The single-type semantic check above cannot run (one
 			// existential query cannot span independent BA types),
 			// so the syntactic subset test used to be the last
@@ -1724,7 +1726,7 @@ static void add_consistency_constraints(
 // formula_time_point's lookback-shifted one (table_step_provider::produce
 // grounds it accordingly).
 template <NodeType node>
-static std::string apply_step_counter_encoding(
+static result<std::string> apply_step_counter_encoding(
     const std::vector<tref>& hoist_conjuncts,
     std::vector<std::pair<tref, std::string>>& atoms,
     std::vector<std::string>& input_props,
@@ -1733,8 +1735,9 @@ static std::string apply_step_counter_encoding(
     std::set<std::string>& counter_relativized_props)
 {
 	using tau = tree<node>;
+	result<std::string> r;
 
-	if (hoist_conjuncts.empty()) return "";
+	if (hoist_conjuncts.empty()) return r.with_value("");
 
 	// Per-conjunct k_max (its own maximum position), and the global maximum
 	// across every hoisted conjunct, which sizes the counter.
@@ -1821,7 +1824,10 @@ static std::string apply_step_counter_encoding(
 		}
 		typename tau::get_options opts;
 		opts.parse.start = tau::wff;
-		tref rel = tau::get(txt, std::move(opts));
+		// Feeds a tref back to its caller's own assert, so its signature
+		// stays fixed; it merges the parse call's report into the
+		// enclosing r instead.
+		tref rel = r.merge_take(tau::get(txt, std::move(opts))).value_or(nullptr);
 		if (!rel) return rel;
 		// A bare wff parse leaves io_vars unclassified (transform_io_var
 		// later rejects that); resolve them here by name-prefix
@@ -1955,7 +1961,7 @@ static std::string apply_step_counter_encoding(
 		extra += " & G((" + minterm(km) + ") -> " + build_guard_skel(C) + ")";
 	}
 
-	return extra;
+	return r.with_value(std::move(extra));
 }
 
 // ── Internal: solve LTL(ABA) problem ─────────────────────────────────────────
@@ -2211,28 +2217,29 @@ static bool has_since_trigger(tref fm) {
 
 // Build   name[t+shift]:<carrier> = {value}   (shift ≤ 0: -1 → t-1, 0 → t).
 template <NodeType node>
-static tref build_carrier_eq_aux(const std::string& name, int shift, int value) {
+static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int value) {
 	using tau = tree<node>;
+	result<tref> r;
 	assert(shift <= 0 && "build_carrier_eq_aux: shift must be <= 0 (past or current)");
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
 	// The Boolean carrier's type, spelled in full — a bare name without its
 	// parameter is rejected by the grammar. IN-M4: ONE width source — this
 	// is the same carrier type seed_aux_lookback_bits builds its seed
 	// values in, so the two never desynchronise.
-	std::string type_str = get_ba_type_name<node>(
-		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
+	TAU_TRY(std::string type_str, get_ba_type_name<node>(
+		get_ba_type_id<node>(pack_bool_carrier_type<node>())));
 	std::string expr = name + "[" + t_str + "]" + type_str + " = { "
 	                 + std::to_string(value) + " }";
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;
-	tref fm = tau::get(expr, std::move(opts));
+	TAU_TRY(tref fm, tau::get(expr, std::move(opts)));
 	// A bare wff parse never sets
 	// the io_var input/output bit (that happens during spec parsing), leaving
 	// these aux variables classified as neither, which transform_io_var and
 	// existentially_quantify_output_streams both reject. Resolve them the way
 	// get_nso_rr resolves a bare formula -- the "o" prefix marks them outputs.
-	return resolve_io_vars<node>(
-		*definitions<node>::instance().get_io_context(), fm);
+	return r.with_value(resolve_io_vars<node>(
+		*definitions<node>::instance().get_io_context(), fm));
 }
 
 // Recursively rewrite all wff_since / wff_trigger nodes.
@@ -2350,8 +2357,11 @@ static tref compile_since_trigger_rec(
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
 
 		// Atoms: aux[t]=1  and  aux[t-1]=1
-		tref curr = build_carrier_eq_aux<node>(aux_name, 0,  1);
-		tref prev = build_carrier_eq_aux<node>(aux_name, -1, 1);
+		// build_carrier_eq_aux's report cannot travel further: this
+		// function feeds ltl_to_safety_formula_full, called from
+		// interpreter.tmpl.h, outside this pass's edit boundary.
+		tref curr = build_carrier_eq_aux<node>(aux_name, 0,  1).value_or(nullptr);
+		tref prev = build_carrier_eq_aux<node>(aux_name, -1, 1).value_or(nullptr);
 
 		// Tracking relation: G(curr ↔ (ψ ∨ (φ ∧ prev))).  It is pushed into
 		// `safety_invs` below (in one of two forms, depending on the spine

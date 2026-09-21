@@ -3,10 +3,11 @@
  * @brief Runtime parameters selecting WHETHER and WHERE a BA's preprocessing
  * pass may run, and what to do with a preprocessed result.
  *
- * Preprocessing is a pack-level *policy*: `pack_preprocess` is an optional
- * capability any BA may declare (today only bv does, as predicate blasting),
- * and core decides whether to invoke it, where, and how to fold its result
- * back in -- without knowing which algebra, if any, actually implements it.
+ * Preprocessing is a pack-level *policy*: `pack_preprocess` chains every BA's
+ * `preprocess` in pack order (today only bv rewrites anything, as predicate
+ * blasting; the rest return their input unchanged), and core decides whether
+ * to invoke it, where, and how to fold its result back in -- without knowing
+ * which algebra, if any, actually rewrites the formula.
  * That is why these three knobs live here, in core, rather than beside
  * `bv_predicate_blasting` where the pass itself lives: a pack without bv
  * still needs somewhere to keep "preprocessing is off" and its placement

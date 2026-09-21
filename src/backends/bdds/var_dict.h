@@ -6,6 +6,7 @@
 #include <string>
 
 #include "defs.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -18,8 +19,9 @@ using sym_t = int_t;
 sym_t var_dict(const char*);
 sym_t var_dict(const std::string&);
 // Name of symbol n; when n is one past the last known symbol, a fresh
-// unique name of the form "x<k>" is generated and registered
-std::string var_dict(sym_t);
+// unique name of the form "x<k>" is generated and registered. Checked:
+// an id past `v.size()` is an out-of-range report, not an OOB read.
+result<std::string> var_dict(sym_t);
 
 } // namespace idni::tau_lang
 

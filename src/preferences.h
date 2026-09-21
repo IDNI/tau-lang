@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 //
-// Operator-preference strengthening for spec synthesis (plan v10 §6 row A1
-// "Preference canonicalisation"; claude-code-addendum.tex §5).
+// Operator-preference strengthening for spec synthesis.
 //
 // Given a spec Φ and an ordered list of preferences over output variables,
 // produce a strengthened spec Φ_pref = Φ ∧ tie_breakers(≼).

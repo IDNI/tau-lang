@@ -32,6 +32,11 @@
 
 namespace idni::tau_lang {
 
+/// Operator-preference strengthening order for `api::apply_preferences`.
+/// Full definition in preferences.h, included by callers that build one;
+/// only a reference to it crosses the api boundary here.
+struct preference_order;
+
 /**
  * @brief Identifies a named I/O stream at a specific discrete time point.
  */
@@ -274,7 +279,7 @@ struct api {
 	 */
 	static void set_cache_bound(size_t n);
 	/**
-	 * @brief Cap the ABA oracle's mixed-type coverage expansion (§13);
+	 * @brief Cap the ABA oracle's mixed-type coverage expansion;
 	 * beyond it the weaker syntactic verdict stands, logged. Default
 	 * 256; 0 = unlimited.
 	 */
@@ -772,9 +777,12 @@ struct api {
 		interpreter_options& options);
 
 	/// Query which input streams the interpreter needs for its next step.
-	/// Returns a vector of (stream_name, time_point) pairs that must be
-	/// provided to the step() call.
-	static std::vector<stream_at> get_inputs_for_step(interpreter<node>& i);
+	/// @return A vector of (stream_name, time_point) pairs that must be
+	///         provided to the step() call, or a structured error
+	///         (code::internal_error) if the interpreter's initial spec
+	///         never calculated.
+	static result<std::vector<stream_at>> get_inputs_for_step(
+		interpreter<node>& i);
 
 	/// Advance the interpreter by one time step with explicit inputs.
 	/// Parses each input value string into the appropriate BA constant,
@@ -824,6 +832,40 @@ struct api {
 	/// @return false (with a structured error) if a step's output failed
 	///   to write; true otherwise.
 	static result<bool> run(interpreter<node>& i, bool quit_on_idle = false);
+
+	/// Per-revision realisability pre-check: would merging `psi` with
+	/// @p i's running spec keep it realisable?  Dry-runs the same planner
+	/// `update` commits, without mutating @p i.
+	/// @return The verdict, or a structured error if `psi` fails to parse
+	///         or the check hits a broken invariant.
+	static result<bool> can_extend(interpreter<node>& i,
+		const std::string& psi);
+
+	/// Apply a pointwise revision to @p i's running specification.
+	/// @return The verdict: true iff the revision was accepted and
+	///         committed; false leaves @p i exactly as it was. The report
+	///         carries the rejection reason, or a parse error for `psi`.
+	static result<bool> update(interpreter<node>& i, const std::string& psi);
+
+	/// Enumerate output assignments admissible at @p i's current step
+	/// without advancing time.
+	/// @param max_results  Upper bound on the number of enumerated
+	///                     assignments.
+	static result<std::vector<assignment<node>>> admissible_outputs(
+		interpreter<node>& i, size_t max_results = 1024);
+
+	/// The operator-approval hash @p i last committed via
+	/// `interpreter::commit_realiser` (empty if none was ever committed).
+	/// Cannot fail, so this returns the value plainly.
+	static std::string approval_hash(const interpreter<node>& i);
+
+	/// Strengthen a spec with operator preferences (lex-priority; see
+	/// preferences.h). Parses @p spec, then applies the ordered
+	/// preferences, dropping any that would make the spec unrealisable.
+	/// @return The strengthened spec, serialized, or a structured error
+	///         if @p spec fails to parse.
+	static result<std::string> apply_preferences(const std::string& spec,
+		const preference_order& po);
 
 	/// Run BA type inference on an expression.  Infers types, canonizes
 	/// quantifier IDs, unnests G-in-G, and checks for semantic errors.

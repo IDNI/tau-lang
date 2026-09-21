@@ -36,15 +36,15 @@ bool is_bv_constant(tref t) {
 
 
 
-// Bit width of the BA type of node `t`. No DBG precondition; if the type
-// is not in the bv family this logs an error and returns 0 (0 is never a
-// valid bv width, so it doubles as the failure value).
+// Bit width of the BA type of node `t`. No DBG precondition; reports when
+// the type is not in the bv family or carries no explicit bitwidth.
 template<NodeType node>
-size_t get_bv_type_bitwidth(tref t) {
+result<size_t> get_bv_type_bitwidth(tref t) {
 	auto type = tree<node>::get(t).get_ba_type();
 	if (!is_bv_type_family<node>(type)) {
-		LOG_ERROR << "Type is not a bitvector type.";
-		return 0;
+		result<size_t> r;
+		return r.with_assert_check_error(code::type_error,
+			"get_bv_type_bitwidth: type is not a bitvector type");
 	}
 	return get_bv_width<node>(type);
 }

@@ -16,12 +16,12 @@ using namespace idni;
 // needs the memo-taking overload already declared for ordinary unqualified
 // lookup to find it.
 template <NodeType node>
-std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
+result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
 			       subtree_map<node, bv>& free_vars, bv_eval_memo<node>& memo,
 			       size_t& ctx_counter, size_t ctx);
 
 template <NodeType node>
-std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
+result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
 			       subtree_map<node, bv>& free_vars) {
 	// Fresh memo per top-level call: shared across the whole recursion but
 	// must not survive past it (see the memo-taking overload below). ctx 0
@@ -44,11 +44,16 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 // that instance is live sees the same `vars` -- memoizing per (tref, ctx)
 // is sound even under shadowing.
 template <NodeType node>
-std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
+result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
 			       subtree_map<node, bv>& free_vars, bv_eval_memo<node>& memo,
 			       size_t& ctx_counter, size_t ctx) {
 	using tau = tree<node>;
 	using tt = typename tree<node>::traverser;
+
+	// Carries only a genuine internal failure (see combine1's default
+	// branch below); an ordinary untranslatable-node decline stays a
+	// value-less, error-less result, same as std::nullopt did before.
+	result<bv> r;
 
 	// Walked with the library's pre_order visit, which is iterative: a
 	// formula nests as deep as it likes, and a worker thread gets 512 KiB
@@ -105,12 +110,17 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			if (auto it = free_vars.find(n); it != free_vars.end())
 				return it->second;
 			auto vn = (tt(n) | tt::Tree).to_str();
-			// a new constant of the right type, remembered as free
-			size_t bv_size = get_bv_size<node>(
-				tau::get(n).get_ba_type_tree());
+			// a new constant of the right type, remembered as free.
+			// Advisory drop: merging either child's report here would
+			// trip result<bv>'s error/value invariant, turning an
+			// ordinary untranslatable-node decline into a spurious error.
+			auto type_tree = tau::get(n).get_ba_type_tree();
+			if (!type_tree.has_value()) return std::nullopt;
+			auto bv_size = get_bv_size<node>(type_tree.value());
+			if (!bv_size.has_value()) return std::nullopt;
 			// no builder wrapper for mkConst yet, unlike mkVar
 			auto x = cvc5_term_manager.mkConst(
-				cvc5_term_manager.mkBitVectorSort(bv_size),
+				cvc5_term_manager.mkBitVectorSort(bv_size.value()),
 				vn.c_str());
 			free_vars.emplace(n, x);
 			return std::optional<bv>(x);
@@ -133,18 +143,28 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			// is_bv_solvable_formula only inspects variable nodes.
 			// get_bv_size requires an explicit bitwidth; fail
 			// gracefully instead of asserting/crashing.
-			tref type_tree = tau::get(n).get_ba_type_tree();
-			if (!is_bv_type_family<node>(tau::get(n).get_ba_type())
-				|| !(tt(type_tree) | tau::type | tau::subtype))
+			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			return make_bitvector_top_elem(get_bv_size<node>(type_tree));
+			// Advisory drop: see the variable case above.
+			auto type_tree = tau::get(n).get_ba_type_tree();
+			if (!type_tree.has_value()) return std::nullopt;
+			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
+				return std::nullopt;
+			auto bv_size = get_bv_size<node>(type_tree.value());
+			if (!bv_size.has_value()) return std::nullopt;
+			return make_bitvector_top_elem(bv_size.value());
 		}
 		case tau::bf_f: {
-			tref type_tree = tau::get(n).get_ba_type_tree();
-			if (!is_bv_type_family<node>(tau::get(n).get_ba_type())
-				|| !(tt(type_tree) | tau::type | tau::subtype))
+			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			return make_bitvector_bottom_elem(get_bv_size<node>(type_tree));
+			// Advisory drop: see the variable case above.
+			auto type_tree = tau::get(n).get_ba_type_tree();
+			if (!type_tree.has_value()) return std::nullopt;
+			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
+				return std::nullopt;
+			auto bv_size = get_bv_size<node>(type_tree.value());
+			if (!bv_size.has_value()) return std::nullopt;
+			return make_bitvector_bottom_elem(bv_size.value());
 		}
 		default: return std::nullopt;
 		}
@@ -159,8 +179,12 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		case tau::wff_neg: return make_term_not(l);
 		case tau::bf_neg: return make_bitvector_not(l);
 		case tau::bf_cast: {
-			size_t target_size = get_bv_size<node>(
-				tau::get(n).get_ba_type_tree());
+			// Advisory drop: see eval_leaf's variable case above.
+			auto type_tree = tau::get(n).get_ba_type_tree();
+			if (!type_tree.has_value()) return std::nullopt;
+			auto target_size_r = get_bv_size<node>(type_tree.value());
+			if (!target_size_r.has_value()) return std::nullopt;
+			size_t target_size = target_size_r.value();
 			size_t src_size = l.getSort().getBitVectorSize();
 			if (target_size > src_size)
 				return make_bitvector_zero_extend(
@@ -171,9 +195,12 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			return o;
 		}
 		default:
-			// kind_of said unary but no case here: the two tables
-			// have drifted, and nullopt reads as "untranslatable"
+			// kind_of said unary but no case here: the two tables have
+			// drifted. A real report now tells this apart from an
+			// ordinary decline where DBG's assert compiles out.
 			DBG(assert(false);)
+			r.error(code::internal_error,
+				"bv_eval_node: combine1 has no case for a kind_of(unary) node");
 			return std::nullopt;
 		}
 	};
@@ -257,10 +284,15 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		// a bound "variable" that is not one (variable capture in
 		// substitution) binds nothing; the body is taken as it is
 		if (!is<node>(v, tau::variable)) return true;
-		size_t bv_size = get_bv_size<node>(
-			tau::get(v).get_ba_type_tree());
+		// Advisory drop: merging this child's report would trip
+		// result<bv>'s error/value invariant; a width failure here drops
+		// the binder the same way an unbound capture above does.
+		auto type_tree = tau::get(v).get_ba_type_tree();
+		if (!type_tree.has_value()) return true;
+		auto bv_size = get_bv_size<node>(type_tree.value());
+		if (!bv_size.has_value()) return true;
 		bv x = make_bitvector_var(
-			cvc5_term_manager.mkBitVectorSort(bv_size),
+			cvc5_term_manager.mkBitVectorSort(bv_size.value()),
 			tau::get(v).to_str());
 		// vars is shared, so an outer binding of the same tref (nested
 		// quantifiers sharing a variable tref through caching) is saved
@@ -318,15 +350,17 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 	};
 
 	tref root = form | tt::ref;
-	if (!root) return std::nullopt;
+	if (!root) return r; // value-less, error-less: an ordinary decline
 	auto all = [](tref) { return true; };
 	pre_order<node>(root).visit(down, all, up);
 	DBG(assert(vals.size() == 1);)
-	return vals.empty() ? std::nullopt : vals.front();
+	if (r.has_error()) return r; // combine1's classifier-drift branch fired
+	if (vals.empty() || !vals.front()) return r; // ordinary decline
+	return r.with_value(vals.front().value());
 }
 
 template<NodeType node>
-std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
+result<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 	subtree_map<node, bv>& free_vars) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -423,8 +457,12 @@ bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 				reason = bv_unsolvable_reason::non_bv_variable;
 				return solvable = false;
 			}
-			// the solver requires an explicit bitwidth
-			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::type | tau::subtype)) {
+			// the solver requires an explicit bitwidth. A
+			// get_ba_type_tree failure (out-of-range ba_type id) means
+			// no usable width either, same as an absent subtype.
+			auto type_tree = tau::get(n).get_ba_type_tree();
+			if (!type_tree.has_value()
+				|| !(tt(type_tree.value()) | tau::type | tau::subtype)) {
 				reason = bv_unsolvable_reason::missing_bitwidth;
 				return solvable = false;
 			}
@@ -434,7 +472,9 @@ bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 			// as unusable here as a widthless variable: inference is
 			// expected to have completed it already, so meeting one here
 			// means an upstream bug, not a spec to route to blasting.
-			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::type | tau::subtype)) {
+			auto type_tree = tau::get(n).get_ba_type_tree();
+			if (!type_tree.has_value()
+				|| !(tt(type_tree.value()) | tau::type | tau::subtype)) {
 				reason = bv_unsolvable_reason::missing_bitwidth;
 				return solvable = false;
 			}
@@ -626,7 +666,10 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 				cvc5::Solver qf_solver(cvc5_term_manager);
 				config_cvc5_solver_quantifier_free(qf_solver);
 				auto qf_expr = bv_eval_node<node>(tt(matrix), vars, free_vars);
-				if (!qf_expr) {
+				// Advisory drop: bv_formula_sat_status returns a bare
+				// optional, so a genuine bv_eval_node failure folds
+				// into the same translation-failure branch as a decline.
+				if (!qf_expr.has_value()) {
 					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
 				}
@@ -669,7 +712,10 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	config_cvc5_solver(solver, true);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	if (!expr) {
+	// Advisory drop: bv_formula_sat_status returns a bare optional, so a
+	// genuine bv_eval_node failure folds into the same
+	// translation-failure branch as a decline.
+	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return memo(std::nullopt);
@@ -717,7 +763,10 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	config_cvc5_solver(solver);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	if (!expr) {
+	// Advisory drop: solve_bv returns a bare optional, so a genuine
+	// bv_eval_node failure folds into the same translation-failure
+	// branch as a decline.
+	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return std::nullopt;

@@ -2,6 +2,9 @@
 
 #include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
+#include "tau_diagnostics.h"
+
+#include <sstream>
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba"
@@ -12,23 +15,25 @@ using namespace cvc5;
 using namespace idni;
 
 template<NodeType node>
-size_t get_bv_size(const tref t) {
+result<size_t> get_bv_size(const tref t) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto subtype = tt(t) | tau::type | tau::subtype | tt::ref;
 	if (!subtype) {
-		LOG_ERROR << "get_bv_size: bv type has no explicit bitwidth\n";
-		throw std::logic_error("get_bv_size: bv type has no explicit bitwidth");
+		result<size_t> r;
+		return r.with_assert_check_error(code::type_error,
+			"get_bv_size: bv type has no explicit bitwidth");
 	}
-	return tau::get(subtype)[0].get_num();
+	return result<size_t>{tau::get(subtype)[0].get_num()};
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>
-std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
+result<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 	using tt = bitvector_parser::tree::traverser;
 	using bv_parser = bitvector_parser::nonterminal;
 
-	if (!parse_tree) return std::nullopt;
+	result<bv> r;
+	if (!parse_tree) return r;
 	auto t = bitvector_parser::tree::traverser(parse_tree)
 					| bitvector_parser::bitvector;
 
@@ -40,25 +45,27 @@ std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 		case bv_parser::hexadecimal: { base = 16; break; }
 		default: {
 			DBG(assert(false);)
-			return std::nullopt;
+			return r;
 		}
 	}
 	DBG(assert(base > 0 );)
-	size_t bv_size = get_bv_size<node<BAs...>>(type_tree);
+	TAU_TRY(size_t bv_size, get_bv_size<node<BAs...>>(type_tree));
 	auto str = t | tt::terminals;
 	try {
-		return make_bitvector_cte(bv_size, str, base);
+		return r.with_value(make_bitvector_cte(bv_size, str, base));
 	} catch (const cvc5::CVC5ApiException& e) {
-		LOG_ERROR << "Error creating bitvector constant from string '"
-			<< str << "': " << e.what() << "\n";
-		return std::nullopt;
+		std::ostringstream oss;
+		oss << "Error creating bitvector constant from string '"
+			<< str << "': " << e.what();
+		return r.with_error(code::parse_error, oss.str(), {{label::width, bv_size}});
 	}
 }
 
 template<typename...BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
+result<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
 		tref type_tree) {
+	result<typename node<BAs...>::constant_with_type> r;
 
 	// Normalize 0x/0b prefixes to #x/#b for the bitvector parser
 	std::string normalized = src;
@@ -67,19 +74,26 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 			 || normalized[1] == 'b' || normalized[1] == 'B'))
 		normalized[0] = '#', normalized[1] = std::tolower(normalized[1]);
 
-	auto result = bitvector_parser::instance().parse(normalized.c_str(), normalized.size());
-	if (!result.found) {
-		auto msg = result.parse_error
-			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC);
-		LOG_ERROR << "[bv] " << msg << "\n";
-		return {}; // Syntax error
+	auto parsed = bitvector_parser::instance().parse(normalized.c_str(), normalized.size());
+	if (!parsed.found) {
+		r.error(code::parse_error, parsed.parse_error
+			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC));
+		return r;
 	}
-	auto cte = bv_constant_from_parse_tree<BAs...>(result.get_shaped_tree2(), type_tree);
-	if (!cte) {
-		LOG_ERROR << "Failed to parse bitvector constant: " << src;
-		return {};
+	// TAU_TRY_OR_ATTR evaluates its attr list before the call, so it would
+	// intern the source text on every successful parse. Attach it by hand,
+	// only in the error branch.
+	auto bv_child = bv_constant_from_parse_tree<BAs...>(
+		parsed.get_shaped_tree2(), type_tree);
+	const bool bv_child_well_formed = bv_child.is_well_formed();
+	auto bv_cte_opt = r.merge_take(std::move(bv_child));
+	if (!bv_cte_opt && !bv_child_well_formed && !r.has_error()) {
+		r.error(code::parse_error, "failed to parse a bitvector constant",
+			{{label::value, src}});
 	}
-	return typename node<BAs...>::constant_with_type{ cte.value(), type_tree };
+	if (!bv_cte_opt) return r;
+	bv cte = std::move(*bv_cte_opt);
+	return r.with_value(typename node<BAs...>::constant_with_type{ cte, type_tree });
 }
 
 } // namespace idni::tau_lang
@@ -108,18 +122,20 @@ bool operator!=(const bool& lhs, const Term& rhs) { return !(rhs == lhs); }
 namespace idni::tau_lang {
 
 template<NodeType node>
-tref simplify_bv_term(tref term) {
-	//using node_t = node<BAs...>;
-	//using tau = tree<node_t>;
-	//using tt = tau::traverser;
-
-	if (auto cvc5_simplified = bv_ba_cvc5_simplification<node>(term)) {
-		return cvc5_simplified;
-	} else if (auto custom_simplified = bv_ba_custom_simplification<node>(term)) {
-		return custom_simplified;
-	}
-	// Unable to simplify, return original term
-	return term;
+result<tref> simplify_bv_term(tref term) {
+	result<tref> r;
+	if (auto cvc5_simplified = r.merge_take(bv_ba_cvc5_simplification<node>(term)))
+		return r.with_value(*cvc5_simplified);
+	// A genuine cvc5-path failure (as opposed to its ordinary decline)
+	// stays a failure: falling back here could silently turn a real bug
+	// into custom_simplification's answer instead of reporting it.
+	if (r.has_error()) return r;
+	// bv_ba_custom_simplification never declines to nullptr, only fails
+	// outright, carrying the round-cap report; propagate it rather than
+	// falling back to term silently.
+	auto custom = r.merge_take(bv_ba_custom_simplification<node>(term));
+	if (!custom) return r;
+	return r.with_value(*custom);
 }
 
 } // namespace idni::tau_lang

@@ -200,21 +200,21 @@ BA ocltl_minterm(const std::vector<BA>& a, size_t A);
 // tp(ā): the concrete k-type of tuple `a`, as a zero mask.
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-ocltl_type_mask ocltl_type_of(const std::vector<BA>& a);
+result<ocltl_type_mask> ocltl_type_of(const std::vector<BA>& a);
 
 // A witness b extending `a` to the requested type, whose new coordinate is the
 // mask's highest bit: each nonzero minterm of `a` contributes all of itself,
 // nothing, or a proper part of itself.
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-BA ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau,
+result<BA> ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau,
 	splitter_type st = splitter_type::upper);
 
 // Same as ocltl_witness, over a 2^(k+1)-length bitset instead of a capped
 // uint64_t mask, so a.size()+1 can exceed ocltl_max_k.
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-BA ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
+result<BA> ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
 	splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang

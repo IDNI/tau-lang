@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "tau_spec.h"
+#include "tau_diagnostics.h"
 
 #include <cstdlib>
 #include <deque>
@@ -55,24 +56,29 @@ struct tau_decision_cache {
 // mains stay in a comparable form; the rec relations are left untouched.
 template <typename... BAs>
 requires BAsPack<BAs...>
-static tref normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
+static result<tref> normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
 	// Memoised per main tree: every Boolean operation on constants
 	// (~, &, |, +) normalises the temporal layer of its operands, and the
 	// same constants are operands over and over. Same key discipline as
 	// cached_tau_ba_predicate: the main tree identifies the element only
 	// when it carries no recurrence relations.
-	if (!fm.nso_rr.rec_relations.empty())
-		return normalize_temporal_quantifiers<node, false>(
-			fm.nso_rr.main->get());
+	result<tref> r;
+	if (!fm.nso_rr.rec_relations.empty()) {
+		tref main = fm.nso_rr.main->get();
+		TAU_TRY(tref normalized,
+			(normalize_temporal_quantifiers<node, false>(main)));
+		return r.with_value(normalized);
+	}
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	tref key = fm.nso_rr.main->get();
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	if (auto it = cache.find(key); it != cache.end())
+		return r.with_value(it->second);
 	// compute before emplace: normalisation can create new trees, and a
 	// rehash of `cache` must not happen with a half-built entry in it.
-	tref res = normalize_temporal_quantifiers<node, false>(key);
-	return cache.insert_or_assign(key, res).first->second;
+	TAU_TRY(tref res, (normalize_temporal_quantifiers<node, false>(key)));
+	return r.with_value(cache.insert_or_assign(key, res).first->second);
 }
 
 template <typename... BAs>
@@ -105,8 +111,12 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// Push the negation in at the end in order to keep normalized forms
 	// after double negation of formulas
-	auto nmain = tau::geth(
-		to_nnf<node>(tau::build_wff_neg(normalized_tau_ba_main(*this))));
+	tref main = nso_rr.main->get();
+	// The Boolean operator contract is total: a failed normalization
+	// falls back to the unnormalized main by definition, not as a
+	// dropped report.
+	auto nmain = tau::geth(to_nnf<node>(tau::build_wff_neg(
+		normalized_tau_ba_main(*this).value_or(main))));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
 }
@@ -114,8 +124,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
-	auto lhs = normalized_tau_ba_main(*this);
-	auto rhs = normalized_tau_ba_main(other);
+	// The Boolean operator contract is total: a failed normalization
+	// falls back to the unnormalized main by definition, not as a
+	// dropped report.
+	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
+	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
 	auto nmain = tau::geth(tau::build_wff_and(lhs, rhs));
 	auto nrec_relations =
 		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
@@ -125,8 +138,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
-	auto lhs = normalized_tau_ba_main(*this);
-	auto rhs = normalized_tau_ba_main(other);
+	// The Boolean operator contract is total: a failed normalization
+	// falls back to the unnormalized main by definition, not as a
+	// dropped report.
+	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
+	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
 	auto nmain = tau::geth(tau::build_wff_or(lhs, rhs));
 	auto nrec_relations = rewriter::merge(nso_rr.rec_relations,
 					      other.nso_rr.rec_relations);
@@ -136,8 +152,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
-	auto lhs = normalized_tau_ba_main(*this);
-	auto rhs = normalized_tau_ba_main(other);
+	// The Boolean operator contract is total: a failed normalization
+	// falls back to the unnormalized main by definition, not as a
+	// dropped report.
+	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
+	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
 	auto nmain = tau::geth(tau::build_wff_xor(lhs, rhs));
 	rewriter::rules nrec_relations = rewriter::merge(nso_rr.rec_relations,
 						other.nso_rr.rec_relations);
@@ -200,27 +219,31 @@ static void pin_decided_key(tref key) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-static bool cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
+static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	subtree_unordered_map<typename tau_ba<BAs...>::node, bool>& cache,
-	bool fallback_on_normalize_failure,
 	auto&& compute)
 {
 	using node = typename tau_ba<BAs...>::node;
+	result<bool> r;
 	if (!fm.nso_rr.rec_relations.empty()) {
-		auto normalized = normalizer<node>(fm.nso_rr);
-		if (!normalized.has_value()) return fallback_on_normalize_failure;
-		return compute(normalized.value());
+		auto normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+		if (!normalized) return r;
+		auto res = r.merge_take(compute(*normalized));
+		if (!res) return r;
+		return r.with_value(*res);
 	}
 	tref key = fm.nso_rr.main->get();
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
-	auto normalized = normalizer<node>(fm.nso_rr);
-	if (!normalized.has_value()) return fallback_on_normalize_failure;
+	if (auto it = cache.find(key); it != cache.end())
+		return r.with_value(it->second);
+	auto normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+	if (!normalized) return r;
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
 	++tau_ba_predicate_misses;
-	bool res = compute(normalized.value());
+	auto res = r.merge_take(compute(*normalized));
+	if (!res) return r;
 	pin_decided_key<node>(key);
-	return cache.insert_or_assign(key, res).first->second;
+	return r.with_value(cache.insert_or_assign(key, *res).first->second);
 }
 
 /**
@@ -384,44 +407,42 @@ static int factored_tau_valid(tref fm) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool tau_ba<BAs...>::is_zero() const {
+result<bool> tau_ba<BAs...>::is_zero() const {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	// Normalization failure falls back to "is zero" = true, matching the
-	// pre-caching-layer contract: an undecidable predicate must not be
-	// treated as a witness of non-zeroness.
-	return cached_tau_ba_predicate(*this, cache, true, [](tref normalized) {
-		if (ba_component_factoring_enabled())
-			if (int r = factored_tau_sat<node>(normalized);
-					r >= 0)
-				return r == 0;
-		auto sat = is_tau_formula_sat<node>(normalized);
-		return !(sat.has_value() && sat.value());
-	});
+	return cached_tau_ba_predicate(*this, cache,
+		[](tref normalized) -> result<bool> {
+			if (ba_component_factoring_enabled())
+				if (int r = factored_tau_sat<node>(normalized);
+						r >= 0)
+					return result<bool>{r == 0};
+			return is_tau_formula_sat<node>(normalized)
+				.transform([](bool sat) { return !sat; });
+		});
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool tau_ba<BAs...>::is_one() const {
+result<bool> tau_ba<BAs...>::is_one() const {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	// Normalization failure falls back to "is one" = false, matching the
-	// pre-caching-layer contract: an undecidable predicate must not be
-	// treated as a proof of validity.
-	return cached_tau_ba_predicate(*this, cache, false, [](tref normalized) {
-		if (ba_component_factoring_enabled())
-			if (int r = factored_tau_valid<node>(normalized);
-					r >= 0)
-				return r == 1;
-		auto imp = is_tau_impl<node>(tau::_T(), normalized);
-		return imp.has_value() && imp.value();
-	});
+	return cached_tau_ba_predicate(*this, cache,
+		[](tref normalized) -> result<bool> {
+			if (ba_component_factoring_enabled())
+				if (int r = factored_tau_valid<node>(normalized);
+						r >= 0)
+					return result<bool>{r == 1};
+			return is_tau_impl<node>(tau::_T(), normalized);
+		});
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	return b ? other.is_one() : other.is_zero();
+	// An undecidable is_one()/is_zero() falls to the side that never
+	// misreports a witness: not one, and (unless proven otherwise) zero.
+	return b ? other.is_one().value_or(false)
+		 : other.is_zero().value_or(true);
 }
 
 template <typename... BAs>
@@ -534,46 +555,53 @@ tau_ba<BAs...> tau_splitter_one() {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_tau_closed(const tau_ba<BAs...>& fm) {
+result<bool> is_tau_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
-	auto applied = nso_rr_apply<node>(fm.nso_rr);
-	if (!applied.has_value()) return false;
-	tref simp_fm = apply_defs_to_spec<node>(applied.value());
-	if (!simp_fm) return false;
+	result<bool> r;
+	auto applied = r.merge_take(nso_rr_apply<node>(fm.nso_rr));
+	if (!applied) return r;
+	tref simp_fm = apply_defs_to_spec<node>(*applied);
+	// apply_defs_to_spec carries no report of its own (normalizer.tmpl.h);
+	// its only failure signal is the null tree.
+	if (!simp_fm)
+		return r.with_error(code::internal_error,
+			"Failed to apply definitions to spec");
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
-		return false;
+		return r.with_value(false);
 	const trefs& vars = get_free_vars<node>(simp_fm);
 	for (tref v : vars) {
 		const tau& t = tau::get(v);
 		if (!(t.child_is(tau::io_var)
 			|| t.child_is(tau::uconst_name)))
-				return false;
+				return r.with_value(false);
 	}
-	return true;
+	return r.with_value(true);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
+result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src)
 {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	result<typename node::constant_with_type> r;
 	// parse source
 	tau_spec<node> s;
 	std::optional<rr<node>> maybe_nso_rr;
 	if (!s.parse(src) || !(maybe_nso_rr = s.get_nso_rr())) {
-		// TODO: pass these errors on so api users can handle them
 		for (const auto& error : s.errors())
-			TAU_LOG_ERROR << "[tau] " << error;
-		return {};
+			r.error(code::parse_error, error);
+		if (!r.has_error())
+			r.error(code::parse_error, "Failed to parse tau constant");
+		return r;
 	}
 	// compute final result
-	return typename node::constant_with_type{
+	return r.with_value(typename node::constant_with_type{
 		std::variant<tau_ba<BAs...>, BAs...>(
 			tau_ba<BAs...>(maybe_nso_rr.value().rec_relations,
 				       maybe_nso_rr.value().main)),
-		tau_type<node>() };
+		tau_type<node>() });
 }
 
 template <typename... BAs>
