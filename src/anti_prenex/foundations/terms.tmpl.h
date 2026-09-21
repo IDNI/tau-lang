@@ -507,15 +507,21 @@ tref simplify_term(tref t, const var_order<node>& order) {
 	using namespace terms_detail;
 	t = tau::trim_right_sibling(t);
 	if (tau::get(t).equals_0() || tau::get(t).equals_1()) return t;
-	// Plain regime: the empty order (phases 1, 2, 5), or a term that
-	// neither touches `P` nor carries a stored BDD anywhere -- the last
-	// test is what keeps a chain over a `BDD_ID` out of the plain
-	// simplifier, which knows no `BDD_ID` (§7 `DISCHARGE`'s keep emission
-	// is `P`-free and not backed itself).
+	// Phases 1, 2 and 5 run without an order, and no term holds a stored
+	// BDD there (terms.h), so the plain regime is reached at once -- the
+	// search for a `BDD_ID` is a Debug check of that contract, never a
+	// cost of those phases.
+	if (order.empty()) {
+		DBG(assert(!holds_bdd_id<node>(t));)
+		return syntactic_path_simplification<node>(t);
+	}
+	// Plain regime under a live order: a term that neither touches `P` nor
+	// carries a stored BDD anywhere -- the last test is what keeps a chain
+	// over a `BDD_ID` out of the plain simplifier, which knows no `BDD_ID`
+	// (§7 `DISCHARGE`'s keep emission is `P`-free and not backed itself).
 	if (!thandle<node>::is_bdd_backed(t) && !tbdd<node>::has_bdd_var(t, order)
 		&& !holds_bdd_id<node>(t))
 		return syntactic_path_simplification<node>(t);
-	DBG(assert(!order.empty());)
 	// BDD regime: the representation re-established (a BDD-backed term is
 	// canonical already; a plain combination of BDD-backed subterms is
 	// built over `P`; a chain over a stored BDD is ONE LEAF of its own
@@ -543,7 +549,14 @@ tref simplify_atom(tref a, const var_order<node>& order) {
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
 	tref res;
-	if (holds_bdd_id<node>(l) || holds_bdd_id<node>(r)) {
+	// Phases 1, 2 and 5 run without an order, and no side holds a stored
+	// BDD there (terms.h), so they take the plain branch at once -- the
+	// search for a `BDD_ID` is a Debug check of that contract, never a
+	// cost of those phases.
+	DBG(assert(!order.empty()
+		|| (!holds_bdd_id<node>(l) && !holds_bdd_id<node>(r)));)
+	if (!order.empty()
+		&& (holds_bdd_id<node>(l) || holds_bdd_id<node>(r))) {
 		// BDD regime: side-wise, the atom never reshaped; a constant-only
 		// atom folds through the construction hooks. A BDD-backed side
 		// is the top-level case of the test; the deeper one is §7
