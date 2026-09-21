@@ -19,8 +19,11 @@
  * When the old module is deleted the namespace is renamed to `anti_prenex`.
  * Nothing here includes the old module.
  *
- * Inclusion order is the build order and is acyclic except inside `push/`:
- * foundations, normalisers, witness, shared, eliminate, push, driver, entry.
+ * Inclusion order is acyclic except inside `push/`: foundations, normalisers,
+ * shared, witness, eliminate, push, driver, entry. `shared/` precedes
+ * `witness/` although it belongs to the later layer, because `witness.h`
+ * reads a BDD-backed conjunct's pin off `shared/cofactors.h`; the list below
+ * is grouped by LAYER instead, every header including what it needs itself.
  * `ELIMINATE_BLOCK` never re-enters the push (§7), so `eliminate/` compiles
  * before `push/`; `push/push.h` is the one cluster header (the steps call
  * each other through `PUSH_BLOCK`).
@@ -47,7 +50,8 @@
 #include "shared/parts.h"
 #include "shared/cofactors.h"
 #include "eliminate/conditions.h"
-// layer 3 — eliminate/atomless.h, eliminate_block.h
+#include "eliminate/atomless.h"
+#include "eliminate/eliminate_block.h"
 // layer 4 — push/push.h; driver/blocks.h, component.h
 // layers 5–6 — the remaining push steps (declared in push/push.h)
 // layers 7–8 — eliminate/finite.h, bitvector.h
