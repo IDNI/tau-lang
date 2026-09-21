@@ -2361,12 +2361,14 @@ TEST_SUITE("LTL S/U mixed nesting with lookback (S/T pending compilation)") {
 	// LTL: is_tau_formula_sat answers only through the realizability
 	// shortcut, which leaves an unrealizable formula undecided (no value),
 	// never a false F.
-	TEST_CASE("((o1:qlt={3}) since (o2[t-1]:qlt={1})) until (i1[t-3]:qlt={1/2}) — unrealizable, sat undecided") {
+	TEST_CASE("((o1:qlt={3}) since (o2[t-1]:qlt={1})) until (i1[t-3]:qlt={1/2}) — unrealizable, so unsat") {
+		// sat of full LTL is realizability, decided both ways
 		tref fm = spec("((o1[t]:qlt = {3}:qlt) since (o2[t-1]:qlt = {1}:qlt)) until (i1[t-3]:qlt = {1/2}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 		auto sat_r = is_tau_formula_sat<node_t>(fm);
-		CHECK_FALSE(sat_r.has_value());
+		REQUIRE(sat_r.has_value());
+		CHECK_FALSE(sat_r.value());
 	}
 }
 
@@ -2394,11 +2396,16 @@ TEST_CASE("Left-nested R chain with current input mirror is REALIZABLE") {
 
 TEST_CASE("Left-nested U with ABA-inconsistent left arm simplifies to G(right-arm) — REALIZABLE") {
     // {X & Y} and {X' | Y'} are complementary SBF constants; their conjunction
-    // is ABA-bottom, so (bot U q) reduces to q at t=0, and G(bot U q) = G(q).
+    // is ABA-bottom, so (bot U q) reduces to q, and G(bot U q) = G(q).
     // G(o2 = i2[t-1]) is realizable: system echoes last i2 each step.
+    // The fold is the normalizer's (fold_constant_temporal_operands), so
+    // the check goes through api::sat; the raw pipeline guards the
+    // lookback witness q per literal and cannot fire it at step 0.
     tref fm = spec("G (((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    auto r = api<node_t>::sat(fm);
+    REQUIRE(r.has_value());
+    CHECK(r.value());
 }
 
 TEST_CASE("Left-nested R with consistent lookback constraints is REALIZABLE") {
@@ -3292,10 +3299,14 @@ TEST_CASE("[SU-40] ((i2[t-2]:qlt={0}) until (o1:qlt={1})) since ((o2:qlt=i1[t-1]
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
-TEST_CASE("[SU-41] (o1:sbf={X}) until (((o2:sbf=i1[t-2]:sbf) since (i2[t-3]:sbf={Y})) until (o1[t-1]:sbf=1)) is UNREALIZABLE") {
+TEST_CASE("[SU-41] (o1:sbf={X}) until (((o2:sbf=i1[t-2]:sbf) since (i2[t-3]:sbf={Y})) until (o1[t-1]:sbf=1)) is REALIZABLE") {
+    // o1[t-1] = 1 reads before step 0 at t = 0: a lookback literal is
+    // vacuous before its past exists, as the safety engine activates a
+    // clause from its deepest lookback, so the inner until holds at step 0
+    // and the outer one is discharged before the left arm pins o1.
     tref fm = spec("(o1[t]:sbf = {X}:sbf) until (((o2[t]:sbf = i1[t-2]:sbf) since (i2[t-3]:sbf = {Y}:sbf)) until (o1[t-1]:sbf = 1)).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm)); // the witness needs step 1, where the left arm pins o1[0] = X
+    CHECK(realizable(fm));
 }
 
 TEST_CASE("[SU-42] F(G(o2:qlt={[0,1]})) is REALIZABLE") {
@@ -3584,11 +3595,13 @@ TEST_CASE("[SU-80] G((o1[t]:qlt > {0}:qlt) since (i1[t]:qlt > {0}:qlt && i1[t]:q
     CHECK_FALSE(realizable(fm));
 }
 
-TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[t-1]:qlt != {1}:qlt)) is UNREALIZABLE") {
-    // ψ=i1[t-1]∈(0,1); initially i1[-1]=0, env keeps i1=0 → ψ never holds. UNREALIZABLE.
+TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[t-1]:qlt != {1}:qlt)) is REALIZABLE") {
+    // ψ=i1[t-1]∈(0,1) reads before step 0 at t = 0, where it is vacuous
+    // (no past to read), so the since holds at step 0; from then on
+    // o1 != 0 keeps it. The environment never has to cooperate.
     tref fm = spec("G ((o1[t]:qlt != {0}:qlt) since ((i1[t-1]:qlt != {0}:qlt) && (i1[t-1]:qlt != {1}:qlt))).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm));
+    CHECK(realizable(fm));
 }
 
 TEST_CASE("[SU-82] F(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) until (o1[t]:qlt = {1/2}:qlt) is REALIZABLE") {
@@ -3708,11 +3721,13 @@ TEST_CASE("[SU-97] G((o1[t]:qlt = i1[t-3]:qlt) since (i2[t]:qlt > {0}:qlt && i2[
     CHECK_FALSE(realizable(fm));
 }
 
-TEST_CASE("[SU-98] G((o1[t]:qlt != i1[t-1]:qlt) since (i2[t-2]:qlt > {0}:qlt && i2[t-2]:qlt < {1}:qlt)) is UNREALIZABLE") {
-    // ψ=i2[t-2]∈(0,1); initially i2[-2]=0 ∉ (0,1); env sets i2=0 always. UNREALIZABLE.
+TEST_CASE("[SU-98] G((o1[t]:qlt != i1[t-1]:qlt) since (i2[t-2]:qlt > {0}:qlt && i2[t-2]:qlt < {1}:qlt)) is REALIZABLE") {
+    // ψ=i2[t-2]∈(0,1) is vacuous before step 2, so the since holds at the
+    // first steps; from step 1 on o1 != i1[t-1] keeps it, and the
+    // environment's later values of i2 are never needed.
     tref fm = spec("G ((o1[t]:qlt != i1[t-1]:qlt) since ((i2[t-2]:qlt > {0}:qlt) && (i2[t-2]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm));
+    CHECK(realizable(fm));
 }
 
 TEST_CASE("[SU-99] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (i2[t]:qlt > {0}:qlt && i2[t]:qlt < {1}:qlt) is UNREALIZABLE") {
@@ -3722,11 +3737,12 @@ TEST_CASE("[SU-99] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (i2[t
     CHECK_FALSE(realizable(fm));
 }
 
-TEST_CASE("[SU-100] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (i1[t-1]:qlt > {0}:qlt && i1[t-1]:qlt < {1}:qlt)) is UNREALIZABLE") {
-    // ψ=i1[t-1]∈(0,1). Initially i1[-1]=0 ∉ (0,1). Env sets i1=0 always. UNREALIZABLE.
+TEST_CASE("[SU-100] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (i1[t-1]:qlt > {0}:qlt && i1[t-1]:qlt < {1}:qlt)) is REALIZABLE") {
+    // ψ=i1[t-1]∈(0,1) is vacuous at step 0, so the since holds there;
+    // o1 ∈ (0,1) keeps it afterwards whatever i1 does.
     tref fm = spec("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((i1[t-1]:qlt > {0}:qlt) && (i1[t-1]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm));
+    CHECK(realizable(fm));
 }
 
 } // TEST_SUITE("(Q,<)-specific S/U: mixed I/O, nontrivial lookbacks")
@@ -3775,8 +3791,15 @@ TEST_SUITE("Adversarial: parser and errors") {
 		CHECK(tau::get(fm)[0].is(tau::wff_always));
 	}
 
-	TEST_CASE("W operator with boolean true right operand") {
+	TEST_CASE("W operator with boolean true right operand folds to T") {
+		// the constant-operand law φ W T = T applies at construction
 		tref fm = spec("(o1[t] = 0) W T.");
+		REQUIRE(fm != nullptr);
+		CHECK(tau::get(fm).equals_T());
+	}
+
+	TEST_CASE("W operator with a stream right operand parses as W") {
+		tref fm = spec("(o1[t] = 0) W (o2[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_weak_until));
 	}
@@ -4216,17 +4239,15 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// ambiguous for a fixed absolute-position fact, so the refusal still
 	// applies there, worded as a temporary implementation gap (the
 	// interpreter is the semantic authority), not a permanent disagreement.
-	TEST_CASE("a positional atom nested inside F is still a hard error, "
+	TEST_CASE("a positional atom nested inside F is still refused, "
 	          "worded as a temporary gap") {
 		tref fm = wff("F(o[3]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
-		bool threw = false;
-		try { solve_ltl_aba<node_t>(fm); }
-		catch (const std::runtime_error& e) {
-			threw = true;
-			CHECK(std::string(e.what()).find("not yet supported") != std::string::npos);
-		}
-		CHECK(threw);
+		auto r = solve_ltl_aba<node_t>(fm);
+		CHECK_FALSE(r.has_value());
+		std::ostringstream os;
+		r.print(os);
+		CHECK(os.str().find("not yet supported") != std::string::npos);
 	}
 
 	// A G() body mixing a positional atom with genuinely temporal (relative)
@@ -4398,16 +4419,17 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
+		// the refusal is an error result: no verdict, not a decided F
 		tref fm = wff("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
 		result<bool> ok_r;
 		CHECK_NOTHROW(ok_r = ltl_explain<node_t>(fm, oss));
-		std::string out = oss.str();
-		REQUIRE(ok_r.has_value());
-		CHECK_FALSE(ok_r.value());
-		CHECK(out.find("REFUSED:") != std::string::npos);
-		MESSAGE(out);
+		CHECK_FALSE(ok_r.has_value());
+		std::ostringstream err;
+		ok_r.print(err);
+		CHECK(err.str().find("not yet supported") != std::string::npos);
+		MESSAGE(oss.str());
 	}
 
 } // TEST_SUITE("ltl_explain diagnostics")
