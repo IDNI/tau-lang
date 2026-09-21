@@ -653,6 +653,70 @@ TEST_CASE("simplify_atom: BDD regime is side-wise and folds through the hooks") 
 	CHECK(sb == b);
 }
 
+TEST_CASE("simplify_term / simplify_atom: a keep-mode emission over a stored BDD (D11)") {
+	tref x = vr("x"), y = vr("y");
+	ap::block P{ x, y };
+	order_t o = order_of(P);
+	// §7 DISCHARGE in keep mode emits the whole block symbolically over
+	// the stored BDD: `∀x ∀y (bf(BDD_ID))`, P-free and not backed itself.
+	tref stored = th::convert_to_tau_node(bf("x & y | x' & z"), o);
+	REQUIRE(th::is_bdd_backed(stored));
+	tref chain = tb::build_functional_quantifiers(
+		{{x, tb::all}, {y, tb::all}}, stored);
+	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
+	REQUIRE(ap::strip_chain<node_t>(chain).second == stored);
+	// the emission comes back as it stands, holding the SAME stored BDD
+	CHECK(ap::simplify_term<node_t>(chain, o) == chain);
+	// and so does the atom it rides in
+	tref atom = build_bf_eq_0<node_t>(chain);
+	REQUIRE(sides(atom).first == chain);
+	tref s = ap::simplify_atom<node_t>(atom, o);
+	CHECK(s == atom);
+	CHECK(sides(s).first == chain);
+	CHECK(ap::strip_chain<node_t>(sides(s).first).second == stored);
+}
+
+TEST_CASE("simplify_term: the leaves INSIDE a kept emission are simplified") {
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// the stored BDD's one leaf is `y·(y′ ∪ z)`, which the path sweep
+	// reduces to `y·z`; the chain around it is untouched
+	tref stored = th::convert_to_tau_node(bf("x & (y & (y' | z))"), o);
+	REQUIRE(th::is_bdd_backed(stored));
+	tref chain = tb::build_functional_quantifiers({{x, tb::all}}, stored);
+	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
+	tref got = ap::simplify_term<node_t>(chain, o);
+	CHECK(got != chain);
+	REQUIRE(tau::get(got).child_is(tau::bf_fall));
+	CHECK(prefix_of(got) == prefix_of(chain));
+	tref gbody = ap::strip_chain<node_t>(got).second;
+	REQUIRE(th::is_bdd_backed(gbody));
+	tb::ref gb = ref_of(gbody, o);
+	REQUIRE(!tb::leaf(gb));
+	CHECK(tau::subtree_equals(tb::get_var(gb), x));
+	CHECK(tau::subtree_equals(tb::get_var_term(tb::get_high(gb)), bf("y & z")));
+	CHECK(tb::get_low(gb) == tb::F);
+}
+
+TEST_CASE("simplify_term: the sweep simplifies AROUND a kept emission") {
+	tref x = vr("x"), y = vr("y");
+	ap::block P{ x, y };
+	order_t o = order_of(P);
+	tref stored = th::convert_to_tau_node(bf("x & y | x' & z"), o);
+	tref chain = tb::build_functional_quantifiers(
+		{{x, tb::all}, {y, tb::all}}, stored);
+	// the emission is an opaque leaf to the sweep: it is its own key, so
+	// a repeat of it folds, `·0` folds, and a negation stays outside it
+	CHECK(ap::simplify_term<node_t>(
+		build_bf_or<node_t>(chain, chain), o) == chain);
+	CHECK(tau::get(ap::simplify_term<node_t>(build_bf_and<node_t>(chain,
+		tau::_0(find_ba_type<node_t>(chain))), o)).equals_0());
+	tref neg = ap::simplify_term<node_t>(build_bf_neg<node_t>(chain), o);
+	CHECK(has_bdd_id(neg));
+	CHECK(neg == build_bf_neg<node_t>(chain));
+}
+
 // 7. term_of, norm_equation ---------------------------------------------------
 
 TEST_CASE("term_of reads l + r without touching the atom; norm_equation descends through ¬") {

@@ -94,6 +94,17 @@ bref<node> quantify_prefix(bref<node> x, const typename tbdd<node>::quants& q,
 		: tbdd<node>::bdd_ex(x, ys, o);
 }
 
+/// Does @p t carry a `BDD_ID` anywhere -- a stored BDD at the top, or one
+/// held under a functional-quantifier chain (§7 `DISCHARGE`'s keep-mode
+/// emission) or inside a leaf? The BDD regime of the two normalisers below is
+/// keyed on it: nothing outside this file knows a `BDD_ID`.
+template <NodeType node>
+bool holds_bdd_id(tref t) {
+	using tau = tree<node>;
+	return tau::get(t).find_top([](tref m) {
+		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
+}
+
 #ifdef DEBUG
 /// Every `BDD_ID` of @p t is a BDD under @p order: the contract both resolvers
 /// have on their input (terms.h), which an EMPTY @p order turns into "no
@@ -239,6 +250,56 @@ tref resolve_plain_chains(tref n, const keep_functional_fn<node>& keep,
 	memo.emplace(n, r);
 	return r;
 }
+
+/// §3 `SIMPLIFY_TERM`'s LEAF SIMPLIFIER, the function its BDD regime maps
+/// over the leaves.
+///
+/// A leaf that holds no `BDD_ID` is the path sweep's, exactly as before. A
+/// leaf that holds one -- §7 `DISCHARGE`'s keep-mode emission
+/// `Q_P (bf(BDD_ID))`, which `build_bdd` keeps whole because §1 forbids
+/// spelling a stored BDD out before the component's close -- is swept over
+/// its PLAIN structure alone: to the sweep a `bf(BDD_ID)` is an opaque leaf,
+/// never descended into (`path_sweep::down` stops at a node that is no
+/// connective), never negated into (`push_negation_in` leaves a negated one
+/// as it is) and never substituted into. The stored BDDs the sweep left
+/// standing are then simplified from the inside, one `map_leaves` each with
+/// this same simplifier, so a nest of them settles innermost leaf first.
+///
+/// Results are memoised per leaf node: a leaf's simplified form is a function
+/// of the leaf and the live order, and one leaf is reached from several BDDs.
+template <NodeType node>
+struct leaf_simplifier {
+	explicit leaf_simplifier(const var_order<node>& o) : order(o) {}
+
+	tref operator()(tref leaf) {
+		if (auto it = memo.find(leaf); it != memo.end())
+			return it->second;
+		tref r = simplify(leaf);
+		memo.emplace(leaf, r);
+		return r;
+	}
+
+private:
+	const var_order<node>& order;
+	subtree_unordered_map<node, tref> memo;
+
+	tref simplify(tref leaf) {
+		tref swept = syntactic_path_simplification<node>(leaf);
+		if (!holds_bdd_id<node>(swept)) return swept;
+		auto inside = [this](tref m) -> tref {
+			if (!thandle<node>::is_bdd_backed(m)) return m;
+			bref<node> b = thandle<node>::convert_to_handle(m).get();
+			DBG(assert(tbdd<node>::is_ordered(b, order));)
+			return thandle<node>::convert_to_tau_node_or_term(
+				thandle<node>(tbdd<node>::map_leaves(
+					b, *this, order)),
+				find_ba_type<node>(m));
+		};
+		// A rebuilt stored BDD is not re-entered: its own leaves went
+		// through this simplifier already.
+		return pre_order<node>(swept).apply_unique_until_change(inside);
+	}
+};
 
 /// The atom under one optional `¬`, and whether there was one.
 template <NodeType node>
@@ -446,20 +507,27 @@ tref simplify_term(tref t, const var_order<node>& order) {
 	using namespace terms_detail;
 	t = tau::trim_right_sibling(t);
 	if (tau::get(t).equals_0() || tau::get(t).equals_1()) return t;
-	// Plain regime: the empty order (phases 1, 2, 5) or a term that does
-	// not touch `P`.
-	if (!thandle<node>::is_bdd_backed(t) && !tbdd<node>::has_bdd_var(t, order))
+	// Plain regime: the empty order (phases 1, 2, 5), or a term that
+	// neither touches `P` nor carries a stored BDD anywhere -- the last
+	// test is what keeps a chain over a `BDD_ID` out of the plain
+	// simplifier, which knows no `BDD_ID` (§7 `DISCHARGE`'s keep emission
+	// is `P`-free and not backed itself).
+	if (!thandle<node>::is_bdd_backed(t) && !tbdd<node>::has_bdd_var(t, order)
+		&& !holds_bdd_id<node>(t))
 		return syntactic_path_simplification<node>(t);
 	DBG(assert(!order.empty());)
 	// BDD regime: the representation re-established (a BDD-backed term is
 	// canonical already; a plain combination of BDD-backed subterms is
-	// built over `P`), then every leaf through the path simplifier and
-	// the rebuild that merges leaves that became equal.
+	// built over `P`; a chain over a stored BDD is ONE LEAF of its own
+	// BDD, §1), then every leaf through the leaf simplifier and the
+	// rebuild that merges leaves that became equal. A whole-block keep
+	// emission is that single leaf and comes back as it stands, its inner
+	// leaves simplified.
 	bref<node> r = tbdd<node>::build_bdd(t, order);
 	DBG(assert(tbdd<node>::is_ordered(r, order));)
-	auto sps = [](tref leaf) { return syntactic_path_simplification<node>(leaf); };
+	leaf_simplifier<node> simp{order};
 	return thandle<node>::convert_to_tau_node_or_term(
-		thandle<node>(tbdd<node>::map_leaves(r, sps, order)),
+		thandle<node>(tbdd<node>::map_leaves(r, simp, order)),
 		find_ba_type<node>(t));
 }
 
@@ -475,9 +543,12 @@ tref simplify_atom(tref a, const var_order<node>& order) {
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
 	tref res;
-	if (thandle<node>::is_bdd_backed(l) || thandle<node>::is_bdd_backed(r)) {
+	if (holds_bdd_id<node>(l) || holds_bdd_id<node>(r)) {
 		// BDD regime: side-wise, the atom never reshaped; a constant-only
-		// atom folds through the construction hooks.
+		// atom folds through the construction hooks. A BDD-backed side
+		// is the top-level case of the test; the deeper one is §7
+		// `DISCHARGE`'s keep emission `Q_P (bf(BDD_ID))`, a side that
+		// holds a stored BDD without being backed itself.
 		tref l2 = simplify_term<node>(l, order);
 		tref r2 = simplify_term<node>(r, order);
 		res = (l2 == l && r2 == r) ? atom

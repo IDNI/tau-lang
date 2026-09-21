@@ -291,9 +291,19 @@ tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
  * through the path simplifier and the BDD is rebuilt, so leaves that became
  * equal merge.
  *
+ * A term CARRYING a stored BDD is in the BDD regime too, whether or not it is
+ * backed itself: `Q_P (bf(BDD_ID))`, keep mode's emission of a discharged
+ * block (§7 `DISCHARGE`), is `P`-free and stays one leaf (§1 — a stored BDD
+ * is never spelled out before the component's close). Such a leaf is
+ * simplified over its plain structure, every `bf(BDD_ID)` in it an opaque
+ * leaf of the sweep, and each stored BDD it holds is simplified from the
+ * inside instead. So the emission comes back as it stands, with the same
+ * stored BDD, its own leaves simplified.
+ *
  * Canonical up to LEAF EQUALITY only (§3): that is the single source of
- * incompleteness behind every syntactic test of the spec. A term that does
- * not touch `P` is in the plain regime whatever the order says.
+ * incompleteness behind every syntactic test of the spec. A term that
+ * neither touches `P` nor carries a stored BDD is in the plain regime
+ * whatever the order says.
  */
 template <NodeType node>
 tref simplify_term(tref t, const var_order<node>& order = {});
@@ -305,14 +315,16 @@ tref simplify_term(tref t, const var_order<node>& order = {});
  * order atom by the bitvector hook. `a` is a `wff` atom, optionally under one
  * `¬`, which is folded through.
  *
- * Two regimes. With no BDD-backed side — the initial phase-1 simplification,
- * phases 2 and 5, and every plain atom of the push, all order atoms among
- * them — the full existing `syntactic_atomic_formula_simplification` runs,
- * including the `norm_equation` / `denorm_equation` round trip on the joint
- * `l + r` and the per-variable `0`/`1` pass, which folds and shrinks before
- * any BDD exists. With a BDD-backed side the work is side-wise and shallow
- * and the atom is never reshaped; the joint fold belongs to `TERM_OF` and
- * `FOLD_DECIDED`.
+ * Two regimes. With neither side carrying a stored BDD — the initial phase-1
+ * simplification, phases 2 and 5, and every plain atom of the push, all order
+ * atoms among them — the full existing
+ * `syntactic_atomic_formula_simplification` runs, including the
+ * `norm_equation` / `denorm_equation` round trip on the joint `l + r` and the
+ * per-variable `0`/`1` pass, which folds and shrinks before any BDD exists.
+ * Once a side is BDD-backed, or holds a stored BDD deeper down (keep mode's
+ * `Q_P (bf(BDD_ID))`, §7 `DISCHARGE`, which the plain atom simplifier knows
+ * nothing of), the work is side-wise and shallow and the atom is never
+ * reshaped; the joint fold belongs to `TERM_OF` and `FOLD_DECIDED`.
  *
  * The plain regime is IDEMPOTENT (a test pins this), so an atom's shape as
  * written is its simplified shape and no memo key drifts — the spec's
