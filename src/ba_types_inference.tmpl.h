@@ -23,6 +23,13 @@ struct parse_error {
 	size_t type_id;
 };
 
+// A type that names a parameterized family but never acquires the
+// parameter: neither its own annotation, nor a cast's operand, supplies one.
+struct incomplete_type_error {
+	tref element;
+	size_t type_id;
+};
+
 template<NodeType node>
 using typeables_type_id_map = std::map<size_t, subtree_map<node, size_t>>;
 
@@ -38,6 +45,30 @@ bool is_typeable(tref t) {
 		|| is<node, tau::bf_t>(t)
 		|| is<node, tau::bf_f>(t)
 		|| is<node, tau::ref>(t);
+}
+
+// An iterative preorder search of @p t's own subtree for the first node
+// with a non-zero effective BA type (own type or a `typed` structural
+// child); 0 when nothing under @p t is typed yet.
+template <NodeType node>
+size_t find_effective_ba_type(tref t) {
+	size_t type = 0;
+	auto f = [&type](const tref n) {
+		type = get_effective_ba_type<node>(n);
+		return type == 0;
+	};
+	pre_order<node>(t).search_unique(f);
+	return type;
+}
+
+// `true` when @p type_id names a parameterized family but carries no
+// parameter of its own. The pack supplies no default for it any more.
+template <NodeType node>
+bool type_needs_param(size_t type_id) {
+	auto type_tree = ba_types<node>::type_tree(type_id);
+	// Advisory drop: bool contract has no channel for the id-validity report.
+	return type_tree.has_value()
+		&& pack_type_family_incomplete<node>(type_id, type_tree.value());
 }
 
 // Logs, at debug level, that @p var received the default type inside the
@@ -832,14 +863,20 @@ tref type_annotated_operands(tref n) {
 		switch (nt) {
 			case tau::variable:
 			case tau::bf_t: case tau::bf_f: {
-				if (size_t type = get_effective_ba_type<node>(x); type) {
+				// A bare family (`x:bv`) is not a resolved type; leave it
+				// for the later pass that may complete it from the cast.
+				if (size_t type = get_effective_ba_type<node>(x);
+						type && !type_needs_param<node>(type)) {
 					if (auto typed = update_tref<node>(x, type); typed != x)
 						changes.insert_or_assign(x, typed);
 				}
 				break;
 			}
 			case tau::ba_constant: {
-				if (size_t type = get_effective_ba_type<node>(x); type) {
+				// A literal cannot be sized until its parameter is known;
+				// leave it for the later pass that reads the resolver.
+				if (size_t type = get_effective_ba_type<node>(x);
+						type && !type_needs_param<node>(type)) {
 					tref typed = x;
 					if (tau::get(typed).data() == 0) {
 						auto parsed = tau::get_ba_constant_from_source(
@@ -1106,11 +1143,11 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 }
 
 // Logs @p error at ERROR level: parse_error as an unparsable constant,
-// scope_error as an improperly closed scope, inference_error as an
-// expected/found type mismatch.
+// scope_error as an improperly closed scope, incomplete_type_error as a
+// family with no parameter, inference_error as an expected/found mismatch.
 template <NodeType node>
 void inference_error_message(
-		const std::variant<inference_error, parse_error,
+		const std::variant<inference_error, parse_error, incomplete_type_error,
 		typename type_scoped_resolver<node>::scope_error>& error) {
 	using tau = tree<node>;
 	using scope_error = typename type_scoped_resolver<node>::scope_error;
@@ -1126,6 +1163,13 @@ void inference_error_message(
 		auto scope_err = std::get<scope_error>(error);
 		LOG_ERROR << "Improper closed scope in "
 			<< tau::get(scope_err.element) << ".\n";
+	} else if (std::holds_alternative<incomplete_type_error>(error)) {
+		auto incomplete_err = std::get<incomplete_type_error>(error);
+		auto nm = ba_types<node>::name(incomplete_err.type_id);
+		// Advisory drop: LOG_ERROR stream chain contract cannot abort the line.
+		LOG_ERROR << "Incomplete type " << (nm.has_value() ? nm.value() : std::string("INVALID"))
+			<< " in " << tau::get(incomplete_err.element)
+			<< ". The type needs a parameter.\n";
 	} else {
 		DBG(assert(std::holds_alternative<inference_error>(error));)
 		auto inference_err = std::get<inference_error>(error);
@@ -1252,7 +1296,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				untyped_type_id<node>());
 
 	subtree_map<node, tref> transformed;
-	std::optional<std::variant<inference_error, parse_error, scope_error>> error = std::nullopt;
+	std::optional<std::variant<inference_error, parse_error,
+		incomplete_type_error, scope_error>> error = std::nullopt;
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&](tref n, tref parent) {
@@ -1283,15 +1328,16 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					auto canonized_io_var = canonize<node>(io_var);
 					for (auto c : io_def.get_children()) {
 						if (tau::get(c).is(tau::typed)) {
-							auto type_id = pack_default_ba_type<node>(
-								get_ba_type_id<node>(c));
+							auto type_id = get_ba_type_id<node>(c);
 							resolver.insert(canonized_io_var);
-							// Advisory drop: local `error` accumulator has no channel for the id-validity report.
-							if (type_id.has_value()) {
-								if (auto assigned = resolver.assign(canonized_io_var, type_id.value());
-										std::holds_alternative<inference_error>(assigned)) {
-									error = std::get<inference_error>(assigned);
-								}
+							// An io var has no merge to complete a bare
+							// family from, unlike an atom's cast.
+							if (type_needs_param<node>(type_id)) {
+								error = incomplete_type_error{n, type_id};
+							} else if (auto assigned = resolver.assign(
+									canonized_io_var, type_id);
+									std::holds_alternative<inference_error>(assigned)) {
+								error = std::get<inference_error>(assigned);
 							}
 							break;
 						}
@@ -1626,22 +1672,33 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				if(std::holds_alternative<inference_error>(merged_type)) {
 					error = std::get<inference_error>(merged_type); break;
 				}
-				// Default only once the whole atomic expression is merged, never
-				// per operand. A cast completed above already unifies to its
-				// real width here (defaulted == resolved, this stays a no-op);
-				// only a group with no width anywhere -- cast included -- still
-				// falls back to the pack's own default.
+				// A merged type naming only its family, never a pack
+				// default, gets one chance to inherit a parameter: from a
+				// cast in this atom whose own operand carries one.
 				size_t resolved = std::get<size_t>(merged_type);
-				auto defaulted_r = pack_default_ba_type<node>(resolved);
-				// Advisory drop: on_enter traversal callback fixed shape has no channel for the id-validity report.
-				if (size_t defaulted = defaulted_r.has_value() ? defaulted_r.value() : resolved;
-						defaulted != resolved) {
+				if (type_needs_param<node>(resolved)) {
+					size_t completed = resolved;
+					for (auto& [cast, cast_type] : typeables_map[tau::bf_cast]) {
+						if (!type_needs_param<node>(cast_type)) continue;
+						size_t operand_type = find_effective_ba_type<node>(
+							tau::get(cast).first());
+						if (!operand_type) continue;
+						auto unified = unify<node>(completed, operand_type);
+						// Advisory drop: on_enter traversal callback fixed shape has no channel for the id-validity report.
+						if (!unified.has_value()) continue;
+						completed = unified.value();
+						if (!type_needs_param<node>(completed)) break;
+					}
+					if (type_needs_param<node>(completed)) {
+						error = incomplete_type_error{n, resolved};
+						break;
+					}
 					trefs mergeables;
 					for (auto& [_, typeables] : typeables_map)
 						for (auto& [t, __] : typeables)
 							mergeables.push_back(t);
 					for (tref t : mergeables) {
-						auto assigned = resolver.assign(t, defaulted);
+						auto assigned = resolver.assign(t, completed);
 						if (std::holds_alternative<inference_error>(assigned)) {
 							error = std::get<inference_error>(assigned);
 							break;
@@ -1885,6 +1942,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// for the solver to abort on (`(bv[8]) y = c`).
 						// Annotations elsewhere in the same operand count
 						// too (`fall x:bv[4] x`), then the enclosing scopes.
+						// The resolver already holds the cast's own type at
+						// this point, even though the bf_cast node itself is
+						// not stamped until its own on_leave case runs below.
+						size_t cast_type = resolver.type_id_of(canonize<node>(parent));
 						subtree_map<node, size_t> known;
 						for (tref v : tau::get(updated).select_all_until(
 								is<node, tau::variable>, is<node, tau::offset>))
@@ -1912,6 +1973,32 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									retyped.insert_or_assign(x,
 										update_tref<node>(x, it->second));
 									continue;
+								}
+							}
+							// Only a leaf whose own annotation needs a param
+							// (`x:bv`, `{ 5 }:bv`) may borrow it; an
+							// unannotated leaf stays an error below.
+							if (cast_type && !is_untyped<node>(cast_type)
+									&& !type_needs_param<node>(cast_type)
+									&& type_needs_param<node>(get_effective_ba_type<node>(x))) {
+								if (tau::get(x).is(tau::variable)) {
+									retyped.insert_or_assign(x,
+										update_tref<node>(x, cast_type));
+									continue;
+								}
+								if (tau::get(x).is(tau::ba_constant)) {
+									tref typed = x;
+									if (tau::get(typed).data() == 0) {
+										auto parsed = tau::get_ba_constant_from_source(
+											tau::get(typed).child_data(), cast_type);
+										// Advisory drop: on_leave traversal callback fixed shape has no channel for the parse report.
+										typed = parsed.has_value() ? parsed.value() : nullptr;
+									}
+									if (typed) {
+										retyped.insert_or_assign(x,
+											update_tref<node>(typed, cast_type));
+										continue;
+									}
 								}
 							}
 							untyped_leaf = x; break;
@@ -1981,6 +2068,19 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				} else {
 					if (new_n != n) transformed.insert_or_assign(n, new_n);
 				}
+				break;
+			}
+			case tau::bf_cast: {
+				// bf_cast is excluded from is_typeable, so update<node> never
+				// retypes it; write back what the atom's scope resolved for
+				// it in on_enter.
+				tref new_n = update_default<node>(n, transformed);
+				size_t resolved = resolver.type_id_of(canonize<node>(n));
+				if (resolved && !is_untyped<node>(resolved)
+						&& resolved != tau::get(n).get_ba_type())
+					new_n = tau::get_typed(tau::bf_cast,
+						tau::get(new_n).first(), resolved);
+				if (new_n != n) transformed.insert_or_assign(n, new_n);
 				break;
 			}
 			default: {

@@ -772,6 +772,27 @@ tref pack_type_tree(const std::string& family,
 }
 
 /**
+ * @brief `true` when the BA owning @p ba_type names a parameterized family
+ *        but @p type_tree carries no parameter of its own.
+ *
+ * pack_type_family_param answers `{name, nullopt}` alike for an
+ * unparameterized owner and a bare parameterized one; this tells the two
+ * apart. @p type_tree is taken separately from @p ba_type for the same
+ * reason as pack_term_is_blasteable's @p term: this header must not depend
+ * on tree<Node>.
+ */
+template <typename Node>
+bool pack_type_family_incomplete(size_t ba_type, tref type_tree) {
+	return pack_owner_apply<Node>(ba_type, [&]<typename BA>()
+		-> std::optional<bool> {
+			if constexpr (ba_has_type_tree_for<Node, BA>)
+				return !ba_descriptor<BA, Node>::type_param(type_tree)
+					.has_value();
+			return std::nullopt;
+		}).value_or(false);
+}
+
+/**
  * @brief The pack family name and parameter of @p type_tree, from its owner.
  *
  * The inverse of @c pack_type_tree, used at emission time to spell a

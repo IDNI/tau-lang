@@ -103,7 +103,7 @@ TEST_SUITE("bv term helpers") {
 	}
 }
 
-TEST_SUITE("bv default width") {
+TEST_SUITE("bv width completion") {
 
 	// x:bv = {5}:bv[8] propagates the constant's width to the variable via unify()'s children_size()==1 branch.
 	TEST_CASE("variable infers width from a widthful constant: x:bv = { 5 }:bv[8]") {
@@ -123,23 +123,16 @@ TEST_SUITE("bv default width") {
 		CHECK( tau::get(cst).get_ba_type() == bv8_type_id<node_t> );
 	}
 
-	// x:bv = {5}:bv has no width anywhere; inference defaults both operands to the same concrete width.
-	TEST_CASE("both operands default when no width appears anywhere: x:bv = { 5 }:bv") {
+	// x:bv = {5}:bv has no width anywhere and no cast to complete it from: a type error, never a pack default.
+	TEST_CASE("no width anywhere is a type error: x:bv = { 5 }:bv") {
 		auto src = parse("x:bv = { 5 }:bv");
-		CHECK( src != nullptr );
-		auto var = tau::get(src).find_top(is<node_t, tau::variable>);
-		auto cst = tau::get(src).find_top(is<node_t, tau::ba_constant>);
-		CHECK( var != nullptr );
-		CHECK( cst != nullptr );
-		CHECK( tau::get(var).get_ba_type() == bv16_type_id<node_t> );
-		CHECK( tau::get(cst).get_ba_type() == bv16_type_id<node_t> );
-		auto solution = solve_bv<node_t>(src);
-		CHECK( solution.has_value() );
+		CHECK( src == nullptr );
 	}
 
 	// Inference leaves an explicit subtype, so get_bv_size never sees a null traverser here.
 	TEST_CASE("inference leaves an explicit subtype for the accessor to read") {
-		auto src = parse("x:bv = { 5 }:bv");
+		auto src = parse("(bv) x:bv[8] = 0");
+		CHECK( src != nullptr );
 		auto var = tau::get(src).find_top(is<node_t, tau::variable>);
 		tref type_tree = get_ba_type_tree<node_t>(tau::get(var).get_ba_type());
 		using tt = tau::traverser;

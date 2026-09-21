@@ -1867,6 +1867,149 @@ TEST_SUITE("regression tests") {
 		if (!casts.empty())
 			CHECK( tau::get(casts[0]).get_ba_type() == bv16_type_id<node_t> );
 	}
+
+	TEST_CASE("a bare family adopts its sibling's width: x:bv = y:bv[8]") {
+		tref parsed = tau::get("x:bv = y:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>},
+			{"y", bv8_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("a bare cast adopts the width of the other side of its atom: (bv) x:bv[8] = y:bv[16]") {
+		// x sits under the cast, a boundary of its own, and keeps its own
+		// declared width; only the cast's own bare type unifies with y.
+		tref parsed = tau::get("(bv) x:bv[8] = y:bv[16]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>},
+			{"y", bv16_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
+		CHECK( casts.size() == 1 );
+		if (!casts.empty())
+			CHECK( tau::get(casts[0]).get_ba_type() == bv16_type_id<node_t> );
+	}
+
+	TEST_CASE("a bare cast over a narrower operand: (bv) x:bv[1] = { 3 }:bv[2]") {
+		// x sits under the cast, its own boundary, and keeps its declared
+		// width even though it is narrower than the cast's resolved type.
+		tref parsed = tau::get("(bv) x:bv[1] = { 3 }:bv[2]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv_type_id<node_t>(1)}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
+		CHECK( casts.size() == 1 );
+		if (!casts.empty())
+			CHECK( tau::get(casts[0]).get_ba_type() == bv_type_id<node_t>(2) );
+		auto expected_ctes = std::vector<size_t> { bv_type_id<node_t>(2) };
+		CHECK( check_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("a cast with its own narrower width leaves its operand alone: (bv[8]) x:bv[4] = y") {
+		tref parsed = tau::get("(bv[8]) x:bv[4] = y", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv_type_id<node_t>(4)},
+			{"y", bv8_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
+		CHECK( casts.size() == 1 );
+		if (!casts.empty())
+			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
+	}
+
+	TEST_CASE("a bare cast completes its width from its own operand: (bv) x:bv[8] = 0") {
+		tref parsed = tau::get("(bv) x:bv[8] = 0", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
+		CHECK( casts.size() == 1 );
+		if (!casts.empty())
+			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
+		auto expected_bf_ctes = std::vector<size_t> { bv8_type_id<node_t> };
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
+	}
+
+	TEST_CASE("a bare constant merges with its atom sibling: (bv) { 5 }:bv = x:bv[8]") {
+		tref parsed = tau::get("(bv) { 5 }:bv = x:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
+		CHECK( casts.size() == 1 );
+		if (!casts.empty())
+			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
+		auto expected_ctes = std::vector<size_t> { bv8_type_id<node_t> };
+		CHECK( check_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("a bare cast operand adopts its atom sibling's width: (bv) x:bv = y:bv[8]") {
+		tref parsed = tau::get("(bv) x:bv = y:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>},
+			{"y", bv8_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
+		CHECK( casts.size() == 1 );
+		if (!casts.empty())
+			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
+	}
+
+	TEST_CASE("a bare family with no cast is a type error: x:bv = 0") {
+		tref parsed = tau::get("x:bv = 0", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("a bare cast over a bare operand is a type error: (bv) x:bv = 0") {
+		tref parsed = tau::get("(bv) x:bv = 0", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("a bare cast over untyped operands is a type error: (bv) x = y") {
+		tref parsed = tau::get("(bv) x = y", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("a bare cast over an untyped variable is a type error: (bv) x = 0") {
+		tref parsed = tau::get("(bv) x = 0", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
 }
 
 TEST_SUITE("typed annotations as structural children") {

@@ -166,9 +166,9 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 	// as a witness-template field (solved at runtime by
 	// table_step_provider) and the edge records the atom's prop; only the
 	// standalone baked step() emitter, which cannot solve, refuses.
-	TEST_CASE("G(o1:bv = i1:bv): output routes as a witness template; the "
+	TEST_CASE("G(o1:bv = i1:bv[8]): output routes as a witness template; the "
 	          "standalone emitter refuses") {
-		auto sol = synth("G(o1[t]:bv = i1[t]:bv)");
+		auto sol = synth("G(o1[t]:bv = i1[t]:bv[8])");
 		REQUIRE_MESSAGE(sol, "the spec must parse and be REALIZABLE: an UNREALIZABLE here is the regression this suite exists to catch");
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());

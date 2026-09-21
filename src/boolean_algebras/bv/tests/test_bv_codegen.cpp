@@ -75,8 +75,8 @@ TEST_SUITE("bv_codegen") {
 		CHECK(has(s, "o.o1 ="));
 	}
 
-	TEST_CASE("G(o1:bv = 1): the default width (no [8] anywhere) still emits a bv witness") {
-		auto sol = synth("G(o1[t]:bv = { 1 }:bv)");
+	TEST_CASE("G(o1:bv[8] = 1): a width-less constant still emits a bv witness, typed from o1") {
+		auto sol = synth("G(o1[t]:bv[8] = { 1 })");
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc<node_t>(*sol);
 		REQUIRE(d.has_value());
@@ -85,7 +85,7 @@ TEST_SUITE("bv_codegen") {
 		emit_program(*d, os);
 		std::string s = os.str();
 		CHECK(has(s, "tref o1"));
-		CHECK(has(s, "make_bitvector_value(" + std::to_string(default_bv_size) + ", \"1\""));
+		CHECK(has(s, "make_bitvector_value(8, \"1\""));
 	}
 
 	TEST_CASE("G(o1:bv[8] = 1): compile_spec builds and runs, printed witness matches the interpreter") {

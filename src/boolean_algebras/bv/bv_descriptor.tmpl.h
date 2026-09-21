@@ -74,18 +74,17 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
-	 * @brief The bitwidth of `bv[n]`, or the default when unspecified.
+	 * @brief The bitwidth of `bv[n]`, or `nullopt` for a bare `bv`.
 	 *
-	 * Reads the subtype directly rather than through get_bv_width: this is
-	 * where type inference (pack_default_ba_type) asks for the default, so
-	 * it cannot itself go through the accessor that now throws on absence.
+	 * Reads the subtype directly rather than through get_bv_width, which
+	 * reports an error on absence; a bare type is an ordinary answer here.
 	 */
 	static std::optional<unsigned short> type_param(tref type_tree) {
 		if (!matches_type(type_tree)) return std::nullopt;
 		using tt = tau::traverser;
 		auto subtype = tt(type_tree) | tau::type | tau::subtype | tt::ref;
-		return static_cast<unsigned short>(subtype
-			? tau::get(subtype)[0].get_num() : default_bv_size);
+		if (!subtype) return std::nullopt;
+		return static_cast<unsigned short>(tau::get(subtype)[0].get_num());
 	}
 
 	static size_t type_id_for(unsigned short bitwidth) {

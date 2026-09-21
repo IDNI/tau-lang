@@ -123,18 +123,13 @@ TEST_SUITE("bv cast - widthless cast") {
 		CHECK( solution.has_value() );
 	}
 
-	// Regression: the cast's operand is itself a bare, widthless annotation
-	// and nothing anywhere supplies a bitwidth. A family-only annotation
-	// is incomplete, not wrong: this defaults to the pack's own width
-	// (bv[16]) rather than erroring, the same as `x:bv = { 5 }:bv` does
-	// outside any cast. Before the fix, the bare annotation reached the
-	// solver unwritten and crashed (a bare type is not literally
-	// untyped, so it escaped the original untyped-operand check).
+	// The cast's operand is itself a bare, widthless annotation and
+	// nothing anywhere supplies a bitwidth: a family-only annotation is
+	// incomplete, not wrong, but with no width to borrow it is a type
+	// error, the same as `x:bv = { 5 }:bv` does outside any cast.
 	TEST_CASE("widthless cast, widthless operand, no width anywhere: (bv) x:bv = 0") {
 		auto src = parse_wff("(bv) x:bv = 0");
-		REQUIRE( src != nullptr );
-		auto solution = solve_bv<node_t>(src);
-		CHECK( solution.has_value() );
+		CHECK( src == nullptr );
 	}
 
 	// Regression: the cast sits under an arithmetic operator, not directly
