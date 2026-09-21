@@ -230,60 +230,71 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 		TAU_TRY(form, anti_prenex<node>(form, el1));
 	}
 	TAU_TRY(form, resolve_quantifiers<node>(form));
+	// Pass 2: arithmetic floor only where the solver could own the
+	// content; the arithmetic/blasteable seeds still hold
+	// unconditionally.
+	//
+	// Arithmetic-typed content is skipped here as well, not just the
+	// arithmetic residue the `arithmetic` verdict marks. Blasting
+	// rewrites arithmetic into per-bit equality/comparison atoms that
+	// are still arithmetic-typed but no longer arithmetic-tainted, so
+	// that verdict stops applying to them and they became eligible for
+	// generic Boole decomposition -- hundreds of atoms per blasted
+	// operation, each split copying the whole formula, and every BDD
+	// node operation on an arithmetic leaf allocating solver terms
+	// (those leaves are solver-term-backed, so this is never the cheap
+	// path atomless content enjoys). Skipping them leaves the
+	// quantifier in place instead, which is sound; whatever is
+	// closeable has already been decided by the solver via
+	// scope_out_independent_conjuncts and the resolve passes above,
+	// and a genuinely open arithmetic scope (e.g. `ex x (x + y = 0)`
+	// with `y` free) could not be reduced by decomposing it anyway.
+	//
+	// The completeness this gives up is bounded and pinned. "Already
+	// decided by the solver" holds only for a scope `pack_can_solve`
+	// accepts; a *closed* scope it rejects (arithmetic plus an
+	// unresolved wff_ref, say) is neither decided here nor
+	// decomposable afterwards, so it comes back with its quantifier
+	// intact. That is the intended outcome, not an oversight: it is
+	// what `is_non_temp_nso_*`'s check_decided fallback reports rather
+	// than asserts, and it is pinned by
+	// "undecidable closed bv scope keeps its quantifier"
+	// (test_integration-wff_normalization.cpp) together with the
+	// UndecidableNormalizationFallback suite (test_normal_forms.cpp).
+	//
+	// ...but "intended outcome" only holds where the caller can live
+	// with an undecided formula. `interpreter::step` cannot: a
+	// surviving quantifier leaves its step system unsolvable and the
+	// run reports "Tau specification is unexpectedly unsat". So the
+	// blanket arithmetic skip is applied only where its own
+	// justification above holds -- where the solver could own this
+	// arithmetic content. A formula carrying a constant of another
+	// Boolean algebra (a `:tau` spec constant, say, as every `run`
+	// over mixed `:tau` and `:bv[N]` streams produces) is one the
+	// solver cannot translate at all, so neither the resolve passes
+	// nor blasting will ever decide its arithmetic scopes; skipping
+	// them there strands the quantifier for good. Boole decomposition
+	// is the only route left, so let it have them -- the `arithmetic`
+	// verdict still keeps genuinely unsupported arithmetic out of it,
+	// and the atom counts in a mixed formula are the spec's own, not
+	// blasting's per-bit residue.
+	//
+	// The pass is not gated on the pack having an arithmetic theory; only
+	// the solver steps below are. A pack with no BA declaring both
+	// arith_ops and solve -- every pack without bv -- still needs this
+	// second anti-prenex/resolve, because it is what closes a scope like
+	// `ex b (b != 1)`. A quantifier surviving there reaches check_decided
+	// as undecided, and aba_synthesis_feasible reads that conservative
+	// false as an infeasible oracle atom: UNREALIZABLE for a realizable
+	// spec. ctx2 needs no gate either -- with no arithmetic-owning BA
+	// has_foreign_arith_constant holds of every constant, which is the
+	// Boole-decomposition branch the paragraph above asks for.
+	analysis_context<node> ctx2;
+	ctx2.arith_is_solver_owned = !has_foreign_arith_constant<node>(form);
+	const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
+	TAU_TRY(form, anti_prenex<node>(form, el2));
+	TAU_TRY(form, resolve_quantifiers<node>(form));
 	if constexpr (pack_has_arithmetic_theory_v<node>) {
-		// Pass 2: arithmetic floor only where the solver could own the
-		// content; the arithmetic/blasteable seeds still hold
-		// unconditionally.
-		//
-		// Arithmetic-typed content is skipped here as well, not just the
-		// arithmetic residue the `arithmetic` verdict marks. Blasting
-		// rewrites arithmetic into per-bit equality/comparison atoms that
-		// are still arithmetic-typed but no longer arithmetic-tainted, so
-		// that verdict stops applying to them and they became eligible for
-		// generic Boole decomposition -- hundreds of atoms per blasted
-		// operation, each split copying the whole formula, and every BDD
-		// node operation on an arithmetic leaf allocating solver terms
-		// (those leaves are solver-term-backed, so this is never the cheap
-		// path atomless content enjoys). Skipping them leaves the
-		// quantifier in place instead, which is sound; whatever is
-		// closeable has already been decided by the solver via
-		// scope_out_independent_conjuncts and the resolve passes above,
-		// and a genuinely open arithmetic scope (e.g. `ex x (x + y = 0)`
-		// with `y` free) could not be reduced by decomposing it anyway.
-		//
-		// The completeness this gives up is bounded and pinned. "Already
-		// decided by the solver" holds only for a scope `pack_can_solve`
-		// accepts; a *closed* scope it rejects (arithmetic plus an
-		// unresolved wff_ref, say) is neither decided here nor
-		// decomposable afterwards, so it comes back with its quantifier
-		// intact. That is the intended outcome, not an oversight: it is
-		// what `is_non_temp_nso_*`'s check_decided fallback reports rather
-		// than asserts, and it is pinned by
-		// "undecidable closed bv scope keeps its quantifier"
-		// (test_integration-wff_normalization.cpp) together with the
-		// UndecidableNormalizationFallback suite (test_normal_forms.cpp).
-		//
-		// ...but "intended outcome" only holds where the caller can live
-		// with an undecided formula. `interpreter::step` cannot: a
-		// surviving quantifier leaves its step system unsolvable and the
-		// run reports "Tau specification is unexpectedly unsat". So the
-		// blanket arithmetic skip is applied only where its own
-		// justification above holds -- where the solver could own this
-		// arithmetic content. A formula carrying a constant of another
-		// Boolean algebra (a `:tau` spec constant, say, as every `run`
-		// over mixed `:tau` and `:bv[N]` streams produces) is one the
-		// solver cannot translate at all, so neither the resolve passes
-		// nor blasting will ever decide its arithmetic scopes; skipping
-		// them there strands the quantifier for good. Boole decomposition
-		// is the only route left, so let it have them -- the `arithmetic`
-		// verdict still keeps genuinely unsupported arithmetic out of it,
-		// and the atom counts in a mixed formula are the spec's own, not
-		// blasting's per-bit residue.
-		analysis_context<node> ctx2;
-		ctx2.arith_is_solver_owned = !has_foreign_arith_constant<node>(form);
-		const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
-		TAU_TRY(form, anti_prenex<node>(form, el2));
-		TAU_TRY(form, resolve_quantifiers<node>(form));
 		// Option 5a -- the per-formula preprocessing destination: one
 		// attempt on the whole formula, after the last anti-prenex/resolve
 		// pass and before the final closed-formula check below. Inert at
