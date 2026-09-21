@@ -1855,64 +1855,6 @@ TEST_SUITE("regression tests") {
 		CHECK( inferred != nullptr );
 	}
 
-	TEST_CASE("widthless cast completes from its operand: (bv) x:bv[8] = 0") {
-		// `(bv) x:bv[8]` is an explicit but incomplete cast: the family is
-		// named, the bitwidth is not. Inference completes it from the
-		// operand's own bv[8] annotation instead of leaving a family-only
-		// type tree for the solver to dereference (crash regression).
-		tref parsed = tau::get("(bv) x:bv[8] = 0", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		REQUIRE( inferred != nullptr );
-		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
-		CHECK( casts.size() == 1 );
-		if (!casts.empty())
-			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
-	}
-
-	TEST_CASE("cast with no width anywhere stays a type error: (bv) x = y") {
-		// No annotation, anywhere, supplies a bitwidth for the cast's
-		// operand: this stays a type error, not a crash and not a silent
-		// default to the pack's own bitwidth.
-		tref parsed = tau::get("(bv) x = y", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred == nullptr );
-	}
-
-	TEST_CASE("widthless cast completes from a sibling's width, not its own operand: x:bv = (bv) y:bv[8]") {
-		// The width lives on the OTHER side of `=` from the cast: a
-		// group-level completion (run before the atom's members open and
-		// merge) finds it there, so the plain variable x completes too,
-		// whichever side the traversal visits first.
-		tref parsed = tau::get("x:bv = (bv) y:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		REQUIRE( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv8_type_id<node_t>},
-			{"y", bv8_type_id<node_t>}
-		};
-		CHECK( check_vars(inferred, expected) );
-		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
-		CHECK( casts.size() == 1 );
-		if (!casts.empty())
-			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
-	}
-
-	TEST_CASE("widthless cast under an arithmetic operand completes: ((bv) x:bv[8]) + y = 0") {
-		// The cast sits under `+`, not directly under `=`: the width must
-		// still be found from x:bv[8] and shared with y in the same atom.
-		tref parsed = tau::get("((bv) x:bv[8]) + y = 0", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		REQUIRE( inferred != nullptr );
-		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
-		CHECK( casts.size() == 1 );
-		if (!casts.empty())
-			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
-	}
-
 	TEST_CASE("a cast with its own width is left untouched: (bv[16]) x:bv[8] = 0") {
 		// A deliberate width change (widening x from 8 to 16 bits) is not
 		// an incomplete annotation and must not be rewritten.
@@ -1924,65 +1866,6 @@ TEST_SUITE("regression tests") {
 		CHECK( casts.size() == 1 );
 		if (!casts.empty())
 			CHECK( tau::get(casts[0]).get_ba_type() == bv16_type_id<node_t> );
-	}
-
-	TEST_CASE("widthless cast over a widthless operand, no width anywhere: (bv) x:bv = 0") {
-		// The operand's own annotation names the family but not the
-		// bitwidth either (`x:bv`, not `x:bv[8]`). A family-only
-		// annotation is incomplete, not wrong: with nothing else in the
-		// group to derive a width from, both the cast and x default to
-		// the pack's own bv[16], the same as a plain `x:bv = { 5 }:bv`
-		// outside any cast already does.
-		tref parsed = tau::get("(bv) x:bv = 0", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		REQUIRE( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv16_type_id<node_t>}
-		};
-		CHECK( check_vars(inferred, expected) );
-		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
-		CHECK( casts.size() == 1 );
-		if (!casts.empty())
-			CHECK( tau::get(casts[0]).get_ba_type() == bv16_type_id<node_t> );
-	}
-
-	TEST_CASE("widthless cast, bare constant operand, width elsewhere: (bv) { 5 }:bv = x:bv[8]") {
-		// The operand is a bare-annotated CONSTANT, not a variable: it
-		// could not even be parsed under its own family-only type (no
-		// bitwidth to size the value with), so it stays unevaluated
-		// until the width on the other side of `=` completes it.
-		tref parsed = tau::get("(bv) { 5 }:bv = x:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		REQUIRE( inferred != nullptr );
-		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
-		CHECK( casts.size() == 1 );
-		if (!casts.empty())
-			CHECK( tau::get(casts[0]).get_ba_type() == bv8_type_id<node_t> );
-	}
-
-	TEST_CASE("widthless cast, bare constant operand, no width anywhere: (bv) { 5 }:bv = 0") {
-		// Same bare constant operand, but nothing anywhere supplies a
-		// width: defaults to bv[16], same as the bare variable operand.
-		tref parsed = tau::get("(bv) { 5 }:bv = 0", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		REQUIRE( inferred != nullptr );
-		auto casts = tau::get(inferred).select_top(is<node_t, tau::bf_cast>);
-		CHECK( casts.size() == 1 );
-		if (!casts.empty())
-			CHECK( tau::get(casts[0]).get_ba_type() == bv16_type_id<node_t> );
-	}
-
-	TEST_CASE("cast with no width anywhere, fully untyped operand: (bv) x = 0") {
-		// x itself carries no annotation at all (bare `x`, not `x:bv`):
-		// the operand's own untyped-leaf check rejects it, independently
-		// of whatever the pack's own default for a bare `bv` would be.
-		tref parsed = tau::get("(bv) x = 0", parse_opts_wff_no_infer).value_or(nullptr);
-		REQUIRE( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred == nullptr );
 	}
 }
 

@@ -813,19 +813,6 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 	return (changes.find(n) != changes.end()) ? changes[n] : n;
 };
 
-// True for a type that names an owning family but not the parameter that
-// family requires (a bare `bv`, family known, no bitwidth): the same
-// condition pack_default_ba_type resolves for a truly untyped element.
-// False for untyped (0, handled by the ba_type()==0 checks already in
-// place) and for any type the pack does not complete further.
-template <NodeType node>
-bool is_incomplete_ba_type(size_t t) {
-	if (!t) return false;
-	auto def = pack_default_ba_type<node>(t);
-	// Advisory drop: bool contract has no channel for the id-validity report.
-	return def.has_value() && def.value() != t;
-}
-
 // Type variables, constants, and bf nodes in a bf_cast operand subtree
 // purely from their explicit type annotations, without consulting the resolver.
 // This avoids conflicts when the same numeric constant appears with different
@@ -852,12 +839,7 @@ tref type_annotated_operands(tref n) {
 				break;
 			}
 			case tau::ba_constant: {
-				// A family-only type (`{5}:bv`) cannot parse a literal
-				// yet -- it has no bitwidth to size the value with.
-				// Leave it as declared; the caller completes it once a
-				// real width is known and parses it then.
-				if (size_t type = get_effective_ba_type<node>(x);
-						type && !is_incomplete_ba_type<node>(type)) {
+				if (size_t type = get_effective_ba_type<node>(x); type) {
 					tref typed = x;
 					if (tau::get(typed).data() == 0) {
 						auto parsed = tau::get_ba_constant_from_source(
@@ -1121,64 +1103,6 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 		return inference_error{ func, it->second, type };
 	}
 	return untyped_type_id<node>();
-}
-
-// find_ba_type, but reading get_effective_ba_type at each node instead of
-// the node's own ba_type directly. A leaf's explicit annotation sits in a
-// `typed` structural child until inference bakes it into the node itself
-// (update_tref); complete_incomplete_casts runs in on_enter, before that
-// baking, so plain find_ba_type would miss a still-unbaked annotation.
-template<NodeType node>
-size_t find_effective_ba_type(tref term) {
-	size_t type = get_effective_ba_type<node>(term);
-	if (type != 0) return type;
-	auto f = [&type](const tref n) {
-		type = get_effective_ba_type<node>(n);
-		return type == 0;
-	};
-	pre_order<node>(term).search_unique(f);
-	return type;
-}
-
-// Completes each still-incomplete bf_cast in @p cast_types from its own
-// operand's ALREADY-PARSED annotation, or failing that from an
-// already-open enclosing scope (a quantifier's binder) -- before the
-// atom's typeables are opened/merged, so the group the cast joins starts
-// out with the real width no matter which sibling the traversal visits
-// first (a bare variable on the other side of `=` is completed by the
-// ordinary merge once this entry is correct, not by a special case of
-// its own). A cast this cannot complete is left as declared: the normal
-// merge/pack-default path, or the operand's own untyped-leaf check,
-// decides its fate exactly as if this pass had not run.
-template <NodeType node>
-void complete_incomplete_casts(type_scoped_resolver<node>& resolver,
-		subtree_map<node, size_t>& cast_types) {
-	using tau = tree<node>;
-
-	for (auto& [cast_node, declared] : cast_types) {
-		if (!is_incomplete_ba_type<node>(declared)) continue;
-		tref operand = tau::get(cast_node).child(0);
-		size_t candidate = find_effective_ba_type<node>(operand);
-		if (!candidate || is_incomplete_ba_type<node>(candidate)) {
-			candidate = 0;
-			auto known = resolver.all_types();
-			for (tref v : tau::get(operand).select_all_until(
-					is<node, tau::variable>,
-					is<node>({tau::offset, tau::bf_cast}))) {
-				auto it = known.find(canonize<node>(v));
-				if (it != known.end() && it->second
-						&& !is_incomplete_ba_type<node>(it->second)) {
-					candidate = it->second;
-					break;
-				}
-			}
-		}
-		if (!candidate) continue;
-		auto completed = unify<node>(declared, candidate);
-		// Advisory drop: void return contract has no channel for the id-validity report.
-		if (completed.has_value())
-			declared = completed.value();
-	}
 }
 
 // Logs @p error at ERROR level: parse_error as an unparsable constant,
@@ -1506,7 +1430,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					break;
 				} // Incompatible types
 				auto typeables_map = std::get<typeables_type_id_map<node>>(typeables);
-				complete_incomplete_casts<node>(resolver, typeables_map[tau::bf_cast]);
 				if (auto inserted = insert<node>(resolver, {
 						typeables_map[tau::ref],
 						typeables_map[tau::variable],
@@ -1689,13 +1612,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					break;
 				} // Incompatible types
 				auto typeables_map = std::get<typeables_type_id_map<node>>(typeables);
-				// Complete a widthless cast from its own operand (or an
-				// enclosing binder) BEFORE the group below is opened, so
-				// the merge that follows unifies every member -- a bare
-				// variable on the other side of `=`, an untyped constant
-				// -- against the real width regardless of which one the
-				// traversal happens to visit first.
-				complete_incomplete_casts<node>(resolver, typeables_map[tau::bf_cast]);
 				open<node>(resolver, {
 						typeables_map[tau::ref],
 						typeables_map[tau::ba_constant],
@@ -1972,74 +1888,15 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						subtree_map<node, size_t> known;
 						for (tref v : tau::get(updated).select_all_until(
 								is<node, tau::variable>, is<node, tau::offset>))
-							if (size_t t = tau::get(v).get_ba_type();
-									t && !is_incomplete_ba_type<node>(t))
+							if (size_t t = tau::get(v).get_ba_type(); t)
 								known.insert_or_assign(canonize<node>(v), t);
 						for (const auto& [v, t] : resolver.all_types())
-							if (t && t != untyped_type_id<node>()
-									&& !is_incomplete_ba_type<node>(t))
+							if (t && t != untyped_type_id<node>())
 								known.try_emplace(v, t);
 						subtree_map<node, tref> retyped;
-						// A family-only annotation (`x:bv`, `{5}:bv`) is
-						// incomplete, not wrong: complete it the same
-						// two-step way an element outside any cast already
-						// is -- a width from elsewhere in this scope first
-						// (`known`, above), else the cast's own resolved
-						// type, itself already the group's width or the
-						// pack default by now (on_enter runs, and
-						// defaults, before any descent into this operand).
-						// A ba_constant still holding its source text is
-						// parsed under the completed width, the same as a
-						// genuinely untyped one is below.
-						size_t cast_type = resolver.type_id_of(canonize<node>(parent));
-						for (tref x : tau::get(updated).select_all_until(
-								[](tref x) {
-									const auto& xt = tau::get(x);
-									return is_incomplete_ba_type<node>(
-											get_effective_ba_type<node>(x))
-										&& (xt.is(tau::variable) || xt.is(tau::ba_constant)
-											|| xt.is(tau::bf_t) || xt.is(tau::bf_f));
-								}, is<node, tau::offset>)) {
-							// A ba_constant deferred by type_annotated_operands
-							// above (its width was still incomplete) is left
-							// unbaked: its own annotation still sits in a
-							// `typed` child, invisible to get_ba_type() alone.
-							size_t own = get_effective_ba_type<node>(x);
-							size_t source = 0;
-							if (tau::get(x).is(tau::variable))
-								if (auto it = known.find(canonize<node>(x));
-										it != known.end())
-									source = it->second;
-							if (!source && cast_type
-									&& !is_incomplete_ba_type<node>(cast_type))
-								source = cast_type;
-							std::optional<size_t> completed;
-							if (source) {
-								auto unified = unify<node>(own, source);
-								// Advisory drop: local completion loop has no channel for the id-validity report.
-								if (unified.has_value())
-									completed = unified.value();
-							} else {
-								auto def = pack_default_ba_type<node>(own);
-								// Advisory drop: local completion loop has no channel for the id-validity report.
-								if (def.has_value()) completed = def.value();
-							}
-							if (!completed) continue;
-							tref typed = x;
-							if (tau::get(x).is(tau::ba_constant)
-									&& tau::get(x).data() == 0) {
-								auto parsed = tau::get_ba_constant_from_source(
-									tau::get(x).child_data(), completed.value());
-								// Advisory drop: tref-shaped local has no channel for the parse report.
-								typed = parsed.has_value() ? parsed.value() : nullptr;
-							}
-							if (typed)
-								retyped.insert_or_assign(x,
-									update_tref<node>(typed, completed.value()));
-						}
 						tref untyped_leaf = nullptr;
 						// offsets (`i1[t]`) hold untyped index variables
-						// that are not terms: never descend into them.
+						// that are not terms: never descend into them
 						auto untyped_leaves = tau::get(updated).select_all_until(
 							[](tref x) {
 								const auto& xt = tau::get(x);
@@ -2048,13 +1905,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 										|| xt.is(tau::bf_t) || xt.is(tau::bf_f));
 							}, is<node, tau::offset>);
 						for (tref x : untyped_leaves) {
-							// Already queued by the incomplete-leaf pass above:
-							// a bare-annotated ba_constant left unbaked (its
-							// width was still incomplete then) reads as
-							// get_ba_type()==0 here too, since `retyped`
-							// records the replacement but the tree itself is
-							// rewritten only once, below.
-							if (retyped.find(x) != retyped.end()) continue;
 							if (tau::get(x).is(tau::variable)) {
 								if (auto it = known.find(canonize<node>(x));
 									it != known.end())
@@ -2131,47 +1981,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				} else {
 					if (new_n != n) transformed.insert_or_assign(n, new_n);
 				}
-				break;
-			}
-			case tau::bf_cast: {
-				tref new_n = update_default<node>(n, transformed);
-				// A widthless cast (`(bv) x:bv[8]`) names its family but not
-				// its parameter: complete it from the operand it wraps -- the
-				// only place that parameter can come from -- instead of
-				// leaving a family-only type tree for the solver to meet. A
-				// cast that already carries a parameter (`(bv[16]) x:bv[8]`,
-				// a deliberate width change) is left untouched.
-				//
-				// This runs independently of the on_enter pre-scan
-				// (complete_incomplete_casts): a nested cast (`(bv[16])
-				// ((bv) x:bv[8])`) is invisible to that scan -- the outer
-				// cast's own boundary stops it -- and is completed here
-				// instead, from its own (by now fully typed) operand,
-				// bottom-up, the same way as a top-level one.
-				const size_t target_type = tau::get(new_n).get_ba_type();
-				if (is_incomplete_ba_type<node>(target_type)) {
-					if (size_t operand_type = find_ba_type<node>(
-							tau::get(new_n).child(0)); operand_type) {
-						auto completed = unify<node>(target_type, operand_type);
-						// Advisory drop: on_leave traversal callback fixed shape has no channel for the id-validity report.
-						if (completed.has_value()) {
-							// Correct the atom's shared scope entry too, so a
-							// sibling merged with this cast (an untyped
-							// constant on the other side of `=`) is typed
-							// from the completed width, not the pack default
-							// on_enter recorded before this operand was seen.
-							auto assigned = resolver.assign(
-								canonize<node>(n), completed.value());
-							if (std::holds_alternative<inference_error>(assigned)) {
-								error = std::get<inference_error>(assigned);
-								break;
-							}
-							new_n = tau::get_typed(tau::bf_cast,
-								tau::get(new_n).child(0), completed.value());
-						}
-					}
-				}
-				if (new_n != n) transformed.insert_or_assign(n, new_n);
 				break;
 			}
 			default: {
