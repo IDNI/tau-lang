@@ -298,15 +298,6 @@ TEST_CASE("L7: a negative tree as the one conjunct") {
 	// becomes its TREE_CONDITION — one condition per literal, the `∨`
 	// re-assembled by the ∨-join — and what comes back is a negative tree
 	// over the free variables.
-	//
-	// FIXME (IMPORTANT): this case FAILS as the module stands.
-	// `ELIMINATE_BLOCK_UNCACHED` takes the clause's member view with
-	// `members`, which flattens an ∨-node just as it flattens an ∧-node,
-	// so a clause that IS a negative tree arrives as TWO CONJUNCTS: the
-	// answer comes back as `¬(y = 0) ∧ ¬(w = 0)`, which is strictly
-	// stronger than `∃x.(x·y ≠ 0 ∨ x·w ≠ 0)`. eliminate_block.h's own
-	// contract says a clause that is no conjunction — an atom, a negated
-	// atom, a negative tree, a binder unit — is its own one-member view.
 	fixture f = make("ex x (xy != 0 || xw != 0).");
 	const tref got = eliminated(f);
 	check_against_source(got, f);

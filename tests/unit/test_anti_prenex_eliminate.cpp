@@ -320,9 +320,31 @@ TEST_CASE("E8: a flat negative tree beside a positive") {
 		parse("!(a' c = 0) || !(a' d = 0).")));
 }
 
+TEST_CASE("E9: a negative tree as the WHOLE clause is one conjunct") {
+	// `members` (dag.h) flattens an ∨-node just as it flattens an ∧-node,
+	// so the member view is taken for an ∧-node ALONE: a clause that IS a
+	// negative tree is ONE conjunct (§1) and goes whole to its
+	// TREE_CONDITION. Read as two conjuncts it would come back as the
+	// CONJUNCTION of the two conditions, which is strictly stronger than
+	// the source.
+	fixture f = make("ex x (!(x y = 0) || !(x w = 0)).");
+	REQUIRE(ap::is_negative_tree<node_t>(f.clause));
+	REQUIRE(ap::members<node_t>(f.clause).size() == 2);
+
+	const tref got = ap::eliminate_block<node_t>(f.clause, f.P, f.c);
+	check_against_source(got, f);
+	CHECK(!holds(got, tau::wff_ex));
+	CHECK(!ap::fv_meets<node_t>(got, f.P));
+	// No positive, so every literal takes O2 on its own variables and the
+	// `∨` is re-assembled: `∃_x x·y ≠ 0` is `y ≠ 0`, and likewise for `w`.
+	CHECK(ap::is_negative_tree<node_t>(got));
+	CHECK(are_nso_equivalent<node_t>(finished(got),
+		parse("!(y = 0) || !(w = 0).")));
+}
+
 // --- what the engine cannot use ------------------------------------------------------
 
-TEST_CASE("E9: a reference freezes its component and nothing else") {
+TEST_CASE("E10: a reference freezes its component and nothing else") {
 	// This engine answers no queries, so `q(x)` is opaque; `∃` does not
 	// distribute over `∧` across shared variables, so `x·a = 0` is frozen
 	// with it. The `y` component is untouched by that and is discharged.
@@ -348,7 +370,7 @@ TEST_CASE("E9: a reference freezes its component and nothing else") {
 	CHECK(!ap::fv_meets<node_t>(resolved, f.P));
 }
 
-TEST_CASE("E10: a block variable hidden in a leaf freezes its component") {
+TEST_CASE("E11: a block variable hidden in a leaf freezes its component") {
 	// A settled sub-block's KEEP emission (§7 DISCHARGE) is a functional
 	// quantifier over a stored BDD, and the block variables that body
 	// still carries are HIDDEN from then on (§1 leaf hazard): under the
@@ -403,7 +425,7 @@ TEST_CASE("E10: a block variable hidden in a leaf freezes its component") {
 
 // --- the memo ------------------------------------------------------------------------
 
-TEST_CASE("E11: the key is the wrap node and the keep flag") {
+TEST_CASE("E12: the key is the wrap node and the keep flag") {
 	// A clause of its own: the table is global, so a clause another case
 	// eliminated would already have an entry.
 	fixture f = make("ex x (x m = 0 && !(x n = 0)).");
