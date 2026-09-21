@@ -17,7 +17,7 @@ using small_node = idni::tau_lang::node<
 using small_tau = idni::tau_lang::tree<small_node>;
 
 std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
-	tref spec = small_tau::get(sample);
+	tref spec = small_tau::get(sample).value_or(nullptr);
 	if (spec == nullptr) return {};
 	return idni::tau_lang::get_nso_rr<small_node>(spec);
 }
@@ -40,13 +40,13 @@ TEST_SUITE("tau_ba predicates") {
 
 	TEST_CASE("is_zero detects contradiction") {
 		tau_ba<bv, sbf_ba> fm(small_get_nso_rr("x = 0 && x != 0.")->main->get());
-		CHECK(fm.is_zero());
+		CHECK(fm.is_zero().value());
 		CHECK(!(fm == true));
 	}
 
 	TEST_CASE("is_one detects tautology") {
 		tau_ba<bv, sbf_ba> fm(small_get_nso_rr("x = 0 || x != 0.")->main->get());
-		CHECK(fm.is_one());
+		CHECK(fm.is_one().value());
 		CHECK(fm == true);
 	}
 }

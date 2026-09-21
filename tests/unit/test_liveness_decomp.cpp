@@ -9,7 +9,7 @@
 using namespace idni::tau_lang;
 
 static tref parse(const char* s) {
-	auto nso = get_nso_rr<node_t>(tau::get(s));
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso.has_value()) return nullptr;
 	return nso.value().main->get();
 }

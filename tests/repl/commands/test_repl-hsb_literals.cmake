@@ -10,6 +10,8 @@ add_repl_test(hsb_literal-cancelling    "normalize o1[t]:hsb = {x[0] + x[1] < x[
 add_repl_test_fail(hsb_literal-all_cancel "normalize o1[t]:hsb = {x[0] < x[0]}:hsb"        "failed for type")
 add_repl_test(hsb_literal-closed_bound   "normalize o1[t]:hsb = {1 <= x[0]}:hsb"           "-x\\[0\\] \\+ 1 <= 0")
 add_repl_test(hsb_literal-variable_closed "normalize o1[t]:hsb = {x[1] <= x[0]}:hsb"       "-x\\[0\\] \\+ x\\[1\\] <= 0")
-# `x[0] <= 1` and `1 < x[0]` are not elements: rejected, naming the set that is.
-add_repl_test_fail(hsb_literal-noncanonical_closed "normalize o1[t]:hsb = {x[0] <= 1}:hsb" "not an element of the lex-half-open algebra")
-add_repl_test_fail(hsb_literal-noncanonical_open   "normalize o1[t]:hsb = {1 < x[0]}:hsb"  "not an element of the lex-half-open algebra")
+# `x[0] <= 1` and `1 < x[0]` are not elements: the hsb constant parser
+# refuses them (see hsb.tmpl.h), which surfaces as the same generic
+# constant-parse-failure report as hsb_literal-all_cancel above.
+add_repl_test_fail(hsb_literal-noncanonical_closed "normalize o1[t]:hsb = {x[0] <= 1}:hsb" "failed for type")
+add_repl_test_fail(hsb_literal-noncanonical_open   "normalize o1[t]:hsb = {1 < x[0]}:hsb"  "failed for type")

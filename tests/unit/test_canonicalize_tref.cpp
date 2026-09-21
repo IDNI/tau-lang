@@ -16,34 +16,34 @@
 TEST_SUITE("matches_tree_mod_and_or") {
 
 	TEST_CASE("identical formula matches") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "x = 0 || y = 0"));
 	}
 
 	TEST_CASE("top-level OR operands reordered still match") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "y = 0 || x = 0"));
 	}
 
 	TEST_CASE("top-level AND operands reordered still match") {
-		tref fm = tau::get("x = 0 && y = 0", parse_wff());
+		tref fm = tau::get("x = 0 && y = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "y = 0 && x = 0"));
 	}
 
 	TEST_CASE("AND/OR reordered at two nesting levels still match") {
 		tref fm = tau::get(
-			"x = 0 && (y = 0 || z = 0) || w = 0", parse_wff());
+			"x = 0 && (y = 0 || z = 0) || w = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm,
 			"w = 0 || (z = 0 || y = 0) && x = 0"));
 	}
 
 	TEST_CASE("undelimited bf_and juxtaposition reordered still matches") {
-		tref fm = tau::get("xy", parse_bf());
+		tref fm = tau::get("xy", parse_bf()).value_or(nullptr);
 		CHECK(matches_bf_mod_and_or(fm, "yx"));
 	}
 
 	TEST_CASE("undelimited bf_and reordered inside bf_or still matches") {
-		tref fm = tau::get("xy|zk", parse_bf());
+		tref fm = tau::get("xy|zk", parse_bf()).value_or(nullptr);
 		CHECK(matches_bf_mod_and_or(fm, "kz|yx"));
 	}
 
@@ -53,12 +53,12 @@ TEST_SUITE("matches_tree_mod_and_or") {
 	// same key would pass every case above vacuously.
 
 	TEST_CASE("negative: different OR operand does not match") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm, "x = 0 || z = 0"));
 	}
 
 	TEST_CASE("negative: different AND operand does not match") {
-		tref fm = tau::get("x = 0 && y = 0", parse_wff());
+		tref fm = tau::get("x = 0 && y = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm, "x = 0 && z = 0"));
 	}
 
@@ -66,7 +66,7 @@ TEST_SUITE("matches_tree_mod_and_or") {
 		// (x=0 && y=0) || z=0 is not the same formula as x=0 && (y=0 ||
 		// z=0), despite sharing every atom and connective -- the
 		// canonicalizer must not conflate genuinely different structure.
-		tref fm = tau::get("(x = 0 && y = 0) || z = 0", parse_wff());
+		tref fm = tau::get("(x = 0 && y = 0) || z = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm,
 			"x = 0 && (y = 0 || z = 0)"));
 	}
@@ -76,7 +76,7 @@ TEST_SUITE("matches_tree_mod_and_or") {
 		// plain variable, neither io nor an uninterpreted constant), so
 		// their order is a content-hash tie-break (subtree_less), not
 		// canonical. "x = y" and "y = x" are the same case, not two.
-		tref fm = tau::get("x = y", parse_wff());
+		tref fm = tau::get("x = y", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "y = x"));
 	}
 
@@ -99,12 +99,12 @@ TEST_SUITE("matches_tree_mod_and_or") {
 	TEST_CASE("negative: undelimited bf_and with a different operand"
 		" does not match")
 	{
-		tref fm = tau::get("xy", parse_bf());
+		tref fm = tau::get("xy", parse_bf()).value_or(nullptr);
 		CHECK_FALSE(matches_bf_mod_and_or(fm, "xz"));
 	}
 
 	TEST_CASE("negative: extra operand does not match") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm, "x = 0 || y = 0 || z = 0"));
 	}
 }

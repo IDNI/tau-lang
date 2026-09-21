@@ -22,7 +22,7 @@ TEST_SUITE("configuration") {
 
 tref parse_wff(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts);
+	auto src = tree<node_t>::get(sample, opts).value_or(nullptr);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
 	}
@@ -31,16 +31,16 @@ tref parse_wff(const std::string& sample) {
 
 static tref blast_formula(const std::string& sample) {
 	auto wff = parse_wff(sample);
-	return wff ? bv_predicate_blasting<node_t>(wff) : nullptr;
+	return wff ? bv_predicate_blasting<node_t>(wff).value_or(nullptr) : nullptr;
 }
 
 static std::string blast_normalize(const std::string& sample) {
-	auto wff = tau::get(sample, parse_opts_wff);
+	auto wff = tau::get(sample, parse_opts_wff).value_or(nullptr);
 	if (!wff) return "parse_error";
 	// We blast the formula and then normalize it to check that the blasting is
 	// correct and it is not simplified first by other heuristics. If the blasting
 	// is correct, the result should be T or F.
-	auto blasted = bv_predicate_blasting<node_t>(wff);
+	tref blasted = bv_predicate_blasting<node_t>(wff).value_or(nullptr);
 	if (!blasted) return "blast_error";
 	// Blasting must not leave unresolved recurrence references behind
 	if (tau::get(blasted).find_top(is<node_t, tau::ref>))
@@ -1102,7 +1102,7 @@ tref parse_wff_no_hooks(const std::string& sample) {
 		.infer_ba_types = false,
 		.reget_with_hooks = false
 	};
-	return tree<node_t>::get(sample, opts);
+	return tree<node_t>::get(sample, opts).value_or(nullptr);
 }
 
 // HE-8: the bf_interval case in wff_predicate_blasting unconditionally set
@@ -1124,7 +1124,7 @@ static std::string blast_normalize_interval(const std::string& sample) {
 	if (!typed) return "infer_error";
 	if (!tau::get(typed).find_top(is<node_t, tau::bf_interval>))
 		return "no_interval_after_inference";
-	auto blasted = bv_predicate_blasting<node_t>(typed);
+	tref blasted = bv_predicate_blasting<node_t>(typed).value_or(nullptr);
 	if (!blasted) return "blast_error";
 	auto result = normalizer<node_t>(blasted);
 	if (!result.has_value()) return "null";
@@ -2481,8 +2481,7 @@ TEST_SUITE("bvshl bugs") {
 // loses the high bits for good). See "arithmetic under a cast" below for the
 // companion case where the cast operand holds arithmetic rather than another
 // cast.
-// REVIEW (nested casting): temporary suite added while reviewing whether the
-// blasting path supports nested casts. See private/review-casting.md.
+// REVIEW (nested casting): confirm the blasting path supports nested casts.
 //
 TEST_SUITE("bvcast nested") {
 

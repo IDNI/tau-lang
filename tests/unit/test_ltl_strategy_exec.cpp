@@ -31,7 +31,7 @@ using namespace idni::tau_lang;
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 static tref spec_exec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -43,7 +43,7 @@ run_no_input(const char* formula, size_t steps, size_t ba_type = 0) {
 	auto o1 = std::make_shared<vector_output_stream>();
 	size_t type_id = (ba_type != 0) ? ba_type : tau_type_id<node_t>();
 	ctx.add_output("o1", type_id, o1);
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
 	if (!nso.has_value()) return o1;
 	tref fm = nso.value().main->get();
 	if (!fm) return o1;
@@ -60,7 +60,7 @@ run_with_i1(const char* formula, const strings& i1_vals, size_t steps,
 	ctx.add_input("i1", type_id, std::make_shared<vector_input_stream>(i1_vals));
 	auto o1 = std::make_shared<vector_output_stream>();
 	ctx.add_output("o1", type_id, o1);
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
 	if (!nso.has_value()) return o1;
 	tref fm = nso.value().main->get();
 	if (!fm) return o1;
@@ -260,7 +260,7 @@ TEST_SUITE("Strategy execution: G input mirroring") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:sbf = {X & Y}:sbf)."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:sbf = {X & Y}:sbf).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -323,7 +323,7 @@ TEST_SUITE("Strategy execution: sbf type") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:sbf = {X & Y}:sbf)."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:sbf = {X & Y}:sbf).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -338,7 +338,7 @@ TEST_SUITE("Strategy execution: sbf type") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:sbf = {X | Z}:sbf)."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:sbf = {X | Z}:sbf).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -353,7 +353,7 @@ TEST_SUITE("Strategy execution: sbf type") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (F (o1[t]:sbf = {X & Y}:sbf))."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (F (o1[t]:sbf = {X & Y}:sbf)).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -376,7 +376,7 @@ TEST_SUITE("Strategy execution: bv type") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b10110101}:bv[8])."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b10110101}:bv[8]).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -391,7 +391,7 @@ TEST_SUITE("Strategy execution: bv type") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:bv[8] = {5}:bv[8])."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:bv[8] = {5}:bv[8]).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -530,7 +530,7 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 		std::string tmp = "/tmp/tau_strat_test_" + std::to_string(::getpid()) + ".hoa";
 		{
 			env_guard g("TAU_LTL_EXPORT_STRATEGY_FILE", tmp.c_str());
-			auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0))."));
+			auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0)).").value_or(nullptr));
 			REQUIRE(fm.has_value());
 			tref f = fm.value().main->get();
 			auto sat_r = is_tau_formula_sat<node_t>(f);
@@ -553,7 +553,7 @@ TEST_SUITE("Strategy export: TAU_LTL_EXPORT_STRATEGY_FILE writes HOA") {
 
 	TEST_CASE("[SQ1-02] state count logged for realizable formula") {
 		// F(G(o=0)) should produce a strategy with States: 1
-		auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0))."));
+		auto fm = get_nso_rr<node_t>(tau::get("F (G (o1[t] = 0)).").value_or(nullptr));
 		REQUIRE(fm.has_value());
 		tref f = fm.value().main->get();
 		// Just verify it's realizable — state count logged to stderr via LOG_INFO

@@ -30,7 +30,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order, eliminability<node_t>::arith_only());
+			used_atms, quant_pattern, order, eliminability<node_t>::arith_only()).value();
 		return {res, used_atms.size()};
 	}
 
@@ -48,7 +48,7 @@ TEST_SUITE("AntiPrenexBlock") {
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
 			used_atms, quant_pattern, order,
-			eliminability<node_t>::arith_only());
+			eliminability<node_t>::arith_only()).value();
 		return {res, used_atms.size()};
 	}
 
@@ -386,13 +386,13 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 
 	static tref run_apb0(const char* sample) {
 		return anti_prenex<node_t>(
-			get_nso_rr(sample).value().main->get());
+			get_nso_rr(sample).value().main->get()).value();
 	}
 
 	TEST_CASE("quantifier-free formula is returned unchanged") {
 		// Short-circuit: no quantifiers → original tref returned as-is.
 		tref fm = get_nso_rr("xy = 0 && wz = 0.").value().main->get();
-		CHECK( anti_prenex<node_t>(fm) == fm );
+		CHECK( anti_prenex<node_t>(fm).value() == fm );
 	}
 
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
@@ -897,7 +897,7 @@ TEST_SUITE("QuantBlockPush") {
 		fm = tau::get(fm)[0].second();
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(fm, quant_block,
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{}, order).value();
 		// tau::get(res).print(std::cout << "res: ") << "\n";
 		CHECK(tau::get(res).to_str() == "(ex b2, b1 b2 b1|b1 b2 = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2|b1) = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2^b1) = 0)");
 	}
@@ -941,7 +941,7 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a all b ex c (a b = 0 || c = 0).")
 			.value().main->get();
 		tref res = process_quantifier_blocks<node_t>(fm,
-			eliminability<node_t>::arith_only());
+			eliminability<node_t>::arith_only()).value();
 		REQUIRE( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
@@ -976,7 +976,7 @@ TEST_SUITE("Gamma4Guard") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block, used_atms,
-			quant_pattern, order, eliminability<node_t>::arith_only());
+			quant_pattern, order, eliminability<node_t>::arith_only()).value();
 		const trefs& fv = get_free_vars<node_t>(res);
 		for (tref v : block) {
 			tref tv = tau::trim_right_sibling(v);
@@ -1113,7 +1113,7 @@ TEST_SUITE("CanonicalQuantifierIds") {
 		// Exactly one binder survives, and the reference is intact.
 		const char* sample = "ex x, y (x = 0 && y w = 0 && f(y)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( tau::get(res).select_top(
 			is<node_t, tau::wff_ex>).size() == 1 );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
@@ -1134,7 +1134,7 @@ TEST_SUITE("BlockLimits") {
 		const char* sample =
 			"ex x, y, z ((x a = 0 || y b = 0) && (z c = 0 || x d = 0)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		block_boole_max_splits = saved;
 		CHECK( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
@@ -1173,7 +1173,7 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		const block_eliminability<node_t> elim = analyse_block<node_t>(
 			block, get_cnf_wff_clauses<node_t>(body), ac);
 		return anti_prenex_block<node_t>(body, block, used_atms, qp,
-			order, eliminability<node_t>::arith_only(), sl, elim);
+			order, eliminability<node_t>::arith_only(), sl, elim).value();
 	}
 
 	// The named free variable of @p fm -- the PARSED node, since a node
@@ -1259,7 +1259,7 @@ TEST_SUITE("PureBaBvEliminability") {
 		tref fm = get_nso_rr("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2]).")
 			.value().main->get();
 		tref r = anti_prenex<node_t>(fm,
-			analyse_formula<node_t>(fm, analysis_context<node_t>{}));
+			analyse_formula<node_t>(fm, analysis_context<node_t>{})).value();
 		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
 	}
 
@@ -1286,7 +1286,7 @@ TEST_SUITE("FrozenBlockNormalization") {
 		// untouched (no decomposition, no blasting attempt).
 		const char* s = "ex y (q(y) && y != 0).";
 		tref fm = get_nso_rr(s).value().main->get();
-		tref r = anti_prenex<node_t>(fm);
+		tref r = anti_prenex<node_t>(fm).value();
 		CHECK(tau::get(r).find_top(is_child_quantifier<node_t>) != nullptr);
 		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
 	}
@@ -1296,7 +1296,7 @@ TEST_SUITE("FrozenBlockNormalization") {
 		// ex z must go, the inner ex y must stay.
 		const char* s = "ex z ex y (q(y) && z = 0).";
 		tref fm = get_nso_rr(s).value().main->get();
-		tref r = anti_prenex<node_t>(fm);
+		tref r = anti_prenex<node_t>(fm).value();
 		trefs quants = tau::get(r).select_top(is_child_quantifier<node_t>);
 		CHECK(quants.size() == 1);   // only y's binder survives
 	}
@@ -1331,7 +1331,7 @@ TEST_SUITE("FrozenBlockNormalization") {
 		REQUIRE(ref_fm != nullptr);
 		tref y = get_free_vars<node_t>(ref_fm)[0];
 		REQUIRE(el.verdict_of(y) == elim_verdict::frozen);
-		tref r = anti_prenex<node_t>(fm, el);
+		tref r = anti_prenex<node_t>(fm, el).value();
 		CHECK(tau::get(r).find_top(is_child_quantifier<node_t>) != nullptr);
 		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
 	}
@@ -1353,7 +1353,7 @@ TEST_SUITE("FrozenBlockNormalization") {
 		REQUIRE(tau::get(fm).select_all(
 			is_child_quantifier<node_t>).size() == 2);
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
-		tref r = anti_prenex<node_t>(fm, el);
+		tref r = anti_prenex<node_t>(fm, el).value();
 		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
 		CHECK(quants.size() == 1);   // only y's binder survives
 		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
@@ -1379,7 +1379,7 @@ TEST_SUITE("FrozenBlockNormalization") {
 		REQUIRE(tau::get(fm).select_all(
 			is_child_quantifier<node_t>).size() == 2);
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
-		tref r = anti_prenex<node_t>(fm, el);
+		tref r = anti_prenex<node_t>(fm, el).value();
 		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
 		CHECK(quants.size() == 1);   // only y's binder survives
 		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
@@ -1467,7 +1467,7 @@ TEST_SUITE("DisplacedBinderOrdering") {
 		REQUIRE(el.verdict_of(b) == elim_verdict::blasteable);
 		REQUIRE(el.verdict_of(z) == elim_verdict::eliminable);
 
-		tref r = anti_prenex<node_t>(fm, el);
+		tref r = anti_prenex<node_t>(fm, el).value();
 
 		// `anti_prenex` runs `canonize_quantifier_ids` on entry AND on
 		// exit (Step 0 / Step 5), which replaces every bound variable
@@ -1590,7 +1590,7 @@ TEST_SUITE("DisplacedBinderOrdering") {
 		REQUIRE(a_vars.size() == 1);
 		REQUIRE(el.verdict_of(a_vars.front()) == elim_verdict::blasteable);
 
-		tref r = anti_prenex<node_t>(fm, el);
+		tref r = anti_prenex<node_t>(fm, el).value();
 
 		// Whatever category-driven order the surviving binders take
 		// WITHIN a kind segment, the KIND SEQUENCE of the output prefix
@@ -1648,7 +1648,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	TEST_CASE("gamma4 lifts a variable-independent atom") {
 		const char* sample = "ex x ex y ((y|y')w = 0 && x y != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
@@ -1660,7 +1660,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	TEST_CASE("an all-frozen block is re-wrapped verbatim") {
 		const char* sample = "ex x, y (f(x) && g(y)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		// Both binders survive around their references.
 		CHECK( tau::get(res).select_top(
@@ -1698,7 +1698,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 		// Non-vacuity: the formula really does carry a foreign BA
 		// constant, so ctx_arith_is_solver_owned really is false here.
 		REQUIRE( has_foreign_ba_constant<node_t>(fm) );
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		// With the solver disowned (foreign :bool constant present) the
 		// demotion at antiprenexing.tmpl.h:1192-1194 routes x away from
@@ -1717,7 +1717,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	TEST_CASE("resolve pass decides a closed bv leaf via the solver") {
 		const char* sample = "ex x : bv[8] x = { 1 }:bv[8].";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).equals_T() );
 	}
@@ -1754,7 +1754,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 		analysis_context<node_t> ctx;
 		ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
-		tref res = anti_prenex<node_t>(fm, el);
+		tref res = anti_prenex<node_t>(fm, el).value();
 		REQUIRE( res != nullptr );
 		// The formula holds a reference, so semantic equivalence is not
 		// checkable; assert the category outcome structurally instead.
@@ -1847,14 +1847,14 @@ TEST_SUITE("AN-2 finite BA quantifier elimination") {
 	TEST_CASE("ex x:bool (x != 0 && x' != 0) is F, not T") {
 		const char* sample = "ex x:bool (x != 0 && x' != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( tau::get(res).equals_F() );
 	}
 
 	TEST_CASE("ex x:bool (x != 0) is still T (AN-2 control)") {
 		const char* sample = "ex x:bool (x != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( tau::get(res).equals_T() );
 	}
 
@@ -1909,7 +1909,7 @@ TEST_SUITE("AN-7 heterogeneous block guard") {
 				x_bf)));
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(clause,
-			trefs{ x }, block_eliminability<node_t>{}, order);
+			trefs{ x }, block_eliminability<node_t>{}, order).value();
 		REQUIRE( res != nullptr );
 		// The quantifier survives (elimination declined).
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)

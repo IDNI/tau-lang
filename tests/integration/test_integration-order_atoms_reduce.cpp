@@ -14,8 +14,8 @@ namespace {
 tref parse_wff(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
 	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	return src;
+	if (!src.has_value()) { src.print(); return nullptr; }
+	return src.value();
 }
 
 std::string norm(const std::string& sample) {

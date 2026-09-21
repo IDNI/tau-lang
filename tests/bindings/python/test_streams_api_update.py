@@ -22,7 +22,6 @@ class TauStreamUpdater:
 		self.i_stream.put(i)
 		res = tau.step(self.i)
 		assert res, f"Failed to step interpreter: {res.report.errors}"
-		outputs = res.value
 		return self.u_stream.get()
 
 def main():

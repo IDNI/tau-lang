@@ -18,8 +18,8 @@ TEST_SUITE("type_scoped_resolver") {
 
 	TEST_CASE("merging in the same scope") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer); // just an existing tref for testing
-		tref b = tau::get("F", parse_opts_wff_no_infer); // just an existing tref for testing
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
 		r.insert(a);
 		r.insert(b);
 		size_t t = 1;
@@ -31,8 +31,8 @@ TEST_SUITE("type_scoped_resolver") {
 
 	TEST_CASE("merging in different scopes") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer); // just an existing tref for testing
-		tref b = tau::get("F", parse_opts_wff_no_infer); // just an existing tref for testing
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
 		size_t t = 1;
 		r.insert(a);
 		r.open({{b, t}});
@@ -43,8 +43,8 @@ TEST_SUITE("type_scoped_resolver") {
 
 	TEST_CASE("merging conflicting types in the same scope") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer); // just an existing tref for testing
-		tref b = tau::get("F", parse_opts_wff_no_infer); // just an existing tref for testing
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
 		r.insert(a);
 		r.insert(b);
 		size_t t1 = 1;
@@ -56,8 +56,8 @@ TEST_SUITE("type_scoped_resolver") {
 
 	TEST_CASE("merging conflicting types in different scopes") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer); // just an existing tref for testing
-		tref b = tau::get("F", parse_opts_wff_no_infer); // just an existing tref for testing
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr); // just an existing tref for testing
 		size_t t1 = 1;
 		size_t t2 = 2;
 		r.insert(a);
@@ -76,8 +76,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free insert (map variant): assigns types without opening a scope") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		std::map<size_t, subtree_map<node_t, size_t>> types {
@@ -93,7 +93,7 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free insert (map variant): reports inference_error on conflicting types") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t nat_tid = get_ba_type_id<node_t>(nat_type<node_t>());
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		// Same tref `a` typed twice with incompatible types across two
@@ -111,8 +111,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free insert (initializer_list variant): assigns types without opening a scope") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		auto scopes_before = r.scoped.scopes.size();
@@ -127,7 +127,7 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free insert (initializer_list variant): reports inference_error on conflicting types") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t nat_tid = get_ba_type_id<node_t>(nat_type<node_t>());
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		auto err = insert<node_t>(r, {
@@ -139,9 +139,9 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open (initializer_list<trefs>, size_t type): opens a new scope, typing every ref with the given id") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
-		tref c = tau::get("c = d", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
+		tref c = tau::get("c = d", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		auto scopes_before = r.scoped.scopes.size();
 		open<node_t>(r, { {a, b}, {c} }, sbf_tid);
@@ -156,7 +156,7 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open (initializer_list<trefs>, tref type): resolves the type tree to its BA type id") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
 		tref bool_type_tree = bool_type<node_t>();
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type_tree);
 		open<node_t>(r, { {a} }, bool_type_tree);
@@ -165,8 +165,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open (map variant): opens a scope with per-node types from a grouped map") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		std::map<size_t, subtree_map<node_t, size_t>> types {
@@ -181,8 +181,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open (initializer_list<subtree_map> variant): opens a scope with per-node types from a list of maps") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		auto scopes_before = r.scoped.scopes.size();
@@ -196,8 +196,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open_same_type (subtree_set variant): assigns default_type without opening a new scope") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		subtree_set<node_t> refs{ a, b };
 		auto scopes_before = r.scoped.scopes.size();
@@ -213,8 +213,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open_same_type (map variant): infers and correctly assigns the unified type") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t untyped_tid = untyped_type_id<node_t>();
 		std::map<size_t, subtree_map<node_t, size_t>> types {
@@ -234,8 +234,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free open_same_type (map variant): reports inference_error on incompatible types") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		std::map<size_t, subtree_map<node_t, size_t>> types {
@@ -249,7 +249,7 @@ TEST_SUITE("type_scoped_resolver free functions") {
 	// returns the unified inferred type, matching the map overload.
 	TEST_CASE("free open_same_type (initializer_list variant): stores/returns the inferred type (TY-4 fixed)") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t untyped_tid = untyped_type_id<node_t>();
 		REQUIRE(bool_tid != untyped_tid);
@@ -262,9 +262,9 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free merge (initializer_list variant): merges nodes, ignoring the map's type values") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
-		tref c = tau::get("c = d", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
+		tref c = tau::get("c = d", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		r.insert(a); r.insert(b); r.insert(c);
 		CHECK(!std::holds_alternative<inference_error>(r.assign(a, bool_tid)));
@@ -285,8 +285,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free merge (map variant): merges nodes, ignoring the map's type values") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		r.insert(a); r.insert(b);
 		CHECK(!std::holds_alternative<inference_error>(r.assign(a, sbf_tid)));
@@ -302,8 +302,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free merge: reports inference_error when collected nodes have incompatible pre-assigned types") {
 		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t nat_tid = get_ba_type_id<node_t>(nat_type<node_t>());
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		r.insert(a); r.insert(b);
@@ -316,8 +316,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 	}
 
 	TEST_CASE("free unify (map, default_type): folds all provided types into one compatible id") {
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t untyped_tid = untyped_type_id<node_t>();
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		std::map<size_t, subtree_map<node_t, size_t>> types {
@@ -329,8 +329,8 @@ TEST_SUITE("type_scoped_resolver free functions") {
 	}
 
 	TEST_CASE("free unify (map, default_type): reports inference_error on incompatible types") {
-		tref a = tau::get("T", parse_opts_wff_no_infer);
-		tref b = tau::get("F", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
 		std::map<size_t, subtree_map<node_t, size_t>> types {
@@ -344,7 +344,7 @@ TEST_SUITE("type_scoped_resolver free functions") {
 	// unify()'s "nat never unifies" contract (see TY-1): the nat type is
 	// barred from BA unification even against itself.
 	TEST_CASE("free unify (map, default_type): nat type never unifies, even with itself") {
-		tref a = tau::get("T", parse_opts_wff_no_infer);
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t nat_tid = get_ba_type_id<node_t>(nat_type<node_t>());
 		std::map<size_t, subtree_map<node_t, size_t>> types {
 			{ 0, { { a, nat_tid } } } };

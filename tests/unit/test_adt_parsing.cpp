@@ -9,7 +9,8 @@
 
 // helper: parse a spec source into a tau tree without inference
 static tref parse_no_infer(const std::string& src) {
-	return tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
+	return tau::get(src, { .infer_ba_types = false, .flatten_adts = false })
+		.value_or(nullptr);
 }
 
 TEST_SUITE("adt grammar") {
@@ -32,10 +33,9 @@ TEST_SUITE("adt grammar") {
 	// production STAYS in parser/tau.tgf as committed -- removing it
 	// re-drifted unrelated nonterminal-id-derived test orderings and
 	// deterministically tripped an unrelated, pre-existing latent DBG
-	// assertion in anti_prenex/hooks.tmpl.h (see the fixwave report's
-	// "latent bug reproducer" section), so the final reviewer sanctioned
-	// rejecting this in the FLATTENER instead of the grammar. A member_path
-	// on the def itself still PARSES (grammar unchanged)...
+	// assertion in anti_prenex/hooks.tmpl.h, so the final reviewer
+	// sanctioned rejecting this in the FLATTENER instead of the grammar.
+	// A member_path on the def itself still PARSES (grammar unchanged)...
 	TEST_CASE("io def with member path still parses at the grammar level") {
 		CHECK(parse_no_infer("p.a := in console. p[t].a = 0.") != nullptr);
 	}
@@ -48,7 +48,7 @@ TEST_SUITE("adt grammar") {
 	// (unlike parse_no_infer's `.flatten_adts = false` above): flattening
 	// is what actually performs the rejection, not parsing.
 	TEST_CASE("io def with member path is rejected by the flattener") {
-		CHECK(tau::get(std::string("p.a := in console. p[t].a = 0.")) == nullptr);
+		CHECK(tau::get(std::string("p.a := in console. p[t].a = 0.")).value_or(nullptr) == nullptr);
 	}
 	TEST_CASE("dot then space is statement end, not member") {
 		// rec_relation body ends at "x." — the following "y" starts main
@@ -59,9 +59,8 @@ TEST_SUITE("adt grammar") {
 	}
 	// Minor #9 (final review): `typed` only ever accepts a `type` (bare
 	// chars, i.e. a NAMED type) per parser/tau.tgf -- an anonymous/inline
-	// tuple annotation on a variable is rejected at the grammar level,
-	// matching the design note's "variables are annotated with named types
-	// only" (private/2026-08-05-adt-design.md, section 1).
+	// tuple annotation on a variable is rejected at the grammar level:
+	// variables are annotated with named types only.
 	TEST_CASE("anonymous tuple annotation on a variable fails to parse") {
 		CHECK(parse_no_infer("x:{a: sbf} = 0.") == nullptr);
 	}
@@ -79,11 +78,11 @@ TEST_SUITE("adt grammar") {
 	TEST_CASE("two file streams on one line are rejected, not mis-captured") {
 		CHECK(tau::get(std::string(
 			"i1:bool := in file(\"a.in\"). i2:bool := in file(\"b.in\"). "
-			"always o1[t] = i1[t].")) == nullptr);
+			"always o1[t] = i1[t].")).value_or(nullptr) == nullptr);
 	}
 	TEST_CASE("two file streams on separate lines parse fine") {
 		CHECK(tau::get(std::string(
 			"i1:bool := in file(\"a.in\").\ni2:bool := in file(\"b.in\").\n"
-			"always o1[t] = i1[t] && o2[t] = i2[t].")) != nullptr);
+			"always o1[t] = i1[t] && o2[t] = i2[t].")).value_or(nullptr) != nullptr);
 	}
 }

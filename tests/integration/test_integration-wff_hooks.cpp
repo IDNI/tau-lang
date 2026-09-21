@@ -5,8 +5,8 @@
 
 bool check_hook(const char* sample, const char* expected) {
 	auto pwff = parse_wff();
-	tref tau_sample   = tau::get(sample, pwff);
-	tref tau_expected = tau::get(expected, pwff);
+	tref tau_sample   = tau::get(sample, pwff).value_or(nullptr);
+	tref tau_expected = tau::get(expected, pwff).value_or(nullptr);
 
 #ifdef DEBUG
 	std::cout << "sample: " << string(sample) << " expected: ";

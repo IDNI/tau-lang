@@ -10,7 +10,8 @@
 // (adt_flatten's empty-registry fast path would otherwise make the second
 // call vacuous once type_defs are already erased by the hook).
 static tref flat(const std::string& src) {
-	tref t = tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
+	tref t = tau::get(src, { .infer_ba_types = false, .flatten_adts = false })
+		.value_or(nullptr);
 	if (!t) return nullptr;
 	return adt_flatten<node_t>(t);
 }
@@ -117,7 +118,8 @@ TEST_SUITE("adt flatten") {
 		// "Point" would not parse as a type_name in the later calls below.
 		tref pspec = tau::get(PT "z = 0.",
 			{ .parse = { .dynamic_ctx = &names },
-			  .infer_ba_types = false, .flatten_adts = false });
+			  .infer_ba_types = false, .flatten_adts = false })
+			.value_or(nullptr);
 		REQUIRE(pspec);
 		using tt = tau::traverser;
 		tref pdef = tt(pspec) | tau::spec | tau::definitions | tau::type_def | tt::ref;
@@ -126,13 +128,15 @@ TEST_SUITE("adt flatten") {
 
 		tref once = tau::get("ex x:Point x = 0.",
 			{ .parse = { .dynamic_ctx = &names },
-			  .infer_ba_types = false, .session_type_defs = &defs });
+			  .infer_ba_types = false, .session_type_defs = &defs })
+			.value_or(nullptr);
 		REQUIRE(once);
 		std::string printed = tau::get(once).to_str();
 
 		tref twice = tau::get(printed,
 			{ .parse = { .dynamic_ctx = &names },
-			  .infer_ba_types = false, .session_type_defs = &defs });
+			  .infer_ba_types = false, .session_type_defs = &defs })
+			.value_or(nullptr);
 		REQUIRE(twice);
 		CHECK(tau::get(once).to_str() == tau::get(twice).to_str());
 	}
@@ -230,7 +234,7 @@ TEST_SUITE("adt flatten") {
 		// spec_multiline node to erase from.
 		tau::get_options opts{ .parse = { .start = tau::spec_multiline },
 			.infer_ba_types = false, .flatten_adts = false };
-		tref t = tau::get(std::string(PT "x = 0."), opts);
+		tref t = tau::get(std::string(PT "x = 0."), opts).value_or(nullptr);
 		REQUIRE(t != nullptr);
 		tref flattened = adt_flatten<node_t>(t);
 		REQUIRE(flattened != nullptr);
@@ -302,7 +306,8 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("tuple input def expands into context") {
 		io_context<node_t> ctx;
 		tref t = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
-			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
@@ -347,7 +352,8 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("io member occurrence round-trips through print/reparse") {
 		io_context<node_t> ctx1;
 		tref t1 = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
-			"always p[t].a = 0.", { .infer_ba_types = false, .context = &ctx1 });
+			"always p[t].a = 0.", { .infer_ba_types = false, .context = &ctx1 })
+			.value_or(nullptr);
 		REQUIRE(t1 != nullptr);
 		std::string printed = tau::get(t1).to_str();
 		// Direct print assertion: renders as "p[t].a", not the internal
@@ -367,21 +373,24 @@ TEST_SUITE("adt io defs") {
 		// what a `this`-stream spec-as-a-value round trip actually relies
 		// on, not tree-shape identity.
 		io_context<node_t> ctx2;
-		tref t2 = tau::get(printed, { .infer_ba_types = false, .context = &ctx2 });
+		tref t2 = tau::get(printed, { .infer_ba_types = false, .context = &ctx2 })
+			.value_or(nullptr);
 		REQUIRE(t2 != nullptr);
 		CHECK(tau::get(t2).to_str() == printed);
 	}
 	TEST_CASE("tuple io def removed from tree") {
 		io_context<node_t> ctx;
 		tref t = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
-			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		CHECK(tau::get(t).to_str().find("Point") == std::string::npos);
 	}
 	TEST_CASE("tuple output def registers under outputs") {
 		io_context<node_t> ctx;
 		tref t = tau::get("type Point = {a: bool, b: bool}. p:Point := out console. "
-			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
@@ -397,7 +406,8 @@ TEST_SUITE("adt io defs") {
 		// entirely, which a registry-less spec would instead exercise).
 		io_context<node_t> ctx;
 		tref t = tau::get("type Point = {a: bool, b: bool}. i:bool := in console. "
-			"always i[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+			"always i[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		CHECK(ctx.adt_streams.empty());
 		CHECK(ctx.inputs.size() == 1); // the plain (non-ADT) root, untouched
@@ -406,7 +416,8 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("alias-typed io def rewrites the annotation, stays one stream") {
 		io_context<node_t> ctx;
 		tref t = tau::get("type byte = bv[8]. i:byte := in console. always i[t] = 0.",
-			{ .infer_ba_types = false, .context = &ctx });
+			{ .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		CHECK(ctx.adt_streams.empty());
 		CHECK(ctx.inputs.size() == 1); // still ONE root stream, not split into members
@@ -417,7 +428,8 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("tuple io def root has no BA type entry after flattening") {
 		io_context<node_t> ctx;
 		tref t = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
-			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		tref root_var = build_canonized_io_var<node_t>("p");
 		CHECK(ctx.type_of(root_var) == 0); // untyped: no phantom "p:Point" entry
@@ -440,7 +452,8 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("io member with a shift offset keeps the shift") {
 		io_context<node_t> ctx;
 		tref t = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
-			"always p[t] = p[t-1].", { .infer_ba_types = false, .context = &ctx });
+			"always p[t] = p[t-1].", { .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		std::string printed = tau::get(t).to_str();
 		// The shifted occurrence's members keep the t-1 offset, printed
@@ -453,18 +466,18 @@ TEST_SUITE("adt io defs") {
 		io_context<node_t> ctx;
 		CHECK(tau::get("type Point = {a: bool}. type Q = {c: bool}. "
 			"p:Point := in console. always p[t]:Q = 0.",
-			{ .infer_ba_types = false, .context = &ctx }) == nullptr);
+			{ .infer_ba_types = false, .context = &ctx }).value_or(nullptr) == nullptr);
 	}
 	TEST_CASE("output def with a member path head is rejected too") {
 		// Same I4-alt rejection as test_adt_parsing.cpp's input-side case;
 		// adt_flatten_check_io_def_head has a separate select_all pass per
 		// def kind, so the output side needs its own case.
 		CHECK(tau::get(std::string(
-			"p.a := out console. always p[t].a = 0.")) == nullptr);
+			"p.a := out console. always p[t].a = 0.")).value_or(nullptr) == nullptr);
 	}
 	TEST_CASE("tuple io def without a context is dropped, parse survives") {
 		tref t = tau::get("type Point = {a: bool}. p:Point := in console. "
-			"always x = 0.", { .infer_ba_types = false });
+			"always x = 0.", { .infer_ba_types = false }).value_or(nullptr);
 		REQUIRE(t != nullptr);
 		std::string printed = tau::get(t).to_str();
 		CHECK(printed.find("console") == std::string::npos); // def dropped
@@ -475,14 +488,14 @@ TEST_SUITE("adt io defs") {
 		// First parse: p is a tuple stream.
 		REQUIRE(tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
-			!= nullptr);
+			.value_or(nullptr) != nullptr);
 		REQUIRE(ctx.adt_streams.contains(dict("p")));
 		// Second parse, SAME ctx: p re-declared plain. The registry must be
 		// non-empty (any type_def) or the empty-registry fast path would
 		// skip the io-def rewrite entirely -- hence the unused type Q.
 		REQUIRE(tau::get("type Q = {z: bool}. p:bool := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
-			!= nullptr);
+			.value_or(nullptr) != nullptr);
 		CHECK(!ctx.adt_streams.contains(dict("p"))); // stale layout retired
 	}
 	TEST_CASE("re-declaring a tuple root is last-def-wins, like a plain stream") {
@@ -507,7 +520,8 @@ TEST_SUITE("adt io defs") {
 		REQUIRE(tau::get("type Point = {a: bool}.\n"
 			"p:Point := in file(\"x.in\").\np:Point := in file(\"y.in\").\n"
 			"always p[t].a = 0.",
-			{ .infer_ba_types = false, .context = &ctx }) != nullptr);
+			{ .infer_ba_types = false, .context = &ctx })
+			.value_or(nullptr) != nullptr);
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
 		CHECK(dict(it->second.stream_id) == "y.in"); // last def wins
@@ -522,7 +536,8 @@ TEST_SUITE("adt io defs") {
 		// the classical BA's type name, and inference (unlike the rest
 		// of this suite's flatten-only calls) actually resolves it.
 		tref t = tau::get("type Rec = {tag: bv[8], a: bool}. "
-			"r:Rec := in console. always r[t] = 0.", { .context = &ctx });
+			"r:Rec := in console. always r[t] = 0.", { .context = &ctx })
+			.value_or(nullptr);
 		REQUIRE(t != nullptr);
 		tref tag_v = build_canonized_io_var<node_t>("r.tag");
 		tref a_v   = build_canonized_io_var<node_t>("r.a");
@@ -537,7 +552,7 @@ TEST_SUITE("adt io defs") {
 		io_context<node_t> ctx;
 		CHECK(tau::get("type Point = {a: bool, b: bool}. "
 			"p:Point := in console. always (p[t].a = { #b10101010 }:bv[8]).",
-			{ .context = &ctx }) == nullptr);
+			{ .context = &ctx }).value_or(nullptr) == nullptr);
 	}
 	TEST_CASE("tuple io def root stays untyped through the REPL's cli grammar too") {
 		io_context<node_t> ctx;
@@ -552,7 +567,7 @@ TEST_SUITE("adt io defs") {
 			.reget_with_hooks = false,
 			.context = &ctx
 		};
-		tref t = tau::get(std::string(PT "p:Point := in console."), opts);
+		tref t = tau::get(std::string(PT "p:Point := in console."), opts).value_or(nullptr);
 		REQUIRE(t != nullptr);
 		tref root_var = build_canonized_io_var<node_t>("p");
 		CHECK(ctx.type_of(root_var) == 0);   // no phantom "p:Point" entry
@@ -565,31 +580,31 @@ TEST_SUITE("adt flatten hook") {
 	TEST_CASE("default get flattens and infers") {
 		// no manual adt_flatten call -- default options, so inference
 		// actually runs; bool (not sbf) is what this pack (bv, Bool) owns.
-		tref t = tau::get("type Point = {a: bool, b: bool}. ex x:Point x = 0.");
+		tref t = tau::get("type Point = {a: bool, b: bool}. ex x:Point x = 0.").value_or(nullptr);
 		REQUIRE(t != nullptr);
-		tref e = tau::get("ex x.a:bool, x.b:bool (x.a = 0 && x.b = 0).");
+		tref e = tau::get("ex x.a:bool, x.b:bool (x.a = 0 && x.b = 0).").value_or(nullptr);
 		REQUIRE(e != nullptr);
 		CHECK(tau::get(t).to_str() == tau::get(e).to_str());
 	}
 	TEST_CASE("round trip: print, reparse, same tree") {
 		// inference runs here too (default options); see above.
-		tref t = tau::get("type Point = {a: bool, b: bool}. ex x:Point x != 1.");
+		tref t = tau::get("type Point = {a: bool, b: bool}. ex x:Point x != 1.").value_or(nullptr);
 		REQUIRE(t != nullptr);
-		tref r = tau::get(tau::get(t).to_str());
+		tref r = tau::get(tau::get(t).to_str()).value_or(nullptr);
 		REQUIRE(r != nullptr);
 		CHECK(tau::get(t).to_str() == tau::get(r).to_str());
 	}
 	TEST_CASE("adt error fails the whole get") {
-		CHECK(tau::get("type Point = {a: bool, b: bool}. ex x:Point x.c = 0.") == nullptr);
+		CHECK(tau::get("type Point = {a: bool, b: bool}. ex x:Point x.c = 0.").value_or(nullptr) == nullptr);
 	}
 	TEST_CASE("alias-typed binder survives inference") {
 		// Full pipeline (flatten AND inference, default options): the
 		// alias rewrite must come out of infer_ba_types identical to the
 		// hand-written base annotation -- the alias flatten test above
 		// only compares trees with inference OFF.
-		tref t = tau::get("type byte = bv[8]. ex x:byte x = 0.");
+		tref t = tau::get("type byte = bv[8]. ex x:byte x = 0.").value_or(nullptr);
 		REQUIRE(t != nullptr);
-		tref e = tau::get("ex x:bv[8] x = 0.");
+		tref e = tau::get("ex x:bv[8] x = 0.").value_or(nullptr);
 		REQUIRE(e != nullptr);
 		CHECK(tau::get(t).to_str() == tau::get(e).to_str());
 	}

@@ -144,7 +144,8 @@ tref get_spec_multiline(const strings& src) {
 			TAU_LOG_ERROR << error;
 		return nullptr;
 	}
-	return spec.get();
+	auto r = spec.get();
+	return r.has_value() ? r.value() : nullptr;
 }
 
 bool has_main(tref fm) {
@@ -231,8 +232,9 @@ TEST_SUITE("TauSpecAdd") {
 		// the inner wff and calls set_main(), exercising the spec-type case.
 		tau_spec<node_t> helper;
 		helper.parse("xy = 0.");
-		tref spec_fm = helper.get();
-		REQUIRE( spec_fm != nullptr );
+		auto spec_fm_r = helper.get();
+		REQUIRE( spec_fm_r.has_value() );
+		tref spec_fm = spec_fm_r.value();
 		using tt = tau::traverser;
 		auto nt = tt(spec_fm) || tt::nt;
 		REQUIRE( nt == tau::spec );
@@ -247,10 +249,12 @@ TEST_SUITE("TauSpecAddAndEof") {
 		tau_spec<node_t> helper1, helper2;
 		helper1.parse("xy = 0.");
 		helper2.parse("xy = 1.");
-		tref m1 = helper1.get();
-		tref m2 = helper2.get();
-		REQUIRE( m1 != nullptr );
-		REQUIRE( m2 != nullptr );
+		auto m1_r = helper1.get();
+		auto m2_r = helper2.get();
+		REQUIRE( m1_r.has_value() );
+		REQUIRE( m2_r.has_value() );
+		tref m1 = m1_r.value();
+		tref m2 = m2_r.value();
 		tau_spec<node_t> spec;
 		CHECK( spec.add(m1) );
 		CHECK( spec.errors().empty() );
@@ -266,11 +270,11 @@ TEST_SUITE("TauSpecAddAndEof") {
 		tau_spec<node_t> spec;
 		CHECK( spec.parse("o[t] =") );   // incomplete
 		CHECK( spec.is_eof() );
-		CHECK( spec.get() == nullptr );  // too early: reported ...
+		CHECK( !spec.get().has_value() );  // too early: reported ...
 		CHECK( !spec.errors().empty() );
 		CHECK( spec.parse(" i[t].") );   // ... but the continuation still completes it
 		CHECK( !spec.is_eof() );
-		REQUIRE( spec.get() != nullptr );
+		REQUIRE( spec.get().has_value() );
 		CHECK( spec.errors().empty() );
 	}
 
@@ -279,7 +283,7 @@ TEST_SUITE("TauSpecAddAndEof") {
 	TEST_CASE("[GR-RT6] operator<<(ostream&, const tau_spec&) instantiates") {
 		tau_spec<node_t> spec;
 		REQUIRE( spec.parse("xy = 0.") );
-		REQUIRE( spec.get() != nullptr );
+		REQUIRE( spec.get().has_value() );
 		std::stringstream ss;
 		ss << spec;
 		CHECK( !ss.str().empty() );
@@ -295,7 +299,7 @@ TEST_SUITE("TauSpecGet") {
 		// parse() call after a successful get() used to silently fail.
 		tau_spec<node_t> spec;
 		REQUIRE( spec.parse("xy = 0.") );
-		REQUIRE( spec.get() != nullptr );
+		REQUIRE( spec.get().has_value() );
 		CHECK( spec.errors().empty() );
 		CHECK( spec.parse("xy = 1.") );
 	}
@@ -310,7 +314,7 @@ TEST_SUITE("TauSpecGet") {
 		CHECK( spec.is_eof() );
 		CHECK( spec.parse(" i[t].") ); // completes the expression
 		CHECK( !spec.is_eof() );
-		REQUIRE( spec.get() != nullptr );
+		REQUIRE( spec.get().has_value() );
 	}
 
 	TEST_CASE("a line failing alone is re-parsed as continuation of the previous part") {
@@ -325,8 +329,8 @@ TEST_SUITE("TauSpecGet") {
 		std::cout << "PROBE continuation errors: ";
 		for (auto& e : spec.errors()) std::cout << e << " | ";
 		std::cout << "\n";
-		tref fm = spec.get();
-		CHECK( fm != nullptr );
+		auto fm_r = spec.get();
+		CHECK( fm_r.has_value() );
 	}
 
 	TEST_CASE("a continuation that still awaits input keeps expecting more") {
@@ -338,8 +342,8 @@ TEST_SUITE("TauSpecGet") {
 		CHECK( spec.parse("&& (o2[t]") );
 		CHECK( spec.is_eof() );
 		CHECK( spec.parse("| o2[t]) = 0.") );
-		tref fm = spec.get();
-		CHECK( fm != nullptr );
+		auto fm_r = spec.get();
+		CHECK( fm_r.has_value() );
 	}
 
 	TEST_CASE("a line failing alone and with the previous part reports the error") {
@@ -349,7 +353,7 @@ TEST_SUITE("TauSpecGet") {
 		REQUIRE( spec.parse("o1[t] = 0") );
 		CHECK( !spec.parse(") ) )") );
 		CHECK( !spec.errors().empty() );
-		CHECK( spec.get() == nullptr );
+		CHECK( !spec.get().has_value() );
 	}
 
 	TEST_CASE("conflicting stream types fail to build a spec") {
@@ -357,7 +361,7 @@ TEST_SUITE("TauSpecGet") {
 		// transform, before get()'s own inference pass.
 		tau_spec<node_t> spec;
 		REQUIRE( spec.parse("o1[t]:sbf = 0 && o1[t]:tau = 0.") );
-		CHECK( spec.get() == nullptr );
+		CHECK( !spec.get().has_value() );
 		REQUIRE( !spec.errors().empty() );
 		CHECK( spec.errors()[0] == "spec failed to transform to tau tree" );
 	}
@@ -371,7 +375,7 @@ TEST_SUITE("TauSpecGet") {
 		tau_spec<node_t> spec;
 		REQUIRE( spec.parse("f(x) := x:sbf.") );
 		REQUIRE( spec.parse("o1[t]:tau = f(y).") );
-		CHECK( spec.get() == nullptr );
+		CHECK( !spec.get().has_value() );
 		REQUIRE( !spec.errors().empty() );
 		CHECK( spec.errors()[0] == "spec failed to transform to tau tree" );
 	}
@@ -387,8 +391,8 @@ TEST_SUITE("TauSpecGet") {
 		CHECK( !spec.is_eof() );
 		REQUIRE( !spec.errors().empty() );
 		const size_t n_errors = spec.errors().size();
-		CHECK( spec.get() == nullptr );
-		CHECK( spec.get() == nullptr ); // repeated call: no crash, still nullptr
+		CHECK( !spec.get().has_value() );
+		CHECK( !spec.get().has_value() ); // repeated call: no crash, still an error
 		CHECK( spec.errors().size() == n_errors );
 	}
 }

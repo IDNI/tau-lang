@@ -4,9 +4,10 @@
 //
 // variant_ba.h lifts the BA operators (&, |, ^, +, ~, == bool) to
 // std::variant<BAs...> by dispatching to the currently-active alternative.
-// Per review finding BA-12, mismatched alternatives are expected to throw
-// std::logic_error("wrong types") by design -- this file exercises both the
-// same-alternative success path and the throws-on-mismatch path.
+// When the two operands hold different alternatives, a debug or devel
+// build asserts (BA-12), and a release build returns a default-constructed
+// variant -- this file exercises both the same-alternative success path
+// and the release fallback for mismatched alternatives.
 //
 // variant_ba's operators require BAsPack<BAs...>, which in turn requires
 // cvc5::Term (aliased as `bv`) to be literally one of the alternatives
@@ -102,17 +103,53 @@ TEST_SUITE("variant boolean algebra") {
 		CHECK( s0 == false );
 	}
 
-	TEST_CASE("mismatched alternatives throw std::logic_error (BA-12)") {
+	// Compiled only outside a debug build, where the assert is compiled
+	// out and the fallback variant is the real, observable behavior.
+#ifndef DEBUG
+	TEST_CASE("mismatched alternatives fall back to a default variant (BA-12)") {
 		V a = make_bv(true);
 		V b = make_sbf("1");
 
-		CHECK_THROWS_AS( a & b, std::logic_error );
-		CHECK_THROWS_AS( a | b, std::logic_error );
-		CHECK_THROWS_AS( a ^ b, std::logic_error );
-		CHECK_THROWS_AS( a + b, std::logic_error );
+		auto check_fallback = [](const V& r) {
+			CHECK( r.index() == 0 );
+			CHECK( std::get<bv>(r).isNull() );
+		};
+
+		check_fallback( a & b );
+		check_fallback( a | b );
+		check_fallback( a ^ b );
+		check_fallback( a + b );
 
 		// order shouldn't matter
-		CHECK_THROWS_AS( b & a, std::logic_error );
-		CHECK_THROWS_AS( b | a, std::logic_error );
+		check_fallback( b & a );
+		check_fallback( b | a );
 	}
+#endif
+
+#ifdef DEBUG
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+	constexpr bool has_fork_death_check = false;
+#else
+	constexpr bool has_fork_death_check = true;
+#endif
+
+	// A debug build's assert turns a mismatched call into a real abort;
+	// only a fork can observe that without killing the whole test process.
+	TEST_CASE("mismatched alternatives abort (BA-12)"
+	          * doctest::skip(!has_fork_death_check)) {
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+		V a = make_bv(true);
+		V b = make_sbf("1");
+
+		CHECK( dies_by_sigabrt([&]{ a & b; }) );
+		CHECK( dies_by_sigabrt([&]{ a | b; }) );
+		CHECK( dies_by_sigabrt([&]{ a ^ b; }) );
+		CHECK( dies_by_sigabrt([&]{ a + b; }) );
+
+		// order shouldn't matter
+		CHECK( dies_by_sigabrt([&]{ b & a; }) );
+		CHECK( dies_by_sigabrt([&]{ b | a; }) );
+#endif
+	}
+#endif
 }

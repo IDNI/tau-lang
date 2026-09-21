@@ -34,10 +34,10 @@ static size_t widths(const std::string& term, size_t base_w, size_t& maxW) {
 		.infer_ba_types = false,
 		.reget_with_hooks = false
 	};
-	tref src = tree<node_t>::get(term, opts);
+	tref src = tree<node_t>::get(term, opts).value_or(nullptr);
 	REQUIRE(src != nullptr);
 	maxW = 0;
-	return needed_width<node_t>(src, base_w, maxW);
+	return needed_width<node_t>(src, base_w, maxW).value();
 }
 
 // Like widths(), but with type inference ON. A `{n}:bv[k]` literal's own
@@ -56,10 +56,10 @@ static size_t widths_typed(const std::string& term, size_t base_w, size_t& maxW)
 		.parse = { .start = tau::bf },
 		.reget_with_hooks = false
 	};
-	tref src = tree<node_t>::get(term, opts);
+	tref src = tree<node_t>::get(term, opts).value_or(nullptr);
 	REQUIRE(src != nullptr);
 	maxW = 0;
-	return needed_width<node_t>(src, base_w, maxW);
+	return needed_width<node_t>(src, base_w, maxW).value();
 }
 
 TEST_SUITE("bv widening - needed_width") {
@@ -110,10 +110,10 @@ TEST_SUITE("bv widening - needed_width") {
 			.parse = { .start = tau::bf },
 			.reget_with_hooks = true
 		};
-		tref src = tree<node_t>::get("x:bv[8] << { 255 }:bv[8]", opts);
+		tref src = tree<node_t>::get("x:bv[8] << { 255 }:bv[8]", opts).value_or(nullptr);
 		REQUIRE(src != nullptr);
 		size_t m = 0;
-		CHECK(needed_width<node_t>(src, 8, m) == 263);
+		CHECK(needed_width<node_t>(src, 8, m).value() == 263);
 		CHECK(m == 263);
 	}
 	TEST_CASE("opaque child (capture) propagates as 0") {
@@ -218,10 +218,10 @@ TEST_SUITE("bv widening - needed_width") {
 			.reget_with_hooks = true
 		};
 		tref src = tree<node_t>::get(
-			"x:bv[64] << { 18446744073709551615 }:bv[64]", opts);
+			"x:bv[64] << { 18446744073709551615 }:bv[64]", opts).value_or(nullptr);
 		REQUIRE(src != nullptr);
 		size_t m = 0;
-		CHECK(needed_width<node_t>(src, 64, m) == 64);
+		CHECK(needed_width<node_t>(src, 64, m).value() == 64);
 		CHECK(m == 64);
 	}
 	TEST_CASE("shift amount too large for stoull falls back to no growth") {
@@ -260,7 +260,7 @@ tref parse_wff(const std::string& s) {
 		.parse = { .start = tau::wff },
 		.reget_with_hooks = true
 	};
-	tref src = tree<node_t>::get(s, opts);
+	tref src = tree<node_t>::get(s, opts).value_or(nullptr);
 	REQUIRE(src != nullptr);
 	return src;
 }
@@ -278,7 +278,7 @@ tref find_atom(tref src, node_t::type nt) {
 // bf_cast descendant (self included) of `t`, in pre-order.
 void collect_cast_widths(tref t, std::vector<size_t>& out) {
 	const auto& n = tree<node_t>::get(t);
-	if (n.is(tau::bf_cast)) out.push_back(get_bv_width<node_t>(n.get_ba_type()));
+	if (n.is(tau::bf_cast)) out.push_back(get_bv_width<node_t>(n.get_ba_type()).value());
 	for (tref ch : n.get_children()) collect_cast_widths(ch, out);
 }
 
@@ -330,7 +330,7 @@ void check_truncating_assignment_shape(tref w, tref bare_ref, size_t base_w) {
 
 	const auto& rhs_op = tree<node_t>::get(cast_side)[0];
 	CHECK(rhs_op.value.nt == tau::bf_cast);
-	CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()) == base_w);
+	CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()).value() == base_w);
 	CHECK(wn.get_ba_type() == bv_type_id<node_t>(base_w));
 }
 
@@ -347,7 +347,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// shape).
 		tref src = parse_wff("x:bv[8] * y <= z");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 
@@ -355,7 +355,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 			== bv_type_id<node_t>(16));
 		tref mulnode = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_mul));
 		REQUIRE(mulnode != nullptr);
-		CHECK(get_bv_width<node_t>(tree<node_t>::get(mulnode).get_ba_type())
+		CHECK(get_bv_width<node_t>(tree<node_t>::get(mulnode).get_ba_type()).value()
 			== 16);
 
 		std::vector<size_t> widths_found;
@@ -383,7 +383,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref src = parse_wff("o:bv[8] = min(x * y, {200})");
 		tref atom = find_atom(src, tau::bf_eq);
 		tref o_side = tree<node_t>::get(atom).child(0);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 
@@ -404,10 +404,9 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// pointer-identical to the untouched `o` found inside `w` even
 		// though both are semantically "the same o" -- tree<node>'s
 		// hash-consing normally guarantees pointer identity for
-		// structurally-equal nodes, but apparently doesn't here (open
-		// question, not this task's implementation to chase -- see the
-		// task-4 report). subtree_equals is the codebase's own answer to
-		// exactly this: compare by structure, not by address.
+		// structurally-equal nodes, but apparently doesn't here.
+		// subtree_equals is the codebase's own answer to exactly this:
+		// compare by structure, not by address.
 		const bool child0_is_var =
 			tree<node_t>::get(wn.child(0))[0].value.nt == tau::variable;
 		const bool child1_is_var =
@@ -419,7 +418,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 
 		const auto& rhs_op = tree<node_t>::get(cast_side)[0];
 		CHECK(rhs_op.value.nt == tau::bf_cast);
-		CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()) == 8);
+		CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()).value() == 8);
 		// the atom itself resets to bv[8] (base_w), via auto-propagation
 		// from the untouched, still-bv[8] bare side
 		CHECK(wn.get_ba_type() == bv_type_id<node_t>(8));
@@ -447,7 +446,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// is a bf_eq -- both sides are extended exactly, like a comparison.
 		tref src = parse_wff("x:bv[8] * y = z * k");
 		tref atom = find_atom(src, tau::bf_eq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
@@ -464,7 +463,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// returning the identical tref (not just an equal-shaped rebuild).
 		tref src = parse_wff("x:bv[8] = y");
 		tref atom = find_atom(src, tau::bf_eq);
-		CHECK(widen_atom<node_t>(atom) == atom);
+		CHECK(widen_atom<node_t>(atom).value_or(nullptr) == atom);
 	}
 
 	TEST_CASE("cap exceeded returns nullptr") {
@@ -475,7 +474,27 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		bv_max_width_scope cap(12); // x*y at bv[8] needs 16 > 12
 		tref src = parse_wff("o:bv[8] = min(x * y, z)");
 		tref atom = find_atom(src, tau::bf_eq);
-		CHECK(widen_atom<node_t>(atom) == nullptr);
+		CHECK(widen_atom<node_t>(atom).value_or(nullptr) == nullptr);
+	}
+
+	// Same D4 cap violation, driven through the descriptor member
+	// (ba_descriptor<bv, node_t>::widen_arithmetic) rather than the lower
+	// widen_bv_arithmetic/widen_atom helpers: pins that the cap violation's
+	// reason survives as far as the mandatory-fold entry point, not just a
+	// null tref.
+	TEST_CASE("cap exceeded through the descriptor carries a report") {
+		bv_widening_scope widen;
+		bv_max_width_scope cap(12); // x*y at bv[8] needs 16 > 12
+		tref fm = parse_wff("o:bv[8] = min(x * y, z)");
+		REQUIRE(fm != nullptr);
+
+		result<tref> widened = ba_descriptor<bv, node_t>::widen_arithmetic(fm);
+
+		CHECK_FALSE(widened.has_value());
+		CHECK(widened.has_error());
+		std::ostringstream oss;
+		widened.print(oss);
+		CHECK(oss.str().find("exceeds") != std::string::npos);
 	}
 
 	TEST_CASE("idempotent (assignment shape): widen_atom(widen_atom(a)) == widen_atom(a)") {
@@ -490,10 +509,10 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// fails it).
 		tref src = parse_wff("o:bv[8] = min(x * y, {200})");
 		tref atom = find_atom(src, tau::bf_eq);
-		tref w1 = widen_atom<node_t>(atom);
+		tref w1 = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w1 != nullptr);
 		CHECK(w1 != atom); // sanity: the first call did real work
-		tref w2 = widen_atom<node_t>(w1);
+		tref w2 = widen_atom<node_t>(w1).value_or(nullptr);
 		REQUIRE(w2 != nullptr);
 		CHECK(w2 == w1);
 	}
@@ -514,16 +533,16 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// needed_width ever runs again.
 		tref src = parse_wff("x:bv[8] * y <= z");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w1 = widen_atom<node_t>(atom);
+		tref w1 = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w1 != nullptr);
 		CHECK(w1 != atom); // sanity: the first call did real work
 		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(16));
-		tref w2 = widen_atom<node_t>(w1);
+		tref w2 = widen_atom<node_t>(w1).value_or(nullptr);
 		REQUIRE(w2 != nullptr);
 		CHECK(w2 == w1);
 		// Three, then four, applications: confirm it truly saturates
 		// rather than merely surviving one extra round.
-		tref w3 = widen_atom<node_t>(w2);
+		tref w3 = widen_atom<node_t>(w2).value_or(nullptr);
 		REQUIRE(w3 != nullptr);
 		CHECK(w3 == w1);
 	}
@@ -548,15 +567,15 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// end of this test: under the bug w2 comes back typed bv[32].
 		tref src = parse_wff("x:bv[8] * y <= {200}");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w1 = widen_atom<node_t>(atom);
+		tref w1 = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w1 != nullptr);
 		CHECK(w1 != atom); // sanity: the first call did real work
 		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(16));
-		tref w2 = widen_atom<node_t>(w1);
+		tref w2 = widen_atom<node_t>(w1).value_or(nullptr);
 		REQUIRE(w2 != nullptr);
 		CHECK(w2 == w1);
 		CHECK(tree<node_t>::get(w2).get_ba_type() == bv_type_id<node_t>(16));
-		tref w3 = widen_atom<node_t>(w2);
+		tref w3 = widen_atom<node_t>(w2).value_or(nullptr);
 		REQUIRE(w3 != nullptr);
 		CHECK(w3 == w1);
 	}
@@ -573,15 +592,15 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// W-dependent semantics) before any cap notices.
 		tref src = parse_wff("x:bv[8] << {3} <= z");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w1 = widen_atom<node_t>(atom);
+		tref w1 = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w1 != nullptr);
 		CHECK(w1 != atom); // sanity: the first call did real work
 		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(11));
-		tref w2 = widen_atom<node_t>(w1);
+		tref w2 = widen_atom<node_t>(w1).value_or(nullptr);
 		REQUIRE(w2 != nullptr);
 		CHECK(w2 == w1);
 		CHECK(tree<node_t>::get(w2).get_ba_type() == bv_type_id<node_t>(11));
-		tref w3 = widen_atom<node_t>(w2);
+		tref w3 = widen_atom<node_t>(w2).value_or(nullptr);
 		REQUIRE(w3 != nullptr);
 		CHECK(w3 == w1);
 	}
@@ -603,12 +622,12 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref src = parse_wff(
 			"((bv[8]) x:bv[8]) * ((bv[8]) y:bv[8]) <= {200}:bv[8]");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
 		// ... and the result of THAT is a fixed point, as always.
-		tref w2 = widen_atom<node_t>(w);
+		tref w2 = widen_atom<node_t>(w).value_or(nullptr);
 		REQUIRE(w2 != nullptr);
 		CHECK(w2 == w);
 	}
@@ -617,17 +636,17 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// bf_interval only survives past construction as a literal 3-child
 		// node when hooks are off (with hooks on, the wff hook always
 		// splits it into wff_and(bf_lteq, bf_lteq) before widen_atom could
-		// ever see it -- see the task-4 report for the full trace); this
-		// is a defensive/structural test of the interval branch, not a
-		// claim that this shape occurs in the real hooks-on pipeline.
+		// ever see it); this is a defensive/structural test of the
+		// interval branch, not a claim that this shape occurs in the
+		// real hooks-on pipeline.
 		auto opts = tau::get_options{
 			.parse = { .start = tau::wff },
 			.reget_with_hooks = false
 		};
-		tref src = tree<node_t>::get("x <= y:bv[8] * z <= k", opts);
+		tref src = tree<node_t>::get("x <= y:bv[8] * z <= k", opts).value_or(nullptr);
 		REQUIRE(src != nullptr);
 		tref atom = find_atom(src, tau::bf_interval);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).is(tau::bf_interval));
@@ -650,7 +669,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref src = parse_wff("min(x * y, {200}) = o:bv[8]");
 		tref atom = find_atom(src, tau::bf_eq);
 		tref o_side = tree<node_t>::get(atom).child(1); // o is written second
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		check_truncating_assignment_shape(w, o_side, 8);
@@ -670,7 +689,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref src = parse_wff("o:bv[8] != min(x * y, {200})");
 		tref atom = find_atom(src, tau::bf_neq);
 		tref o_side = tree<node_t>::get(atom).child(0);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).is(tau::bf_neq)); // nt preserved
@@ -686,7 +705,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// zero-extension, only its declared width grows.
 		tref src = parse_wff("x:bv[8] << {3} <= z");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(11));
@@ -694,12 +713,12 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref shl_node = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_shl));
 		REQUIRE(shl_node != nullptr);
 		const auto& shl = tree<node_t>::get(shl_node);
-		CHECK(get_bv_width<node_t>(shl.get_ba_type()) == 11);
+		CHECK(get_bv_width<node_t>(shl.get_ba_type()).value() == 11);
 
 		// The shifted operand (x) is cast to bv[11].
 		const auto& x_op = tree<node_t>::get(shl.child(0))[0];
 		CHECK(x_op.value.nt == tau::bf_cast);
-		CHECK(get_bv_width<node_t>(x_op.get_ba_type()) == 11);
+		CHECK(get_bv_width<node_t>(x_op.get_ba_type()).value() == 11);
 
 		// The shift amount: find the ba_constant wherever it ended up --
 		// either still wrapped in a literal bf_cast (if not folded) or
@@ -710,7 +729,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 			.find_top(is<node_t>(tau::ba_constant));
 		REQUIRE(amt_const != nullptr);
 		const auto& amt = tree<node_t>::get(amt_const);
-		CHECK(get_bv_width<node_t>(amt.get_ba_type()) == 11);
+		CHECK(get_bv_width<node_t>(amt.get_ba_type()).value() == 11);
 		CHECK(std::get<bv>(amt.get_ba_constant()).getBitVectorValue(10) == "3");
 	}
 
@@ -728,7 +747,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// D2/D3 rule (ALL operators run at W).
 		tref src = parse_wff("x:bv[8] * y / z <= k");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
@@ -736,7 +755,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref div_node = tree<node_t>::get(w).find_top(is<node_t>(tau::bf_div));
 		REQUIRE(div_node != nullptr);
 		const auto& div = tree<node_t>::get(div_node);
-		CHECK(get_bv_width<node_t>(div.get_ba_type()) == 16);
+		CHECK(get_bv_width<node_t>(div.get_ba_type()).value() == 16);
 		// dividend (x*y): a bf_mul somewhere in this side, retyped bv[16]
 		// (found via find_top rather than assumed at a fixed depth, so a
 		// transparent bf_parenthesis wrapper, if any survives, can't
@@ -744,12 +763,12 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref mul_node = tree<node_t>::get(div.child(0))
 			.find_top(is<node_t>(tau::bf_mul));
 		REQUIRE(mul_node != nullptr);
-		CHECK(get_bv_width<node_t>(tree<node_t>::get(mul_node).get_ba_type())
+		CHECK(get_bv_width<node_t>(tree<node_t>::get(mul_node).get_ba_type()).value()
 			== 16);
 		// divisor z: a leaf, so widening it means wrapping it in a cast
 		const auto& divisor_op = tree<node_t>::get(div.child(1))[0];
 		CHECK(divisor_op.value.nt == tau::bf_cast);
-		CHECK(get_bv_width<node_t>(divisor_op.get_ba_type()) == 16);
+		CHECK(get_bv_width<node_t>(divisor_op.get_ba_type()).value() == 16);
 	}
 
 	TEST_CASE("opaque side: returned unchanged (same tref)") {
@@ -784,18 +803,18 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// elaborate it. (This also exercises is_side_saturated_at's own
 		// opaque-node guard on the way there: without it, checking
 		// whether the bf_add side is "already saturated" would call
-		// get_bv_width on $X's ba_type 0 and DBG-assert too.)
+		// get_bv_width on $X's ba_type 0 and report a type_error too.)
 		auto opts = tau::get_options{
 			.parse = { .start = tau::wff },
 			.infer_ba_types = false
 		};
-		tref src = tree<node_t>::get("((bv[8]) x) + $X <= z", opts);
+		tref src = tree<node_t>::get("((bv[8]) x) + $X <= z", opts).value_or(nullptr);
 		REQUIRE(src != nullptr);
 		tref atom = find_atom(src, tau::bf_lteq);
 		// Sanity: confirm the premise (a genuinely bv-family atom) before
 		// asserting on the opaque-side behavior it's meant to exercise.
 		REQUIRE(is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
-		CHECK(widen_atom<node_t>(atom) == atom);
+		CHECK(widen_atom<node_t>(atom).value_or(nullptr) == atom);
 	}
 
 	TEST_CASE("widen_term: W == base_w is the identity (same tref)") {
@@ -813,7 +832,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		REQUIRE(w != nullptr);
 		const auto& op = tree<node_t>::get(w)[0];
 		CHECK(op.value.nt == tau::bf_cast);
-		CHECK(get_bv_width<node_t>(op.get_ba_type()) == 16);
+		CHECK(get_bv_width<node_t>(op.get_ba_type()).value() == 16);
 		CHECK(tree<node_t>::subtree_equals(op.child(0), side));
 	}
 
@@ -858,7 +877,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 			tref atom = tree<node_t>::get(src).find_top(is_cmp);
 			REQUIRE(atom != nullptr);
 			const auto nt = tree<node_t>::get(atom).get_type();
-			tref w = widen_atom<node_t>(atom);
+			tref w = widen_atom<node_t>(atom).value_or(nullptr);
 			REQUIRE(w != nullptr);
 			CHECK(w != atom);
 			CHECK(tree<node_t>::get(w).get_type() == nt);
@@ -868,14 +887,14 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 			collect_cast_widths(w, widths_found);
 			CHECK(widths_found.size() == 3);
 			for (size_t cw : widths_found) CHECK(cw == 16);
-			CHECK(widen_atom<node_t>(w) == w);
+			CHECK(widen_atom<node_t>(w).value_or(nullptr) == w);
 		}
 	}
 
 	TEST_CASE("both-compound inequality: x*y != z*k is exact, no truncation") {
 		tref src = parse_wff("x:bv[8] * y != z * k");
 		tref atom = find_atom(src, tau::bf_neq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).is(tau::bf_neq)); // nt preserved
@@ -893,7 +912,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// is never cut back to 8 bits.
 		tref src = parse_wff("x:bv[8] * y = { 200 }:bv[8]");
 		tref atom = find_atom(src, tau::bf_eq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
@@ -903,7 +922,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		for (size_t cw : widths_found) CHECK(cw == 16);
 		tref c = tree<node_t>::get(w).find_top(is<node_t>(tau::ba_constant));
 		REQUIRE(c != nullptr);
-		CHECK(get_bv_width<node_t>(tree<node_t>::get(c).get_ba_type()) == 16);
+		CHECK(get_bv_width<node_t>(tree<node_t>::get(c).get_ba_type()).value() == 16);
 	}
 
 	TEST_CASE("assignment truncation with an io_var as the bare side") {
@@ -916,7 +935,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref bare = tree<node_t>::get(a.child(0))[0].value.nt == tau::variable
 			? a.child(0) : a.child(1);
 		REQUIRE(tree<node_t>::get(bare).find_top(is<node_t>(tau::io_var)) != nullptr);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		check_truncating_assignment_shape(w, bare, 8);
@@ -929,7 +948,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref bare = tree<node_t>::get(a.child(0))[0].value.nt == tau::variable
 			? a.child(0) : a.child(1);
 		REQUIRE(tree<node_t>::get(bare).find_top(is<node_t>(tau::uconst_name)) != nullptr);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		check_truncating_assignment_shape(w, bare, 8);
@@ -947,7 +966,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 			.parse = { .start = tau::wff },
 			.reget_with_hooks = false
 		};
-		tref src = tree<node_t>::get("(o:bv[8]) = x * y", opts);
+		tref src = tree<node_t>::get("(o:bv[8]) = x * y", opts).value_or(nullptr);
 		REQUIRE(src != nullptr);
 		tref atom = find_atom(src, tau::bf_eq);
 		const auto& a = tree<node_t>::get(atom);
@@ -957,7 +976,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		};
 		REQUIRE(is_o_side(a.child(0)) != is_o_side(a.child(1)));
 		const size_t o_i = is_o_side(a.child(0)) ? 0 : 1;
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		const auto& wn = tree<node_t>::get(w);
@@ -965,7 +984,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		CHECK(tree<node_t>::subtree_equals(wn.child(o_i), a.child(o_i))); // untouched
 		const auto& rhs_op = tree<node_t>::get(wn.child(1 - o_i))[0];
 		CHECK(rhs_op.value.nt == tau::bf_cast);
-		CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()) == 8);
+		CHECK(get_bv_width<node_t>(rhs_op.get_ba_type()).value() == 8);
 		std::vector<size_t> widths_found;
 		collect_cast_widths(w, widths_found);
 		CHECK(std::count(widths_found.begin(), widths_found.end(), 16) == 2);
@@ -980,7 +999,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// (bv[16]) cast around the user's (bv[8]) one, plus q's and r's.
 		tref src = parse_wff("((bv[8]) p:bv[4]) = q:bv[8] * r");
 		tref atom = find_atom(src, tau::bf_eq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != atom);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
@@ -989,7 +1008,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		CHECK(widths_found.size() == 4);
 		CHECK(std::count(widths_found.begin(), widths_found.end(), 16) == 3);
 		CHECK(std::count(widths_found.begin(), widths_found.end(), 8) == 1);
-		CHECK(widen_atom<node_t>(w) == w); // fixed point
+		CHECK(widen_atom<node_t>(w).value_or(nullptr) == w); // fixed point
 	}
 
 	TEST_CASE("a narrower user cast inside an atom: widened, then a fixed point") {
@@ -1001,7 +1020,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		// one (4 < 5), so the second call is a no-op.
 		tref src = parse_wff("((bv[4]) x:bv[8]) + y:bv[4] <= z");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w1 = widen_atom<node_t>(atom);
+		tref w1 = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w1 != nullptr);
 		CHECK(w1 != atom);
 		CHECK(tree<node_t>::get(w1).get_ba_type() == bv_type_id<node_t>(5));
@@ -1009,7 +1028,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		collect_cast_widths(w1, widths_found);
 		CHECK(std::count(widths_found.begin(), widths_found.end(), 5) == 3);
 		CHECK(std::count(widths_found.begin(), widths_found.end(), 4) == 1);
-		CHECK(widen_atom<node_t>(w1) == w1);
+		CHECK(widen_atom<node_t>(w1).value_or(nullptr) == w1);
 	}
 
 	TEST_CASE("documented residual: a hand-written canonical widened atom is a fixed point") {
@@ -1021,7 +1040,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref src = parse_wff(
 			"((bv[16]) x:bv[8]) * ((bv[16]) y:bv[8]) <= { 200 }:bv[16]");
 		tref atom = find_atom(src, tau::bf_lteq);
-		CHECK(widen_atom<node_t>(atom) == atom);
+		CHECK(widen_atom<node_t>(atom).value_or(nullptr) == atom);
 	}
 
 	TEST_CASE("not bv-family: returned unchanged (same tref)") {
@@ -1032,7 +1051,7 @@ TEST_SUITE("bv widening - atom elaboration shapes") {
 		tref src = parse_wff("x = y");
 		tref atom = find_atom(src, tau::bf_eq);
 		CHECK(!is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
-		CHECK(widen_atom<node_t>(atom) == atom);
+		CHECK(widen_atom<node_t>(atom).value_or(nullptr) == atom);
 	}
 }
 
@@ -1051,7 +1070,7 @@ TEST_SUITE("bv widening - whole formula pass") {
 		// there is for widen_atom's own truncating-assignment tests).
 		REQUIRE(!bv_widening);
 		tref src = parse_wff("o:bv[8] = min(x * y, {200})"); // would genuinely widen if ON
-		CHECK(widen_bv_arithmetic<node_t>(src) == src);
+		CHECK(widen_bv_arithmetic<node_t>(src).value_or(nullptr) == src);
 	}
 
 	TEST_CASE("mixed formula: only the bv atom is rewritten, the sbf atom is left alone") {
@@ -1070,11 +1089,11 @@ TEST_SUITE("bv widening - whole formula pass") {
 		tref sbf_atom = find_atom(src, tau::bf_eq);
 		REQUIRE(is_bv_type_family<node_t>(tree<node_t>::get(bv_atom).get_ba_type()));
 		REQUIRE(!is_bv_type_family<node_t>(tree<node_t>::get(sbf_atom).get_ba_type()));
-		tref direct_widened_bv_atom = widen_atom<node_t>(bv_atom);
+		tref direct_widened_bv_atom = widen_atom<node_t>(bv_atom).value_or(nullptr);
 		REQUIRE(direct_widened_bv_atom != nullptr);
 		CHECK(direct_widened_bv_atom != bv_atom); // sanity: real work to do
 
-		tref w = widen_bv_arithmetic<node_t>(src);
+		tref w = widen_bv_arithmetic<node_t>(src).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != src);
 
@@ -1104,11 +1123,11 @@ TEST_SUITE("bv widening - whole formula pass") {
 		tref src = parse_wff("all x:bv[8] all y all z (x * y <= z)");
 		tref atom = find_atom(src, tau::bf_lteq);
 		REQUIRE(is_bv_type_family<node_t>(tree<node_t>::get(atom).get_ba_type()));
-		tref direct = widen_atom<node_t>(atom);
+		tref direct = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(direct != nullptr);
 		CHECK(direct != atom); // sanity: real work to do
 
-		tref w = widen_bv_arithmetic<node_t>(src);
+		tref w = widen_bv_arithmetic<node_t>(src).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != src);
 
@@ -1139,11 +1158,11 @@ TEST_SUITE("bv widening - whole formula pass") {
 	TEST_CASE("no atom at all: fm returned unchanged (same tref)") {
 		bv_widening_scope widen;
 		tref t = parse_wff("T");
-		CHECK(widen_bv_arithmetic<node_t>(t) == t);
+		CHECK(widen_bv_arithmetic<node_t>(t).value_or(nullptr) == t);
 		// A formula whose only atom folded away at parse time has none
 		// left for the pass either: X <= top is T by a BA identity.
 		tref folded = parse_wff("x:bv[8] * y <= { 255 }:bv[8]");
-		CHECK(widen_bv_arithmetic<node_t>(folded) == folded);
+		CHECK(widen_bv_arithmetic<node_t>(folded).value_or(nullptr) == folded);
 	}
 
 	TEST_CASE("all atoms already at base width: fm returned unchanged (same tref)") {
@@ -1153,7 +1172,7 @@ TEST_SUITE("bv widening - whole formula pass") {
 		bv_widening_scope widen;
 		tref src = parse_wff(
 			"(x:bv[8] = y) && (a = b) && (z:bv[8] - w <= k)");
-		CHECK(widen_bv_arithmetic<node_t>(src) == src);
+		CHECK(widen_bv_arithmetic<node_t>(src).value_or(nullptr) == src);
 	}
 
 	TEST_CASE("several atoms with different widths are each widened to their own W") {
@@ -1171,7 +1190,7 @@ TEST_SUITE("bv widening - whole formula pass") {
 		}
 		REQUIRE(pq != nullptr);
 
-		tref w = widen_bv_arithmetic<node_t>(src);
+		tref w = widen_bv_arithmetic<node_t>(src).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != src);
 		// x*y <= z: comparison at W = 16.
@@ -1198,13 +1217,13 @@ TEST_SUITE("bv widening - whole formula pass") {
 		CHECK(widened_eqs == 1);
 		CHECK(untouched_eqs == 1);
 		// The whole pass is a fixed point of itself.
-		CHECK(widen_bv_arithmetic<node_t>(w) == w);
+		CHECK(widen_bv_arithmetic<node_t>(w).value_or(nullptr) == w);
 	}
 
 	TEST_CASE("atoms under negation and disjunction are rewritten too") {
 		bv_widening_scope widen;
 		tref src = parse_wff("!(x:bv[8] * y <= z) || (o:bv[8] != a * b)");
-		tref w = widen_bv_arithmetic<node_t>(src);
+		tref w = widen_bv_arithmetic<node_t>(src).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(w != src);
 		// The negated comparison (whatever nt the hooks fold `!(<=)` to)
@@ -1235,7 +1254,7 @@ TEST_SUITE("bv widening - whole formula pass") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12); // x*y at bv[8] needs 16 > 12
 		tref src = parse_wff("(o:bv[8] = min(x * y, z)) && (p:bv[8] = w + w2)");
-		CHECK(widen_bv_arithmetic<node_t>(src) == nullptr);
+		CHECK(widen_bv_arithmetic<node_t>(src).value_or(nullptr) == nullptr);
 	}
 }
 
@@ -1273,7 +1292,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 			bv_widening_scope widen;
 			fm = parse_wff("{ 16 }:bv[8] * { 16 }:bv[8] <= { 10 }:bv[8]");
 			CHECK( !is_bv_formula_valid<node_t>(
-				widen_bv_arithmetic<node_t>(fm)) );
+				widen_bv_arithmetic<node_t>(fm).value_or(nullptr)) );
 		}
 		REQUIRE(!bv_widening);
 		CHECK( is_bv_formula_valid<node_t>(fm) );
@@ -1284,7 +1303,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// o:bv[8] = min({16}*{16}, {200}): exact min(256,200)=200 ->
 		// the truncating (bv[8]) cast is lossless and o solves to 200.
 		auto fm = parse_wff("o = min({ 16 }:bv[8] * { 16 }:bv[8], { 200 }:bv[8])");
-		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm));
+		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr));
 		REQUIRE(sol.has_value());
 		// `o` is the sole free variable (every other subterm is a
 		// constant): the same size==1 idiom test_bv_ba-solver2.cpp uses,
@@ -1308,7 +1327,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		// below a single, unambiguous code path.)
 		// Same solve+model-check shape as the checked-multiply case.
 		auto fm = parse_wff("o = min({ 200 }:bv[8] + { 90 }:bv[8], { 250 }:bv[8])");
-		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm));
+		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr));
 		REQUIRE(sol.has_value());
 		REQUIRE(sol.value().size() == 1);
 		const tref val = sol.value().begin()->second;
@@ -1333,7 +1352,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 			fm = parse_wff("({ 20 }:bv[8] * { 15 }:bv[8]) - { 10 }:bv[8] "
 				"<= { 50 }:bv[8]");
 			CHECK( !is_bv_formula_valid<node_t>(
-				widen_bv_arithmetic<node_t>(fm)) );
+				widen_bv_arithmetic<node_t>(fm).value_or(nullptr)) );
 		}
 		REQUIRE(!bv_widening);
 		CHECK( is_bv_formula_valid<node_t>(fm) );
@@ -1361,7 +1380,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 			bv_widening_scope widen;
 			fm = parse_wff(
 				"({ 16 }:bv[8] * { 16 }:bv[8])' <= { 255 }:bv[8]");
-			tref widened = widen_bv_arithmetic<node_t>(fm);
+			tref widened = widen_bv_arithmetic<node_t>(fm).value_or(nullptr);
 			REQUIRE(widened != nullptr);
 			CHECK(widened == fm); // already fully folded at parse time: no-op
 			CHECK( is_bv_formula_valid<node_t>(widened) );
@@ -1395,7 +1414,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		CHECK( is_bv_formula_sat<node_t>(fm) ); // modular
 		{
 			bv_widening_scope widen;
-			tref widened = widen_bv_arithmetic<node_t>(fm);
+			tref widened = widen_bv_arithmetic<node_t>(fm).value_or(nullptr);
 			REQUIRE(widened != nullptr);
 			INFO("widened formula: " << tree<node_t>::get(widened).to_str());
 			CHECK( !is_bv_formula_sat<node_t>(widened) ); // exact
@@ -1433,15 +1452,14 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		CHECK(normalize_and_check(sample, tau::wff_f));
 	}
 
-	// Route/eliminability audit (brief Step 5): a widened atom carries a
+	// Route/eliminability audit: a widened atom carries a
 	// bf_cast (the (bv[16]) upcast on its operands); has_bv_arithmetic
 	// (solver.tmpl.h) already treats bf_cast as arithmetic, so a widened
 	// atom routes to solve_bv, not lgrs. A quantified widened atom must
 	// still decide correctly through the FULL stack (is_tau_formula_sat),
 	// not be silently dropped by a blasting-classification mismatch
 	// between has_bv_arithmetic and atom_arith_verdict's
-	// blasting_unsupported lambda (eliminability.tmpl.h:138) -- see the
-	// report for the full read of both call sites.
+	// blasting_unsupported lambda (eliminability.tmpl.h:138).
 	TEST_CASE("route/eliminability audit: quantified widened atom stays satisfiable") {
 		bv_widening_scope widen;
 		// ex x (x*x <= {200}): x=0 makes 0<=200 true even at the exact
@@ -1543,14 +1561,6 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 	// get_executable_spec/compute_part_continuations uses to decide
 	// whether an interpreter can run a spec part) -- confirming no defect
 	// in the widened temporal/QE path for this update-shaped assignment.
-	// (An initial version of the corresponding integration test, in
-	// tests/integration/test_integration-interpreter.cpp, transiently hit
-	// a "No update performed: updated specification is unsat" warning;
-	// traced to that test's fixture pinning a conflicting baseline for
-	// o1, routing pointwise_revision through its separate "I1"
-	// last-resort-alternative path -- unrelated to this clause shape, and
-	// not reproduced here or in the corrected integration test. See the
-	// Task 8 report.)
 	//
 	// Fresh stream names o9/i9, unused elsewhere in this file, sidestep
 	// the global stream-name-type registry trap documented in
@@ -1610,7 +1620,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 // Literal-constant-only analogues of Task 6's own end-to-end samples (e.g.
 // "o = min({16}*{16}, {200})") do NOT exercise this: with both operands
 // literal, the widened RHS folds away to a single constant before blasting
-// ever sees a bf_mul/bf_min node (Task 6's own report traces this exactly).
+// ever sees a bf_mul/bf_min node.
 // These cases instead bind the variable side through a separate equality
 // conjunct (`x = { 16 }:bv[8] && ... x * { 16 }:bv[8] ...`), which pins the
 // value just as deterministically while keeping `x` a genuine `variable`
@@ -1638,9 +1648,9 @@ struct bv_blasting_scope {
 // which stage a nullptr came from), blast, then normalize the result down
 // to a printed constant.
 std::string widen_blast_normalize(tref fm) {
-	tref widened = bv_widening ? widen_bv_arithmetic<node_t>(fm) : fm;
+	tref widened = bv_widening ? widen_bv_arithmetic<node_t>(fm).value_or(nullptr) : fm;
 	if (!widened) return "widen_error";
-	tref blasted = bv_predicate_blasting<node_t>(widened);
+	tref blasted = bv_predicate_blasting<node_t>(widened).value_or(nullptr);
 	if (!blasted) return "blast_error";
 	tref result = normalizer<node_t>(blasted).value_or(nullptr);
 	if (!result) return "null";
@@ -1724,18 +1734,18 @@ TEST_SUITE("bv widening - blasting backend (Task 7)") {
 		// unrelated to this task's fix (the decline happens before
 		// build_variable is ever reached) -- kept here as the required
 		// "outside blasting's limits" companion case, confirming the
-		// widened tree still makes blasting decline CLEANLY (a nullptr
-		// return), not crash. Calling bv_predicate_blasting directly
-		// (rather than through solver.tmpl.h's has_bv_arithmetic-gated
-		// dispatch) means the cvc5 fallback this would normally trigger
-		// in production is not reachable from here -- see the task-7
-		// report for the fuller read of that route.
+		// widened tree still makes blasting decline CLEANLY (the term
+		// unchanged, not nullptr -- a decline is a legitimate value), not
+		// crash. Calling bv_predicate_blasting directly (rather than
+		// through solver.tmpl.h's has_bv_arithmetic-gated dispatch) means
+		// the cvc5 fallback this would normally trigger in production is
+		// not reachable from here.
 		bv_widening_scope widen;
 		bv_blasting_scope blast;
 		tref fm = parse_wff("o:bv[8] = min(x * y, { 200 }:bv[8])");
-		tref widened = widen_bv_arithmetic<node_t>(fm);
+		tref widened = widen_bv_arithmetic<node_t>(fm).value_or(nullptr);
 		REQUIRE(widened != nullptr);
-		CHECK(bv_predicate_blasting<node_t>(widened) == nullptr);
+		CHECK(bv_predicate_blasting<node_t>(widened).value_or(nullptr) == widened);
 	}
 }
 
@@ -1751,8 +1761,8 @@ TEST_SUITE("bv widening - blasting backend (Task 7)") {
 // `normalize_formula` + `is_tau_formula_sat` on top of that, per
 // api.tmpl.h:562-566).
 //
-// As Task 6's report establishes, `bv_widening` must be set BEFORE parsing,
-// not just before normalizing: the fit-gated constant folding in
+// `bv_widening` must be set BEFORE parsing, not just before normalizing:
+// the fit-gated constant folding in
 // `term_mul`/`term_add`/`term_sub` (Task 2) reads the same global flag at
 // construction time and leaves an overflowing constant operation symbolic
 // exactly when the flag is on -- so each side of a flip below re-parses the
@@ -1767,9 +1777,9 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// 8+8 = 16); RHS is a plain constant leaf (needed_width = 8) --
 		// NEITHER side is a bare storage term (variable/io_var), so this
 		// does not qualify for the "truncating assignment" rule. It falls
-		// to the general rule (design doc S2, "Equality between two
-		// compound sides"): extend both sides to the common W and compare
-		// EXACTLY, with nothing to truncate.
+		// to the general rule ("Equality between two compound sides"):
+		// extend both sides to the common W and compare EXACTLY, with
+		// nothing to truncate.
 		//
 		// Modular (bv_widening off): term_mul folds the constant pair at
 		// native bv[8] hardware arithmetic: 16*16 mod 256 = 0, so the
@@ -1859,8 +1869,8 @@ TEST_SUITE("bv widening - realizability on/off") {
 		// extended to W = 16 and compared EXACTLY (not mod 256). As an
 		// unsigned integer over o1's declared domain [0,255] (o1's
 		// declared width is its own range constraint regardless of
-		// widening -- design doc S2, "Variables inside arithmetic ...
-		// keep their declared sort"), o1*o1 computed exactly (never
+		// widening -- variables inside arithmetic keep their declared
+		// sort), o1*o1 computed exactly (never
 		// overflowing 16 bits, since 255*255 = 65025 < 65536) equals 0
 		// if and only if o1 = 0. The second conjunct demands o1 > 10, so
 		// no single value of o1[t] can satisfy both conjuncts at once --
@@ -1951,7 +1961,7 @@ namespace {
 // (widen_bv_arithmetic would be a pass-through anyway).
 bool sat_now(const std::string& s) {
 	tref fm = parse_wff(s);
-	tref ready = bv_widening ? widen_bv_arithmetic<node_t>(fm) : fm;
+	tref ready = bv_widening ? widen_bv_arithmetic<node_t>(fm).value_or(nullptr) : fm;
 	REQUIRE(ready != nullptr);
 	INFO("formula: " << tree<node_t>::get(ready).to_str());
 	return is_bv_formula_sat<node_t>(ready);
@@ -2097,7 +2107,7 @@ TEST_SUITE("bv widening - mixed shapes end-to-end (cvc5)") {
 		REQUIRE(!bv_widening);
 		CHECK(!is_bv_formula_valid<node_t>(parse_wff("all x (x:bv[8] * x >= x)")));
 		bv_widening_scope widen;
-		tref widened = widen_bv_arithmetic<node_t>(parse_wff("all x (x:bv[8] * x >= x)"));
+		tref widened = widen_bv_arithmetic<node_t>(parse_wff("all x (x:bv[8] * x >= x)")).value_or(nullptr);
 		REQUIRE(widened != nullptr);
 		CHECK(is_bv_formula_valid<node_t>(widened));
 	}
@@ -2137,8 +2147,8 @@ TEST_SUITE("bv widening - D4 cap propagation through the guarded entry points") 
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
 		auto opts = tau::get_options{ .parse = { .start = tau::bf } };
-		tref t1 = tree<node_t>::get("x:bv[8] * y:bv[8]", opts);
-		tref t2 = tree<node_t>::get("x:bv[8] + y:bv[8]", opts);
+		tref t1 = tree<node_t>::get("x:bv[8] * y:bv[8]", opts).value_or(nullptr);
+		tref t2 = tree<node_t>::get("x:bv[8] + y:bv[8]", opts).value_or(nullptr);
 		REQUIRE(t1 != nullptr);
 		REQUIRE(t2 != nullptr);
 		CHECK(!are_bf_equal<node_t>(t1, t2));
@@ -2176,7 +2186,7 @@ TEST_SUITE("bv widening - D4 cap propagation through the guarded entry points") 
 		bv_max_width_scope cap(16);
 		tref src = parse_wff("x:bv[8] * y <= z");
 		tref atom = find_atom(src, tau::bf_lteq);
-		tref w = widen_atom<node_t>(atom);
+		tref w = widen_atom<node_t>(atom).value_or(nullptr);
 		REQUIRE(w != nullptr);
 		CHECK(tree<node_t>::get(w).get_ba_type() == bv_type_id<node_t>(16));
 	}

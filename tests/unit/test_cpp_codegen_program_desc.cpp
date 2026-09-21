@@ -50,7 +50,7 @@ std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
 tref wff(const char* s) {
 	tau::get_options opts;
 	opts.parse.start = tau::wff;
-	return tau::get(s, opts);
+	return tau::get(s, opts).value_or(nullptr);
 }
 
 bool has(const std::string& s, const std::string& pat) {
@@ -220,10 +220,13 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("build_program_desc: revisable refuses witness outputs") {
 		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
-		CHECK_THROWS_WITH_AS(
-			build_program_desc<node_t>(*sol, "refused", /*revisable=*/true),
-			"PWR revision with data-atom outputs is not supported",
-			std::runtime_error);
+		auto d = build_program_desc<node_t>(*sol, "refused", /*revisable=*/true);
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		std::ostringstream oss;
+		d.print(oss);
+		CHECK(has(oss.str(),
+			"PWR revision with data-atom outputs is not supported"));
 	}
 
 	TEST_CASE("build_program_desc: witness output still builds when not revisable") {
@@ -261,12 +264,25 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		sol.aut.edges[0].push_back(hoa_edge{"0", 0, false});
 		sol.aut.state_accepting = {false};
 
-		CHECK_THROWS_WITH_AS(
-			build_program_desc<node_t>(sol, "untyped"),
-			"build_program_desc: variable 'o1' carries no BA type -- the "
-			"formula did not go through type inference before reaching "
-			"build_program_desc",
-			std::runtime_error);
+		auto d = build_program_desc<node_t>(sol, "untyped");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::missing_type_information));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::missing_type_information) continue;
+			if (d.report().str(n.key) ==
+				"the variable carries no BA type; the formula did not "
+				"go through type inference before reaching "
+				"build_program_desc")
+				found_summary = true;
+			if (auto name = node_attr_text(d.report(), n, label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o1");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
 	}
 
 	// ── (c) strategy_step unit cases ─────────────────────────────────────
@@ -655,7 +671,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			ctx.add_output("o", bv_type_id<node_t>(2), o);
 			ctx.add_input("i", bv_type_id<node_t>(2),
 			              std::make_shared<vector_input_stream>(strings{tape_val}));
-			auto nso = get_nso_rr<node_t>(ctx, tau::get(spec_text));
+			auto nso = get_nso_rr<node_t>(ctx, tau::get(spec_text).value_or(nullptr));
 			REQUIRE(nso.has_value());
 			tref fm = nso.value().main->get();
 			auto ran = run<node_t>(fm, ctx, 4);
@@ -815,11 +831,11 @@ TEST_SUITE("cpp_codegen_program_desc") {
 				"configure+build)");
 			return;
 		}
-		namespace fs = std::filesystem;
-		fs::path bdir = fs::temp_directory_path()
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = stdfs::temp_directory_path()
 			/ "test_cpp_codegen_hello_world_sdk_link.build";
 		std::error_code ec;
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 
 		std::string src = read_codegen_spec("hello_world.tau");
 		REQUIRE_FALSE(src.empty());
@@ -829,9 +845,11 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::steady_clock::now() - t0).count();
 		MESSAGE("hello_world compile_spec (synth+build): ", ms, " ms");
-		REQUIRE_MESSAGE(res.ok(), res.error);
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		auto run = run_capture_ec(res.exe_path);
+		auto run = run_capture_ec(res.value().exe_path);
 		MESSAGE("hello_world artifact output: ", run.out);
 		CHECK(run.exit_code == 0);
 
@@ -855,7 +873,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			pos = found + std::string(c).size();
 		}
 
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 	}
 
 	// End-to-end: echo has no bakeable witness (each step's value is its own
@@ -864,10 +882,10 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("echo.tau: compile_spec emits the artifact, "
 	          "piped inputs come back in order, exit code 0") {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
-		namespace fs = std::filesystem;
-		fs::path bdir = fs::temp_directory_path() / "_tau_cg_pd_echo";
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = stdfs::temp_directory_path() / "_tau_cg_pd_echo";
 		std::error_code ec;
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 
 		std::string src = read_codegen_spec("echo_dot.tau");
 		REQUIRE_FALSE(src.empty());
@@ -877,10 +895,12 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::steady_clock::now() - t0).count();
 		MESSAGE("echo compile_spec (synth+build): ", ms, " ms");
-		REQUIRE_MESSAGE(res.ok(), res.error);
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
 		auto run = run_capture_ec(
-			"printf '2\\n7\\n4\\n' | " + res.exe_path);
+			"printf '2\\n7\\n4\\n' | " + res.value().exe_path);
 		MESSAGE("echo artifact output: ", run.out);
 		CHECK(run.exit_code == 0);
 		// Each piped input value comes back on the o1 stream, in order
@@ -895,7 +915,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			epos = found + 1;
 		}
 
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 	}
 
 	// ── (h) program_desc::atoms (atom_desc) emission ──────────────────────
@@ -1015,11 +1035,25 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE(r.has_value());
 		auto sol = r.value();
 		REQUIRE(sol.has_value());
-		CHECK_THROWS_WITH_AS(
-			build_program_desc<node_t>(*sol, "qint_refused"),
-			"atom constant's owning BA type ':qint' declined "
-			"codegen_constant_expr; atom emission does not support this shape",
-			std::runtime_error);
+		auto d = build_program_desc<node_t>(*sol, "qint_refused");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::unsupported_operation));
+		bool found_summary = false, found_type_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (d.report().str(n.key) ==
+				"atom constant's owning BA type declined "
+				"codegen_constant_expr; atom emission does not support "
+				"this shape")
+				found_summary = true;
+			if (auto tn = node_attr_text(d.report(), n, label::type_name)) {
+				found_type_attr = true;
+				CHECK(*tn == ":qint");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_type_attr);
 	}
 
 	// Built with get_raw, not the parser: a real ba_constant folds to a
@@ -1051,11 +1085,25 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		sol.aut.edges[0].push_back(hoa_edge{"0", 0, false});
 		sol.aut.state_accepting = {false};
 
-		CHECK_THROWS_WITH_AS(
-			build_program_desc<node_t>(sol, "tau_const_refused"),
-			"atom constant's owning BA type ':tau' declined "
-			"codegen_constant_expr; atom emission does not support this shape",
-			std::runtime_error);
+		auto d = build_program_desc<node_t>(sol, "tau_const_refused");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::unsupported_operation));
+		bool found_summary = false, found_type_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (d.report().str(n.key) ==
+				"atom constant's owning BA type declined "
+				"codegen_constant_expr; atom emission does not support "
+				"this shape")
+				found_summary = true;
+			if (auto tn = node_attr_text(d.report(), n, label::type_name)) {
+				found_type_attr = true;
+				CHECK(*tn == ":tau");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_type_attr);
 	}
 
 	// Same hand-built shape, over the pack's actual bool carrier (bv[1]):
@@ -1067,7 +1115,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		size_t carrier_tid = ba_types<node_t>::id(pack_bool_carrier_type<node_t>());
 		tref io = build_in_var_at_t<node_t>(
 			build_var_name<node_t>("i1"), carrier_tid, "t");
-		size_t width = get_bv_size<node_t>(get_ba_type_tree<node_t>(carrier_tid));
+		size_t width = get_bv_size<node_t>(get_ba_type_tree<node_t>(carrier_tid)).value();
 		tref leaf = tau::get_ba_constant(
 			make_bitvector_value(width, size_t(1)), carrier_tid);
 		REQUIRE(tau::get(leaf).is_ba_constant());
@@ -1132,12 +1180,25 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 		ltl_aba_solution<node_t> sol;
 		sol.atoms.push_back({untyped, "o1"});
-		CHECK_THROWS_WITH_AS(
-			build_program_desc<node_t>(sol, "untyped_refused"),
-			"build_program_desc: variable 'o1' carries no BA type -- the "
-			"formula did not go through type inference before reaching "
-			"build_program_desc",
-			std::runtime_error);
+		auto d = build_program_desc<node_t>(sol, "untyped_refused");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::missing_type_information));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::missing_type_information) continue;
+			if (d.report().str(n.key) ==
+				"the variable carries no BA type; the formula did not "
+				"go through type inference before reaching "
+				"build_program_desc")
+				found_summary = true;
+			if (auto name = node_attr_text(d.report(), n, label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o1");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
 	}
 
 	// A self-lookback atom (o2[t] vs o2[t-1]) is two free-var nodes naming
@@ -1164,11 +1225,25 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		CHECK(d->flag_output_vars.empty());
 
 		std::ostringstream os;
-		CHECK_THROWS_WITH_AS(emit_program(*d, os),
-			"output 'o2' needs runtime witness solving, which the "
-			"standalone emitted step() does not support; drive the "
-			"program through the interpreter's table step provider",
-			std::runtime_error);
+		auto er = emit_program(*d, os);
+		CHECK_FALSE(er.has_value());
+		CHECK(er.has_error());
+		CHECK(report_has_code(er.report(), code::unsupported_operation));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : er.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (er.report().str(n.key) ==
+				"the output needs runtime witness solving, which the "
+				"standalone emitted step() does not support; drive the "
+				"program through the interpreter's table step provider")
+				found_summary = true;
+			if (auto name = node_attr_text(er.report(), n, label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o2");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
 	}
 
 	// Same self-lookback shape, inside a PWR build: the guard bit is itself

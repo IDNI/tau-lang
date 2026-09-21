@@ -45,7 +45,7 @@ namespace {
 // tref is already the folded form.
 tref bf(const std::string& sample) {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
-	tref src = tau::get(sample, opts);
+	tref src = tau::get(sample, opts).value_or(nullptr);
 	if (src == nullptr) TAU_LOG_ERROR << "bf parsing failed for: " << sample;
 	REQUIRE(src != nullptr);
 	return src;

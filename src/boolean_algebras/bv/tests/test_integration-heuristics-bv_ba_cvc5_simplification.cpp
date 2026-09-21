@@ -21,25 +21,25 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	// Variable name edge case (should not crash)
 	TEST_CASE("invalid variable syntax fails to parse") {
 		const char* sample = "|:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
 		CHECK(src == nullptr);
 	}
 
 	// Chained constant addition (should fully flatten)
 	TEST_CASE("chained addition flattening") {
 		const char* sample = "{1}:bv[8] + {2}:bv[8] + {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		const char* expected_str = "{6}:bv[8]";
-		tref expected = tau::get(expected_str, parse_opts_bf);
+		tref expected = tau::get(expected_str, parse_opts_bf).value_or(nullptr);
 		CHECK(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
 
 	TEST_CASE("not of constant") {
 		const char* sample = "{0}:bv[8]'";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
@@ -48,10 +48,10 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 		// Folded to its value at construction (cte_and normalizes, GitHub
 		// #120), so the pass is an identity on an already single constant.
 		const char* sample = "{5}:bv[8] & {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
-		CHECK( simplified == tau::get("{1}:bv[8]", parse_opts_bf) );
+		CHECK( simplified == tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr) );
 	}
 
 	TEST_CASE("nand of constants") {
@@ -60,8 +60,8 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 	// to a single constant -- the pass being an identity then is
 	// correct, so assert the folded SHAPE rather than inequality.
 		const char* sample = "{5}:bv[8] !& {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		if (simplified) CHECK( tau::get(simplified)
 			.find_top(is_child<node_t, tau::ba_constant>) );
@@ -71,17 +71,17 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 		// Folded to its value at construction (cte_or normalizes, GitHub
 		// #120), so the pass is an identity on an already single constant.
 		const char* sample = "{5}:bv[8] | {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
-		CHECK( simplified == tau::get("{7}:bv[8]", parse_opts_bf) );
+		CHECK( simplified == tau::get("{7}:bv[8]", parse_opts_bf).value_or(nullptr) );
 	}
 
 	TEST_CASE("nor of constants") {
 		// See the nand case (AP1-10).
 		const char* sample = "{5}:bv[8] !| {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		if (simplified) CHECK( tau::get(simplified)
 			.find_top(is_child<node_t, tau::ba_constant>) );
@@ -91,16 +91,16 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 		// Folded to its value at construction (cte_xor normalizes, GitHub
 		// #120), so the pass is an identity on an already single constant.
 		const char* sample = "{5}:bv[8] ^ {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
-		CHECK( simplified == tau::get("{6}:bv[8]", parse_opts_bf) );
+		CHECK( simplified == tau::get("{6}:bv[8]", parse_opts_bf).value_or(nullptr) );
 	}
 
 	TEST_CASE("xnor of constants") {
 		const char* sample = "{5}:bv[8] !^ {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		// See the nand case (AP1-10): may arrive pre-folded.
 		if (simplified) CHECK( tau::get(simplified)
@@ -112,40 +112,40 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 
 	TEST_CASE("addition of variable/constant") {
 		const char* sample = "x:bv[8] + {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("addition of constant/variable") {
 		const char* sample = "{3}:bv[8] + x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("substraction of constant/variable") {
 		const char* sample = "{1}:bv[8] - x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		// (bvadd #b00000001 (bvneg x)) cvc5 is using two's complement
 		CHECK( simplified != nullptr );
 	}
 
 	TEST_CASE("substraction of variable/constant") {
 		const char* sample = "x:bv[8] - {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		// (bvadd x #b11111101) cvc5 is using two's complement
 		CHECK( simplified != nullptr );
 	}
 
 	TEST_CASE("multiplication of variable/constant (y1)") {
 		const char* sample = "x:bv[8] * {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
@@ -154,9 +154,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	// to a concat and an extraction.
 	TEST_CASE("multiplication of variable/constant (y2)") {
 		const char* sample = "x:bv[8] * {2}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
 		REQUIRE( src != nullptr );
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		//  cvc5 returns (concat ((_ extract 6 0) x) #b0), now translated back
 		CHECK( simplified != nullptr );
 	}
@@ -165,9 +165,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	// to a concat and an extraction.
 	TEST_CASE("multiplication of variable/constant (y3)") {
 		const char* sample = "x:bv[8] * {4}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
 		REQUIRE( src != nullptr );
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		// cvc5 returns (concat ((_ extract 5 0) x) #b00), now translated back
 		CHECK( simplified != nullptr );
 	}
@@ -176,41 +176,41 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		const char* sample = "{3}:bv[8] * x:bv[8]";
 		// Cvc5 reorder the multiplication!
 		const char* result = "x:bv[8] * {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		auto expected = tau::get(result, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
+		auto expected = tau::get(result, parse_opts_bf).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
 
 	TEST_CASE("division of constant/variable") {
 		const char* sample = "{10}:bv[8] / x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("division of variable/constant") {
 		const char* sample = "x:bv[8] / {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("mod of constant/variable") {
 		const char* sample = "{10}:bv[8] % x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("mod of variable/constant") {
 		const char* sample = "x:bv[8] % {3}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
@@ -218,9 +218,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("shift right of variable/constant") {
 		const char* sample = "x:bv[8] >> {0}:bv[8]";
 		const char* result = "x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		auto expected = tau::get(result, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
+		auto expected = tau::get(result, parse_opts_bf).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -228,9 +228,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("shift right of constant/variable") {
 		const char* sample = "{0}:bv[8] >> x:bv[8]";
 		const char* result = "0:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		auto expected = tau::get(result, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
+		auto expected = tau::get(result, parse_opts_bf).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -238,9 +238,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("shift left of variable/constant") {
 		const char* sample = "x:bv[8] << {0}:bv[8]";
 		const char* result = "x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		auto expected = tau::get(result, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
+		auto expected = tau::get(result, parse_opts_bf).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -248,49 +248,49 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("shift left of constant/variable") {
 		const char* sample = "{0}:bv[8] << x:bv[8]";
 		const char* result = "0:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		auto expected = tau::get(result, parse_opts_bf);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
+		auto expected = tau::get(result, parse_opts_bf).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
 
 	TEST_CASE("not of variable") {
 		const char* sample = "x:bv[8]'";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("and of variable/constant") {
 		const char* sample = "x:bv[8] & {0}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("and of constant/variable") {
 		const char* sample = "{0}:bv[8] & x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("nand of variable/constant") {
 		const char* sample = "x:bv[8] !& {0}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("nand of constant/variable") {
 		const char* sample = "{0}:bv[8] !& x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
@@ -298,9 +298,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("or of variable/constant") {
 		const char* sample = "x:bv[8] | {0}:bv[8]";
 		const char* result = "x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref expected = tau::get(result, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get(result, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -308,25 +308,25 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("or of constant/variable") {
 		const char* sample = "{0}:bv[8] | x:bv[8]";
 		const char* result = "x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref expected = tau::get(result, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get(result, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
 
 	TEST_CASE("nor of variable/constant") {
 		const char* sample = "x:bv[8] !| {0}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
 
 	TEST_CASE("nor of constant/variable") {
 		const char* sample = "{0}:bv[8] !| x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
 	}
@@ -334,9 +334,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("xor of variable/constant") {
 		const char* sample = "x:bv[8] ^ {0}:bv[8]";
 		const char* result = "x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref expected = tau::get(result, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get(result, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -344,9 +344,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("xor of constant/variable") {
 		const char* sample = "{0}:bv[8] ^ x:bv[8]";
 		const char* result = "x:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref expected = tau::get(result, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get(result, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -354,9 +354,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("xnor of variable/constant") {
 		const char* sample = "x:bv[8] !^ {0}:bv[8]";
 		const char* result = "x:bv[8]'";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref expected = tau::get(result, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get(result, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}
@@ -364,9 +364,9 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 	TEST_CASE("xnor of constant/variable") {
 		const char* sample = "{0}:bv[8] !^ x:bv[8]";
 		const char* result = "x:bv[8]'";
-		tref src = tau::get(sample, parse_opts_bf);
-		tref expected = tau::get(result, parse_opts_bf);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get(result, parse_opts_bf).value_or(nullptr);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == expected);
 	}

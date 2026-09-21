@@ -82,7 +82,7 @@ TEST_SUITE("simplify_sbf_symbol / simplify_sbf_term") {
 
 	TEST_CASE("both are identity no-ops") {
 		auto pbf = parse_bf();
-		tref sym = tau::get("a", pbf);
+		tref sym = tau::get("a", pbf).value_or(nullptr);
 		REQUIRE(sym != nullptr);
 
 		CHECK( simplify_sbf_symbol(sym) == sym );

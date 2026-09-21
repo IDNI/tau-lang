@@ -18,14 +18,14 @@ TEST_SUITE("Configuration") {
 static tref parse_no_infer(const std::string& s) {
 	tau::get_options opts{ .parse = { .start = tau::wff },
 		.infer_ba_types = false, .reget_with_hooks = false };
-	return tau::get(s, opts);
+	return tau::get(s, opts).value_or(nullptr);
 }
 
 // Helper: parse as bf without inference
 static tref parse_bf_no_infer(const std::string& s) {
 	tau::get_options opts{ .parse = { .start = tau::bf },
 		.infer_ba_types = false, .reget_with_hooks = false };
-	return tau::get(s, opts);
+	return tau::get(s, opts).value_or(nullptr);
 }
 
 // Helper: find first node of a given type in the tree (pre-order)
@@ -235,19 +235,19 @@ TEST_SUITE("regression/typed rec-relation head with a wff body") {
 	// update pass then dereferenced it. The rejection must surface as an
 	// inference failure (whole parse yields nullptr), never as a crash.
 	TEST_CASE("a typed head with a wff body is rejected without crashing") {
-		tref n = tau::get("p(x):sbf := x = 0. T.");
+		tref n = tau::get("p(x):sbf := x = 0. T.").value_or(nullptr);
 		CHECK( n == nullptr );
 	}
 
 	// The neighbouring accepted shapes from the same sample table must
 	// keep parsing, so the rejection stays narrow.
 	TEST_CASE("a typed head with a bf body still parses") {
-		tref n = tau::get("p(x):sbf := x'. T.");
+		tref n = tau::get("p(x):sbf := x'. T.").value_or(nullptr);
 		CHECK( n != nullptr );
 	}
 
 	TEST_CASE("an untyped head with a wff body still parses") {
-		tref n = tau::get("p(x:sbf) := x = 0. T.");
+		tref n = tau::get("p(x:sbf) := x = 0. T.").value_or(nullptr);
 		CHECK( n != nullptr );
 	}
 }

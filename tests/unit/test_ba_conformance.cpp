@@ -35,7 +35,7 @@ namespace {
 template <typename BA>
 std::optional<BA> parsed_literal(const std::string& src, tref type) {
 	auto c = ba_descriptor<BA, node_t>::parse(src, type);
-	if (!c) return std::nullopt;
+	if (!c.has_value()) return std::nullopt;
 	if (!std::holds_alternative<BA>(c->first)) return std::nullopt;
 	return std::get<BA>(c->first);
 }
@@ -74,16 +74,17 @@ void check_literals_and_predicates() {
 	REQUIRE(one.has_value());
 	REQUIRE(zero.has_value());
 
-	CHECK(desc::is_one(one.value()));
-	CHECK(desc::is_zero(zero.value()));
-	CHECK_FALSE(desc::is_zero(one.value()));
-	CHECK_FALSE(desc::is_one(zero.value()));
-	CHECK(desc::is_closed(one.value()));
-	CHECK(desc::is_closed(zero.value()));
+	CHECK(desc::is_one(one.value()).value());
+	CHECK(desc::is_zero(zero.value()).value());
+	CHECK_FALSE(desc::is_zero(one.value()).value());
+	CHECK_FALSE(desc::is_one(zero.value()).value());
+	CHECK(desc::is_closed(one.value()).value());
+	CHECK(desc::is_closed(zero.value()).value());
 	// syntactic is the stronger claim of the two
-	if (desc::is_syntactic_one(one.value())) CHECK(desc::is_one(one.value()));
+	if (desc::is_syntactic_one(one.value()))
+		CHECK(desc::is_one(one.value()).value());
 	if (desc::is_syntactic_zero(zero.value()))
-		CHECK(desc::is_zero(zero.value()));
+		CHECK(desc::is_zero(zero.value()).value());
 
 	// what every alternative of the constants variant owes generic core
 	CHECK(one.value() == true);
@@ -246,7 +247,9 @@ void check_term_round_trip(tref term, size_t ba_type, tref type) {
 	using tt = typename tau::traverser;
 
 	std::stringstream ss;
-	REQUIRE(serialize_constant<node_t>(ss, term, ba_type));
+	auto ser = serialize_constant<node_t>(ss, term, ba_type);
+	REQUIRE(ser.has_value());
+	REQUIRE(ser.value());
 	const std::string src = ss.str();
 	REQUIRE(src.size() > 0);
 
@@ -256,8 +259,8 @@ void check_term_round_trip(tref term, size_t ba_type, tref type) {
 	if (auto carried = constant_of<BA>(term))
 		CHECK(desc::normalize(back.value())
 			== desc::normalize(carried.value()));
-	else if (tt(term) | tau::bf_f) CHECK(desc::is_zero(back.value()));
-	else if (tt(term) | tau::bf_t) CHECK(desc::is_one(back.value()));
+	else if (tt(term) | tau::bf_f) CHECK(desc::is_zero(back.value()).value());
+	else if (tt(term) | tau::bf_t) CHECK(desc::is_one(back.value()).value());
 }
 
 // zero_constant is the term core initializes an output of this type to
@@ -273,7 +276,7 @@ void check_constant_builders() {
 		tref zt = desc::zero_constant(ba_type);
 		REQUIRE(zt != nullptr);
 		CHECK(is<node_t>(zt, tau::bf));
-		if (auto z = constant_of<BA>(zt)) CHECK(desc::is_closed(z.value()));
+		if (auto z = constant_of<BA>(zt)) CHECK(desc::is_closed(z.value()).value());
 		check_term_round_trip<BA>(zt, ba_type, type);
 	}
 
@@ -281,7 +284,7 @@ void check_constant_builders() {
 		tref vt = desc::value_constant(ba_type, 0);
 		REQUIRE(vt != nullptr);
 		CHECK(is<node_t>(vt, tau::bf));
-		if (auto v = constant_of<BA>(vt)) CHECK(desc::is_closed(v.value()));
+		if (auto v = constant_of<BA>(vt)) CHECK(desc::is_closed(v.value()).value());
 		check_term_round_trip<BA>(vt, ba_type, type);
 	}
 }
@@ -321,8 +324,8 @@ void check_rendering() {
 		auto zero = parsed_literal<BA>(desc::literal_zero(carrier), carrier);
 		REQUIRE(one.has_value());
 		REQUIRE(zero.has_value());
-		CHECK(desc::is_one(one.value()));
-		CHECK(desc::is_zero(zero.value()));
+		CHECK(desc::is_one(one.value()).value());
+		CHECK(desc::is_zero(zero.value()).value());
 	}
 }
 
@@ -363,6 +366,25 @@ TEST_SUITE("every algebra of the configured pack") {
 	}
 }
 
+// The TODO this closes: a refusal used to reach only the log, as an empty
+// optional to the caller. Every reason in tau_spec::errors() must now
+// survive as its own line in the returned result's report.
+#ifdef TAU_PACK_HAS_BA_TAU
+TEST_SUITE("tau constant parse reports why") {
+
+	TEST_CASE("a tau constant that fails to parse carries its own reason") {
+		using tau_t = tau_ba<TAU_PACK_BASE_BAS>;
+		using desc = ba_descriptor<tau_t, node_t>;
+		auto c = desc::parse("", desc::type_tree());
+		CHECK_FALSE(c.has_value());
+		CHECK(c.has_error());
+		std::ostringstream oss;
+		c.print(oss);
+		CHECK(oss.str().find("No main formula") != std::string::npos);
+	}
+}
+#endif
+
 // What a pack WITHOUT a solver-bearing algebra must answer: the empty case
 // of every fold whose non-empty case bv exercises. Built only in such a
 // pack, so the default build never sees it and the nobv presets do.
@@ -371,10 +393,12 @@ TEST_SUITE("fold empty cases without bv") {
 	TEST_CASE("nothing in this pack solves, preprocesses or blasts") {
 		tau::get_options opts;
 		opts.parse.start = tau::wff;
-		tref fm = tau::get("x = 0", opts);
+		tref fm = tau::get("x = 0", opts).value_or(nullptr);
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(pack_can_solve<node_t>(fm));
-		CHECK(pack_preprocess<node_t>(fm) == fm);
+		auto pre = pack_preprocess<node_t>(fm);
+		REQUIRE(pre.has_value());
+		CHECK(pre.value() == fm);
 		CHECK_FALSE(pack_formula_is_preprocessable<node_t>(fm));
 		CHECK_FALSE(pack_has_preprocessing_residue<node_t>(fm));
 		static_assert(!pack_has_arithmetic_theory_v<node_t>);
@@ -387,6 +411,72 @@ TEST_SUITE("fold empty cases without bv") {
 		});
 		CHECK_FALSE(pack_type_has_codegen_witness<node_t>(
 			ba_types<node_t>::id(pack_bool_carrier_type<node_t>())));
+	}
+}
+#endif
+
+// Pins the preprocess/result<tref> contract on a BA under this test's own
+// control (ext_ba fails its preprocess on demand) rather than depending on
+// a real BA's own failure conditions; runs wherever ext is in the pack.
+#ifdef TAU_PACK_HAS_BA_EXT
+TEST_SUITE("a failed preprocess carries a report") {
+	TEST_CASE("not a null tree") {
+		using desc = ba_descriptor<ext_ba, node_t>;
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("x = 0", opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		ext_ba::fail_preprocess_ = true;
+		result<tref> pre = desc::preprocess(fm);
+		ext_ba::fail_preprocess_ = false;
+
+		CHECK_FALSE(pre.has_value());
+		CHECK(pre.has_error());
+		std::ostringstream oss;
+		pre.print(oss);
+		CHECK(oss.str().find("forced to fail") != std::string::npos);
+	}
+}
+
+// Same deterministic-hook idiom as the preprocess case above, pinning that
+// is_zero (standing in for is_zero/is_one/is_closed, all three converted the
+// same way) reports a decision failure rather than a bare false.
+TEST_SUITE("a failed is_zero carries a report") {
+	TEST_CASE("not a bare false") {
+		using desc = ba_descriptor<ext_ba, node_t>;
+
+		ext_ba::fail_is_zero_ = true;
+		result<bool> iz = desc::is_zero(ext_ba{ false });
+		ext_ba::fail_is_zero_ = false;
+
+		CHECK_FALSE(iz.has_value());
+		CHECK(iz.has_error());
+		std::ostringstream oss;
+		iz.print(oss);
+		CHECK(oss.str().find("forced to fail") != std::string::npos);
+	}
+}
+
+// Same idiom again, pinning that simplify_term reports a failure to
+// simplify rather than a bare null tree.
+TEST_SUITE("a failed simplify_term carries a report") {
+	TEST_CASE("not a null tree") {
+		using desc = ba_descriptor<ext_ba, node_t>;
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("x = 0", opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		ext_ba::fail_simplify_term_ = true;
+		result<tref> simp = desc::simplify_term(fm);
+		ext_ba::fail_simplify_term_ = false;
+
+		CHECK_FALSE(simp.has_value());
+		CHECK(simp.has_error());
+		std::ostringstream oss;
+		simp.print(oss);
+		CHECK(oss.str().find("forced to fail") != std::string::npos);
 	}
 }
 #endif

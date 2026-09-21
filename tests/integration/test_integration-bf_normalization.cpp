@@ -5,7 +5,7 @@
 
 bool bf_normalize_and_check(const char* sample_, typename node_t::type nt) {
 	auto pbf = parse_bf();
-	tref formula = tau::get(sample_, pbf);
+	tref formula = tau::get(sample_, pbf).value_or(nullptr);
 	if (!formula) return false;
 	auto nso_rr = get_nso_rr<node_t>(formula);
 	if (!nso_rr.has_value()) return false;
@@ -61,7 +61,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT problems") {
 	TEST_CASE("4 variables") {
 		const char* sample = "ex x ex y ex v ex w (x' & y & v & w') != 0.";
-		tref s = tau::get(sample);
+		tref s = tau::get(sample).value_or(nullptr);
 		CHECK( s != nullptr );
 		if (!s) return;
 		auto formula = get_nso_rr<node_t>(s);
@@ -76,7 +76,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 
 	TEST_CASE("Quantifier Alternation") {
 		const char* sample = "all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0.";
-		tref s = tau::get(sample);
+		tref s = tau::get(sample).value_or(nullptr);
 		CHECK( s != nullptr );
 		if (!s) return;
 		auto formula = get_nso_rr<node_t>(s);

@@ -15,7 +15,7 @@
 
 tt get_main(const char* sample) {
 	tau::get_options opts = { .reget_with_hooks = false };
-	return tt(tau::get(sample, opts)) | tau::spec | tau::main;
+	return tt(tau::get(sample, opts).value_or(nullptr)) | tau::spec | tau::main;
 }
 
 tt get_bf(const char* sample) {
@@ -23,7 +23,7 @@ tt get_bf(const char* sample) {
 		.parse = { .start = tau::bf },
 		.reget_with_hooks = false
 	};
-	return tt(tau::get(sample, opts));
+	return tt(tau::get(sample, opts).value_or(nullptr));
 
 }
 
@@ -31,7 +31,7 @@ tt get_rec_relation(const char* sample) {
 	tau::get_options opts = {
 		.reget_with_hooks = false
 	};
-	tref n = tau::get(sample, opts);
+	tref n = tau::get(sample, opts).value_or(nullptr);
 	return tt(n) | tau::spec | tau::definitions | tau::rec_relation;
 }
 
@@ -640,14 +640,14 @@ TEST_SUITE("regression/disallow T and F as variables") {
 	TEST_CASE("T is not a variable") {
 		const char* sample =
 			"T = 0.";
-		auto src = tau::get(sample);
+		auto src = tau::get(sample).value_or(nullptr);
 		CHECK( src == nullptr );
 	}
 
 	TEST_CASE("F is not a variable") {
 		const char* sample =
 			"F = 0.";
-		auto src = tau::get(sample);
+		auto src = tau::get(sample).value_or(nullptr);
 		CHECK( src == nullptr );
 	}
 
@@ -669,7 +669,7 @@ TEST_SUITE("regression/oversized numeric literals") {
 			"g[99999999999999999999999999](Y) := T."
 			"T.";
 		tref n = nullptr;
-		CHECK_NOTHROW( n = tau::get(sample) );
+		CHECK_NOTHROW( n = tau::get(sample).value_or(nullptr) );
 		CHECK( n == nullptr );
 	}
 
@@ -681,7 +681,7 @@ TEST_SUITE("regression/oversized numeric literals") {
 		const char* sample =
 			"g[18014398509481984](Y) := T." // 2^54
 			"T.";
-		CHECK( tau::get(sample) == nullptr );
+		CHECK( tau::get(sample).value_or(nullptr) == nullptr );
 	}
 
 	// ...while an ordinary literal must keep parsing.
@@ -694,13 +694,13 @@ TEST_SUITE("regression/oversized numeric literals") {
 		const char* sample =
 			"g[3](Y) := T."
 			"T.";
-		CHECK( tau::get(sample) != nullptr );
+		CHECK( tau::get(sample).value_or(nullptr) != nullptr );
 	}
 }
 
 TEST_SUITE("regression/get_options reused across calls") {
 
-	// tree<node>::get(const std::string&, get_options&) pointed
+	// tree<node>::get(const std::string&, get_options&).value_or(nullptr) pointed
 	// options.parse.dynamic_ctx at a function-local fallback container
 	// without resetting it before returning. A caller reusing one
 	// get_options lvalue for a second call then read a dangling pointer
@@ -711,8 +711,8 @@ TEST_SUITE("regression/get_options reused across calls") {
 			.parse = { .start = tau::wff },
 			.infer_ba_types = false, .reget_with_hooks = false
 		};
-		tref a = tau::get("T", opts);
-		tref b = tau::get("F", opts);
+		tref a = tau::get("T", opts).value_or(nullptr);
+		tref b = tau::get("F", opts).value_or(nullptr);
 		CHECK( a != nullptr );
 		CHECK( b != nullptr );
 		CHECK( opts.parse.dynamic_ctx == nullptr );

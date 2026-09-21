@@ -113,8 +113,8 @@ add_multiline_repl_test(adt-cross_line_redeclaration
 # Declaring an ADT-typed input/output stream through the REPL's def_input_cmd/
 # def_output_cmd (as opposed to a `definitions`/spec-file-level input_def)
 # used to NOT reach adt_flatten_rewrite_io_def (src/adt/adt_flatten.tmpl.h),
-# which is what groups a tuple's members behind ONE physical stream/prompt
-# (design doc sec. 4, Task 8): adt_flatten_rewrite's generic dispatch only
+# which is what groups a tuple's members behind ONE physical stream/prompt:
+# adt_flatten_rewrite's generic dispatch only
 # special-cased an input_def/output_def reached through `definitions`/
 # `spec_multiline` (the spec-file grammar), never one reached through a
 # def_input_cmd/def_output_cmd (the REPL's `cli` grammar) -- so a REPL-
@@ -158,96 +158,43 @@ add_multiline_repl_test(adt-cross_line_redeclaration
 # literal "q" there quits cleanly via finish_running(), with no error at
 # any point in the transcript.
 #
-# Round 5: FAIL_REGULAR_EXPRESSION "Error" (just above) caught a second,
-# unrelated defect once round 4's fix was actually rebuilt: the very FIRST
-# read attempt on the "i" prompt logged "(Error) Failed to read from input
-# stream 'i.a'" before the prompt was even shown, because adt_tuple_reader's
-# leaf() (src/io_context.h/.tmpl.h) turned the physical stream's ordinary
-# "no value yet" empty read into nullopt, which interpreter::read()
-# (interpreter.tmpl.h) treats as a hard failure -- unlike a plain stream,
-# whose own get() already returns a PRESENT-but-empty string for the same
-# situation, hitting read()'s quiet end-of-input path instead. Fixed by
-# making leaf() propagate an empty physical read as an empty string (not
-# nullopt); malformed non-empty literals still hard-error as before. See
-# tests/unit/test_io_context.cpp's new "reader propagates an empty physical
-# read..."/"an empty read is not memoized as a failure" cases and
-# task-9-report.md for the fix.
-# UNVERIFIED AGAINST A REBUILT BINARY (the get_applied fix, the
-# adt_tuple_reader empty-propagation fix, and this test's expectations are
-# all read from the relevant code paths, not from an actual run --
-# see task-9-report.md).
+# An empty pending read on an ADT-typed stream must stay silent.
+# A plain stream already treats an empty read this way, with no error.
+# See tests/unit/test_io_context.cpp for the reader-level cases.
 add_test(NAME "test_repl-adt-run"
 	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-adt-run" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
 	FAIL_REGULAR_EXPRESSION "Error")
 
-# Round 6: High review finding, reproduced live -- adt_tuple_reader's
-# read_time_point (src/io_context.h/.tmpl.h) used to latch a malformed-line
-# failure permanently for a time point: once one bad value was submitted,
-# EVERY later call short-circuited to the memoized failure WITHOUT ever
-# consulting the physical stream again, so a textually-valid correction
-# typed right after was silently discarded and the stream stayed stuck
-# ("Failed to read from input stream 'i.a'" forever, no q-escape before the
-# continue gate). Fixed to keep re-consulting the physical stream on retry,
-# comparing the RAW line against the one the memoized failure came from
-# (see tests/unit/test_io_context.cpp's new "a corrected line after a
-# failed one..."/"resubmitting the exact same malformed line..." cases and
-# task-9-report.md for the fix). This is the REPL-level regression test,
-# modeled on test_repl-run_cmd-retry_on_bad_value (repl_evaluator.tmpl.h's
-# own retry mechanism: continue_running re-enters the SAME time point when
-# a submitted value doesn't parse) -- a malformed wire literal is submitted
-# first (expected to log a "(Error) ADT wire: ..." parse error, same as
-# retry_on_bad_value's own "Failed to parse input value" expectation), so
-# this is the raw add_test form with a PASS regex pinning the CORRECTED o[0]
-# output rather than add_repl_test/FAIL_REGULAR_EXPRESSION "Error" (which
-# would wrongly fail on that expected mid-transcript error).
+# A malformed ADT tuple literal must re-ask for the same time point.
+# test_repl-run_cmd-retry_on_bad_value covers the same contract for a
+# scalar value, and tests/unit/test_io_context.cpp covers the reader.
 add_test(NAME "test_repl-adt-run_retry_on_bad_tuple_value"
 	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\nnot a tuple literal\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-adt-run_retry_on_bad_tuple_value" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}")
 
-# Round 7: Critical demo-extension finding (private/2026-08-06-adt-demo-
-# extension-report.md, "Defect B") -- ANY get_applied()-driven REPL command
-# after an ADT-typed `run` in the same session used to crash: SIGABRT
-# (Debug, `tau_spec.tmpl.h:142`'s `DBG(assert(false))`) / SIGSEGV (Release).
-# Root cause (gdb-confirmed against build-Debug/tau, this file's own repro
-# below): repl_evaluator's `type_defs`/`rr_defs`/`io_defs` (repl_evaluator.h)
-# used to store plain `tref` -- a raw, non-owning pointer into
-# bintree<node>'s node storage -- and none of the three are walked by any
-# `collect_live_refs` implementation `interpreter::maybe_gc()` consults
-# (interpreter.tmpl.h), so a stored entry is unprotected from
-# `bintree<node>::gc()`, which `maybe_gc()` runs once accumulated tree size
-# crosses a threshold -- something only a `run`'s per-step tree churn
-# realistically reaches (normalize/sat/solve never step the interpreter at
-# all). Confirmed live: after a sweep, `type_defs[0]` pointed at memory
-# reused for an unrelated, tiny leaf node (gdb: the freed slot's node type
-# read back as `tau_parser_nonterminals::eof`, not `type_def` -- a classic
-# dangling-pointer/memory-reuse signature, not a logic bug in `tau_spec::
-# add`'s dispatch itself), so the NEXT get_applied() call (any later
-# normalize/sat/solve/run) iterated a corrupted entry and hit the
-# `default:` "unknown node" branch. Fixed by storing `htref` (an owning
-# `std::shared_ptr<htree>`) instead of `tref` in all three vectors --
-# exactly how `history`/`H` (repl_evaluator.h) already protects itself the
-# same way, and consistent with every comment in interpreter.tmpl.h
-# explaining that a live htref keeps its node reachable through
-# `bintree<node>::gc()` via M's own weak_ptr bookkeeping. `rr_defs`/
-# `io_defs` (not just `type_defs`) had the identical latent hazard --
-# fixed identically, not just the vector this specific demo repro happened
-# to hit first (type_defs is iterated first in get_applied(), so it always
-# surfaces before rr_defs/io_defs would even be reached).
+# ANY get_applied()-driven REPL command after an ADT-typed `run` in the
+# same session used to crash: SIGABRT (Debug) / SIGSEGV (Release).
+# repl_evaluator's `type_defs`/`rr_defs`/`io_defs` (repl_evaluator.h) stored
+# plain `tref` -- a raw, non-owning pointer -- and none of the three were
+# walked by `interpreter::maybe_gc()`'s live-ref collection
+# (interpreter.tmpl.h), so a stored entry was unprotected from
+# `bintree<node>::gc()`, which a `run`'s per-step tree churn can trigger.
+# A freed slot got reused by an unrelated node, so the next get_applied()
+# call iterated a corrupted entry. Fixed by storing `htref` (an owning
+# `std::shared_ptr<htree>`) in all three vectors, the same way `history`/
+# `H` (repl_evaluator.h) already protect themselves.
 #
-# This is the requested regression test: `run` over an ADT stream, THEN a
-# plain `normalize`, THEN a second `run` over a (differently-named) ADT
-# stream, all in one session -- mirrors the report's exact crashing repro,
-# extended with the second `run` the coordinator asked for. Uses the raw
-# add_test form (interactive -X, like the other `run`-driving cases in this
-# file) but WITH FAIL_REGULAR_EXPRESSION "Error" (error-intolerant: nothing
-# here is expected to fail) -- only the final PASS_REGULAR_EXPRESSION (the
-# SECOND run's grouped output) is asserted, since reaching it at all proves
-# every earlier step (including the crash-prone normalize right after the
-# first run) already completed without crashing or being cut short.
-# Coverage round 2026-08-17 (test-coverage plan, Task 7) --------------------
+# This regression test runs `run` over an ADT stream, then a plain
+# `normalize`, then a second `run` over a differently-named ADT stream, all
+# in one session. Uses the raw add_test form (interactive -X, like the
+# other `run`-driving cases in this file) but WITH
+# FAIL_REGULAR_EXPRESSION "Error" -- only the final PASS_REGULAR_EXPRESSION
+# (the SECOND run's grouped output) is asserted, since reaching it proves
+# every earlier step completed without crashing or being cut short.
+# --------------------------------------------------------------------------
 
 # R1: the tuple console prompt is labeled with the ROOT name and a
 # wire-shaped hint (continue_running's ADT branch: find_adt_stream_for_member

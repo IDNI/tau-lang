@@ -60,7 +60,7 @@ TEST_SUITE("eliminability") {
 	static tref raw_wff(const char* s) {
 		return tau::get(s, tau::get_options{
 			.parse = { .start = tau::wff },
-			.reget_with_hooks = false });
+			.reget_with_hooks = false }).value_or(nullptr);
 	}
 
 	TEST_CASE("a variable sharing no atom with a reference is eliminable") {

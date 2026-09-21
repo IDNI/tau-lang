@@ -49,7 +49,7 @@ using namespace idni::tau_lang;
 
 namespace {
 
-namespace fs = std::filesystem;
+namespace stdfs = std::filesystem;
 
 // Fixtures the interpreter runs but compile_spec cannot yet build, so a
 // straight parity comparison would fail rather than exercise a real gap:
@@ -61,15 +61,15 @@ const std::vector<std::string> excluded_fixtures = {
 
 // Corpus directory, tried both from the ctest working directory (tests/) and
 // the repo root (a manually invoked binary's likely cwd).
-std::optional<fs::path> codegen_specs_dir() {
+std::optional<stdfs::path> codegen_specs_dir() {
 	for (const char* prefix : {"codegen_specs", "tests/codegen_specs"}) {
-		fs::path dir(prefix);
-		if (fs::exists(dir) && fs::is_directory(dir)) return dir;
+		stdfs::path dir(prefix);
+		if (stdfs::exists(dir) && stdfs::is_directory(dir)) return dir;
 	}
 	return std::nullopt;
 }
 
-std::string read_file(const fs::path& p) {
+std::string read_file(const stdfs::path& p) {
 	std::ifstream f(p, std::ios::binary);
 	if (!f) return "";
 	std::ostringstream ss;
@@ -77,9 +77,9 @@ std::string read_file(const fs::path& p) {
 	return ss.str();
 }
 
-std::vector<fs::path> discover_fixtures(const fs::path& dir) {
-	std::vector<fs::path> found;
-	for (auto& e : fs::directory_iterator(dir))
+std::vector<stdfs::path> discover_fixtures(const stdfs::path& dir) {
+	std::vector<stdfs::path> found;
+	for (auto& e : stdfs::directory_iterator(dir))
 		if (e.is_regular_file() && e.path().extension() == ".tau")
 			found.push_back(e.path());
 	std::sort(found.begin(), found.end());
@@ -88,15 +88,15 @@ std::vector<fs::path> discover_fixtures(const fs::path& dir) {
 
 // TAU_CODEGEN_PARITY_ONLY: comma-separated fixture basenames (no .tau) that
 // restrict the opt-in loop to; unset runs the corpus unfiltered, as before.
-std::vector<fs::path> filter_parity_only(std::vector<fs::path> fixtures) {
+std::vector<stdfs::path> filter_parity_only(std::vector<stdfs::path> fixtures) {
 	const char* v = std::getenv("TAU_CODEGEN_PARITY_ONLY");
 	if (!v || !*v) return fixtures;
-	std::vector<fs::path> kept;
+	std::vector<stdfs::path> kept;
 	std::stringstream ss(v);
 	for (std::string name; std::getline(ss, name, ','); ) {
 		if (name.empty()) continue;
 		auto it = std::find_if(fixtures.begin(), fixtures.end(),
-			[&](const fs::path& p) { return p.stem().string() == name; });
+			[&](const stdfs::path& p) { return p.stem().string() == name; });
 		REQUIRE_MESSAGE(it != fixtures.end(),
 			"TAU_CODEGEN_PARITY_ONLY: no fixture named \"" << name << "\"");
 		kept.push_back(*it);
@@ -150,9 +150,9 @@ bool run_parity_test() {
 // time from the tau target (tests/unit/CMakeLists.txt), when built.
 std::optional<std::string> resolve_tau_exe() {
 	if (const char* e = std::getenv("TAU_CODEGEN_TAU_EXE"); e && *e)
-		return fs::exists(e) ? std::optional(std::string(e)) : std::nullopt;
+		return stdfs::exists(e) ? std::optional(std::string(e)) : std::nullopt;
 #ifdef TAU_CLI_EXE_PATH
-	if (fs::exists(TAU_CLI_EXE_PATH)) return std::string(TAU_CLI_EXE_PATH);
+	if (stdfs::exists(TAU_CLI_EXE_PATH)) return std::string(TAU_CLI_EXE_PATH);
 #endif
 	return std::nullopt;
 }
@@ -161,11 +161,11 @@ struct proc_result { std::string out, err; int exit_code = -1; };
 
 // Run `exe_cmd`, feeding it stdin_file's content, into separate stdout/stderr
 // captures identified by `tag` (unique per fixture and side).
-proc_result run_piped(const std::string& exe_cmd, const fs::path& stdin_file,
+proc_result run_piped(const std::string& exe_cmd, const stdfs::path& stdin_file,
 	const std::string& tag)
 {
-	fs::path out_path = fs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".out");
-	fs::path err_path = fs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".err");
+	stdfs::path out_path = stdfs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".out");
+	stdfs::path err_path = stdfs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".err");
 	std::string cmd = exe_cmd
 		+ " < \"" + stdin_file.string() + "\""
 		+ " > \"" + out_path.string() + "\""
@@ -176,18 +176,18 @@ proc_result run_piped(const std::string& exe_cmd, const fs::path& stdin_file,
 	r.out = read_file(out_path);
 	r.err = read_file(err_path);
 	std::error_code ec;
-	fs::remove(out_path, ec);
-	fs::remove(err_path, ec);
+	stdfs::remove(out_path, ec);
+	stdfs::remove(err_path, ec);
 	return r;
 }
 
 // tests/codegen_specs/<name>.in sibling (literal stdin, absent = empty),
 // written to a temp file so both sides read the exact same bytes.
-fs::path write_stdin_tape(const fs::path& spec_path, const std::string& tag) {
-	fs::path in_path = spec_path;
+stdfs::path write_stdin_tape(const stdfs::path& spec_path, const std::string& tag) {
+	stdfs::path in_path = spec_path;
 	in_path.replace_extension(".in");
-	std::string content = fs::exists(in_path) ? read_file(in_path) : "";
-	fs::path tape_path = fs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".stdin");
+	std::string content = stdfs::exists(in_path) ? read_file(in_path) : "";
+	stdfs::path tape_path = stdfs::temp_directory_path() / ("_tau_cg_parity_" + tag + ".stdin");
 	std::ofstream f(tape_path, std::ios::binary);
 	f << content;
 	return tape_path;
@@ -340,9 +340,10 @@ std::optional<bool> trace_is_admissible(const std::string& spec_src,
 			if (!found) return std::nullopt;
 			size_t type_id = tau::get(found).get_ba_type();
 			if (type_id == 0) return std::nullopt;
-			tref type_tree = tau::get(found).get_ba_type_tree();
-			auto cnst = ba_constants<node_t>::get(a.value, type_tree);
-			if (!cnst) return std::nullopt;
+			auto type_tree_r = tau::get(found).get_ba_type_tree();
+			if (!type_tree_r.has_value()) return std::nullopt;
+			auto cnst = ba_constants<node_t>::get(a.value, type_tree_r.value());
+			if (!cnst.has_value()) return std::nullopt;
 			tref const_bf = build_bf_ba_constant<node_t>(
 				cnst.value().first, type_id);
 			if (is_input_var<node_t>(found)) {
@@ -435,7 +436,7 @@ TEST_SUITE("codegen_parity") {
 				p.string() << ": fixture is empty or unreadable");
 			stems.push_back(p.stem().string());
 		}
-		for (auto& e : fs::directory_iterator(*dir)) {
+		for (auto& e : stdfs::directory_iterator(*dir)) {
 			if (!e.is_regular_file() || e.path().extension() != ".in") continue;
 			std::string stem = e.path().stem().string();
 			CHECK_MESSAGE(
@@ -561,7 +562,7 @@ TEST_SUITE("codegen_parity") {
 			REQUIRE_MESSAGE(!src.empty(),
 				name << ": spec file not found or empty");
 
-			fs::path stdin_file = write_stdin_tape(spec_path, name);
+			stdfs::path stdin_file = write_stdin_tape(spec_path, name);
 			std::error_code ec;
 
 			auto t0 = std::chrono::steady_clock::now();
@@ -569,25 +570,26 @@ TEST_SUITE("codegen_parity") {
 				+ "\" -q -b off", stdin_file, name + "_cli");
 			auto cli_ms = elapsed_ms(t0);
 
-			fs::path build_dir = fs::temp_directory_path()
+			stdfs::path build_dir = stdfs::temp_directory_path()
 				/ ("_tau_cg_parity_build_" + name);
-			fs::remove_all(build_dir, ec);
+			stdfs::remove_all(build_dir, ec);
 			auto t1 = std::chrono::steady_clock::now();
 			auto res = compile_spec<node_t>(src, "", build_dir.string());
 			auto compile_ms = elapsed_ms(t1);
 			MESSAGE(name, ": tau run ", cli_ms, " ms, compile_spec ",
 				compile_ms, " ms");
 
-			if (!res.ok()) {
+			if (!res.has_value()) {
+				std::ostringstream why; res.print(why);
 				// Refusal parity: the artifact didn't build, so the CLI run
 				// must show no console-stream output either.
 				CHECK_MESSAGE(!has_console_output(cli.out),
-					name << ": compile_spec refused (" << res.error
+					name << ": compile_spec refused (" << why.str()
 					     << ") but the CLI printed console output:\n"
 					     << cli.out);
-				MESSAGE(name, ": compile_spec refused: ", res.error);
-				fs::remove_all(build_dir, ec);
-				fs::remove(stdin_file, ec);
+				MESSAGE(name, ": compile_spec refused: ", why.str());
+				stdfs::remove_all(build_dir, ec);
+				stdfs::remove(stdin_file, ec);
 				continue;
 			}
 
@@ -598,7 +600,7 @@ TEST_SUITE("codegen_parity") {
 			// variable ever needs real input) diverges on step count
 			// alone, not on interpreter/artifact semantics.
 			auto t2 = std::chrono::steady_clock::now();
-			auto artifact = run_piped("\"" + res.exe_path + "\" -q -b off",
+			auto artifact = run_piped("\"" + res.value().exe_path + "\" -q -b off",
 				stdin_file, name + "_artifact");
 			auto run_ms = elapsed_ms(t2);
 			MESSAGE(name, ": artifact run ", run_ms, " ms, exit ",
@@ -614,9 +616,9 @@ TEST_SUITE("codegen_parity") {
 				// side's trace is still admissible under the spec (e.g.
 				// qlt's "bot" vs "-1/2" print the same admissible
 				// witness differently).
-				fs::path in_path = spec_path;
+				stdfs::path in_path = spec_path;
 				in_path.replace_extension(".in");
-				std::string tape = fs::exists(in_path) ? read_file(in_path) : "";
+				std::string tape = stdfs::exists(in_path) ? read_file(in_path) : "";
 				auto cli_ok = trace_is_admissible(src,
 					extract_output_trace(cli_body), tape);
 				auto artifact_ok = trace_is_admissible(src,
@@ -659,8 +661,8 @@ TEST_SUITE("codegen_parity") {
 					"--- tau stderr ---\n", cli.err,
 					"\n--- artifact stderr ---\n", artifact.err);
 
-			fs::remove_all(build_dir, ec);
-			fs::remove(stdin_file, ec);
+			stdfs::remove_all(build_dir, ec);
+			stdfs::remove(stdin_file, ec);
 		}
 	}
 
@@ -682,24 +684,25 @@ TEST_SUITE("codegen_parity") {
 		auto dir = codegen_specs_dir();
 		REQUIRE_MESSAGE(dir.has_value(), "codegen_specs directory not found");
 		const std::string name = "ltl_lookback_under_eventuality";
-		fs::path spec_path = *dir / (name + ".tau");
+		stdfs::path spec_path = *dir / (name + ".tau");
 		std::string src = read_file(spec_path);
 		REQUIRE_MESSAGE(!src.empty(), name << ": spec file not found or empty");
 
-		fs::path stdin_file = write_stdin_tape(spec_path, name + "_stepguard");
+		stdfs::path stdin_file = write_stdin_tape(spec_path, name + "_stepguard");
 		std::error_code ec;
-		fs::path build_dir = fs::temp_directory_path()
+		stdfs::path build_dir = stdfs::temp_directory_path()
 			/ ("_tau_cg_parity_build_" + name + "_stepguard");
-		fs::remove_all(build_dir, ec);
+		stdfs::remove_all(build_dir, ec);
 
 		auto res = compile_spec<node_t>(src, "", build_dir.string());
-		REQUIRE_MESSAGE(res.ok(), name << ": compile_spec failed: " << res.error);
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), name << ": compile_spec failed: " << err.str());
 
 		// No -q: the run keeps stepping past its own eventuality instead
 		// of idling out; `timeout` is the only thing that stops it.
 		auto cli = run_piped("timeout 10 \"" + *tau_exe + "\" \""
 			+ spec_path.string() + "\" -b off", stdin_file, name + "_sg_cli");
-		auto artifact = run_piped("timeout 10 \"" + res.exe_path + "\" -b off",
+		auto artifact = run_piped("timeout 10 \"" + res.value().exe_path + "\" -b off",
 			stdin_file, name + "_sg_artifact");
 
 		auto cli_trace = extract_output_trace(extract_console_body(cli.out));
@@ -729,8 +732,8 @@ TEST_SUITE("codegen_parity") {
 				     << "] := " << artifact_trace[i].value);
 		}
 
-		fs::remove_all(build_dir, ec);
-		fs::remove(stdin_file, ec);
+		stdfs::remove_all(build_dir, ec);
+		stdfs::remove(stdin_file, ec);
 	}
 
 	// Opt-in (TAU_PHI_DELTA_SWAP_MEASURE=1): synthesis-time wall clock for
@@ -755,7 +758,7 @@ TEST_SUITE("codegen_parity") {
 		REQUIRE_MESSAGE(dir.has_value(), "codegen_specs directory not found");
 
 		for (const char* name : { "hello_world", "atomless2" }) {
-			fs::path spec_path = *dir / (std::string(name) + ".tau");
+			stdfs::path spec_path = *dir / (std::string(name) + ".tau");
 			std::string src = read_file(spec_path);
 			REQUIRE_MESSAGE(!src.empty(), name << ": spec file not found or empty");
 

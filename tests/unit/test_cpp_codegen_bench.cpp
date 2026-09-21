@@ -48,7 +48,7 @@ static std::string cg_tmp(const char* name) { return cg_tmp_dir() + "/" + name; 
 
 using namespace idni::tau_lang;
 using clk = std::chrono::steady_clock;
-namespace fs = std::filesystem;
+namespace stdfs = std::filesystem;
 
 // ── formula strings ───────────────────────────────────────────────────────────
 
@@ -102,7 +102,7 @@ static bool has_gpp() {
 // build_program_desc/emit_program directly (not compile_spec) to assert the
 // omitted ok==true invariant.
 static tref parse_formula(const char* s) {
-    auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+    auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
     if (!nso_rr.has_value()) return nullptr;
     return nso_rr.value().main->get();
 }
@@ -110,8 +110,8 @@ static tref parse_formula(const char* s) {
 // compiled_seconds' outcome: either a real wall-clock measurement, or the
 // reason there is none. `refused` distinguishes compile_spec declining the
 // spec outright (a legitimate, checked pipeline outcome -- test_codegen_parity
-// treats the same res.ok()==false as parity to verify, not a bug) from the
-// artifact actually failing to run once built (a real defect).
+// treats the same res.has_value()==false as parity to verify, not a bug) from
+// the artifact actually failing to run once built (a real defect).
 struct compiled_result {
     double seconds = -1.0;
     bool refused = false;
@@ -133,14 +133,17 @@ static compiled_result compiled_seconds(const char* formula_str,
                                const strings& input_vars,
                                const std::string& tag,
                                long N) {
-    fs::path bdir = fs::temp_directory_path() / ("_tau_bench_" + tag + ".build");
+    stdfs::path bdir = stdfs::temp_directory_path() / ("_tau_bench_" + tag + ".build");
     std::error_code ec;
-    fs::remove_all(bdir, ec);
+    stdfs::remove_all(bdir, ec);
 
     auto res = compile_spec<node_t>(formula_str, "", bdir.string());
-    if (!res.ok()) return { -1.0, true, res.error };
+    if (!res.has_value()) {
+        std::ostringstream why; res.print(why);
+        return { -1.0, true, why.str() };
+    }
 
-    fs::path tape = fs::temp_directory_path() / ("_tau_bench_" + tag + ".stdin");
+    stdfs::path tape = stdfs::temp_directory_path() / ("_tau_bench_" + tag + ".stdin");
     {
         std::ofstream f(tape);
         for (long t = 0; t < N; ++t) {
@@ -149,16 +152,16 @@ static compiled_result compiled_seconds(const char* formula_str,
         }
     }
 
-    fs::path out = fs::temp_directory_path() / ("_tau_bench_" + tag + ".out");
-    std::string cmd = "\"" + res.exe_path + "\" < \"" + tape.string()
+    stdfs::path out = stdfs::temp_directory_path() / ("_tau_bench_" + tag + ".out");
+    std::string cmd = "\"" + res.value().exe_path + "\" < \"" + tape.string()
                      + "\" > \"" + out.string() + "\" 2>/dev/null";
     auto t0 = clk::now();
     int rc = ::system(cmd.c_str());
     auto t1 = clk::now();
 
-    fs::remove_all(bdir, ec);
-    fs::remove(tape, ec);
-    fs::remove(out, ec);
+    stdfs::remove_all(bdir, ec);
+    stdfs::remove(tape, ec);
+    stdfs::remove(out, ec);
     if (rc != 0) return { -1.0, false, "artifact exited with a nonzero status" };
     return { std::chrono::duration<double>(t1 - t0).count(), false, "" };
 }
@@ -183,7 +186,7 @@ static double interp_seconds(const char* formula_str,
         out_streams.push_back(s);
         ctx.add_output(ov, tau_type_id<node_t>(), s);
     }
-    auto nso = get_nso_rr<node_t>(ctx, tau::get(formula_str));
+    auto nso = get_nso_rr<node_t>(ctx, tau::get(formula_str).value_or(nullptr));
     if (!nso.has_value()) return -1.0;
     tref fm = nso.value().main->get();
     if (!fm) return -1.0;
@@ -282,8 +285,8 @@ TEST_SUITE("cpp_codegen_bench") {
 
             // compile_spec declining the spec outright is a legitimate,
             // checked pipeline outcome (test_codegen_parity treats the same
-            // res.ok()==false as parity to verify, not a bug) -- report and
-            // move on rather than failing the whole suite over it.
+            // res.has_value()==false as parity to verify, not a bug) -- report
+            // and move on rather than failing the whole suite over it.
             if (cres.refused) {
                 MESSAGE("Compiled    : SKIPPED (compile_spec refused: "
                         << cres.error << ")");

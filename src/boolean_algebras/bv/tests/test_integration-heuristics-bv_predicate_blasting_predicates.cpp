@@ -28,7 +28,7 @@ TEST_SUITE("bitblasting") {
 		for (const auto& rule : rules)
 			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
 		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvlt_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvlt_rule<node>(2).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 
 	}
@@ -41,7 +41,7 @@ TEST_SUITE("bitblasting") {
 		for (const auto& rule : rules)
 			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
 		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvgt_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvgt_rule<node>(2).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -49,7 +49,7 @@ TEST_SUITE("bitblasting") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "bvshl_by_one_rules:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_by_one_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_by_one_rule<node>(2).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -57,7 +57,7 @@ TEST_SUITE("bitblasting") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "bvshr_by_one_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_by_one_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_by_one_rule<node>(2).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -90,7 +90,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		tref bit0 = bit<node>(x, 0);
+		tref bit0 = bit<node>(x, 0).value_or(nullptr);
 		// bit(x, 0) is the AND of x with the { 1 } bitmask (bit 0 selector)
 		CHECK( tau::get(bit0).find_top(is<node, tau::bf_and>) != nullptr );
 	}
@@ -101,8 +101,12 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto shifted = tau::build_bf_variable(bv_type_id<node>(4));
-		tref shl1 = bvshl_by_one<node>(x, shifted);
-		tref shr1 = bvshr_by_one<node>(x, shifted);
+		auto shl1_r = bvshl_by_one<node>(x, shifted);
+		auto shr1_r = bvshr_by_one<node>(x, shifted);
+		REQUIRE( shl1_r.has_value() );
+		REQUIRE( shr1_r.has_value() );
+		tref shl1 = shl1_r.value();
+		tref shr1 = shr1_r.value();
 		CHECK( tau::get(shl1) != tau::get(shr1) );
 		CHECK( is_non_temp_nso_satisfiable<node>(shl1).value() );
 		CHECK( is_non_temp_nso_satisfiable<node>(shr1).value() );
@@ -117,7 +121,7 @@ TEST_SUITE("bitblasting") {
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
 		auto z = tau::build_bf_variable(bv_type_id<node>(4));
 		TAU_LOG_INFO << "bvadd:\n";
-		TAU_LOG_INFO << tau::get(bvadd<node>(x, y, z, aux)).to_str() << "\n";
+		TAU_LOG_INFO << tau::get(bvadd<node>(x, y, z, aux).value_or(nullptr)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -130,7 +134,7 @@ TEST_SUITE("bitblasting") {
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
 		auto z = tau::build_bf_variable(bv_type_id<node>(4));
 		TAU_LOG_INFO << "bvsub:\n";
-		TAU_LOG_INFO << tau::get(bvsub<node>(x, y, z, aux)).to_str() << "\n";
+		TAU_LOG_INFO << tau::get(bvsub<node>(x, y, z, aux).value_or(nullptr)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -139,7 +143,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvshl_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1))).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -148,7 +152,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvshr_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1))).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -161,7 +165,7 @@ TEST_SUITE("bitblasting") {
 		auto z = tau::build_bf_variable(bv_type_id<node>(4));
 		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
 		TAU_LOG_INFO << "bvmul:\n";
-		TAU_LOG_INFO << tau::get(bvmul<node>(x, c, z, aux)).to_str() << "\n";
+		TAU_LOG_INFO << tau::get(bvmul<node>(x, c, z, aux).value_or(nullptr)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -174,7 +178,7 @@ TEST_SUITE("bitblasting") {
 		auto q = tau::build_bf_variable(bv_type_id<node>(4));
 		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
 		TAU_LOG_INFO << "bvdiv:\n";
-		TAU_LOG_INFO << tau::get(bvdiv<node>(x, c, q, aux)).to_str() << "\n";
+		TAU_LOG_INFO << tau::get(bvdiv<node>(x, c, q, aux).value_or(nullptr)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -187,7 +191,7 @@ TEST_SUITE("bitblasting") {
 		auto r = tau::build_bf_variable(bv_type_id<node>(4));
 		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
 		TAU_LOG_INFO << "bvmod:\n";
-		TAU_LOG_INFO << tau::get(bvmod<node>(x, c, r, aux)).to_str() << "\n";
+		TAU_LOG_INFO << tau::get(bvmod<node>(x, c, r, aux).value_or(nullptr)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -205,7 +209,7 @@ TEST_SUITE("bitblasting") {
 		auto q = tau::build_bf_variable(bv_type_id<node>(4));
 		auto r = tau::build_bf_variable(bv_type_id<node>(4));
 		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 3));
-		tref constraint = bved<node>(x, c, q, r, aux);
+		tref constraint = bved<node>(x, c, q, r, aux).value_or(nullptr);
 		tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, bv_constant<node_t>(4, 10)));
 		tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, bv_constant<node_t>(4, 3)));
 		tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, bv_constant<node_t>(4, 1)));
@@ -226,7 +230,7 @@ TEST_SUITE("bitblasting") {
 		for (const auto& rule : rules)
 			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
 		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -247,8 +251,8 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		CHECK( tau::get(bvlteq<node>(x, y))
-			== tau::get(tau::build_wff_neg(bvgt<node>(x, y))) );
+		CHECK( tau::get(bvlteq<node>(x, y).value_or(nullptr))
+			== tau::get(tau::build_wff_neg(bvgt<node>(x, y).value_or(nullptr))) );
 	}
 
 	TEST_CASE("bvgteq delegates to bvlt") {
@@ -257,8 +261,8 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		CHECK( tau::get(bvgteq<node>(x, y))
-			== tau::get(tau::build_wff_neg(bvlt<node>(x, y))) );
+		CHECK( tau::get(bvgteq<node>(x, y).value_or(nullptr))
+			== tau::get(tau::build_wff_neg(bvlt<node>(x, y).value_or(nullptr))) );
 	}
 
 	TEST_CASE("bvnlteq delegates to bvgt") {
@@ -267,7 +271,7 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		CHECK( tau::get(bvnlteq<node>(x, y)) == tau::get(bvgt<node>(x, y)) );
+		CHECK( tau::get(bvnlteq<node>(x, y).value_or(nullptr)) == tau::get(bvgt<node>(x, y).value_or(nullptr)) );
 	}
 
 	TEST_CASE("bvnlt delegates to bvgteq") {
@@ -276,7 +280,7 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		CHECK( tau::get(bvnlt<node>(x, y)) == tau::get(bvgteq<node>(x, y)) );
+		CHECK( tau::get(bvnlt<node>(x, y).value_or(nullptr)) == tau::get(bvgteq<node>(x, y).value_or(nullptr)) );
 	}
 
 	TEST_CASE("bvngt delegates to bvlteq") {
@@ -285,7 +289,7 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		CHECK( tau::get(bvngt<node>(x, y)) == tau::get(bvlteq<node>(x, y)) );
+		CHECK( tau::get(bvngt<node>(x, y).value_or(nullptr)) == tau::get(bvlteq<node>(x, y).value_or(nullptr)) );
 	}
 
 	TEST_CASE("bvngteq delegates to bvlt") {
@@ -294,7 +298,7 @@ TEST_SUITE("bitblasting") {
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		CHECK( tau::get(bvngteq<node>(x, y)) == tau::get(bvlt<node>(x, y)) );
+		CHECK( tau::get(bvngteq<node>(x, y).value_or(nullptr)) == tau::get(bvlt<node>(x, y).value_or(nullptr)) );
 	}
 
 	TEST_CASE("bvneq: x != x is never satisfiable") {
@@ -306,7 +310,7 @@ TEST_SUITE("bitblasting") {
 		// bitwidth get_bv_type_bitwidth can read, so the recurrence built
 		// around it never resolves.
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		tref pred_same = bvneq<node>(x, x);
+		tref pred_same = bvneq<node>(x, x).value_or(nullptr);
 		auto normalized = normalizer<node>(pred_same);
 		REQUIRE( normalized.has_value() );
 		CHECK( tau::get(normalized.value()).equals_F() );
@@ -321,17 +325,17 @@ TEST_SUITE("bvcast") {
 		auto src    = tau::build_bf_variable(bv_type_id<node>(2));
 		auto result = tau::build_bf_variable(bv_type_id<node>(4));
 		// Expanded bit-equality + zero predicates for a 2->4 zero-extension
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1));
+		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
+		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
+		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
+		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
 		TAU_LOG_INFO << "bvcast zext bv[2]->bv[4]: bit-equality predicates\n";
 		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2))).to_str() << "\n";
-		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3))).to_str() << "\n";
+		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2).value_or(nullptr))).to_str() << "\n";
+		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3).value_or(nullptr))).to_str() << "\n";
 		TAU_LOG_INFO << "------\n";
 	}
 
@@ -341,10 +345,10 @@ TEST_SUITE("bvcast") {
 		auto src    = tau::build_bf_variable(bv_type_id<node>(4));
 		auto result = tau::build_bf_variable(bv_type_id<node>(2));
 		// Expanded bit-equality predicates for a 4->2 truncation (low 2 bits only)
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1));
+		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
+		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
+		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
+		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
 		TAU_LOG_INFO << "bvcast trunc bv[4]->bv[2]: bit-equality predicates\n";
 		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
@@ -361,7 +365,7 @@ TEST_SUITE("bvcast") {
 		for (const auto& rule : rules)
 			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
 		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2).value()) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 }
@@ -374,17 +378,17 @@ TEST_SUITE("bvcast") {
 		auto src    = tau::build_bf_variable(bv_type_id<node>(2));
 		auto result = tau::build_bf_variable(bv_type_id<node>(4));
 		// Expanded bit-equality + zero predicates for a 2->4 zero-extension
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1));
+		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
+		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
+		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
+		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
 		TAU_LOG_INFO << "bvcast zext bv[2]->bv[4]: bit-equality predicates\n";
 		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2))).to_str() << "\n";
-		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3))).to_str() << "\n";
+		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2).value_or(nullptr))).to_str() << "\n";
+		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3).value_or(nullptr))).to_str() << "\n";
 		TAU_LOG_INFO << "------\n";
 	}
 
@@ -394,10 +398,10 @@ TEST_SUITE("bvcast") {
 		auto src    = tau::build_bf_variable(bv_type_id<node>(4));
 		auto result = tau::build_bf_variable(bv_type_id<node>(2));
 		// Expanded bit-equality predicates for a 4->2 truncation (low 2 bits only)
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1));
+		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
+		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
+		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
+		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
 		TAU_LOG_INFO << "bvcast trunc bv[4]->bv[2]: bit-equality predicates\n";
 		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
@@ -414,8 +418,8 @@ TEST_SUITE("bvcast") {
 TEST_SUITE("bv predicate blasting: every comparison operator") {
 	using node = node_t;
 	static bool blasted_is_T(const char* spec) {
-		tref fm = get_nso_rr<node>(tau::get(spec)).value().main->get();
-		tref blasted = bv_predicate_blasting<node>(fm);
+		tref fm = get_nso_rr<node>(tau::get(spec).value_or(nullptr)).value().main->get();
+		tref blasted = bv_predicate_blasting<node>(fm).value_or(nullptr);
 		REQUIRE(blasted != nullptr);
 		auto n = normalizer<node>(blasted);
 		REQUIRE(n.has_value());

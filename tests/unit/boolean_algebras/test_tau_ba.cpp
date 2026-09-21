@@ -111,19 +111,19 @@ TEST_SUITE("tau_ba — is_zero / is_one (semantic)") {
 // ============================================================================
 
 TEST_CASE("T is one") {
-	CHECK(tau_one().is_one() == true);
+	CHECK(tau_one().is_one().value() == true);
 }
 
 TEST_CASE("T is not zero") {
-	CHECK(tau_one().is_zero() == false);
+	CHECK(tau_one().is_zero().value() == false);
 }
 
 TEST_CASE("F is zero") {
-	CHECK(tau_zero().is_zero() == true);
+	CHECK(tau_zero().is_zero().value() == true);
 }
 
 TEST_CASE("F is not one") {
-	CHECK(tau_zero().is_one() == false);
+	CHECK(tau_zero().is_one().value() == false);
 }
 
 TEST_CASE("T equals true") {
@@ -166,8 +166,8 @@ TEST_CASE("a constant with recurrence relations is decided uncached") {
 	REQUIRE(nso_rr.has_value());
 	REQUIRE(!nso_rr.value().rec_relations.empty());
 	test_ba spec(nso_rr.value().rec_relations, nso_rr.value().main);
-	CHECK( spec.is_one() );
-	CHECK_FALSE( spec.is_zero() );
+	CHECK( spec.is_one().value() );
+	CHECK_FALSE( spec.is_zero().value() );
 }
 
 } // TEST_SUITE is_zero / is_one
@@ -178,12 +178,12 @@ TEST_SUITE("tau_ba — complement (NOT)") {
 
 TEST_CASE("complement of T is zero") {
 	auto c = ~tau_one();
-	CHECK(c.is_zero() == true);
+	CHECK(c.is_zero().value() == true);
 }
 
 TEST_CASE("complement of F is one") {
 	auto c = ~tau_zero();
-	CHECK(c.is_one() == true);
+	CHECK(c.is_one().value() == true);
 }
 
 TEST_CASE("complement of T is syntactically F") {
@@ -207,11 +207,11 @@ TEST_CASE("double complement of F is F") {
 }
 
 TEST_CASE("double complement is one for T") {
-	CHECK((~~tau_one()).is_one() == true);
+	CHECK((~~tau_one()).is_one().value() == true);
 }
 
 TEST_CASE("double complement is zero for F") {
-	CHECK((~~tau_zero()).is_zero() == true);
+	CHECK((~~tau_zero()).is_zero().value() == true);
 }
 
 TEST_CASE("triple complement of T is syntactically F") {
@@ -231,19 +231,19 @@ TEST_SUITE("tau_ba — AND operator") {
 // ============================================================================
 
 TEST_CASE("T & T is one") {
-	CHECK((tau_one() & tau_one()).is_one() == true);
+	CHECK((tau_one() & tau_one()).is_one().value() == true);
 }
 
 TEST_CASE("T & F is zero") {
-	CHECK((tau_one() & tau_zero()).is_zero() == true);
+	CHECK((tau_one() & tau_zero()).is_zero().value() == true);
 }
 
 TEST_CASE("F & T is zero") {
-	CHECK((tau_zero() & tau_one()).is_zero() == true);
+	CHECK((tau_zero() & tau_one()).is_zero().value() == true);
 }
 
 TEST_CASE("F & F is zero") {
-	CHECK((tau_zero() & tau_zero()).is_zero() == true);
+	CHECK((tau_zero() & tau_zero()).is_zero().value() == true);
 }
 
 TEST_CASE("T & T is syntactically one after normalize_tau") {
@@ -263,12 +263,12 @@ TEST_CASE("F & F is syntactically zero after normalize_tau") {
 
 TEST_CASE("A & ~A is zero (complement law)") {
 	auto a = tau_one();
-	CHECK((a & ~a).is_zero() == true);
+	CHECK((a & ~a).is_zero().value() == true);
 }
 
 TEST_CASE("F & ~F is zero") {
 	auto a = tau_zero();
-	CHECK((a & ~a).is_zero() == true);
+	CHECK((a & ~a).is_zero().value() == true);
 }
 
 } // TEST_SUITE AND
@@ -278,19 +278,19 @@ TEST_SUITE("tau_ba — OR operator") {
 // ============================================================================
 
 TEST_CASE("T | T is one") {
-	CHECK((tau_one() | tau_one()).is_one() == true);
+	CHECK((tau_one() | tau_one()).is_one().value() == true);
 }
 
 TEST_CASE("T | F is one") {
-	CHECK((tau_one() | tau_zero()).is_one() == true);
+	CHECK((tau_one() | tau_zero()).is_one().value() == true);
 }
 
 TEST_CASE("F | T is one") {
-	CHECK((tau_zero() | tau_one()).is_one() == true);
+	CHECK((tau_zero() | tau_one()).is_one().value() == true);
 }
 
 TEST_CASE("F | F is zero") {
-	CHECK((tau_zero() | tau_zero()).is_zero() == true);
+	CHECK((tau_zero() | tau_zero()).is_zero().value() == true);
 }
 
 TEST_CASE("T | T is syntactically one after normalize_tau") {
@@ -305,12 +305,12 @@ TEST_CASE("F | F is syntactically zero after normalize_tau") {
 
 TEST_CASE("A | ~A is one (complement law)") {
 	auto a = tau_one();
-	CHECK((a | ~a).is_one() == true);
+	CHECK((a | ~a).is_one().value() == true);
 }
 
 TEST_CASE("F | ~F is one") {
 	auto a = tau_zero();
-	CHECK((a | ~a).is_one() == true);
+	CHECK((a | ~a).is_one().value() == true);
 }
 
 } // TEST_SUITE OR
@@ -320,39 +320,39 @@ TEST_SUITE("tau_ba — XOR / addition operators") {
 // ============================================================================
 
 TEST_CASE("T ^ T is zero") {
-	CHECK((tau_one() ^ tau_one()).is_zero() == true);
+	CHECK((tau_one() ^ tau_one()).is_zero().value() == true);
 }
 
 TEST_CASE("T ^ F is one") {
-	CHECK((tau_one() ^ tau_zero()).is_one() == true);
+	CHECK((tau_one() ^ tau_zero()).is_one().value() == true);
 }
 
 TEST_CASE("F ^ T is one") {
-	CHECK((tau_zero() ^ tau_one()).is_one() == true);
+	CHECK((tau_zero() ^ tau_one()).is_one().value() == true);
 }
 
 TEST_CASE("F ^ F is zero") {
-	CHECK((tau_zero() ^ tau_zero()).is_zero() == true);
+	CHECK((tau_zero() ^ tau_zero()).is_zero().value() == true);
 }
 
 TEST_CASE("+ operator is the same as ^ operator") {
 	auto a = tau_one();
 	auto b = tau_zero();
-	CHECK((a + b).is_one() == (a ^ b).is_one());
-	CHECK((a + b).is_zero() == (a ^ b).is_zero());
+	CHECK((a + b).is_one().value() == (a ^ b).is_one().value());
+	CHECK((a + b).is_zero().value() == (a ^ b).is_zero().value());
 }
 
 TEST_CASE("T + T is zero") {
-	CHECK((tau_one() + tau_one()).is_zero() == true);
+	CHECK((tau_one() + tau_one()).is_zero().value() == true);
 }
 
 TEST_CASE("T + F is one") {
-	CHECK((tau_one() + tau_zero()).is_one() == true);
+	CHECK((tau_one() + tau_zero()).is_one().value() == true);
 }
 
 TEST_CASE("A ^ A is zero (XOR self-cancellation)") {
 	auto a = tau_one();
-	CHECK((a ^ a).is_zero() == true);
+	CHECK((a ^ a).is_zero().value() == true);
 }
 
 TEST_CASE("F ^ F is syntactically zero after normalize_tau") {
@@ -368,82 +368,82 @@ TEST_SUITE("tau_ba — Boolean algebra laws") {
 
 TEST_CASE("idempotency of AND: T & T = T") {
 	auto a = tau_one();
-	CHECK((a & a).is_one() == true);
+	CHECK((a & a).is_one().value() == true);
 }
 
 TEST_CASE("idempotency of AND: F & F = F") {
 	auto a = tau_zero();
-	CHECK((a & a).is_zero() == true);
+	CHECK((a & a).is_zero().value() == true);
 }
 
 TEST_CASE("idempotency of OR: T | T = T") {
 	auto a = tau_one();
-	CHECK((a | a).is_one() == true);
+	CHECK((a | a).is_one().value() == true);
 }
 
 TEST_CASE("idempotency of OR: F | F = F") {
 	auto a = tau_zero();
-	CHECK((a | a).is_zero() == true);
+	CHECK((a | a).is_zero().value() == true);
 }
 
 TEST_CASE("De Morgan: ~(T & T) = ~T | ~T") {
 	auto a = tau_one();
 	auto b = tau_one();
-	CHECK((~(a & b)).is_zero() == (~a | ~b).is_zero());
+	CHECK((~(a & b)).is_zero().value() == (~a | ~b).is_zero().value());
 }
 
 TEST_CASE("De Morgan: ~(T | F) = ~T & ~F") {
 	auto a = tau_one();
 	auto b = tau_zero();
-	CHECK((~(a | b)).is_zero() == (~a & ~b).is_zero());
+	CHECK((~(a | b)).is_zero().value() == (~a & ~b).is_zero().value());
 }
 
 TEST_CASE("complement law: A & ~A = F") {
 	auto a = tau_one();
 	auto ca = ~a;
-	CHECK((a & ca).is_zero() == true);
+	CHECK((a & ca).is_zero().value() == true);
 }
 
 TEST_CASE("complement law: A | ~A = T") {
 	auto a = tau_one();
 	auto ca = ~a;
-	CHECK((a | ca).is_one() == true);
+	CHECK((a | ca).is_one().value() == true);
 }
 
 TEST_CASE("complement law for F: F & ~F = F") {
 	auto a = tau_zero();
 	auto ca = ~a;
-	CHECK((a & ca).is_zero() == true);
+	CHECK((a & ca).is_zero().value() == true);
 }
 
 TEST_CASE("complement law for F: F | ~F = T") {
 	auto a = tau_zero();
 	auto ca = ~a;
-	CHECK((a | ca).is_one() == true);
+	CHECK((a | ca).is_one().value() == true);
 }
 
 TEST_CASE("absorption: T & (T | F) = T") {
 	auto a = tau_one();
 	auto b = tau_zero();
-	CHECK((a & (a | b)).is_one() == true);
+	CHECK((a & (a | b)).is_one().value() == true);
 }
 
 TEST_CASE("absorption: F | (F & T) = F") {
 	auto a = tau_zero();
 	auto b = tau_one();
-	CHECK((a | (a & b)).is_zero() == true);
+	CHECK((a | (a & b)).is_zero().value() == true);
 }
 
 TEST_CASE("T & F = F (annihilator)") {
-	CHECK((tau_one() & tau_zero()).is_zero() == true);
+	CHECK((tau_one() & tau_zero()).is_zero().value() == true);
 }
 
 TEST_CASE("T | F = T (identity of OR)") {
-	CHECK((tau_one() | tau_zero()).is_one() == true);
+	CHECK((tau_one() | tau_zero()).is_one().value() == true);
 }
 
 TEST_CASE("F & T = F (commutativity of AND with annihilator)") {
-	CHECK((tau_zero() & tau_one()).is_zero() == true);
+	CHECK((tau_zero() & tau_one()).is_zero().value() == true);
 }
 
 } // TEST_SUITE Boolean algebra laws
@@ -608,52 +608,52 @@ TEST_SUITE("tau_ba — splitter") {
 TEST_CASE("splitter of F is zero") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_zero(), splitter_type::upper);
-	CHECK(s.is_zero() == true);
+	CHECK(s.is_zero().value() == true);
 }
 
 TEST_CASE("splitter of T is non-zero") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_zero() == false);
+	CHECK(s.is_zero().value() == false);
 }
 
 TEST_CASE("splitter of T is non-one") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_one() == false);
+	CHECK(s.is_one().value() == false);
 }
 
 TEST_CASE("splitter of T with upper type is non-zero") {
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_zero() == false);
+	CHECK(s.is_zero().value() == false);
 }
 
 TEST_CASE("splitter of T with upper type is non-one") {
 	auto s = splitter(tau_one(), splitter_type::upper);
-	CHECK(s.is_one() == false);
+	CHECK(s.is_one().value() == false);
 }
 
 TEST_CASE("tau_splitter_one is non-zero") {
 	auto s = tau_splitter_one<inner_bas>();
-	CHECK(s.is_zero() == false);
+	CHECK(s.is_zero().value() == false);
 }
 
 TEST_CASE("tau_splitter_one is non-one") {
 	auto s = tau_splitter_one<inner_bas>();
-	CHECK(s.is_one() == false);
+	CHECK(s.is_one().value() == false);
 }
 
 TEST_CASE("tau_splitter_one complement is non-zero") {
 	auto s = tau_splitter_one<inner_bas>();
 	auto other = tau_one() & ~s;
-	CHECK(other.is_zero() == false);
+	CHECK(other.is_zero().value() == false);
 }
 
 TEST_CASE("splitter result is sub-element of T") {
 	// lower splitter is not yet implemented; upper has the same semantics here
 	auto s = splitter(tau_one(), splitter_type::upper);
 	// s <= T, so s & ~T = s & F = F
-	CHECK((s & ~tau_one()).is_zero() == true);
+	CHECK((s & ~tau_one()).is_zero().value() == true);
 }
 
 } // TEST_SUITE splitter
@@ -663,36 +663,36 @@ TEST_SUITE("tau_ba — is_tau_closed") {
 // ============================================================================
 
 TEST_CASE("T is closed") {
-	CHECK(is_tau_closed(tau_one()));
+	CHECK(is_tau_closed(tau_one()).value());
 }
 
 TEST_CASE("F is closed") {
-	CHECK(is_tau_closed(tau_zero()));
+	CHECK(is_tau_closed(tau_zero()).value());
 }
 
 TEST_CASE("~T is closed") {
-	CHECK(is_tau_closed(~tau_one()));
+	CHECK(is_tau_closed(~tau_one()).value());
 }
 
 TEST_CASE("~F is closed") {
-	CHECK(is_tau_closed(~tau_zero()));
+	CHECK(is_tau_closed(~tau_zero()).value());
 }
 
 TEST_CASE("T & F is closed") {
-	CHECK(is_tau_closed(tau_one() & tau_zero()));
+	CHECK(is_tau_closed(tau_one() & tau_zero()).value());
 }
 
 TEST_CASE("T | F is closed") {
-	CHECK(is_tau_closed(tau_one() | tau_zero()));
+	CHECK(is_tau_closed(tau_one() | tau_zero()).value());
 }
 
 TEST_CASE("T ^ F is closed") {
-	CHECK(is_tau_closed(tau_one() ^ tau_zero()));
+	CHECK(is_tau_closed(tau_one() ^ tau_zero()).value());
 }
 
 TEST_CASE("formula from spec with output var is closed") {
 	auto b = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK(is_tau_closed(b));
+	CHECK(is_tau_closed(b).value());
 }
 
 } // TEST_SUITE is_tau_closed
@@ -743,20 +743,20 @@ TEST_CASE("parse T. is_one()") {
 	auto r = parse_tau<inner_bas>("T.");
 	REQUIRE(r.has_value());
 	auto b = std::get<test_ba>(r->first);
-	CHECK(b.is_one() == true);
+	CHECK(b.is_one().value() == true);
 }
 
 TEST_CASE("parse F. is_zero()") {
 	auto r = parse_tau<inner_bas>("F.");
 	REQUIRE(r.has_value());
 	auto b = std::get<test_ba>(r->first);
-	CHECK(b.is_zero() == true);
+	CHECK(b.is_zero().value() == true);
 }
 
 TEST_CASE("parse realizable tau spec is not zero") {	auto r = parse_tau<inner_bas>("G (o1[t]:tau = {T.}:tau).");
 	REQUIRE(r.has_value());
 	auto b = std::get<test_ba>(r->first);
-	CHECK(b.is_zero() == false);
+	CHECK(b.is_zero().value() == false);
 }
 
 } // TEST_SUITE parse_tau
@@ -803,68 +803,68 @@ TEST_SUITE("tau_ba — LTL integration") {
 // ============================================================================
 
 TEST_CASE("parse and check: T spec is one") {	auto b = from_spec("T.");
-	CHECK(b.is_one() == true);
+	CHECK(b.is_one().value() == true);
 }
 
 TEST_CASE("parse and check: F spec is zero") {	auto b = from_spec("F.");
-	CHECK(b.is_zero() == true);
+	CHECK(b.is_zero().value() == true);
 }
 
 TEST_CASE("G(o1=T) is not zero (realizable)") {	auto b = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK(b.is_zero() == false);
+	CHECK(b.is_zero().value() == false);
 }
 
 TEST_CASE("G(o1=F) is not zero (realizable)") {	auto b = from_spec("G (o1[t]:tau = {F.}:tau).");
-	CHECK(b.is_zero() == false);
+	CHECK(b.is_zero().value() == false);
 }
 
 TEST_CASE("F(o1=T) is not zero (realizable)" * doctest::skip(!ltlsynt_available())) {	auto b = from_spec("F (o1[t]:tau = {T.}:tau).");
-	CHECK(b.is_zero() == false);
+	CHECK(b.is_zero().value() == false);
 }
 
 TEST_CASE("G(o1=T) is not one (not universally valid)") {	auto b = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK(b.is_one() == false);
+	CHECK(b.is_one().value() == false);
 }
 
 TEST_CASE("G(o1=T) & G(o1!=T) is zero (contradiction)") {	auto sat = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto unsat = from_spec("G (o1[t]:tau != {T.}:tau).");
-	CHECK((sat & unsat).is_zero() == true);
+	CHECK((sat & unsat).is_zero().value() == true);
 }
 
 TEST_CASE("G(o1=T) | G(o1=F) is not zero") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto b = from_spec("G (o1[t]:tau = {F.}:tau).");
-	CHECK((a | b).is_zero() == false);
+	CHECK((a | b).is_zero().value() == false);
 }
 
 TEST_CASE("tau_ba conjunction with T is identity") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto and_T = a & tau_one();
-	CHECK(and_T.is_zero() == a.is_zero());
+	CHECK(and_T.is_zero().value() == a.is_zero().value());
 }
 
 TEST_CASE("tau_ba disjunction with F is identity") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto or_F = a | tau_zero();
-	CHECK(or_F.is_zero() == a.is_zero());
+	CHECK(or_F.is_zero().value() == a.is_zero().value());
 }
 
 TEST_CASE("tau_ba and T does not change one-ness") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	auto and_T = a & tau_one();
-	CHECK(and_T.is_one() == a.is_one());
+	CHECK(and_T.is_one().value() == a.is_one().value());
 }
 
 TEST_CASE("G(o1=T) | ~G(o1=T) is one") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK((a | ~a).is_one() == true);
+	CHECK((a | ~a).is_one().value() == true);
 }
 
 TEST_CASE("G(o1=T) & ~G(o1=T) is zero") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK((a & ~a).is_zero() == true);
+	CHECK((a & ~a).is_zero().value() == true);
 }
 
 TEST_CASE("G(o1=T) ^ G(o1=T) is zero") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK((a ^ a).is_zero() == true);
+	CHECK((a ^ a).is_zero().value() == true);
 }
 
 TEST_CASE("is_tau_closed on G(o1=T) spec") {	auto b = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK(is_tau_closed(b));
+	CHECK(is_tau_closed(b).value());
 }
 
 } // TEST_SUITE LTL integration
@@ -894,18 +894,18 @@ TEST_CASE("a pinned key is found again after a sweep") {
 	ba_decision_pins = 4096;
 	const size_t m0 = tau_ba_predicate_misses;
 	{
-		tref fm = tau::get("(x:sbf = 0) && (y:sbf = 1)", parse_wff());
+		tref fm = tau::get("(x:sbf = 0) && (y:sbf = 1)", parse_wff()).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		test_ba a(fm);
-		CHECK_FALSE( a.is_zero() );
+		CHECK_FALSE( a.is_zero().value() );
 	}
 	CHECK( tau_ba_predicate_misses == m0 + 1 );
 	sweep();
 	{
-		tref fm = tau::get("(x:sbf = 0) && (y:sbf = 1)", parse_wff());
+		tref fm = tau::get("(x:sbf = 0) && (y:sbf = 1)", parse_wff()).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		test_ba b(fm);
-		CHECK_FALSE( b.is_zero() );
+		CHECK_FALSE( b.is_zero().value() );
 	}
 	CHECK( tau_ba_predicate_misses == m0 + 1 );
 	ba_decision_pins = saved;
@@ -916,18 +916,18 @@ TEST_CASE("with the cap at 0 the row is lost at the sweep") {
 	ba_decision_pins = 0;
 	const size_t m0 = tau_ba_predicate_misses;
 	{
-		tref fm = tau::get("(z:sbf = 0) && (w:sbf = 1)", parse_wff());
+		tref fm = tau::get("(z:sbf = 0) && (w:sbf = 1)", parse_wff()).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		test_ba a(fm);
-		CHECK_FALSE( a.is_zero() );
+		CHECK_FALSE( a.is_zero().value() );
 	}
 	CHECK( tau_ba_predicate_misses == m0 + 1 );
 	sweep();
 	{
-		tref fm = tau::get("(z:sbf = 0) && (w:sbf = 1)", parse_wff());
+		tref fm = tau::get("(z:sbf = 0) && (w:sbf = 1)", parse_wff()).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		test_ba b(fm);
-		CHECK_FALSE( b.is_zero() );
+		CHECK_FALSE( b.is_zero().value() );
 	}
 	CHECK( tau_ba_predicate_misses == m0 + 2 );
 	ba_decision_pins = saved;

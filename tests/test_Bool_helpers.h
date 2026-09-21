@@ -72,25 +72,25 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 		else return is_sbf_zero(std::get<sbf_ba>(elem));
 	}
 
-	static bool is_one(const std::variant<bv, sbf_ba, Bool>& elem) {
+	static result<bool> is_one(const std::variant<bv, sbf_ba, Bool>& elem) {
 		if (std::holds_alternative<bv>(elem))
-			return is_bv_syntactic_one(std::get<bv>(elem));
+			return result<bool>{is_bv_syntactic_one(std::get<bv>(elem))};
 		else if (std::holds_alternative<Bool>(elem))
-			return std::get<Bool>(elem).is_one();
-		else return is_sbf_one(std::get<sbf_ba>(elem));
+			return result<bool>{std::get<Bool>(elem).is_one()};
+		else return result<bool>{is_sbf_one(std::get<sbf_ba>(elem))};
 	}
 
-	static bool is_zero(const std::variant<bv, sbf_ba, Bool>& elem) {
+	static result<bool> is_zero(const std::variant<bv, sbf_ba, Bool>& elem) {
 		if (std::holds_alternative<bv>(elem))
-			return is_bv_syntactic_zero(std::get<bv>(elem));
+			return result<bool>{is_bv_syntactic_zero(std::get<bv>(elem))};
 		else if (std::holds_alternative<Bool>(elem))
-			return std::get<Bool>(elem).is_zero();
-		else return is_sbf_zero(std::get<sbf_ba>(elem));
+			return result<bool>{std::get<Bool>(elem).is_zero()};
+		else return result<bool>{is_sbf_zero(std::get<sbf_ba>(elem))};
 	}
 
-	static bool is_closed(const std::variant<bv, sbf_ba, Bool>&) {
-		// We return true as bv, sbf and Bool are closed (for our pourposes)
-		return true;
+	static result<bool> is_closed(const std::variant<bv, sbf_ba, Bool>&) {
+		// bv, sbf and Bool are closed for our purposes.
+		return result<bool>{true};
 	}
 
 	// Mirrors ba_descriptor<BA, node>::normalize per alternative -- bv's
@@ -131,9 +131,10 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
 	}
 
-	static tref simplify_term(tref term) {
+	static result<tref> simplify_term(tref term) {
 		auto ba_type = tau::get(term).get_ba_type();
-		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
+		return is_bv_type_family<node_t>(ba_type)
+			? simplify_bv_term<node_t>(term) : result<tref>{term};
 	}
 };
 

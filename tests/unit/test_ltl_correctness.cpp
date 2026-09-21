@@ -31,7 +31,7 @@ using namespace idni::tau_lang;
 // rather than reading as unrealizable.
 static bool realizable(const char* s) {
 	tref fm = [&]{
-		auto nso = get_nso_rr<node_t>(tau::get(s));
+		auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 		return nso.has_value() ? nso.value().main->get() : nullptr;
 	}();
 	if (!fm) return false;
@@ -47,7 +47,7 @@ static strings run_with_i1(const char* formula, const strings& i1_vals, size_t n
 	              std::make_shared<vector_input_stream>(i1_vals));
 	auto o1 = std::make_shared<vector_output_stream>();
 	ctx.add_output("o1", tau_type_id<node_t>(), o1);
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
 	if (!nso.has_value()) return {};
 	tref fm = nso.value().main->get();
 	if (!fm) return {};
@@ -60,7 +60,7 @@ static strings run_no_input(const char* formula, size_t n) {
 	io_context<node_t> ctx;
 	auto o1 = std::make_shared<vector_output_stream>();
 	ctx.add_output("o1", tau_type_id<node_t>(), o1);
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
 	if (!nso.has_value()) return {};
 	tref fm = nso.value().main->get();
 	if (!fm) return {};
@@ -77,7 +77,7 @@ static strings run_qlt_no_input(const char* formula, size_t n) {
 	for (const auto& [var, type] : ctx.types) scope[var->get()] = type;
 	tau::get_options opts;
 	opts.global_scope = &scope;
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts).value_or(nullptr));
 	if (!nso.has_value()) return {};
 	tref fm = nso.value().main->get();
 	if (!fm) return {};
@@ -97,7 +97,7 @@ static strings run_qlt_with_i1(const char* formula, const strings& i1_vals,
 	for (const auto& [var, type] : ctx.types) scope[var->get()] = type;
 	tau::get_options opts;
 	opts.global_scope = &scope;
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts).value_or(nullptr));
 	if (!nso.has_value()) return {};
 	tref fm = nso.value().main->get();
 	if (!fm) return {};
@@ -348,7 +348,7 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	// A formula without G/F/U/R/W goes through the original safety synthesis
 	// pipeline in is_tau_formula_sat (sat_has_ltl_operators returns false).
 	static bool safety_realizable(const char* fm_str) {
-		auto nso = get_nso_rr<node_t>(tau::get(fm_str));
+		auto nso = get_nso_rr<node_t>(tau::get(fm_str).value_or(nullptr));
 		if (!nso.has_value()) return false;
 		tref fm = nso.value().main->get();
 		if (!fm) return false;
@@ -625,7 +625,7 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:sbf = {X & Y}:sbf)."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:sbf = {X & Y}:sbf).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		run<node_t>(nso.value().main->get(), ctx, 6);
 		auto vals = o1->get_values();
@@ -638,7 +638,7 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:sbf = {X | Z}:sbf)."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:sbf = {X | Z}:sbf).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		run<node_t>(nso.value().main->get(), ctx, 4);
 		bool found = false;
@@ -653,7 +653,7 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b10110101}:bv[8])."));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b10110101}:bv[8]).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		run<node_t>(nso.value().main->get(), ctx, 6);
 		auto vals = o1->get_values();

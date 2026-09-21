@@ -107,28 +107,38 @@ TEST_SUITE("ocltl_types: witness") {
 		std::vector<ba_t> a{ x };
 
 		// tp(x) over a single free variable is Z = ∅: neither ¬x nor x is zero.
-		REQUIRE(ocltl_type_of<ba_t, node_t>(a) == 0);
+		auto tp_a = ocltl_type_of<ba_t, node_t>(a);
+		REQUIRE(tp_a.has_value());
+		REQUIRE(*tp_a == 0);
 
 		// b covers ¬x entirely and splits x, exercising both witness branches.
 		ocltl_type_mask tau = ocltl_type_mask{1} << 0;
 		REQUIRE(ocltl_is_valid_type(tau, 2));
-		REQUIRE(ocltl_restrict(tau, 2, { 0 }) == ocltl_type_of<ba_t, node_t>(a));
+		REQUIRE(ocltl_restrict(tau, 2, { 0 }) == *tp_a);
 
-		ba_t b = ocltl_witness<ba_t, node_t>(a, tau);
-		std::vector<ba_t> ab{ x, b };
-		CHECK(ocltl_type_of<ba_t, node_t>(ab) == tau);
+		auto b = ocltl_witness<ba_t, node_t>(a, tau);
+		REQUIRE(b.has_value());
+		std::vector<ba_t> ab{ x, *b };
+		auto tp_ab = ocltl_type_of<ba_t, node_t>(ab);
+		REQUIRE(tp_ab.has_value());
+		CHECK(*tp_ab == tau);
 	}
 
 	TEST_CASE("witness round-trips for several requested masks (k=1 -> k=2)") {
 		ba_t x = sbf_var("y");
 		std::vector<ba_t> a{ x };
-		ocltl_type_mask base = ocltl_type_of<ba_t, node_t>(a);
+		auto base_r = ocltl_type_of<ba_t, node_t>(a);
+		REQUIRE(base_r.has_value());
+		ocltl_type_mask base = *base_r;
 
 		for (ocltl_type_mask tau = 0; tau < ocltl_full_mask(2); ++tau) {
 			if (ocltl_restrict(tau, 2, { 0 }) != base) continue; // must extend tp(a)
-			ba_t b = ocltl_witness<ba_t, node_t>(a, tau);
-			std::vector<ba_t> ab{ x, b };
-			CHECK(ocltl_type_of<ba_t, node_t>(ab) == tau);
+			auto b = ocltl_witness<ba_t, node_t>(a, tau);
+			REQUIRE(b.has_value());
+			std::vector<ba_t> ab{ x, *b };
+			auto tp_ab = ocltl_type_of<ba_t, node_t>(ab);
+			REQUIRE(tp_ab.has_value());
+			CHECK(*tp_ab == tau);
 		}
 	}
 }
@@ -176,31 +186,45 @@ TEST_SUITE("ocltl_types: wide-K agreement with the capped (k <= 6) path") {
 	TEST_CASE("ocltl_witness_wide agrees with ocltl_witness, every requested mask (k=1 -> k=2)") {
 		ba_t x = sbf_var("z");
 		std::vector<ba_t> a{ x };
-		ocltl_type_mask base = ocltl_type_of<ba_t, node_t>(a);
+		auto base_r = ocltl_type_of<ba_t, node_t>(a);
+		REQUIRE(base_r.has_value());
+		ocltl_type_mask base = *base_r;
 
 		for (ocltl_type_mask tau = 0; tau < ocltl_full_mask(2); ++tau) {
 			if (ocltl_restrict(tau, 2, { 0 }) != base) continue; // must extend tp(a)
-			ba_t b_capped = ocltl_witness<ba_t, node_t>(a, tau);
-			ba_t b_wide = ocltl_witness_wide<ba_t, node_t>(a, ocltl_to_wide_mask(tau, 2));
+			auto b_capped = ocltl_witness<ba_t, node_t>(a, tau);
+			auto b_wide = ocltl_witness_wide<ba_t, node_t>(a, ocltl_to_wide_mask(tau, 2));
+			REQUIRE(b_capped.has_value());
+			REQUIRE(b_wide.has_value());
 
-			std::vector<ba_t> ab_capped{ x, b_capped };
-			std::vector<ba_t> ab_wide{ x, b_wide };
+			std::vector<ba_t> ab_capped{ x, *b_capped };
+			std::vector<ba_t> ab_wide{ x, *b_wide };
+			auto tp_capped = ocltl_type_of<ba_t, node_t>(ab_capped);
+			auto tp_wide = ocltl_type_of<ba_t, node_t>(ab_wide);
+			REQUIRE(tp_capped.has_value());
+			REQUIRE(tp_wide.has_value());
 			// Both witnesses must realize the same requested type -- the two
 			// constructions need not pick identical splitter symbols, only
 			// agree on the type they decode to.
-			CHECK(ocltl_type_of<ba_t, node_t>(ab_capped) == tau);
-			CHECK(ocltl_type_of<ba_t, node_t>(ab_wide) == tau);
+			CHECK(*tp_capped == tau);
+			CHECK(*tp_wide == tau);
 		}
 	}
 
 	TEST_CASE("ocltl_witness_wide agrees with ocltl_witness on the empty tuple (k=0 -> k=1)") {
 		std::vector<ba_t> empty;
 		for (ocltl_type_mask tau : { ocltl_type_mask{0b01}, ocltl_type_mask{0b10}, ocltl_type_mask{0b00} }) {
-			ba_t b_capped = ocltl_witness<ba_t, node_t>(empty, tau);
-			ba_t b_wide = ocltl_witness_wide<ba_t, node_t>(empty, ocltl_to_wide_mask(tau, 1));
-			std::vector<ba_t> ab_capped{ b_capped }, ab_wide{ b_wide };
-			CHECK(ocltl_type_of<ba_t, node_t>(ab_capped) == tau);
-			CHECK(ocltl_type_of<ba_t, node_t>(ab_wide) == tau);
+			auto b_capped = ocltl_witness<ba_t, node_t>(empty, tau);
+			auto b_wide = ocltl_witness_wide<ba_t, node_t>(empty, ocltl_to_wide_mask(tau, 1));
+			REQUIRE(b_capped.has_value());
+			REQUIRE(b_wide.has_value());
+			std::vector<ba_t> ab_capped{ *b_capped }, ab_wide{ *b_wide };
+			auto tp_capped = ocltl_type_of<ba_t, node_t>(ab_capped);
+			auto tp_wide = ocltl_type_of<ba_t, node_t>(ab_wide);
+			REQUIRE(tp_capped.has_value());
+			REQUIRE(tp_wide.has_value());
+			CHECK(*tp_capped == tau);
+			CHECK(*tp_wide == tau);
 		}
 	}
 
@@ -211,13 +235,16 @@ TEST_SUITE("ocltl_types: wide-K agreement with the capped (k <= 6) path") {
 		// Every coordinate independent: the all-nonzero-minterm mask (all-false)
 		// requests a fresh coordinate with no forced relation to any of the ten.
 		ocltl_type_mask_wide tau(ocltl_wide_minterm_count(11), false);
-		ba_t b = ocltl_witness_wide<ba_t, node_t>(a, tau);
+		auto b = ocltl_witness_wide<ba_t, node_t>(a, tau);
+		REQUIRE(b.has_value());
 
 		// Spot-check pairwise independence against the first coordinate at a
 		// safe k=2 (ocltl_type_of is capped at ocltl_max_k): no minterm among
 		// the four (a[0], b) combinations should be forced zero.
-		std::vector<ba_t> pair{ a[0], b };
-		CHECK(ocltl_type_of<ba_t, node_t>(pair) == 0);
+		std::vector<ba_t> pair{ a[0], *b };
+		auto tp_pair = ocltl_type_of<ba_t, node_t>(pair);
+		REQUIRE(tp_pair.has_value());
+		CHECK(*tp_pair == 0);
 	}
 }
 
@@ -237,21 +264,26 @@ TEST_SUITE("ocltl_types: empty tuple (k=0)") {
 
 	TEST_CASE("ocltl_type_of of the empty tuple is the unique T_0 element") {
 		std::vector<ba_t> empty;
-		CHECK(ocltl_type_of<ba_t, node_t>(empty) == 0);
+		auto tp = ocltl_type_of<ba_t, node_t>(empty);
+		REQUIRE(tp.has_value());
+		CHECK(*tp == 0);
 	}
 
 	TEST_CASE("ocltl_witness on an empty tuple decodes the three T_1 masks") {
 		std::vector<ba_t> empty;
 		ba_t unit = ocltl_unit<ba_t, node_t>();
 
-		ba_t b01 = ocltl_witness<ba_t, node_t>(empty, ocltl_type_mask{0b01});
-		CHECK(b01 == unit);
+		auto b01 = ocltl_witness<ba_t, node_t>(empty, ocltl_type_mask{0b01});
+		REQUIRE(b01.has_value());
+		CHECK(*b01 == unit);
 
-		ba_t b10 = ocltl_witness<ba_t, node_t>(empty, ocltl_type_mask{0b10});
-		CHECK(is_sbf_zero(b10));
+		auto b10 = ocltl_witness<ba_t, node_t>(empty, ocltl_type_mask{0b10});
+		REQUIRE(b10.has_value());
+		CHECK(is_sbf_zero(*b10));
 
-		ba_t b00 = ocltl_witness<ba_t, node_t>(empty, ocltl_type_mask{0b00});
-		CHECK_FALSE(is_sbf_zero(b00));
-		CHECK_FALSE(b00 == unit);
+		auto b00 = ocltl_witness<ba_t, node_t>(empty, ocltl_type_mask{0b00});
+		REQUIRE(b00.has_value());
+		CHECK_FALSE(is_sbf_zero(*b00));
+		CHECK_FALSE(*b00 == unit);
 	}
 }

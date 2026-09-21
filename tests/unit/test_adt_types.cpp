@@ -8,7 +8,8 @@
 // present in the tree -- task 5's default get_options.flatten_adts = true
 // would otherwise erase them before the registry ever sees them.
 static tref parse_no_infer(const std::string& src) {
-	return tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
+	return tau::get(src, { .infer_ba_types = false, .flatten_adts = false })
+		.value_or(nullptr);
 }
 
 static std::optional<adt_registry<node_t>> reg(const std::string& src) {

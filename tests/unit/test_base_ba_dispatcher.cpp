@@ -34,7 +34,7 @@ using variant_t = std::variant<
 	idni::tau_lang::bv, idni::tau_lang::sbf_ba>;
 
 std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
-	tref spec = small_tau::get(sample);
+	tref spec = small_tau::get(sample).value_or(nullptr);
 	if (spec == nullptr) return {};
 	return idni::tau_lang::get_nso_rr<small_node>(spec);
 }
@@ -55,7 +55,7 @@ TEST_SUITE("base_ba_dispatcher pack_tau_ba/unpack_tau_ba round-trip") {
 		REQUIRE( packed_opt.has_value() );
 		variant_t packed = *packed_opt;
 		REQUIRE( std::holds_alternative<tau_ba<bv, sbf_ba>>(packed) );
-		CHECK( std::get<tau_ba<bv, sbf_ba>>(packed).is_one() );
+		CHECK( std::get<tau_ba<bv, sbf_ba>>(packed).is_one().value() );
 	}
 
 	TEST_CASE("unpack_tau_ba round-trips the wrapped wff for the tau_ba alternative") {
@@ -94,14 +94,14 @@ TEST_SUITE("base_ba_dispatcher::is_closed") {
 	TEST_CASE("bv and sbf_ba alternatives are always closed") {
 		auto parsed = parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>("1");
 		REQUIRE(parsed.has_value());
-		CHECK( dispatcher::is_closed(parsed.value().first) );
+		CHECK( dispatcher::is_closed(parsed.value().first).value() );
 	}
 
 	TEST_CASE("tau_ba alternative delegates to is_tau_closed: T is closed") {
 		auto packed_opt = dispatcher::pack_tau_ba(small_tau::_T());
 		REQUIRE( packed_opt.has_value() );
 		variant_t packed = *packed_opt;
-		CHECK( dispatcher::is_closed(packed) );
+		CHECK( dispatcher::is_closed(packed).value() );
 	}
 
 	TEST_CASE("tau_ba alternative delegates to is_tau_closed: i/o-only spec is closed") {
@@ -110,7 +110,7 @@ TEST_SUITE("base_ba_dispatcher::is_closed") {
 		tau_ba<bv, sbf_ba> spec(nso_rr.value().rec_relations,
 					 nso_rr.value().main);
 		variant_t packed{ spec };
-		CHECK( dispatcher::is_closed(packed) );
+		CHECK( dispatcher::is_closed(packed).value() );
 	}
 
 	TEST_CASE("tau_ba alternative delegates to is_tau_closed: plain free var is not closed") {
@@ -119,6 +119,6 @@ TEST_SUITE("base_ba_dispatcher::is_closed") {
 		tau_ba<bv, sbf_ba> spec(nso_rr.value().rec_relations,
 					 nso_rr.value().main);
 		variant_t packed{ spec };
-		CHECK_FALSE( dispatcher::is_closed(packed) );
+		CHECK_FALSE( dispatcher::is_closed(packed).value() );
 	}
 }

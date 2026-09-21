@@ -105,7 +105,7 @@ TEST_SUITE("Tau API - string") {
 	}
 
 
-	// §4e item 8: api<node>::solve(const string&) rendered every solved
+	// api<node>::solve(const string&) rendered every solved
 	// value with the generic bf-constant spelling ("0"/"1"), unlike the
 	// REPL's solve/lgrs commands (print_solver_cmd_solution ->
 	// serialize_constant), which use the declared type's own literal
@@ -241,7 +241,9 @@ TEST_SUITE("Tau API - string - execution") {
 
 		// The interpreter built before the reset keeps its own streams.
 		auto& i = first.value();
-		auto inputs = tau_api::get_inputs_for_step(i);
+		auto maybe_inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(maybe_inputs.has_value());
+		auto& inputs = maybe_inputs.value();
 		REQUIRE(inputs.size() == 1);
 		std::map<stream_at, std::string> assigned;
 		for (const auto& at : inputs) assigned[at] = "1";
@@ -267,7 +269,9 @@ TEST_SUITE("Tau API - string - execution") {
 			step++;
 
 			// Find out what inputs are expected for the next step
-			auto inputs = tau_api::get_inputs_for_step(i);
+			auto maybe_inputs = tau_api::get_inputs_for_step(i);
+			CHECK(maybe_inputs.has_value());
+			auto& inputs = maybe_inputs.value();
 #ifdef DEBUG
 			TAU_LOG_TRACE << "Inputs:";
 			if (inputs.empty()) TAU_LOG_TRACE << "No inputs";
@@ -307,6 +311,20 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(collected_outputs == std::vector<std::string>({ "F", "T", "F" }));
 	}
 
+	// get_inputs_for_step now goes through calculate_initial_spec() like
+	// step() does, so a caller can tell "the spec never initialized" apart
+	// from "this step genuinely needs no inputs" via has_value().
+	TEST_CASE("get_inputs_for_step returns a result carrying the inputs") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		auto inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(inputs.has_value());
+		REQUIRE(inputs.value().size() == 1);
+		CHECK(inputs.value()[0].name == "i");
+	}
+
 	TEST_CASE("current_spec and spec_revision follow applied updates") {
 		auto maybe_i = tau_api::get_interpreter("u[t] = i[t].");
 		REQUIRE(maybe_i.has_value());
@@ -315,7 +333,9 @@ TEST_SUITE("Tau API - string - execution") {
 		// feeds every input of the next step the same value
 		auto submit = [&i](const std::string& value) {
 			std::map<stream_at, std::string> assigned;
-			for (auto& at : tau_api::get_inputs_for_step(i))
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			for (auto& at : inputs.value())
 				assigned[at] = value;
 			return tau_api::step(i, assigned);
 		};
@@ -353,7 +373,9 @@ TEST_SUITE("Tau API - string - execution") {
 
 		auto submit = [&i](const std::string& value) -> std::string {
 			std::map<stream_at, std::string> assigned;
-			for (auto& at : tau_api::get_inputs_for_step(i))
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			for (auto& at : inputs.value())
 				assigned[at] = value;
 			auto outs = tau_api::step(i, assigned);
 			REQUIRE(outs.has_value());
@@ -377,7 +399,9 @@ TEST_SUITE("Tau API - string - execution") {
 
 		auto submit = [&i](const std::string& value) {
 			std::map<stream_at, std::string> assigned;
-			for (auto& at : tau_api::get_inputs_for_step(i))
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			for (auto& at : inputs.value())
 				assigned[at] = value;
 			return tau_api::step(i, assigned);
 		};
@@ -711,14 +735,45 @@ TEST_SUITE("Tau API - string - step error paths") {
 	}
 
 	// A syntactically valid stream name with an unparseable value hits the
-	// "Failed to parse input value" branch.
+	// "Failed to parse input value" branch. The BA's own parse failure
+	// must survive as a report node in its own right, and step's own
+	// node must name which stream and time point were refused.
 	TEST_CASE("step rejects an unparseable input value") {
 		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
 		REQUIRE( maybe_i.has_value() );
 		auto& i = maybe_i.value();
 		std::map<stream_at, std::string> inputs;
 		inputs[stream_at{ "i", 0 }] = "! ) ( not a constant";
-		CHECK( !tau_api::step(i, inputs).has_value() );
+		auto r = tau_api::step(i, inputs);
+		CHECK( !r.has_value() );
+		CHECK( report_has_code(r.report(), code::parse_error) );
+
+		bool found_ba_cause = false;
+		bool found_step_summary = false;
+		bool found_name_attr = false;
+		bool found_time_point_attr = false;
+		for (const auto& n : r.report().nodes()) {
+			if (n.tag != code::parse_error) continue;
+			std::string msg(r.report().str(n.key));
+			if (msg.starts_with("Failed to parse input value"))
+				found_step_summary = true;
+			else if (!msg.empty())
+				found_ba_cause = true;
+			if (auto name = node_attr_text(r.report(), n, label::name)) {
+				found_name_attr = true;
+				CHECK( *name == "i" );
+			}
+			if (auto tp = node_attr_value(r.report(), n, label::time_point)) {
+				found_time_point_attr = true;
+				CHECK( *tp == 0 );
+			}
+		}
+		// the BA's own reason (e.g. a parser error) is preserved as its
+		// own node, distinct from step's summary line
+		CHECK( found_ba_cause );
+		CHECK( found_step_summary );
+		CHECK( found_name_attr );
+		CHECK( found_time_point_attr );
 	}
 
 	// The "this" pseudo-stream is skipped rather than looked up.

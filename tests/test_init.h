@@ -34,8 +34,6 @@ using namespace idni::tau_lang;
 //
 // Out-of-range values clamp to the default, matching the api setters
 // (api::set_preprocess_placement and friends).
-//
-// See private/sdd-eliminability/task-8-brief.md; Task 9 drives the matrix.
 inline void apply_tau_experiment_env() {
 	auto env_int = [](const char* name, int lo, int hi, int fallback) {
 		const char* v = std::getenv(name);

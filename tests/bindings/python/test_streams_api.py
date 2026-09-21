@@ -28,7 +28,6 @@ def main():
 		# Step the interpreter and retrieve outputs
 		res = tau.step(i)
 		assert res, f"Failed to step interpreter: {res.report.errors}"
-		# outputs = maybe_outputs
 
 	o_values = o_stream.get_values()
 

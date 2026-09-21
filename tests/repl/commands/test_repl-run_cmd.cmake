@@ -517,7 +517,7 @@ set_tests_properties("test_repl-run_cmd-two_input_streams-next_step" PROPERTIES
 add_test(NAME "test_repl-run_cmd-retry_on_bad_value"
 	COMMAND bash -c "printf 'run o[t] = i[t].\\nzzz.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-run_cmd-retry_on_bad_value" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Failed to parse input value")
+	PASS_REGULAR_EXPRESSION "failed to parse the input value for the stream")
 
 # --- the continue-or-quit gate and finish_running ----------------------------
 # A spec constraining only time point 0 stops needing input, so the step loop
@@ -531,7 +531,7 @@ set_tests_properties("test_repl-run_cmd-continue_or_quit_prompt" PROPERTIES
 add_test(NAME "test_repl-run_cmd-quit_finishes_run"
 	COMMAND bash -c "printf 'run o[0] = i[0].\\nT.\\n\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-run_cmd-quit_finishes_run" PROPERTIES
-	PASS_REGULAR_EXPRESSION "run: ")
+	PASS_REGULAR_EXPRESSION "run:")
 
 # --- a specification that cannot be run -------------------------------------
 # run_cmd returns early when the argument does not yield a formula or an
@@ -564,9 +564,12 @@ set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTI
 # An unwritable output file makes api::step fail with code::io_error, not
 # code::invalid_state; continue_running() must report it and stop instead of
 # falling into the "continue?" prompt meant for an awaited input.
+# interpreter::write's own per-stream refusal (interpreter.tmpl.h) replaced
+# api::step's old blanket "Failed to write outputs" wrapper, which the
+# refactor dropped in favor of merging write()'s report as-is.
 add_repl_test_fail(run_cmd-continue_running-genuine_step_error
 	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run o1[t] = 1."
-	"Failed to write outputs")
+	"failed to write to the output stream")
 
 # --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------
 # The reporter's 7-line reproducer (two :tau streams, a cross-stream

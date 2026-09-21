@@ -9,7 +9,7 @@ bool check(std::string sample, std::string expected = "") {
 	tau::get_options opts = {
 		.reget_with_hooks = false
 	};
-	tref parsed = tau::get(sample, opts);
+	tref parsed = tau::get(sample, opts).value_or(nullptr);
 	if (parsed == nullptr) {
 		std::cout << "Parse failed: " << sample << "\n";
 		return false;
@@ -59,7 +59,7 @@ TEST_SUITE("pretty printer") {
 		tau::get_options opts = {
 			.reget_with_hooks = false
 		};
-		tref fm = tau::get("b9999999999 = 0.", opts);
+		tref fm = tau::get("b9999999999 = 0.", opts).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		std::stringstream ss;
 		REQUIRE_NOTHROW( tau::get(fm).print(ss) );

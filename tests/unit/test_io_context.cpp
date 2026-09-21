@@ -51,18 +51,18 @@ struct cerr_capture {
 	std::string str() const { return oss.str(); }
 };
 
-// --- temporary file helper ------------------------------------------------
+// --- temporary path helper -------------------------------------------------
 
 // Unique path under the system temp dir, removed on scope exit.
-struct temp_file {
+struct temp_path {
 	std::filesystem::path path;
-	explicit temp_file(const std::string& tag)
+	explicit temp_path(const std::string& tag)
 		: path(std::filesystem::temp_directory_path()
 			/ ("tau_test_io_context_" + tag)) {
 		std::error_code ec;
 		std::filesystem::remove(path, ec);
 	}
-	~temp_file() {
+	~temp_path() {
 		std::error_code ec;
 		std::filesystem::remove(path, ec);
 	}
@@ -254,7 +254,7 @@ TEST_SUITE("vector_output_stream") {
 TEST_SUITE("file streams") {
 
 	TEST_CASE("written values round-trip through a file") {
-		temp_file tf("roundtrip");
+		temp_path tf("roundtrip");
 		{
 			file_output_stream out(tf.str());
 			CHECK(out.put("line one"));
@@ -269,7 +269,7 @@ TEST_SUITE("file streams") {
 	}
 
 	TEST_CASE("reading past the end yields nullopt (AP2-6)") {
-		temp_file tf("eof");
+		temp_path tf("eof");
 		{
 			file_output_stream out(tf.str());
 			CHECK(out.put("only"));
@@ -310,7 +310,7 @@ TEST_SUITE("file streams") {
 	}
 
 	TEST_CASE("file_input_stream rebuild rereads from the beginning") {
-		temp_file tf("in_rebuild");
+		temp_path tf("in_rebuild");
 		{
 			file_output_stream out(tf.str());
 			CHECK(out.put("alpha"));
@@ -329,7 +329,7 @@ TEST_SUITE("file streams") {
 	}
 
 	TEST_CASE("file_output_stream rebuild reopens the file") {
-		temp_file tf("out_rebuild");
+		temp_path tf("out_rebuild");
 		file_output_stream out(tf.str());
 		CHECK(out.put("first"));
 		auto rebuilt = out.rebuild();
@@ -340,7 +340,7 @@ TEST_SUITE("file streams") {
 	// As with vector_output_stream, the time-point overload is hidden by the
 	// put(const string&) override and must be reached via the base class.
 	TEST_CASE("put through the base time-point overload writes the value") {
-		temp_file tf("tp");
+		temp_path tf("tp");
 		{
 			file_output_stream out(tf.str());
 			serialized_constant_output_stream& base = out;
@@ -356,7 +356,7 @@ TEST_SUITE("file streams") {
 	// explicitly since the /dev/stdout fix lives in the very same
 	// constructor/put() this exercises.
 	TEST_CASE("a fresh open of an ordinary named file truncates prior content") {
-		temp_file tf("truncate");
+		temp_path tf("truncate");
 		{
 			file_output_stream out(tf.str());
 			CHECK(out.put("stale"));
@@ -373,24 +373,22 @@ TEST_SUITE("file streams") {
 		CHECK(read_lines(tf.path) == std::vector<std::string>{"fresh"});
 	}
 
-	// Defect A (private/2026-08-06-adt-demo-extension-report.md): opening
-	// "/dev/stdout" as an ordinary named file creates a SECOND, independent
-	// file description on the same underlying file std::cout already
-	// writes to (fd 1); the two descriptions' independently-tracked
+	// Opening "/dev/stdout" as an ordinary named file creates a SECOND,
+	// independent file description on the same underlying file std::cout
+	// already writes to (fd 1); the two descriptions' independently-tracked
 	// offsets, combined with the default open mode's truncation, produced
 	// NUL-byte holes once both were flushed to a regular (seekable) file
-	// (reproduced against the pre-fix binaries: 144 NUL bytes via the
-	// report's own repro; zero on a pipe, since a pipe has no offset
-	// concept to corrupt). The fix routes "/dev/stdout"/"/dev/stderr"
-	// through the process's own std::cout/std::cerr instead of opening a
-	// private ofstream on the same path, sidestepping the dual-description
-	// problem entirely rather than trying to make two independent
-	// descriptions agree on a shared offset. Directly testable via rdbuf
-	// redirection (the coordinator's suggested "temp regular file
-	// exercising the same write path" does not apply here: the fix does
-	// NOT touch how ordinary named files are opened at all, only these two
+	// (144 NUL bytes reproduced against the pre-fix binaries; zero on a
+	// pipe, since a pipe has no offset concept to corrupt). The fix routes
+	// "/dev/stdout"/"/dev/stderr" through the process's own
+	// std::cout/std::cerr instead of opening a private ofstream on the same
+	// path, sidestepping the dual-description problem entirely rather than
+	// trying to make two independent descriptions agree on a shared offset.
+	// Directly testable via rdbuf redirection. A temp regular file
+	// exercising the same write path does not apply here: the fix does NOT
+	// touch how ordinary named files are opened at all, only these two
 	// specific paths -- see the truncation regression guard above for that
-	// unchanged path instead).
+	// unchanged path instead.
 	TEST_CASE("\"/dev/stdout\" writes through std::cout, not a private file") {
 		cout_capture out;
 		file_output_stream s("/dev/stdout");
@@ -824,7 +822,7 @@ TEST_SUITE("adt tuple streams") {
 		io_context<node_t> ctx;
 		REQUIRE(tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
-			!= nullptr);
+			.value_or(nullptr) != nullptr);
 		tref member = build_canonized_io_var<node_t>("p.a");
 		const adt_stream_layout<node_t>* l =
 			find_adt_stream_for_member<node_t>(ctx, member);

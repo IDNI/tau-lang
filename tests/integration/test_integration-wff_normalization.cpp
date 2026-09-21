@@ -242,7 +242,9 @@ TEST_SUITE("boole_normal_form") {
 	TEST_CASE("1") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		// The listed strings are not all one AND/OR-commutative class:
 		// pairwise-checking them under matches_wff_mod_and_or splits them
 		// into exactly two -- one factored on b ("b&(a|x')|b'ax") and one
@@ -256,8 +258,9 @@ TEST_SUITE("boole_normal_form") {
 	TEST_CASE("2") {
 		const char* sample = "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).equals_F());
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK(tau::get(res_r.value()).equals_F());
 	}
 	// Inequality reasoning is not supported yet
 	// TEST_CASE("3") {
@@ -270,14 +273,16 @@ TEST_SUITE("boole_normal_form") {
 	TEST_CASE("4") {
 		const char* sample = "xy = 0 && (abx' | by'a) != 0 && ab = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).equals_F());
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK(tau::get(res_r.value()).equals_F());
 	}
 	TEST_CASE("5") {
 		const char* sample = "!(xy = 0 && (abx' | by'a) != 0 && ab = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).equals_T());
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK(tau::get(res_r.value()).equals_T());
 	}
 }
 
@@ -307,7 +312,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		auto nso = get_nso_rr("always o1[t] = 1.");
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 		// No spurious always(F) node anywhere in the result tree.
 		CHECK(!tau::get(result).find_top(is_always_F));
@@ -322,7 +329,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		auto nso = get_nso_rr("sometimes o1[t] = 1.");
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 		CHECK(!tau::get(result).find_top(is_always_F));
 		// Result must not be false (formula is not trivially unsatisfiable).
@@ -335,7 +344,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		auto nso = get_nso_rr("(always o1[t] = 1) && (sometimes o2[t] = 0).");
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 		CHECK(!tau::get(result).find_top(is_always_F));
 		// Result contains at least one always(...) subformula.
@@ -369,7 +380,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		tref fm = tau::build_wff_or(temporal_clause, non_temporal_clause);
 		REQUIRE(has_temp_var<node_t>(fm));
 
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 
 		// No spurious always(F) node.
@@ -713,13 +726,11 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 // shares free variables with atoms inside a quantified block lifts those
 // variables above `eliminable` and the binder survives -- even though the
 // block alone (or with a disjoint-variable or non-arithmetic sibling) is
-// eliminated. Reproducers R5/R6 of
-// private/review-pointwise-revision-2026-08-16.md §3; the pointwise-revision
-// fallback ¬∃outs.(S∧U) ∨ (S∧U) produces exactly the R6 configuration
-// whenever S∧U carries bv arithmetic.
+// eliminated. The pointwise-revision fallback ¬∃outs.(S∧U) ∨ (S∧U) produces
+// exactly this configuration whenever S∧U carries bv arithmetic.
 TEST_SUITE("Normalizer bv sibling-taint") {
 	static bool normalizes_quantifier_free(const char* sample) {
-		tref spec = tau::get(sample);
+		tref spec = tau::get(sample).value_or(nullptr);
 		REQUIRE( spec != nullptr );
 		// Use the api entry (inference + io_var resolution +
 		// normalizer), the path the interpreter-built formulas take

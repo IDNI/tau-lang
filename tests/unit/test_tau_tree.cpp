@@ -396,8 +396,13 @@ TEST_SUITE("semantic-error predicates") {
 	TEST_CASE("has_semantic_error aggregates the individual predicates") {
 		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
 		tref bad = tau::build_wff_ex(x, tau::build_wff_always(x_eq_0("x")), false);
-		CHECK(has_semantic_error<node_t>(bad));
-		CHECK(!has_semantic_error<node_t>(get_nso_rr("x=0.").value().main->get()));
+		auto bad_r = has_semantic_error<node_t>(bad);
+		REQUIRE(bad_r.has_value());
+		CHECK(*bad_r);
+		auto good_r = has_semantic_error<node_t>(
+			get_nso_rr("x=0.").value().main->get());
+		REQUIRE(good_r.has_value());
+		CHECK(!*good_r);
 	}
 }
 
@@ -476,7 +481,7 @@ TEST_SUITE("expression_paths: multi-level and term paths") {
 	// bf_xor rather than wff_or, and exhaustion yields _0 rather than _F.
 	TEST_CASE("paths over a term split on bf_or") {
 		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
-		tref term = tau::get("a|b", bf_opts);
+		tref term = tau::get("a|b", bf_opts).value_or(nullptr);
 		REQUIRE(term != nullptr);
 		trefs paths = collect(term);
 		CHECK(paths.size() == 2);
@@ -484,7 +489,7 @@ TEST_SUITE("expression_paths: multi-level and term paths") {
 
 	TEST_CASE("paths over a term split on bf_xor") {
 		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
-		tref term = tau::get("a^b", bf_opts);
+		tref term = tau::get("a^b", bf_opts).value_or(nullptr);
 		REQUIRE(term != nullptr);
 		trefs paths = collect(term);
 		CHECK(paths.size() >= 2);
@@ -492,7 +497,7 @@ TEST_SUITE("expression_paths: multi-level and term paths") {
 
 	TEST_CASE("apply over a term transforms a path") {
 		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
-		tref term = tau::get("a|b", bf_opts);
+		tref term = tau::get("a|b", bf_opts).value_or(nullptr);
 		REQUIRE(term != nullptr);
 		size_t calls = 0;
 		auto accept_first = [&](tref) { ++calls; return true; };
@@ -564,12 +569,12 @@ TEST_SUITE("expression_paths: multi-level and term paths") {
 // ── TT-22: extractor branch coverage ────────────────────────────────────────
 //
 // Coverage-driven additions (2026-08-01), branch pass. After correcting the
-// raw gcovr numbers for template-instantiation multiplicity (see
-// private/add-tests-whole-code.md 6.1) and for the permanently one-sided
-// branch that every LOG_TRACE/LOG_DEBUG contributes (BOOST_LOG_STREAM_SEV
-// tests "is this channel enabled", which is always false in a test run),
-// tau_tree_extractors.tmpl.h sat at 54.6% real branch coverage -- the worst
-// of any substantial file whose gaps are reachable from a unit test.
+// raw gcovr numbers for template-instantiation multiplicity and for the
+// permanently one-sided branch that every LOG_TRACE/LOG_DEBUG contributes
+// (BOOST_LOG_STREAM_SEV tests "is this channel enabled", which is always
+// false in a test run), tau_tree_extractors.tmpl.h sat at 54.6% real branch
+// coverage -- the worst of any substantial file whose gaps are reachable
+// from a unit test.
 //
 // The suites below take the *untested polarity* of conditionals whose lines
 // already execute. That is the class of gap line coverage cannot see: the
@@ -694,7 +699,7 @@ TEST_SUITE("get_nso_rr early returns") {
 	}
 
 	TEST_CASE("a bare bf becomes an rr that is all main and no relations") {
-		tref b = tau::get("x", parse_bf());
+		tref b = tau::get("x", parse_bf()).value_or(nullptr);
 		REQUIRE(b != nullptr);
 		auto r = get_nso_rr<node_t>(b);
 		REQUIRE(r.has_value());
@@ -703,7 +708,7 @@ TEST_SUITE("get_nso_rr early returns") {
 	}
 
 	TEST_CASE("a lone rec_relation becomes an rr that is all relations and no main") {
-		tref defs = tau::get("f(x) := x.", parse_rec_relations());
+		tref defs = tau::get("f(x) := x.", parse_rec_relations()).value_or(nullptr);
 		REQUIRE(defs != nullptr);
 		tref rel = tau::get(defs)[0].get();
 		REQUIRE(tau::get(rel).is(tau::rec_relation));
@@ -731,7 +736,7 @@ TEST_SUITE("get_var_name_node unwrapping") {
 		// A bv literal is used rather than a :tau one: a :tau
 		// ba_constant only survives parsing when a :tau variable
 		// anchors it, which would drag a whole spec into this test.
-		tref c = tau::get("{1}:bv[8]", parse_bf());
+		tref c = tau::get("{1}:bv[8]", parse_bf()).value_or(nullptr);
 		REQUIRE(c != nullptr);
 		tref cte = tau::get(c).find_top(is<node_t, tau::ba_constant>);
 		REQUIRE(cte != nullptr);
@@ -769,8 +774,8 @@ TEST_SUITE("semantic-error predicates: the untested polarity") {
 	// where most of its uncovered branches were.
 
 	TEST_CASE("an open tau constant is rejected, a closed one accepted") {
-		CHECK(tau::get("x:tau = { y = 0 }.") == nullptr);
-		CHECK(tau::get("x:tau = { all y y = 0 }.") != nullptr);
+		CHECK(tau::get("x:tau = { y = 0 }.").value_or(nullptr) == nullptr);
+		CHECK(tau::get("x:tau = { all y y = 0 }.").value_or(nullptr) != nullptr);
 	}
 
 	TEST_CASE("a fallback inside a rec_relation body is rejected") {
@@ -779,10 +784,10 @@ TEST_SUITE("semantic-error predicates: the untested polarity") {
 		// -- the last arm of the has_semantic_error chain -- rejects it.
 		CHECK(tau::get("g[n](x) := g[n-1](x) fallback T."
 			"g[0](x) := T."
-			"g(x).") == nullptr);
+			"g(x).").value_or(nullptr) == nullptr);
 		CHECK(tau::get("g[n](x) := !g[n-1](x)."
 			"g[0](x) := T."
-			"g(x) fallback T.") != nullptr);
+			"g(x) fallback T.").value_or(nullptr) != nullptr);
 	}
 
 	TEST_CASE("nested temporal quantifiers are accepted") {
@@ -792,8 +797,8 @@ TEST_SUITE("semantic-error predicates: the untested polarity") {
 		// "invalid_nesting_of_temp_quants never flags nesting: full LTL
 		// allows it" in the suite above, which pins the predicate that
 		// used to reject it.
-		CHECK(tau::get("always (sometimes x = 0).") != nullptr);
-		CHECK(tau::get("always x = 0.") != nullptr);
+		CHECK(tau::get("always (sometimes x = 0).").value_or(nullptr) != nullptr);
+		CHECK(tau::get("always x = 0.").value_or(nullptr) != nullptr);
 	}
 }
 
@@ -839,7 +844,7 @@ TEST_SUITE("extractor/builder direct coverage (TT2-24)") {
 
 	TEST_CASE("get_free_vars_appearance_order preserves appearance order") {
 		tau::get_options opts = { .parse = { .start = tau::bf } };
-		tref fm = tau::get("zy | ax", opts);
+		tref fm = tau::get("zy | ax", opts).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		trefs vars = get_free_vars_appearance_order<node_t>(fm);
 		REQUIRE( vars.size() == 4 );
@@ -865,9 +870,9 @@ TEST_SUITE("extractor/builder direct coverage (TT2-24)") {
 
 	TEST_CASE("get_rr_sig: name and arities, stable across argument names") {
 		tau::get_options opts = { .parse = { .start = tau::wff } };
-		tref px = tau::get("p(x)", opts);
-		tref py = tau::get("p(y)", opts);
-		tref qxy = tau::get("q[t](x, y)", opts);
+		tref px = tau::get("p(x)", opts).value_or(nullptr);
+		tref py = tau::get("p(y)", opts).value_or(nullptr);
+		tref qxy = tau::get("q[t](x, y)", opts).value_or(nullptr);
 		REQUIRE( px != nullptr );
 		REQUIRE( py != nullptr );
 		REQUIRE( qxy != nullptr );
@@ -940,12 +945,12 @@ TEST_SUITE("rr_dict (RR-12)") {
 		size_t b = rr_dict("rr_dict_test_b");
 		CHECK( a != b );
 		CHECK( rr_dict("rr_dict_test_a") == a );
-		CHECK( rr_dict(a) == "rr_dict_test_a" );
-		CHECK( rr_dict(b) == "rr_dict_test_b" );
+		CHECK( rr_dict(a).value() == "rr_dict_test_a" );
+		CHECK( rr_dict(b).value() == "rr_dict_test_b" );
 	}
 
-	TEST_CASE("invalid id throws instead of reading out of bounds") {
-		CHECK_THROWS_AS( rr_dict(size_t(-1)), std::logic_error );
+	TEST_CASE("invalid id reports out of range instead of reading out of bounds") {
+		CHECK( rr_dict(size_t(-1)).has_error() );
 	}
 }
 
@@ -1055,7 +1060,7 @@ TEST_SUITE("tree::cold builders") {
 		// A ctnvar node comes out of a parsed constraint; the builders
 		// rebuild each comparison around it.
 		tau::get_options o; o.parse.start = tau::wff; o.reget_with_hooks = false;
-		tref parsed = tau::get("[n = 2]", o);
+		tref parsed = tau::get("[n = 2]", o).value_or(nullptr);
 		REQUIRE(parsed != nullptr);
 		using tt = tau::traverser;
 		tref ctnvar = tt(parsed) | tau::constraint | tau::ctn_eq | tau::ctnvar | tt::ref;

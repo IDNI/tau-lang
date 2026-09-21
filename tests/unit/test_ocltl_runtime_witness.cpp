@@ -52,7 +52,9 @@ tau_t tau_var(const std::string& name) {
 template <typename BA, typename Node>
 bool ba_equal(const BA& x, const BA& y) {
 	using desc = ba_descriptor<BA, Node>;
-	return desc::is_zero((x & ~y) | (~x & y));
+	auto z = desc::is_zero((x & ~y) | (~x & y));
+	REQUIRE(z.has_value());
+	return *z;
 }
 
 // Ground truth for one target_atom, decided independently of
@@ -91,7 +93,7 @@ void check_atomless2_step(
 	BA i1_0 = var("i1t"),   i1_1 = var("i1tm1"), i1_2 = var("i1tm2");
 	BA i2_0 = var("i2t"),   i2_1 = var("i2tm1"), i2_2 = var("i2tm2");
 
-	// o1[t]: 9 exclusions (design §2.1(e), atoms 1,2,6,7,10,12,14,15,16).
+	// o1[t]: 9 exclusions (atoms 1,2,6,7,10,12,14,15,16).
 	std::vector<BA> a1{ o1_1, o1_2, o2_1, o2_2, i1_0, i1_1, i1_2 };
 	std::vector<ocltl_target_atom> atoms1{
 		{ ocltl_target_none, true,  false }, // != {T.}
@@ -101,12 +103,13 @@ void check_atomless2_step(
 		{ 4, false, false }, { 5, false, false }, { 6, false, false }, // != i1[t],i1[t-1],i1[t-2]
 	};
 	REQUIRE(atoms1.size() == 9);
-	BA b1 = ocltl_decode_witness<BA, Node>(a1, atoms1);
-	CHECK(check_all<BA, Node>(b1, atoms1, a1, unit, zero));
+	auto b1 = ocltl_decode_witness<BA, Node>(a1, atoms1);
+	REQUIRE(b1.has_value());
+	CHECK(check_all<BA, Node>(*b1, atoms1, a1, unit, zero));
 
 	// o2[t]: 10 exclusions plus the sibling o1[t] -- 11 total, decoded with
 	// o1[t] now concrete (design's forced decode order).
-	std::vector<BA> a2{ o2_1, o2_2, o1_1, o1_2, i2_0, i2_1, i2_2, i1_0, b1 };
+	std::vector<BA> a2{ o2_1, o2_2, o1_1, o1_2, i2_0, i2_1, i2_2, i1_0, *b1 };
 	std::vector<ocltl_target_atom> atoms2{
 		{ ocltl_target_none, true,  false }, // != {T.}
 		{ ocltl_target_none, false, false }, // != {F.}
@@ -117,8 +120,9 @@ void check_atomless2_step(
 		{ 8, false, false }, // != o1[t] (sibling, now concrete)
 	};
 	REQUIRE(atoms2.size() == 11);
-	BA b2 = ocltl_decode_witness<BA, Node>(a2, atoms2);
-	CHECK(check_all<BA, Node>(b2, atoms2, a2, unit, zero));
+	auto b2 = ocltl_decode_witness<BA, Node>(a2, atoms2);
+	REQUIRE(b2.has_value());
+	CHECK(check_all<BA, Node>(*b2, atoms2, a2, unit, zero));
 }
 
 } // namespace
@@ -144,8 +148,9 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): atomless2's exact step shape"
 			{ ocltl_target_none, true, false }, // != {T.}
 			{ 0, false, false }, { 1, false, false }, { 2, false, false },
 		};
-		tau_t b = ocltl_decode_witness<tau_t, node_t>(a, atoms);
-		CHECK(check_all<tau_t, node_t>(b, atoms, a, unit, zero));
+		auto b = ocltl_decode_witness<tau_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<tau_t, node_t>(*b, atoms, a, unit, zero));
 	}
 }
 
@@ -184,10 +189,11 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): adversarial -- real positive 
 			{ 0, false, false },                // b != x
 			{ 1, false, false },                // b != y
 		};
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero));
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero));
 		// The positive atom fully determines b: it must equal the unit exactly.
-		CHECK(ba_equal<sbf_t, node_t>(b, unit));
+		CHECK(ba_equal<sbf_t, node_t>(*b, unit));
 	}
 
 	TEST_CASE("sbf: positive equality to a sibling coordinate") {
@@ -199,9 +205,10 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): adversarial -- real positive 
 			{ 0, false, true },  // b == x, required
 			{ 1, false, false }, // b != y
 		};
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero));
-		CHECK(ba_equal<sbf_t, node_t>(b, x));
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero));
+		CHECK(ba_equal<sbf_t, node_t>(*b, x));
 	}
 
 	TEST_CASE("sbf: positive equality to zero, mixed with disequalities") {
@@ -213,9 +220,10 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): adversarial -- real positive 
 			{ ocltl_target_none, false, true }, // b == {F.}, required
 			{ 0, false, false },                // b != x
 		};
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero));
-		CHECK(ba_equal<sbf_t, node_t>(b, zero));
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero));
+		CHECK(ba_equal<sbf_t, node_t>(*b, zero));
 	}
 }
 
@@ -226,8 +234,9 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): degenerate cases") {
 		sbf_t zero = ~unit;
 		std::vector<sbf_t> a{};
 		std::vector<ocltl_target_atom> atoms{};
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero)); // vacuously true
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero)); // vacuously true
 	}
 
 	TEST_CASE("no live atoms: nonempty a, empty atom list") {
@@ -235,8 +244,9 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): degenerate cases") {
 		sbf_t zero = ~unit;
 		std::vector<sbf_t> a{ sbf_var("dega"), sbf_var("degb"), sbf_var("degc") };
 		std::vector<ocltl_target_atom> atoms{};
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero));
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero));
 	}
 
 	TEST_CASE("all-equal memory values: every exclusion is the same concrete value") {
@@ -248,8 +258,9 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): degenerate cases") {
 			{ 0, false, false }, { 1, false, false }, { 2, false, false },
 			{ 3, false, false }, { 4, false, false },
 		};
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero));
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero));
 	}
 
 	TEST_CASE("all-equal memory values, tau algebra") {
@@ -260,8 +271,9 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): degenerate cases") {
 		std::vector<ocltl_target_atom> atoms{
 			{ 0, false, false }, { 1, false, false }, { 2, false, false },
 		};
-		tau_t b = ocltl_decode_witness<tau_t, node_t>(a, atoms);
-		CHECK(check_all<tau_t, node_t>(b, atoms, a, unit, zero));
+		auto b = ocltl_decode_witness<tau_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<tau_t, node_t>(*b, atoms, a, unit, zero));
 	}
 }
 
@@ -311,8 +323,9 @@ TEST_SUITE("ocltl runtime witness decode (Gate 0): randomized cases") {
 		for (size_t i = 0; i < k; ++i)
 			if (i != skip) atoms.push_back({ i, false, false }); // b != a[i]
 
-		sbf_t b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
-		CHECK(check_all<sbf_t, node_t>(b, atoms, a, unit, zero));
+		auto b = ocltl_decode_witness<sbf_t, node_t>(a, atoms);
+		REQUIRE(b.has_value());
+		CHECK(check_all<sbf_t, node_t>(*b, atoms, a, unit, zero));
 	}
 
 	TEST_CASE("random case 1 (k=6, seed=1001)") { run_random_case(1001, 6); }

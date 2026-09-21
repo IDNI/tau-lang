@@ -39,7 +39,7 @@ TEST_SUITE("unify") {
 
 	bool nomatch(const type_t& type1, const type_t& type2) {
 		auto merged = unify<node_t>(type1, type2);
-		return !merged;
+		return !merged.has_value();
 	}
 
 	TEST_CASE("untyped with untyped") {

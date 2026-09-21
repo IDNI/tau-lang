@@ -96,7 +96,7 @@ TEST_SUITE("solve_inequality_system") {
 	tref tau_var_operand(const std::string& name) {
 		using tau = tree<node_t>;
 		tref eq = get_nso_rr<node_t>(
-			tau::get(name + " != {T.}:tau.")).value().main->get();
+			tau::get(name + " != {T.}:tau.").value_or(nullptr)).value().main->get();
 		tref neq_node = tau::get(eq).first();
 		return tau::get(neq_node).first();
 	}
@@ -191,8 +191,10 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( solution.value().size() == 2 );
 		for (const auto& [var, value] : solution.value()) {
 			std::stringstream ss;
-			CHECK( serialize_constant<node_t>(ss, value,
-				find_ba_type<node_t>(var)) );
+			auto ser = serialize_constant<node_t>(ss, value,
+				find_ba_type<node_t>(var));
+			bool serialized_ok = ser.has_value() && ser.value();
+			CHECK( serialized_ok );
 		}
 	}
 

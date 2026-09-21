@@ -21,7 +21,7 @@ namespace {
 
 std::string carrier_type_str() {
 	return get_ba_type_name<node_t>(
-		get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>()));
+		get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>())).value();
 }
 
 // Parse `spec` (a full ". "-terminated tau spec string) against `ctx` --
@@ -30,7 +30,7 @@ std::string carrier_type_str() {
 // interpreter unable to match a formula's io_var against ctx.inputs/outputs
 // for anything beyond a single output-only spec).
 tref parse_against(io_context<node_t>& ctx, const std::string& spec) {
-	auto nso = get_nso_rr<node_t>(ctx, tau::get(spec));
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(spec).value_or(nullptr));
 	if (!nso.has_value()) return nullptr;
 	return nso.value().main->get();
 }
@@ -68,7 +68,7 @@ strings run_table_o1(std::shared_ptr<table_step_provider<node_t>> provider,
 // needed since ocltl_direct_decode_edge only ever grounds via
 // update_to_time_point + rewriter::replace on the raw tref.
 tref parse_tmpl_atom(const std::string& src) {
-	return get_nso_rr<node_t>(tau::get(src)).value().main->get();
+	return get_nso_rr<node_t>(tau::get(src).value_or(nullptr)).value().main->get();
 }
 
 // A grounded template atom holds after substituting `sol` in for its free

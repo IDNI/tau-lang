@@ -25,7 +25,7 @@ static constexpr size_t    MEMORY_LIMIT_MB = 16384;   // 2 GB per test
 
 static tref parse_wff(const std::string& s) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	return tree<node_t>::get(s, opts);
+	return tree<node_t>::get(s, opts).value_or(nullptr);
 }
 
 static std::string normalize_blasting_on(const std::string& s) {

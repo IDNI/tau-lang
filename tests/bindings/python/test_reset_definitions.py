@@ -20,7 +20,9 @@ def main():
 	assert retyped, f"Failed to retype o7 after the reset: {retyped.report.errors}"
 
 	# The interpreter built before the reset keeps its own streams.
-	inputs = {at: "1" for at in tau.get_inputs_for_step(first)}
+	r = tau.get_inputs_for_step(first)
+	assert r, f"Failed to get inputs for step: {r.report.errors}"
+	inputs = {at: "1" for at in r.value}
 	assert len(inputs) == 1, "Expected the one input stream i7"
 	stepped = tau.step(first, inputs)
 	assert stepped, f"The first interpreter no longer steps: {stepped.report.errors}"

@@ -19,7 +19,9 @@ def main():
 		step += 1
 
 		# Find out what inputs are expected for the next step
-		inputs = tau.get_inputs_for_step(i)
+		r = tau.get_inputs_for_step(i)
+		assert r, f"Failed to get inputs for step: {r.report.errors}"
+		inputs = r.value
 
 		# Assign values to the inputs (spec has only `i` input stream)
 		assigned_inputs = {}

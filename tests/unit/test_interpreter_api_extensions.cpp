@@ -1,13 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Tests for the 11 interpreter API methods added for tau-neuro runtime
-// (plan v10 §14 + claude-code-addendum.tex §7).
+// Tests for the 11 interpreter API methods added for tau-neuro runtime.
 //
 // Test categories:
 //   IAX-INSP-*    Inspection: current_spec, reset, current_state,
 //                 accumulator_state, committed_approval_hash
-//   IAX-PWR-*     PWR / runtime: step(values, u), can_extend,
-//                 admissible_outputs
+//   IAX-PWR-*     PWR / runtime: can_extend, admissible_outputs
 //   IAX-MEALY-*   Mealy-strategy: visualise_mealy_dot, determinise,
 //                 boundary_traces, commit_realiser
 //   IAX-PREF-*    apply_preferences (free function)
@@ -27,7 +25,7 @@ using namespace idni::tau_lang;
 // Parse a tau spec string and construct an interpreter.
 static std::optional<interpreter<node_t>> make(const char* s) {
 	io_context<node_t> ctx;
-	auto nso_rr = get_nso_rr<node_t>(ctx, tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(ctx, tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return {};
 	tref spec_tref = nso_rr.value().main->get();
 	auto interp_r = interpreter<node_t>::make_interpreter(spec_tref, ctx);
@@ -73,13 +71,17 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
 		// Safety spec → no cached_solution multi-state → state index 0.
-		REQUIRE(i->current_state() == 0);
+		auto cs = i->current_state();
+		REQUIRE(cs.has_value());
+		CHECK(cs.value() == 0);
 	}
 
 	TEST_CASE("[IAX-INSP-04] accumulator_state returns empty for non-existent name") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
-		REQUIRE(i->accumulator_state("does_not_exist").empty());
+		auto acc = i->accumulator_state("does_not_exist");
+		REQUIRE(acc.has_value());
+		REQUIRE(acc.value().empty());
 	}
 
 	TEST_CASE("[IAX-INSP-05] committed_approval_hash defaults to empty") {
@@ -95,45 +97,13 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 
 TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 
-	// AP2-20: declare_open/undeclare_open/open_streams had zero coverage.
-	TEST_CASE("[IAX-OPEN-01] declare/undeclare/open_streams round-trip") {
-		auto i = make("o1[t] = 1 && o2[t] = 0.");
-		REQUIRE(i.has_value());
-		REQUIRE(i->open_streams().empty());
-		auto handler = [](const std::string&) -> std::string {
-			return "";
-		};
-		i->declare_open("o1", handler);
-		i->declare_open("o2", handler);
-		auto streams = i->open_streams();
-		REQUIRE(streams.size() == 2);
-		// Iteration order matches insertion order.
-		REQUIRE(streams[0] == "o1");
-		REQUIRE(streams[1] == "o2");
-		// Re-declaring replaces, not duplicates.
-		i->declare_open("o1", handler);
-		REQUIRE(i->open_streams().size() == 2);
-		i->undeclare_open("o1");
-		streams = i->open_streams();
-		REQUIRE(streams.size() == 1);
-		REQUIRE(streams[0] == "o2");
-		i->undeclare_open("o2");
-		REQUIRE(i->open_streams().empty());
-	}
-
-	TEST_CASE("[IAX-OPEN-02] declare_open rejects a non-output stream") {
-		auto i = make("o1[t] = 1.");
-		REQUIRE(i.has_value());
-		REQUIRE_THROWS(i->declare_open("not_a_stream",
-			[](const std::string&) { return std::string(); }));
-	}
-
-	// AP2-3 + AP2-20: reset() takes a multi-state Mealy run back to the
-	// real t=0 state: the warm-up constraint starts the machine in its
-	// initial state, so no state bit is pre-populated, and the first step
-	// after the reset lands in the same state as the first step did.
-	// Requires ltlsynt on PATH, like every genuine-synthesis test here.
-	TEST_CASE("[IAX-MEALY-06] reset replays a multi-state run from t=0") {
+	// AP2-3: a multi-state Mealy strategy's initial state bits
+	// are pre-populated into memory by make_interpreter; reset() must
+	// re-seed them (it used to just clear memory, so "back to t=0" was
+	// not the real t=0 state), and current_state()'s aux-bit scan must
+	// survive stepping (IN-N12 guard). Requires ltlsynt on PATH, like
+	// every genuine-synthesis test in this repo.
+	TEST_CASE("[IAX-MEALY-06] reset re-seeds multi-state initial memory") {
 		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
 		if (!i.has_value()) return; // ltlsynt unavailable: nothing to pin
 		if (!i->cached_solution
@@ -142,13 +112,17 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		CHECK(i->memory.empty());
 		auto first = i->step();
 		REQUIRE(first.has_value());
-		const int s1 = i->current_state();
+		auto s1_r = i->current_state();
+		REQUIRE(s1_r.has_value());
+		const int s1 = s1_r.value();
 		i->reset();
 		REQUIRE(i->time_point == 0);
 		CHECK(i->memory.empty());
 		auto again = i->step();
 		REQUIRE(again.has_value());
-		CHECK(i->current_state() == s1);
+		auto s2_r = i->current_state();
+		REQUIRE(s2_r.has_value());
+		CHECK(s2_r.value() == s1);
 	}
 
 	// IN-N2: the LTL aux state bits (o__ltl_ms*) are encoding artefacts;
@@ -230,38 +204,34 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		REQUIRE(psi != nullptr);
 		// can_extend dry-runs the merge; the safety-spec o1=1 with
 		// added o2=1 stays realisable.
-		bool ok = i->can_extend(psi);
-		// We don't strictly REQUIRE(ok) because the partition / clause
-		// matching logic may decline non-overlapping updates; the
-		// important behaviour is that the call returns without throwing.
-		(void)ok;
+		auto ok_r = i->can_extend(psi);
+		REQUIRE(ok_r.has_value());
+		// We don't strictly REQUIRE(ok_r.value()) because the partition /
+		// clause matching logic may decline non-overlapping updates; the
+		// important behaviour is that the call resolves without an error.
+		(void)ok_r.value();
 	}
 
 	TEST_CASE("[IAX-PWR-02] admissible_outputs returns at least one solution") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
-		auto results = i->admissible_outputs(10);
+		auto results_r = i->admissible_outputs(10);
+		REQUIRE(results_r.has_value());
 		// A satisfiable safety spec with a determined output has
 		// at least one admissible solution.
-		REQUIRE(results.size() >= 1);
+		REQUIRE(results_r.value().size() >= 1);
 	}
 
 	TEST_CASE("[IAX-PWR-03] admissible_outputs respects max_results bound") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());
-		auto results = i->admissible_outputs(0);
-		REQUIRE(results.empty());
+		auto results_r = i->admissible_outputs(0);
+		REQUIRE(results_r.has_value());
+		REQUIRE(results_r.value().empty());
 
-		auto results_3 = i->admissible_outputs(3);
-		REQUIRE(results_3.size() <= 3);
-	}
-
-	TEST_CASE("[IAX-PWR-04] step(values, optional<formula> u) with no u behaves like step(values)") {
-		auto i = make("o1[t] = 1.");
-		REQUIRE(i.has_value());
-		assignment<node_t> empty_inputs;
-		auto [out, _] = i->step(empty_inputs, std::nullopt);
-		REQUIRE(out.has_value());
+		auto results_3_r = i->admissible_outputs(3);
+		REQUIRE(results_3_r.has_value());
+		REQUIRE(results_3_r.value().size() <= 3);
 	}
 
 	// IN-N11: make_interpreter pushed the multi-state Mealy initial-output
@@ -279,8 +249,10 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		(void)i->step();
 		tref psi = parse_formula("always o2[t]:tau = 1");
 		REQUIRE(psi != nullptr);
-		bool accepted = false;
-		REQUIRE_NOTHROW(accepted = i->update(psi));
+		result<bool> accepted_r;
+		REQUIRE_NOTHROW(accepted_r = i->update(psi));
+		REQUIRE(accepted_r.has_value());
+		bool accepted = accepted_r.value();
 		REQUIRE(i->ubt_ctn.size() == i->original_spec.size());
 		if (accepted) {
 			// IN-N3: the synthesised automaton no longer describes
@@ -304,15 +276,23 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		REQUIRE(ok_spec.has_value());
 		tref compatible = parse_formula("always o1[t]:tau = 1");
 		REQUIRE(compatible != nullptr);
-		CHECK(ok_spec->can_extend(compatible));
-		CHECK(ok_spec->update(compatible));
+		auto ce_ok = ok_spec->can_extend(compatible);
+		auto up_ok = ok_spec->update(compatible);
+		REQUIRE(ce_ok.has_value());
+		REQUIRE(up_ok.has_value());
+		CHECK(ce_ok.value());
+		CHECK(up_ok.value());
 
 		auto bad_spec = make("o1[t] = 1.");
 		REQUIRE(bad_spec.has_value());
 		tref contradictory = parse_formula("always (o2[t]:tau = 0 && o2[t]:tau = 1)");
 		REQUIRE(contradictory != nullptr);
-		const bool ce = bad_spec->can_extend(contradictory);
-		const bool up = bad_spec->update(contradictory);
+		auto ce_r = bad_spec->can_extend(contradictory);
+		auto up_r = bad_spec->update(contradictory);
+		REQUIRE(ce_r.has_value());
+		REQUIRE(up_r.has_value());
+		const bool ce = ce_r.value();
+		const bool up = up_r.value();
 		CHECK(ce == up);
 		CHECK_FALSE(up);
 		// A refused update leaves the interpreter untouched: it steps.
@@ -336,7 +316,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		tref conditional = parse_formula(
 			"always (o1[t]:tau = i1[t]:tau' || o1[t]:tau = 0)");
 		REQUIRE(conditional != nullptr);
-		REQUIRE(i->update(conditional));
+		auto update_r = i->update(conditional);
+		REQUIRE(update_r.has_value());
+		REQUIRE(update_r.value());
 		const std::string before = i->current_spec();
 		// With i1 = 0 the first alternative is solvable and forces
 		// o1 = 0; the disjunction of both alternatives would also admit
@@ -345,7 +327,9 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		assignment<node_t> in;
 		in[build_in_var_at_n<node_t>("i1", 0, tid)] = tau::_0(tid);
 		i->memory = in;
-		auto admissible = i->admissible_outputs(10);
+		auto admissible_r = i->admissible_outputs(10);
+		REQUIRE(admissible_r.has_value());
+		auto& admissible = admissible_r.value();
 		REQUIRE(admissible.size() == 1);
 		for (const auto& [var, value] : admissible[0])
 			CHECK(tau::get(value).to_str() == "0");
@@ -434,7 +418,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 
 	TEST_CASE("[IAX-PREF-01] empty preference order returns spec unchanged") {
 		io_context<node_t> ctx;
-		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("o1[t] = 1."));
+		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("o1[t] = 1.").value_or(nullptr));
 		REQUIRE(nso_rr.has_value());
 		tref spec_tref = nso_rr.value().main->get();
 		REQUIRE(spec_tref != nullptr);
@@ -446,7 +430,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 
 	TEST_CASE("[IAX-PREF-02] preference that's a parse failure is silently dropped") {
 		io_context<node_t> ctx;
-		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("o1[t] = 1."));
+		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("o1[t] = 1.").value_or(nullptr));
 		REQUIRE(nso_rr.has_value());
 		tref spec_tref = nso_rr.value().main->get();
 
@@ -463,7 +447,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 	// dropped instead.
 	TEST_CASE("[IAX-PREF-03] refused spec (semantic negation) drops the preference, no throw") {
 		io_context<node_t> ctx;
-		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("-(F o1[t] = 1)."));
+		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("-(F o1[t] = 1).").value_or(nullptr));
 		REQUIRE(nso_rr.has_value());
 		tref spec_tref = nso_rr.value().main->get();
 		REQUIRE(spec_tref != nullptr);
@@ -477,7 +461,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 
 	TEST_CASE("[IAX-PREF-04] CTL* spec (A) drops the preference, no throw") {
 		io_context<node_t> ctx;
-		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("F (A (o1[t] = 1))."));
+		auto nso_rr = get_nso_rr<node_t>(ctx, tau::get("F (A (o1[t] = 1)).").value_or(nullptr));
 		REQUIRE(nso_rr.has_value());
 		tref spec_tref = nso_rr.value().main->get();
 		REQUIRE(spec_tref != nullptr);

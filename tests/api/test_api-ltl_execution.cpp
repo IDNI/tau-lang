@@ -33,7 +33,9 @@ std::vector<std::string> drive(const char* spec, size_t steps,
 	auto& i = maybe_i.value();
 	for (size_t step = 0; step < steps; ++step) {
 		std::map<stream_at, std::string> assigned;
-		for (auto& input_at_ : tau_api::get_inputs_for_step(i))
+		auto inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE_MESSAGE(inputs.has_value(), spec << " step " << step);
+		for (auto& input_at_ : inputs.value())
 			assigned[input_at_] = input_at(step);
 		auto outputs = tau_api::step(i, assigned, /*interactive=*/false);
 		REQUIRE_MESSAGE(outputs.has_value(), spec << " step " << step);

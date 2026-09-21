@@ -23,7 +23,7 @@ tref parse(const std::string& sample) {
 		.parse = { .start = tau::wff },
 		.reget_with_hooks = true
 	};
-	tref src = tree<node_t>::get(sample, opts);
+	tref src = tree<node_t>::get(sample, opts).value_or(nullptr);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
 	}
@@ -46,28 +46,28 @@ TEST_SUITE("bv to tau tree translation") {
 TEST_SUITE("bv division hook") {
 
 	TEST_CASE("symbolic X / X is not folded") {
-		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf);
-		tref folded = tau::get("{1}:bv[8]", parse_opts_bf);
+		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref folded = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src != nullptr);
 		CHECK(src != folded);
 	}
 
 	TEST_CASE("{0} / {0} is top") {
-		CHECK(tau::get("{0}:bv[8] / {0}:bv[8]", parse_opts_bf)
-			== tau::get("1:bv[8]", parse_opts_bf)); // <- top element 1111....
+		CHECK(tau::get("{0}:bv[8] / {0}:bv[8]", parse_opts_bf).value_or(nullptr)
+			== tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr)); // <- top element 1111....
 	}
 
 	TEST_CASE("non-zero {c} / {c} is 1") {
-		CHECK(tau::get("{42}:bv[8] / {42}:bv[8]", parse_opts_bf)
-			== tau::get("{1}:bv[8]", parse_opts_bf)); // <- 1 (not top element)
+		CHECK(tau::get("{42}:bv[8] / {42}:bv[8]", parse_opts_bf).value_or(nullptr)
+			== tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr)); // <- 1 (not top element)
 	}
 }
 
 TEST_SUITE("bv modulo hook") {
 
 	TEST_CASE("1 % 0 is top") {
-		CHECK(tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf)
-			== tau::get("1:bv[8]", parse_opts_bf)); // <- top element 1111....
+		CHECK(tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf).value_or(nullptr)
+			== tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr)); // <- top element 1111....
 	}
 }
 

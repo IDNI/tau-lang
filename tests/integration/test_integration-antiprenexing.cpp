@@ -7,25 +7,25 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("1") {
 		const char* sample = "ex v { o1[t]o2[t] = 0 } : tau ({ o1[t]o2[t] = 0 } : tau v)' = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK(tau::get(res).equals_T());
 	}
 	TEST_CASE("2") {
 		const char* sample = "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && (ex o2[1], o1[1] o1[1]o2[1] = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK(tau::get(res).equals_T());
 	}
 	TEST_CASE("3") {
 		const char* sample = "all y !({ <:a><:d><:c>|<:a>'<:d><:c>|<:b> = 0 } : tau y != 0 ) || { <:a><:b>|<:c><:d> = 0 } : tau y != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK(tau::get(res).equals_T());
 	}
 	TEST_CASE("4") {
 		const char* sample = "{!(always <:a>&(<:b>|<:d><:c>)|<:a>'<:d><:c> = 0)}&{always <:b>|<:d><:c> = 0} != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK(tau::get(res).equals_F());
 	}
 	// Checked equivalent to its input by hand (the conservative
@@ -33,7 +33,7 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("b4 squeeze_absorb below ex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		// Matched up to AND/OR commutativity: the hash order that decides
 		// which permutation of a shape gets printed drifts with a parser
 		// regen, so only the shape families below are pinned, not one
@@ -66,7 +66,7 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("b4 squeeze_absorb below all") {
 		const char* sample = "all x !((((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		// Matched up to AND/OR commutativity: the hash order that decides
 		// which permutation of a shape gets printed drifts with a parser
 		// regen, so only the shape families below are pinned, not one
@@ -95,7 +95,7 @@ TEST_SUITE("anti_prenex") {
 		// completely, with and without the squeeze
 		const char* sample = "all x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( matches_wff_mod_and_or_any_of(res, {
 			"y = 0 "
 			"&& (w = 0 || (all b1 b1 yz != 0 "
@@ -117,21 +117,21 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("cqe: neq-starved ex block is eliminated") {
 		const char* sample = "ex b (by != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( matches_wff_mod_and_or_any_of(res, { "y != 0 && z != 0" }) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 	TEST_CASE("cqe: neq-starved all block is eliminated via dualization") {
 		const char* sample = "all b (by = 0 || bz = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( matches_wff_mod_and_or_any_of(res, { "y = 0 || z = 0" }) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 	TEST_CASE("cqe: disjunctive scope distributes per clause") {
 		const char* sample = "ex b (by != 0 && bz != 0 || bw != 0 && bu != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		// clause/conjunct order drifts with parser regens; matched up to
 		// AND/OR commutativity rather than pinning one permutation
 		CHECK( matches_wff_mod_and_or(res, "y != 0 && z != 0 || w != 0 && u != 0") );
@@ -146,7 +146,7 @@ TEST_SUITE("anti_prenex") {
 		tref fm = normalize_atomic_formula_operators<node_t>(
 			get_nso_rr(sample).value().main->get());
 		cqe_max_clauses = 3;
-		tref r = complete_quantifier_elimination<node_t>(fm);
+		tref r = complete_quantifier_elimination<node_t>(fm).value();
 		cqe_max_clauses = std::numeric_limits<size_t>::max();
 		CHECK( tau::get(r).find_top(is_quantifier<node_t>) != nullptr );
 	}
@@ -158,7 +158,7 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b ((by != 0 || z != 0) && (bx != 0 || w != 0)).";
 		tref fm = normalize_atomic_formula_operators<node_t>(
 			get_nso_rr(sample).value().main->get());
-		tref r = complete_quantifier_elimination<node_t>(fm);
+		tref r = complete_quantifier_elimination<node_t>(fm).value();
 		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
 		// (x != 0 || z != 0) && (y != 0 || w != 0): 4 two-atom clauses,
 		// order-insensitive since cqe's own clause order is hash-driven.
@@ -176,7 +176,7 @@ TEST_SUITE("anti_prenex") {
 			"&& (t != 0 || u != 0) && (by != 0 || bz != 0)).";
 		tref fm = normalize_atomic_formula_operators<node_t>(
 			get_nso_rr(sample).value().main->get());
-		tref r = complete_quantifier_elimination<node_t>(fm);
+		tref r = complete_quantifier_elimination<node_t>(fm).value();
 		cqe_max_clauses = std::numeric_limits<size_t>::max();
 		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
 		// The b-free factors survive verbatim (not multiplied out).
@@ -185,7 +185,7 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("cqe: nested starved quantifiers resolve innermost-first") {
 		const char* sample = "ex a, b (ab != 0 && ay != 0 && bz != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( matches_wff_mod_and_or_any_of(res, { "y != 0 && z != 0" }) );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
@@ -196,7 +196,7 @@ TEST_SUITE("anti_prenex") {
 		const trefs& fv = get_free_vars<node_t>(spec);
 		REQUIRE( !fv.empty() );
 		tref fm = tau::build_wff_all_many(fv, spec);
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		const std::string out = tau::get(res).to_str();
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( tau::get(res).find_top(
@@ -208,7 +208,7 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("cqe: wff_ref scope is frozen verbatim") {
 		const char* sample = "ex b (bw != 0 && q(b)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( matches_wff_mod_and_or_any_of(res, {
 			"ex b1 q(b1) && b1 w != 0"
 		}) );
@@ -219,7 +219,7 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "ex b (by != 0 && bz != 0) &&"
 			" { (ex v o1[t]v = 0) && o2[t] = 0 } : tau x = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		// No exact-shape pin here: a formula holding a tau constant does
 		// not print with a canonical conjunct order, so assert
 		// order-insensitively: the starved outer quantifier is gone from
@@ -240,7 +240,7 @@ TEST_SUITE("anti_prenex") {
 	// TEST_CASE("5") {
 	// 	const char* sample = "all x ex y (f1(x,y)=0 && g1(x,y)!=0 && h1(x,y)!=0) || (f2(x,y)=0 && g2(x,y)!=0 && h2(x,y)!=0).";
 	// 	tref fm = get_nso_rr(sample).value().main->get();
-	// 	tref res = anti_prenex<node_t>(fm);
+	// 	tref res = anti_prenex<node_t>(fm).value();
 	// 	std::cout << "res: " << tau::get(res) << "\n";
 	// 	res = boole_normal_form<node_t>(res);
 	// 	std::cout << "res: " << tau::get(res) << "\n";
@@ -340,7 +340,7 @@ TEST_SUITE("AN-1 symbolic qlt bounds") {
 	TEST_CASE("ex x (a < x && x < b) with free a, b is not resolved to T") {
 		const char* sample = "ex x:qlt (a:qlt < x && x < b:qlt).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( !tau::get(res).equals_T() );
 		// The binder survives (elimination declined).
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
@@ -350,7 +350,7 @@ TEST_SUITE("AN-1 symbolic qlt bounds") {
 	TEST_CASE("closed qlt scope is still resolved (AN-1 control)") {
 		const char* sample = "ex x:qlt ({1/4}:qlt < x && x < {3/4}:qlt).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( tau::get(res).equals_T() );
 	}
 }
