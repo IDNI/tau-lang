@@ -20,6 +20,7 @@ set(TESTS
 	anti_prenex_cofactors
 	anti_prenex_conditions
 	anti_prenex_eliminate
+	anti_prenex_layer3
 	adt_flatten
 	adt_parsing
 	adt_types
