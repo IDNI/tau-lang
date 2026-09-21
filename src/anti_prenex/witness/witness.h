@@ -2,22 +2,28 @@
 
 /**
  * @file witness.h
- * @brief §3's witness steps: `TRY_WITNESS` in its SPELLED mode, phase 2's
- * deep pass `TRY_WITNESS_DEEP`, the case-pin matcher `TRY_CASE_WITNESS` and
- * phase 2's driver `ELIMINATE_BY_SUBSTITUTION`.
+ * @brief §3's witness steps: `TRY_WITNESS` and the case-pin matcher
+ * `TRY_CASE_WITNESS`, each in its SPELLED and its COF mode, phase 2's deep
+ * pass `TRY_WITNESS_DEEP` and phase 2's driver `ELIMINATE_BY_SUBSTITUTION`.
  *
- * ONE MATCH UNDERNEATH: `find_pin_for(atom, x)` (simplify.h), the PIN — the
- * equation that solves a variable — asked about the variable being
- * eliminated. Nothing here reads an equation's spelling: `x = t`, `t = x` and
- * `x + t = 0` are one term `TERM_OF(c)` to it, which is what the call sites
- * straddling `NORMALIZE_OPERATORS` (§3) need. An equation under `¬` pins
- * nothing in the ∃ sense, and is exactly what pins in the ∀ sense, where the
- * deep pass works under `¬∃x¬`.
+ * ONE NOTION OF A PIN, TWO MATCHES FOR IT. The SPELLED mode asks
+ * `find_pin_for(atom, x)` (simplify.h) — the PIN, the equation that solves a
+ * variable, asked about the variable being eliminated. The COF mode asks
+ * `cof` (shared/cofactors.h) for the same test on the cofactors the term's
+ * BDD hands over (§6). Neither reads an equation's spelling: `x = t`,
+ * `t = x` and `x + t = 0` are one term `TERM_OF(c)` to them, which is what
+ * the call sites straddling `NORMALIZE_OPERATORS` (§3) need. An equation
+ * under `¬` pins nothing in the ∃ sense, and is exactly what pins in the ∀
+ * sense, where the deep pass works under `¬∃x¬`.
  *
- * NO BDD IN SPELLED MODE (§3: "nothing is BDD-backed there"). Every entry
- * here Debug-asserts that its formula carries no `BDD_ID` anywhere; a backed
- * term reaching one is a CALLER BUG, not a case to handle. Nothing here calls
- * a finish or spells a term out.
+ * NO BDD IN THE SPELLED MODE (§3: "nothing is BDD-backed there"). The entries
+ * WITHOUT a `ctx` — `try_witness(x, ψ)`, `try_witness_deep`,
+ * `try_case_witness(x, ψ)` and `eliminate_by_substitution`, all of them phase
+ * 2's — Debug-assert that their formula carries no `BDD_ID` anywhere; a
+ * backed term reaching one is a CALLER BUG, not a case to handle. The entries
+ * WITH a `ctx` are phase 4's, where a conjunct's term is BDD-backed under
+ * `ctx.order` and the BDD primitives assert the order themselves. Nothing
+ * here calls a finish or spells a term out.
  *
  * WHAT MAY TOUCH A UNIT (§4) — a unit is a surviving binder, opaque to every
  * step: the substitution of `x` DESCENDS into its body, because the pinning
@@ -47,11 +53,13 @@
 #include <vector>
 
 #include "../foundations/fwd.h"
+#include "../foundations/ctx.h"
 #include "../foundations/dag.h"
 #include "../foundations/options.h"
 #include "../foundations/terms.h"
 #include "../normalisers/joins.h"
 #include "../normalisers/simplify.h"
+#include "../shared/cofactors.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -73,6 +81,31 @@ namespace idni::tau_lang::anti_prenexing {
  */
 template <NodeType node>
 std::optional<tref> try_witness(tref x, tref psi);
+
+/**
+ * @brief §3 `TRY_WITNESS(x, ψ, ctx)`, COF mode: the witnessed BODY of
+ * `∃x.ψ` for a `ψ` whose terms are BDD-backed under `ctx.order`, or
+ * `nullopt`.
+ *
+ * Phase 4's match (§3, §6). The top-level conjuncts that are POSITIVE
+ * equations are scanned — an equation under `¬` pins nothing in the ∃ sense
+ * and an order atom never pins — and on each the term `TERM_OF(c)` is
+ * cofactored by `x`: `cof_memo`'s key, which this site forms itself. `x` is
+ * PINNED iff the record is USABLE and `f₀ ∪ f₁ = 1`, since Boole's expansion
+ * puts the zeros of the term at `f₀ ≤ x ≤ f₁′`, an interval that test
+ * collapses to a point. The witness is the LOWER end `f₁′`, which carries the
+ * residual `p = f₀f₁` into every sibling's terms rather than leaving it there
+ * as inert bulk, and the pin is STRICT when `p` folds to `0`. A conjunct
+ * whose term does not mention `x` pins nothing and is skipped; one that hides
+ * `x` inside a leaf — a reference argument, a functional quantifier's body —
+ * is `usable = false` (§1, the LEAF HAZARD) and pins nothing either.
+ *
+ * What follows the match is the spelled mode's, above: a STRICT pin first,
+ * else the smallest `‖f₁′‖`; the witness substituted for `x` in EVERY
+ * conjunct, THE PINNING ONE INCLUDED; the result `SIMPLIFY`d (invariant 6).
+ */
+template <NodeType node>
+std::optional<tref> try_witness(tref x, tref psi, ctx<node>& c);
 
 /**
  * @brief §3 `TRY_WITNESS_DEEP(Q, x, Φ)`, phase 2's deep pass: the body of
@@ -140,6 +173,26 @@ struct case_witness {
  */
 template <NodeType node>
 std::optional<case_witness<node>> try_case_witness(tref x, tref psi);
+
+/**
+ * @brief §3 `TRY_CASE_WITNESS(x, ψ, ctx)`, COF mode: the same MATCH on a `ψ`
+ * whose terms are BDD-backed under `ctx.order`, or `nullopt`.
+ *
+ * A branch `dᵢ` qualifies when one of its conjuncts is a positive equation
+ * whose term pins `x` by `COF` (§6) — the match `try_witness`'s COF mode
+ * reads, choosing among a branch's several pins as it does: a strict pin
+ * first, else the smallest `‖f₁′‖`. A pin's `x ∉ FV(tᵢ)` comes with `usable`.
+ * A branch that is not a conjunction is its own one-member view, and a unit
+ * is opaque (§4), so it never qualifies. ALL-OR-NOTHING, as in the spelled
+ * mode, and the conjunct with the smallest `|D|` wins.
+ *
+ * The threshold on the number of branches is `ctx.case_max`, the component's
+ * knob, where the spelled mode reads the bare constant (§1 `K″`: phase 2
+ * predates any ctx).
+ */
+template <NodeType node>
+std::optional<case_witness<node>> try_case_witness(tref x, tref psi,
+	ctx<node>& c);
 
 /**
  * @brief §3 `ELIMINATE_BY_SUBSTITUTION(φ)`, phase 2: ONE pre-order pass in

@@ -6,16 +6,26 @@
  * function means; the comments here say how it is built.
  *
  * The pieces come from below: `find_pin_for` and `simplify`
- * (normalisers/simplify.h), the result joins (normalisers/joins.h),
- * `members`, `fv_meets`, `formula_size`, `is_negated_equation`, `atom_of` and
- * the binder accessors (foundations/dag.h), `mem_size` and `simplify_term`
- * (foundations/terms.h), `case_max` (foundations/options.h).
+ * (normalisers/simplify.h), `cof` (shared/cofactors.h), the result joins
+ * (normalisers/joins.h), `members`, `fv_meets`, `formula_size`,
+ * `is_negated_equation`, `atom_of` and the binder accessors
+ * (foundations/dag.h), `term_of`, `mem_size` and `simplify_term`
+ * (foundations/terms.h), `case_max` (foundations/options.h) and its
+ * component-scoped copy `ctx.case_max` (foundations/ctx.h).
+ *
+ * WHAT THE TWO MODES SHARE: the tail of `TRY_WITNESS` — the choice among the
+ * pins a conjunct list offers, the substitution of the winner's witness and
+ * the simplification — is one helper over the mode's own pin test, and the
+ * COF test itself is one helper over a conjunct list, asked of `ψ`'s
+ * conjuncts by `TRY_WITNESS` and of a branch's by `TRY_CASE_WITNESS`.
  *
  * THE TWO REWRITES of the deep pass are the library's, never a hand-rolled
- * walk: `φ[x ← t]` is `tree<node>::substitute` (tau_tree.h) with the empty
- * order — the plain regime of phase 2 — and a re-simplifying argument hook,
- * since substitution is what dirties a reference argument and is asked to
- * clean up after itself (§1, invariant 6); the spine's replacement is
+ * walk: `φ[x ← t]` is `tree<node>::substitute` (tau_tree.h) with a
+ * re-simplifying argument hook, since substitution is what dirties a
+ * reference argument and is asked to clean up after itself (§1, invariant 6),
+ * and under the LIVE ORDER — empty in the plain regime of phase 2, `ctx.order`
+ * in the COF mode, where the library rewrites a BDD-backed term's leaves and
+ * composes the key out of its decision variables; the spine's replacement is
  * `rewriter::replace`, a CONTENT match with a unique-cached, hooked rebuild
  * of the path above it. Replacing every occurrence of the spine is sound
  * exactly because the descent enforces confinement first (§3, condition (b)):
@@ -44,17 +54,16 @@ bool holds_bdd_term(tref n) {
 		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
 }
 
-/// §3 `φ[x ← t]`: the library's substitution under the EMPTY order — phase 2
-/// is the plain regime — with the argument hook invariant 6 asks for.
-/// Substitution is what dirties a reference argument from phase 2 on (§1), so
-/// it re-simplifies the arguments it changed; `SIMPLIFY` after it does not
-/// (only phase 1 passes `ref_args`). `key` is the variable's `bf` TERM, the
-/// form every occurrence takes inside a term.
+/// §3 `φ[x ← t]`: the library's substitution under the live `order` — empty
+/// for phase 2, which is the plain regime — with the argument hook invariant 6
+/// asks for. Substitution is what dirties a reference argument from phase 2 on
+/// (§1), so it re-simplifies the arguments it changed; `SIMPLIFY` after it
+/// does not (only phase 1 passes `ref_args`). `key` is the variable's `bf`
+/// TERM, the form every occurrence takes inside a term.
 template <NodeType node>
-tref subst_var(tref phi, tref key, tref t) {
-	auto on_argument = [](tref a) { return simplify_term<node>(a); };
+tref subst_var(tref phi, tref key, tref t, const var_order<node>& order = {}) {
 	return tree<node>::get(tree<node>::trim_right_sibling(phi))
-		.substitute(key, t, {}, on_argument);
+		.substitute(key, t, order, detail::resimplify_argument<node>());
 }
 
 /// The result join of `ms` in the connective `conj` picks (§3): the ∧-join
@@ -64,6 +73,51 @@ tref subst_var(tref phi, tref key, tref t) {
 template <NodeType node>
 tref join_of(const trefs& ms, bool conj) {
 	return conj ? simplified_and_join<node>(ms) : simplified_or_join<node>(ms);
+}
+
+/// The TOP-LEVEL CONJUNCTS of `ψ`: the member view of a conjunction, else
+/// `ψ` itself — a `wff_or` is ONE conjunct here, not a member list. Both
+/// modes of `TRY_WITNESS` and `TRY_CASE_WITNESS` read `ψ` this way.
+template <NodeType node>
+trefs conjuncts_of(tref psi) {
+	return is_child<node>(psi, tree<node>::wff_and)
+		? members<node>(psi) : trefs{ psi };
+}
+
+/// §3 The choice among the pins a conjunct list offers, `match` being the
+/// mode's pin test on ONE conjunct: a STRICT pin first — taken without
+/// comparing witnesses — else the smallest `‖f₁′‖` (`mem_size`), the cost every
+/// later substitution of the witness pays.
+template <NodeType node, typename Match>
+std::optional<pin<node>> best_pin(const trefs& cs, Match&& match) {
+	std::optional<pin<node>> best;
+	size_t best_size = 0;
+	for (tref c : cs) {
+		std::optional<pin<node>> p = match(c);
+		if (!p) continue;
+		if (p->strict) return p;
+		if (const size_t size = mem_size<node>(p->witness);
+			!best || size < best_size)
+				best = p, best_size = size;
+	}
+	return best;
+}
+
+/// §3 `TRY_WITNESS`'s TAIL, the one both modes run once their own `search`
+/// has picked a pin among `ψ`'s conjuncts: `x` is replaced by that pin's
+/// witness in EVERY conjunct, THE PINNING ONE INCLUDED — its image is the
+/// residual `p = 0`, `T` for a strict pin, so no site emits a residual of its
+/// own — and the result is SIMPLIFIED (invariant 6). One substitution over
+/// `ψ` reaches every conjunct. `order` is the mode's: empty for the spelled
+/// one, `ctx.order` for the COF one.
+template <NodeType node, typename Search>
+std::optional<tref> witness_with(tref x, tref psi,
+	const var_order<node>& order, Search&& search)
+{
+	const std::optional<pin<node>> best = search(conjuncts_of<node>(psi));
+	if (!best) return {};
+	return simplify<node>(subst_var<node>(psi, detail::term_key<node>(x),
+		best->witness, order), order);
 }
 
 /// The POSITIVE EQUATION the pin match reads off a spine member, in `Q`'s
@@ -164,6 +218,81 @@ std::optional<std::vector<case_branch<node>>> case_pin_of(tref m, tref x,
 	return out;
 }
 
+/**
+ * @brief §3 The COF-MODE pin test on ONE conjunct: the pin `x` has in a
+ * BDD-backed conjunct, or `nullopt`.
+ *
+ * Only a POSITIVE equation is asked — an equation under `¬` pins nothing in
+ * the ∃ sense, and an order atom is no equation and never pins. The term is
+ * `TERM_OF(c)` as it arrives, which IS `cof_memo`'s key (§1), so this site
+ * forms it itself. A term not mentioning `x` is skipped rather than asked:
+ * it can pin nothing, and `COF` Debug-asserts against such a vacuous entry.
+ * The pin is `COF`'s (§6); the witness `f₁′` and the STRICT verdict `p = 0`
+ * are read off the record, which carries neither.
+ */
+template <NodeType node>
+std::optional<pin<node>> cof_pin_of(tref m, tref x, ctx<node>& c) {
+	using tau = tree<node>;
+	m = tau::trim_right_sibling(m);
+	if (!is_child<node>(m, tau::bf_eq)) return {};
+	const tref f = term_of<node>(m, c.order);
+	if (f == nullptr) return {};
+	// The binary search over the cached free-variable set (simplify.tmpl.h).
+	if (!detail::free_in<node>(f, x)) return {};
+	const cof_entry e = cof<node>(f, x, c);
+	if (!e.pin) return {};
+	// THE WITNESS IS THE LOWER END `f₁′` (§3): it carries the residual into
+	// every sibling's terms, where `p = 0` then folds.
+	const tref witness =
+		simplify_term<node>(build_bf_neg<node>(e.f1), c.order);
+	return pin<node>{ x, witness, tau::get(e.p).equals_0() };
+}
+
+/// §3 The COF-mode pin search over ONE conjunct list: the scan
+/// `TRY_WITNESS` runs over `ψ`'s conjuncts, and the one `TRY_CASE_WITNESS`
+/// runs over a branch's.
+template <NodeType node>
+std::optional<pin<node>> cof_pin_in(const trefs& cs, tref x, ctx<node>& c) {
+	return best_pin<node>(cs,
+		[x, &c](tref m) { return cof_pin_of<node>(m, x, c); });
+}
+
+/**
+ * @brief §3 A CASE PIN for `x` in the conjunct `m`, COF mode: the branches
+ * with their witnesses, or `nullopt`.
+ *
+ * `m` is an ∨-node of at most `ctx.case_max` branches — the component's knob,
+ * where phase 2 reads the bare constant — and EVERY branch has a conjunct
+ * whose term pins `x` by `COF`: all or nothing, since a branch without a pin
+ * would keep `∃x` alive inside its copy (§3). A branch that is not a
+ * conjunction is its own one-member view, so a lone `x = t` branch qualifies
+ * and a unit branch, being no equation, does not (§4). The match stays at
+ * `m`'s TOP branches (§3). Each branch comes back AS IT STANDS, its pinning
+ * conjunct included: the pin becomes the branch's residual under `[x ← tᵢ]`.
+ */
+template <NodeType node>
+std::optional<std::vector<std::pair<tref, tref>>> cof_case_pin_of(tref m,
+	tref x, ctx<node>& c)
+{
+	using tau = tree<node>;
+	m = tau::trim_right_sibling(m);
+	if (!is_child<node>(m, tau::wff_or)) return {};
+	const trefs bs = members<node>(m);
+	if (bs.size() > c.case_max) return {};
+	std::vector<std::pair<tref, tref>> out;
+	out.reserve(bs.size());
+	for (tref b : bs) {
+		b = tau::trim_right_sibling(b);
+		const std::optional<pin<node>> hit =
+			cof_pin_in<node>(members<node>(b), x, c);
+		if (!hit) return {};      // ALL-OR-NOTHING (§3)
+		// `x ∉ FV(tᵢ)` comes with `usable` (§1, the leaf hazard).
+		DBG(assert(!fv_meets<node>(hit->witness, block{ x }));)
+		out.emplace_back(b, hit->witness);
+	}
+	return out;
+}
+
 /// `x` free in this node? The block form of the cached test (dag.h).
 template <NodeType node>
 bool holds(tref n, tref x) {
@@ -176,33 +305,29 @@ bool holds(tref n, tref x) {
 
 template <NodeType node>
 std::optional<tref> try_witness(tref x, tref psi) {
-	using tau = tree<node>;
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
 	DBG(assert(!holds_bdd_term<node>(psi));)
-	// The top-level conjuncts: the member view of a conjunction, else `ψ`
-	// itself — a `wff_or` is ONE conjunct here, not a member list.
-	const trefs cs = is_child<node>(psi, tau::wff_and)
-		? members<node>(psi) : trefs{ psi };
-	// Several pins on `x`: a STRICT one first, else the smallest `‖f₁′‖`
-	// (§3) — the cost every later substitution of the witness pays.
-	std::optional<pin<node>> best;
-	size_t best_size = 0;
-	for (tref c : cs) {
-		std::optional<pin<node>> p = find_pin_for<node>(c, x);
-		if (!p) continue;
-		if (p->strict) { best = p; break; }
-		if (const size_t size = mem_size<node>(p->witness);
-			!best || size < best_size)
-				best = p, best_size = size;
-	}
-	if (!best) return {};
-	// EVERY conjunct, the pinning one included: its image is the residual
-	// `p = 0`, `T` for a strict pin, so no site emits a residual on its own
-	// (§3). One substitution over `ψ` reaches them all. The result is
-	// SIMPLIFIED here (invariant 6).
-	return simplify<node>(subst_var<node>(psi,
-		detail::term_key<node>(x), best->witness));
+	// The SPELLED match on every conjunct, under the empty order: phase 2 is
+	// the plain regime, where nothing is BDD-backed.
+	return witness_with<node>(x, psi, {}, [x](const trefs& cs) {
+		return best_pin<node>(cs,
+			[x](tref m) { return find_pin_for<node>(m, x); });
+	});
+}
+
+// --- TRY_WITNESS, COF mode -------------------------------------------------------
+
+template <NodeType node>
+std::optional<tref> try_witness(tref x, tref psi, ctx<node>& c) {
+	using namespace witness_detail;
+	DBG(assert(psi != nullptr && x != nullptr);)
+	// The same tail over the COF match (§6), under the component's order:
+	// the substitution rewrites a BDD-backed conjunct through the library's
+	// compose, and the pinning conjunct's image is the residual `p = 0`.
+	return witness_with<node>(x, psi, c.order, [x, &c](const trefs& cs) {
+		return cof_pin_in<node>(cs, x, c);
+	});
 }
 
 // --- TRY_WITNESS_DEEP, phase 2's deep pass ---------------------------------------
@@ -311,12 +436,10 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 
 template <NodeType node>
 std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
-	using tau = tree<node>;
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
 	DBG(assert(!holds_bdd_term<node>(psi));)
-	const trefs cs = is_child<node>(psi, tau::wff_and)
-		? members<node>(psi) : trefs{ psi };
+	const trefs cs = conjuncts_of<node>(psi);
 	// SMALLEST `|D|` FIRST (§3): one scan over the conjuncts, the smallest
 	// case pin kept. `|·|` is `formula_size` (dag.h).
 	std::vector<case_branch<node>> best;
@@ -335,6 +458,39 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
 	// residual under `[x ← tᵢ]` (§3 `TRY_WITNESS`). No copy is built here.
 	for (const case_branch<node>& b : best)
 		r.branches.emplace_back(b.branch, b.witness);
+	trefs rest;
+	rest.reserve(cs.size() - 1);
+	for (size_t i = 0; i < cs.size(); ++i)
+		if (i != at) rest.push_back(cs[i]);
+	r.rest = simplified_and_join<node>(rest);
+	return r;
+}
+
+// --- TRY_CASE_WITNESS, COF mode --------------------------------------------------
+
+template <NodeType node>
+std::optional<case_witness<node>> try_case_witness(tref x, tref psi,
+	ctx<node>& c)
+{
+	using namespace witness_detail;
+	DBG(assert(psi != nullptr && x != nullptr);)
+	const trefs cs = conjuncts_of<node>(psi);
+	// SMALLEST `|D|` FIRST (§3): one scan over the conjuncts, the smallest
+	// case pin kept. `|·|` is `formula_size` (dag.h).
+	std::optional<std::vector<std::pair<tref, tref>>> best;
+	size_t at = 0, best_size = 0;
+	for (size_t i = 0; i < cs.size(); ++i) {
+		auto bs = cof_case_pin_of<node>(cs[i], x, c);
+		if (!bs) continue;
+		const size_t size = formula_size<node>(cs[i]);
+		if (!best || size < best_size)
+			best = std::move(bs), at = i, best_size = size;
+	}
+	if (!best) return {};
+	case_witness<node> r;
+	// The branches AS THEY STAND, with the witnesses their pins give; no
+	// copy of the rewrite is built here (§3).
+	r.branches = std::move(*best);
 	trefs rest;
 	rest.reserve(cs.size() - 1);
 	for (size_t i = 0; i < cs.size(); ++i)
