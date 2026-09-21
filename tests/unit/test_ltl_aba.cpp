@@ -2405,14 +2405,40 @@ TEST_CASE("Left-nested U with ABA-inconsistent left arm simplifies to G(right-ar
     // {X & Y} and {X' | Y'} are complementary SBF constants; their conjunction
     // is ABA-bottom, so (bot U q) reduces to q, and G(bot U q) = G(q).
     // G(o2 = i2[t-1]) is realizable: system echoes last i2 each step.
-    // The fold is the normalizer's (fold_constant_temporal_operands), so
-    // the check goes through api::sat; the raw pipeline guards the
-    // lookback witness q per literal and cannot fire it at step 0.
+    // Through api::sat the normalizer folds the left arm away; the raw
+    // pipeline must agree: the whole formula waits out its lookback, so
+    // nothing is enforced at step 0 and q fires from step 1.
     tref fm = spec("G (((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf)).");
     REQUIRE(fm != nullptr);
     auto r = api<node_t>::sat(fm);
     REQUIRE(r.has_value());
     CHECK(r.value());
+    CHECK(realizable(fm));
+    CHECK(sat(fm));
+}
+
+TEST_CASE("a lookback anywhere in a clause delays the whole clause: G(p U q) and G(q) agree with q reading i2[t-1]") {
+    // A lookback-free obligation beside a lookback witness is not enforced
+    // during the clause's warm-up either, as the interpreter leaves every
+    // output of the clause free until its deepest lookback exists.
+    tref g_q = spec("G (o2[t]:sbf = i2[t-1]:sbf).");
+    tref g_pq = spec("G ((o1[t]:sbf = {X}:sbf && o1[t]:sbf = {Y}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)).");
+    REQUIRE(g_q != nullptr);
+    REQUIRE(g_pq != nullptr);
+    CHECK(realizable(g_q));
+    CHECK(realizable(g_pq));
+}
+
+TEST_CASE("the warm-up is per clause: an always without lookback keeps step 0 beside a sometimes with one") {
+    // (always o1 = 1) is its own clause and reads no past, so o1 = 1 holds
+    // from step 0 and the sometimes can never find o1[t-2] = 0; only a
+    // clause reading the past starts late.
+    tref fm = spec("(always o1[t] = 1) && (sometimes o1[t-2] = 0).");
+    tref late = spec("(always o1[t] = 1) && (G ((o2[t] = 1) until (o3[t] = i1[t-1]))).");
+    REQUIRE(fm != nullptr);
+    REQUIRE(late != nullptr);
+    CHECK_FALSE(realizable(fm));
+    CHECK(realizable(late));
 }
 
 TEST_CASE("Left-nested R with consistent lookback constraints is REALIZABLE") {

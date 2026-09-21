@@ -729,9 +729,33 @@ ltl_skeleton_with_testers(
     tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
+	using tau = tree<node>;
 	result<std::pair<std::string, std::vector<past_temporal_tester>>> r;
 	std::vector<past_temporal_tester> testers;
-	TAU_TRY(auto skel, skeleton_str_with_testers<node>(fm, atoms, testers));
+	// Each top-level conjunct is a clause of the specification, and the
+	// safety engine enforces a clause from the deepest lookback it reads:
+	// nothing of it is asked during that warm-up, not even a lookback-free
+	// literal or a witness. The clause's skeleton is therefore shifted
+	// whole by X^k, which the per-literal guards alone cannot express for
+	// an until (its blocked witness would still demand the left arm). A
+	// clause that reads no past starts at step 0, so an always beside a
+	// sometimes with a lookback keeps its full reach.
+	trefs clauses;
+	std::function<void(tref)> split = [&](tref n) {
+		if (const auto& t = tau::get(n); t.child_is(tau::wff_and)) {
+			split(t[0].first());
+			split(t[0].second());
+		} else clauses.push_back(n);
+	};
+	split(fm);
+	std::string skel;
+	for (tref clause : clauses) {
+		TAU_TRY(auto cs, skeleton_str_with_testers<node>(clause, atoms, testers));
+		const auto ks = collect_step_guards<node>(clause);
+		for (int_t i = ks.empty() ? 0 : *ks.rbegin(); i > 0; --i)
+			cs = "X(" + cs + ")";
+		skel += (skel.empty() ? "(" : " & (") + cs + ")";
+	}
 	return r.with_value(std::make_pair(std::move(skel), std::move(testers)));
 }
 
