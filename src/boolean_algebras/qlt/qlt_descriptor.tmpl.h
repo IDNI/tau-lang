@@ -63,13 +63,15 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/// Backing getter/setter for @ref options; plain free functions so they
 	/// decay to the function pointers `ba_option` holds.
 	/// @{
-	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap; }
-	static void set_t3_cap_option(size_t n) { qlt_t3_encoding_cap = n; }
+	static size_t get_t3_cap_option() { return qlt_t3_encoding_cap(); }
+	static void set_t3_cap_option(size_t n) {
+		qlt_t3_encoding_cap_param = (long) n;
+	}
 	static size_t get_const_output_max_option() {
-		return qlt_const_output_max;
+		return qlt_const_output_max();
 	}
 	static void set_const_output_max_option(size_t n) {
-		qlt_const_output_max = n;
+		qlt_const_output_max_param = (long) n;
 	}
 	/// @}
 
@@ -86,13 +88,15 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 				get_t3_cap_option, set_t3_cap_option,
 				"cap the data atoms the qlt T3 synthesis encodings "
 				"accept before the ABA-oracle path decides instead "
-				"(default 20, at most 30; 0 = 30)" },
+				"(default: TAU_QLT_T3_CAP or 20, at most 30; "
+				"0 = 30)" },
 			{ "const-output-max", ba_option_kind::count,
 				nullptr, nullptr,
 				get_const_output_max_option,
 				set_const_output_max_option,
 				"cap the constant-output assignments the fast path "
-				"in front of Algorithm B enumerates (default 100; "
+				"in front of Algorithm B enumerates (default: "
+				"TAU_QLT_CONST_OUTPUT_MAX or 100; "
 				"0 = unlimited)" },
 		}};
 	}

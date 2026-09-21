@@ -293,7 +293,7 @@ struct parser {
  * @return The cubes, or `std::nullopt`.
  */
 inline std::optional<std::vector<cube>> to_dnf(
-	const std::string& label, size_t max_cubes = ltl_guard_max_cubes)
+	const std::string& label, size_t max_cubes = ltl_guard_max_cubes())
 {
 	// An empty label is the unconditional guard, same convention the
 	// evaluator and the ABA guard parser use.
@@ -360,8 +360,9 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 		while (*end == ' ' || *end == '\t') ++end;
 		return *end == '\0' ? v : -1;
 	};
-	const long max_states = ltl_hoa_max_states
-		? (long) std::min<size_t>(ltl_hoa_max_states, (size_t) LONG_MAX)
+	const size_t state_cap = ltl_hoa_max_states();
+	const long max_states = state_cap
+		? (long) std::min<size_t>(state_cap, (size_t) LONG_MAX)
 		: LONG_MAX;
 
 	std::istringstream ss(hoa_text);

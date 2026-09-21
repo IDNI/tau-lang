@@ -147,9 +147,10 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	// A strategy with more states than this is not something ltlsynt
 	// produces for any specification this pipeline builds; an absurd
 	// count is a garbled header, not an automaton (SY-R3). Runtime
-	// parameter `ltl_hoa_max_states` (0 = unlimited).
-	const long max_states = ltl_hoa_max_states
-		? (long) std::min<size_t>(ltl_hoa_max_states, (size_t) LONG_MAX)
+	// parameter `ltl_hoa_max_states()` (0 = unlimited).
+	const size_t cap = ltl_hoa_max_states();
+	const long max_states = cap
+		? (long) std::min<size_t>(cap, (size_t) LONG_MAX)
 		: LONG_MAX;
 	bool seen_states = false;
 

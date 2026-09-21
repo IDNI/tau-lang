@@ -753,21 +753,30 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
 | `TAU_LTL_OMCAT_QE_MAX_VARS` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path. Values above 2 re-enable a fast path that is not sound; leave it at the default. Environment fallback of `--ltl-qe-max-vars` / REPL `set ltlqemaxvars`. |
 | `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
+| `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
+| `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
+| `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
+| `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
 
-The watchdog, the algorithm choice and the QE cap are runtime parameters
-with a CLI flag, a REPL option and an `api::set_*` setter each (see the CLI
-and REPL option tables); the environment variables above remain as fallbacks
-for scripts that already set them. Two more LTL(ABA) caps have no
-environment form: `--ltl-hoa-max-states` (largest strategy accepted from
-`ltlsynt`, default 2^22), `--ltl-guard-max-cubes` (DNF cubes a HOA guard
-may expand into in the Algorithm D game, default 512),
-`--ltl-refinement-rounds` (ABA-oracle refinement rounds per realizability
-check, default 64) and `--ltl-window-max-paths` (paths the window oracle
-examines per check, default 4096). The `qlt` algebra declares `--qlt-t3-cap`
-(data atoms its T3 encodings accept, default 20, at most 30) and
-`--qlt-const-output-max` (constant-output assignments the fast path in front
-of Algorithm B enumerates, default 100), and `nlang` declares
-`--nlang-http-timeout` (seconds per LLM request, default 15).
+Every limit above is a runtime parameter carried by all three surfaces --
+a CLI flag, a REPL option and an `api::set_*` setter (see the CLI and REPL
+option tables) -- with the environment variable as the last fallback. Each
+one resolves **option > environment > default**, so a flag or a `set`
+command always wins over a variable a script exported, and each variable is
+validated: a negative, out-of-range or non-numeric value keeps the default
+and says so once. Zero is a value rather than an absence -- it means
+unlimited for every cap here, and no watchdog for the timeout -- except for
+`--ltl-qe-max-vars`, whose own "not set" sentinel is 0 because a cap of 0
+would mean nothing there.
+
+The caps an algebra declares about itself follow the same three surfaces,
+addressed `--<ba>-<option>` on the command line and `<ba>-<option>` in the
+REPL, and are present when that algebra is in the pack: `qlt` declares
+`--qlt-t3-cap` (data atoms its T3 encodings accept, default 20, at most 30,
+`TAU_QLT_T3_CAP`) and `--qlt-const-output-max` (constant-output assignments
+the fast path in front of Algorithm B enumerates, default 100,
+`TAU_QLT_CONST_OUTPUT_MAX`); `nlang` declares `--nlang-http-timeout`
+(seconds per LLM request, default 15, `TAU_NLANG_HTTP_TIMEOUT`).
 
 **Other environment variables.** Three Boolean switches keep an environment
 fallback beside their option: `TAU_BA_COMPONENT_FACTORING` (a non-empty
@@ -865,7 +874,8 @@ agrees with `G q` when `p` is contradictory.
 - **nlang needs an LLM API key**: the oracle reads `TAU_LLM_API_KEY` (falling
   back to `OPENAI_API_KEY`), with `TAU_LLM_ENDPOINT` (default
   `https://api.openai.com/v1`) and `TAU_LLM_MODEL` optional and each HTTP
-  request capped by the `nlang-http-timeout` option (15 s). Without a key
+  request capped by the `nlang-http-timeout` option (15 s, or
+  `TAU_NLANG_HTTP_TIMEOUT`). Without a key
   every emptiness, universality and equivalence question over `nlang`
   elements is answered `false` (not cached), a warning is printed once, and
   verdicts over `nlang` are not reliable.
@@ -2158,7 +2168,8 @@ for equality, emptiness, and universality tests: the key is read from
 `TAU_LLM_API_KEY` (or `OPENAI_API_KEY`), the base URL from `TAU_LLM_ENDPOINT`
 (default `https://api.openai.com/v1`) and the model from `TAU_LLM_MODEL`
 (unset: the endpoint's default); each request is capped by the
-`nlang-http-timeout` option (15 s).  Without a key every emptiness,
+`nlang-http-timeout` option (15 s, or `TAU_NLANG_HTTP_TIMEOUT`).  Without a
+key every emptiness,
 universality and equivalence question is answered `false` (a warning is
 printed once; the default is not cached), so verdicts over `nlang` elements
 are not reliable without the key.
@@ -2674,10 +2685,10 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (0 = no watchdog; default `TAU_LTL_TIMEOUT_SEC` or 60) |
 | -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `TAU_LTL_ALG` or `auto`)     |
 | -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (0 = `TAU_LTL_OMCAT_QE_MAX_VARS` or 2) |
-| -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
-| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
-| -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
-| -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
+| -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default `TAU_LTL_HOA_MAX_STATES` or 4194304; 0 = unlimited) |
+| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default `TAU_LTL_GUARD_MAX_CUBES` or 512; 0 = unlimited) |
+| -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default `TAU_LTL_REFINEMENT_ROUNDS` or 64; 0 = unlimited) |
+| -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default `TAU_LTL_WINDOW_MAX_PATHS` or 4096; 0 = unlimited) |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
 "Selecting Boolean algebras" above) may declare CLI options of its own,
@@ -2935,20 +2946,24 @@ path (`--ltl-qe-max-vars`). 2 by default, or `TAU_LTL_OMCAT_QE_MAX_VARS` when
 that is set; values above 2 re-enable a fast path that is not sound.
 
 * `ltlhoamaxstates`: largest state count accepted from an `ltlsynt` HOA
-strategy (`--ltl-hoa-max-states`). 4194304 by default; 0 = unlimited.
+strategy (`--ltl-hoa-max-states`). 4194304 by default, or
+`TAU_LTL_HOA_MAX_STATES` when that is set; 0 = unlimited. `get` shows the
+effective value, as it does for every limit below.
 
 * `ltlguardmaxcubes`: cap on the DNF cubes a HOA guard may expand into in the
-Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default; 0 =
-unlimited.
+Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default, or
+`TAU_LTL_GUARD_MAX_CUBES` when that is set; 0 = unlimited.
 
 * `ltlrefinementrounds`: cap on the ABA-oracle refinement rounds of one
 realizability check, each round blocking an infeasible strategy edge and
-re-running `ltlsynt` (`--ltl-refinement-rounds`). 64 by default; 0 =
-unlimited. On the cap the verdict is an error (UNKNOWN), never a false answer.
+re-running `ltlsynt` (`--ltl-refinement-rounds`). 64 by default, or
+`TAU_LTL_REFINEMENT_ROUNDS` when that is set; 0 = unlimited. On the cap the
+verdict is an error (UNKNOWN), never a false answer.
 
 * `ltlwindowmaxpaths`: cap on the strategy paths the multi-step window oracle
-examines per check (`--ltl-window-max-paths`). 4096 by default; 0 =
-unlimited; a hit cap likewise answers UNKNOWN.
+examines per check (`--ltl-window-max-paths`). 4096 by default, or
+`TAU_LTL_WINDOW_MAX_PATHS` when that is set; 0 = unlimited; a hit cap
+likewise answers UNKNOWN.
 
 Changing any of these, or the two temporal-normalization caps, between two
 queries drops the verdict memos, so the next `sat`/`realizable` is decided

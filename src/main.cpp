@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cerrno>
 #include <cstdlib>
+#include <optional>
 #include <fstream>
 #include <sstream>
 
@@ -152,10 +153,11 @@ cli::options tau_options() {
 	opts["cache-bound"] = cli::option("cache-bound", 'A', "4096")
 		.set_description("bound the string-keyed synthesis caches, "
 			"FIFO eviction (default 4096; 0 = unbounded)");
-	// The two LTL(ABA) knobs below keep an environment fallback
-	// (TAU_LTL_TIMEOUT_SEC, TAU_LTL_ALG) for scripts that already set it;
-	// an empty default means "not given", so the fallback stays in force
-	// unless the flag is passed.
+	// Every LTL(ABA) knob below keeps an environment fallback (TAU_LTL_*)
+	// for scripts that set one; an empty default means "not given", so the
+	// fallback stays in force unless the flag is passed. --ltl-qe-max-vars
+	// is the exception: 0 is its own "not set" sentinel, since a cap of 0
+	// would mean nothing there.
 	opts["ltl-timeout"] = cli::option("ltl-timeout", 'T', "")
 		.set_description("wall-clock cap in seconds on each ltlsynt call "
 			"(0 = no watchdog; default: TAU_LTL_TIMEOUT_SEC or 60)");
@@ -166,22 +168,25 @@ cli::options tau_options() {
 		.set_description("free-variable cap of the omcat QE fast path; "
 			"above 2 is not sound (0 = TAU_LTL_OMCAT_QE_MAX_VARS or 2)");
 	opts["ltl-hoa-max-states"] =
-		cli::option("ltl-hoa-max-states", 'Y', "4194304")
+		cli::option("ltl-hoa-max-states", 'Y', "")
 		.set_description("largest state count accepted from an ltlsynt "
-			"HOA strategy (default 4194304; 0 = unlimited)");
+			"HOA strategy (default: TAU_LTL_HOA_MAX_STATES or "
+			"4194304; 0 = unlimited)");
 	opts["ltl-guard-max-cubes"] =
-		cli::option("ltl-guard-max-cubes", 'U', "512")
+		cli::option("ltl-guard-max-cubes", 'U', "")
 		.set_description("cap the DNF cubes a HOA guard may expand into "
-			"in the Algorithm D game (default 512; 0 = unlimited)");
+			"in the Algorithm D game (default: "
+			"TAU_LTL_GUARD_MAX_CUBES or 512; 0 = unlimited)");
 	opts["ltl-refinement-rounds"] =
-		cli::option("ltl-refinement-rounds", 'D', "64")
+		cli::option("ltl-refinement-rounds", 'D', "")
 		.set_description("cap the ABA-oracle refinement rounds of a "
-			"realizability check; the cap answers UNKNOWN (default 64; "
-			"0 = unlimited)");
+			"realizability check; the cap answers UNKNOWN (default: "
+			"TAU_LTL_REFINEMENT_ROUNDS or 64; 0 = unlimited)");
 	opts["ltl-window-max-paths"] =
-		cli::option("ltl-window-max-paths", 'O', "4096")
+		cli::option("ltl-window-max-paths", 'O', "")
 		.set_description("cap the strategy paths the multi-step window "
-			"oracle examines per check (default 4096; 0 = unlimited)");
+			"oracle examines per check (default: "
+			"TAU_LTL_WINDOW_MAX_PATHS or 4096; 0 = unlimited)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
 		.set_description("tree-node count floor before gc may trigger "
 			"(default 256)");
@@ -194,12 +199,15 @@ cli::options tau_options() {
 	// descriptor.
 	for (const auto& e : pack_ba_options<node_t>()) {
 		std::string cli_name = e.family + "-" + e.option.name;
+		// A count option is registered with an empty default on
+		// purpose: writing the descriptor's own value back would
+		// shadow whatever environment fallback the algebra resolves
+		// for itself, and the option's own help text names its default.
 		if (e.option.kind == ba_option_kind::flag)
 			opts[cli_name] = cli::option(cli_name, '\0',
 				e.option.get_flag())
 				.set_description(e.option.help);
-		else opts[cli_name] = cli::option(cli_name, '\0',
-			std::to_string(e.option.get_count()))
+		else opts[cli_name] = cli::option(cli_name, '\0', "")
 			.set_description(e.option.help);
 	}
 	return opts;
@@ -373,6 +381,28 @@ int main(int argc, char** argv) {
 	tau_api::set_max_consistency_subsets(optnum("max-consistency-subsets"));
 	tau_api::set_max_cover_products(optnum("max-cover-products"));
 	tau_api::set_cache_bound(optnum("cache-bound"));
+	// An option with an environment fallback is applied only when it was
+	// given: a flag that always wrote its own default would shadow the
+	// variable the limit's accessor would otherwise read. Garbage is an
+	// error rather than atoll's silent 0, which is "unlimited" for every
+	// cap here; the first bad value is reported once, below.
+	string bad_option;
+	auto given_count = [&opts, &bad_option](const char* name)
+		-> std::optional<size_t>
+	{
+		const string v = opts[name].get<string>();
+		if (v.empty()) return {};
+		char* end = nullptr;
+		errno = 0;
+		const long n = std::strtol(v.c_str(), &end, 10);
+		if (end == v.c_str() || *end != '\0' || n < 0 || errno == ERANGE) {
+			if (bad_option.empty())
+				bad_option = string("--") + name + " expects a "
+					"non-negative number, got '" + v + "'";
+			return {};
+		}
+		return (size_t) n;
+	};
 	if (const string t = opts["ltl-timeout"].get<string>(); !t.empty()) {
 		char* end = nullptr;
 		errno = 0;
@@ -385,10 +415,15 @@ int main(int argc, char** argv) {
 	if (const string a = opts["ltl-alg"].get<string>(); !a.empty())
 		tau_api::set_ltl_algorithm(a);
 	tau_api::set_ltl_qe_max_vars(optnum("ltl-qe-max-vars"));
-	tau_api::set_ltl_hoa_max_states(optnum("ltl-hoa-max-states"));
-	tau_api::set_ltl_guard_max_cubes(optnum("ltl-guard-max-cubes"));
-	tau_api::set_ltl_max_refinement_rounds(optnum("ltl-refinement-rounds"));
-	tau_api::set_ltl_window_max_paths(optnum("ltl-window-max-paths"));
+	if (auto n = given_count("ltl-hoa-max-states"); n)
+		tau_api::set_ltl_hoa_max_states(*n);
+	if (auto n = given_count("ltl-guard-max-cubes"); n)
+		tau_api::set_ltl_guard_max_cubes(*n);
+	if (auto n = given_count("ltl-refinement-rounds"); n)
+		tau_api::set_ltl_max_refinement_rounds(*n);
+	if (auto n = given_count("ltl-window-max-paths"); n)
+		tau_api::set_ltl_window_max_paths(*n);
+	if (!bad_option.empty()) return error(bad_option);
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(
 		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
@@ -397,9 +432,15 @@ int main(int argc, char** argv) {
 	// already uses, just addressed by family-option instead of a bare name.
 	for (const auto& e : pack_ba_options<node_t>()) {
 		std::string cli_name = e.family + "-" + e.option.name;
-		if (e.option.kind == ba_option_kind::flag)
+		if (e.option.kind == ba_option_kind::flag) {
 			e.option.set_flag(opts[cli_name].get<bool>());
-		else e.option.set_count(optnum(cli_name.c_str()));
+			continue;
+		}
+		// Not given: the algebra keeps whatever it resolves itself --
+		// its own environment fallback, else its default.
+		auto n = given_count(cli_name.c_str());
+		if (!bad_option.empty()) return error(bad_option);
+		if (n) e.option.set_count(*n);
 	}
 
 	// Rule counting piggybacks on the benchmarks flag: both paths below

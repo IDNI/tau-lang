@@ -16,6 +16,7 @@ set(TAU_CORE_HEADERS
 	heuristics/simplify_options.h           # runtime option-set for bv simplification heuristics
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
+	env_limits.h       # environment fallback of a numeric runtime limit
 	tau_bdd.h          # BDD library over tau trees
 	tau_tree.h         # tau tree, node, tree traverser, builders,
 	                   # extractors, printers, queries, and

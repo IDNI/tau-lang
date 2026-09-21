@@ -1712,13 +1712,13 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ ltl_qe_max_vars_opt, [this]() {
 		out << "ltlqemaxvars:        " << ltl_qe_max_vars() << "\n"; } },
 	{ ltl_hoa_max_states_opt, [climit, this]() {
-		out << "ltlhoamaxstates:     " << climit(ltl_hoa_max_states) << "\n"; } },
+		out << "ltlhoamaxstates:     " << climit(ltl_hoa_max_states()) << "\n"; } },
 	{ ltl_guard_max_cubes_opt, [climit, this]() {
-		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes) << "\n"; } },
+		out << "ltlguardmaxcubes:    " << climit(ltl_guard_max_cubes()) << "\n"; } },
 	{ ltl_refinement_rounds_opt, [climit, this]() {
-		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds) << "\n"; } },
+		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds()) << "\n"; } },
 	{ ltl_window_max_paths_opt, [climit, this]() {
-		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths) << "\n"; } }
+		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths()) << "\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;

@@ -17,6 +17,7 @@
 
 #include "tau_tree.h"
 #include "ba_constants.h"
+#include "env_limits.h"
 #include "splitter_types.h"
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 
@@ -29,8 +30,12 @@ namespace idni::tau_lang {
  * ABA-oracle path decides instead. Runtime parameter by policy (qlt's own
  * `qlt-t3-cap` CLI/REPL option); clamped to 30 (a signed shift is
  * undefined at 31); 0 = unlimited within that bound.
+ *
+ * The sentinel -1 means "not set", in which case `TAU_QLT_T3_CAP` is
+ * consulted and 20 applies when that is absent too; the option always wins
+ * over the variable. Read through @ref qlt_t3_encoding_cap.
  */
-inline size_t qlt_t3_encoding_cap = 20;
+inline long qlt_t3_encoding_cap_param = -1;
 
 /**
  * @brief Cap on the output-position combinations the constant-output fast
@@ -38,15 +43,44 @@ inline size_t qlt_t3_encoding_cap = 20;
  * constant assignments, each checked with `ltlfilt`. Above it the fast
  * path declines and Algorithm B decides. Runtime parameter by policy
  * (qlt's own `qlt-const-output-max` CLI/REPL option); 0 = unlimited.
+ *
+ * The sentinel -1 means "not set", in which case `TAU_QLT_CONST_OUTPUT_MAX`
+ * is consulted and 100 applies when that is absent too. Read through
+ * @ref qlt_const_output_max.
  */
-inline size_t qlt_const_output_max = 100;
+inline long qlt_const_output_max_param = -1;
 
-/// Effective T3 atom cap: `qlt_t3_encoding_cap` bounded by 30.
+/**
+ * @brief Effective data-atom cap of the T3 encodings before the 30 bound.
+ *
+ * Precedence: @ref qlt_t3_encoding_cap_param when set (>= 0), else
+ * `TAU_QLT_T3_CAP`, else 20.
+ */
+inline size_t qlt_t3_encoding_cap() {
+	if (qlt_t3_encoding_cap_param >= 0)
+		return (size_t) qlt_t3_encoding_cap_param;
+	return env_limit_count("TAU_QLT_T3_CAP", 20);
+}
+
+/**
+ * @brief Effective cap on the constant-output assignments the fast path in
+ * front of Algorithm B enumerates (0 = unlimited).
+ *
+ * Precedence: @ref qlt_const_output_max_param when set (>= 0), else
+ * `TAU_QLT_CONST_OUTPUT_MAX`, else 100.
+ */
+inline size_t qlt_const_output_max() {
+	if (qlt_const_output_max_param >= 0)
+		return (size_t) qlt_const_output_max_param;
+	return env_limit_count("TAU_QLT_CONST_OUTPUT_MAX", 100);
+}
+
+/// Effective T3 atom cap: `qlt_t3_encoding_cap()` bounded by 30.
 inline int qlt_t3_encoding_cap_effective() {
 	const size_t hard = 30;
-	if (qlt_t3_encoding_cap == 0 || qlt_t3_encoding_cap > hard)
-		return (int) hard;
-	return (int) qlt_t3_encoding_cap;
+	const size_t cap = qlt_t3_encoding_cap();
+	if (cap == 0 || cap > hard) return (int) hard;
+	return (int) cap;
 }
 
 

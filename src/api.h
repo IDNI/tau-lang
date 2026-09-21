@@ -311,25 +311,29 @@ struct api {
 	static void set_ltl_qe_max_vars(size_t n);
 	/**
 	 * @brief Largest state count accepted from an `ltlsynt` HOA strategy
-	 * (`ltl_hoa_max_states`); default 2^22, 0 = unlimited.
+	 * (`ltl_hoa_max_states_param`); 0 = unlimited. The parameter wins over
+	 * the `TAU_LTL_HOA_MAX_STATES` environment fallback (default 2^22).
 	 */
 	static void set_ltl_hoa_max_states(size_t n);
 	/**
 	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
-	 * the Algorithm D product game (`ltl_guard_max_cubes`); default 512,
-	 * 0 = unlimited.
+	 * the Algorithm D product game (`ltl_guard_max_cubes_param`);
+	 * 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_GUARD_MAX_CUBES` environment fallback (default 512).
 	 */
 	static void set_ltl_guard_max_cubes(size_t n);
 	/**
 	 * @brief Cap on the ABA-oracle refinement rounds of a realizability
-	 * check (`ltl_max_refinement_rounds`); on the cap the verdict is
-	 * UNKNOWN. Default 64; 0 = unlimited.
+	 * check (`ltl_max_refinement_rounds_param`); on the cap the verdict is
+	 * UNKNOWN. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_REFINEMENT_ROUNDS` environment fallback (default 64).
 	 */
 	static void set_ltl_max_refinement_rounds(size_t n);
 	/**
 	 * @brief Cap on the strategy paths the multi-step window oracle
-	 * examines per check (`ltl_window_max_paths`); a hit cap yields
-	 * UNKNOWN. Default 4096; 0 = unlimited.
+	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
+	 * UNKNOWN. 0 = unlimited. The parameter wins over the
+	 * `TAU_LTL_WINDOW_MAX_PATHS` environment fallback (default 4096).
 	 */
 	static void set_ltl_window_max_paths(size_t n);
 	/**

@@ -193,13 +193,13 @@ State: 0
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 1\nStart: x" + tail).num_states == 0);
 		// The state cap is the runtime parameter ltl_hoa_max_states.
-		const size_t saved = ltl_hoa_max_states;
-		ltl_hoa_max_states = 3;
+		const long saved = ltl_hoa_max_states_param;
+		ltl_hoa_max_states_param = 3;
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 4\nStart: 0" + tail).num_states == 0);
 		CHECK(alg_d::parse_synth_game_hoa(
 			"HOA: v1\nStates: 3\nStart: 0" + tail).num_states == 3);
-		ltl_hoa_max_states = saved;
+		ltl_hoa_max_states_param = saved;
 	}
 
 	TEST_CASE("[ALG-D-32c] more atomic propositions than the game can "

@@ -316,9 +316,9 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		return r.with_value(true);
 	};
 
-	// Runtime parameter (ltl_max_refinement_rounds; 0 = unlimited): each
+	// Runtime parameter (ltl_max_refinement_rounds(); 0 = unlimited): each
 	// round blocks one infeasible edge and re-runs ltlsynt.
-	const size_t max_refinement_rounds = ltl_max_refinement_rounds;
+	const size_t max_refinement_rounds = ltl_max_refinement_rounds();
 	for (size_t round = 0; ; ++round) {
 		std::vector<std::string> clauses;
 		if (auto rejected = check_edges()) {
@@ -336,7 +336,7 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
 			if (W <= 1) return realizable_now();
 			auto wres = window_infeasible_paths<node>(sol, W,
-				ltl_window_max_paths);
+				ltl_window_max_paths());
 			if (wres.path_cap_reached) return undecided("window oracle path cap");
 			if (wres.blocking_clauses.empty()) return realizable_now();
 			clauses = std::move(wres.blocking_clauses);

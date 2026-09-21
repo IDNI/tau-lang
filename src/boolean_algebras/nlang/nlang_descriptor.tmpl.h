@@ -49,17 +49,18 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	/// @name nlang-declared CLI/REPL options
 	/// @{
 	static size_t get_http_timeout_option() {
-		return (size_t) nlang_http_timeout_sec;
+		return (size_t) nlang_http_timeout_sec();
 	}
 	static void set_http_timeout_option(size_t n) {
-		nlang_http_timeout_sec = (long) n;
+		nlang_http_timeout_sec_param = (long) n;
 	}
 	/// @}
 
 	/**
 	 * @brief The options nlang declares about itself:
 	 * `nlang-http-timeout`, the per-request wall-clock cap of the LLM
-	 * oracle's HTTP calls in seconds (default 15; 0 = no cap).
+	 * oracle's HTTP calls in seconds (default 15, or
+	 * `TAU_NLANG_HTTP_TIMEOUT`; 0 = no cap).
 	 */
 	static std::array<ba_option, 1> options() {
 		return {{
@@ -67,7 +68,8 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 				nullptr, nullptr,
 				get_http_timeout_option, set_http_timeout_option,
 				"cap each LLM oracle HTTP request at this many "
-				"seconds (default 15; 0 = no cap)" },
+				"seconds (default: TAU_NLANG_HTTP_TIMEOUT or 15; "
+				"0 = no cap)" },
 		}};
 	}
 

@@ -129,43 +129,102 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_qe_max_vars_param = saved;
 	}
 
-	TEST_CASE("ltl game caps write their globals verbatim") {
-		const size_t s1 = ltl_hoa_max_states, s2 = ltl_guard_max_cubes;
-		const size_t s3 = ltl_max_refinement_rounds, s4 = ltl_window_max_paths;
+	TEST_CASE("ltl game caps write their parameters verbatim") {
+		const long s1 = ltl_hoa_max_states_param;
+		const long s2 = ltl_guard_max_cubes_param;
+		const long s3 = ltl_max_refinement_rounds_param;
+		const long s4 = ltl_window_max_paths_param;
 		tau_api::set_ltl_hoa_max_states(77);
-		CHECK( ltl_hoa_max_states == 77 );
+		CHECK( ltl_hoa_max_states() == 77 );
 		tau_api::set_ltl_hoa_max_states(0);
-		CHECK( ltl_hoa_max_states == 0 );
+		CHECK( ltl_hoa_max_states() == 0 );
 		tau_api::set_ltl_guard_max_cubes(5);
-		CHECK( ltl_guard_max_cubes == 5 );
-		// The two caps promoted from header constants ship at their old
-		// values and are plain 0-is-unlimited counts.
-		CHECK( s3 == 64 );
-		CHECK( s4 == 4096 );
+		CHECK( ltl_guard_max_cubes() == 5 );
 		tau_api::set_ltl_max_refinement_rounds(9);
-		CHECK( ltl_max_refinement_rounds == 9 );
+		CHECK( ltl_max_refinement_rounds() == 9 );
 		tau_api::set_ltl_max_refinement_rounds(0);
-		CHECK( ltl_max_refinement_rounds == 0 );
+		CHECK( ltl_max_refinement_rounds() == 0 );
 		tau_api::set_ltl_window_max_paths(11);
-		CHECK( ltl_window_max_paths == 11 );
-		ltl_hoa_max_states = s1;
-		ltl_guard_max_cubes = s2;
-		ltl_max_refinement_rounds = s3;
-		ltl_window_max_paths = s4;
+		CHECK( ltl_window_max_paths() == 11 );
+		ltl_hoa_max_states_param = s1;
+		ltl_guard_max_cubes_param = s2;
+		ltl_max_refinement_rounds_param = s3;
+		ltl_window_max_paths_param = s4;
+	}
+
+	// Each of the four game caps resolves parameter > environment >
+	// default, like the timeout and the QE cap before them, so a script
+	// can set one without a flag and a flag always wins over the script.
+	TEST_CASE("ltl game caps: parameter beats environment, garbage keeps "
+	          "the default") {
+		struct cap {
+			const char* var;
+			long* param;
+			size_t (*effective)();
+			size_t dflt;
+		};
+		const cap caps[] = {
+			{ "TAU_LTL_HOA_MAX_STATES", &ltl_hoa_max_states_param,
+				&ltl_hoa_max_states, size_t(1) << 22 },
+			{ "TAU_LTL_GUARD_MAX_CUBES", &ltl_guard_max_cubes_param,
+				&ltl_guard_max_cubes, 512 },
+			{ "TAU_LTL_REFINEMENT_ROUNDS",
+				&ltl_max_refinement_rounds_param,
+				&ltl_max_refinement_rounds, 64 },
+			{ "TAU_LTL_WINDOW_MAX_PATHS",
+				&ltl_window_max_paths_param,
+				&ltl_window_max_paths, 4096 }
+		};
+		for (const auto& c : caps) {
+			const long saved = *c.param;
+			*c.param = -1;
+			unsetenv(c.var);
+			CHECK( c.effective() == c.dflt );
+			setenv(c.var, "7", 1);
+			CHECK( c.effective() == 7 );
+			// 0 is a value, not an absence: it means unlimited.
+			setenv(c.var, "0", 1);
+			CHECK( c.effective() == 0 );
+			setenv(c.var, "-3", 1);
+			CHECK( c.effective() == c.dflt );
+			setenv(c.var, "abc", 1);
+			CHECK( c.effective() == c.dflt );
+			*c.param = 11;
+			CHECK( c.effective() == 11 );
+			unsetenv(c.var);
+			*c.param = saved;
+		}
 	}
 
 	// Both new caps can change a verdict (decided vs UNKNOWN), so the memos
 	// must see them move.
 	TEST_CASE("refinement and window caps are part of the budget fingerprint") {
 		const size_t base = verdict_budget_fingerprint();
-		const size_t s3 = ltl_max_refinement_rounds, s4 = ltl_window_max_paths;
-		tau_api::set_ltl_max_refinement_rounds(s3 + 1);
+		const long s3 = ltl_max_refinement_rounds_param;
+		const long s4 = ltl_window_max_paths_param;
+		tau_api::set_ltl_max_refinement_rounds(
+			ltl_max_refinement_rounds() + 1);
 		CHECK( verdict_budget_fingerprint() != base );
-		ltl_max_refinement_rounds = s3;
-		tau_api::set_ltl_window_max_paths(s4 + 1);
+		ltl_max_refinement_rounds_param = s3;
+		tau_api::set_ltl_window_max_paths(ltl_window_max_paths() + 1);
 		CHECK( verdict_budget_fingerprint() != base );
-		ltl_window_max_paths = s4;
+		ltl_window_max_paths_param = s4;
 		CHECK( verdict_budget_fingerprint() == base );
+	}
+
+	// An environment fallback is part of the same fingerprint: a memo made
+	// under one budget must not answer a query made under another, however
+	// the budget was set.
+	TEST_CASE("an environment fallback moves the budget fingerprint") {
+		const long saved = ltl_window_max_paths_param;
+		ltl_window_max_paths_param = -1;
+		unsetenv("TAU_LTL_WINDOW_MAX_PATHS");
+		const size_t base = verdict_budget_fingerprint();
+		setenv("TAU_LTL_WINDOW_MAX_PATHS", "13", 1);
+		CHECK( verdict_budget_fingerprint() != base );
+		unsetenv("TAU_LTL_WINDOW_MAX_PATHS");
+		CHECK( verdict_budget_fingerprint() == base );
+		ltl_window_max_paths_param = saved;
 	}
 
 	// The verdict memos are keyed on the formula; the budget fingerprint

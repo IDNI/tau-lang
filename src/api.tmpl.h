@@ -226,22 +226,22 @@ void api<node>::set_ltl_qe_max_vars(size_t n) {
 
 template <NodeType node>
 void api<node>::set_ltl_hoa_max_states(size_t n) {
-	ltl_hoa_max_states = n;
+	ltl_hoa_max_states_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_guard_max_cubes(size_t n) {
-	ltl_guard_max_cubes = n;
+	ltl_guard_max_cubes_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_max_refinement_rounds(size_t n) {
-	ltl_max_refinement_rounds = n;
+	ltl_max_refinement_rounds_param = (long) n;
 }
 
 template <NodeType node>
 void api<node>::set_ltl_window_max_paths(size_t n) {
-	ltl_window_max_paths = n;
+	ltl_window_max_paths_param = (long) n;
 }
 
 template <NodeType node>

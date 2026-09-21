@@ -199,6 +199,16 @@ process-wide storage of your own, so every pack in one process shares the
 value. A switch that gates a preprocessing pass also needs core's master
 `preprocessing` switch on: `bv-blasting` is the example.
 
+A `count` option is written back only when its flag is actually given on the
+command line, so a getter is free to resolve an environment fallback of its
+own and the CLI will not shadow it with the option's default. Read the
+variable in the getter with `env_limit_count` (`env_limits.h`), keep the
+setter writing a parameter that the getter prefers when set, and the option
+then resolves option > environment > default like core's own limits do;
+`qlt-t3-cap` (`TAU_QLT_T3_CAP`) is the example. Name the default in the help
+string: the CLI registers the option with an empty default, so `--help` shows
+the help string alone.
+
 ### Rewrite hooks
 
 Capabilities answer questions; **hooks rewrite trees**, and they are a separate
