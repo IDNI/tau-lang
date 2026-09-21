@@ -18,6 +18,7 @@ set(TESTS
 	anti_prenex_regression
 	anti_prenex_parts
 	anti_prenex_cofactors
+	anti_prenex_conditions
 	adt_flatten
 	adt_parsing
 	adt_types
