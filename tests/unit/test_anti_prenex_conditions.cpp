@@ -342,6 +342,50 @@ TEST_CASE("S4: a negative tree is rewritten at its literals, and kept") {
 	REQUIRE(r.comps.size() == 1);
 }
 
+TEST_CASE("S5: a positive whose zero form loses its last block variable") {
+	tref x = vr("x"), b = vr("b"), cc = vr("c");
+	const ap::block P{ x };
+	auto c0 = ap::ctx<node_t>::for_component(P, 0, false);
+	// `x + b = x + c`: both sides are prepared over `{x}`, so they are
+	// spelled differently and the atom does not fold when it is built, and
+	// the side-wise atom simplifier — which never puts two sides together —
+	// leaves it as it stands. The RING SUM of the zero form cancels `x` and
+	// leaves `b + c = 0`, an atom over no block variable at all.
+	const tref left = sides(ap::prepare_terms<node_t>(
+		eq0(lxor(bf("x"), bf("b"))), P, c0.order)).first;
+	const tref right = sides(ap::prepare_terms<node_t>(
+		eq0(lxor(bf("x"), bf("c"))), P, c0.order)).first;
+	const tref stripped = eq(left, right);
+	REQUIRE(is_child<node_t>(stripped, tau::bf_eq));
+	prepared_clause k({ x }, conj(stripped, eq0(lor(bf("x"), bf("a")))));
+	REQUIRE(k.conjuncts.size() == 2);
+
+	auto r = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	REQUIRE(!r.decided_false);
+	// It is a part of its own over NO variable, beside the component of
+	// the ordinary positive.
+	REQUIRE(r.comps.size() == 2);
+	const size_t free_k = r.comps[0].vars.empty() ? 0 : 1;
+	REQUIRE(r.comps[free_k].vars.empty());
+	CHECK(same_function(r.comps[free_k].F, lxor(bf("b"), bf("c")),
+		{ b, cc }));
+	REQUIRE(r.comps[1 - free_k].vars.size() == 1);
+	CHECK(same(r.comps[1 - free_k].vars[0], x));
+
+	// `DISCHARGE` over the empty block quantifies nothing, so the atom goes
+	// out as the zero form left it, beside `∀_x (x ∪ a) = 0`, which is
+	// `a = 0`.
+	const tref pos = ap::positive_condition<node_t>(r.comps, k.c);
+	REQUIRE(is_child<node_t>(pos, tau::wff_and));
+	REQUIRE(ap::members<node_t>(pos).size() == 2);
+	CHECK(has_member(pos, ap::simplify_atom<node_t>(
+		eq0(r.comps[free_k].F), k.c.order)));
+	CHECK(has_member(pos, ap::simplify_atom<node_t>(eq0(bf("a")),
+		k.c.order)));
+	CHECK(are_nso_equivalent<node_t>(finished(pos),
+		ex("x", finished(k.psi))));
+}
+
 // --- POSITIVE_CONDITION -------------------------------------------------------------
 
 TEST_CASE("PC1: one atom per component, each over its own variables") {

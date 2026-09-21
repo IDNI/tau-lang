@@ -23,7 +23,6 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__SHARED__PARTS_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__SHARED__PARTS_TMPL_H__
 
-#include <cassert>
 #include <vector>
 
 #include "../../union_find_with_sets.h"
@@ -62,9 +61,8 @@ std::vector<part<node>> group_parts(const trefs& conjuncts, const block& X,
 	for (tref c : conjuncts) {
 		vars.push_back(fv_intersect<node>(c, X));
 		const block& vs = vars.back();
-		// Every caller's contract is that a conjunct touches `X`
-		// (§7); one that does not is scoped out before the call.
-		DBG(assert(!vs.empty() && "parts: a conjunct free of X");)
+		// A conjunct touching no variable of `X` joins no class and
+		// becomes a part of its own below.
 		if (vs.empty()) continue;
 		uf.insert(vs[0]);
 		for (size_t i = 1; i < vs.size(); ++i) uf.merge(vs[0], vs[i]);
@@ -72,9 +70,9 @@ std::vector<part<node>> group_parts(const trefs& conjuncts, const block& X,
 	std::vector<part<node>> ps;
 	subtree_unordered_map<node, size_t> of_root;
 	for (size_t i = 0; i < conjuncts.size(); ++i) {
-		// A conjunct free of `X` (Release only) is a part of its own,
-		// merging with nothing, so that the parts still partition the
-		// input.
+		// A conjunct free of `X` is a part of its own over no
+		// variable, merging with nothing, so that the parts still
+		// partition the input.
 		if (vars[i].empty()) {
 			ps.push_back(part<node>{ trefs{ conjuncts[i] }, {} });
 			continue;

@@ -16,11 +16,15 @@
  * The consumers in §7 are `FREEZE_OPAQUE_COMPONENTS`, which freezes a whole
  * part around an opaque conjunct, and `SQUEEZE`, which squeezes the positives
  * of one part into one equation; §6 `PUSH_OVER_CONJUNCTION` and the finite
- * method's second tier follow in later layers. Every one of them hands in
- * conjuncts that touch `X` — a conjunct that does not is the caller's to
- * scope out first (§7) — so such a conjunct is a Debug assertion here; in
- * Release it becomes a part of its own with no variables, merging with
- * nothing, which keeps the output a partition of the input.
+ * method's second tier follow in later layers.
+ *
+ * A CONJUNCT TOUCHING NO VARIABLE OF `X` IS LEGAL and becomes a part of its
+ * own with empty `vars`, merging with nothing, so that the parts still
+ * partition the input. `SQUEEZE` is where one arises: the zero form of a
+ * positive can strip its last block variable (`x + b = x + c` gives
+ * `b + c = 0`), and `DISCHARGE` over the empty block then emits that atom
+ * unchanged (§7). `INCIDENCE` flags nothing for such a conjunct: it holds no
+ * block variable to flag.
  *
  * DETERMINISTIC AND CONTENT-DERIVED, like every order in the module (§1): the
  * parts come in the order of their FIRST conjunct, a part's conjuncts in
@@ -44,7 +48,9 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * `vars` is `X ∩ FV(⋀conjuncts)` in `X`'s order — the sub-block the caller
  * quantifies over this part — and `conjuncts` is a sublist of the input, in
- * input order. The parts of one call partition the input list.
+ * input order. The parts of one call partition the input list. `vars` is
+ * EMPTY for the part of a conjunct that touches no variable of `X`, which is
+ * a part of one conjunct.
  */
 template <NodeType node>
 struct part {
