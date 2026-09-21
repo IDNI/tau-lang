@@ -142,10 +142,9 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 * when @p o gives a key of `last_order` a DIFFERENT rank.
 	 *
 	 * Orders that agree on their common keys live together: a component's
-	 * `P` and a sub-order of it (the chain case of `build_bdd` drops the
-	 * subscripts of a functional quantifier), or the tiny order a
-	 * functional-quantifier fold builds over its own subscripts. Rank
-	 * EQUALITY is the test, so a sub-order keeps the tables.
+	 * `P` and a sub-order of it, or the tiny order a functional-quantifier
+	 * fold builds over its own subscripts. Rank EQUALITY is the test, so a
+	 * sub-order keeps the tables.
 	 */
 	static void sync_order_cache(const order& o);
 #endif

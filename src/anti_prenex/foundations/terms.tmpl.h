@@ -22,9 +22,11 @@
  *    `bdd_compose_impl`). Walks over the TAU tree go through `pre_order`
  *    (dag.h, tree.h) instead.
  *  - `build_bdd` owns the functional-quantifier SLIDE: it collects a chain
- *    whole, builds the body under the order minus the subscripts, and wraps
- *    the chain onto every leaf. Nothing here prepares a term for that, and
- *    every caller hands it the term as written.
+ *    whole, builds the body under the order and wraps the chain onto every
+ *    leaf. A chain BINDING a key of the order does not slide -- it is one
+ *    leaf, hiding what its body carries (§1) -- and neither does one that
+ *    meets no key. Nothing here prepares a term for any of that, and every
+ *    caller hands it the term as written.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__

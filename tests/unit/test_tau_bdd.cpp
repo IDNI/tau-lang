@@ -1402,38 +1402,86 @@ TEST_SUITE("BDD build_bdd functional-quantifier chain") {
 			== bdd::build_bdd(pbf("y & w & v"), o3));
 	}
 
-	TEST_CASE("a subscript that IS a key is bound, not a decision variable") {
+	TEST_CASE("a chain BINDING a key is one leaf, body and all") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
 		tref tx = pvar("x"), tz = pvar("z");
 		bdd::order o {{tx, 1}, {tz, 2}};
+		// ∀x (x·z ∪ x′·w): the subscript `x` is a key, so the chain is
+		// a leaf as it stands. Neither `x` nor the key `z` its body
+		// carries is a decision variable of the result -- they are
+		// HIDDEN inside the leaf (§1's leaf hazard).
 		tref body = pbf("x & z | x' & w");
 		tref f = bdd::build_functional_quantifiers({{tx, bdd::all}}, body);
 		REQUIRE(tau::get(f).child_is(tau::bf_fall));
 		bdd::ref r = bdd::build_bdd(f, o);
+		CHECK(bdd::leaf(r));
+		CHECK(bdd::node_count(r) == 1);
+		CHECK(tau::subtree_equals(bdd::get_var_term(r), f));
+		// and so is a chain over a body of keys alone: ∀x (x·y)
+		tref ty = pvar("y");
+		bdd::order oxy {{tx, 1}, {ty, 2}};
+		tref g = bdd::build_functional_quantifiers({{tx, bdd::all}},
+			pbf("x & y"));
+		REQUIRE(tau::get(g).child_is(tau::bf_fall));
+		bdd::ref rg = bdd::build_bdd(g, oxy);
+		CHECK(bdd::leaf(rg));
+		CHECK(bdd::node_count(rg) == 1);
+		CHECK(tau::subtree_equals(bdd::get_var_term(rg), g));
+	}
+
+	TEST_CASE("a chain over a stored BDD is one leaf: nothing is spelled out") {
+		using hbdd = term_handle<node_t>;
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = pvar("x"), ty = pvar("y");
+		bdd::order o {{tx, 1}, {ty, 2}};
+		// §7 DISCHARGE's keep-mode emission: a chain over a STORED BDD
+		// whose decision variables are the keys themselves.
+		tref stored = hbdd::convert_to_tau_node(pbf("x & y | x' & a"), o);
+		REQUIRE(hbdd::is_bdd_backed(stored));
+		tref chain = bdd::build_functional_quantifiers(
+			{{tx, bdd::all}}, stored);
+		REQUIRE(tau::get(chain).child_is(tau::bf_fall));
+		REQUIRE(qbody(chain) == stored);
+		bdd::ref r = bdd::build_bdd(chain, o);
+		// one leaf, the chain itself, holding the SAME stored BDD: no
+		// decision node, no spell-out, no rebuild under a sub-order
+		CHECK(bdd::leaf(r));
+		CHECK(bdd::node_count(r) == 1);
+		tref lt = bdd::get_var_term(r);
+		CHECK(tau::subtree_equals(lt, chain));
+		CHECK(qbody(lt) == stored);
+	}
+
+	TEST_CASE("an unkeyed chain still slides") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = pvar("x"), ty = pvar("y"), ta = pvar("a");
+		bdd::order o {{tx, 1}};
+		// ∀y (x·y ∪ a) = x·∀y (y ∪ a) ∪ x′·∀y a: `y` is no key, so the
+		// chain rides onto the leaves and `x` stays a decision variable
+		tref f = bdd::build_functional_quantifiers({{ty, bdd::all}},
+			pbf("x & y | a"));
+		REQUIRE(tau::get(f).child_is(tau::bf_fall));
+		bdd::ref r = bdd::build_bdd(f, o);
 		CHECK(bdd::is_ordered(r, o));
-		// no decision node on the bound `x`
-		auto absent = [&tx](bdd::ref c, bool is_leaf) {
-			return is_leaf
-				|| !tau::subtree_equals(bdd::get_var(c), tx);
-		};
-		CHECK(bdd::visit_nodes(r, absent));
-		// the oracle: ∀x of the body built under the full order. Each
-		// chain leaf of `r` is resolved on its own subscript first.
-		auto resolve = [](tref l) -> tref {
-			if (!tau::get(l).child_is(tau::bf_fall)) return l;
-			tref sub = qvar(l), bod = qbody(l);
-			bdd::order ox {{sub, 1}};
-			return bdd::to_tau_term(bdd::bdd_quant(
-				bdd::build_bdd(bod, ox), {{sub, bdd::all}}, ox),
-				find_ba_type<node_t>(bod));
-		};
-		bdd::order oz {{tz, 2}};
-		bdd::ref got = bdd::map_leaves(r, resolve, oz);
-		bdd::ref want = bdd::bdd_all(bdd::build_bdd(body, o),
-			trefs{ tx }, o);
-		CHECK(got == want);
+		REQUIRE(!bdd::leaf(r));
+		CHECK(tau::subtree_equals(bdd::get_var(r), tx));
+		bdd::ref hi = bdd::get_high(r), lo = bdd::get_low(r);
+		REQUIRE(bdd::leaf(hi));
+		REQUIRE(bdd::leaf(lo));
+		tref hit = bdd::get_var_term(hi);
+		REQUIRE(tau::get(hit).child_is(tau::bf_fall));
+		CHECK(tau::subtree_equals(qvar(hit), ty));
+		bdd::order oya {{ty, 1}, {ta, 2}};
+		CHECK(bdd::build_bdd(qbody(hit), oya)
+			== bdd::build_bdd(pbf("y | a"), oya));
+		// ∀y a drops its degenerate subscript
+		CHECK(tau::subtree_equals(bdd::get_var_term(lo), pbf("a")));
 	}
 
 	TEST_CASE("a chain meeting no key is one leaf") {

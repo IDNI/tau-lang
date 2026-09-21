@@ -375,12 +375,12 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 		}
 		case tau::bf_fall:
 		case tau::bf_fex: {
-			// §1 the functional-quantifier CHAIN: `Q_Y b` over the
-			// order's keys is `x·Q_Y b₁ ∪ x′·Q_Y b₀` for a key `x`
-			// outside `Y`, i.e. the body's BDD with the chain pushed
-			// onto every leaf. A subscript that IS a key is bound
-			// here, so it is dropped from the order the body is
-			// built under and re-bound by the wrap.
+			// §1 the functional-quantifier CHAIN `Q_Y b`, with two
+			// outcomes and no third. It SLIDES onto the leaves when
+			// no subscript is a key of @p o: `Q_Y b` is
+			// `x·Q_Y b₁ ∪ x′·Q_Y b₀` for a key `x` outside `Y`,
+			// i.e. the body's BDD with the chain pushed onto every
+			// leaf. Otherwise it is ONE LEAF.
 			quants q;
 			tref body = nullptr;
 			for (tref c = f;;) {
@@ -393,45 +393,43 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 					&& !tb.child_is(tau::bf_fex)) break;
 				c = tb.first();
 			}
-			// The chain meets no key: ONE leaf, but a canonical
-			// one -- the constructor puts an input chain into
-			// content order, merges its runs, drops a degenerate
-			// subscript and folds a closed chain, and `add` maps a
-			// folded `bf_t`/`bf_f` to the terminals. The body is
-			// never built under @p o (it may be arbitrarily large),
-			// only inside that fold, under the chain's own order;
-			// a chain nested in it lands in this same case with a
-			// smaller body, so the recursion terminates. The free
-			// variables of a chain are read off its `bf` wrapper,
-			// which excludes the subscripts.
-			if (!has_bdd_var(tau::get(tau::bf,
-				tau::trim_right_sibling(f)), o))
-				return add(tau::trim(
-					build_functional_quantifiers(q, body)));
+			// ONE LEAF, and a canonical one -- the constructor
+			// puts an input chain into content order, merges its
+			// runs, drops a degenerate subscript and folds a closed
+			// chain, and `add` maps a folded `bf_t`/`bf_f` to the
+			// terminals -- in two cases. A chain meeting no key is
+			// a leaf like any other term free of decision
+			// variables. And so is a chain BINDING one: its
+			// subscript is no decision variable of the result, and
+			// the keys its body still carries are hidden with it,
+			// which is §1's leaf hazard and what the rest of the
+			// push reads through `LEAF_FV`. Spelling the body out
+			// to re-back it under the remaining keys is what §1
+			// forbids: "No later term construction slides ... A
+			// stored BDD is never spelled out before the
+			// component's close, and never reordered."
+			// The body is never built under @p o (it may be
+			// arbitrarily large), only inside the constructor's
+			// fold, under the chain's own order; a chain nested in
+			// it lands in this same case with a smaller body, so
+			// the recursion terminates. The free variables of a
+			// chain are read off its `bf` wrapper, which excludes
+			// the subscripts.
 			bool keyed = false;
 			for (const auto& qy : q)
 				if (o.contains(qy.first)) { keyed = true; break; }
-			order sub;
-			const order* ob = &o;
-			if (keyed) {
-				// A stored BDD has the subscripts as decision
-				// variables, which the sub-order no longer
-				// admits: spell it out before dropping them.
-				if (tau::get(body).find_top([](tref m) {
-					return tau::get(m).is(tau::BDD_ID); }))
-					body = term_handle<node>::
-						convert_to_tau_terms(body);
-				sub = o;
-				for (const auto& qy : q) sub.erase(qy.first);
-				ob = &sub;
-			}
-			// rebuild = false: a wrapped leaf is re-interned as a
-			// leaf, never built as a BDD -- see the worker.
+			if (keyed || !has_bdd_var(tau::get(tau::bf,
+				tau::trim_right_sibling(f)), o))
+				return add(tau::trim(
+					build_functional_quantifiers(q, body)));
+			// The slide. rebuild = false: a wrapped leaf is
+			// re-interned as a leaf, never built as a BDD -- see
+			// the worker.
 			auto wrap = [&q](tref leaf) {
 				return build_functional_quantifiers(q, leaf);
 			};
 			std::unordered_map<ref, ref> memo;
-			ref r = map_leaves(build_bdd(body, *ob), wrap, o, false,
+			ref r = map_leaves(build_bdd(body, o), wrap, o, false,
 				memo);
 			DBG(assert(is_ordered(r, o));)
 			return r;
