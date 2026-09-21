@@ -2,6 +2,7 @@
 # and creates TAU_GIT_DEFINITIONS list
 
 # Skip outside a git checkout (a tau-compiled spec's emitted project has none).
+# A container build without .git supplies the same three values as env vars.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
 execute_process(
 	COMMAND git describe --tags --always
@@ -21,6 +22,10 @@ execute_process(
 	OUTPUT_VARIABLE TAU_GIT_COMMIT_HASH
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+else()
+	set(TAU_GIT_DESCRIBED "$ENV{TAU_GIT_DESCRIBED}")
+	set(TAU_GIT_BRANCH "$ENV{TAU_GIT_BRANCH}")
+	set(TAU_GIT_COMMIT_HASH "$ENV{TAU_GIT_COMMIT_HASH}")
 endif()
 
 set(TAU_GIT_DEFINITIONS

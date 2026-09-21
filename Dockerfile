@@ -79,7 +79,6 @@ RUN echo "(BUILD) -- Creating /tau-lang and home directory" && \
 FROM base AS source
 
 # Copy source files to tau-lang directory
-COPY ./.git      /tau-lang/.git
 COPY ./bindings  /tau-lang/bindings
 COPY ./cmake     /tau-lang/cmake
 COPY ./external  /tau-lang/external
@@ -126,6 +125,14 @@ FROM deps AS build
 COPY --from=source /tau-lang /tau-lang
 
 WORKDIR /tau-lang
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_GIT_DESCRIBED=
+ARG TAU_GIT_BRANCH=
+ARG TAU_GIT_COMMIT_HASH=
+ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
+	TAU_GIT_BRANCH=${TAU_GIT_BRANCH} \
+	TAU_GIT_COMMIT_HASH=${TAU_GIT_COMMIT_HASH}
 
 # The presets name clang and clang++. The versioned package provides
 # only clang-19 and clang++-19.
@@ -226,7 +233,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	scripts/with-gh-token ./dev test-with-tau-testnet \
-		${BUILD_PRESET}-binding-python-tests \
+		${BUILD_PRESET}-binding-python \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -306,6 +313,14 @@ FROM w64-deps AS w64-build
 COPY --from=source /tau-lang /tau-lang
 
 WORKDIR /tau-lang
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_GIT_DESCRIBED=
+ARG TAU_GIT_BRANCH=
+ARG TAU_GIT_COMMIT_HASH=
+ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
+	TAU_GIT_BRANCH=${TAU_GIT_BRANCH} \
+	TAU_GIT_COMMIT_HASH=${TAU_GIT_COMMIT_HASH}
 
 # Argument NIGHTLY=yes is used to build nightly packages (works only if RELEASE=yes)
 ARG NIGHTLY=no
@@ -393,6 +408,14 @@ FROM wasm-deps AS wasm-build
 COPY --from=source /tau-lang /tau-lang
 
 WORKDIR /tau-lang
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_GIT_DESCRIBED=
+ARG TAU_GIT_BRANCH=
+ARG TAU_GIT_COMMIT_HASH=
+ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
+	TAU_GIT_BRANCH=${TAU_GIT_BRANCH} \
+	TAU_GIT_COMMIT_HASH=${TAU_GIT_COMMIT_HASH}
 
 ARG BUILD_JOBS=5
 

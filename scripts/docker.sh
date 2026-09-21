@@ -4,8 +4,16 @@ CMD="${1:-help}"
 PROGRESS="auto" # "auto" or "plain"
 
 build() {
+        local git_args=()
+        if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+                git_args=(
+                        --build-arg "TAU_GIT_DESCRIBED=$(git describe --tags --always)"
+                        --build-arg "TAU_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)"
+                        --build-arg "TAU_GIT_COMMIT_HASH=$(git log -1 --format=%h)"
+                )
+        fi
         echo "Building: '${@}'"
-        docker buildx build --progress=${PROGRESS} "$@" .
+        docker buildx build --progress=${PROGRESS} "${git_args[@]}" "$@" .
 }
 
 run() {

@@ -135,6 +135,21 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      # The default pack entry of the linux job writes this cache, so the
+      # key names default. This job only reads, to avoid a duplicate save.
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ccache
+          key: ccache-ubuntu-24.04-default-${{ github.sha }}
+          restore-keys: |
+            ccache-ubuntu-24.04-default-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
       # tau-testnet's specs use bv, so this suite only runs against the default pack
       - name: Run the tau-testnet suite
         run: |
