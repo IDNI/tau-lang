@@ -428,6 +428,16 @@ bool is_bv_solvable_formula(tref form, bv_unsolvable_reason& reason) {
 				reason = bv_unsolvable_reason::missing_bitwidth;
 				return solvable = false;
 			}
+		} else if (is<node>(n, tau::bf_cast)
+				&& is_bv_type_family<node>(tau::get(n).get_ba_type())) {
+			// A cast declared as a bare family (`(bv)`, no bitwidth) is
+			// as unusable here as a widthless variable: inference is
+			// expected to have completed it already, so meeting one here
+			// means an upstream bug, not a spec to route to blasting.
+			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::type | tau::subtype)) {
+				reason = bv_unsolvable_reason::missing_bitwidth;
+				return solvable = false;
+			}
 		} else if (is<node>(n, tau::ba_constant)) {
 			// A non-bv-typed constant (e.g. a qlt constant like
 			// `{1/3}:qlt`) can appear in an otherwise bv-only clause once
