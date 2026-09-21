@@ -276,7 +276,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 				"go through type inference before reaching "
 				"build_program_desc")
 				found_summary = true;
-			if (auto name = node_attr_text(d.report(), n, label::name)) {
+			if (auto name = node_attr_text(d.report(), n, tau_lang::label::name)) {
 				found_name_attr = true;
 				CHECK(*name == "o1");
 			}
@@ -1047,7 +1047,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 				"codegen_constant_expr; atom emission does not support "
 				"this shape")
 				found_summary = true;
-			if (auto tn = node_attr_text(d.report(), n, label::type_name)) {
+			if (auto tn = node_attr_text(d.report(), n, tau_lang::label::type_name)) {
 				found_type_attr = true;
 				CHECK(*tn == ":qint");
 			}
@@ -1097,7 +1097,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 				"codegen_constant_expr; atom emission does not support "
 				"this shape")
 				found_summary = true;
-			if (auto tn = node_attr_text(d.report(), n, label::type_name)) {
+			if (auto tn = node_attr_text(d.report(), n, tau_lang::label::type_name)) {
 				found_type_attr = true;
 				CHECK(*tn == ":tau");
 			}
@@ -1192,7 +1192,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 				"go through type inference before reaching "
 				"build_program_desc")
 				found_summary = true;
-			if (auto name = node_attr_text(d.report(), n, label::name)) {
+			if (auto name = node_attr_text(d.report(), n, tau_lang::label::name)) {
 				found_name_attr = true;
 				CHECK(*name == "o1");
 			}
@@ -1237,7 +1237,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 				"standalone emitted step() does not support; drive the "
 				"program through the interpreter's table step provider")
 				found_summary = true;
-			if (auto name = node_attr_text(er.report(), n, label::name)) {
+			if (auto name = node_attr_text(er.report(), n, tau_lang::label::name)) {
 				found_name_attr = true;
 				CHECK(*name == "o2");
 			}

@@ -4,7 +4,16 @@
 # like the other LTL run tests.
 #
 
+include(tau_repl_pack)
+
 function(add_ltl_run_test name input pass fail)
+	# Several inputs below annotate with bv[N]; gate them like add_repl_test
+	# does, or a pack without that algebra runs a spec it cannot type.
+	tau_repl_unsupported(_tau_skip "${input}")
+	if(_tau_skip)
+		tau_repl_record_skip("test_repl-ltl_execution-${name}")
+		return()
+	endif()
 	add_test(NAME "test_repl-ltl_execution-${name}"
 		COMMAND bash -c "printf '${input}' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 	set_tests_properties("test_repl-ltl_execution-${name}" PROPERTIES

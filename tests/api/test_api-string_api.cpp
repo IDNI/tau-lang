@@ -759,11 +759,11 @@ TEST_SUITE("Tau API - string - step error paths") {
 				found_step_summary = true;
 			else if (!msg.empty())
 				found_ba_cause = true;
-			if (auto name = node_attr_text(r.report(), n, label::name)) {
+			if (auto name = node_attr_text(r.report(), n, tau_lang::label::name)) {
 				found_name_attr = true;
 				CHECK( *name == "i" );
 			}
-			if (auto tp = node_attr_value(r.report(), n, label::time_point)) {
+			if (auto tp = node_attr_value(r.report(), n, tau_lang::label::time_point)) {
 				found_time_point_attr = true;
 				CHECK( *tp == 0 );
 			}
