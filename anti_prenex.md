@@ -1700,7 +1700,10 @@ SQUEEZE(clause, X) → (f, comps, negatives, clause):
  2. f ← ⋃ { positives of clause }                        // squeeze; ⋃{} = 0
     comps ← [(F_k, X_k)]: PARTS (§6) over the POSITIVES alone, negatives
             ignored — F_k the union of part k's terms, X_k = X ∩ FV(F_k),
-            so f = ⋃_k F_k over pairwise disjoint X_k
+            so f = ⋃_k F_k over pairwise disjoint X_k. A positive whose zero
+            form lost its last block variable (x + b = x + c gives b + c = 0)
+            is a part of its own over NO variable: PARTS tolerates it, and
+            DISCHARGE over the empty block emits the atom as it is
     //   The push's own incidence pass counts negatives as connections, so a
     //   clause whose positives are linked only through negative material
     //   — the shape a negative tree (§1) brings to the leaf whole — arrives
