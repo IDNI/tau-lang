@@ -22,6 +22,11 @@ namespace idni {}
 namespace idni::tau_lang {}
 
 using namespace idni;
+// These bring every tau name into the global namespace, where a few of them
+// collide with the platform headers. On macOS doctest's implementation half
+// (above) includes <sys/sysctl.h>, and <sys/ucred.h> declares a global
+// `struct label` that makes an unqualified `label::` ambiguous; write
+// `tau_lang::label::` in a test instead.
 using namespace idni::tau_lang;
 
 // Experiment overrides for the preprocessing/solver placement parameters;

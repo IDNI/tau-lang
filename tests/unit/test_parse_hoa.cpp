@@ -166,7 +166,7 @@ TEST_SUITE("spawn_capture") {
 		CHECK(r.has_error());
 		CHECK(!r.has_value());
 		CHECK(report_has_code(r.report(), code::runtime_error));
-		CHECK(report_has_attr(r.report(), label::timeout));
+		CHECK(report_has_attr(r.report(), tau_lang::label::timeout));
 	}
 
 	TEST_CASE("[SPAWN-02] a nonexistent binary is not_found") {

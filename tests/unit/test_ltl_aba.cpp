@@ -5305,7 +5305,7 @@ TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 		CHECK(!r.has_value());
 		CHECK(report_has_code(r.report(), code::io_error));
 
-		auto name_val = report_attr_value(r.report(), label::name);
+		auto name_val = report_attr_value(r.report(), tau_lang::label::name);
 		std::string failed_call = name_val
 			? std::string(r.report().str(static_cast<idni::int_t>(*name_val)))
 			: std::string();

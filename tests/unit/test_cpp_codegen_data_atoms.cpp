@@ -196,7 +196,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 				"standalone emitted step() does not support; drive the "
 				"program through the interpreter's table step provider")
 				found_summary = true;
-			if (auto name = node_attr_text(er.report(), n, label::name)) {
+			if (auto name = node_attr_text(er.report(), n, tau_lang::label::name)) {
 				found_name_attr = true;
 				CHECK(*name == "o1");
 			}
