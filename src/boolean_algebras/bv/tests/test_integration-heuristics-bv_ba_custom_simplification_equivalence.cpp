@@ -29,7 +29,7 @@
 
 tref parse_bf(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::bf }};
-	auto src = tree<node_t>::get(sample, opts);
+	auto src = tree<node_t>::get(sample, opts).value_or(nullptr);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
 	}
@@ -63,7 +63,7 @@ static void run_child(const std::string& sample, const std::filesystem::path& ou
 	// an oracle failure -- classify it as CRASHED.
 	tref simplified = nullptr;
 	try {
-		simplified = bv_ba_custom_simplification<node_t>(src);
+		simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 	} catch (const std::exception& e) {
 		out << "CRASHED|exception escaped bv_ba_custom_simplification: " << e.what() << " for: " << sample << "\n";
 		return;

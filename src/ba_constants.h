@@ -15,6 +15,7 @@
 #include <stdexcept>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -79,22 +80,26 @@ struct ba_constants {
 
 	/**
 	 * @brief Retrieve the raw constant value by its pool index @p constant_id.
+	 *
+	 * An out-of-range or zero id is an out-of-range report, never a throw.
 	 * @param constant_id One-based id into the constant pool (0 is invalid).
 	 * @return The constant variant value at that index.
 	 */
-	static constant get(size_t constant_id);
+	static result<constant> get(size_t constant_id);
 
 	/**
 	 * @brief Parse a constant from its source representation.
 	 *
 	 * Calls the BA parser for @p type_tree to convert @p constant_source into a
-	 * typed constant, or returns `std::nullopt` if parsing fails.
+	 * typed constant. The returned result carries a report: on refusal it names
+	 * why, and an unowned @p type_tree comes back malformed (no value, no
+	 * error) rather than as a parse failure.
 	 * @param constant_source Source text to parse.
 	 * @param type_tree Tree node identifying the BA type.
 	 * @param options Ignored by every current specialization (BA2-21: kept for signature stability only).
-	 * @return Parsed constant-with-type pair, or `std::nullopt` on failure.
+	 * @return Parsed constant-with-type pair, or a report explaining the refusal.
 	 */
-	static std::optional<typename node::constant_with_type> get(
+	static result<typename node::constant_with_type> get(
 		const std::string& constant_source,
 		tref type_tree,
 		const std::string options = ""

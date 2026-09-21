@@ -159,8 +159,9 @@ tref scope_out_independent_conjuncts(tref fm) {
  * @endinternal
  */
 template <NodeType node>
-tref eliminate_arithmetic_and_quantifiers(tref form) {
+result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Case-split quantifier elimination is an identity on the formula, so
 	// running it unconditionally is always safe. Which BA, if any, can make
 	// progress is for the pack fold to decide, and the owning BA gates it.
@@ -182,7 +183,7 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 	// scope the solver decides directly, keeping the common mixed-type case
 	// off the blasting path entirely.
 	form = scope_out_independent_conjuncts<node>(form);
-	form = resolve_quantifiers<node>(form);
+	TAU_TRY(form, resolve_quantifiers<node>(form));
 	// Mark variables used as an argument of an unresolved predicate
 	// reference (`wff_ref`), or entangled with one through a shared atom,
 	// so they are not Boole-decomposed.
@@ -226,9 +227,9 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 	{
 		analysis_context<node> ctx1;          // arith_is_solver_owned = true
 		const eliminability<node> el1 = analyse_formula<node>(form, ctx1);
-		form = anti_prenex<node>(form, el1);
+		TAU_TRY(form, anti_prenex<node>(form, el1));
 	}
-	form = resolve_quantifiers<node>(form);
+	TAU_TRY(form, resolve_quantifiers<node>(form));
 	if constexpr (pack_has_arithmetic_theory_v<node>) {
 		// Pass 2: arithmetic floor only where the solver could own the
 		// content; the arithmetic/blasteable seeds still hold
@@ -281,8 +282,8 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 		analysis_context<node> ctx2;
 		ctx2.arith_is_solver_owned = !has_foreign_arith_constant<node>(form);
 		const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
-		form = anti_prenex<node>(form, el2);
-		form = resolve_quantifiers<node>(form);
+		TAU_TRY(form, anti_prenex<node>(form, el2));
+		TAU_TRY(form, resolve_quantifiers<node>(form));
 		// Option 5a -- the per-formula preprocessing destination: one
 		// attempt on the whole formula, after the last anti-prenex/resolve
 		// pass and before the final closed-formula check below. Inert at
@@ -292,13 +293,16 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 		// `solver_placement`: it is the single "final" solver site that
 		// both `per_closed_block` and `per_formula` rely on, so it runs
 		// under every setting.
-		if (preprocessing && preprocess_placement == preprocess_site::per_formula)
-			if (tref blasted = pack_preprocess<node>(form);
-				blasted && blasted != form)
-				form = preprocess_method == preprocess_mode::anti_prenex_result
-					? anti_prenex<node>(blasted,
-						eliminability<node>::arith_only())
-					: blasted;
+		if (preprocessing && preprocess_placement == preprocess_site::per_formula) {
+			TAU_TRY(tref pre_val, pack_preprocess<node>(form));
+			if (pre_val != form) {
+				tref blasted = pre_val;
+				if (preprocess_method == preprocess_mode::anti_prenex_result) {
+					TAU_TRY(form, anti_prenex<node>(blasted,
+						eliminability<node>::arith_only()));
+				} else form = blasted;
+			}
+		}
 		if (get_free_vars<node>(form).empty()
 			&& pack_can_solve<node>(form))
 		{
@@ -306,10 +310,10 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 			// result, or translation failing, means we cannot
 			// decide, not that the formula is false.
 			if (auto sat = pack_sat_status<node>(form))
-				return *sat ? tau::_T() : tau::_F();
+				return r.with_value(*sat ? tau::_T() : tau::_F());
 		}
 	}
-	return form;
+	return r.with_value(form);
 }
 
 // Replaces each maximal temporal-free wff below a temporal or CTL* operator
@@ -350,20 +354,16 @@ result<tref> normalize(tref form) {
 	using tau = tree<node>;
 	result<tref> r;
 	if (!form) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	// Caching architecture (see private/2026-08-15-normalizer-caching-plan.md,
-	// "Explicitly NOT cacheable as-is", for the full rationale):
-	// This entry cache (and normalize_non_temp's below) dedupes whole-formula
-	// calls -- measured 37/37 distinct on the probe case, i.e. no repetition
-	// at this level. The real repetition lives in the leaf passes: to_nnf
-	// (16x), normalize_atomic_formula_operators (16x),
-	// syntactic_path_simplification (66x) and ex_subs_based_elimination
-	// (44,795 calls on the probe case) -- those now carry their own
-	// TAU_CACHE-gated caches. anti_prenex_block / anti_prenex(el) /
-	// process_quantifier_blocks stay deliberately uncached: their key would
-	// have to include per-pass eliminability state and in/out recursion
-	// state, which would never hit.
+	// This entry cache (and normalize_non_temp's below) dedupes
+	// whole-formula calls; the leaf passes (to_nnf,
+	// normalize_atomic_formula_operators, syntactic_path_simplification,
+	// ex_subs_based_elimination) carry their own TAU_CACHE-gated caches.
+	// anti_prenex_block / anti_prenex(el) / process_quantifier_blocks stay
+	// deliberately uncached: their key would have to include per-pass
+	// eliminability state and in/out recursion state, which would never
+	// hit.
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
@@ -381,7 +381,7 @@ result<tref> normalize(tref form) {
 		auto sg = r.open("eliminate_arithmetic_and_quantifiers");
 		// Case that the formula has no temporal quantifier
 		if (temps.empty()) {
-			form = eliminate_arithmetic_and_quantifiers<node>(form);
+			TAU_TRY(form, eliminate_arithmetic_and_quantifiers<node>(form));
 		} else {
 			subtree_map<node, tref> changes;
 			for (tref temp : temps) {
@@ -409,7 +409,7 @@ result<tref> normalize(tref form) {
 				tref f = tau::trim2(temp);
 				if (tau::get(f).find_top(is_temporal_quantifier<node>))
 					f = fold_constant_temporal_operands<node>(f);
-				f = eliminate_arithmetic_and_quantifiers<node>(f);
+				TAU_TRY(f, eliminate_arithmetic_and_quantifiers<node>(f));
 				// Add quantifier again and save as change
 				if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
 				else changes.emplace(temp, tau::build_wff_sometimes(f));
@@ -422,7 +422,7 @@ result<tref> normalize(tref form) {
 	tref result;
 	{
 		auto sg = r.open("normalize_temporal_quantifiers");
-		result = normalize_temporal_quantifiers<node>(form);
+		TAU_TRY(result, normalize_temporal_quantifiers<node>(form));
 	}
 	if (!result) {
 		return r.with_assert_check_error(code::internal_error,
@@ -445,12 +445,12 @@ result<tref> normalize_non_temp(tref fm) {
 	// growing set of call sites feed one normalization's (possibly null)
 	// result straight back in as another call's fm.
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	// Widen before the cache lookup, so a cached result is keyed on the
 	// widened formula; a BA's own width-cap violation returns nullptr
 	// here and must propagate rather than crash downstream.
-	fm = pack_widen_arithmetic<node>(fm);
+	TAU_TRY(fm, pack_widen_arithmetic<node>(fm));
 	if (!fm) {
 		return r.with_assert_check_error(code::internal_error,
 			messages::non_temp_normalization_produced_no_formula);
@@ -469,11 +469,11 @@ result<tref> normalize_non_temp(tref fm) {
 	tref result;
 	{
 		auto sg = r.open("eliminate_arithmetic_and_quantifiers");
-		result = eliminate_arithmetic_and_quantifiers<node>(fm);
+		TAU_TRY(result, eliminate_arithmetic_and_quantifiers<node>(fm));
 	}
 	{
 		auto sg = r.open("term_boole_normal_form");
-		result = term_boole_normal_form<node>(result);
+		TAU_TRY(result, term_boole_normal_form<node>(result));
 	}
 	if (!result) {
 		return r.with_assert_check_error(code::internal_error,
@@ -644,7 +644,7 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	// LTL formulas are routed to is_ltl_aba_realizable; don't reject them here.
 	auto is_ltl_op = [](tref x) {
@@ -789,7 +789,7 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 
 	const auto& fm = tau::get(n);
@@ -844,7 +844,7 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	result<bool> r;
 	using tau = tree<node>;
 	if (!n) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
@@ -970,7 +970,7 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n1 || !n2) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 
 	LOG_DEBUG << "Begin is_nso_impl";
@@ -1558,11 +1558,11 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	// Widen before anything else runs; a BA's own width-cap violation
 	// returns nullptr and must propagate rather than crash downstream.
-	fm = pack_widen_arithmetic<node>(fm);
+	TAU_TRY(fm, pack_widen_arithmetic<node>(fm));
 	if (!fm) {
 		return r.with_assert_check_error(code::internal_error,
 			messages::temp_normalization_produced_no_formula);
@@ -1591,8 +1591,8 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	// based eliminations (the closed formula check in resolve_quantifiers
 	// runs before they are created); resolve them late and fold again.
 	if (tau::get(fm).find_top(is_quantifier<node>)) {
-		if (auto resolved = resolve_quantifiers<node>(fm);
-			resolved && resolved != fm)
+		TAU_TRY(tref resolved, resolve_quantifiers<node>(fm));
+		if (resolved && resolved != fm)
 			fm = fold_trivial_quantifiers<node>(
 				tau::reget(resolved));
 		// A block that is eliminable in isolation can still be
@@ -1600,7 +1600,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 		// whole-formula with a flat cross-scope join, so an arithmetic
 		// atom in a SIBLING clause sharing free variables with the
 		// block's atoms lifts those variables above `eliminable` and
-		// the binder is kept (review-pointwise-revision §3, R6).
+		// the binder is kept (R6).
 		// Re-eliminate each surviving maximal block with block-local
 		// analysis, which sees no sibling content. Do not descend into
 		// terms: tau_ba constants carry their own wff_ex/wff_all over
@@ -1612,7 +1612,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 		{
 			subtree_map<node, tref> changes;
 			for (tref b : blocks) {
-				tref br = eliminate_arithmetic_and_quantifiers<node>(b);
+				TAU_TRY(tref br, eliminate_arithmetic_and_quantifiers<node>(b));
 				if (!br || br == b || tau::get(br).find_top(
 					is_quantifier<node>))
 				{
@@ -1625,8 +1625,8 @@ result<tref> normalize_with_temp_simp(tref fm) {
 					// default) never reaches it. Its negation
 					// is the ∃ form; eliminate that and negate
 					// back.
-					tref nb = eliminate_arithmetic_and_quantifiers<
-						node>(tau::build_wff_neg(b));
+					TAU_TRY(tref nb, eliminate_arithmetic_and_quantifiers<
+						node>(tau::build_wff_neg(b)));
 					if (nb && !tau::get(nb).find_top(
 						is_quantifier<node>))
 					{
@@ -2508,7 +2508,7 @@ template <NodeType node>
 result<tref> normalizer(tref fm) {
 	result<tref> r;
 	if (!fm) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	auto res = r.take_or_error(normalize_with_temp_simp<node>(fm),
 		code::internal_error, "Normalization failed");

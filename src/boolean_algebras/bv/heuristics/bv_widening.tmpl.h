@@ -48,12 +48,14 @@ namespace idni::tau_lang {
  * @param op The `bf_shl` operator node (the child of its `bf` wrapper).
  * @return The literal amount, or `0` for a variable amount, an untyped
  * constant, or an amount too large to be represented (`w >= 64` top
- * element, or a literal `std::stoull` cannot parse).
+ * element, or a literal `std::stoull` cannot parse). Returns no value when
+ * a typed bv amount's bitwidth cannot be looked up.
  * @endinternal
  */
 template <NodeType node>
-size_t bf_shl_shift_amount(const tree<node>& op) {
+result<size_t> bf_shl_shift_amount(const tree<node>& op) {
 	using tau = tree<node>;
+	result<size_t> r;
 
 	const tau& amount = op[1][0];
 	const size_t amount_type = amount.get_ba_type();
@@ -62,33 +64,34 @@ size_t bf_shl_shift_amount(const tree<node>& op) {
 
 	// The top element is the literal 2^w - 1 for its own declared width w.
 	if (amount.is(tau::bf_t)) {
-		if (!typed_bv) return 0; // untyped: no width, not a known constant
-		const size_t w = get_bv_width<node>(amount_type);
+		if (!typed_bv) return r.with_value(0); // untyped: no width, not a known constant
+		TAU_TRY(size_t w, get_bv_width<node>(amount_type));
 		// 2^w - 1 is not representable in size_t for w >= 64 (and the
 		// resulting width would be astronomically past any usable
 		// bv_max_width anyway): fall into the same "no known growth"
 		// fallback the unparseably-large `std::stoull` case uses, rather
 		// than wrapping around to a small -- silently under-widening --
 		// amount.
-		if (w >= sizeof(size_t) * 8) return 0;
-		return (static_cast<size_t>(1) << w) - 1;
+		if (w >= sizeof(size_t) * 8) return r.with_value(0);
+		return r.with_value((static_cast<size_t>(1) << w) - 1);
 	}
 
 	if (amount.is_ba_constant() && typed_bv) {
 		const auto c = amount.get_ba_constant();
 		try {
-			return static_cast<size_t>(
-				std::stoull(std::get<bv>(c).getBitVectorValue(10)));
+			return r.with_value(static_cast<size_t>(
+				std::stoull(std::get<bv>(c).getBitVectorValue(10))));
 		} catch (const std::exception&) {
-			return 0; // too large (or malformed) to parse: no known growth
+			return r.with_value(0); // too large (or malformed) to parse: no known growth
 		}
 	}
-	return 0;
+	return r.with_value(0);
 }
 
 template <NodeType node>
-size_t needed_width(tref bf_node, size_t base_w, size_t& maxW) {
+result<size_t> needed_width(tref bf_node, size_t base_w, size_t& maxW) {
 	using tau = tree<node>;
+	result<size_t> r;
 
 	const tau& n = tau::get(bf_node);
 	DBG(assert(n.is(tau::bf));)
@@ -98,7 +101,7 @@ size_t needed_width(tref bf_node, size_t base_w, size_t& maxW) {
 	// bv_ba_hooks.tmpl.h:29-30, for the same one-level-under-`bf` access).
 	const tau& op = n[0];
 
-	auto rec = [&](size_t i) -> size_t {
+	auto rec = [&](size_t i) -> result<size_t> {
 		return needed_width<node>(op.child(i), base_w, maxW);
 	};
 
@@ -115,8 +118,8 @@ size_t needed_width(tref bf_node, size_t base_w, size_t& maxW) {
 		break;
 	// Transparent wrapper: "(" bf ")" contributes its inner width unchanged.
 	case tau::bf_parenthesis: {
-		size_t inner = rec(0);
-		if (inner == 0) return 0;
+		TAU_TRY(size_t inner, rec(0));
+		if (inner == 0) return r.with_value(0);
 		w = inner;
 		break;
 	}
@@ -124,38 +127,41 @@ size_t needed_width(tref bf_node, size_t base_w, size_t& maxW) {
 	// The target type id is attached directly to the bf_cast node at
 	// parse-to-tree time (tau_tree_from_parser.tmpl.h, case bf_cast), so no
 	// type inference is required to read it here. A cast to a non-bv-family
-	// (or untyped) target has no width to contribute and would DBG-assert
-	// inside get_bv_width, so it is treated as opaque -- the same explicit
-	// guard is_side_saturated_at's operator branch applies before its own
-	// get_bv_width call.
+	// (or untyped) target has no width to contribute, so it is treated as
+	// opaque -- the same explicit guard is_side_saturated_at's operator
+	// branch applies before its own get_bv_width call.
 	case tau::bf_cast: {
 		const size_t cast_type = op.get_ba_type();
-		if (cast_type == 0 || !is_bv_type_family<node>(cast_type)) return 0;
-		w = get_bv_width<node>(cast_type);
+		if (cast_type == 0 || !is_bv_type_family<node>(cast_type)) return r.with_value(0);
+		TAU_TRY(w, get_bv_width<node>(cast_type));
 		break;
 	}
 	case tau::bf_add: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
-		w = std::max(l, r) + 1;
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
+		w = std::max(l, rhs) + 1;
 		break;
 	}
 	case tau::bf_sub: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
-		w = std::max(l, r);
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
+		w = std::max(l, rhs);
 		break;
 	}
 	case tau::bf_mul: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
-		w = l + r;
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
+		w = l + rhs;
 		break;
 	}
 	case tau::bf_div:
 	case tau::bf_mod: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
 		w = l; // keep the dividend's width; result magnitude is bounded by it
 		break;
 	}
@@ -167,34 +173,38 @@ size_t needed_width(tref bf_node, size_t base_w, size_t& maxW) {
 	case tau::bf_nand:
 	case tau::bf_nor:
 	case tau::bf_xnor: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
-		w = std::max(l, r);
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
+		w = std::max(l, rhs);
 		break;
 	}
 	case tau::bf_neg: {
-		size_t l = rec(0);
-		if (l == 0) return 0;
+		TAU_TRY(size_t l, rec(0));
+		if (l == 0) return r.with_value(0);
 		w = l; // complement runs at the operand's own width
 		break;
 	}
 	case tau::bf_shr: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
 		w = l; // a right shift never grows the needed width
 		break;
 	}
 	case tau::bf_shl: {
-		size_t l = rec(0), r = rec(1);
-		if (l == 0 || r == 0) return 0;
-		w = l + bf_shl_shift_amount<node>(op); // 0 when the amount is not a literal
+		TAU_TRY(size_t l, rec(0));
+		TAU_TRY(size_t rhs, rec(1));
+		if (l == 0 || rhs == 0) return r.with_value(0);
+		TAU_TRY(size_t shift, bf_shl_shift_amount<node>(op)); // 0 when the amount is not a literal
+		w = l + shift;
 		break;
 	}
 	default:
-		return 0; // opaque subterm (bf_ref, capture, ...): caller skips the atom
+		return r.with_value(0); // opaque subterm (bf_ref, capture, ...): caller skips the atom
 	}
 	maxW = std::max(maxW, w);
-	return w;
+	return r.with_value(w);
 }
 
 /**
@@ -309,16 +319,17 @@ bool is_bare_storage_side(tref side) {
  * @tparam node Tree node type.
  * @param cast_op The `bf_cast` operator node.
  * @return The operand's bv width, or `0` for an untyped or non-bv operand.
+ * Returns no value when a bv-family operand's bitwidth cannot be looked up.
  * @endinternal
  */
 template <NodeType node>
-size_t bf_cast_operand_width(const tree<node>& cast_op) {
+result<size_t> bf_cast_operand_width(const tree<node>& cast_op) {
 	using tau = tree<node>;
 
 	tref operand = cast_op.child(0);
 	size_t t = tau::get(operand).get_ba_type();
 	if (t == 0) t = tau::get(operand)[0].get_ba_type();
-	if (t == 0 || !is_bv_type_family<node>(t)) return 0;
+	if (t == 0 || !is_bv_type_family<node>(t)) { result<size_t> r; return r.with_value(0); }
 	return get_bv_width<node>(t);
 }
 
@@ -436,8 +447,9 @@ size_t bf_cast_operand_width(const tree<node>& cast_op) {
  * @endinternal
  */
 template <NodeType node>
-bool is_side_saturated_at(tref side, size_t W, bool& saw_widening_cast) {
+result<bool> is_side_saturated_at(tref side, size_t W, bool& saw_widening_cast) {
 	using tau = tree<node>;
+	result<bool> r;
 
 	const tau& op = tau::get(side)[0];
 	switch (op.value.nt) {
@@ -447,56 +459,62 @@ bool is_side_saturated_at(tref side, size_t W, bool& saw_widening_cast) {
 	case tau::bf_cast: {
 		const size_t cast_type = op.get_ba_type();
 		if (cast_type == 0 || !is_bv_type_family<node>(cast_type))
-			return false;
-		if (get_bv_width<node>(cast_type) != W) return false;
+			return r.with_value(false);
+		TAU_TRY(size_t cast_width, get_bv_width<node>(cast_type));
+		if (cast_width != W) return r.with_value(false);
 		// An operand of unknown width (0, from a tree never run through
 		// type inference) counts as narrower: erring towards "already
 		// widened" keeps the pass terminating, which is the stronger
 		// safety property here -- escalation ends at the D4 cap, whose
 		// conservative fallback flips answers.
-		if (bf_cast_operand_width<node>(op) < W) saw_widening_cast = true;
-		return true;
+		TAU_TRY(size_t operand_width, bf_cast_operand_width<node>(op));
+		if (operand_width < W) saw_widening_cast = true;
+		return r.with_value(true);
 	}
 	case tau::variable:
-		return false; // a bare, uncast variable is never "already widened"
+		return r.with_value(false); // a bare, uncast variable is never "already widened"
 	case tau::ba_constant:
 	case tau::bf_t:
 	case tau::bf_f: {
 		// A constant leaf keeps no cast (bv_term_cast folds it away), so
 		// its own declared width is the only evidence available.
 		const size_t leaf_type = op.get_ba_type();
-		return leaf_type != 0 && is_bv_type_family<node>(leaf_type)
-			&& get_bv_width<node>(leaf_type) == W;
+		if (leaf_type == 0 || !is_bv_type_family<node>(leaf_type))
+			return r.with_value(false);
+		TAU_TRY(size_t w, get_bv_width<node>(leaf_type));
+		return r.with_value(w == W);
 	}
 	default: {
 		// An opaque subterm (bf_ref, capture, ...) has ba_type 0 (or, in
-		// principle, some non-bv type) -- get_bv_width DBG-asserts on
-		// anything that isn't bv-family, so it must never be called on
-		// one. Guard explicitly rather than relying on op.get_ba_type()
-		// happening to equal W (it can't, since W is always a bv-family
-		// width here, but 0 would still reach get_bv_width unguarded).
+		// principle, some non-bv type); guard explicitly rather than relying
+		// on op.get_ba_type() happening to equal W (it can't, since W is
+		// always a bv-family width here).
 		const size_t op_type = op.get_ba_type();
-		if (op_type == 0 || !is_bv_type_family<node>(op_type)) return false;
-		if (get_bv_width<node>(op_type) != W) return false;
-		if (!is_side_saturated_at<node>(op.child(0), W, saw_widening_cast))
-			return false;
-		if (op.children_size() > 1
-				&& !is_side_saturated_at<node>(op.child(1), W,
-					saw_widening_cast)) return false;
-		return true;
+		if (op_type == 0 || !is_bv_type_family<node>(op_type)) return r.with_value(false);
+		TAU_TRY(size_t w, get_bv_width<node>(op_type));
+		if (w != W) return r.with_value(false);
+		TAU_TRY(bool left_saturated, is_side_saturated_at<node>(op.child(0), W, saw_widening_cast));
+		if (!left_saturated) return r.with_value(false);
+		if (op.children_size() > 1) {
+			TAU_TRY(bool right_saturated, is_side_saturated_at<node>(op.child(1), W,
+				saw_widening_cast));
+			if (!right_saturated) return r.with_value(false);
+		}
+		return r.with_value(true);
 	}
 	}
 }
 
 template <NodeType node>
-tref widen_atom(tref atom) {
+result<tref> widen_atom(tref atom) {
 	using tau = tree<node>;
 
+	result<tref> r;
 	const tau& n = tau::get(atom);
 	const size_t atom_type = n.get_ba_type();
-	if (!is_bv_type_family<node>(atom_type)) return atom; // not bv: no-op
+	if (!is_bv_type_family<node>(atom_type)) return r.with_value(atom); // not bv: no-op
 
-	const size_t base_w = get_bv_width<node>(atom_type);
+	TAU_TRY(size_t base_w, get_bv_width<node>(atom_type));
 	const bool is_interval = n.value.nt == tau::bf_interval;
 	const size_t nsides = is_interval ? 3 : 2;
 
@@ -511,11 +529,12 @@ tref widen_atom(tref atom) {
 	// it below.
 	{
 		bool all_saturated = true, saw_widening_cast = false;
-		for (size_t i = 0; i < nsides && all_saturated; ++i)
-			if (!is_side_saturated_at<node>(n.child(i), base_w,
-					saw_widening_cast))
-				all_saturated = false;
-		if (all_saturated && saw_widening_cast) return atom;
+		for (size_t i = 0; i < nsides && all_saturated; ++i) {
+			TAU_TRY(bool saturated, is_side_saturated_at<node>(n.child(i), base_w,
+				saw_widening_cast));
+			if (!saturated) all_saturated = false;
+		}
+		if (all_saturated && saw_widening_cast) return r.with_value(atom);
 	}
 
 	// Step 2: needed_width on every side; any opaque side (returns 0,
@@ -524,18 +543,18 @@ tref widen_atom(tref atom) {
 	size_t maxW = 0;
 	for (size_t i = 0; i < nsides; ++i) {
 		sides[i] = n.child(i);
-		if (needed_width<node>(sides[i], base_w, maxW) == 0) return atom;
+		TAU_TRY(size_t w, needed_width<node>(sides[i], base_w, maxW));
+		if (w == 0) return r.with_value(atom);
 	}
 
 	// Step 3: W == base_w -> nothing to elaborate; W > bv_max_width ->
-	// loud, logged cap error (D4).
+	// cap error (D4).
 	const size_t W = maxW;
-	if (W == base_w) return atom;
-	if (W > bv_max_width) {
-		LOG_ERROR << "bv-widening: required width " << W
-			<< " exceeds bv-max-width " << bv_max_width;
-		return nullptr;
-	}
+	if (W == base_w) return r.with_value(atom);
+	if (W > bv_max_width)
+		return r.with_error(code::out_of_range,
+			"bv-widening: required width exceeds bv-max-width",
+			{{ label::limit, bv_max_width }, { label::width, W }});
 
 	// Step 4: bf_eq/bf_neq with exactly one bare-storage side --
 	// truncating "assignment" semantics: the bare side is untouched, the
@@ -550,8 +569,8 @@ tref widen_atom(tref atom) {
 			tref truncated = build_bf_cast<node>(wide_other,
 				bv_type_id<node>(base_w));
 			tref l = bare0 ? sides[0] : truncated;
-			tref r = bare0 ? truncated : sides[1];
-			return tau::get(n.get_type(), l, r);
+			tref rhs = bare0 ? truncated : sides[1];
+			return r.with_value(tau::get(n.get_type(), l, rhs));
 		}
 	}
 
@@ -561,15 +580,16 @@ tref widen_atom(tref atom) {
 	new_sides.reserve(nsides);
 	for (size_t i = 0; i < nsides; ++i)
 		new_sides.push_back(widen_term<node>(sides[i], base_w, W));
-	if (is_interval) return tau::get(n.get_type(), new_sides);
-	return tau::get(n.get_type(), new_sides[0], new_sides[1]);
+	if (is_interval) return r.with_value(tau::get(n.get_type(), new_sides));
+	return r.with_value(tau::get(n.get_type(), new_sides[0], new_sides[1]));
 }
 
 template <NodeType node>
-tref widen_bv_arithmetic(tref fm) {
+result<tref> widen_bv_arithmetic(tref fm) {
 	using tau = tree<node>;
 
-	if (!bv_widening) return fm; // pass fully inert when the flag is off
+	result<tref> r;
+	if (!bv_widening) return r.with_value(fm); // pass fully inert when the flag is off
 
 	// The full bv-family atom nt set widen_atom knows how to elaborate --
 	// parser/tau.tgf:64-74. `is<node>({...})` (tau_tree_queries.tmpl.h) is
@@ -585,7 +605,7 @@ tref widen_bv_arithmetic(tref fm) {
 		tau::bf_lteq, tau::bf_nlteq, tau::bf_gt, tau::bf_ngt,
 		tau::bf_gteq, tau::bf_ngteq, tau::bf_interval
 	}));
-	if (atoms.empty()) return fm; // no bv atom at all: nothing to do
+	if (atoms.empty()) return r.with_value(fm); // no bv atom at all: nothing to do
 
 	// Build the replacement map for the CHANGED atoms only: widen_atom is
 	// itself a no-op (returns the same tref) for a non-bv-family atom or
@@ -598,13 +618,13 @@ tref widen_bv_arithmetic(tref fm) {
 	// normal_forms_transformations.tmpl.h's shift_io_vars_in_fm).
 	subtree_map<node, tref> changes;
 	for (tref atom : atoms) {
-		tref widened = widen_atom<node>(atom);
-		if (widened == nullptr) return nullptr; // D4 cap: propagate the failure
+		// D4 cap: TAU_TRY propagates widen_atom's own report on failure.
+		TAU_TRY(auto widened, widen_atom<node>(atom));
 		if (widened != atom) changes[atom] = widened;
 	}
-	if (changes.empty()) return fm; // every atom was already a no-op
+	if (changes.empty()) return r.with_value(fm); // every atom was already a no-op
 
-	return rewriter::replace<node>(fm, changes);
+	return r.with_value(rewriter::replace<node>(fm, changes));
 }
 
 } // namespace idni::tau_lang

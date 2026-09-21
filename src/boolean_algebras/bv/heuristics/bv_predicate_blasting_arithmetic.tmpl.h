@@ -44,32 +44,38 @@ namespace idni::tau_lang {
 //
 
 template<NodeType node>
-tref bvadd(tref augend, tref addend, tref sum, trefs& aux) {
+result<tref> bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 	using tau = tree<node>;
 
-	auto bitwidth = get_bv_type_bitwidth<node>(augend);
-	if (bitwidth == 0) return nullptr;
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(augend));
 
 	auto carry = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_carry = tau::get(tau::bf, carry);
 	aux.push_back(carry);
 
-	tref body = tau::build_bf_eq_0(bit<node>(bf_carry, 0));
+	TAU_TRY(auto carry0, bit<node>(bf_carry, 0));
+	tref body = tau::build_bf_eq_0(carry0);
 	for (size_t i = 0; i < bitwidth; ++i) {
+		TAU_TRY(auto sum_i, bit<node>(sum, (int_t)i));
+		TAU_TRY(auto augend_i, bit<node>(augend, (int_t)i));
+		TAU_TRY(auto addend_i, bit<node>(addend, (int_t)i));
+		TAU_TRY(auto carry_i, bit<node>(bf_carry, (int_t)i));
 		auto sum_eq = tau::build_bf_eq_0(tau::build_bf_xor(
-			tau::build_bf_xor(bit<node>(sum, (int_t)i), bit<node>(augend, (int_t)i)),
-			tau::build_bf_xor(bit<node>(addend, (int_t)i), bit<node>(bf_carry, (int_t)i))));
+			tau::build_bf_xor(sum_i, augend_i),
+			tau::build_bf_xor(addend_i, carry_i)));
 		body = tau::build_wff_and(body, sum_eq);
 		if (i + 1 == bitwidth) continue;
 		auto maj = tau::build_bf_or(tau::build_bf_or(
-				tau::build_bf_and(bit<node>(augend, (int_t)i), bit<node>(addend, (int_t)i)),
-				tau::build_bf_and(bit<node>(augend, (int_t)i), bit<node>(bf_carry, (int_t)i))),
-			tau::build_bf_and(bit<node>(addend, (int_t)i), bit<node>(bf_carry, (int_t)i)));
+				tau::build_bf_and(augend_i, addend_i),
+				tau::build_bf_and(augend_i, carry_i)),
+			tau::build_bf_and(addend_i, carry_i));
+		TAU_TRY(auto carry_i1, bit<node>(bf_carry, (int_t)(i + 1)));
 		body = tau::build_wff_and(body, tau::build_wff_equiv(
-			tau::build_bf_eq_0(bit<node>(bf_carry, (int_t)(i + 1))),
+			tau::build_bf_eq_0(carry_i1),
 			tau::build_bf_eq_0(maj)));
 	}
-	return body;
+	return r.with_value(body);
 }
 
 //
@@ -108,36 +114,42 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 //
 
 template<NodeType node>
-tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
+result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	using tau = tree<node>;
 
-	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
-	if (bitwidth == 0) return nullptr;
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(minuend));
 	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
 	auto borrow = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_borrow = tau::get(tau::bf, borrow);
 	aux.push_back(borrow);
 
-	tref body = tau::build_bf_eq_0(bit<node>(bf_borrow, 0));
+	TAU_TRY(auto borrow0, bit<node>(bf_borrow, 0));
+	tref body = tau::build_bf_eq_0(borrow0);
 	for (size_t i = 0; i < bitwidth; ++i) {
+		TAU_TRY(auto difference_i, bit<node>(difference, (int_t)i));
+		TAU_TRY(auto minuend_i, bit<node>(minuend, (int_t)i));
+		TAU_TRY(auto subtrahend_i, bit<node>(subtrahend, (int_t)i));
+		TAU_TRY(auto borrow_i, bit<node>(bf_borrow, (int_t)i));
 		auto diff_eq = tau::build_bf_eq_0(tau::build_bf_xor(
-			tau::build_bf_xor(bit<node>(difference, (int_t)i), bit<node>(minuend, (int_t)i)),
-			tau::build_bf_xor(bit<node>(subtrahend, (int_t)i), bit<node>(bf_borrow, (int_t)i))));
+			tau::build_bf_xor(difference_i, minuend_i),
+			tau::build_bf_xor(subtrahend_i, borrow_i)));
 		body = tau::build_wff_and(body, diff_eq);
 		if (i + 1 == bitwidth) continue;
 		auto mask_i = bit_mask_cte<node>(i, bitwidth);
 		auto not_a_i = tau::build_bf_and(
-			tau::build_bf_neg(bit<node>(minuend, (int_t)i)), mask_i);
+			tau::build_bf_neg(minuend_i), mask_i);
 		auto borrow_gen = tau::build_bf_or(tau::build_bf_or(
-				tau::build_bf_and(not_a_i, bit<node>(subtrahend, (int_t)i)),
-				tau::build_bf_and(not_a_i, bit<node>(bf_borrow, (int_t)i))),
-			tau::build_bf_and(bit<node>(subtrahend, (int_t)i), bit<node>(bf_borrow, (int_t)i)));
+				tau::build_bf_and(not_a_i, subtrahend_i),
+				tau::build_bf_and(not_a_i, borrow_i)),
+			tau::build_bf_and(subtrahend_i, borrow_i));
+		TAU_TRY(auto borrow_i1, bit<node>(bf_borrow, (int_t)(i + 1)));
 		body = tau::build_wff_and(body, tau::build_wff_equiv(
-			tau::build_bf_eq_0(bit<node>(bf_borrow, (int_t)(i + 1))),
+			tau::build_bf_eq_0(borrow_i1),
 			tau::build_bf_eq_0(borrow_gen)));
 	}
-	return body;
+	return r.with_value(body);
 }
 
 //
@@ -155,30 +167,30 @@ tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 //
 
 template<NodeType node>
-tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
+result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
 	using tau = tree<node>;
 
+	result<tref> r;
 	// zero multiplier (the hooks normalize zero constants to bf_f)
 	if (tau::get(tau::trim(multiplier)).is(tau::bf_f))
-		return tau::build_bf_eq_0(product);
+		return r.with_value(tau::build_bf_eq_0(product));
 	if (!tau::get(tau::trim(multiplier)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(multiplier))) {
 		DBG(LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting.";)
-		return nullptr;
+		return r.with_value(nullptr);
 	}
 
-	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
-	if (bitwidth == 0) return nullptr;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(multiplier));
 
 	// set bit positions of the multiplier (position 0 = least significant)
 	auto cte = std::get<bv>(
 		tau::get(tau::trim(multiplier)).get_ba_constant());
-	if (!cte.isBitVectorValue()) return nullptr;
+	if (!cte.isBitVectorValue()) return r.with_value(nullptr);
 	const std::string bv_str = cte.getBitVectorValue();
 	std::vector<size_t> bits;
 	for (size_t i = 0; i < bv_str.size(); ++i)
 		if (bv_str[bv_str.size() - 1 - i] == '1') bits.push_back(i);
-	if (bits.empty()) return tau::build_bf_eq_0(product);
+	if (bits.empty()) return r.with_value(tau::build_bf_eq_0(product));
 
 	auto shift_count = [&](size_t i) {
 		typename node::constant c = { make_bitvector_value(bitwidth, i) };
@@ -188,15 +200,13 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
 	// single summand: constrain the product directly
 	if (bits.size() == 1) {
 		if (bits[0] == 0)
-			return tau::build_bf_eq(multiplicand, product);
+			return r.with_value(tau::build_bf_eq(multiplicand, product));
 		return bvshl<node>(multiplicand, shift_count(bits[0]), product);
 	}
 
 	tref body = nullptr;
-	auto conjoin = [&](tref constraint) -> bool {
-		if (!constraint) return false;
+	auto conjoin = [&](tref constraint) {
 		body = body ? tau::build_wff_and(body, constraint) : constraint;
-		return true;
 	};
 
 	// shifted summands
@@ -206,8 +216,10 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
 		auto shifted = tau::build_variable(bv_type_id<node>(bitwidth));
 		auto bf_shifted = tau::get(tau::bf, shifted);
 		aux.push_back(shifted);
-		if (!conjoin(bvshl<node>(multiplicand, shift_count(i),
-			bf_shifted))) return nullptr;
+		TAU_TRY(auto shifted_c, bvshl<node>(multiplicand, shift_count(i),
+			bf_shifted));
+		if (!shifted_c) return r.with_value(nullptr);
+		conjoin(shifted_c);
 		terms.push_back(bf_shifted);
 	}
 
@@ -222,11 +234,12 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
 			out = tau::get(tau::bf, partial);
 			aux.push_back(partial);
 		}
-		if (!conjoin(bvadd<node>(acc, terms[k], out, aux)))
-			return nullptr;
+		TAU_TRY(auto sum_c, bvadd<node>(acc, terms[k], out, aux));
+		if (!sum_c) return r.with_value(nullptr);
+		conjoin(sum_c);
 		acc = out;
 	}
-	return body;
+	return r.with_value(body);
 }
 
 //
@@ -264,47 +277,50 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
  * remainder 1, satisfying `exact = 10 - 1 = 9` and `quotient * 3 = 9`.
  */
 template<NodeType node>
-static tref bv_euclidean_constraints(tref dividend, tref divisor,
+static result<tref> bv_euclidean_constraints(tref dividend, tref divisor,
 	tref quotient, tref remainder, trefs& aux)
 {
 	using tau = tree<node>;
 	DBG( LOG_TRACE << "bvdiv_rule/divisor: " << LOG_FM(divisor) << "\n"; )
 
+	result<tref> r;
 	if (!tau::get(tau::trim(divisor)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(divisor))) {
 		DBG(LOG_DEBUG << "Only division/modulo by constant is supported in predicate blasting.";)
-		return nullptr;
+		return r.with_value(nullptr);
 	}
-	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
 	// the quotient bound below is computed with 64 bit arithmetic
-	if (bitwidth == 0 || bitwidth > 64) return nullptr;
+	if (bitwidth > 64) return r.with_value(nullptr);
 	auto divisor_value = get_bv_constant_value<node>(tau::trim(divisor));
 	// division by zero falls back to the solver semantics
-	if (!divisor_value || *divisor_value == 0) return nullptr;
+	if (!divisor_value || *divisor_value == 0) return r.with_value(nullptr);
 
 	auto exact = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_exact = tau::get(tau::bf, exact);
 	aux.push_back(exact);
 
 	tref body = nullptr;
-	auto conjoin = [&](tref constraint) -> bool {
-		if (!constraint) return false;
+	auto conjoin = [&](tref constraint) {
 		body = body ? tau::build_wff_and(body, constraint) : constraint;
-		return true;
 	};
 
 	// exact = dividend - remainder
-	if (!conjoin(bvsub<node>(dividend, remainder, bf_exact, aux)))
-		return nullptr;
+	TAU_TRY(auto exact_eq, bvsub<node>(dividend, remainder, bf_exact, aux));
+	if (!exact_eq) return r.with_value(nullptr);
+	conjoin(exact_eq);
 	// quotient * divisor = exact
-	if (!conjoin(bvmul<node>(quotient, divisor, bf_exact, aux)))
-		return nullptr;
+	TAU_TRY(auto quot_eq, bvmul<node>(quotient, divisor, bf_exact, aux));
+	if (!quot_eq) return r.with_value(nullptr);
+	conjoin(quot_eq);
 	// remainder < divisor
-	if (!conjoin(bvlt<node>(remainder, divisor))) return nullptr;
+	TAU_TRY(auto r_lt_d, bvlt<node>(remainder, divisor));
+	if (!r_lt_d) return r.with_value(nullptr);
+	conjoin(r_lt_d);
 	// remainder <= dividend, so the subtraction cannot wrap around
-	auto r_gt_d = bvgt<node>(remainder, dividend);
-	if (!r_gt_d) return nullptr;
-	if (!conjoin(tau::build_wff_neg(r_gt_d))) return nullptr;
+	TAU_TRY(auto r_gt_d, bvgt<node>(remainder, dividend));
+	if (!r_gt_d) return r.with_value(nullptr);
+	conjoin(tau::build_wff_neg(r_gt_d));
 	// quotient <= (2^bitwidth - 1) / divisor, so the product cannot wrap
 	// around; omitted when the bound covers the whole domain
 	const size_t max_value = (bitwidth == 64)
@@ -316,19 +332,19 @@ static tref bv_euclidean_constraints(tref dividend, tref divisor,
 			{ make_bitvector_value(bitwidth, bound) };
 		auto bound_cte = tau::build_bf_ba_constant(c,
 			bv_type_id<node>(bitwidth));
-		auto q_gt_bound = bvgt<node>(quotient, bound_cte);
-		if (!q_gt_bound) return nullptr;
-		if (!conjoin(tau::build_wff_neg(q_gt_bound))) return nullptr;
+		TAU_TRY(auto q_gt_bound, bvgt<node>(quotient, bound_cte));
+		if (!q_gt_bound) return r.with_value(nullptr);
+		conjoin(tau::build_wff_neg(q_gt_bound));
 	}
-	return body;
+	return r.with_value(body);
 }
 
 template<NodeType node>
-tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
+result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 	using tau = tree<node>;
 
-	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
-	if (bitwidth == 0) return nullptr;
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
 	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_remainder = tau::get(tau::bf, remainder);
 	aux.push_back(remainder);
@@ -337,14 +353,14 @@ tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 }
 
 template<NodeType node>
-tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
+result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 	using tau = tree<node>;
 	DBG( LOG_TRACE << "bvmod/dividend: " << LOG_FM(dividend) << "\n"; )
 	DBG( LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor) << "\n"; )
 	DBG( LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder) << "\n"; )
 
-	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
-	if (bitwidth == 0) return nullptr;
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
 	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_quotient = tau::get(tau::bf, quotient);
 	aux.push_back(quotient);
@@ -353,7 +369,7 @@ tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 }
 
 template<NodeType node>
-tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
+result<tref> bved(tref dividend, tref divisor, tref quotient, tref remainder,
 	trefs& aux)
 {
 	return bv_euclidean_constraints<node>(dividend, divisor, quotient,
@@ -367,36 +383,40 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
 // which at equal operands still picks the shared value through the negated
 // branch. Equality is spelled !bvneq, the one bit-level equality entry point.
 template<NodeType node>
-static tref bv_pick_by_order(tref left, tref right, tref result, bool pick_smaller) {
+static result<tref> bv_pick_by_order(tref left, tref right, tref res, bool pick_smaller) {
 	using tau = tree<node>;
 
+	result<tref> r;
 	// bvlt/bvneq read the bitwidth off their first operand (left and
-	// result respectively); the fresh result variable always carries one,
+	// res respectively); the fresh result variable always carries one,
 	// the operands do after type inference -- bail out like the other
-	// builders if either is missing.
-	if (get_bv_type_bitwidth<node>(result) == 0
-		|| get_bv_type_bitwidth<node>(left) == 0) return nullptr;
-	auto lt = bvlt<node>(left, right);
-	if (!lt) return nullptr;
-	auto eq = [&](tref operand) -> tref {
-		auto neq = bvneq<node>(result, operand);
-		return neq ? tau::build_wff_neg(neq) : nullptr;
+	// builders if either is missing (each checked on its own: a failure
+	// on one must not be masked by comparing it against the other).
+	if (auto w = r.merge_take(get_bv_type_bitwidth<node>(res)); !w) return r;
+	if (auto w = r.merge_take(get_bv_type_bitwidth<node>(left)); !w) return r;
+	TAU_TRY(auto lt, bvlt<node>(left, right));
+	if (!lt) return r.with_value(nullptr);
+	auto eq = [&](tref operand) -> result<tref> {
+		result<tref> r;
+		TAU_TRY(auto neq, bvneq<node>(res, operand));
+		if (!neq) return r.with_value(nullptr);
+		return r.with_value(tau::build_wff_neg(neq));
 	};
-	auto eq_low = eq(pick_smaller ? left : right);
-	auto eq_high = eq(pick_smaller ? right : left);
-	if (!eq_low || !eq_high) return nullptr;
-	return tau::build_wff_and(
+	TAU_TRY(auto eq_low, eq(pick_smaller ? left : right));
+	TAU_TRY(auto eq_high, eq(pick_smaller ? right : left));
+	if (!eq_low || !eq_high) return r.with_value(nullptr);
+	return r.with_value(tau::build_wff_and(
 		tau::build_wff_imply(lt, eq_low),
-		tau::build_wff_imply(tau::build_wff_neg(lt), eq_high));
+		tau::build_wff_imply(tau::build_wff_neg(lt), eq_high)));
 }
 
 template<NodeType node>
-tref bvmin(tref left, tref right, tref result) {
+result<tref> bvmin(tref left, tref right, tref result) {
 	return bv_pick_by_order<node>(left, right, result, true);
 }
 
 template<NodeType node>
-tref bvmax(tref left, tref right, tref result) {
+result<tref> bvmax(tref left, tref right, tref result) {
 	return bv_pick_by_order<node>(left, right, result, false);
 }
 

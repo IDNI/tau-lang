@@ -47,7 +47,7 @@ namespace {
 
 // Parse a spec string into a tref.  Returns nullptr on parse failure.
 tref parse_spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -75,7 +75,8 @@ bool unsat_str(const char* spec) {
 // parse_spec never supplies one, so a fresh output_def needs its own.
 bool sat_str_with_io_def(const char* spec) {
 	tref t = tau::get(spec,
-		{ .context = definitions<node_t>::instance().get_io_context() });
+		{ .context = definitions<node_t>::instance().get_io_context() })
+		.value_or(nullptr);
 	REQUIRE(t != nullptr);
 	auto nso_rr = get_nso_rr<node_t>(t);
 	REQUIRE(nso_rr.has_value());

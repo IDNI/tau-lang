@@ -199,10 +199,10 @@ std::optional<bool> carrier_flag_negated(tref atom_ref, tref io_var_ref) {
 template <NodeType node>
 field_kind classify_output_field(tref atom_ref, tref io_var_ref) {
 	const size_t vtype = tree<node>::get(io_var_ref).get_ba_type();
-	if (vtype == 0)
-		throw std::runtime_error("untyped variable '"
-			+ get_var_name<node>(io_var_ref)
-			+ "' reached codegen; spec did not go through type inference");
+	// build_program_desc's precondition already refused a vtype 0 atom;
+	// this assert only guards direct misuse of the classifier.
+	DBG(assert(vtype != 0);)
+	if (vtype == 0) return field_kind::witness;
 	if (vtype == ba_types<node>::id(pack_bool_carrier_type<node>())
 		&& carrier_flag_negated<node>(atom_ref, io_var_ref).has_value())
 		return field_kind::flag;
@@ -327,20 +327,6 @@ atom_field_info classify_atom_field(
 	return m;
 }
 
-// Every free io variable of an atom reaching codegen must carry a real BA
-// type -- ba_type 0 means type inference never ran for it. Checked for both
-// input and output atoms, single- and multi-variable alike, independently of
-// classify_output_field's own check (which only ever sees a single-variable
-// output atom's var).
-template <NodeType node>
-void validate_atom_io_types(tref atom_ref) {
-	for (tref v : get_free_vars<node>(atom_ref))
-		if (tree<node>::get(v).get_ba_type() == 0)
-			throw std::runtime_error("untyped variable '"
-				+ get_var_name<node>(v)
-				+ "' reached codegen; spec did not go through type inference");
-}
-
 // Snapshot the emitting process's full ba-type registry, in id order, as
 // replayable recipes: a reserved builder, a pack family (+param), or a bare
 // syntactic type tree. The emitted main replays every entry and asserts its
@@ -349,11 +335,12 @@ void validate_atom_io_types(tref atom_ref) {
 // main in both processes, in an order neither controls, and only a full
 // replay-with-assert makes the numbering portable.
 template <NodeType node>
-std::vector<ba_type_entry> snapshot_ba_type_registry() {
+result<std::vector<ba_type_entry>> snapshot_ba_type_registry() {
 	using namespace ba_types_detail;
+	result<std::vector<ba_type_entry>> r;
 	std::vector<ba_type_entry> table;
 	for (size_t i = 0; i < ba_types<node>::count(); ++i) {
-		tref t = ba_types<node>::type_tree(i);
+		TAU_TRY(tref t, ba_types<node>::type_tree(i));
 		ba_type_entry e;
 		e.id = i;
 		if (t == untyped_type<node>()) {
@@ -372,18 +359,22 @@ std::vector<ba_type_entry> snapshot_ba_type_registry() {
 			e.name = fp->first;
 			e.param = fp->second;
 		} else {
-			std::string nm = ba_types<node>::name(i);
+			TAU_TRY(std::string type_name, ba_types<node>::name(i));
+			std::string nm = type_name;
 			if (!nm.empty() && nm[0] == ':') nm.erase(0, 1);
-			if (make_syntactic_type_tree<node>(nm.c_str()) != t)
-				throw std::runtime_error("ba type '"
-					+ ba_types<node>::name(i)
-					+ "' is not replayable by an emitted artifact");
+			if (make_syntactic_type_tree<node>(nm.c_str()) != t) {
+				return r.with_assert_check_error(
+					code::unsupported_operation,
+					"the Boolean-algebra type is not replayable by an "
+					"emitted artifact",
+					{{label::type_name, type_name}});
+			}
 			e.kind = ba_type_entry::recipe::syntactic;
 			e.name = nm;
 		}
 		table.push_back(std::move(e));
 	}
-	return table;
+	return r.with_assert_check_value(std::move(table));
 }
 
 // Reconstruct one ABA-comparison operand (a ground BA constant, a bare bf_t/
@@ -393,13 +384,14 @@ std::vector<ba_type_entry> snapshot_ba_type_registry() {
 // -- so it carries the atom's real BA type once inference has run; when it
 // is still 0 (untyped), fall back to `sibling_type`, the other operand's type.
 template <NodeType node>
-std::string build_atom_term_expr(tref term, size_t sibling_type = 0) {
+result<std::string> build_atom_term_expr(tref term, size_t sibling_type = 0) {
 	using tau = tree<node>;
+	result<std::string> r;
 	tref trimmed = tau::trim(term);
 	if (tau::get(trimmed).is_ba_constant()) {
 		size_t bt = tau::get(trimmed).get_ba_type();
 		if (auto e = pack_codegen_constant_expr<node>(bt, trimmed); e)
-			return *e;
+			return r.with_value(*e);
 		// is_one/is_zero are mandatory descriptor members (unlike
 		// codegen_constant_expr), so a carrier-typed constant that is
 		// trivially one or zero has a BA-agnostic C++ spelling -- a truth
@@ -409,31 +401,38 @@ std::string build_atom_term_expr(tref term, size_t sibling_type = 0) {
 		// codegen_constant_expr is a hard error, not a fallback.
 		if (bt == ba_types<node>::id(pack_bool_carrier_type<node>())) {
 			const auto& cst = tau::get(trimmed).get_ba_constant();
-			if (node::ba::is_one(cst))
-				return "::idni::tau_lang::build_bf_t_type<"
-					"::idni::tau_lang::tau_pack::node_t>(" + std::to_string(bt) + ")";
-			if (node::ba::is_zero(cst))
-				return "::idni::tau_lang::build_bf_f_type<"
-					"::idni::tau_lang::tau_pack::node_t>(" + std::to_string(bt) + ")";
-			throw std::runtime_error(
+			TAU_TRY(auto one, node::ba::is_one(cst));
+			if (one) return r.with_value(
+				"::idni::tau_lang::build_bf_t_type<"
+				"::idni::tau_lang::tau_pack::node_t>(" + std::to_string(bt) + ")");
+			TAU_TRY(auto zero, node::ba::is_zero(cst));
+			if (zero) return r.with_value(
+				"::idni::tau_lang::build_bf_f_type<"
+				"::idni::tau_lang::tau_pack::node_t>(" + std::to_string(bt) + ")");
+			return r.with_error(code::unsupported_operation,
 				"atom constant's owning BA declined codegen_constant_expr "
 				"for a feasible edge");
 		}
-		throw std::runtime_error("atom constant's owning BA type '"
-			+ ba_types<node>::name(bt) + "' declined codegen_constant_expr; "
-			"atom emission does not support this shape");
+		{
+			TAU_TRY(std::string bt_name, ba_types<node>::name(bt));
+			return r.with_error(code::unsupported_operation,
+				"atom constant's owning BA type declined "
+				"codegen_constant_expr; atom emission does not support "
+				"this shape",
+				{{label::type_name, bt_name}});
+		}
 	}
 	if (tau::get(trimmed).is(tau::bf_t) || tau::get(trimmed).is(tau::bf_f)) {
 		size_t bt = tau::get(trimmed).get_ba_type();
 		if (bt == 0) bt = sibling_type;
-		if (bt == 0) throw std::runtime_error(
+		if (bt == 0) return r.with_error(code::missing_type_information,
 			"atom's bare literal operand is untyped and its sibling "
 			"operand names no BA type either; atom emission does not "
 			"support this shape");
 		const char* fn = tau::get(trimmed).is(tau::bf_t)
 			? "build_bf_t_type" : "build_bf_f_type";
-		return std::string("::idni::tau_lang::") + fn
-			+ "<::idni::tau_lang::tau_pack::node_t>(" + std::to_string(bt) + ")";
+		return r.with_value(std::string("::idni::tau_lang::") + fn
+			+ "<::idni::tau_lang::tau_pack::node_t>(" + std::to_string(bt) + ")");
 	}
 	// A BA-level complement over an otherwise-plain operand (e.g. the tau BA's
 	// own `x'`) is not itself a ground constant or a variable reference, but
@@ -442,8 +441,9 @@ std::string build_atom_term_expr(tref term, size_t sibling_type = 0) {
 	// rebuilt with their own build_bf_* counterparts.
 	if (tau::get(trimmed).is(tau::bf_neg)) {
 		tref inner = tau::get(trimmed).child(0);
-		return "::idni::tau_lang::build_bf_neg<::idni::tau_lang::tau_pack::"
-			"node_t>(" + build_atom_term_expr<node>(inner, sibling_type) + ")";
+		TAU_TRY(auto inner_expr, build_atom_term_expr<node>(inner, sibling_type));
+		return r.with_value("::idni::tau_lang::build_bf_neg<::idni::tau_lang::tau_pack::"
+			"node_t>(" + inner_expr + ")");
 	}
 	// A binary bf operator (e.g. `x & y`) is likewise rebuilt with its own
 	// build_bf_* runtime builder, recursing into both operands.
@@ -465,14 +465,15 @@ std::string build_atom_term_expr(tref term, size_t sibling_type = 0) {
 		if (fn) {
 			tref lhs = tau::get(trimmed).first();
 			tref rhs = tau::get(trimmed).second();
-			return std::string("::idni::tau_lang::") + fn
+			TAU_TRY(auto lhs_expr, build_atom_term_expr<node>(lhs, sibling_type));
+			TAU_TRY(auto rhs_expr, build_atom_term_expr<node>(rhs, sibling_type));
+			return r.with_value(std::string("::idni::tau_lang::") + fn
 				+ "<::idni::tau_lang::tau_pack::node_t>("
-				+ build_atom_term_expr<node>(lhs, sibling_type) + ", "
-				+ build_atom_term_expr<node>(rhs, sibling_type) + ")";
+				+ lhs_expr + ", " + rhs_expr + ")");
 		}
 	}
 	if (get_free_vars<node>(term).size() != 1 || !is_io_var<node>(trimmed))
-		throw std::runtime_error(
+		return r.with_error(code::unsupported_operation,
 			"atom operand is neither a ground constant nor a plain "
 			"variable reference; atom emission does not support this shape");
 	tref io_node = tau::get(trimmed).is(tau::io_var)
@@ -497,16 +498,17 @@ std::string build_atom_term_expr(tref term, size_t sibling_type = 0) {
 		      "::idni::tau_lang::tau_pack::node_t>(\"" << name << "\"), "
 		   << type_id << ", \"t\")";
 	}
-	return ss.str();
+	return r.with_value(ss.str());
 }
 
 // Reconstruct a relative-time ABA-comparison atom (sol.atoms[i].first) as a self-contained C++ expression of type tref.
 template <NodeType node>
-std::string build_atom_ground_expr(tref atom_ref) {
+result<std::string> build_atom_ground_expr(tref atom_ref) {
 	using tau = tree<node>;
+	result<std::string> r;
 	const auto& t = tau::get(atom_ref);
 	if (!t.has_child())
-		throw std::runtime_error(
+		return r.with_error(code::unsupported_operation,
 			"atom has no comparison operator; atom emission does not "
 			"support this shape");
 	auto nt = t[0].value.nt;
@@ -521,16 +523,16 @@ std::string build_atom_ground_expr(tref atom_ref) {
 	else if (nt == tau::bf_ngt) fn = "build_bf_ngt";
 	else if (nt == tau::bf_gteq) fn = "build_bf_gteq";
 	else if (nt == tau::bf_ngteq) fn = "build_bf_ngteq";
-	else throw std::runtime_error(
+	else return r.with_error(code::unsupported_operation,
 		"atom's comparison operator (bf_interval or unrecognized) is "
 		"not supported by atom emission");
 	tref lhs_term = t[0].first(), rhs_term = t[0].second();
 	size_t lhs_type = tau::get(tau::trim(lhs_term)).get_ba_type();
 	size_t rhs_type = tau::get(tau::trim(rhs_term)).get_ba_type();
-	std::string lhs = build_atom_term_expr<node>(lhs_term, rhs_type);
-	std::string rhs = build_atom_term_expr<node>(rhs_term, lhs_type);
-	return std::string("::idni::tau_lang::") + fn
-		+ "<::idni::tau_lang::tau_pack::node_t>(" + lhs + ", " + rhs + ")";
+	TAU_TRY(auto lhs, build_atom_term_expr<node>(lhs_term, rhs_type));
+	TAU_TRY(auto rhs, build_atom_term_expr<node>(rhs_term, lhs_type));
+	return r.with_value(std::string("::idni::tau_lang::") + fn
+		+ "<::idni::tau_lang::tau_pack::node_t>(" + lhs + ", " + rhs + ")");
 }
 
 // Returns {lookback, highest_initial_pos}: max relative shift among the
@@ -695,7 +697,7 @@ inline program_desc build_program_desc_prop(
 }
 
 template <NodeType node>
-std::optional<program_desc> build_program_desc(
+result<program_desc> build_program_desc(
     const ltl_aba_solution<node>& sol,
     const std::string& class_name,
     bool revisable,
@@ -704,6 +706,7 @@ std::optional<program_desc> build_program_desc(
 {
 	using tau = tree<node>;
 	using namespace codegen_detail;
+	result<program_desc> r;
 
 	// Precondition: build_program_desc is handed a solved strategy, not a
 	// formula, so it cannot run inference itself -- that is compile_spec's
@@ -712,32 +715,34 @@ std::optional<program_desc> build_program_desc(
 	// rather than let classify_output_field discover it mid-emission.
 	for (auto& [atom_ref, prop] : sol.atoms)
 		for (tref v : get_free_vars<node>(atom_ref))
-			if (tau::get(v).get_ba_type() == 0)
-				throw std::runtime_error(
-					"build_program_desc: variable '"
-					+ get_var_name<node>(v) + "' carries no BA "
-					"type -- the formula did not go through type "
-					"inference before reaching build_program_desc");
+			if (tau::get(v).get_ba_type() == 0) {
+				return r.with_error(code::missing_type_information,
+					"the variable carries no BA type; the formula did not "
+					"go through type inference before reaching "
+					"build_program_desc",
+					{{label::name, get_var_name<node>(v)}});
+			}
 
 	std::set<std::string> input_set(sol.input_props.begin(), sol.input_props.end());
 	std::map<std::string, atom_field_info> ameta;
 	std::vector<atom_desc> atoms;
 	for (auto& [atom_ref, prop] : sol.atoms) {
-		validate_atom_io_types<node>(atom_ref);
 		bool is_out = !input_set.count(prop);
 		ameta[prop] = classify_atom_field<node>(atom_ref, is_out, revisable);
-		if (atom_is_data_typed<node>(atom_ref, revisable))
-			atoms.push_back({prop,
-				build_atom_ground_expr<node>(atom_ref)});
+		if (atom_is_data_typed<node>(atom_ref, revisable)) {
+			TAU_TRY(auto ge, build_atom_ground_expr<node>(atom_ref));
+			atoms.push_back({prop, std::move(ge)});
+		}
 	}
 
 	// The emitted artifact needs a ground tref for every input guard atom
 	// (table_step_provider's evaluate_atom) and every witness_template output
 	// atom (emit_main's per-edge templates array looks each one up by prop) --
 	// collect whichever the data gate above skipped. Carrier-typed atoms
-	// included: build_atom_term_expr's is_one/is_zero fallback covers a
-	// carrier whose owner spells no constants of its own, and a plain
-	// variable reference is reconstructed generically regardless of type.
+	// included: build_atom_term_expr's is_one/is_zero path covers a carrier
+	// whose owner spells no constants of its own (an undecided constant is an
+	// error, not a fallback), and a plain variable reference is reconstructed
+	// generically regardless of type.
 	{
 		std::set<std::string> have;
 		for (auto& a : atoms) have.insert(a.prop);
@@ -747,7 +752,8 @@ std::optional<program_desc> build_program_desc(
 			bool is_template = it != ameta.end()
 				&& it->second.kind == field_kind::witness_template;
 			if (input_set.count(prop) || is_template) {
-				atoms.push_back({prop, build_atom_ground_expr<node>(atom_ref)});
+				TAU_TRY(auto ge, build_atom_ground_expr<node>(atom_ref));
+				atoms.push_back({prop, std::move(ge)});
 				have.insert(prop);
 			}
 		}
@@ -791,7 +797,7 @@ std::optional<program_desc> build_program_desc(
 	// than emit a program whose revise() would silently strand stale
 	// witnesses.
 	if (revisable && (!witness_vars.empty() || !template_vars.empty()))
-		throw std::runtime_error(
+		return r.with_error(code::unsupported_operation,
 			"PWR revision with data-atom outputs is not supported");
 
 	program_desc d;
@@ -892,7 +898,7 @@ std::optional<program_desc> build_program_desc(
 				list.push_back(std::move(sd));
 			}
 	}
-	d.ba_type_table = snapshot_ba_type_registry<node>();
+	TAU_TRY(d.ba_type_table, snapshot_ba_type_registry<node>());
 	d.step_guard_ks = sol.step_guard_ks;
 
 	std::vector<int> in_ap_idx, flag_out_ap_idx;
@@ -990,10 +996,10 @@ std::optional<program_desc> build_program_desc(
 						// No pos_conj means every literal was negative and
 						// the owner declined; keep the output default.
 						if (!pos_conj) continue;
-						throw std::runtime_error(
-							"output '" + var + "' is owned by a data BA "
-							"that declined to supply a codegen witness "
-							"for a feasible edge");
+						return r.with_error(code::unsupported_operation,
+							"the output is owned by a data BA that declined to "
+							"supply a codegen witness for a feasible edge",
+							{{label::name, var}});
 					}
 					ed.witness_ctors.emplace_back(sanitize(var), *w);
 				}
@@ -1003,7 +1009,7 @@ std::optional<program_desc> build_program_desc(
 		}
 	}
 
-	return d;
+	return r.with_value(std::move(d));
 }
 
 // Emit the declared-open appendix: open_streams()/register_open_oracle()/
@@ -1211,9 +1217,10 @@ inline void emit_atoms_appendix(const program_desc& d, std::ostream& out) {
 	out << "\t\treturn " << d.atoms.size() << ";\n\t}\n\n";
 }
 
-inline void emit_program(const program_desc& d, std::ostream& out)
+inline result<bool> emit_program(const program_desc& d, std::ostream& out)
 {
 	using namespace codegen_detail;
+	result<bool> r;
 
 	const size_t nflag = num_flag_outputs(d);
 	const bool has_witness = nflag != d.outputs.size();
@@ -1225,11 +1232,13 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 	// templates; this standalone step() has no solver, so such programs run
 	// through the interpreter's table_step_provider instead.
 	for (auto& f : d.outputs)
-		if (f.kind == field_kind::witness_template)
-			throw std::runtime_error("output '" + f.prop
-				+ "' needs runtime witness solving, which the "
+		if (f.kind == field_kind::witness_template) {
+			return r.with_assert_check_error(code::unsupported_operation,
+				"the output needs runtime witness solving, which the "
 				"standalone emitted step() does not support; drive the "
-				"program through the interpreter's table step provider");
+				"program through the interpreter's table step provider",
+				{{label::name, f.prop}});
+		}
 
 	out << "// Auto-generated by tau-lang's C++ program emitter.\n";
 	out << "// Do not edit by hand — regenerate from the source .tau spec.\n\n";
@@ -1514,6 +1523,7 @@ inline void emit_program(const program_desc& d, std::ostream& out)
 	}
 
 	out << "};\n";
+	return r.with_assert_check_value(true);
 }
 
 

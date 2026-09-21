@@ -26,9 +26,6 @@
 // test_integration-interpreter_helper.h) define a free function
 // `tref create_spec(const char*)` with the identical signature, and including
 // more than one in the same translation unit would be an ODR violation.
-//
-// Every spec string below was verified against ./build-Debug/tau -e first
-// (transcripts in task-10-report.md).
 
 // Mirrors test_integration-solver.cpp's own check_solution helper (that
 // file defines it locally in a .cpp, not a shared header, so it cannot be
@@ -50,9 +47,9 @@ static bool check_adt_solution(tref eq, const solution<node_t>& sol) {
 static std::vector<std::string> run_point_spec(const std::string& tag,
 	const std::string& preamble, const std::string& spec_body)
 {
-	namespace fs = std::filesystem;
-	fs::path in_p  = fs::temp_directory_path() / ("tau_test_adt_" + tag + "_in.txt");
-	fs::path out_p = fs::temp_directory_path() / ("tau_test_adt_" + tag + "_out.txt");
+	namespace stdfs = std::filesystem;
+	stdfs::path in_p  = stdfs::temp_directory_path() / ("tau_test_adt_" + tag + "_in.txt");
+	stdfs::path out_p = stdfs::temp_directory_path() / ("tau_test_adt_" + tag + "_out.txt");
 	{
 		std::ofstream f(in_p);
 		f << "{ a: \"1\", b: \"0\" }\n" << "{ a: \"0\", b: \"1\" }\n";
@@ -64,7 +61,7 @@ static std::vector<std::string> run_point_spec(const std::string& tag,
 		"i:Point := in file(\"" + in_p.string() + "\").\n"
 		"o:Point := out file(\"" + out_p.string() + "\").\n"
 		+ spec_body;
-	tref parsed = tau::get(spec_src, { .context = &ctx });
+	tref parsed = tau::get(spec_src, { .context = &ctx }).value_or(nullptr);
 	REQUIRE( parsed != nullptr );
 	auto nso_rr = get_nso_rr<node_t>(ctx, parsed);
 	REQUIRE( nso_rr.has_value() );
@@ -89,7 +86,7 @@ static std::vector<std::string> run_point_spec(const std::string& tag,
 		for (std::string l; std::getline(f, l);) lines.push_back(l);
 	}
 	std::error_code ec;
-	fs::remove(in_p, ec); fs::remove(out_p, ec);
+	stdfs::remove(in_p, ec); stdfs::remove(out_p, ec);
 	return lines;
 }
 
@@ -197,7 +194,7 @@ TEST_SUITE("adt integration") {
 			"type Rec = {tag: bv[8], a: sbf}. "
 			"i:Rec := in console. o:Rec := out console. "
 			"o[t] = i[t].",
-			{ .context = &ctx });
+			{ .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		strings i_values = {
@@ -240,7 +237,7 @@ TEST_SUITE("adt integration") {
 			"type Point = {a: sbf, b: sbf}. "
 			"i:Point := in console. o:Point := out console. "
 			"o[t] = i[t].",
-			{ .context = &ctx });
+			{ .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 
@@ -278,7 +275,7 @@ TEST_SUITE("adt integration") {
 			"type Point = {a: sbf, b: sbf}. "
 			"i:Point := in console. o:Point := out console. "
 			"(o[0].a = i[0].a) && o[1] = i[1].",
-			{ .context = &ctx });
+			{ .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		strings i_values = {
@@ -314,7 +311,7 @@ TEST_SUITE("adt integration") {
 			"type Point = {a: sbf, b: sbf}. "
 			"i:Point := in console. o:Point := out console. "
 			"o[0].a = i[0].a.",
-			{ .context = &ctx });
+			{ .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		strings i_values = { "{ a: \"1\", b: \"1\" }" };
@@ -338,9 +335,9 @@ TEST_SUITE("adt integration") {
 		// adt_flatten's upfront scan -- see test_adt_parsing.cpp's
 		// "two file streams on one line" case.
 		bdd_init<Bool>();
-		namespace fs = std::filesystem;
-		fs::path in_p  = fs::temp_directory_path() / "tau_test_adt_in.txt";
-		fs::path out_p = fs::temp_directory_path() / "tau_test_adt_out.txt";
+		namespace stdfs = std::filesystem;
+		stdfs::path in_p  = stdfs::temp_directory_path() / "tau_test_adt_in.txt";
+		stdfs::path out_p = stdfs::temp_directory_path() / "tau_test_adt_out.txt";
 		{
 			std::ofstream f(in_p);
 			f << "{ a: \"0\", b: \"1\" }\n" << "{ a: \"1\", b: \"0\" }\n";
@@ -351,7 +348,7 @@ TEST_SUITE("adt integration") {
 			"i:Point := in file(\"" + in_p.string() + "\").\n"
 			"o:Point := out file(\"" + out_p.string() + "\").\n"
 			"o[t] = i[t].";
-		tref parsed = tau::get(spec_src, { .context = &ctx });
+		tref parsed = tau::get(spec_src, { .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		auto maybe_i = run<node_t>(spec, ctx, 2);
@@ -365,7 +362,7 @@ TEST_SUITE("adt integration") {
 		CHECK( lines[0] == "{ a: \"0\", b: \"1\" }" );
 		CHECK( lines[1] == "{ a: \"1\", b: \"0\" }" );
 		std::error_code ec;
-		fs::remove(in_p, ec); fs::remove(out_p, ec);
+		stdfs::remove(in_p, ec); stdfs::remove(out_p, ec);
 	}
 
 	// --- member OPERATIONS on tuple streams ---------------------------------

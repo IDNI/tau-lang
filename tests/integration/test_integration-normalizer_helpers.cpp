@@ -20,10 +20,10 @@ namespace {
 
 // A wff parsed on its own (no trailing '.'), i.e. what get_formula_or_term
 // hands the normal-form entry points.
-tref wff(const char* s) { return tau::get(s, parse_wff()); }
+tref wff(const char* s) { return tau::get(s, parse_wff()).value_or(nullptr); }
 
 // A bf term parsed on its own.
-tref bf(const char* s) { return tau::get(s, parse_bf()); }
+tref bf(const char* s) { return tau::get(s, parse_bf()).value_or(nullptr); }
 
 std::string str(tref n) { return n ? tau::get(n).to_str() : "<null>"; }
 
@@ -121,23 +121,30 @@ TEST_SUITE("term Boole decomposition") {
 	// The documented example of term_boole_normal_form: xy|xy' = x.
 	TEST_CASE("term_boole_normal_form reduces xy|xy' = 0 to x = 0") {
 		tref fm = wff("xy|xy' = 0");
-		tref res = term_boole_normal_form<node_t>(fm);
-		CHECK( str(res) == "x = 0" );
+		auto res_r = term_boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK( str(res_r.value()) == "x = 0" );
 	}
 
 	TEST_CASE("term_boole_normal_form is the identity on T and F") {
-		CHECK( tau::get(term_boole_normal_form<node_t>(tau::_T()))
-			.equals_T() );
-		CHECK( tau::get(term_boole_normal_form<node_t>(tau::_F()))
-			.equals_F() );
+		auto t_r = term_boole_normal_form<node_t>(tau::_T());
+		REQUIRE( t_r.has_value() );
+		CHECK( tau::get(t_r.value()).equals_T() );
+		auto f_r = term_boole_normal_form<node_t>(tau::_F());
+		REQUIRE( f_r.has_value() );
+		CHECK( tau::get(f_r.value()).equals_F() );
 	}
 
 	// Constant terms take the documented early return.
 	TEST_CASE("term_boole_decomposition is the identity on constants") {
 		tref zero = tau::_0(0);
 		tref one = tau::_1(0);
-		CHECK( term_boole_decomposition<node_t>(zero) == zero );
-		CHECK( term_boole_decomposition<node_t>(one) == one );
+		auto zero_r = term_boole_decomposition<node_t>(zero);
+		REQUIRE( zero_r.has_value() );
+		CHECK( zero_r.value() == zero );
+		auto one_r = term_boole_decomposition<node_t>(one);
+		REQUIRE( one_r.has_value() );
+		CHECK( one_r.value() == one );
 	}
 
 	// A single decomposition step on a variable must produce a term that is
@@ -153,8 +160,10 @@ TEST_SUITE("term Boole decomposition") {
 	TEST_CASE("full decomposition preserves the function") {
 		for (const char* s : { "x y | x z", "x y' | x' y", "x", "x y z" }) {
 			tref term = bf(s);
-			tref bd = term_boole_decomposition<node_t>(term);
+			auto bd_r = term_boole_decomposition<node_t>(term);
 			CAPTURE(s);
+			REQUIRE( bd_r.has_value() );
+			tref bd = bd_r.value();
 			CHECK( bd != nullptr );
 			CHECK( are_bf_equal<node_t>(bd, term) );
 		}
@@ -189,7 +198,7 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 	// eliminates x entirely.
 	TEST_CASE("eliminate_arithmetic_and_quantifiers removes an eliminable binder") {
 		tref fm = wff("ex x x|y = 0");
-		tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm);
+		tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm).value();
 		CHECK( res != nullptr );
 		CHECK( !tau::get(res).find_top(is_quantifier<node_t>) );
 	}
@@ -200,7 +209,7 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 					"all x (x = 0 || y != 0)" }) {
 			CAPTURE(s);
 			tref fm = wff(s);
-			tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm);
+			tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm).value();
 			CHECK( res != nullptr );
 			CHECK( are_nso_equivalent<node_t>(res, fm) );
 		}
@@ -401,14 +410,18 @@ TEST_SUITE("term Boole decomposition over function symbols") {
 
 	TEST_CASE("a term containing a bf_ref still normalizes") {
 		tref fm = wff("x g(y) | x' g(y) = 0");
-		tref res = term_boole_normal_form<node_t>(fm);
+		auto res_r = term_boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		REQUIRE( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
 
 	TEST_CASE("two function symbols in one term") {
 		tref fm = wff("g(y) h(z) = 0");
-		tref res = term_boole_normal_form<node_t>(fm);
+		auto res_r = term_boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
 		REQUIRE( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}

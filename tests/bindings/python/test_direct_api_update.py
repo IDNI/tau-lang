@@ -17,7 +17,9 @@ class TauDirectUpdater:
 	def submit(self, value: str):
 
 		"Retrieve the inputs for the next step"
-		inputs = tau.get_inputs_for_step(self.i)
+		r = tau.get_inputs_for_step(self.i)
+		assert r, f"Failed to get inputs for step: {r.report.errors}"
+		inputs = r.value
 
 		"Assign value to the input"
 		input_values = {}

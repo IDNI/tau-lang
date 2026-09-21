@@ -9,7 +9,9 @@ TEST_SUITE("var_dict") {
 
 	TEST_CASE("round trip: name to id and back") {
 		sym_t id = var_dict("BA-5-round-trip");
-		CHECK(var_dict(id) == "BA-5-round-trip");
+		auto name = var_dict(id);
+		REQUIRE(name.has_value());
+		CHECK(name.value() == "BA-5-round-trip");
 	}
 
 	// BA-5: var_dict(sym_t) used to return a const char* into a
@@ -20,10 +22,18 @@ TEST_SUITE("var_dict") {
 	// valid and distinct.
 	TEST_CASE("two consecutive auto-generated names do not clobber each other") {
 		sym_t next = var_dict("BA-5-next-marker") + 1;
-		std::string first = var_dict(next);
-		std::string second = var_dict(next + 1);
+		auto first_r = var_dict(next);
+		auto second_r = var_dict(next + 1);
+		REQUIRE(first_r.has_value());
+		REQUIRE(second_r.has_value());
+		std::string first = first_r.value();
+		std::string second = second_r.value();
 		CHECK(first != second);
-		CHECK(var_dict(next) == first);
-		CHECK(var_dict(next + 1) == second);
+		auto next_again = var_dict(next);
+		auto next_plus_1_again = var_dict(next + 1);
+		REQUIRE(next_again.has_value());
+		REQUIRE(next_plus_1_again.has_value());
+		CHECK(next_again.value() == first);
+		CHECK(next_plus_1_again.value() == second);
 	}
 }

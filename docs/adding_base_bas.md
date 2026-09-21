@@ -61,6 +61,13 @@ variant:
 All four are checked by the descriptor concept, so a missing one is reported
 with the BA named instead of failing deep inside `std::variant`.
 
+The Boolean operators are total. Each operator returns a value of the
+algebra type, never a `result`. This keeps every Boolean expression
+composable: an algebra that cannot decide an operator falls back to a
+defined value instead. An algebra that must report why a decision failed
+reports it through a descriptor member instead, such as `normalize` or
+`is_zero`.
+
 ### The descriptor
 
 Specialize `ba_descriptor<your_ba, node<PackBAs...>>` in your own header.
@@ -72,12 +79,33 @@ against the line naming it:
   `atomless`, `non_aba_omcat`
 - **type system** — `matches_type` (by tree), `type_tree`, `owns_type` (by
   id)
-- **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
-  `is_closed`, `literal_one`, `literal_zero`
+- **constants** — `is_one`, `is_zero`, `is_closed` (each returns a
+  `result<bool>`, described below), plus `is_syntactic_one`,
+  `is_syntactic_zero`, `literal_one`, `literal_zero` (plain `bool` or
+  `string`, because these never run a decision procedure)
 - **normalization** — `normalize` (`splitter` and `splitter_one` join it when
   `atomless`; see the optional table)
-- **rewriting** — `simplify_symbol`, `simplify_term`
+- **rewriting** — `simplify_symbol` (plain `tref`), `simplify_term` (returns
+  a `result<tref>`, described below)
 - **parsing** — `parse`
+
+`is_one`, `is_zero`, `is_closed`, and `simplify_term` can each run a full
+decision or rewrite procedure. Each one can fail. Give each the same
+result-carrying shape that `preprocess` uses (see
+[Preprocessing](#preprocessing)). On success, the result holds a value. On
+failure, the result holds no value, only a report that names the reason. A
+BA whose own check cannot fail, such as a plain field comparison, still
+returns a result. Wrap the value with `result<bool>{...}` or
+`result<tref>{...}` and add no report.
+
+Every other mandatory member keeps a fixed, non-`result` signature, such
+as `type_name` or `normalize`. A BA that meets a failure there cannot
+return a report, because the signature has no channel for one. Name the
+blocking contract on one line instead:
+
+```cpp
+// Advisory drop: <the contract that blocks the report>.
+```
 
 Assert a whole pack at its first instantiation site:
 
@@ -115,10 +143,10 @@ need solver or LTL types, which sit beside their single consumer:
 |---|---|---|
 | `solve(fm)` | your own decision procedure for a whole formula | the single declarer (two are refused at compile time) |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
-| `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch | every declarer, chained in pack order |
+| `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch. A failure reports the reason (see [Preprocessing](#preprocessing)) | every declarer, chained in pack order, stopping at the first failure |
 | `case_split_quantifiers(fm)` | eliminate your quantified variables tested only against constants by a finite case split, before any quantifier block forms | every declarer, chained in pack order |
 | `eliminate_definitional_existentials(fm)` | substitute your existentially quantified variables that a total definition in their scope determines and drop the binder, before the case split | every declarer, chained in pack order |
-| `widen_arithmetic(fm)` | elaborate your arithmetic atoms to an overflow-free width before solving | every declarer, chained in pack order |
+| `widen_arithmetic(fm)` | elaborate your arithmetic atoms to an overflow-free width before solving. Returns a `result<tref>`. A failure reports the reason, the same shape as `preprocess` | every declarer, chained in pack order, stopping at the first failure |
 | `widening_state()` | whether your widening is currently on, for a caller that must key a cache on it (your own construction-time hooks read it too, not just `widen_arithmetic`) | any declarer active |
 | `formula_is_preprocessable(fm)`, `has_preprocessing_residue(fm)` | whether your pass can still make progress / left a shape closing would make expensive | any declarer |
 | `term_is_blasteable(term)` | whether a term with an arithmetic operator can be blasted | owner of the term's type |
@@ -193,6 +221,10 @@ owns the operator but you declined, it preserves the comparison as an atom
 rather than falling through to the generic Boolean definition. So return
 `nullptr` freely for operands you cannot fold — the atom survives for the solver.
 
+A hook keeps a fixed signature too, so it cannot carry a report. A hook
+that meets a failure there declines with `nullptr` and names the blocking
+contract the same way.
+
 ### The manifest
 
 `src/boolean_algebras/<id>/ba.cmake`, three lines and up. It is where the plugin
@@ -249,10 +281,52 @@ before smoke-running the CLI.
 
 ## Constants and grammar
 
-`parse` receives the constant's source text and its type tree and returns a
-`constant_with_type`. A BA with non-trivial literal syntax gets its own `.tgf`
-grammar under `parser/`, compiled ahead of time and regenerated with
-`./dev regen` — see `sbf.tgf` or `qint.tgf`.
+`parse` receives the source text of the constant and its type tree. It
+returns a `result<constant_with_type>`.
+
+On success, the result holds the parsed constant. On refusal, the result
+holds no value, only a report that names the reason.
+
+Add the reason with `r.error(code::parse_error, "the reason")`, then return
+`r`. Do not log the same reason too. The BA reports the reason. Core prints
+the report.
+
+```cpp
+static result<typename node_t::constant_with_type>
+parse(const std::string& src, tref)
+{
+    result<typename node_t::constant_with_type> r;
+    if (src != "0" && src != "1") {
+        r.error(code::parse_error, "Not a valid my_ba literal: " + src);
+        return r;
+    }
+    return r.with_value(typename node_t::constant_with_type{
+        typename node_t::constant{ my_ba{ src == "1" } },
+        my_ba_type<node_t>() });
+}
+```
+
+A BA with non-trivial literal syntax gets its own `.tgf` grammar under
+`parser/`. Build tools compile the grammar ahead of time. `./dev regen`
+regenerates it. See `sbf.tgf` or `qint.tgf` for an example.
+
+## Preprocessing
+
+`preprocess` is an optional capability. Declare it only when your BA
+rewrites a formula before solving, as bv does for predicate blasting.
+Omit it otherwise.
+
+`preprocess` receives the whole formula. It returns a `result<tref>`.
+
+On success, the result holds the formula, rewritten or unchanged. On
+failure, the result holds no value, only a report that names the reason.
+
+Add the reason with `r.error(code::internal_error, "the reason")`. Return
+`r`. Do not log the same reason too. The BA reports the reason. Core
+prints the report.
+
+`pack_preprocess` chains every declaring BA's `preprocess`, in pack order.
+It stops at the first failure and carries that report forward.
 
 ## Dispatch
 

@@ -19,8 +19,8 @@ TEST_SUITE("nso_ba bf operators") {
 
 	TEST_CASE("and/or/xor/neg dispatch to the bf builders") {
 		auto pbf = parse_bf();
-		tref x = tau::get("X", pbf);
-		tref y = tau::get("Y", pbf);
+		tref x = tau::get("X", pbf).value_or(nullptr);
+		tref y = tau::get("Y", pbf).value_or(nullptr);
 		REQUIRE(x != nullptr);
 		REQUIRE(y != nullptr);
 
@@ -34,9 +34,9 @@ TEST_SUITE("nso_ba bf operators") {
 
 	TEST_CASE("zero/one absorption and identity") {
 		auto pbf = parse_bf();
-		tref x    = tau::get("X", pbf);
-		tref zero = tau::get("0", pbf);
-		tref one  = tau::get("1", pbf);
+		tref x    = tau::get("X", pbf).value_or(nullptr);
+		tref zero = tau::get("0", pbf).value_or(nullptr);
+		tref one  = tau::get("1", pbf).value_or(nullptr);
 		REQUIRE(x != nullptr);
 		REQUIRE(zero != nullptr);
 		REQUIRE(one != nullptr);
@@ -52,9 +52,9 @@ TEST_SUITE("nso_ba bf operators") {
 
 	TEST_CASE("is_zero/is_one predicates") {
 		auto pbf = parse_bf();
-		tref x    = tau::get("X", pbf);
-		tref zero = tau::get("0", pbf);
-		tref one  = tau::get("1", pbf);
+		tref x    = tau::get("X", pbf).value_or(nullptr);
+		tref zero = tau::get("0", pbf).value_or(nullptr);
+		tref one  = tau::get("1", pbf).value_or(nullptr);
 
 		CHECK( is_zero(tau::get(zero)) );
 		CHECK_FALSE( is_one(tau::get(zero)) );
@@ -67,11 +67,11 @@ TEST_SUITE("nso_ba bf operators") {
 
 	TEST_CASE("equality/inequality and bf == bool / bool == bf") {
 		auto pbf = parse_bf();
-		tref x     = tau::get("X", pbf);
-		tref x_dup = tau::get("X", pbf);
-		tref y     = tau::get("Y", pbf);
-		tref zero  = tau::get("0", pbf);
-		tref one   = tau::get("1", pbf);
+		tref x     = tau::get("X", pbf).value_or(nullptr);
+		tref x_dup = tau::get("X", pbf).value_or(nullptr);
+		tref y     = tau::get("Y", pbf).value_or(nullptr);
+		tref zero  = tau::get("0", pbf).value_or(nullptr);
+		tref one   = tau::get("1", pbf).value_or(nullptr);
 
 		CHECK( tau::get(x) == tau::get(x_dup) );
 		CHECK( tau::get(x) != tau::get(y) );
@@ -84,8 +84,8 @@ TEST_SUITE("nso_ba bf operators") {
 
 	TEST_CASE("ordering operators are consistent with operator<=>") {
 		auto pbf = parse_bf();
-		tau lt = tau::get(tau::get("X", pbf));
-		tau rt = tau::get(tau::get("Y", pbf));
+		tau lt = tau::get(tau::get("X", pbf).value_or(nullptr));
+		tau rt = tau::get(tau::get("Y", pbf).value_or(nullptr));
 
 		CHECK( (lt <=> lt) == std::weak_ordering::equivalent );
 		auto cmp = lt <=> rt;
@@ -117,13 +117,41 @@ TEST_SUITE("nso_ba wff operators") {
 		CHECK( tau::get(f) == false );
 	}
 
-	TEST_CASE("mixing bf and wff operands throws (nso_ba wrong types)") {
+	// Compiled only outside a debug build, where the assert is compiled
+	// out and the fallback return is the real, observable behavior.
+#ifndef DEBUG
+	TEST_CASE("mixing bf and wff operands falls back to the left operand "
+	          "(nso_ba wrong types)") {
 		auto pbf = parse_bf();
-		tref x = tau::get("X", pbf);
+		tref x = tau::get("X", pbf).value_or(nullptr);
 		tref t = tau::_T();
 
-		CHECK_THROWS_AS( tau::get(x) & tau::get(t), std::logic_error );
-		CHECK_THROWS_AS( tau::get(x) | tau::get(t), std::logic_error );
-		CHECK_THROWS_AS( tau::get(x) ^ tau::get(t), std::logic_error );
+		CHECK( (tau::get(x) & tau::get(t)) == tau::get(x) );
+		CHECK( (tau::get(x) | tau::get(t)) == tau::get(x) );
+		CHECK( (tau::get(x) ^ tau::get(t)) == tau::get(x) );
 	}
+#endif
+
+#ifdef DEBUG
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+	constexpr bool has_fork_death_check = false;
+#else
+	constexpr bool has_fork_death_check = true;
+#endif
+
+	// A debug build's assert turns a mismatched call into a real abort;
+	// only a fork can observe that without killing the whole test process.
+	TEST_CASE("mixing bf and wff operands aborts (nso_ba wrong types)"
+	          * doctest::skip(!has_fork_death_check)) {
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+		auto pbf = parse_bf();
+		tref x = tau::get("X", pbf).value_or(nullptr);
+		tref t = tau::_T();
+
+		CHECK( dies_by_sigabrt([&]{ tau::get(x) & tau::get(t); }) );
+		CHECK( dies_by_sigabrt([&]{ tau::get(x) | tau::get(t); }) );
+		CHECK( dies_by_sigabrt([&]{ tau::get(x) ^ tau::get(t); }) );
+#endif
+	}
+#endif
 }

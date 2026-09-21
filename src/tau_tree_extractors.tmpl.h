@@ -1043,9 +1043,10 @@ bool has_temp_var(tref fm) {
 }
 
 template <NodeType node>
-bool has_open_tau_fm_in_constant(tref fm) {
+result<bool> has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<bool> r;
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
@@ -1053,13 +1054,17 @@ bool has_open_tau_fm_in_constant(tref fm) {
 		// the whole scan here (TT2-6) let an open tau constant hide
 		// behind an earlier unparsed one.
 		if (tau::get(ba_const).get_ba_constant_id() == 0) continue;
-		if (!node::ba::is_closed(tt(ba_const) | tt::ba_constant)) {
-			LOG_ERROR << "A Tau formula constant must be closed: "
-							<< TAU_TO_STR(ba_const);
-			return true;
+		TAU_TRY(auto is_closed_val,
+			node::ba::is_closed(tt(ba_const) | tt::ba_constant));
+		if (!is_closed_val) {
+			// The scan still returns true here, so the message travels
+			// as a warning -- an error would discard that value.
+			r.warning("a Tau formula constant must be closed",
+				{{label::value, TAU_TO_STR(ba_const)}});
+			return r.with_assert_check_value(true);
 		}
 	}
-	return false;
+	return r.with_assert_check_value(false);
 }
 
 template<NodeType node>
@@ -1178,13 +1183,15 @@ bool has_missplaced_fallback(tref fm) {
 }
 
 template<NodeType node>
-bool has_semantic_error(tref fm) {
-	if (invalid_nesting_of_quants<node>(fm)) return true;
-	if (has_open_tau_fm_in_constant<node>(fm)) return true;
-	if (invalid_nesting_of_temp_quants<node>(fm)) return true;
-	if (missing_temp_quants<node>(fm)) return true;
-	if (has_negative_offset<node>(fm)) return true;
-	return has_missplaced_fallback<node>(fm);
+result<bool> has_semantic_error(tref fm) {
+	result<bool> r;
+	if (invalid_nesting_of_quants<node>(fm)) return r.with_assert_check_value(true);
+	TAU_TRY(auto open_in_const, has_open_tau_fm_in_constant<node>(fm));
+	if (open_in_const) return r.with_assert_check_value(true);
+	if (invalid_nesting_of_temp_quants<node>(fm)) return r.with_assert_check_value(true);
+	if (missing_temp_quants<node>(fm)) return r.with_assert_check_value(true);
+	if (has_negative_offset<node>(fm)) return r.with_assert_check_value(true);
+	return r.with_assert_check_value(has_missplaced_fallback<node>(fm));
 }
 
 // Rewrite G(A && G(B)) → G(A) && G(B).

@@ -47,16 +47,19 @@ inline std::string sbf_literal_expr(const std::string& name, bool negated) {
 // the numeric BDD ids this process happened to assign), so the same logical
 // constant always emits the same text regardless of parse/interning order.
 template <NodeType node>
-inline std::string sbf_value_expr(const sbf_ba& v) {
+inline result<std::string> sbf_value_expr(const sbf_ba& v) {
+	result<std::string> r;
 	if (v->is_zero())
-		return "::idni::tau_lang::bdd_handle<::idni::tau_lang::Bool>::hfalse";
+		return r.with_value("::idni::tau_lang::bdd_handle<::idni::tau_lang::Bool>::hfalse");
 	if (v->is_one())
-		return "::idni::tau_lang::bdd_handle<::idni::tau_lang::Bool>::htrue";
+		return r.with_value("::idni::tau_lang::bdd_handle<::idni::tau_lang::Bool>::htrue");
 	std::vector<std::pair<std::string, std::string>> clauses; // sort key, expr
 	for (const auto& clause : v->dnf()) {
 		std::vector<std::pair<std::string, bool>> lits; // name, negated
-		for (int_t lit : clause.second)
-			lits.emplace_back(var_dict(lit < 0 ? -lit : lit), lit < 0);
+		for (int_t lit : clause.second) {
+			TAU_TRY(std::string name, var_dict(lit < 0 ? -lit : lit));
+			lits.emplace_back(name, lit < 0);
+		}
 		std::sort(lits.begin(), lits.end());
 		std::ostringstream expr, key;
 		expr << "(";
@@ -78,19 +81,21 @@ inline std::string sbf_value_expr(const sbf_ba& v) {
 		ss << expr;
 	}
 	ss << ")";
-	return ss.str();
+	return r.with_value(ss.str());
 }
 
 // A self-contained C++ expression of type tref: an IIFE that rebuilds the
 // exact sbf BDD via sbf_value_expr and registers it through the BA's own
 // constant pool, mirroring qlt_witness_expr / bv_witness_expr.
 template <NodeType node>
-inline std::string sbf_constant_expr(const sbf_ba& v) {
+inline result<std::string> sbf_constant_expr(const sbf_ba& v) {
+	result<std::string> r;
+	TAU_TRY(std::string value_expr, sbf_value_expr<node>(v));
 	std::ostringstream ss;
 	ss << "[]() -> ::idni::tref {\n"
 	   << "\t\t\t\tusing node_t = ::idni::tau_lang::tau_pack::node_t;\n"
 	   << "\t\t\t\t::idni::tau_lang::sbf_ba v = "
-	   << sbf_value_expr<node>(v) << ";\n"
+	   << value_expr << ";\n"
 	   << "\t\t\t\t::idni::tau_lang::tree<node_t>::constant c = v;\n"
 	   << "\t\t\t\t::idni::tref witness_raw = "
 	   << "::idni::tau_lang::ba_constants<node_t>::get(c, "
@@ -99,7 +104,7 @@ inline std::string sbf_constant_expr(const sbf_ba& v) {
 	   << "\t\t\t\treturn ::idni::tau_lang::tree<node_t>::get("
 	   << "::idni::tau_lang::tree<node_t>::bf, witness_raw);\n"
 	   << "\t\t\t}()";
-	return ss.str();
+	return r.with_value(ss.str());
 }
 
 // The codegen_constant_expr capability: @p cst is already a trimmed, known
@@ -108,8 +113,13 @@ template <NodeType node>
 static std::optional<std::string> sbf_codegen_constant_expr(tref cst) {
 	using tau = tree<node>;
 	if (!tau::get(cst).is_ba_constant()) return std::nullopt;
-	return sbf_constant_expr<node>(
+	auto expr = sbf_constant_expr<node>(
 		std::get<sbf_ba>(tau::get(cst).get_ba_constant()));
+	// Advisory drop: codegen_constant_expr is fixed to
+	// std::optional<std::string> by ba_has_codegen_constant_expr, so a
+	// var_dict lookup failure has no report channel back to the pack descriptor.
+	if (!expr.has_value()) return std::nullopt;
+	return expr.value();
 }
 
 } // namespace idni::tau_lang

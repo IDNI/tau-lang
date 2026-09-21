@@ -17,7 +17,7 @@ TEST_SUITE("BDD creation terms") {
 			.parse = { .start = tau::bf },
 		};
 		const char* sample = "1";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		bdd::order o;
 		bdd::ref x = bdd::build_bdd(spec, o);
 		CHECK((x == bdd::T));
@@ -28,7 +28,7 @@ TEST_SUITE("BDD creation terms") {
 			.parse = { .start = tau::bf },
 		};
 		const char* sample = "0";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		bdd::order o;
 		bdd::ref x = bdd::build_bdd(spec, o);
 		CHECK((x == bdd::F));
@@ -39,7 +39,7 @@ TEST_SUITE("BDD creation terms") {
 			.parse = { .start = tau::bf },
 		};
 		const char* sample = "1'";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		bdd::order o;
 		bdd::ref x = bdd::build_bdd(spec, o);
 		CHECK((x == bdd::F));
@@ -50,7 +50,7 @@ TEST_SUITE("BDD creation terms") {
 			.parse = { .start = tau::bf },
 		};
 		const char* sample = "0'";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		bdd::order o;
 		bdd::ref x = bdd::build_bdd(spec, o);
 		CHECK((x == bdd::T));
@@ -62,13 +62,13 @@ TEST_SUITE("BDD creation terms") {
 		};
 
 		const char* sample = "xyz";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::trim(tau::get(x, opts).value_or(nullptr));
 		const char* y = "y";
-		tref ty = tau::trim(tau::get(y, opts));
+		tref ty = tau::trim(tau::get(y, opts).value_or(nullptr));
 		const char* z = "z";
-		tref tz = tau::trim(tau::get(z, opts));
+		tref tz = tau::trim(tau::get(z, opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -83,13 +83,13 @@ TEST_SUITE("BDD creation terms") {
 		bdd::clear_caches();
 #endif
 		const char* sample = "xyz";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::trim(tau::get(x, opts).value_or(nullptr));
 		const char* y = "y";
-		tref ty = tau::trim(tau::get(y, opts));
+		tref ty = tau::trim(tau::get(y, opts).value_or(nullptr));
 		const char* z = "z";
-		tref tz = tau::trim(tau::get(z, opts));
+		tref tz = tau::trim(tau::get(z, opts).value_or(nullptr));
 		bdd::order o {{tx, 2}, {ty, 1}, {tz, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -104,13 +104,13 @@ TEST_SUITE("BDD creation terms") {
 		bdd::clear_caches();
 #endif
 		const char* sample = "(xyz)'";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::trim(tau::get(x, opts).value_or(nullptr));
 		const char* y = "y";
-		tref ty = tau::trim(tau::get(y, opts));
+		tref ty = tau::trim(tau::get(y, opts).value_or(nullptr));
 		const char* z = "z";
-		tref tz = tau::trim(tau::get(z, opts));
+		tref tz = tau::trim(tau::get(z, opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -125,9 +125,9 @@ TEST_SUITE("BDD creation terms") {
 		bdd::clear_caches();
 #endif
 		const char* sample = "(xyz)'";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::trim(tau::get(x, opts).value_or(nullptr));
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -148,7 +148,7 @@ TEST_SUITE("BDD creation terms") {
 		bdd::clear_caches();
 #endif
 		const char* sample = "xyzqwert";
-		tref spec = tau::get(sample, opts);
+		tref spec = tau::get(sample, opts).value_or(nullptr);
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -178,22 +178,22 @@ TEST_SUITE("BDD and many") {
 #endif
 		// Vars
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::trim(tau::get(vs, opts).value_or(nullptr));
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::trim(tau::get(ws, opts).value_or(nullptr));
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::trim(tau::get(xs, opts).value_or(nullptr));
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::trim(tau::get(ys, opts).value_or(nullptr));
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::trim(tau::get(zs, opts).value_or(nullptr));
 		// BDDs
 		const char* bdd1s = "xab";
-		tref bdd1 = tau::get(bdd1s, opts);
+		tref bdd1 = tau::get(bdd1s, opts).value_or(nullptr);
 		const char* bdd2s = "ycd";
-		tref bdd2 = tau::get(bdd2s, opts);
+		tref bdd2 = tau::get(bdd2s, opts).value_or(nullptr);
 		const char* bdd3s = "ef";
-		tref bdd3 = tau::get(bdd3s, opts);
+		tref bdd3 = tau::get(bdd3s, opts).value_or(nullptr);
 		// Ordering
 		bdd::order o = {{tv, -2}, {tw, -1}, {tx, 0}, {ty, 1}, {tz, 2}};
 		// Construction
@@ -221,18 +221,18 @@ TEST_SUITE("BDD and many") {
 #endif
 		// Vars
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::trim(tau::get(vs, opts).value_or(nullptr));
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::trim(tau::get(ws, opts).value_or(nullptr));
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::trim(tau::get(xs, opts).value_or(nullptr));
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::trim(tau::get(ys, opts).value_or(nullptr));
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::trim(tau::get(zs, opts).value_or(nullptr));
 		// BDD
 		const char* bdd1s = "((vw'xy'z)'|(vw'xy'z))ab & (e|f) & ((v'|w|x'|y|z')|(vw'xy'z))bc & ((vw'xy'z)|(vw'xy'z)')cd";
-		tref bdd1 = tau::get(bdd1s, opts);
+		tref bdd1 = tau::get(bdd1s, opts).value_or(nullptr);
 		// Ordering
 		bdd::order o = {{tv, -2}, {tw, -1}, {tx, 0}, {ty, 1}, {tz, 2}};
 		// Construction
@@ -275,24 +275,24 @@ TEST_SUITE("BDD quantification") {
 #endif
 		// Vars
 		const char* ss = "s";
-		tref ts = tau::trim(tau::get(ss, opts));
+		tref ts = tau::trim(tau::get(ss, opts).value_or(nullptr));
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::trim(tau::get(vs, opts).value_or(nullptr));
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::trim(tau::get(ws, opts).value_or(nullptr));
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::trim(tau::get(xs, opts).value_or(nullptr));
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::trim(tau::get(ys, opts).value_or(nullptr));
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::trim(tau::get(zs, opts).value_or(nullptr));
 		// BDDs
 		const char* bdd1s = "(z|y') & (y|z')";
-		tref bdd1 = tau::get(bdd1s, opts);
+		tref bdd1 = tau::get(bdd1s, opts).value_or(nullptr);
 		const char* bdd2s = "(w|x') & (x|w')";
-		tref bdd2 = tau::get(bdd2s, opts);
+		tref bdd2 = tau::get(bdd2s, opts).value_or(nullptr);
 		const char* bdd3s = "(s|v') & (v|s')";
-		tref bdd3 = tau::get(bdd3s, opts);
+		tref bdd3 = tau::get(bdd3s, opts).value_or(nullptr);
 		// Ordering
 		bdd::order o = {{ts, -3}, {tv, -2}, {tw, -1}, {tx, 0}, {ty, 1}, {tz, 2}};
 		// Construction
@@ -338,11 +338,11 @@ TEST_SUITE("BDD get_free_tau_vars") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts), o);
+		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts).value_or(nullptr), o);
 		const trefs& fvs = hbdd::get_free_tau_vars(xx.b);
 		CHECK(std::is_sorted(fvs.begin(), fvs.end(), tau::subtree_less));
 		CHECK(fvs.size() == 3);
@@ -353,10 +353,10 @@ TEST_SUITE("BDD get_free_tau_vars") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts), o);
+		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts).value_or(nullptr), o);
 		const trefs& fvs = hbdd::get_free_tau_vars(xx.b);
 		CHECK(std::is_sorted(fvs.begin(), fvs.end(), tau::subtree_less));
 		CHECK(fvs.size() == 3);
@@ -367,10 +367,10 @@ TEST_SUITE("BDD get_free_tau_vars") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		tref bdd_node = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
+		tref bdd_node = hbdd::convert_to_tau_node(tau::get("xy", opts).value_or(nullptr), o);
 		// Traverse via the BDD_ID collector branch inside get_free_vars
 		const trefs& via_extractor = get_free_vars<node_t>(bdd_node);
 		// Traverse the BDD directly
@@ -389,11 +389,11 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_ite(bdd::T, g, h, o) == g);
 	}
 
@@ -402,11 +402,11 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_ite(bdd::F, g, h, o) == h);
 	}
 
@@ -415,10 +415,10 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_ite(f, bdd::T, bdd::F, o) == f);
 	}
 
@@ -427,10 +427,10 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_ite(f, bdd::F, bdd::T, o) == bdd::bdd_not(f));
 	}
 
@@ -439,11 +439,11 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref f = bdd::build_bdd(tau::get("x|y", opts), o);
-		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("x|y", opts).value_or(nullptr), o);
+		bdd::ref g = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_ite(f, g, g, o) == g);
 	}
 
@@ -452,13 +452,13 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
-		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts).value_or(nullptr), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_ite(bdd::bdd_not(f), g, h, o) ==
 		      bdd::bdd_ite(f, h, g, o));
 	}
@@ -468,13 +468,13 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
-		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts).value_or(nullptr), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts).value_or(nullptr), o);
 		bdd::ref ite_result = bdd::bdd_ite(f, g, h, o);
 		bdd::ref composed = bdd::bdd_or(
 			bdd::bdd_and(f, g, o),
@@ -487,13 +487,13 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
-		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts).value_or(nullptr), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts).value_or(nullptr), o);
 		bdd::ref r1 = bdd::bdd_ite(f, g, h, o);
 		bdd::ref r2 = bdd::bdd_ite(f, g, h, o);
 		CHECK(r1.b == r2.b);
@@ -509,8 +509,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		CHECK(bdd::bdd_compose(xi, tx, xi, o) == xi);
@@ -521,8 +521,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		CHECK(bdd::bdd_compose(xi, tx, bdd::T, o) == bdd::T);
@@ -533,8 +533,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		CHECK(bdd::bdd_compose(xi, tx, bdd::F, o) == bdd::F);
@@ -545,8 +545,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		bdd::ref xj = bdd::from_bit(ty);
@@ -558,11 +558,11 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 		bdd::subs_t subs {{tx, bdd::T}, {ty, bdd::F}};
 		CHECK(bdd::bdd_compose(f, std::move(subs), o) == bdd::F);
 	}
@@ -572,15 +572,15 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		// f = x AND y, g = y AND z, replace x with g
 		// result should equal ITE(g, f_hi, f_lo) = ITE(g, y, F) = g AND y = y AND z AND y = yz
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
-		bdd::ref expected = bdd::build_bdd(tau::get("yz", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts).value_or(nullptr), o);
+		bdd::ref expected = bdd::build_bdd(tau::get("yz", opts).value_or(nullptr), o);
 		CHECK(bdd::bdd_compose(f, tx, g, o) == expected);
 	}
 
@@ -589,9 +589,9 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref ta = tau::trim(tau::get("a", opts));
-		tref tx = tau::trim(tau::get("x", opts));
-		tref tb = tau::trim(tau::get("b", opts));
+		tref ta = tau::trim(tau::get("a", opts).value_or(nullptr));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref tb = tau::trim(tau::get("b", opts).value_or(nullptr));
 		// order: a(0) above x(1) above b(2)
 		bdd::order o {{ta, 0}, {tx, 1}, {tb, 2}};
 		bdd::ref xi = bdd::from_bit(tx);
@@ -606,14 +606,14 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref ta = tau::trim(tau::get("a", opts));
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref ta = tau::trim(tau::get("a", opts).value_or(nullptr));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		// order: a(0) above x(1) above y(2)
 		// f = x AND y, substitute x := a (a is above x), y := a
 		// result = a AND a = a
 		bdd::order o {{ta, 0}, {tx, 1}, {ty, 2}};
-		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 		bdd::ref xa = bdd::from_bit(ta);
 		bdd::subs_t subs {{tx, xa}, {ty, xa}};
 		CHECK(bdd::bdd_compose(f, std::move(subs), o) == xa);
@@ -628,10 +628,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
 		bdd::order o = {{tx, 0}};
 		// "xa": x is the BDD variable, a is a free-variable leaf not in order
-		hbdd h = hbdd::build(tau::get("xa", opts), o);
+		hbdd h = hbdd::build(tau::get("xa", opts).value_or(nullptr), o);
 		// ∃x at formula level → ∀x at BDD level (Schröder: ∃x(f=0) ↔ (∀x f)=0)
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
@@ -646,10 +646,10 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
 		bdd::order o = {{tx, 0}};
 		// ITE(x, a, b): high cofactor (x=1) = a, low cofactor (x=0) = b
-		hbdd h = hbdd::build(tau::get("xa|x'b", opts), o);
+		hbdd h = hbdd::build(tau::get("xa|x'b", opts).value_or(nullptr), o);
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
@@ -670,7 +670,7 @@ TEST_SUITE("BDD IO variable") {
 		// Build i[0] via the tree builder (returns bf-wrapped IO variable)
 		tref bi_var = build_in_var_at_n<node_t>("i", 0, tau_type_id<node_t>());
 		tref ti = tau::trim(bi_var);    // strip bf wrapper → typed variable node for the BDD key
-		tref ba_var = tau::get("a", opts);  // bf(a) — free leaf not in order
+		tref ba_var = tau::get("a", opts).value_or(nullptr);  // bf(a) — free leaf not in order
 		// Term: i[0] AND a (both already bf-level)
 		tref term = tau::build_bf_and(bi_var, ba_var);
 		// IO variable i[0] is the only BDD variable; a becomes a leaf atom
@@ -693,15 +693,15 @@ TEST_SUITE("BDD term_handle substitute") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		// Order: x(0) < y(1) < z(2); z is above both x and y
 		bdd::order o = {{tx, 0}, {ty, 1}, {tz, 2}};
 		// Build BDD for "xy" and register as a BDD_ID tau node in U
-		tref node_xy = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
+		tref node_xy = hbdd::convert_to_tau_node(tau::get("xy", opts).value_or(nullptr), o);
 		// Build handle for the substitution value: single-variable BDD of "z"
-		hbdd with_z = hbdd::build(tau::get("z", opts), o);
+		hbdd with_z = hbdd::build(tau::get("z", opts).value_or(nullptr), o);
 		// Substitute x → z across the formula containing the BDD node
 		tref result_node = hbdd::substitute(node_xy, tx, with_z, o);
 		// Retrieve the tau term for the resulting BDD (z has rank 2 > y rank 1, so y is above z)
@@ -715,16 +715,16 @@ TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
 	tau::get_options opts = { .parse = { .start = tau::bf } };
 
 	TEST_CASE("less_then compares by order rank") {
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
 		CHECK(bdd::less_then(tx, ty, o));
 		CHECK(!bdd::less_then(ty, tx, o));
 	}
 
 	TEST_CASE("less_then returns false when a variable is absent from the order") {
-		tref tx = tau::trim(tau::get("x", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}};
 		CHECK(!bdd::less_then(tx, tz, o));
 		CHECK(!bdd::less_then(tz, tx, o));
@@ -734,11 +734,11 @@ TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref a = bdd::build_bdd(tau::get("x", opts), o);
-		bdd::ref b = bdd::build_bdd(tau::get("y", opts), o);
+		bdd::ref a = bdd::build_bdd(tau::get("x", opts).value_or(nullptr), o);
+		bdd::ref b = bdd::build_bdd(tau::get("y", opts).value_or(nullptr), o);
 
 		bdd::ref x1 = a, y1 = b;
 		bdd::make_canonical(x1, y1);
@@ -762,24 +762,24 @@ TEST_SUITE("BDD handle creation") {
 #endif
 		// Vars
 		const char* ss = "s";
-		tref ts = tau::trim(tau::get(ss, opts));
+		tref ts = tau::trim(tau::get(ss, opts).value_or(nullptr));
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::trim(tau::get(vs, opts).value_or(nullptr));
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::trim(tau::get(ws, opts).value_or(nullptr));
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::trim(tau::get(xs, opts).value_or(nullptr));
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::trim(tau::get(ys, opts).value_or(nullptr));
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::trim(tau::get(zs, opts).value_or(nullptr));
 		// BDDs
 		const char* bdd1s = "(z|y') & (y|z')";
-		tref bdd1 = tau::get(bdd1s, opts);
+		tref bdd1 = tau::get(bdd1s, opts).value_or(nullptr);
 		const char* bdd2s = "(w|x') & (x|w')";
-		tref bdd2 = tau::get(bdd2s, opts);
+		tref bdd2 = tau::get(bdd2s, opts).value_or(nullptr);
 		const char* bdd3s = "(s|v') & (v|s')";
-		tref bdd3 = tau::get(bdd3s, opts);
+		tref bdd3 = tau::get(bdd3s, opts).value_or(nullptr);
 		// Ordering
 		bdd::order o = {{ts, -3}, {tv, -2}, {tw, -1}, {tx, 0}, {ty, 1}, {tz, 2}};
 		// Construction of handles
@@ -826,11 +826,11 @@ TEST_SUITE("BDD ex/all quantification") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
-		bdd::ref y  = bdd::build_bdd(tau::get("y", opts), o);
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
+		bdd::ref y  = bdd::build_bdd(tau::get("y", opts).value_or(nullptr), o);
 		trefs v {tx};
 		// ex x (x & y) == y
 		CHECK((bdd::bdd_ex(xy, v, o) == y));
@@ -844,10 +844,10 @@ TEST_SUITE("BDD ex/all quantification") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 		trefs v {tx};
 		// all x (x & y) == 0
 		CHECK((bdd::bdd_all(xy, v, o) == bdd::F));
@@ -860,10 +860,10 @@ TEST_SUITE("BDD ex/all quantification") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		hbdd::order o {{tx, 0}, {ty, 1}};
-		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		hbdd xy = hbdd::build(tau::get("xy", opts).value_or(nullptr), o);
 		tref n = hbdd::convert_to_tau_node(xy, 0);
 		REQUIRE( n != nullptr );
 		auto found = hbdd::convert_to_handle(n);
@@ -876,16 +876,16 @@ TEST_SUITE("BDD ex/all quantification") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		hbdd::order o {{tx, 0}, {ty, 1}};
-		hbdd x  = hbdd::build(tau::get("x", opts), o);
-		hbdd y  = hbdd::build(tau::get("y", opts), o);
-		hbdd xy = hbdd::build(tau::get("xy", opts), o);
-		hbdd x_or_y = hbdd::build(tau::get("x|y", opts), o);
+		hbdd x  = hbdd::build(tau::get("x", opts).value_or(nullptr), o);
+		hbdd y  = hbdd::build(tau::get("y", opts).value_or(nullptr), o);
+		hbdd xy = hbdd::build(tau::get("xy", opts).value_or(nullptr), o);
+		hbdd x_or_y = hbdd::build(tau::get("x|y", opts).value_or(nullptr), o);
 		// ite(x, y, y) == y; ite(x, y, 0) == x & y
 		CHECK((x.bdd_ite(y, y, o) == y));
-		CHECK((x.bdd_ite(y, hbdd::build(tau::get("0", opts), o), o)
+		CHECK((x.bdd_ite(y, hbdd::build(tau::get("0", opts).value_or(nullptr), o), o)
 			== xy));
 		CHECK((hbdd::bdd_and_many({x, y}, o) == xy));
 		CHECK((hbdd::bdd_or_many({x, y}, o) == x_or_y));
@@ -902,13 +902,13 @@ TEST_SUITE("BDD ex/all quantification") {
 #ifdef TAU_CACHE
 		tau_term_bdd<node_t>::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		hbdd::order o {{tx, 0}, {ty, 1}};
 		const trefs v {tx};
-		hbdd xy = hbdd::build(tau::get("xy", opts), o);
-		hbdd y  = hbdd::build(tau::get("y", opts), o);
-		hbdd f  = hbdd::build(tau::get("0", opts), o);
+		hbdd xy = hbdd::build(tau::get("xy", opts).value_or(nullptr), o);
+		hbdd y  = hbdd::build(tau::get("y", opts).value_or(nullptr), o);
+		hbdd f  = hbdd::build(tau::get("0", opts).value_or(nullptr), o);
 		CHECK((xy.bdd_ex(v, o) == y));
 		CHECK((xy.bdd_all(v, o) == f));
 	}
@@ -942,11 +942,11 @@ TEST_SUITE("BDD order cache clearing") {
 			.parse = { .start = tau::bf },
 		};
 		bdd::clear_caches();
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o);
-		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o);
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts).value_or(nullptr), o);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts).value_or(nullptr), o);
 		bdd::bdd_and(bx, by, o);
 		REQUIRE(bdd::has_last_order);
 		REQUIRE(!bdd::last_order.empty());
@@ -963,16 +963,16 @@ TEST_SUITE("BDD order cache invalidation") {
 			.parse = { .start = tau::bf },
 		};
 		bdd::clear_caches();
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		// Single-variable BDDs: from_bit() interns purely on the
 		// variable's tref, so bx/by are the same refs regardless of
 		// which order build_bdd is given -- only the AND below is
 		// order-sensitive, and it is applied to the very same {bx, by}
 		// pair both times.
 		bdd::order o1 {{tx, 0}, {ty, 1}};
-		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o1);
-		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o1);
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts).value_or(nullptr), o1);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts).value_or(nullptr), o1);
 
 		// x ranks above y: AND puts x at the root, populating and_memo
 		// keyed on {bx, by} under o1.
@@ -1003,8 +1003,8 @@ TEST_SUITE("BDD collect_live_refs pins last_order") {
 			.parse = { .start = tau::bf },
 		};
 		bdd::clear_caches();
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		// "qqorder" is a variable name no other TEST_CASE in this file
 		// uses, so it cannot already be a decision variable somewhere in
 		// the (process-lifetime, never-swept-in-tests) BDD universe from
@@ -1013,10 +1013,10 @@ TEST_SUITE("BDD collect_live_refs pins last_order") {
 		// built into a BDD, so it can only reach `keep` via last_order,
 		// not via the decision-variable walk -- isolating exactly the
 		// behaviour under test.
-		tref tq = tau::trim(tau::get("qqorder", opts));
+		tref tq = tau::trim(tau::get("qqorder", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tq, 2}};
-		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o);
-		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o);
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts).value_or(nullptr), o);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts).value_or(nullptr), o);
 		// Populate last_order through bdd_and: build_bdd alone does not
 		// call sync_order_cache(), so has_last_order would stay false.
 		bdd::bdd_and(bx, by, o);
@@ -1038,10 +1038,10 @@ TEST_SUITE("BDD prune_caches") {
 			.parse = { .start = tau::bf },
 		};
 		bdd::clear_caches();
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 
 		const trefs vx {tx};
 		const trefs vy {ty};
@@ -1079,13 +1079,13 @@ TEST_SUITE("BDD prune_caches leaves the ref-keyed tables alone") {
 			.parse = { .start = tau::bf },
 		};
 		bdd::clear_caches();
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
+		tref tz = tau::trim(tau::get("z", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
-		bdd::ref bx = bdd::build_bdd(tau::get("x", opts), o);
-		bdd::ref by = bdd::build_bdd(tau::get("y", opts), o);
-		bdd::ref bz = bdd::build_bdd(tau::get("z", opts), o);
+		bdd::ref bx = bdd::build_bdd(tau::get("x", opts).value_or(nullptr), o);
+		bdd::ref by = bdd::build_bdd(tau::get("y", opts).value_or(nullptr), o);
+		bdd::ref bz = bdd::build_bdd(tau::get("z", opts).value_or(nullptr), o);
 
 		bdd::bdd_and(bx, by, o);
 		bdd::refs many {bx, by, bz};
@@ -1129,10 +1129,10 @@ TEST_SUITE("BDD prune_caches via a real gc sweep") {
 			.parse = { .start = tau::bf },
 		};
 		bdd::clear_caches();
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::trim(tau::get("x", opts).value_or(nullptr));
+		tref ty = tau::trim(tau::get("y", opts).value_or(nullptr));
 		bdd::order o {{tx, 0}, {ty, 1}};
-		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts).value_or(nullptr), o);
 
 		// "unplug" is spelled only from letters (g,h,j,k,l,m,n,p,u) that
 		// no other TEST_CASE in this file ever uses as a bf sample --
@@ -1146,7 +1146,7 @@ TEST_SUITE("BDD prune_caches via a real gc sweep") {
 		// store, unlike the Tau tree, is never swept, so any such
 		// history would pin it forever via collect_live_refs' walk of
 		// decision variables (and via add()'s protect_bdd_atom).
-		tref tunplug = tau::trim(tau::get("unplug", opts));
+		tref tunplug = tau::trim(tau::get("unplug", opts).value_or(nullptr));
 
 		// tunplug deliberately stays out of o, so it is not pinned via
 		// last_order either; it is never passed to build_bdd/add(), so

@@ -19,7 +19,7 @@
 using namespace idni::tau_lang;
 
 static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -786,9 +786,8 @@ State: 1
 	// awarded to sys together with sys's attractor of it — which does NOT
 	// include state 0, because env there has the live alternative 2 (the
 	// ∀-rule only pulls in an opponent state ALL of whose successors are
-	// in the set).  The §14 plan predicted this expectation would flip;
-	// hand-computing the textbook rule shows it stands: env avoids its
-	// dead end by choice, not by a refused attractor.
+	// in the set).  Hand-computing the textbook rule shows it stands: env
+	// avoids its dead end by choice, not by a refused attractor.
 	TEST_CASE("[ALG-D-50] textbook: an env dead end is sys-won; an env state with an alternative is not") {
 		alg_d::product_game pg;
 		pg.n_states = 3;

@@ -22,7 +22,7 @@ tref parse(const std::string& sample) {
 		.parse = { .start = tau::wff },
 		.reget_with_hooks = true
 	};
-	tref src = tree<node_t>::get(sample, opts);
+	tref src = tree<node_t>::get(sample, opts).value_or(nullptr);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
 	}
@@ -81,13 +81,13 @@ TEST_SUITE("bv term helpers") {
 		// not the bare variable node -- get_ba_type_tree() synthesizes
 		// that from the variable's ba_type id.
 		CHECK( get_bv_size<node_t>(
-			tau::get(vars[0]).get_ba_type_tree()) == 8 );
+			tau::get(vars[0]).get_ba_type_tree().value()).value() == 8 );
 		tref fm16 = parse("Y:bv[16] = { 0 }:bv[16]");
 		REQUIRE( fm16 != nullptr );
 		trefs vars16 = get_free_vars<node_t>(fm16);
 		REQUIRE( vars16.size() == 1 );
 		CHECK( get_bv_size<node_t>(
-			tau::get(vars16[0]).get_ba_type_tree()) == 16 );
+			tau::get(vars16[0]).get_ba_type_tree().value()).value() == 16 );
 	}
 
 	TEST_CASE("normalize_bv is idempotent and cache-stable") {
@@ -146,11 +146,13 @@ TEST_SUITE("bv default width") {
 		CHECK( (tt(type_tree) | tau::type | tau::subtype | tt::ref) != nullptr );
 	}
 
-	// A genuinely widthless type tree reaching the accessor is a loud, defined failure, never UB.
-	TEST_CASE("get_bv_size throws on a genuinely widthless bv type tree") {
+	// The checked accessor reports a widthless type instead of reading past it.
+	TEST_CASE("get_bv_size reports a type_error on a genuinely widthless bv type tree") {
 		tref widthless_type = tau::get(tau::typed,
 			tau::get(tau::type, "bv"));
-		CHECK_THROWS_AS( get_bv_size<node_t>(widthless_type), std::logic_error );
+		auto r = get_bv_size<node_t>(widthless_type);
+		CHECK_FALSE( r.has_value() );
+		CHECK( report_has_code(r.report(), code::type_error) );
 	}
 }
 

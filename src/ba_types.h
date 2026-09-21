@@ -13,6 +13,8 @@
 #ifndef __IDNI__TAU__BA_TYPES_H__
 #define __IDNI__TAU__BA_TYPES_H__
 
+#include "tau_diagnostics.h"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -148,18 +150,26 @@ struct ba_types {
 	/** @brief Return the integer id for type tree @p ba_type, inserting it if absent. */
 	static size_t id(tref ba_type);
 
-	/** @brief Return the type tree corresponding to @p ba_type_id. */
-	static tref type_tree(size_t ba_type_id);
+	/**
+	 * @brief Return the type tree corresponding to @p ba_type_id.
+	 *
+	 * An id at or past `count()` is an out-of-range report, never a throw.
+	 */
+	static result<tref> type_tree(size_t ba_type_id);
 
-	/** @brief Return the string name for @p ba_type_id. */
-	static std::string name(size_t ba_type_id);
+	/**
+	 * @brief Return the string name for @p ba_type_id.
+	 *
+	 * An id at or past `count()` is an out-of-range report, never a throw.
+	 */
+	static result<std::string> name(size_t ba_type_id);
 
 	/**
 	 * @brief Number of registered ba_type ids (valid ids are `[0, count())`).
 	 *
-	 * `type_tree()` and `name()` throw for anything at or past this bound, so
-	 * code that scans the registry must consult it rather than probing for a
-	 * sentinel name.
+	 * `type_tree()` and `name()` report out-of-range for anything at or past
+	 * this bound, so code that scans the registry must consult it rather than
+	 * probing for a sentinel name.
 	 */
 	static size_t count();
 
@@ -198,13 +208,18 @@ private:
 template <NodeType node>
 size_t get_ba_type_id(tref ba_type);
 
-/** @brief Return the type tree for @p ba_type_id. */
+/** @brief Return the type tree for @p ba_type_id; requires a validated id `< count()`. */
 template <NodeType node>
 tref get_ba_type_tree(size_t ba_type_id);
 
-/** @brief Return the string name for @p ba_type_id. */
+/**
+ * @brief Return the string name for @p ba_type_id.
+ *
+ * An id at or past `get_ba_type_count()` is an out-of-range report, never a
+ * throw.
+ */
 template <NodeType node>
-std::string get_ba_type_name(size_t ba_type_id);
+result<std::string> get_ba_type_name(size_t ba_type_id);
 
 /** @brief Number of registered ba_type ids; valid ids are `[0, count())`. */
 template <NodeType node>
@@ -223,10 +238,12 @@ tref unify(tref t1, tref t2);
 
 /**
  * @brief Unify type ids @p tid1 and @p tid2.
- * @return The more informative type id if compatible, or `std::nullopt` on conflict.
+ * @return The unified type id when compatible; a value-less, error-less
+ * result when @p tid1 and @p tid2 conflict (a legitimate answer, not a
+ * failure); or an out-of-range error when either id is invalid.
  */
 template <NodeType node>
-std::optional<size_t> unify(size_t tid1, size_t tid2);
+result<size_t> unify(size_t tid1, size_t tid2);
 
 /**
  * @brief Unify the types of all nodes in @p ns against @p default_type.
@@ -278,9 +295,15 @@ bool pack_owns_ba_type_name(const std::string& name);
 template <NodeType node>
 bool pack_owns_ba_type(size_t ba_type_id);
 
-/** @brief Refine @p type_id to its owner's default parameter if underspecified, else unchanged. */
+/**
+ * @brief Refine @p type_id to its owner's default parameter if
+ * underspecified, else unchanged.
+ *
+ * An id at or past `get_ba_type_count()` is an out-of-range report, never a
+ * throw.
+ */
 template <NodeType node>
-size_t pack_default_ba_type(size_t type_id);
+result<size_t> pack_default_ba_type(size_t type_id);
 
 /** @brief Search @p term and its children for any assigned BA type id; return 0 if not found. */
 template <NodeType node>

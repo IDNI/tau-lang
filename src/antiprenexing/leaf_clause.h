@@ -26,6 +26,7 @@
 
 #include "tau_tree.h"
 #include "tau_bdd.h"
+#include "tau_diagnostics.h"
 #include "eliminability.h"
 
 namespace idni::tau_lang {
@@ -37,7 +38,7 @@ namespace idni::tau_lang {
 // argument here -- a default cannot be redeclared, and that call site always
 // passes an explicit analysis.
 template<NodeType node>
-tref anti_prenex(tref formula, const eliminability<node>& el);
+result<tref> anti_prenex(tref formula, const eliminability<node>& el);
 
 /**
  * @brief Eliminate @p block over the single clause @p clause.
@@ -59,7 +60,7 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
  * part re-wrapped around only its own conjuncts.
  */
 template <NodeType node>
-tref eliminate_block_over_clause(tref clause, const trefs& block,
+result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	const block_eliminability<node>& elim,
 	const typename term_handle<node>::order& order);
 

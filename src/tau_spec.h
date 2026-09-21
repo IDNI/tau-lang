@@ -41,9 +41,9 @@ struct tau_spec {
 	const std::vector<std::string>& errors() const;
 	/**
 	 * @brief Return the most recently built formula tree, or `nullptr`.
-	 * @return Latest parsed tree ref.
+	 * @return Latest parsed tree ref, with the parse report.
 	 */
-	tref get();
+	result<tref> get();
 	/**
 	 * @brief Append a pre-built formula @p expr to the specification.
 	 * @param expr Formula to add.
@@ -70,7 +70,7 @@ private:
 	/// @brief Parse @p part together with the previous part for context.
 	bool parse_with_prev_part(size_t part);
 	/// @brief Combine all parsed pieces into one formula tree.
-	tref build_parse_tree();
+	result<tref> build_parse_tree();
 
 	std::string current_part_{};
 	std::string prev_part_{};

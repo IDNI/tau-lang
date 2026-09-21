@@ -19,6 +19,11 @@ using namespace idni::tau_lang;
 
 namespace {
 
+// Local stand-ins for the deleted production timeout/ceiling exceptions,
+// used only by this test's own stage-1 build loop.
+struct test_timeout {};
+struct test_limit_exceeded { std::string ceiling; size_t limit; size_t value; };
+
 // ── brute-force ground truth over a small tau space ─────────────────────────
 
 bool atom_holds_direct(ocltl_type_mask tau, size_t K, const ocltl_delta_atom& atom) {
@@ -57,7 +62,9 @@ void check_pointwise(const ocltl_phi_delta_dims& dims,
 	const std::vector<ocltl_delta_atom>& atoms)
 {
 	auto reachable = enumerate_phi_delta(dims, atoms);
-	auto result = ocltl_build_phi_delta(dims, atoms);
+	auto build = ocltl_build_phi_delta(dims, atoms);
+	REQUIRE(build.has_value());
+	const auto& result = build.value();
 
 	const size_t sigma_n = size_t{1} << result.sigma_vars.size();
 	const size_t rho_n = size_t{1} << result.rho_vars.size();
@@ -133,7 +140,9 @@ void check_direct_against_brute(const ocltl_phi_delta_dims& dims,
 void check_direct_against_bdd(const ocltl_phi_delta_dims& dims,
 	const std::vector<ocltl_delta_atom>& atoms)
 {
-	auto result = ocltl_build_phi_delta(dims, atoms);
+	auto build = ocltl_build_phi_delta(dims, atoms);
+	REQUIRE(build.has_value());
+	const auto& result = build.value();
 	const size_t b_count = result.sigma_vars.size();
 	const size_t c_count = result.rho_vars.size();
 	const size_t sigma_n = size_t{1} << b_count;
@@ -255,30 +264,24 @@ bool report_point(size_t s, size_t l, size_t delta_count,
 		<< " K=" << dims.k() << " starting..." << std::endl;
 	auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
 	auto t0 = std::chrono::steady_clock::now();
-	try {
-		auto result = ocltl_build_phi_delta(dims, atoms, deadline, {}, force_sigma_major);
-		auto t1 = std::chrono::steady_clock::now();
-		std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
-			<< " K=" << dims.k() << " tau_bits=" << result.stats.tau_bits
-			<< " sigma_bits=" << result.stats.sigma_bits
-			<< " rho_bits=" << result.stats.rho_bits
-			<< " nodes_pre=" << result.stats.nodes_before_projection
-			<< " nodes_post=" << result.stats.nodes_after_projection
-			<< " time=" << fmt_dur(t1 - t0) << std::endl;
-		CHECK(result.stats.tau_bits == (size_t{1} << dims.k()));
-		return true;
-	} catch (const ocltl_phi_delta_timeout&) {
+	auto result = ocltl_build_phi_delta(dims, atoms, deadline, {}, force_sigma_major);
+	if (!result.has_value()) {
 		std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
 			<< " K=" << dims.k() << " tau_bits=" << (size_t{1} << dims.k())
-			<< " TIMEOUT (>120s)" << std::endl;
-		return false;
-	} catch (const ocltl_phi_delta_limit_exceeded& e) {
-		std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
-			<< " K=" << dims.k() << " tau_bits=" << (size_t{1} << dims.k())
-			<< " CEILING " << e.ceiling << " exceeded: " << e.value
-			<< " > " << e.limit << std::endl;
+			<< " SKIPPED (timeout or ceiling)" << std::endl;
 		return false;
 	}
+	const auto& rr = result.value();
+	auto t1 = std::chrono::steady_clock::now();
+	std::cout << "phi_delta s=" << s << " l=" << l << " |D|=" << delta_count
+		<< " K=" << dims.k() << " tau_bits=" << rr.stats.tau_bits
+		<< " sigma_bits=" << rr.stats.sigma_bits
+		<< " rho_bits=" << rr.stats.rho_bits
+		<< " nodes_pre=" << rr.stats.nodes_before_projection
+		<< " nodes_post=" << rr.stats.nodes_after_projection
+		<< " time=" << fmt_dur(t1 - t0) << std::endl;
+	CHECK(rr.stats.tau_bits == (size_t{1} << dims.k()));
+	return true;
 }
 
 // Sweeps |Delta| upward for one (s, l), stopping the group once a point
@@ -311,7 +314,7 @@ std::string read_codegen_spec(const std::string& name) {
 // through get_nso_rr, with no normalizer pass -- extract_data_atoms sees
 // exactly this tree in the real pipeline (ltl_aba_builders.tmpl.h).
 tref parse_spec(const std::string& src) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(src));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(src).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -352,12 +355,12 @@ result build(const ocltl_phi_delta_dims& dims,
 
 	auto check_deadline = [&] {
 		if (deadline && std::chrono::steady_clock::now() > *deadline)
-			throw ocltl_phi_delta_timeout{};
+			throw test_timeout{};
 	};
 	auto check_ceiling = [&] {
 		size_t n = ocltl_phi_delta_detail::node_table_size();
 		if (n > node_ceiling)
-			throw ocltl_phi_delta_limit_exceeded{ "nodes", node_ceiling, n };
+			throw test_limit_exceeded{ "nodes", node_ceiling, n };
 	};
 
 	// shape-tagged ids, so repeat builds at other shapes in the same process
@@ -545,7 +548,9 @@ TEST_SUITE("ocltl_phi_delta: correctness") {
 			ocltl_atom_coordinate_const(0, true), // coordinate 0 (m) == the unit
 		};
 
-		auto result = ocltl_build_phi_delta(dims, atoms);
+		auto build = ocltl_build_phi_delta(dims, atoms);
+		REQUIRE(build.has_value());
+		const auto& result = build.value();
 		REQUIRE(result.sigma_vars.size() == 4);
 		REQUIRE(result.rho_vars.size() == 2);
 		REQUIRE(result.delta_vars.size() == 3);
@@ -718,8 +723,8 @@ TEST_SUITE("ocltl_phi_delta: direct predicate vs BDD") {
 		ocltl_phi_delta_bdd_init();
 		ocltl_phi_delta_dims dims{ 4, 1, 3 }; // k_sigma=5, k_rho=3
 		std::vector<ocltl_delta_atom> no_atoms;
-		CHECK_THROWS_AS(ocltl_build_phi_delta(dims, no_atoms),
-			const ocltl_phi_delta_limit_exceeded&);
+		auto build = ocltl_build_phi_delta(dims, no_atoms);
+		CHECK(build.has_error());
 	}
 }
 
@@ -820,16 +825,14 @@ TEST_SUITE("ocltl_phi_delta: id ordering comparison") {
 		ocltl_phi_delta_dims dims{ 1, 1, 5 };
 		for (size_t dc : std::vector<size_t>{ 1, 2, 4, 8 }) {
 			auto atoms = synthetic_atoms(dims.k(), dc);
-			try {
-				auto result = ocltl_build_phi_delta(dims, atoms, std::nullopt, {}, true);
-				std::cout << "sigma-major |D|=" << dc
-					<< " nodes_pre=" << result.stats.nodes_before_projection
-					<< " nodes_post=" << result.stats.nodes_after_projection << std::endl;
-			} catch (const ocltl_phi_delta_limit_exceeded& e) {
-				std::cout << "sigma-major |D|=" << dc << " CEILING " << e.ceiling
-					<< " exceeded: " << e.value << " > " << e.limit << std::endl;
+			auto build = ocltl_build_phi_delta(dims, atoms, std::nullopt, {}, true);
+			if (!build.has_value()) {
+				std::cout << "sigma-major |D|=" << dc << " CEILING exceeded" << std::endl;
 				break;
 			}
+			std::cout << "sigma-major |D|=" << dc
+				<< " nodes_pre=" << build.value().stats.nodes_before_projection
+				<< " nodes_post=" << build.value().stats.nodes_after_projection << std::endl;
 		}
 	}
 
@@ -838,16 +841,14 @@ TEST_SUITE("ocltl_phi_delta: id ordering comparison") {
 		ocltl_phi_delta_dims dims{ 1, 1, 5 };
 		for (size_t dc : std::vector<size_t>{ 1, 2, 4, 8 }) {
 			auto atoms = synthetic_atoms(dims.k(), dc);
-			try {
-				auto result = ocltl_build_phi_delta(dims, atoms, std::nullopt, {}, false);
-				std::cout << "rho-major |D|=" << dc
-					<< " nodes_pre=" << result.stats.nodes_before_projection
-					<< " nodes_post=" << result.stats.nodes_after_projection << std::endl;
-			} catch (const ocltl_phi_delta_limit_exceeded& e) {
-				std::cout << "rho-major |D|=" << dc << " CEILING " << e.ceiling
-					<< " exceeded: " << e.value << " > " << e.limit << std::endl;
+			auto build = ocltl_build_phi_delta(dims, atoms, std::nullopt, {}, false);
+			if (!build.has_value()) {
+				std::cout << "rho-major |D|=" << dc << " CEILING exceeded" << std::endl;
 				break;
 			}
+			std::cout << "rho-major |D|=" << dc
+				<< " nodes_pre=" << build.value().stats.nodes_before_projection
+				<< " nodes_post=" << build.value().stats.nodes_after_projection << std::endl;
 		}
 	}
 }
@@ -857,15 +858,15 @@ void probe_point(const ocltl_phi_delta_dims& dims, size_t delta_count) {
 	auto atoms = synthetic_atoms(dims.k(), delta_count);
 	std::cout << "probe K=" << dims.k() << " k_sigma=" << (dims.d_m + dims.d_x)
 		<< " k_rho=" << dims.d_y << " |D|=" << delta_count << " starting..." << std::endl;
-	try {
-		auto result = ocltl_build_phi_delta(dims, atoms);
+	auto build = ocltl_build_phi_delta(dims, atoms);
+	if (!build.has_value()) {
 		std::cout << "probe K=" << dims.k() << " |D|=" << delta_count
-			<< " nodes_pre=" << result.stats.nodes_before_projection
-			<< " nodes_post=" << result.stats.nodes_after_projection << std::endl;
-	} catch (const ocltl_phi_delta_limit_exceeded& e) {
-		std::cout << "probe K=" << dims.k() << " |D|=" << delta_count << " CEILING "
-			<< e.ceiling << " exceeded: " << e.value << " > " << e.limit << std::endl;
+			<< " CEILING exceeded" << std::endl;
+		return;
 	}
+	std::cout << "probe K=" << dims.k() << " |D|=" << delta_count
+		<< " nodes_pre=" << build.value().stats.nodes_before_projection
+		<< " nodes_post=" << build.value().stats.nodes_after_projection << std::endl;
 }
 
 TEST_SUITE("ocltl_phi_delta: boundary probe") {
@@ -1144,10 +1145,10 @@ void run_stage1_point(const std::string& label, size_t s, size_t l,
 			<< " cumulative_delta=" << (result.table_after - result.table_before)
 			<< " time=" << fmt_dur(t1 - t0) << std::endl;
 		spot_check_stage1_vs_direct(dims, atoms, result, spot_samples);
-	} catch (const ocltl_phi_delta_timeout&) {
+	} catch (const test_timeout&) {
 		std::cout << "stage1 " << label << " K=" << dims.k() << " |atoms|=" << atoms.size()
 			<< " TIMEOUT (>" << timeout_s << "s)" << std::endl;
-	} catch (const ocltl_phi_delta_limit_exceeded& e) {
+	} catch (const test_limit_exceeded& e) {
 		std::cout << "stage1 " << label << " K=" << dims.k() << " |atoms|=" << atoms.size()
 			<< " CEILING " << e.ceiling << " exceeded: " << e.value << " > " << e.limit << std::endl;
 	}

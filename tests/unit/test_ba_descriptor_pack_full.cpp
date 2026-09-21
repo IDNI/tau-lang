@@ -23,7 +23,7 @@ static_assert(assert_pack_descriptors_complete<conv_node>(),
 	"a converted BA's descriptor is incomplete");
 
 template struct base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt, hsb, nlang_ba, bv>, sbf_ba, qint, qlt, hsb, nlang_ba, bv>;
-template std::optional<typename conv_node::constant_with_type>
+template result<typename conv_node::constant_with_type>
 ba_constants<conv_node>::get(const std::string&, tref, const std::string);
 
 } // namespace idni::tau_lang
@@ -52,29 +52,29 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 	TEST_CASE("one/zero route to the qint descriptor's literals") {
 		tref t = qint_type<conv_node>();
 		REQUIRE(t != nullptr);
-		CHECK( conv_dispatcher::one(t) == "top" );
-		CHECK( conv_dispatcher::zero(t) == "bot" );
+		CHECK( conv_dispatcher::one(t).value() == "top" );
+		CHECK( conv_dispatcher::zero(t).value() == "bot" );
 	}
 
 	TEST_CASE("one/zero route to the qlt descriptor's literals") {
 		tref t = qlt_type<conv_node>();
 		REQUIRE(t != nullptr);
-		CHECK( conv_dispatcher::one(t) == "top" );
-		CHECK( conv_dispatcher::zero(t) == "bot" );
+		CHECK( conv_dispatcher::one(t).value() == "top" );
+		CHECK( conv_dispatcher::zero(t).value() == "bot" );
 	}
 
 	TEST_CASE("one/zero route to the hsb descriptor's literals") {
 		tref t = hsb_type<conv_node>();
 		REQUIRE(t != nullptr);
-		CHECK( conv_dispatcher::one(t) == "top" );
-		CHECK( conv_dispatcher::zero(t) == "bot" );
+		CHECK( conv_dispatcher::one(t).value() == "top" );
+		CHECK( conv_dispatcher::zero(t).value() == "bot" );
 	}
 
 	TEST_CASE("one/zero route to the nlang descriptor's literals") {
 		tref t = nlang_type<conv_node>();
 		REQUIRE(t != nullptr);
-		CHECK( conv_dispatcher::one(t) == "everything" );
-		CHECK( conv_dispatcher::zero(t) == "nothing" );
+		CHECK( conv_dispatcher::one(t).value() == "everything" );
+		CHECK( conv_dispatcher::zero(t).value() == "nothing" );
 	}
 
 	TEST_CASE("bv is the one parameterized type: subtype round-trips") {
@@ -93,9 +93,9 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 	}
 
 	TEST_CASE("bv literals are width-dependent, unlike every other BA's") {
-		CHECK( conv_dispatcher::one(ba_descriptor<bv, conv_node>::type_tree_for(8))
+		CHECK( conv_dispatcher::one(ba_descriptor<bv, conv_node>::type_tree_for(8)).value()
 			!= conv_dispatcher::one(
-				ba_descriptor<bv, conv_node>::type_tree_for(16)) );
+				ba_descriptor<bv, conv_node>::type_tree_for(16)).value() );
 	}
 
 	TEST_CASE("an unowned type falls back to the carrier's own literals") {
@@ -105,8 +105,8 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 		// is bv[16] that would answer "65535".
 		tref t = untyped_type<conv_node>();
 		REQUIRE(t != nullptr);
-		CHECK( conv_dispatcher::one(t) == "1" );
-		CHECK( conv_dispatcher::zero(t) == "0" );
+		CHECK( conv_dispatcher::one(t).value() == "1" );
+		CHECK( conv_dispatcher::zero(t).value() == "0" );
 	}
 
 	TEST_CASE("the Boolean carrier resolves per pack, from one configured order") {

@@ -16,6 +16,7 @@
 #include <unordered_map>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -38,14 +39,28 @@ inline size_t rr_dict(const std::string& s) {
 	return rr_m.emplace(s, rr_v.size()), rr_v.push_back(s), rr_v.size() - 1;
 };
 /**
+ * @brief Return the recurrence-relation name registered under @p i,
+ * without validation; requires a valid id in `[0, rr_v.size())`.
+ */
+inline const std::string& rr_dict_name(size_t i) {
+	DBG(assert(i < rr_v.size());)
+	return rr_v[i];
+}
+
+/**
  * @brief Return the recurrence-relation name registered under @p i.
+ *
+ * An id at or past `rr_v.size()` is an out-of-range report, never a throw.
  * @param i Id previously returned by `rr_dict(string)`.
  */
-inline const std::string& rr_dict(size_t i) {
+inline result<std::string> rr_dict(size_t i) {
+	result<std::string> r;
 	if (i >= rr_v.size())
-		throw std::logic_error("rr_dict: invalid id " + std::to_string(i));
-	return rr_v[i];
-};
+		return r.with_assert_check_error(code::out_of_range,
+			"the recurrence-relation id is invalid",
+			{{label::actual, i}, {label::limit, rr_v.size()}});
+	return r.with_assert_check_value(std::string(rr_dict_name(i)));
+}
 
 /**
  * @brief Signature of a recurrence relation: name, offset arity, and argument arity.
@@ -66,7 +81,7 @@ struct rr_sig {
  */
 inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
 	return os
-		<< rr_dict(s.name)
+		<< rr_dict_name(s.name)
 		<< "[" << s.offset_arity << "]/"
 		<< s.arg_arity;
 }

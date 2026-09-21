@@ -22,6 +22,12 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#include <csignal>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
 namespace idni::tau_lang {
 
 using strings = std::vector<std::string>;
@@ -59,10 +65,20 @@ inline tau::get_options parse_rec_relations() {
 
 inline std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
 	auto prr = parse_rec_relations();
+	auto rec_r = tau::get(rec, prr);
+	// "" is the documented no-extra-relations idiom: definitions is
+	// one-or-more, so it always fails to parse; get_rec_relations tolerates
+	// a null tref. A non-empty rec that still fails is a real bug in the
+	// caller's input, so its report is printed rather than dropped, but the
+	// helper stays tolerant (matching pre-refactor behavior) and falls back
+	// to an empty rule set either way.
+	if (!rec_r.has_value() && rec && *rec) rec_r.print();
 	rewriter::rules rrs = get_rec_relations<node_t>(
-			tau::get(rec, prr));
+		rec_r.has_value() ? rec_r.value() : nullptr);
 	auto pbf = parse_bf();
-	tref main_fm = tau::get(sample, pbf);
+	auto main_fm_r = tau::get(sample, pbf);
+	if (!main_fm_r.has_value()) return {};
+	tref main_fm = main_fm_r.value();
 	if (!main_fm) return {};
 	return rr<node_t>(rrs, tau::geth(main_fm));
 }
@@ -70,7 +86,9 @@ inline std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* samp
 inline std::optional<rr<node_t>> get_nso_rr(const char* sample)
 {
 	// DBG(TAU_LOG_TRACE << "get_nso_rr: " << sample;)
-	tref spec = tau::get(sample);
+	auto spec_r = tau::get(sample);
+	if (!spec_r.has_value()) return {};
+	tref spec = spec_r.value();
 	if (!spec) return {};
 	return get_nso_rr<node_t>(spec);
 }
@@ -374,7 +392,12 @@ inline bool matches_tree_mod_and_or(tref result, tref expected) {
 // Parses expected_bf with the bf grammar (as get_bf_nso_rr's sample
 // argument does) and compares under matches_tree_mod_and_or.
 inline bool matches_bf_mod_and_or(tref result, const char* expected_bf) {
-	tref expected = tau::get(expected_bf, parse_bf());
+	auto expected_r = tau::get(expected_bf, parse_bf());
+	if (!expected_r.has_value()) {
+		expected_r.print();
+		return false;
+	}
+	tref expected = expected_r.value();
 	if (!expected) {
 		TAU_LOG_ERROR << "expected bf does not parse: "
 			<< expected_bf;
@@ -386,7 +409,12 @@ inline bool matches_bf_mod_and_or(tref result, const char* expected_bf) {
 // Parses expected_wff with the wff grammar and compares under
 // matches_tree_mod_and_or.
 inline bool matches_wff_mod_and_or(tref result, const char* expected_wff) {
-	tref expected = tau::get(expected_wff, parse_wff());
+	auto expected_r = tau::get(expected_wff, parse_wff());
+	if (!expected_r.has_value()) {
+		expected_r.print();
+		return false;
+	}
+	tref expected = expected_r.value();
 	if (!expected) {
 		TAU_LOG_ERROR << "expected wff does not parse: "
 			<< expected_wff;
@@ -413,7 +441,12 @@ inline bool matches_wff_mod_and_or_any_of(tref result,
 inline bool matches_wff_str_mod_and_or(const std::string& actual_wff,
 	const char* expected_wff)
 {
-	tref actual = tau::get(actual_wff.c_str(), parse_wff());
+	auto actual_r = tau::get(actual_wff.c_str(), parse_wff());
+	if (!actual_r.has_value()) {
+		actual_r.print();
+		return false;
+	}
+	tref actual = actual_r.value();
 	return actual && matches_wff_mod_and_or(actual, expected_wff);
 }
 
@@ -448,7 +481,12 @@ inline bool values_match_mod_and_or(const strings& values,
 {
 	if (values.size() != expected.size()) return false;
 	for (size_t i = 0; i < values.size(); i++) {
-		tref v = tau::get(values[i].c_str(), parse_wff());
+		auto v_r = tau::get(values[i].c_str(), parse_wff());
+		if (!v_r.has_value()) {
+			v_r.print();
+			return false;
+		}
+		tref v = v_r.value();
 		if (!v) {
 			TAU_LOG_ERROR << "value does not parse: "
 				<< values[i];
@@ -468,6 +506,24 @@ inline bool normalize_and_check_mod_and_or(const char* sample,
 	if (!result.has_value()) return false;
 	return matches_wff_mod_and_or(result.value(), expected_wff);
 }
+
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+// A live assert(false) raises SIGABRT, which doctest's own handler would
+// turn into a normal exit; run op() in a fork with the default disposition
+// restored, and _exit before any teardown or atexit runs twice.
+template<typename F>
+inline bool dies_by_sigabrt(F op) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		std::signal(SIGABRT, SIG_DFL);
+		op();
+		_exit(0);
+	}
+	int status = 0;
+	waitpid(pid, &status, 0);
+	return WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;
+}
+#endif
 
 } // namespace idni::tau_lang
 

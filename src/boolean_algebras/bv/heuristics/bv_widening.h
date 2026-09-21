@@ -37,7 +37,8 @@
  * Any `0` returned by a child call propagates: an operator with an opaque
  * child is itself opaque, and returns `0`. Callers are expected to skip
  * (leave untouched) any atom for which the top-level `needed_width` call
- * returns `0`.
+ * returns `0`. A bv-family operand whose bitwidth cannot be looked up is a
+ * separate case: it carries a report instead of folding into `0`.
  */
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_WIDENING_H__
@@ -78,7 +79,8 @@ inline size_t bv_max_width = 1024;
  * @return The subtree's exact-result width, or `0` if `bf` (or any
  *   descendant) is an opaque subterm (e.g. `bf_ref`, `capture`) that the
  *   elaboration pass cannot reason about -- the caller should then skip the
- *   enclosing atom entirely.
+ *   enclosing atom entirely. Returns no value when a bv-family operand's
+ *   bitwidth cannot be looked up.
  *
  * @par Example
  * @code{.cpp}
@@ -88,12 +90,12 @@ inline size_t bv_max_width = 1024;
  *                                .reget_with_hooks = false };
  * tref src = tree<node_t>::get("x * y", opts);
  * size_t maxW = 0;
- * CHECK( needed_width<node_t>(src, 8, maxW) == 16 );
+ * CHECK( needed_width<node_t>(src, 8, maxW).value_or(0) == 16 );
  * CHECK( maxW == 16 );
  * @endcode
  */
 template <NodeType node>
-size_t needed_width(tref bf, size_t base_w, size_t& maxW);
+result<size_t> needed_width(tref bf, size_t base_w, size_t& maxW);
 
 /**
  * @brief Rebuild a `bf` subtree at width `W`, upcasting leaves and
@@ -145,7 +147,7 @@ size_t needed_width(tref bf, size_t base_w, size_t& maxW);
  * tref atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_lteq));
  * tref side = tree<node_t>::get(atom).child(0);
  * tref wide = widen_term<node_t>(side, 8, 16);
- * CHECK( get_bv_width<node_t>(tree<node_t>::get(wide).get_ba_type()) == 16 );
+ * CHECK( get_bv_width<node_t>(tree<node_t>::get(wide).get_ba_type()).value() == 16 );
  * CHECK( widen_term<node_t>(side, 8, 8) == side ); // W == base_w: identity
  * @endcode
  */
@@ -199,9 +201,10 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  *   outer truncating cast resets the rebuilt atom's own auto-propagated
  *   type back down to `base_w` -- the saturation guard above never matches
  *   that shape, because its untouched bare side is never "saturated").
- *   Returns `nullptr`, after `LOG_ERROR`-ing the cap violation, when the
- *   computed `W` exceeds `bv_max_width` (the D4 width cap; the cap itself
- *   is inclusive, `W == bv_max_width` is allowed).
+ *   Returns no value, carrying a `code::out_of_range` error (the `{label::limit,
+ *   ...}`/`{label::width, ...}` attrs give the cap and the required width),
+ *   when the computed `W` exceeds `bv_max_width` (the D4 width cap; the cap
+ *   itself is inclusive, `W == bv_max_width` is allowed).
  *
  * @par Example
  * @code{.cpp}
@@ -213,21 +216,21 @@ tref widen_term(tref bf_node, size_t base_w, size_t W);
  * tref src = tree<node_t>::get("o:bv[8] = min(x * y, { 200 })",
  *     tau::get_options{ .parse = { .start = tau::wff } });
  * tref atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_eq));
- * tref wide = widen_atom<node_t>(atom);
+ * tref wide = widen_atom<node_t>(atom).value_or(nullptr);
  * CHECK( tree<node_t>::get(wide).get_ba_type() == bv_type_id<node_t>(8) );
- * CHECK( widen_atom<node_t>(wide) == wide ); // idempotent
+ * CHECK( widen_atom<node_t>(wide).value_or(nullptr) == wide ); // idempotent
  *
  * // Comparison shape: "x:bv[8] * y <= z" extends every side to bv[16] and
  * // truncates nothing, so the atom itself is typed bv[16] afterwards.
  * src = tree<node_t>::get("x:bv[8] * y <= z",
  *     tau::get_options{ .parse = { .start = tau::wff } });
  * atom = tree<node_t>::get(src).find_top(is<node_t>(tau::bf_lteq));
- * CHECK( tree<node_t>::get(widen_atom<node_t>(atom)).get_ba_type()
+ * CHECK( tree<node_t>::get(widen_atom<node_t>(atom).value_or(nullptr)).get_ba_type()
  *     == bv_type_id<node_t>(16) );
  * @endcode
  */
 template <NodeType node>
-tref widen_atom(tref atom);
+result<tref> widen_atom(tref atom);
 
 /**
  * @brief Whole-formula `bv_widening` pass: rewrite every bv-family atom in
@@ -253,11 +256,10 @@ tref widen_atom(tref atom);
  * @param fm A `wff`-nonterminal (or any other) node ref to rewrite.
  * @return `fm` unchanged (same tref) when `bv_widening` is off or no atom
  *   needs rewriting; otherwise `fm` with every changed bv atom replaced by
- *   its `widen_atom` result. Returns `nullptr`, exactly like `widen_atom`
- *   itself (which already `LOG_ERROR`s the cap violation before returning
- *   `nullptr`), the moment any one atom's required width exceeds
- *   `bv_max_width` (the D4 width cap) -- callers should treat a `nullptr`
- *   result the same way they treat a failed normalization.
+ *   its `widen_atom` result. Returns no value, carrying `widen_atom`'s own
+ *   error report, the moment any one atom's required width exceeds
+ *   `bv_max_width` (the D4 width cap) -- callers should treat that the same
+ *   way they treat a failed normalization.
  *
  * @par Example
  * @code{.cpp}
@@ -276,7 +278,7 @@ tref widen_atom(tref atom);
  * @endcode
  */
 template <NodeType node>
-tref widen_bv_arithmetic(tref fm);
+result<tref> widen_bv_arithmetic(tref fm);
 
 } // namespace idni::tau_lang
 

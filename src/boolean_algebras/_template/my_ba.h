@@ -18,6 +18,7 @@
 #include <string>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
@@ -45,7 +46,7 @@ inline std::ostream& operator<<(std::ostream& os, const my_ba& x) {
 
 /** @brief Parse a `my_ba` constant; `{0}` and `{1}` are the only literals. */
 template <typename... BAs>
-std::optional<typename node<BAs...>::constant_with_type> parse_my_ba(
+result<typename node<BAs...>::constant_with_type> parse_my_ba(
 	const std::string& src);
 
 } // namespace idni::tau_lang

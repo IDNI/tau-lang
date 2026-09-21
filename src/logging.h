@@ -270,8 +270,11 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #define LOG_RULE(r)          TAU_LOG_RULE(r)
 
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id
-#define TAU_LOG_BA_TYPE(tid) TAU_LOG_BA_COLOR << ba_types<node>::name(tid) \
-								    <<TC.CLEAR()
+// Advisory drop: ostream `<<` chain contract cannot abort the line.
+#define TAU_LOG_BA_TYPE(tid) TAU_LOG_BA_COLOR << [](size_t bid) { \
+		auto nm = ba_types<node>::name(bid); \
+		return nm.has_value() ? nm.value() : std::string("INVALID"); \
+	}(tid) <<TC.CLEAR()
 #define LOG_BA_TYPE(tid)     TAU_LOG_BA_TYPE(tid)
 
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id with the id

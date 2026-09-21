@@ -22,7 +22,7 @@ static_assert(assert_pack_descriptors_complete<mini_node>(),
 	"sbf/tau descriptors incomplete for the minimal pack");
 
 template struct base_ba_dispatcher<tau_ba<sbf_ba>, sbf_ba>;
-template std::optional<typename mini_node::constant_with_type>
+template result<typename mini_node::constant_with_type>
 ba_constants<mini_node>::get(const std::string&, tref, const std::string);
 
 } // namespace idni::tau_lang

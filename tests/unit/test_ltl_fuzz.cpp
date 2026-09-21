@@ -132,7 +132,7 @@ static formula make_formula(mt19937& rng, int depth,
 // Returns 1 (satisfiable), 0 (unsatisfiable), -1 (parse error / skip /
 // undecided). Used by the CRASH and DETERM suites.
 static int tau_decide(const string& spec_str) {
-	auto nso = get_nso_rr<node_t>(tau::get(spec_str.c_str()));
+	auto nso = get_nso_rr<node_t>(tau::get(spec_str.c_str()).value_or(nullptr));
 	if (!nso.has_value()) return -1;
 	tref fm = nso.value().main->get();
 	if (!fm) return -1;

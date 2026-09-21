@@ -138,12 +138,12 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvlt_rule(size_t bitwidth) {
+static result<rewriter::rule> bvlt_rule(size_t bitwidth) {
 	using tau = tree<node>;
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		return it->second;
+		return result<rewriter::rule>(it->second);
 	}
 
 	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -158,8 +158,8 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
 	auto rr = make_rr<node>(rules, call);
-	auto applied = nso_rr_apply(rr);
-	tref body = applied.has_value() ? applied.value() : nullptr;
+	result<rewriter::rule> r;
+	TAU_TRY(tref body, nso_rr_apply(rr));
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -169,17 +169,18 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 #endif // DEBUG
 
 	cache[bitwidth] = rule;
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvlt(tref left, tref right) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto rule = bvlt_rule<node>(bitwidth);
+result<tref> bvlt(tref left, tref right) {
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(left));
+	TAU_TRY(auto rule, bvlt_rule<node>(bitwidth));
 	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth-1);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto body, nso_rr_apply(rr));
+	return r.with_value(body);
 }
 
 //
@@ -311,12 +312,12 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvgt_rule(size_t bitwidth) {
+static result<rewriter::rule> bvgt_rule(size_t bitwidth) {
 	using tau = tree<node>;
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		return it->second;
+		return result<rewriter::rule>(it->second);
 	}
 
 	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -331,8 +332,8 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
 	auto rr = make_rr<node>(rules, call);
-	auto applied = nso_rr_apply(rr);
-	tref body = applied.has_value() ? applied.value() : nullptr;
+	result<rewriter::rule> r;
+	TAU_TRY(tref body, nso_rr_apply(rr));
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -342,17 +343,18 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 #endif // DEBUG
 
 	cache[bitwidth] = rule;
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvgt(tref left, tref right) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto rule = bvgt_rule<node>(bitwidth);
+result<tref> bvgt(tref left, tref right) {
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(left));
+	TAU_TRY(auto rule, bvgt_rule<node>(bitwidth));
 	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto body, nso_rr_apply(rr));
+	return r.with_value(body);
 }
 
 //
@@ -492,12 +494,12 @@ static rewriter::rules bvneq_rules(size_t bitwidth) {
  * @endcode
  */
 template<NodeType node>
-static rewriter::rule bvneq_rule(size_t bitwidth) {
+static result<rewriter::rule> bvneq_rule(size_t bitwidth) {
 	using tau = tree<node>;
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		return it->second;
+		return result<rewriter::rule>(it->second);
 	}
 
 	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -512,8 +514,8 @@ static rewriter::rule bvneq_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
 	auto rr = make_rr<node>(rules, call);
-	auto applied = nso_rr_apply(rr);
-	tref body = applied.has_value() ? applied.value() : nullptr;
+	result<rewriter::rule> r;
+	TAU_TRY(tref body, nso_rr_apply(rr));
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -523,17 +525,18 @@ static rewriter::rule bvneq_rule(size_t bitwidth) {
 #endif // DEBUG
 
 	cache[bitwidth] = rule;
-	return rule;
+	return r.with_value(rule);
 }
 
 template<NodeType node>
-tref bvneq(tref left, tref right) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto rule = bvneq_rule<node>(bitwidth);
+result<tref> bvneq(tref left, tref right) {
+	result<tref> r;
+	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(left));
+	TAU_TRY(auto rule, bvneq_rule<node>(bitwidth));
 	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth - 1);
 	auto rr = make_rr<node>({ rule }, call);
-	auto applied = nso_rr_apply(rr);
-	return applied.has_value() ? applied.value() : nullptr;
+	TAU_TRY(auto body, nso_rr_apply(rr));
+	return r.with_value(body);
 }
 
 } // namespace idni::tau_lang

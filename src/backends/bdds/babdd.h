@@ -666,6 +666,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// negative v its complement
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
+		// Advisory drop: bit() returns bdd_ref, not result<>, so a
+		// stale/corrupt id here has no channel to report through.
 		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
@@ -897,8 +899,10 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	// Given x with at least one zero, fill m with a constant of B per
 	// variable such that x evaluates to zero under m -- a witness
-	// zero, as used by the LGRS construction (see bdd_handle::lgrs)
-	static void get_one_zero(bdd_ref, std::map<int_t, B>&);
+	// zero, as used by the LGRS construction (see bdd_handle::lgrs).
+	// x == F succeeds with the empty map; x == T has no zero witness
+	// and is an error.
+	static result<bool> get_one_zero(bdd_ref, std::map<int_t, B>&);
 
 	// Simultaneously substitute the mapped functions for the mapped
 	// variables, bottom-up; variables absent from m are kept
@@ -1008,18 +1012,26 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 };
 
 template<typename B, bdd_options o>
-void bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
-	assert(!leaf(x));
+result<bool> bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
+	result<bool> r;
+	if (x == T)
+		return r.with_assert_check_error(code::invalid_argument,
+			"a constantly-one function has no zero witness");
+	if (x == F) return m.clear(), r.with_assert_check_value(true);
 	const bdd_node_t& n = get_node(x);
 	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
 	else if (n.h == F) m.clear(), m.emplace(n.v, B::one());
-	else if (!leaf(n.l))
-		get_one_zero(bdd_and(n.l, n.h), m),
-			m.emplace(n.v, get_elem(eval(n.l, m)));
+	else if (!leaf(n.l)) {
+		TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.l, n.h), m));
+		m.emplace(n.v, get_elem(eval(n.l, m)));
+	}
 	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
-	else	get_one_zero(bdd_and(n.h, get_elem(n.l)), m),
-			m.emplace(n.v, compose(bdd_not(n.h), m));
+	else {
+		TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.h, get_elem(n.l)), m));
+		m.emplace(n.v, compose(bdd_not(n.h), m));
+	}
 	DBG(assert(compose(x, m) == false);)
+	return r.with_assert_check_value(true);
 }
 
 template<typename B, bdd_options o>
@@ -1290,6 +1302,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
+		// Advisory drop: bit() returns bdd_ref, not result<>, so a
+		// stale/corrupt id here has no channel to report through.
 		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
@@ -1568,21 +1582,26 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	// Witness zero for Bool: walks the low branches, assigning false,
 	// until a node whose high child is F (assign true) or the F leaf
-	// pins x to false; the assignment in m is partial. Requires
-	// x != T; throws int(0) if the walk runs into the T leaf
-	static void get_one_zero(bdd_ref x, std::map<int_t, Bool>& m) {
-		DBG(assert(x != T);)
+	// pins x to false; the assignment in m is partial. x == T has no
+	// zero witness and is an error.
+	static result<bool> get_one_zero(bdd_ref x, std::map<int_t, Bool>& m) {
+		result<bool> r;
+		if (x == T)
+			return r.with_assert_check_error(code::invalid_argument,
+				"a constantly-one function has no zero witness");
 		m.clear();
 		while (!leaf(x)) {
 			const bdd_node_t& n = get(x);
-			if (n.h == F) { m.emplace(n.v, true); return; }
+			if (n.h == F) {
+				m.emplace(n.v, true);
+				return r.with_assert_check_value(true);
+			}
 			m.emplace(n.v, false);
-			if ((x = n.l) == F) return;
+			if ((x = n.l) == F) return r.with_assert_check_value(true);
 		}
-		// BA1-23: reachable for x == F (the loop never runs); a bare
-		// `throw 0` was uncatchable as std::exception.
-		throw std::logic_error(
-			"bdd::get_one_zero called on F or malformed chain");
+		// x == F here (the loop never runs): the empty assignment is its
+		// witness zero.
+		return r.with_assert_check_value(true);
 	}
 
 	static bdd_ref compose(bdd_ref x, const std::map<int_t, bdd_ref>& m) {

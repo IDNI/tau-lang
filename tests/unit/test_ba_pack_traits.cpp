@@ -10,7 +10,7 @@
 namespace {
 size_t tid(tref type_tree) { return ba_types<node_t>::id(type_tree); }
 
-tref wff(const char* src) { return tau::get(src, parse_wff()); }
+tref wff(const char* src) { return tau::get(src, parse_wff()).value_or(nullptr); }
 }
 
 TEST_SUITE("configuration") {
@@ -165,8 +165,21 @@ TEST_SUITE("accumulating folds") {
 		tref fm = wff("x = 0");
 		REQUIRE(fm != nullptr);
 		pack_set_preprocessing<node_t>(false);
-		CHECK(pack_preprocess<node_t>(fm) == fm);
+		auto pre = pack_preprocess<node_t>(fm);
+		REQUIRE(pre.has_value());
+		CHECK(pre.value() == fm);
 	}
+#ifdef TAU_PACK_HAS_BA_EXT
+	TEST_CASE("pack_preprocess stops the chain and keeps the failing report") {
+		tref fm = wff("x = 0");
+		REQUIRE(fm != nullptr);
+		ext_ba::fail_preprocess_ = true;
+		auto pre = pack_preprocess<node_t>(fm);
+		ext_ba::fail_preprocess_ = false;
+		CHECK_FALSE(pre.has_value());
+		CHECK(pre.has_error());
+	}
+#endif
 	TEST_CASE("pack_can_solve declines a formula no BA can translate") {
 		// every core caller asks pack_sat_status only after this says yes
 		tref fm = wff("x = 0");

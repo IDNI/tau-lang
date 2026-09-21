@@ -5,6 +5,7 @@
 # Each test is run in a separate process to avoid leakage.
 
 set -u
+source "${BASH_SOURCE[0]%/*}/resolve_timeout"
 BUILD_DIR="${1:-build}"
 BIN="$BUILD_DIR/test_integration-pointwise_revision"
 
@@ -33,7 +34,7 @@ TESTS=(
 pass=0
 fail=0
 for tc in "${TESTS[@]}"; do
-	out=$(timeout 30 "$BIN" -tc="$tc" 2>&1)
+	out=$(run_with_timeout 30 "$BIN" -tc="$tc" 2>&1)
 	if echo "$out" | grep -q "Status: SUCCESS"; then
 		echo "[PASS] $tc"
 		((pass++))

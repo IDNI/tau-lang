@@ -31,7 +31,9 @@ TEST_SUITE("interpreter") {
 		auto& i = maybe_i.value();
 		CHECK(i.time_point == 0);
 
-		auto inputs = tau_api::get_inputs_for_step(i);
+		auto maybe_inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(maybe_inputs.has_value());
+		auto& inputs = maybe_inputs.value();
 		REQUIRE(inputs.size() == 1);
 		CHECK(inputs[0].name == "i");
 		auto maybe_outputs = tau_api::step(i, {
@@ -84,7 +86,9 @@ TEST_SUITE("interpreter") {
 		REQUIRE(maybe_i.has_value());
 		auto& i = maybe_i.value();
 
-		auto inputs = tau_api::get_inputs_for_step(i);
+		auto maybe_inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(maybe_inputs.has_value());
+		auto& inputs = maybe_inputs.value();
 		std::vector<std::string> names;
 		for (auto& in : inputs) names.push_back(in.name);
 		std::sort(names.begin(), names.end());
@@ -107,7 +111,7 @@ TEST_SUITE("interpreter") {
 
 		tau::get_options opts;
 		opts.parse.start = tau::wff;
-		tref fm = tau::get("G(o[t]:tau = {T.}:tau)", opts);
+		tref fm = tau::get("G(o[t]:tau = {T.}:tau)", opts).value_or(nullptr);
 		REQUIRE(fm != nullptr);
 
 		auto ran = run<node_t>(fm, ctx, 3);
@@ -126,7 +130,7 @@ TEST_SUITE("interpreter") {
 		// this pack resolves it to
 		const size_t cid = get_ba_type_id<node_t>(
 			pack_bool_carrier_type<node_t>());
-		const std::string ct = get_ba_type_name<node_t>(cid);
+		const std::string ct = get_ba_type_name<node_t>(cid).value();
 		io_context<node_t> ctx;
 		auto o = std::make_shared<vector_output_stream>();
 		ctx.add_output("o", cid, o);
@@ -134,7 +138,7 @@ TEST_SUITE("interpreter") {
 		tau::get_options opts;
 		opts.parse.start = tau::wff;
 		tref fm = tau::get("G(o[0]" + ct + " = {1}" + ct
-			+ ") && F(o[t]" + ct + " = {0}" + ct + ")", opts);
+			+ ") && F(o[t]" + ct + " = {0}" + ct + ")", opts).value_or(nullptr);
 		REQUIRE(fm != nullptr);
 
 		auto ran = run<node_t>(fm, ctx, 3);

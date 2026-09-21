@@ -184,7 +184,25 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 			if (!e.witness_template_props.empty()) tmpl_edge = true;
 		CHECK(tmpl_edge);
 		std::ostringstream os;
-		CHECK_THROWS_AS(emit_program(*d, os), std::runtime_error);
+		auto er = emit_program(*d, os);
+		CHECK_FALSE(er.has_value());
+		CHECK(er.has_error());
+		CHECK(report_has_code(er.report(), code::unsupported_operation));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : er.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (er.report().str(n.key) ==
+				"the output needs runtime witness solving, which the "
+				"standalone emitted step() does not support; drive the "
+				"program through the interpreter's table step provider")
+				found_summary = true;
+			if (auto name = node_attr_text(er.report(), n, label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o1");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
 	}
 
 	TEST_CASE("G(o1:qlt > 1/3 && o1:qlt < 2/3): exact-rational witness stays in (1/3, 2/3)") {
@@ -247,15 +265,17 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 				"the emitted text on every run)");
 			return;
 		}
-		namespace fs = std::filesystem;
-		fs::path bdir = fs::temp_directory_path() / "test_cpp_codegen_sdk_link.build";
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = stdfs::temp_directory_path() / "test_cpp_codegen_sdk_link.build";
 		std::error_code ec;
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 
 		auto res = compile_spec<node_t>("G(o1[t]:qlt > {1/2}:qlt)", "", bdir.string());
-		REQUIRE_MESSAGE(res.ok(), res.error);
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		std::string out = run_capture(res.exe_path);
+		std::string out = run_capture(res.value().exe_path);
 		CHECK(has(out, "OK"));
 
 		long long p = 0, q = 0;
@@ -263,7 +283,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 		CHECK(q > 0);
 		CHECK(p * 2 > q);  // p/q > 1/2
 
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 	}
 }
 

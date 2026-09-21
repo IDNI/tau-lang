@@ -17,7 +17,7 @@ using small_node = idni::tau_lang::node<
 using small_tau = idni::tau_lang::tree<small_node>;
 
 std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
-	tref spec = small_tau::get(sample);
+	tref spec = small_tau::get(sample).value_or(nullptr);
 	if (spec == nullptr) return {};
 	return idni::tau_lang::get_nso_rr<small_node>(spec);
 }
@@ -74,13 +74,13 @@ TEST_SUITE("tau_ba dispatcher helpers") {
 	TEST_CASE("is_closed accepts io-only free variables") {
 		auto nso = small_get_nso_rr("i1[t] = o1[t].");
 		REQUIRE(nso.has_value());
-		CHECK(is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
+		CHECK(is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())).value());
 	}
 
 	TEST_CASE("is_closed rejects ordinary free variables") {
 		auto nso = small_get_nso_rr("x = 0.");
 		REQUIRE(nso.has_value());
-		CHECK(!is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
+		CHECK(!is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())).value());
 	}
 }
 

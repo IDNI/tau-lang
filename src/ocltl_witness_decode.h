@@ -57,7 +57,7 @@ inline ocltl_type_mask_wide ocltl_build_target_mask(size_t k,
 // directly.
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-BA ocltl_decode_witness(const std::vector<BA>& a,
+result<BA> ocltl_decode_witness(const std::vector<BA>& a,
 	const std::vector<ocltl_target_atom>& atoms,
 	splitter_type st = splitter_type::upper);
 

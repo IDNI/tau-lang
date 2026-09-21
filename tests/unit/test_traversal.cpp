@@ -8,14 +8,14 @@ TEST_SUITE("operator|") {
 	TEST_CASE("match zero nodes") {
 		const char* sample = "X & Y";
 		auto pbf = parse_bf();
-		auto rule = tt(tau::get(sample, pbf));
+		auto rule = tt(tau::get(sample, pbf).value_or(nullptr));
 		CHECK( !(rule | tau::main) );
 	}
 
 	TEST_CASE("match one node") {
 		const char* sample = "X & Y";
 		auto pbf = parse_bf();
-		auto rule = tt(tau::get(sample, pbf));
+		auto rule = tt(tau::get(sample, pbf).value_or(nullptr));
 		CHECK( (rule | tau::bf_and).size() == 1 );
 	}
 }
@@ -25,21 +25,21 @@ TEST_SUITE("operator||") {
 	TEST_CASE("match zero nodes") {
 		const char* sample = "X & Y";
 		auto pbf = parse_bf();
-		auto rule = tt(tau::get(sample, pbf));
+		auto rule = tt(tau::get(sample, pbf).value_or(nullptr));
 		CHECK( (rule || tau::wff).empty() );
 	}
 
 	TEST_CASE("match one node") {
 		const char* sample = "X & Y";
 		auto pbf = parse_bf();
-		auto rule = tt(tau::get(sample, pbf));
+		auto rule = tt(tau::get(sample, pbf).value_or(nullptr));
 		CHECK( (rule || tau::bf_and).size() == 1 );
 	}
 
 	TEST_CASE("match several nodes") {
 		const char* sample = "X & Y";
 		auto pbf = parse_bf();
-		auto rule = tt(tau::get(sample, pbf));
+		auto rule = tt(tau::get(sample, pbf).value_or(nullptr));
 		CHECK( (rule | tau::bf_and || tau::bf).size() == 2 );
 	}
 }

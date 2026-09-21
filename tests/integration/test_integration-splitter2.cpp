@@ -16,7 +16,7 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_tau_coeff2") {
@@ -25,7 +25,7 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		auto s_str = tau::get(s).to_str();
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 }
 

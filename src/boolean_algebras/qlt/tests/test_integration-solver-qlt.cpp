@@ -151,7 +151,7 @@ TEST_SUITE("solve") {
 TEST_SUITE("SO-1 mixed ordering systems") {
 
 	std::optional<solution<node_t>> solve_mixed(const std::string& system) {
-		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
 		solver_options options = {
 			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
 			.mode = solver_mode::general
@@ -175,7 +175,7 @@ TEST_SUITE("SO-1 mixed ordering systems") {
 		// against: substituting it into the system's atoms must not
 		// produce F (ground qlt comparisons fold at construction).
 		tref atoms = get_nso_rr<node_t>(tau::get(
-			"x : qlt != {0}:qlt && x : qlt > {3/4}:qlt."))
+			"x : qlt != {0}:qlt && x : qlt > {3/4}:qlt.").value_or(nullptr))
 			.value().main->get();
 		tref subst = rewriter::replace<node_t>(atoms, sol.value());
 		CHECK( !tau::get(subst).find_top(is<node_t, tau::wff_f>) );
@@ -187,7 +187,7 @@ TEST_SUITE("SO-1 mixed ordering systems") {
 TEST_SUITE("SO-14 qlt ordering systems") {
 
 	std::optional<solution<node_t>> solve_ord(const std::string& system) {
-		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
 		solver_options options = {
 			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
 			.mode = solver_mode::general

@@ -45,8 +45,8 @@ static std::optional<hsb> eval_from_str(const std::string& s) {
 		| hsb_parser::hsb;
 	if (!t.has_value()) return std::nullopt;
 	auto tval = idni::tau_lang::hsb_grammar_detail::eval_parse_tree(t);
-	if (!tval) return std::nullopt;
-	return hsb(*tval);
+	if (!tval.has_value()) return std::nullopt;
+	return hsb(tval.value());
 }
 
 TEST_SUITE("hsb — basic construction") {
@@ -1456,14 +1456,16 @@ TEST_SUITE("hsb — dispatcher") {
 		gc_fixture gc;
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto s = dispatcher_t::one(hsb_type<node_t>());
-		CHECK(s == "top");
+		REQUIRE(s.has_value());
+		CHECK(s.value() == "top");
 	}
 
 	TEST_CASE("dispatcher zero() returns bot for hsb") {
 		gc_fixture gc;
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto s = dispatcher_t::zero(hsb_type<node_t>());
-		CHECK(s == "bot");
+		REQUIRE(s.has_value());
+		CHECK(s.value() == "bot");
 	}
 
 	TEST_CASE("dispatcher is_syntactic_one for hsb top") {
@@ -1562,28 +1564,28 @@ TEST_SUITE("hsb — dispatcher") {
 		gc_fixture gc;
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
-		CHECK(dispatcher_t::is_zero(v) == false);
+		CHECK(dispatcher_t::is_zero(v).value() == false);
 	}
 
 	TEST_CASE("dispatcher is_zero for bot") {
 		gc_fixture gc;
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
-		CHECK(dispatcher_t::is_zero(v) == true);
+		CHECK(dispatcher_t::is_zero(v).value() == true);
 	}
 
 	TEST_CASE("dispatcher is_one for top") {
 		gc_fixture gc;
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
-		CHECK(dispatcher_t::is_one(v) == true);
+		CHECK(dispatcher_t::is_one(v).value() == true);
 	}
 
 	TEST_CASE("dispatcher is_one for bot") {
 		gc_fixture gc;
 		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
-		CHECK(dispatcher_t::is_one(v) == false);
+		CHECK(dispatcher_t::is_one(v).value() == false);
 	}
 
 } // TEST_SUITE dispatcher
@@ -1593,7 +1595,7 @@ TEST_SUITE("hsb — dispatcher") {
 
 // Parse a tau spec string and return the main wff tref.
 static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -2265,8 +2267,8 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 	// This is critical for Mode A (full synthesis): tokens are bv[K], activations
 	// are hsb in R^d, and the synthesis pipeline handles both jointly.
 	//
-	// Ref: llm-is-tau.md §1: "A transformer is a quantified LTL(hsb, bv) formula."
-	// Ref: re-evaluation §Stage 2: "The synthesis pipeline is mode-agnostic."
+	// A transformer is a quantified LTL(hsb, bv) formula.
+	// The synthesis pipeline is mode-agnostic.
 
 	// --- F(hsb) && F(bv) simple conjunction ---
 
@@ -2595,8 +2597,8 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 	//   o_token : bv — token-level output (inner)
 	//   o_admit : hsb — admissibility region (inner/outer)
 	//
-	// Ref: str-ltl.tex §3: tick-segmented reduction
-	// Ref: llm-is-tau.md §2: two temporal axes
+	// Tick-segmented reduction.
+	// Two temporal axes.
 	// Ref: tau_neuro.tex Definition 17: two-cadence Mealy automaton
 
 	// --- Frame formula: ticks happen infinitely often ---
@@ -2836,8 +2838,8 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	// P3 (Contradiction testing): conjunction satisfiability of multiple hsb
 	// atoms — is_hsb_zero returns false iff the conjunction is satisfiable.
 	//
-	// Ref: ba_hom.md §8 (P5: Sikorski extension)
-	// Ref: ba_hom.md §6 (P3: Contradiction testing)
+	// P5: Sikorski extension.
+	// P3: Contradiction testing.
 	// Ref: LP_d_CONSTRUCTION.md (atomless BA, emptiness decidable by LP)
 
 	// =====================================================================
@@ -2916,7 +2918,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		CHECK_FALSE(is_hsb_zero(h1 & h2 & h3));
 	}
 
-	// --- 4-element and 5-element MUS (bounded k_max = 5 from ba_hom.md §7.2) ---
+	// --- 4-element and 5-element MUS (bounded k_max = 5) ---
 
 	TEST_CASE("Conjunction emptiness: 4-element conjunction in 2D") {
 		gc_fixture gc;
@@ -3060,7 +3062,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	// =====================================================================
 	// Coherence enforcement — h(P) ∧ commitments consistency
 	// =====================================================================
-	// Ref: ba_hom.md §10.5: when the model asserts P, check h(P) ∧ commitments ≠ ⊥.
+	// When the model asserts P, check h(P) ∧ commitments ≠ ⊥.
 
 	TEST_CASE("Coherence: single commitment compatible with new assertion") {
 		gc_fixture gc;
@@ -3121,7 +3123,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	// =====================================================================
 	// MUS-enumerated structure — testing MUS properties via is_hsb_zero
 	// =====================================================================
-	// Ref: ba_hom.md §2.5: MUS = minimal unsatisfiable subset
+	// MUS = minimal unsatisfiable subset.
 
 	TEST_CASE("MUS: minimal — removing any element makes it satisfiable") {
 		gc_fixture gc;
@@ -3157,7 +3159,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	// =====================================================================
 	// LTL(hsb) specs for coherence enforcement
 	// =====================================================================
-	// Ref: ba_hom.md §10.5: coherence = hsb satisfiability in temporal context
+	// Coherence = hsb satisfiability in temporal context.
 
 	TEST_CASE("LTL coherence: G(commitment -> admit!=bot) REALIZABLE") {
 		gc_fixture gc;
@@ -4161,7 +4163,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 	// candidate specs. Each template must parse and synthesize correctly.
 	//
 	// Ref: tau_neuro/hypothesis_class.py lines 156-204
-	// Ref: paper/tau_neuro.tex §5 (inductive spec synthesis)
+	// Inductive spec synthesis.
 
 	// --- Size 1: single temporal + single atom ---
 
@@ -4449,10 +4451,9 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	//
-	// Tests validating spec evolution patterns from tau-neuro's
-	// spec_evolution.py and paper/tau_neuro.tex §5, §8, §10.7:
-	// inductive synthesis, failure recovery, mode switching, session
-	// persistence, BA-Hom incremental construction.
+	// Tests validating spec evolution patterns: inductive synthesis,
+	// failure recovery, mode switching, session persistence, BA-Hom
+	// incremental construction.
 
 	// --- Spec consolidation: conjunction of multiple clauses ---
 

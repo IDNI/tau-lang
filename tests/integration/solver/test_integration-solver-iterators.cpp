@@ -12,7 +12,7 @@ TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 #ifdef DEBUG
 		using node = node_t;
 		std::cout << "sample: " << TAU_DUMP_TO_STR(n) << "\n";
@@ -30,7 +30,7 @@ TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with two vars") {
 		const char* sample = "x | y = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
@@ -53,7 +53,7 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with three vars") {
 		std::cout << "------------------------------------------------------\n";
 		const char* sample = "x | y | z = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
@@ -79,7 +79,7 @@ TEST_SUITE("minterm_range") {
 
 	TEST_CASE("one var") {
 		const char* sample = "x = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
 		CHECK ( rng.begin() != rng.end() );
@@ -88,7 +88,7 @@ TEST_SUITE("minterm_range") {
 
 	TEST_CASE("two var") {
 		const char* sample = "x | y = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
 		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
@@ -97,7 +97,7 @@ TEST_SUITE("minterm_range") {
 
 	TEST_CASE("three var") {
 		const char* sample = "x | y | z = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
 		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
@@ -111,7 +111,7 @@ TEST_SUITE("minterm_range") {
 		// unreachable: a false first choice at index 0 only coincides
 		// with counter wrap-around, which exhausts first.)
 		const char* sample = "x' & y = 0.";
-		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+		tref n = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr)).value().main->get();
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_range<node_t> rng(fm);
 		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
@@ -134,7 +134,7 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr));
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_iterator<node_t> it(sys);
@@ -143,7 +143,7 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("one inequality with two vars") {
 		const char* sample = "x | y != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr));
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_iterator<node_t> it(sys);
@@ -155,7 +155,7 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("one inequality with three vars") {
 		const char* sample = "x | y | z != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr));
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_iterator<node_t> it(sys);
@@ -166,10 +166,10 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("two inequalities with one var") {
 		const char* sample1 = "a != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x != 0.";
-		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2).value_or(nullptr));
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_iterator<node_t> it(sys);
@@ -178,10 +178,10 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a | b != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y != 0.";
-		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2).value_or(nullptr));
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_iterator<node_t> it(sys);
@@ -193,10 +193,10 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("two inequalities with three vars") {
 		const char* sample1 = "a | b |c != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y | z!= 0.";
-		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2).value_or(nullptr));
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_iterator<node_t> it(sys);
@@ -217,7 +217,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr));
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_range<node_t> range(sys);
@@ -227,7 +227,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("one inequality with two vars") {
 		const char* sample = "x | y != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr));
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_range<node_t> range(sys);
@@ -237,7 +237,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("one inequality with three vars") {
 		const char* sample = "x | y | z != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample).value_or(nullptr));
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_range<node_t> range(sys);
@@ -247,10 +247,10 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x != 0.";
-		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2).value_or(nullptr));
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_range<node_t> range(sys);
@@ -260,10 +260,10 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a | b != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y != 0.";
-		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2).value_or(nullptr));
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_range<node_t> range(sys);
@@ -273,10 +273,10 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("three inequalities with two vars") {
 		const char* sample1 = "a | b | c != 0.";
-		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y | z!= 0.";
-		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2).value_or(nullptr));
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_range<node_t> range(sys);
@@ -289,14 +289,14 @@ TEST_SUITE("minterm_inequality_system_range") {
 // solve() used to be a DEBUG-only assertion and is a runtime error now.
 TEST_SUITE("solver guards") {
 	TEST_CASE("var_free_holds on constant equations") {
-		tref t = get_nso_rr<node_t>(tau::get("1 = 1.")).value().main->get();
-		tref f = get_nso_rr<node_t>(tau::get("1 = 0.")).value().main->get();
+		tref t = get_nso_rr<node_t>(tau::get("1 = 1.").value_or(nullptr)).value().main->get();
+		tref f = get_nso_rr<node_t>(tau::get("1 = 0.").value_or(nullptr)).value().main->get();
 		CHECK( var_free_holds<node_t>(t) );
 		CHECK_FALSE( var_free_holds<node_t>(f) );
 	}
 	TEST_CASE("solve refuses a formula with a full-LTL operator") {
 		tref fm = get_nso_rr<node_t>(
-			tau::get("(x = 1) U (y = 0).")).value().main->get();
+			tau::get("(x = 1) U (y = 0).").value_or(nullptr)).value().main->get();
 		REQUIRE( fm != nullptr );
 		auto r = solve<node_t>(fm, solver_options{});
 		CHECK_FALSE( r.has_value() );

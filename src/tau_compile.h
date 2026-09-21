@@ -12,15 +12,15 @@
 #include "api.h"
 #include "ltl_aba.h"
 #include "cpp_codegen.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
 
-// Returned by compile_spec. On success exe_path is populated; on failure
-// error holds a human-readable message and exe_path is empty.
+// Returned by compile_spec, wrapped in a result: the report carries the
+// failure reason, so this struct only holds the success payload.
 struct codegen_result {
 	std::string exe_path;
-	std::string error;
-	bool ok() const { return error.empty() && !exe_path.empty(); }
+	bool ok() const { return !exe_path.empty(); }
 };
 
 // Parse, synthesize and emit `spec_src` via the existing cpp_codegen
@@ -30,7 +30,7 @@ struct codegen_result {
 // build_dir empty → defaults to <current dir>/spec.build.
 // cxx empty       → TAU_CXX, else clang++ when on PATH, else cmake's default.
 template <NodeType Node>
-codegen_result compile_spec(
+result<codegen_result> compile_spec(
 	const std::string& spec_src,
 	const std::string& out_exe = "",
 	const std::string& build_dir = "",

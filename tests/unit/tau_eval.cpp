@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
 		return 2;
 	}
 
-	auto nso = get_nso_rr<node_t>(tau::get(formula.c_str()));
+	auto nso = get_nso_rr<node_t>(tau::get(formula.c_str()).value_or(nullptr));
 	if (!nso.has_value()) {
 		std::string hint = classify_parse_error<node_t>(formula);
 		std::cout << "PARSE_ERROR\n";

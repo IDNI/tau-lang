@@ -36,17 +36,18 @@ typename node::type inverse_of(size_t operation) {
 // top element of a bitvector type, not its multiplicative identity, so the
 // bf_mul identity is built as the constant value 1 of the type's width.
 template<NodeType node>
-tref identity_of(size_t operation, size_t type) {
+result<tref> identity_of(size_t operation, size_t type) {
 	using tau = tree<node>;
+	result<tref> r;
 
-	if (operation == tau::bf_add) return _0<node>(type);
+	if (operation == tau::bf_add) return r.with_value(_0<node>(type));
 	if (operation == tau::bf_mul) {
-		const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type));
-		return tau::build_bf_ba_constant(make_bitvector_value(width, 1), type);
+		TAU_TRY(size_t width, get_bv_width<node>(get_ba_type_tree<node>(type)));
+		return r.with_value(tau::build_bf_ba_constant(make_bitvector_value(width, 1), type));
 	}
 	DBG(assert(false && "identity_of: operation must be bf_add or bf_mul");)
-	LOG_ERROR << "identity_of: unsupported operation " << LOG_NT(operation);
-	return _0<node>(type);
+	return r.with_error(code::unsupported_operation,
+		"identity_of: unsupported operation", {{ label::value, operation }});
 }
 
 // Both overloads return/accept *bare* (unwrapped) values: a lone leaf
@@ -152,16 +153,20 @@ std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operat
  * @endinternal
  */
 template<NodeType node>
-tref combine_diff(size_t operation, size_t type, tref args_side, tref invs_side) {
+result<tref> combine_diff(size_t operation, size_t type, tref args_side, tref invs_side) {
 	using tau = tree<node>;
+	result<tref> r;
 
 	DBG(assert((operation == tau::bf_add || operation == tau::bf_mul)
 		&& "combine_diff: operation must be the direct (non-inverse) associative operator");)
 
-	if (!args_side && !invs_side) return nullptr;
-	if (!invs_side) return args_side;
-	if (!args_side) return tau::get(inverse_of<node>(operation), identity_of<node>(operation, type), tau::get(tau::bf, invs_side));
-	return tau::get(inverse_of<node>(operation), tau::get(tau::bf, args_side), tau::get(tau::bf, invs_side));
+	if (!args_side && !invs_side) return r.with_value(nullptr);
+	if (!invs_side) return r.with_value(args_side);
+	if (!args_side) {
+		TAU_TRY(tref id, identity_of<node>(operation, type));
+		return r.with_value(tau::get(inverse_of<node>(operation), id, tau::get(tau::bf, invs_side)));
+	}
+	return r.with_value(tau::get(inverse_of<node>(operation), tau::get(tau::bf, args_side), tau::get(tau::bf, invs_side)));
 }
 
 /**
@@ -190,8 +195,9 @@ tref combine_diff(size_t operation, size_t type, tref args_side, tref invs_side)
  * @endinternal
  */
 template<NodeType node>
-tref build_simplification(const trefs& arguments, const trefs& inverses, size_t operation, size_t type) {
+result<tref> build_simplification(const trefs& arguments, const trefs& inverses, size_t operation, size_t type) {
 	using tau = tree<node>;
+	result<tref> r;
 
 	DBG(assert((operation == tau::bf_add || operation == tau::bf_mul)
 		&& "build_simplification: operation must be the direct (non-inverse) associative operator");)
@@ -202,7 +208,7 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 	// side of a bf_mul run in the first place (bf_div is always opaque,
 	// never joins a run -- see simplify_block_root), so this is normally
 	// a no-op; kept as an explicit guard rather than an assumed invariant.
-	if (operation != tau::bf_add && !inverses.empty()) return nullptr;
+	if (operation != tau::bf_add && !inverses.empty()) return r.with_value(nullptr);
 
 	// Cancelling a common operand (a + b - b = a) is only sound for
 	// bf_add: bitvector division truncates, so a * b / b == a does not
@@ -225,10 +231,10 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 		// bare, like every other return here: `identity_of` is bf-wrapped
 		// (it goes through `_0`/`_1`), and returning it directly would nest
 		// the replacement in a second bf layer
-		if (!vars && !ctes) return _0_trimmed<node>(type);
-		if (!vars) return ctes;
-		if (!ctes) return vars;
-		return tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes));
+		if (!vars && !ctes) return r.with_value(_0_trimmed<node>(type));
+		if (!vars) return r.with_value(ctes);
+		if (!ctes) return r.with_value(vars);
+		return r.with_value(tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes)));
 	}
 
 	// Everything below is additive-only: a multiplicative block with a
@@ -239,25 +245,26 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 		// bare, like every other return here: `identity_of` is bf-wrapped
 		// (it goes through `_0`/`_1`), and returning it directly would nest
 		// the replacement in a second bf layer
-		if (!vars && !ctes) return _0_trimmed<node>(type);
-		if (!vars) return tau::get(inverse_of<node>(operation), identity_of<node>(operation, type), tau::get(tau::bf, ctes));
-		if (!ctes) return tau::get(inverse_of<node>(operation), identity_of<node>(operation, type), tau::get(tau::bf, vars));
-		return tau::get(inverse_of<node>(operation),
-			identity_of<node>(operation, type),
+		if (!vars && !ctes) return r.with_value(_0_trimmed<node>(type));
+		TAU_TRY(tref id, identity_of<node>(operation, type));
+		if (!vars) return r.with_value(tau::get(inverse_of<node>(operation), id, tau::get(tau::bf, ctes)));
+		if (!ctes) return r.with_value(tau::get(inverse_of<node>(operation), id, tau::get(tau::bf, vars)));
+		return r.with_value(tau::get(inverse_of<node>(operation),
+			id,
 			tau::get(tau::bf,
-				tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes))));
+				tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes)))));
 	}
 
 	auto [invs_vars, invs_ctes] = build_simplification<node>(invs, operation, type);
 	auto [args_vars, args_ctes] = build_simplification<node>(args, operation, type);
 
-	tref vars = combine_diff<node>(operation, type, args_vars, invs_vars);
-	tref ctes = combine_diff<node>(operation, type, args_ctes, invs_ctes);
+	TAU_TRY(tref vars, combine_diff<node>(operation, type, args_vars, invs_vars));
+	TAU_TRY(tref ctes, combine_diff<node>(operation, type, args_ctes, invs_ctes));
 	// bare, like every other return here: see the note above `_0_trimmed`.
-	if (!vars && !ctes) return _0_trimmed<node>(type);
-	if (!vars) return ctes;
-	if (!ctes) return vars;
-	return tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes));
+	if (!vars && !ctes) return r.with_value(_0_trimmed<node>(type));
+	if (!vars) return r.with_value(ctes);
+	if (!ctes) return r.with_value(vars);
+	return r.with_value(tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes)));
 }
 
 // Forward declaration: simplify_block_root and collect_block_operand are
@@ -265,7 +272,7 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 // associative run is simplified as its own independent subtree, which may
 // itself be -- or contain -- a block).
 template<NodeType node>
-std::pair<trefs, trefs> collect_block_operand(tref n, size_t operation, subtree_map<node, tref>& changes);
+result<std::pair<trefs, trefs>> collect_block_operand(tref n, size_t operation, subtree_map<node, tref>& changes);
 
 /**
  * @internal
@@ -299,13 +306,14 @@ std::pair<trefs, trefs> collect_block_operand(tref n, size_t operation, subtree_
  * @endinternal
  */
 template<NodeType node>
-void simplify_block_root(tref n, subtree_map<node, tref>& changes) {
+result<bool> simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 	using tau = tree<node>;
+	result<bool> r;
 
 	if (!n) {
 		DBG(assert(false && "simplify_block_root: null subtree");)
 		LOG_ERROR << "simplify_block_root: null subtree, skipping";
-		return;
+		return r.with_value(true);
 	}
 
 	auto nt = tau::get(n).get_type();
@@ -313,7 +321,8 @@ void simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 		auto inverse = (nt == tau::bf_sub);
 		auto operation = inverse ? inverse_of<node>(nt) : nt;
 		auto type = tau::get(n).get_ba_type();
-		auto [args, invs] = collect_block_operand<node>(n, operation, changes);
+		TAU_TRY(auto operands, collect_block_operand<node>(n, operation, changes));
+		auto& [args, invs] = operands;
 
 		// A binary block operator always contributes at least two leaves
 		// to its own run, so this is structurally unreachable; kept as a
@@ -323,17 +332,20 @@ void simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 		if (args.empty() && invs.empty()) {
 			LOG_ERROR << "simplify_block_root: block rooted at "
 				<< LOG_NT(nt) << " collected no operands, leaving it unsimplified";
-			return;
+			return r.with_value(true);
 		}
 
-		changes[n] = build_simplification<node>(args, invs, operation, type);
+		TAU_TRY(changes[n], build_simplification<node>(args, invs, operation, type));
 
 		DBG(LOG_TRACE << "simplify_block_root/operation: " << LOG_NT(operation) << "\n";
 			LOG_TRACE << "simplify_block_root/simplification: " << tau::get(changes[n]).tree_to_str() << "\n";)
-		return;
+		return r.with_value(true);
 	}
 
-	for (tref c : tau::get(n).children()) simplify_block_root<node>(c, changes);
+	for (tref c : tau::get(n).children()) {
+		TAU_TRY([[maybe_unused]] bool ok, simplify_block_root<node>(c, changes));
+	}
+	return r.with_value(true);
 }
 
 /**
@@ -360,13 +372,14 @@ void simplify_block_root(tref n, subtree_map<node, tref>& changes) {
  * @endinternal
  */
 template<NodeType node>
-std::pair<trefs, trefs> collect_block_operand(tref n, size_t operation, subtree_map<node, tref>& changes) {
+result<std::pair<trefs, trefs>> collect_block_operand(tref n, size_t operation, subtree_map<node, tref>& changes) {
 	using tau = tree<node>;
+	result<std::pair<trefs, trefs>> r;
 
 	if (!n) {
 		DBG(assert(false && "collect_block_operand: null subtree");)
 		LOG_ERROR << "collect_block_operand: null subtree, contributing nothing";
-		return {};
+		return r.with_value(std::pair<trefs, trefs>{});
 	}
 
 	auto nt = tau::get(n).get_type();
@@ -378,12 +391,14 @@ std::pair<trefs, trefs> collect_block_operand(tref n, size_t operation, subtree_
 				&& "collect_block_operand: block operator is not binary");)
 			auto left  = tau::trim(tau::get(n).child(0));
 			auto right = tau::trim(tau::get(n).child(1));
-			auto [args, invs] = collect_block_operand<node>(left, operation, changes);
-			auto [rargs, rinvs] = collect_block_operand<node>(right, operation, changes);
+			TAU_TRY(auto left_operands, collect_block_operand<node>(left, operation, changes));
+			TAU_TRY(auto right_operands, collect_block_operand<node>(right, operation, changes));
+			auto& [args, invs] = left_operands;
+			auto& [rargs, rinvs] = right_operands;
 			if (inverse) std::swap(rargs, rinvs);
 			args.insert(args.end(), rargs.begin(), rargs.end());
 			invs.insert(invs.end(), rinvs.begin(), rinvs.end());
-			return { std::move(args), std::move(invs) };
+			return r.with_value(std::pair<trefs, trefs>{ std::move(args), std::move(invs) });
 		}
 	}
 
@@ -392,8 +407,8 @@ std::pair<trefs, trefs> collect_block_operand(tref n, size_t operation, subtree_
 	// subtree as one opaque operand. The actual substitution is applied
 	// by the caller's rewriter::replace, possibly needing another
 	// fixpoint round to fully flatten, like constant folding.
-	simplify_block_root<node>(n, changes);
-	return { trefs{n}, trefs{} };
+	TAU_TRY([[maybe_unused]] bool ok, simplify_block_root<node>(n, changes));
+	return r.with_value(std::pair<trefs, trefs>{ trefs{n}, trefs{} });
 }
 
 /**
@@ -413,14 +428,15 @@ std::pair<trefs, trefs> collect_block_operand(tref n, size_t operation, subtree_
  * @endinternal
  */
 template<NodeType node>
-subtree_map<node, tref> simplify_blocks(const tref& n) {
+result<subtree_map<node, tref>> simplify_blocks(const tref& n) {
+	result<subtree_map<node, tref>> r;
 	subtree_map<node, tref> changes;
-	simplify_block_root<node>(n, changes);
-	return changes;
+	TAU_TRY([[maybe_unused]] bool ok, simplify_block_root<node>(n, changes));
+	return r.with_value(std::move(changes));
 }
 
 template<NodeType node>
-tref bv_ba_custom_simplification(const tref term) {
+result<tref> bv_ba_custom_simplification(const tref term) {
 	// Loop simplify_blocks to a fixpoint. Previously current was inserted
 	// into visited every iteration right before the loop condition
 	// checked for it, so the condition was always false and the loop ran
@@ -431,8 +447,9 @@ tref bv_ba_custom_simplification(const tref term) {
 	tref current = term;
 	std::unordered_set<tref> visited{current};
 	size_t round = 0;
+	result<tref> r;
 	for (; !max_simplify_rounds || round < max_simplify_rounds; ++round) {
-		auto changes = simplify_blocks<node>(current);
+		TAU_TRY(auto changes, simplify_blocks<node>(current));
 		tref next = rewriter::replace<node>(current, changes);
 		if (next == current) break;
 		if (visited.contains(next)) { current = next; break; }
@@ -440,16 +457,17 @@ tref bv_ba_custom_simplification(const tref term) {
 		current = next;
 	}
 	if (max_simplify_rounds && round == max_simplify_rounds)
-		LOG_ERROR << "bv_ba_custom_simplification: exceeded "
-			<< max_simplify_rounds << " rounds (max-simplify-rounds)"
-			" without reaching a fixpoint or cycle, giving up";
+		r.warning("bv_ba_custom_simplification: exceeded max-simplify-rounds "
+			"without reaching a fixpoint or cycle, returning the partial "
+			"simplification",
+			{{ label::limit, max_simplify_rounds }});
 
 #ifdef DEBUG
 	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";
 	LOG_TRACE << "bv_ba_custom_simplification/final: " << LOG_FM(current) << "\n";
 #endif // DEBUG
 
-	return current;
+	return r.with_value(current);
 }
 
 } // namespace idni::tau_lang

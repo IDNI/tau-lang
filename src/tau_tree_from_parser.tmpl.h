@@ -31,7 +31,7 @@ namespace idni::tau_lang {
 //
 
 template <NodeType node>
-tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
+result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	using type = typename node::type;
 
 	// map of parse tree nodes' refs to tau tree nodes' refs
@@ -46,7 +46,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	// stack temporary (TT1-5).
 	auto m_get = [&m](tref t) -> const tree<node>& { return get(m.at(t)); };
 
-	bool error = false;
+	result<tref> r;
 
 	auto transformer = [&](tref t, [[maybe_unused]] tref parent) {
 		// DBG(LOG_TRACE << " -- transforming: "
@@ -193,13 +193,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 					fits = pos == ds.size();
 				} catch (const std::exception&) { fits = false; }
 				if (!fits || value > node::data_mask) {
-					LOG_ERROR << "Numeric literal `" << ds
-						<< "` is out of range: it must "
-						"not exceed " << node::data_mask;
 					// Keep producing a node so that the rest
 					// of the traversal stays well formed; the
-					// error flag discards the whole tree.
-					error = true, value = 0;
+					// error discards the whole tree.
+					r.error(code::out_of_range,
+						"numeric literal is out of range",
+						{{label::value, ds}});
+					value = 0;
 				}
 				x = getx_data(value);
 				break;
@@ -260,11 +260,11 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				std::string tname = tree<node>::get(ch[0])
 					.get_string();
 				if (!pack_owns_ba_type_name<node>(tname)) {
-					LOG_ERROR << "[tau] unknown type '" << tname
-						<< "' in cast (valid: "
-						<< node::ba::types_joined()
-						<< ")\n";
-					error = true;
+					r.error(code::type_error,
+						"unknown type in cast",
+						{{label::name, tname},
+						 {label::expected,
+						  node::ba::types_joined()}});
 					break;
 				}
 				ba_type = get_ba_type_id<node>(
@@ -324,9 +324,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		use_hooks_guard<node> hooks_off(false);
 		// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 		post_order<tau_parser::pnode>(ptr.get()).search(transformer);
-		if (error || m.find(ptr.get()) == m.end()) {
+		if (r.has_error()) {
 			// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-			return nullptr;
+			return r;
+		}
+		if (m.find(ptr.get()) == m.end()) {
+			// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
+			return r.with_value(nullptr);
 		}
 		DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
 		DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
@@ -335,33 +339,42 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		if (options.flatten_adts) {
 			transformed = adt_flatten<node>(transformed, options.context,
 				options.session_type_defs);
-			if (!transformed) return nullptr;
+			if (!transformed) {
+				r.error(code::type_error,
+					"ADT flattening produced no tree");
+				return r;
+			}
 		}
 
 		if (options.infer_ba_types) {
-			auto result = infer_ba_types<node>(transformed,
+			auto inferred = infer_ba_types<node>(transformed,
 				options.global_scope, options.definition_heads,
 				{ .use_defaults = options.use_default_types });
-			transformed = result.first;
+			transformed = inferred.first;
 			// If type inference failed
 			if (!transformed) {
 				DBG(LOG_TRACE << "inferred is nullptr";)
-				return nullptr;
+				r.error(code::type_error,
+					"type inference produced no tree");
+				return r;
 			}
 			if (options.context) {
-				options.context->update_types(result.second);
+				options.context->update_types(inferred.second);
 			}
 			if (options.global_scope)
-				*options.global_scope = std::move(result.second);
+				*options.global_scope = std::move(inferred.second);
 		}
 
 		// Rewrite G(A && G(B)) → G(A) && G(B) before semantic error check.
 		transformed = unnest_nested_always<node>(transformed);
 
 		//Check for semantic errors in expression
-		if (has_semantic_error<node>(transformed)) {
+		TAU_TRY(bool sem_error, has_semantic_error<node>(transformed));
+		if (sem_error) {
 			DBG(LOG_TRACE << "transformed has semantic error";)
-			return nullptr;
+			r.error(code::type_error,
+				"transformed formula has a semantic error");
+			return r;
 		}
 	}
 	if (options.reget_with_hooks) transformed = reget(transformed);
@@ -398,35 +411,36 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	// otherwise quantified variables cannot be correctly caught.
 	if (options.infer_ba_types)
 		transformed = canonize_quantifier_ids<node>(transformed);
-	return transformed;
+	return r.with_value(transformed);
 }
 
 template <NodeType node>
-tref tree<node>::get(const tau_parser::tree& t, get_options&& options) {
+result<tref> tree<node>::get(const tau_parser::tree& t, get_options&& options) {
 	return get(t, options);
 }
 
 //------------------------------------------------------------------------------
 
 template <NodeType node>
-tref tree<node>::get(tau_parser::result& result, get_options& options) {
-	if (!result.found) {
-		auto msg = result.parse_error
+result<tref> tree<node>::get(tau_parser::result& presult, get_options& options) {
+	if (!presult.found) {
+		auto msg = presult.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-		LOG_ERROR << "[tau] " << msg << "\n";
-		return nullptr;
+		result<tref> r;
+		r.error(code::parse_error, msg);
+		return r;
 	}
-	auto pt = parse_tree::get(result.get_shaped_tree2());
+	auto pt = parse_tree::get(presult.get_shaped_tree2());
 	return tree<node>::get(pt, options);
 }
 
 template <NodeType node>
-tref tree<node>::get(tau_parser::result& result, get_options&& options) {
+result<tref> tree<node>::get(tau_parser::result& result, get_options&& options) {
 	return get(result, options);
 }
 
 template<NodeType node>
-tref tree<node>::get(const std::string& str) {
+result<tref> tree<node>::get(const std::string& str) {
 	get_options opts;
 	// The (const std::string&, get_options&) overload below falls back to a
 	// local container when opts.parse.dynamic_ctx is null, same as here.
@@ -434,7 +448,7 @@ tref tree<node>::get(const std::string& str) {
 }
 
 template <NodeType node>
-tref tree<node>::get(const std::string& source, get_options& options) {
+result<tref> tree<node>::get(const std::string& source, get_options& options) {
 	// A parse with no caller-owned context still needs one, so a name a
 	// type_def declares can be used later in this same parse.
 	tau_dynamic_context fallback_names;
@@ -446,12 +460,12 @@ tref tree<node>::get(const std::string& source, get_options& options) {
 }
 
 template <NodeType node>
-tref tree<node>::get(const std::string& source, get_options&& options) {
+result<tref> tree<node>::get(const std::string& source, get_options&& options) {
 	return get(source, options);
 }
 
 template <NodeType node>
-tref tree<node>::get(std::istream& is, get_options& options) {
+result<tref> tree<node>::get(std::istream& is, get_options& options) {
 	// See the (const std::string&, get_options&) overload's own comment.
 	tau_dynamic_context fallback_names;
 	auto parse = options.parse;
@@ -461,12 +475,12 @@ tref tree<node>::get(std::istream& is, get_options& options) {
 }
 
 template <NodeType node>
-tref tree<node>::get(std::istream& is, get_options&& options) {
+result<tref> tree<node>::get(std::istream& is, get_options&& options) {
 	return get(is, options);
 }
 
 template <NodeType node>
-tref tree<node>::get_from_file(const std::string& filename,
+result<tref> tree<node>::get_from_file(const std::string& filename,
 	get_options& options)
 {
 	// See the (const std::string&, get_options&) overload's own comment.
@@ -478,7 +492,7 @@ tref tree<node>::get_from_file(const std::string& filename,
 }
 
 template <NodeType node>
-tref tree<node>::get_from_file(const std::string& filename,
+result<tref> tree<node>::get_from_file(const std::string& filename,
 	get_options&& options)
 {
 	return get_from_file(filename, options);

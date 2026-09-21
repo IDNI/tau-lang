@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "defs.h"
+#include "tau_diagnostics.h"
 #include "backends/bdds/bdd_handle.h"
 
 namespace idni::tau_lang {
@@ -98,9 +99,6 @@ inline void ocltl_phi_delta_bdd_init() {
 	bdd_init<Bool, ocltl_phi_delta_bdd_options>();
 }
 
-// Thrown out of ocltl_build_phi_delta when a supplied deadline passes.
-struct ocltl_phi_delta_timeout {};
-
 // Conservative default ceilings a single build refuses to exceed.
 inline constexpr size_t ocltl_phi_delta_default_max_vars = size_t{1} << 20;
 inline constexpr size_t ocltl_phi_delta_default_max_nodes = size_t{1} << 20;
@@ -109,14 +107,6 @@ inline constexpr size_t ocltl_phi_delta_default_max_nodes = size_t{1} << 20;
 struct ocltl_phi_delta_limits {
 	size_t max_vars = ocltl_phi_delta_default_max_vars;
 	size_t max_nodes = ocltl_phi_delta_default_max_nodes;
-};
-
-// Thrown out of ocltl_build_phi_delta when a limit in `ocltl_phi_delta_limits`
-// would be exceeded; `ceiling` names which one ("vars" or "nodes").
-struct ocltl_phi_delta_limit_exceeded {
-	std::string ceiling;
-	size_t limit = 0;
-	size_t value = 0;
 };
 
 struct ocltl_phi_delta_stats {
@@ -136,12 +126,11 @@ struct ocltl_phi_delta_result {
 // Build phi_delta(sigma, rho, D) for the given coordinate layout and data
 // atoms. Never enumerates tau; builds a BDD over 2^k() fresh tau-bit
 // variables and existentially projects them away. Requires
-// ocltl_phi_delta_bdd_init() to already have been called. Throws
-// ocltl_phi_delta_timeout if `deadline` is given and passes before the build
-// completes, and ocltl_phi_delta_limit_exceeded if `limits` would be
-// exceeded, checked before the allocation that would exceed it.
+// ocltl_phi_delta_bdd_init() to already have been called. Reports
+// code::solver_error when a supplied `deadline` passes or a `limits` ceiling
+// is exceeded, checked before the allocation that would exceed it.
 // `force_sigma_major` overrides the id ordering; unset auto-picks the smaller of k_sigma/k_rho.
-ocltl_phi_delta_result ocltl_build_phi_delta(const ocltl_phi_delta_dims& dims,
+result<ocltl_phi_delta_result> ocltl_build_phi_delta(const ocltl_phi_delta_dims& dims,
 	const std::vector<ocltl_delta_atom>& atoms,
 	std::optional<std::chrono::steady_clock::time_point> deadline
 		= std::nullopt,

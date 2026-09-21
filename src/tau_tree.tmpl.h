@@ -258,7 +258,7 @@ bool has_temp_var(tref n);
  * converted yet (BA constant id 0).
  */
 template <NodeType node>
-bool has_open_tau_fm_in_constant(tref fm);
+result<bool> has_open_tau_fm_in_constant(tref fm);
 
 /**
  * @brief Report (with an error log) a temporal quantifier nested inside
@@ -290,10 +290,11 @@ bool has_negative_offset(tref fm);
  * invalid_nesting_of_quants, has_open_tau_fm_in_constant,
  * invalid_nesting_of_temp_quants, missing_temp_quants,
  * has_negative_offset or has_missplaced_fallback rejects @p fm; each
- * check logs its own error message.
+ * check logs its own error message. Fails when has_open_tau_fm_in_constant
+ * fails.
  */
 template <NodeType node>
-bool has_semantic_error(tref fm);
+result<bool> has_semantic_error(tref fm);
 
 template <NodeType node>
 tref unnest_nested_always(tref fm);
@@ -614,7 +615,7 @@ tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(
+result<tref> tree<node>::get_ba_constant(
 	const std::string& constant_source,
 	tref type_tree)
 {
@@ -623,42 +624,49 @@ tref tree<node>::get_ba_constant(
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant_from_source(
+result<tref> tree<node>::get_ba_constant_from_source(
 	size_t constant_source_sid,
 	size_t ba_type_id)
 {
+	result<tref> r;
+	TAU_TRY(tref type_tree, ba_types<node>::type_tree(ba_type_id));
 #ifdef DEBUG
 	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
 				<< dict(constant_source_sid) << "`, "
 				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
 	if (ba_type_id == 0)
 		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
-	else LOG_TRACE << " -- typed: " << ba_types<node>::name(ba_type_id);
+	// Advisory drop: DEBUG-only trace line has no channel for a report here.
+	else LOG_TRACE << " -- typed: "
+		<< ba_types<node>::name(ba_type_id).value_or(std::string());
 	assert(ba_type_id > 0);
 #endif // DEBUG
 
-	tref r = get_ba_constant(ba_constants<node>::get(
-					dict(constant_source_sid),
-					ba_types<node>::type_tree(ba_type_id)));
+	auto cnst_r = ba_constants<node>::get(dict(constant_source_sid), type_tree);
+	tref value = cnst_r.has_value()
+		? get_ba_constant(cnst_r.value().first, type_tree)
+		: nullptr;
 	// (A 2026-08-18 REVIEW note here blamed lazy provider init for
 	// order-dependent constant-parse failures in test packs; the real
 	// cause was the Bool-pack test harness's get() specialization
 	// ignoring the requested type — fixed in tests/test_Bool_helpers.h,
 	// 2026-08-19. Nothing is wrong at this call site.)
-	if (r == nullptr) LOG_ERROR << "Parsing constant `"
+	// Advisory drop: LOG_ERROR contract cannot abort the line for a report.
+	if (value == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
-		<< ba_types<node>::name(ba_type_id) << "` (valid: "
-		<< node::ba::types_joined() << ").";
-	else LOG_TRACE << " -- result: " << LOG_FM(r);
-	return r;
+		<< ba_types<node>::name(ba_type_id).value_or(std::string())
+		<< "` (valid: " << node::ba::types_joined() << ").";
+	else LOG_TRACE << " -- result: " << LOG_FM(value);
+	return r.with_value(value);
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
+result<tref> tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
+	result<tref> r;
+	TAU_TRY(constant c, ba_constants<node>::get(constant_id));
 	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
-		<< LOG_BA(ba_constants<node>::get(constant_id)) << "`, "
-		<< LOG_BA_TYPE(ba_type_id);
-	return get_ba_constant(ba_constants<node>::get(constant_id), ba_type_id);
+		<< LOG_BA(c) << "`, " << LOG_BA_TYPE(ba_type_id);
+	return r.with_value(get_ba_constant(c, ba_type_id));
 }
 
 template <NodeType node>
@@ -975,7 +983,8 @@ size_t tree<node>::get_ba_constant_id() const {
 template <NodeType node>
 tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
-	return ba_constants<node>::get(data());
+	// Advisory drop: plain-value accessor contract.
+	return ba_constants<node>::get(data()).value_or(constant{});
 }
 
 template <NodeType node>
@@ -986,13 +995,8 @@ size_t tree<node>::get_ba_type() const {
 	return this->value.ba_type;
 }
 
-template <NodeType node>
-std::string tree<node>::get_ba_type_name() const {
-	return ba_types<node>::name(this->get_ba_type());
-}
-
 template<NodeType node>
-tref tree<node>::get_ba_type_tree() const {
+result<tref> tree<node>::get_ba_type_tree() const {
 	return ba_types<node>::type_tree(this->get_ba_type());
 }
 

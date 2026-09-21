@@ -94,13 +94,13 @@ TEST_SUITE("cvc5_satisfiability") {
 
 	TEST_CASE("all x ex y x + y = { #b1 }:bv[4]") {
 		const std::string sample = "all x ex y x + y = { #b1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( is_bv_formula_sat<node_t>(formula) );
 	}
 
 	TEST_CASE("all x x + y = { #b1 }:bv[4]") {
 		const std::string sample = "all x x + y = { #b1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		// y is implicitlly existentially quantified by cvc5
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
@@ -109,7 +109,7 @@ TEST_SUITE("cvc5_satisfiability") {
 
 	TEST_CASE("all x x > { 0 }") {
 		const std::string sample = "all x x > { 0 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
 		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
@@ -117,7 +117,7 @@ TEST_SUITE("cvc5_satisfiability") {
 
 	TEST_CASE("all x x + { 1 } = { 1 }") {
 		const std::string sample = "all x x + { 1 } = { 1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
 		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
@@ -125,7 +125,7 @@ TEST_SUITE("cvc5_satisfiability") {
 
 	TEST_CASE("all x x + { 1 } < { 1 }") {
 		const std::string sample = "all x x + { 1 } < { 1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
 		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
@@ -133,7 +133,7 @@ TEST_SUITE("cvc5_satisfiability") {
 
 	TEST_CASE("all x x + { 1 }:bv[4] < { 1 }:bv[4]") {
 		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		// TODO (HIGH) change assertion when supporting overflows
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
@@ -147,33 +147,33 @@ TEST_SUITE("cvc5_satisfiability: min/max") {
 
 	TEST_CASE("all x all y min(x, y:bv[4]) <= x") {
 		const std::string sample = "all x all y min(x, y:bv[4]) <= x";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( is_bv_formula_valid<node_t>(formula) );
 	}
 
 	TEST_CASE("all x all y ( min(x, y:bv[4]) = x || min(x, y) = y )") {
 		const std::string sample =
 			"all x all y ( min(x, y:bv[4]) = x || min(x, y) = y )";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( is_bv_formula_valid<node_t>(formula) );
 	}
 
 	TEST_CASE("all x all y min(x, y:bv[4]) + max(x, y) = x + y") {
 		const std::string sample =
 			"all x all y min(x, y:bv[4]) + max(x, y) = x + y";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( is_bv_formula_valid<node_t>(formula) );
 	}
 
 	TEST_CASE("ex x min(x, { 3 }:bv[4]) = { 2 }:bv[4]") {
 		const std::string sample = "ex x min(x, { 3 }:bv[4]) = { 2 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( is_bv_formula_sat<node_t>(formula) );
 	}
 
 	TEST_CASE("ex x max(x, { 3 }:bv[4]) < { 3 }:bv[4]") {
 		const std::string sample = "ex x max(x, { 3 }:bv[4]) < { 3 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
 	}
 }
@@ -186,7 +186,7 @@ TEST_SUITE("bv_formula_sat_status (BA-1)") {
 
 	TEST_CASE("sat formula") {
 		const std::string sample = "ex x x = { 1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		auto status = bv_formula_sat_status<node_t>(formula);
 		REQUIRE( status.has_value() );
 		CHECK( status.value() == bv_sat_status::sat );
@@ -195,7 +195,7 @@ TEST_SUITE("bv_formula_sat_status (BA-1)") {
 
 	TEST_CASE("unsat formula") {
 		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
-		auto formula = tau::get(sample, parse_opts_wff);
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		auto status = bv_formula_sat_status<node_t>(formula);
 		REQUIRE( status.has_value() );
 		CHECK( status.value() == bv_sat_status::unsat );

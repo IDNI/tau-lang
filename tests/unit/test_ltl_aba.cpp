@@ -41,7 +41,14 @@
 #ifdef DEBUG
 #  include "interpreter.h"
 #endif
+#include <cstdlib>
 #include <sstream>
+#include <fstream>
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 using namespace idni::tau_lang;
 
@@ -60,7 +67,7 @@ struct gc_fixture { gc_fixture() { do_gc(); } };
 
 // Parse a tau spec string and return the main wff tref.
 static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -69,7 +76,7 @@ static tref spec(const char* s) {
 static tref wff(const char* s) {
 	tau::get_options opts;
 	opts.parse.start = tau::wff;
-	return tau::get(s, opts);
+	return tau::get(s, opts).value_or(nullptr);
 }
 
 // Unwraps is_tau_formula_sat, treating a diagnostic error as unsatisfiable.
@@ -1033,7 +1040,7 @@ TEST_SUITE("LTL interpreter dispatch") {
 	static std::optional<interpreter<node_t>>
 	make_ltl_interp(const char* s) {
 		io_context<node_t> ctx;
-		auto nso = get_nso_rr<node_t>(ctx, tau::get(s));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get(s).value_or(nullptr));
 		if (!nso.has_value()) return {};
 		tref fm = nso.value().main->get();
 		if (!fm) return {};
@@ -1272,7 +1279,7 @@ TEST_SUITE("LTL execution with input streams") {
 
 	// Helper: parse formula with ctx and return main tref.
 	static tref parse_with_ctx(io_context<node_t>& ctx, const char* formula) {
-		auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
 		if (!nso.has_value()) return nullptr;
 		return nso.value().main->get();
 	}
@@ -4020,7 +4027,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
 
 } // TEST_SUITE("[Adversarial: SBF type]")
 
-// ── §29  Algorithm A: binary T_3 encoding end-to-end ─────────────────────────
+// ── Algorithm A: binary T_3 encoding end-to-end ──────────────────────────────
 //
 // Forces TAU_LTL_ALG=A for each test via RAII guard; env var is restored after.
 // Algorithm A is applicable iff all atoms are qlt-typed with lookback ≤ 1,
@@ -4093,7 +4100,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
 
 } // TEST_SUITE("[Algorithm A: binary T3 encoding]")
 
-// ── §30  Algorithm B: polarity-complete pairwise constraints end-to-end ───────
+// ── Algorithm B: polarity-complete pairwise constraints end-to-end ──────────
 //
 // Forces TAU_LTL_ALG=B via RAII guard. Algorithm B adds mixed-polarity
 // pairwise constraints (¬δ_i∧δ_j, δ_i∧¬δ_j, ¬δ_i∧¬δ_j) for all non-lookback
@@ -4167,7 +4174,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
 } // TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]")
 
-// ── §31  Positional atoms: X-encoding in the LTL(ABA) skeleton ───────────────
+// ── Positional atoms: X-encoding in the LTL(ABA) skeleton ───────────────────
 //
 // A data atom whose io_vars are all at a constant absolute position (o[k],
 // as opposed to the relative o[t]/o[t-1]) is placed at its step via nested
@@ -4245,9 +4252,14 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		CHECK_FALSE(r.has_value());
-		std::ostringstream os;
-		r.print(os);
-		CHECK(os.str().find("not yet supported") != std::string::npos);
+		CHECK(report_has_code(r.report(), code::unsupported_operation));
+		bool found = false;
+		for (auto& n : r.report().nodes())
+			if (n.tag == code::unsupported_operation
+				&& r.report().str(n.key).find("not yet supported")
+					!= std::string::npos)
+				found = true;
+		CHECK(found);
 	}
 
 	// A G() body mixing a positional atom with genuinely temporal (relative)
@@ -4419,17 +4431,16 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
-		// the refusal is an error result: no verdict, not a decided F
 		tref fm = wff("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
 		result<bool> ok_r;
 		CHECK_NOTHROW(ok_r = ltl_explain<node_t>(fm, oss));
-		CHECK_FALSE(ok_r.has_value());
-		std::ostringstream err;
-		ok_r.print(err);
-		CHECK(err.str().find("not yet supported") != std::string::npos);
-		MESSAGE(oss.str());
+		std::string out = oss.str();
+		REQUIRE(ok_r.has_value());
+		CHECK_FALSE(ok_r.value());
+		CHECK(out.find("REFUSED:") != std::string::npos);
+		MESSAGE(out);
 	}
 
 } // TEST_SUITE("ltl_explain diagnostics")
@@ -4445,7 +4456,7 @@ TEST_SUITE("Positional atoms: executed safety path") {
 	// Parse a formula string through `ctx` (wiring its io_vars to ctx's
 	// registered streams the way a real spec's parse would).
 	static tref parse_thru_ctx(io_context<node_t>& ctx, const char* formula) {
-		auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
+		auto nso = get_nso_rr<node_t>(ctx, tau::get(formula).value_or(nullptr));
 		if (!nso.has_value()) return nullptr;
 		return nso.value().main->get();
 	}
@@ -4535,7 +4546,7 @@ TEST_SUITE("Since (S) operator: executed safety path") {
 		ctx.add_output("o2", tau_type_id<node_t>(), o2);
 
 		auto nso = get_nso_rr<node_t>(ctx,
-		    tau::get("(o1[t]:tau = {T.}:tau) since (o2[t]:tau = {T.}:tau)."));
+		    tau::get("(o1[t]:tau = {T.}:tau) since (o2[t]:tau = {T.}:tau).").value_or(nullptr));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -4894,7 +4905,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK(guard_is_aba_feasible<node_t>("!0&2&3 | 0&!2 | !0&!2", aps, atoms));
 	}
 
-	// ── §13 / Batch O8: exact mixed-type coverage ─────────────────────────
+	// ── Batch O8: exact mixed-type coverage ───────────────────────────────
 	//
 	// The single-type semantic COVER check cannot span independent BA
 	// types, so mixed-type guards used to stop at the syntactic subset
@@ -5193,51 +5204,135 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 
 TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 
-	// `call_ltlsynt` special-cased only exit 127 (binary not on PATH).  Every
-	// other failure — in particular exit 143, which is 128 + SIGTERM, exactly
-	// what the TAU_LTL_TIMEOUT_SEC watchdog sends — fell into the
-	// `out.empty()` branch and returned {false, ""}, which every caller reads
-	// as a definitive UNREALIZABLE.  A slow-but-realizable specification thus
-	// got a WRONG ANSWER with only a LOG_DEBUG trace behind it.
+	// `call_ltlsynt` used to special-case only exit 127 (binary not on
+	// PATH). Every other failure -- in particular exit 143, which is
+	// 128 + SIGTERM, exactly what the TAU_LTL_TIMEOUT_SEC watchdog sends --
+	// fell through to a definitive UNREALIZABLE. A slow-but-realizable
+	// specification thus got a WRONG ANSWER with only a LOG_DEBUG trace
+	// behind it.
 	//
-	// A timeout cannot be forced on demand without making ltlsynt misbehave,
-	// so the decision itself is pinned here as a table over the classifier
-	// `call_ltlsynt` consults.
+	// The exit-code convention now lives entirely inside spawn_capture
+	// (backends/spot/spot.h), which decides it once from a real spawn and
+	// never returns the raw code; these cases drive that decision with
+	// small `sh` stubs instead of a synthetic (exit_code, stdout) pair.
 
-	TEST_CASE("[LX-01] a real verdict is `ok`") {
-		CHECK(classify_spot_exit(0, "REALIZABLE\nHOA: v1\n")
-		      == spot_exit_kind::ok);
-		CHECK(classify_spot_exit(1, "UNREALIZABLE\n")
-		      == spot_exit_kind::ok);
+	TEST_CASE("[LX-01] an accepted exit code is ok") {
+		auto exit_ok = [](int c) { return c == 0 || c == 1; };
+		auto r0 = spawn_capture({"sh", "-c",
+			"printf 'REALIZABLE\\nHOA: v1\\n'"}, 0, exit_ok);
+		CHECK(r0.has_value());
+		auto r1 = spawn_capture({"sh", "-c",
+			"printf 'UNREALIZABLE\\n'; exit 1"}, 0, exit_ok);
+		CHECK(r1.has_value());
 	}
 
-	TEST_CASE("[LX-02] the watchdog kill is a failure, not UNREALIZABLE") {
-		// 128 + SIGTERM(15) = 143.
-		CHECK(classify_spot_exit(143, "") == spot_exit_kind::failed);
+	TEST_CASE("[LX-02] a signal death is a failure, not UNREALIZABLE") {
+		// 128 + SIGTERM(15) = 143, the timeout watchdog's own signal.
+		auto term = spawn_capture({"sh", "-c", "kill -TERM $$"});
+		CHECK(term.has_error());
+		CHECK(report_has_code(term.report(), code::runtime_error));
 		// A partially-written strategy is still no verdict.
-		CHECK(classify_spot_exit(143, "REALIZABLE\nHOA: v1")
-		      == spot_exit_kind::failed);
-		// Any other signal death, e.g. SIGSEGV(11) → 139.
-		CHECK(classify_spot_exit(139, "") == spot_exit_kind::failed);
+		auto partial = spawn_capture({"sh", "-c",
+			"printf 'REALIZABLE\\nHOA: v1'; kill -TERM $$"});
+		CHECK(partial.has_error());
+		// Any other signal death, e.g. SIGSEGV(11), fails the same way.
+		auto segv = spawn_capture({"sh", "-c", "kill -SEGV $$"});
+		CHECK(segv.has_error());
 	}
 
 	TEST_CASE("[LX-03] usage / internal errors are failures") {
-		CHECK(classify_spot_exit(2, "") == spot_exit_kind::failed);
-		CHECK(classify_spot_exit(2, "ltlsynt: unrecognized option")
-		      == spot_exit_kind::failed);
-		// Non-zero with nothing on stdout carries no verdict either.
-		CHECK(classify_spot_exit(1, "") == spot_exit_kind::failed);
+		auto exit_ok = [](int c) { return c == 0 || c == 1; };
+		auto r = spawn_capture({"sh", "-c", "exit 2"}, 0, exit_ok);
+		CHECK(r.has_error());
+		CHECK(report_has_code(r.report(), code::runtime_error));
+		auto with_msg = spawn_capture({"sh", "-c",
+			"echo 'ltlsynt: unrecognized option'; exit 2"}, 0, exit_ok);
+		CHECK(with_msg.has_error());
 	}
 
-	TEST_CASE("[LX-04] a failed spawn is a failure") {
-		CHECK(classify_spot_exit(-1, "") == spot_exit_kind::failed);
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+	constexpr bool has_rlimit_nofile = false;
+#else
+	constexpr bool has_rlimit_nofile = true;
+#endif
+
+	// setrlimit(RLIMIT_NOFILE) forces pipe() itself to fail with EMFILE,
+	// the one internal spawn_capture failure a test can force portably on
+	// POSIX; Windows and Emscripten have neither the syscall nor EMFILE.
+	TEST_CASE("[LX-04] exhausting file descriptors is a failure"
+	          * doctest::skip(!has_rlimit_nofile)) {
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+		struct rlimit saved{};
+		if (getrlimit(RLIMIT_NOFILE, &saved) != 0) return;
+		struct restore_rlimit {
+			struct rlimit r;
+			~restore_rlimit() { setrlimit(RLIMIT_NOFILE, &r); }
+		} restore{saved};
+
+		// 3 leaves no room below stdin/stdout/stderr for pipe()'s two
+		// new descriptors, regardless of how many others are already open.
+		struct rlimit low{3, saved.rlim_max};
+		if (setrlimit(RLIMIT_NOFILE, &low) != 0) return;
+
+		auto r = spawn_capture({"true"});
+		CHECK(r.has_error());
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::io_error));
+
+		auto name_val = report_attr_value(r.report(), label::name);
+		std::string failed_call = name_val
+			? std::string(r.report().str(static_cast<idni::int_t>(*name_val)))
+			: std::string();
+		CHECK(failed_call == "pipe");
+#endif
 	}
 
 	TEST_CASE("[LX-05] a missing binary keeps its own classification") {
 		// Kept distinct so ltlsynt-less environments degrade (log + false)
 		// instead of aborting, which is what the existing skip patterns in
 		// the PWR and Algorithm-D suites rely on.
-		CHECK(classify_spot_exit(127, "") == spot_exit_kind::not_found);
+		auto r = spawn_capture({"definitely_not_a_binary_xyz_98765"});
+		CHECK(r.has_error());
+		CHECK(report_has_code(r.report(), code::not_found));
+	}
+
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+	constexpr bool has_posix_stub_path = false;
+#else
+	constexpr bool has_posix_stub_path = true;
+#endif
+
+	// synthesize() spawns "ltlsynt" by name, so driving it needs a real
+	// stub on PATH; Windows lacks mkdtemp/chmod, and Emscripten's
+	// spawn_capture never runs a spawned command at all.
+	TEST_CASE("[LX-06] an accepted exit code with empty stdout is still no verdict"
+	          * doctest::skip(!has_posix_stub_path)) {
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+		char tmpl[] = "/tmp/tau_ltl_lx06_XXXXXX";
+		char* dir = mkdtemp(tmpl);
+		REQUIRE(dir != nullptr);
+		const std::string stub = std::string(dir) + "/ltlsynt";
+		{
+			std::ofstream s(stub);
+			s << "#!/bin/sh\nexit 1\n";
+		}
+		chmod(stub.c_str(), 0755);
+
+		const char* old_path = std::getenv("PATH");
+		REQUIRE(old_path != nullptr);
+		struct restore_path {
+			std::string p;
+			~restore_path() { setenv("PATH", p.c_str(), 1); }
+		} restore{old_path};
+		setenv("PATH", (std::string(dir) + ":" + restore.p).c_str(), 1);
+
+		auto r = synthesize("F(p0)", {}, {"p0"}, 0);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::solver_error));
+
+		std::remove(stub.c_str());
+		rmdir(dir);
+#endif
 	}
 
 }

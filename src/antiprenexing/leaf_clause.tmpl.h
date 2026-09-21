@@ -60,17 +60,18 @@ bool is_squeezable_conjunct(tref conj) {
 
 /** @internal @copydoc eliminate_block_over_clause @endinternal */
 template <NodeType node>
-tref eliminate_block_over_clause(tref clause, const trefs& block,
+result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	const block_eliminability<node>& elim,
 	const typename term_handle<node>::order& order)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	(void) order; // reserved: the squeezes below build their own orders
 
 	if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
-		return clause;
+		return r.with_value(clause);
 	// If there are no quantifiers to remove, the clause can be returned
-	if (block.empty()) return clause;
+	if (block.empty()) return r.with_value(clause);
 
 	// ---- Lift the conjuncts no block variable touches --------------------
 	//
@@ -91,7 +92,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	}
 	// Nothing in the clause depends on the block at all: under the standing
 	// non-empty domain assumption every binder drops.
-	if (conjs.empty()) return indep;
+	if (conjs.empty()) return r.with_value(indep);
 
 	// ---- BA-type homogeneity, over the DEPENDENT conjuncts only ----------
 	//
@@ -147,7 +148,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		tref kept = tau::build_wff_and(conjs);
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			kept = build_wff_ex<node>(*v, kept, false);
-		return tau::build_wff_and(indep, kept);
+		return r.with_value(tau::build_wff_and(indep, kept));
 	}
 
 	// ---- qlt: DLO quantifier elimination (AN-1/AN-10) --------------------
@@ -203,7 +204,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 				tref scoped_v = tau::build_wff_and(mine);
 				if (auto sat = pack_omcat_qe<node>(
 					clause_type, v, scoped_v); sat) {
-					if (!*sat) return _F<node>();
+					if (!*sat) return r.with_value(_F<node>());
 					// Satisfiable for every value of the
 					// outer/kept endpoints: the conjuncts
 					// and the binder go.
@@ -216,9 +217,9 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 					false));
 				rem = std::move(rest);
 			}
-			if (rem.empty()) return indep;
-			return tau::build_wff_and(indep,
-				tau::build_wff_and(rem));
+			if (rem.empty()) return r.with_value(indep);
+			return r.with_value(tau::build_wff_and(indep,
+				tau::build_wff_and(rem)));
 		}
 	}
 
@@ -319,7 +320,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	if (live.empty()) {
 		// Nothing left to eliminate. Re-wrap the dependent part whole,
 		// which is what the frozen path above already expresses.
-		return with_kept(_T<node>());
+		return r.with_value(with_kept(_T<node>()));
 	}
 
 	tref scoped = tau::build_wff_and(free_conjs);
@@ -341,7 +342,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		return r;
 	};
 	live = occurring_in(live, scoped);
-	if (live.empty()) return with_kept(scoped);
+	if (live.empty()) return r.with_value(with_kept(scoped));
 
 	// ---- A substitution witness, per live variable -----------------------
 	//
@@ -380,13 +381,13 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		still_live.push_back(live[i]);
 	}
 
-	if (tau::get(scoped).equals_T()) return with_kept(_T<node>());
+	if (tau::get(scoped).equals_T()) return r.with_value(with_kept(_T<node>()));
 	// An existential over F is F, independently of the variables.
-	if (tau::get(scoped).equals_F()) return _F<node>();
+	if (tau::get(scoped).equals_F()) return r.with_value(_F<node>());
 	// Again after substitution: eliminating one variable can remove the last
 	// occurrence of another.
 	still_live = occurring_in(still_live, scoped);
-	if (still_live.empty()) return with_kept(scoped);
+	if (still_live.empty()) return r.with_value(with_kept(scoped));
 
 	// ---- Bitvector content: the solver, then blasting --------------------
 	//
@@ -424,8 +425,8 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 				= pack_sat_status<node>(
 					tau::build_wff_ex(v, scoped, false));
 			if (status == true)
-				return with_kept(_T<node>());
-			if (status == false) return _F<node>();
+				return r.with_value(with_kept(_T<node>()));
+			if (status == false) return r.with_value(_F<node>());
 			DBG(if (!status) LOG_TRACE << "solver undecided";)
 		}
 		// Non-closed, or closed-but-undecided: blast the bv existential
@@ -442,19 +443,20 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// re-entry that bypasses those bounded hops, add the guard here.)
 		if (preprocessing && preprocess_placement == preprocess_site::per_leaf) {
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
-			if (auto blasted = pack_preprocess<node>(ex_fm);
-				blasted && blasted != ex_fm)
+			TAU_TRY(tref pre_val, pack_preprocess<node>(ex_fm));
+			if (pre_val != ex_fm) {
 				// preprocess_mode::defer keeps the rewritten formula
 				// without re-entering, leaving the quantifiers
 				// preprocessing introduced to the next resolve pass.
-				return with_kept(
-					preprocess_method == preprocess_mode::defer
-					? blasted
-					: anti_prenex<node>(blasted,
-						eliminability<node>::arith_only()));
+				if (preprocess_method == preprocess_mode::defer)
+					return r.with_value(with_kept(pre_val));
+				TAU_TRY(tref reentered, anti_prenex<node>(pre_val,
+					eliminability<node>::arith_only()));
+				return r.with_value(with_kept(reentered));
+			}
 		}
 		// Not resolvable: keep this binder around the scoped part.
-		return with_kept(tau::build_wff_ex(v, scoped, false));
+		return r.with_value(with_kept(tau::build_wff_ex(v, scoped, false)));
 	}
 
 	// ---- The squeeze -----------------------------------------------------
@@ -504,17 +506,17 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 					tau::_0_trimmed(type_v)),
 				rewriter::replace<node>(scoped, var,
 					tau::_1_trimmed(type_v)));
-			return normalize_atomic_formula_operators<node>(
-				with_kept(term_boole_normal_form<node>(
-					expanded)));
+			TAU_TRY(tref tbnf, term_boole_normal_form<node>(expanded));
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(tbnf)));
 		}
 		if (!neqs.empty() && type_v > 0
 			&& pack_type_has_arith_ops<node>(type_v)) {
 			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
 				"with disequations, keeping the binder: "
 				<< LOG_FM(scoped) << "\n";)
-			return normalize_atomic_formula_operators<node>(
-				with_kept(tau::build_wff_ex(var, scoped, false)));
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(tau::build_wff_ex(var, scoped, false))));
 		}
 		tref f = squeeze_positives<node>(scoped, type_v);
 		tref f_0 = f ? rewriter::replace<node>(f, var,
@@ -567,8 +569,9 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// caller should not be able to tell which path ran. Without this,
 		// the same clause comes back spelled `bf_neq` from the
 		// single-variable path and `!(= 0)` from the block path.
-		return normalize_atomic_formula_operators<node>(
-			with_kept(term_boole_normal_form<node>(out)));
+		TAU_TRY(tref tbnf, term_boole_normal_form<node>(out));
+		return r.with_value(normalize_atomic_formula_operators<node>(
+			with_kept(tbnf)));
 	}
 
 	// Several variables: squeeze the positives into one term and adjust the
@@ -597,7 +600,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 					v != still_live.rend(); ++v)
 					keep = build_wff_ex<node>(*v, keep,
 						false);
-				return with_kept(keep);
+				return r.with_value(with_kept(keep));
 			}
 	}
 	// ---- Atomless-only, the block-squeeze half of the same law -------------
@@ -628,7 +631,8 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 					tau::_0_trimmed(clause_type)),
 				rewriter::replace<node>(expanded, *v,
 					tau::_1_trimmed(clause_type)));
-		return with_kept(term_boole_normal_form<node>(expanded));
+		TAU_TRY(tref tbnf, term_boole_normal_form<node>(expanded));
+		return r.with_value(with_kept(tbnf));
 	}
 	if (!neg.empty() && clause_type > 0
 		&& pack_type_has_arith_ops<node>(clause_type)) {
@@ -638,7 +642,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		tref keep = scoped;
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			keep = build_wff_ex<node>(*v, keep, false);
-		return with_kept(keep);
+		return r.with_value(with_kept(keep));
 	}
 	// Squeeze positive atomic formulas together -> result is a lazy BDD.
 	// By assumption they all have the same type.
@@ -653,7 +657,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			g = build_wff_ex<node>(*v, g, false);
 	}
-	return with_kept(tau::build_wff_and(res, tau::build_wff_and(neg)));
+	return r.with_value(with_kept(tau::build_wff_and(res, tau::build_wff_and(neg))));
 }
 
 } // namespace idni::tau_lang

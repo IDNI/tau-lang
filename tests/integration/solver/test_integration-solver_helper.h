@@ -23,7 +23,7 @@ bool check_solution(tref eq, const solution<node>& sol) {
 }
 
 inline bool test_find_solution(const char* src) {
-	tref equation = get_nso_rr<node_t>(tau::get(src)).value().main->get();
+	tref equation = get_nso_rr<node_t>(tau::get(src).value_or(nullptr)).value().main->get();
 	equation = norm_all_equations<node_t>(equation);
 	equation = apply_all_xor_def<node_t>(equation);
 	auto solution = find_solution<node_t>(equation);
@@ -37,7 +37,7 @@ inline std::optional<inequality_system<node_t>> build_inequality_system(
 		const std::vector<std::string>& inequalities) {
 	inequality_system<node_t> system;
 	for (const auto& ineq : inequalities) {
-		tref eq = get_nso_rr<node_t>(tau::get(ineq)).value().main->get();
+		tref eq = get_nso_rr<node_t>(tau::get(ineq).value_or(nullptr)).value().main->get();
 		eq = norm_all_equations<node_t>(eq);
 		eq = apply_all_xor_def<node_t>(eq);
 		if (tau::get(eq).equals_F()) return {};
@@ -72,10 +72,10 @@ inline bool test_solve_system(
 	equation_system<node_t> system;
 	if (!equality.empty())
 		system.first = get_nso_rr<node_t>(
-			tau::get(equality)).value().main->get();
+			tau::get(equality).value_or(nullptr)).value().main->get();
 	for (const auto& ineq : inequalities)
 		system.second.insert(get_nso_rr<node_t>(
-			tau::get(ineq)).value().main->get());
+			tau::get(ineq).value_or(nullptr)).value().main->get());
 	solver_options options = {
 		.splitter_one = splitter_one,
 		.mode = solver_mode::general
@@ -92,7 +92,7 @@ inline bool test_solve_system(
 }
 
 inline bool test_solve(const std::string& system, const solver_options& options) {
-	tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+	tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
 	auto solution = solve<node_t>(form, options);
 	return solution.has_value()
 		? check_solution<node_t>(form, solution.value()) : false;

@@ -86,11 +86,11 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	static bool is_syntactic_zero(const nlang_ba& x) { return is_nlang_zero(x); }
 
-	static bool is_one(const nlang_ba& x) { return is_nlang_one(x); }
+	static result<bool> is_one(const nlang_ba& x) { return result<bool>{is_nlang_one(x)}; }
 
-	static bool is_zero(const nlang_ba& x) { return is_nlang_zero(x); }
+	static result<bool> is_zero(const nlang_ba& x) { return result<bool>{is_nlang_zero(x)}; }
 
-	static bool is_closed(const nlang_ba&) { return true; }
+	static result<bool> is_closed(const nlang_ba&) { return result<bool>{true}; }
 
 	static std::string literal_one(tref) { return "everything"; }
 
@@ -112,9 +112,9 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 		return simplify_nlang_symbol(sym);
 	}
 
-	static tref simplify_term(tref term) { return simplify_nlang_term(term); }
+	static result<tref> simplify_term(tref term) { return result<tref>{simplify_nlang_term(term)}; }
 
-	static std::optional<typename node_t::constant_with_type>
+	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{
 		return parse_nlang<PackBAs...>(src);

@@ -24,7 +24,7 @@ using clock_t_ = std::chrono::steady_clock;
 // Returns elapsed seconds for one synthesis call.
 static double timed_realizable(const char* s, bool* result = nullptr) {
 	auto t0 = clock_t_::now();
-	auto nso = get_nso_rr<node_t>(tau::get(s));
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	bool r = false;
 	if (nso.has_value()) {
 		tref fm = nso.value().main->get();

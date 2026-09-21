@@ -130,10 +130,12 @@ TEST_SUITE("parse_hoa") {
 	}
 }
 
-// ── SY-RT2: spawn_capture contract (re-port of the pre-rebase SPAWN suite) ──
+// ── SY-RT2: spawn_capture contract ──────────────────────────────────────────
 //
-// classify_spot_exit depends on the 127 / 128+signo encodings, and the
-// pipe drain must outrun a child that writes more than the pipe buffer.
+// The exit code and its meaning are decided inside spawn_capture itself and
+// never cross back out as a raw int; these tests check the report instead
+// of a returned exit code. The pipe drain must also outrun a child that
+// writes more than the pipe buffer.
 
 TEST_SUITE("spawn_capture") {
 
@@ -155,20 +157,23 @@ TEST_SUITE("spawn_capture") {
 
 	// NOTE (SY-3): the missing SIGKILL escalation for TERM-ignoring children
 	// is deliberately not tested — a faithful test would hang the suite.
-	TEST_CASE("[SPAWN-01] timeout kills a slow child promptly with exit >= 128") {
+	TEST_CASE("[SPAWN-01] the timeout watchdog is a runtime_error with a timeout attr") {
 		auto t0 = std::chrono::steady_clock::now();
-		auto [out, code] = spawn_capture({"sleep", "10"}, 1);
+		auto r = spawn_capture({"sleep", "10"}, 1);
 		auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
 			std::chrono::steady_clock::now() - t0).count();
 		CHECK(elapsed < 5);
-		CHECK(code >= 128);
-		CHECK(out.empty());
+		CHECK(r.has_error());
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::runtime_error));
+		CHECK(report_has_attr(r.report(), label::timeout));
 	}
 
-	TEST_CASE("[SPAWN-02] nonexistent binary returns exit code 127") {
-		auto [out, code] = spawn_capture({"definitely_not_a_binary_xyz_12345"});
-		CHECK(code == 127);
-		CHECK(out.empty());
+	TEST_CASE("[SPAWN-02] a nonexistent binary is not_found") {
+		auto r = spawn_capture({"definitely_not_a_binary_xyz_12345"});
+		CHECK(r.has_error());
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::not_found));
 	}
 
 	// IN-N1 / Batch 3: a missing backend is no verdict -- call_ltlsynt
@@ -181,21 +186,29 @@ TEST_SUITE("spawn_capture") {
 	}
 
 	TEST_CASE("[SPAWN-04] 70KB of child output round-trips through the pipe") {
-		auto [out, code] = spawn_capture(
-			{"dd", "if=/dev/zero", "bs=70000", "count=1"});
-		CHECK(code == 0);
-		CHECK(out.size() == 70000);
+		auto r = spawn_capture({"dd", "if=/dev/zero", "bs=70000", "count=1"});
+		CHECK(r.has_value());
+		CHECK(r.value().size() == 70000);
 	}
 
-	TEST_CASE("[SPAWN-05] empty argv returns {empty, -1}") {
-		auto [out, code] = spawn_capture({});
-		CHECK(code == -1);
-		CHECK(out.empty());
+	TEST_CASE("[SPAWN-05] empty argv is invalid_argument") {
+		auto r = spawn_capture({});
+		CHECK(r.has_error());
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
 	}
 
-	TEST_CASE("[SPAWN-06] signal exit is encoded as 128 + signo") {
-		auto [out, code] = spawn_capture({"sh", "-c", "kill -TERM $$"});
-		CHECK(code == 128 + SIGTERM); // 143
+	TEST_CASE("[SPAWN-06] a signal death is a runtime_error") {
+		auto r = spawn_capture({"sh", "-c", "kill -TERM $$"});
+		CHECK(r.has_error());
+		CHECK(report_has_code(r.report(), code::runtime_error));
+	}
+
+	TEST_CASE("[SPAWN-07] a usage/internal error exit is a runtime_error") {
+		auto r = spawn_capture({"sh", "-c", "exit 2"}, 0,
+			[](int c) { return c == 0 || c == 1; });
+		CHECK(r.has_error());
+		CHECK(report_has_code(r.report(), code::runtime_error));
 	}
 
 	// SY-RT4 / SY-R5: the TAU_LTL_TIMEOUT_SEC parser.

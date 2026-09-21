@@ -29,7 +29,7 @@ TEST_SUITE("Execution: revision stream continuity") {
 		ctx.add_output("u", tau_type_id<node_t>(), u_out);
 		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
 			"u[t] = i1[t].";
-		tref parsed = tau::get(sample, { .context = &ctx });
+		tref parsed = tau::get(sample, { .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		// run() both writes the output streams and drives revision, as
@@ -61,7 +61,7 @@ TEST_SUITE("Execution: revision stream continuity") {
 		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
 			"o1 : tau := out file(\"" + out_file + "\").\n"
 			"o1[t] = i1[t] && u[t] = i1[t].";
-		tref parsed = tau::get(sample, { .context = &ctx });
+		tref parsed = tau::get(sample, { .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		auto maybe_i = run<node_t>(spec, ctx, 3);
@@ -138,7 +138,9 @@ TEST_SUITE("Execution: revision stream continuity") {
 
 		// The real update must still recognize file_a as unchanged and
 		// keep reading it from line 2, not reopen it at line 1.
-		REQUIRE( i.update(psi) );
+		auto update_r = i.update(psi);
+		REQUIRE( update_r.has_value() );
+		REQUIRE( update_r.value() );
 		auto step2 = i.step();
 		REQUIRE( step2.has_value() );
 		REQUIRE( step2.value().first.has_value() );

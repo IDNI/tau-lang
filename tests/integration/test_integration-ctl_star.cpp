@@ -12,241 +12,241 @@
 
 TEST_SUITE("CTL* parsing - A operator") {
 	TEST_CASE("parse_A_simple_eq") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_always_inner") {
-		auto r = get_nso_rr<node_t>(tau::get("A always o1[t] = o1[t-1]."));
+		auto r = get_nso_rr<node_t>(tau::get("A always o1[t] = o1[t-1].").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_sometimes_inner") {
-		auto r = get_nso_rr<node_t>(tau::get("A sometimes o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A sometimes o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_nested_bool") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 && o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 && o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_F") {
-		auto r = get_nso_rr<node_t>(tau::get("A F o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A F o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_G") {
-		auto r = get_nso_rr<node_t>(tau::get("A G o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A G o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_U") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_R") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 release o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 release o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_or") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 || o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 || o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_imply") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 -> o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 -> o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_paren") {
-		auto r = get_nso_rr<node_t>(tau::get("A ((o1[t] = 1))."));
+		auto r = get_nso_rr<node_t>(tau::get("A ((o1[t] = 1)).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_neg") {
-		auto r = get_nso_rr<node_t>(tau::get("A !o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A !o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_input_var") {
-		auto r = get_nso_rr<node_t>(tau::get("A (i1[t] = 1 -> o1[t] = i1[t])."));
+		auto r = get_nso_rr<node_t>(tau::get("A (i1[t] = 1 -> o1[t] = i1[t]).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_W") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 weak_until o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 weak_until o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_xor") {
-		auto r = get_nso_rr<node_t>(tau::get("A ((o1[t] = 1) ^^ (o2[t] = 0))."));
+		auto r = get_nso_rr<node_t>(tau::get("A ((o1[t] = 1) ^^ (o2[t] = 0)).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_equiv") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 <-> o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 <-> o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_conditional") {
-		auto r = get_nso_rr<node_t>(tau::get("A (i1[t] = 1 ? o1[t] = 1 : o1[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (i1[t] = 1 ? o1[t] = 1 : o1[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_two_outputs") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 && o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 && o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_multibit") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t]:bv[8] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t]:bv[8] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 }
 
 TEST_SUITE("CTL* parsing - E operator") {
 	TEST_CASE("parse_E_simple_eq") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_always_inner") {
-		auto r = get_nso_rr<node_t>(tau::get("E always o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("E always o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_sometimes_inner") {
-		auto r = get_nso_rr<node_t>(tau::get("E sometimes o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("E sometimes o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_nested_bool") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 || o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 || o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_F") {
-		auto r = get_nso_rr<node_t>(tau::get("E F o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("E F o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_G") {
-		auto r = get_nso_rr<node_t>(tau::get("E G o1[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E G o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_U") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_R") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 release o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 release o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_and") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1 && o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1 && o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_imply") {
-		auto r = get_nso_rr<node_t>(tau::get("E (i1[t] = 0 -> o1[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (i1[t] = 0 -> o1[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_paren") {
-		auto r = get_nso_rr<node_t>(tau::get("E ((o1[t] = 0))."));
+		auto r = get_nso_rr<node_t>(tau::get("E ((o1[t] = 0)).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_neg") {
-		auto r = get_nso_rr<node_t>(tau::get("E !o1[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E !o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_W") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_xor") {
-		auto r = get_nso_rr<node_t>(tau::get("E ((o1[t] = 0) ^^ (o2[t] = 1))."));
+		auto r = get_nso_rr<node_t>(tau::get("E ((o1[t] = 0) ^^ (o2[t] = 1)).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_equiv") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 <-> o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 <-> o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_conditional") {
-		auto r = get_nso_rr<node_t>(tau::get("E (i1[t] = 0 ? o1[t] = 0 : o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (i1[t] = 0 ? o1[t] = 0 : o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_two_outputs") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 && o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 && o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_multibit") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t]:bv[8] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t]:bv[8] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_lookback") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = o1[t-1])."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = o1[t-1]).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 }
 
 TEST_SUITE("CTL* parsing - semantic negation") {
 	TEST_CASE("parse_sem_neg_simple") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_always") {
-		auto r = get_nso_rr<node_t>(tau::get("-(always o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(always o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_sometimes") {
-		auto r = get_nso_rr<node_t>(tau::get("-(sometimes o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(sometimes o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_F") {
-		auto r = get_nso_rr<node_t>(tau::get("-(F o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(F o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_and") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 && o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 && o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_or") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 || o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 || o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_neg") {
-		auto r = get_nso_rr<node_t>(tau::get("-(!o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(!o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_double") {
-		auto r = get_nso_rr<node_t>(tau::get("--(o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("--(o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_A") {
-		auto r = get_nso_rr<node_t>(tau::get("-(A o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(A o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_E") {
-		auto r = get_nso_rr<node_t>(tau::get("-(E o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(E o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_U") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_R") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 release o2[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 release o2[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_imply") {
-		auto r = get_nso_rr<node_t>(tau::get("-(i1[t] = 1 -> o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(i1[t] = 1 -> o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_equiv") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 <-> o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 1 <-> o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_paren") {
-		auto r = get_nso_rr<node_t>(tau::get("-((o1[t] = 1))."));
+		auto r = get_nso_rr<node_t>(tau::get("-((o1[t] = 1)).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_conditional") {
-		auto r = get_nso_rr<node_t>(tau::get("-(i1[t] = 1 ? o1[t] = 1 : o1[t] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(i1[t] = 1 ? o1[t] = 1 : o1[t] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_G") {
-		auto r = get_nso_rr<node_t>(tau::get("-(G o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(G o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_multibit") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t]:bv[8] = 0)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t]:bv[8] = 0).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_xor") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 ^^ o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 ^^ o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_lookback") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = o1[t-1])."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = o1[t-1]).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 }
@@ -257,79 +257,79 @@ TEST_SUITE("CTL* parsing - semantic negation") {
 
 TEST_SUITE("CTL* parsing - nested quantifiers") {
 	TEST_CASE("parse_AA") {
-		auto r = get_nso_rr<node_t>(tau::get("A A o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A A o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_AE") {
-		auto r = get_nso_rr<node_t>(tau::get("A E o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A E o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_EA") {
-		auto r = get_nso_rr<node_t>(tau::get("E A o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("E A o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_EE") {
-		auto r = get_nso_rr<node_t>(tau::get("E E o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("E E o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_E_conjunct") {
-		auto r = get_nso_rr<node_t>(tau::get("A o1[t] = 1 && E o2[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("A o1[t] = 1 && E o2[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_E_disjunct") {
-		auto r = get_nso_rr<node_t>(tau::get("A o1[t] = 1 || E o2[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("A o1[t] = 1 || E o2[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_sem_neg_A") {
-		auto r = get_nso_rr<node_t>(tau::get("E -(A o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E -(A o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_A_E") {
-		auto r = get_nso_rr<node_t>(tau::get("-(A E o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(A E o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_GF") {
-		auto r = get_nso_rr<node_t>(tau::get("A G F o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A G F o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_FG") {
-		auto r = get_nso_rr<node_t>(tau::get("E F G o1[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E F G o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_F_E_G") {
-		auto r = get_nso_rr<node_t>(tau::get("A F (E G o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A F (E G o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_triple_A") {
-		auto r = get_nso_rr<node_t>(tau::get("A A A o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A A A o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_triple_E") {
-		auto r = get_nso_rr<node_t>(tau::get("E E E o1[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E E E o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_AEA") {
-		auto r = get_nso_rr<node_t>(tau::get("A E A o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A E A o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_EAE") {
-		auto r = get_nso_rr<node_t>(tau::get("E A E o1[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E A E o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_neg_A_neg_E") {
-		auto r = get_nso_rr<node_t>(tau::get("!A !E o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("!A !E o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_nested_3") {
-		auto r = get_nso_rr<node_t>(tau::get("---(o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("---(o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_with_lookback") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = o1[t-1] && o2[t] = o2[t-2])."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = o1[t-1] && o2[t] = o2[t-2]).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_with_lookback") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] != o1[t-1])."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] != o1[t-1]).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 }
@@ -340,91 +340,91 @@ TEST_SUITE("CTL* parsing - nested quantifiers") {
 
 TEST_SUITE("CTL* parsing - combined with LTL") {
 	TEST_CASE("parse_A_U") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_U") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_W") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 weak_until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_W") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_R") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 release o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 1 release o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_R") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1 release o2[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 1 release o2[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_S") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 since o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 since o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_S") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 since o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 since o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_T") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 trigger o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 T o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_T") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 trigger o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 T o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_U") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_W") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 weak_until o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_R") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 release o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 release o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_S") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 since o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 since o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_T") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 trigger o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 T o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_G_F") {
-		auto r = get_nso_rr<node_t>(tau::get("A G F o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A G F o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_G_F") {
-		auto r = get_nso_rr<node_t>(tau::get("E G F o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("E G F o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_F_G") {
-		auto r = get_nso_rr<node_t>(tau::get("A F G o1[t] = 1."));
+		auto r = get_nso_rr<node_t>(tau::get("A F G o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_F_G") {
-		auto r = get_nso_rr<node_t>(tau::get("E F G o1[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E F G o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_conj_always") {
-		auto r = get_nso_rr<node_t>(tau::get("A o1[t] = 1 && always o2[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("A o1[t] = 1 && always o2[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_E_conj_sometimes") {
-		auto r = get_nso_rr<node_t>(tau::get("E o1[t] = 1 && sometimes o2[t] = 0."));
+		auto r = get_nso_rr<node_t>(tau::get("E o1[t] = 1 && sometimes o2[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_sem_neg_with_constraint") {
-		auto r = get_nso_rr<node_t>(tau::get("-([n = 5] && o1[t] = 1)."));
+		auto r = get_nso_rr<node_t>(tau::get("-([n = 5] && o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 }
@@ -568,21 +568,21 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 	TEST_CASE("stress_A_eq_variants") {
 		for (int i = 0; i < 20; ++i) {
 			std::string fm = "A (o1[t] = " + std::to_string(i % 2) + ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
 	TEST_CASE("stress_E_eq_variants") {
 		for (int i = 0; i < 20; ++i) {
 			std::string fm = "E (o1[t] = " + std::to_string(i % 2) + ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
 	TEST_CASE("stress_sem_neg_variants") {
 		for (int i = 0; i < 20; ++i) {
 			std::string fm = "-(o" + std::to_string(i + 1) + "[t] = 0).";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -591,7 +591,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 			std::string fm = "";
 			for (int d = 0; d < depth; ++d) fm += "A ";
 			fm += "o1[t] = 1.";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -600,7 +600,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 			std::string fm = "";
 			for (int d = 0; d < depth; ++d) fm += "E ";
 			fm += "o1[t] = 0.";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -609,7 +609,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 			std::string fm = "";
 			for (int d = 0; d < depth; ++d) fm += "-";
 			fm += "(o1[t] = 1).";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -621,7 +621,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 				fm += "o" + std::to_string(i) + "[t] = " + std::to_string(i % 2);
 			}
 			fm += ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -633,7 +633,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 				fm += "o" + std::to_string(i) + "[t] = " + std::to_string(i % 2);
 			}
 			fm += ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -644,7 +644,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 				fm += (i % 2 == 0) ? "A " : "E ";
 			}
 			fm += "o1[t] = 1.";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -653,7 +653,7 @@ TEST_SUITE("CTL* stress - 200 parsing formulas") {
 			std::string fm = "-";
 			fm += (n % 2 == 0) ? "(A o1[t] = " : "(E o1[t] = ";
 			fm += std::to_string(n % 2) + ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -670,7 +670,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 			std::string fm = "A ";
 			fm += ops[i % 4];
 			fm += " o1[t] = " + std::to_string(i % 2) + ".";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -680,7 +680,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 			std::string fm = "E ";
 			fm += ops[i % 4];
 			fm += " o1[t] = " + std::to_string(i % 2) + ".";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -690,7 +690,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 			std::string fm = "-(";
 			fm += ops[i % 4];
 			fm += " o1[t] = " + std::to_string(i % 2) + ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -704,7 +704,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 			fm += " o2[t] = ";
 			fm += std::to_string((i + 1) % 2);
 			fm += ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -718,7 +718,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 			fm += " o2[t] = ";
 			fm += std::to_string((i + 1) % 2);
 			fm += ").";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}
@@ -727,7 +727,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 			std::string fm = "A (i" + std::to_string(i + 1) +
 				"[t] = 1 -> o" + std::to_string(i + 1) +
 				"[t] = i" + std::to_string(i + 1) + "[t]).";
-			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()));
+			auto r = get_nso_rr<node_t>(tau::get(fm.c_str()).value_or(nullptr));
 			CHECK(r.has_value());
 		}
 	}

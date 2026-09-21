@@ -19,7 +19,7 @@ TEST_SUITE("bf operator hooks") {
 	// we should get an error during parsing and hence return true if we get an error
 	bool check_unbound_hook(const char* sample) {
 		auto pbf = parse_bf();
-		tref tau_sample = tau::get(sample, pbf);
+		tref tau_sample = tau::get(sample, pbf).value_or(nullptr);
 
 #ifdef DEBUG
 		using node = node_t;
@@ -36,10 +36,10 @@ TEST_SUITE("bf operator hooks") {
 	bool check_hook(const char* sample_, const char* expected_) {
 		TAU_LOG_TRACE << "===== sample =====";
 		auto sample = string(sample_) + " = 0.";
-		tref tau_sample   = tau::get(sample);
+		tref tau_sample   = tau::get(sample).value_or(nullptr);
 		TAU_LOG_TRACE << "===== expected =====";
 		auto expected = string(expected_) + " = 0.";
-		tref tau_expected = tau::get(expected);
+		tref tau_expected = tau::get(expected).value_or(nullptr);
 
 #ifdef DEBUG
 		cout << "sample: " << sample << "\nexpected: \t";
@@ -58,14 +58,15 @@ TEST_SUITE("bf operator hooks") {
 		tau::get_options opts = {
 			.reget_with_hooks = false
 		};
-		tref parsed = tau::get(std::string(sample) + " = 0.", opts);
+		tref parsed = tau::get(std::string(sample) + " = 0.", opts)
+			.value_or(nullptr);
 		using node = node_t;
 		// DBG(TAU_LOG_TRACE << "parsed: " << TAU_LOG_FM_DUMP(parsed);)
 		tref c = tau::get(parsed).find_top(is<node, tau::ba_constant>);
 		size_t type_id = tau::get(c).get_ba_type();
 		size_t type_expected_id = get_ba_type_id<node_t>(type);
-		auto sample_type = get_ba_type_name<node_t>(type_id);
-		auto expected_type = get_ba_type_name<node_t>(type_expected_id);
+		auto sample_type = get_ba_type_name<node_t>(type_id).value();
+		auto expected_type = get_ba_type_name<node_t>(type_expected_id).value();
 
 #ifdef DEBUG
 		string str(sample);

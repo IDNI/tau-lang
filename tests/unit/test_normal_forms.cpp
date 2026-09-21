@@ -17,14 +17,14 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "1";
 		tau::get_options opts;
 		opts.parse.start = tau::bf;
-		tref fm = tau::get(sample, opts);
+		tref fm = tau::get(sample, opts).value_or(nullptr);
 		tau::get(fm).dump(std::cout << "fm: ") << "\n";
 		CHECK( tau::get(fm)[0].is(tau::bf_t) );
 	}
 
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
-		tref fm = tau::get(tau::get(sample))
+		tref fm = tau::get(tau::get(sample).value())
 			.find_top(is<node_t, tau::wff>);
 		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
@@ -32,7 +32,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: F") {
 		const char* sample = "F.";
-		tref fm = tau::get(tau::get(sample))
+		tref fm = tau::get(tau::get(sample).value())
 			.find_top(is<node_t, tau::wff>);
 		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		CHECK( tau::get(fm)[0].is(tau::wff_f) );
@@ -41,7 +41,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: X = 0") {
 		using node = node_t;
 		const char* sample = "X = 0.";
-		tref spec = tau::get(sample);
+		tref spec = tau::get(sample).value_or(nullptr);
 		TAU_LOG_TRACE << "spec: " << TAU_LOG_FM_DUMP(spec);
 		tref fm = tt(spec) | tau::spec | tau::main | tau::wff | tt::ref;
 		tref result = unequal_to_not_equal<node_t>(nnt(fm));
@@ -53,7 +53,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: X != 0") {
 		const char* sample = "X != 0.";
 
-		tref fm = tt(tau::get(sample))
+		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_eq  = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
@@ -64,7 +64,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X = 0 && Y = 0") {
 		const char* sample = "X = 0 && Y = 0.";
-		tref fm = tt(tau::get(sample))
+		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
@@ -75,7 +75,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X != 0 && Y != 0") {
 		const char* sample = "X != 0 && Y != 0.";
-		tref fm = tt(tau::get(sample))
+		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
@@ -88,7 +88,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X = 0 || Y = 0") {
 		const char* sample = "X = 0 || Y = 0.";
-		tref fm = tt(tau::get(sample))
+		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = unequal_to_not_equal<node_t>(nnt(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
@@ -107,7 +107,7 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = uninterp_constants_sample;
-		tref fm = tt(tau::get(sample))
+		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff
 			| bf_reduce_canonical<node_t>() | tt::ref;
 		CHECK( tau::get(fm) == tau::get_T() );
@@ -133,7 +133,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = uninterp_constants_sample;
-		tref fm = tt(tau::get(sample))
+		tref fm = tt(tau::get(sample).value())
 			| tau::spec | tau::main | tau::wff | tau::bf_eq
 			| tau::bf | tt::f(to_dnf<node_t, false>) | tt::ref;
 		CHECK( tau::get(fm).equals_0() );
@@ -1286,9 +1286,9 @@ TEST_SUITE("normalizer helpers") {
 	}
 	TEST_CASE("is_nso_equivalent_to_any_of finds an equivalent formula in a list") {
 		using node = node_t;
-		tref a = tau::get("x = 0 && y = 0", wff_opts());
-		tref b = tau::get("y = 0 && x = 0", wff_opts());
-		tref c = tau::get("x = 0 || y = 0", wff_opts());
+		tref a = tau::get("x = 0 && y = 0", wff_opts()).value_or(nullptr);
+		tref b = tau::get("y = 0 && x = 0", wff_opts()).value_or(nullptr);
+		tref c = tau::get("x = 0 || y = 0", wff_opts()).value_or(nullptr);
 		trefs previous{ c };
 		CHECK_FALSE( is_nso_equivalent_to_any_of<node>(a, previous) );
 		previous.push_back(b);
@@ -1297,9 +1297,9 @@ TEST_SUITE("normalizer helpers") {
 
 	TEST_CASE("is_bf_same_to_any_of compares Boolean functions, not trees") {
 		using node = node_t;
-		tref a = tau::get("x & y", bf_opts());
-		tref b = tau::get("y & x", bf_opts());
-		tref c = tau::get("x | y", bf_opts());
+		tref a = tau::get("x & y", bf_opts()).value_or(nullptr);
+		tref b = tau::get("y & x", bf_opts()).value_or(nullptr);
+		tref c = tau::get("x | y", bf_opts()).value_or(nullptr);
 		trefs previous{ c };
 		CHECK_FALSE( is_bf_same_to_any_of<node>(a, previous) );
 		previous.push_back(b);

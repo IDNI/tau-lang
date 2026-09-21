@@ -39,15 +39,23 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	}
 
 
-	static bool is_syntactic_one(const ba_t& x) { return x.is_one(); }
+	// Undecidable falls to false here (never a witness of validity), the
+	// same fallback is_one() itself uses on its own decision failure.
+	static bool is_syntactic_one(const ba_t& x) {
+		return x.is_one().value_or(false);
+	}
 
-	static bool is_syntactic_zero(const ba_t& x) { return x.is_zero(); }
+	// Undecidable falls to true here (never a witness of non-zeroness),
+	// mirroring is_zero()'s own fallback on decision failure.
+	static bool is_syntactic_zero(const ba_t& x) {
+		return x.is_zero().value_or(true);
+	}
 
-	static bool is_one(const ba_t& x) { return x.is_one(); }
+	static result<bool> is_one(const ba_t& x) { return x.is_one(); }
 
-	static bool is_zero(const ba_t& x) { return x.is_zero(); }
+	static result<bool> is_zero(const ba_t& x) { return x.is_zero(); }
 
-	static bool is_closed(const ba_t& x) { return is_tau_closed<BaseBAs...>(x); }
+	static result<bool> is_closed(const ba_t& x) { return is_tau_closed<BaseBAs...>(x); }
 
 	static std::string literal_one(tref) { return "T"; }
 
@@ -78,9 +86,9 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 
 	static tref simplify_symbol(tref sym) { return sym; }
 
-	static tref simplify_term(tref term) { return term; }
+	static result<tref> simplify_term(tref term) { return result<tref>{term}; }
 
-	static std::optional<typename node_t::constant_with_type>
+	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{
 		return parse_tau<BaseBAs...>(src);

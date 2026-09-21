@@ -44,7 +44,9 @@ bool is_tau_type(tref t) {
 
 template <NodeType node>
 bool is_tau_type(size_t t) {
-	return is_tau_type<node>(ba_types<node>::type_tree(t));
+	auto tt = ba_types<node>::type_tree(t);
+	// Advisory drop: bool contract, no channel for a report here.
+	return tt.has_value() && is_tau_type<node>(tt.value());
 }
 
 template<NodeType node>
@@ -107,7 +109,9 @@ bool is_untyped(tref t) {
 
 template <NodeType node>
 bool is_untyped(size_t t) {
-	return is_untyped<node>(ba_types<node>::type_tree(t));
+	auto tt = ba_types<node>::type_tree(t);
+	// Advisory drop: bool contract, no channel for a report here.
+	return tt.has_value() && is_untyped<node>(tt.value());
 }
 
 template<NodeType node>
@@ -127,7 +131,9 @@ bool is_bool_type(tref t) {
 
 template <NodeType node>
 bool is_bool_type(size_t t) {
-	return is_bool_type<node>(ba_types<node>::type_tree(t));
+	auto tt = ba_types<node>::type_tree(t);
+	// Advisory drop: bool contract, no channel for a report here.
+	return tt.has_value() && is_bool_type<node>(tt.value());
 }
 
 namespace ba_types_detail {
@@ -156,8 +162,9 @@ bool type_tree_name_is(tref t, const char* name) {
 
 template <typename BA, NodeType node>
 bool type_tree_name_is(size_t ba_type_id, const char* name) {
-	return type_tree_name_is<BA, node>(ba_types<node>::type_tree(ba_type_id),
-		name);
+	auto t = ba_types<node>::type_tree(ba_type_id);
+	// Advisory drop: bool contract, no channel for a report here.
+	return t.has_value() && type_tree_name_is<BA, node>(t.value(), name);
 }
 
 } // namespace ba_types_detail
@@ -183,11 +190,13 @@ size_t ba_types<node>::id(tref ba_type) {
 // which unify(size_t,size_t) would then happily merge with whatever the
 // other operand's type is. Fail loudly in both configurations instead.
 template<NodeType node>
-tref ba_types<node>::type_tree(size_t ba_type_id) {
+result<tref> ba_types<node>::type_tree(size_t ba_type_id) {
+	result<tref> r;
 	if (ba_type_id >= type_trees().size())
-		throw std::logic_error("ba_types::type_tree: invalid ba_type_id "
-			+ std::to_string(ba_type_id));
-	return type_trees()[ba_type_id]->get();
+		return r.with_assert_check_error(code::out_of_range,
+			messages::invalid_ba_type_id,
+			{{label::actual, ba_type_id}, {label::limit, type_trees().size()}});
+	return r.with_assert_check_value(type_trees()[ba_type_id]->get());
 }
 
 template <NodeType node>
@@ -196,11 +205,12 @@ size_t ba_types<node>::count() {
 }
 
 template <NodeType node>
-std::string ba_types<node>::name(size_t ba_type_id) {
-
+result<std::string> ba_types<node>::name(size_t ba_type_id) {
+	result<std::string> r;
 	if (ba_type_id >= type_trees().size())
-		throw std::logic_error("ba_types::name: invalid ba_type_id "
-			+ std::to_string(ba_type_id));
+		return r.with_assert_check_error(code::out_of_range,
+			messages::invalid_ba_type_id,
+			{{label::actual, ba_type_id}, {label::limit, type_trees().size()}});
 	// type_trees() entries are stable once registered (see id()), so the
 	// name is cached here rather than re-stringified on every call: this
 	// is on the hot path of node::hashit(), called for every tree node
@@ -213,10 +223,13 @@ std::string ba_types<node>::name(size_t ba_type_id) {
 	using cache_t = subtree_unordered_map<node, std::string>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	tref type = type_trees()[ba_type_id]->get();
-	if (auto it = cache.find(type); it != cache.end()) return it->second;
-	return cache.emplace(type, tau::get(type).to_str()).first->second;
+	if (auto it = cache.find(type); it != cache.end())
+		return r.with_assert_check_value(it->second);
+	return r.with_assert_check_value(
+		cache.emplace(type, tau::get(type).to_str()).first->second);
 #endif // TAU_CACHE
-	return tree<node>::get(type_trees()[ba_type_id]->get()).to_str();
+	return r.with_assert_check_value(
+		tree<node>::get(type_trees()[ba_type_id]->get()).to_str());
 }
 
 template <NodeType node>
@@ -230,6 +243,7 @@ size_t ba_types<node>::name_hash(size_t ba_type_id) {
 		static const size_t h0 = std::hash<std::string>{}(":untyped");
 		return h0;
 	}
+	DBG(assert(ba_type_id < type_trees().size());)
 	// index = ba_type id; type_trees() entries are stable once registered
 	// (see id()), so a computed hash never changes. 0 marks "not yet
 	// computed" -- no valid name hashes to 0 in practice, and a spurious
@@ -238,12 +252,20 @@ size_t ba_types<node>::name_hash(size_t ba_type_id) {
 	if (ba_type_id < cache.size() && cache[ba_type_id])
 		return cache[ba_type_id];
 	if (ba_type_id >= cache.size()) cache.resize(ba_type_id + 1, 0);
-	return cache[ba_type_id] = std::hash<std::string>{}(name(ba_type_id));
+	auto nm = name(ba_type_id);
+	// Advisory drop: node::hashit()'s noexcept contract has no channel for a report here.
+	if (!nm.has_value()) {
+		static const size_t h_invalid = std::hash<std::string>{}(":invalid");
+		return h_invalid;
+	}
+	return cache[ba_type_id] = std::hash<std::string>{}(nm.value());
 }
 
 template <NodeType node>
 std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
-	return os << name(tid);
+	auto nm = name(tid);
+	// Advisory drop: std::ostream& contract cannot abort the line.
+	return os << (nm.has_value() ? nm.value() : std::string("INVALID"));
 }
 
 template <NodeType node>
@@ -251,10 +273,13 @@ std::ostream& ba_types<node>::dump(std::ostream& os) {
 	LOG_TRACE << "BA types pool(" << type_trees().size() << "):\n";
 	os << "BA type_trees pool(" << type_trees().size() << "):\n";
 	for (size_t i = 0; i < type_trees().size(); ++i) {
+		auto nm = name(i);
+		// Advisory drop: std::ostream& contract cannot abort the line.
+		std::string s = nm.has_value() ? nm.value() : std::string("INVALID");
 		LOG_TRACE << "type: " << i;
-		LOG_TRACE << "val:  " << name(i);
+		LOG_TRACE << "val:  " << s;
 		os << LOG_INDENT << "type: "
-			<< i << " " << name(i) << "\n";
+			<< i << " " << s << "\n";
 	}
 	return os;
 }
@@ -324,7 +349,9 @@ size_t get_ba_type_id(tref ba_type) {
 
 template<NodeType node>
 tref get_ba_type_tree(size_t ba_type_id) {
-	return ba_types<node>::type_tree(ba_type_id);
+	auto t = ba_types<node>::type_tree(ba_type_id);
+	// Advisory drop: tref contract, nullptr is this function's existing invalid-id answer.
+	return t.has_value() ? t.value() : nullptr;
 }
 
 template <NodeType node>
@@ -333,10 +360,12 @@ size_t get_ba_type_count() {
 }
 
 template <NodeType node>
-std::string get_ba_type_name(size_t ba_type_id) {
+result<std::string> get_ba_type_name(size_t ba_type_id) {
+	result<std::string> r;
 	// This is needed in order to initialize the type trees
-	if (ba_type_id == 0) return ":untyped";
-	return ba_types<node>::name(ba_type_id);
+	if (ba_type_id == 0) return r.with_value(":untyped");
+	TAU_TRY(auto name, ba_types<node>::name(ba_type_id));
+	return r.with_value(std::move(name));
 }
 
 template<NodeType node>
@@ -395,19 +424,23 @@ tref unify(const trefs& ns1, const trefs& ns2, tref default_type) {
 }
 
 template <NodeType node>
-std::optional<size_t> unify(size_t tid1, size_t tid2) {
-	auto t1 = ba_types<node>::type_tree(tid1);
-	auto t2 = ba_types<node>::type_tree(tid2);
-	auto result = unify<node>(t1, t2);
-	return result ? std::optional<size_t>{ ba_types<node>::id(result) } : std::nullopt;
+result<size_t> unify(size_t tid1, size_t tid2) {
+	result<size_t> r;
+	TAU_TRY(tref t1, ba_types<node>::type_tree(tid1));
+	TAU_TRY(tref t2, ba_types<node>::type_tree(tid2));
+	auto unified = unify<node>(t1, t2);
+	if (!unified) return r; // conflict: no value, no error
+	return r.with_value(ba_types<node>::id(unified));
 }
 
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type) {
 	std::optional<size_t> result = default_type;
 	for (size_t i = 0; i < nids.size(); ++i) {
-		result = unify<node>(result.value(), nids[i]);
-		if (!result) return std::nullopt;
+		auto u = unify<node>(result.value(), nids[i]);
+		// Advisory drop: optional<size_t> conflict-only contract has no channel for a report here.
+		if (!u.has_value()) return std::nullopt;
+		result = u.value();
 	}
 	return result;
 }
@@ -417,10 +450,14 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 	if (nids1.size() != nids2.size()) return std::nullopt;
 	std::optional<size_t> result = default_type;
 	for (size_t i = 0; i < nids1.size(); ++i) {
-		result = unify<node>(result.value(), nids1[i]);
-		if (!result) return std::nullopt;
-		result = unify<node>(result.value(), nids2[i]);
-		if (!result) return std::nullopt;
+		auto u1 = unify<node>(result.value(), nids1[i]);
+		// Advisory drop: optional<size_t> conflict-only contract has no channel for a report here.
+		if (!u1.has_value()) return std::nullopt;
+		result = u1.value();
+		auto u2 = unify<node>(result.value(), nids2[i]);
+		// Advisory drop: optional<size_t> conflict-only contract has no channel for a report here.
+		if (!u2.has_value()) return std::nullopt;
+		result = u2.value();
 	}
 	return result;
 }
@@ -485,21 +522,24 @@ template <NodeType node>
 bool pack_owns_ba_type(size_t ba_type_id) {
 	using tau = tree<node>;
 	if (is_reserved_ba_type<node>(ba_type_id)) return true;
-	return pack_owns_ba_type_name<node>(
-		tau::get(ba_types<node>::type_tree(ba_type_id))[0].get_string());
+	auto tt = ba_types<node>::type_tree(ba_type_id);
+	// Advisory drop: bool contract, no channel for a report here.
+	if (!tt.has_value()) return false;
+	return pack_owns_ba_type_name<node>(tau::get(tt.value())[0].get_string());
 }
 
 template <NodeType node>
-size_t pack_default_ba_type(size_t type_id) {
-	tref type_tree = ba_types<node>::type_tree(type_id);
-	return pack_owner_apply<node>(type_id, [&]<typename BA>()
+result<size_t> pack_default_ba_type(size_t type_id) {
+	result<size_t> r;
+	TAU_TRY(tref type_tree, ba_types<node>::type_tree(type_id));
+	return r.with_value(pack_owner_apply<node>(type_id, [&]<typename BA>()
 		-> std::optional<size_t> {
 			if constexpr (ba_has_type_tree_for<node, BA>)
 				if (auto param = ba_descriptor<BA, node>::type_param(
 						type_tree))
 					return ba_descriptor<BA, node>::type_id_for(*param);
 			return std::nullopt;
-		}).value_or(type_id);
+		}).value_or(type_id));
 }
 
 template <NodeType node>
@@ -531,7 +571,9 @@ size_t find_ba_type (tref term) {
 template <NodeType node>
 tref find_ba_type_tree (tref term) {
 	const size_t t = find_ba_type<node>(term);
-	return get_ba_type_tree<node>(t);
+	auto tt = ba_types<node>::type_tree(t);
+	// Advisory drop: tref contract, nullptr is this function's existing not-found answer.
+	return tt.has_value() ? tt.value() : nullptr;
 }
 
 template <NodeType node>
@@ -554,15 +596,17 @@ bool is_buildable(size_t op, tref n, tref m) {
 	if (n_type != m_type) return false;
 	auto n_ba_type = tau::get(n).get_ba_type();
 	auto m_ba_type = tau::get(m).get_ba_type();
-	auto unified = unify<node>(n_ba_type, m_ba_type);
-	if(!unified.has_value()) return false;
+	auto unified_r = unify<node>(n_ba_type, m_ba_type);
+	// Advisory drop: bool contract, no channel for a report here.
+	if (!unified_r.has_value()) return false;
+	size_t unified = unified_r.value();
 	switch (op) {
 		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 		case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
 		case tau::bf_nor: case tau::bf_min: case tau::bf_max: {
-			return pack_type_has_arith_ops<node>(unified.value())
-				|| is_untyped<node>(unified.value());
+			return pack_type_has_arith_ops<node>(unified)
+				|| is_untyped<node>(unified);
 		}
 		// BA2-15: bf_neg dropped from this switch -- it is unary and a
 		// two-operand buildability answer for it was meaningless.

@@ -252,7 +252,7 @@ result<solution<node>> lgrs(equality eq) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	if (!eq) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	if (tau::get(eq).equals_T()) {
 		DBG(LOG_TRACE << "lgrs/solution: {}";)
@@ -1890,7 +1890,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	if (!form) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	if (tau::get(form).equals_T()) {
 		return r.with_assert_check_value(solution<node>());
@@ -2049,7 +2049,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 		for (auto& [type, conjs] : type_partition) {
 			// The options for the solver depend on the equation type
 			solver_options op = options;
-			tref type_tree = ba_types<node>::type_tree(type);
+			TAU_TRY(tref type_tree, ba_types<node>::type_tree(type));
 			op.type_id = get_ba_type_id<node>(type_tree);
 			if (pack_type_has_arith_ops<node>(type_tree)) {
 				// Read off every `var = constant` conjunct before choosing a
@@ -2123,13 +2123,14 @@ result<solution<node>> solve(tref form, solver_options options) {
 					DBG(assert(!squeezed_by_width.empty());)
 					for (const auto& [_, squeezed] : squeezed_by_width) {
 						DBG(assert(squeezed.has_value());)
-						if (auto lgrs_sol = lgrs<node>(squeezed.value())) {
+						if (auto lgrs_sol = lgrs<node>(squeezed.value()); lgrs_sol.has_value()) {
 							for (const auto& [var, value] : lgrs_sol.value())
 								clause_solution[var] = value;
-						} else { theory_sat = false; skip = true; break; }
+						} else { // lgrs found no solution; advisory, a later route may solve
+							theory_sat = false; skip = true; break; }
 					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
-					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(remaining))) {
+					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(remaining)); theory_solution.has_value()) {
 						theory_sat = true;
 						for (const auto& [var, value] : read_off)
 							clause_solution[var] = value;
@@ -2140,7 +2141,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 				} else skip = true;
 			} else {
 				op.splitter_one = node::ba::splitter_one(type_tree);
-				if (auto solution = solve<node>(conjs, op)) {
+				if (auto solution = solve<node>(conjs, op); solution.has_value()) {
 					for (const auto& [var, value]: solution.value()) {
 						clause_solution[var] = value;
 					}
@@ -2188,7 +2189,7 @@ result<solution<node>> solve(const trefs& forms, solver_options options) {
 	result<solution<node>> r;
 	using tau = tree<node>;
 	if (forms.empty()) {
-		return r.with_assert_check_error(code::invalid_argument, "Invalid argument(s)");
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	return solve<node>(tau::build_wff_and(forms), options);
 }

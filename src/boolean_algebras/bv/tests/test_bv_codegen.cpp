@@ -95,16 +95,18 @@ TEST_SUITE("bv_codegen") {
 				"cover the emitted text on every run)");
 			return;
 		}
-		namespace fs = std::filesystem;
-		fs::path bdir = fs::temp_directory_path() / "test_bv_codegen_sdk_link.build";
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = stdfs::temp_directory_path() / "test_bv_codegen_sdk_link.build";
 		std::error_code ec;
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 
 		const std::string spec = "G(o1[t]:bv = { 1 }:bv[8])";
 		auto res = compile_spec<node_t>(spec, "", bdir.string());
-		REQUIRE_MESSAGE(res.ok(), res.error);
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		auto captured = run_capture(res.exe_path);
+		auto captured = run_capture(res.value().exe_path);
 		CHECK(captured.exit_code == 0);
 		std::string out = captured.out;
 		// The artifact is stream-based like the interpreter: "o1[t] := value".
@@ -148,7 +150,7 @@ TEST_SUITE("bv_codegen") {
 		CHECK(artifact_value == interp_value);
 		CHECK(artifact_value == "1");
 
-		fs::remove_all(bdir, ec);
+		stdfs::remove_all(bdir, ec);
 	}
 }
 

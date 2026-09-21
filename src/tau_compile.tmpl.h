@@ -358,7 +358,9 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 		"\t\treturn 2;\n"
 		"\t}\n"
 		"\tauto run_start = std::chrono::steady_clock::now();\n"
-		"\tbool run_ok = interp->run_loop(0, quit_on_idle);\n"
+		"\tauto run_r = interp->run_loop(0, quit_on_idle);\n"
+		"\trun_r.report().print(cerr);\n"
+		"\tbool run_ok = run_r.has_value() && run_r.value();\n"
 		"\tif (print_benchmarks)\n"
 		"\t\tcerr << \"run: \" << std::chrono::duration<double, std::milli>(\n"
 		"\t\t\tstd::chrono::steady_clock::now() - run_start).count()\n"
@@ -376,82 +378,47 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 } // namespace compile_detail
 
 template <NodeType Node>
-codegen_result compile_spec(
+result<codegen_result> compile_spec(
 	const std::string& spec_src,
 	const std::string& out_exe,
 	const std::string& build_dir,
 	const std::string& cxx)
 {
-	namespace fs = std::filesystem;
+	namespace stdfs = std::filesystem;
 	compile_detail::scoped_clean_definitions<Node> clean_defs;
-	codegen_result res;
+	result<codegen_result> r;
 
-	fs::path bdir = build_dir.empty()
-		? fs::current_path() / "spec.build"
-		: fs::path(build_dir);
+	stdfs::path bdir = build_dir.empty()
+		? stdfs::current_path() / "spec.build"
+		: stdfs::path(build_dir);
 	std::error_code ec;
-	fs::create_directories(bdir, ec);
-	if (ec) {
-		res.error = "compile: cannot create build dir " + bdir.string()
-			+ ": " + ec.message();
-		return res;
-	}
+	stdfs::create_directories(bdir, ec);
+	if (ec) return r.with_error(code::io_error,
+		"compile: cannot create build dir " + bdir.string()
+		+ ": " + ec.message());
 
 	// 1. Parse the spec via get_spec -- the interpreter's own grammar
 	// (trailing '.', stream/rec-relation definitions) -- through the same
 	// nso_rr/normalizer pipeline get_interpreter uses.
 	using tau_api = api<Node>;
-	auto spec_res = tau_api::get_spec(spec_src);
-	tref spec_tree = spec_res.has_value() ? spec_res.value() : nullptr;
-	if (!spec_tree) {
-		res.error = "compile: failed to parse spec";
-		return res;
-	}
+	TAU_TRY(tref spec_tree, tau_api::get_spec(spec_src));
+	if (!spec_tree) return r.with_error(code::parse_error,
+		"compile: failed to parse spec");
 	auto nso_rr = get_nso_rr<Node>(spec_tree);
-	if (!nso_rr) {
-		res.error = "compile: failed to build the recurrence relation from spec";
-		return res;
-	}
-	auto applied_r = nso_rr_apply<Node>(*nso_rr);
-	if (!applied_r.has_value()) {
-		res.error = "compile: failed to apply the recurrence relation";
-		return res;
-	}
-	tref applied = applied_r.value();
-	auto normalized = normalizer<Node>(applied);
-	if (!normalized.has_value()) {
-		res.error = "compile: failed to normalize spec";
-		return res;
-	}
-	tref fm = normalized.value();
+	if (!nso_rr) return r.with_error(code::parse_error,
+		"compile: failed to build the recurrence relation from spec");
+	TAU_TRY(tref applied, nso_rr_apply<Node>(*nso_rr));
+	TAU_TRY(tref fm, normalizer<Node>(applied));
 	// fm is checked before solve_ltl_aba runs, so it is never a bare-reparsed atom.
-	if (has_free_vars<Node>(fm)) {
-		res.error = "compile: spec has unresolved free variables";
-		return res;
-	}
+	if (has_free_vars<Node>(fm)) return r.with_error(code::invalid_argument,
+		"compile: spec has unresolved free variables");
 
 	// 2. Synthesize: solve_ltl_aba drives the same ABA/ltlsynt pipeline
 	// the interpreter uses at runtime, but ahead of time. A positional
 	// atom outside its supported scope surfaces here as a compile error,
 	// not a crash.
-	std::optional<ltl_aba_solution<Node>> sol;
-	try {
-		auto sol_r = solve_ltl_aba<Node>(fm);
-		if (!sol_r.has_value()) {
-			std::ostringstream oss;
-			sol_r.print(oss);
-			res.error = "compile: " + oss.str();
-			return res;
-		}
-		sol = std::move(sol_r.value());
-	} catch (const std::exception& e) {
-		res.error = std::string("compile: ") + e.what();
-		return res;
-	}
-	if (!sol) {
-		res.error = "compile: spec is UNREALIZABLE";
-		return res;
-	}
+	TAU_TRY(auto sol, solve_ltl_aba<Node>(fm));
+	if (!sol) return r.with_error(code::unsat, "compile: spec is UNREALIZABLE");
 
 	// 3. Build the program_desc and emit the C++ artifact via the one
 	// data-driven emit path (build_program_desc picks flag-only vs
@@ -459,54 +426,38 @@ codegen_result compile_spec(
 	// it). A synthesis-time refusal (PWR x witness, or a witness owner that
 	// declines) surfaces here as a compile error, not a crash.
 	const std::string class_name = "tau_program";
-	std::optional<program_desc> d;
-	try {
-		d = build_program_desc<Node>(*sol, class_name, /*revisable=*/false,
-			/*open_streams=*/{}, definitions<Node>::instance().get_io_context());
-	} catch (const std::exception& e) {
-		res.error = std::string("compile: ") + e.what();
-		return res;
-	}
-	if (!d) {
-		res.error = "compile: internal codegen error (no program_desc)";
-		return res;
-	}
-	d->spec_src = spec_src;
+	TAU_TRY(program_desc d, build_program_desc<Node>(*sol, class_name,
+		/*revisable=*/false, /*open_streams=*/{},
+		definitions<Node>::instance().get_io_context()));
+	d.spec_src = spec_src;
 
 	// Every flag output field must key its stream on a single variable --
 	// emit_main's flag_outputs list has no other way to name its guard slot.
-	for (size_t k = 0; k < d->flag_output_vars.size(); ++k)
-		if (d->flag_output_vars[k].empty()) {
-			res.error = "compile: flag output '"
-				+ d->outputs[k].prop + "' has no single variable "
-				"to key its stream on; the artifact cannot be emitted";
-			return res;
-		}
+	for (size_t k = 0; k < d.flag_output_vars.size(); ++k)
+		if (d.flag_output_vars[k].empty())
+			return r.with_error(code::internal_error, "compile: flag output '"
+				+ d.outputs[k].prop + "' has no single variable "
+				"to key its stream on; the artifact cannot be emitted");
 
 	// 4. Emit the one artifact main (main.cpp only -- see emit_main).
 	{
 		std::ofstream f(bdir / "main.cpp");
-		if (!f) {
-			res.error = "compile: cannot write main.cpp in " + bdir.string();
-			return res;
-		}
-		compile_detail::emit_main(*d, f);
+		if (!f) return r.with_error(code::io_error,
+			"compile: cannot write main.cpp in " + bdir.string());
+		compile_detail::emit_main(d, f);
 	}
 
 	// 5. Emit CMakeLists.txt: every artifact links the emitting build's SDK.
 	const std::string exe_name = "program";
 	{
 		std::ofstream f(bdir / "CMakeLists.txt");
-		if (!f) {
-			res.error = "compile: cannot write CMakeLists.txt in "
-				+ bdir.string();
-			return res;
-		}
+		if (!f) return r.with_error(code::io_error,
+			"compile: cannot write CMakeLists.txt in " + bdir.string());
 		f << compile_detail::emit_cmake_sdk_linked(exe_name);
 	}
 
 	// 6. Drive cmake configure + build.
-	fs::path bin_dir = bdir / "build";
+	stdfs::path bin_dir = bdir / "build";
 	std::string cxx_flag = compile_detail::preferred_cxx_flag(cxx);
 
 	std::string config_log = (bdir / "configure.log").string();
@@ -514,43 +465,38 @@ codegen_result compile_spec(
 		+ " -B \"" + bin_dir.string() + "\""
 		+ " -DCMAKE_BUILD_TYPE=Release" + cxx_flag
 		+ " > \"" + config_log + "\" 2>&1";
-	if (std::system(config_cmd.c_str()) != 0) {
-		res.error = "compile: cmake configure failed, see " + config_log
-			+ compile_detail::log_tail(config_log);
-		return res;
-	}
+	if (std::system(config_cmd.c_str()) != 0)
+		return r.with_error(code::runtime_error,
+			"compile: cmake configure failed, see " + config_log
+			+ compile_detail::log_tail(config_log));
 
 	std::string build_log = (bdir / "build.log").string();
 	std::string build_cmd = "cmake --build \"" + bin_dir.string() + "\""
 		+ " > \"" + build_log + "\" 2>&1";
-	if (std::system(build_cmd.c_str()) != 0) {
-		res.error = "compile: cmake build failed, see " + build_log
-			+ compile_detail::log_tail(build_log);
-		return res;
-	}
+	if (std::system(build_cmd.c_str()) != 0)
+		return r.with_error(code::runtime_error,
+			"compile: cmake build failed, see " + build_log
+			+ compile_detail::log_tail(build_log));
 
 	// 7. Locate the built executable (single- and multi-config layouts).
-	fs::path built = bin_dir / exe_name;
-	if (!fs::exists(built)) built = bin_dir / "Release" / exe_name;
-	if (!fs::exists(built)) {
-		res.error = "compile: built executable not found at "
-			+ (bin_dir / exe_name).string();
-		return res;
-	}
+	stdfs::path built = bin_dir / exe_name;
+	if (!stdfs::exists(built)) built = bin_dir / "Release" / exe_name;
+	if (!stdfs::exists(built)) return r.with_error(code::not_found,
+		"compile: built executable not found at "
+		+ (bin_dir / exe_name).string());
 
-	fs::path dest = out_exe.empty() ? (bdir / exe_name) : fs::path(out_exe);
+	stdfs::path dest = out_exe.empty() ? (bdir / exe_name) : stdfs::path(out_exe);
 	if (dest != built) {
 		if (!dest.parent_path().empty())
-			fs::create_directories(dest.parent_path(), ec);
-		fs::copy_file(built, dest, fs::copy_options::overwrite_existing, ec);
-		if (ec) {
-			res.error = "compile: failed to copy executable to "
-				+ dest.string() + ": " + ec.message();
-			return res;
-		}
+			stdfs::create_directories(dest.parent_path(), ec);
+		stdfs::copy_file(built, dest, stdfs::copy_options::overwrite_existing, ec);
+		if (ec) return r.with_error(code::io_error,
+			"compile: failed to copy executable to " + dest.string()
+			+ ": " + ec.message());
 	}
+	codegen_result res;
 	res.exe_path = dest.string();
-	return res;
+	return r.with_assert_check_value(std::move(res));
 }
 
 } // namespace idni::tau_lang

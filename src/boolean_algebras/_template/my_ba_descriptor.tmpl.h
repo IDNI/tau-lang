@@ -57,11 +57,11 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 	// ── constants ───────────────────────────────────────────────────────
 	static bool is_syntactic_one(const my_ba& x) { return x.value; }
 	static bool is_syntactic_zero(const my_ba& x) { return !x.value; }
-	static bool is_one(const my_ba& x) { return x.value; }
-	static bool is_zero(const my_ba& x) { return !x.value; }
+	static result<bool> is_one(const my_ba& x) { return result<bool>{x.value}; }
+	static result<bool> is_zero(const my_ba& x) { return result<bool>{!x.value}; }
 
 	/** @brief `false` for a BA whose elements may contain free variables. */
-	static bool is_closed(const my_ba&) { return true; }
+	static result<bool> is_closed(const my_ba&) { return result<bool>{true}; }
 
 	static std::string literal_one(tref) { return "1"; }
 	static std::string literal_zero(tref) { return "0"; }
@@ -71,10 +71,10 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 
 	// ── term rewriting owned by this BA ─────────────────────────────────
 	static tref simplify_symbol(tref sym) { return sym; }
-	static tref simplify_term(tref term) { return term; }
+	static result<tref> simplify_term(tref term) { return result<tref>{term}; }
 
 	// ── parsing ─────────────────────────────────────────────────────────
-	static std::optional<typename node_t::constant_with_type>
+	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{
 		return parse_my_ba<PackBAs...>(src);

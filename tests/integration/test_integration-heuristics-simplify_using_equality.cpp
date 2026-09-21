@@ -539,7 +539,7 @@ TEST_SUITE("simplify_using_equality") {
 		//
 		// o1 and o2 are the same term_comp category, so which one wins as
 		// the representative is decided by tau::subtree_less -- a content
-		// hash, not a canonical order (.local/build-emscripten.md §4i).
+		// hash, not a canonical order.
 		// Rather than enumerate the two possible full strings, match the
 		// structural invariant directly: whichever variable is first is
 		// backreferenced as the representative in the second conjunct, and

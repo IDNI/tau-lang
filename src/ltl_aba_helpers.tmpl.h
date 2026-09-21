@@ -355,24 +355,21 @@ static result<std::vector<tref>> collect_hoist_conjuncts(
 	bool any_positional = false;
 	for (auto& [a, name] : atoms)
 		if (atom_is_positional<node>(a)) { any_positional = true; break; }
-	if (!any_positional) return r.with_value(std::vector<tref>{});
+	if (!any_positional)
+		return r.with_assert_check_value(std::vector<tref>{});
 
 	std::vector<tref> hoist;
-	std::string refusal;
-	std::function<void(tref)> walk = [&](tref n) {
-		if (!refusal.empty()) return;
+	std::string fail_msg;
+	std::function<bool(tref)> walk = [&](tref n) -> bool {
 		const auto& t = tau::get(n);
 		if (t.has_child()) {
 			const auto& op = t[0];
 			if (op.value.nt == tau::wff_and) {
-				walk(op.first());
-				walk(op.second());
-				return;
+				if (!walk(op.first())) return false;
+				return walk(op.second());
 			}
-			if (op.value.nt == tau::wff_always) {
-				walk(op.first());
-				return;
-			}
+			if (op.value.nt == tau::wff_always)
+				return walk(op.first());
 		}
 		// n is a leaf (maximal) top-level conjunct.
 		bool has_pos = false, has_nonpos = false;
@@ -381,29 +378,28 @@ static result<std::vector<tref>> collect_hoist_conjuncts(
 			if (atom_is_positional<node>(a)) has_pos = true;
 			else has_nonpos = true;
 		}
-		if (!has_pos) return; // no positional content -- not this pass's concern
+		if (!has_pos) return true; // no positional content -- not this pass's concern
 		if (has_nonpos) {
-			refusal =
-				"conjunct '" + tau::get(n).to_str() + "' mixes a positional "
+			fail_msg = "conjunct '" + tau::get(n).to_str() + "' mixes a positional "
 				"atom with relative-time content in the same conjunct; not "
 				"yet supported (no single evaluation step is defined for "
 				"the mix)";
-			return;
+			return false;
 		}
 		if (tref bad = find_positional_under_temporal_op<node>(n, atoms)) {
-			refusal =
-				"positional atom under '" + tau::get(bad).to_str() + "' "
+			fail_msg = "positional atom under '" + tau::get(bad).to_str() + "' "
 				"is not yet supported (a temporal operator gives a "
 				"fixed-position fact recurring semantics that has not "
 				"been derived from the interpreter yet)";
-			return;
+			return false;
 		}
 		hoist.push_back(n);
+		return true;
 	};
-	walk(fm);
-	if (!refusal.empty())
-		return r.with_error(code::unsupported_operation, refusal);
-	return r.with_value(std::move(hoist));
+	if (!walk(fm))
+		return r.with_assert_check_error(code::unsupported_operation,
+			fail_msg);
+	return r.with_assert_check_value(std::move(hoist));
 }
 
 // ── Propositional LTL skeleton (LT-16(c): ONE walker) ───────────────────────

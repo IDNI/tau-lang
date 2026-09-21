@@ -13,8 +13,11 @@ add_repl_test(history_store_cmd-bf "1" ": 1")
 add_repl_test(history_store_cmd-wff "T" ": T")
 add_repl_test(history_store_cmd-tau "{T.}" "1")
 
-add_repl_test_fail(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "Syntax Error")
-add_repl_test_fail(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "Syntax Error")
+# The BA constant parser rejects `x`/`x = 0` for their declared type; the
+# generic "Parsing constant ... failed for type" report (tau_tree.tmpl.h)
+# replaced the old unconditional "Syntax Error" log line.
+add_repl_test_fail(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "failed for type")
+add_repl_test_fail(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "failed for type")
 
 # history print command
 add_repl_test(history_print_cmd-empty_absolute "history %1" "history is empty")

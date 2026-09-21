@@ -36,7 +36,7 @@ TEST_SUITE("leaf_clause") {
 	// The hazard reached through the single-variable path.
 	TEST_CASE("a disequation is not silently dropped, single variable") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			CHECK( !tau::get(run(parse(
 				"ex x (x a = 0 && !(x b = 0))."))).equals_T() );
 		}
@@ -46,7 +46,7 @@ TEST_SUITE("leaf_clause") {
 	// opposite precondition.
 	TEST_CASE("a disequation is not silently dropped, block") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			CHECK( !tau::get(run(parse(
 				"ex x, y (x y a = 0 && !(x y b = 0))."))).equals_T() );
 		}
@@ -55,7 +55,7 @@ TEST_SUITE("leaf_clause") {
 	// Both spellings of the same disequation must reach the same answer.
 	TEST_CASE("the bf_neq spelling gives the same answer as !(= 0)") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			tref a = run(parse("ex x (x a = 0 && x b != 0)."));
 			tref b = run(parse("ex x (x a = 0 && !(x b = 0))."));
 			CHECK( tau::get(a) == tau::get(b) );
@@ -66,7 +66,7 @@ TEST_SUITE("leaf_clause") {
 	// binder, and the binder itself is fully eliminable here.
 	TEST_CASE("an independent conjunct is lifted out of the binder") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			CHECK( !tau::get(run(parse("ex x (x a = 0 && w = 0).")))
 				.find_top(is<node_t, tau::wff_ex>) );
 		}
@@ -141,7 +141,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			tau::_T(), { x },
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{}, order).value();
 		CHECK( tau::get(res).equals_T() );
 	}
 
@@ -150,7 +150,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			tau::_F(), { x },
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{}, order).value();
 		CHECK( tau::get(res).equals_F() );
 	}
 
@@ -174,7 +174,7 @@ TEST_SUITE("leaf_clause direct calls") {
 			analysis_context<node_t>{});
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, block, el, order);
+			body, block, el, order).value();
 		REQUIRE( res != nullptr );
 		// The reference and exactly one surviving binder remain.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
@@ -243,7 +243,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim, order).value();
 		REQUIRE( res != nullptr );
 		// The binder survives -- no solver decision was reached.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
@@ -269,7 +269,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim, order).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 		CHECK( !tau::get(res).equals_T() );
@@ -298,7 +298,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim, order).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}

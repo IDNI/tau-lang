@@ -4,7 +4,7 @@
  * @file qlt_semantic_pwr.tmpl.h
  * @brief qlt's winning-region revision, the optimal mode of pointwise revision.
  *
- * Implements pwr-ltl.tex §11: θ = ψ ∧ G(Win), where Win says the product-game
+ * Implements θ = ψ ∧ G(Win), where Win says the product-game
  * state is in the winning region computed by Zielonka over the T_3 order types.
  * Every part of that is (Q,<) theory, so all of it lives here and core reaches
  * it through one capability.
@@ -242,8 +242,8 @@ tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 		alg_d::initial_memory(constants));
 	// A backend failure here is undecided, not unrealizable; fall back
 	// to fast mode the same way any other not-applicable case does.
-	if (!alg_result_r) return nullptr;
-	auto& alg_result = *alg_result_r;
+	if (!alg_result_r.has_value()) return nullptr;
+	auto& alg_result = alg_result_r.value();
 
 	if (!alg_result.realizable) {
 		LOG_DEBUG << "[semantic_pwr] unrealizable via Algorithm D";

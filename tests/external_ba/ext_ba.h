@@ -19,6 +19,7 @@
 #include <string>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 #include "ba_types.h"
 #include "boolean_algebras/ba_descriptor.h"
 
@@ -53,14 +54,18 @@ tref ext_ba_type() {
 }
 
 template <typename... BAs>
-std::optional<typename node<BAs...>::constant_with_type> parse_ext_ba(
+result<typename node<BAs...>::constant_with_type> parse_ext_ba(
 	const std::string& src)
 {
 	using node_t = node<BAs...>;
-	if (src != "0" && src != "1") return std::nullopt;
-	return typename node_t::constant_with_type{
+	result<typename node_t::constant_with_type> r;
+	if (src != "0" && src != "1") {
+		r.error(code::parse_error, "Not a valid ext literal: " + src);
+		return r;
+	}
+	return r.with_value(typename node_t::constant_with_type{
 		typename node_t::constant{ ext_ba{ src == "1" } },
-		ext_ba_type<node_t>() };
+		ext_ba_type<node_t>() });
 }
 
 template <typename... PackBAs>
@@ -91,9 +96,25 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 
 	static bool is_syntactic_one(const ext_ba& x) { return x.value; }
 	static bool is_syntactic_zero(const ext_ba& x) { return !x.value; }
-	static bool is_one(const ext_ba& x) { return x.value; }
-	static bool is_zero(const ext_ba& x) { return !x.value; }
-	static bool is_closed(const ext_ba&) { return true; }
+	static result<bool> is_one(const ext_ba& x) { return result<bool>{x.value}; }
+
+	/**
+	 * @brief `!x.value`, unless @ref fail_is_zero_ asks it to fail -- a
+	 * deterministic hook for pinning that an is_zero failure carries a
+	 * report, with no dependence on a real BA's own failure conditions.
+	 */
+	static result<bool> is_zero(const ext_ba& x) {
+		if (fail_is_zero_) {
+			result<bool> r;
+			r.error(code::internal_error,
+				"ext is_zero forced to fail for testing");
+			return r;
+		}
+		return result<bool>{!x.value};
+	}
+	static inline bool fail_is_zero_ = false;
+
+	static result<bool> is_closed(const ext_ba&) { return result<bool>{true}; }
 
 	static std::string literal_one(tref) { return "1"; }
 	static std::string literal_zero(tref) { return "0"; }
@@ -103,9 +124,23 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	static tref splitter_one(tref) { return nullptr; }
 
 	static tref simplify_symbol(tref sym) { return sym; }
-	static tref simplify_term(tref term) { return term; }
 
-	static std::optional<typename node_t::constant_with_type>
+	/**
+	 * @brief Identity, unless @ref fail_simplify_term_ asks it to fail --
+	 * the same deterministic hook as @ref fail_is_zero_, for simplify_term.
+	 */
+	static result<tref> simplify_term(tref term) {
+		if (fail_simplify_term_) {
+			result<tref> r;
+			r.error(code::internal_error,
+				"ext simplify_term forced to fail for testing");
+			return r;
+		}
+		return result<tref>{term};
+	}
+	static inline bool fail_simplify_term_ = false;
+
+	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{
 		return parse_ext_ba<PackBAs...>(src);
@@ -120,9 +155,22 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 			typename tau::constant(ext_ba{ false }), type_tree()));
 	}
 
-	/** @brief Accumulated: a preprocessing pass that is the identity. */
-	static tref preprocess(tref n) { return n; }
+	/**
+	 * @brief Accumulated: identity, unless @ref fail_preprocess_ asks it
+	 * to fail -- a deterministic hook for pinning that a failure carries
+	 * a report, with no dependence on a real BA's own failure conditions.
+	 */
+	static result<tref> preprocess(tref n) {
+		if (fail_preprocess_) {
+			result<tref> r;
+			r.error(code::internal_error,
+				"ext preprocess forced to fail for testing");
+			return r;
+		}
+		return result<tref>{n};
+	}
 	static void set_preprocessing(bool) {}
+	static inline bool fail_preprocess_ = false;
 
 	/** @brief Declared: an option of its own, addressed as `ext-probe`. */
 	static bool get_probe() { return probe_; }

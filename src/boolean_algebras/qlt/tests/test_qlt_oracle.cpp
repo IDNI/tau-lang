@@ -23,7 +23,7 @@ using namespace cvc5;
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 static bool realizable(const char* s) {
-	auto nso = get_nso_rr<node_t>(tau::get(s));
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;

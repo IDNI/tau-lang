@@ -48,9 +48,10 @@ struct step_provider {
 	 * @param memory Committed memory so far this step (inputs already merged in).
 	 * @param time_point Current execution time point.
 	 * @param formula_time_point Time point the running formula is phrased at.
-	 * @return The solution, or `std::nullopt` if no part of @p step_spec is solvable.
+	 * @return The solution, or `std::nullopt` if no part of @p step_spec
+	 * is solvable; the report carries the probes tried along the way.
 	 */
-	virtual std::optional<solution<node>> produce(
+	virtual result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) = 0;
 
@@ -207,30 +208,16 @@ struct interpreter {
 	 */
 	result<step_result> step(const assignment<node>& values);
 
-	// Step with optional pointwise-revision payload `u`. When `u` is
-	// non-null, the interpreter steps as usual on `values`, then runs
-	// pointwise revision with `u` as the update (between turns, after the
-	// commit — F6-compliant: never mid-token). Equivalent to calling
-	// `step(values)` then `update(u)` in sequence.
-	//
-	// PWR mode is interpreter-internal. LS-7: BOTH modes are wired at
-	// HEAD -- syntactic fast mode (pwr-ltl.tex §3 via
-	// `pointwise_revision_temporal`) with `semantic_pwr_optimal`
-	// (pwr-ltl.tex §11) invoked as its fallback inside
-	// pointwise_revision.h.
-	step_result step(const assignment<node>& values,
-						std::optional<tref> u);
-
 	/**
 	 * @brief Apply a pointwise revision to the running specification.
 	 *
 	 * Both the running spec and @p update must be normalized before calling.
 	 * @param update Normalized update formula.
-	 * @return true iff the update was accepted and committed; false leaves
-	 *         the interpreter exactly as it was (spec, streams, memory).
-	 *         The reason is logged.
+	 * @return The verdict: true iff the update was accepted and committed;
+	 *         false leaves the interpreter exactly as it was (spec,
+	 *         streams, memory). The report carries the rejection reason.
 	 */
-	bool update(tref update);
+	result<bool> update(tref update);
 
 	/**
 	 * @brief The interactive stepping loop run() drives after construction.
@@ -258,8 +245,10 @@ struct interpreter {
 	 *   starts waiting on stdin and with false when the wait ends.
 	 * @return false if a step's output failed to write (error already
 	 *   logged); true otherwise, including a clean user/input-driven stop.
+	 *   The report carries any pointwise-revision rejection reasons seen
+	 *   along the way.
 	 */
-	bool run_loop(const size_t steps = 0, bool quit_on_idle = false,
+	result<bool> run_loop(const size_t steps = 0, bool quit_on_idle = false,
 		const std::function<void(bool)>& idle_hook = {});
 
 	// ── Inspection / introspection (added for tau-neuro runtime) ─────────
@@ -310,7 +299,7 @@ struct interpreter {
 	// one-hot bit `o__ltl_ms<i>__` is set in `memory` at the most-recently
 	// committed time step. For single-state Mealy or pure-safety specs
 	// (no auxiliary bits), this returns 0.
-	int current_state() const;
+	result<int> current_state() const;
 
 	// Per-revision realisability pre-check: would PWR-merging `psi` with
 	// the current spec keep the result realisable?
@@ -326,14 +315,14 @@ struct interpreter {
 	// Non-const because the dry-run needs to copy the output_partition
 	// union-find structure, which lacks a usable copy constructor;
 	// implementation defers to the same machinery as `update()` --
-	// literally: both call plan_update(), so can_extend(psi) is true
-	// exactly when update(psi) would commit (PW-N9 / IN-M7). The one
+	// literally: both call plan_update(), so can_extend(psi)'s verdict is
+	// true exactly when update(psi) would commit (PW-N9 / IN-M7). The one
 	// side effect both share is that unknown console streams named by
 	// psi get registered in the io_context during stream collection.
-	bool can_extend(tref psi);
+	result<bool> can_extend(tref psi);
 
 	// Enumerate output assignments admissible at the current step without
-	// advancing time. Implements plan v10 §7.1 step (b)
+	// advancing time. Implements
 	// "K_t = M_Φ.admissible_outputs(q_t)" via blocking-clause solver
 	// enumeration above `solve()`:
 	//   1. solve(step_spec) → assignment s_1; record.
@@ -357,23 +346,27 @@ struct interpreter {
 	//
 	// Non-const because lazy initialization of step_spec via
 	// `calculate_initial_spec()` may be required.
-	std::vector<assignment<node>>
+	//
+	// The report carries every solve() call's diagnostics across the
+	// enumeration; an error means the solver failed, not that the
+	// admissibility set is exhausted -- the caller can tell those apart.
+	result<std::vector<assignment<node>>>
 	admissible_outputs(size_t max_results = 1024);
 
-	// Read-only observability of a Def 5.7 accumulator.
+	// Read-only observability of an accumulator.
 	//
-	// Per canonical paper §5.4 Definition 5.7, accumulators are
-	// bounded-type spec-language state variables (Bool, Int[l..h],
-	// Real([l,h], q), Phase, Set[T,M], List[T,M,ttl], Enum). Their update
-	// function f_a runs INSIDE the synthesised Mealy (paper Def 5.7
-	// "expressed in the spec language's primitives"); Python's role is
+	// Accumulators are bounded-type spec-language state variables (Bool,
+	// Int[l..h], Real([l,h], q), Phase, Set[T,M], List[T,M,ttl], Enum).
+	// Their update function f_a runs INSIDE the synthesised Mealy,
+	// expressed in the spec language's primitives; Python's role is
 	// read-only observability.
 	//
 	// Implementation: look up `name` (or `acc_<name>`) in `memory` at the
 	// most-recent committed time step, format the BA-element value via
-	// `serialize_constant`. Returns the serialised string, or empty if
-	// no accumulator with this name is found.
-	std::string accumulator_state(const std::string& name) const;
+	// `serialize_constant`. The value is the serialised string, or empty
+	// if no accumulator with this name is found; the report carries any
+	// entry that matched the name but did not serialise.
+	result<std::string> accumulator_state(const std::string& name) const;
 
 	// ── Mealy-strategy introspection (cached_solution-dependent) ─────────
 	//
@@ -383,7 +376,7 @@ struct interpreter {
 	// equivalents that document the absence of a strategy.
 
 	// Emit the cached Mealy strategy as a Graphviz DOT graph. Useful for
-	// operator audit (Approach A3 per claude-code-addendum.tex §5).
+	// an operator audit of Approach A3.
 	// Returns "" when no Mealy was synthesised.
 	std::string visualise_mealy_dot() const;
 
@@ -394,9 +387,8 @@ struct interpreter {
 	hoa_automaton determinise() const;
 
 	// Extract up to `n` "boundary" traces — simple paths from the initial
-	// Mealy state, sorted by length (longest first). For first iteration
-	// this approximates the canonical paper §13.2 / addendum §13.2 notion
-	// of "extremal behaviour" (longest delay before eventually fires,
+	// Mealy state, sorted by length (longest first). This approximates
+	// "extremal behaviour" (longest delay before eventually fires,
 	// minimum sequence between until antecedent and consequent) by
 	// returning the longest distinct paths through the strategy graph.
 	//
@@ -410,49 +402,15 @@ struct interpreter {
 	// interpreter; subsequent PWR / re-synthesis paths can check
 	// `committed_approval_hash` and refuse / fork as policy dictates.
 	//
-	// Caller is responsible for the approval hash's structure (per
-	// addendum §13.2: SHA-256 of `(timestamp, operator_id, NL_spec,
-	// formula_with_atoms, boundary_trace_set, approach_choice,
-	// prev_hash)`). This method only persists the string.
+	// Caller is responsible for the approval hash's structure: SHA-256 of
+	// `(timestamp, operator_id, NL_spec, formula_with_atoms,
+	// boundary_trace_set, approach_choice, prev_hash)`. This method only
+	// persists the string.
 	void commit_realiser(const std::string& approval_hash);
 
 	// The committed approval hash (empty if no commit_realiser call has
 	// occurred). Public so downstream policy checks can read it.
 	std::string committed_approval_hash;
-
-	// ── Oracle-resolved output streams (declare_open) ────────────────────
-	//
-	//
-	// DESIGN CONTRACT (target semantics): an oracle_handler is invoked
-	// when step() encounters an open output stream; it receives a
-	// serialized tau data formula F characterizing the admissible values
-	// and returns a satisfying assignment ("var := value" per free
-	// variable), which the engine validates against F and commits. F is
-	// guaranteed satisfiable by W-invariance.
-	//
-	// V1 STATUS (AP2-11): step() does NOT yet dispatch to handlers --
-	// open-stream resolution stays host-side (see the V1 scaffolding
-	// note in interpreter.tmpl.h step()); consequently the
-	// in_oracle_handler_ re-entrance guard cannot fire yet.
-	// declare_open DOES validate stream_name (throws on unknown).
-	using oracle_handler = std::function<std::string(const std::string& formula)>;
-
-	// Declare `stream_name` as an open output stream filled by `handler`.
-	// Subsequent step() calls dispatch to `handler` when the value of this
-	// stream needs to be chosen. Replaces any prior registration for the
-	// same stream. Throws if `stream_name` is not an output stream of the
-	// current spec, or if called from inside a handler invocation
-	// (re-entrance violation).
-	void declare_open(const std::string& stream_name, oracle_handler handler);
-
-	// Remove a prior declaration for `stream_name`. Subsequent step()
-	// calls use the committed strategy for this stream. No-op if the
-	// stream was not declared open.
-	void undeclare_open(const std::string& stream_name);
-
-	// Inspectable: list currently-declared open streams (declaration
-	// order preserved).
-	std::vector<std::string> open_streams() const;
 
 	/**
 	 * @brief Insert every raw tref reachable from this interpreter into @p keep.
@@ -515,17 +473,6 @@ struct interpreter {
 	// make_interpreter from ltl_to_safety_formula_full's third result;
 	// consumed by seed_since_aux_bits() (make_interpreter and reset()).
 	std::vector<std::string> since_aux_anchor_;
-
-	// Open-stream handlers (declared via declare_open). Iteration order
-	// matches insertion order via std::vector<std::string> open_streams_order_;
-	// std::map gives us name-keyed lookup but loses order, so we keep a
-	// parallel vector for declaration order (per design doc §4.5).
-	std::map<std::string, oracle_handler> open_handlers_;
-	std::vector<std::string> open_streams_order_;
-
-	// Re-entrance guard: set true while inside an oracle_handler invocation;
-	// mutating methods (step, update, declare_open, ...) check and refuse.
-	bool in_oracle_handler_ = false;
 
 private:
 	/// Counts applied updates; see spec_revision().
@@ -611,16 +558,16 @@ private:
 	/// @brief Dry-run the pointwise revision of the running spec by
 	/// @p update: the first update clause that yields an entirely
 	/// executable revised spec (with its streams resolvable) wins.
-	/// @return The plan, or std::nullopt (reason logged) when no clause does.
-	std::optional<update_plan> plan_update(tref update);
+	/// @return The plan, or a structured error/warning report when no
+	///         clause does.
+	result<update_plan> plan_update(tref update);
 
 	/// @brief The index of the first alternative of part @p part whose
 	/// continuation is solvable at the current time point under the
-	/// current memory -- the one step() would execute (IN-M2).
-	std::optional<size_t> first_solvable_alternative(size_t part);
-	/// Whether alternative @p alt_idx of step_spec part @p part has a
-	/// solution at the current step under memory.
-	bool alternative_solvable(size_t part, size_t alt_idx);
+	/// current memory -- the one step() would execute (IN-M2). The value
+	/// is `std::nullopt` when no alternative solves; the report carries
+	/// the probes tried along the way.
+	result<std::optional<size_t>> first_solvable_alternative(size_t part);
 
 	/// @brief Thin wrapper over the free solution_with_max_update,
 	/// supplying this interpreter's own time_point.
@@ -629,8 +576,9 @@ private:
 	/// @brief The running spec as step() executes it: per part its chosen
 	/// alternative when known (@p use_memory picks by solvability under
 	/// the current memory, else the last step's choice), the
-	/// disjunction otherwise.
-	tref executed_spec_fm(bool use_memory);
+	/// disjunction otherwise. The report carries the per-part
+	/// solvability probes.
+	result<tref> executed_spec_fm(bool use_memory);
 	/// The spec restricted to the alternatives the last step chose
 	/// (executed_spec_fm(false)); const, reads chosen_alt_ only.
 	tref chosen_spec_fm() const;
@@ -652,10 +600,14 @@ private:
 	create_spec_partition(tref spec, auto& output_partition);
 
 	/// @brief Read input variables at the given @p time_step.
-	std::pair<std::optional<assignment<node>>, bool> read(
+	/// @return On success, the assignment (always present) and whether
+	/// the stream signalled quit. On a hard read/parse failure the
+	/// result carries no value; the report says why, including any
+	/// child diagnostic (e.g. from ba_constants<node>::get).
+	result<std::pair<std::optional<assignment<node>>, bool>> read(
 		const trefs& in_vars, size_t time_step);
 	/// @brief Write output assignments to the output context.
-	bool write(const assignment<node>& outputs);
+	result<bool> write(const assignment<node>& outputs);
 	/// @brief Rebuild the input stream map from @p current_inputs.
 	/// @return false if a stream could not be found (interpretation should stop).
 	bool rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
@@ -690,11 +642,14 @@ private:
 	subtree_map<node, size_t> collect_output_streams(tref dnf);
 
 	/// @brief Return the unbounded continuation formulas at time @p t,
-	/// per spec part in alternative order.
-	std::vector<trefs> get_ubt_ctn_at(int_t t);
+	/// per spec part in alternative order. The report carries any
+	/// alternative dropped because it did not normalize.
+	result<std::vector<trefs>> get_ubt_ctn_at(int_t t);
 
-	/// @brief Compute and store the initial specification.
-	bool calculate_initial_spec();
+	/// @brief Compute and store the initial specification. The report
+	/// carries get_ubt_ctn_at's report. The value is whether the initial
+	/// spec was calculated.
+	result<bool> calculate_initial_spec();
 
 	/// @brief Build the input variable assignments required for step @p t.
 	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
@@ -725,8 +680,9 @@ private:
 	/// @brief Recompute the executable continuations of a part's ordered
 	/// alternatives. Alternatives that are not executable are dropped from
 	/// @p alts (they could never fire in step()).
-	/// @return false when no alternative survives.
-	static bool compute_part_continuations(htrefs& alts, htrefs& ctns,
+	/// @return An error when no alternative survives; the report carries
+	/// why each dropped alternative was rejected either way.
+	static result<bool> compute_part_continuations(htrefs& alts, htrefs& ctns,
 		const size_t start_time);
 
 	/// @brief Apply the pointwise revision algorithm to a part's ordered
@@ -734,9 +690,10 @@ private:
 	/// the plain conjunction is unsat, appends the update clause as a
 	/// last-resort alternative instead of embedding the guarded
 	/// ¬∃outs.(S∧U) disjunction into a stored formula.
-	/// @return The revised ordered alternatives, or `std::nullopt` when no
-	/// update clause yields a satisfiable revision.
-	std::optional<htrefs> pointwise_revision(const htrefs& alts,
+	/// @return The revised ordered alternatives, or a value of
+	/// `std::nullopt` when no update clause yields a satisfiable
+	/// revision; the report carries the probes tried along the way.
+	result<std::optional<htrefs>> pointwise_revision(const htrefs& alts,
 		tref update, const int_t start_time);
 
 	/// @brief Return `true` if @p var is excluded from output.
@@ -822,9 +779,9 @@ bool has_free_vars(tref fm, bool silent = false);
 template <NodeType node>
 tref update_to_time_point(tref f, const int_t t);
 
-// Ground @p atom_ref at @p formula_time_point against @p memory (update_to_time_point + rewriter::replace + normalize_non_temp) and return its truth; a step_provider's guard-evaluation counterpart to update_to_time_point.
+// Ground @p atom_ref at @p formula_time_point against @p memory (update_to_time_point + rewriter::replace + normalize_non_temp) and return its truth; a step_provider's guard-evaluation counterpart to update_to_time_point. A normalization failure yields false, not an error; the report carries why.
 template <NodeType node>
-bool evaluate_atom(tref atom_ref, const assignment<node>& memory,
+result<bool> evaluate_atom(tref atom_ref, const assignment<node>& memory,
 	size_t formula_time_point);
 
 /**

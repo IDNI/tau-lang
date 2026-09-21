@@ -17,6 +17,10 @@
 
 #include "tau_tree.h"
 #include "tau_bdd.h"
+// For `result<T>`, used throughout this header's own declarations; not
+// reliably pulled in by tau_tree.h/tau_bdd.h, so name it explicitly rather
+// than depend on inclusion order elsewhere.
+#include "tau_diagnostics.h"
 // `preprocessing` and the preprocessing/solver placement parameters. They
 // belong here, and used to be spelled out here, but live in their own
 // dependency-free header so tests/test_init.h can apply environment
@@ -60,7 +64,7 @@ inline bool bv_blasting = true;
 template<NodeType node> struct eliminability;
 
 template<NodeType node>
-tref anti_prenex(tref formula, const eliminability<node>& el);
+result<tref> anti_prenex(tref formula, const eliminability<node>& el);
 
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
@@ -70,10 +74,13 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
  * @brief Entry point for predicate blasting on bitvector formulas.
  *
  * Rewrites bitvector formulas into equivalent Boolean formulas containing
- * existentially quantified variables and predicates. Only supports a limited set of
- * bitvector operations. If unsupported operations or predicates are encountered,
- * it returns nullptr to indicate failure, and the caller can choose to leave the
- * formula unchanged.
+ * existentially quantified variables and predicates. Only supports a limited
+ * set of bitvector operations, and is all-or-nothing: one atom it cannot
+ * blast (an unsupported operation or predicate) leaves the WHOLE formula
+ * unchanged, carrying a warning/info report explaining why, rather than
+ * mixing blasted and unblasted bv atoms in one result; a genuine internal
+ * failure (a non-terminating rewrite) instead carries no value and an error
+ * report.
  *
  * See implementation in bv_predicate_blasting.tmpl.h and its companion
  * files bv_predicate_blasting_logic.tmpl.h,
@@ -82,7 +89,9 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
  *
  * @tparam node Node type
  * @param term The formula to blast
- * @return The formula with predicates blasted, or nullptr on error
+ * @return The formula with predicates blasted; @p term unchanged (still a
+ * value, with a warning/info report) if any atom could not be blasted, or
+ * no value at all (with an error report) on internal failure.
  *
  * @par Example
  * @code{.cpp}
@@ -90,12 +99,12 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:70-72).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bv_predicate_blasting(tref term);
+result<tref> bv_predicate_blasting(tref term);
 
 /**
  * @brief Computes a term giving the value of a specific bit in a bitvector.
@@ -108,12 +117,12 @@ tref bv_predicate_blasting(tref term);
  * @code{.cpp}
  * // bit(x, 0) is x masked-and with the { 1 } bit-0 selector
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
- * tref bit0 = bit<node_t>(x, 0);
+ * tref bit0 = bit<node_t>(x, 0).value_or(nullptr);
  * CHECK( tau::get(bit0).find_top(is<node_t, tau::bf_and>) != nullptr );
  * @endcode
  */
 template<NodeType node>
-tref bit(tref operand, int_t bit);
+result<tref> bit(tref operand, int_t bit);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting operand left by one bit.
@@ -128,12 +137,12 @@ tref bit(tref operand, int_t bit);
  * // Constrains bit 0 of "shifted" to 0 and bit i+1 of "shifted" to bit i of x
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto shifted = tau::build_bf_variable(bv_type_id<node_t>(4));
- * tref constraint = bvshl_by_one<node_t>(x, shifted);
+ * tref constraint = bvshl_by_one<node_t>(x, shifted).value_or(nullptr);
  * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint).value_or(false) );
  * @endcode
  */
 template<NodeType node>
-tref bvshl_by_one(tref base, tref shifted);
+result<tref> bvshl_by_one(tref base, tref shifted);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting operand right by one bit.
@@ -149,12 +158,12 @@ tref bvshl_by_one(tref base, tref shifted);
  * // i+1 of x -- structurally distinct from bvshl_by_one's constraint.
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto shifted = tau::build_bf_variable(bv_type_id<node_t>(4));
- * tref constraint = bvshr_by_one<node_t>(x, shifted);
+ * tref constraint = bvshr_by_one<node_t>(x, shifted).value_or(nullptr);
  * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint).value_or(false) );
  * @endcode
  */
 template<NodeType node>
-tref bvshr_by_one(tref base, tref shifted);
+result<tref> bvshr_by_one(tref base, tref shifted);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting
@@ -173,12 +182,12 @@ tref bvshr_by_one(tref base, tref shifted);
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 3 }:bv[4] && x << { 3 }:bv[4] = y && "
  *     "y = { 8 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvshl(tref base, tref count, tref shifted);
+result<tref> bvshl(tref base, tref count, tref shifted);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting
@@ -197,12 +206,12 @@ tref bvshl(tref base, tref count, tref shifted);
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 15 }:bv[4] && x >> { 4 }:bv[4] = y && "
  *     "y = { 0 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvshr(tref base, tref count, tref shifted);
+result<tref> bvshr(tref base, tref count, tref shifted);
 
 /**
  * @brief Computes a predicate constraining result to be the cast of src to a
@@ -236,7 +245,7 @@ tref bvshr(tref base, tref count, tref shifted);
  * @endcode
  */
 template<NodeType node>
-tref bvcast(tref src, tref result);
+result<tref> bvcast(tref src, tref result);
 
 /**
  * @brief Computes a predicate checking if left is not equal to right as bitvectors.
@@ -260,12 +269,12 @@ tref bvcast(tref src, tref result);
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * // TEST_CASE("bvneq: x != x is never satisfiable")).
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
- * tref pred = bvneq<node_t>(x, x);
+ * tref pred = bvneq<node_t>(x, x).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(pred).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
-tref bvneq(tref left, tref right);
+result<tref> bvneq(tref left, tref right);
 
 /**
  * @brief Computes a predicate checking if left is less than right as bitvectors.
@@ -281,12 +290,12 @@ tref bvneq(tref left, tref right);
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:340-341).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvlt(tref left, tref right);
+result<tref> bvlt(tref left, tref right);
 
 /**
  * @brief Computes a predicate checking if left is greater than right as bitvectors.
@@ -301,12 +310,12 @@ tref bvlt(tref left, tref right);
  * // x > x is never satisfiable (see
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
  * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_F() );
  * @endcode
  */
 template<NodeType node>
-tref bvgt(tref left, tref right);
+result<tref> bvgt(tref left, tref right);
 
 /**
  * @brief Computes a predicate checking if left is less than or equal to right as bitvectors.
@@ -334,10 +343,13 @@ tref bvgt(tref left, tref right);
  * @endcode
  */
 template<NodeType node>
-tref bvlteq(tref left, tref right) {
+result<tref> bvlteq(tref left, tref right) {
 	using tau = tree<node>;
 
-	return tau::build_wff_neg(bvgt<node>(left, right)); }
+	result<tref> r;
+	TAU_TRY(auto gt, bvgt<node>(left, right));
+	return r.with_value(tau::build_wff_neg(gt));
+}
 
 /**
  * @brief Computes a predicate checking if left is greater or equal to right as bitvectors.
@@ -361,10 +373,12 @@ tref bvlteq(tref left, tref right) {
  * @endcode
  */
 template<NodeType node>
-tref bvgteq(tref left, tref right) {
+result<tref> bvgteq(tref left, tref right) {
 	using tau = tree<node>;
 
-	return tau::build_wff_neg(bvlt<node>(left, right));
+	result<tref> r;
+	TAU_TRY(auto lt, bvlt<node>(left, right));
+	return r.with_value(tau::build_wff_neg(lt));
 }
 
 /**
@@ -388,7 +402,7 @@ tref bvgteq(tref left, tref right) {
  * @endcode
  */
 template<NodeType node>
-tref bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
+result<tref> bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
 
 /**
  * @brief Computes a predicate checking if left is not greater or equal to right as bitvectors.
@@ -412,7 +426,7 @@ tref bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
  * @endcode
  */
 template<NodeType node>
-tref bvngteq(tref left, tref right) { return bvlt<node>(left, right); }
+result<tref> bvngteq(tref left, tref right) { return bvlt<node>(left, right); }
 
 /**
  * @brief Computes a predicate checking if left is not less than right as bitvectors.
@@ -434,7 +448,7 @@ tref bvngteq(tref left, tref right) { return bvlt<node>(left, right); }
  * @endcode
  */
 template<NodeType node>
-tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
+result<tref> bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
 
 /**
  * @brief Computes a predicate checking if left is not greater than right as bitvectors.
@@ -458,7 +472,7 @@ tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
  * @endcode
  */
 template<NodeType node>
-tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
+result<tref> bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
 
 /**
  * @brief Computes a predicate constraining sum to be the addition of the operands.
@@ -480,12 +494,12 @@ tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:82-84).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 15 }:bv[4] && x + { 1 }:bv[4] = { 0 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvadd(tref augend, tref addend, tref sum, trefs& aux);
+result<tref> bvadd(tref augend, tref addend, tref sum, trefs& aux);
 
 /**
  * @brief Computes a predicate constraining difference to be the subtraction
@@ -508,12 +522,12 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux);
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:116-118).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 0 }:bv[4] && x - { 1 }:bv[4] = { 15 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
+result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
 
 /**
  * @brief Computes a predicate constraining product to be the multiplication
@@ -537,12 +551,12 @@ tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
  * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:151-152).
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && x * { 6 }:bv[4] = { 2 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
+result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
 
 /**
  * @brief Computes the Euclidean division predicate constraining quotient and
@@ -575,7 +589,7 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
  * auto q = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto r = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto divisor = tau::get(tau::bf, bv_constant<node_t>(4, 3));
- * tref constraint = bved<node_t>(x, divisor, q, r, aux);
+ * tref constraint = bved<node_t>(x, divisor, q, r, aux).value_or(nullptr);
  * tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, bv_constant<node_t>(4, 10)));
  * tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, bv_constant<node_t>(4, 3)));
  * tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, bv_constant<node_t>(4, 1)));
@@ -585,7 +599,7 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
  * @endcode
  */
 template<NodeType node>
-tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
+result<tref> bved(tref dividend, tref divisor, tref quotient, tref remainder,
 	trefs& aux);
 
 /**
@@ -610,12 +624,12 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 10 }:bv[4] && x / { 3 }:bv[4] = y && "
  *     "y = { 3 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
+result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
 
 /**
  * @brief Computes a predicate constraining remainder to be the modulo of
@@ -639,12 +653,12 @@ tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
  * tref fm = get_nso_rr(
  *     "ex x ex y (x = { 10 }:bv[4] && x % { 3 }:bv[4] = y && "
  *     "y = { 1 }:bv[4]).").value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
+result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
 
 /**
  * @brief Computes a predicate constraining result to be the unsigned minimum
@@ -670,12 +684,12 @@ tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
  * tref fm = get_nso_rr(
  *     "ex x (x = { 3 }:bv[4] && min(x, { 5 }:bv[4]) = { 3 }:bv[4]).")
  *     .value().main->get();
- * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * tref blasted = bv_predicate_blasting<node_t>(fm).value_or(nullptr);
  * CHECK( tau::get(normalizer<node_t>(blasted).value_or(nullptr)).equals_T() );
  * @endcode
  */
 template<NodeType node>
-tref bvmin(tref left, tref right, tref result);
+result<tref> bvmin(tref left, tref right, tref result);
 
 /**
  * @brief Computes a predicate constraining result to be the unsigned maximum
@@ -690,7 +704,7 @@ tref bvmin(tref left, tref right, tref result);
  * determined
  */
 template<NodeType node>
-tref bvmax(tref left, tref right, tref result);
+result<tref> bvmax(tref left, tref right, tref result);
 
 } // namespace idni::tau_lang
 

@@ -25,6 +25,7 @@
 
 
 #include "defs.h"
+#include "tau_diagnostics.h"
 #include "tau_parser.generated.h"
 
 namespace idni::tau_lang {
@@ -269,10 +270,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Number of interned tree nodes (size of `bintree<node>::M()`). */
 	static size_t m_size();
 
-	/** @brief Transform parse tree @p t to a `tref` using @p options. */
-	static tref get(const tau_parser::tree& t, get_options& options);
-	/** @brief Transform parse tree @p t to a `tref` using @p options (rvalue). */
-	static tref get(const tau_parser::tree& t, get_options&& options);
+	/** @brief Transform parse tree @p t to a tree using @p options. */
+	static result<tref> get(const tau_parser::tree& t, get_options& options);
+	/** @brief Transform parse tree @p t to a tree using @p options (rvalue). */
+	static result<tref> get(const tau_parser::tree& t, get_options&& options);
 	/** @brief Re-register tree @p n in post-order (useful after structural edits). */
 	static tref reget(tref n);
 
@@ -352,11 +353,11 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Create a BA-constant node from @p constant and type id @p ba_type_id. */
 	static tref get_ba_constant(const constant& constant, size_t ba_type_id);
 	/** @brief Parse source string @p constant_source and create a BA-constant node. */
-	static tref get_ba_constant(const std::string& constant_source, tref type_tree);
+	static result<tref> get_ba_constant(const std::string& constant_source, tref type_tree);
 	/** @brief Create a BA-constant node from pre-interned source id and type id. */
-	static tref get_ba_constant_from_source(size_t constant_source_sid, size_t ba_type_id);
+	static result<tref> get_ba_constant_from_source(size_t constant_source_sid, size_t ba_type_id);
 	/** @brief Create a BA-constant node from pre-registered constant id and type id. */
-	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
+	static result<tref> get_ba_constant(size_t constant_id, size_t ba_type_id);
 	/** @brief Create a BA-constant node from a typed-constant pair. */
 	static tref get_ba_constant(const std::pair<constant, tref>& typed_const);
 	/** @brief Create a BA-constant node from an optional typed-constant pair. */
@@ -499,10 +500,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	constant get_ba_constant() const;
 	/** @brief Return the BA type id for this node. */
 	size_t get_ba_type() const;
-	/** @brief Return the string name of this node's BA type. */
-	std::string get_ba_type_name() const;
 	/** @brief Return the BA type tree ref for this node. */
-	tref get_ba_type_tree() const;
+	result<tref> get_ba_type_tree() const;
 	/** @brief Return the free variables reachable from this node. */
 	const trefs& get_free_vars() const;
 
@@ -545,23 +544,23 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	};
 
 	/** @brief Convert parser @p result to a tree using @p options. */
-	static tref get(tau_parser::result& result, get_options& options);
+	static result<tref> get(tau_parser::result& result, get_options& options);
 	/** @brief Convert parser @p result to a tree using @p options (rvalue). */
-	static tref get(tau_parser::result& result, get_options&& options);
+	static result<tref> get(tau_parser::result& result, get_options&& options);
 	/** @brief Parse @p str with default options. */
-	static tref get(const std::string& str);
+	static result<tref> get(const std::string& str);
 	/** @brief Parse @p str with @p options. */
-	static tref get(const std::string& str, get_options& options);
+	static result<tref> get(const std::string& str, get_options& options);
 	/** @brief Parse @p str with @p options (rvalue). */
-	static tref get(const std::string& str, get_options&& options);
+	static result<tref> get(const std::string& str, get_options&& options);
 	/** @brief Parse from stream @p is with @p options. */
-	static tref get(std::istream& is, get_options& options);
+	static result<tref> get(std::istream& is, get_options& options);
 	/** @brief Parse from stream @p is with @p options (rvalue). */
-	static tref get(std::istream& is, get_options&& options);
+	static result<tref> get(std::istream& is, get_options&& options);
 	/** @brief Parse file @p filename with @p options. */
-	static tref get_from_file(const std::string& filename, get_options& options);
+	static result<tref> get_from_file(const std::string& filename, get_options& options);
 	/** @brief Parse file @p filename with @p options (rvalue). */
-	static tref get_from_file(const std::string& filename, get_options&& options);
+	static result<tref> get_from_file(const std::string& filename, get_options&& options);
 
 	// -----------------------------------------------------------------------
 	// Traverser / tt API (tau_tree_traverser.tmpl.h)

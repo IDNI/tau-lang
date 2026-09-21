@@ -1,199 +1,87 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// ltl_aba_synthesis.tmpl.h - Spot subprocess integration, HOA/DPA parsing
-// Split from ltl_aba.tmpl.h for readability.
+// ltl_aba_synthesis.tmpl.h - HOA parsing and the tau-lang side of ltlsynt
+// calls. The Spot subprocess mechanics (spawn, argv, tempfiles, the
+// exit-code convention) live in backends/spot/spot.h; call_ltlsynt builds
+// the request, calls the backend, and interprets the verdict.
 
 // Generated from parser/hoa.tgf into the build tree; bare spelling, same as
 // tau_tree.h's own include of "tau_parser.generated.h".
 #include "hoa_parser.generated.h"
+#include "backends/spot/spot.h"
 #include <climits>
-#include <filesystem>
 
 namespace idni::tau_lang {
-
-// ── Spot subprocess ───────────────────────────────────────────────────────────
 
 // The ltlsynt watchdog is the runtime parameter `ltl_timeout_sec_param`
 // (ltl_aba.h): `--ltl-timeout`, REPL `set ltltimeout`,
 // `api::set_ltl_timeout_sec`, with TAU_LTL_TIMEOUT_SEC as the environment
 // fallback. `ltl_timeout_sec()` there resolves the precedence.
 
+// ltlsynt_available() is declared in ltl_aba.h and used throughout the test
+// suites as a doctest::skip() gate; the name stays, delegating to the
+// backend so there is exactly one PATH probe.
+inline bool ltlsynt_available() { return available(); }
 
-// Spawn an external command directly via posix_spawnp (no shell), capture
-// its stdout, and return {captured-output, exit-code}.
-//
-// Why not popen?  popen("cmd") forwards the argument to /bin/sh -c, which
-// requires shell-escaping every interpolated value; it also doubles the
-// process count, charges the cost of parsing the shell, and inherits the
-// shell's signal handling.  posix_spawnp + execvp passes argv exactly as
-// given, with no shell intermediating, which is both safer (no escaping
-// bugs across `"`/`\\`/`$`/`` ` `` plus everything else) and a measurable
-// fraction faster on the hot synthesis path.
-//
-// Conventions:
-//   exit_code ==  127  -> command not found (matches the legacy run_cmd
-//                         contract; callers test against 127 to print a
-//                         "ltlsynt not on PATH" hint).
-//   exit_code ==   -1  -> spawn or wait failed.
-//   exit_code == >124  -> the optional `timeout_sec` wrapper killed the
-//                         child (`timeout -k 0 N cmd ...`-style behaviour
-//                         is implemented via SIGTERM after `timeout_sec`
-//                         seconds).
-//   stderr             -> redirected to /dev/null.
-//
-// The caller passes argv as a vector of C++ strings.  An empty
-// `timeout_sec` (or 0) disables the kill-after-N-seconds watchdog.
-inline std::pair<std::string, int> spawn_capture(
-    const std::vector<std::string>& argv,
-    int timeout_sec = 0)
+// ── stderr side channels (opt-in debug output; no report, no return value) ─
+
+// TAU_LTL_WITNESS=1: on UNREALIZABLE, print the environment's winning
+// strategy. By determinacy of ω-regular two-player games, UNREAL means
+// ∃env.∀sys.¬φ, so swapping ins/outs and negating the formula turns the
+// environment into "sys" of a new, REALIZABLE-iff-witness game.
+inline void print_env_counter_strategy_witness(
+	const std::string& ltl_formula,
+	const std::vector<std::string>& input_props,
+	const std::vector<std::string>& output_props,
+	int timeout_sec)
 {
-#ifdef __EMSCRIPTEN__
-	(void)argv; (void)timeout_sec;
-	return {"", 127}; // no process model under wasm; matches the not-on-PATH contract
-#else
-	if (argv.empty()) return {"", -1};
-
-	int pipefd[2];
-	if (::pipe(pipefd) != 0) return {"", -1};
-
-	posix_spawn_file_actions_t fa;
-	if (posix_spawn_file_actions_init(&fa) != 0) {
-		::close(pipefd[0]); ::close(pipefd[1]);
-		return {"", -1};
-	}
-	// Child: redirect stdout -> pipe write end; stderr -> /dev/null.
-	posix_spawn_file_actions_addclose(&fa, pipefd[0]);
-	posix_spawn_file_actions_adddup2 (&fa, pipefd[1], STDOUT_FILENO);
-	posix_spawn_file_actions_addclose(&fa, pipefd[1]);
-	posix_spawn_file_actions_addopen (&fa, STDERR_FILENO, "/dev/null",
-	                                  O_WRONLY, 0);
-
-	std::vector<char*> cargv;
-	cargv.reserve(argv.size() + 1);
-	for (const auto& s : argv) cargv.push_back(const_cast<char*>(s.c_str()));
-	cargv.push_back(nullptr);
-
-	pid_t pid;
-	int rc = posix_spawnp(&pid, cargv[0], &fa, nullptr, cargv.data(), environ);
-	posix_spawn_file_actions_destroy(&fa);
-	::close(pipefd[1]);
-	if (rc != 0) {
-		::close(pipefd[0]);
-		// posix_spawnp returns ENOENT (==2) when the binary isn't on PATH;
-		// surface that as 127 to match the legacy `popen` contract.
-		return {"", rc == ENOENT ? 127 : -1};
-	}
-
-	// Watchdog thread: SIGTERM the child after timeout_sec seconds.
-	std::atomic<bool> done{false};
-	std::thread killer;
-	if (timeout_sec > 0) {
-		killer = std::thread([pid, timeout_sec, &done]() {
-			const long long polls = 10LL * timeout_sec;
-			for (long long i = 0; i < polls && !done.load(); ++i)
-				::usleep(100'000);
-			if (!done.load()) ::kill(pid, SIGTERM);
-		});
-	}
-
-	// Drain pipe.
-	std::string out;
-	std::array<char, 4096> buf;
-	for (;;) {
-		ssize_t n = ::read(pipefd[0], buf.data(), buf.size());
-		if (n > 0) out.append(buf.data(), buf.data() + n);
-		else if (n == 0) break;
-		else if (errno == EINTR) continue;
-		else break;
-	}
-	::close(pipefd[0]);
-
-	// SY-N6: stop the watchdog BEFORE the child is reaped.  After waitpid
-	// returns the PID may already belong to another process, and a poll
-	// firing in the window between the reap and `done.store(true)` would
-	// SIGTERM it.  Once the pipe is drained (above) the child has closed
-	// its stdout and is exiting, so cancelling the kill here cannot let a
-	// still-running child escape the timeout: the watchdog's job -- bound
-	// the time we wait for OUTPUT -- is done.  (A pidfd_open/WNOWAIT
-	// scheme would close the remaining theoretical window.)
-	done.store(true);
-	if (killer.joinable()) killer.join();
-	int status = 0;
-	while (::waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
-
-	int exit_code;
-	if (WIFEXITED(status))        exit_code = WEXITSTATUS(status);
-	else if (WIFSIGNALED(status)) exit_code = 128 + WTERMSIG(status);
-	else                          exit_code = -1;
-	return {out, exit_code};
-#endif // __EMSCRIPTEN__
+	const char* w = std::getenv("TAU_LTL_WITNESS");
+	if (!w || !*w || std::string(w) == "0") return;
+	auto neg = synthesize("!(" + ltl_formula + ")",
+		output_props, input_props, timeout_sec);
+	if (neg.has_value() && neg.value().realizable)
+		std::fprintf(stderr,
+		    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s\n",
+		    neg.value().hoa.c_str());
 }
 
-// Cached: computed once per process from the same spawn_capture() this file
-// uses to run ltlsynt itself, so this can't drift from call_ltlsynt's own
-// not-found detection. Under Emscripten, spawn_capture() unconditionally
-// returns exit code 127 (no process model), so this is false by construction.
-inline bool ltlsynt_available() {
-	static const bool available = [] {
-		auto [out, exit_code] = spawn_capture({"ltlsynt", "--version"});
-		(void)out;
-		return exit_code != 127;
-	}();
-	return available;
-}
-
-// Legacy shim kept for the few sites still passing a pre-built shell
-// command line (autfilt --dot, ltlfilt -f).  These paths will be migrated
-// in a follow-up; for now they incur the popen-shell cost only on rarely-
-// hit fallbacks.
-inline std::pair<std::string, int> run_cmd(const std::string& cmd) {
-#ifdef __EMSCRIPTEN__
-	(void)cmd;
-	return {"", 127}; // no process model under wasm; matches the not-on-PATH contract
-#else
-	std::array<char, 4096> buf;
-	std::string result;
-	FILE* raw = popen(cmd.c_str(), "r");
-	if (!raw) {
-		LOG_ERROR << "[ltl_aba] popen() failed for: " << cmd;
-		return {"", -1};
-	}
-	while (fgets(buf.data(), static_cast<int>(buf.size()), raw))
-		result += buf.data();
-	int status = pclose(raw);
-	int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-	return {result, exit_code};
-#endif // __EMSCRIPTEN__
-}
-
-// Write `content` to a fresh <tmpdir>/<prefix>_XXXXXX path, where <tmpdir>
-// honours TMPDIR (std::filesystem::temp_directory_path) and falls back to
-// /tmp.  Caller owns removal.  Returns the absolute path on success, "" on
-// failure.
-static std::string write_tempfile(const std::string& prefix,
-                                  const std::string& content)
+// TAU_LTL_EXPORT_STRATEGY=hoa|dot: print the winning strategy to stderr.
+// TAU_LTL_EXPORT_STRATEGY_FILE=<path>: also write the HOA text to that
+// (persistent, user-named) path; a write failure is a report warning, not
+// a silently dropped error.
+inline void export_strategy(report& rep, const std::string& hoa,
+	int timeout_sec)
 {
-	std::string dir = "/tmp";
-	try {
-		std::error_code ec;
-		auto d = std::filesystem::temp_directory_path(ec);
-		if (!ec && !d.empty()) dir = d.string();
-	} catch (...) {}
-	std::string tmpl = dir + "/" + prefix + "_XXXXXX";
-	std::vector<char> buf(tmpl.begin(), tmpl.end());
-	buf.push_back('\0');
-	int fd = ::mkstemp(buf.data());
-	if (fd < 0) return "";
-	const char* p = content.data();
-	size_t left = content.size();
-	while (left) {
-		ssize_t n = ::write(fd, p, left);
-		if (n < 0) { if (errno == EINTR) continue; ::close(fd); return ""; }
-		p += n; left -= static_cast<size_t>(n);
+	const char* fmt  = std::getenv("TAU_LTL_EXPORT_STRATEGY");
+	const char* path = std::getenv("TAU_LTL_EXPORT_STRATEGY_FILE");
+
+	if (fmt && !hoa.empty()) {
+		if (std::string(fmt) == "hoa") {
+			std::fprintf(stderr, "=== STRATEGY HOA ===\n%s\n", hoa.c_str());
+		} else if (std::string(fmt) == "dot") {
+			auto dot = to_dot(hoa, timeout_sec);
+			if (dot.has_value())
+				std::fprintf(stderr, "=== STRATEGY DOT ===\n%s\n",
+					dot.value().c_str());
+			else
+				std::fprintf(stderr,
+					"=== STRATEGY HOA (dot unavailable) ===\n%s\n",
+					hoa.c_str());
+		}
 	}
-	::close(fd);
-	return std::string(buf.data());
+	if (path && *path) {
+		FILE* f = std::fopen(path, "w");
+		// fwrite buffers, so a write failure can surface only at the
+		// flush that fclose does.
+		bool ok = f
+			&& std::fwrite(hoa.data(), 1, hoa.size(), f) == hoa.size();
+		if (f && std::fclose(f) != 0) ok = false;
+		if (!ok) rep.warning("failed to write the strategy export file",
+			{{label::path, path}});
+	}
 }
+
+// ── call_ltlsynt ─────────────────────────────────────────────────────────
 
 inline result<std::pair<bool, std::string>> call_ltlsynt(
     const std::string& ltl_formula,
@@ -201,170 +89,28 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
     const std::vector<std::string>& output_props)
 {
 	result<std::pair<bool, std::string>> r;
-
-	// Build --ins and --outs CSV lists.
-	std::string ins_str, outs_str;
-	for (size_t i = 0; i < input_props.size(); ++i) {
-		if (i) ins_str += ",";
-		ins_str += input_props[i];
-	}
-	for (size_t i = 0; i < output_props.size(); ++i) {
-		if (i) outs_str += ",";
-		outs_str += output_props[i];
-	}
-
-	// Configurable watchdog (--ltl-timeout / `set ltltimeout` /
-	// TAU_LTL_TIMEOUT_SEC; default 60). 0 disables.
 	int timeout_sec = ltl_timeout_sec();
 
-	// Always write the formula to a temp file and use `-F path`.  The old
-	// inline `--formula="..."` path required shell-escaping every char and
-	// was capped at the Linux MAX_ARG_STRLEN limit (131072) when the
-	// formula grew (Algorithm B with many constants).  posix_spawn passes
-	// argv vectors directly so neither limit applies, but writing the
-	// formula to a file is still the simpler invariant — exactly one code
-	// path, exactly one length cap (the filesystem's).
-	std::string tmpfile_path = write_tempfile("tau_lang", ltl_formula + "\n");
-	if (tmpfile_path.empty()) {
-		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
+	// LT-7: a backend failure (not on PATH, timeout watchdog,
+	// usage error, no recognized verdict line) is forwarded as an error
+	// here, never read as a decided UNREALIZABLE.
+	TAU_TRY(auto verdict, synthesize(ltl_formula, input_props, output_props,
+		timeout_sec));
+
+	if (!verdict.realizable) {
+		print_env_counter_strategy_witness(ltl_formula, input_props,
+			output_props, timeout_sec);
 		return r.with_value(std::make_pair(false, std::string()));
 	}
 
-	auto build_argv = [&](const std::string& formula_path) {
-		std::vector<std::string> argv = {"ltlsynt", "-F", formula_path};
-		if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
-		if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
-		if (const char* simp = std::getenv("TAU_LTL_SIMPLIFICATION"))
-			if (*simp) argv.push_back("--simplification=" + std::string(simp));
-		return argv;
-	};
+	export_strategy(r.report(), verdict.hoa, timeout_sec);
 
-	auto argv = build_argv(tmpfile_path);
-
-	{
-		std::string flat;
-		for (const auto& a : argv) { flat += a; flat += ' '; }
-		LOG_DEBUG << "[ltl_aba] calling: " << flat;
+	if (auto pos = verdict.hoa.find("States:"); pos != std::string::npos) {
+		auto eol = verdict.hoa.find('\n', pos);
+		LOG_INFO << "[ltl_aba] strategy " << verdict.hoa.substr(pos, eol - pos);
 	}
 
-	auto [out, exit_code] = spawn_capture(argv, timeout_sec);
-	std::remove(tmpfile_path.c_str());
-	LOG_DEBUG << "[ltl_aba] ltlsynt output (exit=" << exit_code << "): " << out;
-
-	// LT-7: only exit 127 used to be special-cased, so a watchdog kill
-	// (128 + SIGTERM = 143) or a usage error fell into the `out.empty()`
-	// branch below and every caller read the result as a definitive
-	// UNREALIZABLE.  A slow-but-realizable specification therefore got a
-	// wrong answer with nothing but a LOG_DEBUG trace behind it.
-	switch (classify_spot_exit(exit_code, out)) {
-	case spot_exit_kind::not_found:
-		// IN-N1: a missing backend is no verdict either; returning
-		// {false, ""} here made every caller print "UNREALIZABLE".
-		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
-		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		return r.with_error(code::solver_error, "ltlsynt not found on PATH; install "
-			"Spot (>= 2.10) -- realizability is UNKNOWN");
-	case spot_exit_kind::failed: {
-		std::string msg = "ltlsynt produced no verdict (exit "
-		                + std::to_string(exit_code) + ")";
-		if (exit_code == 143)
-			msg += " — killed by the ltl-timeout watchdog ("
-			     + std::to_string(timeout_sec) + "s; --ltl-timeout / "
-			     "`set ltltimeout` / TAU_LTL_TIMEOUT_SEC)";
-		LOG_ERROR << "[ltl_aba] " << msg
-		          << "; the realizability of this specification is UNKNOWN\n";
-		return r.with_error(code::solver_error, msg);
-	}
-	case spot_exit_kind::ok:
-		break;
-	}
-	if (out.empty()) {
-		LOG_ERROR << "[ltl_aba] ltlsynt exited normally with no output; "
-		             "the realizability of this specification is UNKNOWN\n";
-		return r.with_error(code::solver_error,
-			"ltlsynt produced no verdict (empty output)");
-	}
-	if (out.substr(0, 12) == "UNREALIZABLE") {
-		// Q40-UX3: on UNREAL, optionally produce env counter-strategy.
-		// By determinacy of ω-regular two-player games, UNREAL means
-		// ∃env.∀sys.¬φ.  So swapping roles (ins↔outs) and negating the
-		// formula yields a game where env plays the role of sys; if that
-		// is REALIZABLE, ltlsynt's output is env's winning strategy.
-		if (const char* w = std::getenv("TAU_LTL_WITNESS");
-		    w && *w && std::string(w) != "0")
-		{
-			std::string neg_path = write_tempfile(
-			    "tau_lang_neg", "!(" + ltl_formula + ")\n");
-			if (!neg_path.empty()) {
-				std::vector<std::string> neg_argv = {
-				    "ltlsynt", "-F", neg_path};
-				// Swap --ins and --outs in the negated game.
-				if (!outs_str.empty()) neg_argv.push_back("--ins="  + outs_str);
-				if (!ins_str.empty())  neg_argv.push_back("--outs=" + ins_str);
-				auto [neg_out, neg_rc] = spawn_capture(neg_argv, timeout_sec);
-				std::remove(neg_path.c_str());
-				if (neg_rc != 127 && neg_out.substr(0, 10) == "REALIZABLE") {
-					auto nl = neg_out.find('\n');
-					std::string env_hoa = nl == std::string::npos
-						? std::string() : neg_out.substr(nl + 1);
-					std::fprintf(stderr,
-					    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s\n",
-					    env_hoa.c_str());
-				}
-			}
-		}
-		return r.with_value(std::make_pair(false, std::string()));
-	}
-	if (out.substr(0, 10) == "REALIZABLE") {
-		std::string hoa = out.substr(out.find('\n') + 1);
-		// Strategy export:
-		//   TAU_LTL_EXPORT_STRATEGY=hoa  → print HOA to stderr
-		//   TAU_LTL_EXPORT_STRATEGY=dot  → ask autfilt for dot, print to stderr
-		//   TAU_LTL_EXPORT_STRATEGY_FILE=<path> → also write HOA to that path
-		const char* export_fmt = std::getenv("TAU_LTL_EXPORT_STRATEGY");
-		if (export_fmt && !hoa.empty()) {
-			std::string fmt = export_fmt;
-			if (fmt == "hoa") {
-				std::fprintf(stderr, "=== STRATEGY HOA ===\n%s\n", hoa.c_str());
-			} else if (fmt == "dot") {
-				// Pipe HOA through autfilt --dot if available; else fall back to HOA.
-				// LS-21: mkstemp-style tempfile + argv spawn (no
-				// predictable /tmp name, no shell string concat).
-				std::string tmp = write_tempfile("tau_strategy", hoa);
-				if (!tmp.empty()) {
-					auto [dot, rc] = spawn_capture(
-					    {"autfilt", "--dot", tmp}, timeout_sec);
-					std::remove(tmp.c_str());
-					if (rc == 0 && !dot.empty())
-						std::fprintf(stderr, "=== STRATEGY DOT ===\n%s\n", dot.c_str());
-					else
-						std::fprintf(stderr, "=== STRATEGY HOA (dot unavailable) ===\n%s\n", hoa.c_str());
-				}
-			}
-		}
-		if (const char* path = std::getenv("TAU_LTL_EXPORT_STRATEGY_FILE"); path && *path) {
-			if (FILE* f = std::fopen(path, "w")) {
-				std::fwrite(hoa.data(), 1, hoa.size(), f);
-				std::fclose(f);
-			}
-		}
-		// Log state count at INFO level if possible (parse `States:` from HOA header).
-		{
-			auto pos = hoa.find("States:");
-			if (pos != std::string::npos) {
-				auto eol = hoa.find('\n', pos);
-				std::string line = hoa.substr(pos, eol - pos);
-				LOG_INFO << "[ltl_aba] strategy " << line;
-			}
-		}
-		return r.with_value(std::make_pair(true, std::move(hoa)));
-	}
-	// SY-R4: output that starts with neither verdict line is no verdict
-	// (a crashed or foreign binary on PATH printing something else with
-	// exit 0); it used to fall through as UNREALIZABLE.
-	LOG_ERROR << "[ltl_aba] ltlsynt output carried no verdict line; the "
-	             "realizability of this specification is UNKNOWN\n";
-	return r.with_error(code::solver_error, "ltlsynt output carried no verdict line");
+	return r.with_value(std::make_pair(true, std::move(verdict.hoa)));
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
@@ -392,7 +138,7 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	auto parsed = hoa_parser::instance().parse(
 					hoa_text.c_str(), hoa_text.size());
 	if (!parsed.found) {
-		return r.with_error(code::parse_error, "malformed HOA strategy: not a HOA "
+		return r.with_error(code::parse_error, "the HOA strategy is not a HOA "
 			"automaton (truncated, or no `--BODY--`)");
 	}
 	auto root = tt(parsed.get_shaped_tree2());
@@ -424,9 +170,9 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 			long n = num_of(st);
 			if (n < 1 || n > max_states) {
 				return r.with_error(code::parse_error,
-					"malformed HOA strategy: bad state "
-					"count '" + (st | hoa::num
-						| tt::terminals) + "'");
+					"the HOA strategy has a malformed state count",
+					{{label::value, std::string(
+						st | hoa::num | tt::terminals)}});
 			}
 			aut.num_states = (int) n;
 			seen_states = true;
@@ -453,8 +199,8 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	}
 
 	if (!seen_states) {
-		return r.with_error(code::parse_error, "malformed HOA strategy: "
-			"no `States:` header");
+		return r.with_error(code::parse_error,
+			"the HOA strategy has no `States:` header");
 	}
 
 	int cur_state = -1;
@@ -496,7 +242,7 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 // ── Algorithm D: ltlsynt → parity game ───────────────────────────────────────
 //
 // Declared in algorithm_d_game.h and defined here so it can use the same
-// tempfile + posix_spawn mechanism `call_ltlsynt` uses (LS-10).
+// backend `call_ltlsynt` uses (LS-10).
 //
 // It used to be popen + an inline `--formula="…"` with hand-rolled escaping of
 // only `" \ $ \``.  That is the exact pattern `call_ltlsynt` retired: a single
@@ -515,91 +261,37 @@ inline result<synth_game> call_ltlsynt_game(
 	result<synth_game> r;
 
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
-	// TT2-13 / LG-27: a bounded_cache in runtime-bound mode (`set
-	// cachebound`, 0 = unbounded, FIFO eviction) instead of the previous
-	// unbounded unordered_map of full synth_game copies — this cache holds
-	// no trefs, so the tree GC never pruned it and the bound is its only
-	// control. Callers get their own copy of the cached entry.
+	// TT2-13: a bounded_cache in runtime-bound mode (`set cachebound`, 0 =
+	// unbounded, FIFO eviction). Callers get their own copy of the
+	// cached entry.
+	static bounded_cache<std::string, synth_game> cache{&cache_bound};
+	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
+	// name, so the concatenation is injective. Local to this cache key --
+	// the backend's own comma-joiner formats an argv flag, a different job.
 	auto csv = [](const std::vector<std::string>& v) {
 		std::string s;
 		for (size_t i = 0; i < v.size(); ++i) { if (i) s += ","; s += v[i]; }
 		return s;
 	};
-	static bounded_cache<std::string, synth_game> cache{&cache_bound};
-	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
-	// name, so the concatenation is injective.
-	const std::string key =
-		phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
+	const std::string key = phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
 	if (auto it = cache.find(key); it != cache.end()) { return r.with_value(it->second); }
 
-	// Configurable timeout (same env var as call_ltlsynt).
 	int timeout_sec = ltl_timeout_sec();
 
-	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
-	if (tmpfile_path.empty()) {
-		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
-		return r.with_value(synth_game{});  // transient — don't cache
-	}
+	// SY-R1: a timeout, a missing binary or a usage error is a backend
+	// error, not the EMPTY game every caller used to read as a definitive
+	// UNREALIZABLE. Nothing transient is cached.
+	TAU_TRY(auto hoa, synthesize_game(phi_prop, ins, outs, timeout_sec));
 
-	// §14 / Batch O7: --polarity=no.  ltlsynt's polarity optimization
-	// substitutes output APs of constant polarity with their favorable
-	// value BEFORE building the game, so `--print-game-hoa` for
-	// `d_0 U d_1` came back as a 2-state acceptance-"all" machine whose
-	// single sys edge is `[0&1]` — the propositional strategy, with every
-	// alternative discarded.  Algorithm D re-solves the game under DATA
-	// feasibility, where a discarded alternative (set d_1 alone) may be
-	// the only feasible one; the reduced machine then reads as a sys dead
-	// end and textbook dead-end semantics flips a realizable spec
-	// (ALG-D-28).  With --polarity=no ltlsynt emits the genuine arena
-	// (all sys alternatives, real acceptance), which is what a re-solver
-	// needs.
-	std::vector<std::string> argv = {
-	    "ltlsynt", "-F", tmpfile_path,
-	    // --decompose=no: a decomposed spec prints one game per part, and
-	    // the product game needs a single game carrying every d_i (see
-	    // parse_synth_game_hoa's decomposed-game refusal).
-	    "--polarity=no", "--decompose=no", "--print-game-hoa"};
-	if (!ins.empty())  argv.push_back("--ins="  + csv(ins));
-	if (!outs.empty()) argv.push_back("--outs=" + csv(outs));
-
-	auto [hoa, exit_code] = spawn_capture(argv, timeout_sec);
-	std::remove(tmpfile_path.c_str());
-
-	// SY-R1: a timeout, a missing binary or a usage error used to come
-	// back as the EMPTY game, which every caller (Algorithm D, the
-	// semantic-PWR fallback) reads as a definitive UNREALIZABLE. Classify
-	// like call_ltlsynt: no verdict is not a verdict, so this reports an
-	// error instead of an empty game. Nothing transient is cached.
-	switch (classify_spot_exit(exit_code, hoa)) {
-	case spot_exit_kind::not_found:
-		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
-		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
-		return r.with_error(code::solver_error, "ltlsynt not found on PATH; install "
-			"Spot (>= 2.10) -- the parity game could not be built");
-	case spot_exit_kind::failed: {
-		std::string msg = "ltlsynt --print-game-hoa produced no game "
-			"(exit " + std::to_string(exit_code) + ")";
-		if (exit_code == 143)
-			msg += " — killed by the ltl-timeout watchdog ("
-			     + std::to_string(timeout_sec) + "s; --ltl-timeout / "
-			     "`set ltltimeout` / TAU_LTL_TIMEOUT_SEC)";
-		LOG_ERROR << "[ltl_aba] " << msg << "\n";
-		return r.with_error(code::solver_error, msg);
-	}
-	case spot_exit_kind::ok:
-		break;
-	}
 	// Insert-then-copy: the freshly inserted entry is the newest in FIFO
 	// order, so an eviction triggered by this insert can only remove
 	// OLDER entries (bound >= 1) — reading it back right after is safe.
-	// The hand-written HOA game parser reports a rejected header (bad
-	// counts, too many APs, a decomposed multi-game text) as the EMPTY
-	// game; like the spot failures above that is no verdict, not an
-	// UNREALIZABLE one, so refuse here instead of caching it.
+	// A rejected header (bad counts, too many APs, a decomposed
+	// multi-game text) is the EMPTY game from the hand-written parser;
+	// like a spot failure that is no verdict, not an UNREALIZABLE one, so
+	// refuse here instead of caching it.
 	synth_game game = parse_synth_game_hoa(hoa);
 	if (game.num_states == 0) {
-		LOG_ERROR << "[ltl_aba] ltlsynt --print-game-hoa output could "
-			"not be parsed into a synthesis game\n";
 		return r.with_error(code::parse_error, "malformed synthesis game "
 			"HOA from ltlsynt; the parity game could not be built");
 	}

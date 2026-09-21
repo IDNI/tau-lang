@@ -57,7 +57,7 @@ add_repl_test(get_cmd-cachebound_default_finite "get cachebound"
 	"cachebound: *4096")
 add_repl_test(get_cmd-cachebound_zero_is_unlimited
 	"set cachebound 0. get cachebound" "cachebound: *unlimited")
-# §13 / Batch O8: the oracle's mixed-type coverage expansion cap ships
+# Batch O8: the oracle's mixed-type coverage expansion cap ships
 # FINITE (256); 0 opts into unlimited.
 add_repl_test(get_cmd-maxcoverproducts_default_finite "get maxcoverproducts"
 	"maxcoverproducts: *256")

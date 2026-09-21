@@ -286,8 +286,10 @@ else()
 	# output, so no FAIL regex.
 	add_test(NAME "test_repl-cli-bv_max_width_cap_exceeded"
 		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --bv-widening --bv-max-width 12 -e \"sat o:bv[8] = x * y\"")
+	# The cap/width numbers now travel as report attrs (limit=.. width=..)
+	# instead of being spliced into the sentence (bv_widening.tmpl.h).
 	set_tests_properties("test_repl-cli-bv_max_width_cap_exceeded" PROPERTIES
-		PASS_REGULAR_EXPRESSION "required width 16 exceeds bv-max-width 12")
+		PASS_REGULAR_EXPRESSION "required width exceeds bv-max-width")
 	# Spec-file mode gets the flags too (they are applied before the file
 	# runs): a one-step run of the guard-free saturating add stores 200, not 44.
 	add_test(NAME "test_repl-cli-bv_widening_spec_file_mode"

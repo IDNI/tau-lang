@@ -13,6 +13,7 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "boolean_algebras/ba_descriptor.h"
@@ -235,15 +236,20 @@ std::optional<bool> pack_sat_status(Form form) {
 /**
  * @brief Run @p form through the preprocessing of every BA that offers it.
  *
- * A BA whose preprocessing is disabled returns @p form unchanged, so callers
- * test the result against the input rather than consulting a flag.
+ * A BA whose preprocessing is disabled (or that offers none) returns its
+ * input unchanged, so callers test the result against the input rather than
+ * consulting a flag. The chain stops at the first declaring BA whose
+ * preprocess fails, carrying that report forward instead of running the rest
+ * on a formula that never got fixed up.
  */
 template <typename Node, typename Form>
-Form pack_preprocess(Form form) {
-	Form out = form;
+result<Form> pack_preprocess(Form form) {
+	result<Form> out{form};
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_preprocess<Node, BA>)
-			out = ba_descriptor<BA, Node>::preprocess(out);
+			out = std::move(out).and_then([](Form f) -> result<Form> {
+				return ba_descriptor<BA, Node>::preprocess(f);
+			});
 	});
 	return out;
 }
@@ -287,14 +293,17 @@ Form pack_eliminate_definitional_existentials(Form form) {
  *
  * No BA in the pack declaring the capability means no BA widens this
  * formula, so this returns @p form unchanged -- the same "absent means
- * ordinary" convention as @ref pack_preprocess.
+ * ordinary" convention as @ref pack_preprocess. Stops the chain and carries
+ * the failing report forward the same way, too.
  */
 template <typename Node, typename Form>
-Form pack_widen_arithmetic(Form form) {
-	Form out = form;
+result<Form> pack_widen_arithmetic(Form form) {
+	result<Form> out{form};
 	pack_visit_all<Node>([&]<typename BA>() {
 		if constexpr (ba_has_widen_arithmetic<Node, BA>)
-			out = ba_descriptor<BA, Node>::widen_arithmetic(out);
+			out = std::move(out).and_then([](Form f) -> result<Form> {
+				return ba_descriptor<BA, Node>::widen_arithmetic(f);
+			});
 	});
 	return out;
 }

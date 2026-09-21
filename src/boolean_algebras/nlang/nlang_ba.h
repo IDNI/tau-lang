@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 #include "ba_constants.h"
 #include "splitter_types.h"
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
@@ -435,12 +436,16 @@ inline std::optional<nlang_ba::fptr> parse_nlang_grammar(const std::string& s) {
 //   3. Full DeepSeek fallback when grammar fails (e.g. unbalanced parens).
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
+result<typename node<BAs...>::constant_with_type> parse_nlang(
 	const std::string& src)
 {
+	result<typename node<BAs...>::constant_with_type> r;
 	std::string s = strip_ba_constant_source(src, /*strip_quotes=*/true);
 
-	if (s.empty()) return {};
+	if (s.empty()) {
+		r.error(code::parse_error, "Empty nlang literal");
+		return r;
+	}
 
 	nlang_ba::fptr fm;
 	if (auto gr = parse_nlang_grammar(s); gr) {
@@ -456,9 +461,9 @@ std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
 		fm = llm_decompose(s);
 	}
 
-	return typename node<BAs...>::constant_with_type{
+	return r.with_value(typename node<BAs...>::constant_with_type{
 		std::variant<BAs...>{ nlang_ba::from_fm(std::move(fm)) },
-		ba_descriptor<nlang_ba, node<BAs...>>::type_tree() };
+		ba_descriptor<nlang_ba, node<BAs...>>::type_tree() });
 }
 
 } // namespace idni::tau_lang

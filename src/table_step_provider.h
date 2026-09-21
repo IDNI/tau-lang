@@ -53,7 +53,7 @@ struct table_step_provider : step_provider<node> {
 			edge_witness_template_is_counter = {},
 		std::vector<int_t> step_guard_ks = {});
 
-	std::optional<solution<node>> produce(
+	result<std::optional<solution<node>>> produce(
 		const trefs& step_spec, const assignment<node>& memory,
 		size_t time_point, size_t formula_time_point) override;
 

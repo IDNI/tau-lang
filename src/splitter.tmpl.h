@@ -71,8 +71,9 @@ const tree<node<BAs...>>& tau_splitter(const tree<node<BAs...>>& t,
 // the proposed splitter in "splitter".
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
+result<bool> is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 	using node = tau_lang::node<BAs...>;
+	result<bool> r;
 	if (spec_clause) {
 		// We are dealing with a temporal formula
 		// NOTE: temporal upper splitters do not necessarily imply fm; the
@@ -81,25 +82,26 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 			rewriter::replace<node>(spec_clause, fm, splitter));
 		// No value when the definitions in the clause do not settle;
 		// no normalized clause means no splitter to report.
-		if (!new_spec_clause_r.has_value()) return false;
+		if (!new_spec_clause_r.has_value()) return r.with_value(false);
 		tref new_spec_clause = new_spec_clause_r.value();
-		auto sat = is_tau_formula_sat<node>(new_spec_clause);
+		auto sat = r.merge_take(is_tau_formula_sat<node>(new_spec_clause));
 		if (sat.has_value() && sat.value()) {
-			auto eq = are_tau_equivalent<node>(new_spec_clause, spec_clause);
+			auto eq = r.merge_take(
+				are_tau_equivalent<node>(new_spec_clause, spec_clause));
 			if (!(eq.has_value() && eq.value()))
-				return true;
+				return r.with_value(true);
 		}
 	} else {
 		// We are dealing with a non-temporal formula
-		auto sat = is_non_temp_nso_satisfiable<node>(splitter);
+		auto sat = r.merge_take(is_non_temp_nso_satisfiable<node>(splitter));
 		if (sat.has_value() && sat.value()
 			&& !are_nso_equivalent<node>(splitter, fm)) {
 			DBG(auto impl = is_nso_impl<node>(splitter, fm);
 				assert(impl.has_value() && impl.value());)
-			return true;
+			return r.with_value(true);
 		}
 	}
-	return false;
+	return r.with_value(false);
 }
 
 // Given an inequality literal f (g != 0) of clause, searches for a
@@ -109,13 +111,14 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 // or clause unchanged when no candidate passes is_splitter.
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref good_splitter_using_function(tref f, splitter_type st, tref clause,
+result<tref> good_splitter_using_function(tref f, splitter_type st, tref clause,
 	tref fm_without_clause, tref original_fm, tref spec_clause) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
+	result<tref> r;
 	tref func = norm_equation<node>(f);
 	if (tau::get(func).equals_T() || tau::get(func).equals_F())
-		return clause;
+		return r.with_value(clause);
 	DBG(assert(is<node>(tau::trim2(func), tau::bf));)
 	func = tau::trim2(func);
 	// First check if we have more than one disjunct
@@ -126,12 +129,12 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 		if (tau::get(new_clause).equals_F()) return false;
 		tref splitter_candidate = tau::build_wff_or(
 			fm_without_clause, new_clause);
-		if (is_splitter<BAs...>(original_fm, splitter_candidate, spec_clause))
-			return true;
-		else return false;
+		auto splits = r.merge_take(is_splitter<BAs...>(
+			original_fm, splitter_candidate, spec_clause));
+		return splits.has_value() && splits.value();
 	};
 	tref s = split_path<BAs...>(func, st, true, check_splitter);
-	if (tau::get(s) != tau::get(func)) return new_clause;
+	if (tau::get(s) != tau::get(func)) return r.with_value(new_clause);
 	// Find possible coefficient in each disjunct of f
 	tref curr_path = nullptr;
 	auto remove_path = [&](tref path) {
@@ -154,15 +157,17 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 			if (tau::get(new_clause).equals_F()) return false;
 			tref splitter_candidate =
 				tau::build_wff_or(fm_without_clause, new_clause);
-			if(is_splitter<BAs...>(original_fm, splitter_candidate, spec_clause))
+			auto splits = r.merge_take(is_splitter<BAs...>(
+				original_fm, splitter_candidate, spec_clause));
+			if (splits.has_value() && splits.value())
 				return true;
 		}
 		return false;
 	};
 	tref nfunc = expression_paths<node>(func).apply_only_if(remove_path, split_coeff);
 	if (tau::get(nfunc) != tau::get(func))
-		return new_clause;
-	return clause;
+		return r.with_value(new_clause);
+	return r.with_value(clause);
 }
 
 // Dual of good_splitter_using_function for an equality literal f
@@ -172,13 +177,14 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 // Returns the rewritten clause, or clause unchanged on failure.
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref good_reverse_splitter_using_function(tref f, splitter_type st,
+result<tref> good_reverse_splitter_using_function(tref f, splitter_type st,
 	tref clause, tref fm_without_clause, tref original_fm, tref spec_clause) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
+	result<tref> r;
 	tref func = norm_equation<node>(f);
 	if (tau::get(func).equals_T() || tau::get(func).equals_F())
-		return clause;
+		return r.with_value(clause);
 	func = tau::trim2(func);
 	DBG(assert(is<node>(func, tau::bf));)
 
@@ -217,8 +223,9 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 			}
 			tref splitter_candidate =
 				tau::build_wff_or(fm_without_clause, new_clause);
-			if(is_splitter<BAs...>(
-				original_fm, splitter_candidate, spec_clause))
+			auto splits = r.merge_take(is_splitter<BAs...>(
+				original_fm, splitter_candidate, spec_clause));
+			if (splits.has_value() && splits.value())
 				return true;
 			lit = tmp;
 		}
@@ -227,8 +234,8 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	tref nfunc = expression_paths<node>(func).apply_only_if(
 		remove_path, remove_literal);
 	if (tau::get(nfunc) != tau::get(func))
-		return new_clause;
-	return clause;
+		return r.with_value(new_clause);
+	return r.with_value(clause);
 }
 
 // Return a bad splitter for the provided formula: conjuncts a fresh
@@ -310,8 +317,11 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 							continue;
 						tref new_fm = tau::build_wff_or(
 							curr_fm, new_clause);
+						// Report dropped: nso_tau_splitter stays a bare
+						// pair; converting it would ripple into
+						// tau_splitter's callers outside this file's ownership.
 						if (is_splitter<BAs...>(
-							fm, new_fm, spec_clause)) {
+							fm, new_fm, spec_clause).value_or(false)) {
 							curr_clause = new_clause;
 							return true;
 						}
@@ -319,7 +329,8 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 				}
 			}
 			if (tref s = good_reverse_splitter_using_function<BAs...>(
-				eq, st, curr_clause, curr_fm, fm, spec_clause);
+				eq, st, curr_clause, curr_fm, fm, spec_clause)
+					.value_or(curr_clause);
 					tau::get(s) != tau::get(curr_clause)) {
 				curr_clause = s;
 				return true;
@@ -360,15 +371,19 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 						continue;
 					tref new_fm = tau::build_wff_or(
 							curr_fm, new_clause);
+					// Report dropped: nso_tau_splitter stays a bare
+					// pair; converting it would ripple into
+					// tau_splitter's callers outside this file's ownership.
 					if (is_splitter<BAs...>(fm, new_fm,
-						spec_clause)) {
+						spec_clause).value_or(false)) {
 						curr_clause = new_clause;
 						return true;
 					}
 				}
 			}
 			if (tref s = good_splitter_using_function<BAs...>(
-				neq, st, curr_clause, curr_fm, fm, spec_clause);
+				neq, st, curr_clause, curr_fm, fm, spec_clause)
+					.value_or(curr_clause);
 				tau::get(s) != tau::get(curr_clause)) {
 				curr_clause = s;
 				return true;
@@ -385,8 +400,11 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 
 	// Split disjunction if possible
 	auto check_splitter = [&](tref s) {
+		// Report dropped: nso_tau_splitter stays a bare pair; converting
+		// it would ripple into tau_splitter's callers outside ownership.
 		if (tau::get(fm) != tau::get(s) &&
-			is_splitter<BAs...>(fm, s, spec_clause)) return true;
+			is_splitter<BAs...>(fm, s, spec_clause).value_or(false))
+			return true;
 		else return false;
 	};
 	splitter = split_path<BAs...>(fm, st, true, check_splitter);

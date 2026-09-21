@@ -18,7 +18,7 @@
 // Parse a bare wff (no trailing '.'), mirroring test_integration-wff_hooks.cpp
 static tref wff_of(const char* s) {
 	auto pwff = parse_wff();
-	return tau::get(s, pwff);
+	return tau::get(s, pwff).value_or(nullptr);
 }
 
 // The `variable` nodes whose child is an io_var, exactly as every helper in

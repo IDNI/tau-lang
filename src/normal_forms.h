@@ -465,12 +465,12 @@ tref to_nnf(tref fm);
  * tref fm = get_nso_rr(
  *     "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && "
  *     "f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.").value().main->get();
- * tref res = boole_normal_form<node_t>(fm);
+ * tref res = boole_normal_form<node_t>(fm).value();
  * CHECK( tau::get(res).equals_F() );
  * @endcode
  */
 template <NodeType node>
-tref boole_normal_form(tref formula);
+result<tref> boole_normal_form(tref formula);
 
 /**
  * @brief Convert a formula to term-level Boole Normal Form.
@@ -486,12 +486,12 @@ tref boole_normal_form(tref formula);
  * @code{.cpp}
  * // xy|xy' = x(y|y') = x
  * tref fm = get_nso_rr("xy|xy' = 0.").value().main->get();
- * tref res = term_boole_normal_form<node_t>(fm);
+ * tref res = term_boole_normal_form<node_t>(fm).value();
  * // tau::get(res).to_str() == "x = 0"
  * @endcode
  */
 template <NodeType node>
-tref term_boole_normal_form(tref formula);
+result<tref> term_boole_normal_form(tref formula);
 
 /**
  * @brief Convert a formula to Algebraic Normal Form (ANF) for a given type.

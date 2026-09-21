@@ -16,7 +16,7 @@ static void do_gc() {
 }
 
 static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -25,7 +25,7 @@ static tref spec(const char* s) {
 // rather than reading as unrealizable.
 static bool realizable(const char* s) {
 	do_gc();
-	auto nso = get_nso_rr<node_t>(tau::get(s));
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso.has_value()) return false;
 	tref fm = nso.value().main->get();
 	if (!fm) return false;

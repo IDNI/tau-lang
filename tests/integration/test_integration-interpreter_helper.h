@@ -28,11 +28,11 @@ std::string random_file(const std::string& extension = ".out", const std::string
 }
 
 tref create_spec(const char* spec) {
-	return get_nso_rr<node_t>(tau::get(spec)).value().main->get();
+	return get_nso_rr<node_t>(tau::get(spec).value_or(nullptr)).value().main->get();
 }
 
 tref create_spec(io_context<node_t>& ctx, const char* spec) {
-	return get_nso_rr<node_t>(ctx, tau::get(spec)).value().main->get();
+	return get_nso_rr<node_t>(ctx, tau::get(spec).value_or(nullptr)).value().main->get();
 }
 
 std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
@@ -45,7 +45,7 @@ std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
 #endif // DEBUG
 
 	auto intprtr = interpreter<node>::make_interpreter(spec, ctx);
-	if (intprtr) {
+	if (intprtr.has_value()) {
 		// we read the inputs only once (they are always empty in this test suite)
 
 		for (size_t i = 0; i < times; ++i) {

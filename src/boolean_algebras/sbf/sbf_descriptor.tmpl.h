@@ -60,11 +60,11 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 
 	static bool is_syntactic_zero(const sbf_ba& x) { return is_sbf_zero(x); }
 
-	static bool is_one(const sbf_ba& x) { return is_sbf_one(x); }
+	static result<bool> is_one(const sbf_ba& x) { return result<bool>{is_sbf_one(x)}; }
 
-	static bool is_zero(const sbf_ba& x) { return is_sbf_zero(x); }
+	static result<bool> is_zero(const sbf_ba& x) { return result<bool>{is_sbf_zero(x)}; }
 
-	static bool is_closed(const sbf_ba&) { return true; }
+	static result<bool> is_closed(const sbf_ba&) { return result<bool>{true}; }
 
 	static std::string literal_one(tref) { return "1"; }
 
@@ -92,9 +92,9 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 
 	static tref simplify_symbol(tref sym) { return simplify_sbf_symbol(sym); }
 
-	static tref simplify_term(tref term) { return simplify_sbf_term(term); }
+	static result<tref> simplify_term(tref term) { return result<tref>{simplify_sbf_term(term)}; }
 
-	static std::optional<typename node_t::constant_with_type>
+	static result<typename node_t::constant_with_type>
 	parse(const std::string& src, tref)
 	{
 		return parse_sbf<PackBAs...>(src);

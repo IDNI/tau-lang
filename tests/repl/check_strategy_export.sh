@@ -8,7 +8,7 @@ set -u
 TAU="${1:?usage: check_strategy_export.sh <tau-binary> <command>}"
 CMD="${2:?usage: check_strategy_export.sh <tau-binary> <command>}"
 
-source "${BASH_SOURCE[0]%/*}/resolve_timeout.sh"
+source "${BASH_SOURCE[0]%/*}/../../scripts/resolve_timeout"
 
 TMP="$(mktemp -t tau_strategy_export.XXXXXX.hoa)" || {
 	echo "FAIL: could not create temp file" >&2; exit 1; }

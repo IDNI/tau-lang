@@ -41,7 +41,7 @@ using namespace idni;
  * // tests/integration/test_integration-heuristics-bv_ba_custom_simplification.cpp:62-69).
  * auto pbf = parse_bf();
  * tref src = tau::get("{5}:bv[8] - {2}:bv[8] + {2}:bv[8]", pbf);
- * tref simplified = bv_ba_custom_simplification<node_t>(src);
+ * tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
  * tref expected = tau::get("{5}:bv[8]", pbf);
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
@@ -49,14 +49,15 @@ using namespace idni;
 // HE-11: declaration matches the definition (template<NodeType node>);
 // the old BAs-pack declaration was a dead, never-defined template.
 template <NodeType node>
-tref bv_ba_custom_simplification(tref term);
+result<tref> bv_ba_custom_simplification(tref term);
 
 /**
  * @brief Simplify BV term @p term by invoking the cvc5 `simplify` procedure.
  *
- * HE-17: returns nullptr whenever bv_eval_node or the back-translation
- * fails -- simplify_bv_term depends on that to fall back to
- * bv_ba_custom_simplification, which is fallback-only by contract.
+ * HE-17: declines (value-less, error-less) whenever bv_eval_node or the
+ * back-translation can't produce a term -- simplify_bv_term depends on
+ * that to fall back to bv_ba_custom_simplification, which is fallback-only
+ * by contract. A genuine bv_eval_node failure carries an error instead.
  *
  * Evaluates @p term into a cvc5 bitvector object, runs cvc5's own
  * simplifier on it, and translates the result back into a tau tree via
@@ -72,13 +73,13 @@ tref bv_ba_custom_simplification(tref term);
  * // tests/integration/test_integration-heuristics-bv_ba_cvc5_simplification.cpp:37-45).
  * auto pbf = parse_bf();
  * tref src = tau::get("{1}:bv[8] + {2}:bv[8] + {3}:bv[8]", pbf);
- * tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+ * tref simplified = bv_ba_cvc5_simplification<node_t>(src).value_or(nullptr);
  * tref expected = tau::get("{6}:bv[8]", pbf);
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
  */
 template <NodeType node> // HE-11: matches the definition
-tref bv_ba_cvc5_simplification(tref term);
+result<tref> bv_ba_cvc5_simplification(tref term);
 
 } // namespace idni::tau_lang
 

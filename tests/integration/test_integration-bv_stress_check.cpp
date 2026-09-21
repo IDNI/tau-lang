@@ -455,7 +455,7 @@ TEST_SUITE("bv stress check: rule generation") {
 				auto rule = build_rule_for_iteration(rng, idx,
 					0, width);
 				INFO("bv[", width, "] rule ", idx, ": ", rule);
-				CHECK( tau::get(rule) != nullptr );
+				CHECK( tau::get(rule).has_value() );
 			}
 		}
 	}
@@ -467,7 +467,7 @@ TEST_SUITE("bv stress check: rule generation") {
 			auto rule = build_rule_for_iteration(rng, idx, 3,
 				default_bv_width);
 			INFO("rule ", idx, ": ", rule);
-			CHECK( tau::get(rule) != nullptr );
+			CHECK( tau::get(rule).has_value() );
 		}
 	}
 }
@@ -572,8 +572,7 @@ TEST_SUITE("bv stress check: execution") {
 		CHECK( res.steps_executed == 14 );
 	}
 
-	// The historical logged rules (private/bv_load_test.log, translated to
-	// current syntax -- see private/andrei-bv-stress.md A1), replayed at
+	// Historical logged rules, translated to current syntax and replayed at
 	// bv[16]. This is the workload the blasting/solver placement experiment
 	// exists to move: N=1 takes about a second, and N=2 has historically
 	// never returned.

@@ -37,24 +37,25 @@ sym_t var_dict(const char* s) {
 // a pointer into v[n] could dangle after a later push_back reallocates the
 // vector (v[n]'s short-string-optimized buffer lives inside the string
 // object, which push_back may move to a new address).
-string var_dict(sym_t n) {
-	assert((size_t)n <= v.size());
-	// BA1-26: a stale/corrupt id in Release must throw, not read OOB.
+result<std::string> var_dict(sym_t n) {
+	result<std::string> r;
+	// BA1-26: a stale/corrupt id must not read OOB; report instead.
 	if ((size_t)n > v.size())
-		throw std::out_of_range("var_dict: invalid id "
-			+ std::to_string(n));
+		return r.with_assert_check_error(code::out_of_range,
+			"the variable id is invalid",
+			{{label::actual, (size_t)n}, {label::limit, v.size()}});
 	if ((size_t)n == v.size()) {
 		do {
 			stringstream ss;
 			ss << "x" << n;
 			if (auto it = m.find(ss.str()); it == m.end()) {
 				var_dict(ss.str());
-				return ss.str();
+				return r.with_assert_check_value(ss.str());
 			}
 			++n;
 		} while (true);
 	}
-	return v[n];
+	return r.with_assert_check_value(v[n]);
 }
 
 // std::string convenience overload of the interning function above

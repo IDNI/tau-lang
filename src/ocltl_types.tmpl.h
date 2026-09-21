@@ -27,20 +27,24 @@ BA ocltl_minterm(const std::vector<BA>& a, size_t A) {
 
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-ocltl_type_mask ocltl_type_of(const std::vector<BA>& a) {
+result<ocltl_type_mask> ocltl_type_of(const std::vector<BA>& a) {
+	result<ocltl_type_mask> r;
 	size_t k = a.size();
 	DBG(assert(k <= ocltl_max_k);)
 	ocltl_type_mask z = 0;
-	for (size_t A = 0; A < ocltl_minterm_count(k); ++A)
-		if (ba_descriptor<BA, Node>::is_zero(ocltl_minterm<BA, Node>(a, A)))
-			z |= (ocltl_type_mask{1} << A);
-	return z;
+	for (size_t A = 0; A < ocltl_minterm_count(k); ++A) {
+		TAU_TRY(bool zero, (ba_descriptor<BA, Node>::is_zero(
+			ocltl_minterm<BA, Node>(a, A))));
+		if (zero) z |= (ocltl_type_mask{1} << A);
+	}
+	return r.with_value(z);
 }
 
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-BA ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter_type st) {
+result<BA> ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter_type st) {
 	using desc = ba_descriptor<BA, Node>;
+	result<BA> r;
 	size_t k = a.size();
 	DBG(assert(k + 1 <= ocltl_max_k);)
 	// See ocltl_minterm above: emplace, never operator=, for tau_ba's sake.
@@ -48,7 +52,8 @@ BA ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter_type st
 		? ~ocltl_unit<BA, Node>() : (a[0] & ~a[0])); // the zero element
 	for (size_t A = 0; A < ocltl_minterm_count(k); ++A) {
 		BA m = ocltl_minterm<BA, Node>(a, A);
-		if (desc::is_zero(m)) continue;
+		TAU_TRY(bool zero, desc::is_zero(m));
+		if (zero) continue;
 		bool neg_b_zero = ((tau >> A) & 1) != 0;
 		bool pos_b_zero = ((tau >> (A | (size_t{1} << k))) & 1) != 0;
 		DBG(assert(!(neg_b_zero && pos_b_zero));) // the mask must extend tp(ā)
@@ -56,15 +61,16 @@ BA ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau, splitter_type st
 		else if (neg_b_zero && !pos_b_zero) b.emplace(*b | m); // b covers m entirely
 		else b.emplace(*b | desc::splitter(m, st));            // atomless proper part
 	}
-	return *b;
+	return r.with_value(*b);
 }
 
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
-BA ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
+result<BA> ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
 	splitter_type st)
 {
 	using desc = ba_descriptor<BA, Node>;
+	result<BA> r;
 	size_t k = a.size();
 	DBG(assert(tau.size() == ocltl_wide_minterm_count(k + 1));)
 	// See ocltl_minterm above: emplace, never operator=, for tau_ba's sake.
@@ -72,7 +78,8 @@ BA ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
 		? ~ocltl_unit<BA, Node>() : (a[0] & ~a[0])); // the zero element
 	for (size_t A = 0; A < ocltl_wide_minterm_count(k); ++A) {
 		BA m = ocltl_minterm<BA, Node>(a, A);
-		if (desc::is_zero(m)) continue;
+		TAU_TRY(bool zero, desc::is_zero(m));
+		if (zero) continue;
 		bool neg_b_zero = tau[A];
 		bool pos_b_zero = tau[A | (size_t{1} << k)];
 		DBG(assert(!(neg_b_zero && pos_b_zero));) // the mask must extend tp(ā)
@@ -80,7 +87,7 @@ BA ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
 		else if (neg_b_zero && !pos_b_zero) b.emplace(*b | m); // b covers m entirely
 		else b.emplace(*b | desc::splitter(m, st));            // atomless proper part
 	}
-	return *b;
+	return r.with_value(*b);
 }
 
 } // namespace idni::tau_lang

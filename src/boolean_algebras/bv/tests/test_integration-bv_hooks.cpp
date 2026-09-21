@@ -16,60 +16,60 @@ TEST_SUITE("bv operator hooks:intermediate cases") {
 
 	// Addition
 	TEST_CASE("addition intermediate values") {
-		CHECK(tau::get("{10}:bv[8] + {20}:bv[8]", parse_opts_bf) == tau::get("{30}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{100}:bv[8] + {155}:bv[8]", parse_opts_bf) == tau::get("{255}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{200}:bv[8] + {100}:bv[8]", parse_opts_bf) == tau::get("{44}:bv[8]", parse_opts_bf)); // 300 mod 256 = 44
+		CHECK(tau::get("{10}:bv[8] + {20}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{30}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{100}:bv[8] + {155}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{255}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{200}:bv[8] + {100}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{44}:bv[8]", parse_opts_bf).value_or(nullptr)); // 300 mod 256 = 44
 	}
 
 	// Bitwise operators on two constants intern as the value, not as a
 	// symbolic term of the algebra (GitHub #120).
 	TEST_CASE("bitwise constant folds intern as values") {
-		CHECK(tau::get("{1}:bv[8] ^ {3}:bv[8]", parse_opts_bf) == tau::get("{2}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{1}:bv[8] | {2}:bv[8]", parse_opts_bf) == tau::get("{3}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{7}:bv[8] & {5}:bv[8]", parse_opts_bf) == tau::get("{5}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{215}:bv[8] ^ {24}:bv[8] ^ {53}:bv[8] ^ {55}:bv[8]", parse_opts_bf) == tau::get("{205}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{1}:bv[8] ^ {3}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{2}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{1}:bv[8] | {2}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{3}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{7}:bv[8] & {5}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{5}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{215}:bv[8] ^ {24}:bv[8] ^ {53}:bv[8] ^ {55}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{205}:bv[8]", parse_opts_bf).value_or(nullptr));
 	}
 
 	// Subtraction
 	TEST_CASE("subtraction intermediate values") {
-		CHECK(tau::get("{50}:bv[8] - {20}:bv[8]", parse_opts_bf) == tau::get("{30}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{20}:bv[8] - {50}:bv[8]", parse_opts_bf) == tau::get("{226}:bv[8]", parse_opts_bf)); // wrap
-		CHECK(tau::get("{100}:bv[8] - {44}:bv[8]", parse_opts_bf) == tau::get("{56}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{50}:bv[8] - {20}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{30}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{20}:bv[8] - {50}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{226}:bv[8]", parse_opts_bf).value_or(nullptr)); // wrap
+		CHECK(tau::get("{100}:bv[8] - {44}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{56}:bv[8]", parse_opts_bf).value_or(nullptr));
 	}
 
 	// Multiplication
 	TEST_CASE("multiplication intermediate values") {
-		CHECK(tau::get("{10}:bv[8] * {20}:bv[8]", parse_opts_bf) == tau::get("{200}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{15}:bv[8] * {17}:bv[8]", parse_opts_bf) == tau::get("{255}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{100}:bv[8] * {3}:bv[8]", parse_opts_bf) == tau::get("{44}:bv[8]", parse_opts_bf)); // 300 mod 256 = 44
+		CHECK(tau::get("{10}:bv[8] * {20}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{200}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{15}:bv[8] * {17}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{255}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{100}:bv[8] * {3}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{44}:bv[8]", parse_opts_bf).value_or(nullptr)); // 300 mod 256 = 44
 	}
 
 	// Division
 	TEST_CASE("division intermediate values") {
-		CHECK(tau::get("{100}:bv[8] / {10}:bv[8]", parse_opts_bf) == tau::get("{10}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{200}:bv[8] / {15}:bv[8]", parse_opts_bf) == tau::get("{13}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{44}:bv[8] / {2}:bv[8]", parse_opts_bf) == tau::get("{22}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{100}:bv[8] / {10}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{10}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{200}:bv[8] / {15}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{13}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{44}:bv[8] / {2}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{22}:bv[8]", parse_opts_bf).value_or(nullptr));
 	}
 
 	// Modulo
 	TEST_CASE("modulo intermediate values") {
-		CHECK(tau::get("{100}:bv[8] % {15}:bv[8]", parse_opts_bf) == tau::get("{10}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{200}:bv[8] % {17}:bv[8]", parse_opts_bf) == tau::get("{13}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{44}:bv[8] % {7}:bv[8]", parse_opts_bf) == tau::get("{2}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{100}:bv[8] % {15}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{10}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{200}:bv[8] % {17}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{13}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{44}:bv[8] % {7}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{2}:bv[8]", parse_opts_bf).value_or(nullptr));
 	}
 
 	// Shift right
 	TEST_CASE("shift right intermediate values") {
-		CHECK(tau::get("{128}:bv[8] >> {1}:bv[8]", parse_opts_bf) == tau::get("{64}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{255}:bv[8] >> {4}:bv[8]", parse_opts_bf) == tau::get("{15}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{44}:bv[8] >> {2}:bv[8]", parse_opts_bf) == tau::get("{11}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{128}:bv[8] >> {1}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{64}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{255}:bv[8] >> {4}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{15}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{44}:bv[8] >> {2}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{11}:bv[8]", parse_opts_bf).value_or(nullptr));
 	}
 
 	// Shift left
 	TEST_CASE("shift left intermediate values") {
-		CHECK(tau::get("{2}:bv[8] << {3}:bv[8]", parse_opts_bf) == tau::get("{16}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{15}:bv[8] << {2}:bv[8]", parse_opts_bf) == tau::get("{60}:bv[8]", parse_opts_bf));
-		CHECK(tau::get("{44}:bv[8] << {1}:bv[8]", parse_opts_bf) == tau::get("{88}:bv[8]", parse_opts_bf));
+		CHECK(tau::get("{2}:bv[8] << {3}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{16}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{15}:bv[8] << {2}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{60}:bv[8]", parse_opts_bf).value_or(nullptr));
+		CHECK(tau::get("{44}:bv[8] << {1}:bv[8]", parse_opts_bf).value_or(nullptr) == tau::get("{88}:bv[8]", parse_opts_bf).value_or(nullptr));
 	}
 }
 
@@ -78,26 +78,26 @@ TEST_SUITE("bv operator hooks:corner cases") {
 
 	// --- Division corner cases ---
 	TEST_CASE("division 0 / 0") {
-		tref src = tau::get("{0}:bv[8] / {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("1:bv[8]", parse_opts_bf); // <- top element 1111....
+		tref src = tau::get("{0}:bv[8] / {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr); // <- top element 1111....
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("division 1 / 0") {
-		tref src = tau::get("{1}:bv[8] / {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("1:bv[8]", parse_opts_bf); // <- top element 1111....
+		tref src = tau::get("{1}:bv[8] / {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr); // <- top element 1111....
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("division 0 / 1") {
-		tref src = tau::get("{0}:bv[8] / {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] / {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("division X / 1") {
-		tref src = tau::get("{42}:bv[8] / {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{42}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{42}:bv[8] / {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{42}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
@@ -154,207 +154,207 @@ TEST_SUITE("bv operator hooks:corner cases") {
 	}
 
 	TEST_CASE("division X / X") {
-		tref src = tau::get("{77}:bv[8] / {77}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{1}:bv[8]", parse_opts_bf); // <- 1 (not top element)
+		tref src = tau::get("{77}:bv[8] / {77}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr); // <- 1 (not top element)
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("division symbolic X / X") {
-		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf);
-		tref folded = tau::get("{1}:bv[8]", parse_opts_bf); // <- must stay unevaluated (bvudiv(0,0) = all_ones)
+		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref folded = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr); // <- must stay unevaluated (bvudiv(0,0) = all_ones)
 		CHECK(src != nullptr);
 		CHECK(src != folded);
 	}
 
 	// --- Modulo corner cases ---
 	TEST_CASE("modulo 0 % 0") {
-		tref src = tau::get("{0}:bv[8] % {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf); // <- same element (not bottom element)
+		tref src = tau::get("{0}:bv[8] % {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr); // <- same element (not bottom element)
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("modulo 1 % 0") {
-		tref src = tau::get("{1}:bv[8] % {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{1}:bv[8]", parse_opts_bf); // <- same element (not bottom element)
+		tref src = tau::get("{1}:bv[8] % {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr); // <- same element (not bottom element)
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("modulo top % 0") {
-		tref src = tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf);
-		tref expected = tau::get("1:bv[8]", parse_opts_bf); // <- top element 1111....
+		tref src = tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr); // <- top element 1111....
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("modulo 0 % 1") {
-		tref src = tau::get("{0}:bv[8] % {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] % {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("modulo X % 1") {
-		tref src = tau::get("{99}:bv[8] % {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{99}:bv[8] % {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("modulo X % X") {
-		tref src = tau::get("{77}:bv[8] % {77}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{77}:bv[8] % {77}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	// --- Addition corner cases ---
 	TEST_CASE("addition 0 + 0") {
-		tref src = tau::get("{0}:bv[8] + {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] + {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("addition 0 + X") {
-		tref src = tau::get("{0}:bv[8] + {55}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{55}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] + {55}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{55}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("addition X + 0") {
-		tref src = tau::get("{99}:bv[8] + {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{99}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{99}:bv[8] + {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{99}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("addition 1 + 1") {
-		tref src = tau::get("{1}:bv[8] + {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{2}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] + {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{2}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("addition X + 1") {
-		tref src = tau::get("{42}:bv[8] + {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{43}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{42}:bv[8] + {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{43}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("addition 1 + X") {
-		tref src = tau::get("{1}:bv[8] + {42}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{43}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] + {42}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{43}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	// --- Subtraction corner cases ---
 	TEST_CASE("subtraction 0 - 0") {
-		tref src = tau::get("{0}:bv[8] - {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] - {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("subtraction 0 - X") {
-		tref src = tau::get("{0}:bv[8] - {5}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{251}:bv[8]", parse_opts_bf); // 256-5=251 (wrap)
+		tref src = tau::get("{0}:bv[8] - {5}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{251}:bv[8]", parse_opts_bf).value_or(nullptr); // 256-5=251 (wrap)
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("subtraction X - 0") {
-		tref src = tau::get("{77}:bv[8] - {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{77}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{77}:bv[8] - {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{77}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("subtraction 1 - 1") {
-		tref src = tau::get("{1}:bv[8] - {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] - {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("subtraction X - 1") {
-		tref src = tau::get("{42}:bv[8] - {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{41}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{42}:bv[8] - {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{41}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("subtraction 1 - X") {
-		tref src = tau::get("{1}:bv[8] - {42}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{215}:bv[8]", parse_opts_bf); // 1-42 mod 256 = 215
+		tref src = tau::get("{1}:bv[8] - {42}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{215}:bv[8]", parse_opts_bf).value_or(nullptr); // 1-42 mod 256 = 215
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("subtraction X - X") {
-		tref src = tau::get("{77}:bv[8] - {77}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{77}:bv[8] - {77}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	// --- Multiplication corner cases ---
 	TEST_CASE("multiplication 0 * 0") {
-		tref src = tau::get("{0}:bv[8] * {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] * {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("multiplication 0 * X") {
-		tref src = tau::get("{0}:bv[8] * {99}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{0}:bv[8] * {99}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("multiplication X * 0") {
-		tref src = tau::get("{99}:bv[8] * {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{99}:bv[8] * {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("multiplication 1 * 1") {
-		tref src = tau::get("{1}:bv[8] * {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{1}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] * {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("multiplication X * 1") {
-		tref src = tau::get("{42}:bv[8] * {1}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{42}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{42}:bv[8] * {1}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{42}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("multiplication 1 * X") {
-		tref src = tau::get("{1}:bv[8] * {42}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{42}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] * {42}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{42}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	// --- Shift right corner cases ---
 	TEST_CASE("shift right by 0") {
-		tref src = tau::get("{128}:bv[8] >> {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{128}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{128}:bv[8] >> {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{128}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("shift right by width") {
-		tref src = tau::get("{255}:bv[8] >> {8}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{255}:bv[8] >> {8}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("shift right by more than width") {
-		tref src = tau::get("{255}:bv[8] >> {12}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{255}:bv[8] >> {12}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	// --- Shift left corner cases ---
 	TEST_CASE("shift left by 0") {
-		tref src = tau::get("{1}:bv[8] << {0}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("{1}:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] << {0}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("shift left by width") {
-		tref src = tau::get("{1}:bv[8] << {8}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] << {8}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 
 	TEST_CASE("shift left by more than width") {
-		tref src = tau::get("{1}:bv[8] << {12}:bv[8]", parse_opts_bf);
-		tref expected = tau::get("0:bv[8]", parse_opts_bf);
+		tref src = tau::get("{1}:bv[8] << {12}:bv[8]", parse_opts_bf).value_or(nullptr);
+		tref expected = tau::get("0:bv[8]", parse_opts_bf).value_or(nullptr);
 		CHECK(src == expected);
 	}
 }

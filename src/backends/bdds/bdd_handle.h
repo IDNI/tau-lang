@@ -281,10 +281,11 @@ struct bdd_handle {
 	// Witness zero: an assignment of constants of B to variables
 	// under which this function evaluates to zero (see
 	// bdd::get_one_zero); this must have a zero
-	std::map<int_t, B> get_one_zero() const {
+	result<std::map<int_t, B>> get_one_zero() const {
+		result<std::map<int_t, B>> r;
 		std::map<int_t, B> m;
-		bdd<B, o>::get_one_zero(b, m);
-		return m;
+		TAU_TRY([[maybe_unused]] bool ok, (bdd<B, o>::get_one_zero(b, m)));
+		return r.with_assert_check_value(std::move(m));
 	}
 
 	// Simultaneously substitute the mapped functions for the mapped
@@ -308,14 +309,16 @@ struct bdd_handle {
 	 * map when f is zero (any X solves, no substitution needed);
 	 * f must not be one (no solution exists).
 	 */
-	std::map<int_t, hbdd<B, o>> lgrs() const {
-		std::map<int_t, hbdd<B, o>> r;
-		if (b == bdd<B, o>::F) return r;
+	result<std::map<int_t, hbdd<B, o>>> lgrs() const {
+		result<std::map<int_t, hbdd<B, o>>> r;
+		std::map<int_t, hbdd<B, o>> m;
+		if (b == bdd<B, o>::F) return r.with_assert_check_value(std::move(m));
 		DBG(assert((b != bdd<B, o>::T));)
-		for (const auto& z : get_one_zero())
-			r.emplace(z.first,	((*this) & get(z.second)) |
-						(bit(true, z.first) & ~*this));
-		return r;
+		TAU_TRY(auto z, get_one_zero());
+		for (const auto& kv : z)
+			m.emplace(kv.first,	((*this) & get(kv.second)) |
+						(bit(true, kv.first) & ~*this));
+		return r.with_assert_check_value(std::move(m));
 	}
 
 	// A splitter of this function: some s with 0 < s < this.
@@ -486,10 +489,11 @@ struct bdd_handle<Bool, o> {
 		return bdd<Bool, o>::get_vars(b, r), r;
 	}
 
-	std::map<int_t, Bool> get_one_zero() const {
+	result<std::map<int_t, Bool>> get_one_zero() const {
+		result<std::map<int_t, Bool>> r;
 		std::map<int_t, Bool> m;
-		bdd<Bool, o>::get_one_zero(b, m);
-		return m;
+		TAU_TRY([[maybe_unused]] bool ok, (bdd<Bool, o>::get_one_zero(b, m)));
+		return r.with_assert_check_value(std::move(m));
 	}
 
 	hbdd<Bool, o> compose(const std::map<int_t, hbdd<Bool, o>>& m) const {
@@ -502,14 +506,16 @@ struct bdd_handle<Bool, o> {
 		return bdd<Bool, o>::eval(b, m);
 	}
 
-	std::map<int_t, hbdd<Bool, o>> lgrs() const {
-		std::map<int_t, hbdd<Bool, o>> r;
-		if (b == bdd<Bool, o>::F) return r;
+	result<std::map<int_t, hbdd<Bool, o>>> lgrs() const {
+		result<std::map<int_t, hbdd<Bool, o>>> r;
+		std::map<int_t, hbdd<Bool, o>> m;
+		if (b == bdd<Bool, o>::F) return r.with_assert_check_value(std::move(m));
 		DBG(assert((b != bdd<Bool, o>::T));)
-		for (const auto& z : get_one_zero())
-			r.emplace(z.first,	((*this) & get(z.second)) |
-						  (bit(true, z.first) & ~*this));
-		return r;
+		TAU_TRY(auto z, get_one_zero());
+		for (const auto& kv : z)
+			m.emplace(kv.first,	((*this) & get(kv.second)) |
+						  (bit(true, kv.first) & ~*this));
+		return r.with_assert_check_value(std::move(m));
 	}
 
 	hbdd<Bool, o> splitter (splitter_type st) {
@@ -654,8 +660,9 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) s.insert(var_dict(-v) + "'");
-			else s.insert(var_dict(v));
+			// Advisory drop: the printer contract cannot abort a line.
+			if (auto name = var_dict(v < 0 ? -v : v); name.has_value())
+				s.insert(v < 0 ? name.value() + "'" : name.value());
 		bool first = true;
 		for (auto& x : s) {
 			if (!first) t << " "; else first = false;

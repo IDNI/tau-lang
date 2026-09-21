@@ -50,8 +50,11 @@ tref bv_case_split_quantifiers(tref formula) {
 		const tref scope = t[0].second();
 		const size_t vtype = tau::get(var).get_ba_type();
 		if (vtype == 0 || !is_bv_type_family<node>(vtype)) return n;
-		const size_t width = get_bv_width<node>(vtype);
-		if (width == 0) return n;
+		auto width_r = get_bv_width<node>(vtype);
+		// Advisory drop: post_order's step callback returns a fixed tref; a
+		// missing bitwidth here just leaves the quantifier untouched.
+		if (!width_r.has_value()) return n;
+		const size_t width = width_r.value();
 		// Scan: every occurrence of `var` must be one side of a comparison
 		// whose other side is a constant of the same type. BA constants are
 		// opaque and not descended into.

@@ -37,7 +37,7 @@ using namespace idni::tau_lang;
 namespace {
 
 static tref parse_spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -69,7 +69,7 @@ static std::optional<std::string> emit_revised_cpp(
 	// witness_template, which this suite's bare emit_program cannot run;
 	// see test_cpp_codegen_program_desc.cpp's self-lookback tests).
 	auto d = build_program_desc<node_t>(*sol, class_name, /*revisable=*/true);
-	if (!d) return std::nullopt;
+	if (!d.has_value()) return std::nullopt;
 	std::ostringstream out;
 	emit_program(*d, out);
 	return out.str();

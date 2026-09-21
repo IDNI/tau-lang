@@ -7,7 +7,7 @@
 //   X (neXt) and Y (Yesterday) are subsumed by io_var time indices and are
 //   therefore not needed as explicit grammar operators.
 //
-// Algorithm (oracle-assisted synthesis, see book.tex §6.7):
+// Algorithm (oracle-assisted synthesis):
 //   1. Extract data atoms (maximal temporal-operator-free subformulas).
 //   2. Build the propositional LTL skeleton over abstract propositions p0,p1,...
 //   3. Classify each proposition as input (only i* io_vars) or output (has o* io_var).
@@ -61,7 +61,7 @@ inline size_t max_consistency_subsets = 4096;
  * @brief Cap on the literal products the ABA oracle's exact mixed-type
  * coverage check may expand (0 = unlimited).
  *
- * §13 / Batch O8: cap on the literal products the ABA oracle's exact
+ * Batch O8: cap on the literal products the ABA oracle's exact
  * mixed-type coverage check may expand `I_k ∧ ⋀_j ¬I_j` into. Beyond the
  * cap the check keeps the (weaker, syntactic-subset) pre-O8 verdict for
  * that product and logs — a possible false UNREALIZABLE, never a false
@@ -248,43 +248,10 @@ bool is_pure_input_atom(tref atom);
 // backend failure is a `result<T>` error, merged into the caller's own `r`.
 // Every skeleton/translation walker reports the same way, via its own
 // `result<T>` return.
-
-/**
- * @brief How to read a (exit_code, stdout) pair from a Spot subprocess.
- *
- *   ok         a verdict was produced (REALIZABLE / UNREALIZABLE).
- *   not_found  the binary is not on PATH — spawn_capture maps ENOENT to 127.
- *   failed     no verdict: the TAU_LTL_TIMEOUT_SEC watchdog killed the child
- *              (exit 128 + SIGTERM = 143), the spawn itself failed (-1), the
- *              tool reported a usage/internal error, or it exited non-zero
- *              with nothing on stdout.
- */
-enum class spot_exit_kind { ok, not_found, failed };
-
-/**
- * @brief Classify the exit code and stdout of a Spot subprocess as a
- * `spot_exit_kind`.
- * @param exit_code Exit code as returned by `spawn_capture`.
- * @param out Captured stdout of the subprocess.
- * @return `not_found` for 127, `failed` for a negative code, a code >= 128,
- * any code other than 0/1, or empty output; otherwise `ok`.
- */
-inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) {
-	if (exit_code == 127) return spot_exit_kind::not_found;
-	// Negative: spawn_capture could not create the pipe or the process.
-	// >= 128: killed by signal 128 + N — in particular 143 = SIGTERM, which
-	// is exactly what the timeout watchdog sends.
-	if (exit_code < 0 || exit_code >= 128) return spot_exit_kind::failed;
-	// ltlsynt exits 0 on REALIZABLE and 1 on UNREALIZABLE; every other code
-	// is a usage or internal error.
-	if (exit_code != 0 && exit_code != 1) return spot_exit_kind::failed;
-	// SY-R4: ltlsynt always prints a verdict line, so no output at all is
-	// no verdict -- whatever the exit code (a 0 with empty stdout used to be
-	// read as UNREALIZABLE by call_ltlsynt and as an empty game by
-	// call_ltlsynt_game).
-	if (out.empty()) return spot_exit_kind::failed;
-	return spot_exit_kind::ok;
-}
+//
+// The Spot subprocess mechanics, including the exit-code convention, live
+// in backends/spot/spot.h; nothing outside that backend reads a raw exit
+// code.
 
 /**
  * @brief Invoke ltlsynt as a subprocess and return {realizable,
@@ -293,9 +260,7 @@ inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) 
  * hoa_strategy_text is non-empty only when realizable == true.
  *
  * The result carries an error (code::solver_error) when the subprocess
- * produced no verdict (see classify_spot_exit) -- including when ltlsynt is
- * not on PATH (IN-N1: the old {false, ""} degradation made a missing Spot
- * install print "UNREALIZABLE (propositional)" for every specification).
+ * produced no verdict, and when ltlsynt is not on PATH.
  * Every caller merges that error into its own result rather than reading it
  * as a definite UNREALIZABLE.
  * @param ltl_formula Propositional LTL formula in Spot syntax.
@@ -311,11 +276,9 @@ result<std::pair<bool, std::string>> call_ltlsynt(
 /**
  * @brief Whether this build can actually invoke ltlsynt.
  *
- * Whether this build can actually invoke ltlsynt: always false under
- * Emscripten (no process model to spawn it with), a real PATH probe
- * otherwise. Reuses call_ltlsynt's own spawn/not-found detection, so the
- * two can never disagree about whether ltlsynt is reachable.  The probe
- * runs once per process and its answer is cached.
+ * Delegates to the Spot backend's own cached PATH probe
+ * (backends/spot/spot.h), so this and `call_ltlsynt` can never disagree
+ * about whether ltlsynt is reachable.
  * @return `true` iff `ltlsynt` can be spawned.
  */
 bool ltlsynt_available();

@@ -69,7 +69,7 @@ TEST_SUITE("lgrs") {
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		tref equation = get_nso_rr<node_t>(tau::get(src)).value().main->get();
+		tref equation = get_nso_rr<node_t>(tau::get(src).value_or(nullptr)).value().main->get();
 		auto solution = lgrs<node_t>(equation);
 		return ( check_solution<node_t>(equation, solution.value()) );
 	}
@@ -93,7 +93,7 @@ TEST_SUITE("solve_minterm_system") {
 #endif // DEBUG
 		minterm_system<node_t> system;
 		for (const auto& mt : minterms) system.insert(
-				get_nso_rr<node_t>(tau::get(mt)).value().main->get());
+				get_nso_rr<node_t>(tau::get(mt).value_or(nullptr)).value().main->get());
 		solver_options options = {
 			.splitter_one = splitter_one_bdd(),
 			.mode = solver_mode::general
@@ -296,7 +296,7 @@ TEST_SUITE("solve") {
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
 		auto solution = solve<node_t>(form, options);
 		return solution.has_value() ? check_solution<node_t>(form, solution.value()) : false;
 	}

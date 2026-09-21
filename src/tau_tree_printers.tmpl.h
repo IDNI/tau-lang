@@ -91,10 +91,15 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::ba_constant) {
-		if (n.data != 0) // constant id is not 0 = parsed
-			os << " { " << ba_constants<node>::get(n.data)
-				<< " } : " << get_ba_type_name<node>(n.ba_type);
-		else os << " { UNPARSED } : " << get_ba_type_name<node>(n.ba_type);
+		auto tn = get_ba_type_name<node>(n.ba_type);
+		// Advisory drop: std::ostream& contract cannot abort the line.
+		std::string type_name = tn.has_value() ? tn.value() : std::string("INVALID");
+		if (n.data == 0)
+			os << " { UNPARSED } : " << type_name;
+		else if (auto c = ba_constants<node>::get(n.data); c.has_value())
+			os << " { " << c.value() << " } : " << type_name;
+		// Advisory drop: the printer contract cannot abort a line.
+		else os << " { INVALID } : " << type_name;
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
 		os << "<" << dict(n.data) << ">";
@@ -146,16 +151,21 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "IO types:     ";
 	if (ctx.types.empty()) os << " none";
 	os << "\n";
-	for (const auto& [var, type] : ctx.types)
+	for (const auto& [var, type] : ctx.types) {
+		auto tn = get_ba_type_name<node>(type);
+		// Advisory drop: std::ostream& contract cannot abort the line.
 		os << "\t" << get_var_name<node>(var->get())
-			<< get_ba_type_name<node>(type) << "\n";
+			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << "\n";
+	}
 #endif
 	os << "IO variables:   ";
 	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
+		auto tn = get_ba_type_name<node>(ctx.type_of(var));
+		// Advisory drop: std::ostream& contract cannot abort the line.
 		os << "\t" << get_var_name<node>(var)
-			<< get_ba_type_name<node>(ctx.type_of(var)) << " := "
+			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << " := "
 			<< (output ? "out" : "in") << " "
 			<< (s == 0 ? "console"
 				: "file(\"" + dict(s) + "\")")
@@ -186,20 +196,29 @@ std::ostream& print_binding(std::ostream& os, tref var, tref value) {
 }
 
 // Serialize a BA constant of @p type. bf_t/bf_f carry no type of their own, so
-// they render as the type's one/zero. False if it is not a BA element.
+// they render as the type's one/zero. False value if it is not a BA element.
 template <NodeType node>
-bool serialize_constant(std::stringstream& ss, tref constant, size_t type) {
+result<bool> serialize_constant(std::stringstream& ss, tref constant,
+	size_t type)
+{
 	using tau = tree<node>;
 	using tt = typename tau::traverser;
+	result<bool> r;
 	auto value = tt(constant) | tau::ba_constant;
 	if (!value) {
-		if (auto check = tt(constant) | tau::bf_t; check)
-			ss << node::ba::one(get_ba_type_tree<node>(type));
-		else if (auto check = tt(constant) | tau::bf_f; check)
-			ss << node::ba::zero(get_ba_type_tree<node>(type));
-		else return false;
+		if (auto check = tt(constant) | tau::bf_t; check) {
+			auto one = r.merge_take(node::ba::one(
+				get_ba_type_tree<node>(type)));
+			if (!one) return r;
+			ss << *one;
+		} else if (auto check = tt(constant) | tau::bf_f; check) {
+			auto zero = r.merge_take(node::ba::zero(
+				get_ba_type_tree<node>(type)));
+			if (!zero) return r;
+			ss << *zero;
+		} else return r.with_assert_check_value(false);
 	} else ss << (value | tt::ba_constant);
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 template <NodeType node>
@@ -622,14 +641,18 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offsets:           out("["); break;
 			case offset:            if (pnt == io_var) out("[");
 						break;
-			case ba_constant:
+			case ba_constant: {
 				out("{ ");
 				if (tref src = tt(ref) | source | tt::ref; src)
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
 				out(" }");
-				out(tau::get(t.get_ba_type_tree()));
+				auto ba_type_tree = t.get_ba_type_tree();
+				// Advisory drop: printer callback shape has no channel for the id-validity report.
+				if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
+				else out(std::string("INVALID"));
 				break;
+			}
 			case typed:
 				type_printed = true;
 				out(":"); break;
@@ -693,9 +716,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// the target type's children, i.e. the
 				// annotation without its leading ':'
 				out("(");
-				for (tref c : get(t.get_ba_type_tree())
-						.children())
-					out(get(c));
+				auto ba_type_tree = t.get_ba_type_tree();
+				// Advisory drop: printer callback shape has no channel for the id-validity report.
+				if (ba_type_tree.has_value())
+					for (tref c : get(ba_type_tree.value()).children())
+						out(get(c));
 				out(") ");
 				break;
 			}
@@ -989,7 +1014,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// specific to ADT flattening or to the dotted-member case
 				// above, so the fix is general.
 				if (parent && !is_untyped<node>(tau::get(parent).get_ba_type())) {
-					out(tau::get(tau::get(parent).get_ba_type_tree()));
+					auto ba_type_tree = tau::get(parent).get_ba_type_tree();
+					// Advisory drop: printer callback shape has no channel for the id-validity report.
+					if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
+					else out(std::string("INVALID"));
 					type_printed = true;
 				}
 				break;

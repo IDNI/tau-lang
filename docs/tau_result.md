@@ -10,6 +10,13 @@ Include `src/tau_diagnostics.h`. It aliases the parser library's types into
 adds `TAU_TRY`, `TAU_TRY_OR`, `step_awaiting_input()`, `report_has_code()`.
 Full reference: `external/parser/docs/diagnostics.md`.
 
+## One name per concept
+
+A function that can build a report returns `result<T>`. It has no twin
+that returns the bare value under a suffixed name such as `_total` or
+`_name`. Such a twin hides the point where a caller drops the report, and
+it goes stale as every caller reaches for the unchecked name instead.
+
 ## Consuming
 
 ```cpp
@@ -20,6 +27,11 @@ tref fm = *r;                                  // or r.value()
 
 `if (r)` / `has_value()` — succeeded · `*r` / `value()` — the value ·
 `report()` — the report, on success too.
+
+A null pointer is a legitimate value for a pointer-typed `result<T>`, for
+example `result<tref>`. The container never turns a null pointer into an
+error. A producer that treats a null result as failure reports that error
+itself, with `error()` on the same result before it returns.
 
 ## Propagating
 
@@ -34,10 +46,24 @@ result<tref> normalize_input(const std::string& s) {
 }
 ```
 
+`TAU_TRY` merges the report of every child into `r`, on the success path as
+well as the failure path. So the function must end with
+`return r.with_value(...)` (or another `with_*` form), never with a freshly
+constructed `result<T>{...}`. A fresh result discards everything `TAU_TRY`
+already merged into `r`.
+
 It is a statement, not an expression — never the unbraced body of an `if`, and
 it belongs in the same block as any `scope_guard` it should close.
 `TAU_TRY_OR(decl, expr, code, msg)` handles a child returning neither value nor
 error.
+
+`TAU_TRY(decl, expr)` takes two macro arguments. A comma inside angle
+brackets splits the macro, because the preprocessor does not parse
+templates. Wrap such an expression in parentheses:
+
+```cpp
+TAU_TRY(auto ok, (bdd<B, o>::get_one_zero(b, m)));
+```
 
 ## Returning in one statement
 
@@ -73,6 +99,38 @@ if (!r) {
 ```
 
 This is what `main.cpp`'s run loop and the REPL's `continue_running` branch on.
+
+**Never `result<std::optional<T>>`.** A `result<T>` already carries three
+states:
+
+- a value and no error means success
+- no value and no error means the legitimate decline above
+- an error in the report means a genuine failure
+
+Wrapping an optional inside a result duplicates the middle state. Produce
+that state instead with a default-constructed `result<T>`.
+
+## Dropping a report
+
+A report is dropped only at a call site whose signature cannot carry one.
+Name the blocking contract in a comment there:
+
+```cpp
+// Advisory drop: <the contract that blocks the report>.
+```
+
+Real contracts in this codebase include:
+
+- a hash function that a `noexcept` constructor calls
+- a `std::ostream&` stream operator
+- a log macro that expands inside a stream chain
+- a mandatory `ba_descriptor` member with a fixed return type
+- a `tref f(tref)` rewrite hook
+- a traversal callback with a fixed shape
+
+A dropped report must never produce a silently wrong answer. When the only
+fallback available would change the meaning of the result, change the
+signature instead of dropping the report.
 
 ## Measuring and counting
 
@@ -120,12 +178,19 @@ if not r:
 out = r.value                          # or r.unwrap() to raise instead
 ```
 
-Every result-returning api call returns one `tau.result`, with `.value`,
-`.report`, `__bool__` and `unwrap()`. Errors are not raised by default, so
-warnings and timing scopes survive on the success path.
+Every fallible call in the Python binding returns one `tau.result`: `get_interpreter`, `step`, `can_extend`, `update`, and `is_realizable`.
+Each result carries `.value`, `.report`, `__bool__`, and `unwrap()`.
+The binding never raises.
+An exception carries one string, so it drops the warnings, the infos, and the timing scopes that a report holds.
 
-`.value` is whatever the call produced, already converted to Python, and `None`
-when the call produced nothing. It owns its data: an interpreter taken out of a
-result stays valid after the result is dropped. The type is erased on purpose —
-nanobind binds concrete types, so a per-`T` result class would mean a new Python
-class for each of the ~50 result-returning api methods.
+`.value` is whatever the call produced, already converted to Python, and `None` when the call produced no value.
+It owns its data, so an interpreter taken out of a result stays valid after the caller drops the result.
+Nanobind erases the type on purpose.
+It binds concrete types, so a per-`T` result class would need one new Python class for each result-returning method.
+
+`update` puts the real verdict of the interpreter in `.value`: True when the interpreter accepts the revision, False when it rejects the revision.
+`is_realizable` returns no value when the backend gives no verdict.
+It never uses False as a substitute verdict.
+
+`unwrap()` raises a RuntimeError with the report instead of returning a falsy result.
+A consumer that wants a bare value writes that wrapper itself.

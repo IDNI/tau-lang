@@ -2,7 +2,7 @@
 
 // Tests for semantic PWR (Optimal Mode) — winning-region-based revision.
 //
-// Tests the Algorithm D-based fallback from pwr-ltl.tex §11.
+// Tests the Algorithm D-based fallback.
 // LS-18: the production code builds θ = ψ ∧ G(Win) ONLY (see
 // semantic_pwr_optimal) -- Win_0 is not conjoined; build_win0_formula is
 // exercised by these tests but has no production caller, and nothing
@@ -31,7 +31,7 @@ static const bool semantic_fallback_enabled_for_tests = [] {
 }();
 
 static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
 	if (!nso_rr.has_value()) return nullptr;
 	return nso_rr.value().main->get();
 }
@@ -471,7 +471,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 // BEFORE `gather_top_conjuncts`, and the interpreter feeds it exactly the
 // shape `G(∧ inners) ∧ (∧ rest)` produced by `unsqueeze_always` whenever any
 // non-always clause exists.  Result: whole G-blocks get revised or dropped
-// wholesale instead of per conjunct, contrary to pwr-ltl §3 Step 0.
+// wholesale instead of per conjunct.
 
 TEST_SUITE("[LS-1: and_distribute below conjunction roots]") {
 
