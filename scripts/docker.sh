@@ -12,6 +12,13 @@ build() {
                         --build-arg "TAU_GIT_COMMIT_HASH=$(git log -1 --format=%h)"
                 )
         fi
+        if git -C external/parser rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+                git_args+=(
+                        --build-arg "TAU_PARSER_GIT_DESCRIBED=$(git -C external/parser describe --tags --always)"
+                        --build-arg "TAU_PARSER_GIT_BRANCH=$(git -C external/parser rev-parse --abbrev-ref HEAD)"
+                        --build-arg "TAU_PARSER_GIT_COMMIT_HASH=$(git -C external/parser log -1 --format=%h)"
+                )
+        fi
         echo "Building: '${@}'"
         docker buildx build --progress=${PROGRESS} "${git_args[@]}" "$@" .
 }
