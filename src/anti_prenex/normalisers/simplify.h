@@ -63,6 +63,30 @@ struct pin {
 };
 
 /**
+ * @brief §3 `TRY_WITNESS`'s PIN TEST as ONE recipe over a pair of cofactors:
+ * what `f₀` and `f₁` say about the variable `y` they were taken on, recorded
+ * in a `cof_entry` (fwd.h).
+ *
+ * `usable` holds iff `y ∉ FV(f₀) ∪ FV(f₁)`; where it does not, `y` still
+ * hides inside a subterm no cofactor reached (§1, the LEAF HAZARD) and the
+ * record must not be used. `p`, the residual `SIMPLIFY_TERM(f₀·f₁)`, is built
+ * when `usable` and is `nullptr` otherwise. `pin` holds iff `usable` and
+ * `SIMPLIFY_TERM(f₀ ∪ f₁) = 1`, the test that collapses Boole's interval
+ * `f₀ ≤ y ≤ f₁′` to a point. A pin gives the witness `f₁′` — which the
+ * consumer builds itself, there being no slot for it — and the residual
+ * equation `p = 0`, and is STRICT when `p` folds to `0`.
+ *
+ * TWO WAYS TO THE COFACTORS, ONE NOTION OF A PIN. The plain regime takes them
+ * by SUBSTITUTION, which is what `find_pin` / `find_pin_for` below do; §6
+ * `COF` takes them by CHILD SELECTION in the term's BDD. The test on them is
+ * the same, so it is written once. `order` is the live order, handed to every
+ * `SIMPLIFY_TERM` here; the plain regime passes the empty one.
+ */
+template <NodeType node>
+cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
+	const var_order<node>& order);
+
+/**
  * @brief §3 `TRY_WITNESS`'s pin match, on a plain term: the best pin of
  * `atom`, or `nullopt`.
  *

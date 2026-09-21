@@ -112,6 +112,10 @@ tref pin_term(tref atom, const block& X, const var_order<node>& order) {
 /// witness `f₁′`, STRICT when the residual `p = f₀f₁` folds to `0`. The
 /// per-variable half of the match, which `find_pin` asks of every free
 /// variable and `find_pin_for` of one.
+///
+/// The cofactors are taken by SUBSTITUTION, which is what the plain regime
+/// has; the test on them is `pin_from_cofactors` (simplify.h), the one pin
+/// recipe.
 template <NodeType node>
 std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 	const var_order<node>& order)
@@ -122,22 +126,37 @@ std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 		_0<node>(type), order, resimplify_argument<node>()), order);
 	const tref f1 = simplify_term<node>(tau::get(f).substitute(key,
 		_1<node>(type), order, resimplify_argument<node>()), order);
-	// `usable`: `y` gone from both cofactors. Where it is not, `y` still
-	// hides in a subterm the substitution did not reach and the record
-	// must not be used (§1, the leaf hazard).
-	if (free_in<node>(f0, y) || free_in<node>(f1, y)) return {};
-	// Boole's expansion puts the zeros of `f` at `f₀ ≤ y ≤ f₁′`, an
-	// interval that `f₀ ∪ f₁ = 1` collapses to a point.
-	if (!tau::get(simplify_term<node>(build_bf_or<node>(f0, f1), order))
-		.equals_1()) return {};
+	const cof_entry e = pin_from_cofactors<node>(f0, f1, y, order);
+	if (!e.pin) return {};
 	// The witness is the LOWER end `f₁′`: it carries the residual into
 	// every sibling's terms, where `p = 0` then folds syntactically (§3).
-	const tref witness = simplify_term<node>(build_bf_neg<node>(f1), order);
-	const tref p = simplify_term<node>(build_bf_and<node>(f0, f1), order);
-	return pin<node>{ y, witness, tau::get(p).equals_0() };
+	const tref witness = simplify_term<node>(build_bf_neg<node>(e.f1), order);
+	return pin<node>{ y, witness, tau::get(e.p).equals_0() };
 }
 
 } // namespace detail
+
+// --- the one pin recipe ----------------------------------------------------------
+
+template <NodeType node>
+cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
+	const var_order<node>& order)
+{
+	using tau = tree<node>;
+	cof_entry e{ f0, f1, nullptr, false, false };
+	// `usable`: `y` gone from both cofactors. Where it is not, `y` still
+	// hides in a subterm no cofactor reached and the record must not be
+	// used (§1, the leaf hazard).
+	if (detail::free_in<node>(f0, y) || detail::free_in<node>(f1, y))
+		return e;
+	e.usable = true;
+	// Boole's expansion puts the zeros of the term at `f₀ ≤ y ≤ f₁′`, an
+	// interval that `f₀ ∪ f₁ = 1` collapses to a point.
+	e.pin = tau::get(simplify_term<node>(build_bf_or<node>(f0, f1), order))
+		.equals_1();
+	e.p = simplify_term<node>(build_bf_and<node>(f0, f1), order);
+	return e;
+}
 
 template <NodeType node>
 std::optional<pin<node>> find_pin(tref atom, const block& X,
