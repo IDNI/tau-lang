@@ -358,6 +358,36 @@ size_t mem_size(tref t);
 template <NodeType node>
 trefs leaf_fv(tref f);
 
+// --- the PURE shapes --------------------------------------------------------------
+
+/**
+ * @brief §1 PURE term: built from variables, constants, the BA operations
+ * `∪ · ′ +` and functional quantifiers alone — no reference, no arithmetic
+ * operator (a width cast is one), no subterm of another type.
+ *
+ * @p type is the BA type the term is read under; a node carrying the untyped
+ * id `0` carries no type of its own and is of it. A BDD-backed term is read
+ * LEAF BY LEAF: its decision variables are variables, so everything a stored
+ * BDD could hide sits in a leaf.
+ *
+ * The shape has a name because it is the literal shape §7's engines decide
+ * without a solver, and §6's fast paths take only these.
+ */
+template <NodeType node>
+bool is_pure_term(tref t, ba_type_id type);
+
+/**
+ * @brief §1 PURE (¬)equation: an equation, seen through one optional `¬`,
+ * both of whose sides are pure terms of @p type. An ORDER ATOM is never one,
+ * and neither is anything that is no equation — a reference, a unit, a
+ * temporal operator.
+ *
+ * A `bf_neq` atom is no equation here: after phase 3 a negative leaf is
+ * `¬(l = r)` (invariant 4), so none is left where this is asked.
+ */
+template <NodeType node>
+bool is_pure_equation(tref literal, ba_type_id type);
+
 } // namespace idni::tau_lang::anti_prenexing
 
 #include "terms.tmpl.h"

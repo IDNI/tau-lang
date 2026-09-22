@@ -2,13 +2,17 @@
 
 /**
  * @file subst.h
- * @brief Anti-prenexing foundations: the formula-level atom substitution
- * `φ[atm ↦ T/F]` of §3 with the occurrence guard of §10, and §1's
- * `atoms_memo` behind it.
+ * @brief Anti-prenexing foundations: the two substitutions of §3 — the
+ * formula-level `φ[atm ↦ T/F]` with the occurrence guard of §10 and §1's
+ * `atoms_memo` behind it, and the variable substitution `φ[x ← t]`.
  *
- * `φ[x ← t]`, the variable substitution, is not here: it is the library's
- * `tree<node>::substitute` (tau_tree.h), called directly with the live order
- * and a re-simplifying argument hook.
+ * `φ[x ← t]` IS the library's `tree<node>::substitute` (tau_tree.h) under the
+ * live order, wrapped here with the re-simplifying ARGUMENT HOOK invariant 6
+ * asks for. The hook belongs with the substitution — §3 hands every reference
+ * argument a rewrite changed once to the caller's re-simplification — so the
+ * file that owns `φ[x ← t]` owns the hook that makes the library call the
+ * spec's primitive, and `SIMPLIFY`'s propagation, which substitutes with the
+ * same hook, takes it from here.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_H__
@@ -59,6 +63,21 @@ const trefs& atoms(tref n);
 /// `atm ∈ atoms(n)` — the occurrence guard of `subst_atom`.
 template <NodeType node>
 bool has_atom(tref n, tref atm);
+
+/**
+ * @brief §3 `φ[x ← t]`: the library's substitution under the live @p order —
+ * empty in the plain regime — with the argument hook of invariant 6, which
+ * re-simplifies once every reference argument the rewrite changed.
+ *
+ * @p x is the VARIABLE node; the key the library matches is its `bf` term,
+ * the form every occurrence takes inside a term, and it is formed here so
+ * that no caller spells it. An occurrence under a binder over @p x is bound,
+ * not free, and the library leaves it where it is.
+ *
+ * @param phi a `wff` formula or a `bf` term
+ */
+template <NodeType node>
+tref subst_var(tref phi, tref x, tref t, const var_order<node>& order = {});
 
 } // namespace idni::tau_lang::anti_prenexing
 

@@ -10,6 +10,10 @@
  * its own, because its replacement is a CONSTANT and the hooks fold it out of
  * a chain in place.
  *
+ * `[x ← t]` IS the library's `tree<node>::substitute`, which is where the
+ * order, the capture rules and the rename-apart live. What is added here is
+ * the key — the variable's `bf` term — and the argument hook.
+ *
  * SPINE nodes — a `wff` wrapping the same connective as its parent operator
  * node, on either nesting side — get no `atoms_memo` row, the rule
  * `get_free_vars` follows as well: a chain of k members has k spine nodes,
@@ -54,6 +58,21 @@ bool is_spine(tref n, tref parent) {
 }
 
 } // namespace subst_detail
+
+namespace detail {
+
+/// The argument hook of `φ[x ← t]` (§1, invariant 6): a reference argument
+/// the substitution changed is re-simplified once, in the PLAIN regime — an
+/// argument is the inside of a leaf, never BDD-backed, whatever the live
+/// order. One `std::function`, built once.
+template <NodeType node>
+const typename tree<node>::argument_hook& resimplify_argument() {
+	static const typename tree<node>::argument_hook hook =
+		[](tref a) { return simplify_term<node>(a); };
+	return hook;
+}
+
+} // namespace detail
 
 // --- φ[atm ↦ T/F] ------------------------------------------------------------------
 
@@ -147,6 +166,18 @@ bool has_atom(tref n, tref atm) {
 	const trefs& as = atoms<node>(n);
 	return std::binary_search(as.begin(), as.end(), atm,
 		tree<node>::subtree_less);
+}
+
+// --- φ[x ← t] ------------------------------------------------------------------------
+
+template <NodeType node>
+tref subst_var(tref phi, tref x, tref t, const var_order<node>& order) {
+	using tau = tree<node>;
+	// The rewrite happens inside `phi`, so a right sibling it carries as a
+	// chain member is not part of it.
+	return tau::get(tau::trim_right_sibling(phi))
+		.substitute(tau::get(tau::bf, x), t, order,
+			detail::resimplify_argument<node>());
 }
 
 } // namespace idni::tau_lang::anti_prenexing

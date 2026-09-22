@@ -1,12 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 0 unit tests for src/anti_prenex/foundations/subst.h (package C).
-// Spec: anti_prenex.md §1 (atoms_memo), §3 (`[atm ↦ T/F]`), §4 (what may
-// touch a unit), §10 (occurrence guards).
+// Unit tests for src/anti_prenex/foundations/subst.h.
+// Spec: anti_prenex.md §1 (atoms_memo), §3 (`[atm ↦ T/F]`, `[x ← t]`), §4
+// (what may touch a unit), §10 (occurrence guards).
 //
-// `φ[x ← t]` is the library's `tree<node>::substitute` and is tested in
-// tests/unit/test_tau_tree.cpp; the module's own call of it is in
-// test_anti_prenex_layer0.cpp.
+// `φ[x ← t]` is `subst_var`: the library's `tree<node>::substitute` under the
+// live order, with the key formed from the variable and the re-simplifying
+// argument hook. The library's substitution has its own suite
+// (tests/unit/test_tau_tree.cpp) and a hand-built hook is exercised in
+// test_anti_prenex_layer0.cpp, so the cases here are about what the wrapper
+// adds: the key, the hook and the order it hands on.
 //
 // Conventions. Every substitution takes the `wff` WRAPPER. A member of a chain
 // that is not the last child of its operator node carries a right sibling, so
@@ -51,6 +54,11 @@ tref member_where(tref chain, P pred) {
 bool in_fv(tref n, tref v) {
 	const trefs& vars = get_free_vars<node_t>(n);
 	return std::binary_search(vars.begin(), vars.end(), v, tau::subtree_less);
+}
+
+bool has_bdd_id(tref n) {
+	return tau::get(n).find_top([](tref m) {
+		return tree<node_t>::get(m).is(tau::BDD_ID); }) != nullptr;
 }
 
 } // namespace
@@ -208,6 +216,68 @@ TEST_CASE("gc: an atoms row survives a sweep with a live key, its trimmed atoms 
 	CHECK(row->items[1] == a1);
 	CHECK(ap::has_atom<node_t>(phi, wff("g1 = 0")));
 	CHECK(ap::has_atom<node_t>(phi, wff("g2 = 0")));
+}
+
+// --- φ[x ← t] -------------------------------------------------------------------
+
+TEST_CASE("subst_var: every free occurrence, and a reference argument re-simplified") {
+	tref x = vr("x");
+	tref phi = wff("f(x) && x & u1 = 0");
+	REQUIRE(ap::members<node_t>(phi).size() == 2);
+	// Every free occurrence, inside the reference as well — the one rewrite
+	// that enters one (§4).
+	tref res = ap::subst_var<node_t>(phi, x, bf("z"));
+	CHECK(!in_fv(res, x));
+	CHECK(in_fv(res, vr("z")));
+	CHECK(ap::is_member<node_t>(res, wff("f(z)")));
+	CHECK(ap::is_member<node_t>(res, wff("z & u1 = 0")));
+	// THE HOOK: an argument the rewrite changed comes back through
+	// `SIMPLIFY_TERM`, so a witness that folds inside the argument folds
+	// there — `u1·(u1′ ∪ u2)` is the function `u1·u2` by per-path
+	// contradiction, which no construction hook does.
+	tref res2 = ap::subst_var<node_t>(phi, x, bf("u1 & (u1' | u2)"));
+	CHECK(ap::is_member<node_t>(res2, wff("f(u1 & u2)")));
+	// Outside a reference argument nothing is simplified: the caller's
+	// `SIMPLIFY` follows (invariant 6).
+	CHECK(!ap::is_member<node_t>(res2, wff("u1 & u2 = 0")));
+	// A formula the variable is not free in is the same node.
+	CHECK(ap::subst_var<node_t>(wff("f(u1)"), x, bf("z")) == wff("f(u1)"));
+}
+
+TEST_CASE("subst_var: an occurrence a binder below binds is left alone") {
+	tref x = vr("x");
+	// The binder is built over the very node the free occurrence is, which
+	// no parse reproduces: the parser gives every bound variable an id of
+	// its own.
+	tref inner = tau::build_wff_ex(x, wff("x & b = 0"), false);
+	tref phi = tau::build_wff_and(wff("x & a = 0"), inner);
+	REQUIRE(in_fv(phi, x));
+	tref res = ap::subst_var<node_t>(phi, x, bf("c"));
+	CHECK(res != phi);
+	CHECK(!in_fv(res, x));
+	CHECK(ap::is_member<node_t>(res, wff("c & a = 0")));
+	// The unit is the formula it was, bound occurrence included.
+	tref u = member_where(res, is_child_quantifier<node_t>);
+	REQUIRE(u != nullptr);
+	CHECK(same(u, inner));
+}
+
+TEST_CASE("subst_var: under a live order the rewrite reaches a stored BDD's leaves") {
+	tref x = vr("x"), y = vr("y");
+	const ap::block P{ x };
+	const ap::var_order<node_t> o =
+		ap::ctx<node_t>::for_component(P, 0, false).order;
+	tref phi = ap::prepare_terms<node_t>(wff("x & y | x' & z = 0"), P, o);
+	REQUIRE(has_bdd_id(phi));
+	// `y` sits in a leaf, so the rewrite is one inside the BDD and the term
+	// keeps its decision variable — and with it its backing.
+	tref res = ap::subst_var<node_t>(phi, y, bf("a"), o);
+	CHECK(has_bdd_id(res));
+	CHECK(!in_fv(res, y));
+	CHECK(in_fv(res, vr("a")));
+	// The order is the library's, so the result is the BDD the same formula
+	// prepares to: one node, by interning.
+	CHECK(res == ap::prepare_terms<node_t>(wff("x & a | x' & z = 0"), P, o));
 }
 
 } // TEST_SUITE

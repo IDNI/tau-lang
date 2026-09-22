@@ -34,6 +34,22 @@ tref wff(const char* s) {
 /// blocks and free-variable sets hold.
 tref vr(const char* s) { return tau::trim(bf(s)); }
 
+/// A `tau`-typed term variable. Purity is asked against a BA type, so a
+/// fixture that carries one of its own spells it; a parsed fixture carries
+/// none and is of whatever type it is read under.
+tref tbf(const char* name) {
+	return tau::build_bf_variable(name, tau_type_id<node_t>());
+}
+
+/// A real order atom `l ≤ r`. On a non-bitvector type the construction hooks
+/// rewrite `≤` into the equation `l·r′ = 0`, so one does not survive
+/// construction; the parser builds with the hooks disabled, and this helper
+/// reproduces that shape the same way.
+tref order_atom(tref l, tref r) {
+	use_hooks_guard<node_t> g(false);
+	return tau::build_bf_lteq(l, r);
+}
+
 /// `P[i] ↦ |P| - i` (§5): inner → LOWER rank.
 order_t order_of(const ap::block& P) {
 	order_t o;
@@ -1016,6 +1032,70 @@ TEST_CASE("leaf_fv: the leaves' contribution alone") {
 	CHECK(std::binary_search(fv.begin(), fv.end(), x, tau::subtree_less));
 	// a plain term: its FV
 	CHECK(ap::leaf_fv<node_t>(bf("y & z")).size() == 2);
+}
+
+// 11. the PURE shapes ---------------------------------------------------------
+
+TEST_CASE("is_pure_term: variables, constants, the BA operations and a chain") {
+	const ap::ba_type_id T = tau_type_id<node_t>();
+	// ∪ · ′ and a functional-quantifier chain over them
+	CHECK(ap::is_pure_term<node_t>(bf("x & y | z'"), T));
+	CHECK(ap::is_pure_term<node_t>(tau::build_bf_and(tbf("x"), tbf("y")), T));
+	CHECK(ap::is_pure_term<node_t>(bf("fall y fex w (x & y & w | z)"), T));
+	// arithmetic is out, read under its own type
+	tref sum = bf("x:bv[8] + { 1 }:bv[8]");
+	const ap::ba_type_id BV = find_ba_type<node_t>(sum);
+	REQUIRE(BV != 0);
+	REQUIRE(BV != T);
+	CHECK(!ap::is_pure_term<node_t>(sum, BV));
+	CHECK(ap::is_pure_term<node_t>(bf("x:bv[8] & y:bv[8]"), BV));
+	// the same term read under `tau`: every bitvector node is a
+	// foreign-typed subterm, a constant as much as a variable
+	CHECK(!ap::is_pure_term<node_t>(bf("x:bv[8] & y:bv[8]"), T));
+	CHECK(!ap::is_pure_term<node_t>(bf("{ 1 }:bv[8]"), T));
+	// and the `tau`-typed term read under the bitvector type is foreign the
+	// same way, which is what says the fixture carries its type at all
+	CHECK(!ap::is_pure_term<node_t>(
+		tau::build_bf_and(tbf("x"), tbf("y")), BV));
+	// a term-level reference
+	CHECK(!ap::is_pure_term<node_t>(bf("x & r(y)"), T));
+}
+
+TEST_CASE("is_pure_term: a BDD-backed term is read leaf by leaf") {
+	const ap::ba_type_id T = tau_type_id<node_t>();
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	tref l = sides(ap::prepare_terms<node_t>(
+		wff("x & y | x' & z = 0"), P, o)).first;
+	REQUIRE(th::is_bdd_backed(l));
+	CHECK(ap::is_pure_term<node_t>(l, T));
+	// what a reference hides sits in a leaf (§1's leaf hazard), where the
+	// scan of the leaves finds it
+	tref m = sides(ap::prepare_terms<node_t>(wff("x & r(y) = 0"), P, o)).first;
+	REQUIRE(th::is_bdd_backed(m));
+	CHECK(!ap::is_pure_term<node_t>(m, T));
+}
+
+TEST_CASE("is_pure_equation: an equation through one ¬, never an order atom") {
+	const ap::ba_type_id T = tau_type_id<node_t>();
+	tref e = wff("x & y = 0");
+	CHECK(ap::is_pure_equation<node_t>(e, T));
+	tref ne = build_wff_neg<node_t>(e);
+	REQUIRE(ap::is_negated_equation<node_t>(ne));
+	CHECK(ap::is_pure_equation<node_t>(ne, T));
+	// an order atom is no equation — it is never split and rides whole
+	CHECK(!ap::is_pure_equation<node_t>(order_atom(tbf("x"), tbf("y")), T));
+	// a reference on a side refuses the equation
+	CHECK(!ap::is_pure_equation<node_t>(wff("x & r(y) = 0"), T));
+	// a `bf_neq` atom is no equation here: after phase 3 a negative leaf is
+	// `¬(l = r)` (invariant 4) and none of these is left
+	tref neq = wff("x != y");
+	REQUIRE(is_child<node_t>(neq, tau::bf_neq));
+	CHECK(!ap::is_pure_equation<node_t>(neq, T));
+	// and neither is anything that is no atom at all
+	CHECK(!ap::is_pure_equation<node_t>(wff("f(x)"), T));
+	CHECK(!ap::is_pure_equation<node_t>(wff("x = 0 && y = 0"), T));
 }
 
 } // TEST_SUITE

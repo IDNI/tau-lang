@@ -12,13 +12,14 @@
  * conjuncts by `TRY_WITNESS` and of a branch's by `TRY_CASE_WITNESS`.
  *
  * THE TWO REWRITES of the deep pass are the library's: `φ[x ← t]` is
- * `tree<node>::substitute` (tau_tree.h) with a re-simplifying argument hook
- * under the live order — empty in phase 2, `ctx.order` in the COF mode — and
- * the spine's replacement is `rewriter::replace`, a CONTENT match with a
- * hooked rebuild of the path above it. Replacing every occurrence of the
- * spine is sound because the descent enforces confinement first (§3): a
- * second occurrence of that node elsewhere in `Φ` would put `x` free in two
- * members of some junction on the way down, which the descent refuses.
+ * `subst_var` (foundations/subst.h), the library's `tree<node>::substitute`
+ * with a re-simplifying argument hook under the live order — empty in phase
+ * 2, `ctx.order` in the COF mode — and the spine's replacement is
+ * `rewriter::replace`, a CONTENT match with a hooked rebuild of the path
+ * above it. Replacing every occurrence of the spine is sound because the
+ * descent enforces confinement first (§3): a second occurrence of that node
+ * elsewhere in `Φ` would put `x` free in two members of some junction on the
+ * way down, which the descent refuses.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__WITNESS__WITNESS_TMPL_H__
@@ -40,16 +41,6 @@ bool holds_bdd_term(tref n) {
 	using tau = tree<node>;
 	return tau::get(n).find_top([](tref m) {
 		return tau::get(m).is(tau::BDD_ID); }) != nullptr;
-}
-
-/// §3 `φ[x ← t]`: the library's substitution under the live `order` — empty
-/// in phase 2 — with the argument hook invariant 6 asks for, which
-/// re-simplifies the reference arguments it changed. `key` is the variable's
-/// `bf` TERM, the form every occurrence takes inside a term.
-template <NodeType node>
-tref subst_var(tref phi, tref key, tref t, const var_order<node>& order = {}) {
-	return tree<node>::get(tree<node>::trim_right_sibling(phi))
-		.substitute(key, t, order, detail::resimplify_argument<node>());
 }
 
 /// The result join of `ms` in the connective `conj` picks (§3): the ∧-join
@@ -91,11 +82,10 @@ template <NodeType node, typename Search>
 std::optional<tref> witness_with(tref x, tref psi,
 	const var_order<node>& order, Search&& search)
 {
-	using tau = tree<node>;
 	const std::optional<pin<node>> best = search(get_cnf_wff_clauses<node>(psi));
 	if (!best) return {};
-	return simplify<node>(subst_var<node>(psi, tau::get(tau::bf, x),
-		best->witness, order), order);
+	return simplify<node>(
+		subst_var<node>(psi, x, best->witness, order), order);
 }
 
 /// The POSITIVE EQUATION the pin match reads off a spine member, in `Q`'s
@@ -319,7 +309,6 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 	const bool ex = Q == tau_term_bdd<node>::ex;
 	const size_t spine_nt = ex ? tau::wff_and : tau::wff_or;
 	const size_t other_nt = ex ? tau::wff_or : tau::wff_and;
-	const tref key = tau::get(tau::bf, x);
 	block D;               // bound past the first kind flip, barred from FV(t)
 	bool flipped = false;
 	// The rewrite is a replacement inside this node, so a right sibling it
@@ -349,7 +338,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 			rest.reserve(ms.size() - 1);
 			for (size_t j = 0; j < ms.size(); ++j)
 				if (j != i) rest.push_back(subst_var<node>(
-					ms[j], key, p->witness));
+					ms[j], x, p->witness));
 			return rewriter::replace<node>(root, n,
 				join_of<node>(rest, ex));
 		}
@@ -369,11 +358,11 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 				trefs parts;
 				parts.reserve(ms.size());
 				parts.push_back(subst_var<node>(
-					b.residue, key, b.witness));
+					b.residue, x, b.witness));
 				for (size_t j = 0; j < ms.size(); ++j)
 					if (j != i) parts.push_back(
 						subst_var<node>(ms[j],
-							key, b.witness));
+							x, b.witness));
 				cases.push_back(join_of<node>(parts, ex));
 			}
 			return rewriter::replace<node>(root, n,

@@ -59,17 +59,6 @@ bool is_positive_equation(tref n) {
 	return is_child<node>(n, tree<node>::bf_eq);
 }
 
-/// The argument hook of every substitution in this file (§1, invariant 6):
-/// a reference argument the substitution changed is re-simplified once, in
-/// the PLAIN regime — an argument is the inside of a leaf, never BDD-backed,
-/// whatever the live order. One `std::function`, built once.
-template <NodeType node>
-const typename tree<node>::argument_hook& resimplify_argument() {
-	static const typename tree<node>::argument_hook hook =
-		[](tref a) { return simplify_term<node>(a); };
-	return hook;
-}
-
 } // namespace detail
 
 // --- the pin match ---------------------------------------------------------------

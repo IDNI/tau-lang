@@ -714,6 +714,50 @@ trefs leaf_fv(tref f) {
 		thandle<node>::convert_to_handle(f).get().b);
 }
 
+// --- the PURE shapes --------------------------------------------------------------
+
+template <NodeType node>
+bool is_pure_term(tref t, ba_type_id type) {
+	using tau = tree<node>;
+	using namespace terms_detail;
+	// ONE scan per plain term, stopping at the first node that breaks the
+	// shape: an arithmetic operator or a width cast
+	// (`is_non_boolean_term`), a term-level reference, or a node carrying a
+	// BA type of its own that is not `type` — a foreign-typed subterm. The
+	// untyped id `0` is no claim of its own and passes.
+	auto plain_pure = [type](tref n) {
+		return tau::get(n).find_top([type](tref m) {
+			const tau& tm = tau::get(m);
+			if (is_non_boolean_term<node>(m)
+				|| tm.is(tau::bf_ref)) return true;
+			const ba_type_id bt = tm.get_ba_type();
+			return bt != 0 && bt != type;
+		}) == nullptr;
+	};
+	if (!thandle<node>::is_bdd_backed(t)) return plain_pure(t);
+	// A stored BDD branches on variables alone, so the same scan on every
+	// leaf answers for the whole term. The walk stops at the first impure
+	// leaf and then reports that it was stopped.
+	auto at_node = [&plain_pure](bref<node> x, bool leaf) {
+		return !leaf || plain_pure(tbdd<node>::get_var_term(x));
+	};
+	return tbdd<node>::visit_nodes(
+		thandle<node>::convert_to_handle(t).get(), at_node);
+}
+
+template <NodeType node>
+bool is_pure_equation(tref literal, ba_type_id type) {
+	using tau = tree<node>;
+	const tref a = is_negated_equation<node>(literal)
+		? atom_of<node>(literal) : literal;
+	if (!is_child<node>(a, tau::bf_eq)) return false;
+	// The sides are read off the atom as `TERM_OF` reads them, each trimmed
+	// of the sibling chain it carries inside the atom.
+	const tau& eq = tau::get(a)[0];
+	return is_pure_term<node>(tau::trim_right_sibling(eq.first()), type)
+		&& is_pure_term<node>(tau::trim_right_sibling(eq.second()), type);
+}
+
 } // namespace idni::tau_lang::anti_prenexing
 
 #endif // __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__

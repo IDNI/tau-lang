@@ -40,6 +40,7 @@
 #include "../foundations/dag.h"
 #include "../foundations/ctx.h"
 #include "../foundations/terms.h"
+#include "../foundations/subst.h"
 #include "../foundations/options.h"
 
 namespace idni::tau_lang::anti_prenexing {
