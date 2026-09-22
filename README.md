@@ -835,17 +835,25 @@ equivalent and tau-lang automatically merges the latter form into a single
 ### Lookback initialization
 
 When a specification uses lookback stream variables (e.g. `i1[t-k]` or
-`o1[t-k]`), the interpreter needs `k` warm-up steps before the lookback
-values are available.  During these initial steps all output variables are
-unconstrained and default to the bottom element (`0`/`"F"` for tau,
-`0`/`"F"` for sbf, etc.).  The number of warm-up steps equals the *maximum*
-lookback shift across all stream variables in the formula (the global
-`max_lookback`).  Every output — even those with a smaller individual shift —
-receives `max_lookback` initial default values.
+`o1[t-k]`), the values they read do not exist for the first `k` steps.  The
+interpreter handles this per *clause*: the `always` part of a specification
+(every `always` statement merged into one) and each `sometimes` statement, or
+each top-level conjunct of a full-LTL formula, is enforced from the deepest
+lookback that clause reads, and asks nothing before that.  During a clause's
+warm-up its outputs are unconstrained by it, lookback-free ones included; the
+interpreter picks the bottom element (`0`/`"F"` for tau, `0`/`"F"` for sbf,
+etc.) unless a later step of the run needs another value, so
+`G(o1[t-1] = 1)` starts with `o1[0] = 1`.
 
-Example: `G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` has `max_lookback = 2`.
-Both `o1` and `o2` will output `"F"` for steps 0 and 1, regardless of their
-individual shifts.
+A clause that reads no past starts at step 0 even beside one that does.
+`(always o1[t] = 1) && (sometimes o1[t-2] = 0)` is unsatisfiable: the
+`always` holds from step 0, so `o1` never was `0` two steps earlier.  Within
+one clause the deepest lookback counts for every literal:
+`G(o1[t] = 1 && o2[t] = o2[t-1])` leaves `o1[0]` unconstrained, and
+`G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` leaves both outputs unconstrained
+for steps 0 and 1, whatever their individual shifts.  The LTL synthesis
+pipeline follows the same rule, so `G(p U q)` with `q` reading the past
+agrees with `G q` when `p` is contradictory.
 
 ### Known LTL limitations
 
