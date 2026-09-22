@@ -625,7 +625,8 @@ kind — an adjoining same-kind run of `f` is merged into it, and a chain
 binding every free variable of a PLAIN `f` is folded to its constant unless a
 subscript hides in a leaf), `NORM_EQUATION(atom, order)`
 (`l = r ↦ l + r = 0`, descending through one `¬`), `TERM_OF(atom, order)` (for
-an atom `l = r`, the term `l + r`, read through one `¬`) and
+an atom `l = r` — or `l ≠ r`, which phase 1 meets before
+`NORMALIZE_OPERATORS` — the term `l + r`, read through one `¬`) and
 `REWRAP(φ, X, kind = ∃)` (re-attach the block around `φ`, in `X`'s order —
 every graceful exit of invariant 3; the kind defaults to `∃` and the dualised
 `∀` form is available, `X` is duplicate-free, and the set is attached as given
@@ -633,22 +634,39 @@ every graceful exit of invariant 3; the kind defaults to `∃` and the dualised
 So are the two aggressive normalisers of invariant 6:
 
 - `SIMPLIFY_TERM(t, order = ∅)` — constant folding, complement laws, per-path
-  contradiction, and reduction to the canonical form of the BDD backing `t`.
-  Per-path contradiction is `prop:xfx` — `x·f(x) = x·f(1)`, `x′·f(x) =
-  x′·f(0)` — so a sub-term under a literal is reduced by that literal's
-  assignment; absorption is its literal instance (`x ∪ x·c = x`), and a
-  compound one (`ab ∪ ab·c`) stays as written. It is what stops nested Boole
-  normal forms from compounding as substitutions stack terms inside terms.
-- `SIMPLIFY_ATOM(a, order = ∅)` — `SIMPLIFY_TERM` on both sides, then fold a
-  constant-only atom to `T`/`F`. With no BDD-backed side — the initial
-  phase-1 effort, phases 2 and 5, and every plain atom of the push, order
-  atoms included — it also normalises the joint `l + r` and runs the
-  per-variable `0`/`1` pass (a side identically constant, or independent of a
-  variable): the strongest syntactic effort before any BDD exists, and an
-  early detection that spares a BDD later. With a BDD-backed side it is
-  side-wise and never reshapes the atom; the joint fold there is `TERM_OF`'s
-  (`FOLD_DECIDED`). Idempotent, so an atom's shape as written is its
-  simplified shape.
+  contradiction, the cofactor check, and reduction to the canonical form of
+  the BDD backing `t`. Per-path contradiction is `prop:xfx` — `x·f(x) =
+  x·f(1)`, `x′·f(x) = x′·f(0)` — so a sub-term under a literal is reduced by
+  that literal's assignment; absorption is its literal instance (`x ∪ x·c =
+  x`), and a compound one (`ab ∪ ab·c`) stays as written. The COFACTOR CHECK
+  is one-level Shannon reduction of the WHOLE term over every free variable
+  of `t` that is not a variable of `order`: an order variable in a Boolean
+  position the BDD has decided already, and one still free in a leaf sits
+  where the expansion is not licensed (§1 leaf hazard). For each such `y`,
+  `f₀ = t[y←0]` and `f₁ = t[y←1]`, the substitution reaching BOOLEAN
+  POSITIONS only — under `∪ · ′ +` and the functional quantifiers, never
+  under an arithmetic operator, a reference or a foreign-typed subterm, where
+  no Shannon expansion holds — with constants folding through the hooks;
+  `f₀ = f₁`, a constant included, makes `t ← f₀`. Sound for a variable that
+  also sits inside a reference: the reference is an opaque element the
+  expansion is taken around. TWO PHASES, no interplay: the sweep first, then
+  the check ONCE over the swept term, one pass over its variables on the
+  running term; a cofactor is what the substitution hands back, folded by
+  the hooks and simplified no further, and the check's result is emitted as
+  it stands. It is what stops nested Boole normal forms from compounding as
+  substitutions stack terms inside terms.
+- `SIMPLIFY_ATOM(a, order = ∅)` — one recipe in both regimes. `SIMPLIFY_TERM`
+  on both sides, the atom rebuilt through the construction hooks, which fold
+  a constant-only atom and equal sides. For a (¬)equation the joint ring sum
+  `l + r` — `TERM_OF`'s, a BDD operation once a side is BDD-backed — then
+  goes through `SIMPLIFY_TERM` as a DECISION alone: `0` decides `=` as `T`, a
+  nonzero constant as `F`, dually for `≠` (phase 1 meets it before
+  `NORMALIZE_OPERATORS`); anything else leaves the atom as its sides stand.
+  Never reshaped, and `NORM_EQUATION` (`SQUEEZE`) stays the one rewrite of
+  an equation's shape. An order atom is side-wise alone. NOT idempotent: a
+  second call may simplify further, since the check's result is not swept
+  again; keys do not drift because an atom is simplified ONCE, at
+  construction, and again only when a substitution rewrote it.
 
 The `order` these four carry is the LIVE order of §1's term representation:
 the EMPTY order is the plain regime — phases 1, 2 and 5 — and a term touching
@@ -900,7 +918,8 @@ failure falls through to a more general path.
 `NORM_EQUATION` rewrites an atom and is called in exactly one place:
 `SQUEEZE` step 1, whose squeeze needs zero form. Everywhere
 else equations stay as written — as `SIMPLIFY_ATOM` left them at construction,
-which is idempotent, so no key drifts — `TERM_OF` reads a term off an atom
+simplified once there and again only when a substitution rewrote them, so no
+key drifts — `TERM_OF` reads a term off an atom
 without touching it, and every substitution keyed on an atom uses the atom as
 it occurs in the formula.
 
@@ -1382,8 +1401,9 @@ COF(f, x, ctx) → (f₀, f₁, p, usable, pin):       // the cof_memo recipe �
 
 FOLD_DECIDED(C, X, ctx) → conjunct list | F:
     // f = 0 forces f₀f₁ = 0 on EVERY variable, so p a nonzero constant proves
-    // the atom F outright — a fold SIMPLIFY_ATOM cannot see (it folds
-    // constant-only atoms). One memoized probe per (¬)equation; a negative
+    // the atom F outright — a fold SIMPLIFY_ATOM cannot see (it decides an
+    // atom whose ring sum is a constant; here the PRODUCT of two cofactors
+    // is). One memoized probe per (¬)equation; a negative
     // tree conjunct (§1) is read literal-wise.
     for each (¬)equation conjunct c of C, and each literal c of a negative
             tree conjunct t of C:
