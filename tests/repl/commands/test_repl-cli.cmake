@@ -161,6 +161,8 @@ set(TAU_CLI_LIMIT_ROWS
 	"max_consistency_subsets|max-consistency-subsets|j|9|maxsubsets|9"
 	"cache_bound|cache-bound|A|123|cachebound|123"
 	"max_cover_products|max-cover-products|n|9|maxcoverproducts|9"
+	"tref_budget|tref-budget|y|4096|trefbudget|4096"
+	"tref_budget_soft|tref-budget-soft|C|50|trefbudgetsoft|50"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

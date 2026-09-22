@@ -187,6 +187,15 @@ cli::options tau_options() {
 		.set_description("cap the strategy paths the multi-step window "
 			"oracle examines per check (default: "
 			"TAU_LTL_WINDOW_MAX_PATHS or 4096; 0 = unlimited)");
+	opts["tref-budget"] = cli::option("tref-budget", 'y', "")
+		.set_description("cap the live interned tree nodes; an api call "
+			"that starts with the store at or above the cap fails "
+			"instead of running (default: TAU_TREF_BUDGET or 0; "
+			"0 = unlimited)");
+	opts["tref-budget-soft"] = cli::option("tref-budget-soft", 'C', "")
+		.set_description("percentage of --tref-budget at which a sweep "
+			"is forced regardless of the gc growth trigger "
+			"(default: TAU_TREF_BUDGET_SOFT or 75)");
 	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
 		.set_description("tree-node count floor before gc may trigger "
 			"(default 256)");
@@ -423,6 +432,10 @@ int main(int argc, char** argv) {
 		tau_api::set_ltl_max_refinement_rounds(*n);
 	if (auto n = given_count("ltl-window-max-paths"); n)
 		tau_api::set_ltl_window_max_paths(*n);
+	if (auto n = given_count("tref-budget"); n)
+		tau_api::set_tref_budget(*n);
+	if (auto n = given_count("tref-budget-soft"); n)
+		tau_api::set_tref_budget_soft_percent(*n);
 	if (!bad_option.empty()) return error(bad_option);
 	tau_api::set_gc_min_size(optnum("gc-min-size"));
 	tau_api::set_gc_growth_factor(

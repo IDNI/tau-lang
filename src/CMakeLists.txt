@@ -46,6 +46,7 @@ set(TAU_CORE_HEADERS
 	interpreter.h
 	pointwise_revision.h
 	tau_diagnostics.h  # idni::tau_lang aliases for the parser library's diagnostics types
+	tau_memory_budget.h # cap on the interned tree store, checked on entry to each api call
 	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h

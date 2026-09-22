@@ -29,6 +29,7 @@
 #include "heuristics/simplify_options.h"
 #include "interpreter.h"
 #include "tau_diagnostics.h"
+#include "tau_memory_budget.h"
 
 namespace idni::tau_lang {
 
@@ -255,6 +256,24 @@ struct api {
 	 * sweep. Default 1.5 (kept); <= 0 disables gc.
 	 */
 	static void set_gc_growth_factor(double f);
+	/**
+	 * @brief Cap on live interned tree nodes; 0 = unlimited (default).
+	 *
+	 * Checked on entry to every api call: a call that starts with the
+	 * store already at or above the cap returns an error without doing
+	 * any work, while a call that was allowed to start returns its value
+	 * whatever it does to the store. See `tau_memory_budget.h` for what
+	 * this does and does not bound.
+	 */
+	static void set_tref_budget(size_t n);
+	/**
+	 * @brief Percentage of the tref budget at which the store counts as
+	 * approaching its cap and the interpreter sweeps regardless of its
+	 * own growth trigger. Default 75.
+	 */
+	static void set_tref_budget_soft_percent(size_t pct);
+	/// Live interned tree node count.
+	static size_t tref_count();
 	/**
 	 * @brief Warn when an updated specification exceeds this many printed
 	 * characters (the I7 size guard); 0 = off (default).

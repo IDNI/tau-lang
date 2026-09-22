@@ -1531,6 +1531,8 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "maxprobesteps")     return probe_steps_opt;
 	if (x == "rewriterounds"
 		|| x == "maxrewriterounds")  return rewrite_rounds_opt;
+	if (x == "trefbudget")               return tref_budget_opt;
+	if (x == "trefbudgetsoft")           return tref_budget_soft_opt;
 	if (x == "gcminsize")                return gc_min_size_opt;
 	if (x == "gcgrowth"
 		|| x == "gcgrowthfactor")    return gc_growth_opt;
@@ -1689,7 +1691,13 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ ltl_refinement_rounds_opt, [climit, this]() {
 		out << "ltlrefinementrounds: " << climit(ltl_max_refinement_rounds()) << "\n"; } },
 	{ ltl_window_max_paths_opt, [climit, this]() {
-		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths()) << "\n"; } }
+		out << "ltlwindowmaxpaths:   " << climit(ltl_window_max_paths()) << "\n"; } },
+	{ tref_budget_opt, [climit, this]() {
+		out << "trefbudget:          " << climit(tref_budget())
+			<< " (live: " << api<node>::tref_count() << ")\n"; } },
+	{ tref_budget_soft_opt, [this]() {
+		out << "trefbudgetsoft:      " << tref_budget_soft_percent()
+			<< "%\n"; } }
 	};
 	printers.insert(limit_printers.begin(), limit_printers.end());
 	if (o == invalid_opt) return;
@@ -1897,7 +1905,11 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	{ ltl_refinement_rounds_opt, [&]() { if (auto n = str2count(); n)
 		api<node>::set_ltl_max_refinement_rounds(*n); } },
 	{ ltl_window_max_paths_opt, [&]() { if (auto n = str2count(); n)
-		api<node>::set_ltl_window_max_paths(*n); } } };
+		api<node>::set_ltl_window_max_paths(*n); } },
+	{ tref_budget_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_tref_budget(*n); } },
+	{ tref_budget_soft_opt, [&]() { if (auto n = str2count(); n)
+		api<node>::set_tref_budget_soft_percent(*n); } } };
 	setters[o]();
 }
 
@@ -2110,6 +2122,30 @@ requires BAsPack<BAs...>
 int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command = n | tt::only_child;
 	auto command_type = command | tt::nt;
+	// Refuse before the command runs, not after: a command allowed to
+	// start keeps its result. This covers the commands that do not go
+	// through the api -- anf_cmd today, and whatever is added next --
+	// while the api's own guard covers the rest; the check is a cheap
+	// measurement, so doing it twice costs nothing.
+	//
+	// The control commands are exempt, and have to be: they are how a
+	// session at its budget recovers. Gating `quit` strands the user in a
+	// REPL they cannot leave, and gating `set`/`clear` takes away the two
+	// ways to get back under the cap.
+	switch (command_type) {
+	case tau::quit_cmd: case tau::clear_cmd: case tau::help_cmd:
+	case tau::version_cmd: case tau::get_cmd: case tau::set_cmd:
+	case tau::enable_cmd: case tau::disable_cmd: case tau::toggle_cmd:
+	case tau::reset_cmd: case tau::comment:
+		break;
+	default:
+		if (over_tref_budget<node>()) {
+			error = true;
+			TAU_LOG_ERROR << tref_budget_message<node>();
+			return 0;
+		}
+	}
+	budget_scope<node> budget;
 #ifdef DEBUG
 	if (opt.debug_repl) {
 		// out << "command: " << command << "\n";
@@ -2355,6 +2391,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  rewriterounds          rewrite-to-fixpoint rounds           unlimited\n"
 		"  gcminsize              gc trigger floor (tree nodes)        256\n"
 		"  gcgrowth               gc growth-factor trigger (decimal)   1.5\n"
+		"  trefbudget             live interned tree nodes allowed     unlimited\n"
+		"  trefbudgetsoft         % of trefbudget that forces a sweep  75\n"
 		"  specsizewarn           updated-spec size warning (chars)    off\n"
 		"  revisionalts           revision alternatives kept per part  unlimited\n"
 		"  maxsubsets             k-ary consistency subset checks      4096\n"

@@ -4,6 +4,7 @@ set(TESTS
 	tref_api
 	string_api
 	limits
+	memory_budget
 	ltl_execution
 )
 

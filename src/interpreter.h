@@ -14,6 +14,7 @@
 
 #include "solver.h"
 #include "ltl_aba.h"
+#include "tau_memory_budget.h"
 
 #include <functional>
 #include <map>

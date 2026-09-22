@@ -230,3 +230,29 @@ else()
 	set_tests_properties("test_repl-ltl_env-qlt_t3_cap_default_without_flag" PROPERTIES
 		PASS_REGULAR_EXPRESSION "qlt-t3-cap: *20")
 endif()
+
+# TAU_TREF_BUDGET is the memory budget's environment form: it shows through
+# `get` when the flag is unset, and the flag wins when both are given.
+add_test(NAME "test_repl-tref_budget_env_is_the_fallback"
+	COMMAND bash -c "TAU_TREF_BUDGET=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get trefbudget\"")
+set_tests_properties("test_repl-tref_budget_env_is_the_fallback" PROPERTIES
+	PASS_REGULAR_EXPRESSION "trefbudget: *4096")
+
+add_test(NAME "test_repl-tref_budget_flag_beats_env"
+	COMMAND bash -c "TAU_TREF_BUDGET=4096 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --tref-budget 8192 -e \"get trefbudget\"")
+set_tests_properties("test_repl-tref_budget_flag_beats_env" PROPERTIES
+	PASS_REGULAR_EXPRESSION "trefbudget: *8192")
+
+# A budget no session can meet refuses the command instead of answering it,
+# and says which knob set the cap.
+add_test(NAME "test_repl-tref_budget_refuses_when_exhausted"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --tref-budget 1 -e \"dnf (x & y) | z\" 2>&1")
+set_tests_properties("test_repl-tref_budget_refuses_when_exhausted" PROPERTIES
+	PASS_REGULAR_EXPRESSION "memory budget exhausted.*--tref-budget")
+
+# Unlimited is the shipped default: the same command answers normally.
+add_test(NAME "test_repl-tref_budget_unlimited_by_default"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"dnf (x & y) | z\" 2>&1")
+set_tests_properties("test_repl-tref_budget_unlimited_by_default" PROPERTIES
+	FAIL_REGULAR_EXPRESSION "memory budget exhausted"
+	PASS_REGULAR_EXPRESSION "xy\\|z")

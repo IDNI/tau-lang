@@ -1837,13 +1837,22 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 
 template <NodeType node>
 void interpreter<node>::maybe_gc(const assignment<node>* pin) {
-	if (gc_growth_factor <= 0.0) return;
 	const size_t m_pre = tau::m_size();
-	// Floor: don't sweep until M is non-trivially large. Bounds peak size
-	// for any workload (a sweep fires no later than M = gc_min_size + growth).
-	if (m_pre < gc_min_size) return;
-	// Amortize: don't sweep unless M grew enough since the last sweep.
-	if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc) return;
+	// A store approaching its budget sweeps whatever the growth trigger
+	// says, and even with gc disabled: the alternative is refusing the
+	// next api call over nodes a sweep would have freed. This is the one
+	// place a sweep can be forced, because it is the one place the whole
+	// root set is known -- see collect_live_refs below.
+	if (!over_tref_soft_mark<node>()) {
+		if (gc_growth_factor <= 0.0) return;
+		// Floor: don't sweep until M is non-trivially large. Bounds peak
+		// size for any workload (a sweep fires no later than
+		// M = gc_min_size + growth).
+		if (m_pre < gc_min_size) return;
+		// Amortize: don't sweep unless M grew enough since the last sweep.
+		if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc)
+			return;
+	}
 
 	const auto t0 = std::chrono::steady_clock::now();
 	std::unordered_set<tref> keep;
