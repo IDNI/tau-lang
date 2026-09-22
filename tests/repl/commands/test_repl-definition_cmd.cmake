@@ -77,3 +77,31 @@ add_repl_test_fail(definitions-solve_unresolved_reference
 	"type Point = {a: sbf, b: sbf}. solve x:Point = x && foo(x.a, x.b) && x.a != 0"
 	"unresolved reference")
 set_tests_properties("test_repl-definitions-solve_unresolved_reference" PROPERTIES TIMEOUT 60)
+
+# A definition body brings its own bound variables, numbered per formula, so
+# the body's `ex b1` and a call site's `all b1` used to be the same name and
+# the argument was captured on expansion: `all x (t(x))` answered T because it
+# had become `all b1 (ex b1 (b1 != 0))`. The argument is only at risk when it
+# is the innermost binder, hence the two nesting orders.
+add_repl_test(definitions-quant_body_no_capture
+	"t(a) := (ex c (a != 0)). valid all x (t(x))" ": F")
+add_repl_test(definitions-quant_body_no_capture-inner
+	"t(a) := (ex c (a != 0)). valid all y (all x (t(x)))" ": F")
+add_repl_test(definitions-quant_body_no_capture-outer
+	"t(a) := (ex c (a != 0)). valid all x (all y (t(x)))" ": F")
+# The renaming must not break a body that does bind the argument's value.
+add_repl_test(definitions-quant_body_witness
+	"t(a) := (ex c (a = c)). valid all x (t(x))" ": T")
+
+# A bound variable of the body handed to another definition is a value, not a
+# pattern hole. It used to be turned into a capture, which left an unbound
+# capture in the expansion -- `q1(0)` normalized to `1 != 0` and answered F.
+add_repl_test(definitions-bound_var_as_ref_arg
+	"q0(b) := (0 != b). q1(a) := (ex c (q0(c))). valid q1(0)" ": T")
+add_repl_test(definitions-bound_var_as_fn_ref_arg
+	"f(x) := x'. g(a) := (ex c (f(c) = 0)). valid g(0)" ": T")
+# A head parameter passed on to another definition stays a pattern hole.
+add_repl_test(definitions-head_var_as_ref_arg
+	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(1)" ": T")
+add_repl_test(definitions-head_var_as_ref_arg-false
+	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(0)" ": F")
