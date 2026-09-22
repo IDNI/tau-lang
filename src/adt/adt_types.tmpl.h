@@ -201,12 +201,14 @@ std::optional<adt_registry<node>> adt_registry<node>::build(tref spec,
 				} else result.alias_target = sub.alias_target;
 			} else {
 				// Unregistered type name: base type alias. Rebuild the
-				// same `typed(type[, subtype])` shape ba_types.h's
-				// constructors use, generically -- no base type is
+				// same `typed(type(subtype))` shape ba_types.h's
+				// constructors use -- subtype nests inside type, it is not
+				// a sibling under typed -- generically, no base type is
 				// hardcoded here.
-				result.alias_target = subtype_child
-					? tau::get(tau::typed, type_child, subtype_child)
-					: tau::get(tau::typed, type_child);
+				tref typed_type = subtype_child
+					? tau::get(node(tau::type, tname), subtype_child)
+					: type_child;
+				result.alias_target = tau::get(tau::typed, typed_type);
 			}
 		}
 
