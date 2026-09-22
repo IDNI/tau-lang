@@ -32,10 +32,8 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_TMPL_H__
 
-// `syntactic_path_simplification` (heuristics/) and
-// `syntactic_atomic_formula_simplification` (normal_forms.tmpl.h, declared
-// nowhere else) are the simplification building blocks the two normalisers
-// below reuse. The heuristics header must be included through
+// `syntactic_path_simplification` (heuristics/) is the sweep the two
+// normalisers below reuse. The heuristics header must be included through
 // normal_forms.h, which declares what its body uses before the body.
 #include "normal_forms.h"
 
@@ -591,29 +589,31 @@ tref simplify_atom(tref a, const var_order<node>& order) {
 	DBG(assert(is_atomic_fm<node>(atom));)
 	tref l = tau::trim_right_sibling(t[0].first());
 	tref r = tau::trim_right_sibling(t[0].second());
-	tref res;
 	// Phases 1, 2 and 5 run without an order, and no side holds a stored
-	// BDD there (terms.h), so they take the plain branch at once -- the
-	// search for a `BDD_ID` is a Debug check of that contract, never a
-	// cost of those phases.
+	// BDD there (terms.h): a Debug check of that contract.
 	DBG(assert(!order.empty()
 		|| (!holds_bdd_id<node>(l) && !holds_bdd_id<node>(r)));)
-	if (!order.empty()
-		&& (holds_bdd_id<node>(l) || holds_bdd_id<node>(r))) {
-		// BDD regime: side-wise, the atom never reshaped; a constant-only
-		// atom folds through the construction hooks. A BDD-backed side
-		// is the top-level case of the test; the deeper one is §7
-		// `DISCHARGE`'s keep emission `Q_P (bf(BDD_ID))`, a side that
-		// holds a stored BDD without being backed itself.
-		tref l2 = simplify_term<node>(l, order);
-		tref r2 = simplify_term<node>(r, order);
-		res = (l2 == l && r2 == r) ? atom
-			: tau::get(tau::wff, tau::get(t[0].value.nt, l2, r2));
-	} else {
-		// Plain regime: the full existing atom simplifier — the
-		// norm/denorm round trip on the joint `l + r` and the per-variable
-		// pass — idempotent, so "as written" is "as simplified".
-		res = syntactic_atomic_formula_simplification<node>(atom);
+	// ONE recipe in both regimes: the sides simplified, the atom rebuilt
+	// through the construction hooks, which fold a constant-only atom,
+	// equal sides and a side against its complement. The atom is never
+	// reshaped.
+	tref l2 = simplify_term<node>(l, order);
+	tref r2 = simplify_term<node>(r, order);
+	tref res = (l2 == l && r2 == r) ? atom
+		: tau::get(tau::wff, tau::get(t[0].value.nt, l2, r2));
+	// The joint `l + r` then DECIDES a (¬)equation and does nothing else:
+	// it is what sees two sides the hooks cannot compare, two `BDD_ID`
+	// nodes above all. `0` decides `=` as `T` and a nonzero constant as
+	// `F`, dually for `≠`, which phase 1 meets before NORMALIZE_OPERATORS;
+	// anything else leaves the atom as its sides stand.
+	const bool eq = t.child_is(tau::bf_eq), neq = t.child_is(tau::bf_neq);
+	if (const tau& rt = tau::get(res);
+		(eq || neq) && !rt.equals_T() && !rt.equals_F())
+	{
+		tref f = simplify_term<node>(term_of<node>(res, order), order);
+		const tau& z = tau::get(build_bf_eq_0<node>(f));
+		if (z.equals_T()) res = eq ? tau::_T() : tau::_F();
+		else if (z.equals_F()) res = eq ? tau::_F() : tau::_T();
 	}
 	return negated ? build_wff_neg<node>(res) : res;
 }
@@ -627,7 +627,8 @@ tref term_of(tref atom, const var_order<node>& order) {
 	using bdd = tbdd<node>;
 	auto [eq, _] = unwrap_neg<node>(atom);
 	const tau& t = tau::get(eq);
-	if (!t.is(tau::wff) || !t.child_is(tau::bf_eq)) {
+	if (!t.is(tau::wff)
+		|| (!t.child_is(tau::bf_eq) && !t.child_is(tau::bf_neq))) {
 		DBG(assert(false && "term_of: not an equation");)
 		return nullptr;
 	}

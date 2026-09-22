@@ -328,38 +328,37 @@ template <NodeType node>
 tref simplify_term(tref t, const var_order<node>& order = {});
 
 /**
- * @brief §3 `SIMPLIFY_ATOM(a, order = ∅)`: `simplify_term` on both sides,
- * after which a constant-only atom folds to `T` / `F` through the
- * construction hooks — an equation by the hooks' constant rules, a bitvector
- * order atom by the bitvector hook. `a` is a `wff` atom, optionally under one
- * `¬`, which is folded through.
+ * @brief §3 `SIMPLIFY_ATOM(a, order = ∅)`: ONE recipe in both regimes.
+ * `simplify_term` on both sides, the atom rebuilt through the construction
+ * hooks, which fold a constant-only atom and equal sides. `a` is a `wff`
+ * atom, optionally under one `¬`, which is folded through.
  *
- * Two regimes. With neither side carrying a stored BDD — the initial phase-1
- * simplification, phases 2 and 5, and every plain atom of the push, all order
- * atoms among them — the full existing
- * `syntactic_atomic_formula_simplification` runs, including the
- * `norm_equation` / `denorm_equation` round trip on the joint `l + r` and the
- * per-variable `0`/`1` pass, which folds and shrinks before any BDD exists.
- * Once a side is BDD-backed, or holds a stored BDD deeper down (keep mode's
- * `Q_P (bf(BDD_ID))`, §7 `DISCHARGE`, which the plain atom simplifier knows
- * nothing of), the work is side-wise and shallow and the atom is never
- * reshaped; the joint fold belongs to `TERM_OF` and `FOLD_DECIDED`.
+ * For a (¬)equation the joint ring sum `l + r` — `term_of`'s, a BDD
+ * operation once a side is BDD-backed — then goes through `simplify_term` as
+ * a DECISION alone: `0` decides `=` as `T`, a nonzero constant as `F`, dually
+ * for `≠` (phase 1 meets one before `NORMALIZE_OPERATORS`). It is what sees
+ * two sides no hook can compare, two `BDD_ID` nodes above all. Anything else
+ * leaves the atom as its sides stand: the atom is NEVER reshaped, and
+ * `norm_equation` (`SQUEEZE`) stays the one rewrite of an equation's shape.
+ * An order atom is side-wise alone.
  *
- * The plain regime is IDEMPOTENT (a test pins this), so an atom's shape as
- * written is its simplified shape and no memo key drifts — the spec's
- * "equations stay as written outside SQUEEZE".
+ * NOT IDEMPOTENT: a second call may simplify further, since the cofactor
+ * check's result is not swept again (`simplify_term`). No memo key drifts
+ * even so, because an atom is simplified ONCE, where it is built, and again
+ * only when a substitution rewrote it.
  */
 template <NodeType node>
 tref simplify_atom(tref a, const var_order<node>& order = {});
 
 // --- reading and rewriting equations ---------------------------------------------
 
-/// §3 `TERM_OF(atom)`: for an equation `l = r`, seen through one optional
-/// `¬`, the term `l + r`. Read off without touching the atom, since equations
-/// stay as written (invariant 4). `order` is the live order: the ring sum of
-/// two BDD-backed sides is a BDD operation, and a plain side is a leaf under
-/// it. `nullptr` on anything but an equation, which is a caller bug and is
-/// Debug-asserted; every caller guards.
+/// §3 `TERM_OF(atom)`: for an equation `l = r` — or `l ≠ r`, which phase 1
+/// meets before `NORMALIZE_OPERATORS` — seen through one optional `¬`, the
+/// term `l + r`. Read off without touching the atom, since equations stay as
+/// written (invariant 4). `order` is the live order: the ring sum of two
+/// BDD-backed sides is a BDD operation, and a plain side is a leaf under it.
+/// `nullptr` on anything else, which is a caller bug and is Debug-asserted;
+/// every caller guards.
 template <NodeType node>
 tref term_of(tref atom, const var_order<node>& order);
 

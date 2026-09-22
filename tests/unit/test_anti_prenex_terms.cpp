@@ -701,27 +701,26 @@ TEST_CASE("simplify_term: the check's result is emitted as it stands, so a secon
 
 // 6. simplify_atom ------------------------------------------------------------
 
-TEST_CASE("simplify_atom: plain regime folds and is idempotent") {
+TEST_CASE("simplify_atom: the sides simplified, the atom decided") {
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & x' = 0"))).equals_T());
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x | x' = 0"))).equals_F());
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("!(x & x' = 0)"))).equals_F());
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & y = x & y"))).equals_T());
-	// the joint l + r catches what side-wise cannot: x·y = x·(y ∪ x′)
+	// sides that differ as written and simplify to one term: x·y = x·(y ∪ x′)
 	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & y = x & (y | x')"))).equals_T());
-	// (a Boolean order atom is not in the list: the hooks decompose it into
-	// a compound formula at parse, which is not an atom — Debug asserts)
-	for (const char* s : { "x = 1", "x = y", "x & y = x", "x' = 0", "x = y'",
-		"x | y = 1", "x & y = 0", "!(x = y)",
-		"x:bv[8] <= y:bv[8]", "x:bv[8] & y:bv[8] < x:bv[8]",
-		"{ 1 }:bv[8] <= { 2 }:bv[8]" })
-	{
-		tref once  = ap::simplify_atom<node_t>(wff(s));
-		tref twice = ap::simplify_atom<node_t>(once);
-		CHECK(once == twice);
-	}
+	// the same sides under `≠` decide dually
+	CHECK(tau::get(ap::simplify_atom<node_t>(wff("x & y != x & (y | x')"))).equals_F());
 }
 
-TEST_CASE("simplify_atom: BDD regime is side-wise and folds through the hooks") {
+TEST_CASE("simplify_atom: an atom nothing decides comes back as written") {
+	// (a Boolean order atom is not in the list: the hooks decompose it into
+	// a compound formula at parse, which is not an atom — Debug asserts)
+	for (const char* s : { "x = y", "x = y'", "x != y", "x' = 0",
+		"!(x = y)", "x:bv[8] <= y:bv[8]" })
+		CHECK(ap::simplify_atom<node_t>(wff(s)) == wff(s));
+}
+
+TEST_CASE("simplify_atom: BDD regime — the sides, and the hooks around them") {
 	tref x = vr("x");
 	ap::block P{ x };
 	order_t o = order_of(P);
@@ -735,6 +734,29 @@ TEST_CASE("simplify_atom: BDD regime is side-wise and folds through the hooks") 
 	tref b = ap::prepare_terms<node_t>(wff("x & y = x & z"), P, o);
 	tref sb = ap::simplify_atom<node_t>(b, o);
 	CHECK(sb == b);
+	CHECK(th::is_bdd_backed(sides(sb).first));
+	CHECK(th::is_bdd_backed(sides(sb).second));
+}
+
+TEST_CASE("simplify_atom: the joint decides what no hook can compare") {
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// x and x′ as PREPARED sides: two different `BDD_ID` nodes, neither
+	// the negation of the other to look at, so the ring sum — the constant
+	// 1 — is what decides the atom
+	tref l = th::convert_to_tau_node(bf("x"), o);
+	tref r = th::convert_to_tau_node(bf("x'"), o);
+	REQUIRE(th::is_bdd_backed(l));
+	REQUIRE(th::is_bdd_backed(r));
+	REQUIRE(l != r);
+	tref eq = tau::get(tau::wff, tau::get(tau::bf_eq, l, r));
+	REQUIRE(is_atomic_fm<node_t>(eq));
+	CHECK(tau::get(ap::simplify_atom<node_t>(eq, o)).equals_F());
+	// and `≠` dually
+	tref neq = tau::get(tau::wff, tau::get(tau::bf_neq, l, r));
+	REQUIRE(is_atomic_fm<node_t>(neq));
+	CHECK(tau::get(ap::simplify_atom<node_t>(neq, o)).equals_T());
 }
 
 TEST_CASE("simplify_term / simplify_atom: a keep-mode emission over a stored BDD (D11)") {
@@ -812,6 +834,10 @@ TEST_CASE("term_of reads l + r without touching the atom; norm_equation descends
 	CHECK(tau::subtree_equals(t, bf("x ^ y")));
 	CHECK(plain == wff("x = y")); // hash-consed: the atom node is unchanged
 	CHECK(ap::term_of<node_t>(wff("!(x = y)"), o) == t);
+	// a `≠`, which phase 1 meets before NORMALIZE_OPERATORS, has the same
+	// ring sum, read through one ¬ as well
+	CHECK(ap::term_of<node_t>(wff("x != y"), o) == t);
+	CHECK(ap::term_of<node_t>(wff("!(x != y)"), o) == t);
 	// BDD-backed sides: the ring sum at BDD level, same function
 	tref prepared = ap::prepare_terms<node_t>(wff("x & y = x"), P, o);
 	tref tb = ap::term_of<node_t>(prepared, o);
