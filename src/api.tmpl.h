@@ -736,6 +736,58 @@ result<tref> api<node>::nnf(tref expr) {
 	return r;
 }
 
+template <NodeType node>
+result<tref> api<node>::onf(tref expr, tref var) {
+	result<tref> r;
+	if (!var) return r.with_assert_check_error(
+		code::invalid_argument, messages::invalid_arguments);
+	// No simplify() here -- see the declaration's comment.
+	TAU_TRY(tref a, apply_all_defs(expr));
+	if (!tau::get(a).is(tau::wff)) {
+		r.error(code::invalid_argument, messages::invalid_arguments);
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	tref o = tau_lang::onf<node>(a, var);
+	if (!o) r.error(code::internal_error, "ONF conversion failed");
+	else    r = o;
+	DBG(assert(r.is_well_formed());)
+	return r;
+}
+
+template <NodeType node>
+result<tref> api<node>::pnf(tref expr) {
+	result<tref> r;
+	TAU_TRY(auto simplified, simplify(expr));
+	TAU_TRY(tref a, apply_all_defs(simplified));
+	tref p = tau_lang::pnf<node>(a);
+	if (!p) r.error(code::internal_error, "PNF conversion failed");
+	else    r = p;
+	DBG(assert(r.is_well_formed());)
+	return r;
+}
+
+template <NodeType node>
+result<tref> api<node>::mnf(tref expr) {
+	result<tref> r;
+	TAU_TRY(auto simplified, simplify(expr));
+	TAU_TRY(tref a, apply_all_defs(simplified));
+	tref m = nullptr;
+	// Dispatch to wff-level or bf-level MNF depending on root type
+	switch (tau::get(a).get_type()) {
+	case tau::wff: m = unequal_to_not_equal<node>(reduce<node>(
+			to_dnf<node>(bf_reduce_canonical<node>()(a)))); break;
+	case tau::bf:  m = bf_reduced_dnf<node>(a); break;
+	default: r.error(code::invalid_argument, messages::invalid_arguments);
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	if (!m) r.error(code::internal_error, "MNF conversion failed");
+	else    r = m;
+	DBG(assert(r.is_well_formed());)
+	return r;
+}
+
 // Procedures
 // ------------------------------------------------------------
 

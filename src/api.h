@@ -604,6 +604,36 @@ struct api {
 	/// @copydoc nnf(const std::string&)
 	static result<htref> nnf(htref expression);
 
+	/// Convert a wff to order normal form (ONF) with respect to @p var.
+	/// @p var is a variable, or a bf wrapping one; it is NOT a formula and
+	/// is passed through untouched. Unlike the other normal forms this one
+	/// does not run `simplify` on the expression: inference there can give
+	/// the formula's own variables a BA type, which would stop them
+	/// matching the caller's untyped @p var.
+	static result<std::string> onf(const std::string& formula,
+						const std::string& var);
+	/// @copydoc onf(const std::string&, const std::string&)
+	static result<tref> onf(tref formula, tref var);
+	/// @copydoc onf(const std::string&, const std::string&)
+	static result<htref> onf(htref formula, htref var);
+
+	/// Convert a formula to prenex normal form (PNF): all quantifiers
+	/// pulled to the front.
+	static result<std::string> pnf(const std::string& formula);
+	/// @copydoc pnf(const std::string&)
+	static result<tref> pnf(tref formula);
+	/// @copydoc pnf(const std::string&)
+	static result<htref> pnf(htref formula);
+
+	/// Convert an expression to minimal normal form (MNF): a reduced DNF
+	/// with `!=` atoms presented as negated equalities.
+	/// Dispatches to bf or wff MNF depending on the root node type.
+	static result<std::string> mnf(const std::string& expression);
+	/// @copydoc mnf(const std::string&)
+	static result<tref> mnf(tref expression);
+	/// @copydoc mnf(const std::string&)
+	static result<htref> mnf(htref expression);
+
 	// -----------------------------------------------------------------------
 	// Procedures
 	// ------------------------------------------------------------

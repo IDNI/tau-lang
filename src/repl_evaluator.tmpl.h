@@ -358,25 +358,13 @@ tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	// itself (must not go through get_any/apply_all_defs, which expect a
 	// formula/history argument), n[2] is the formula.
 	tref var = n[1].get();
-	tref arg = n[2].get();
-	report rep;
-	auto root = rep.open_if(opt.print_benchmarks, "onf");
 	tref r = nullptr;
-	if (auto value = get_any(arg); value) {
-		auto applied = tau_api::apply_all_defs(value);
-		if (!applied.has_value()) {
-			applied.print(err);
-			rep.append(std::move(applied).report());
-			root.close();
-			print_benchmarks(rep);
-			return r;
-		}
-		tref a = applied.value();
-		rep.append(std::move(applied).report());
-		r = onf<node>(a, var);
+	if (auto value = get_any(n[2].get()); value) {
+		auto res = tau_api::onf(value, var);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
 	}
-	root.close();
-	print_benchmarks(rep);
 	return r;
 }
 
@@ -435,42 +423,25 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
 	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value)
-		r = pnf<node>(value);
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::pnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
+	}
 	return r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
-	report rep;
-	auto root = rep.open_if(opt.print_benchmarks, "mnf");
- 	tref r = nullptr;
-	tref arg = n[1].get();
-	auto wff_mnf = [](tref applied) {
-		return unequal_to_not_equal<node>(
-			reduce<node>(to_dnf<node>(
-				bf_reduce_canonical<node>()(applied))));
-	};
-	if (auto value = get_any(arg); value) {
-		auto applied = tau_api::apply_all_defs(value);
-		if (!applied.has_value()) {
-			applied.print(err);
-			rep.append(std::move(applied).report());
-			root.close();
-			print_benchmarks(rep);
-			return r;
-		}
-		tref a = applied.value();
-		rep.append(std::move(applied).report());
-		switch (tau::get(a).get_type()) {
-		case tau::wff: r = wff_mnf(a); break;
-		case tau::bf:  r = bf_reduced_dnf<node>(a); break;
-		default: return invalid_argument();
-		}
+	tref r = nullptr;
+	if (auto value = get_any(n[1].get()); value) {
+		auto res = tau_api::mnf(value);
+		print_benchmarks(res);
+		if (!res.has_value()) { res.print(err); return nullptr; }
+		r = res.value();
 	}
-	root.close();
-	print_benchmarks(rep);
 	return r;
 }
 

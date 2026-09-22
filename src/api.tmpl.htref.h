@@ -230,6 +230,36 @@ result<htref> api<node>::nnf(htref expr) {
 		[](tref v) { return tau::geth(v); });
 }
 
+template <NodeType node>
+result<htref> api<node>::onf(htref expr, htref var) {
+	if (!expr || !var) {
+		result<htref> r;
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
+	return onf(expr->get(), var->get()).transform(
+		[](tref v) { return tau::geth(v); });
+}
+
+template <NodeType node>
+result<htref> api<node>::pnf(htref expr) {
+	if (!expr) {
+		result<htref> r;
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
+	return pnf(expr->get()).transform(
+		[](tref v) { return tau::geth(v); });
+}
+
+template <NodeType node>
+result<htref> api<node>::mnf(htref expr) {
+	if (!expr) {
+		result<htref> r;
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
+	return mnf(expr->get()).transform(
+		[](tref v) { return tau::geth(v); });
+}
+
 // Procedures
 // ------------------------------------------------------------
 

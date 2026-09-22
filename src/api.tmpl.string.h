@@ -167,6 +167,30 @@ result<std::string> api<node>::nnf(const std::string& expr) {
 	).transform([](tref v) { return to_str(v); });
 }
 
+template <NodeType node>
+result<std::string> api<node>::onf(const std::string& fm, const std::string& var) {
+	// The variable parses as a term: onf wraps a bare variable node in a
+	// bf itself, so either form reaches onf_wff correctly.
+	return get_term(var, false).and_then([&fm](tref v) {
+		return get_formula(fm).and_then(
+			[v](tref e) { return onf(e, v); });
+	}).transform([](tref v) { return to_str(v); });
+}
+
+template <NodeType node>
+result<std::string> api<node>::pnf(const std::string& fm) {
+	return get_formula(fm).and_then(
+		[](tref e) { return pnf(e); }
+	).transform([](tref v) { return to_str(v); });
+}
+
+template <NodeType node>
+result<std::string> api<node>::mnf(const std::string& expr) {
+	return get_formula_or_term(expr).and_then(
+		[](tref e) { return mnf(e); }
+	).transform([](tref v) { return to_str(v); });
+}
+
 // Procedures
 // ------------------------------------------------------------
 
