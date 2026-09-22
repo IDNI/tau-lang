@@ -96,8 +96,7 @@ tref eliminate_block_uncached(tref clause, const block& X, ctx<node>& c) {
 	// on the list. ONLY AN ∧-NODE HAS ONE: `members` flattens either
 	// connective, and a clause that is an ∨-node is a NEGATIVE TREE (§1),
 	// which is ONE conjunct and goes whole to the method.
-	const trefs ms = is_child<node>(clause, tau::wff_and)
-		? members<node>(clause) : trefs{ clause };
+	const trefs ms = get_cnf_wff_clauses<node>(clause);
 	trefs indep, dep;
 	for (tref m : ms) (fv_meets<node>(m, left) ? dep : indep).push_back(m);
 	// `X` narrowed to what the dependent conjuncts still hold, in `X`'s
