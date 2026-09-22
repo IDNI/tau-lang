@@ -58,16 +58,6 @@ bool is_positive_equation(tref n) {
 	return is_child<node>(n, tree<node>::bf_eq);
 }
 
-/// The substitution key of a variable: its `bf` TERM, not the bare
-/// `variable` node `get_free_vars` hands out. `tree::substitute` matches a
-/// key by content exactly as given, and every occurrence inside a term is the
-/// wrapped form — a bare key would replace the node inside the wrapper and
-/// nest one `bf` in another.
-template <NodeType node>
-tref term_key(tref var) {
-	return tree<node>::get(tree<node>::bf, var);
-}
-
 /// The argument hook of every substitution in this file (§1, invariant 6):
 /// a reference argument the substitution changed is re-simplified once, in
 /// the PLAIN regime — an argument is the inside of a leaf, never BDD-backed,
@@ -121,7 +111,7 @@ std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 	const var_order<node>& order)
 {
 	using tau = tree<node>;
-	const tref key = term_key<node>(y);
+	const tref key = tau::get(tau::bf, y);
 	const tref f0 = simplify_term<node>(tau::get(f).substitute(key,
 		_0<node>(type), order, resimplify_argument<node>()), order);
 	const tref f1 = simplify_term<node>(tau::get(f).substitute(key,
