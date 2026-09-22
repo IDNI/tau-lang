@@ -105,9 +105,10 @@ template <NodeType node, typename Search>
 std::optional<tref> witness_with(tref x, tref psi,
 	const var_order<node>& order, Search&& search)
 {
+	using tau = tree<node>;
 	const std::optional<pin<node>> best = search(get_cnf_wff_clauses<node>(psi));
 	if (!best) return {};
-	return simplify<node>(subst_var<node>(psi, detail::term_key<node>(x),
+	return simplify<node>(subst_var<node>(psi, tau::get(tau::bf, x),
 		best->witness, order), order);
 }
 
@@ -332,7 +333,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 	const bool ex = Q == tau_term_bdd<node>::ex;
 	const size_t spine_nt = ex ? tau::wff_and : tau::wff_or;
 	const size_t other_nt = ex ? tau::wff_or : tau::wff_and;
-	const tref key = detail::term_key<node>(x);
+	const tref key = tau::get(tau::bf, x);
 	block D;               // bound past the first kind flip, barred from FV(t)
 	bool flipped = false;
 	// The rewrite is a replacement inside this node, so a right sibling it

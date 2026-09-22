@@ -461,7 +461,7 @@ private:
 	{
 		const std::optional<pin<node>> p = matched(atom);
 		if (!p) return {};
-		const tref key = term_key<node>(p->var);
+		const tref key = tau::get(tau::bf, p->var);
 		if (blocked && tau::subtree_equals(key, blocked)) return {};
 		// A variable already pinned IN FORCE cannot be pinned again:
 		// its occurrences are rewritten before they are ever matched.
