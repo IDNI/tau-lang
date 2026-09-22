@@ -193,7 +193,7 @@ term representation, per component (PREPARE_TERMS):
 | `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): a pin whose admission would push `Σ‖witnesses‖` past this factor times `Σ‖TERM_OF(pinning conjunct)‖` is refused. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
-| `keep_functional` | decided PER BLOCK by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per block it is handed the block's binder node — `REWRAP(matrix, X)`, the run head with its variables outermost first and the matrix below (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a component's close, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified |
+| `keep_functional` | decided PER COMPONENT by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per component it is handed `REWRAP(body, X)` — the `∃` wrap of the whole block, its variables outermost first, over the body as that component's setup finds it: the dualised matrix for a `∀` run, the earlier components' results already in place (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a component's close, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified. Two components of one block may be answered differently; every key carries its component's flag, so the tables stay exact |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
 | `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF`, and by `SIMPLIFY`'s equality propagation (§3), whose plain match records its substitution cofactors under `(TERM_OF(c), y)` — a free `y` of an `X`-free term, a key no `COF` call forms, `COF` asking about a block variable of a BDD-backed term; consumers of `COF`: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
@@ -776,8 +776,12 @@ The remaining primitives are defined by their contracts alone:
   (§5): every BDD-backed term of `φ` converted back to a plain term wherever
   it sits — under a REWRAPped binder, inside a symbolic functional
   quantifier's body, inside a reference argument, under a temporal operator.
-  One memoised walk. Inverse up to term normal form: the round trip returns
-  the node it started from, by interning.
+  One memoised walk. Inverse up to term normal form: each spelled term goes
+  once through `SIMPLIFY_TERM` in the plain regime — the spelling phase 1
+  gave every atom — so the round trip returns the node it started from, and
+  a result of the push is spelled as the plain phases spell it: `ANTI_PRENEX`
+  is a fixpoint on its own output from the first run, a kept chain included,
+  and a re-wrapped block is the node phase 3 built.
 - `LEAF_FV(t)` — the free variables the LEAVES of `t` contribute: for a
   BDD-backed term the union over its leaves, for a plain term its whole `FV`.
   The leaf-hazard test (§1) is `LEAF_FV(t) ∩ X ≠ ∅`, read behind `usable`
@@ -1028,13 +1032,17 @@ PUSH_EX_BLOCK(body, X, kf):
     // (inv. 2), which gives ELIMINATE_BLOCK one type to dispatch on.
     // Connectivity only decays during the push — PUSH_OVER_CONJUNCTION
     // narrows scopes on the way.
+    X ← X ∩ FV(body), keeping X's order           // a variable the body does not
+                                                  //   mention binds nothing: no
+                                                  //   component is set up for it
     for P in CONNECTED_COMPONENTS(X, body):       // each keeps X's order;
                                                   //   0-based: P[0] outermost
         ctx.type  ← the BA type of P
         ctx.order ← { P[i] ↦ |P|-i }              // inner → LOWER,  ranks 1..|P|
         ctx.prio  ← { P[i] ↦ i+1 }                // inner → HIGHER, ranks 1..|P|
-        ctx.keep_functional ← kf(REWRAP(body, X)) // the callback, per block, on
-                                                  //   the block's node (§1)
+        ctx.keep_functional ← kf(REWRAP(body, X)) // the callback, per component,
+                                                  //   on ∃X over the body as it
+                                                  //   stands (§1)
         ctx.subsume_max ← K = 32 ; ctx.qbf_node_max ← K′ = 2²⁰
         ctx.case_max ← K″ = 16 ; ctx.expand_max ← K‴ = 2¹⁴
         ctx.accept_growth ← γ = 16 ; ctx.accept_floor ← 2²⁰
