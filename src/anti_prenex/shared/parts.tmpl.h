@@ -5,19 +5,13 @@
  * @brief Template implementations for parts.h. parts.h says what each
  * function means; the comments here say how it is built.
  *
- * THE UNION-FIND IS `union_find_with_sets` (src/union_find_with_sets.h), the
- * tref-keyed one already in use in `src/` (`squeeze_absorb`,
- * normal_forms.tmpl.h). It is keyed through `subtree_unordered_map`, so two
- * content-equal variable nodes are one element however they were spelled, and
- * its `find` is path-compressed. Two other union-finds exist and were not
- * taken: the parser library's `tref_union_find` has no caller at all, and
- * `union_find.h` is `std::map`-based, i.e. a comparison tree where this one
- * hashes. Nothing new is written here.
- *
- * The comparator picks the root of a merged class and is `subtree_less`, the
- * content order (§1), so the class roots — and with them nothing the result
- * depends on — are content-derived. It is held BY REFERENCE inside the
- * union-find, so the lambda outlives every call made on it.
+ * THE UNION-FIND IS `union_find_with_sets` (src/union_find_with_sets.h),
+ * keyed through `subtree_unordered_map`, so two content-equal variable nodes
+ * are one element however they were spelled, with a path-compressed `find`.
+ * Its comparator picks the root of a merged class and is `subtree_less`, the
+ * content order (§1), so the class roots are content-derived. It is held BY
+ * REFERENCE inside the union-find, so the lambda outlives every call made on
+ * it.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__SHARED__PARTS_TMPL_H__

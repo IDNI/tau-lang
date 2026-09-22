@@ -2,8 +2,7 @@
 
 /**
  * @file prims.tmpl.h
- * @brief Template implementations for prims.h (package D). Included by
- * prims.h.
+ * @brief Template implementations for prims.h. Included by prims.h.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__PRIMS_TMPL_H__
@@ -47,9 +46,7 @@ tref rewrap(tref phi, const block& X, quantifier<node> kind) {
 	return phi;
 }
 
-// The vacuous-binder drop in `scope_out_independent_conjuncts`
-// (normalizer.tmpl.h) cannot be reused here: it is welded into a push pass
-// this module must not depend on, and the construction hooks fold no binder.
+// The construction hooks fold no binder, so the drop is a pass of its own.
 // Post-order, so a cascade collapses in one go; `apply_unique` memoises per
 // node (§10).
 template <NodeType node>

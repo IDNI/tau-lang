@@ -2,7 +2,7 @@
 
 /**
  * @file ctx.tmpl.h
- * @brief Template implementations for ctx.h (package E). Included by ctx.h.
+ * @brief Template implementations for ctx.h. Included by ctx.h.
  *
  * `table_ptr` below is the ONLY place in `src/anti_prenex/` that spells
  * `#ifdef TAU_CACHE`; everything else treats a null table as a miss, a no-op

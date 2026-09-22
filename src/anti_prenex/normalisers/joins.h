@@ -18,7 +18,7 @@
  * AC-CANONICAL: insertion order drives the short-circuits, but the assembled
  * node is a function of the member SET — flattening gives associativity, the
  * content-order emission of `canonical_and`/`canonical_or` (dag.h) gives
- * commutativity — so converging expansion states build equal memo keys (§6).
+ * commutativity — so equal member sets build equal nodes and equal memo keys.
  *
  * The construction hooks fold `T`/`F`, `X ∧ X` and `X ∧ ¬X`; the insert rules
  * are those same facts one step earlier, where they can still stop an operand

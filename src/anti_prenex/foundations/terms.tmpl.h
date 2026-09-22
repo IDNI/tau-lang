@@ -2,9 +2,8 @@
 
 /**
  * @file terms.tmpl.h
- * @brief Template implementations for terms.h (package B). Included by
- * terms.h. terms.h says what each function means; the comments here say how
- * it is built.
+ * @brief Template implementations for terms.h. Included by terms.h. terms.h
+ * says what each function means; the comments here say how it is built.
  *
  * Conventions of the BDD library this file rides on (tau_bdd.h):
  *  - the library's universe map `U`, which links a `BDD_ID` node to its BDD,
@@ -135,22 +134,11 @@ struct chain_result {
 };
 
 /**
- * @brief THE CHAIN STEP (§3): ONE quantification of the STORED BDD @p s by
- * those subscripts of the canonical prefix @p q — outermost first — that the
- * §1 LEAF HAZARD leaves reachable. @p order is the order @p s is built over,
- * and every subscript is a key of it.
- *
- * A subscript occurring in a LEAF of @p s is reached by no quantification and
- * stays. THE STUCK RULE decides the rest, INNERMOST FIRST: ahead of the first
- * hidden subscript every subscript is quantified; the first hidden one opens a
- * stuck run of ITS KIND, into which an outer subscript of that kind still
- * commutes — quantified when it is not hidden, joining the run when it is —
- * and the first subscript of the OTHER kind blocks, staying along with
- * everything outward of it. What is taken is quantified in ONE pass, and
- * `std::nullopt` says nothing was, which leaves the chain as it is.
- *
- * A choice of size, not of soundness: crossing an alternation by cofactors is
- * legal and duplicates the stuck chain.
+ * @brief THE CHAIN STEP: ONE quantification of the STORED BDD @p s by those
+ * subscripts of the canonical prefix @p q — outermost first — that the stuck
+ * rule (terms.h) takes. @p order is the order @p s is built over, and every
+ * subscript is a key of it. `std::nullopt` says nothing was taken, which
+ * leaves the chain as it is.
  */
 template <NodeType node>
 std::optional<chain_result<node>> resolve_chain(
@@ -252,16 +240,13 @@ tref resolve_plain_chains(tref n, const keep_functional_fn<node>& keep,
 /// §3 `SIMPLIFY_TERM`'s LEAF SIMPLIFIER, the function its BDD regime maps
 /// over the leaves.
 ///
-/// A leaf that holds no `BDD_ID` is the path sweep's, exactly as before. A
-/// leaf that holds one -- §7 `DISCHARGE`'s keep-mode emission
-/// `Q_P (bf(BDD_ID))`, which `build_bdd` keeps whole because §1 forbids
-/// spelling a stored BDD out before the component's close -- is swept over
-/// its PLAIN structure alone: to the sweep a `bf(BDD_ID)` is an opaque leaf,
-/// never descended into (`path_sweep::down` stops at a node that is no
-/// connective), never negated into (`push_negation_in` leaves a negated one
-/// as it is) and never substituted into. The stored BDDs the sweep left
-/// standing are then simplified from the inside, one `map_leaves` each with
-/// this same simplifier, so a nest of them settles innermost leaf first.
+/// A leaf that holds no `BDD_ID` goes through the path sweep. A leaf that
+/// holds one — a functional-quantifier chain over a stored BDD, which
+/// `build_bdd` keeps whole — is swept over its PLAIN structure alone: to the
+/// sweep a `bf(BDD_ID)` is an opaque leaf, never descended into, negated
+/// into or substituted into. The stored BDDs the sweep left standing are
+/// then simplified from the inside, one `map_leaves` each with this same
+/// simplifier, so a nest of them settles innermost leaf first.
 ///
 /// Results are memoised per leaf node: a leaf's simplified form is a function
 /// of the leaf and the live order, and one leaf is reached from several BDDs.
@@ -299,24 +284,12 @@ private:
 	}
 };
 
-/// §3 `SIMPLIFY_TERM`'s fourth law, the COFACTOR CHECK: one-level Shannon
-/// reduction of the WHOLE term over every free variable of @p t that is no
-/// variable of @p order. An order variable is one the BDD has decided
-/// already, and one still free in a leaf sits where the expansion is not
-/// licensed (§1's leaf hazard).
-///
-/// `f₀ = t[y←0]` and `f₁ = t[y←1]` reach BOOLEAN POSITIONS only, which is
-/// what the substitution's guard says: no Shannon expansion holds under an
-/// arithmetic operator, a reference or a foreign-typed subterm. Leaving a
-/// variable inside one of those is sound — it is an opaque element the
-/// expansion is taken around. Equal cofactors, a constant included, make
-/// `t ← f₀`, which covers being `0` under both bits, being `1` under both,
-/// and not depending on `y` at all.
-///
-/// The variables are read off the term handed in and then tried ON THE
-/// RUNNING term, so the ones after a replacement are tried on the smaller
-/// term. A cofactor is what the substitution hands back, folded by the
-/// construction hooks and simplified no further.
+/// §3 `SIMPLIFY_TERM`'s fourth law, the COFACTOR CHECK (terms.h says what it
+/// means). The variables are read off the term handed in and then tried ON
+/// THE RUNNING term, so the ones after a replacement are tried on the smaller
+/// term. Equal cofactors, a constant included, make `t ← f₀`, which covers
+/// being `0` under both bits, being `1` under both, and not depending on `y`
+/// at all.
 template <NodeType node>
 tref cofactor_check(tref t, const var_order<node>& order) {
 	using tau = tree<node>;
@@ -555,8 +528,7 @@ tref simplify_term(tref t, const var_order<node>& order) {
 	}
 	// Plain regime under a live order: a term that neither touches `P` nor
 	// carries a stored BDD anywhere -- the last test is what keeps a chain
-	// over a `BDD_ID` out of the plain simplifier, which knows no `BDD_ID`
-	// (§7 `DISCHARGE`'s keep emission is `P`-free and not backed itself).
+	// over a `BDD_ID` out of the plain simplifier, which knows no `BDD_ID`.
 	if (!thandle<node>::is_bdd_backed(t) && !tbdd<node>::has_bdd_var(t, order)
 		&& !holds_bdd_id<node>(t))
 		return cofactor_check<node>(

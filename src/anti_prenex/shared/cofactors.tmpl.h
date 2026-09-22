@@ -47,23 +47,13 @@ tref discharge(tref term, bool negative, const block& X, ctx<node>& c) {
 		q = quantify_over<node>(kind, term, X, c.order);
 	} else {
 		// KEPT INSTEAD OF DISCHARGED: the canonical chain over `term`,
-		// `X` outermost first as the constructor takes it. On a
-		// BDD-backed `term` the chain is never folded — the
-		// constructor leaves a body holding a stored BDD alone — so
-		// what comes out keeps that BDD.
-		//
-		// A WHOLE-BLOCK emission (`X` the whole decision set) is
-		// X-free and holds its stored BDD until the component's CLOSE,
-		// where `resolve_functional_quantifiers_bdd` (terms.h)
-		// quantifies it once and the finish spells out what is kept.
-		//
-		// A SETTLED SUB-BLOCK's emission (`X ⊂ P`, the settle move of
-		// the push) keeps its stored BDD the same way, and the block
-		// variables that body still carries are HIDDEN from the rest
-		// of the push (§1 LEAF HAZARD): the atom is opaque to the
-		// methods and `cof` on its term finds `usable` false, so its
-		// component is frozen and re-wrapped. Nothing slides and
-		// nothing is reordered — by choice (§7).
+		// `X` outermost first as the constructor takes it. The
+		// constructor leaves a body holding a stored BDD alone, so what
+		// comes out keeps that BDD until the component's close, where
+		// `resolve_functional_quantifiers_bdd` (terms.h) quantifies it
+		// once. Block variables such a body still carries are HIDDEN in
+		// a leaf (§1 LEAF HAZARD): `cof` on its term finds `usable`
+		// false. Nothing slides and nothing is reordered (§7).
 		typename tbdd::quants qs;
 		qs.reserve(X.size());
 		for (tref x : X) qs.emplace_back(x, kind);

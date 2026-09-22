@@ -22,15 +22,13 @@
  * WHAT IT MAY TOUCH (§4): the substitution descends through a sibling's whole
  * ∧/∨ structure and INTO a binder unit's body, with a pin SUSPENDED under a
  * binder over its variable or over a variable of its witness. Temporal
- * operators are opaque to both passes. A reference — a formula-level one or
- * one inside an atom's terms — is no equation and never matches; a pin's
- * substitution reaches its arguments like any other occurrence (§1: it
- * reaches every occurrence) and re-simplifies the argument it changed, once,
- * through `SIMPLIFY_TERM`, so no argument is left dirty (invariant 6). Under
- * `ref_args` every argument goes through `SIMPLIFY_TERM`, changed or not. The
- * pinning conjunct STAYS, rewritten by every pin but its OWN: `y` is
- * free, so the conjunct still constrains it, and for a weak pin it is what
- * keeps the residual `p = 0`, while its own pin would fold it to `T`.
+ * operators are opaque to both passes. A reference never matches; a pin's
+ * substitution reaches its arguments like any other occurrence and
+ * re-simplifies the argument it changed through `SIMPLIFY_TERM` (invariant
+ * 6); under `ref_args` every argument goes through `SIMPLIFY_TERM`, changed
+ * or not. The pinning conjunct STAYS, rewritten by every pin but its OWN: it
+ * still constrains its variable, and for a weak pin it is what keeps the
+ * residual `p = 0`, while its own pin would fold it to `T`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_H__
@@ -77,12 +75,11 @@ struct pin {
  * consumer builds itself, there being no slot for it — and the residual
  * equation `p = 0`, and is STRICT when `p` folds to `0`.
  *
- * TWO WAYS TO THE COFACTORS, ONE NOTION OF A PIN. The plain regime takes them
- * by SUBSTITUTION, which is what `find_pin` / `find_pin_for` below do; §6
- * `COF` takes them by CHILD SELECTION in the term's BDD. The test on them is
- * the same, so it is written once, and both records land in `cof_memo` (§1),
- * keyed by the term and the variable. `order` is the live order, handed to
- * every `SIMPLIFY_TERM` here; the plain regime passes the empty one.
+ * The one pin recipe: `find_pin` / `find_pin_for` take the cofactors by
+ * SUBSTITUTION on a plain term, `cof` (cofactors.h) by CHILD SELECTION in
+ * the term's BDD, and both record the result in `cof_memo` (§1). `order` is
+ * the live order, handed to every `SIMPLIFY_TERM` here; the plain regime
+ * passes the empty one.
  */
 template <NodeType node>
 cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
@@ -101,9 +98,8 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
  * where `usable` is `y ∉ FV(f₀) ∪ FV(f₁)`. Among several pins of one atom: a
  * STRICT one first, else the smallest `‖f₁′‖` (`mem_size`).
  *
- * ONE implementation, shared with `TRY_WITNESS`'s spelled mode (§3). `order`
- * is the live order; the plain regime (phases 1, 2 and 5) passes the empty
- * one, where nothing is BDD-backed and the `X` guard is vacuous.
+ * `order` is the live order; the plain regime (phases 1, 2 and 5) passes the
+ * empty one, where nothing is BDD-backed and the `X` guard is vacuous.
  */
 template <NodeType node>
 std::optional<pin<node>> find_pin(tref atom, const block& X,
@@ -113,18 +109,11 @@ std::optional<pin<node>> find_pin(tref atom, const block& X,
  * @brief §3 `TRY_WITNESS`'s pin match asked about ONE variable: the pin `x`
  * has in `atom`, or `nullopt`.
  *
- * The same match as `find_pin` — ONE implementation, two entries — asked
- * about a GIVEN variable instead of scanning the atom's free variables, which
- * is what the witness steps need (§3 `TRY_WITNESS`, `TRY_WITNESS_DEEP`, the
- * case pin): the variable is the one being eliminated. There is nothing to
- * choose here — an atom pins a given variable at most one way; §3's
- * strict-first, then smallest-`‖f₁′‖` choice is the caller's, across the
- * conjuncts it scans.
- *
- * `atom` must be a POSITIVE equation. The ORIENTATION guard of §3 —
- * `find_pin`'s requirement that the atom be free of the block in scope — is
- * not repeated: a caller with a block hands in an atom its own guard already
- * found block-free, so the block is not a parameter. `nullopt` when the atom
+ * The same match as `find_pin`, asked about a GIVEN variable instead of
+ * scanning the atom's free variables. There is nothing to choose: an atom
+ * pins a given variable at most one way. `atom` must be a POSITIVE equation.
+ * The block guard of `find_pin` is not repeated: a caller with a block hands
+ * in an atom its own guard already found block-free. `nullopt` when the atom
  * is no positive equation, when `x` is not free in its term, and when `x` is
  * not pinned.
  */

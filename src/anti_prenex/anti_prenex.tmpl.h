@@ -2,27 +2,14 @@
 
 /**
  * @file anti_prenex.tmpl.h
- * @brief Template implementation for anti_prenex.h: §3 `ANTI_PRENEX`, the
- * pipeline's phases in the one order the spec fixes. anti_prenex.h says what
- * the entry means; the comments here say how it is built.
+ * @brief Template implementation for anti_prenex.h: the phases of §3
+ * `ANTI_PRENEX`, each one call into the module below, in the order the spec
+ * fixes.
  *
- * Every phase is ONE call into the module below it —
- * `canonicalise_binder_ids`, `resolve_functional_quantifiers_plain`,
- * `fold_degenerate_binders` (foundations), `to_canonically_factored_nnf`,
- * `simplify`, `normalize_operators` (normalisers) and
- * `eliminate_by_substitution` (witness) — and this file adds nothing of its
- * own but the order. PHASE ORDER IS FIXED AS GIVEN (§3): phase 2 runs BEFORE
- * phase 3, so the deep pass still meets a `bf_neq` in either spelling, which
- * is why it reads both (witness.h).
- *
- * PHASE 4 IS THE IDENTITY: `PROCESS_ALL_BLOCKS` — the push, the elimination
- * and everything the `ctx` carries — is not called here, and the pipeline
- * runs end to end around it with every other phase the spec's.
- *
- * THE PLAIN REGIME THROUGHOUT: phases 1, 2 and 5 pass the EMPTY order, where
- * nothing is BDD-backed (§3) — `simplify`'s propagation guard is vacuous, and
- * the chain resolver phase 1 opens with is the plain one, which takes no order
- * at all. A live order exists only inside a component (§5).
+ * Phase 4, `PROCESS_ALL_BLOCKS`, is the identity here. Phases 1, 2 and 5 pass
+ * the EMPTY order: nothing is BDD-backed outside a component (§3), so
+ * `simplify`'s propagation guard is vacuous and the plain chain resolver
+ * takes no order at all.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_TMPL_H__
@@ -34,13 +21,11 @@ namespace idni::tau_lang::anti_prenexing {
 
 namespace anti_prenex_detail {
 
-/// Does `phi` carry a QUANTIFIER anywhere — a formula binder (`wff_ex` /
-/// `wff_all`) or a term-level FUNCTIONAL one (`bf_fex` / `bf_fall`)? §3's
-/// entry test names both: phase 0 canonicalises a chain's subscripts and
-/// phase 1 resolves its chains, so a formula whose only quantifier is a chain
-/// still has work waiting. One `find_top` search, which enters everything —
-/// a quantifier under a temporal operator or inside a reference argument
-/// counts.
+/// Does `phi` carry a quantifier anywhere: a formula binder (`wff_ex` /
+/// `wff_all`) or a term-level functional one (`bf_fex` / `bf_fall`)? Both
+/// count, because phases 0 and 1 work on functional chains too (§3). The
+/// search enters everything, temporal bodies and reference arguments
+/// included.
 template <NodeType node>
 bool carries_quantifier(tref phi) {
 	using tau = tree<node>;
@@ -66,12 +51,9 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	// 0. Binder ids by depth: it makes every later substitution
 	//    capture-safe and lets alpha-variants share one node (§3).
 	phi = canonicalise_binder_ids<node>(phi);
-	// 1. Every chain PRESENT in the input that the callback does not keep,
-	//    before any order is live: from here on a chain is a kept or a
-	//    stuck one, and it stays (§3). Then NNF and the ONE `ref_args` call
-	//    of the run: the canonical entry state for reference arguments,
-	//    which establishes invariant 6. From here on only substitution
-	//    dirties one, and it re-simplifies what it touched (§1).
+	// 1. Resolve the functional chains the callback does not keep, then
+	//    NNF, then the one `ref_args` simplification of the run, which
+	//    establishes invariant 6 for reference arguments (§3).
 	phi = resolve_functional_quantifiers_plain<node>(phi, kf);
 	phi = to_canonically_factored_nnf<node>(phi);
 	phi = simplify<node>(phi, {}, true);

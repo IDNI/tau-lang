@@ -31,24 +31,20 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * `f₀` and `f₁` are `SIMPLIFY_TERM` of the two cofactors, taken by CHILD
  * SELECTION in `f`'s BDD under `ctx.order`; the rest of the `cof_entry`
- * (fwd.h) is the pin test `pin_from_cofactors` (simplify.h) applies to them,
- * the same test the plain regime runs on substitution cofactors, recording
- * the result in this same table (`find_pin`, simplify.h). There is no
- * witness slot: a consumer that needs `f₁′` builds
+ * (fwd.h) is the pin test `pin_from_cofactors` (simplify.h) applied to them.
+ * There is no witness slot: a consumer that needs `f₁′` builds
  * `SIMPLIFY_TERM(¬f₁)` itself, and reads STRICT off `p = 0`.
  *
- * `f` IS THE KEY, exactly as it arrives (§1 cache scope) — a functional-
- * quantifier chain its leaves carry is part of it — so every consumer forms
- * the key itself with `TERM_OF` before calling. `cof_memo` is GLOBAL: the
- * entry is a pure function of `(f, x)`, and nothing of the component beyond
- * the order that `f` was built under enters it. The table is a cache, absent
- * in Debug builds, so nothing here may depend on a hit.
+ * `f` IS THE KEY, exactly as it arrives (§1 cache scope): pass `TERM_OF` of
+ * the atom, not the atom. `cof_memo` is GLOBAL: the entry is a pure function
+ * of `(f, x)`, and nothing of the component beyond the order that `f` was
+ * built under enters it. The table is a cache, absent in Debug builds, so
+ * nothing here may depend on a hit.
  *
- * `x` must be free in `f` (Debug-asserted): an `x`-free term pins nothing and
- * an entry for it would say nothing, so a scan skips such a conjunct instead
- * of asking. `x` need not be a DECISION variable, however — when it is not,
- * child selection returns `f` unchanged, both cofactors keep `x` and the
- * record is unusable, which is exactly what the leaf hazard means.
+ * `x` must be free in `f` (Debug-asserted): an `x`-free term pins nothing.
+ * `x` need not be a DECISION variable — when it is not, child selection
+ * returns `f` unchanged, both cofactors keep `x` and the record is unusable,
+ * which is exactly what the leaf hazard means.
  */
 template <NodeType node>
 cof_entry cof(tref f, tref x, ctx<node>& c);

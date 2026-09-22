@@ -2,10 +2,10 @@
 
 /**
  * @file ctx.h
- * @brief Anti-prenexing foundations (layer 0), package E: `ctx` (the §1 ctx
- * table), the memo tables — the five §1 result tables and the structural
- * per-node facet tables — the memo wrapper with its taint rule (§1 cache
- * scope, §6 `PUSH_BLOCK`), and the flush.
+ * @brief Anti-prenexing foundations: `ctx` (the §1 ctx table), the memo
+ * tables — the five §1 result tables and the structural per-node facet
+ * tables — the memo wrapper with its taint rule (§1 cache scope), and the
+ * flush.
  *
  * Every table is an entry of `enum class table` with a `table_traits`
  * specialisation and a static GC-registered `create_cache` instance. A
@@ -28,8 +28,8 @@
  * flush.
  *
  * Every function taking a `ctx` takes it by MUTABLE REFERENCE, because
- * `EXPAND` and `DECOMPOSE_ARMS` write `expand_count`. Single-threaded, like
- * every knob and cache in the library.
+ * `expand_count` is written during a push. Single-threaded, like every knob
+ * and cache in the library.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
@@ -80,9 +80,7 @@ struct ctx {
 	/// §1 `order`: BDD variable order, inner → LOWER rank; §5 `P[i] ↦ |P| - i`.
 	var_order<node> order;
 	/// §1 `prio`: variable priority, inner → HIGHER rank; §5 `P[i] ↦ i + 1`.
-	/// Read by `EXPAND`'s disjunct key, `DECOMPOSE_ARMS`'s pinned-variable
-	/// choice, and `FOLD_DECIDED`'s probe variable. The two conventions are
-	/// opposite and cannot be merged (§1).
+	/// The two conventions are opposite and cannot be merged (§1).
 	var_order<node> prio;
 	/// The six knobs (§1 ctx table), copied from options.h at setup.
 	size_t subsume_max   = anti_prenexing::subsume_max;
@@ -94,9 +92,8 @@ struct ctx {
 	/// §1 `keep_functional`: emit `∀_X`/`∃_X` symbolically instead of
 	/// discharging them. Part of the `push_memo` / `elim_memo` keys.
 	bool keep_functional = false;
-	/// §1 `expand_count`: the cases `EXPAND` has built so far — the one
-	/// COMPONENT-scoped counter, reset to 0 at setup and shared with
-	/// `DECOMPOSE_ARMS` through the single `ctx&` threaded down.
+	/// §1 `expand_count`: the cases `EXPAND` has built in this component —
+	/// the one COMPONENT-scoped counter, reset to 0 at setup.
 	size_t expand_count = 0;
 
 	/**
@@ -110,17 +107,14 @@ struct ctx {
 // --- taint ----------------------------------------------------------------------
 
 /// §1 `taint_count`: the number of budget hits so far. GLOBAL, never reset,
-/// never gated. It is incremented by every source of taint (`EXPAND` and
-/// `DECOMPOSE_ARMS` exhaustion, a `DECIDE_FINITE` sweep abandoned to an `ASK`
-/// that ends `unknown`) and read by the memo wrapper, which caches only
-/// across an unchanged count. `taint()` is the only writer.
+/// never gated. `taint()` is the only writer; the memo wrapper reads it and
+/// caches only across an unchanged count.
 template <NodeType node>
 size_t taint_count();
 
 /// The one increment every source of taint calls. The counter is per `node`
-/// type, so a taint source in code templated on the BDD node type (the
-/// `qbf_node_max` sweep of `DECIDE_FINITE`) must name the FORMULA node type
-/// here, the one whose tables the wrapper guards.
+/// type: a taint source templated on another node type must name the
+/// FORMULA node type here, the one whose tables the wrapper guards.
 template <NodeType node>
 void taint();
 
@@ -138,7 +132,7 @@ enum class table {
 	// structural per-node facets — unconditional
 	atoms_memo,    ///< §1: formula node → the atoms occurring in it, units opaque (subst.h)
 	size_memo,     ///< §1 `|φ|` (dag.h `formula_size`, its only writer)
-	neg_memo,      ///< §1 `neg(φ)` (dag.h `neg_of`/`set_neg`; filled by layer 1)
+	neg_memo,      ///< §1 `neg(φ)` (dag.h `neg_of`/`set_neg`; filled by nnf.h)
 	negative_tree_memo, ///< §1 NEGATIVE TREE flag (dag.h `is_negative_tree`)
 	count_         ///< NOT a table: the enumerator count, so `all_tables` sizes itself
 };
@@ -367,20 +361,18 @@ typename table_traits<node, T>::value_t
 memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 
 /**
- * @brief The same wrapper for an UNCONDITIONAL table: the lazy fill of a
- * structural facet (`formula_size`, `neg_of`, `is_negative_tree`, `atoms`).
- * Compute on the first query, store, and hand back a reference into the
- * table, so that an accessor can return `const trefs&`. The accessor is the
- * table's only writer (§10: computed once, never recomputed).
+ * @brief The same wrapper for an UNCONDITIONAL table: compute on the first
+ * query, store, and hand back a reference into the table, so that an
+ * accessor can return `const trefs&`.
  *
  * No structural table is `taint_aware`: a facet is a pure function of its
  * node, and a budget hit cannot change it.
  *
  * `compute()` may recurse into `memoised` on the same table — the reference
  * this call returns survives those insertions (see LIFETIME above) — but
- * recursion costs one frame per level, so a whole-tree fill belongs in a
- * post-order walk (`pre_order`'s `up` callback) that calls `find` / `store`
- * per node, not in a recursive `compute`.
+ * recursion costs one frame per level, so the facet accessors of dag.h and
+ * subst.h fill their tables in a post-order walk with `find` / `store` per
+ * node instead.
  */
 template <NodeType node, table T, typename Compute>
 	requires (!table_traits<node, T>::gated)
@@ -392,9 +384,7 @@ memoised(const typename table_traits<node, T>::key_t& key, Compute&& compute);
 /// `solver_flushed` table (`solver_memo`, `push_memo`, `elim_memo`) as a
 /// whole, since an entry carries no record of whether it embedded a solver
 /// verdict. `qbf_memo` is exempt, its entries being mathematical truths, and
-/// so is every structural table. The caller is the api layer on a solver
-/// option change (layer 4 and later); until then this is a test-only entry
-/// point.
+/// so is every structural table.
 template <NodeType node>
 void flush_solver_dependent();
 

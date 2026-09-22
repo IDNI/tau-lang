@@ -8,10 +8,10 @@
  * positives, and the three conditions that discharge one component, one
  * negative literal and one negative tree.
  *
- * Shared by the atomless and the finite method: the mathematics down to here
- * holds in ANY Boolean algebra, and what separates the two engines — which
- * conjunct shapes are opaque, whether one condition per negative is licensed —
- * stays with the method.
+ * Shared by every leaf method: the mathematics down to here holds in ANY
+ * Boolean algebra, and what separates the engines — which conjunct shapes
+ * are opaque, whether one condition per negative is licensed — stays with
+ * the method.
  *
  * A CLAUSE TRAVELS AS ITS CONJUNCT LIST. The member view of the clause is
  * taken once, by the caller, and a formula is assembled again only where one
@@ -99,11 +99,10 @@ struct component {
  * @brief §7 `SQUEEZE`'s result: the clause in zero form, its positives
  * squeezed and grouped, and its negatives.
  *
- * `f` is `⋃_k F_k` — the whole positive part, `0` when the clause has no
- * positive — which only the finite method reads; `comps` are the parts of the
- * POSITIVES alone, negatives ignored; `negatives` are the negative conjuncts,
- * literals and trees alike, in the clause's order; `conjuncts` is the whole
- * clause as the rewrite left it.
+ * `f` is `⋃_k F_k`, the whole positive part, `0` when the clause has no
+ * positive; `comps` are the parts of the POSITIVES alone, negatives ignored;
+ * `negatives` are the negative conjuncts, literals and trees alike, in the
+ * clause's order; `conjuncts` is the whole clause as the rewrite left it.
  *
  * `decided_false` says a conjunct folded to `F` while it was being rewritten,
  * so the clause is unsatisfiable and `∃X.clause` is `F`. Nothing else is
@@ -128,13 +127,12 @@ struct squeeze_result {
  * again, because the ring sum builds terms the path simplifier has not seen
  * (invariant 6). An atom that folds to `T` in the process drops out of the
  * clause and one that folds to `F` decides it. A conjunct that is no atom —
- * a swallowed binder unit, a conversion emission of the finite method — rides
- * along untouched.
+ * a binder unit, say — rides along untouched.
  *
- * The grouping is FINER than the push's own incidence pass, which counts a
- * negative as a connection: quantifiers over disjoint variable sets distribute
- * over `∪` and `·`, so nothing of one component ever enters another's term,
- * and that is what every condition below is exact over.
+ * The positives are grouped on their own, negatives ignored: quantifiers over
+ * disjoint variable sets distribute over `∪` and `·`, so nothing of one
+ * component ever enters another's term, and that is what every condition
+ * below is exact over.
  *
  * @param order the component's live order, which `TERM_OF` and the term
  *        simplifier both require

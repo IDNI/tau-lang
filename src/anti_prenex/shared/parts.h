@@ -13,18 +13,10 @@
  * holds two conjuncts under one quantifier (invariant 2). The relation is
  * closed transitively, so a part is a connected component, not a pair.
  *
- * The consumers in §7 are `FREEZE_OPAQUE_COMPONENTS`, which freezes a whole
- * part around an opaque conjunct, and `SQUEEZE`, which squeezes the positives
- * of one part into one equation; §6 `PUSH_OVER_CONJUNCTION` and the finite
- * method's second tier follow in later layers.
- *
  * A CONJUNCT TOUCHING NO VARIABLE OF `X` IS LEGAL and becomes a part of its
  * own with empty `vars`, merging with nothing, so that the parts still
- * partition the input. `SQUEEZE` is where one arises: the zero form of a
- * positive can strip its last block variable (`x + b = x + c` gives
- * `b + c = 0`), and `DISCHARGE` over the empty block then emits that atom
- * unchanged (§7). `INCIDENCE` flags nothing for such a conjunct: it holds no
- * block variable to flag.
+ * partition the input. `INCIDENCE` flags nothing for such a conjunct: it
+ * holds no block variable to flag.
  *
  * DETERMINISTIC AND CONTENT-DERIVED, like every order in the module (§1): the
  * parts come in the order of their FIRST conjunct, a part's conjuncts in

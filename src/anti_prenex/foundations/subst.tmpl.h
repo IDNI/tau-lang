@@ -2,32 +2,22 @@
 
 /**
  * @file subst.tmpl.h
- * @brief Template implementations for subst.h (package C). Included by
- * subst.h. subst.h says what each function means; the comments here say how
- * it is built.
+ * @brief Template implementations for subst.h. Included by subst.h. subst.h
+ * says what each function means; the comments here say how it is built.
  *
  * `[atm ↦ T/F]` IS the library's `rewriter::replace_if`: content match, the
  * `atoms` guard as its descent predicate, hooked rebuild. It needs no walk of
- * its own, because its replacement is a CONSTANT — members only VANISH and
- * the hooks fold them out of a chain in place, so nothing has to be
- * re-canonicalised and no parent is needed mid-walk.
- *
- * The `atoms` fill is ONE `pre_order::visit` (tree.h; the `up` callback is the
- * post-order visit) over the formula, storing a row per wrapper in the reach.
+ * its own, because its replacement is a CONSTANT and the hooks fold it out of
+ * a chain in place.
  *
  * SPINE nodes — a `wff` wrapping the same connective as its parent operator
- * node, on either nesting side — are transparent. They are entered
- * unconditionally, never asked for a facet, and never given an `atoms_memo`
- * row; the chain top folds them away through `members`. The reason no facet is
- * asked: `get_free_vars` and `atoms` publish every root they are asked about,
- * and a chain of k members has k spine nodes, each with a set of size O(k).
- *
- * A spine node met later STANDALONE is a root and does get its row. That is
- * why the `atoms` fill uses `visit` with row-based pruning rather than
- * `visit_unique`: the traversal's own set would skip that occurrence and leave
- * the parent's lookup dangling. `[atm ↦ T/F]` has no parent at hand and
- * recognises a spine node by the ABSENCE of a row, since the guard's fill gave
- * every other wrapper in the reach one.
+ * node, on either nesting side — get no `atoms_memo` row, the rule
+ * `get_free_vars` follows as well: a chain of k members has k spine nodes,
+ * each with a set of size O(k). A spine node met later STANDALONE is a root
+ * and does get its row, which is why the fill uses `visit` with row-based
+ * pruning rather than `visit_unique`. `[atm ↦ T/F]` recognises a spine node
+ * by the ABSENCE of a row, since the guard's fill gave every other wrapper in
+ * the reach one.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_TMPL_H__
@@ -92,15 +82,11 @@ tref subst_atom(tref phi, tref atm, bool value) {
 		return row == nullptr || std::binary_search(row->items.begin(),
 			row->items.end(), atm, tau::subtree_less);
 	};
-	// `replace_if`: an occurrence — compared by CONTENT, the atom as it
-	// occurs, never re-spelled (§3) — becomes the constant, and nothing
-	// below it is entered. Every changed parent is rebuilt through the
-	// hooked constructor, so `T`/`F` fold out of a chain (`X ∧ T`, `X ∨ F`)
-	// or collapse it (`X ∧ F`, `X ∨ T`), and `¬T`/`¬F` fold, which is how a
-	// negated occurrence receives the complement. Members only vanish, so a
-	// canonical chain stays sorted, deduplicated and left-nested (the left
-	// fold of the remaining members) with nothing re-canonicalised; a shared
-	// subtree is rewritten once (the traversal's cache).
+	// `replace_if`: an occurrence becomes the constant, nothing below it is
+	// entered, and every changed parent is rebuilt through the hooked
+	// constructor, which folds the constant out of a chain or collapses the
+	// chain, and folds `¬T`/`¬F`. A shared subtree is rewritten once (the
+	// traversal's cache).
 	return rewriter::replace_if<node>(phi, atm, cst, reach);
 }
 

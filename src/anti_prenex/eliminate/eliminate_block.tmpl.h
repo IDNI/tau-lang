@@ -5,17 +5,12 @@
  * @brief Template implementations for eliminate_block.h. eliminate_block.h
  * says what each procedure means; the comments here say how it is built.
  *
- * The pieces come from the layers below: the type predicates of ba_types.h
- * for the table, `fv_intersect` / `fv_meets` / `members` (dag.h) for the
- * pre-steps, `try_witness` in its COF mode (witness/witness.h) for the
- * witness pass, `rewrap` (prims.h) for the key and for every graceful exit,
- * `memoised` (ctx.h) for the table, and `eliminate_atomless_clause`
- * (atomless.h) for the one method there is.
- *
- * ITS CALLERS come with the push: `PUSH_BLOCK`'s dispatch at a leaf, the
- * whole-formula fast paths, and `PUSH_OVER_CONJUNCTION`'s settle move and
- * consistency check. None of them exists yet, so nothing in the module calls
- * this file.
+ * The pieces come from the files below: the type predicates of ba_types.h
+ * for the table, `fv_intersect` / `fv_meets` (dag.h) for the pre-steps,
+ * `try_witness` in its COF mode (witness/witness.h) for the witness pass,
+ * `rewrap` (prims.h) for the key and for every graceful exit, `memoised`
+ * (ctx.h) for the table, and `eliminate_atomless_clause` (atomless.h) for the
+ * one method there is.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__ELIMINATE_BLOCK_TMPL_H__
@@ -91,11 +86,10 @@ tref eliminate_block_uncached(tref clause, const block& X, ctx<node>& c) {
 	}
 	if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
 		return clause;
-	// 2. THE STRIP, one cached free-variable test per conjunct. The member
-	// view of the clause is taken HERE, once, and the methods below work
-	// on the list. ONLY AN ∧-NODE HAS ONE: `members` flattens either
-	// connective, and a clause that is an ∨-node is a NEGATIVE TREE (§1),
-	// which is ONE conjunct and goes whole to the method.
+	// 2. THE STRIP, one cached free-variable test per conjunct. The
+	// conjunct list is taken HERE, once, with `get_cnf_wff_clauses`, which
+	// flattens ∧ alone: a clause that is an ∨-node is a NEGATIVE TREE (§1),
+	// ONE conjunct that goes whole to the method.
 	const trefs ms = get_cnf_wff_clauses<node>(clause);
 	trefs indep, dep;
 	for (tref m : ms) (fv_meets<node>(m, left) ? dep : indep).push_back(m);
@@ -115,7 +109,7 @@ tref eliminate_block_uncached(tref clause, const block& X, ctx<node>& c) {
 	case method_kind::atomless:
 		indep.push_back(eliminate_atomless_clause<node>(dep, Xd, c));
 		break;
-	case method_kind::bitvector:   // §7's router, with no arm here yet
+	case method_kind::bitvector:   // §7's router: no method is wired
 	case method_kind::none:
 		// No method for this type: the block comes back around the
 		// dependent conjuncts, undecided (invariant 3).

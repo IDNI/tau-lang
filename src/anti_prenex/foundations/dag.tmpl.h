@@ -2,18 +2,16 @@
 
 /**
  * @file dag.tmpl.h
- * @brief Template implementations for dag.h (package A). Included by dag.h.
- * dag.h says what each function means; the comments here say how it is built.
+ * @brief Template implementations for dag.h. Included by dag.h. dag.h says
+ * what each function means; the comments here say how it is built.
  *
- * Everything is a facet of the existing hash-consed tree, assembled from what
- * the codebase already has: `get_free_vars` for the free variables,
- * `get_leaves` for the member view, `subtree_vec_contains` for the membership
- * scan, `build_wff_*` for the raw constructors, the `is_child_*` family for
- * the wrapper-form classification, and `pre_order` — whose `up` callback is
- * the post-order visit — for the two walks that fill a table. A §1 term that
- * IS one library call is not re-declared (dag.h's VOCABULARY block lists
- * them). The three cached facets reach their tables through ctx.h's `find`
- * and `store` and never spell `#ifdef TAU_CACHE`.
+ * Everything is assembled from what the codebase already has: `get_free_vars`
+ * for the free variables, `get_leaves` for the member view,
+ * `subtree_vec_contains` for the membership scan, `build_wff_*` for the raw
+ * constructors, the `is_child_*` family for the wrapper-form classification,
+ * and `pre_order` — whose `up` callback is the post-order visit — for the two
+ * walks that fill a table. The cached facets reach their tables through
+ * ctx.h's `find` and `store` and never spell `#ifdef TAU_CACHE`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__DAG_TMPL_H__

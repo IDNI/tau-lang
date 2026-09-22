@@ -5,7 +5,7 @@
  * @brief Template implementations for conditions.h. conditions.h says what
  * each procedure means; the comments here say how it is built.
  *
- * The pieces come from the layers below: `parts` (§6) for every grouping,
+ * The pieces come from the files below: `parts` (§6) for every grouping,
  * `norm_equation`, `term_of`, `simplify_term` and `simplify_atom` (§3) for the
  * rewrite, `discharge` (§7) for every quantified atom that goes out, the
  * result joins (§3) for every formula, and `rewrap` (§3) for what is frozen.

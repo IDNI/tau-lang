@@ -2,26 +2,21 @@
 
 /**
  * @file options.h
- * @brief Anti-prenexing foundations (layer 0): the eight knobs of the §1 ctx
- * table as process-wide defaults. The last two — `propagate_growth`, which
+ * @brief Anti-prenexing foundations: the eight knobs of the §1 ctx table as
+ * process-wide defaults, plain `inline` globals in a dependency-free header
+ * (the pattern of `heuristics/bv_simplify_options.h`).
+ *
+ * `ctx::for_component` (ctx.h) copies the first six into a component's ctx
+ * when the component is set up. The last two — `propagate_growth`, which
  * belongs to `SIMPLIFY`, and `absorb_occ_max`, which belongs to the result
- * joins — are process-wide ONLY: both run in every phase without a ctx, so
- * neither is copied into one and every use reads them bare.
+ * joins — are read bare wherever they are used: both run in every phase,
+ * with or without a ctx.
  *
- * Plain `inline` globals in a dependency-free header — the pattern of
- * `heuristics/bv_simplify_options.h` — so both the algorithm and the API
- * layer can include it. `ctx::for_component` (ctx.h) copies these into the
- * component's ctx, as §5 `PUSH_EX_BLOCK` does with the spec's constants. The
- * values here are the EFFECTIVE ones; API setters follow the codebase
- * convention that `0` means "unlimited" at the surface and is translated to
- * the maximum internally. Every constant is provisional pending benchmarks
- * (§1).
- *
- * Every knob is a size limit or a step count. Exhausting one costs precision,
- * never soundness: by invariant 3 the algorithm can always exit gracefully,
- * re-wrapping the block it was pushing. Some budget hits also TAINT the
- * computation, which means its result is returned but not cached (ctx.h).
- * Not thread-safe, like every other knob in the library.
+ * Every knob is a size limit or a step count. Exhausting one costs
+ * precision, never soundness: the algorithm can always exit gracefully by
+ * re-wrapping the block it was pushing (invariant 3). Some budget hits also
+ * TAINT the computation: its result is returned but not cached (ctx.h). Not
+ * thread-safe, like every other knob in the library.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__OPTIONS_H__

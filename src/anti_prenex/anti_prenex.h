@@ -4,35 +4,26 @@
  * @file anti_prenex.h
  * @brief Anti-prenexing, written from `anti_prenex.md` (the spec).
  *
- * The module's single entry header: includes the layers in build order and
- * declares the top-level procedure `anti_prenex` (spec §3, `ANTI_PRENEX`).
- * The spec is the sole source of truth; every function carries a comment
- * naming the spec section it implements, and names mirror the spec one to
- * one in snake case (`PUSH_BLOCK` → `push_block`). The module map — every
- * directory and file of all nine layers — and the ground rules are kept in
- * the layer-0 implementation plan, a working document outside the
- * repository.
+ * The module's single entry header: it includes every layer in dependency
+ * order and declares the top-level procedure `anti_prenex` (spec §3,
+ * `ANTI_PRENEX`). The spec is the sole source of truth. Every function
+ * carries a comment naming the spec section it implements, and names mirror
+ * the spec one to one in snake case (`PUSH_BLOCK` → `push_block`). A `§n`
+ * reference anywhere in the module points into the spec.
  *
- * Namespace `idni::tau_lang::anti_prenexing`: the spelling differs from the
- * old module's entry function `anti_prenex` (`src/antiprenexing/`), which
- * stays wired until this module is sound end to end (layer 4 milestone).
- * When the old module is deleted the namespace is renamed to `anti_prenex`.
- * Nothing here includes the old module.
+ * The namespace is `idni::tau_lang::anti_prenexing`, distinct from the entry
+ * function `anti_prenex` of the module in `src/antiprenexing/`, which this
+ * module does not include.
  *
- * Inclusion order is acyclic except inside `push/`: foundations, normalisers,
- * shared, witness, eliminate, push, driver, entry. `shared/` precedes
- * `witness/` although it belongs to the later layer, because `witness.h`
- * reads a BDD-backed conjunct's pin off `shared/cofactors.h`; the list below
- * is grouped by LAYER instead, every header including what it needs itself.
- * `ELIMINATE_BLOCK` never re-enters the push (§7), so `eliminate/` compiles
- * before `push/`; `push/push.h` is the one cluster header (the steps call
- * each other through `PUSH_BLOCK`).
+ * Phase 4 of the pipeline — the push (§4–§6) — and the finite and bitvector
+ * methods of §7 are not part of the module; `eliminate_block` re-wraps a
+ * block of a type without a method.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
 #define __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
 
-// layer 0 — foundations
+// foundations
 #include "foundations/fwd.h"
 #include "foundations/options.h"
 #include "foundations/dag.h"
@@ -40,21 +31,18 @@
 #include "foundations/subst.h"
 #include "foundations/prims.h"
 #include "foundations/ctx.h"
-// layer 1 — normalisers
+// normalisers
 #include "normalisers/joins.h"
 #include "normalisers/nnf.h"
 #include "normalisers/simplify.h"
-// layer 2 — witness
+// witness
 #include "witness/witness.h"
-// layer 3 — the elimination core
+// the elimination core
 #include "shared/parts.h"
 #include "shared/cofactors.h"
 #include "eliminate/conditions.h"
 #include "eliminate/atomless.h"
 #include "eliminate/eliminate_block.h"
-// layer 4 — push/push.h; driver/blocks.h, component.h
-// layers 5–6 — the remaining push steps (declared in push/push.h)
-// layers 7–8 — eliminate/finite.h, bitvector.h
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -70,11 +58,9 @@ namespace idni::tau_lang::anti_prenexing {
  * is, and phase 4 is the identity.
  *
  * @param phi a `wff` node
- * @param kf  §1 `keep_functional`, the ONE callback of the run, pure and
- *            asked on a NODE (fwd.h): the chain's node at a phase-1 chain
- *            resolution (§3) and the block's binder node per block (§5), a
- *            yes emitting `∀_X`/`∃_X` symbolically instead of discharging
- *            them. The default keeps nothing
+ * @param kf  §1 `keep_functional` (fwd.h `keep_functional_fn`): a yes keeps
+ *            a functional-quantifier chain symbolic instead of resolving it.
+ *            The default keeps nothing
  * @return the anti-prenexed formula, a `wff` node
  */
 template <NodeType node>

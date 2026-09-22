@@ -5,31 +5,19 @@
  * @brief Template implementations for witness.h. witness.h says what each
  * function means; the comments here say how it is built.
  *
- * The pieces come from below: `find_pin_for` and `simplify`
- * (normalisers/simplify.h), `cof` (shared/cofactors.h), the result joins
- * (normalisers/joins.h), `members`, `fv_meets`, `formula_size`,
- * `is_negated_equation`, `atom_of` and the binder accessors
- * (foundations/dag.h), `term_of`, `mem_size` and `simplify_term`
- * (foundations/terms.h), `case_max` (foundations/options.h) and its
- * component-scoped copy `ctx.case_max` (foundations/ctx.h).
- *
  * WHAT THE TWO MODES SHARE: the tail of `TRY_WITNESS` — the choice among the
  * pins a conjunct list offers, the substitution of the winner's witness and
  * the simplification — is one helper over the mode's own pin test, and the
  * COF test itself is one helper over a conjunct list, asked of `ψ`'s
  * conjuncts by `TRY_WITNESS` and of a branch's by `TRY_CASE_WITNESS`.
  *
- * THE TWO REWRITES of the deep pass are the library's, never a hand-rolled
- * walk: `φ[x ← t]` is `tree<node>::substitute` (tau_tree.h) with a
- * re-simplifying argument hook, since substitution is what dirties a
- * reference argument and is asked to clean up after itself (§1, invariant 6),
- * and under the LIVE ORDER — empty in the plain regime of phase 2, `ctx.order`
- * in the COF mode, where the library rewrites a BDD-backed term's leaves and
- * composes the key out of its decision variables; the spine's replacement is
- * `rewriter::replace`, a CONTENT match with a unique-cached, hooked rebuild
- * of the path above it. Replacing every occurrence of the spine is sound
- * exactly because the descent enforces confinement first (§3, condition (b)):
- * a second occurrence of that node elsewhere in `Φ` would put `x` free in two
+ * THE TWO REWRITES of the deep pass are the library's: `φ[x ← t]` is
+ * `tree<node>::substitute` (tau_tree.h) with a re-simplifying argument hook
+ * under the live order — empty in phase 2, `ctx.order` in the COF mode — and
+ * the spine's replacement is `rewriter::replace`, a CONTENT match with a
+ * hooked rebuild of the path above it. Replacing every occurrence of the
+ * spine is sound because the descent enforces confinement first (§3): a
+ * second occurrence of that node elsewhere in `Φ` would put `x` free in two
  * members of some junction on the way down, which the descent refuses.
  */
 
@@ -55,11 +43,9 @@ bool holds_bdd_term(tref n) {
 }
 
 /// §3 `φ[x ← t]`: the library's substitution under the live `order` — empty
-/// for phase 2, which is the plain regime — with the argument hook invariant 6
-/// asks for. Substitution is what dirties a reference argument from phase 2 on
-/// (§1), so it re-simplifies the arguments it changed; `SIMPLIFY` after it
-/// does not (only phase 1 passes `ref_args`). `key` is the variable's `bf`
-/// TERM, the form every occurrence takes inside a term.
+/// in phase 2 — with the argument hook invariant 6 asks for, which
+/// re-simplifies the reference arguments it changed. `key` is the variable's
+/// `bf` TERM, the form every occurrence takes inside a term.
 template <NodeType node>
 tref subst_var(tref phi, tref key, tref t, const var_order<node>& order = {}) {
 	return tree<node>::get(tree<node>::trim_right_sibling(phi))

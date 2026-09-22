@@ -2,8 +2,8 @@
 
 /**
  * @file fwd.h
- * @brief Anti-prenexing foundations (layer 0): shared aliases and small value
- * types. Every file of `src/anti_prenex/` includes this one first.
+ * @brief Anti-prenexing foundations: shared aliases and small value types.
+ * Every file of `src/anti_prenex/` includes this one first.
  *
  * A `§n` reference points into `anti_prenex.md`, the specification this
  * module implements and the sole source of truth for the algorithm. The
@@ -11,14 +11,13 @@
  * build-type behaviour and garbage collection.
  *
  * CACHE GATING, the rule the whole module follows. Every memo table is an
- * entry of ctx.h's `enum class table`. The six §1 result tables are caches:
+ * entry of ctx.h's `enum class table`. The five §1 result tables are caches:
  * they exist under `#ifdef TAU_CACHE` only, which is off in Debug builds, so
  * no result may depend on a hit. The structural per-node tables
  * (`atoms_memo`, `size_memo`, `neg_memo`, `negative_tree_memo`) hold facets
  * of a single node, always exist, and may therefore hand out references, like
- * `get_free_vars`' own table. The member view (dag.h `members`) is not cached
- * at all. The `#ifdef` itself appears in exactly one place: ctx.tmpl.h's
- * `table_ptr`.
+ * `get_free_vars`' own table. The `#ifdef` itself appears in exactly one
+ * place: ctx.tmpl.h's `table_ptr`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__FWD_H__

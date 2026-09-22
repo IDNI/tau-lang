@@ -14,23 +14,15 @@
  *
  * ONE WALK: a single `pre_order::apply_unique_pure`, where `down` rewrites ONE
  * negation at the node it stands on and hands the result back for the walk to
- * descend into, and `up` re-emits what the walk rebuilt. Phase 1 meets a raw
- * formula and rebuilds it in this one memoised pass; from phase 3 on every
- * node is in NNF already and the only work left is `NEG`, cached on the node
- * as `neg(φ)` (§1, dag.h's `neg_of`/`set_neg`).
+ * descend into, and `up` re-emits every `wff_and`/`wff_or` it closes through
+ * the matching join, whether or not the walk changed it. `up` carries no
+ * marker: a marker stack pushed in `down` and popped in `up` would
+ * desynchronise, because `apply_unique_pure` skips `up` on a memo hit.
+ * Unconditional re-emission costs nothing on an already canonical chain,
+ * which the joins return unchanged.
  *
- * `up` CARRIES NO MARKER: it re-emits every `wff_and`/`wff_or` it closes
- * through the matching join, whether or not the walk changed it. A marker
- * stack pushed in `down` and popped in `up` would desynchronise, because
- * `apply_unique_pure` consults its slot memo on the node `down` RETURNED and
- * skips `up` on a hit, `down` having already run. Unconditional re-emission
- * needs no marker and is what §3 asks for — "∧ / ∨ ↦ re-emitted through the
- * joins over the normalised members" — and it costs nothing on an already
- * canonical chain, which the joins return unchanged.
- *
- * THE NEG SLOT is filled by `canonically_factored_neg`, and not at the inner
- * `¬ψ` nodes a walk happens to pass: §1 fills a node's slot on first DEMAND,
- * which is what that entry is.
+ * THE NEG SLOT `neg(φ)` (dag.h) is filled by `canonically_factored_neg`, on
+ * first demand, and not at the inner `¬ψ` nodes a walk happens to pass.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__NNF_H__
@@ -49,9 +41,8 @@ namespace idni::tau_lang::anti_prenexing {
  *
  * `¬ψ ↦ NEG(ψ)`; an atom stays as written; a binder and a temporal operator
  * are rebuilt over the normalised body; `∧` and `∨` are re-emitted through
- * the joins over the normalised members, which is what canonicalises phase
- * 1's raw input — a chain comes back deduplicated, flattened and in content
- * order.
+ * the joins over the normalised members, so a chain comes back deduplicated,
+ * flattened and in content order.
  *
  * The name does not hide `tau_lang::to_nnf`, the codebase's own NNF pass:
  * that one fuses a negated atom into `!=` and the negated order operators,
@@ -79,11 +70,10 @@ tref canonically_factored_neg(tref psi);
  * the six comparison rewrites (`≰ ≮ ≥ > ≱ ≯`) only where the operator denotes
  * ARITHMETIC comparison — today a bitvector type.
  *
- * Phase 3 (§3). The negated rewrites are total-order laws and are unsound for
- * a lattice order, which is why the guard is on the type and not on the
- * operator alone. Postcondition for arithmetic-typed content: only un-negated
- * `≤` and `<` remain, so after this phase "negated equation" names every
- * negative leaf (§1).
+ * The negated rewrites are total-order laws and are unsound for a lattice
+ * order, which is why the guard is on the type and not on the operator alone.
+ * Postcondition for arithmetic-typed content: only un-negated `≤` and `<`
+ * remain, so afterwards "negated equation" names every negative leaf (§1).
  *
  * It is `normalize_atomic_formula_operators<node, true, true>` under its spec
  * name; that pass caches per instantiation, so the flag keeps these results

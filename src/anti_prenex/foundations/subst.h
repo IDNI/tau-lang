@@ -2,31 +2,13 @@
 
 /**
  * @file subst.h
- * @brief Anti-prenexing foundations (layer 0), package C: the formula-level
- * atom substitution `φ[atm ↦ T/F]` of §3 with the occurrence guard of §10,
- * and §1's `atoms_memo` behind it.
+ * @brief Anti-prenexing foundations: the formula-level atom substitution
+ * `φ[atm ↦ T/F]` of §3 with the occurrence guard of §10, and §1's
+ * `atoms_memo` behind it.
  *
- * `φ[x ← t]` is the library's `tree<node>::substitute` (tau_tree.h), called
- * directly with the live order and a re-simplifying argument hook.
- *
- * The occurrence guard of §10 is `atoms_memo`, a per-node atom vocabulary
- * with exactly this substitution's reach (unit-opaque, §4).
- *
- * REACH (§4). `[atm ↦ T/F]` reaches through ∧, ∨ and ¬ only: a unit, a
- * reference and a TEMPORAL operator are opaque leaves, and a temporal body is
- * not in the `atoms` vocabulary.
- *
- * REBUILD. The substitution does not run `SIMPLIFY`; the caller does (§6, the
- * decomposition arms), which is invariant 6. Its replacement is a constant, so
- * members only VANISH: a canonical chain stays canonical — sorted,
- * deduplicated, left-nested — with nothing re-canonicalised, and any other
- * input keeps its nesting minus the erased occurrences. Everything else goes
- * through the hooked constructors: `T`/`F` fold along a chain and `¬T` / `¬F`
- * / `¬¬ψ` fold.
- *
- * No hook exists for a binder, so `∃x.T` stands until
- * `FOLD_DEGENERATE_BINDERS` or the caller's `SIMPLIFY`. A chain none of whose
- * members changed is returned as it stands.
+ * `φ[x ← t]`, the variable substitution, is not here: it is the library's
+ * `tree<node>::substitute` (tau_tree.h), called directly with the live order
+ * and a re-simplifying argument hook.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_H__
@@ -40,21 +22,17 @@ namespace idni::tau_lang::anti_prenexing {
 
 /**
  * @brief §3 `φ[atm ↦ T/F]`: erase every REACHABLE occurrence of the atom
- * `atm`, taken as it occurs in the formula — compared by content, never
- * re-spelled — with units, references and temporal operators OPAQUE (§4).
+ * `atm`, compared by content as it occurs in the formula — never re-spelled
+ * — with units, references and temporal operators OPAQUE (§4): the
+ * substitution reaches through ∧, ∨ and ¬ only.
  *
- * A node whose atom vocabulary (`atoms`) does not contain `atm` is returned
- * untouched, and `φ` itself comes back when `atm` is not reachable in it.
  * `value = true` puts `T`, `false` puts `F`; a negated occurrence `¬atm`
  * receives the complement, because the `¬` folds through the construction
- * hooks. The constants fold through the hooks too; the deep folding is the
- * caller's `SIMPLIFY` (§6, the decomposition arms).
- *
- * The implementation is the library's `rewriter::replace_if` with `atoms` as
- * its descent predicate. Members only vanish, so a canonical chain stays
- * canonical — sorted, deduplicated, left-nested — with nothing
- * re-canonicalised, and a non-canonical input keeps its nesting minus the
- * erased occurrences.
+ * hooks. `T`/`F` fold along a chain through the hooks too, so members only
+ * VANISH: a canonical chain stays canonical, and any other input keeps its
+ * nesting minus the erased occurrences. No hook exists for a binder, so
+ * `∃x.T` stands until `fold_degenerate_binders` or the caller's `simplify`.
+ * `φ` itself comes back when `atm` is not reachable in it.
  */
 template <NodeType node>
 tref subst_atom(tref phi, tref atm, bool value);

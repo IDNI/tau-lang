@@ -15,9 +15,6 @@
  *
  * WHAT GOES OUT: a formula equivalent to `∃X.clause`. What no method can
  * decide is RE-WRAPPED, never answered `F` (invariant 3).
- *
- * NOTHING HERE RE-ENTERS THE PUSH (§7), which is why `eliminate/` compiles
- * before `push/`.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__ELIMINATE_BLOCK_H__
@@ -45,8 +42,8 @@ enum class method_kind { none, atomless, bitvector };
  * THE TABLE, one row per type. `tau` and `sbf` are the ATOMLESS types — no
  * "atomless" predicate exists anywhere in `src/`, so this row is the module's
  * statement of which types are atomless, and `EX_DISTRIBUTES_OVER_NEGATIVES`
- * reads the same row. The bitvector family is §7's router, which has no
- * dispatch arm here yet and therefore re-wraps, exactly as the `⊥` row does.
+ * reads the same row. The bitvector family names §7's router, for which no
+ * method is wired, so it re-wraps like the `⊥` row.
  *
  * EVERY OTHER TYPE — the untyped id `0`, `bool`, `nat` — is OUTSIDE the
  * algorithm: not a row but a CALLER BUG, a block of such a type must never
@@ -76,9 +73,8 @@ bool ex_distributes_over_negatives(ba_type_id type);
  * as the type's method reaches. The `elim_memo` wrapper.
  *
  * `T` and `F` come back as they are, and `X` is first narrowed to
- * `X ∩ FV(clause)` — the key canonicalisation `PUSH_BLOCK` also does, so that
- * nothing enters the key which `∃X` does not scope. An empty narrowed block
- * leaves the clause alone.
+ * `X ∩ FV(clause)`, so that nothing enters the key which `∃X` does not
+ * scope. An empty narrowed block leaves the clause alone.
  *
  * THE KEY is `(REWRAP(clause, X), keep_functional)` (§1): the wrap node
  * carries the ordered `X`, and the flag switches what `DISCHARGE` emits. The

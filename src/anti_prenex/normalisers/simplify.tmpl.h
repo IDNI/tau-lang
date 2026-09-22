@@ -99,22 +99,17 @@ tref pin_term(tref atom, const block& X, const var_order<node>& order) {
 }
 
 /// The pin a FREE variable `y` has in the prepared term `f` of BA type
-/// `type`, or `nullopt` (§3): `usable ∧ f₀ ∪ f₁ = 1` on the two cofactors,
-/// witness `f₁′`, STRICT when the residual `p = f₀f₁` folds to `0`. The
-/// per-variable half of the match, which `find_pin` asks of every free
-/// variable and `find_pin_for` of one.
+/// `type`, or `nullopt` (§3): the per-variable half of the match, which
+/// `find_pin` asks of every free variable and `find_pin_for` of one.
 ///
-/// The cofactors are taken by SUBSTITUTION, which is what the plain regime
-/// has; the test on them is `pin_from_cofactors` (simplify.h), the one pin
-/// recipe. The record is MEMOISED in `cof_memo` (§1) under `(f, y)`, the
-/// table `COF` fills by child selection: `f` is `X`-free, so no order
-/// enters its cofactors and the entry is a pure function of its key, and
-/// the same conjunct is matched again at every construction site of a
-/// push, past the reach of the pass's own per-call memo. The two writers
-/// never meet at one key — `COF` asks about a block variable of a
-/// BDD-backed term, this site about a free variable outside the block. The
-/// table is a cache, absent in Debug builds, so nothing here depends on a
-/// hit.
+/// The cofactors are taken by SUBSTITUTION and tested by
+/// `pin_from_cofactors`. The record is MEMOISED in `cof_memo` (§1) under
+/// `(f, y)`, the table `cof` fills by child selection: `f` is `X`-free, so
+/// no order enters its cofactors and the entry is a pure function of its
+/// key. The two writers never meet at one key — `cof` asks about a block
+/// variable of a BDD-backed term, this site about a free variable outside the
+/// block. The table is a cache, absent in Debug builds, so nothing here
+/// depends on a hit.
 template <NodeType node>
 std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 	const var_order<node>& order)
@@ -348,15 +343,12 @@ private:
 
 	/// §3: an atom rewritten by the environment `e` and re-emitted through
 	/// `SIMPLIFY_ATOM` — which unwraps one `¬` itself — whenever the
-	/// environment changed it, or always in `ref_args` mode, which is what
-	/// establishes invariant 6 in phase 1. A pin reaches a reference
-	/// argument like any other occurrence, and an argument it changed is
-	/// re-simplified by the substitution itself (`resimplify_argument`).
-	/// In `ref_args` mode EVERY argument of a reference inside the atom's
-	/// terms goes through `SIMPLIFY_TERM` besides (§3: the descent into
-	/// reference arguments is recursive): a reference is a leaf to the
-	/// atom simplifier, so nothing else reaches them, and a simplified
-	/// argument may let two leaves merge.
+	/// environment changed it, or always in `ref_args` mode. A pin reaches
+	/// a reference argument like any other occurrence, and the substitution
+	/// re-simplifies an argument it changed (`resimplify_argument`). In
+	/// `ref_args` mode EVERY reference argument inside the atom's terms
+	/// goes through `SIMPLIFY_TERM` besides: a reference is a leaf to the
+	/// atom simplifier, so nothing else reaches them.
 	tref rewrite_under(const environment& e, tref a) {
 		const tref bare = tau::trim_right_sibling(a);
 		tref res = e.changes.empty() ? bare
