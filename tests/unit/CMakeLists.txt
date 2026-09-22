@@ -21,6 +21,7 @@ set(TESTS
 	anti_prenex_conditions
 	anti_prenex_eliminate
 	anti_prenex_layer3
+	anti_prenex_push
 	adt_flatten
 	adt_parsing
 	adt_types
