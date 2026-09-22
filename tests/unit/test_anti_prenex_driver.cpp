@@ -341,16 +341,17 @@ TEST_CASE("B2: two components are pushed one after the other") {
 	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("B3: a component that re-wraps leaves a unit the next transports") {
-	// `∃x` discharges its atom; the disjunction no step of this module
-	// pushes comes back re-wrapped over `y` (invariant 3), and nothing
-	// later opens it.
+TEST_CASE("B3: the second component is pushed into what the first left") {
+	// Two components again, the second one DISJUNCTIVE. `∃x` strips the
+	// disjunction outside its block and discharges its own atom to `T`;
+	// `∃y` then meets that disjunction alone, where 2b squeezes the two
+	// positives on terms and both discharge at `y := 0`.
 	fixture f = split("ex x ex y (x a = 0 && (y b = 0 || y c = 0)).");
 	const tref got = ap::push_ex_block<node_t>(f.blk.matrix, f.blk.vars,
 		ap::keep_no_functional<node_t>);
 	check_claims(got, f);
-	REQUIRE(binder_count(got) == 1);
-	CHECK(same(ap::binder_var<node_t>(got), f.blk.vars[1]));
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_T());
 }
 
 TEST_CASE("B4: the callback is asked per component, on the block as it stands") {
@@ -498,16 +499,18 @@ TEST_CASE("D2: what the ∃ push resolves comes back negated") {
 	CHECK(are_nso_equivalent<node_t>(finished(got), parse("y = 0.")));
 }
 
-TEST_CASE("D3: a ∀ run whose push re-wraps comes back as the same ∀ head") {
-	// The dualised matrix is a disjunction, which no step of this module
-	// pushes: it re-wraps as `∃x`, and the outbound negation turns that
-	// back into the ∀ block over the matrix it started from.
+TEST_CASE("D3: a ∀ run is answered through the push over its dualised "
+	"disjunction") {
+	// `∀x(x·y = 0 ∧ x·w ≠ 0)` dualises to `∃x(x·y ≠ 0 ∨ x·w = 0)`,
+	// which 2d pushes per disjunct: `∃x(x·w = 0)` is `T` at `x := 0` and
+	// decides the ∨-join, so the outbound negation answers `F` — and `F`
+	// it is, since `x := 0` refutes `x·w ≠ 0`.
 	fixture f = split("all x (x y = 0 && x w != 0).");
 	const tref got = ap::process_block<node_t>(f.blk,
 		ap::keep_no_functional<node_t>);
 	check_claims(got, f);
-	CHECK(same(got, ap::rewrap<node_t>(plainly_spelled(f.blk.matrix),
-		f.blk.vars, tb::all)));
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_F());
 }
 
 TEST_CASE("D4: an ∃ run goes straight to the push") {
@@ -576,16 +579,18 @@ TEST_CASE("A1: the inner run is eliminated first and the outer one folds") {
 	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("A2: a conjunctive matrix re-wraps, and the run above it re-wraps too") {
-	// The push over a conjunction is not part of the module: the inner
-	// block re-wraps (invariant 3), and the ∀ run above it then sees one
-	// UNIT, which its own push transports rather than opens — so both
-	// binders stand in the answer.
+TEST_CASE("A2: an alternating nest is answered innermost first") {
+	// The inner clause is a conjunction no member of which is
+	// disjunctive, so the conjunction push settles `b` whole and the leaf
+	// gives `∃b(a·b = 0 ∧ b·c ≠ 0)` = `a′·c ≠ 0`. The ∀ run above it
+	// then dualises that one literal, `∃a(a′·c = 0)` is `T` at `a := 1`,
+	// and the outbound negation answers `F`.
 	tref phi = parse("all a (ex b (a b = 0 && b c != 0)).");
 	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
 		ap::keep_no_functional<node_t>);
 	check_claims(got, phi);
-	CHECK(binder_count(got) == 2);
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_F());
 }
 
 TEST_CASE("A3: a run inside a conjunction is folded through the join") {
@@ -613,8 +618,11 @@ TEST_CASE("A5: a shared run head is processed once") {
 	// `(∃x.ψ) ∧ ∀y.((∃x.ψ) ∨ χ)` with ONE node for the two `∃x.ψ`, which
 	// the normalisation keeps shared. The second occurrence sits inside
 	// the ∀ run's matrix, so a NESTED walk meets it; the pass memo spans
-	// the walks and answers it, and the callback is asked once per run —
-	// each of these has one component — rather than once per occurrence.
+	// the walks and answers it, so the callback is asked for `ψ`'s ONE
+	// component once and not once per occurrence — a second processing
+	// would show up here as a second ask. The ∀ run adds none: 2b resolves
+	// `ψ` to `T`, which decides the disjunction it stands in, and a matrix
+	// that is a constant has no component to ask about.
 	const tref psi = parse("ex x (x a = 0 || x c = 0).");
 	const tref borrowed = parse("all y (y b = 0).");
 	const tref phi = tau::build_wff_and(psi,
@@ -626,8 +634,9 @@ TEST_CASE("A5: a shared run head is processed once") {
 	auto count = [&asked](tref) { ++asked; return false; };
 	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
 		count);
-	CHECK(asked == 2);
+	CHECK(asked == 1);
 	check_claims(got, phi);
+	CHECK(binder_count(got) == 0);
 }
 
 TEST_CASE("A6: a run under a temporal operator is processed") {
@@ -667,18 +676,22 @@ TEST_CASE("A8: a term is never entered, so a functional quantifier is untouched"
 	CHECK(functional_count(got) == 1);
 }
 
-TEST_CASE("A9: every run of an ∃ over ∀ over ∃ nest is processed") {
-	// Three runs, innermost first. Each matrix is a disjunction or a unit,
-	// which no step of this module pushes, so each run re-wraps over what
-	// the run below it left — and the callback is asked once per run.
+TEST_CASE("A9: an ∃ over ∀ over ∃ nest is walked innermost first") {
+	// The pass reaches the innermost run through both enclosing ones and
+	// answers it first: `∃c` is distributed over the disjunction (2d),
+	// where the `a·b = 0` disjunct is c-free and rides along while
+	// `∃c(c·d = 0)` is `T` at `c := 0` and decides the ∨-join. That `T`
+	// is the matrix of both runs above, so neither has a component left
+	// to ask the callback about, and phase 5 drops their binders.
 	tref phi = parse("ex a (all b (ex c (a b = 0 || c d = 0))).");
 	size_t asked = 0;
 	auto count = [&asked](tref) { ++asked; return false; };
 	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
 		count);
-	CHECK(asked == 3);
+	CHECK(asked == 1);
 	check_claims(got, phi);
-	CHECK(binder_count(got) == 3);
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_T());
 }
 
 } // TEST_SUITE

@@ -14,10 +14,11 @@
 // the finished formula), no free variable ESCAPED, INVARIANT 4, and per case
 // the block RESOLVED or exactly the RE-WRAP.
 //
-// EVERY RE-ENTRY of these steps goes through `push_block`, whose `∧` and `∨`
-// arms re-wrap; `push/push_block.h` is the hub that wires the steps into that
-// dispatcher. So a junction a step hands back comes back around the narrowed
-// block, which is what the shapes below expect.
+// EVERY RE-ENTRY of these steps goes through `push_block`, the hub
+// (`push/push_block.h`), whose `∨` and `∧` arms are these two steps: a
+// junction a step hands back is pushed on under the narrowed block, and only
+// what the whole ladder leaves comes back wrapped (invariant 3). The shapes
+// below are the ladder's, not one step's.
 //
 // TYPES: §7's table has no row for an untyped block, so every fixture carries
 // typed variables, read off the parsed block through inference.
@@ -210,28 +211,26 @@ TEST_CASE("J1: a disjunct that resolves to T decides the join") {
 	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("J2: a disjunct no step resolves comes back re-wrapped beside the "
-	"resolved one") {
-	// `∃x(x·y ≠ 0)` is `y ≠ 0`; the conjunction beside it re-enters
-	// `push_block`, whose `∧` arm re-wraps it over `x` alone. `∃X` is
-	// distributed either way, which is 2d.
+TEST_CASE("J2: each disjunct is pushed under the block on its own") {
+	// `∃X` is distributed over the disjunction and each disjunct pushed
+	// with the block narrowed to itself, which is 2d. `∃x(x·y ≠ 0)` is
+	// `y ≠ 0`, by 2a; the conjunction beside it re-enters `push_block`,
+	// whose `∧` arm settles `x` and hands the clause to the leaf, giving
+	// `a′·b ≠ 0`. Two literals, no binder.
 	fixture f = make("ex x (x y != 0 || (x a = 0 && x b != 0)).");
 	REQUIRE(is_child<node_t>(f.clause, tau::wff_or));
 	REQUIRE(ap::members<node_t>(f.clause).size() == 2);
 	const tref got = pushed_or(f);
 	check_against_source(got, f);
+	check_resolved(got, f);
 	REQUIRE(is_child<node_t>(got, tau::wff_or));
 	const trefs ms = ap::members<node_t>(got);
 	REQUIRE(ms.size() == 2);
-	// One member is the resolved literal, the other the re-wrapped block.
-	CHECK(binder_count(got) == 1);
-	size_t wrapped = 0, literals = 0;
-	for (tref m : ms) {
-		if (binder_count(m) == 1) ++wrapped;
-		else if (ap::is_negated_equation<node_t>(m)) ++literals;
-	}
-	CHECK(wrapped == 1);
-	CHECK(literals == 1);
+	size_t literals = 0;
+	for (tref m : ms) if (ap::is_negated_equation<node_t>(m)) ++literals;
+	CHECK(literals == 2);
+	CHECK(are_nso_equivalent<node_t>(finished(got),
+		parse("!(y = 0) || !(a'b = 0).")));
 }
 
 // --- scope narrowing: the split ---------------------------------------------------
@@ -249,36 +248,37 @@ TEST_CASE("N1: the split pushes each part under its own variables") {
 	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("N2: a part takes only the variables of its own component") {
-	// The four `x` conjuncts are one part and `y·b = 0` another. The `y`
-	// part discharges to `T` and drops out of the ∧-join; the `x` part is
-	// a conjunction, which re-enters `push_block` and comes back wrapped
-	// over `x` ALONE — `y` is not in its block.
+TEST_CASE("N2: a part is pushed under its own variables, and an F part "
+	"decides the join") {
+	// The four `x` conjuncts are one part and `y·b = 0` another. Each is
+	// pushed under ITS OWN variables: the `y` part discharges to `T` and
+	// drops out of the ∧-join, and the `x` part — a conjunction that
+	// settles `x` whole, `y` not being in its block at all — has its
+	// positives squeeze to `1`, so §7 answers `F` for it. An `F` conjunct
+	// decides its clause at once (invariant 7).
 	fixture f = make("ex x ex y (x a = 0 && x' a = 0 && x a' = 0 "
 		"&& x' a' = 0 && y b = 0).");
 	REQUIRE(f.P.size() == 2);
 	REQUIRE(ap::incidence<node_t>(ap::members<node_t>(f.clause),
 		f.P).parts.size() == 2);
-	// The positives of the `x` part squeeze to `1`, so §7 answers `F` for
-	// it: this is the part an eager `F` would decide the whole ∧-join on.
 	const ap::block x{ f.P[0] };
 	const tref part = ap::simplified_and_join<node_t>(
 		conjuncts_of(f, f.P[0]));
 	REQUIRE(tau::get(ap::eliminate_block<node_t>(part, x, f.c)).equals_F());
 	const tref got = pushed_and(f);
 	check_against_source(got, f);
-	REQUIRE(binder_count(got) == 1);
-	CHECK(same(ap::binder_var<node_t>(got), f.P[0]));
-	CHECK(!ap::fv_meets<node_t>(got, ap::block{ f.P[1] }));
+	check_resolved(got, f);
+	CHECK(tau::get(got).equals_F());
 }
 
 // --- scope narrowing: the settle move ---------------------------------------------
 
 TEST_CASE("N3: a settled variable leaves through its own sub-block") {
 	// `x` touches no disjunctive conjunct, so its scope is final:
-	// `∃x∃y(x·y = 0 ∧ D) = ∃y(∃x(x·y = 0) ∧ D)`. The sub-block discharges
-	// to `T`, and what is left is pushed on under `y` alone — a
-	// disjunction, which re-wraps.
+	// `∃x∃y(x·y = 0 ∧ D) = ∃y(∃x(x·y = 0) ∧ D)`. The sub-block
+	// discharges to `T`, which leaves the ∧-join, and what remains is
+	// pushed on under `y` alone: a disjunction of positives, which 2b
+	// squeezes on terms and the leaves discharge to `T` at `y := 0`.
 	fixture f = make("ex x ex y (x y = 0 && (y a = 0 || y b = 0)).");
 	REQUIRE(f.P.size() == 2);
 	const ap::incidence_result<node_t> inc =
@@ -288,9 +288,8 @@ TEST_CASE("N3: a settled variable leaves through its own sub-block") {
 	REQUIRE(same(inc.settled[0], f.P[0]));
 	const tref got = pushed_and(f);
 	check_against_source(got, f);
-	REQUIRE(binder_count(got) == 1);
-	CHECK(same(ap::binder_var<node_t>(got), f.P[1]));
-	CHECK(!ap::fv_meets<node_t>(got, ap::block{ f.P[0] }));
+	check_resolved(got, f);
+	CHECK(tau::get(got).equals_T());
 }
 
 TEST_CASE("N4: a clause whose ∨-nodes settle nothing is pushed home") {
@@ -310,19 +309,22 @@ TEST_CASE("N4: a clause whose ∨-nodes settle nothing is pushed home") {
 TEST_CASE("N5: in keep mode the settled sub-block emits its chain") {
 	// `DISCHARGE` under `ctx.keep_functional` spells the sub-block instead
 	// of solving it: `∃x(x·y = 0)` comes back as the atom `(∀_x x·y) = 0`,
-	// a chain over the stored BDD, which rides on as a conjunct of the
-	// smaller block. The component's close resolves it, and what is left
-	// is the answer the plain mode gives.
+	// a chain, which rides on as a conjunct of the smaller block — where
+	// 2b squeezes it INTO the terms it builds, so the chain ends up in a
+	// BDD leaf (§1's leaf hazard) and is only visible once the terms are
+	// spelled out. The close resolves the chains it can reach and never
+	// enters a leaf (§3 `RESOLVE_FUNCTIONAL_BDD`), so that one stays —
+	// decided already, and the answer is the plain mode's.
 	fixture plain = make("ex x ex y (x y = 0 && (y a = 0 || y b = 0)).");
 	fixture kept = make("ex x ex y (x y = 0 && (y a = 0 || y b = 0)).",
 		true);
 	const tref want = pushed_and(plain);
 	tref emitted = nullptr;
 	const tref got = pushed_and(kept, &emitted);
-	CHECK(holds(emitted, tau::bf_fall));
+	CHECK(holds(finished(emitted), tau::bf_fall));
 	CHECK(!same(emitted, want));
 	check_against_source(got, kept);
-	CHECK(!holds(got, tau::bf_fall));
+	CHECK(holds(got, tau::bf_fall));
 	CHECK(!holds(got, tau::bf_fex));
 	CHECK(are_nso_equivalent<node_t>(finished(got), finished(want)));
 }

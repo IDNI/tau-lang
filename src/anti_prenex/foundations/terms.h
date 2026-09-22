@@ -18,8 +18,7 @@
  * `build(term, order)` treats exactly the order's keys as decision variables
  * and everything else as a leaf, which IS this representation. A BDD-backed
  * term is stored as a `bf(BDD_ID)` node, interned per type, so the same BDD
- * is the same Tau node everywhere and the round trip out of and back into
- * this representation preserves hash-consed identity.
+ * is the same Tau node everywhere.
  *
  * THE LIVE ORDER IS THE CALLER'S. Every BDD primitive here takes the order as
  * an explicit parameter — the component's `ctx.order` (§5) — and nothing in
@@ -132,11 +131,11 @@ tref prepare_terms(tref body, const block& P, const var_order<node>& order);
  * opaque, and the library's substitute spells a backed witness out before it
  * enters an argument, so there is nothing below a reference to spell.
  *
- * Why the plain normal form and not the library's raw spelling: it makes the
- * round trip an identity BY NODE. A term the component prepared comes back
- * as the node it went in as, so a re-wrapped block is the node phase 3 built,
- * a kept chain is spelled as the plain phases spell it, and `ANTI_PRENEX` is
- * a fixpoint on its own output.
+ * Why the plain normal form and not the library's raw spelling: every
+ * spelled term goes through the plain-regime simplification phase 1 applies
+ * to every atom, a kept chain's body included, so the terms leaving a
+ * component are normalised the way the phases around the push normalise
+ * theirs — ONE normal form on both sides of the module.
  *
  * @param phi a `wff` node, at the close of one component
  * @return the same formula with every term plain

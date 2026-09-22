@@ -26,6 +26,7 @@ set(TESTS
 	anti_prenex_layer4
 	anti_prenex_fast_paths
 	anti_prenex_junctions
+	anti_prenex_layer5
 	adt_flatten
 	adt_parsing
 	adt_types

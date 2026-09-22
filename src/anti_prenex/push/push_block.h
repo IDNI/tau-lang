@@ -14,6 +14,15 @@
  * WHAT GOES OUT: a formula equivalent to `∃X.φ`, pushed as far inward as the
  * steps reach. What no step reaches is RE-WRAPPED, never answered `F`
  * (invariant 3).
+ *
+ * THE HUB, the module's one documented exception to "each header includes
+ * what it needs": the two declarations below come first, then the step files
+ * `push/fast_paths.h` and `push/junctions.h` — each holding its own
+ * `.tmpl.h` and not including this one back, their bodies calling
+ * `push_block` — and last this file's own `.tmpl.h`, so every declaration
+ * precedes every template body and any include order works. Everything
+ * outside the push — the module's shell, every test — includes this file
+ * alone and gets the whole push with it.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__PUSH_BLOCK_H__
@@ -57,17 +66,27 @@ tref push_block(tref phi, const block& X, ctx<node>& c);
  * @brief §6 `PUSH_BLOCK_UNCACHED(φ, X, ctx)`: the dispatcher, cheapest class
  * first (invariant 8).
  *
- * 1. A NEGATIVE TREE (§1) goes whole to the leaf (§7): it is one conjunct,
+ * 1. THE FAST PATHS (2a, 2b, `push/fast_paths.h`), for a formula that is NOT
+ *    a conjunction: one census walk, and what fires ends in small clauses at
+ *    the leaf. A conjunction tries them inside `PUSH_OVER_CONJUNCTION`
+ *    instead, after the scope narrowing, so that what they are asked of
+ *    carries no material the narrowing would have taken out.
+ * 2. A NEGATIVE TREE (§1) goes whole to the leaf (§7): it is one conjunct,
  *    and pushing per member would hand the elimination one unit per
- *    non-literal member instead of one.
- * 2. A DISJUNCTION or a CONJUNCTION re-wraps. The push over a junction is not
- *    part of the module; the block comes back around the formula, undecided
- *    (invariant 3).
- * 3. A LITERAL or a BINDER UNIT is a one-literal (or one-unit) clause and
+ *    non-literal member instead of one. Where 2a applies it has taken the
+ *    tree above already.
+ * 3. A DISJUNCTION is pushed per disjunct (2d, `push/junctions.h`), smallest
+ *    first, so a disjunct deciding `T` leaves the dearer ones unpushed.
+ * 4. A CONJUNCTION goes through the ladder a conjunction offers
+ *    (`push/junctions.h`): scope narrowing, the fast paths, the consistency
+ *    check, the witness step, the case witness — and the re-wrap of
+ *    invariant 3 below all of them, where the licensed decomposition and the
+ *    expansion will stand.
+ * 5. A LITERAL or a BINDER UNIT is a one-literal (or one-unit) clause and
  *    goes to the leaf (§7), which may swallow a unit whole into a query. An
  *    order atom is a literal too, and comes back from the method's freeze as
  *    exactly the re-wrap below.
- * 4. Anything else — a reference, a temporal operator, or `¬` over one — is
+ * 6. Anything else — a reference, a temporal operator, or `¬` over one — is
  *    re-wrapped: pushed as far as it goes (invariant 3).
  *
  * `X` is non-empty and already narrowed to `X ∩ FV(φ)`, the wrapper's
@@ -77,6 +96,10 @@ template <NodeType node>
 tref push_block_uncached(tref phi, const block& X, ctx<node>& c);
 
 } // namespace idni::tau_lang::anti_prenexing
+
+// The steps, after the declarations they call back into (see THE HUB above).
+#include "fast_paths.h"
+#include "junctions.h"
 
 #include "push_block.tmpl.h"
 

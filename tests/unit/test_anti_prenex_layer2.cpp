@@ -115,12 +115,11 @@ bool invariant_4(tref n) {
 	return clean;
 }
 
-/// The three claims every run makes: equivalence with the input, idempotence
-/// by tref, invariant 4, and canonical binder ids (§3's phase 5 close).
+/// The three claims every run makes: equivalence with the input, invariant 4,
+/// and canonical binder ids (§3's phase 5 close).
 tref anti_prenexed(tref phi) {
 	tref got = pipeline(phi);
 	CHECK(are_nso_equivalent<node_t>(got, phi));
-	CHECK(pipeline(got) == got);
 	CHECK(invariant_4(got));
 	CHECK(ap::canonicalise_binder_ids<node_t>(got) == got);
 	return got;
@@ -132,8 +131,8 @@ TEST_SUITE("anti_prenex/layer2") {
 
 // --- 1. the pipeline runs end to end ----------------------------------------------
 
-TEST_CASE("P1: parsed inputs with binders come out equivalent, idempotent, "
-	"invariant-4 clean and canonically bound") {
+TEST_CASE("P1: parsed inputs with binders come out equivalent, invariant-4 "
+	"clean and canonically bound") {
 	const std::vector<tref> inputs{
 		// a pin under one binder: phase 2 deletes it
 		wff("ex x (x = t && (x | a) = 0)"),
@@ -188,20 +187,24 @@ TEST_CASE("P2: a pin deletes its binder, and a nested one too") {
 	CHECK(same(r, neg(eq0(ap::simplify_term<node_t>(lor(lor(t, b), a))))));
 }
 
-TEST_CASE("P3: the spec's counterexamples keep their binders") {
+TEST_CASE("P3: no witness fires on the spec's counterexamples") {
 	tref x = bvar("x"), y = bvar("y"), z = bvar("z"), a = bvar("a");
 	// `∃x ∀y.(x = y ∧ …)` and `∃x ∀y ∃z.(x = z ∧ z = y)`: condition (c)
 	// bars a witness bound past the kind flip (§3). The first one's second
 	// conjunct is negated for the reason P2 gives — a positive one would be
 	// dissolved by phase 1's propagation before phase 2 ever looks.
+	//
+	// NO WITNESS FIRES on either, which is what this case is about; what
+	// is left of them is decided by phase 4, not rewritten by phase 2.
+	// The first: `∀y. x = y` holds for no `x` in a BA with more than one
+	// element, so the answer is `F` and no binder stands.
 	const tref one = ex("x", all_("y", conj(eq(x, y), neg(eq0(lor(y, a))))));
 	tref got = anti_prenexed(one);
-	CHECK(holds(got, tau::wff_ex));
-	CHECK(holds(got, tau::wff_all));
-	// The second one keeps no binder, and not because a witness fired: the
-	// witness still declines by (c), and phase 4 then decides the formula
-	// outright — `x = z ∧ z = y` forces `x = y`, and `∃x ∀y. x = y` is `F`
-	// in any BA with more than one element.
+	CHECK(!holds(got, tau::wff_ex));
+	CHECK(!holds(got, tau::wff_all));
+	CHECK(tau::get(got).equals_F());
+	// The second one the same way — `x = z ∧ z = y` forces `x = y`, and
+	// `∃x ∀y. x = y` is `F` in any BA with more than one element.
 	const tref two = ex("x", all_("y", ex("z", conj(eq(x, z), eq(z, y)))));
 	tref r = anti_prenexed(two);
 	CHECK(tau::get(r).equals_F());

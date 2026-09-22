@@ -348,69 +348,83 @@ TEST_CASE("P10: a binder unit is a one-unit clause, and freezes") {
 	CHECK(binder_count(got) == 2);
 }
 
-// --- the dispatcher: what re-wraps ----------------------------------------------------
+// --- the dispatcher: what goes to a junction's own step -------------------------------
 
-TEST_CASE("P11: a plain clause re-wraps") {
-	// The push over a junction is not part of the module: the block comes
-	// back around the conjunction, undecided (invariant 3).
+TEST_CASE("P11: a plain clause is pushed home and resolves") {
+	// The `∧` arm hands the clause to the conjunction push, whose scope
+	// narrowing finds no disjunctive conjunct at all: `Xs = X`, the
+	// degenerate case, and the whole clause goes to the leaf in one piece
+	// (§6). `∃x(x·y = 0 ∧ x·w ≠ 0)` is `y′·w ≠ 0`, witnessed by
+	// `x := y′·w`.
 	fixture f = make("ex x (x y = 0 && x w != 0).");
 	const tref got = pushed(f);
 	check_against_source(got, f);
-	CHECK(same(got, rewrapped(f)));
-	CHECK(binder_count(got) == 1);
-	CHECK(same(ap::binder_var<node_t>(got), f.P[0]));
+	check_resolved(got, f);
+	CHECK(are_nso_equivalent<node_t>(finished(got), parse("!(y'w = 0).")));
 }
 
-TEST_CASE("P12: a clause holding a disjunctive conjunct re-wraps") {
+TEST_CASE("P12: a clause holding a positive disjunctive conjunct is squeezed") {
+	// `x` touches a disjunctive conjunct, so neither move of the scope
+	// narrowing fires and the fast paths are asked on the whole clause.
+	// Every leaf is positive and none is X-free, so 2b squeezes on TERMS
+	// into `{x(y ∪ w), x(y ∪ z)}`, and each of those one-atom clauses
+	// is discharged to `T` at `x := 0`.
 	fixture f = make("ex x (x y = 0 && (x w = 0 || x z = 0)).");
 	const tref got = pushed(f);
 	check_against_source(got, f);
-	CHECK(same(got, rewrapped(f)));
-	CHECK(binder_count(got) == 1);
+	check_resolved(got, f);
+	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("P13: a clause whose only ∨-member is a negative tree re-wraps") {
-	// The negative-tree arm reads the WHOLE formula, not a member of it:
-	// a conjunction holding one is a conjunction.
+TEST_CASE("P13: a clause whose only ∨-member is a negative tree is pushed home") {
+	// The negative-tree arm reads the WHOLE formula, not a member of it,
+	// so this is a conjunction for the dispatcher. Inside the conjunction
+	// push a negative tree is no disjunctive conjunct either (§6): `x`
+	// settles, `Xs = X`, and the clause goes to the leaf whole.
+	// `∃x(x·y = 0 ∧ (x·w ≠ 0 ∨ x·z ≠ 0))` is `y′w ≠ 0 ∨ y′z ≠ 0`.
 	fixture f = make("ex x (x y = 0 && (x w != 0 || x z != 0)).");
 	REQUIRE(!ap::is_negative_tree<node_t>(f.clause));
 	const tref got = pushed(f);
 	check_against_source(got, f);
-	CHECK(same(got, rewrapped(f)));
-	CHECK(binder_count(got) == 1);
+	check_resolved(got, f);
+	CHECK(are_nso_equivalent<node_t>(finished(got),
+		parse("!(y'w = 0) || !(y'z = 0).")));
 }
 
-TEST_CASE("P14: a clause is stripped, and what is left re-wraps") {
+TEST_CASE("P14: a clause is stripped, and what is left is pushed home") {
 	// The two halves of the wrapper in one formula: `w = 0` rides outside
-	// the block, and the dependent conjunction — which no step of this
-	// module pushes — comes back re-wrapped beside it.
+	// the block, and the dependent clause — P11's, under a block of its
+	// own now — settles and is discharged beside it.
 	fixture f = make("ex x (x y = 0 && x w != 0 && w = 0).");
 	trefs indep, dep;
 	for (tref m : ap::members<node_t>(f.clause))
 		(ap::fv_meets<node_t>(m, f.P) ? dep : indep).push_back(m);
 	REQUIRE(indep.size() == 1);
 	REQUIRE(dep.size() == 2);
-	indep.push_back(ap::rewrap<node_t>(
-		ap::simplified_and_join<node_t>(dep), f.P));
 	const tref got = pushed(f);
 	check_against_source(got, f);
-	CHECK(same(got, ap::simplified_and_join<node_t>(indep)));
-	// ONE binder, over `x` alone, around the two dependent conjuncts.
-	REQUIRE(binder_count(got) == 1);
-	const trefs ms = ap::members<node_t>(got);
-	REQUIRE(ms.size() == 2);
-	CHECK(binder_count(ms[0]) + binder_count(ms[1]) == 1);
+	check_resolved(got, f);
+	// `w = 0` stands beside the discharged half — the strip moves a
+	// conjunct, it does not decide it, and the result join reads only the
+	// members' top-level interaction (invariant 6), so the two are not
+	// folded together although `w = 0` refutes `y′·w ≠ 0`.
+	CHECK(ap::members<node_t>(got).size() == 2);
+	CHECK(are_nso_equivalent<node_t>(finished(got),
+		parse("w = 0 && !(y'w = 0).")));
 }
 
-TEST_CASE("P15: a disjunction re-wraps") {
-	// Not a negative tree — `x·w = 0` is a positive leaf — so it is the
-	// disjunction arm that answers, with the same re-wrap.
+TEST_CASE("P15: a disjunction of positives is taken by 2b, not by 2d") {
+	// The fast paths are tried before the junction arms for anything but
+	// a conjunction (§6): every leaf here is a positive equation and none
+	// is X-free, so 2b squeezes the disjunction on TERMS into `{x·y,
+	// x·w}`, and each one-atom clause discharges to `T` at `x := 0`.
 	fixture f = make("ex x (x y = 0 || x w = 0).");
 	REQUIRE(is_child<node_t>(f.clause, tau::wff_or));
+	REQUIRE(ap::try_fast_paths<node_t>(f.clause, f.P, f.c).has_value());
 	const tref got = pushed(f);
 	check_against_source(got, f);
-	CHECK(same(got, rewrapped(f)));
-	CHECK(binder_count(got) == 1);
+	check_resolved(got, f);
+	CHECK(tau::get(got).equals_T());
 }
 
 TEST_CASE("P16: a reference re-wraps") {

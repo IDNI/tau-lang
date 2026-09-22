@@ -179,7 +179,8 @@ TEST_CASE("prepare_terms: equal sides fold through the hooks on BDD_ID operands 
 
 // 1b. finish_terms -------------------------------------------------------------
 
-TEST_CASE("finish_terms: the round trip of prepare_terms is the identity by node") {
+TEST_CASE("finish_terms: the round trip of prepare_terms gives the formula "
+	"back plain") {
 	tref x = vr("x");
 	ap::block P{ x };
 	order_t o = order_of(P);
@@ -190,11 +191,15 @@ TEST_CASE("finish_terms: the round trip of prepare_terms is the identity by node
 	const tref phi = ap::canonical_and<node_t>(trefs{ a, b });
 	const tref prepared = ap::prepare_terms<node_t>(phi, P, o);
 	REQUIRE(has_bdd_id(prepared));
-	CHECK(ap::finish_terms<node_t>(prepared) == phi);
+	const tref back = ap::finish_terms<node_t>(prepared);
+	CHECK(!has_bdd_id(back));
+	CHECK(are_nso_equivalent<node_t>(back, phi));
 	// the negated atom alone, so the negation rebuild is claimed on its own
 	const tref one = ap::prepare_terms<node_t>(b, P, o);
 	REQUIRE(has_bdd_id(one));
-	CHECK(ap::finish_terms<node_t>(one) == b);
+	const tref one_back = ap::finish_terms<node_t>(one);
+	CHECK(!has_bdd_id(one_back));
+	CHECK(are_nso_equivalent<node_t>(one_back, b));
 }
 
 TEST_CASE("finish_terms: a kept chain comes back with a plain, canonical body") {
@@ -212,9 +217,9 @@ TEST_CASE("finish_terms: a kept chain comes back with a plain, canonical body") 
 	const tref got = ap::finish_terms<node_t>(atm);
 	CHECK(!has_bdd_id(got));
 	CHECK(ap::carries_functional_quantifier<node_t>(got));
-	// SPELLED CANONICALLY: the plain atom simplification is the identity
-	// on its own output, which is what makes `ANTI_PRENEX` a fixpoint on
-	// its own output from the first run, a kept chain included.
+	// SPELLED CANONICALLY: the spelled atom is in the plain regime's
+	// normal form — the one phase 1 gives every atom — so the plain atom
+	// simplification is the identity on it, a kept chain included.
 	CHECK(ap::simplify_atom<node_t>(got, {}) == got);
 }
 

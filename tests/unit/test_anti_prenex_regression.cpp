@@ -19,7 +19,10 @@
 //  where the checker is undecidable, and not at all where neither applies,
 //  which each such case says); no free variable ESCAPED (`FV(out) ⊆ FV(in)`);
 //  INVARIANT 4 (no `bf_neq`, no negated or mirrored order operator, a `¬`
-//  only directly over an atom); and IDEMPOTENCE by tref.
+//  only directly over an atom). Running the pipeline on its own output is not
+//  claimed to give the same node back: what a run hands back re-wrapped,
+//  phase 5's `SIMPLIFY` may fold further, and a second run then pushes
+//  further.
 //  DORMANT, written and guarded: "the quantifier is actually eliminated" and
 //  the shapes that depend on it. Each carries `resolved_from_layer(N)`
 //  against the `built_layer` constant below, so an assertion switches on with
@@ -41,7 +44,7 @@ namespace {
 
 /// The layer this module is built to. The dormant tier is keyed on it.
 /// Raising it switches on the assertions that layer makes true.
-constexpr int built_layer = 4;
+constexpr int built_layer = 5;
 
 /// A DORMANT claim's guard: true once the layer that makes it true is built.
 bool resolved_from_layer(int n) { return n <= built_layer; }
@@ -123,7 +126,6 @@ tref anti_prenexed(tref in, meaning how = meaning::equivalence) {
 		CHECK(are_nso_equivalent<node_t>(got, in));
 	CHECK(no_escape(got, in));
 	CHECK(invariant_4(got));
-	CHECK(ap::anti_prenex<node_t>(got) == got);
 	return got;
 }
 

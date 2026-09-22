@@ -80,8 +80,8 @@ std::vector<block> connected_components(const block& X, tref body);
  * WHAT GOES OUT IS PLAIN: a component closes by resolving the functional
  * quantifiers `kf` does not keep while the terms are still BDDs, and then
  * spelling every backed term out canonically (§3 `FINISH_TERMS`) — in the
- * plain regime's normal form, so a block that only re-wrapped comes back as
- * the node it arrived as.
+ * plain regime's normal form, the one phase 1 gives every atom, so what
+ * leaves a component is spelled as the phases around the push spell theirs.
  */
 template <NodeType node>
 tref push_ex_block(tref body, const block& X,

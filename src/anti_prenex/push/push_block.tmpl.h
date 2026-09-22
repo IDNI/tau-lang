@@ -9,14 +9,18 @@
  * shape predicates (dag.h) for the key canonicalisation and the dispatch,
  * `rewrap` (prims.h) for the key and for every graceful exit,
  * `simplified_and_join` (normalisers/joins.h) for the strip's two joins,
- * `memoised` (ctx.h) for the table, and `eliminate_block`
- * (eliminate/eliminate_block.h) for the leaves.
+ * `memoised` (ctx.h) for the table, `eliminate_block`
+ * (eliminate/eliminate_block.h) for the leaves, and the steps the dispatcher
+ * hands a formula to: `try_fast_paths` (push/fast_paths.h),
+ * `push_over_disjunction` and `push_over_conjunction` (push/junctions.h),
+ * which push_block.h includes above this file.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__PUSH_BLOCK_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__PUSH__PUSH_BLOCK_TMPL_H__
 
 #include <cassert>
+#include <optional>
 #include <utility>
 
 namespace idni::tau_lang::anti_prenexing {
@@ -64,14 +68,22 @@ template <NodeType node>
 tref push_block_uncached(tref phi, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
 	DBG(assert(!X.empty());)
+	// THE FAST PATHS, for everything but a conjunction: that one asks them
+	// inside `push_over_conjunction`, once the scope narrowing has had its
+	// two moves (§6).
+	if (!is_child<node>(phi, tau::wff_and))
+		if (const std::optional<tref> r =
+			try_fast_paths<node>(phi, X, c)) return *r;
 	// A negative tree is an ∨-node, so it is classified ahead of the
-	// junctions; the test is cached (§1).
+	// junctions; the test is cached (§1). Where 2a applies it took the
+	// whole tree above.
 	if (is_negative_tree<node>(phi)) return eliminate_block<node>(phi, X, c);
-	// The push over a junction is not part of the module; the block
-	// re-wraps, whatever the junction's shape (invariant 3).
-	if (is_child<node>(phi, tau::wff_or)
-		|| is_child<node>(phi, tau::wff_and))
-			return rewrap<node>(phi, X);
+	// The two junctions, each its own step: 2d per disjunct, and the
+	// conjunction's ladder (push/junctions.h).
+	if (is_child<node>(phi, tau::wff_or))
+		return push_over_disjunction<node>(phi, X, c);
+	if (is_child<node>(phi, tau::wff_and))
+		return push_over_conjunction<node>(phi, X, c);
 	// A one-literal or one-unit clause, which the leaf reads as its own
 	// one-member view (§7).
 	if (is_literal<node>(phi) || is_child_quantifier<node>(phi))

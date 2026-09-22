@@ -9,8 +9,9 @@
 // with `get_nso_rr` so that the types come from inference — §7's table has no
 // row for an untyped block. What every case claims, through node identity
 // and `are_nso_equivalent` and never through an output string:
-//  1. the output is EQUIVALENT to the input, and running the pipeline again
-//     returns the SAME node (idempotence by tref);
+//  1. the output is EQUIVALENT to the input (running the pipeline on its own
+//     output is not claimed to give the same node back: what a run hands back
+//     re-wrapped, phase 5's `SIMPLIFY` may fold further);
 //  2. INVARIANT 4 — no `bf_neq`, no negated or mirrored order operator, and a
 //     `¬` only directly over an atom;
 //  3. binder ids are canonical (§3's phase 5 close);
@@ -19,11 +20,15 @@
 // Then its own SHAPE claim: what the block driver does to that input, worked
 // out from the spec and spelled in the case's comment.
 //
-// WHAT RESOLVES: a block over one literal, one negative tree (§1: an ∨-node
-// all of whose leaves are negated equations) or one binder unit. Every other
-// disjunction and every conjunction RE-WRAPS, after the strip of its X-free
-// conjuncts — the push over a junction is not part of the module, and an
-// undecided block comes back wrapped rather than answered (invariant 3).
+// WHAT RESOLVES: §6's cheap steps are all wired into the dispatcher, so a
+// block resolves wherever one of them reaches — a literal, a negative tree
+// (§1: an ∨-node all of whose leaves are negated equations) or a binder unit
+// at the leaf, the two fast paths, the push per disjunct, and the
+// conjunction's ladder of scope narrowing, fast paths, consistency check and
+// pin matches. What none of them takes re-wraps, after the strip of its
+// X-free conjuncts: an undecided block comes back wrapped rather than
+// answered (invariant 3). The cases here are the DRIVER's; the ladder's own
+// milestone is tests/unit/test_anti_prenex_layer5.cpp.
 //
 // Some cases take their INPUT STRING, and nothing else, from
 // tests/unit/test_antiprenexing.cpp; every expectation here is the spec's. A
@@ -103,53 +108,12 @@ bool invariant_4(tref n) {
 	return clean;
 }
 
-/// The formula under the outermost @p k binders of `n`.
-tref matrix_of(tref n, size_t k) {
-	while (k-- > 0) {
-		REQUIRE(is_child_quantifier<node_t>(n));
-		n = tau::trim_right_sibling(ap::binder_body<node_t>(n));
-	}
-	return n;
-}
-
-/// THE PIPELINE WITHOUT ITS PUSH: §3's phases in order, phase 4 left out. A
-/// run the push only RE-WRAPS gives its formula back as the node it arrived
-/// as — a component's close spells its terms in the plain regime's normal
-/// form (§3 `FINISH_TERMS`), the form the phases around it use — so a result
-/// that equals this came out of phase 4 untouched.
-tref without_the_push(tref phi) {
-	tref n = ap::canonicalise_binder_ids<node_t>(phi);
-	n = ap::resolve_functional_quantifiers_plain<node_t>(n,
-		ap::keep_no_functional<node_t>);
-	n = ap::to_canonically_factored_nnf<node_t>(n);
-	n = ap::simplify<node_t>(n, {}, true);
-	n = ap::eliminate_by_substitution<node_t>(n);
-	n = ap::simplify<node_t>(n);
-	n = ap::normalize_operators<node_t>(n);
-	n = ap::simplify<node_t>(n);
-	n = ap::fold_degenerate_binders<node_t>(n);
-	return ap::canonicalise_binder_ids<node_t>(n);
-}
-
-/// A RE-WRAPPED RUN: one binder over the same junction with the same members,
-/// and the block variable still bound under it.
-void rewrapped_over(tref got, size_t junction, size_t member_count) {
-	REQUIRE(binder_count(got) == 1);
-	const tref matrix = matrix_of(got, 1);
-	CHECK(is_child<node_t>(matrix, junction));
-	CHECK(ap::members<node_t>(matrix).size() == member_count);
-	CHECK(ap::fv_meets<node_t>(matrix,
-		ap::block{ tau::trim_right_sibling(
-			ap::binder_var<node_t>(got)) }));
-}
-
 /// THE CLAIMS EVERY CASE MAKES. @p equivalent is false where the checker is
 /// out of reach — it does not decide a formula holding an unresolved
 /// reference — and the case then rests on the structural claims alone.
 tref anti_prenexed(tref phi, bool equivalent = true) {
 	const tref got = ap::anti_prenex<node_t>(phi);
 	if (equivalent) CHECK(are_nso_equivalent<node_t>(got, phi));
-	CHECK(ap::anti_prenex<node_t>(got) == got);
 	CHECK(invariant_4(got));
 	CHECK(ap::canonicalise_binder_ids<node_t>(got) == got);
 	CHECK(no_escape(got, phi));
@@ -198,15 +162,17 @@ TEST_CASE("M3: the strip leaves a one-literal block behind") {
 
 // --- 2. runs, nests and alternations ----------------------------------------------
 
-TEST_CASE("M4: an alternating nest re-wraps around its conjunctive clause") {
-	// The corpus's R9, whose stronger claim needs the push over a
-	// conjunction. The inner matrix is a CONJUNCTION, which re-wraps
-	// (invariant 3); the ∀ run above it is dualised onto a binder UNIT,
-	// which the leaf transports rather than opens, so both binders stand
-	// in the answer.
+TEST_CASE("M4: an alternating nest is answered innermost first") {
+	// The corpus's R9, the claim the conjunction push makes true. The
+	// inner matrix is a conjunction with no disjunctive member, so the
+	// scope narrowing settles `b` whole and the leaf answers
+	// `∃b(a·b = 0 ∧ b·c ≠ 0)` with `a′·c ≠ 0`; the ∀ run above it
+	// dualises that one literal, `∃a(a′·c = 0)` is `T` at `a := 1`, and
+	// the outbound negation answers `F`. No binder is left.
 	const tref phi = parse("all a ex b (ab = 0 && bc != 0).");
 	const tref got = anti_prenexed(phi);
-	CHECK(binder_count(got) == 2);
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_F());
 }
 
 TEST_CASE("M5: nested same-kind runs are shared between phases 2 and 4") {
@@ -231,47 +197,46 @@ TEST_CASE("M6: an alternation is eliminated innermost first") {
 
 // --- 3. what re-wraps -------------------------------------------------------------
 
-TEST_CASE("M7: a ∀ matrix that is a negative tree comes back as it went") {
+TEST_CASE("M7: a ∀ matrix that is a negative tree is answered through its "
+	"dual") {
 	// The matrix is a negative tree, but the ∀ run is DUALISED before the
 	// push, so what the dispatcher sees is the conjunction `x·y = 0 ∧
-	// x·w = 0` — which re-wraps. The outbound negation restores the run.
+	// x·w = 0`: no member of it is disjunctive, the narrowing settles `x`
+	// whole, and the leaf answers `T` at `x := 0`. Negated back, the run
+	// is `F` — as it must be, `x := 0` refuting both disequations.
 	const tref phi = parse("all x (xy != 0 || xw != 0).");
 	const tref got = anti_prenexed(phi);
-	CHECK(holds(got, tau::wff_all));
-	rewrapped_over(got, tau::wff_or, 2);
-	// The run came back as it went, BY NODE.
-	CHECK(got == without_the_push(phi));
+	CHECK(!holds(got, tau::wff_all));
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_F());
 }
 
-TEST_CASE("M8: a disjunction matrix re-wraps unchanged") {
-	// Not a negative tree — its leaves are positive — so the dispatcher's
-	// junction arm re-wraps the block whole (invariant 3).
+TEST_CASE("M8: a disjunction of positives is squeezed to T") {
+	// Not a negative tree — its leaves are positive — and the fast paths
+	// are tried before the junction arms: every leaf is a positive
+	// equation and none is X-free, so 2b squeezes on TERMS into
+	// `{x·y, x·w}` and each one-atom clause discharges at `x := 0`.
 	const tref phi = parse("ex x (xy = 0 || xw = 0).");
 	const tref got = anti_prenexed(phi);
-	CHECK(holds(got, tau::wff_ex));
-	rewrapped_over(got, tau::wff_or, 2);
-	CHECK(got == without_the_push(phi));
+	CHECK(!holds(got, tau::wff_ex));
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("M9: the strip hoists the X-free conjunct and the rest re-wraps") {
+TEST_CASE("M9: the strip hoists the X-free conjunct and the rest resolves") {
 	// `v = 0` does not touch `x`, so the strip hoists it outside the block
-	// (§6); the disjunctive conjunct that is left re-wraps over `x` alone.
-	// What comes back is a conjunction of exactly those two.
+	// (§6); what is left is M8's disjunction, which 2b resolves to `T`,
+	// and a `T` leaves the ∧-join. So the whole formula is `v = 0`.
 	//
 	// The X-free conjunct is written over a variable OF ITS OWN: one the
 	// disjunction also mentions would pin that variable at phase 1 and
 	// dissolve the disjunct before any block is pushed.
 	const tref phi = parse("ex x (v = 0 && (xy = 0 || xw = 0)).");
 	const tref got = anti_prenexed(phi);
-	CHECK(binder_count(got) == 1);
-	REQUIRE(ap::members<node_t>(got).size() == 2);
-	bool free_conjunct = false, wrapped = false;
-	for (tref m : ap::members<node_t>(got)) {
-		if (is_child_quantifier<node_t>(m)) wrapped = true;
-		else free_conjunct = true;
-	}
-	CHECK(free_conjunct);
-	CHECK(wrapped);
+	CHECK(binder_count(got) == 0);
+	CHECK(holds_var(got, "v"));
+	CHECK(are_nso_equivalent<node_t>(got, parse("v = 0.")));
+	CHECK(!holds(got, tau::wff_or));
 }
 
 TEST_CASE("M10: a block over a reference is frozen and re-wrapped") {
@@ -306,7 +271,7 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	// with no formula binder left.
 	//
 	// The claims are spelled out rather than taken from `anti_prenexed`:
-	// idempotence has to be claimed under the SAME callback.
+	// what this case pins is the KEPT shape, under its own callback.
 	const tref phi = parse("ex x (xy = 0).");
 	auto keep_all = [](tref) { return true; };
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
@@ -317,11 +282,6 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	CHECK(!holds(got, tau::BDD_ID));
 	// EQUIVALENT, which the checker does answer for this chain.
 	CHECK(are_nso_equivalent<node_t>(got, phi));
-	// IDEMPOTENT UNDER THE SAME CALLBACK, on the FIRST run: the close spells
-	// the emission's term in the plain regime's normal form (§3
-	// `FINISH_TERMS`), which is the form a second run — finding no formula
-	// binder, hence no component and no order — would spell it in anyway.
-	CHECK(ap::anti_prenex<node_t>(got, keep_all) == got);
 	// Handed back to the default callback, phase 1's
 	// `RESOLVE_FUNCTIONAL_PLAIN` resolves the chain, and what is left is
 	// the answer the plain run gives directly.
@@ -354,23 +314,29 @@ TEST_CASE("M14: a negative tree under a block is resolved whole") {
 	CHECK(!holds_var(got, "x"));
 }
 
-TEST_CASE("M15: a conjunction of negated equations re-wraps") {
+TEST_CASE("M15: a conjunction of negated equations is pushed home") {
 	// test_antiprenexing.cpp:178. A negative tree is an ∨-NODE (§1), so a
-	// conjunction of the same literals is not one: it takes the
-	// dispatcher's junction arm and re-wraps (invariant 3).
+	// conjunction of the same literals is not one: it takes the `∧` arm,
+	// where neither member is disjunctive — the narrowing settles `x`
+	// whole and the leaf answers the clause, `x := 1` witnessing
+	// `y ≠ 0 ∧ w ≠ 0`.
 	const tref phi = parse("ex x (xy != 0 && xw != 0).");
 	const tref got = anti_prenexed(phi);
-	rewrapped_over(got, tau::wff_and, 2);
-	CHECK(got == without_the_push(phi));
+	CHECK(binder_count(got) == 0);
+	CHECK(!holds_var(got, "x"));
+	CHECK(are_nso_equivalent<node_t>(got, parse("!(y = 0) && !(w = 0).")));
 }
 
-TEST_CASE("M16: a mixed-sign clause re-wraps") {
-	// test_antiprenexing.cpp:189. Both conjuncts mention `x`, so the strip
-	// hoists nothing and the conjunction re-wraps whole.
+TEST_CASE("M16: a mixed-sign clause is pushed home") {
+	// test_antiprenexing.cpp:189. Both conjuncts mention `x` and neither
+	// is disjunctive, so the strip hoists nothing, the narrowing settles
+	// `x` whole and the clause goes to the leaf in one piece:
+	// `∃x(x·y = 0 ∧ x·w ≠ 0)` is `y′·w ≠ 0`, witnessed by
+	// `x := y′·w`.
 	const tref phi = parse("ex x (xy = 0 && xw != 0).");
 	const tref got = anti_prenexed(phi);
-	rewrapped_over(got, tau::wff_and, 2);
-	CHECK(got == without_the_push(phi));
+	CHECK(binder_count(got) == 0);
+	CHECK(are_nso_equivalent<node_t>(got, parse("!(y'w = 0).")));
 }
 
 TEST_CASE("M17: a contradictory pin folds the whole formula to F") {
@@ -383,15 +349,19 @@ TEST_CASE("M17: a contradictory pin folds the whole formula to F") {
 	CHECK(tau::get(got).equals_F());
 }
 
-TEST_CASE("M18: the strip leaves a disjunctive clause, which re-wraps") {
+TEST_CASE("M18: the strip leaves a disjunctive clause, pushed per disjunct") {
 	// test_antiprenexing.cpp:340. `z = 0` rides outside the block; what is
 	// left is an ∨-node with a POSITIVE leaf, so it is no negative tree
-	// and re-wraps over `x`.
+	// and no fast path takes it — 2d pushes each disjunct on its own:
+	// `∃x(x·y ≠ 0)` is `y ≠ 0` by 2a, and the conjunction beside it
+	// settles `x` and goes to the leaf as `w′·k ≠ 0`.
 	const tref phi = parse("ex x (z = 0 && (xy != 0 || (xw = 0 && xk != 0))).");
 	const tref got = anti_prenexed(phi);
-	CHECK(binder_count(got) == 1);
+	CHECK(binder_count(got) == 0);
 	CHECK(holds_var(got, "z"));
 	CHECK(ap::members<node_t>(got).size() == 2);
+	CHECK(are_nso_equivalent<node_t>(got,
+		parse("z = 0 && (!(y = 0) || !(w'k = 0)).")));
 }
 
 TEST_CASE("M19: a pin eliminates its binder before the push") {
@@ -404,14 +374,17 @@ TEST_CASE("M19: a pin eliminates its binder before the push") {
 	CHECK(holds_var(got, "w"));
 }
 
-TEST_CASE("M20: a two-variable clause of one component re-wraps whole") {
+TEST_CASE("M20: a two-variable clause of one component is pushed home") {
 	// test_antiprenexing.cpp:899. `x·y = 0` mentions both variables, so
-	// the partition gives ONE component of two; the clause is a mixed-sign
-	// conjunction, which re-wraps, and both binders come back.
+	// the partition gives ONE component of two; no member of the clause is
+	// disjunctive, so the narrowing settles BOTH variables at once and the
+	// leaf answers the whole clause. `x := 1, y := 0` satisfies it in any
+	// atomless BA, so the answer is `T`.
 	const tref phi = parse(
 		"ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).");
 	const tref got = anti_prenexed(phi);
-	CHECK(binder_count(got) == 2);
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_T());
 }
 
 } // TEST_SUITE
