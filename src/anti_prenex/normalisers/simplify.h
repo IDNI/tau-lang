@@ -40,6 +40,7 @@
 
 #include "../foundations/fwd.h"
 #include "../foundations/dag.h"
+#include "../foundations/ctx.h"
 #include "../foundations/terms.h"
 #include "../foundations/options.h"
 
@@ -79,8 +80,9 @@ struct pin {
  * TWO WAYS TO THE COFACTORS, ONE NOTION OF A PIN. The plain regime takes them
  * by SUBSTITUTION, which is what `find_pin` / `find_pin_for` below do; §6
  * `COF` takes them by CHILD SELECTION in the term's BDD. The test on them is
- * the same, so it is written once. `order` is the live order, handed to every
- * `SIMPLIFY_TERM` here; the plain regime passes the empty one.
+ * the same, so it is written once, and both records land in `cof_memo` (§1),
+ * keyed by the term and the variable. `order` is the live order, handed to
+ * every `SIMPLIFY_TERM` here; the plain regime passes the empty one.
  */
 template <NodeType node>
 cof_entry pin_from_cofactors(tref f0, tref f1, tref y,

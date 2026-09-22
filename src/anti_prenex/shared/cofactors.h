@@ -32,7 +32,8 @@ namespace idni::tau_lang::anti_prenexing {
  * `f₀` and `f₁` are `SIMPLIFY_TERM` of the two cofactors, taken by CHILD
  * SELECTION in `f`'s BDD under `ctx.order`; the rest of the `cof_entry`
  * (fwd.h) is the pin test `pin_from_cofactors` (simplify.h) applies to them,
- * the same test the plain regime runs on substitution cofactors. There is no
+ * the same test the plain regime runs on substitution cofactors, recording
+ * the result in this same table (`find_pin`, simplify.h). There is no
  * witness slot: a consumer that needs `f₁′` builds
  * `SIMPLIFY_TERM(¬f₁)` itself, and reads STRICT off `p = 0`.
  *

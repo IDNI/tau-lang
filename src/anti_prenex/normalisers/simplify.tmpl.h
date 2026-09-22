@@ -18,8 +18,9 @@
  *
  * The pieces come from the foundations: `term_of`, `simplify_term`,
  * `simplify_atom`, `mem_size` (terms.h); `fv_meets`, `is_literal`,
- * `binder_var` (dag.h); `tree::substitute` for every rewrite; `get_leaves`
- * for the member view of an open conjunction, with its spine.
+ * `binder_var` (dag.h); `memoised` over `cof_memo` (ctx.h) for the pin
+ * match's cofactor records; `tree::substitute` for every rewrite;
+ * `get_leaves` for the member view of an open conjunction, with its spine.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__SIMPLIFY_TMPL_H__
@@ -105,18 +106,28 @@ tref pin_term(tref atom, const block& X, const var_order<node>& order) {
 ///
 /// The cofactors are taken by SUBSTITUTION, which is what the plain regime
 /// has; the test on them is `pin_from_cofactors` (simplify.h), the one pin
-/// recipe.
+/// recipe. The record is MEMOISED in `cof_memo` (§1) under `(f, y)`, the
+/// table `COF` fills by child selection: `f` is `X`-free, so no order
+/// enters its cofactors and the entry is a pure function of its key, and
+/// the same conjunct is matched again at every construction site of a
+/// push, past the reach of the pass's own per-call memo. The two writers
+/// never meet at one key — `COF` asks about a block variable of a
+/// BDD-backed term, this site about a free variable outside the block. The
+/// table is a cache, absent in Debug builds, so nothing here depends on a
+/// hit.
 template <NodeType node>
 std::optional<pin<node>> pin_of_var(tref f, tref y, size_t type,
 	const var_order<node>& order)
 {
 	using tau = tree<node>;
-	const tref key = tau::get(tau::bf, y);
-	const tref f0 = simplify_term<node>(tau::get(f).substitute(key,
-		_0<node>(type), order, resimplify_argument<node>()), order);
-	const tref f1 = simplify_term<node>(tau::get(f).substitute(key,
-		_1<node>(type), order, resimplify_argument<node>()), order);
-	const cof_entry e = pin_from_cofactors<node>(f0, f1, y, order);
+	const cof_entry e = memoised<node, table::cof_memo>({ f, y }, [&] {
+		const tref key = tau::get(tau::bf, y);
+		const tref f0 = simplify_term<node>(tau::get(f).substitute(key,
+			_0<node>(type), order, resimplify_argument<node>()), order);
+		const tref f1 = simplify_term<node>(tau::get(f).substitute(key,
+			_1<node>(type), order, resimplify_argument<node>()), order);
+		return pin_from_cofactors<node>(f0, f1, y, order);
+	});
 	if (!e.pin) return {};
 	// The witness is the LOWER end `f₁′`: it carries the residual into
 	// every sibling's terms, where `p = 0` then folds syntactically (§3).

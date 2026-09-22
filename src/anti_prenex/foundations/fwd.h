@@ -101,7 +101,8 @@ struct tref_set {
  * cofactoring the term `f` by the variable `x`.
  *
  * `f0` and `f1` are the simplified cofactors `f[x ← 0]` and `f[x ← 1]`, taken
- * by child selection in the BDD (§1). `usable` holds iff
+ * by child selection in the BDD (§1) or, at §3 `SIMPLIFY`'s pin match, by
+ * substitution on a plain term. `usable` holds iff
  * `x ∉ FV(f₀) ∪ FV(f₁)`; otherwise `x` still hides inside a leaf — the LEAF
  * HAZARD of §1 — and the record must not be used. `p` is the residual
  * `SIMPLIFY_TERM(f₀·f₁)` when `usable`, and `nullptr` (⊥) otherwise. `pin`
