@@ -1484,6 +1484,60 @@ TEST_SUITE("tree::substitute") {
 		CHECK(res != phi);
 		CHECK(res == build_wff_and<node_t>(wff("z & s2 = 0"), unit));
 	}
+
+	TEST_CASE("the descent guard stops at an arithmetic operator") {
+		// The key sits twice in one term: in a Boolean position and
+		// under a bitvector sum.
+		tref f = bf("x:bv[8] & (x:bv[8] + { 1 }:bv[8])");
+		tref x = bf("x:bv[8]"), y = bf("y:bv[8]");
+		// the default guard enters everything, so both occurrences go
+		CHECK(tau::get(f).substitute(x, y)
+			== bf("y:bv[8] & (y:bv[8] + { 1 }:bv[8])"));
+		// the Boolean guard leaves the sum, and the occurrence in it,
+		// as they stand
+		tref kept = tau::get(f).substitute(x, y, {}, idni::identity,
+			while_is_boolean_operation<node_t>);
+		CHECK(kept == bf("y:bv[8] & (x:bv[8] + { 1 }:bv[8])"));
+		CHECK(get_free_vars<node_t>(kept).size() == 2);
+	}
+
+	TEST_CASE("the descent guard stops at a reference, so the hook never runs") {
+		tref f = build_bf_and<node_t>(bf("x"), ref_term(trefs{ bf("x") }));
+		size_t calls = 0;
+		auto count = [&calls](tref a) { ++calls; return a; };
+		tref r = tau::get(f).substitute(bf("x"), bf("z"), {}, count,
+			while_is_boolean_operation<node_t>);
+		// the argument keeps its occurrence and is never re-emitted
+		CHECK(calls == 0);
+		CHECK(r == build_bf_and<node_t>(bf("z"),
+			ref_term(trefs{ bf("x") })));
+	}
+
+	TEST_CASE("the descent guard rides into the leaves of a BDD-backed term") {
+		tref p = vr("p"), b = vr("b"), z = vr("z");
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		bdd::order o {{p, 0}};
+		// p·a ∪ p′·b with a and b in leaves; the key is a, which is no
+		// decision variable of `o`, so the leaves are all there is to
+		// rewrite
+		tref f = hbdd::convert_to_tau_node(bf("pa|p'b"), o);
+		REQUIRE(hbdd::is_bdd_backed(f));
+		tref s = tau::get(f).substitute(bf("a"), bf("z"), o, idni::identity,
+			while_is_boolean_operation<node_t>);
+		REQUIRE(hbdd::is_bdd_backed(s));
+		CHECK(bdd::is_ordered(hbdd::convert_to_handle(s).get(), o));
+		CHECK(same_function(s, bf("pz|p'b"), { p, b, z }));
+	}
+
+	TEST_CASE("the descent guard enters the body of a functional quantifier") {
+		tref t = bf("fall w (w | x)");
+		CHECK(tau::subtree_equals(tau::get(t).substitute(bf("x"),
+			bf("y"), {}, idni::identity,
+			while_is_boolean_operation<node_t>),
+			bf("fall w (w | y)")));
+	}
 }
 
 TEST_SUITE("tree::substitute through a nested BDD_ID") {

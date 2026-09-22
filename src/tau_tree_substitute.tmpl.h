@@ -131,11 +131,11 @@ void tree<node>::finish(substitution& s) {
 #endif
 }
 
-/** @internal @copydoc tree::substitute(tref, tref, const subtree_unordered_map<node, int_t>&, const argument_hook&) const @endinternal */
+/** @internal @copydoc tree::substitute(tref, tref, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(tref that, tref with,
 	const subtree_unordered_map<node, int_t>& o,
-	const argument_hook& on_argument) const
+	const argument_hook& on_argument, const descent_guard& descend) const
 {
 	using tau = tree<node>;
 	const tref formula = this->get();
@@ -143,16 +143,17 @@ tref tree<node>::substitute(tref that, tref with,
 	// One pair, prepared straight into the substitution: the map the other
 	// overload takes would be built only to be read back.
 	substitution s;
+	if (descend) s.descend = &descend;
 	prepare(s, formula, that, with);
 	finish(s);
 	return tau::substitute(formula, s, o, on_argument);
 }
 
-/** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const subtree_unordered_map<node, int_t>&, const argument_hook&) const @endinternal */
+/** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	const subtree_unordered_map<node, int_t>& o,
-	const argument_hook& on_argument) const
+	const argument_hook& on_argument, const descent_guard& descend) const
 {
 	using tau = tree<node>;
 	const tref formula = this->get();
@@ -162,6 +163,7 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	// renamed apart here, and the walk below — the leaves of a BDD and the
 	// arguments of a reference included — reuses the result.
 	substitution s;
+	if (descend) s.descend = &descend;
 	for (const auto& [key, value] : changes)
 		prepare(s, formula, key, value);
 	finish(s);
@@ -218,6 +220,10 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 			|| ct.is(tau::bf_and) || ct.is(tau::bf_or) ? c : nullptr;
 	};
 	auto visit_subtree = [&](tref n, tref parent) {
+		// The caller's guard, where there is one, decides first: what
+		// it turns away is left as it stands, the occurrences under it
+		// included.
+		if (s.descend != nullptr && !(*s.descend)(n)) return false;
 		if (!s.keys_are_variables) return true;
 		const tau& t = tau::get(n);
 		if (!t.is(tau::wff) && !t.is(tau::bf)) return true;
@@ -345,17 +351,21 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 template <NodeType node>
 tref substitute(tref formula, tref that, tref with,
 	const subtree_unordered_map<node, int_t>& o,
-	const typename tree<node>::argument_hook& on_argument)
+	const typename tree<node>::argument_hook& on_argument,
+	const typename tree<node>::descent_guard& descend)
 {
-	return tree<node>::get(formula).substitute(that, with, o, on_argument);
+	return tree<node>::get(formula).substitute(that, with, o, on_argument,
+		descend);
 }
 
 template <NodeType node>
 tref substitute(tref formula, const subtree_map<node, tref>& changes,
 	const subtree_unordered_map<node, int_t>& o,
-	const typename tree<node>::argument_hook& on_argument)
+	const typename tree<node>::argument_hook& on_argument,
+	const typename tree<node>::descent_guard& descend)
 {
-	return tree<node>::get(formula).substitute(changes, o, on_argument);
+	return tree<node>::get(formula).substitute(changes, o, on_argument,
+		descend);
 }
 
 } // namespace idni::tau_lang
