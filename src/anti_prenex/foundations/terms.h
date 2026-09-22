@@ -274,22 +274,41 @@ tref resolve_functional_quantifiers_bdd(tref n, const var_order<node>& order,
 
 /**
  * @brief §3 `SIMPLIFY_TERM(t, order = ∅)`: constant folding, complement
- * laws, per-path contradiction, and reduction to the canonical form of the
- * BDD backing `t`.
+ * laws, per-path contradiction, the cofactor check, and reduction to the
+ * canonical form of the BDD backing `t`.
  *
  * Per-path contradiction is the rule `prop:xfx` — `x·f(x) = x·f(1)` and
  * `x′·f(x) = x′·f(0)` — so a subterm under a literal is reduced by that
  * literal's assignment. Absorption is its literal instance (`x ∪ x·c = x`);
  * a compound one (`ab ∪ ab·c`) stays as written.
  *
- * All three laws come from the existing `syntactic_path_simplification`
- * (heuristics/). A plain term goes through it whole. For a term under the
- * live order the representation is re-established first: a BDD-backed term is
- * already canonical over `P`, while a plain combination of BDD-backed
- * subterms (`f₀·f₁`, `f₀ ∪ f₁`, `f₁′`, the way `COF` forms its products and
- * complements) is built over `P`, absorbing them. Then every leaf goes
- * through the path simplifier and the BDD is rebuilt, so leaves that became
- * equal merge.
+ * The first three laws are THE SWEEP, the existing
+ * `syntactic_path_simplification` (heuristics/). A plain term goes through it
+ * whole. For a term under the live order the representation is re-established
+ * first: a BDD-backed term is already canonical over `P`, while a plain
+ * combination of BDD-backed subterms (`f₀·f₁`, `f₀ ∪ f₁`, `f₁′`, the way
+ * `COF` forms its products and complements) is built over `P`, absorbing
+ * them. Then every leaf goes through the path simplifier and the BDD is
+ * rebuilt, so leaves that became equal merge.
+ *
+ * THE COFACTOR CHECK is one-level Shannon reduction of the WHOLE term over
+ * every free variable of `t` that is no variable of `order`: an order
+ * variable is one the BDD has decided already, and one still free in a leaf
+ * sits where the expansion is not licensed (§1's leaf hazard). For each such
+ * `y`, `f₀ = t[y←0]` and `f₁ = t[y←1]`, the substitution reaching BOOLEAN
+ * POSITIONS only — under `∪ · ′ +` and the functional quantifiers, never
+ * under an arithmetic operator, a reference or a foreign-typed subterm, where
+ * no Shannon expansion holds — with constants folding through the
+ * construction hooks; `f₀ = f₁`, a constant included, makes `t ← f₀`. It is
+ * sound for a variable that also sits inside a reference: the reference is an
+ * opaque element the expansion is taken around. It is what stops nested Boole
+ * normal forms from compounding as substitutions stack terms inside terms.
+ *
+ * TWO PHASES, no interplay: the sweep first, then the check ONCE over the
+ * swept term, one pass over its variables on the running term. A cofactor is
+ * what the substitution hands back, folded by the hooks and simplified no
+ * further, and the check's result is emitted as it stands. So this is NOT
+ * idempotent: a second call may simplify further.
  *
  * A term CARRYING a stored BDD is in the BDD regime too, whether or not it is
  * backed itself: `Q_P (bf(BDD_ID))`, keep mode's emission of a discharged

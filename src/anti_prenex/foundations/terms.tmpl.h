@@ -301,6 +301,45 @@ private:
 	}
 };
 
+/// §3 `SIMPLIFY_TERM`'s fourth law, the COFACTOR CHECK: one-level Shannon
+/// reduction of the WHOLE term over every free variable of @p t that is no
+/// variable of @p order. An order variable is one the BDD has decided
+/// already, and one still free in a leaf sits where the expansion is not
+/// licensed (§1's leaf hazard).
+///
+/// `f₀ = t[y←0]` and `f₁ = t[y←1]` reach BOOLEAN POSITIONS only, which is
+/// what the substitution's guard says: no Shannon expansion holds under an
+/// arithmetic operator, a reference or a foreign-typed subterm. Leaving a
+/// variable inside one of those is sound — it is an opaque element the
+/// expansion is taken around. Equal cofactors, a constant included, make
+/// `t ← f₀`, which covers being `0` under both bits, being `1` under both,
+/// and not depending on `y` at all.
+///
+/// The variables are read off the term handed in and then tried ON THE
+/// RUNNING term, so the ones after a replacement are tried on the smaller
+/// term. A cofactor is what the substitution hands back, folded by the
+/// construction hooks and simplified no further.
+template <NodeType node>
+tref cofactor_check(tref t, const var_order<node>& order) {
+	using tau = tree<node>;
+	// Copied rather than held: the walks below write to the cache this
+	// list comes from.
+	const trefs vars = get_free_vars<node>(t);
+	for (tref y : vars) {
+		if (order.contains(y)) continue;
+		const tref key = tau::get(tau::bf, y);
+		const size_t ba = find_ba_type<node>(y);
+		const tref f0 = tau::get(t).substitute(key, _0<node>(ba),
+			order, identity, while_is_boolean_operation<node>);
+		const tref f1 = tau::get(t).substitute(key, _1<node>(ba),
+			order, identity, while_is_boolean_operation<node>);
+		if (f0 != f1) continue;
+		t = f0;
+		if (tau::get(t).equals_0() || tau::get(t).equals_1()) break;
+	}
+	return t;
+}
+
 /// The atom under one optional `¬`, and whether there was one.
 template <NodeType node>
 std::pair<tref, bool> unwrap_neg(tref a) {
@@ -513,7 +552,8 @@ tref simplify_term(tref t, const var_order<node>& order) {
 	// cost of those phases.
 	if (order.empty()) {
 		DBG(assert(!holds_bdd_id<node>(t));)
-		return syntactic_path_simplification<node>(t);
+		return cofactor_check<node>(
+			syntactic_path_simplification<node>(t), order);
 	}
 	// Plain regime under a live order: a term that neither touches `P` nor
 	// carries a stored BDD anywhere -- the last test is what keeps a chain
@@ -521,20 +561,23 @@ tref simplify_term(tref t, const var_order<node>& order) {
 	// (§7 `DISCHARGE`'s keep emission is `P`-free and not backed itself).
 	if (!thandle<node>::is_bdd_backed(t) && !tbdd<node>::has_bdd_var(t, order)
 		&& !holds_bdd_id<node>(t))
-		return syntactic_path_simplification<node>(t);
+		return cofactor_check<node>(
+			syntactic_path_simplification<node>(t), order);
 	// BDD regime: the representation re-established (a BDD-backed term is
 	// canonical already; a plain combination of BDD-backed subterms is
 	// built over `P`; a chain over a stored BDD is ONE LEAF of its own
 	// BDD, §1), then every leaf through the leaf simplifier and the
 	// rebuild that merges leaves that became equal. A whole-block keep
 	// emission is that single leaf and comes back as it stands, its inner
-	// leaves simplified.
+	// leaves simplified. The sweep is per leaf; the check that follows it
+	// is per term.
 	bref<node> r = tbdd<node>::build_bdd(t, order);
 	DBG(assert(tbdd<node>::is_ordered(r, order));)
 	leaf_simplifier<node> simp{order};
-	return thandle<node>::convert_to_tau_node_or_term(
-		thandle<node>(tbdd<node>::map_leaves(r, simp, order)),
-		find_ba_type<node>(t));
+	return cofactor_check<node>(
+		thandle<node>::convert_to_tau_node_or_term(
+			thandle<node>(tbdd<node>::map_leaves(r, simp, order)),
+			find_ba_type<node>(t)), order);
 }
 
 template <NodeType node>

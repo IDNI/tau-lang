@@ -615,6 +615,90 @@ TEST_CASE("simplify_term: leaves simplified and merged in the BDD regime") {
 	CHECK(tau::subtree_equals(ap::simplify_term<node_t>(bf("y & (y' | z)"), o), bf("y & z")));
 }
 
+TEST_CASE("simplify_term: the cofactor check reduces over a variable the term does not decide") {
+	tref x = vr("x"), y = vr("y");
+	// both cofactors over x are `y`, so `y` is the term
+	CHECK(tau::subtree_equals(ap::simplify_term<node_t>(bf("x & y | x' & y")),
+		bf("y")));
+	CHECK(tau::subtree_equals(
+		ap::simplify_term<node_t>(bf("(x | y) & (x' | y)")), bf("y")));
+	// the cofactors differ, so nothing is reduced
+	tref t = bf("x & y | x' & y'");
+	CHECK(same_function(ap::simplify_term<node_t>(t), t, { x, y }));
+}
+
+TEST_CASE("simplify_term: the cofactor check stays out of an arithmetic position") {
+	// the Boolean product folds away; the sum is no place for a Shannon
+	// expansion, so the occurrence in it is neither read nor replaced
+	tref s = ap::simplify_term<node_t>(
+		bf("x:bv[8] & x:bv[8]' | (x:bv[8] + { 1 }:bv[8])"));
+	CHECK(tau::subtree_equals(s, bf("x:bv[8] + { 1 }:bv[8]")));
+	CHECK(get_free_vars<node_t>(s).size() == 1);
+}
+
+TEST_CASE("simplify_term: the cofactor check takes a reference as an opaque element") {
+	// x is free inside the reference argument too, where the expansion is
+	// taken around it
+	CHECK(tau::subtree_equals(
+		ap::simplify_term<node_t>(bf("x & r(x) | x' & r(x)")), bf("r(x)")));
+}
+
+TEST_CASE("simplify_term: the cofactor check reduces a leaf in the BDD regime") {
+	tref x = vr("x"), w = vr("w"), z = vr("z");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// x·(y·z ∪ y′·z) ∪ x′·w: the high leaf does not depend on y, and y is
+	// no decision variable, so the check reduces it where it lies
+	tref l = sides(ap::prepare_terms<node_t>(
+		wff("x & (y & z | y' & z) | x' & w = 0"), P, o)).first;
+	REQUIRE(th::is_bdd_backed(l));
+	tref s = ap::simplify_term<node_t>(l, o);
+	REQUIRE(th::is_bdd_backed(s));
+	tb::ref b = ref_of(s, o);
+	REQUIRE(!tb::leaf(b));
+	CHECK(tau::subtree_equals(tb::get_var(b), x));
+	CHECK(tau::subtree_equals(tb::get_var_term(tb::get_high(b)), bf("z")));
+	CHECK(tau::subtree_equals(tb::get_var_term(tb::get_low(b)), bf("w")));
+	CHECK(same_function(s, bf("x & z | x' & w"), { x, w, z }));
+}
+
+TEST_CASE("simplify_term: the cofactor check reaches the leaves of a kept emission") {
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// §7 DISCHARGE's keep-mode emission over a stored BDD whose one leaf,
+	// `w·u ∪ w′·u`, decides nothing over w
+	tref stored = th::convert_to_tau_node(bf("x & (w & u | w' & u)"), o);
+	REQUIRE(th::is_bdd_backed(stored));
+	tref chain = tb::build_functional_quantifiers({{x, tb::all}}, stored);
+	REQUIRE(tau::get(chain).child_is(tau::bf_fall));
+	tref got = ap::simplify_term<node_t>(chain, o);
+	CHECK(got != chain);
+	REQUIRE(tau::get(got).child_is(tau::bf_fall));
+	// the prefix as it stands, over a body still backed by the live order
+	CHECK(prefix_of(got) == prefix_of(chain));
+	tref gbody = ap::strip_chain<node_t>(got).second;
+	REQUIRE(th::is_bdd_backed(gbody));
+	tb::ref gb = ref_of(gbody, o);
+	CHECK(tb::is_ordered(gb, o));
+	REQUIRE(!tb::leaf(gb));
+	CHECK(tau::subtree_equals(tb::get_var(gb), x));
+	CHECK(tau::subtree_equals(tb::get_var_term(tb::get_high(gb)), bf("u")));
+	CHECK(tb::get_low(gb) == tb::F);
+}
+
+TEST_CASE("simplify_term: the check's result is emitted as it stands, so a second call may go further") {
+	// the cofactors over y are equal and both hold `x·(x′ ∪ w)`, a
+	// per-path contradiction the sweep of THIS call is already past
+	tref once = ap::simplify_term<node_t>(bf("(y | x) & (y' | x) & (x' | w)"));
+	CHECK(tau::get(once).find_top(is<node_t, tau::bf_neg>) != nullptr);
+	// the next call sweeps what this one emitted
+	tref twice = ap::simplify_term<node_t>(once);
+	CHECK(twice != once);
+	CHECK(tau::get(twice).find_top(is<node_t, tau::bf_neg>) == nullptr);
+	CHECK(same_function(twice, bf("x & w"), { vr("x"), vr("w") }));
+}
+
 // 6. simplify_atom ------------------------------------------------------------
 
 TEST_CASE("simplify_atom: plain regime folds and is idempotent") {
