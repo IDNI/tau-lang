@@ -67,10 +67,11 @@ using var_order = typename term_handle<node>::order;
 /// component's close, §3) it is handed the canonical chain's term node —
 /// prefix outermost first with the kinds, body below it, both read off with
 /// `strip_chain` (terms.h).
-/// Per BLOCK (§5) it is handed the block's binder node `REWRAP(matrix, X)`,
-/// the run head with its variables outermost first over the matrix. A node,
-/// rather than a prefix or a variable list, so that the policy can look at
-/// what is quantified.
+/// Per COMPONENT of a block (§5) it is handed `REWRAP(body, X)`: the ∃ wrap of
+/// the whole block, its variables outermost first, over the body as that
+/// component's setup finds it — the dualised matrix for a ∀ run, the earlier
+/// components' results already in place. A node, rather than a prefix or a
+/// variable list, so that the policy can look at what is quantified.
 template <NodeType node>
 using keep_functional_fn = std::function<bool(tref)>;
 

@@ -41,7 +41,7 @@ namespace {
 
 /// The layer this module is built to. The dormant tier is keyed on it.
 /// Raising it switches on the assertions that layer makes true.
-constexpr int built_layer = 2;
+constexpr int built_layer = 4;
 
 /// A DORMANT claim's guard: true once the layer that makes it true is built.
 bool resolved_from_layer(int n) { return n <= built_layer; }
@@ -232,9 +232,11 @@ TEST_CASE("R8: a mixed block — one variable pins, the other needs the push") {
 
 TEST_CASE("R9: every block of an alternating nest is processed") {
 	// AntiPrenexBlock0Arg / "nested alternation: every block is
-	// processed": the inner ∃ block and the enclosing ∀ block both.
+	// processed": the inner ∃ block and the enclosing ∀ block both. The
+	// inner clause is a CONJUNCTION, which needs the settle move of the
+	// conjunction push.
 	tref got = anti_prenexed(parse("all a ex b (ab = 0 && bc != 0)."));
-	if (resolved_from_layer(4)) CHECK(binder_count(got) == 0);
+	if (resolved_from_layer(5)) CHECK(binder_count(got) == 0);
 }
 
 TEST_CASE("R10: a binder over a constant scope is dropped") {

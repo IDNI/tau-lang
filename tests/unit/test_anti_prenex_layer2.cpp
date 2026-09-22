@@ -36,8 +36,14 @@ namespace {
 
 using tb = tau_term_bdd<node_t>;
 
-tref bvar(const char* name) { return tau::build_bf_variable(name, 0); }
-tref fvar(const char* name) { return tau::build_variable(name, 0); }
+/// Hand-built variables are TYPED: only a typed block has a row in §7's table
+/// (`method`), and a parsed input gets its type from inference.
+tref bvar(const char* name) {
+	return tau::build_bf_variable(name, tau_type_id<node_t>());
+}
+tref fvar(const char* name) {
+	return tau::build_variable(name, tau_type_id<node_t>());
+}
 
 tref eq(tref l, tref r)   { return tau::build_bf_eq(l, r); }
 tref eq0(tref t)          { return tau::build_bf_eq_0(t); }
@@ -164,11 +170,13 @@ TEST_CASE("P2: a pin deletes its binder, and a nested one too") {
 	tref got = anti_prenexed(one);
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(!holds_var(got, "x"));
-	// The witness landed in the sibling's term: `¬(t ∪ a = 0)`, with the
-	// term in the normal form `SIMPLIFY_TERM` gives it — the union's
-	// operands are emitted in content order, so the expectation is built
-	// through the same normaliser rather than spelled by hand.
-	CHECK(same(got, neg(eq0(ap::simplify_term<node_t>(lor(t, a))))));
+	// The witness landed in the sibling's term: `¬(t ∪ a = 0)`. Compared BY
+	// MEANING, because the expectation is hand-built and the pipeline's
+	// spelling of a union's operands is not a normal form — which of `t ∪ a`
+	// and `a ∪ t` comes back depends on the order the substitution built it
+	// in, and both are the same term.
+	CHECK(are_nso_equivalent<node_t>(got,
+		neg(eq0(ap::simplify_term<node_t>(lor(t, a))))));
 	// Nested: the outer rewrite substitutes into the inner binder's body
 	// (§4), and the inner binder falls in the same pass.
 	const tref nested = ex("x", conj(eq(x, t),
@@ -188,10 +196,13 @@ TEST_CASE("P3: the spec's counterexamples keep their binders") {
 	tref got = anti_prenexed(one);
 	CHECK(holds(got, tau::wff_ex));
 	CHECK(holds(got, tau::wff_all));
+	// The second one keeps no binder, and not because a witness fired: the
+	// witness still declines by (c), and phase 4 then decides the formula
+	// outright — `x = z ∧ z = y` forces `x = y`, and `∃x ∀y. x = y` is `F`
+	// in any algebra with two elements.
 	const tref two = ex("x", all_("y", ex("z", conj(eq(x, z), eq(z, y)))));
 	tref r = anti_prenexed(two);
-	CHECK(holds(r, tau::wff_ex));
-	CHECK(holds(r, tau::wff_all));
+	CHECK(tau::get(r).equals_F());
 	// The case-pin counterexample: past the flip the branch CHOICE may not
 	// depend on the inner variable, so the guard is not distributed.
 	const tref guard = disj(conj(eq0(y), eq0(x)),

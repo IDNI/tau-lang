@@ -127,6 +127,11 @@ tref prepare_terms(tref body, const block& P, const var_order<node>& order);
  * over the spelled one, the hooks folding `¬T` and `¬F`. Nothing else is
  * touched, so a formula holding no stored BDD comes back as the SAME node.
  *
+ * THE WALK MAY STOP AT A TERM, an atom's own sides apart: a stored BDD never
+ * sits in a REFERENCE ARGUMENT. `PREPARE_TERMS` transports a reference
+ * opaque, and the library's substitute spells a backed witness out before it
+ * enters an argument, so there is nothing below a reference to spell.
+ *
  * WHY THE PLAIN NORMAL FORM AND NOT THE LIBRARY'S RAW SPELLING: it is what
  * makes the round trip an identity BY NODE. A term the component prepared
  * comes back the node it went in as, so a re-wrapped block is the node phase

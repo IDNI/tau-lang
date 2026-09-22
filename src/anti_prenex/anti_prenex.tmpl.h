@@ -6,10 +6,9 @@
  * `ANTI_PRENEX`, each one call into the module below, in the order the spec
  * fixes.
  *
- * Phase 4, `PROCESS_ALL_BLOCKS`, is the identity here. Phases 1, 2 and 5 pass
- * the EMPTY order: nothing is BDD-backed outside a component (§3), so
- * `simplify`'s propagation guard is vacuous and the plain chain resolver
- * takes no order at all.
+ * Phases 1, 2 and 5 pass the EMPTY order: nothing is BDD-backed outside a
+ * component (§3), so `simplify`'s propagation guard is vacuous and the plain
+ * chain resolver takes no order at all.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_TMPL_H__
@@ -64,8 +63,9 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	// 3. `f ≠ 0 ↦ ¬(f = 0)` and the fused comparisons, after phase 2 by
 	//    the fixed order (§3).
 	phi = normalize_operators<node>(phi);
-	// 4. `PROCESS_ALL_BLOCKS(φ, keep_functional)` — the identity here
-	//    (§3, §4).
+	// 4. Every quantifier run pushed inward and eliminated over its
+	//    final matrix (§4, §5).
+	phi = process_all_blocks<node>(phi, kf);
 	// 5. The close: simplify, drop the binders that bind nothing, and
 	//    canonicalise the ids again (§3).
 	phi = simplify<node>(phi);

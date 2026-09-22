@@ -15,9 +15,10 @@
  * function `anti_prenex` of the module in `src/antiprenexing/`, which this
  * module does not include.
  *
- * Phase 4 of the pipeline — the push (§4–§6) — and the finite and bitvector
- * methods of §7 are not part of the module; `eliminate_block` re-wraps a
- * block of a type without a method.
+ * The push over a disjunction or a conjunction is not part of the module: such
+ * a block comes back re-wrapped, undecided rather than answered (invariant 3).
+ * Neither are the finite and bitvector methods of §7, so `eliminate_block`
+ * re-wraps a block of a type without a method.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
@@ -43,6 +44,11 @@
 #include "eliminate/conditions.h"
 #include "eliminate/atomless.h"
 #include "eliminate/eliminate_block.h"
+// the push
+#include "push/push_block.h"
+// the driver
+#include "driver/block.h"
+#include "driver/driver.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -55,7 +61,7 @@ namespace idni::tau_lang::anti_prenexing {
  * `ELIMINATE_BY_SUBSTITUTION` then `SIMPLIFY`; 3 `NORMALIZE_OPERATORS`; 4
  * `PROCESS_ALL_BLOCKS`; 5 `SIMPLIFY`, `FOLD_DEGENERATE_BINDERS`,
  * `CANONICALISE_BINDER_IDS`. A formula without a quantifier is returned as
- * is, and phase 4 is the identity.
+ * is.
  *
  * @param phi a `wff` node
  * @param kf  §1 `keep_functional` (fwd.h `keep_functional_fn`): a yes keeps

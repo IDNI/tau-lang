@@ -23,6 +23,7 @@ set(TESTS
 	anti_prenex_layer3
 	anti_prenex_push
 	anti_prenex_driver
+	anti_prenex_layer4
 	adt_flatten
 	adt_parsing
 	adt_types

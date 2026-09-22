@@ -392,10 +392,14 @@ tref finish_terms(tref phi) {
 	// folded to a constant decides the junction it stood in, so every ∧/∨
 	// the walk closes is re-emitted through the canonical constructor over
 	// its member view: content order, deduplicated, the hooks folding `T`,
-	// `F`, a repeated member and a complement pair. The members are
-	// already simplified and already absorbed against each other, and
-	// spelling is injective on atoms, so nothing beyond this is left for
-	// the result joins to find.
+	// `F`, a repeated member and a complement pair.
+	//
+	// THE RAW CONSTRUCTOR AND NOT THE RESULT JOINS, which are a normaliser
+	// and may not be included from a foundation. The joins add one thing
+	// to it, the absorption pass, and that finds nothing new here: the
+	// members were already absorbed against each other, and spelling is
+	// injective on atoms, so it cannot bring two of them into a
+	// containment they were not already in.
 	auto up = [](tref r) -> tref {
 		if (is_child<node>(r, tau::wff_and))
 			return canonical_and<node>(members<node>(r));
