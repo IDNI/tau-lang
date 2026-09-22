@@ -571,6 +571,7 @@ tref simplify_atom(tref a, const var_order<node>& order) {
 	// reshaped.
 	tref l2 = simplify_term<node>(l, order);
 	tref r2 = simplify_term<node>(r, order);
+	DBG(assert(tau::get(l2).is(tau::bf) && tau::get(r2).is(tau::bf));)
 	tref res = (l2 == l && r2 == r) ? atom
 		: tau::get(tau::wff, tau::get(t[0].value.nt, l2, r2));
 	// The joint `l + r` then DECIDES a (¬)equation and does nothing else:
