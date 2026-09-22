@@ -75,15 +75,6 @@ tref join_of(const trefs& ms, bool conj) {
 	return conj ? simplified_and_join<node>(ms) : simplified_or_join<node>(ms);
 }
 
-/// The TOP-LEVEL CONJUNCTS of `ψ`: the member view of a conjunction, else
-/// `ψ` itself — a `wff_or` is ONE conjunct here, not a member list. Both
-/// modes of `TRY_WITNESS` and `TRY_CASE_WITNESS` read `ψ` this way.
-template <NodeType node>
-trefs conjuncts_of(tref psi) {
-	return is_child<node>(psi, tree<node>::wff_and)
-		? members<node>(psi) : trefs{ psi };
-}
-
 /// §3 The choice among the pins a conjunct list offers, `match` being the
 /// mode's pin test on ONE conjunct: a STRICT pin first — taken without
 /// comparing witnesses — else the smallest `‖f₁′‖` (`mem_size`), the cost every
@@ -114,7 +105,7 @@ template <NodeType node, typename Search>
 std::optional<tref> witness_with(tref x, tref psi,
 	const var_order<node>& order, Search&& search)
 {
-	const std::optional<pin<node>> best = search(conjuncts_of<node>(psi));
+	const std::optional<pin<node>> best = search(get_cnf_wff_clauses<node>(psi));
 	if (!best) return {};
 	return simplify<node>(subst_var<node>(psi, detail::term_key<node>(x),
 		best->witness, order), order);
@@ -439,7 +430,7 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi) {
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
 	DBG(assert(!holds_bdd_term<node>(psi));)
-	const trefs cs = conjuncts_of<node>(psi);
+	const trefs cs = get_cnf_wff_clauses<node>(psi);
 	// SMALLEST `|D|` FIRST (§3): one scan over the conjuncts, the smallest
 	// case pin kept. `|·|` is `formula_size` (dag.h).
 	std::vector<case_branch<node>> best;
@@ -474,7 +465,7 @@ std::optional<case_witness<node>> try_case_witness(tref x, tref psi,
 {
 	using namespace witness_detail;
 	DBG(assert(psi != nullptr && x != nullptr);)
-	const trefs cs = conjuncts_of<node>(psi);
+	const trefs cs = get_cnf_wff_clauses<node>(psi);
 	// SMALLEST `|D|` FIRST (§3): one scan over the conjuncts, the smallest
 	// case pin kept. `|·|` is `formula_size` (dag.h).
 	std::optional<std::vector<std::pair<tref, tref>>> best;
