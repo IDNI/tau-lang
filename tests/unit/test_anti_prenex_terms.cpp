@@ -161,6 +161,79 @@ TEST_CASE("prepare_terms: equal sides fold through the hooks on BDD_ID operands 
 	CHECK(tau::get(build_bf_eq<node_t>(l, l)).equals_T());
 }
 
+// 1b. finish_terms -------------------------------------------------------------
+
+TEST_CASE("finish_terms: the round trip of prepare_terms is the identity by node") {
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// The atoms are taken as PHASE 1 leaves them, in the plain regime's
+	// normal form, because that is the form the close spells back to.
+	const tref a = ap::simplify_atom<node_t>(wff("x & y = 0"), {});
+	const tref b = ap::simplify_atom<node_t>(wff("!(x | z = 0)"), {});
+	const tref phi = ap::canonical_and<node_t>(trefs{ a, b });
+	const tref prepared = ap::prepare_terms<node_t>(phi, P, o);
+	REQUIRE(has_bdd_id(prepared));
+	CHECK(ap::finish_terms<node_t>(prepared) == phi);
+	// the negated atom alone, so the negation rebuild is claimed on its own
+	const tref one = ap::prepare_terms<node_t>(b, P, o);
+	REQUIRE(has_bdd_id(one));
+	CHECK(ap::finish_terms<node_t>(one) == b);
+}
+
+TEST_CASE("finish_terms: a kept chain comes back with a plain, canonical body") {
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// §7 `DISCHARGE`'s keep-mode emission: a chain over the component's own
+	// stored BDD. The close does NOT resolve it — it spells the body out,
+	// in the plain regime's normal form, and the chain stands.
+	tref l = sides(ap::prepare_terms<node_t>(wff("x & y = 0"), P, o)).first;
+	REQUIRE(th::is_bdd_backed(l));
+	const tref atm = build_bf_eq_0<node_t>(
+		tb::build_functional_quantifiers({{ x, tb::all }}, l));
+	REQUIRE(has_bdd_id(atm));
+	const tref got = ap::finish_terms<node_t>(atm);
+	CHECK(!has_bdd_id(got));
+	CHECK(ap::carries_functional_quantifier<node_t>(got));
+	// SPELLED CANONICALLY: the plain atom simplification is the identity
+	// on its own output, which is what makes `ANTI_PRENEX` a fixpoint on
+	// its own output from the first run, a kept chain included.
+	CHECK(ap::simplify_atom<node_t>(got, {}) == got);
+}
+
+TEST_CASE("finish_terms: a formula with no stored BDD is the same node") {
+	const tref phi = ap::simplify_atom<node_t>(wff("x & y = 0"), {});
+	REQUIRE(!has_bdd_id(phi));
+	CHECK(ap::finish_terms<node_t>(phi) == phi);
+	// A binder unit and a junction too: nothing is re-emitted when there
+	// is nothing to spell.
+	const tref psi = wff("ex z (x & z = 0) && !(y = 0)");
+	REQUIRE(!has_bdd_id(psi));
+	CHECK(ap::finish_terms<node_t>(psi) == psi);
+}
+
+TEST_CASE("finish_terms: an atom that decides folds through the junction") {
+	tref x = vr("x");
+	ap::block P{ x };
+	order_t o = order_of(P);
+	// `x = x′`: two DIFFERENT BDDs, so nothing folds while they are
+	// stored — the hooks cannot read a complement pair off two interned
+	// ids. Spelled out, the plain regime's joint `l + r` is `1`, which
+	// decides the equation as `F`, and `F` decides the conjunction it
+	// stood in.
+	tref l = sides(ap::prepare_terms<node_t>(wff("x = 0"), P, o)).first;
+	tref r = sides(ap::prepare_terms<node_t>(wff("x' = 0"), P, o)).first;
+	REQUIRE(th::is_bdd_backed(l));
+	REQUIRE(th::is_bdd_backed(r));
+	REQUIRE(l != r);
+	const tref atm = build_bf_eq<node_t>(l, r);
+	REQUIRE(has_bdd_id(atm));
+	const tref phi = ap::canonical_and<node_t>(trefs{ atm, wff("z = 0") });
+	REQUIRE(has_bdd_id(phi));
+	CHECK(tau::get(ap::finish_terms<node_t>(phi)).equals_F());
+}
+
 // 2. cofactor -----------------------------------------------------------------
 
 TEST_CASE("cofactor: the child when x is on top, a rebuild at any depth") {

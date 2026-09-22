@@ -371,6 +371,45 @@ tref prepare_terms(tref body, [[maybe_unused]] const block& P,
 	return pre_order<node>(body).apply_unique(f, visit);
 }
 
+template <NodeType node>
+tref finish_terms(tref phi) {
+	using tau = tree<node>;
+	using namespace terms_detail;
+	DBG(assert(phi != nullptr);)
+	// Nothing prepared, nothing to spell: the formula comes back as the
+	// SAME node, its junctions untouched. One cached walk pays for it.
+	if (!holds_bdd_id<node>(phi)) return phi;
+	// An atom holding a stored BDD anywhere is spelled out by the library
+	// and then normalised in the PLAIN regime — the empty order, the
+	// spelling phase 1 gives every atom. Everything else is handed back
+	// unlooked at, so a formula with no stored BDD is the same node.
+	auto down = [](tref n) -> tref {
+		if (!is_atomic_fm<node>(n) || !holds_bdd_id<node>(n)) return n;
+		return simplify_atom<node>(
+			thandle<node>::convert_to_tau_terms(n), {});
+	};
+	// A spelled atom may sort elsewhere among its siblings, and one that
+	// folded to a constant decides the junction it stood in, so every ∧/∨
+	// the walk closes is re-emitted through the canonical constructor over
+	// its member view: content order, deduplicated, the hooks folding `T`,
+	// `F`, a repeated member and a complement pair. The members are
+	// already simplified and already absorbed against each other, and
+	// spelling is injective on atoms, so nothing beyond this is left for
+	// the result joins to find.
+	auto up = [](tref r) -> tref {
+		if (is_child<node>(r, tau::wff_and))
+			return canonical_and<node>(members<node>(r));
+		if (is_child<node>(r, tau::wff_or))
+			return canonical_or<node>(members<node>(r));
+		return r;
+	};
+	// `while_is_formula` enters ∧, ∨, ¬, a re-wrapped binder and a temporal
+	// operator, and stops at a term — which is where an atom's own `down`
+	// has already done the work.
+	return pre_order<node>(phi).apply_unique_pure(down,
+		while_is_formula<node>, up);
+}
+
 // --- cofactors and quantification -----------------------------------------------
 
 template <NodeType node>

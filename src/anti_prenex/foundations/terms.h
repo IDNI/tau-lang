@@ -48,6 +48,7 @@
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__TERMS_H__
 
 #include "fwd.h"
+#include "dag.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -56,7 +57,7 @@ namespace idni::tau_lang::anti_prenexing {
 // Not declared here — used directly, on a `bf` term `t` or a formula `phi`:
 //
 //   BDD-backed term        term_handle<node>::is_bdd_backed(t)
-//   the finish             term_handle<node>::convert_to_tau_terms(phi)
+//   the library's spelling  term_handle<node>::convert_to_tau_terms(phi)
 //   ∀_X f  /  ∃_X f        quantify_over(tbdd::all / tbdd::ex, f, X, order)
 //   f[x ← bit]             tau_term_bdd<node>::bdd_cofactor (behind `cofactor`)
 //   symbolic ∀_Y f / ∃_Y f tau_term_bdd<node>::build_functional_quantifiers
@@ -67,11 +68,13 @@ namespace idni::tau_lang::anti_prenexing {
 // live order, with at least one decision variable. The `bf` WRAPPER is the
 // form that counts; a bare `BDD_ID` node is not one.
 //
-// THE FINISH: every `BDD_ID` term of `phi` converted back to a plain `bf`,
-// wherever it sits. One memoised walk with no node kind special-cased, and
-// the inverse of `prepare_terms` up to term normal form:
+// THE LIBRARY'S SPELLING: every `BDD_ID` term of `phi` converted back to a
+// plain `bf`, wherever it sits. One memoised walk with no node kind
+// special-cased, and the inverse of `prepare_terms` up to term normal form:
 // `prepare_terms(convert_to_tau_terms(prepared))` yields the same BDD and,
-// by interning, the same `BDD_ID` node.
+// by interning, the same `BDD_ID` node. It is the library HALF of §3's
+// `FINISH_TERMS` (below), which spells an atom out with it and then puts the
+// result into the plain regime's normal form.
 //
 // SYMBOLIC ∀_Y / ∃_Y: the library's chain constructor takes `quants`
 // outermost first. It is canonical — absent subscripts dropped, each
@@ -108,6 +111,33 @@ namespace idni::tau_lang::anti_prenexing {
  */
 template <NodeType node>
 tref prepare_terms(tref body, const block& P, const var_order<node>& order);
+
+/**
+ * @brief §3 primitive `FINISH_TERMS(φ)`: `PREPARE_TERMS`' inverse, run at a
+ * component's close (§5) — every BDD-backed term of @p phi spelled back out
+ * as a plain term, wherever it sits.
+ *
+ * ONE WALK over the formula skeleton. An ATOM carrying a stored BDD anywhere
+ * — on a side, or in the body of a functional-quantifier chain `DISCHARGE`
+ * emitted in keep mode — is spelled out by the library and then put through
+ * `simplify_atom` in the PLAIN REGIME, the empty order: exactly what phase 1
+ * does to every atom. A junction the walk closes is re-emitted canonically,
+ * because a spelled atom may sort elsewhere among its siblings or fold to a
+ * constant, which then decides the junction. A `¬` over an atom is rebuilt
+ * over the spelled one, the hooks folding `¬T` and `¬F`. Nothing else is
+ * touched, so a formula holding no stored BDD comes back as the SAME node.
+ *
+ * WHY THE PLAIN NORMAL FORM AND NOT THE LIBRARY'S RAW SPELLING: it is what
+ * makes the round trip an identity BY NODE. A term the component prepared
+ * comes back the node it went in as, so a re-wrapped block is the node phase
+ * 3 built and a kept chain is spelled as the plain phases spell it — and
+ * `ANTI_PRENEX` is therefore a fixpoint on its own output from the FIRST run.
+ *
+ * @param phi a `wff` node, at the close of one component
+ * @return the same formula with every term plain
+ */
+template <NodeType node>
+tref finish_terms(tref phi);
 
 // --- cofactors and quantification -----------------------------------------------
 

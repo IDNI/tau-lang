@@ -10,7 +10,8 @@
  *
  * WHAT GOES OUT: a formula equivalent to the run, pushed as far inward as §6
  * reaches, with every term PLAIN: each component closes by spelling out the
- * BDDs it worked in, so nothing of §1's term representation leaves here.
+ * BDDs it worked in, in the normal form the plain phases use, so nothing of
+ * §1's term representation leaves here and nothing of its spelling either.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__DRIVER__BLOCK_H__
@@ -78,7 +79,9 @@ std::vector<block> connected_components(const block& X, tref body);
  *
  * WHAT GOES OUT IS PLAIN: a component closes by resolving the functional
  * quantifiers `kf` does not keep while the terms are still BDDs, and then
- * spelling every backed term out.
+ * spelling every backed term out canonically (§3 `FINISH_TERMS`) — in the
+ * plain regime's normal form, so a block that only re-wrapped comes back as
+ * the node it arrived as.
  */
 template <NodeType node>
 tref push_ex_block(tref body, const block& X,

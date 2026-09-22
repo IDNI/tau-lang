@@ -9,9 +9,9 @@
  * (src/union_find_with_sets.h) for the partition, `is_atomic_fm` and
  * `while_is_formula` (src/tau_tree.h) for the one walk that feeds it,
  * `find_ba_type` (src/ba_types.h) and `ctx::for_component` (ctx.h) for a
- * component's setup, `prepare_terms` and
- * `resolve_functional_quantifiers_bdd` (foundations/terms.h) with the
- * library's `convert_to_tau_terms` for its term representation and its close,
+ * component's setup, `prepare_terms`,
+ * `resolve_functional_quantifiers_bdd` and `finish_terms`
+ * (foundations/terms.h) for its term representation and its close,
  * `push_block` (push/push_block.h) for the push itself, `formula_size`,
  * `fv_meets`, `fv_intersect` and `members` (foundations/dag.h) with
  * `simplified_and_join` (normalisers/joins.h) and `rewrap`
@@ -84,7 +84,6 @@ tref push_ex_block(tref body, const block& X,
 	const keep_functional_fn<node>& kf)
 {
 	using tau = tree<node>;
-	using th = term_handle<node>;
 	// A variable the body does not mention binds nothing: no component is
 	// set up for it, and the callback's node carries the narrowed block.
 	const block Xc = fv_intersect<node>(body, X);
@@ -129,10 +128,13 @@ tref push_ex_block(tref body, const block& X,
 		// whole-block chain over `P`'s own BDD resolves by one
 		// quantification of what is stored, and a chain `kf` keeps or
 		// the stuck rule leaves behind stays; then every remaining
-		// backed term is spelled out, chains intact.
+		// backed term is spelled out CANONICALLY, chains intact — in
+		// the plain regime's normal form, the one phase 1 gives every
+		// atom, so what leaves a component is spelled as the plain
+		// phases spell it (§3 `FINISH_TERMS`).
 		body = resolve_functional_quantifiers_bdd<node>(body, c.order,
 			kf);
-		body = th::convert_to_tau_terms(body);
+		body = finish_terms<node>(body);
 	}
 	// The close is total, so nothing of §1's term representation leaves.
 	DBG(assert(tau::get(body).find_top([](tref m) {

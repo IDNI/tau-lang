@@ -141,6 +141,21 @@ tref normalised(tref body) {
 		ap::to_canonically_factored_nnf<node_t>(body));
 }
 
+/// `ψ` with every atom in the PLAIN REGIME's normal form, its members
+/// re-joined. `normalised` stops before `SIMPLIFY`, so a fixture keeps the
+/// spelling it was parsed with, while a component's close spells every term
+/// it prepared back in that normal form (§3 `FINISH_TERMS`). An expectation
+/// compared BY NODE against a result therefore goes through here first. On an
+/// atom already in normal form this is the identity.
+tref plainly_spelled(tref n) {
+	trefs ms;
+	for (tref m : ap::members<node_t>(n))
+		ms.push_back(ap::simplify_atom<node_t>(m, {}));
+	return is_child<node_t>(n, tau::wff_or)
+		? ap::simplified_or_join<node_t>(ms)
+		: ap::simplified_and_join<node_t>(ms);
+}
+
 /// A `tau`-typed term variable, the type every parsed fixture here gets by
 /// inference. Hand-built content has to say so itself.
 tref bvar(const char* name) {
@@ -435,10 +450,12 @@ TEST_CASE("B9: a push past the acceptance bound is discarded for its input") {
 	// component-free conjuncts left outside the wrap. The same input under
 	// the real knobs is accepted and resolves.
 	fixture f = split("ex x (x y = 0 && w = 0).");
+	// The members are compared against a RESULT, so they are taken as the
+	// close spells them back.
 	trefs dep, indep;
 	for (tref m : ap::members<node_t>(f.blk.matrix))
 		(ap::fv_meets<node_t>(m, f.blk.vars) ? dep : indep)
-			.push_back(m);
+			.push_back(plainly_spelled(m));
 	REQUIRE(dep.size() == 1);
 	REQUIRE(indep.size() == 1);
 	indep.push_back(ap::rewrap<node_t>(
@@ -489,8 +506,8 @@ TEST_CASE("D3: a ∀ run whose push re-wraps comes back as the same ∀ head") {
 	const tref got = ap::process_block<node_t>(f.blk,
 		ap::keep_no_functional<node_t>);
 	check_claims(got, f);
-	CHECK(same(got, ap::rewrap<node_t>(f.blk.matrix, f.blk.vars,
-		tb::all)));
+	CHECK(same(got, ap::rewrap<node_t>(plainly_spelled(f.blk.matrix),
+		f.blk.vars, tb::all)));
 }
 
 TEST_CASE("D4: an ∃ run goes straight to the push") {
