@@ -2,20 +2,24 @@
 
 // Unit tests for src/anti_prenex/driver/: §5's one block — the atom
 // connectivity that partitions a block, the ∃ push over the components it
-// gives, and the ∀ run's dualisation onto that push. Spec: anti_prenex.md §5
-// (CONNECTED_COMPONENTS, PUSH_EX_BLOCK with its size acceptance and its
-// close, PROCESS_BLOCK), §3 (the primitives those call), §1 (the ctx table's
-// keep_functional row), invariants 2, 3 and 4.
+// gives, and the ∀ run's dualisation onto that push — and §4's pass over a
+// WHOLE FORMULA, which collects every run and eliminates it over a matrix the
+// pass has already finished. Spec: anti_prenex.md §5 (CONNECTED_COMPONENTS,
+// PUSH_EX_BLOCK with its size acceptance and its close, PROCESS_BLOCK), §4
+// (COLLECT_RUN, PROCESS_NODE, PROCESS_ALL_BLOCKS), §3 (the primitives those
+// call), §1 (the ctx table's keep_functional row, assumption 1), invariants
+// 2, 3 and 4.
 //
-// Every case is ONE formula through one harness: parse a quantifier run, take
+// A §5 case is ONE formula through one harness: parse a quantifier run, take
 // its kind, its variables and its matrix as phase 4 meets it — in NNF, with
-// `f ≠ 0` spelled `¬(f = 0)` — and hand them over. What is claimed of every
-// pushed result: EQUIVALENT to the run it came from, no free variable
-// ESCAPED, INVARIANT 4, and PLAIN — the component's close is total, so no
-// `BDD_ID` survives it.
+// `f ≠ 0` spelled `¬(f = 0)` — and hand them over. A §4 case hands the whole
+// normalised formula over instead. What is claimed of every result:
+// EQUIVALENT to the formula it came from, no free variable ESCAPED, INVARIANT
+// 4, and PLAIN — a component's close is total, so no `BDD_ID` survives it.
 //
 // TYPES: only the atomless types are rows of §7's table, so every fixture is
-// parsed as a whole spec and typed by inference.
+// parsed as a whole spec and typed by inference; what a case builds by hand
+// says its type itself.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -24,6 +28,7 @@
 #include "test_Bool_helpers.h"
 #include "normalizer.h"
 #include "anti_prenex/driver/block.h"
+#include "anti_prenex/driver/driver.h"
 
 #include <algorithm>
 #include <utility>
@@ -136,6 +141,12 @@ tref normalised(tref body) {
 		ap::to_canonically_factored_nnf<node_t>(body));
 }
 
+/// A `tau`-typed term variable, the type every parsed fixture here gets by
+/// inference. Hand-built content has to say so itself.
+tref bvar(const char* name) {
+	return tau::build_bf_variable(name, tau_type_id<node_t>());
+}
+
 /// A parsed run, split the way §4's driver hands one over: the kind, the
 /// variables OUTERMOST FIRST, and the matrix normalised. Collecting a run off
 /// a binder chain is §4's own procedure and no subject of this file, so the
@@ -163,13 +174,18 @@ fixture split(const char* src) {
 	return f;
 }
 
-/// What every pushed run claims: equivalent to the run as parsed, no free
-/// variable escaped, invariant 4, and no stored BDD left anywhere.
-void check_claims(tref got, const fixture& f) {
-	CHECK(are_nso_equivalent<node_t>(finished(got), f.quantified));
-	CHECK(no_escape(finished(got), f.quantified));
+/// What every result claims against the formula it came from: equivalence, no
+/// free variable escaped, invariant 4, and no stored BDD left anywhere.
+void check_claims(tref got, tref source) {
+	CHECK(are_nso_equivalent<node_t>(finished(got), source));
+	CHECK(no_escape(finished(got), source));
 	CHECK(invariant_4(got));
 	CHECK(!holds(got, tau::BDD_ID));
+}
+
+/// The same claims for a pushed run, whose source is the run as parsed.
+void check_claims(tref got, const fixture& f) {
+	check_claims(got, f.quantified);
 }
 
 /// The two acceptance knobs for the scope of one case, restored on the way
@@ -484,6 +500,168 @@ TEST_CASE("D4: an ∃ run goes straight to the push") {
 	check_claims(got, f);
 	CHECK(same(got, ap::push_ex_block<node_t>(f.blk.matrix, f.blk.vars,
 		ap::keep_no_functional<node_t>)));
+}
+
+// --- §4 COLLECT_RUN -------------------------------------------------------------------
+
+TEST_CASE("R1: a same-kind chain is one run, its variables outermost first") {
+	tref phi = parse("ex x ex y (x y = 0).");
+	const ap::run<node_t> blk = ap::collect_run<node_t>(phi);
+	CHECK(blk.kind == tb::ex);
+	REQUIRE(blk.vars.size() == 2);
+	CHECK(same(blk.vars[0], tau::trim_right_sibling(
+		ap::binder_var<node_t>(phi))));
+	CHECK(same(blk.vars[1], tau::trim_right_sibling(
+		ap::binder_var<node_t>(matrix_of(phi, 1)))));
+	// What stopped the walk is the matrix.
+	CHECK(same(blk.matrix, matrix_of(phi, 2)));
+	CHECK(is_atomic_fm<node_t>(blk.matrix));
+}
+
+TEST_CASE("R2: a kind change ends the run and leaves the inner head as matrix") {
+	// Only same-kind quantifiers commute, so `∀y` is a head of its own,
+	// collected when the matrix is processed.
+	tref phi = parse("ex x (all y (x y = 0)).");
+	const ap::run<node_t> blk = ap::collect_run<node_t>(phi);
+	CHECK(blk.kind == tb::ex);
+	CHECK(blk.vars.size() == 1);
+	REQUIRE(is_child_quantifier<node_t>(blk.matrix));
+	CHECK(ap::binder_kind<node_t>(blk.matrix) == tb::all);
+	CHECK(same(blk.matrix, matrix_of(phi, 1)));
+}
+
+TEST_CASE("R3: a lone binder is a run of one variable") {
+	tref phi = parse("ex x (x y = 0).");
+	const ap::run<node_t> blk = ap::collect_run<node_t>(phi);
+	CHECK(blk.kind == tb::ex);
+	CHECK(blk.vars.size() == 1);
+	CHECK(same(blk.matrix, matrix_of(phi, 1)));
+}
+
+TEST_CASE("R4: a ∀ chain is collected the same way") {
+	tref phi = parse("all x all y (x y = 0).");
+	const ap::run<node_t> blk = ap::collect_run<node_t>(phi);
+	CHECK(blk.kind == tb::all);
+	CHECK(blk.vars.size() == 2);
+	CHECK(same(blk.matrix, matrix_of(phi, 2)));
+}
+
+// --- §4 PROCESS_ALL_BLOCKS ------------------------------------------------------------
+
+TEST_CASE("A1: the inner run is eliminated first and the outer one folds") {
+	// `∃b. a·b = 0` holds for every `a` — take `b = 0` — so the ∀ run is
+	// left with `T`, and `T` needs no block at all.
+	tref phi = parse("all a (ex b (a b = 0)).");
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		ap::keep_no_functional<node_t>);
+	check_claims(got, phi);
+	CHECK(binder_count(got) == 0);
+	CHECK(tau::get(got).equals_T());
+}
+
+TEST_CASE("A2: a conjunctive matrix re-wraps, and the run above it re-wraps too") {
+	// The push over a conjunction is not part of the module: the inner
+	// block re-wraps (invariant 3), and the ∀ run above it then sees one
+	// UNIT, which its own push transports rather than opens — so both
+	// binders stand in the answer.
+	tref phi = parse("all a (ex b (a b = 0 && b c != 0)).");
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		ap::keep_no_functional<node_t>);
+	check_claims(got, phi);
+	CHECK(binder_count(got) == 2);
+}
+
+TEST_CASE("A3: a run inside a conjunction is folded through the join") {
+	// `∃x. x·y = 0` is `T`, and the join drops a `T` from the conjunction
+	// the run stood in (invariant 6), leaving the other conjunct alone.
+	tref phi = parse("(ex x (x y = 0)) && z = 0.");
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		ap::keep_no_functional<node_t>);
+	check_claims(got, phi);
+	CHECK(binder_count(got) == 0);
+	CHECK(same(got, normalised(parse("z = 0."))));
+}
+
+TEST_CASE("A4: a run inside a disjunction is folded the same way") {
+	// `∃x. x·y ≠ 0` is `y ≠ 0`, which takes the run's place among the
+	// disjunction's members.
+	tref phi = parse("(ex x (x y != 0)) || z = 0.");
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		ap::keep_no_functional<node_t>);
+	check_claims(got, phi);
+	CHECK(binder_count(got) == 0);
+}
+
+TEST_CASE("A5: a shared run head is processed once") {
+	// `(∃x.ψ) ∧ ∀y.((∃x.ψ) ∨ χ)` with ONE node for the two `∃x.ψ`, which
+	// the normalisation keeps shared. The second occurrence sits inside
+	// the ∀ run's matrix, so a NESTED walk meets it; the pass memo spans
+	// the walks and answers it, and the callback is asked once per run —
+	// each of these has one component — rather than once per occurrence.
+	const tref psi = parse("ex x (x a = 0 || x c = 0).");
+	const tref borrowed = parse("all y (y b = 0).");
+	const tref phi = tau::build_wff_and(psi,
+		tau::build_wff_all(tau::trim_right_sibling(
+				ap::binder_var<node_t>(borrowed)),
+			tau::build_wff_or(psi, matrix_of(borrowed, 1)),
+			false));
+	size_t asked = 0;
+	auto count = [&asked](tref) { ++asked; return false; };
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		count);
+	CHECK(asked == 2);
+	check_claims(got, phi);
+}
+
+TEST_CASE("A6: a run under a temporal operator is processed") {
+	// The walk enters a temporal operator like any other formula node, so
+	// the block below one is reached and discharged.
+	tref phi = parse("always ex x (x y = 0).");
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		ap::keep_no_functional<node_t>);
+	CHECK(binder_count(got) == 0);
+	CHECK(invariant_4(got));
+	CHECK(!holds(got, tau::BDD_ID));
+	CHECK(no_escape(finished(got), phi));
+	CHECK(are_nso_equivalent<node_t>(finished(got), phi));
+}
+
+TEST_CASE("A7: a formula with no formula binder comes back as the same node") {
+	// Every step of the pass is then the identity or a re-join of an
+	// already canonical chain.
+	const tref phi = normalised(parse("x y = 0 && z = 0."));
+	REQUIRE(binder_count(phi) == 0);
+	CHECK(ap::process_all_blocks<node_t>(phi,
+		ap::keep_no_functional<node_t>) == phi);
+}
+
+TEST_CASE("A8: a term is never entered, so a functional quantifier is untouched") {
+	// The only quantifier here is TERM-level, and the pass stops at a term
+	// (§4): resolving a chain belongs to the phases before this one.
+	const tref chain = tb::build_functional_quantifiers(
+		{{ tau::trim(bvar("x")), tb::all }},
+		tau::build_bf_or(bvar("x"), bvar("z")));
+	const tref phi = normalised(tau::build_bf_eq_0(
+		tau::build_bf_and(bvar("a"), chain)));
+	REQUIRE(functional_count(phi) == 1);
+	const tref got = ap::process_all_blocks<node_t>(phi,
+		ap::keep_no_functional<node_t>);
+	CHECK(got == phi);
+	CHECK(functional_count(got) == 1);
+}
+
+TEST_CASE("A9: every run of an ∃ over ∀ over ∃ nest is processed") {
+	// Three runs, innermost first. Each matrix is a disjunction or a unit,
+	// which no step of this module pushes, so each run re-wraps over what
+	// the run below it left — and the callback is asked once per run.
+	tref phi = parse("ex a (all b (ex c (a b = 0 || c d = 0))).");
+	size_t asked = 0;
+	auto count = [&asked](tref) { ++asked; return false; };
+	const tref got = ap::process_all_blocks<node_t>(normalised(phi),
+		count);
+	CHECK(asked == 3);
+	check_claims(got, phi);
+	CHECK(binder_count(got) == 3);
 }
 
 } // TEST_SUITE
