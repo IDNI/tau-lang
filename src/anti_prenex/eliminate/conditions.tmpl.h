@@ -24,16 +24,6 @@ namespace idni::tau_lang::anti_prenexing {
 
 namespace conditions_detail {
 
-/// `⋃ ts` through the hooked binary builder; the EMPTY union is `0` of the
-/// block's type (§7: `⋃{} = 0`).
-template <NodeType node>
-tref join_terms(const trefs& ts, ba_type_id type) {
-	if (ts.empty()) return _0<node>(type);
-	tref r = ts.front();
-	for (size_t i = 1; i < ts.size(); ++i) r = build_bf_or<node>(r, ts[i]);
-	return r;
-}
-
 /// The BA type of the block, read off its first variable: a block is
 /// type-homogeneous (invariant 2), and `SQUEEZE` has no ctx to read
 /// `ctx.type` from. The id is needed for the empty union alone.
@@ -157,12 +147,12 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
 		for (tref a : p.conjuncts)
 			part_terms.push_back(term_of<node>(a, order));
 		const tref F = simplify_term<node>(
-			join_terms<node>(part_terms, type), order);
+			build_bf_or<node>(part_terms, type), order);
 		terms.push_back(F);
 		r.comps.push_back(component<node>{ F, std::move(p.vars) });
 	}
 	// `f = ⋃_k F_k` over pairwise disjoint `X_k`, the whole positive part.
-	r.f = simplify_term<node>(join_terms<node>(terms, type), order);
+	r.f = simplify_term<node>(build_bf_or<node>(terms, type), order);
 	return r;
 }
 
@@ -208,7 +198,7 @@ tref negative_condition(tref g, const std::vector<component<node>>& comps,
 	block vs;
 	for (tref x : X)
 		if (vars.contains(x)) vs.push_back(tau::trim_right_sibling(x));
-	const tref F_K = simplify_term<node>(join_terms<node>(FK, c.type),
+	const tref F_K = simplify_term<node>(build_bf_or<node>(FK, c.type),
 		c.order);
 	const tref h = simplify_term<node>(
 		build_bf_and<node>(build_bf_neg<node>(F_K), g), c.order);
