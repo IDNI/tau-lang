@@ -1,13 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// THE LAYER-4 MILESTONE: the whole pipeline with phase 4 real. Spec:
+// THE WHOLE PIPELINE, the phase-4 push included. Spec:
 // anti_prenex.md §3 (ANTI_PRENEX's phase list), §4 (PROCESS_ALL_BLOCKS,
 // COLLECT_RUN), §5 (PROCESS_BLOCK, PUSH_EX_BLOCK), §6 (PUSH_BLOCK's
 // dispatcher), §1's `keep_functional` row, invariants 3 and 4.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
-// with `get_nso_rr` so that the types come from inference — only the atomless
-// types are rows of §7's table. What every case claims, through node identity
+// with `get_nso_rr` so that the types come from inference — §7's table has no
+// row for an untyped block. What every case claims, through node identity
 // and `are_nso_equivalent` and never through an output string:
 //  1. the output is EQUIVALENT to the input, and running the pipeline again
 //     returns the SAME node (idempotence by tref);
@@ -19,17 +19,16 @@
 // Then its own SHAPE claim: what the block driver does to that input, worked
 // out from the spec and spelled in the case's comment.
 //
-// WHAT RESOLVES AT THIS LAYER: a block over one literal, one negative tree
-// (§1: an ∨-node all of whose leaves are negated equations) or one binder
-// unit. Every other disjunction and every conjunction RE-WRAPS, after the
-// strip of its X-free conjuncts — the push over a junction is not part of the
-// module yet, and an undecided block comes back wrapped rather than answered
-// (invariant 3).
+// WHAT RESOLVES: a block over one literal, one negative tree (§1: an ∨-node
+// all of whose leaves are negated equations) or one binder unit. Every other
+// disjunction and every conjunction RE-WRAPS, after the strip of its X-free
+// conjuncts — the push over a junction is not part of the module, and an
+// undecided block comes back wrapped rather than answered (invariant 3).
 //
-// Part of the corpus is seeded from the single-block inputs of the old
-// module's suite (tests/unit/test_antiprenexing.cpp), which is the source of
-// the INPUT STRINGS and of nothing else — every expectation here is the
-// spec's.
+// Some cases take their INPUT STRING, and nothing else, from
+// tests/unit/test_antiprenexing.cpp; every expectation here is the spec's. A
+// case naming `R`<n> shares its input with that case of the regression
+// corpus, tests/unit/test_anti_prenex_regression.cpp.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -145,8 +144,8 @@ void rewrapped_over(tref got, size_t junction, size_t member_count) {
 }
 
 /// THE CLAIMS EVERY CASE MAKES. @p equivalent is false where the checker is
-/// out of reach — a lone reference is compared by signature and may answer
-/// no — and the case then rests on the structural claims alone.
+/// out of reach — it does not decide a formula holding an unresolved
+/// reference — and the case then rests on the structural claims alone.
 tref anti_prenexed(tref phi, bool equivalent = true) {
 	const tref got = ap::anti_prenex<node_t>(phi);
 	if (equivalent) CHECK(are_nso_equivalent<node_t>(got, phi));
@@ -200,10 +199,11 @@ TEST_CASE("M3: the strip leaves a one-literal block behind") {
 // --- 2. runs, nests and alternations ----------------------------------------------
 
 TEST_CASE("M4: an alternating nest re-wraps around its conjunctive clause") {
-	// The corpus's R9, whose dormant claim waits for layer 5. The inner
-	// matrix is a CONJUNCTION, which re-wraps (invariant 3); the ∀ run
-	// above it is dualised onto a binder UNIT, which the leaf transports
-	// rather than opens, so both binders stand in the answer.
+	// The corpus's R9, whose stronger claim needs the push over a
+	// conjunction. The inner matrix is a CONJUNCTION, which re-wraps
+	// (invariant 3); the ∀ run above it is dualised onto a binder UNIT,
+	// which the leaf transports rather than opens, so both binders stand
+	// in the answer.
 	const tref phi = parse("all a ex b (ab = 0 && bc != 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 2);
@@ -277,9 +277,9 @@ TEST_CASE("M9: the strip hoists the X-free conjunct and the rest re-wraps") {
 TEST_CASE("M10: a block over a reference is frozen and re-wrapped") {
 	// A reference is opaque to every step (§4) and its arguments are
 	// terms, so nothing here reads into it and the block comes back
-	// wrapped. STRUCTURAL: the equivalence checker compares a lone
-	// reference by its signature and may answer no, so that claim is not
-	// made here.
+	// wrapped. STRUCTURAL: the equivalence checker does not decide a
+	// formula holding an unresolved reference, so that claim is not made
+	// here.
 	const tref phi = parse("ex x (q(x)).");
 	const tref got = anti_prenexed(phi, false);
 	CHECK(binder_count(got) == 1);
@@ -289,9 +289,9 @@ TEST_CASE("M10: a block over a reference is frozen and re-wrapped") {
 // --- 4. one answer per meaning, not per spelling ----------------------------------
 
 TEST_CASE("M11: both spellings of a disequation give the same node") {
-	// The corpus's R22 claim, now made through the driver: phase 3's
-	// `NORMALIZE_OPERATORS` runs before the push, so the two inputs reach
-	// phase 4 as one formula and leave it as one node.
+	// The corpus's R22 claim, made here through the whole pipeline:
+	// phase 3's `NORMALIZE_OPERATORS` runs before the push, so the two
+	// inputs reach phase 4 as one formula and leave it as one node.
 	const tref a = anti_prenexed(parse("ex x (x a = 0 && x b != 0)."));
 	const tref b = anti_prenexed(parse("ex x (x a = 0 && !(x b = 0))."));
 	CHECK(same(a, b));
@@ -305,9 +305,8 @@ TEST_CASE("M12: a kept block leaves a functional quantifier, resolved later") {
 	// keeps: `∃x. x·y = 0` comes back as the one atom `(∀_x x·y) = 0`,
 	// with no formula binder left.
 	//
-	// No `are_nso_equivalent` on the kept output: the checker is
-	// undecidable on functional-quantifier content and answers
-	// conservatively, which is what layer 2's P4 shows.
+	// The claims are spelled out rather than taken from `anti_prenexed`:
+	// idempotence has to be claimed under the SAME callback.
 	const tref phi = parse("ex x (xy = 0).");
 	auto keep_all = [](tref) { return true; };
 	const tref got = ap::anti_prenex<node_t>(phi, keep_all);
@@ -358,8 +357,7 @@ TEST_CASE("M14: a negative tree under a block is resolved whole") {
 TEST_CASE("M15: a conjunction of negated equations re-wraps") {
 	// test_antiprenexing.cpp:178. A negative tree is an ∨-NODE (§1), so a
 	// conjunction of the same literals is not one: it takes the
-	// dispatcher's junction arm and re-wraps (invariant 3). The push over
-	// a conjunction arrives with layer 5.
+	// dispatcher's junction arm and re-wraps (invariant 3).
 	const tref phi = parse("ex x (xy != 0 && xw != 0).");
 	const tref got = anti_prenexed(phi);
 	rewrapped_over(got, tau::wff_and, 2);

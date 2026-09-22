@@ -14,9 +14,9 @@
 // INVARIANT 4. Per case: the block is RESOLVED, or what came back is exactly
 // the RE-WRAP.
 //
-// TYPES: only the atomless types are rows of §7's table, so every fixture
-// carries typed variables — a parsed one through inference, a built one by
-// spelling the type.
+// TYPES: §7's table has no row for an untyped block and `method`
+// Debug-asserts on one, so every fixture carries typed variables — a parsed
+// one through inference, a built one by spelling the type.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -44,8 +44,8 @@ tref parse(const char* sample) {
 }
 
 /// A `tau`-typed `variable` node — a block member and an order key — and the
-/// `bf` around it, which is what a term holds. Only a typed block has a row
-/// in §7's table, so a fixture that is built rather than parsed spells the
+/// `bf` around it, which is what a term holds. §7's table has no row for an
+/// untyped block, so a fixture that is built rather than parsed spells the
 /// type itself.
 tref tvar(const char* name) {
 	return tau::build_variable(name, tau_type_id<node_t>());
@@ -161,10 +161,11 @@ fixture make(const char* src, bool keep = false, size_t vars = 0) {
 	return f;
 }
 
-/// THE HARNESS: `∃P.ψ` pushed exactly as a component's caller does it — the
-/// block pushed, and in KEEP MODE the component's close run over what came
-/// back, which resolves every chain `DISCHARGE` emitted (§5). @p emitted
-/// takes the result BEFORE that close, where the chains are still there.
+/// THE HARNESS: `∃P.ψ` pushed as a component's caller pushes it — the block
+/// pushed, and in KEEP MODE `RESOLVE_FUNCTIONAL_BDD`, the first half of the
+/// component's close (§5), run over what came back, which resolves every
+/// chain `DISCHARGE` emitted. @p emitted takes the result BEFORE that pass,
+/// where the chains are still there.
 tref pushed(fixture& f, tref* emitted = nullptr) {
 	const tref r = ap::push_block<node_t>(f.clause, f.P, f.c);
 	if (emitted) *emitted = r;
@@ -181,10 +182,10 @@ void check_against_source(tref got, const fixture& f) {
 	CHECK(invariant_4(got));
 }
 
-/// The same for a result the equivalence checker cannot read: it compares a
-/// LONE REFERENCE by signature alone and answers `false` where it is
-/// undecided, so such a case claims what it can — no escape, invariant 4 —
-/// and says the rest structurally.
+/// The same for a result the equivalence checker cannot read: it does not
+/// decide a formula holding an unresolved reference and answers `false`, so
+/// such a case claims what it can — no escape, invariant 4 — and says the
+/// rest structurally.
 void check_structurally(tref got, const fixture& f) {
 	CHECK(no_escape(finished(got), f.quantified));
 	CHECK(invariant_4(got));
@@ -256,7 +257,7 @@ TEST_CASE("P4: the strip hoists every X-free conjunct outside the block") {
 }
 
 TEST_CASE("P5: the key is the wrap node, and the entry is the result") {
-	// A formula of its own: the table is global, so one another case
+	// A formula of its own: the table is GLOBAL, so a formula another case
 	// pushed would already have an entry.
 	fixture f = make("ex x (x m = 0 && !(x n = 0)).");
 	const std::pair<tref, bool> key{ ap::rewrap<node_t>(f.clause, f.P),
@@ -335,9 +336,9 @@ TEST_CASE("P9: a negative tree is taken whole by the leaf") {
 }
 
 TEST_CASE("P10: a binder unit is a one-unit clause, and freezes") {
-	// The unit goes to the leaf (§7), where this engine can swallow it
-	// into no query, so what comes back is the method's freeze — exactly
-	// the re-wrap the dispatcher's last line would have built.
+	// The unit goes to the leaf (§7). The atomless method has no query to
+	// swallow it into, so it freezes the unit, and what comes back is
+	// exactly the re-wrap the dispatcher's last line would have built.
 	fixture f = make("ex x (ex z (x z = 0)).", false, 1);
 	REQUIRE(f.P.size() == 1);
 	REQUIRE(is_child_quantifier<node_t>(f.clause));
@@ -414,8 +415,9 @@ TEST_CASE("P15: a disjunction re-wraps") {
 
 TEST_CASE("P16: a reference re-wraps") {
 	// A reference is no atom and no junction: it is pushed as far as it
-	// goes, which is nowhere (invariant 3). The claim is structural — the
-	// equivalence checker compares a lone reference by signature alone.
+	// goes, which is nowhere (invariant 3). The claim is structural: the
+	// equivalence checker does not decide a formula holding an unresolved
+	// reference.
 	fixture f = make("ex x (q(x)).");
 	const tref got = pushed(f);
 	check_structurally(got, f);
@@ -469,15 +471,15 @@ TEST_CASE("P18: a sub-block is pushed under the component's full order") {
 TEST_CASE("P19: keep mode emits the chain, and the close resolves it") {
 	// `DISCHARGE` under `ctx.keep_functional` spells the block instead of
 	// solving it: the one-literal clause comes back as `∀_x x·y = 0`, a
-	// functional-quantifier chain over the stored BDD. The component's
-	// close is one quantification of it, and what it leaves is the
-	// non-keep answer.
+	// functional-quantifier chain over the stored BDD. One quantification
+	// of that BDD resolves the chain, and what is left is the non-keep
+	// answer.
 	fixture plain = make("ex x (x y = 0).");
 	fixture kept = make("ex x (x y = 0).", true);
 	const tref want = pushed(plain);
 	tref emitted = nullptr;
 	const tref got = pushed(kept, &emitted);
-	// BEFORE the close: one atom whose term is a chain.
+	// BEFORE that pass: one atom whose term is a chain.
 	REQUIRE(is_child<node_t>(emitted, tau::bf_eq));
 	CHECK(!ap::strip_chain<node_t>(sides(emitted).first).first.empty());
 	CHECK(!same(emitted, want));

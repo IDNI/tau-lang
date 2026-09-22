@@ -186,8 +186,8 @@ TEST_CASE("finish_terms: a kept chain comes back with a plain, canonical body") 
 	ap::block P{ x };
 	order_t o = order_of(P);
 	// §7 `DISCHARGE`'s keep-mode emission: a chain over the component's own
-	// stored BDD. The close does NOT resolve it — it spells the body out,
-	// in the plain regime's normal form, and the chain stands.
+	// stored BDD. `FINISH_TERMS` does NOT resolve it — it spells the body
+	// out, in the plain regime's normal form, and the chain stands.
 	tref l = sides(ap::prepare_terms<node_t>(wff("x & y = 0"), P, o)).first;
 	REQUIRE(th::is_bdd_backed(l));
 	const tref atm = build_bf_eq_0<node_t>(

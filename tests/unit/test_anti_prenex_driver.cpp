@@ -7,8 +7,8 @@
 // pass has already finished. Spec: anti_prenex.md §5 (CONNECTED_COMPONENTS,
 // PUSH_EX_BLOCK with its size acceptance and its close, PROCESS_BLOCK), §4
 // (COLLECT_RUN, PROCESS_NODE, PROCESS_ALL_BLOCKS), §3 (the primitives those
-// call), §1 (the ctx table's keep_functional row, assumption 1), invariants
-// 2, 3 and 4.
+// call), §1 (the ctx table's `keep_functional` row), the paper's assumption
+// 1 (shared subtrees), invariants 2, 3 and 4.
 //
 // A §5 case is ONE formula through one harness: parse a quantifier run, take
 // its kind, its variables and its matrix as phase 4 meets it — in NNF, with
@@ -17,9 +17,9 @@
 // EQUIVALENT to the formula it came from, no free variable ESCAPED, INVARIANT
 // 4, and PLAIN — a component's close is total, so no `BDD_ID` survives it.
 //
-// TYPES: only the atomless types are rows of §7's table, so every fixture is
-// parsed as a whole spec and typed by inference; what a case builds by hand
-// says its type itself.
+// TYPES: §7's table has no row for an untyped block and `method`
+// Debug-asserts on one, so every fixture is parsed as a whole spec and typed
+// by inference; what a case builds by hand says its type itself.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -97,8 +97,8 @@ tref matrix_of(tref n, size_t k) {
 }
 
 /// The formula with every stored BDD spelled out, which is what the oracle
-/// reads. Every result here is plain already — the close saw to that — so
-/// this is the identity on one, and it says so where the claim is made.
+/// reads. A result is plain already — a component's close sees to that, and
+/// `check_claims` claims it — so on one this is the identity.
 tref finished(tref n) { return th::convert_to_tau_terms(n); }
 
 /// NO FREE VARIABLE ESCAPED: `FV(out) ⊆ FV(in)`.
@@ -163,9 +163,9 @@ tref bvar(const char* name) {
 }
 
 /// A parsed run, split the way §4's driver hands one over: the kind, the
-/// variables OUTERMOST FIRST, and the matrix normalised. Collecting a run off
-/// a binder chain is §4's own procedure and no subject of this file, so the
-/// loop here is the harness's own.
+/// variables OUTERMOST FIRST, and the matrix normalised. The loop is the
+/// harness's own, so that a §5 case rests on nothing `COLLECT_RUN` does —
+/// which the R cases claim separately.
 struct fixture {
 	tref quantified = nullptr;   ///< the run as parsed, the oracle's source
 	ap::run<node_t> blk{};

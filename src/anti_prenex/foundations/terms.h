@@ -132,11 +132,11 @@ tref prepare_terms(tref body, const block& P, const var_order<node>& order);
  * opaque, and the library's substitute spells a backed witness out before it
  * enters an argument, so there is nothing below a reference to spell.
  *
- * WHY THE PLAIN NORMAL FORM AND NOT THE LIBRARY'S RAW SPELLING: it is what
- * makes the round trip an identity BY NODE. A term the component prepared
- * comes back the node it went in as, so a re-wrapped block is the node phase
- * 3 built and a kept chain is spelled as the plain phases spell it — and
- * `ANTI_PRENEX` is therefore a fixpoint on its own output from the FIRST run.
+ * Why the plain normal form and not the library's raw spelling: it makes the
+ * round trip an identity BY NODE. A term the component prepared comes back
+ * as the node it went in as, so a re-wrapped block is the node phase 3 built,
+ * a kept chain is spelled as the plain phases spell it, and `ANTI_PRENEX` is
+ * a fixpoint on its own output.
  *
  * @param phi a `wff` node, at the close of one component
  * @return the same formula with every term plain

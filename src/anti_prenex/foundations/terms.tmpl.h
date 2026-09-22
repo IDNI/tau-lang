@@ -382,7 +382,7 @@ tref finish_terms(tref phi) {
 	// An atom holding a stored BDD anywhere is spelled out by the library
 	// and then normalised in the PLAIN regime — the empty order, the
 	// spelling phase 1 gives every atom. Everything else is handed back
-	// unlooked at, so a formula with no stored BDD is the same node.
+	// unlooked at.
 	auto down = [](tref n) -> tref {
 		if (!is_atomic_fm<node>(n) || !holds_bdd_id<node>(n)) return n;
 		return simplify_atom<node>(

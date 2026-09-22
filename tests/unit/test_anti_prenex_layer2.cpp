@@ -1,7 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // End-to-end tests for src/anti_prenex/anti_prenex.h: the whole pipeline on
-// one formula, with phase 4 the identity. Spec: anti_prenex.md §3
+// one formula, claiming the phases AROUND the push — the push itself is
+// claimed in tests/unit/test_anti_prenex_layer4.cpp. Spec: anti_prenex.md §3
 // (ANTI_PRENEX's phase list, TRY_WITNESS_DEEP, RESOLVE_FUNCTIONAL_PLAIN,
 // NORMALIZE_OPERATORS), §1's `keep_functional` row, invariant 4.
 //
@@ -13,8 +14,8 @@
 //     operator, and a `¬` only directly over an atom.
 //  3. binder ids are canonical: `canonicalise_binder_ids` of the output is
 //     the output.
-//  4. phase 2 is visible end to end — a pin deletes its binder — while the
-//     spec's counterexamples keep theirs.
+//  4. phase 2 is visible end to end — a pin deletes its binder — while a
+//     witness the spec's conditions bar is not taken.
 //  5. phase 1 resolves a functional-quantifier chain under the default
 //     callback and keeps it under a keep-all one, which is handed the chain
 //     NODE (its prefix read off with `strip_chain`).
@@ -36,8 +37,9 @@ namespace {
 
 using tb = tau_term_bdd<node_t>;
 
-/// Hand-built variables are TYPED: only a typed block has a row in §7's table
-/// (`method`), and a parsed input gets its type from inference.
+/// Hand-built variables are TYPED: §7's table has no row for an untyped
+/// block and `method` Debug-asserts on one. A parsed input gets its type
+/// from inference.
 tref bvar(const char* name) {
 	return tau::build_bf_variable(name, tau_type_id<node_t>());
 }
@@ -199,7 +201,7 @@ TEST_CASE("P3: the spec's counterexamples keep their binders") {
 	// The second one keeps no binder, and not because a witness fired: the
 	// witness still declines by (c), and phase 4 then decides the formula
 	// outright — `x = z ∧ z = y` forces `x = y`, and `∃x ∀y. x = y` is `F`
-	// in any algebra with two elements.
+	// in any BA with more than one element.
 	const tref two = ex("x", all_("y", ex("z", conj(eq(x, z), eq(z, y)))));
 	tref r = anti_prenexed(two);
 	CHECK(tau::get(r).equals_F());

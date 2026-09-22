@@ -58,8 +58,8 @@ run<node> collect_run(tref h);
  * never entered, so a functional quantifier is untouched here.
  *
  * RUN HEADS ARE MEMOISED for the whole pass, so a shared subtree is processed
- * ONCE, not once per site (§1, assumption 1). The memo is exact because a
- * head's result is a pure function of the head and of @p kf.
+ * ONCE, not once per site (the spec's assumption 1). The memo is exact
+ * because a head's result is a pure function of the head and of @p kf.
  *
  * @p kf is the caller's callback (§1), handed to every block unchanged.
  * A formula holding no formula binder comes back AS THE SAME NODE: every step
