@@ -347,6 +347,31 @@ TEST_CASE("F1: a narrowed clause that settles nothing goes to the fast paths") {
 
 // --- the consistency check --------------------------------------------------------
 
+TEST_CASE("F2: an X-free member inside a disjunct keeps the variable "
+	"unsettled, and 2a takes the clause") {
+	// `(¬(xy = 0) ∨ c = 0)` is no negative tree — `c = 0` is a positive leaf
+	// — so `x` is flagged and the settle move does not fire; the census then
+	// counts the one top-level positive, one negated leaf and one X-free
+	// leaf, which is 2a's shape: the positive rides into the negated leaf's
+	// clause, `c = 0` rides along untouched.
+	fixture f = make("ex x (x a = 0 && (x y != 0 || c = 0)).");
+	const ap::incidence_result<node_t> inc =
+		ap::incidence<node_t>(ap::members<node_t>(f.clause), f.P);
+	REQUIRE(inc.parts.size() == 1);
+	REQUIRE(inc.settled.empty());
+	const ap::census k = ap::sign_census<node_t>(f.clause, f.P, 1);
+	CHECK(k.pos == 1);
+	CHECK(k.neg == 1);
+	CHECK(k.free == 1);
+	CHECK(k.other == 0);
+	REQUIRE(ap::try_fast_paths<node_t>(f.clause, f.P, f.c).has_value());
+	const tref got = pushed_and(f);
+	check_against_source(got, f);
+	check_resolved(got, f);
+	CHECK(are_nso_equivalent<node_t>(finished(got),
+		parse("!(a' y = 0) || c = 0.")));
+}
+
 TEST_CASE("C1: positives with no common zero in the block decide F") {
 	// The four positives squeeze to `1`, so `∃x.⋀P` is `F` — joint over
 	// every positive and the whole block, which no leaf sees on its own.
