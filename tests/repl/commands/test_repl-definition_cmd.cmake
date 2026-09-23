@@ -105,3 +105,33 @@ add_repl_test(definitions-head_var_as_ref_arg
 	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(1)" ": T")
 add_repl_test(definitions-head_var_as_ref_arg-false
 	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(0)" ": F")
+
+# The same two defects on a recurrence relation, which is unrolled by
+# calculate_fixed_point one rule at a time rather than through nso_rr_apply's
+# fixpoint loop, so the bodies it splices in keep their shifted ids. f
+# alternates: f[n](y) is y = 0 for even n and y = 1 for odd n; its body hands
+# its bound variable to the previous step, which used to leave `1 = 0` for
+# every query below.
+set(_rec_f "f[0](y) := y = 0. f[n](y) := ex x (f[n-1](x) && y = x')")
+add_repl_test(definitions-rec_bound_var_step_1_true
+	"${_rec_f}. normalize f[1](1)" ": T")
+add_repl_test(definitions-rec_bound_var_step_1_false
+	"${_rec_f}. normalize f[1](0)" ": F")
+add_repl_test(definitions-rec_bound_var_step_2
+	"${_rec_f}. normalize f[2](0)" ": T")
+add_repl_test(definitions-rec_bound_var_step_3
+	"${_rec_f}. normalize f[3](1)" ": T")
+# f has no fixed point (it alternates), so f(0) is F.
+add_repl_test(definitions-rec_bound_var_fixed_point
+	"${_rec_f}. normalize f(0)" ": F")
+# A quantified query over the unrolled recurrence (a control: it was right
+# before as well).
+add_repl_test(definitions-rec_bound_var_quantified_query
+	"${_rec_f}. normalize all z (f[2](z) -> z = 0)" ": T")
+# g[n](y) is T for every n (take c = y'); a query binder at the innermost
+# position used to be captured by the body's `ex c` and answered F.
+set(_rec_g "g[0](y) := ex c (c = y). g[n](y) := ex c (g[n-1](c) && c != y)")
+add_repl_test(definitions-rec_quant_body_no_capture
+	"${_rec_g}. normalize all z (g[2](z))" ": T")
+add_repl_test(definitions-rec_quant_body_fixed_point
+	"${_rec_g}. normalize g(0)" ": T")
