@@ -641,6 +641,29 @@ TEST_SUITE("Tau API - tref - procedures") {
 		// x = 0 is not logically equivalent to T
 		CHECK(!valid_x.value());
 	}
+	// issue #132: a term is not a formula. valid and valid_spec are both
+	// public and both reject it before any negation or backend call
+	// (a bv term used to abort the process on a cvc5 exception).
+	TEST_CASE_FIXTURE(api_fixture, "valid and valid_spec reject a term") {
+		for (const auto& t : { "x", "x & y'", "0" }) {
+			CAPTURE(t);
+			auto term_r = tau_api::get_term(t);
+			REQUIRE(term_r.has_value());
+			auto v = tau_api::valid(term_r.value());
+			auto vs = tau_api::valid_spec(term_r.value());
+			CHECK(!v.has_value());
+			CHECK(!vs.has_value());
+			CHECK(report_has_code(v.report(), code::invalid_argument));
+			CHECK(report_has_code(vs.report(), code::invalid_argument));
+		}
+	}
+	TEST_CASE_FIXTURE(api_fixture, "realizable keeps rejecting a term") {
+		auto term_r = tau_api::get_term("x");
+		REQUIRE(term_r.has_value());
+		auto r = tau_api::realizable(term_r.value());
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+	}
 }
 
 TEST_SUITE("Tau API - tref - solving") {

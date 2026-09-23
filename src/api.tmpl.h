@@ -992,12 +992,27 @@ std::optional<bool> ba_fast_path_sat(tref fm) {
 	}
 }
 
+/// A formula, or a spec whose main part is a formula: the roots the
+/// decision procedures accept (normalize_formula unwraps a spec).
+template <NodeType node>
+bool is_formula_or_spec_root(tref fm) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	if (!fm) return false;
+	const auto& t = tau::get(fm);
+	return t.is(tau::wff)
+		|| (t.is(tau::spec) && (tt(fm) | tau::main | tau::wff | tt::ref));
+}
+
 /// Fast path for validity: fm is valid iff !fm is unsat.
 template <NodeType node>
 std::optional<bool> ba_fast_path_valid(tref fm) {
 	using tau = tree<node>;
 	if constexpr (!pack_has_arithmetic_theory_v<node>) return std::nullopt;
 	else {
+	// Only a formula can be negated; anything else is left to the caller's
+	// own shape check (issue #132).
+	if (!fm || !tau::get(fm).is(tau::wff)) return std::nullopt;
 	if (!is_whole_query_ba_solvable<node>(fm)) return std::nullopt;
 	// valid iff the negation is unsat, so the answer inverts.
 	if (auto sat = pack_sat_status<node>(tau::build_wff_neg(fm)))
@@ -1016,10 +1031,7 @@ result<bool> api<node>::realizable(tref fm) {
 		fm = flatten_always_conjuncts<node>(simplified);
 		// get_spec_or_term yields a spec for any formula, and normalize_formula
 		// unwraps it, so a spec root is as decidable as the formula it wraps.
-		using tt = tau::traverser;
-		const bool is_fm = is_formula(fm) || (tau::get(fm).is(tau::spec)
-			&& (tt(fm) | tau::main | tau::wff | tt::ref));
-		if (!fm || !is_fm) {
+		if (!is_formula_or_spec_root<node>(fm)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
 		// Whole-query BA fast path; falls through when undecided. It decides
@@ -1178,6 +1190,13 @@ result<bool> api<node>::valid_spec(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
 		TAU_TRY(fm, simplify(fm));
+		// valid() and valid_spec() are both public: the shape check sits
+		// here so neither can hand a term to formula negation or to a
+		// backend that expects a Boolean (issue #132: `valid x:bv[1]`
+		// aborted on a cvc5 exception).
+		if (!is_formula_or_spec_root<node>(fm)) {
+			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
+		}
 		// Validity of a CTL* formula quantifies over every computation tree,
 		// which no procedure here decides; is_tau_impl would read the opaque
 		// A / E / - nodes as "not valid".
