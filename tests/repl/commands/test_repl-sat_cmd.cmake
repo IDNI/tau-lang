@@ -74,3 +74,17 @@ set_tests_properties("test_repl-sat_cmd-issue72_disjoint_support_ladder" PROPERT
 	PASS_REGULAR_EXPRESSION ": T"
 	FAIL_REGULAR_EXPRESSION "Error"
 	TIMEOUT 60)
+
+# issue #130: equality substitution looped forever on a representative that
+# contained its own class member and ended in std::bad_alloc
+add_repl_test(sat_cmd-issue130_self_absorbing_x "sat x = x & y' && x' != 0" ": T")
+add_repl_test(sat_cmd-issue130_self_absorbing_a "sat a = a & b && a' != 0" ": T")
+add_repl_test(sat_cmd-issue130_negated_alias "sat x = x & y' && z = x'" ": T")
+add_repl_test(sat_cmd-issue130_sbf "sat x:sbf = x:sbf & y:sbf' && x:sbf' != 0" ": T")
+add_repl_test(sat_cmd-issue130_normalize "n x = x & y' && x' != 0" ": .*x' != 0")
+foreach(_t self_absorbing_x self_absorbing_a negated_alias sbf normalize)
+	if(TEST "test_repl-sat_cmd-issue130_${_t}")
+		set_tests_properties("test_repl-sat_cmd-issue130_${_t}"
+			PROPERTIES TIMEOUT 30)
+	endif()
+endforeach()
