@@ -32,6 +32,20 @@ void flush_rule_counts(report& rep) {
 	hits.clear();
 }
 
+// Returns @p r with its body's bound variables renamed clear of every bound
+// variable of @p n, so that applying it cannot capture an argument taken from
+// @p n. A body without bound variables (the common case) is returned as is,
+// without scanning @p n.
+template <NodeType node>
+rewriter::rule alpha_shift_rule_body(const rewriter::rule& r, tref n) {
+	using tau = tree<node>;
+	tref body = r.second->get();
+	if (max_bound_var_id<node>(body) == 0) return r;
+	tref shifted = shift_bound_var_ids<node>(body, max_bound_var_id<node>(n));
+	if (shifted == body) return r;
+	return { r.first, tau::geth(shifted) };
+}
+
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	static const auto is_capture = [](const tref& n) {
@@ -50,8 +64,16 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 		return it->second;
 #endif // TAU_CACHE
 
+	// A definition body carries bound-variable ids numbered per formula
+	// (canonize_quantifier_ids), so the body's `ex 1` and a call site's
+	// `all 1` are the same name: splicing the body in as it stands would
+	// capture the argument. Move the body's ids above every id n uses.
+	// Recomputed per application -- an expansion earlier in the same round
+	// may itself have introduced shifted ids. The result is renumbered once
+	// the expansion has settled, in the rr overload below.
+	const rewriter::rule ar = alpha_shift_rule_body<node>(r, n);
 	auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
-							r, n, is_capture);
+							ar, n, is_capture);
 		if (rule_counting) {
 			auto name = to_str<node>(r);
 			++rule_apply_counts<node>()[name];
@@ -273,8 +295,14 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	auto def_transformer = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable)) {
-			// If we collect head variables, save it
+			// If we collect head variables, save it; in a body
+			// only a variable the head declared is a pattern hole
+			// -- a bound variable of the body handed to a nested
+			// call (`p(a) := ex c q(c)`) is a value, and turning
+			// it into a capture would leave an unbound capture in
+			// the expansion.
 			if (collecting) head_vars.insert(tau::trim(n));
+			else if (!head_vars.contains(tau::trim(n))) return n;
 			auto type = t[0][0].get_ba_type();
 			return tau::get_typed(tau::ref_arg,
 				tau::get_typed(tau::bf,
@@ -349,6 +377,13 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 		return r.with_assert_check_error(code::internal_error,
 			"recurrence relation rewriting did not reach a fixed point");
 	}
+	// The expanded bodies came in with their ids shifted out of the way
+	// (alpha_shift_rule_body). Renumber so the formula leaves with the
+	// canonical numbering every other pass assumes: within a scope the
+	// outer quantifier holds the larger id, which is what lets
+	// find_biggest_quant_id stop at the outermost one.
+	if (new_main != main)
+		new_main = canonize_quantifier_ids<node>(new_main);
 	LOG_DEBUG << "End nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	LOG_DEBUG << "New main: " << LOG_FM(new_main);
