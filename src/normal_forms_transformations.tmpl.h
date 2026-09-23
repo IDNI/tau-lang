@@ -126,6 +126,28 @@ tref apply_xor_def(tref fm) {
 }
 
 
+/**
+ * @internal
+ * @brief Expands a single `bf_xor` node in conjunctive shape:
+ * `A XOR B` → `(A | B) & (!A | !B)`.
+ * @tparam node Tree node type.
+ * @param fm Formula node to expand; must be wrapped in `bf` with a `bf_xor` child.
+ * @return Expanded formula, or `fm` unchanged if no `bf_xor` child is present.
+ * @endinternal
+ */
+template<NodeType node>
+tref apply_xor_def_cnf(tref fm) {
+	using tau = tree<node>;
+	tau t = tau::get(fm);
+	if (t.child_is(tau::bf_xor)) {
+		return tau::build_bf_and(
+			tau::build_bf_or(t[0].first(), t[0].second()),
+			tau::build_bf_or(tau::build_bf_neg(t[0].first()),
+					tau::build_bf_neg(t[0].second())));
+	}
+	return fm;
+}
+
 /** @internal @copydoc apply_all_xor_def @endinternal */
 template<NodeType node>
 tref apply_all_xor_def(tref fm) {
