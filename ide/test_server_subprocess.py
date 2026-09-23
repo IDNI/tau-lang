@@ -151,5 +151,38 @@ class SubprocessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(maximum, server._TAU_MAX_CHILDREN)
 
 
+class FindBinaryTests(unittest.TestCase):
+    """The binary is looked up where the dev scripts and the presets build."""
+
+    def _root_with(self, *builds: str) -> Path:
+        root = Path(tempfile.mkdtemp(prefix="tau-ide-root-"))
+        for b in builds:
+            exe = root / b / "tau"
+            exe.parent.mkdir(parents=True)
+            exe.write_text("#!/bin/sh\n")
+            exe.chmod(0o755)
+        return root
+
+    def _find(self, root: Path) -> str | None:
+        with patch.object(server, "REPO_ROOT", root), \
+                patch("shutil.which", return_value=None):
+            return server.find_tau_binary()
+
+    def test_preset_build_dirs_are_found(self):
+        for build in ("build/release", "build/relwithdebinfo",
+                      "build/devel", "build/debug"):
+            with self.subTest(build=build):
+                root = self._root_with(build)
+                self.assertEqual(self._find(root), str(root / build / "tau"))
+
+    def test_release_is_preferred_over_debug(self):
+        root = self._root_with("build/debug", "build/release")
+        self.assertEqual(self._find(root), str(root / "build/release/tau"))
+
+    def test_stale_paths_are_not_searched(self):
+        root = self._root_with("build")
+        self.assertIsNone(self._find(root))
+
+
 if __name__ == "__main__":
     unittest.main()

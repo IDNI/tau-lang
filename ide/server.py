@@ -76,13 +76,16 @@ async def _run_tau(args: list[str], *, timeout: float) -> subprocess.CompletedPr
 
 def find_tau_binary() -> str | None:
     """Locate the tau binary from build directory or PATH."""
+    # ./dev release|debug|relwithdebinfo build into build-<Type>/, the CMake
+    # presets into build/<preset>/.
     candidates = [
         REPO_ROOT / "build-Release" / "tau",
-        REPO_ROOT / "build-Debug" / "tau",
+        REPO_ROOT / "build" / "release" / "tau",
         REPO_ROOT / "build-RelWithDebInfo" / "tau",
-        REPO_ROOT / "build" / "tau",
-        REPO_ROOT / "build" / "Release" / "tau",
-        REPO_ROOT / "build" / "Debug" / "tau",
+        REPO_ROOT / "build" / "relwithdebinfo" / "tau",
+        REPO_ROOT / "build-Debug" / "tau",
+        REPO_ROOT / "build" / "devel" / "tau",
+        REPO_ROOT / "build" / "debug" / "tau",
     ]
     for c in candidates:
         if c.is_file() and os.access(c, os.X_OK):

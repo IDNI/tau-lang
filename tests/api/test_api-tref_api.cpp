@@ -657,6 +657,25 @@ TEST_SUITE("Tau API - tref - procedures") {
 			CHECK(report_has_code(vs.report(), code::invalid_argument));
 		}
 	}
+	// valid_spec asks about the negation of a full-LTL formula. A spec
+	// root must have its main formula negated, not the spec node itself.
+	TEST_CASE_FIXTURE(api_fixture, "valid_spec negates the main formula of a spec root") {
+		const std::pair<const char*, bool> cases[] = {
+			{ "G (o1[t] = 0) || F (o1[t] != 0).", true },
+			{ "G (i1[t] = 0 -> i1[t] = 0).", true },
+			{ "G (o1[t] = 0).", false },
+			{ "F (o1[t] = 0).", false },
+		};
+		for (const auto& [src, expected] : cases) {
+			CAPTURE(src);
+			auto spec_r = tau_api::get_spec(src);
+			REQUIRE(spec_r.has_value());
+			REQUIRE(tau::get(spec_r.value()).is(tau::spec));
+			auto vs = tau_api::valid_spec(spec_r.value());
+			REQUIRE(vs.has_value());
+			CHECK(vs.value() == expected);
+		}
+	}
 	TEST_CASE_FIXTURE(api_fixture, "realizable keeps rejecting a term") {
 		auto term_r = tau_api::get_term("x");
 		REQUIRE(term_r.has_value());
@@ -673,6 +692,21 @@ TEST_SUITE("Tau API - tref - solving") {
 		auto solution = tau_api::solve(eq_r.value(), solver_mode::general);
 		REQUIRE(solution.has_value());
 		CHECK(!solution.value().empty());
+	}
+	// solve and eliminate_quantifiers take a formula: a term is rejected
+	// instead of being solved or returned as if it had been eliminated.
+	TEST_CASE_FIXTURE(api_fixture, "solve and eliminate_quantifiers reject a term") {
+		for (const auto& t : { "x", "x & y'", "0" }) {
+			CAPTURE(t);
+			auto term_r = tau_api::get_term(t);
+			REQUIRE(term_r.has_value());
+			auto s = tau_api::solve(term_r.value(), solver_mode::general);
+			auto q = tau_api::eliminate_quantifiers(term_r.value());
+			CHECK(!s.has_value());
+			CHECK(!q.has_value());
+			CHECK(report_has_code(s.report(), code::invalid_argument));
+			CHECK(report_has_code(q.report(), code::invalid_argument));
+		}
 	}
 	TEST_CASE_FIXTURE(api_fixture, "lgrs") {
 		// FIXED (issue-60): this used to abort for every non-null

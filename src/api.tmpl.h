@@ -798,7 +798,7 @@ result<tref> api<node>::onf(tref expr, tref var) {
 		// No simplify() here -- see the declaration's comment.
 		TAU_TRY(tref a, apply_all_defs(expr));
 		if (!tau::get(a).is(tau::wff)) {
-			r.error(code::invalid_argument, messages::invalid_arguments);
+			r.error(code::invalid_argument, "Invalid formula");
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
@@ -954,6 +954,11 @@ result<tref> api<node>::eliminate_quantifiers(tref fm) {
 		result<tref> r;
 		if (!fm) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		// Quantifier elimination works on a formula; a term given here
+		// used to come back unchanged as if it had been eliminated.
+		if (!tau::get(fm).is(tau::wff)) {
+			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
 		TAU_TRY(auto simplified, simplify(fm));
 		TAU_TRY(auto applied, apply_all_defs(simplified));
@@ -1212,7 +1217,17 @@ result<bool> api<node>::valid_spec(tref fm) {
 		// unsat(¬φ) alone would not (¬φ unrealizable does not make φ
 		// realizable).
 		if (sat_has_ltl_operators<node>(fm)) {
-			auto s = sat(inputs_as_outputs<node>(tau::build_wff_neg(fm)));
+			// A spec root is unwrapped, with its definitions applied,
+			// before it is negated: sat takes a formula, and negating the
+			// spec node itself wraps it instead of its main formula.
+			tref main = fm;
+			if (tau::get(fm).is(tau::spec)) {
+				TAU_TRY(main, apply_all_defs(fm));
+				if (!main || !tau::get(main).is(tau::wff))
+					return r.with_assert_check_error(
+						code::invalid_argument, "Invalid formula");
+			}
+			auto s = sat(inputs_as_outputs<node>(tau::build_wff_neg(main)));
 			if (!s.has_value()) {
 				r.merge(std::move(s));
 				return r.with_error(code::solver_error,
@@ -1256,6 +1271,10 @@ result<subtree_map<node, tref>> api<node>::solve(
 {
 	return with_budget<node>([&] {
 		result<subtree_map<node, tref>> r;
+		// The solver takes a formula; a term has nothing to solve.
+		if (!fm || !tau::get(fm).is(tau::wff)) {
+			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
+		}
 		auto simplified_v = r.merge_take(simplify(fm));
 		if (!simplified_v) {
 			DBG(assert(r.is_well_formed());)
@@ -1293,6 +1312,9 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	return with_budget<node>([&] {
 		result<subtree_map<node, tref>> r;
 		using tt = tau::traverser;
+		if (!equation || !tau::get(equation).is(tau::wff)) {
+			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
+		}
 		TAU_TRY(auto simplified, simplify(equation));
 		auto applied_v = r.merge_take(apply_all_defs(simplified));
 		if (!applied_v) {

@@ -31,3 +31,7 @@ add_repl_test(lgrs_cmd-untyped_zero "lgrs x = 0" "x := \\{ F \\}:tau")
 add_repl_test_fail(lgrs_cmd-non_boolean
 	"lgrs x:bv[16] + y:bv[16] = { 0 }:bv[16]"
 	"Found non-Boolean operation in equation")
+
+# lgrs takes an equation: a term argument is rejected instead of the whole
+# line being stored as a term (`lgrs x` used to print `%1: lgrsx`)
+add_repl_test_fail(lgrs_cmd-term_rejected "lgrs x" "Invalid formula")
