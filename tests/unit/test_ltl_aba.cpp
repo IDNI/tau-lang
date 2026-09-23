@@ -4469,6 +4469,29 @@ TEST_SUITE("ltl_explain diagnostics") {
 		MESSAGE(out);
 	}
 
+	// issue #131: a term is not a formula. It used to reach the backends
+	// as one (a bv term aborted on a cvc5 exception; an sbf term answered
+	// UNREALIZABLE).
+	TEST_CASE("a term is an invalid argument, not a verdict") {
+		tref eq = wff("x = 0");
+		REQUIRE(eq != nullptr);
+		tref term = tau::get(eq)[0].first();
+		REQUIRE(tau::get(term).is(tau::bf));
+		std::ostringstream oss;
+		result<bool> r;
+		CHECK_NOTHROW(r = ltl_explain<node_t>(term, oss));
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+		CHECK(oss.str().find("REALIZABLE") == std::string::npos);
+	}
+
+	TEST_CASE("a null formula is an invalid argument") {
+		std::ostringstream oss;
+		auto r = ltl_explain<node_t>(nullptr, oss);
+		CHECK_FALSE(r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+	}
+
 } // TEST_SUITE("ltl_explain diagnostics")
 
 

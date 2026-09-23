@@ -92,3 +92,11 @@ add_repl_test(ltl_decisions-normalize_keeps_negated_disjunction
 	"!\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1 \\|\\| \\(always o3\\[t\\]:tau = 1\\)\\)")
 add_repl_test(ltl_decisions-sat_negated_disjunction_F
 	"sat !((!((o1[t] = 1) until (o2[t] = 1))) || (F (o2[t] = 1)))" ": F")
+
+# issue #131: `ltl` takes a formula; a term is rejected instead of aborting
+# on a cvc5 exception (bv) or answering UNREALIZABLE (sbf)
+add_repl_test_fail(ltl_decisions-issue131_bv_term "ltl x:bv[1]" "Invalid formula")
+add_repl_test_fail(ltl_decisions-issue131_bv_constant "ltl 0:bv[1]" "Invalid formula")
+add_repl_test_fail(ltl_decisions-issue131_bv_term_under_G "ltl G x:bv[1]" "Invalid formula")
+add_repl_test_fail(ltl_decisions-issue131_sbf_term "ltl x:sbf" "Invalid formula")
+add_repl_test(ltl_decisions-issue131_bv_formula_control "ltl x:bv[1] = x:bv[1]" "[^N]REALIZABLE")
