@@ -188,8 +188,14 @@ tref to_dnf(tref fm) {
 		}
 		return n;
 	};
+	// Push negation in and expand XOR in the same pre-order step: the
+	// distribution below and the reduce() it calls read only `&`, `|` and
+	// negated literals, so a `bf_xor` left in place was later expanded by
+	// reduce() with its negations unpushed and read as a clause (issue #129).
 	auto pn = [](const auto& n) {
-		return push_negation_one_in<node, is_wff>(n);
+		tref r = push_negation_one_in<node, is_wff>(n);
+		if constexpr (!is_wff) r = apply_xor_def<node>(r);
+		return r;
 	};
 	tref r;
 	if constexpr (is_wff) r = pre_order<node>(fm)
@@ -259,8 +265,12 @@ tref to_cnf(tref fm) {
 			}
 		return n;
 	};
+	// See to_dnf: XOR is expanded while descending, here straight into its
+	// conjunctive shape `(A | B) & (A' | B')` so no distribution is needed.
 	auto pn = [](tref n) {
-		return push_negation_one_in<node, is_wff>(n);
+		tref r = push_negation_one_in<node, is_wff>(n);
+		if constexpr (!is_wff) r = apply_xor_def_cnf<node>(r);
+		return r;
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(

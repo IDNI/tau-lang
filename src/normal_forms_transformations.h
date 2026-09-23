@@ -99,6 +99,24 @@ tref norm_all_equations(tref fm);
 
 
 /**
+ * @brief Expand one XOR node `A ^ B` into `A B' | A' B`.
+ * @tparam node Tree node type.
+ * @param fm The node to transform.
+ * @return The expansion, or `fm` unchanged when it is not an XOR.
+ */
+template <NodeType node>
+tref apply_xor_def(tref fm);
+
+/**
+ * @brief Expand one XOR node `A ^ B` into `(A | B) & (A' | B')`.
+ * @tparam node Tree node type.
+ * @param fm The node to transform.
+ * @return The expansion, or `fm` unchanged when it is not an XOR.
+ */
+template <NodeType node>
+tref apply_xor_def_cnf(tref fm);
+
+/**
  * @brief Expand all XOR sub-expressions throughout `fm`.
  *
  * Applies `apply_xor_def` recursively to every `bf_xor` node via pre-order.

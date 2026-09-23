@@ -23,3 +23,10 @@ add_repl_test(normal_forms-dnf_bf_dist_right "dnf (X & (Y | Z))" ": ..\\|..")
 add_repl_test(normal_forms-dnf_bf_dist_left "dnf ((X | Y) & Z)" ": ..\\|..")
 add_repl_test(normal_forms-dnf_bf_mem_abs "1. dnf %1" "1")
 add_repl_test(normal_forms-dnf_bf_mem_rel "1. dnf %-0" "1")
+
+#
+# xor (issue #129: `dnf (x ^ (x & y))` answered `x` and logged an error)
+#
+
+add_repl_test(normal_forms-dnf_bf_xor_nested "dnf (x ^ (x & y))" ": xy'")
+add_repl_test(normal_forms-dnf_bf_xnor_conj "dnf ((x ^ y)' & z)" ": x'y'z\\|xyz")
