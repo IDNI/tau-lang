@@ -1,10 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// THE WHOLE PIPELINE with §6's CHEAP PUSH STEPS wired in — the milestone of
-// the ladder. Spec: anti_prenex.md §6 (PUSH_BLOCK's dispatcher, the two fast
-// paths 2a and 2b, PUSH_OVER_DISJUNCTION, PUSH_OVER_CONJUNCTION with its
-// scope narrowing, consistency check, witness step and case witness), §7 (the
-// leaves), §3 (the phases around the push), invariants 3, 6, 7 and 8.
+// THE WHOLE PIPELINE with §6's CHEAP PUSH STEPS in it. Spec: anti_prenex.md
+// §6 (PUSH_BLOCK's dispatcher, the two fast paths 2a and 2b,
+// PUSH_OVER_DISJUNCTION, PUSH_OVER_CONJUNCTION with its scope narrowing,
+// consistency check, witness step and case witness), §7 (the leaves), §3 (the
+// phases around the push), invariants 3, 6, 7 and 8.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no
@@ -20,8 +20,9 @@
 //     the push: a component's close is total, so no `BDD_ID` survives.
 // Then ONE SHAPE CLAIM, the strict criterion: `binder_count == 0` and the
 // value for an input the ladder RESOLVES, the binder count for one that WAITS
-// at the conjunction's floor, where §6's decomposition and expansion will
-// stand. Each case's comment names the route its input takes.
+// at the conjunction's floor, in place of §6's decomposition and expansion,
+// which this module does not carry. Each case's comment names the route its
+// input takes.
 //
 // The inputs come, and nothing else does, from the suite of the old module,
 // tests/unit/test_antiprenexing.cpp, at the line each case names; every
@@ -327,8 +328,8 @@ TEST_CASE("L17: a clause no cheap step takes waits, one binder") {
 	// census refuses 2a (a positive inside the disjunction) and 2b (the
 	// negated conjunct); the positives are consistent; neither disjunct
 	// pins `x`, so there is no pin and no case pin. The block comes back
-	// re-wrapped, undecided (invariant 3) — this is where the licensed
-	// decomposition and the expansion will stand.
+	// re-wrapped, undecided (invariant 3): §6's licensed decomposition and
+	// expansion, which would take it, are not part of this module.
 	const tref got = anti_prenexed(
 		parse("ex x ((xy = 0 || xw = 0) && xz != 0)."));
 	waits(got, 1);
@@ -401,8 +402,8 @@ TEST_CASE("L23: a block of three one-variable components waits three times") {
 }
 
 TEST_CASE("L24: a bitvector run under a reference waits, structurally") {
-	// test_antiprenexing.cpp:1556. `q(y)` is opaque (§4) and the
-	// bitvector conjunct reaches no method of this layer (§7), so what the
+	// test_antiprenexing.cpp:1556. `q(y)` is opaque (§4) and the bitvector
+	// conjunct reaches no method this module carries (§7), so what the
 	// census sees is `other > 0` and the clause waits. STRUCTURAL: the
 	// equivalence checker decides neither an unresolved reference nor
 	// bitvector content, so this case claims no escape, invariant 4 and

@@ -28,7 +28,7 @@
 // pin matches. What none of them takes re-wraps, after the strip of its
 // X-free conjuncts: an undecided block comes back wrapped rather than
 // answered (invariant 3). The cases here are the DRIVER's; the ladder's own
-// milestone is tests/unit/test_anti_prenex_layer5.cpp.
+// routes are claimed in tests/unit/test_anti_prenex_layer5.cpp.
 //
 // Some cases take their INPUT STRING, and nothing else, from
 // tests/unit/test_antiprenexing.cpp; every expectation here is the spec's. A
@@ -195,7 +195,7 @@ TEST_CASE("M6: an alternation is eliminated innermost first") {
 	CHECK(tau::get(got).equals_T());
 }
 
-// --- 3. what re-wraps -------------------------------------------------------------
+// --- 3. the dispatcher's arms, and what re-wraps ----------------------------------
 
 TEST_CASE("M7: a ∀ matrix that is a negative tree is answered through its "
 	"dual") {
@@ -302,12 +302,13 @@ TEST_CASE("M13: a block inside a temporal operator is pushed too") {
 
 // --- 7. the seed corpus: single-block inputs of the old module's suite -------------
 
-TEST_CASE("M14: a negative tree under a block is resolved whole") {
+TEST_CASE("M14: a negative tree under a block is resolved leaf by leaf") {
 	// test_antiprenexing.cpp:161. Phase 3 spells both disequations as
 	// formula negations, so the matrix is an ∨-node all of whose leaves
 	// are negated equations — a NEGATIVE TREE (§1), which the dispatcher
-	// classifies ahead of the junctions and hands to the leaf in one
-	// piece. RESOLVED.
+	// classifies ahead of the junctions. The fast paths are tried above
+	// that classification, so 2a takes it, one clause per negated leaf.
+	// RESOLVED.
 	const tref phi = parse("ex x (xy != 0 || xw != 0).");
 	const tref got = anti_prenexed(phi);
 	CHECK(binder_count(got) == 0);

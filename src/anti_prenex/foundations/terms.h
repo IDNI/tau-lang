@@ -370,7 +370,8 @@ trefs leaf_fv(tref f);
  * BDD could hide sits in a leaf.
  *
  * The shape has a name because it is the literal shape §7's engines decide
- * without a solver, and §6's fast paths take only these.
+ * without a solver; §6's 2a takes only these as its top-level positives, and
+ * so does the consistency check.
  */
 template <NodeType node>
 bool is_pure_term(tref t, ba_type_id type);

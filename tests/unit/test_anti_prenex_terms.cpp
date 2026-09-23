@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Layer 0 unit tests for src/anti_prenex/foundations/terms.h (package B).
+// Unit tests for src/anti_prenex/foundations/terms.h.
 // Spec: anti_prenex.md.
 //
 // Never assert on to_str() of a BDD-backed term: BDD_ID is an unreachable

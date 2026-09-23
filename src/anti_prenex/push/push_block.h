@@ -20,9 +20,8 @@
  * `push/fast_paths.h` and `push/junctions.h` — each holding its own
  * `.tmpl.h` and not including this one back, their bodies calling
  * `push_block` — and last this file's own `.tmpl.h`, so every declaration
- * precedes every template body and any include order works. Everything
- * outside the push — the module's shell, every test — includes this file
- * alone and gets the whole push with it.
+ * precedes every template body and any include order works. Including this
+ * file alone brings the whole push with it.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__PUSH_BLOCK_H__
@@ -80,8 +79,8 @@ tref push_block(tref phi, const block& X, ctx<node>& c);
  * 4. A CONJUNCTION goes through the ladder a conjunction offers
  *    (`push/junctions.h`): scope narrowing, the fast paths, the consistency
  *    check, the witness step, the case witness — and the re-wrap of
- *    invariant 3 below all of them, where the licensed decomposition and the
- *    expansion will stand.
+ *    invariant 3 below all of them, in place of §6's licensed decomposition
+ *    and expansion, which this module does not carry.
  * 5. A LITERAL or a BINDER UNIT is a one-literal (or one-unit) clause and
  *    goes to the leaf (§7), which may swallow a unit whole into a query. An
  *    order atom is a literal too, and comes back from the method's freeze as

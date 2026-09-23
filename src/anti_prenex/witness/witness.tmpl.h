@@ -12,14 +12,13 @@
  * conjuncts by `TRY_WITNESS` and of a branch's by `TRY_CASE_WITNESS`.
  *
  * THE TWO REWRITES of the deep pass are the library's: `φ[x ← t]` is
- * `subst_var` (foundations/subst.h), the library's `tree<node>::substitute`
- * with a re-simplifying argument hook under the live order — empty in phase
- * 2, `ctx.order` in the COF mode — and the spine's replacement is
- * `rewriter::replace`, a CONTENT match with a hooked rebuild of the path
- * above it. Replacing every occurrence of the spine is sound because the
- * descent enforces confinement first (§3): a second occurrence of that node
- * elsewhere in `Φ` would put `x` free in two members of some junction on the
- * way down, which the descent refuses.
+ * `subst_var` (foundations/subst.h) under the empty order, phase 2 holding
+ * no BDD-backed term, and the spine's replacement is `rewriter::replace`, a
+ * CONTENT match with a hooked rebuild of the path above it. Replacing every
+ * occurrence of the spine is sound because the descent enforces confinement
+ * first (§3): a second occurrence of that node elsewhere in `Φ` would put
+ * `x` free in two members of some junction on the way down, which the descent
+ * refuses.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__WITNESS__WITNESS_TMPL_H__

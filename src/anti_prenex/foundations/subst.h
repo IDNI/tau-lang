@@ -8,11 +8,9 @@
  *
  * `φ[x ← t]` IS the library's `tree<node>::substitute` (tau_tree.h) under the
  * live order, wrapped here with the re-simplifying ARGUMENT HOOK invariant 6
- * asks for. The hook belongs with the substitution — §3 hands every reference
- * argument a rewrite changed once to the caller's re-simplification — so the
- * file that owns `φ[x ← t]` owns the hook that makes the library call the
- * spec's primitive, and `SIMPLIFY`'s propagation, which substitutes with the
- * same hook, takes it from here.
+ * asks for: that hook is what makes the library call the spec's primitive.
+ * `SIMPLIFY`'s propagation substitutes with the same hook and takes it from
+ * here.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_H__

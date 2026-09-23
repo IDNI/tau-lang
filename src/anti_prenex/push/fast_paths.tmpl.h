@@ -135,7 +135,7 @@ std::optional<tref> try_fast_paths(tref phi, const block& X, ctx<node>& c) {
 	// An X-free part refutes it: the term-level squeeze has no way to carry
 	// a formula through the cross product.
 	if (k.free == 0 && k.neg == 0 && k.pos > 0) {
-		// Guard first (invariant 7): a `T` among the eliminations
+		// Eager `T` (invariant 7): a `T` among the eliminations
 		// stops the rest of the list from being eliminated at all.
 		join_builder<node, false> acc;
 		for (tref t : squeeze_positives<node>(phi, c.order)) {

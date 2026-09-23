@@ -294,8 +294,7 @@ TEST_CASE("N3: a settled variable leaves through its own sub-block") {
 
 TEST_CASE("N4: a clause whose ∨-nodes settle nothing is pushed home") {
 	// `Xs = X`, the degenerate case: the whole conjunction is one clause
-	// for §7, which resolves it. The same formula the dispatcher's `∧` arm
-	// re-wraps on its own.
+	// for §7, which resolves it — so the answer is not the re-wrap.
 	fixture f = make("ex x (x y = 0 && x w != 0).");
 	const ap::incidence_result<node_t> inc =
 		ap::incidence<node_t>(ap::members<node_t>(f.clause), f.P);

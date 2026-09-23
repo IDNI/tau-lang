@@ -322,10 +322,12 @@ TEST_CASE("P8: a negated atom is a one-literal clause and resolves") {
 	CHECK(are_nso_equivalent<node_t>(finished(got), parse("!(y = 0).")));
 }
 
-TEST_CASE("P9: a negative tree is taken whole by the leaf") {
+TEST_CASE("P9: a negative tree is taken by fast path 2a, one clause per leaf") {
 	// An ∨-node all of whose leaves are negated equations is ONE conjunct
-	// (§1), classified ahead of the disjunction arm and handed over whole
-	// rather than per member.
+	// (§1), classified ahead of the disjunction arm. The fast paths are
+	// tried above that classification, so 2a takes this one, one clause per
+	// negated leaf, and reaches the answer the leaf reaches on the whole
+	// tree (§6).
 	fixture f = make("ex x (x y != 0 || x w != 0).");
 	REQUIRE(ap::is_negative_tree<node_t>(f.clause));
 	const tref got = pushed(f);

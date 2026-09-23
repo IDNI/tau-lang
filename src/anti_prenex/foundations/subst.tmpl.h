@@ -61,10 +61,11 @@ bool is_spine(tref n, tref parent) {
 
 namespace detail {
 
-/// The argument hook of `φ[x ← t]` (§1, invariant 6): a reference argument
-/// the substitution changed is re-simplified once, in the PLAIN regime — an
-/// argument is the inside of a leaf, never BDD-backed, whatever the live
-/// order. One `std::function`, built once.
+/// The argument hook of every variable substitution in the module (§1,
+/// invariant 6): a reference argument the substitution changed is
+/// re-simplified once, in the PLAIN regime — an argument is the inside of a
+/// leaf, never BDD-backed, whatever the live order. One `std::function`,
+/// built once.
 template <NodeType node>
 const typename tree<node>::argument_hook& resimplify_argument() {
 	static const typename tree<node>::argument_hook hook =

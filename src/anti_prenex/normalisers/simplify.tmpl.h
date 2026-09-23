@@ -19,7 +19,8 @@
  * The pieces come from the foundations: `term_of`, `simplify_term`,
  * `simplify_atom`, `mem_size` (terms.h); `fv_meets`, `is_literal`,
  * `binder_var` (dag.h); `memoised` over `cof_memo` (ctx.h) for the pin
- * match's cofactor records; `tree::substitute` for every rewrite;
+ * match's cofactor records; `tree::substitute` with the argument hook
+ * `resimplify_argument` (subst.h) for every rewrite;
  * `get_leaves` for the member view of an open conjunction, with its spine.
  */
 

@@ -8,8 +8,9 @@
 //
 // What the cases claim, observed through node identity, `are_nso_equivalent`
 // and predicates over the output — never through an output string:
-//  1. every input comes out equivalent, and running the pipeline again
-//     returns the SAME node (invariant 6 at the pipeline's end).
+//  1. every input comes out equivalent. Running the pipeline on its own
+//     output is not claimed to give the same node back: what a run hands
+//     back re-wrapped, phase 5's `SIMPLIFY` may fold further.
 //  2. the output obeys invariant 4: no `bf_neq`, no negated or mirrored order
 //     operator, and a `¬` only directly over an atom.
 //  3. binder ids are canonical: `canonicalise_binder_ids` of the output is
