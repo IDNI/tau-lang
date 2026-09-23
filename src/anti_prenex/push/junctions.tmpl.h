@@ -14,8 +14,8 @@
  * question, `try_fast_paths` (push/fast_paths.h) for 2a and 2b,
  * `try_witness` and `try_case_witness` (witness/witness.h) for the two pin
  * matches, `subst_var` (foundations/subst.h) with `simplify`
- * (normalisers/simplify.h) for a branch's copy, and `rewrap`
- * (foundations/prims.h) for the floor.
+ * (normalisers/simplify.h) for a branch's copy, and `expand`
+ * (push/expand.h) for the floor.
  *
  * `push_block` — the hub, `push/push_block.h` — is what every re-entry goes
  * through, so each of them narrows `X` and strips the conjuncts the narrowed
@@ -161,9 +161,10 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		return acc.result();
 	}
 
-	// 6. THE FLOOR: a conjunction none of the steps above takes re-wraps
+	// 6. THE FLOOR: `∃X` distributed over ONE disjunctive conjunct in
+	// exclusive cases (§6); what its budget refuses re-wraps in there
 	// (invariant 3).
-	return rewrap<node>(psi, X);
+	return expand<node>(psi, X, c);
 }
 
 } // namespace idni::tau_lang::anti_prenexing

@@ -433,6 +433,32 @@ TEST_CASE("X5: a case that decides T leaves the later cases unbuilt") {
 	CHECK(f.c.expand_count == 1);
 }
 
+TEST_CASE("X5b: the inner expansion through the floor decides T at its first "
+	"case") {
+	// The two disjunctions tie on prio and member count, so content order
+	// picks `D = x·y = 0 ∨ x·w = 0`. Its first case, `x·y = 0` (`x·w = 0`
+	// alike), pushes `x·y = 0 ∧ (x·z = 0 ∨ ¬(x·k = 0))`, which no cheaper
+	// step takes, back to the floor; there the smaller member `x·z = 0`
+	// gives `∃x(x·y = 0 ∧ x·z = 0)`, `T` at `x := 0`, which decides the
+	// inner ∨-join and then the outer one: two of the four members charged.
+	fixture f = make("ex x ((xy = 0 || xw = 0) && (xz = 0 || xk != 0)).");
+	const trefs S = disjunctive(f);
+	REQUIRE(S.size() == 2);
+	auto all_positive = [](tref d) {
+		return std::ranges::all_of(ap::members<node_t>(d), [](tref m) {
+			return is_child<node_t>(m, tau::bf_eq); });
+	};
+	const tref D = all_positive(S[0]) ? S[0] : S[1];
+	const tref other = D == S[0] ? S[1] : S[0];
+	REQUIRE(all_positive(D));
+	REQUIRE(!all_positive(other));
+	REQUIRE(tau::subtree_less(D, other));
+	const tref got = expanded(f);
+	check_against_source(got, f);
+	CHECK(tau::get(got).equals_T());
+	CHECK(f.c.expand_count == 2);
+}
+
 TEST_CASE("X6: a spent budget re-wraps the rest as ONE pending block, and "
 	"taints") {
 	// L17's clause under a budget of one case: the first member is

@@ -1,10 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// THE WHOLE PIPELINE with §6's CHEAP PUSH STEPS in it. Spec: anti_prenex.md
-// §6 (PUSH_BLOCK's dispatcher, the two fast paths 2a and 2b,
+// THE WHOLE PIPELINE with §6's PUSH STEPS in it. Spec: anti_prenex.md §6
+// (PUSH_BLOCK's dispatcher, the two fast paths 2a and 2b,
 // PUSH_OVER_DISJUNCTION, PUSH_OVER_CONJUNCTION with its scope narrowing,
-// consistency check, witness step and case witness), §7 (the leaves), §3 (the
-// phases around the push), invariants 3, 6, 7 and 8.
+// consistency check, witness step, case witness and EXPAND at its floor), §7
+// (the leaves), §3 (the phases around the push), invariants 3, 6, 7 and 8.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no
@@ -19,9 +19,10 @@
 //  4. no free variable ESCAPED, and nothing of §1's term representation left
 //     the push: a component's close is total, so no `BDD_ID` survives.
 // Then ONE SHAPE CLAIM, the strict criterion: `binder_count == 0` and the
-// value for an input the ladder RESOLVES, the binder count for one that WAITS
-// at the conjunction's floor, in place of §6's decomposition and expansion,
-// which this module does not carry. Each case's comment names the route its
+// value for an input the ladder RESOLVES, the binder count for one that WAITS,
+// re-wrapped over an opaque shape or a spent expansion budget (invariant 3).
+// §6's licensed decomposition is not carried, so the conjunction's floor
+// expands without trying it first. Each case's comment names the route its
 // input takes.
 //
 // The inputs come, and nothing else does, from the suite of the old module,
@@ -125,8 +126,9 @@ tref anti_prenexed(tref phi, bool equivalent = true) {
 /// THE BLOCK IS RESOLVED: the pipeline left no binder at all.
 void resolved(tref got) { CHECK(binder_count(got) == 0); }
 
-/// WHAT WAITS: the push reached the conjunction's floor and re-wrapped
-/// (invariant 3), so @p n binders stand in the answer.
+/// WHAT WAITS: the push re-wrapped what it could not decide — an opaque
+/// shape, or a spent expansion budget (invariant 3) — so @p n binders stand in
+/// the answer.
 void waits(tref got, size_t n) { CHECK(binder_count(got) == n); }
 
 } // namespace
@@ -320,99 +322,102 @@ TEST_CASE("L16: a pin under a disjunct is taken by phase 2, not by the push") {
 	CHECK(are_nso_equivalent<node_t>(got, parse("!(w = 0).")));
 }
 
-// --- 6. what waits at the conjunction's floor ---------------------------------------
+// --- 6. what the conjunction's floor expands ----------------------------------------
 
-TEST_CASE("L17: a clause no cheap step takes waits, one binder") {
+TEST_CASE("L17: a clause no cheaper step takes is expanded, and resolves") {
 	// test_antiprenexing.cpp:222 — the floor's shape. `x` sits in a
 	// disjunctive conjunct, so nothing settles and there is one part; the
 	// census refuses 2a (a positive inside the disjunction) and 2b (the
 	// negated conjunct); the positives are consistent; neither disjunct
-	// pins `x`, so there is no pin and no case pin. The block comes back
-	// re-wrapped, undecided (invariant 3): §6's licensed decomposition and
-	// expansion, which would take it, are not part of this module.
+	// pins `x`, so there is no pin and no case pin. The floor expands the
+	// disjunction into `x·y = 0 ∧ x·z ≠ 0` and, under `x·y ≠ 0`,
+	// `x·w = 0 ∧ x·z ≠ 0`: clauses of literals, each settled and resolved
+	// by the leaf.
 	const tref got = anti_prenexed(
 		parse("ex x ((xy = 0 || xw = 0) && xz != 0)."));
-	waits(got, 1);
-	CHECK(holds(got, tau::wff_ex));
+	resolved(got);
 }
 
-TEST_CASE("L18: two disjunctive conjuncts over one variable wait") {
+TEST_CASE("L18: two disjunctive conjuncts over one variable are expanded") {
 	// test_antiprenexing.cpp:154. The same refusals as L17, with the
 	// negated conjunct and a second disjunction: `¬(x·z = 0)` bars 2b and
 	// the positives bar 2a, no variable settles, and no disjunct of either
-	// disjunction pins `x`.
+	// disjunction pins `x`. The floor expands one disjunction, and every
+	// case re-enters the ladder one disjunctive conjunct short, down to
+	// clauses of literals the leaf resolves.
 	const tref got = anti_prenexed(parse(
 		"ex x ((xy = 0 || xw = 0) && !(xz = 0) && (xz = 0 || xk = 0))."));
-	waits(got, 1);
+	resolved(got);
 }
 
-TEST_CASE("L19: an X-free disjunct does not help a waiting clause") {
+TEST_CASE("L19: an X-free disjunct is a case of its own") {
 	// test_antiprenexing.cpp:231. `v = 0` is X-free, so the census counts
 	// it in `free` and 2b is refused for that alone, 2a by the positive
 	// beside it; `v = 0` is no pin for `x` either, so the case witness
-	// declines and the clause waits.
+	// declines. The floor expands the disjunction: the case `v = 0` strips
+	// to `v = 0 ∧ ∃x(x·k ≠ 0)`, and in the case `x·y = 0` `x` settles; the
+	// leaf resolves both.
 	const tref got = anti_prenexed(
 		parse("ex x ((xy = 0 || v = 0) && xk != 0)."));
-	waits(got, 1);
+	resolved(got);
 }
 
 TEST_CASE("L20: the same with the negated atom in the other disjunct") {
 	// test_antiprenexing.cpp:383. `x·y ≠ 0` is the spine's negated
 	// conjunct and `v = 0` the X-free disjunct: neither fast path, no
-	// settle, no pin.
+	// settle, no pin, and the floor expands the disjunction as in L19.
 	const tref got = anti_prenexed(
 		parse("ex x ((xw = 0 || v = 0) && xy != 0)."));
-	waits(got, 1);
+	resolved(got);
 }
 
-TEST_CASE("L21: four mixed-sign pairs wait as one clause") {
+TEST_CASE("L21: four mixed-sign pairs are decided at the first case of each") {
 	// test_antiprenexing.cpp:334, the old module's budget case. Every
 	// conjunct is disjunctive and mixed-sign, so no variable settles and
-	// the census refuses both fast paths; nothing multiplies here, so the
-	// whole clause comes back under one binder at LINEAR cost — where the
-	// old module paid `2^4` branches.
+	// the census refuses both fast paths. The floor expands one pair at a
+	// time, the positive member first, the smaller; the all-positive case
+	// is `T` at `x := 0` and decides every ∨-join on the way back up.
 	const tref got = anti_prenexed(
 		parse("ex x ((xa = 0 || xb != 0) && (xc = 0 || xd != 0) && "
 			"(xe = 0 || xf != 0) && (xg = 0 || xh != 0))."));
-	waits(got, 1);
+	resolved(got);
+	CHECK(tau::get(got).equals_T());
 }
 
-TEST_CASE("L22: a free variable in the pin's atom keeps the clause waiting") {
+TEST_CASE("L22: a pin under a disjunct with a free variable is a case") {
 	// test_antiprenexing.cpp:362 — L16's formula with `y` FREE. `x ⊕ y = 0`
 	// is then no pin phase 2 may take (it pins `x` to a free term only
 	// under the disjunction, which is a CASE pin, and the other disjunct
-	// `z = 0` pins nothing), so the case witness declines and the clause
-	// waits.
+	// `z = 0` pins nothing), so the case witness declines. The floor
+	// expands the disjunction: the case `z = 0` strips to `∃x(x·w ≠ 0)`,
+	// and in the case `x ⊕ y = 0` the pin is a plain conjunct, so `x`
+	// settles; the leaf resolves both.
 	const tref got = anti_prenexed(
 		parse("ex x ((x ^ y = 0 || z = 0) && xw != 0)."));
-	waits(got, 1);
+	resolved(got);
 }
 
-TEST_CASE("L23: a block of three one-variable components waits three times") {
+TEST_CASE("L23: a block of three one-variable components resolves") {
 	// test_antiprenexing.cpp:1143. No atom mentions two block variables,
-	// so §5's partition gives THREE components, each pushed on its own.
-	// For each of them the other components' atoms are maximal X-FREE
-	// subtrees, which refuse 2b, and their positive leaves refuse 2a; no
-	// variable settles, and a disjunct that mentions another component's
-	// variable pins nothing. So each component re-wraps at the floor, and
-	// the three binders stand.
+	// so §5's partition gives THREE components, pushed one after the
+	// other. For `x`, the first, the other components' atoms are maximal
+	// X-FREE subtrees, which refuse 2b, and its positive leaves refuse 2a;
+	// no variable settles and nothing pins `x`, so the floor expands, and
+	// its cases resolve `x`; what is left of `y` and `z` resolves in turn.
 	const tref got = anti_prenexed(parse(
 		"ex x, y, z ((x a = 0 || y b = 0) && (z c = 0 || x d = 0))."));
-	waits(got, 3);
+	resolved(got);
 }
 
 TEST_CASE("L24: a bitvector run under a reference waits, structurally") {
-	// test_antiprenexing.cpp:1556. `q(y)` is opaque (§4) and the bitvector
-	// conjunct reaches no method this module carries (§7), so what the
-	// census sees is `other > 0` and the clause waits. STRUCTURAL: the
-	// equivalence checker decides neither an unresolved reference nor
-	// bitvector content, so this case claims no escape, invariant 4 and
-	// the shape.
+	// test_antiprenexing.cpp:1556, checked structurally. The floor expands
+	// the `∃a` clause into two cases, and in each the bitvector leaf, which
+	// has no method (§7), re-wraps its `∃a` atom; `q(y)` stays opaque (§4).
 	const tref got = anti_prenexed(
 		parse("ex a all y ex z "
 			"(((a:bv[2] + { 1 }:bv[2] = { 0 }:bv[2]) <-> q(y)) "
 			"&& z = 0)."), false);
-	waits(got, 3);
+	waits(got, 5);
 	CHECK(holds(got, tau::wff_ref));
 	CHECK(!holds_var(got, "z"));
 }
@@ -430,14 +435,13 @@ TEST_CASE("L25: a ∀ run whose dual is a negative tree resolves") {
 	CHECK(are_nso_equivalent<node_t>(got, parse("y = 0 && w = 0.")));
 }
 
-TEST_CASE("L26: a ∀ run whose dual waits comes back as a ∀ head") {
+TEST_CASE("L26: a ∀ run whose dual is expanded resolves") {
 	// The dual of this run is L17's clause — `(x·y = 0 ∨ x·w = 0) ∧
-	// x·z ≠ 0` — which no cheap step takes, so the `∃` block re-wraps and
-	// the outbound negation puts the `∀` head back over the matrix.
+	// x·z ≠ 0` — which the floor expands and the leaf resolves, as in L17;
+	// the outbound negation turns that answer back, and no binder is left.
 	const tref got = anti_prenexed(
 		parse("all x ((xy != 0 && xw != 0) || xz = 0)."));
-	waits(got, 1);
-	CHECK(holds(got, tau::wff_all));
+	resolved(got);
 }
 
 // --- 8. keep mode end to end --------------------------------------------------------

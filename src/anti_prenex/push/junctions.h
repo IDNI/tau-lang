@@ -5,7 +5,7 @@
  * @brief §6 the push over a JUNCTION: 2d, which hands `∃X` to each disjunct
  * of a disjunction, and the conjunction's ladder — scope narrowing, the fast
  * paths, the consistency check, the witness step and the case witness —
- * whose floor is a re-wrap.
+ * whose floor is the expansion.
  *
  * WHAT ARRIVES is what `PUSH_BLOCK`'s wrapper leaves: `X` non-empty and
  * narrowed to `X ∩ FV(φ)`, and, for a conjunction, every conjunct touching
@@ -15,8 +15,9 @@
  *
  * CHEAPEST CLASS FIRST (invariant 8): the narrowing's two moves and the fast
  * paths are one traversal each, the consistency check is one question to §7,
- * and the binder-killing steps come last — the pin, then the case pin, the
- * one step here that copies anything, and it copies one branch at a time.
+ * and the binder-killing steps come next — the pin, then the case pin, which
+ * copies one branch at a time — above the floor, the one step that
+ * multiplies.
  *
  * `push/push_block.h` is the hub that includes this file, after `push_block`
  * is declared: the template bodies here call it back.
@@ -30,13 +31,13 @@
 #include "../foundations/dag.h"
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
-#include "../foundations/prims.h"
 #include "../normalisers/joins.h"
 #include "../normalisers/simplify.h"
 #include "../shared/parts.h"
 #include "../witness/witness.h"
 #include "../eliminate/eliminate_block.h"
 #include "fast_paths.h"
+#include "expand.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -79,7 +80,9 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c);
  *    binder, and what is left is pushed on under the smaller block.
  * 5. THE CASE WITNESS, whose rewrite is emitted branch by branch, so that a
  *    branch deciding `T` leaves every later copy unbuilt.
- * 6. THE FLOOR: what none of them takes is re-wrapped (invariant 3).
+ * 6. THE FLOOR: the expansion (`push/expand.h`), `∃X` distributed over one
+ *    disjunctive conjunct in exclusive cases; what its budget refuses
+ *    re-wraps (invariant 3).
  */
 template <NodeType node>
 tref push_over_conjunction(tref psi, const block& X, ctx<node>& c);

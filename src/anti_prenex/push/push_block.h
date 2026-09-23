@@ -78,9 +78,10 @@ tref push_block(tref phi, const block& X, ctx<node>& c);
  *    first, so a disjunct deciding `T` leaves the dearer ones unpushed.
  * 4. A CONJUNCTION goes through the ladder a conjunction offers
  *    (`push/junctions.h`): scope narrowing, the fast paths, the consistency
- *    check, the witness step, the case witness — and the re-wrap of
- *    invariant 3 below all of them, in place of §6's licensed decomposition
- *    and expansion, which this module does not carry.
+ *    check, the witness step, the case witness — and the expansion
+ *    (`push/expand.h`) below all of them, the floor. §6's licensed
+ *    decomposition, which precedes it, is not carried, so the floor expands
+ *    without trying a decomposition first.
  * 5. A LITERAL or a BINDER UNIT is a one-literal (or one-unit) clause and
  *    goes to the leaf (§7), which may swallow a unit whole into a query. An
  *    order atom is a literal too, and comes back from the method's freeze as
