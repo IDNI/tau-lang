@@ -317,3 +317,9 @@ add_repl_test(solver_cmd-bv_through_def
 add_repl_test(solver_cmd-bv_through_def_rev
 	"g(y:bv[16]) := y:bv[16]. solve g({ 2 }:bv[16]) = y:bv[16]"
 	"y := \\{ 2 \\}:bv\\[16\\]")
+
+# solve takes a formula: a term argument is rejected instead of the whole line
+# being stored as a term (`solve x` used to print `%1: solvex`)
+add_repl_test_fail(solver_cmd-term_rejected "solve x" "Invalid formula")
+add_repl_test_fail(solver_cmd-bv_term_rejected "solve x:bv[1]" "Invalid formula")
+add_repl_test_fail(solver_cmd-term_with_option_rejected "solve --min x" "Invalid formula")
