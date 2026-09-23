@@ -40,6 +40,40 @@ app = FastAPI(title="Tau-lang IDE")
 _tau_binary: str | None = None
 
 
+# One-shot commands run as asyncio children so the event loop keeps serving
+# other requests while tau works (issue #133). The semaphore bounds how many
+# tau children run at once; a request that is cancelled or times out kills
+# its child instead of leaving it running unobserved.
+_TAU_MAX_CHILDREN = max(1, int(os.environ.get("TAU_IDE_MAX_CHILDREN", "1")))
+_tau_children = asyncio.Semaphore(_TAU_MAX_CHILDREN)
+
+
+async def _run_tau(args: list[str], *, timeout: float) -> subprocess.CompletedProcess:
+    """Run a tau child without blocking the event loop.
+
+    Mirrors ``subprocess.run(args, capture_output=True, text=True,
+    timeout=timeout)``: returns a CompletedProcess and raises
+    subprocess.TimeoutExpired, so the handlers keep their error mapping.
+    The timeout covers only the child's run, not the wait for a slot.
+    """
+    async with _tau_children:
+        proc = await asyncio.create_subprocess_exec(
+            *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(), timeout)
+        except BaseException as e:
+            # timeout, or the request was cancelled: do not orphan the child
+            if proc.returncode is None:
+                proc.kill()
+                await proc.wait()
+            if isinstance(e, asyncio.TimeoutError):
+                raise subprocess.TimeoutExpired(args, timeout) from None
+            raise
+        return subprocess.CompletedProcess(
+            args, proc.returncode,
+            out.decode(errors="replace"), err.decode(errors="replace"))
+
+
 def find_tau_binary() -> str | None:
     """Locate the tau binary from build directory or PATH."""
     candidates = [
@@ -290,12 +324,7 @@ async def api_eval(body: dict[str, Any]):
 
     # For one-shot evaluation, use -e flag
     try:
-        result = subprocess.run(
-            [binary, "-e", cmd, "-c", "false", "-B", "false", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
         return JSONResponse({
             "output": result.stdout,
             "error": result.stderr,
@@ -320,18 +349,13 @@ async def api_run(body: dict[str, Any]):
 
     # Write source to temp file and run
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".tau", delete=False, dir="/tmp"
+        mode="w", suffix=".tau", delete=False
     ) as f:
         f.write(source)
         tmp_path = f.name
 
     try:
-        result = subprocess.run(
-            [binary, tmp_path, "-q", "-c", "false", "-B", "false"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = await _run_tau([binary, tmp_path, "-q", "-c", "false", "-B", "false"], timeout=30)
         return JSONResponse({
             "output": result.stdout,
             "error": result.stderr,
@@ -358,12 +382,7 @@ async def api_parse(body: dict[str, Any]):
 
     # Use whatis command to get type info
     try:
-        result = subprocess.run(
-            [binary, "-e", f"whatis {formula}.", "-c", "false", "-B", "false", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        result = await _run_tau([binary, "-e", f"whatis {formula}.", "-c", "false", "-B", "false", "-q"], timeout=10)
         return JSONResponse({
             "formula": formula,
             "output": result.stdout,
@@ -390,12 +409,7 @@ async def api_normalize(body: dict[str, Any]):
 
     cmd = f"{form} {formula}."
     try:
-        result = subprocess.run(
-            [binary, "-e", cmd, "-c", "false", "-B", "false", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
         return JSONResponse({
             "formula": formula,
             "form": form,
@@ -423,12 +437,7 @@ async def api_check(body: dict[str, Any]):
 
     cmd = f"{check_type} {formula}."
     try:
-        result = subprocess.run(
-            [binary, "-e", cmd, "-c", "false", "-B", "false", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
         return JSONResponse({
             "formula": formula,
             "check": check_type,
@@ -455,12 +464,7 @@ async def api_solve(body: dict[str, Any]):
 
     cmd = f"solve {formula}."
     try:
-        result = subprocess.run(
-            [binary, "-e", cmd, "-c", "false", "-B", "false", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=60)
         return JSONResponse({
             "formula": formula,
             "output": result.stdout,
@@ -490,12 +494,7 @@ async def api_substitute(body: dict[str, Any]):
 
     cmd = f"subst {formula} [{target} / {replacement}]."
     try:
-        result = subprocess.run(
-            [binary, "-e", cmd, "-c", "false", "-B", "false", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
         return JSONResponse({
             "formula": formula,
             "target": target,
