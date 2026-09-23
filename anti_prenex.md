@@ -776,12 +776,9 @@ The remaining primitives are defined by their contracts alone:
   (§5): every BDD-backed term of `φ` converted back to a plain term wherever
   it sits — under a REWRAPped binder, inside a symbolic functional
   quantifier's body, inside a reference argument, under a temporal operator.
-  One memoised walk. Inverse up to term normal form: each spelled term goes
-  once through `SIMPLIFY_TERM` in the plain regime — the spelling phase 1
-  gave every atom — so the round trip returns the node it started from, and
-  a result of the push is spelled as the plain phases spell it: `ANTI_PRENEX`
-  is a fixpoint on its own output from the first run, a kept chain included,
-  and a re-wrapped block is the node phase 3 built.
+  One memoised walk. Each spelled term goes once through `SIMPLIFY_TERM` in
+  the plain regime, the spelling phase 1 gives every atom; the inverse of
+  `PREPARE_TERMS` up to term normal form.
 - `LEAF_FV(t)` — the free variables the LEAVES of `t` contribute: for a
   BDD-backed term the union over its leaves, for a plain term its whole `FV`.
   The leaf-hazard test (§1) is `LEAF_FV(t) ∩ X ≠ ∅`, read behind `usable`
