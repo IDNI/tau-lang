@@ -90,6 +90,15 @@ template <NodeType node>
 std::optional<tref> try_witness(tref x, tref psi, ctx<node>& c);
 
 /**
+ * @brief §3 the COF pin test on ONE equation conjunct `m`: `x` is pinned iff
+ * `usable ∧ f₀ ∪ f₁ = 1` on `TERM_OF(m)`; the witness is `f₁′`, STRICT when
+ * the residual `p` folds to `0`. `nullopt` for anything but a pinning
+ * equation.
+ */
+template <NodeType node>
+std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c);
+
+/**
  * @brief §3 `TRY_WITNESS_DEEP(Q, x, Φ)`, phase 2's deep pass: the body of
  * `Qx.Φ` with the BINDER DELETED and the pin consumed, or `nullopt`. A pure
  * function of the binder node.

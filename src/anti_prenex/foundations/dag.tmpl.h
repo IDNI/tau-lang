@@ -133,6 +133,17 @@ block fv_intersect(tref n, const block& X) {
 	return out;
 }
 
+template <NodeType node>
+block without(const block& X, const block& ys) {
+	using tau = tree<node>;
+	// Two short lists, so a linear scan.
+	block out = X;
+	std::erase_if(out, [&ys](tref v) {
+		return std::any_of(ys.begin(), ys.end(),
+			[v](tref y) { return tau::subtree_equals(v, y); }); });
+	return out;
+}
+
 // --- member view and raw canonical chains ---------------------------------------
 
 template <NodeType node>

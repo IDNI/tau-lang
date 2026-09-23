@@ -5,8 +5,9 @@
  * @brief Template implementations for junctions.h. junctions.h says what each
  * procedure means; the comments here say how it is built.
  *
- * The pieces come from the files below: `members`, `formula_size` and
- * `fv_meets` (foundations/dag.h) for the member lists and the orders,
+ * The pieces come from the files below: `members`, `formula_size`,
+ * `fv_meets` and `without` (foundations/dag.h) for the member lists, the
+ * orders and the smaller blocks,
  * `incidence` (shared/parts.h) for the narrowing, the result joins
  * (normalisers/joins.h) for every assembly, `eliminate_block`
  * (eliminate/eliminate_block.h) for the sub-block and the consistency
@@ -30,22 +31,6 @@
 #include <utility>
 
 namespace idni::tau_lang::anti_prenexing {
-
-namespace junctions_detail {
-
-/// `X ∖ ys`, KEEPING `X`'s order: the smaller block a step hands on once it
-/// has taken variables out of `X`. Two short lists, so a linear scan.
-template <NodeType node>
-block without(const block& X, const block& ys) {
-	using tau = tree<node>;
-	block out = X;
-	std::erase_if(out, [&ys](tref v) {
-		return std::any_of(ys.begin(), ys.end(),
-			[v](tref y) { return tau::subtree_equals(v, y); }); });
-	return out;
-}
-
-} // namespace junctions_detail
 
 // --- 2d ---------------------------------------------------------------------------
 
@@ -72,7 +57,6 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c) {
 template <NodeType node>
 tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
-	using namespace junctions_detail;
 	DBG(assert(psi != nullptr && !X.empty());)
 	DBG(assert(is_child<node>(psi, tau::wff_and));)
 	// THE CONJUNCT LIST, taken once: every sub-formula below is a join of

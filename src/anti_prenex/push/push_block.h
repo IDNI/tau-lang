@@ -17,8 +17,8 @@
  *
  * THE HUB, the module's one documented exception to "each header includes
  * what it needs": the two declarations below come first, then the step files
- * `push/fast_paths.h` and `push/junctions.h` — each holding its own
- * `.tmpl.h` and not including this one back, their bodies calling
+ * `push/fast_paths.h`, `push/expand.h` and `push/junctions.h` — each holding
+ * its own `.tmpl.h` and not including this one back, their bodies calling
  * `push_block` — and last this file's own `.tmpl.h`, so every declaration
  * precedes every template body and any include order works. Including this
  * file alone brings the whole push with it.
@@ -98,6 +98,7 @@ tref push_block_uncached(tref phi, const block& X, ctx<node>& c);
 
 // The steps, after the declarations they call back into (see THE HUB above).
 #include "fast_paths.h"
+#include "expand.h"
 #include "junctions.h"
 
 #include "push_block.tmpl.h"

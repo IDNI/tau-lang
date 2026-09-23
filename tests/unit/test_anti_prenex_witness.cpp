@@ -709,4 +709,41 @@ TEST_CASE("WC10: a unit branch is opaque, and a branch without a pin "
 	CHECK(!ap::try_case_witness<node_t>(x, m.psi, m.c).has_value());
 }
 
+// --- the COF pin test -------------------------------------------------------------
+
+TEST_CASE("WC11: the pin test on one equation gives the witness and its "
+	"strictness") {
+	tref x = fvar("x");
+	// `x = t`: the cofactors of `x + t` are `t` and `t′`, whose union is
+	// `1`, so `x` is pinned; the witness is `f₁′ = t` and the residual
+	// `t·t′` folds to `0`, so the pin is STRICT.
+	component k({ x }, eq(bvar("x"), bvar("t")));
+	const auto p = ap::cof_pin<node_t>(k.psi, x, k.c);
+	REQUIRE(p.has_value());
+	CHECK(same(p->var, x));
+	CHECK(same_function(p->witness, bvar("t"), { fvar("t") }));
+	CHECK(p->strict);
+	// `x ∪ a = 0`: the cofactors `a` and `1` pin `x` WEAKLY — the witness
+	// is `1′ = 0` and the residual `a` is no constant.
+	component w({ x }, eq0(lor(bvar("x"), bvar("a"))));
+	const auto q = ap::cof_pin<node_t>(w.psi, x, w.c);
+	REQUIRE(q.has_value());
+	CHECK(tau::get(q->witness).equals_0());
+	CHECK(!q->strict);
+}
+
+TEST_CASE("WC12: the pin test on one conjunct answers nullopt for anything "
+	"but a pinning equation") {
+	tref x = fvar("x");
+	// `x·b` has the cofactors `0` and `b`, whose union is not `1`.
+	component k({ x }, eq0(land(bvar("x"), bvar("b"))));
+	CHECK(!ap::cof_pin<node_t>(k.psi, x, k.c).has_value());
+	// An equation under `¬` pins nothing in the ∃ sense, and a term that
+	// does not mention `x` is not asked.
+	component n({ x }, neg(eq(bvar("x"), bvar("t"))));
+	CHECK(!ap::cof_pin<node_t>(n.psi, x, n.c).has_value());
+	component f({ x }, eq(bvar("a"), bvar("t")));
+	CHECK(!ap::cof_pin<node_t>(f.psi, x, f.c).has_value());
+}
+
 } // TEST_SUITE
