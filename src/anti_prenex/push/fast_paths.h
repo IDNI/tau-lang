@@ -107,12 +107,11 @@ tref distribute_to_atoms(tref phi, const block& X, ctx<node>& c,
  * clauses — the honest cost of 2b (invariant 8). A shared sub-skeleton is
  * squeezed once.
  *
- * Every term goes through `SIMPLIFY_TERM` once, at the end: the unions are
- * built raw, and the list is NOT deduplicated — the term sweep folds a
- * repeated factor inside a term, and the join over the eliminations merges
- * equal atoms across the list.
+ * RAW: the unions are built by the hooked binary alone, and the list is NOT
+ * deduplicated — a repeated factor inside one term and an equal atom
+ * elsewhere in the list are both left standing.
  *
- * @param order the live order, under which the terms are read and simplified
+ * @param order the live order, under which the terms are read
  */
 template <NodeType node>
 trefs squeeze_positives(tref phi, const var_order<node>& order);

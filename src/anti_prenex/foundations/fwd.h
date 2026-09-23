@@ -104,11 +104,12 @@ struct tref_set {
  * by child selection in the BDD (§1) or, at §3 `SIMPLIFY`'s pin match, by
  * substitution on a plain term. `usable` holds iff
  * `x ∉ FV(f₀) ∪ FV(f₁)`; otherwise `x` still hides inside a leaf — the LEAF
- * HAZARD of §1 — and the record must not be used. `p` is the residual
- * `SIMPLIFY_TERM(f₀·f₁)` when `usable`, and `nullptr` (⊥) otherwise. `pin`
- * holds iff `usable` and `f₀ ∪ f₁ = 1`; a pin gives §3 `TRY_WITNESS` the
- * witness `f₁′` and the residual equation `p = 0`, and is STRICT when `p`
- * folds to `0`, so that the residual vanishes.
+ * HAZARD of §1 — and the record must not be used. `pin` holds iff `usable`
+ * and `f₀ ∪ f₁ = 1`; a pin gives §3 `TRY_WITNESS` the witness `f₁′` and the
+ * residual equation `p = 0`, and is STRICT when `p` folds to `0`, so that the
+ * residual vanishes. `p` is the residual `SIMPLIFY_TERM(f₀·f₁)` when `pin`
+ * holds; a usable non-pin record has it from `COF` alone, `nullptr` (⊥)
+ * otherwise.
  *
  * The three terms are built by `COF` and are not subtrees of the key, so the
  * table has to pin them against garbage collection: `for_each_tref` opts this

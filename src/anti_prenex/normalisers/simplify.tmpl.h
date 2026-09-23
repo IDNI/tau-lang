@@ -140,7 +140,8 @@ cof_entry pin_from_cofactors(tref f0, tref f1, tref y,
 	// interval that `f₀ ∪ f₁ = 1` collapses to a point.
 	e.pin = tau::get(simplify_term<node>(build_bf_or<node>(f0, f1), order))
 		.equals_1();
-	e.p = simplify_term<node>(build_bf_and<node>(f0, f1), order);
+	// `p` is the pin's own residual equation; a non-pin reads none of it.
+	if (e.pin) e.p = simplify_term<node>(build_bf_and<node>(f0, f1), order);
 	return e;
 }
 

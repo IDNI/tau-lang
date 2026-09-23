@@ -364,7 +364,9 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK on a NODE, pu
                                        //   arguments; from here on only
                                        //   substitution dirties one, and it
                                        //   re-simplifies what it touched (§1)
- 2. φ ← ELIMINATE_BY_SUBSTITUTION(φ) ; φ ← SIMPLIFY(φ)
+ 2. φ′ ← ELIMINATE_BY_SUBSTITUTION(φ) ; if φ′ ≠ φ: φ ← SIMPLIFY(φ′)
+                                       // no witness fired: φ stands as
+                                       //   phase 1 simplified it
  3. φ ← NORMALIZE_OPERATORS(φ)
  4. φ ← PROCESS_ALL_BLOCKS(φ, keep_functional)
  5. φ ← SIMPLIFY(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
@@ -662,6 +664,8 @@ So are the two aggressive normalisers of invariant 6:
   goes through `SIMPLIFY_TERM` as a DECISION alone: `0` decides `=` as `T`, a
   nonzero constant as `F`, dually for `≠` (phase 1 meets it before
   `NORMALIZE_OPERATORS`); anything else leaves the atom as its sides stand.
+  A side that is `0` skips the decision: the sum is then the other side,
+  simplified already, and a constant there was folded by the hooks.
   Never reshaped, and `NORM_EQUATION` (`SQUEEZE`) stays the one rewrite of
   an equation's shape. An order atom is side-wise alone. NOT idempotent: a
   second call may simplify further, since the check's result is not swept

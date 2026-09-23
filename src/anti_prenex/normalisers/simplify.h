@@ -69,12 +69,14 @@ struct pin {
  *
  * `usable` holds iff `y ∉ FV(f₀) ∪ FV(f₁)`; where it does not, `y` still
  * hides inside a subterm no cofactor reached (§1, the LEAF HAZARD) and the
- * record must not be used. `p`, the residual `SIMPLIFY_TERM(f₀·f₁)`, is built
- * when `usable` and is `nullptr` otherwise. `pin` holds iff `usable` and
+ * record must not be used. `pin` holds iff `usable` and
  * `SIMPLIFY_TERM(f₀ ∪ f₁) = 1`, the test that collapses Boole's interval
- * `f₀ ≤ y ≤ f₁′` to a point. A pin gives the witness `f₁′` — which the
- * consumer builds itself, there being no slot for it — and the residual
- * equation `p = 0`, and is STRICT when `p` folds to `0`.
+ * `f₀ ≤ y ≤ f₁′` to a point. `p`, the residual `SIMPLIFY_TERM(f₀·f₁)`, is
+ * built here when `pin` holds and is `nullptr` otherwise; a usable non-pin
+ * record has it filled in by `cof` (cofactors.h) instead. A pin gives the
+ * witness `f₁′` — which the consumer builds itself, there being no slot for
+ * it — and the residual equation `p = 0`, and is STRICT when `p` folds to
+ * `0`.
  *
  * The one pin recipe: `find_pin` / `find_pin_for` take the cofactors by
  * SUBSTITUTION on a plain term, `cof` (cofactors.h) by CHILD SELECTION in

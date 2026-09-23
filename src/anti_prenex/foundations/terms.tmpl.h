@@ -623,8 +623,11 @@ tref simplify_atom(tref a, const var_order<node>& order) {
 	// `F`, dually for `≠`, which phase 1 meets before NORMALIZE_OPERATORS;
 	// anything else leaves the atom as its sides stand.
 	const bool eq = t.child_is(tau::bf_eq), neq = t.child_is(tau::bf_neq);
+	// A side of `0` makes `term_of` the other side, simplified two lines
+	// above already, its own constant (if any) folded by the hooks.
 	if (const tau& rt = tau::get(res);
-		(eq || neq) && !rt.equals_T() && !rt.equals_F())
+		(eq || neq) && !rt.equals_T() && !rt.equals_F()
+		&& !tau::get(l2).equals_0() && !tau::get(r2).equals_0())
 	{
 		tref f = simplify_term<node>(term_of<node>(res, order), order);
 		const tau& z = tau::get(build_bf_eq_0<node>(f));

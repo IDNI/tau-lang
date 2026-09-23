@@ -9,8 +9,9 @@
  * `norm_equation`, `term_of`, `simplify_term` and `simplify_atom` (§3) for the
  * rewrite, `discharge` (§7) for every quantified atom that goes out, the
  * result joins (§3) for every formula, and `rewrap` (§3) for what is frozen.
- * The union of a list of terms is the hooked binary `build_bf_or`, which the
- * term simplifier then absorbs into the representation.
+ * The union of a list of terms is the hooked binary `build_bf_or`; what feeds
+ * `discharge` alone needs only the representation step of `simplify_term`'s
+ * BDD regime, not its leaf sweep or cofactor check.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__CONDITIONS_TMPL_H__
@@ -30,6 +31,22 @@ namespace conditions_detail {
 template <NodeType node>
 ba_type_id block_type(const block& X) {
 	return X.empty() ? 0 : find_ba_type<node>(X.front());
+}
+
+/**
+ * @brief The representation step of `simplify_term`'s BDD regime alone: no
+ * leaf simplifier, no cofactor check. A term `simplify_term` would send to
+ * the plain regime comes back as built, untouched.
+ */
+template <NodeType node>
+tref build_only(tref t, const var_order<node>& order) {
+	using tbdd = tau_term_bdd<node>;
+	using thandle = term_handle<node>;
+	if (!thandle::is_bdd_backed(t) && !tbdd::has_bdd_var(t, order)
+		&& !terms_detail::holds_bdd_id<node>(t))
+		return t;
+	return thandle::convert_to_tau_node_or_term(
+		thandle(tbdd::build_bdd(t, order)), find_ba_type<node>(t));
 }
 
 /**
@@ -146,7 +163,7 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
 		part_terms.reserve(p.conjuncts.size());
 		for (tref a : p.conjuncts)
 			part_terms.push_back(term_of<node>(a, order));
-		const tref F = simplify_term<node>(
+		const tref F = build_only<node>(
 			build_bf_or<node>(part_terms, type), order);
 		terms.push_back(F);
 		r.comps.push_back(component<node>{ F, std::move(p.vars) });
@@ -198,10 +215,10 @@ tref negative_condition(tref g, const std::vector<component<node>>& comps,
 	block vs;
 	for (tref x : X)
 		if (vars.contains(x)) vs.push_back(tau::trim_right_sibling(x));
-	const tref F_K = simplify_term<node>(build_bf_or<node>(FK, c.type),
+	const tref h = build_only<node>(
+		build_bf_and<node>(
+			build_bf_neg<node>(build_bf_or<node>(FK, c.type)), g),
 		c.order);
-	const tref h = simplify_term<node>(
-		build_bf_and<node>(build_bf_neg<node>(F_K), g), c.order);
 	return discharge<node>(h, true, vs, c);
 }
 

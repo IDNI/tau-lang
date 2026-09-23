@@ -32,7 +32,12 @@ cof_entry cof(tref f, tref x, ctx<node>& c) {
 			cofactor<node>(f, x, false, c.order), c.order);
 		const tref f1 = simplify_term<node>(
 			cofactor<node>(f, x, true, c.order), c.order);
-		return pin_from_cofactors<node>(f0, f1, x, c.order);
+		cof_entry e = pin_from_cofactors<node>(f0, f1, x, c.order);
+		// A non-pin's residual, left unbuilt there, is still part of the
+		// record this table promises for every usable entry.
+		if (e.usable && !e.pin)
+			e.p = simplify_term<node>(build_bf_and<node>(f0, f1), c.order);
+		return e;
 	});
 }
 

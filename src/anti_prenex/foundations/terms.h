@@ -296,12 +296,12 @@ tref simplify_term(tref t, const var_order<node>& order = {});
  * atom, optionally under one `¬`, which is folded through.
  *
  * For a (¬)equation the joint ring sum `l + r` (`term_of`) then goes through
- * `simplify_term` as a DECISION alone: `0` decides `=` as `T`, a nonzero
- * constant as `F`, dually for `≠`. It is what sees two sides no hook can
- * compare, two `BDD_ID` nodes above all. Anything else leaves the atom as
- * its sides stand: the atom is NEVER reshaped, and `norm_equation` stays the
- * one rewrite of an equation's shape. An order atom is simplified side-wise
- * alone.
+ * `simplify_term` as a DECISION alone, skipped when either simplified side is
+ * `0`: `0` decides `=` as `T`, a nonzero constant as `F`, dually for `≠`. It
+ * is what sees two sides no hook can compare, two `BDD_ID` nodes above all.
+ * Anything else leaves the atom as its sides stand: the atom is NEVER
+ * reshaped, and `norm_equation` stays the one rewrite of an equation's
+ * shape. An order atom is simplified side-wise alone.
  *
  * NOT IDEMPOTENT, like `simplify_term`.
  */

@@ -228,7 +228,7 @@ trefs squeeze_positives(tref phi, const var_order<node>& order) {
 			else {
 				// `f₁ = 0 ∧ f₂ = 0` squeezes to `f₁ ∪ f₂ = 0`;
 				// the union is RAW, the hooks folding what they
-				// fold, and the sweep comes once at the end.
+				// fold — the list comes back exactly that way.
 				trefs product;
 				product.reserve(out.size() * l.size());
 				for (tref a : out) for (tref b : l)
@@ -248,9 +248,7 @@ trefs squeeze_positives(tref phi, const var_order<node>& order) {
 		return false;
 	};
 	pre_order<node>(phi).visit_unique(classify, skeleton<node>, up);
-	trefs out = list_of(phi);
-	for (tref& t : out) t = simplify_term<node>(t, order);
-	return out;
+	return list_of(phi);
 }
 
 } // namespace idni::tau_lang::anti_prenexing

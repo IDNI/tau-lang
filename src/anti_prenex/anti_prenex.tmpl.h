@@ -58,8 +58,10 @@ tref anti_prenex(tref phi, const keep_functional_fn<node>& kf) {
 	phi = simplify<node>(phi, {}, true);
 	// 2. The deep witness pass, then the global simplification it leaves
 	//    to its caller (§3, `TRY_WITNESS_DEEP`).
+	const tref pre_witness = phi;
 	phi = eliminate_by_substitution<node>(phi);
-	phi = simplify<node>(phi);
+	// Nothing rewritten, nothing to clean up after phase 1's simplification.
+	if (phi != pre_witness) phi = simplify<node>(phi);
 	// 3. `f ≠ 0 ↦ ¬(f = 0)` and the fused comparisons, after phase 2 by
 	//    the fixed order (§3).
 	phi = normalize_operators<node>(phi);
