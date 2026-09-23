@@ -507,4 +507,23 @@ TEST_CASE("P19: keep mode emits the chain, and the close resolves it") {
 	CHECK(same(got, want));
 }
 
+TEST_CASE("P20: a negative tree of a bitvector block goes whole to the leaf") {
+	// The one route to the dispatcher's negative-tree arm: fast path 2a is
+	// refused for a type whose `∃` does not distribute over negatives, so
+	// the tree is handed whole to the leaf, where the bitvector row has no
+	// method and re-wraps it exactly (invariant 3). The claim is structural:
+	// the equivalence checker does not read bitvector content.
+	fixture f = make(
+		"ex x (x:bv[2] & y:bv[2] != { 0 }:bv[2] || x:bv[2] & w:bv[2] != { 0 }:bv[2]).");
+	REQUIRE(is_bv_type_family<node_t>(f.c.type));
+	REQUIRE(ap::is_negative_tree<node_t>(f.clause));
+	REQUIRE(!ap::ex_distributes_over_negatives<node_t>(f.c.type));
+	CHECK(!ap::try_fast_paths<node_t>(f.clause, f.P, f.c).has_value());
+	const tref got = pushed(f);
+	check_structurally(got, f);
+	CHECK(same(got, rewrapped(f)));
+	REQUIRE(binder_count(got) == 1);
+	CHECK(same(ap::binder_var<node_t>(got), f.P[0]));
+}
+
 } // TEST_SUITE
