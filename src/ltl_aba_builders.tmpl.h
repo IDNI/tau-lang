@@ -824,8 +824,19 @@ tref ltl_to_safety_formula(tref fm) {
 template <NodeType node>
 result<bool> ltl_explain(tref fm, std::ostream& out) {
 	using tau = tree<node>;
+	using tt = tau::traverser;
 	result<bool> r;
 	bool exact_reduction = true;
+
+	// Same input contract as api::realizable: a formula, or a spec whose
+	// main part is one. A term used to reach the backends as a formula:
+	// `ltl x:bv[1]` aborted on a cvc5 exception and `ltl x:sbf` answered
+	// UNREALIZABLE (issue #131).
+	if (!fm || !(tau::get(fm).is(tau::wff) || (tau::get(fm).is(tau::spec)
+		&& (tt(fm) | tau::main | tau::wff | tt::ref))))
+	{
+		return r.with_error(code::invalid_argument, "Invalid formula");
+	}
 
 	// IN-R3: `ltl` used to hand A/E/- straight to the skeleton, where the
 	// tester variant flattened them to "1". Reduce like is_tau_formula_sat

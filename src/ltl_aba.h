@@ -424,7 +424,8 @@ bool has_semantic_negation(tref fm);
  * negation placement with no sound reduction) -- the caller must check
  * has_value() and must not read an error as a decided false.
  * @tparam node Tree node type.
- * @param fm Formula to explain.
+ * @param fm Formula to explain: a wff, or a spec whose main part is one;
+ *        anything else is an invalid_argument error, not a verdict.
  * @param out Stream receiving the trace.
  * @return `true` iff @p fm is realizable, or an error when undecided.
  */
