@@ -37,6 +37,19 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula);
  * @endcode
  * @endinternal
  */
+// Number of nodes of a term, memoised (terms are interned).
+template <NodeType node>
+size_t simplify_using_equality_term_size(tref n) {
+	using tau = tree<node>;
+	using cache_t = subtree_unordered_map<node, size_t>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(n); it != cache.end()) return it->second;
+	size_t size = 1;
+	for (tref c : tau::get(n).children())
+		size += simplify_using_equality_term_size<node>(c);
+	return cache.emplace(n, size).first->second;
+}
+
 // TODO: For variables, make lower time step < higher time step
 template <NodeType node>
 bool simplify_using_equality_term_comp(tref l, tref r) {
@@ -83,7 +96,17 @@ bool simplify_using_equality_term_comp(tref l, tref r) {
 		} else return true;
 	}
 	if (rc.is(tau::variable)) return false;
+	// Compound terms: the smaller one is the representative. The union-find
+	// merges `x & y' = x` together with its negations, so `x' | y` and `x'`
+	// share a class; picking by subtree_less (hash first) could make
+	// `x' | y` represent its own subterm `x'`, and simplify_equation's
+	// pre_order rewrite then descended into the replacement forever
+	// (issue #130). With size first, a representative never contains
+	// another member of its class and rewriting never grows a term.
 	// TODO: also use free_vars count once constant time
+	if (size_t sl = simplify_using_equality_term_size<node>(l),
+		sr = simplify_using_equality_term_size<node>(r); sl != sr)
+		return sl < sr;
 	return tau::subtree_less(l, r);
 }
 
