@@ -358,9 +358,19 @@ tref bv_definitional_block_elimination(tref root) {
 						if (!consumed) { d.readers.push_back(c); continue; }
 						std::vector<std::vector<tref>> flat;
 						if (!flatten(b.var, c, flat)) { d.readers.push_back(c); continue; }
+						// A clause for x whose witness is not a chosen one
+						// is a reader, as in find_def_in_scope.
 						for (auto& ds : flat) {
 							dclause dc;
-							if (!classify(b.var, ds, dc)) d.readers.push_back(or_of(ds));
+							bool chosen = classify(b.var, ds, dc);
+							if (chosen) {
+								chosen = false;
+								for (const dclause& k : d.defs)
+									if (tau::get(k.cbf) == tau::get(dc.cbf)) {
+										chosen = true; break;
+									}
+							}
+							if (!chosen) d.readers.push_back(or_of(ds));
 						}
 					}
 					defs.emplace_back(b, d); reused = true; break;

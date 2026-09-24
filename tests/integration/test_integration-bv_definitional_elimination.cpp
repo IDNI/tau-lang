@@ -185,6 +185,30 @@ TEST_SUITE("bv definitional elimination") {
 		CHECK(binder_removed(s));
 	}
 
+	TEST_CASE("a definition reused in a later round keeps its other-witness clauses as readers") {
+		// In a fixpoint step of the first spec o2[3] is defined by
+		// o2[3] = b3, and (o1[3] = b1 || b5 = o2[3]) is a clause for o2[3]
+		// with the unchosen witness b5, so it is a reader. A definition of
+		// o2[3] reused from an earlier round keeps that clause; without it
+		// the temporal fixpoint closes a step early and these unsatisfiable
+		// specs, which differ only in their stream names, read as sat.
+		auto sat = [](const char* spec) {
+			defelim_config c(true);
+			bdd_init<Bool>();
+			auto r = api<node_t>::sat(std::string(spec));
+			REQUIRE(r.has_value());
+			return r.value();
+		};
+		for (const char* spec : {
+			"always (!(((o2[t-1]:bv[2] = o2[t]) -> (o2[t-2] = o1[t-2]:bv[2]))) && ((o1[t] = o2[t-2]) <-> (o1[t-2] != o2[t])))",
+			"always (!(((o1[t-1]:bv[2] = o1[t]) -> (o1[t-2] = o2[t-2]:bv[2]))) && ((o2[t] = o1[t-2]) <-> (o2[t-2] != o1[t])))",
+			"always (!(((o9[t-1]:bv[2] = o9[t]) -> (o9[t-2] = o5[t-2]:bv[2]))) && ((o5[t] = o9[t-2]) <-> (o5[t-2] != o9[t])))",
+		}) {
+			CAPTURE(spec);
+			CHECK_FALSE(sat(spec));
+		}
+	}
+
 	TEST_CASE("a run with a computed value read by a guard: same outputs") {
 		const char* spec = "(o1[t]:bv[8] = i1[t]:bv[8] + { 1 }:bv[8]) && ((o1[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8])).";
 		CHECK(run_spec(spec, false) == run_spec(spec, true));
