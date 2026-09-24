@@ -220,3 +220,91 @@ TEST_SUITE("SO-14 qlt ordering systems") {
 		CHECK( sol.value().size() == 2 );
 	}
 }
+
+// Relations between qlt variables are solved jointly: every model returned
+// must satisfy each atom of its input, and only unsatisfiable systems may be
+// declined.
+TEST_SUITE("relational qlt ordering systems") {
+
+	std::optional<solution<node_t>> solve_rel(const std::string& system) {
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		auto r = solve<node_t>(form, options);
+		return r.has_value() ? std::optional<solution<node_t>>(r.value()) : std::nullopt;
+	}
+
+	// Substituting the model folds every ground atom; all must be T.
+	bool satisfies(const std::string& system, const solution<node_t>& sol) {
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
+		for (tref atom : get_cnf_wff_clauses<node_t>(form)) {
+			tref v = tau::traverser(rewriter::replace<node_t>(atom, sol))
+				| bf_reduce_canonical<node_t>() | tau::traverser::ref;
+			if (!tau::get(v).equals_T()) return false;
+		}
+		return true;
+	}
+
+	bool solved_and_satisfied(const std::string& system) {
+		auto sol = solve_rel(system);
+		return sol.has_value() && satisfies(system, sol.value());
+	}
+
+	TEST_CASE("strict pair") {
+		CHECK( solved_and_satisfied("x : qlt < y : qlt.") );
+	}
+
+	TEST_CASE("strict pair, reversed names") {
+		CHECK( solved_and_satisfied("y : qlt < x : qlt.") );
+		CHECK( solved_and_satisfied("x : qlt > y : qlt.") );
+	}
+
+	TEST_CASE("increasing and decreasing chains") {
+		CHECK( solved_and_satisfied("x : qlt < y : qlt && y : qlt < z : qlt.") );
+		CHECK( solved_and_satisfied("z : qlt < y : qlt && y : qlt < x : qlt.") );
+		CHECK( solved_and_satisfied(
+			"x2 : qlt < x1 : qlt && x1 : qlt < x3 : qlt && x2 : qlt < x3 : qlt.") );
+	}
+
+	TEST_CASE("two variables below one") {
+		CHECK( solved_and_satisfied("x : qlt < y : qlt && z : qlt < y : qlt.") );
+	}
+
+	TEST_CASE("relations bounded by constants") {
+		CHECK( solved_and_satisfied("x : qlt < y : qlt && y : qlt < {0}:qlt.") );
+		CHECK( solved_and_satisfied("x : qlt < y : qlt && x : qlt > {3}:qlt.") );
+		CHECK( solved_and_satisfied(
+			"{0}:qlt < x : qlt && x : qlt < y : qlt && y : qlt < {1}:qlt.") );
+	}
+
+	TEST_CASE("disequalities") {
+		CHECK( solved_and_satisfied("x : qlt < y : qlt && x : qlt != {0}:qlt.") );
+		CHECK( solved_and_satisfied(
+			"x : qlt <= y : qlt && x : qlt != y : qlt.") );
+		CHECK( solved_and_satisfied(
+			"{0}:qlt < x : qlt && x : qlt < {1}:qlt && x : qlt != {1/2}:qlt.") );
+	}
+
+	TEST_CASE("non-strict cycle forces equality") {
+		CHECK( solved_and_satisfied(
+			"x : qlt <= y : qlt && y : qlt <= x : qlt && x : qlt > {2}:qlt.") );
+	}
+
+	TEST_CASE("inconsistent systems are declined") {
+		CHECK( !solve_rel("x : qlt < y : qlt && y : qlt < x : qlt.").has_value() );
+		CHECK( !solve_rel("x : qlt < y : qlt && y : qlt <= x : qlt.").has_value() );
+		CHECK( !solve_rel(
+			"x : qlt <= y : qlt && y : qlt <= x : qlt && x : qlt != y : qlt.")
+			.has_value() );
+		CHECK( !solve_rel(
+			"{1}:qlt < x : qlt && x : qlt < y : qlt && y : qlt < {1}:qlt.")
+			.has_value() );
+	}
+
+	TEST_CASE("constant-bound controls") {
+		CHECK( solved_and_satisfied("x : qlt > {1}:qlt.") );
+		CHECK( solved_and_satisfied("x : qlt > {3/4}:qlt && x : qlt < {7/8}:qlt.") );
+	}
+}

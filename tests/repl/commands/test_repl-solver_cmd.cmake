@@ -141,6 +141,21 @@ add_repl_test(solver_cmd-qlt-solve-unsatisfiable
 add_repl_test(solver_cmd-qlt-solve-interval_via_lteq
 	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{") # qlt.cpp:130-133
 
+# Relations between qlt variables are solved jointly: the model satisfies them
+# and a satisfiable chain has a solution.
+add_repl_test(solver_cmd-qlt-solve-strict_pair
+	"solve x:qlt < y:qlt" "y := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-strict_pair_reversed
+	"solve y:qlt < x:qlt" "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-increasing_chain
+	"solve x:qlt < y:qlt && y:qlt < z:qlt" "z := \\{ 2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-decreasing_chain
+	"solve z:qlt < y:qlt && y:qlt < x:qlt" "x := \\{ 2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-bounded_chain
+	"solve x:qlt < y:qlt && y:qlt < {0}:qlt" "x := \\{ -1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-inconsistent_cycle
+	"solve x:qlt < y:qlt && y:qlt < x:qlt" "no solution")
+
 # mixed -- tests/integration/solver/test_integration-solver-mixed.cpp
 
 add_repl_test(solver_cmd-mixed-qint_qlt
