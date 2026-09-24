@@ -694,12 +694,15 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 	const std::array<ref, 3> key = {f, g, h};
 	if (auto it = memo.find(key); it != memo.end())
 		return out_inv ? bdd_not(it->second) : it->second;
-	// Top variable: minimum rank among the three BDD roots
-	tref top = get_var(f);
+	// Top variable: minimum rank among the non-leaf roots; a leaf's term is
+	// no variable of the order, so splitting on it never shrinks anything.
+	tref top = nullptr;
 	auto upd = [&](ref x) {
-		if (!leaf(x)) { tref v = get_var(x); if (less_then(v, top, o)) top = v; }
+		if (leaf(x)) return;
+		tref v = get_var(x);
+		if (!top || less_then(v, top, o)) top = v;
 	};
-	upd(g); upd(h);
+	upd(f); upd(g); upd(h);
 	// Co-factor inline — no temporary BDD allocation
 	auto cof = [&](ref x, bool hi) -> ref {
 		if (leaf(x) || !tau::subtree_equals(get_var(x), top)) return x;

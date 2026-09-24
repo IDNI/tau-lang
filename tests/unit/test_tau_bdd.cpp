@@ -503,6 +503,25 @@ TEST_SUITE("BDD ITE") {
 		CHECK(r1.b == r2.b);
 		CHECK(r1.inv == r2.inv);
 	}
+
+	// f is a leaf outside the order, so top must come from g or h.
+	TEST_CASE("ITE(leaf,g,h) picks top from a non-leaf root") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 1}, {tz, 2}};
+		bdd::ref y = bdd::build_bdd(tau::get("y", opts), o);
+		REQUIRE(bdd::leaf(y));
+		bdd::ref z = bdd::from_bit(tz);
+		bdd::ref r = bdd::bdd_ite(y, z, bdd::bdd_not(z), o);
+		bdd::ref composed = bdd::bdd_or(
+			bdd::bdd_and(y, z, o),
+			bdd::bdd_and(bdd::bdd_not(y), bdd::bdd_not(z), o), o);
+		CHECK(r == composed);
+	}
 }
 
 TEST_SUITE("BDD compose") {
