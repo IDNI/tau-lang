@@ -3871,9 +3871,18 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	// step_spec is read below for t == time_point; keep it current here too,
 	// since callers (e.g. get_inputs_for_step) may reach this before step().
 	if (!calculate_initial_spec().value_or(false)) return appeared;
+	// No input to look for (e.g. a spec without inputs): skip the scan,
+	// which substitutes and simplifies every formula at every lookahead t.
+	if (vars.empty()) return appeared;
 	auto check = [&](tref fm, size_t t) {
 		tref step_ubt_ctn = update_to_time_point(fm,
 			t < formula_time_point ? formula_time_point : t);
+		// Exact: memory's values were committed before this step and
+		// hold none of its inputs, and the simplification only recombines
+		// existing subterms, so a var absent here cannot appear below.
+		if (std::ranges::none_of(vars, [&](tref v) {
+				return contains<node>(step_ubt_ctn, v); }))
+			return;
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
 		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
 		for (tref v : vars) {
@@ -3886,6 +3895,8 @@ trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 		}
 	};
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
+		// Every var already appeared (appeared never repeats one).
+		if (appeared.size() == vars.size()) break;
 		// This step's read set must come from the same tree, substituted
 		// and simplified the same way, that step(values) hands the solver.
 		// Lookahead steps keep the raw alternatives: no step formula yet.

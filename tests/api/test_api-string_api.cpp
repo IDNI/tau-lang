@@ -472,6 +472,46 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK( o_values.size() == i_values.size() );
 		CHECK( o_values == i_values );
 	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	// The lookback read set stops scanning once every input was found and
+	// skips formulas holding none of them. Pins the exact read set: ilb[t]
+	// is found only by the lookahead step (ilb[t-1]), and ila[1] drops out
+	// once the committed ilb[0] = 1 is substituted (1 | ila[1] = 1). The
+	// stream names are this test's own: definitions persist across tests.
+	TEST_CASE("get_inputs_for_step keeps lookahead inputs and drops "
+		  "inputs the committed memory decides")
+	{
+		auto maybe_i = tau_api::get_interpreter(
+			"ola[t]:sbf = ila[t]:sbf | ilb[t-1]:sbf.");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		const std::vector<std::vector<std::string>> expected = {
+			{ "ilb" }, { "ilb" }, { "ila", "ilb" } };
+		std::vector<std::string> outs;
+		for (size_t step = 0; step < expected.size(); ++step) {
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			std::vector<std::string> names;
+			std::map<stream_at, std::string> assigned;
+			for (auto& at : inputs.value()) {
+				names.push_back(at.name);
+				CHECK(at.time_point == step);
+				// ila is always 0, ilb is 1 at step 0 and 0 afterwards
+				assigned[at] = at.name == "ilb" && step == 0
+					? "1" : "0";
+			}
+			std::sort(names.begin(), names.end());
+			CHECK(names == expected[step]);
+			auto o = tau_api::step(i, assigned);
+			REQUIRE(o.has_value());
+			REQUIRE(o.value().contains({ "ola", step }));
+			outs.push_back(o.value().at({ "ola", step }));
+		}
+		CHECK(outs[1] == "1");
+		CHECK(outs[2] == "0");
+	}
+#endif // TAU_PACK_HAS_BA_SBF
 }
 
 // NF-1 / NF-2 regression: api::boole_normal_form(const std::string&) used

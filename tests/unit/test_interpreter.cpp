@@ -152,6 +152,29 @@ TEST_SUITE("interpreter") {
 		CHECK(vals[0] == "1");
 		CHECK(std::find(vals.begin(), vals.end(), "0") != vals.end());
 	}
+
+	TEST_CASE("an input-free lookback recurrence runs without a read set") {
+		// no input stream, so step() skips the lookback read-set scan;
+		// o[t] = o[t-1] ^ o[t-2] from 1, 1 repeats 1, 1, 0
+		const size_t cid = get_ba_type_id<node_t>(
+			pack_bool_carrier_type<node_t>());
+		const std::string ct = get_ba_type_name<node_t>(cid).value();
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", cid, o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		auto at = [&](const std::string& t) { return "o[" + t + "]" + ct; };
+		tref fm = tau::get(at("0") + " = {1}" + ct + " && " + at("1")
+			+ " = {1}" + ct + " && " + at("t") + " = " + at("t-1")
+			+ " ^ " + at("t-2"), opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 6);
+		REQUIRE(ran.has_value());
+		CHECK(o->get_values() == strings{ "1", "1", "0", "1", "1", "0" });
+	}
 }
 
 // Coverage-driven additions (2026-08-01). interpreter.tmpl.h measured 79.6%
