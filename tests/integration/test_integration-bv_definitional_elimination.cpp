@@ -209,6 +209,30 @@ TEST_SUITE("bv definitional elimination") {
 		}
 	}
 
+	TEST_CASE("a definition reused in a later round keeps its unclassifiable pieces as readers") {
+		// Round one finds definitions for x and y and eliminates x; round
+		// two reuses the definition of y, whose clause
+		// (a = 0 || (y = 1 && y < z)) flattens to a defining piece
+		// (a = 0 || y = 1) and a piece (a = 0 || y < z) that defines
+		// nothing: that one stays a reader and is substituted, so the
+		// result keeps (a = 0 || 1 < z). A definition is reused only while
+		// its clauses are the same nodes in the rebuilt scope, sibling
+		// included, which the parentheses around y's clauses ensure.
+		const char* s = "ex x ex y ((y:bv[8] = { 1 }:bv[8] && (a = 0 || (y:bv[8] = { 1 }:bv[8] && y:bv[8] < z:bv[8]))) && x:bv[8] = { 5 }:bv[8] && (d = 0 || (x:bv[8] = { 5 }:bv[8] && x:bv[8] < z:bv[8])) && x:bv[8] < z:bv[8])";
+		CHECK(binder_removed(s));
+		CHECK(agree(s));
+		tref r = bv_eliminate_definitional_existentials<node_t>(parse_wff(s));
+		REQUIRE(r != nullptr);
+		tref expected = parse_wff("(a = 0 || { 1 }:bv[8] < z:bv[8]) && (d = 0 || { 5 }:bv[8] < z:bv[8]) && { 5 }:bv[8] < z:bv[8]");
+		REQUIRE(expected != nullptr);
+		defelim_config c(false);
+		tref eq = tau::build_wff_equiv(r, expected);
+		const trefs& fv = get_free_vars<node_t>(eq);
+		auto closed = normalizer<node_t>(fv.empty() ? eq : tau::build_wff_all_many(fv, eq));
+		REQUIRE(closed.has_value());
+		CHECK(tau::get(closed.value()).equals_T());
+	}
+
 	TEST_CASE("a run with a computed value read by a guard: same outputs") {
 		const char* spec = "(o1[t]:bv[8] = i1[t]:bv[8] + { 1 }:bv[8]) && ((o1[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8])).";
 		CHECK(run_spec(spec, false) == run_spec(spec, true));
