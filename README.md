@@ -795,7 +795,10 @@ opts the codegen test suite into a minutes-long real `cmake` build.
 
 **Normal-form reuse switches.** Four three-way switches (`0` off, `1` on, the default, `2` shadow: both paths run, every disagreement is counted and reported at exit when the variable is set) govern the reuse of the normal forms of tau constants: `TAU_BA_NORMALIZED_MEMO` (a normal form `normalize_tau` returned is decided and renormalized without a further normalization pass and, as an operand of the constant operators, taken as it is), `TAU_BA_NORMALIZED_CONJUNCTION` (the normal form of a conjunction of normal forms is built from their bodies, or assembled from their shape), `TAU_API_SAT_FACTORED` (`api::sat` decides an always-conjunction over streams by its stream-disjoint components) and `TAU_BA_NORMALIZED_WITHOUT` (the normal form of an always-conjunction without one of its conjuncts is assembled from its shape).
 
+
 **Type scope seeding.** `TAU_TYPE_SCOPE_SEED` governs how the type inference of a REPL line or of a step's input is seeded from the streams the session has seen: `0` walks the whole scope on every call, `1` (the default) seeds the streams the formula mentions only, `2` is the shadow mode, which seeds by mention, infers once more from the whole scope, and counts every disagreement, reported at exit.
+
+**Continuation fixpoint from the functional shape.** `TAU_FUNCTIONAL_CONTINUATION` governs how the fixpoint of the unbounded continuation is settled: `0` decides the implication between two consecutive iterates only, `1` (the default) settles the fixpoint, the run check and the constant closure from the functional shape of the specification where it has one (every output of a time point defined by one equation or one conditional tree over the inputs, the earlier outputs and the other outputs of the time point, without a cycle) and decides the implication elsewhere, `2` is the shadow mode, which lets the implication decide every check and counts the checks the shape would have settled, those among them whose implication does not hold or could not be decided, and the closures it would have settled, reported at exit together with the number of checks.
 
 **Execution**: when the interpreter pipeline is given a realizable LTL formula,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
@@ -1089,7 +1092,14 @@ Note that before a Tau specification is executed, it is checked for satisfiabili
 that it can be executed indefinitely as described above. During this process the specification
 is also converted to what we call _unbounded continuation_ which essentially adds all implicit
 assumptions from a specification ensuring that the solutions for output stream values
-do not make the execution contradictory in a future step.
+do not make the execution contradictory in a future step. The continuation is built
+time point by time point until a fixpoint is reached. A specification of functional
+shape, whose outputs are functions of its inputs and of the earlier outputs, is a
+fixpoint as soon as the lookback is covered: the block a time point adds holds for every
+value of what it reads from outside, so adding it changes nothing. The shape is read off
+the specification as written, before it is normalized, and settles the fixpoint, the run
+check and the constant closure without deciding the implication between the two iterates
+(`TAU_FUNCTIONAL_CONTINUATION`, see the environment variables below).
 
 It is not always the case that the values which can be assigned to outputs are unique.
 For this reason, a single specification can give rise to a multitude of different programs
