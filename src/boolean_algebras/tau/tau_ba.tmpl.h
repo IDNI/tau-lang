@@ -54,6 +54,13 @@ struct tau_decision_cache {
 
 } // namespace detail
 
+// The record of `normalize_tau` and the switch of its memo, defined
+// with the decision's memo below; the operand pass takes a recorded
+// main as it is.
+template <typename node>
+bool is_normalized_main(tref main);
+inline int ba_normalized_memo_mode();
+
 // Main formula of `fm` with its temporal quantifiers normalized;
 // normalize_scopes=false leaves the formulas below the temporal
 // quantifiers as they are. Used by ~, &, |, ^ below so newly combined
@@ -79,6 +86,22 @@ static result<tref> normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
+	// A main `normalize_tau` returned is a fixed point of this pass (the
+	// scopes below the hulls are already normal forms, and the pass
+	// leaves them as they are), so the operators take it as it is
+	// instead of running the pass over the whole constant again. Same
+	// record and switch as the decision's memo (ba_normalized_memo); the
+	// shadow mode runs the pass anyway and counts every main it changes,
+	// which is what measures the fixed point.
+	if (is_normalized_main<node>(key)) {
+		++tau_ba_normalized_memo_hits;
+		if (ba_normalized_memo_mode() == 2) {
+			TAU_TRY(tref res,
+				(normalize_temporal_quantifiers<node, false>(key)));
+			if (res != key) ++tau_ba_normalized_memo_mismatches;
+		}
+		return r.with_value(key);
+	}
 	// compute before emplace: normalisation can create new trees, and a
 	// rehash of `cache` must not happen with a half-built entry in it.
 	TAU_TRY(tref res, (normalize_temporal_quantifiers<node, false>(key)));

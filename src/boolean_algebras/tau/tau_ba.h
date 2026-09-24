@@ -52,10 +52,12 @@ inline size_t ba_decision_pins = 4096;
 inline size_t tau_ba_predicate_misses = 0;
 /// Reuse of a Tau-BA constant's own normal form. `normalize_tau` records
 /// every main it returns; the cached `is_zero`/`is_one` decision of such a
-/// main, and a second `normalize_tau` of it, skip the renormalization the
-/// decision procedure would otherwise run over the whole constant again
-/// (the normal form is a fixed point of the normalizer). The decision is
-/// sound on the recorded main regardless of tree identity: the main and
+/// main, a second `normalize_tau` of it, and the Boolean operators (`~`,
+/// `&`, `|`, `+`; `^` forwards to `+`), which normalize the temporal layer
+/// of their operands, skip the renormalization they would otherwise run
+/// over the whole constant again (the normal form is a fixed point of the
+/// normalizer). The decision is sound on the recorded main regardless of
+/// tree identity: the main and
 /// its renormalization are equivalent, and the decision procedure accepts
 /// any well-formed formula; that the two coincide is what makes the skip
 /// exact, and what the shadow mode measures. 0 = off, 1 = on, 2 = shadow:
