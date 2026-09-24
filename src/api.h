@@ -261,6 +261,18 @@ struct api {
 	 * sweep. Default 1.5 (kept); <= 0 disables gc.
 	 */
 	static void set_gc_growth_factor(double f);
+	/// Decide `sat` of an always-conjunction over streams by its
+	/// stream-disjoint components (the factoring `is_zero` of a Tau-BA
+	/// constant uses, tau_ba.h `ba_component_factoring`), each component
+	/// remembered across queries, instead of one decision over the whole
+	/// formula. 0 = off, 1 = on, 2 = shadow: both are computed and every
+	/// disagreement is counted in `sat_factored_mismatches`. The
+	/// environment variable TAU_API_SAT_FACTORED (0, 1 or 2) overrides it.
+	static inline int sat_factored = 1;
+	/// Factored decisions taken, and disagreements the shadow mode found,
+	/// for tests and diagnostics.
+	static inline size_t sat_factored_hits = 0;
+	static inline size_t sat_factored_mismatches = 0;
 	/**
 	 * @brief Cap on live interned tree nodes; 0 = unlimited (default).
 	 *

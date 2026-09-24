@@ -389,6 +389,10 @@ inline bool ba_component_factoring_enabled() {
 
 template <typename node>
 static int factored_tau_valid(tref fm);
+// satisfiability.tmpl.h: the fingerprint of the runtime budgets that can
+// change a verdict, read there by the whole-formula memo.
+template <NodeType node>
+size_t verdict_budget_fingerprint();
 
 /**
  * @brief The dual of a `sometimes` formula: `G(!D)` for `F(D)`, in NNF.
@@ -477,6 +481,14 @@ static int factored_tau_sat(tref fm) {
 	if (cc.size() < 2) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// As the whole-formula memo of is_tau_formula_sat: every runtime
+	// budget can change a verdict, so the remembered components are
+	// dropped whenever the budgets moved.
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget) {
+		cache.clear();
+		cache_budget = fp;
+	}
 	bool all_sat = true;
 	for (size_t c = 0; c < cc.size() && all_sat; ++c) {
 		tref f = cc[c][0];
@@ -489,7 +501,10 @@ static int factored_tau_sat(tref fm) {
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
 		auto sat = is_tau_formula_sat<node>(f);
-		bool sres = sat.has_value() && sat.value();
+		// an undecided component leaves the question undecided: decline,
+		// and the caller's whole-formula decision reports it as before
+		if (!sat.has_value()) return -1;
+		const bool sres = sat.value();
 		pin_decided_key<node>(f);
 		cache.insert_or_assign(f, sres);
 		all_sat = sres;
@@ -510,6 +525,11 @@ static int factored_tau_valid(tref fm) {
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget) {
+		cache.clear();
+		cache_budget = fp;
+	}
 	bool all = true;
 	for (size_t i = 0; i < units.size() && all; ++i) {
 		if (auto it = cache.find(units[i]); it != cache.end()) {
@@ -517,7 +537,8 @@ static int factored_tau_valid(tref fm) {
 			continue;
 		}
 		auto imp = is_tau_impl<node>(tau::_T(), units[i]);
-		bool vres = imp.has_value() && imp.value();
+		if (!imp.has_value()) return -1;
+		const bool vres = imp.value();
 		pin_decided_key<node>(units[i]);
 		cache.insert_or_assign(units[i], vres);
 		all = vres;
