@@ -199,6 +199,10 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 template <NodeType node>
 result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 	result<bool> r;
+	// outputs computed on a full bdd node table are unknown: none is written
+	if (bdd_node_table_exhausted)
+		return r.with_error(code::runtime_error,
+			messages::bdd_node_table_exhausted);
 	// Sort variables in output by time
 	trefs io_vars;
 	for (const auto& [var, _ ] : output_values) {

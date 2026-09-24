@@ -100,6 +100,7 @@ include(test_repl-cli.cmake)
 
 # Limit options that change algorithm behavior (give-up branches).
 include(test_repl-limit_effects.cmake)
+include(test_repl-bdd_capacity.cmake)
 
 # `tau compile` verb
 include(test_repl-compile_verb.cmake)

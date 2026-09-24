@@ -114,7 +114,10 @@ struct bdd_handle {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
 		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>(); //(new bdd_handle);
-		return h->b = bdd<B, o>::add(x), Mn.emplace(x, h), h;
+		h->b = bdd<B, o>::add(x);
+		// a full table gave F for x: that handle must not stand for x
+		if (!bdd_node_table_exhausted) Mn.emplace(x, h);
+		return h;
 	}
 
 	// Handle for a leaf constant of B, keyed in Mb
@@ -122,7 +125,9 @@ struct bdd_handle {
 		if (auto it = Mb.find(x); it != Mb.end())
 			return it->second;//.lock();
 		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();//(new bdd_handle);
-		return h->b = bdd<B, o>::add(x), Mb.emplace(x, h), h;
+		h->b = bdd<B, o>::add(x);
+		if (!bdd_node_table_exhausted) Mb.emplace(x, h);
+		return h;
 	}
 
 	// Handle for a bdd value: dispatch on leaf vs node
@@ -386,7 +391,10 @@ struct bdd_handle<Bool, o> {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
 		hbdd<Bool, o> h = std::make_shared<bdd_handle<Bool, o>>(); //(new bdd_handle);
-		return h->b = bdd<Bool, o>::add(x), Mn.emplace(x, h), h;
+		h->b = bdd<Bool, o>::add(x);
+		// a full table gave F for x: that handle must not stand for x
+		if (!bdd_node_table_exhausted) Mn.emplace(x, h);
+		return h;
 	}
 
 	static hbdd<Bool, o> get(bdd_ref t) {

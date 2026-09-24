@@ -167,4 +167,59 @@ TEST_SUITE("Tau API - memory budget") {
 		// Parsing a formula the store has not seen interns nodes for it.
 		CHECK( budget_scope<node_t>::residue() > 0 );
 	}
+
+	// A full bdd node table makes the value of the call unknown: the api
+	// must answer with an error and no value, never a T or F, and leave
+	// the process ready for the next call.
+	TEST_CASE("a call that fills a bdd node table has no value") {
+		budget_guard g;
+		tau_api::set_tref_budget(0);
+		auto r = with_budget<node_t>([] {
+			bdd_node_table_exhausted = true;
+			return result<bool>{}.with_value(false);
+		});
+		CHECK_FALSE( r.has_value() );
+		CHECK( r.has_error() );
+		CHECK_FALSE( bdd_node_table_exhausted );
+		auto next = with_budget<node_t>([] {
+			return result<bool>{}.with_value(true);
+		});
+		REQUIRE( next.has_value() );
+		CHECK( next.value() == true );
+	}
+
+	// The outer call cannot turn a nested failure into an answer: the flag
+	// stays up until the outermost call has seen it.
+	TEST_CASE("a nested bdd table overflow fails the outer call") {
+		budget_guard g;
+		tau_api::set_tref_budget(0);
+		auto outer = with_budget<node_t>([] {
+			auto inner = with_budget<node_t>([] {
+				bdd_node_table_exhausted = true;
+				return result<bool>{}.with_value(false);
+			});
+			CHECK_FALSE( inner.has_value() );
+			CHECK( bdd_node_table_exhausted );
+			return result<bool>{}.with_value(true);
+		});
+		CHECK_FALSE( outer.has_value() );
+		CHECK( outer.has_error() );
+		CHECK_FALSE( bdd_node_table_exhausted );
+	}
+
+	// Work outside any boundary that filled a table may have left unknown
+	// values in the caches: the next call is refused and the caches reset.
+	TEST_CASE("a call starting on a full-table flag is refused") {
+		budget_guard g;
+		tau_api::set_tref_budget(0);
+		bdd_node_table_exhausted = true;
+		bool called = false;
+		auto r = with_budget<node_t>([&] {
+			called = true;
+			return result<bool>{}.with_value(true);
+		});
+		CHECK_FALSE( called );
+		CHECK_FALSE( r.has_value() );
+		CHECK_FALSE( bdd_node_table_exhausted );
+	}
 }

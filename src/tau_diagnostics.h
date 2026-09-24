@@ -58,6 +58,9 @@ struct messages {
 	static constexpr sv specification_could_not_be_compiled
 		= "the specification could not be compiled";
 	static constexpr sv failed_to_write_outputs = "Failed to write outputs";
+	static constexpr sv bdd_node_table_exhausted
+		= "bdd node table exhausted: a node did not fit, so the result "
+		  "is unknown and no answer is given";
 	static constexpr sv no_ba_element_assigned_to_output
 		= "No Boolean algebra element assigned to output";
 	static constexpr sv execution_stopped_on_failed_step

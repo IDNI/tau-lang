@@ -2228,6 +2228,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	default: error = true; out << std::endl;
 		TAU_LOG_ERROR << "Unknown command";
 	}
+	// The api reports a full bdd node table itself; this catches the
+	// commands that reach the bdds around it.
+	if (take_bdd_node_table_exhausted<node>()) {
+		error = true, result = 0;
+		TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
+		if (command_type == tau::run_cmd) finish_running();
+	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
 		out << "result tree: ") << "\n";
@@ -2319,6 +2326,11 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 			if (req.kind == pending_request::stream_value)
 				continue_running(req);
 			else continue_running();
+			if (take_bdd_node_table_exhausted<node>()) {
+				error = true;
+				TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
+				finish_running();
+			}
 		}
 		out << "\n", out.flush();
 		if (!pending) reprompt();
@@ -2328,6 +2340,12 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 	// make_cli() already prints its own report (see its own comment);
 	// eval()'s result<int> return carries REPL quit codes, not a report.
 	tref cli = make_cli(src).value_or(nullptr);
+	// parsing builds the bdds of sbf constants: a line whose constants did
+	// not fit in the node table is not run
+	if (take_bdd_node_table_exhausted<node>()) {
+		error = true, cli = nullptr;
+		TAU_LOG_ERROR << messages::bdd_node_table_exhausted;
+	}
 	// Pin the parsed command line for the whole evaluation: a `run` among
 	// its commands steps the interpreter, which calls maybe_gc(), and the
 	// commands still queued behind it live in this very tree. A line that

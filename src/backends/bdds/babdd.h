@@ -26,6 +26,20 @@ typedef int32_t int_t;
 typedef uint32_t uint_t;
 template<typename T> using sp = std::shared_ptr<T>;
 
+/**
+ * @brief Raised when a bdd node table had no id left for a new node.
+ *
+ * Ids are idW bits wide, so a table holds at most 2^idW entries. The node
+ * that does not fit is not interned: F takes its place, and while the flag
+ * is up every memoized operation answers F, so the result is unknown. No
+ * memo, handle table or constant cache takes a write meanwhile, so what they
+ * hold still describes exactly what it did before. The unit-of-work
+ * boundaries turn the flag into an error without a value, empty the tree
+ * caches the unknown result may have reached and lower the flag
+ * (take_bdd_node_table_exhausted in tau_memory_budget.h).
+ */
+inline bool bdd_node_table_exhausted = false;
+
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
@@ -404,7 +418,11 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	 * the keys are used as-is. check_cache returns true on a hit and
 	 * replaces x with the (rebased) cached result.
 	 */
+	// With a full table every memoized operation answers F at once: the
+	// result is unknown anyway, and without memo writes the recursion
+	// would otherwise not be bounded by the memos.
 	static bool check_cache(bdd_ref& x, const auto& cache) {
+		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(bdd_ref::to_cache_node(x, x.shift));
 				it != cache.end()) {
@@ -426,6 +444,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
+		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			auto d = max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
@@ -451,6 +470,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
+		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(
 					{bdd_ref::to_cache_node(x, x.shift),
@@ -474,6 +494,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
+		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
@@ -485,6 +506,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
+		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 					      bdd_ref::to_cache_node(x, x.shift),
@@ -501,6 +523,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
+		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			auto d = max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
@@ -536,15 +559,11 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static bdd_ref add(const bdd_node_t& n) { return add(n.v, n.h, n.l); }
 
-	// idW-bit ids can address at most 2^idW nodes; past that, interning a
-	// new node would alias it to an existing id. Report once and fail to
-	// F rather than silently corrupting the universe.
-	static bdd_ref universe_full() {
-		static bool warned = false;
-		if (!warned) warned = true, std::cerr <<
-			"bdd: universe full (idW=" << +o.idW << "), "
-			"further nodes alias to F\n";
-		return F;
+	// idW-bit ids address at most 2^idW entries; the node that does not
+	// fit stays out of the table (see bdd_node_table_exhausted)
+	static bool table_full() {
+		if (V.size() < (uint64_t{1} << o.idW)) return false;
+		return bdd_node_table_exhausted = true;
 	}
 
 	// Canonicalizing node constructor ("mk"): returns the unique
@@ -555,7 +574,6 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// into the reference's out bit -- so a function and its
 	// complement share one stored node.
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-		if (V.size() >= (uint64_t{1} << o.idW)) return universe_full();
 #ifdef DEBUG
 		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
@@ -589,6 +607,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		bdd_node_t n(v, h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, it->second);
+		if (table_full()) return F;
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, V.size() - 1);
@@ -604,6 +623,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		node_skeleton<bdd_ref> n(h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, v, it->second);
+		if (table_full()) return F;
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, v, V.size() - 1);
@@ -613,12 +633,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// true map to F and T, and with output inverters an already
 	// interned ~b is reused via the out bit
 	static bdd_ref add(const B& b) {
-		if (V.size() >= (uint64_t{1} << o.idW)) return universe_full();
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return bdd_ref(0,0,it->second);
 		else if constexpr (o.has_inv_out())
 			if ((it = Mb.find(~b)) != Mb.end()) return bdd_ref(0,1,it->second);
+		if (table_full()) return F;
 		Mb.emplace(b, V.size());
 		V.emplace_back(b);
 		return bdd_ref(0, 0, V.size()-1);
@@ -1088,7 +1108,11 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
 
+	// With a full table every memoized operation answers F at once: the
+	// result is unknown anyway, and without memo writes the recursion
+	// would otherwise not be bounded by the memos.
 	static bool check_cache(bdd_ref& x, const auto& cache) {
+		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(bdd_ref::to_cache_node(x, x.shift));
 				it != cache.end()) {
@@ -1110,6 +1134,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
+		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			auto d = max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
@@ -1135,6 +1160,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
+		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			if (auto it = cache.find(
 				{bdd_ref::to_cache_node(x, x.shift),
@@ -1158,6 +1184,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
+		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
 				      bdd_ref::to_cache_node(r, x.shift));
@@ -1169,6 +1196,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
+		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			cache.emplace(std::pair<bdd_ref, uint_t>{
 				bdd_ref::to_cache_node(x, x.shift),
@@ -1185,6 +1213,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
+		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
 			auto d = max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
@@ -1218,19 +1247,14 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref add(bdd_node_t b) { return add(b.v, b.h, b.l); }
 
-	// idW-bit ids can address at most 2^idW nodes; past that, interning a
-	// new node would alias it to an existing id. Report once and fail to
-	// F rather than silently corrupting the universe.
-	static bdd_ref universe_full() {
-		static bool warned = false;
-		if (!warned) warned = true, std::cerr <<
-			"bdd: universe full (idW=" << +o.idW << "), "
-			"further nodes alias to F\n";
-		return F;
+	// idW-bit ids address at most 2^idW entries; the node that does not
+	// fit stays out of the table (see bdd_node_table_exhausted)
+	static bool table_full() {
+		if (V.size() < (uint64_t{1} << o.idW)) return false;
+		return bdd_node_table_exhausted = true;
 	}
 
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-		if (V.size() >= (uint64_t{1} << o.idW)) return universe_full();
 #ifdef DEBUG
 		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
@@ -1259,6 +1283,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		bdd_node_t n(v, h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, it->second);
+		if (table_full()) return F;
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, V.size() - 1);
@@ -1271,6 +1296,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		node_skeleton<bdd_ref> n(h, l);
 		if (auto it = Mn.find(n); it != Mn.end())
 			return bdd_ref(in, out, v, it->second);
+		if (table_full()) return F;
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return bdd_ref(in, out, v, V.size() - 1);
@@ -1444,7 +1470,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		auto it = and_many_memo.find(v);
 		if (it != and_many_memo.end()) return it->second;
 		if (v.size() == 2)
-			return and_many_memo.emplace(v, bdd_and(v[0], v[1])).first->second;
+			return memo_and_many(v, bdd_and(v[0], v[1]));
 		bdd_ref res = F, h, l;
 		uint_t m = 0;
 		std::vector<bdd_ref> vh, vl;
@@ -1452,12 +1478,17 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			case 0: l = bdd_and_many(std::move(vl)),
 					h = bdd_and_many(std::move(vh));
 				break;
-			case 1: return and_many_memo.emplace(v, res), res;
+			case 1: return memo_and_many(v, res);
 			case 2: h = bdd_and_many(std::move(vh)), l = F; break;
 			case 3: h = F, l = bdd_and_many(std::move(vl)); break;
 			default: { DBG(assert(false)); }
 		}
-		return and_many_memo.emplace(v, bdd::add(m, h, l)).first->second;
+		return memo_and_many(v, bdd::add(m, h, l));
+	}
+
+	static bdd_ref memo_and_many(const std::vector<bdd_ref>& v, bdd_ref r) {
+		if (!bdd_node_table_exhausted) and_many_memo.emplace(v, r);
+		return r;
 	}
 
 
