@@ -9,6 +9,7 @@
 #include "tau_diagnostics.h"
 #include "reset_hooks.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
@@ -470,36 +471,35 @@ static int factored_tau_sat(tref fm) {
 			if (nm.empty()) return -1;
 			supp[i].push_back(nm);
 		}
-	std::vector<std::vector<std::string>> cn;
-	std::vector<trefs> cc;
-	auto shares = [](const std::vector<std::string>& a,
-			 const std::vector<std::string>& b) {
-		for (const auto& x : a) for (const auto& y : b)
-			if (x == y) return true;
-		return false;
+	// The groups are the connected components of the units under "share
+	// a name": a name is owned by the group of the first unit that
+	// mentions it, and a unit that mentions names of two groups merges
+	// them (union-find over unit indices, path halving). Near-linear in the
+	// number of names; the groups are listed by their first unit, the
+	// units of a group in their order.
+	std::vector<size_t> parent(units.size());
+	for (size_t i = 0; i < units.size(); ++i) parent[i] = i;
+	auto find = [&parent](size_t a) {
+		while (parent[a] != a) a = parent[a] = parent[parent[a]];
+		return a;
 	};
+	std::unordered_map<std::string, size_t> owner;
+	for (size_t i = 0; i < units.size(); ++i)
+		for (const std::string& nm : supp[i]) {
+			auto [it, fresh] = owner.try_emplace(nm, i);
+			if (fresh) continue;
+			size_t a = find(i), b = find(it->second);
+			if (a != b) parent[std::max(a, b)] = std::min(a, b);
+		}
+	std::vector<trefs> cc;
+	std::vector<size_t> slot(units.size(), SIZE_MAX);
 	for (size_t i = 0; i < units.size(); ++i) {
-		std::vector<size_t> hit;
-		for (size_t c = 0; c < cn.size(); ++c)
-			if (shares(cn[c], supp[i])) hit.push_back(c);
-		if (hit.empty()) {
-			cn.push_back(supp[i]);
-			cc.push_back(trefs{ units[i] });
-			continue;
+		size_t root = find(i);
+		if (slot[root] == SIZE_MAX) {
+			slot[root] = cc.size();
+			cc.emplace_back();
 		}
-		size_t base = hit[0];
-		cn[base].insert(cn[base].end(),
-			supp[i].begin(), supp[i].end());
-		cc[base].push_back(units[i]);
-		for (size_t k = hit.size(); k-- > 1; ) {
-			size_t c = hit[k];
-			cn[base].insert(cn[base].end(),
-				cn[c].begin(), cn[c].end());
-			cc[base].insert(cc[base].end(),
-				cc[c].begin(), cc[c].end());
-			cn.erase(cn.begin() + c);
-			cc.erase(cc.begin() + c);
-		}
+		cc[slot[root]].push_back(units[i]);
 	}
 	if (cc.size() < 2) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
