@@ -7,6 +7,7 @@ set(TESTS
 	memory_budget
 	ltl_execution
 	normal_forms_xor
+	undecided_verdicts
 )
 
 foreach(TEST IN LISTS TESTS)

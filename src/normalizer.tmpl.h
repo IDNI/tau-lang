@@ -702,9 +702,14 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
  * eliminate a part, `find_fixpoint_phi`/`chi` keep unrolling until their step
  * cap) -- and say so loudly instead of silently.
  *
- * The proper fix is a tri-state (`true`/`false`/`undecided`) contract threaded
- * through these predicates and their callers; until then this at least makes the
- * case diagnosable.
+ * A negative answer is not conservative for every public decision: read by
+ * `sat` it is F for a satisfiable formula, read by `valid` it is T for a
+ * falsifiable one. The result-returning predicates
+ * (`is_non_temp_nso_satisfiable`, `is_non_temp_nso_unsat`, `is_nso_impl`)
+ * therefore pass `negative_fallback = false` and turn an undecided formula
+ * into an UNKNOWN error, the third state of `result<bool>`. Only
+ * `are_nso_equivalent`, which stays `bool` and whose callers read "not
+ * equivalent" as "keep going", answers negatively.
  *
  * One shape among the undecided ones is not a gap to chase: a temporal
  * operator (`always`, `sometimes`, ...) directly inside a quantifier scope
@@ -720,15 +725,26 @@ result<bool> has_no_boolean_combs_of_models(tref n) {
  * @tparam node Tree node type.
  * @param who Name of the calling predicate, for the log line.
  * @param normalized The normalized formula to check.
+ * @param negative_fallback `true` (default) logs the negative answer the
+ * caller will give; `false` logs at debug level only, for a caller that
+ * reports UNKNOWN in its result instead.
  * @return `true` if the formula was decided (`T`, `F`, or a constraint).
  * @endinternal
  */
 template <NodeType node>
-bool check_decided(const char* who, tref normalized) {
+bool check_decided(const char* who, tref normalized,
+	bool negative_fallback = true)
+{
 	using tau = tree<node>;
 	const auto& t = tau::get(normalized);
 	if (t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)) return true;
+	// The caller carries the diagnostic in its report.
+	if (!negative_fallback) {
+		LOG_DEBUG << who << ": normalization could not decide "
+			<< LOG_FM(normalized) << "; reporting UNKNOWN.";
+		return false;
+	}
 	// NZ-1: a quantifier whose scope still holds a temporal operator.
 	auto is_temporal_under_quantifier = [](tref m) {
 		return is_child_quantifier<node>(m)
@@ -747,6 +763,17 @@ bool check_decided(const char* who, tref normalized) {
 		<< LOG_FM(normalized) << "; answering negatively. This is a "
 		"conservative fallback, not a proof.";
 	return false;
+}
+
+// The error of a predicate whose normalization left the formula undecided,
+// with the "UNKNOWN:" prefix of the other no-verdict errors (messages::unknown_*).
+template <NodeType node>
+std::string undecided_message(const char* what, tref normalized) {
+	std::stringstream ss;
+	ss << "UNKNOWN: normalization could not decide "
+		<< tree<node>::get(normalized).to_str() << "; " << what
+		<< " could not be decided";
+	return ss.str();
 }
 
 // Shape-gated shortcut for is_non_temp_nso_satisfiable: a conjunction of
@@ -821,7 +848,10 @@ result<bool> is_non_temp_nso_satisfiable(tref n) {
 	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
 		  << LOG_FM(normalized);)
 
-	check_decided<node>("is_non_temp_nso_satisfiable", normalized);
+	if (!check_decided<node>("is_non_temp_nso_satisfiable", normalized,
+		false))
+		return r.with_error(code::solver_error,
+			undecided_message<node>("satisfiability", normalized));
 
 	bool full = tau::get(normalized).equals_T();
 	if (lean && *lean != full) {
@@ -865,7 +895,9 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	nn = tau::build_wff_ex_many(vars, nn);
 	TAU_TRY_OR(tref normalized, normalize_non_temp<node>(nn),
 		code::internal_error, "non-temporal normalization failed");
-	check_decided<node>("is_non_temp_nso_unsat", normalized);
+	if (!check_decided<node>("is_non_temp_nso_unsat", normalized, false))
+		return r.with_error(code::solver_error,
+			undecided_message<node>("unsatisfiability", normalized));
 	return r.with_assert_check_value(tau::get(normalized).equals_F());
 }
 
@@ -1017,7 +1049,11 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 		auto nres = r.take_or_error(normalize_non_temp<node>(imp),
 			code::internal_error, "implication normalization failed");
 		if (!nres) return std::nullopt;
-		check_decided<node>("is_nso_impl", *nres);
+		if (!check_decided<node>("is_nso_impl", *nres, false)) {
+			r.error(code::solver_error,
+				undecided_message<node>("implication", *nres));
+			return std::nullopt;
+		}
 		return tau::get(*nres).equals_T();
 	};
 

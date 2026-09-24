@@ -1064,7 +1064,8 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 // because it inspects only variable nodes, and which cvc5 then fails to
 // translate) comes back with its quantifier intact. All three predicates below
 // asserted that could not happen, so each aborted a Debug build on this input.
-// They now fall back to their negative answer and log it.
+// are_nso_equivalent (bool) falls back to its negative answer and logs it; the
+// result-returning predicates report UNKNOWN.
 TEST_SUITE("UndecidableNormalizationFallback") {
 
 	static tref undecidable() {
@@ -1082,16 +1083,24 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 	}
 
-	TEST_CASE("is_nso_impl answers false instead of aborting") {
-		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()).value() );
+	// An error with no value: a negative answer would read as a definite
+	// F for sat and as T for valid of the negation.
+	TEST_CASE("is_nso_impl reports UNKNOWN instead of aborting") {
+		auto res = is_nso_impl<node_t>(tau::_T(), undecidable());
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
-	TEST_CASE("is_non_temp_nso_unsat answers false instead of aborting") {
-		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()).value() );
+	TEST_CASE("is_non_temp_nso_unsat reports UNKNOWN instead of aborting") {
+		auto res = is_non_temp_nso_unsat<node_t>(undecidable());
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
-	TEST_CASE("is_non_temp_nso_satisfiable answers false instead of aborting") {
-		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()).value() );
+	TEST_CASE("is_non_temp_nso_satisfiable reports UNKNOWN instead of aborting") {
+		auto res = is_non_temp_nso_satisfiable<node_t>(undecidable());
+		CHECK( !res.has_value() );
+		CHECK( res.has_error() );
 	}
 
 	TEST_CASE("are_nso_equivalent answers false instead of aborting") {

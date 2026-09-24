@@ -1342,7 +1342,14 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		}
 		run = normed_run.value();
 		auto sat = is_run_satisfiable<node>(run);
-		if (!sat.has_value() || !sat.value()) {
+		// An undecided run is not a refutation: nullptr is this
+		// function's "no verdict".
+		if (!sat.has_value()) {
+			LOG_ERROR << "always_to_unbounded_continuation: the "
+				"satisfiability of the run could not be decided";
+			return nullptr;
+		}
+		if (!sat.value()) {
 			print_fixpoint_info(
 				"Temporal normalization of G specification reached fixpoint after "
 				+ std::to_string(steps) +
@@ -1719,7 +1726,10 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 		// dereferencing it below.
 		if (!normed_run) return r.with_value(nullptr);
 		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
-		if (sat.has_value() && sat.value()) {
+		// An undecided step is no verdict; reading it as "the flag
+		// cannot be raised here" would add a false assumption below.
+		if (!sat) return r;
+		if (*sat) {
 			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
 			LOG_DEBUG << LOG_FM(normed_run);
 			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
@@ -1843,7 +1853,10 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
 		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
-		if (sat.has_value() && sat.value()) {
+		// An undecided step is no verdict; reading it as "the flag
+		// cannot be raised here" would add a false assumption below.
+		if (!sat) return r;
+		if (*sat) {
 			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
 			LOG_DEBUG << LOG_FM(normed_run);
 			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
@@ -2208,20 +2221,33 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	}
 	{
 		auto _s = r.open("expression_paths");
-		// Convert each disjunct to unbounded continuation
+		// Convert each disjunct to unbounded continuation. An undecided
+		// disjunct does not stop the scan -- a later satisfiable one
+		// still decides the disjunction -- but it keeps "no disjunct
+		// satisfiable" from reading as F.
+		std::optional<result<tref>> undecided_path;
 		for (tref clause : expression_paths<node>(normalized_fm)) {
-			TAU_TRY_OR(tref val, transform_to_execution<node>(
-				clause, start_time, output),
-				code::internal_error,
-				"transform_to_execution returned neither a "
-				"value nor an error while checking a "
-				"disjunct's satisfiability");
-			if (!tau::get(val).equals_F()) {
+			auto val = transform_to_execution<node>(
+				clause, start_time, output);
+			if (!val.has_value()) {
+				if (!undecided_path) undecided_path.emplace(
+					std::move(val));
+				continue;
+			}
+			if (!tau::get(val.value()).equals_F()) {
 				LOG_DEBUG << "End is_tau_formula_sat: true";
 				memoize(true);
 				DBG(assert(r.is_well_formed());)
 				return r;
 			}
+		}
+		if (undecided_path) {
+			TAU_TRY_OR(tref unused, std::move(*undecided_path),
+				code::internal_error,
+				"transform_to_execution returned neither a "
+				"value nor an error while checking a "
+				"disjunct's satisfiability");
+			(void)unused;
 		}
 	}
 	LOG_DEBUG << "End is_tau_formula_sat: false";
@@ -2254,11 +2280,23 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 			"by the safety pipeline");
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
+	// One satisfiable disjunct refutes the implication even when another
+	// is undecided; an undecided one only matters when no disjunct is
+	// satisfiable, and then it is the result.
+	std::optional<result<tref>> undecided_path;
 	for (tref c : expression_paths<node>(imp_check)) {
-		TAU_TRY(tref val, transform_to_execution<node>(c));
-		if (!tau::get(val).equals_F()) {
+		auto val = transform_to_execution<node>(c);
+		if (!val.has_value()) {
+			if (!undecided_path) undecided_path.emplace(std::move(val));
+			continue;
+		}
+		if (!tau::get(val.value()).equals_F()) {
 			return r.with_assert_check_value(false);
 		}
+	}
+	if (undecided_path) {
+		TAU_TRY(tref unused, std::move(*undecided_path));
+		(void)unused;
 	}
 	return r.with_assert_check_value(true);
 }
@@ -2286,14 +2324,24 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 			"by the safety pipeline");
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
+	// Same undecided-disjunct rule as is_tau_impl.
+	std::optional<result<tref>> undecided_path;
 	for (const auto& c : expression_paths<node>(equiv_check)) {
-		TAU_TRY_OR(tref val, transform_to_execution<node>(c),
+		auto val = transform_to_execution<node>(c);
+		if (!val.has_value()) {
+			if (!undecided_path) undecided_path.emplace(std::move(val));
+			continue;
+		}
+		if (!tau::get(val.value()).equals_F()) {
+			return r.with_assert_check_value(false);
+		}
+	}
+	if (undecided_path) {
+		TAU_TRY_OR(tref unused, std::move(*undecided_path),
 			code::internal_error,
 			"transform_to_execution returned neither a value nor "
 			"an error while checking equivalence");
-		if (!tau::get(val).equals_F()) {
-			return r.with_assert_check_value(false);
-		}
+		(void)unused;
 	}
 	return r.with_assert_check_value(true);
 }
