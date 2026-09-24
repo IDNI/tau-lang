@@ -46,6 +46,99 @@ TEST_SUITE("nso_rr unit tests") {
 
 }
 
+// nso_rr_apply(rules, n) skips a definition whose head signature occurs
+// nowhere in the formula. A definition reached only through another
+// definition's body must still fire, whichever order the rules come in.
+TEST_SUITE("definition expansion skips absent heads (#135)") {
+
+	// Applies @p sample's definitions with rule counting on and returns
+	// the expanded main plus the per-rule application counts.
+	static std::pair<tref, std::unordered_map<std::string, size_t>>
+		apply_counted(const char* sample)
+	{
+		auto maybe = get_nso_rr(sample);
+		REQUIRE( maybe.has_value() );
+		rule_apply_counts<node_t>().clear();
+		rule_hit_counts<node_t>().clear();
+		rule_counting = true;
+		auto applied = nso_rr_apply<node_t>(maybe.value());
+		rule_counting = false;
+		auto counts = rule_apply_counts<node_t>();
+		rule_apply_counts<node_t>().clear();
+		rule_hit_counts<node_t>().clear();
+		REQUIRE( applied.has_value() );
+		return { applied.value(), counts };
+	}
+
+	static bool applied_rule_named(
+		const std::unordered_map<std::string, size_t>& counts,
+		const std::string& head)
+	{
+		for (const auto& [name, count] : counts)
+			if (name.starts_with(head) && count) return true;
+		return false;
+	}
+
+	static bool has_ref(tref n) {
+		return tau::get(n).find_top(is<node_t, tau::ref>) != nullptr;
+	}
+
+	TEST_CASE("a definition whose head is absent is never attempted") {
+		auto [fm, counts] = apply_counted(
+			"k135a(x) := x = 0."
+			"u135a(x) := x = 1."
+			"k135a(y).");
+		CHECK( !has_ref(fm) );
+		CHECK( applied_rule_named(counts, "k135a(") );
+		CHECK( !applied_rule_named(counts, "u135a(") );
+	}
+
+	TEST_CASE("a head introduced by an earlier rule still fires") {
+		// g135b calls h135b; h135b comes later in rule order, so it
+		// becomes eligible in the same round g135b is expanded.
+		auto [fm, counts] = apply_counted(
+			"g135b(x) := h135b(x)."
+			"h135b(x) := x = 0."
+			"g135b(y).");
+		CHECK( !has_ref(fm) );
+		CHECK( applied_rule_named(counts, "h135b(") );
+	}
+
+	TEST_CASE("a head introduced by a later rule fires next round") {
+		auto [fm, counts] = apply_counted(
+			"h135c(x) := x = 0."
+			"m135c(x) := h135c(x)."
+			"g135c(x) := m135c(x)."
+			"g135c(y).");
+		CHECK( !has_ref(fm) );
+	}
+
+	TEST_CASE("arities of one symbol are told apart") {
+		auto [fm, counts] = apply_counted(
+			"f135d(x) := x = 0."
+			"f135d(x, y) := x = y."
+			"f135d(z, w).");
+		CHECK( !has_ref(fm) );
+		// only the binary head occurs, so the unary one is skipped
+		size_t unary = 0, binary = 0;
+		for (const auto& [name, count] : counts) {
+			if (!name.starts_with("f135d(")) continue;
+			(name.find(',') < name.find(":=") ? binary : unary)
+								+= count;
+		}
+		CHECK( binary > 0 );
+		CHECK( unary == 0 );
+	}
+
+	TEST_CASE("recurrences with offsets still unfold") {
+		auto [fm, counts] = apply_counted(
+			"r135e[n](x) := !r135e[n-1](x)."
+			"r135e[0](x) := x = 0."
+			"r135e[2](y).");
+		CHECK( !has_ref(fm) );
+	}
+}
+
 TEST_SUITE("rule counting") {
 
 	TEST_CASE("normalizer: rule_counting gates count nodes in the report") {
