@@ -9,6 +9,7 @@
 // tau_tree.h's own include of "tau_parser.generated.h".
 #include "hoa_parser.generated.h"
 #include "backends/spot/spot.h"
+#include "reset_hooks.h"
 #include <climits>
 
 namespace idni::tau_lang {
@@ -266,6 +267,9 @@ inline result<synth_game> call_ltlsynt_game(
 	// unbounded, FIFO eviction). Callers get their own copy of the
 	// cached entry.
 	static bounded_cache<std::string, synth_game> cache{&cache_bound};
+	static const bool reset_registered =
+		(on_reset([] { cache.clear(); }), true);
+	(void)reset_registered;
 	// '\x1e' (record separator) cannot occur in an LTL formula or an AP
 	// name, so the concatenation is injective. Local to this cache key --
 	// the backend's own comma-joiner formats an argv flag, a different job.

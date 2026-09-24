@@ -479,6 +479,19 @@ void api<node>::reset_definitions() {
 }
 
 template <NodeType node>
+size_t api<node>::reset() {
+	reset_definitions();
+	run_reset_hooks();
+	const size_t before = tref_count();
+	std::unordered_set<tref> keep;
+	// The Tau-BDD store is never swept and holds raw Tau trefs.
+	tau_term_bdd<node>::collect_live_refs(keep);
+	bintree<node>::gc(keep);
+	const size_t after = tref_count();
+	return before > after ? before - after : 0;
+}
+
+template <NodeType node>
 result<tref> api<node>::get_definition(const std::string& definition, bool simplified) {
 	return with_budget<node>([&] {
 		result<tref> r;

@@ -30,6 +30,7 @@
 #include "interpreter.h"
 #include "tau_diagnostics.h"
 #include "tau_memory_budget.h"
+#include "reset_hooks.h"
 
 namespace idni::tau_lang {
 
@@ -470,6 +471,21 @@ struct api {
 	/// same stream differently (o5:bv[16], then o5:bv[24]) must reset in
 	/// between. Interpreters already built keep their own I/O context.
 	static void reset_definitions();
+	/**
+	 * @brief Return the process to a fresh state: drop the definitions (as
+	 * @ref reset_definitions), empty the caches, and free every interned
+	 * tree node that no `htref` holds.
+	 *
+	 * Options and limits keep their values. The interning pools -- BA
+	 * types, BA constants and the BDD stores -- are kept, since the
+	 * values still held index into them.
+	 *
+	 * Destroy every interpreter first: an interpreter holds raw trefs the
+	 * sweep cannot see. A value kept across the call must be an `htref`;
+	 * a raw `tref` into a freed node dangles.
+	 * @return The number of tree nodes freed.
+	 */
+	static size_t reset();
 
 	// -----------------------------------------------------------------------
 	// Querying

@@ -144,6 +144,12 @@ NB_MODULE(tau, m) {
 		"types, so the next spec may type a stream differently. "
 		"Interpreters already built keep their own streams.");
 
+	m.def("reset", []() { return tau_api::reset(); },
+		"Return the engine to a fresh state: drop the definitions, empty "
+		"the caches and free every tree node nothing holds. Options keep "
+		"their values. Release every interpreter first. Returns the "
+		"number of tree nodes freed.");
+
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")
 		.def(nb::init<const std::string&, size_t>())

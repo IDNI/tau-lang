@@ -7,6 +7,7 @@
 
 #include "tau_spec.h"
 #include "tau_diagnostics.h"
+#include "reset_hooks.h"
 
 #include <cstdlib>
 #include <deque>
@@ -213,6 +214,9 @@ template <typename node>
 static void pin_decided_key(tref key) {
 	static std::deque<htref> pins;
 	if (ba_decision_pins == 0) return;
+	static const bool reset_registered =
+		(on_reset([] { pins.clear(); }), true);
+	(void)reset_registered;
 	pins.push_back(tree<node>::geth(key));
 	while (pins.size() > ba_decision_pins) pins.pop_front();
 }

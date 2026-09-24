@@ -5,6 +5,7 @@ set(TESTS
 	string_api
 	limits
 	memory_budget
+	reset
 	ltl_execution
 	normal_forms_xor
 )
