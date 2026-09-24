@@ -882,6 +882,13 @@ result<tref> api<node>::onf(tref expr, tref var) {
 	});
 }
 
+// tau_ba.tmpl.h: the normal form of an always-conjunction without one of
+// its conjuncts. tau.h includes this file ahead of tau_ba.tmpl.h, so a
+// translation unit that reaches the api through tau.h needs the declaration
+// here.
+template <typename node>
+tref normal_form_without(tref km, tref cm);
+
 template <NodeType node>
 result<tref> api<node>::without(tref formula, tref clause) {
 	return with_budget<node>([&] {
