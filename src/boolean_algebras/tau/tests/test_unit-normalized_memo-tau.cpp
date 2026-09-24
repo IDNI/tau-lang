@@ -88,12 +88,38 @@ TEST_SUITE("normalized main memo") {
 		CHECK(tau_ba_normalized_memo_mismatches == 0);
 	}
 
+	// The Boolean operators normalize the temporal layer of their operands
+	// (normalized_tau_ba_main) and take a recorded main as it is: each
+	// recorded operand counts as a hit, and under the shadow mode the pass
+	// still runs and must leave every recorded main unchanged.
+	TEST_CASE("a recorded normal form is taken as an operand as it is") {
+		memo_mode shadow(2);
+		tau_t k = normalize_tau(tau_t(wff(
+			"(always o1[t] = 1) && (always o2[t] = 0)")));
+		tau_t c = normalize_tau(tau_t(wff("always o3[t] = 1")));
+		size_t before = tau_ba_normalized_memo_hits;
+		tau_t kc = k & c;
+		CHECK(tau_ba_normalized_memo_hits >= before + 2);
+		tau_t kd = k | c;
+		tau_t kx = k + c;
+		tau_t nk = ~k;
+		CHECK(tau_ba_normalized_memo_hits >= before + 7);
+		CHECK(tau_ba_normalized_memo_mismatches == 0);
+		auto zero = kc.is_zero();
+		REQUIRE(zero.has_value());
+		CHECK_FALSE(zero.value());
+		auto one = kd.is_one();
+		REQUIRE(one.has_value());
+		CHECK_FALSE(one.value());
+	}
+
 	TEST_CASE("off keeps the old path") {
 		memo_mode off(0);
 		tau_t k = normalize_tau(tau_t(wff("always o4[t] = 1")));
 		auto zero = k.is_zero();
 		REQUIRE(zero.has_value());
 		CHECK_FALSE(zero.value());
+		tau_t kk = k & k;
 		CHECK(tau_ba_normalized_memo_hits == 0);
 	}
 }
