@@ -88,3 +88,15 @@ foreach(_t self_absorbing_x self_absorbing_a negated_alias sbf normalize)
 			PROPERTIES TIMEOUT 30)
 	endif()
 endforeach()
+
+# a top-level sometimes, alone or next to an always, is decided, not
+# rejected as a Boolean combination of models
+add_repl_test(sat_cmd-issue144_sometimes_tautology "sat sometimes (o1[t] = 0 || o1[t] != 0)" ": T")
+add_repl_test(sat_cmd-issue144_sometimes_atom "sat sometimes o1[t] = 1" ": T")
+add_repl_test(sat_cmd-issue144_sometimes_contradiction "sat sometimes (o1[t] = 1 && o1[t] = 0)" ": F")
+add_repl_test(sat_cmd-issue144_always_and_sometimes "sat (always o1[t] = 1) && (sometimes o1[t] = 1)" ": T")
+add_repl_test(sat_cmd-issue144_always_and_sometimes_conflict "sat (always o1[t] = 1) && (sometimes o1[t] = 0)" ": F")
+add_repl_test(sat_cmd-issue144_sometimes_and_sometimes "sat (sometimes o1[t] = 1) && (sometimes o1[t] = 0)" ": T")
+add_repl_test(sat_cmd-issue144_not_sometimes "sat !(sometimes o1[t] = 1)" ": T")
+add_repl_test(sat_cmd-issue144_sometimes_lookback "sat sometimes (o1[t] = 1 && o1[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-issue144_unsat_sometimes_atom "unsat sometimes o1[t] = 1" ": F")

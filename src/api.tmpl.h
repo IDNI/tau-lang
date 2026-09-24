@@ -1251,6 +1251,11 @@ result<bool> api<node>::valid_spec(tref fm) {
 		// Valid iff T (tautology) implies the normalized formula.
 		// Same synthesis-failure gate as realizable() -- see the note there:
 		// is_tau_impl's own result<T> error propagates through r.
+		// Validity quantifies over traces. The safety pipeline reads the
+		// inputs of an always part universally, and the negation of
+		// `sometimes ψ` is `always ¬ψ`, so read every input as an output
+		// first, as the full-LTL branch above does.
+		nfm = inputs_as_outputs<node>(nfm);
 		TAU_TRY_OR(r, is_tau_impl<node>(tau::_T(), nfm),
 			code::internal_error,
 			"is_tau_impl returned neither a value nor an error "

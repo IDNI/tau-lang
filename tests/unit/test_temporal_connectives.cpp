@@ -350,4 +350,16 @@ TEST_SUITE("temporal connectives — valid of full LTL is trace validity") {
 		CHECK(valid_str("(o1[t] = 1) until (o2[t] = 1).")
 			== std::optional<bool>(false));
 	}
+
+	// the negation of F ψ is G ¬ψ, which the safety pipeline decides; an
+	// input in ψ must not be read universally there
+	TEST_CASE("F over an input is not valid in the safety fragment") {
+		CHECK(valid_str("F (i1[t] = 1).") == std::optional<bool>(false));
+		CHECK(valid_str("F (o1[t] = 1 || i1[t] = 1).")
+			== std::optional<bool>(false));
+		CHECK(valid_str("F (i1[t] = 0 || i1[t] != 0).")
+			== std::optional<bool>(true));
+		CHECK(valid_str("(F (i1[t] = 1)) || (G (i1[t] != 1)).")
+			== std::optional<bool>(true));
+	}
 }
