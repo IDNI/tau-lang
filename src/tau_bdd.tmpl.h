@@ -561,36 +561,45 @@ tref tau_term_bdd<node>::build_functional_quantifiers(const quants& q,
 	return r;
 }
 
+/** @internal @copydoc tau_term_bdd::bdd_and_leaves(std::span<const ref>) @endinternal */
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_leaves(
+	std::span<const ref> leaves)
+{
+	using tau = tree<node>;
+	// Leaves are compared by identity and a product is reached in any
+	// grouping and order, so it is spelled from its members in content
+	// order.
+	trefs m;
+	for (ref l : leaves) {
+		if (l == T) continue;
+		if (l == F) return F;
+		get_leaves<node>(tau::get(tau::bf, get_var(l)), tau::bf_and, m);
+	}
+	if (m.empty()) return T;
+	std::sort(m.begin(), m.end(), tau::subtree_less);
+	m.erase(std::unique(m.begin(), m.end(), tau::subtree_equals), m.end());
+	for (tref t : m)
+		if (tau::get(t).child_is(tau::bf_neg) && std::binary_search(
+			m.begin(), m.end(), tau::trim2(t), tau::subtree_less))
+			return F;
+	tref p = m[0];
+	for (size_t i = 1; i < m.size(); ++i) p = tau::build_bf_and(p, m[i]);
+	return add(tau::trim(p));
+}
+
 /** @internal @copydoc tau_term_bdd::bdd_and(ref, tref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
-	using tau = tree<node>;
 	if (x == T) return add(y);
 	if (x == F) return F;
+	// No memo key has a leaf first, so a leaf skips the lookup.
+	if (leaf(x)) return bdd_and_leaves(std::array{x, add(y)});
 #ifdef TAU_CACHE
 	if (auto it = and_memo.find({x, add(y)}); it != and_memo.end())
 		return it->second;
 #endif
 	tref v = get_var(x);
-	if (leaf(x)) {
-		// Leaves are compared by identity and the callers pass the two
-		// factors in either order, so the product is spelled from its
-		// members in content order.
-		trefs m;
-		get_leaves<node>(tau::get(tau::bf, v), tau::bf_and, m);
-		get_leaves<node>(tau::get(tau::bf, y), tau::bf_and, m);
-		std::sort(m.begin(), m.end(), tau::subtree_less);
-		m.erase(std::unique(m.begin(), m.end(), tau::subtree_equals),
-			m.end());
-		for (tref t : m)
-			if (tau::get(t).child_is(tau::bf_neg) && std::binary_search(
-				m.begin(), m.end(), tau::trim2(t), tau::subtree_less))
-				return F;
-		tref p = m[0];
-		for (size_t i = 1; i < m.size(); ++i)
-			p = tau::build_bf_and(p, m[i]);
-		return add(tau::trim(p));
-	}
 	ref r = add(v, bdd_and(get_high(x), y), bdd_and(get_low(x), y));
 #ifdef TAU_CACHE
 	and_memo.emplace(std::array<ref, 2>{x, add(y)}, r);
@@ -1021,12 +1030,7 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 		if (!leaf(v[i])) {
 			m = get_var(v[i]); break;
 		} else if (v[i] == F) return res = F, 1;
-	if (i == v.size()) {
-		// All refs are leaves
-		res = T;
-		for (const ref& el : v) res = bdd_and(res, get_var(el));
-		return 1;
-	}
+	if (i == v.size()) return res = bdd_and_leaves(v), 1;
 	// m becomes smallest variable
 	for (; i != v.size(); ++i)
 		if (!leaf(v[i])) {
@@ -1165,11 +1169,17 @@ void tau_term_bdd<node>::am_sort(refs& b) {
 		else if (!n) { ++n; continue; }
 		else if (b[n] == b[n-1]) b.erase(b.begin() + n);
 		else if (b[n] == bdd_not(b[n-1])) { b = {F}; return; }
-		else if (leaf(b[n]) && leaf(b[n-1])) {
-			b[n-1] = bdd_and(b[n-1], get_var(b[n]));
-			b.erase(b.begin() + n);
-		}
 		else ++n;
+	// Each maximal run of adjacent leaves becomes one leaf, at the place
+	// of the run's first.
+	size_t w = 0;
+	for (size_t i = 0, j; i < b.size(); i = j) {
+		j = i + 1;
+		if (leaf(b[i])) while (j < b.size() && leaf(b[j])) ++j;
+		b[w++] = j - i == 1 ? b[i]
+			: bdd_and_leaves(std::span(b).subspan(i, j - i));
+	}
+	b.resize(w);
 }
 
 /** @internal @copydoc tau_term_bdd::am_simplify(refs&, const std::unordered_map<refs, ref>&) @endinternal */
