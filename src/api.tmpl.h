@@ -605,7 +605,7 @@ bool api<node>::unrealizable(tref fm) {
 template <NodeType node>
 bool api<node>::sat(tref fm) {
 	fm = simplify(fm);
-	return fm && has_no_boolean_combs_of_models<node>(fm) && realizable(fm);
+	return fm && realizable(fm);
 }
 
 template <NodeType node>
@@ -616,13 +616,18 @@ bool api<node>::unsat(tref fm) {
 template <NodeType node>
 bool api<node>::valid(tref fm) {
 	fm = simplify(fm);
-	return fm && has_no_boolean_combs_of_models<node>(fm) && valid_spec(fm);
+	return fm && valid_spec(fm);
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
 	fm = simplify(fm);
-	return fm && is_tau_impl<node>(tau::_T(), normalize_formula(fm));
+	if (!fm) return false;
+	// Validity quantifies over traces, inputs included, while the safety
+	// pipeline reads the inputs of an always part universally.
+	tref nfm = normalize_formula(fm);
+	return nfm && is_tau_impl<node>(tau::_T(),
+		inputs_as_outputs<node>(nfm));
 }
 
 
