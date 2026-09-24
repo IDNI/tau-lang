@@ -51,6 +51,30 @@ TEST_SUITE("Alignments bv[16]") {
 	}
 }
 
+// The step at which a sometimes holds may depend on the inputs: no single
+// step forces it, but every input sequence reaches it
+TEST_SUITE("sometimes over inputs bv[1]") {
+	TEST_CASE("reached at a step that depends on the inputs") {
+		// i1[t] = 0 && i1[t-1] = 1 cannot hold at two steps in a row
+		tref spec = create_spec("sometimes (i1[t]:bv[1] = 1 || i1[t-1]:bv[1] = 0).");
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
+	}
+	TEST_CASE("reached two steps late") {
+		tref spec = create_spec("sometimes (i1[t-1]:bv[1] = 1 || i1[t-2]:bv[1] = 0).");
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(sat.value());
+	}
+	TEST_CASE("avoided by a constant input") {
+		tref spec = create_spec("sometimes i1[t]:bv[1] != i1[t-1]:bv[1].");
+		auto sat = is_tau_formula_sat<node_t>(spec);
+		REQUIRE(sat.has_value());
+		CHECK(!sat.value());
+	}
+}
+
 TEST_SUITE("Alignments bv[4]") {
 	TEST_CASE("greater_lookback_two_st_1") {
 		tref spec = create_spec("(always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 1 }) && (sometimes o2[t-2]:bv[4] = { 0 }).");

@@ -122,6 +122,42 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm).value() );
 	}
 
+	// Satisfiability quantifies the inputs of a `sometimes` universally,
+	// like the inputs of the `always` part (README "Satisfiability").
+	TEST_CASE("is_tau_formula_sat: the inputs of a sometimes are universal") {
+		auto sat = [](const char* spec) {
+			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		// the environment can keep i1 away from 1 forever
+		CHECK( !sat("sometimes i1[t] = 1.") );
+		CHECK( !sat("(always o1[t] = 1) && (sometimes i1[t] = 1).") );
+		// a stronger formula than the unsatisfiable
+		// `(always o1[t] = i1[t]) && (sometimes o1[t] = 1)`
+		CHECK( !sat("(always o1[t] = i1[t]) && "
+			"(sometimes (i1[t] = 1 && o1[t] = 1)).") );
+		CHECK( !sat("(always o1[t] = 0) && (sometimes o1[t] = i1[t]).") );
+		// the output can follow the input at the step it reads it
+		CHECK( sat("sometimes o1[t] = i1[t].") );
+		CHECK( sat("(always o1[t] = i1[t]) && "
+			"(sometimes (i1[t] = 1 -> o2[t] = 1)).") );
+	}
+
+	// The negated side of an implication turns an `always` over inputs
+	// into a `sometimes`, which the check reads through a guard: read
+	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would
+	// imply `always i1[t] = 0`.
+	TEST_CASE("is_tau_impl: T does not imply an always over an input") {
+		tref fm = create_spec("always i1[t] = 0.");
+		auto impl = is_tau_impl<node_t>(tau::_T(), fm);
+		REQUIRE( impl.has_value() );
+		CHECK( !impl.value() );
+		auto eq = are_tau_equivalent<node_t>(tau::_T(), fm);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
+	}
+
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
 	// direct tests. Formulas from its doc example at src/satisfiability.h:162-171.
 	TEST_CASE("are_tau_equivalent: equivalent pair") {
@@ -615,6 +651,22 @@ TEST_SUITE("satisfiability helpers") {
 		auto res = transform_to_eventual_variables<node_t>(fm, true, 0);
 		CHECK( res.first == fm );
 		CHECK( res.second == 0 );
+	}
+
+	TEST_CASE("transform_to_eventual_variables: guards the inputs of a sometimes only on request") {
+		tref fm = create_spec("sometimes o1[t] = i1[t].");
+		auto has_uconst = [](tref f) {
+			return tau::get(f).find_top(
+				is_child<node_t, tau::uconst_name>) != nullptr;
+		};
+		auto universal = transform_to_eventual_variables<node_t>(
+								fm, true, 0);
+		REQUIRE( universal.first != nullptr );
+		CHECK( !has_uconst(universal.first) );
+		auto guarded = transform_to_eventual_variables<node_t>(
+				fm, true, 0, sometimes_inputs::guarded);
+		REQUIRE( guarded.first != nullptr );
+		CHECK( has_uconst(guarded.first) );
 	}
 
 	TEST_CASE("transform_to_eventual_variables: introduces an _eN flag stream") {

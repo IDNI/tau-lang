@@ -766,18 +766,18 @@ struct api {
 	/// @copydoc unrealizable(const std::string&)
 	static result<bool> unrealizable(htref spec);
 
-	/// Check satisfiability: does some trace satisfy the formula?
-	/// realizable(fm) implies sat(fm), never the converse, so this is a
-	/// weaker question than realizable() and can answer true where
-	/// realizable() answers false. A spec root (what get_spec yields) is
-	/// unwrapped to its main formula with its definitions applied. Merges
-	/// top-level G-conjuncts before checking; a formula with a stream
-	/// variable and no temporal quantifier is read as its implicit
-	/// `always`, so a one-step solver answer only decides unsat. For
-	/// genuinely full-LTL content with no realizable program, the verdict
-	/// is undecided (an error result), not false. A closed formula that
-	/// normalization leaves undecided is an error whose message starts
-	/// with "UNKNOWN:" (`code::solver_error`), never false.
+	/// Check satisfiability as README "Satisfiability" defines it: for
+	/// all inputs there exist outputs at each step, quantified in time
+	/// order, such that the formula holds. Input streams are read
+	/// universally under `sometimes` too, so `sometimes i1[t] = 1` is
+	/// unsatisfiable. For full LTL the verdict is realizability, and
+	/// realizable(fm) implies sat(fm). A spec root (what get_spec yields)
+	/// is unwrapped to its main formula with its definitions applied.
+	/// Merges top-level G-conjuncts before checking; a formula with a
+	/// stream variable and no temporal quantifier is read as its implicit
+	/// `always`, so a one-step solver answer only decides unsat. A closed
+	/// formula that normalization leaves undecided is an error whose
+	/// message starts with "UNKNOWN:" (`code::solver_error`), never false.
 	static result<bool> sat(const std::string& formula);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(tref formula);
