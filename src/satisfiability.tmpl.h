@@ -188,10 +188,10 @@ tref transform_io_var(tref io_var, int_t time_point) {
  * Constant-time (initial-condition) variables in @p io_vars are skipped,
  * as are streams whose value at @p time_point is predefined by
  * @p initials; each remaining output stream name is quantified once.
- * The bound variables are deliberately not renamed: the phi/chi
- * unrolling (`build_step`/`build_step_chi`) splices later steps
- * underneath the quantifiers built here, and their lookback occurrences
- * must be captured by exactly these binders.
+ * The bound variables are deliberately not renamed: the phi unrolling
+ * (`build_step`) splices later steps underneath the quantifiers built
+ * here, and their lookback occurrences must be captured by exactly these
+ * binders.
  * @tparam node Tree node type.
  * @param fm Formula to quantify.
  * @param io_vars IO variable nodes of the surrounding formula.
@@ -411,51 +411,6 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) 
 
 /**
  * @internal
- * @brief Build step 0 of the chi unrolling (`find_fixpoint_chi`): the
- * always-part and the sometimes-flag formula instantiated at
- * @p time_point, with the flag part hidden behind a placeholder atom.
- *
- * Both @p chi and @p st are instantiated at @p time_point; instead of
- * conjoining the instantiated @p st directly, the placeholder atom
- * `_pholder[time_point] = 0` is conjoined and mapped to it in
- * @p pholder_to_st. The placeholder marks the splice point at which
- * `build_step_chi` inserts step 1; callers recover the real formula by
- * replacing every placeholder via @p pholder_to_st. Unlike later steps,
- * step 0 carries no quantifier prefix.
- * @tparam node Tree node type.
- * @param chi Always-part local specification driving the recurrence.
- * @param st Eventual-variable flag formula tracked by the unrolling.
- * @param io_vars IO variable nodes appearing in @p chi and @p st.
- * @param time_point Time step at which the unrolling starts.
- * @param pholder_to_st [in,out] Map extended with the placeholder atom
- * mapped to the instantiated @p st.
- * @return Pair `(chi@time_point && placeholder, placeholder)`; the
- * second element seeds `build_step_chi`'s @p cached_fm splice cursor.
- * @endinternal
- */
-template <NodeType node>
-std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
-	const trefs& io_vars, int_t time_point, auto& pholder_to_st)
-{
-	using tau = tree<node>;
-	subtree_map<node, tref> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
-		changes[io_vars[i]] = new_io_var;
-	}
-	// SO-9: same type as build_step_chi's placeholder -- each is only
-	// used as its own replace key, but the asymmetry invited bugs.
-	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point,
-		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
-	c_pholder = tau::build_bf_eq_0(c_pholder);
-	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
-	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
-					 c_pholder);
-	return std::make_pair(new_fm, c_pholder);
-}
-
-/**
- * @internal
  * @brief Extend the phi unrolling (`find_fixpoint_phi`) by one step:
  * instantiate @p original_fm at time `time_point + step_num`, wrap it in
  * that step's time-compatible quantifier prefix, and splice it into the
@@ -510,74 +465,34 @@ tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 
 /**
  * @internal
- * @brief Extend the chi unrolling (`find_fixpoint_chi`) by one step:
- * instantiate @p chi and @p st at time `time_point + step_num`, hide the
- * instantiated @p st behind a fresh placeholder, quantify the step, and
- * splice it into @p prev_fm as the alternative of raising the flag one
- * step later.
+ * @brief Move every constant-time IO variable of @p fm whose time point is at
+ * least @p from by @p delta steps.
  *
- * The new step `chi@n && _pholder@n` (with `_pholder@n` mapped to the
- * instantiated @p st in @p pholder_to_st) is quantified
- * `all inputs ex outputs` at its time point and spliced in by replacing
- * @p cached_fm — the previous step's placeholder atom — with
- * `cached_fm || <quantified new step>`. After placeholder substitution
- * chi therefore reads "the always-part holds and the flag is raised
- * now, or one step later, or ...", one disjunctive layer per step. When
- * @p st is `T` (empty sometimes clause) the previous placeholder is
- * replaced instead of disjoined.
+ * Variables below @p from (initial conditions) stay put. All occurrences are
+ * replaced at once, so a variable moved onto the time point of another one
+ * is not moved again.
  * @tparam node Tree node type.
- * @param chi Always-part local specification driving the recurrence.
- * @param st Eventual-variable flag formula tracked by the unrolling.
- * @param prev_fm Chi telescope built so far (steps `0..step_num-1`),
- * still containing placeholders.
- * @param io_vars IO variable nodes appearing in @p chi and @p st.
- * @param initials Set of `(variable name, time point)` pairs predefined
- * by explicit initial conditions (not re-quantified).
- * @param step_num Index of the step to add; must be `> 0` (step 0 is
- * `build_initial_step_chi`).
- * @param time_point Time step at which the unrolling started.
- * @param cached_fm [in,out] Splice cursor: on entry the previous step's
- * placeholder atom, on exit the new step's.
- * @param pholder_to_st [in,out] Map extended with the new placeholder
- * atom mapped to the instantiated @p st.
- * @return @p prev_fm with the new step spliced in (placeholders intact).
+ * @param fm Formula whose IO variables all refer to constant time points.
+ * @param from Smallest time point that moves.
+ * @param delta Number of steps to move by; may be negative.
+ * @return @p fm with the moved variables.
  * @endinternal
  */
 template <NodeType node>
-tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
-	const auto& initials, int_t step_num, int_t time_point, tref& cached_fm,
-	auto& pholder_to_st)
-{
+tref shift_state_io_vars(tref fm, int_t from, int_t delta) {
 	using tau = tree<node>;
-	// Use build_initial_step otherwise
-	DBG(assert(step_num > 0);)
 	subtree_map<node, tref> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(
-					io_vars[i], time_point + step_num);
-		changes[io_vars[i]] = new_io_var;
+	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+		DBG(assert(is_io_initial<node>(v));)
+		const int_t tp = get_io_time_point<node>(v);
+		if (tp < from || changes.contains(v)) continue;
+		const size_t type = tau::get(v).get_ba_type();
+		tref name = get_var_name_node<node>(v);
+		changes.emplace(v, tau::trim(tau::get(v).is_input_variable()
+			? build_in_var_at_n<node>(name, tp + delta, type)
+			: build_out_var_at_n<node>(name, tp + delta, type)));
 	}
-	// We need a placeholder symbol in order to substitute during the next step
-	tref c_chi = rewriter::replace<node>(chi, changes);
-	tref c_pholder = build_out_var_at_n<node>("_pholder",
-							time_point + step_num,
-							get_ba_type_id<node>(pack_bool_carrier_type<node>()));
-	c_pholder = tau::build_bf_eq_0(c_pholder);
-	tref c_st = rewriter::replace<node>(st, changes);
-	pholder_to_st.emplace(c_pholder, c_st);
-	// Quantify formula which is to be added to chi
-	tref q_most_inner_step = existentially_quantify_output_streams<node>(
-		tau::build_wff_and(c_chi, c_pholder), io_vars,
-		time_point + step_num, initials);
-	q_most_inner_step = universally_quantify_input_streams<node>(
-		q_most_inner_step, io_vars, time_point + step_num, initials);
-	// If build_step_chi is used with empty sometimes clause
-	if (tau::get(st).equals_T())
-		changes = { { cached_fm,  q_most_inner_step } };
-	else changes = { { cached_fm,
-			tau::build_wff_or(cached_fm, q_most_inner_step) }};
-	cached_fm = c_pholder;
-	return rewriter::replace<node>(prev_fm, changes);
+	return rewriter::replace<node>(fm, changes);
 }
 
 /**
@@ -880,68 +795,87 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 
 /**
  * @internal
- * @brief Compute the unbounded continuation of the combined always/flag
- * ("chi") state used to decide whether a `sometimes` clause's guard flag
- * can ever be raised, by repeatedly unrolling one more time step
- * (`build_step_chi`) and checking for a fixpoint against the previous
- * step's (placeholder-substituted) formula.
+ * @brief Compute the set of states of the combined always/flag ("chi")
+ * recurrence from which a `sometimes` clause's flag can still be raised,
+ * as the least fixpoint of a backward reachability iteration.
+ *
+ * Writing `chi@tp` and `st@tp` for @p chi_base and @p st instantiated at
+ * @p time_point, and `Q` for the time-compatible quantification
+ * `all i[tp+1] ex o[tp+1]`, the iterates are
+ * `chi_0 = chi@tp && st@tp` and
+ * `chi_{n+1} = chi@tp && (st@tp || Q chi_n')`, where `chi_n'` is `chi_n`
+ * with its state (every variable at @p time_point minus the lookback or
+ * later) moved one step forward. `chi_n` holds exactly in the states from
+ * which the flag can be raised within `n` steps. Every iterate is
+ * normalized, so its size stays bounded by the state and does not grow
+ * with `n`.
+ *
+ * Each step adds one more chance to raise the flag, so the iterates only
+ * weaken and the fixpoint is reached once `chi_{n+1} -> chi_n`. With
+ * @p st `T` the flag part is absent, `chi_{n+1} = chi@tp && Q chi_n'`,
+ * the iterates only strengthen and the test is `chi_n -> chi_{n+1}`.
  * @tparam node Tree node type.
  * @param chi_base Always-part local specification driving the recurrence.
  * @param st Eventual-variable flag formula (from
  * `transform_to_eventual_variables`) whose satisfiability is being
  * tracked.
- * @param io_vars IO variable nodes appearing in `chi_base`.
+ * @param io_vars IO variable nodes appearing in `chi_base` and `st`.
  * @param initials Set of `(variable name, time point)` pairs marking
  * positions predefined by explicit initial conditions.
- * @param time_point Time step at which unrolling starts.
+ * @param time_point Time step at which the state is anchored; the
+ * initial conditions must all lie before @p time_point minus the lookback.
  * @return A `result` carrying the pair `(chi, steps)`: `chi` is the
- * (placeholder-substituted) formula at the fixpoint and `steps` is the
- * number of steps taken. A failed result means the step cap
+ * normalized fixpoint over constant-time variables anchored at
+ * @p time_point, and `steps` is the number of steps taken. A failed
+ * result means a normalization failed or the step cap
  * (`max_fixpoint_steps`) was hit before a fixpoint was reached.
  * @endinternal
  *
  * @par Example
- * Like `find_fixpoint_phi`, this operates on partially unrolled,
- * placeholder-substituted AST state rather than a parseable spec string,
- * so the following is illustrative only. `to_unbounded_continuation` calls
- * `find_fixpoint_chi` only after the initial segment up to
- * `flag_boundary` failed to raise the flag directly; it then unrolls the
- * always-part together with the flag recurrence until two consecutive
- * steps agree (up to implication), yielding a formula describing every
- * time point from which the flag could still be raised, or `F` once
- * normalized if it never can be (see the "flag_boundary" tests in
- * tests/integration/test_integration-solver.cpp:841-878 for concrete
- * sat/unsat outcomes of this overall code path).
+ * For the always-part `o2[t] = o1[t-1] && o3[t] = o2[t-1] &&
+ * o4[t] = o3[t-1]` and the flag `o4[t] = 1` anchored at 1, `chi_n` accepts
+ * the states where one of `o4[1]`, `o3[1]`, ... already carries the 1
+ * that reaches `o4` within `n` steps; the free `o1` makes every state
+ * reach it, so the fixpoint is `chi@1` after four steps
+ * (tests/integration/test_integration-satisfiability6.cpp).
  */
 template <NodeType node>
 result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 	const trefs& io_vars, const auto& initials, int_t time_point)
 {
+	using tau = tree<node>;
 	result<std::pair<tref, int_t>> r;
-	subtree_map<node, tref> pholder_to_st;
-	auto [chi_prev, cache] = build_initial_step_chi<node>(
-		chi_base, st, io_vars, time_point, pholder_to_st);
+	const int_t lookback = get_max_shift<node>(io_vars);
+	const int_t first_state = time_point - lookback;
+	const bool weakening = !tau::get(st).equals_T();
+	const tref chi_now = fm_at_time_point<node>(chi_base, io_vars,
+								time_point);
+	const tref st_now = fm_at_time_point<node>(st, io_vars, time_point);
 
-	int_t lookback = get_max_shift<node>(io_vars);
-	int_t step_num = 1;
-
-	tref chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
-		 initials, step_num, time_point, cache, pholder_to_st);
-
-	tref chi_replc = rewriter::replace<node>(chi, pholder_to_st);
-	tref chi_prev_replc = rewriter::replace<node>(chi_prev, pholder_to_st);
-
-	LOG_DEBUG << "Continuation at step " << step_num << ": "
-			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
-
-	// Find fix point once the lookback is greater the step_num
-	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
-	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
+	auto step = [&](tref prev) {
+		tref next = shift_state_io_vars<node>(prev, first_state, 1);
+		next = existentially_quantify_output_streams<node>(
+			next, io_vars, time_point + 1, initials);
+		next = universally_quantify_input_streams<node>(
+			next, io_vars, time_point + 1, initials);
+		if (weakening) next = tau::build_wff_or(st_now, next);
+		return normalize_non_temp<node>(tau::build_wff_and(chi_now, next));
+	};
 	auto impl = [](tref a, tref b) {
 		auto ir = is_nso_impl<node>(a, b);
 		return ir.has_value() && ir.value();
 	};
-	while (step_num < lookback || !impl(chi_prev_replc, chi_replc))
+
+	TAU_TRY(tref chi_prev, normalize_non_temp<node>(
+					tau::build_wff_and(chi_now, st_now)));
+	int_t step_num = 1;
+	TAU_TRY(tref chi, step(chi_prev));
+	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(chi);
+
+	// SO-1: same unbounded-search concern as find_fixpoint_phi above, and
+	// the same cap (global max_fixpoint_steps, default 500, 0 = unlimited).
+	while (step_num < lookback || !(weakening ? impl(chi, chi_prev)
+						: impl(chi_prev, chi)))
 	{
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
@@ -954,23 +888,15 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 				"0 = unlimited) to decide this specification",
 				{{label::limit, max_fixpoint_steps}});
 		}
-		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
-
-		chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
-			initials, step_num, time_point, cache, pholder_to_st);
-		chi_replc = rewriter::replace<node>(chi, pholder_to_st);
-
+		chi_prev = chi, ++step_num;
+		TAU_TRY(chi, step(chi_prev));
 		LOG_DEBUG << "Continuation at step " << step_num << ": "
-			<< LOG_FM(chi_replc);
+			<< LOG_FM(chi);
 	}
-	auto normed_trace = normalize_non_temp<node>(chi_prev_replc);
-	std::string trace_str = normed_trace.has_value()
-		? tree<node>::get(normed_trace.value()).to_str()
-		: "<normalization failed>";
 	LOG_DEBUG << "Unbounded continuation of Tau formula "
 		<< "reached fixpoint after " << step_num - 1 << " steps: "
-		<< trace_str;
-	return r.with_value(std::make_pair(chi_prev_replc, step_num - 1));
+		<< LOG_FM(chi_prev);
+	return r.with_value(std::make_pair(chi_prev, step_num - 1));
 }
 
 /**
@@ -988,7 +914,7 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
  * initial conditions and stay constant.
  * @tparam node Tree node type.
  * @param fm Formula over constant-time IO variables, as produced by
- * `find_fixpoint_phi`/`find_fixpoint_chi` after normalization.
+ * `find_fixpoint_phi` after normalization.
  * @param highest_init_cond Greatest time point still predefined by an
  * explicit initial condition.
  * @return @p fm with all non-initial IO variables made relative again.
@@ -1787,10 +1713,11 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 			TAU_TO_STR(tau::_F()), output);
 		return r.with_value(tau::_F());
 	}
-	chi_inf = transform_back_non_initials<node>(chi_inf, point_after_inits-1);
-	io_vars = tau::get(chi_inf).select_top(is_child<node, tau::io_var>);
-	auto chi_inf_anchored = fm_at_time_point<node>(chi_inf, io_vars,
-				std::max(point_after_inits, time_point));
+	// chi_inf is anchored at time_point + point_after_inits; its state
+	// starts at point_after_inits and moves as a whole to the new anchor.
+	auto chi_inf_anchored = shift_state_io_vars<node>(chi_inf,
+		point_after_inits, std::max(point_after_inits, time_point)
+					- (time_point + point_after_inits));
 
 	LOG_TRACE << "Fm to check sat: "
 			<< LOG_FM(tau::build_wff_and(run, chi_inf_anchored));
