@@ -29,6 +29,7 @@ set(TESTS
 	anti_prenex_layer5
 	anti_prenex_expand
 	anti_prenex_decompose
+	anti_prenex_layer6
 	adt_flatten
 	adt_parsing
 	adt_types

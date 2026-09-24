@@ -26,8 +26,8 @@
 //  DORMANT, written and guarded: "the quantifier is actually eliminated" and
 //  the shapes that depend on it. Each carries `resolved_from_layer(N)`
 //  against the `built_layer` constant below, so an assertion switches on with
-//  the machinery it needs: 4 the block driver, 5 the cheap push steps, 6
-//  decomposition and `EXPAND`, 8 the bitvector method.
+//  the machinery it needs: 4 the block driver, 5 the cheap push steps, 8 the
+//  bitvector method.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
 // juxtaposition is conjunction, so every input keeps its parentheses.
@@ -44,7 +44,7 @@ namespace {
 
 /// The layer this module is built to. The dormant tier is keyed on it.
 /// Raising it switches on the assertions that layer makes true.
-constexpr int built_layer = 5;
+constexpr int built_layer = 6;
 
 /// A DORMANT claim's guard: true once the layer that makes it true is built.
 bool resolved_from_layer(int n) { return n <= built_layer; }
@@ -221,12 +221,12 @@ TEST_CASE("R7: a pin under a disjunction still witnesses") {
 
 TEST_CASE("R8: a mixed block — one variable pins, the other needs the push") {
 	// AntiPrenexBlock0Arg / "trivial_skolem wiring: mixed block falls back
-	// safely": `x` occurs once, in `x = c` under a disjunction; `y` occurs
-	// in two disjuncts, which only the decomposition can take apart.
+	// safely": phase 2's deep witness takes `x` through the disjunction (§3),
+	// and fast path 2b squeezes what is left, `∃y(y·z = 0 ∨ y·w = 0)`, to T.
 	tref got = anti_prenexed(
 		parse("ex x ex y ((x = c || z = 0) && (yz = 0 || yw = 0))."));
 	CHECK(!holds_var(got, "x"));
-	if (resolved_from_layer(6)) {
+	if (resolved_from_layer(5)) {
 		CHECK(!holds(got, tau::wff_ex));
 		CHECK(!holds_var(got, "y"));
 	}
