@@ -1740,7 +1740,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 			return r.with_assert_check_error(code::internal_error, "Type inference failed");
 		}
 		defs.get_io_context()->update_types(infer_result.second);
-		defs.set_global_scope(std::move(infer_result.second));
+		defs.merge_global_scope(infer_result.second);
 
 		// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.
 		// This arises because the CFG parser is ambiguous: G(X) && G(Y) can

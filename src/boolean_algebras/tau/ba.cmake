@@ -7,4 +7,5 @@ set(TAU_BA_TESTS
 	tests/test_unit-normalized_memo-tau.cpp
 	tests/test_unit-normalized_conjunction-tau.cpp
 	tests/test_unit-normalized_without-tau.cpp
+	tests/test_unit-type_scope_seed-tau.cpp
 )
