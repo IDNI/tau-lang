@@ -36,6 +36,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 	subtree_set<node> upper_strict;    // { fv : var < fv }
 	subtree_set<node> upper_nonstrict; // { fv : var <= fv }
 	subtree_set<node> eq_free;         // { fv : var = fv }
+	subtree_set<node> neq_free;        // { fv : var != fv }
 	std::function<void(tref)> collect = [&](tref n) {
 		if (!n || undetermined || acc.is_empty()) return;
 		const auto& t = tau::get(n);
@@ -95,7 +96,11 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 				}
 				// ∃x.(x ≠ free_var) ≡ T over DLO for any free_var.
 				// bf_neq is symmetric so direction flip doesn't change it.
-				if (raw_op == tau::bf_neq && !negate) return;
+				if (raw_op == tau::bf_neq && !negate) {
+					neq_free.insert(var_in_lhs ? rhs_t
+						: lhs_t);
+					return;
+				}
 				// Symbolic free-variable endpoints: classify into lower/upper
 				// bounds so we can detect contradictions like a<var && var<a.
 				// Determine effective direction (normalise to var <op> fv).
@@ -121,7 +126,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 				else if (eff_op == tau::bf_gt)    lower_strict.insert(fv_tree);
 				else if (eff_op == tau::bf_gteq)  lower_nonstrict.insert(fv_tree);
 				else if (eff_op == tau::bf_eq)    eq_free.insert(fv_tree);
-				else if (eff_op == tau::bf_neq)   { /* var != fv: always sat over DLO */ }
+				else if (eff_op == tau::bf_neq)   neq_free.insert(fv_tree);
 				else { undetermined = true; }
 				return;
 			}
@@ -280,6 +285,19 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 					.lo.val.is_neg_inf())
 			undetermined = true;
 	}
+	// A symbolic disequality removes one point: it cannot empty a set with
+	// an interior point, but it can empty a point (an equality, the
+	// non-strict cycle through one endpoint, or a constant singleton).
+	if (!undetermined && !acc.is_empty() && !neq_free.empty()) {
+		const bool pinned_sym = !eq_free.empty()
+			|| (!lower_nonstrict.empty() && !upper_nonstrict.empty());
+		bool has_interior = false;
+		for (const auto& piece : acc.pieces)
+			if (qlt_sem_cmp(piece.lo.val, piece.hi.val)
+				== std::partial_ordering::less)
+				has_interior = true;
+		if (pinned_sym || !has_interior) undetermined = true;
+	}
 	if (undetermined) {
 		// If we already derived an empty interval symbolically, prefer that
 		// (it is a definitive answer; the BA fallback would wrongly say SAT).
@@ -308,6 +326,89 @@ static std::optional<bool> qlt_omcat_qe(tref var, tref body) {
 	auto interval = qlt_dlo_qe_interval<node>(var, inner);
 	if (!interval) return std::nullopt;
 	return universal ? interval->is_full() : !interval->is_empty();
+}
+
+// Fourier-Motzkin elimination for the dense order without
+// endpoints that qlt_dlo_qe_interval reasons in. For body a conjunction of
+// atoms `L op var` / `var op U` (op among <, <=, >, >= and their negations)
+// whose var side is var itself and whose other side does not mention var,
+//   ex var (/\ L_i <_i var  /\  var <_j U_j)  ==  /\ L_i <_ij U_j
+// where <_ij is strict iff either bound is strict. Density gives a point
+// strictly between L and U, and the absence of endpoints the one-sided case
+// (which qlt_dlo_qe_interval already decides, so only the two-sided case is
+// answered here). Anything else -- an equality, a disequality (it needs a
+// case split), a compound term, a typed 0/1 sentinel (an endpoint) --
+// returns nullptr and leaves the binder in place.
+template<NodeType node>
+static tref qlt_dlo_fm_residual(tref var, tref body) {
+	using tau = tree<node>;
+	tref inner = body;
+	if (const auto& t = tau::get(body); t.has_child()
+		&& t[0].value.nt == tau::wff_ex) inner = t[0].second();
+	std::vector<std::pair<tref, bool>> lower, upper; // (term, strict)
+	auto is_bare_var = [&](tref side) {
+		const auto& st = tau::get(side);
+		return st.is(tau::bf) && st.has_child()
+			&& tau::get(st.first()) == tau::get(var);
+	};
+	auto is_sentinel = [](tref side) {
+		const auto& st = tau::get(side);
+		return st.has_child() && (st[0].is(tau::bf_f) || st[0].is(tau::bf_t));
+	};
+	std::function<bool(tref)> collect = [&](tref n) -> bool {
+		const auto& t = tau::get(n);
+		if (t.equals_T()) return true;
+		if (!t.is(tau::wff) || !t.has_child()) return false;
+		auto op = t[0].value.nt;
+		if (op == tau::wff_and)
+			return collect(t[0].first()) && collect(t[0].second());
+		bool negate = false;
+		const tree<node>* at = &t[0];
+		if (op == tau::wff_neg) {
+			const auto& ti = tau::get(t[0].first());
+			if (!ti.is(tau::wff) || !ti.has_child()) return false;
+			at = &ti[0];
+			op = ti[0].value.nt;
+			negate = true;
+		}
+		if      (op == tau::bf_ngt)   op = tau::bf_lteq;
+		else if (op == tau::bf_nlt)   op = tau::bf_gteq;
+		else if (op == tau::bf_ngteq) op = tau::bf_lt;
+		else if (op == tau::bf_nlteq) op = tau::bf_gt;
+		if (op != tau::bf_lt && op != tau::bf_lteq
+			&& op != tau::bf_gt && op != tau::bf_gteq) return false;
+		tref lhs = at->first(), rhs = at->second();
+		const bool in_l = contains<node>(lhs, var);
+		const bool in_r = contains<node>(rhs, var);
+		if (in_l == in_r) return false;
+		if (!is_bare_var(in_l ? lhs : rhs)) return false;
+		tref other = in_l ? rhs : lhs;
+		if (is_sentinel(other)) return false;
+		// Normalise to `var op other`.
+		if (in_r) {
+			if      (op == tau::bf_lt)   op = tau::bf_gt;
+			else if (op == tau::bf_gt)   op = tau::bf_lt;
+			else if (op == tau::bf_lteq) op = tau::bf_gteq;
+			else                         op = tau::bf_lteq;
+		}
+		if (negate) {
+			if      (op == tau::bf_lt)   op = tau::bf_gteq;
+			else if (op == tau::bf_gt)   op = tau::bf_lteq;
+			else if (op == tau::bf_lteq) op = tau::bf_gt;
+			else                         op = tau::bf_lt;
+		}
+		if (op == tau::bf_lt || op == tau::bf_lteq)
+			upper.emplace_back(other, op == tau::bf_lt);
+		else lower.emplace_back(other, op == tau::bf_gt);
+		return true;
+	};
+	if (!collect(inner) || lower.empty() || upper.empty()) return nullptr;
+	trefs out;
+	for (const auto& [l, ls] : lower)
+		for (const auto& [u, us] : upper)
+			out.push_back(ls || us ? tau::build_bf_lt(l, u)
+				: tau::build_bf_lteq(l, u));
+	return tau::build_wff_and(out);
 }
 
 } // namespace idni::tau_lang

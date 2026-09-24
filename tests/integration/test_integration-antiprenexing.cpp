@@ -333,7 +333,8 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 // rewritten to T -- but over Q the truth is `a < b`, false at a = b.
 // resolve_quantifiers' omcat branch already gates on a closed scope; the
 // leaf-clause call site (eliminate_block_over_clause's qlt/DLO branch) keeps
-// the binder when an ordering atom survives an undetermined interval.
+// the binder when an ordering atom survives an undetermined interval, unless
+// the owning BA eliminates it into a residual formula.
 #ifdef TAU_PACK_HAS_BA_QLT
 TEST_SUITE("AN-1 symbolic qlt bounds") {
 
@@ -342,8 +343,10 @@ TEST_SUITE("AN-1 symbolic qlt bounds") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( !tau::get(res).equals_T() );
-		// The binder survives (elimination declined).
+		// Density eliminates the binder exactly, leaving `a < b`.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
+			== nullptr );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>)
 			!= nullptr );
 	}
 

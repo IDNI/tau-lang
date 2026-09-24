@@ -680,6 +680,26 @@ std::optional<bool> pack_omcat_qe(size_t ba_type_id, tref var, tref body) {
 }
 
 /**
+ * @brief Ask the BA owning @p ba_type_id for a quantifier-free formula
+ * equivalent to `ex var. body`.
+ *
+ * The complement of @ref pack_omcat_qe for a body whose truth depends on the
+ * other variables (`ex x (a < x && x < b)` is `a < b`), which that capability
+ * can only answer "undetermined". nullptr when no BA owns the type, its owner
+ * has no residual elimination, or the body is outside what it eliminates.
+ */
+template <typename Node>
+tref pack_omcat_qe_residual(size_t ba_type_id, tref var, tref body) {
+	return pack_owner_apply<Node>(ba_type_id, [&]<typename BA>()
+		-> std::optional<tref> {
+			if constexpr (ba_has_omcat_qe_residual<Node, BA>)
+				return ba_descriptor<BA, Node>
+					::omcat_qe_residual(var, body);
+			return nullptr;
+		}).value_or(nullptr);
+}
+
+/**
  * @brief Revise @p clause against @p update through a BA's winning region.
  *
  * Takes no type id: the capability decides for itself whether the clause is

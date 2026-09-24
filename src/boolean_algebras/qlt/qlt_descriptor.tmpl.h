@@ -26,6 +26,9 @@ template <NodeType node>
 static std::optional<bool> qlt_omcat_qe(tref var, tref body);
 
 template <NodeType node>
+static tref qlt_dlo_fm_residual(tref var, tref body);
+
+template <NodeType node>
 static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
 	const inequality_system<node>& sys, const solver_options& options);
 
@@ -185,6 +188,14 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 */
 	static std::optional<bool> omcat_qe(tref var, tref body) {
 		return qlt_omcat_qe<node_t>(var, body);
+	}
+
+	/**
+	 * @brief Eliminate an existential qlt variable bounded on both sides
+	 * by other terms (Fourier-Motzkin for a dense order).
+	 */
+	static tref omcat_qe_residual(tref var, tref body) {
+		return qlt_dlo_fm_residual<node_t>(var, body);
 	}
 
 	/** @brief A rational witness for @p var, spelled for generated C++. */
