@@ -14,7 +14,8 @@
  * question, `try_fast_paths` (push/fast_paths.h) for 2a and 2b,
  * `try_witness` and `try_case_witness` (witness/witness.h) for the two pin
  * matches, `subst_var` (foundations/subst.h) with `simplify`
- * (normalisers/simplify.h) for a branch's copy, and `expand`
+ * (normalisers/simplify.h) for a branch's copy, `try_decompose`
+ * (push/decompose.h) for the licensed decomposition, and `expand`
  * (push/expand.h) for the floor.
  *
  * `push_block` — the hub, `push/push_block.h` — is what every re-entry goes
@@ -161,9 +162,10 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		return acc.result();
 	}
 
-	// 6. THE FLOOR: `∃X` distributed over ONE disjunctive conjunct in
-	// exclusive cases (§6); what its budget refuses re-wraps in there
-	// (invariant 3).
+	// 6. THE LICENSED DECOMPOSITION, then the expansion, the floor (§6);
+	// what the budget refuses re-wraps in there (invariant 3).
+	if (const std::optional<tref> r = try_decompose<node>(psi, X, c))
+		return *r;
 	return expand<node>(psi, X, c);
 }
 

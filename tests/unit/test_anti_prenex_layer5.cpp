@@ -21,9 +21,7 @@
 // Then ONE SHAPE CLAIM, the strict criterion: `binder_count == 0` and the
 // value for an input the ladder RESOLVES, the binder count for one that WAITS,
 // re-wrapped over an opaque shape or a spent expansion budget (invariant 3).
-// §6's licensed decomposition is not carried, so the conjunction's floor
-// expands without trying it first. Each case's comment names the route its
-// input takes.
+// Each case's comment names the route its input takes.
 //
 // The inputs come, and nothing else does, from the suite of the old module,
 // tests/unit/test_antiprenexing.cpp, at the line each case names; every
@@ -410,14 +408,14 @@ TEST_CASE("L23: a block of three one-variable components resolves") {
 }
 
 TEST_CASE("L24: a bitvector run under a reference waits, structurally") {
-	// test_antiprenexing.cpp:1556, checked structurally. The floor expands
-	// the `∃a` clause into two cases, and in each the bitvector leaf, which
-	// has no method (§7), re-wraps its `∃a` atom; `q(y)` stays opaque (§4).
+	// test_antiprenexing.cpp:1556. The decomposition splits on the bitvector
+	// atom; the leaf, which has no method (§7), re-wraps each arm's `∃a`
+	// atom, and `q(y)` stays opaque (§4).
 	const tref got = anti_prenexed(
 		parse("ex a all y ex z "
 			"(((a:bv[2] + { 1 }:bv[2] = { 0 }:bv[2]) <-> q(y)) "
 			"&& z = 0)."), false);
-	waits(got, 5);
+	waits(got, 4);
 	CHECK(holds(got, tau::wff_ref));
 	CHECK(!holds_var(got, "z"));
 }

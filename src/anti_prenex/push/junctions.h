@@ -5,7 +5,7 @@
  * @brief §6 the push over a JUNCTION: 2d, which hands `∃X` to each disjunct
  * of a disjunction, and the conjunction's ladder — scope narrowing, the fast
  * paths, the consistency check, the witness step and the case witness —
- * whose floor is the expansion.
+ * which ends in the licensed decomposition, then the expansion, the floor.
  *
  * WHAT ARRIVES is what `PUSH_BLOCK`'s wrapper leaves: `X` non-empty and
  * narrowed to `X ∩ FV(φ)`, and, for a conjunction, every conjunct touching
@@ -16,8 +16,8 @@
  * CHEAPEST CLASS FIRST (invariant 8): the narrowing's two moves and the fast
  * paths are one traversal each, the consistency check is one question to §7,
  * and the binder-killing steps come next — the pin, then the case pin, which
- * copies one branch at a time — above the floor, the one step that
- * multiplies.
+ * copies one branch at a time — above the licensed decomposition, two arms
+ * on one atom, and the floor, which multiplies.
  *
  * `push/push_block.h` is the hub that includes this file, after `push_block`
  * is declared: the template bodies here call it back.
@@ -38,6 +38,7 @@
 #include "../eliminate/eliminate_block.h"
 #include "fast_paths.h"
 #include "expand.h"
+#include "decompose.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
@@ -80,8 +81,11 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c);
  *    binder, and what is left is pushed on under the smaller block.
  * 5. THE CASE WITNESS, whose rewrite is emitted branch by branch, so that a
  *    branch deciding `T` leaves every later copy unbuilt.
- * 6. THE FLOOR: the expansion (`push/expand.h`), `∃X` distributed over one
- *    disjunctive conjunct in exclusive cases; what its budget refuses
+ * 6. THE LICENSED DECOMPOSITION (`push/decompose.h`), one Boole split on an
+ *    atom whose two signs span sibling disjunctive conjuncts, taken when its
+ *    cofactors separate material rather than copy it; then THE FLOOR, the
+ *    expansion (`push/expand.h`), `∃X` distributed over one disjunctive
+ *    conjunct in exclusive cases. What the budget they share refuses
  *    re-wraps (invariant 3).
  */
 template <NodeType node>
