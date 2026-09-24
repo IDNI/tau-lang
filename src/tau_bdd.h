@@ -407,9 +407,9 @@ private:
  *
  * Acts as the user-facing view of a BDD node.  Holds an `htref` (hash-consed
  * tree reference) to the underlying `tau_term_bdd` node plus an output
- * inverter flag.  A global universe map `U` links the `BDD_ID` node of a
- * converted Tau term to its handle, enabling GC of BDD nodes when the
- * originating Tau term is collected.
+ * inverter flag.  A global universe map `U` links the id the `BDD_ID` node
+ * of a converted Tau term carries to its handle, enabling GC of BDD nodes
+ * when the originating Tau term is collected.
  *
  * @tparam node Tree node type.
  */
@@ -422,34 +422,24 @@ struct tau_term_bdd_handle {
 	using term_handles = std::vector<term_handle>;           ///< @brief Vector of handles.
 	using tbdd         = tau_term_bdd<node>;                 ///< @brief Underlying BDD type.
 	using quants       = std::vector<std::pair<tref, typename tbdd::Quantifier>>; ///< @brief Quantifier list.
-	using universe_t   = std::unordered_map<tref, term_handle>; ///< @brief Universe type.
+	using universe_t   = std::unordered_map<size_t, term_handle>; ///< @brief Universe type.
 	/** @brief Interning key of a converted node: the handle and the BA type
 	 * the `BDD_ID` node was minted with (the type is part of the node). */
 	using intern_key_t = std::pair<term_handle, size_t>;
-	using intern_t     = std::unordered_map<intern_key_t, tref>; ///< @brief Interning map type.
+	/** @brief An interned conversion: the `BDD_ID` node and the id it carries. */
+	struct interned_t { tref id_node; size_t id; };
+	using intern_t     = std::unordered_map<intern_key_t, interned_t>; ///< @brief Interning map type.
 
 	/**
-	 * @brief Universe map: the `BDD_ID` node of a converted term → its BDD
-	 * handle. A bijection with `I`: `convert_to_tau_node` interns, so one
-	 * BDD (per type) has exactly one `BDD_ID` node, and equal BDDs give the
-	 * same hash-consed Tau node.
-	 *
-	 * KEY: the inner `BDD_ID` node, never the `bf` wrapper around it. In
-	 * the LCRS tree the wrapper has one spelling per right sibling (alone,
-	 * or followed by the other side inside an equation) and the tree's gc
-	 * marks by pointer, so a key on the wrapper would die with the one
-	 * spelling nothing holds while the term lives on in another; the
-	 * `BDD_ID` child is the same node in every spelling. `key_of` takes a
-	 * term to its key.
+	 * @brief Universe map: the id a `BDD_ID` node carries → its BDD handle.
+	 * Filled before the node is built, as the node's hash and order read its
+	 * BDD here; `I`'s sweep drops an entry with its node, and no id recurs.
 	 */
 	static universe_t& U;
 	/**
-	 * @brief Interning map: (handle, type) → the `BDD_ID` node minted for
-	 * it, the inverse of `U` (the same node as `U`'s key). Swept with the
-	 * tree: an entry whose node did not survive a `bintree<node>::gc()` is
-	 * dropped, as `U`'s is, so a node nothing references is collectable
-	 * and a later conversion of the same BDD mints afresh. Interning holds
-	 * among live nodes, which is all hash-consed identity needs.
+	 * @brief Interning map: (handle, type) → the `BDD_ID` node minted for it.
+	 * An entry dies with its node in a `bintree<node>::gc()`, so a later
+	 * conversion of the same BDD mints afresh; interning holds among live nodes.
 	 */
 	static intern_t& I;
 
@@ -492,12 +482,11 @@ struct tau_term_bdd_handle {
 	 */
 	static bool is_bdd_backed(tref term);
 	/**
-	 * @brief The store key of a BDD-backed term: its `BDD_ID` node, the
-	 * same tref whatever the right sibling of the `bf` wrapper (see `U`).
-	 * Accepts the `bf(BDD_ID)` wrapper in any spelling, or the `BDD_ID`
-	 * node itself.
+	 * @brief The store key of a BDD-backed term: the id its `BDD_ID` node
+	 * carries (see `U`). Accepts the `bf(BDD_ID)` wrapper in any spelling,
+	 * or the `BDD_ID` node itself.
 	 */
-	static tref key_of(tref tau_node);
+	static size_t key_of(tref tau_node);
 	/** @brief Convert this handle to a Tau term of type @p term_type. */
 	tref to_tau_term(size_t term_type) const;
 	/**

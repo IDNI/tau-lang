@@ -974,8 +974,9 @@ const trefs& get_free_vars(tref n) {
 			return false;
 		case tau::BDD_ID: {
 			// A BDD-backed term holds its variables in the BDD, not in
-			// the tree. `U` is keyed by the `BDD_ID` node (tau_bdd.h),
-			// and get_free_tau_vars returns them in the shape above.
+			// the tree. `U` is keyed by the id the `BDD_ID` node carries
+			// (tau_bdd.h), and get_free_tau_vars returns them in the shape
+			// above.
 			const auto& bdd_u = tau_term_bdd_handle<node>::U;
 			if (auto it = bdd_u.find(tau_term_bdd_handle<node>::key_of(m));
 				it != bdd_u.end())

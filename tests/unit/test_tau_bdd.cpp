@@ -738,7 +738,7 @@ TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
 }
 
 TEST_SUITE("BDD handle creation") {
-	TEST_CASE("gc: the key is the BDD_ID node, shared by every spelling of the wrapper") {
+	TEST_CASE("gc: the key is the BDD_ID node's id, shared by every spelling of the wrapper") {
 		using bdd = tau_term_bdd<node_t>;
 		using hbdd = term_handle<node_t>;
 		tau::get_options opts = {
@@ -753,15 +753,18 @@ TEST_SUITE("BDD handle creation") {
 		// A BDD-backed term as an equation's left side: inside the atom the
 		// bf(BDD_ID) wrapper carries `0` as its right sibling, a different
 		// tree node from the trimmed wrapper `l` that convert_to_tau_node
-		// returned; the two share the BDD_ID child, the store's key.
+		// returned; the two share the BDD_ID child, whose id is the key.
 		tref l = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
 		tref atom = tau::build_bf_eq_0(l);
 		tref l_in_atom = tau::get(atom)[0].first();
 		REQUIRE(l_in_atom != l);
 		REQUIRE(tau::get(l_in_atom).has_right_sibling());
-		const tref key = hbdd::key_of(l);
+		const tref id_node = tau::get(l).first();
+		CHECK(tau::get(l_in_atom).first() == id_node);
+		CHECK(tau::get(id_node).is(tau::BDD_ID));
+		const size_t key = hbdd::key_of(l);
 		CHECK(hbdd::key_of(l_in_atom) == key);
-		CHECK(tau::get(key).is(tau::BDD_ID));
+		CHECK(hbdd::key_of(id_node) == key);
 		REQUIRE(hbdd::U.contains(key));
 		const hbdd::intern_key_t ikey{ hbdd::convert_to_handle(l),
 			find_ba_type<node_t>(l) };
@@ -778,7 +781,8 @@ TEST_SUITE("BDD handle creation") {
 			// Every lookup hits through the sibling-carrying spelling.
 			REQUIRE(hbdd::U.contains(key));
 			REQUIRE(hbdd::I.contains(ikey));
-			CHECK(hbdd::I.find(ikey)->second == key);
+			CHECK(hbdd::I.find(ikey)->second.id_node == id_node);
+			CHECK(hbdd::I.find(ikey)->second.id == key);
 			hbdd h = hbdd::convert_to_handle(l_in_atom);
 			CHECK(tau::get(h.to_tau_term(find_ba_type<node_t>(l_in_atom)))
 				.to_str() == "xy");
@@ -1203,7 +1207,7 @@ TEST_SUITE("BDD is_bdd_backed") {
 		tref atom = tau::build_bf_eq_0(n);
 		CHECK(hbdd::is_bdd_backed(tau::get(atom)[0].first()));
 		// the bare BDD_ID node is not one
-		CHECK(!hbdd::is_bdd_backed(hbdd::key_of(n)));
+		CHECK(!hbdd::is_bdd_backed(tau::get(n).first()));
 		CHECK(!hbdd::is_bdd_backed(tau::get("a", opts)));
 		CHECK(!hbdd::is_bdd_backed(nullptr));
 	}

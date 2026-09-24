@@ -7,10 +7,9 @@
  *
  * Conventions of the BDD library this file rides on (tau_bdd.h):
  *  - the library's universe map `U`, which links a `BDD_ID` node to its BDD,
- *    is keyed by the `BDD_ID` node under the `bf` wrapper (`key_of`). That is
- *    the same tref in every spelling of the wrapper, so a lookup steps to the
- *    child and never trims. `convert_to_tau_node` interns (tau_bdd.tmpl.h),
- *    so one BDD per type is one Tau node.
+ *    is keyed by the id that node carries (`key_of`), the same in every
+ *    spelling of the `bf` wrapper. `convert_to_tau_node` interns
+ *    (tau_bdd.tmpl.h), so one BDD per type is one Tau node.
  *  - a BDD leaf's variable (`get_var`, or `get_var_term` as a `bf` term) is
  *    the TRIMMED Tau node under `bf`, a `bf_neg` node for an inverted leaf.
  *    `add(leaf)` takes the trimmed node and maps `bf_t` / `bf_f` to the

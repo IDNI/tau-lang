@@ -162,6 +162,15 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	//if (term != that.term) return C(term) <=> C(that.term);
 	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
+	// The id a `BDD_ID` node carries depends on process history; its BDD
+	// does not. Interning makes one (BDD, type) one live node.
+	if (nt == type::BDD_ID && data != that.data) {
+		const auto& u = tau_term_bdd_handle<node>::U;
+		const auto a = u.at(data).get(), b = u.at(that.data).get();
+		return a < b ? std::weak_ordering::less
+			: b < a ? std::weak_ordering::greater
+			: std::weak_ordering::equivalent;
+	}
 	return C(data) <=> C(that.data);
 }
 #undef C
@@ -222,6 +231,10 @@ size_t node<BAs...>::hashit() const {
 	// Get string from pool, untyped ba_constant also has string as data
 	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
 		hash_combine(seed, dict(data));
+	// By its BDD, not by the id it carries, which depends on process history.
+	else if (nt == type::BDD_ID)
+		hash_combine(seed, std::hash<tau_term_bdd_handle<node>>{}(
+			tau_term_bdd_handle<node>::U.at(data)));
 	else hash_combine(seed, static_cast<size_t>(data));
 	return seed;
 }

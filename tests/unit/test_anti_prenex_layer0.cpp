@@ -618,13 +618,14 @@ TEST_CASE("facet rows survive construction, and a sweep keeps the live ones and 
 	// is never swept, so they are pinned through collect_live_refs; the
 	// formula through its handle. Nothing else: the atom's side carries `0`
 	// as its right sibling, so the TRIMMED bf(BDD_ID) wrapper `l_before` is
-	// no subtree of `r` and dies — the store is keyed by the BDD_ID node the
-	// two spellings share (tau_bdd.h, `key_of`), so the term keeps its BDD.
+	// no subtree of `r` and dies — the store is keyed by the id of the BDD_ID
+	// node the two spellings share (tau_bdd.h, `key_of`), so the term keeps
+	// its BDD.
 	// The kept node then keeps its rows and its interned terms; the churn
 	// dies.
 	tref l_before = sides(member_touching(prepared, P, {})).first;
 	REQUIRE(th::is_bdd_backed(l_before));
-	const tref key_before = th::key_of(l_before);
+	const size_t key_before = th::key_of(l_before);
 	htref keep = tau::geth(r);
 	std::unordered_set<tref> ks{ r };
 	tb::collect_live_refs(ks);

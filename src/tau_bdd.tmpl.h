@@ -1223,9 +1223,10 @@ void tau_term_bdd<node>::collect_live_refs(std::unordered_set<tref>& keep) {
 		if (bn.value.v) keep.insert(bn.value.v);
 }
 
+// Keyed by an id rather than a tref, so `I`'s sweep drops its entries.
 template<NodeType node>
 tau_term_bdd_handle<node>::universe_t& tau_term_bdd_handle<node>::U =
-	bintree<node>::template create_cache<universe_t>();
+	[]() -> universe_t& { static universe_t u; return u; }();
 
 // Not a create_cache: that machinery promotes an entry's value trefs to
 // reachable whenever the key's trefs are (vacuously, for a key without any),
@@ -1240,8 +1241,10 @@ tau_term_bdd_handle<node>::intern_t& tau_term_bdd_handle<node>::I =
 		bintree<node>::gc_callbacks.push_back(
 			[](const std::unordered_set<tref>& kept) {
 				for (auto it = cache.begin(); it != cache.end();)
-					if (!kept.contains(it->second)) it = cache.erase(it);
-					else ++it;
+					if (!kept.contains(it->second.id_node)) {
+						U.erase(it->second.id);
+						it = cache.erase(it);
+					} else ++it;
 			});
 		return cache;
 	}();
@@ -1264,24 +1267,18 @@ template<NodeType node>
 tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t term_type) {
 	using tau = tree<node>;
 
-	// Interned: the same BDD under the same type is the same `BDD_ID` node,
-	// so a round trip through to_tau_term and build gives back the node it
-	// started from and hash-consed identity holds across conversions. The
-	// store holds the `BDD_ID` node (the key, see `U`); the `bf` wrapper is
-	// re-derived through the hash-consed typed constructor: the same node
-	// while it lives, a fresh content-equal one otherwise.
+	// Interned, so a round trip through to_tau_term and build gives back
+	// the node it started from and hash-consed identity holds.
 	const intern_key_t key{handle, term_type};
 	tref id_node;
-	if (auto it = I.find(key); it != I.end()) id_node = it->second;
+	if (auto it = I.find(key); it != I.end()) id_node = it->second.id_node;
 	else {
-		static size_t bdd_id = 0;
-		id_node = tau::get_typed(tau::BDD_ID, tau::get_num(bdd_id),
-			term_type);
-		// Increment id for unique node creation
-		++bdd_id;
-		// Save the connection both ways
-		U.emplace(id_node, handle);
-		I.emplace(key, id_node);
+		static size_t next_id = 0;
+		const size_t id = next_id++;
+		// The node's hash reads its BDD through `U`.
+		U.emplace(id, handle);
+		id_node = tau::get(node(tau::BDD_ID, id, true, term_type));
+		I.emplace(key, interned_t{ id_node, id });
 	}
 	return tau::get_typed(tau::bf, id_node, term_type);
 }
@@ -1321,15 +1318,12 @@ convert_to_handle(tref tau_node) {
 
 /** @internal @copydoc tau_term_bdd_handle::key_of(tref) @endinternal */
 template<NodeType node>
-tref tau_term_bdd_handle<node>::key_of(tref tau_node) {
+size_t tau_term_bdd_handle<node>::key_of(tref tau_node) {
 	using tau = tree<node>;
 	const tau& t = tau::get(tau_node);
-	if (t.is(tau::BDD_ID)) return tau::trim_right_sibling(tau_node);
+	if (t.is(tau::BDD_ID)) return t.data();
 	DBG(assert(t.is(tau::bf) && t.child_is(tau::BDD_ID)));
-	// The wrapper's one child carries no right sibling, so it is the
-	// stored node itself, whatever the wrapper's own sibling.
-	DBG(assert(!tau::get(t.first()).has_right_sibling()));
-	return t.first();
+	return tau::get(t.first()).data();
 }
 
 /** @internal @copydoc tau_term_bdd_handle::to_tau_term(size_t) const @endinternal */

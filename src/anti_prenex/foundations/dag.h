@@ -71,8 +71,8 @@ namespace idni::tau_lang::anti_prenexing {
 // h(φ) (§1), the structural hash: a pure function of CONTENT — the binder ids
 // phase 0 assigns, the source names of free variables, the BDD-canonical
 // terms — hence identical within one run, across components and across
-// inputs that share subtrees; a BDD-backed term hashes by the id the process
-// assigns it. It is the node's value hash combined with its child list's
+// inputs that share subtrees; a BDD-backed term hashes by its BDD's
+// structure. It is the node's value hash combined with its child list's
 // hash, with the right sibling EXCLUDED, the functor the tree's own hashed
 // maps use. Two neighbours are NOT `h(φ)`: `node::hash` is the value alone
 // without children, and `bintree::hash` includes the right sibling chain.

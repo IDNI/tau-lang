@@ -243,7 +243,7 @@ int_t find_biggest_var_id(tref fm) {
 	auto f = [&](tref n) {
 		if (is<node, tau::variable>(n)) consider(n);
 		else if (tau::get(n).is(tau::BDD_ID)) {
-			// `U` is keyed by the `BDD_ID` node itself (tau_bdd.h).
+			// `U` is keyed by the id the `BDD_ID` node carries (tau_bdd.h).
 			const auto& bdd_u = tau_term_bdd_handle<node>::U;
 			if (auto jt = bdd_u.find(
 					tau_term_bdd_handle<node>::key_of(n));

@@ -91,7 +91,8 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			os << " { " << ba_constants<node>::get(n.data)
 				<< " } : " << get_ba_type_name<node>(n.ba_type);
 		else os << " { UNPARSED } : " << get_ba_type_name<node>(n.ba_type);
-	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
+	} else if (tau::is_digital_nt(n.nt) || n.nt == tau::BDD_ID)
+		os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
 		os << "<" << dict(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
@@ -540,6 +541,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (nt) {
 			case bf_f:              out('0'); break;
 			case bf_t:              out('1'); break;
+			case BDD_ID:            out(t.data()); break;
 			case wff_f:             out('F'); break;
 			case wff_t:             out('T'); break;
 			case wff_neg:           out("!");
