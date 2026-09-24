@@ -83,21 +83,15 @@ add_test(NAME "test_repl-cli-spec_file"
 set_tests_properties("test_repl-cli-spec_file" PROPERTIES
 	PASS_REGULAR_EXPRESSION "No more inputs provided")
 
-# --- CLI ARGUMENT ORDERING BUG (characterized, not endorsed) -----------------
-# `tau <spec> -q` runs the specification, but `tau -q <spec>` SILENTLY IGNORES
-# the specification and drops into the interactive REPL instead -- no error, no
-# warning. The boolean options are declared with an optional value
-# (cli::option(name, short, <bool default>)), so the following argument is
-# consumed as the flag's value and never reaches cl.get_files().
-#
-# Any boolean flag placed before the file reproduces it (-q, -X, ...), and
-# options-before-operands is the ordering most users would reach for, so this
-# silently does the wrong thing. Pinned here so the current behaviour is
-# visible; if it is fixed, this test should fail and be inverted.
-add_test(NAME "test_repl-cli-option_before_file_ignores_file"
+# --- CLI argument ordering ---------------------------------------------------
+# A boolean option takes an optional value (cli::option(name, short, <bool
+# default>)); a file placed after it must still reach cl.get_files() and run,
+# rather than being consumed as the flag's value and leaving the REPL open.
+add_test(NAME "test_repl-cli-option_before_file_runs_file"
 	COMMAND bash -c "printf 'o[t] = i[t].\\n' > cli_order_fixture.tau && echo q | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -q cli_order_fixture.tau; r=$?; rm -f cli_order_fixture.tau; exit $r")
-set_tests_properties("test_repl-cli-option_before_file_ignores_file" PROPERTIES
-	PASS_REGULAR_EXPRESSION "Welcome to the Tau Language Framework")
+set_tests_properties("test_repl-cli-option_before_file_runs_file" PROPERTIES
+	PASS_REGULAR_EXPRESSION "Execution step: 0"
+	FAIL_REGULAR_EXPRESSION "Welcome to the Tau Language Framework")
 
 # --- spec file WITHOUT --quit ------------------------------------------------
 # run_loop() prints "Press ENTER to continue" only for a step that needs no
