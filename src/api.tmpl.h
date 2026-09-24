@@ -883,6 +883,22 @@ result<tref> api<node>::onf(tref expr, tref var) {
 }
 
 template <NodeType node>
+result<tref> api<node>::without(tref formula, tref clause) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		if (!formula || !clause) return r.with_assert_check_error(
+			code::invalid_argument, messages::invalid_arguments);
+		TAU_TRY(tref k, normalize_formula(formula));
+		TAU_TRY(tref c, normalize_formula(clause));
+		tref w = normal_form_without<node>(k, c);
+		if (!w) r.error(code::internal_error, "Normalization failed");
+		else    r = w;
+		DBG(assert(r.is_well_formed());)
+		return r;
+	});
+}
+
+template <NodeType node>
 result<tref> api<node>::pnf(tref expr) {
 	return with_budget<node>([&] {
 		result<tref> r;

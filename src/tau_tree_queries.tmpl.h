@@ -228,6 +228,7 @@ bool is_cli_cmd(tref n) {
 		tau::nnf_cmd,
 		tau::mnf_cmd,
 		tau::onf_cmd,
+		tau::without_cmd,
 		tau::qelim_cmd,
 		tau::get_cmd,
 		tau::set_cmd,

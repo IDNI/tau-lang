@@ -682,8 +682,26 @@ struct api {
 						const std::string& var);
 	/// @copydoc onf(const std::string&, const std::string&)
 	static result<tref> onf(tref formula, tref var);
+
 	/// @copydoc onf(const std::string&, const std::string&)
 	static result<htref> onf(htref formula, htref var);
+
+	/// The normal form of an always-conjunction without one of its
+	/// conjuncts: @p formula and @p clause are normalized, and the result
+	/// is the normal form of the top-level conjuncts of @p formula minus
+	/// the one equal to @p clause (a single clause). The normalized
+	/// @p formula comes back unchanged when it is no always-conjunction,
+	/// when @p clause is no single clause, or when no conjunct equals it;
+	/// a failed normalization of the remainder is an `internal_error`.
+	/// Where the normal form has the shape the Boole normal form gives a
+	/// conjunction of clauses, the result is assembled from that shape
+	/// without a normalization pass (tau_ba.h `ba_normalized_without`).
+	static result<std::string> without(const std::string& formula,
+						const std::string& clause);
+	/// @copydoc without(const std::string&, const std::string&)
+	static result<tref> without(tref formula, tref clause);
+	/// @copydoc without(const std::string&, const std::string&)
+	static result<htref> without(htref formula, htref clause);
 
 	/// Convert a formula to prenex normal form (PNF): all quantifiers
 	/// pulled to the front.

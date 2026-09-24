@@ -3211,6 +3211,11 @@ expression.
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
 
+* `without <repl_memory|tau> <repl_memory|tau>`: computes the normal form of
+the given always-conjunction without the conjunct equal to the given single
+clause; the normalized formula itself when it is no always-conjunction or no
+conjunct equals the clause.
+
 ## **Specification execution**
 
 Finally, you can run a given Tau specification. The syntax for the commands is:
