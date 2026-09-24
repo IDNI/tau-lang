@@ -921,6 +921,23 @@ const std::vector<ba_named_option>& pack_ba_options() {
 }
 
 /**
+ * @brief @p seed mixed with the current value of every BA-declared option
+ * of @p Node's pack.
+ *
+ * These options steer how an algebra's formulas are decided, so a verdict
+ * memo keyed on the formula alone drops its entries when this value moves.
+ */
+template <typename Node>
+size_t pack_ba_options_fingerprint(size_t seed = 0) {
+	for (const auto& e : pack_ba_options<Node>()) {
+		const size_t v = e.option.kind == ba_option_kind::flag
+			? (size_t) e.option.get_flag() : e.option.get_count();
+		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+	}
+	return seed;
+}
+
+/**
  * @brief Every family name in @p Node's pack, for answering family
  * existence.
  */

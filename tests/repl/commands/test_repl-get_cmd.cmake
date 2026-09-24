@@ -8,12 +8,12 @@ add_repl_test(get_cmd-all "get" "status:")
 add_repl_test(get_cmd-one "get colors" "colors:")
 
 # Bare `get` also lists every numeric limit option with its default
-# (unlimited caps except the finite temporal-search cap, tuned gc
+# (unlimited caps except the finite temporal-search caps, tuned gc
 # values, spec-size warning off).
 add_repl_test(get_cmd-lists_limits "get" "maxsplits: *unlimited")
-# flagsteps ships FINITE (500): its search has no termination guarantee;
-# 0 still means unlimited, which is fixpointsteps' own default.
-add_repl_test(get_cmd-fixpointsteps_default_unlimited "get fixpointsteps" "fixpointsteps: *unlimited")
+# The two temporal searches have no termination guarantee, so both caps
+# ship FINITE (500) through the CLI as well; 0 still means unlimited.
+add_repl_test(get_cmd-fixpointsteps_default_finite "get fixpointsteps" "fixpointsteps: *500")
 add_repl_test(get_cmd-flagsteps_default_finite "get flagsteps" "flagsteps: *500")
 add_repl_test(get_cmd-fixpointsteps_zero_is_unlimited "set fixpointsteps 0. get fixpointsteps" "fixpointsteps: *unlimited")
 add_repl_test(get_cmd-lists_gc_defaults "get" "gcgrowth: *1.5")

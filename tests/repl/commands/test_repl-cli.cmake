@@ -119,6 +119,12 @@ set_tests_properties("test_repl-cli-max_fixpoint_steps_flag" PROPERTIES
 	PASS_REGULAR_EXPRESSION "fixpointsteps: *9"
 	FAIL_REGULAR_EXPRESSION "Error")
 
+# The option is applied on every run, so its default must be the library's.
+add_test(NAME "test_repl-cli-max_fixpoint_steps_default"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"get fixpointsteps\"")
+set_tests_properties("test_repl-cli-max_fixpoint_steps_default" PROPERTIES
+	PASS_REGULAR_EXPRESSION "fixpointsteps: *500")
+
 add_test(NAME "test_repl-cli-gc_growth_factor_flag"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --gc-growth-factor 2.5 -e \"get gcgrowth\"")
 set_tests_properties("test_repl-cli-gc_growth_factor_flag" PROPERTIES

@@ -3,6 +3,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 using tau_api = api<node_t>;
@@ -199,17 +200,17 @@ TEST_SUITE("Tau API - runtime limits") {
 	// Both new caps can change a verdict (decided vs UNKNOWN), so the memos
 	// must see them move.
 	TEST_CASE("refinement and window caps are part of the budget fingerprint") {
-		const size_t base = verdict_budget_fingerprint();
+		const size_t base = verdict_budget_fingerprint<node_t>();
 		const long s3 = ltl_max_refinement_rounds_param;
 		const long s4 = ltl_window_max_paths_param;
 		tau_api::set_ltl_max_refinement_rounds(
 			ltl_max_refinement_rounds() + 1);
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_max_refinement_rounds_param = s3;
 		tau_api::set_ltl_window_max_paths(ltl_window_max_paths() + 1);
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_window_max_paths_param = s4;
-		CHECK( verdict_budget_fingerprint() == base );
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
 
 	// An environment fallback is part of the same fingerprint: a memo made
@@ -219,40 +220,40 @@ TEST_SUITE("Tau API - runtime limits") {
 		const long saved = ltl_window_max_paths_param;
 		ltl_window_max_paths_param = -1;
 		unsetenv("TAU_LTL_WINDOW_MAX_PATHS");
-		const size_t base = verdict_budget_fingerprint();
+		const size_t base = verdict_budget_fingerprint<node_t>();
 		setenv("TAU_LTL_WINDOW_MAX_PATHS", "13", 1);
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		unsetenv("TAU_LTL_WINDOW_MAX_PATHS");
-		CHECK( verdict_budget_fingerprint() == base );
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
 		ltl_window_max_paths_param = saved;
 	}
 
 	// The verdict memos are keyed on the formula; the budget fingerprint
 	// is what tells them a runtime budget moved in between.
 	TEST_CASE("verdict budget fingerprint moves with every budget") {
-		const size_t base = verdict_budget_fingerprint();
+		const size_t base = verdict_budget_fingerprint<node_t>();
 		const size_t saved_fp = max_fixpoint_steps;
 		const size_t saved_fl = max_flag_search_steps;
 		const size_t saved_cs = max_consistency_subsets;
 		const long   saved_to = ltl_timeout_sec_param;
 		const std::string saved_alg = ltl_algorithm_param;
 		max_fixpoint_steps = saved_fp + 1;
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		max_fixpoint_steps = saved_fp;
-		CHECK( verdict_budget_fingerprint() == base );
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
 		max_flag_search_steps = saved_fl + 1;
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		max_flag_search_steps = saved_fl;
 		max_consistency_subsets = saved_cs + 1;
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		max_consistency_subsets = saved_cs;
 		tau_api::set_ltl_timeout_sec(ltl_timeout_sec() + 1);
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_timeout_sec_param = saved_to;
 		tau_api::set_ltl_algorithm("B");
-		CHECK( verdict_budget_fingerprint() != base );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
 		ltl_algorithm_param = saved_alg;
-		CHECK( verdict_budget_fingerprint() == base );
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
 	}
 
 	// PW-N4: the semantic PWR fallback is a runtime knob, OFF by default.
@@ -266,7 +267,71 @@ TEST_SUITE("Tau API - runtime limits") {
 		pwr_semantic_fallback = saved;
 	}
 
+	// An algebra's options steer how its formulas are decided, and the
+	// memos are keyed on the formula alone.
+	TEST_CASE("BA options and preprocessing are part of the budget fingerprint") {
+		const size_t base = verdict_budget_fingerprint<node_t>();
+		for (const std::string& name : tau_api::ba_option_names()) {
+			CAPTURE(name);
+			auto got = tau_api::get_ba_option(name);
+			REQUIRE( got.has_value() );
+			const size_t v = got.value();
+			auto moved = tau_api::set_ba_option(name, v == 1 ? 2 : 1);
+			REQUIRE( moved.has_value() );
+			if (moved.value() != v)
+				CHECK( verdict_budget_fingerprint<node_t>() != base );
+			REQUIRE( tau_api::set_ba_option(name, v).has_value() );
+			CHECK( verdict_budget_fingerprint<node_t>() == base );
+		}
+		const bool saved = preprocessing;
+		tau_api::set_preprocessing(!saved);
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
+		tau_api::set_preprocessing(saved);
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
+	}
+
+	TEST_CASE("BA options answer an error for a name no algebra declares") {
+		for (const char* name : { "nope-nothing", "nothing", "-x", "bv-" })
+		{
+			CAPTURE(name);
+			auto set = tau_api::set_ba_option(name, 1);
+			CHECK_FALSE( set.has_value() );
+			CHECK( set.report().has_error() );
+			CHECK_FALSE( tau_api::get_ba_option(name).has_value() );
+		}
+		for (const std::string& name : tau_api::ba_option_names())
+			CHECK( tau_api::get_ba_option(name).has_value() );
+	}
+
 #ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("BA options round-trip through the api") {
+		const auto names = tau_api::ba_option_names();
+		CHECK( std::ranges::find(names, "bv-widening") != names.end() );
+		const bool saved_elim = bv_definitional_elimination;
+		auto off = tau_api::set_ba_option("bv-definitional-elimination", 0);
+		REQUIRE( off.has_value() );
+		CHECK( off.value() == 0 );
+		CHECK_FALSE( bv_definitional_elimination );
+		CHECK( tau_api::get_ba_option("bv-definitional-elimination")
+			.value() == 0 );
+		CHECK( tau_api::set_ba_option("bv-definitional-elimination", 7)
+			.value() == 1 );
+		CHECK( bv_definitional_elimination );
+		bv_definitional_elimination = saved_elim;
+
+		const size_t saved_atoms = bv_defelim_max_atoms;
+		CHECK( tau_api::set_ba_option("bv-defelim-max-atoms", 5)
+			.value() == 5 );
+		CHECK( bv_defelim_max_atoms == 5 );
+		bv_defelim_max_atoms = saved_atoms;
+
+		// bv-max-width ignores 0: the value in force is reported back.
+		const size_t saved_width = bv_max_width;
+		CHECK( tau_api::set_ba_option("bv-max-width", 0).value()
+			== saved_width );
+		bv_max_width = saved_width;
+	}
+
 	// The case-split cap follows the block budgets: 0 = unlimited = SIZE_MAX.
 	// Driven through bv's own `case-split-max-tests` option, not an api
 	// setter: only bv's own case-split pass can ever make progress against

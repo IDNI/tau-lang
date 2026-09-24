@@ -327,10 +327,13 @@ static bool aba_existential_feasible(tref fm) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	// The verdict depends on the QE free-variable cap (below); a cap change
-	// between two queries must not return the old cap's answer.
-	static size_t cache_budget = ltl_verdict_budget_fingerprint();
-	if (const size_t fp = ltl_verdict_budget_fingerprint();
+	// The verdict depends on the QE free-variable cap (below) and on how
+	// the algebras decide the atoms; a change of either between two queries
+	// must not return the old answer.
+	static size_t cache_budget = ltl_verdict_budget_fingerprint(
+		pack_ba_options_fingerprint<node>());
+	if (const size_t fp = ltl_verdict_budget_fingerprint(
+			pack_ba_options_fingerprint<node>());
 		fp != cache_budget) { cache.clear(); cache_budget = fp; }
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE

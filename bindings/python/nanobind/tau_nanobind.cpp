@@ -150,6 +150,173 @@ NB_MODULE(tau, m) {
 		"their values. Release every interpreter first. Returns the "
 		"number of tree nodes freed.");
 
+	// Runtime budgets and engine switches. Each forwards to the api
+	// setter of the same name, the one the CLI option and the REPL `set`
+	// option of the same meaning write.
+	struct count_setter {
+		const char* name;
+		void (*set)(size_t);
+		const char* doc;
+	};
+	static constexpr count_setter count_setters[] = {
+		{ "set_block_max_splits", &tau_api::set_block_max_splits,
+			"Per-block Boole-decomposition split budget in "
+			"anti-prenexing (--block-max-splits); 0 = unlimited." },
+		{ "set_block_max_rounds", &tau_api::set_block_max_rounds,
+			"Anti-prenexing quantifier-block driver rounds "
+			"(--block-max-rounds); 0 = unlimited." },
+		{ "set_cqe_max_clauses", &tau_api::set_cqe_max_clauses,
+			"DNF clauses complete quantifier elimination may "
+			"distribute one scope into (--cqe-max-clauses); "
+			"0 = unlimited." },
+		{ "set_lgrs_max_vars", &tau_api::set_lgrs_max_vars,
+			"Distinct variables above which a pure-equality "
+			"bitvector system goes to the solver instead of being "
+			"solved algebraically per width (--lgrs-max-vars); "
+			"default 8, 0 = unlimited." },
+		{ "set_block_squeeze_cap", &tau_api::set_block_squeeze_cap,
+			"Operand-set size above which block squeezing declines "
+			"(--block-squeeze-cap); 0 = unlimited." },
+		{ "set_max_fixpoint_steps", &tau_api::set_max_fixpoint_steps,
+			"Temporal-normalization fixpoint steps "
+			"(--max-fixpoint-steps); default 500, 0 = unlimited." },
+		{ "set_max_flag_search_steps",
+			&tau_api::set_max_flag_search_steps,
+			"Eventual-flag search steps past the flag boundary "
+			"(--max-flag-search-steps); default 500, "
+			"0 = unlimited." },
+		{ "set_max_def_passes", &tau_api::set_max_def_passes,
+			"Definition-expansion passes (--max-def-passes); "
+			"0 = unlimited." },
+		{ "set_max_enum_steps", &tau_api::set_max_enum_steps,
+			"Recurrence-relation enumeration steps "
+			"(--max-enum-steps); 0 = unlimited." },
+		{ "set_max_probe_steps", &tau_api::set_max_probe_steps,
+			"Untyped saturation probe steps over a residual "
+			"recurrence reference (--max-probe-steps); default "
+			"10000, 0 = unlimited." },
+		{ "set_max_rewrite_rounds", &tau_api::set_max_rewrite_rounds,
+			"Rewrite-to-fixpoint rounds (--max-rewrite-rounds); "
+			"0 = unlimited." },
+		{ "set_max_simplify_rounds",
+			&tau_api::set_max_simplify_rounds,
+			"Bitvector simplification rewrite rounds "
+			"(--max-simplify-rounds); 0 = unlimited." },
+		{ "set_gc_min_size", &tau_api::set_gc_min_size,
+			"Tree-node count floor before the interpreter's gc may "
+			"trigger (--gc-min-size); default 256." },
+		{ "set_tref_budget", &tau_api::set_tref_budget,
+			"Cap on live interned tree nodes (--tref-budget); a call "
+			"that starts with the store at or above it fails "
+			"without running. 0 = unlimited." },
+		{ "set_tref_budget_soft_percent",
+			&tau_api::set_tref_budget_soft_percent,
+			"Percentage of the tref budget at which a sweep is "
+			"forced (--tref-budget-soft); default 75." },
+		{ "set_spec_size_warn", &tau_api::set_spec_size_warn,
+			"Warn when an updated specification exceeds this many "
+			"characters (--spec-size-warn); 0 = off." },
+		{ "set_max_revision_alts", &tau_api::set_max_revision_alts,
+			"Revision alternatives kept per specification part "
+			"(--max-revision-alts); 0 = unlimited." },
+		{ "set_max_consistency_subsets",
+			&tau_api::set_max_consistency_subsets,
+			"k-ary consistency subset checks per atom group in "
+			"LTL(ABA) synthesis (--max-consistency-subsets); "
+			"default 4096, 0 = unlimited." },
+		{ "set_cache_bound", &tau_api::set_cache_bound,
+			"Bound of the string-keyed synthesis caches "
+			"(--cache-bound); default 4096, 0 = unbounded." },
+		{ "set_max_cover_products", &tau_api::set_max_cover_products,
+			"The ABA oracle's mixed-type coverage expansion "
+			"(--max-cover-products); default 256, 0 = unlimited." },
+		{ "set_ltl_qe_max_vars", &tau_api::set_ltl_qe_max_vars,
+			"Free-variable cap of the omcat QE fast path "
+			"(--ltl-qe-max-vars); above 2 is not sound, 0 falls "
+			"back to TAU_LTL_OMCAT_QE_MAX_VARS or 2." },
+		{ "set_ltl_hoa_max_states", &tau_api::set_ltl_hoa_max_states,
+			"Largest state count accepted from an ltlsynt HOA "
+			"strategy (--ltl-hoa-max-states); 0 = unlimited." },
+		{ "set_ltl_guard_max_cubes",
+			&tau_api::set_ltl_guard_max_cubes,
+			"DNF cubes a HOA guard may expand into in the Algorithm "
+			"D game (--ltl-guard-max-cubes); 0 = unlimited." },
+		{ "set_ltl_max_refinement_rounds",
+			&tau_api::set_ltl_max_refinement_rounds,
+			"ABA-oracle refinement rounds of a realizability check "
+			"(--ltl-refinement-rounds); the cap answers UNKNOWN. "
+			"0 = unlimited." },
+		{ "set_ltl_window_max_paths",
+			&tau_api::set_ltl_window_max_paths,
+			"Strategy paths the multi-step window oracle examines "
+			"per check (--ltl-window-max-paths); 0 = unlimited." },
+		{ "set_ba_decision_pins", &tau_api::set_ba_decision_pins,
+			"Decided tau-algebra rows whose key tree is kept alive "
+			"across the step sweep (--ba-decision-pins); default "
+			"4096, 0 = none." },
+	};
+	for (const count_setter& s : count_setters)
+		m.def(s.name, s.set, "n"_a, s.doc);
+
+	struct flag_setter {
+		const char* name;
+		void (*set)(bool);
+		const char* doc;
+	};
+	static constexpr flag_setter flag_setters[] = {
+		{ "set_preprocessing", &tau_api::set_preprocessing,
+			"Master BA preprocessing switch (--preprocessing); a "
+			"BA's own pass needs its own option on too, e.g. "
+			"bv-blasting." },
+		{ "set_ba_component_factoring",
+			&tau_api::set_ba_component_factoring,
+			"Decide tau-algebra constants per support component "
+			"(--ba-component-factoring)." },
+		{ "set_pwr_semantic_fallback",
+			&tau_api::set_pwr_semantic_fallback,
+			"Semantic fallback of the temporal pointwise revision "
+			"(--pwr-semantic); off by default." },
+		{ "set_step_definitional_propagation",
+			&tau_api::set_step_definitional_propagation,
+			"Propagate the constants a step formula determines "
+			"before its paths are enumerated "
+			"(--step-definitional-propagation); on by default." },
+	};
+	for (const flag_setter& s : flag_setters)
+		m.def(s.name, s.set, "state"_a, s.doc);
+
+	m.def("set_gc_growth_factor", &tau_api::set_gc_growth_factor,
+		"factor"_a, "Growth factor of the interpreter's gc trigger "
+		"(--gc-growth-factor); default 1.5, <= 0 disables gc.");
+	m.def("set_ltl_timeout_sec", &tau_api::set_ltl_timeout_sec,
+		"seconds"_a, "Wall-clock cap on each ltlsynt call "
+		"(--ltl-timeout); 0 disables the watchdog, a negative value "
+		"falls back to TAU_LTL_TIMEOUT_SEC or 60.");
+	m.def("set_ltl_algorithm", &tau_api::set_ltl_algorithm,
+		"algorithm"_a, "Omcat synthesis algorithm: A, B, D or auto "
+		"(--ltl-alg); the empty string falls back to TAU_LTL_ALG.");
+	m.def("tref_count", &tau_api::tref_count,
+		"Live interned tree node count, what set_tref_budget caps.");
+
+	// Options an algebra of the pack declares about itself, named
+	// <family>-<option> as on the command line (bv-widening, qlt-t3-cap).
+	m.def("ba_option_names", &tau_api::ba_option_names,
+		"Names of the options the algebras of this build declare.");
+	m.def("set_ba_option",
+		[](const std::string& name, size_t value) {
+			return to_py_result(tau_api::set_ba_option(name, value));
+		}, "name"_a, "value"_a,
+		"Set a BA-declared option: a flag takes 0 or 1, a count its "
+		"number. Returns a result carrying the value now in force; no "
+		"value, and the reason in the report, when no algebra of this "
+		"build declares the name.");
+	m.def("get_ba_option",
+		[](const std::string& name) {
+			return to_py_result(tau_api::get_ba_option(name));
+		}, "name"_a,
+		"The value of a BA-declared option (a flag reads 0 or 1), or no "
+		"value when no algebra of this build declares the name.");
+
 	// Stream at
 	nb::class_<stream_at>(m, "stream_at")
 		.def(nb::init<const std::string&, size_t>())

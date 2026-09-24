@@ -2689,8 +2689,8 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
 | -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
 | -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
-| -g, --lgrs-max-vars           | hand a pure-equality bitvector system with more distinct variables than this to the solver instead of the `lgrs` route, whose Boole expansion is exponential in them (default 8, 0 = unlimited) |
-| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
+| -g, --lgrs-max-vars           | hand a pure-equality bitvector system with more distinct variables than this to the solver instead of squeezing it per width and computing a ground solution algebraically, whose Boole expansion is exponential in them (default 8, 0 = unlimited) |
+| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
 | -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
 | -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
 | -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
@@ -2700,6 +2700,8 @@ defaults. Each has a matching REPL option (see [REPL options](#repl-options)):
 | -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (0 = unlimited)                                         |
 | -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)                              |
 | -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
+| -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default `TAU_TREF_BUDGET` or 0; 0 = unlimited) |
+| -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default `TAU_TREF_BUDGET_SOFT` or 75) |
 | -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
 | -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited)        |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded)   |
@@ -2898,8 +2900,10 @@ elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
 default.
 
 * `lgrsmaxvars`: above this many distinct variables, a partition of pure
-bitvector equalities is handed to the solver instead of being squeezed and
-solved through `lgrs`, whose Boole expansion is exponential in the variables;
+bitvector equalities is handed to the solver instead of being squeezed per
+width and given a ground solution algebraically (`find_solution`, or
+`find_minimal_solution` in minimum mode), whose Boole expansion is
+exponential in the variables;
 `var = constant` conjuncts are read off before the count (`--lgrs-max-vars`).
 8 by default.
 
@@ -2941,6 +2945,15 @@ type-blocked rule from a legitimately uninterpreted one (`--max-probe-steps`).
 * `gcgrowth|gcgrowthfactor`: gc growth-factor trigger; accepts decimals such
 as `1.5` (`--gc-growth-factor`). 1.5 by default; a value at or below 0
 disables gc.
+
+* `trefbudget`: cap on the live interned tree nodes (`--tref-budget`). A
+command that starts with the store at or above the cap fails without running;
+one that was allowed to start finishes even if it ends above it. Unlimited by
+default, or `TAU_TREF_BUDGET` when that is set.
+
+* `trefbudgetsoft`: percentage of `trefbudget` at which the interpreter sweeps
+regardless of its gc growth trigger (`--tref-budget-soft`). 75 by default, or
+`TAU_TREF_BUDGET_SOFT` when that is set.
 
 * `specsizewarn`: warn when an updated specification exceeds this many printed
 characters (`--spec-size-warn`). 0 (off) by default.
@@ -2989,8 +3002,9 @@ examines per check (`--ltl-window-max-paths`). 4096 by default, or
 `TAU_LTL_WINDOW_MAX_PATHS` when that is set; 0 = unlimited; a hit cap
 likewise answers UNKNOWN.
 
-Changing any of these, or the two temporal-normalization caps, between two
-queries drops the verdict memos, so the next `sat`/`realizable` is decided
+Changing any of these, the two temporal-normalization caps, `preprocessing`
+or an option an algebra declares (below) between two queries drops the
+verdict memos, so the next `sat`/`realizable` is decided
 under the new budgets rather than answered from the old ones.
 
 Beyond the options above, each Boolean algebra in the configured pack may
@@ -3463,13 +3477,17 @@ the logical procedures, the normal forms and the execution of specifications
 subset-minimal set of a specification's top-level conjuncts that is already
 unrealizable (or unsatisfiable), and `reset` returns the process to a fresh
 state, freeing every tree node no `htref` holds. Global switches such as
-`set_charvar`, `set_preprocessing`, `set_bv_case_split`, `set_ba_component_factoring`,
+`set_charvar`, `set_preprocessing`, `set_ba_component_factoring`,
 `set_indenting`, `set_highlighting`, `set_json` and
 `set_severity` mirror the command line options, and every runtime limit has a
 setter of the same name as its option (`set_block_max_splits`,
-`set_bv_case_split_max_tests`, `set_ba_decision_pins`, ...). A BA-declared
-option such as `bv-widening`/`bv-max-width` has no dedicated `api<node>`
-setter — reach it via the CLI/REPL route described above.
+`set_max_fixpoint_steps`, `set_ba_decision_pins`, ...). An option a Boolean
+algebra declares about itself is set by the name it has on the command line,
+without the dashes in front: `set_ba_option("bv-widening", 1)` or
+`set_ba_option("bv-defelim-max-atoms", 5)` (a flag takes 0 or 1) returns the
+value now in force, `get_ba_option(name)` reads it back, both answer an error
+when no algebra of the build declares the name, and `ba_option_names()` lists
+the names the build has.
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and
@@ -3508,6 +3526,13 @@ for _ in range(3):
 
 print(o_stream.get_values())   # ['T', 'F', 'T']
 ```
+
+The module also carries the api's runtime budgets and engine switches under
+the same names (`tau.set_max_fixpoint_steps(1000)`, `tau.set_tref_budget(n)`,
+`tau.set_ltl_timeout_sec(120)`, `tau.set_preprocessing(False)`, ...) and the
+options the algebras declare (`tau.ba_option_names()`,
+`tau.set_ba_option("bv-widening", 1)`, `tau.get_ba_option(name)`, both
+returning a `tau.result`).
 
 Further examples are in [`tests/bindings/python`](tests/bindings/python).
 

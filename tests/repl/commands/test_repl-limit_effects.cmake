@@ -34,8 +34,8 @@ add_test(NAME "test_repl-limit_effect-fixpointsteps_memo_dropped_on_change"
 set_tests_properties("test_repl-limit_effect-fixpointsteps_memo_dropped_on_change" PROPERTIES
 	PASS_REGULAR_EXPRESSION ": T")
 
-# fixpointsteps ships unlimited, so this workload completes without
-# ever reaching a cap.
+# This workload needs a handful of steps, so it completes under the
+# shipped cap of 500 without ever reaching it.
 add_test(NAME "test_repl-limit_effect-fixpointsteps_default_completes"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat always o1[t] = o1[t-2]\"")
 set_tests_properties("test_repl-limit_effect-fixpointsteps_default_completes" PROPERTIES
