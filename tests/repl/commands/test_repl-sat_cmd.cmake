@@ -157,3 +157,17 @@ foreach(_t o1_o2 o2_o1)
 			PROPERTIES TIMEOUT 60)
 	endif()
 endforeach()
+
+# A sometimes target behind a delay chain of three or more stages is reached
+# only after the initial segment the flag search covers directly, so the
+# verdict rests on the reachability fixpoint of the flag
+set(_chain3 "o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o4[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1] && o4[t] = o3[t-1]")
+set(_chain5 "o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o4[0] = 0 && o5[0] = 0 && o6[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1] && o4[t] = o3[t-1] && o5[t] = o4[t-1] && o6[t] = o5[t-1]")
+add_repl_test(sat_cmd-delay_chain3_sometimes_eq "sat (always (${_chain3})) && (sometimes o4[t] = 1)" ": T")
+add_repl_test(sat_cmd-delay_chain3_sometimes_neq "sat (always (${_chain3})) && (sometimes o4[t] != 0)" ": T")
+add_repl_test(sat_cmd-delay_chain3_unsat "unsat (always (${_chain3})) && (sometimes o4[t] = 1)" ": F")
+add_repl_test(sat_cmd-delay_chain3_valid_negation "valid !((always (${_chain3})) && (sometimes o4[t] = 1))" ": F")
+add_repl_test(sat_cmd-delay_chain3_blocked "sat (always (${_chain3} && o1[t] = 0)) && (sometimes o4[t] = 1)" ": F")
+add_repl_test(sat_cmd-delay_chain5_sometimes_mid "sat (always (${_chain5})) && (sometimes o4[t] = 1)" ": T")
+add_repl_test(sat_cmd-delay_chain5_sometimes_last "sat (always (${_chain5})) && (sometimes o6[t] = 1)" ": T")
+add_repl_test(sat_cmd-delay_chain3_bv "sat (always (o1[0]:bv[8] = 0 && o2[0]:bv[8] = 0 && o3[0]:bv[8] = 0 && o4[0]:bv[8] = 0 && o2[t]:bv[8] = o1[t-1]:bv[8] && o3[t]:bv[8] = o2[t-1]:bv[8] && o4[t]:bv[8] = o3[t-1]:bv[8])) && (sometimes o4[t]:bv[8] = 1)" ": T")

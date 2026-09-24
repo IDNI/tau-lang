@@ -657,6 +657,49 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 	}
+
+	// find_fixpoint_chi on a three-stage delay chain with the target
+	// o4[t] = 1. From the state where o1..o4 are all 0 at time 1, o4 can
+	// only become 1 four steps later (o1[2] = 1 gives o4[5] = 1), so the
+	// fixpoint needs at least four unrolling steps and must accept that
+	// state.
+	static std::pair<tref, int_t> delay_chain_chi(const char* extra) {
+		std::string aw = std::string("always o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1]") + extra + ".";
+		tref chi_base = spec_always_body(aw.c_str());
+		tref st = spec_always_body("always o4[t] = 1.");
+		REQUIRE( chi_base != nullptr );
+		REQUIRE( st != nullptr );
+		trefs io_vars = io_vars_of(tau::build_wff_and(chi_base, st));
+		std::set<std::pair<std::string, int_t>> initials;
+		auto res = find_fixpoint_chi<node_t>(chi_base, st, io_vars,
+			initials, 1);
+		REQUIRE( res.has_value() );
+		return res.value();
+	}
+
+	static tref all_zero_at_1() {
+		return spec_always_body("always o1[1] = 0 && o2[1] = 0 "
+			"&& o3[1] = 0 && o4[1] = 0.");
+	}
+
+	TEST_CASE("find_fixpoint_chi: reachability grows past the lookback") {
+		auto [chi, steps] = delay_chain_chi("");
+		CHECK( steps >= 4 );
+		auto sat = is_run_satisfiable<node_t>(
+			tau::build_wff_and(chi, all_zero_at_1()));
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+	}
+
+	TEST_CASE("find_fixpoint_chi: an unreachable target stays unreachable") {
+		// With o1 held at 0 the zero state never reaches o4[t] = 1.
+		auto [chi, steps] = delay_chain_chi(" && o1[t] = 0");
+		auto sat = is_run_satisfiable<node_t>(
+			tau::build_wff_and(chi, all_zero_at_1()));
+		REQUIRE( sat.has_value() );
+		CHECK( !sat.value() );
+	}
 }
 
 // -----------------------------------------------------------------------------
