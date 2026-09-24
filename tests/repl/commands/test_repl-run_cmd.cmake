@@ -125,6 +125,11 @@ add_repl_test(run_cmd-ltl_correctness-adv_sbf_02_f_x_or_z
 add_repl_test(run_cmd-ltl_correctness-adv_bv_01_g_b10110101
 	"o1:bv[8] := out console. run 6 steps G (o1[t]:bv[8] = {#b10110101}:bv[8])."
 	"o1\\[[0-9]+\\] := 181")
+# GitHub #136: two equal bv outputs take the solver's pure-equality route;
+# every step must print a value for both outputs.
+add_repl_test(run_cmd-ltl_correctness-adv_bv_02_g_two_equal_outputs
+	"o1:bv[2] := out console. o2:bv[2] := out console. run 3 steps G (o1[t]:bv[2] = o2[t]:bv[2])."
+	"o1\\[0\\] := [0-3].*o2\\[0\\] := [0-3].*o1\\[1\\] := [0-3].*o2\\[1\\] := [0-3].*o1\\[2\\] := [0-3].*o2\\[2\\] := [0-3]")
 
 # ── stop command ──────────────────────────────────────────────────────────────
 add_repl_test(stop_cmd-no_run_in_progress "stop" "no run in progress")
@@ -570,6 +575,12 @@ set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTI
 add_repl_test_fail(run_cmd-continue_running-genuine_step_error
 	"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run o1[t] = 1."
 	"failed to write to the output stream")
+# GitHub #136: the same failure under a step budget ends the run too. `-b
+# false` because the benchmark report would print the error anyway.
+add_test(NAME "test_repl-run_cmd-continue_running-genuine_step_error_finite"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -b false -e \"o1:tau := out file(\\\"/nonexistent_dir_xyz_tau_repl_test/out.txt\\\"). run 3 steps o1[t] = 1.\" -S trace")
+set_tests_properties("test_repl-run_cmd-continue_running-genuine_step_error_finite"
+	PROPERTIES PASS_REGULAR_EXPRESSION "failed to write to the output stream")
 
 # --- GitHub #76: bitvector-free mixed :tau stream spec ----------------------
 # The reporter's 7-line reproducer (two :tau streams, a cross-stream

@@ -75,6 +75,35 @@ TEST_SUITE("solve: pure bitvector equalities") {
 		CHECK( solves(form, sol.value()) );
 	}
 
+	// GitHub #136: a pure-equality partition gets constants, not a
+	// reproductive solution such as x := x|y that no caller can commit.
+	static bool ground(const solution<node_t>& sol) {
+		for (const auto& [var, value] : sol)
+			if (tau::get(value).find_top(is_child<node_t, tau::variable>))
+				return false;
+		return true;
+	}
+
+	TEST_CASE("equal variables get ground values") {
+		tref form = parse_form("x:bv[8] = y:bv[8].");
+		auto sol = solve<node_t>(form, bv8_options());
+		REQUIRE( sol.has_value() );
+		CHECK( sol.value().size() == 2 );
+		CHECK( ground(sol.value()) );
+		CHECK( solves(form, sol.value()) );
+	}
+
+	TEST_CASE("equal variables get ground values in minimum mode") {
+		tref form = parse_form("x:bv[8] = y:bv[8] && y:bv[8] = z:bv[8].");
+		solver_options op = bv8_options();
+		op.mode = solver_mode::minimum;
+		auto sol = solve<node_t>(form, op);
+		REQUIRE( sol.has_value() );
+		CHECK( sol.value().size() == 3 );
+		CHECK( ground(sol.value()) );
+		CHECK( solves(form, sol.value()) );
+	}
+
 	TEST_CASE("above the lgrs cap the pack solver answers") {
 		const size_t saved = lgrs_max_vars;
 		lgrs_max_vars = 1;
