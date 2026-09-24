@@ -1006,7 +1006,14 @@ std::optional<bool> ba_fast_path_sat(tref fm) {
 	else {
 	if (!is_whole_query_ba_solvable<node>(fm)) return std::nullopt;
 	// nullopt already covers both translation failure and an unknown answer.
-	return pack_sat_status<node>(fm);
+	auto status = pack_sat_status<node>(fm);
+	// A spec without a temporal wrapper is implicitly `always`, while the
+	// one-step query reads each stream atom (o1[t], o1[t-1], i1[t]) as an
+	// independent existential: steps lose their link and the solver picks
+	// the inputs. That relaxation keeps unsat sound but not sat.
+	if (status.has_value() && *status && has_temp_var<node>(fm))
+		return std::nullopt;
+	return status;
 	}
 }
 

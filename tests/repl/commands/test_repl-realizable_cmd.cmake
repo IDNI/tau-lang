@@ -801,3 +801,6 @@ add_repl_test(realizable_cmd-ltl_qlt_bv-gf_08_multi_output_qlt_gt0_lt1 "realizab
 add_repl_test(realizable_cmd-ltl_qlt_bv-gf_09_multi_output_bv_const_and_const "realizable G (o1[t]:bv[8] = {#b11110000}:bv[8] && o2[t]:bv[8] = {#b00001111}:bv[8])." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-gf_10_s_nested_multi_output_qlt "realizable G ((o1[t]:qlt > {1/4}:qlt) since (o2[t]:qlt < {3/4}:qlt))." ": T")
 
+# A spec without a temporal wrapper is implicitly `always`, and a 2-bit
+# stream cannot increase forever.
+add_repl_test(realizable_cmd-bv-bare_strict_increase_unrealizable "realizable o1[t]:bv[2] > o1[t-1]:bv[2]." ": F")
