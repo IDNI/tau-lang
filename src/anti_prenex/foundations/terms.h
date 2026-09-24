@@ -388,6 +388,17 @@ bool is_pure_term(tref t, ba_type_id type);
 template <NodeType node>
 bool is_pure_equation(tref literal, ba_type_id type);
 
+/**
+ * @brief §1 PURE, extended to a whole formula as §7's router reads a
+ * binder unit's body: every atom reachable through ∧, ∨, ¬ and formula
+ * binders is a pure equation of @p type, every binder binds a variable of
+ * @p type, and nothing else occurs — no reference, no order atom, no
+ * `bf_neq`, no temporal operator. `T` and `F` are pure. The shape
+ * `BIT_BLAST` reads whole (§7).
+ */
+template <NodeType node>
+bool is_pure_formula(tref n, ba_type_id type);
+
 } // namespace idni::tau_lang::anti_prenexing
 
 #include "terms.tmpl.h"

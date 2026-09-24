@@ -12,6 +12,8 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "anti_prenex/foundations/ctx.h"
+#include "anti_prenex/eliminate/ask.h"
+#include "anti_prenex/eliminate/blast.h"
 
 using namespace idni::tau_lang;
 namespace ap = idni::tau_lang::anti_prenexing;
@@ -34,6 +36,14 @@ tref mk_var(const std::string& name) {
 /// a content hash disagree about it.
 tref untrimmed(tref n, tref sibling) {
 	return tau::get(tau::get(tau::build_wff_and(n, sibling)).l).l;
+}
+
+/// A closed bitvector query, parsed with inference so that its variables
+/// carry their type.
+tref parse(const char* sample) {
+	auto rr = get_nso_rr(sample);
+	REQUIRE(rr.has_value());
+	return rr.value().main->get();
 }
 
 } // namespace
@@ -411,6 +421,48 @@ TEST_CASE("a table reference survives the insertions that rehash the table") {
 	CHECK(&r == before);                  // same entry, however many rehashes
 	CHECK(r == 123);
 	CHECK(ap::find<node_t, ap::table::size_memo>(k) == before);
+}
+
+// --- the two solver-side tables through their writers (§7 ASK, DECIDE_FINITE) -----
+
+TEST_CASE("ask writes solver_memo, and the flush empties it") {
+	const tref q = parse("ex x (x:bv[2] & { 1 }:bv[2] = { 1 }:bv[2]).");
+	const tref k = ap::canonicalise_binder_ids<node_t>(q);
+	CHECK(ap::ask<node_t>(q) == ap::answer::sat);
+	const auto got = ap::lookup<node_t, ap::table::solver_memo>(k);
+#ifdef TAU_CACHE
+	REQUIRE(got.has_value());
+	CHECK(*got == ap::answer::sat);
+#else
+	CHECK(!got.has_value());              // no storage, hence no entry
+#endif
+	ap::flush_solver_dependent<node_t>();
+	CHECK(!ap::lookup<node_t, ap::table::solver_memo>(k).has_value());
+	CHECK(ap::ask<node_t>(q) == ap::answer::sat);   // asked again: the same
+}
+
+TEST_CASE("decide_finite writes qbf_memo, and the flush keeps it") {
+	const tref q = parse("all x (x:bv[2] & { 2 }:bv[2] = { 2 }:bv[2]).");
+	const tref k = ap::canonicalise_binder_ids<node_t>(q);
+	ap::block P{ tau::trim_right_sibling(ap::binder_var<node_t>(q)) };
+	auto c = ap::ctx<node_t>::for_component(P, find_ba_type<node_t>(P[0]),
+		false);
+	CHECK(ap::decide_finite<node_t>(q, c) == false);
+#ifdef TAU_CACHE
+	// The sweep decided: its verdict is recorded, the solver was not asked.
+	CHECK(ap::lookup<node_t, ap::table::qbf_memo>(k) == false);
+	CHECK(!ap::lookup<node_t, ap::table::solver_memo>(k).has_value());
+#endif
+	ap::flush_solver_dependent<node_t>();
+	const auto got = ap::lookup<node_t, ap::table::qbf_memo>(k);
+#ifdef TAU_CACHE
+	// A verdict of the sweep is a mathematical truth, exempt from the flush.
+	REQUIRE(got.has_value());
+	CHECK(*got == false);
+#else
+	CHECK(!got.has_value());
+#endif
+	CHECK(ap::decide_finite<node_t>(q, c) == false);
 }
 
 // --- GC (last: a sweep rebuilds every table in the process) -----------------------
