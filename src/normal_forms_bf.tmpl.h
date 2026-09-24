@@ -133,6 +133,32 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	auto atm_type = tau::get(atomic_fm)[0].value.nt;
 	tref func1 = tau::get(atomic_fm)[0].first();
 	tref func2 = tau::get(atomic_fm)[0].second();
+	// The substituted terms are brought to canonical form so that two
+	// spellings of the same function compare equal -- but not when the term
+	// carries a tau constant: canonicalizing such a term decides the
+	// constants it holds (bf_reduce_canonical runs bf_reduced_dnf, whose
+	// normalize_ba normalizes every tau-valued coefficient and its
+	// complement through node::ba::normalize, i.e. normalize_tau, and
+	// rebuilds the constant node, whose cte hook folds it to 0/1 through
+	// is_syntactic_zero/is_syntactic_one -- for a tau constant the full
+	// is_zero/is_one decisions), each a decision on a temporal
+	// specification, asked here on every atom for every free variable. A
+	// syntactic pass must not pay for that; those terms are compared as
+	// substituted. The choice is made once per atom, over both sides, so
+	// the two sides are always compared under the same form. (The BDD
+	// classification below answers `unknown` for a term with a constant,
+	// so such a term always reaches this comparison.)
+	auto has_tau_constant = [](tref t) {
+		return tau::get(t).find_top([](tref n) {
+			const auto& x = tau::get(n);
+			return x.is_ba_constant()
+				&& is_tau_type<node>(x.get_ba_type()); }) != nullptr;
+	};
+	const bool canonical = !has_tau_constant(func1)
+		&& !has_tau_constant(func2);
+	auto canon = [&](tref t) {
+		return canonical ? (tt(t) | bf_reduce_canonical<node>() | tt::ref) : t;
+	};
 	// The reduced DNF of a cofactor can be exponential (x1 ^ ... ^ xn), so
 	// settle the outcome of the checks below from a BDD when it can. If
 	// func1 depends on var, its cofactors differ as Boolean functions: their
@@ -145,12 +171,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		func1 = tau::_1(find_ba_type<node>(func1));
 	else if (dep1 == bf_dependence::unknown) {
 		// Make sure that it works only on Boolean parts by using replace_if
-		tref func1_v_0 = rewriter::replace_if<node>(func1, var,
-			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func1_v_0 = tt(func1_v_0) | bf_reduce_canonical<node>() | tt::ref;
-		tref func1_v_1 = rewriter::replace_if<node>(func1, var,
-			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func1_v_1 = tt(func1_v_1) | bf_reduce_canonical<node>() | tt::ref;
+		tref func1_v_0 = canon(rewriter::replace_if<node>(func1, var,
+			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>));
+		tref func1_v_1 = canon(rewriter::replace_if<node>(func1, var,
+			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>));
 		// Is func syntactically identically 0
 		if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
 			func1 = tau::_0(find_ba_type<node>(func1));
@@ -173,12 +197,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	else if (dep2 == bf_dependence::one)
 		func2 = tau::_1(find_ba_type<node>(func2));
 	else if (dep2 == bf_dependence::unknown) {
-		tref func2_v_0 = rewriter::replace_if<node>(func2, var,
-			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
-		tref func2_v_1 = rewriter::replace_if<node>(func2, var,
-			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
-		func2_v_1 = tt(func2_v_1) | bf_reduce_canonical<node>() | tt::ref;
+		tref func2_v_0 = canon(rewriter::replace_if<node>(func2, var,
+			_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>));
+		tref func2_v_1 = canon(rewriter::replace_if<node>(func2, var,
+			_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>));
 		// Is func syntactically identically 0
 		if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
 			func2 = tau::_0(find_ba_type<node>(func2));
