@@ -189,3 +189,23 @@ set_tests_properties("test_repl-sat_cmd-components_shadow_agrees" PROPERTIES
 	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits [1-9][0-9]*, mismatches 0"
 	FAIL_REGULAR_EXPRESSION "Error"
 )
+
+# The components are the connected components of the units under "share a
+# stream". A unit that mentions streams of two earlier groups joins them:
+# the cases below need that join for their verdict (a lookback keeps the
+# contradiction out of the syntactic simplifier, so it is the temporal
+# decision of the joined component that finds it), whether the joining unit
+# comes last, comes between the groups it joins, or joins three groups; the
+# `[t-1]` variant with a satisfiable bridge is the control.
+add_repl_test(sat_cmd-components_join_unsat        "set charvar off. sat (always o1[t] = 1) && (always o2[t] = 0) && (always (o1[t-1] = 0 || o2[t] = 1)) && (always o3[t] = 0)" ": F")
+add_repl_test(sat_cmd-components_join_sat          "set charvar off. sat (always o1[t] = 1) && (always o2[t] = 0) && (always (o1[t-1] = 1 || o2[t] = 1)) && (always o3[t] = 0)" ": T")
+add_repl_test(sat_cmd-components_join_last_unit    "set charvar off. sat (always o1[t] = 1) && (always o3[t] = 0) && (always o2[t] = 0) && (always (o1[t-1] = 0 || o2[t] = 1))" ": F")
+add_repl_test(sat_cmd-components_join_three_groups "set charvar off. sat (always o1[t] = 1) && (always o2[t] = 0) && (always o3[t] = 1) && (always (o1[t-1] = 0 || o3[t-1] = 0 || o2[t] = 1)) && (always o4[t] = 0)" ": F")
+# The joined component is decided on its own next to the untouched one; the
+# shadow mode requires a taken factored decision that agrees.
+add_test(NAME "test_repl-sat_cmd-components_join_shadow_agrees"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat (always o1[t] = 1) && (always o2[t] = 0) && (always (o1[t-1] = 0 || o2[t] = 1)) && (always o3[t] = 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_join_shadow_agrees" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits [1-9][0-9]*, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
