@@ -710,6 +710,44 @@ TEST_SUITE("BDD term_handle substitute") {
 	}
 }
 
+// build_bdd over a DAG-shaped term (the output of a Boole
+// decomposition shares its cofactors) must build each shared subterm once.
+// p_k = x_k p_{k-1} | x_k' p_{k-1}' has 2^k paths as a tree; the same
+// function written as q_k = (x_k ^ q_{k-1})' is a plain chain. Their BDDs
+// are canonical, so they must be the same ref -- and the DAG build must
+// finish at all (2^32 paths without the memo).
+TEST_SUITE("BDD build over shared subterms") {
+	TEST_CASE("DAG with 2^32 paths builds the same BDD as the linear chain") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		const size_t n = 32;
+		bdd::order o;
+		std::vector<tref> vars;
+		for (size_t k = 0; k <= n; ++k) {
+			const std::string name = "x" + std::to_string(k);
+			tref v = tau::get(name.c_str(), opts).value_or(nullptr);
+			REQUIRE(v != nullptr);
+			vars.push_back(v);
+			o.emplace(tau::trim(v), k);
+		}
+		tref p = vars[0], q = vars[0];
+		for (size_t k = 1; k <= n; ++k) {
+			p = tau::build_bf_or(tau::build_bf_and(vars[k], p),
+				tau::build_bf_and(tau::build_bf_neg(vars[k]),
+					tau::build_bf_neg(p)));
+			q = tau::build_bf_neg(tau::build_bf_xor(vars[k], q));
+		}
+		bdd::ref bp = bdd::build_bdd(p, o);
+		bdd::ref bq = bdd::build_bdd(q, o);
+		CHECK(bp.b == bq.b);
+		CHECK(bp.inv == bq.inv);
+		CHECK(!bdd::leaf(bp));
+	}
+}
+
 TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
 	using bdd = tau_term_bdd<node_t>;
 	tau::get_options opts = { .parse = { .start = tau::bf } };

@@ -184,6 +184,13 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 
 	/** @brief Build a BDD for Tau formula @p f using variable order @p o. */
 	static ref build_bdd(tref f, const order& o);
+	/**
+	 * @brief build_bdd with @p memo holding the BDD of every subterm already
+	 * built under @p o, so a subterm shared by several parents is built once.
+	 */
+	static ref build_bdd(tref f, const order& o, std::unordered_map<tref, ref>& memo);
+	/** @brief One step of build_bdd; recurses through the memoized overload. */
+	static ref build_bdd_step(tref f, const order& o, std::unordered_map<tref, ref>& memo);
 	/** @brief Build a single-bit BDD for variable @p v. */
 	static ref from_bit(tref v);
 

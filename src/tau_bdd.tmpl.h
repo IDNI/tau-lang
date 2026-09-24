@@ -354,6 +354,23 @@ bool tau_term_bdd<node>::leaf(ref l) {
  */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
+	std::unordered_map<tref, ref> memo;
+	return build_bdd(f, o, memo);
+}
+
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o,
+	std::unordered_map<tref, ref>& memo) {
+	if (auto it = memo.find(f); it != memo.end())
+		return it->second;
+	ref r = build_bdd_step(f, o, memo);
+	memo.emplace(f, r);
+	return r;
+}
+
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd_step(tref f, const order& o,
+	std::unordered_map<tref, ref>& memo) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(f).get_type() != tau::wff));
 	// If the current tree is considered to be a BDD variable, it is
@@ -363,30 +380,30 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 		return from_bit(f);
 	}
 	switch (auto nt = tau::get(f).get_type()) {
-		case tau::bf: return build_bdd(tau::trim(f), o);
+		case tau::bf: return build_bdd(tau::trim(f), o, memo);
 		case tau::bf_and: {
 			refs bdds;
 			for (tref c : get_cnf_bf_clauses<node>(f))
-				bdds.emplace_back(build_bdd(c, o));
+				bdds.emplace_back(build_bdd(c, o, memo));
 			return bdd_and_many(std::move(bdds), o);
 		}
 		case tau::bf_or: {
 			refs bdds;
 			for (tref d : get_dnf_bf_clauses<node>(f))
-				bdds.emplace_back(build_bdd(d, o));
+				bdds.emplace_back(build_bdd(d, o, memo));
 			return bdd_or_many(std::move(bdds), o);
 		}
 		case tau::bf_xor: {
 			const tau& tf = tau::get(f);
-			const ref a = build_bdd(tf.first(), o);
-			const ref b = build_bdd(tf.second(), o);
+			const ref a = build_bdd(tf.first(), o, memo);
+			const ref b = build_bdd(tf.second(), o, memo);
 			return bdd_or(
 				bdd_and(a, bdd_not(b), o),
 				bdd_and(bdd_not(a), b, o), o);
 		}
 		case tau::bf_neg: {
 			const tau& tf = tau::get(f);
-			return bdd_not(build_bdd(tf.first(), o));
+			return bdd_not(build_bdd(tf.first(), o, memo));
 		}
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID.

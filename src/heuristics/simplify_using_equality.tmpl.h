@@ -421,7 +421,10 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 		}
 		return n;
 	};
-	tref simp_eq = pre_order<node>(eq).apply(uf_find);
+	// Memoized: a Boole-decomposed term is a DAG whose shared cofactors are
+	// exponentially larger as a tree, and uf_find answers the same for a
+	// node wherever it occurs (find only path-compresses).
+	tref simp_eq = pre_order<node>(eq).apply_unique(uf_find);
 	DBG(LOG_TRACE << "Simplified to: " << tau::get(simp_eq) << "\n";)
 	if (tau::get(simp_eq) != tau::get(eq))
 		return simp_eq;
