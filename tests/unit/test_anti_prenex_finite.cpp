@@ -557,6 +557,26 @@ TEST_CASE("F10: a swallowed unit enters the query whole") {
 	CHECK(ap::taint_count<node_t>() == before);
 }
 
+TEST_CASE("F12: a negative the squeeze frees of the block is a part of its own") {
+	// `x^b = x^c` squeezes to `b^c = 0`: a tier-2 part over no variable,
+	// its query the conjunct itself, open and undecided, so it stays. The
+	// `x` part needs `a` mixed and re-wraps; the two share no variable.
+	fixture f = make("ex x (!(x:bv[2] ^ b:bv[2] = x:bv[2] ^ c:bv[2]) "
+		"&& !(x:bv[2] & a:bv[2] = { 0 }:bv[2]) "
+		"&& !(x:bv[2] & a:bv[2]' = { 0 }:bv[2])).");
+	for (tref m : f.conjuncts) REQUIRE(ap::fv_meets<node_t>(m, f.P));
+	const tref got = ap::eliminate_finite_clause<node_t>(f.conjuncts, f.P,
+		f.c);
+	check_against_source(got, f);
+	REQUIRE(binder_count(got) == 1);
+	const auto [unit, rest] = unit_and_rest(got);
+	CHECK(same(ap::binder_var<node_t>(unit), f.P[0]));
+	CHECK(ap::is_negated_equation<node_t>(rest));
+	CHECK(!ap::fv_meets<node_t>(rest, f.P));
+	CHECK(bv_equivalent(rest,
+		parse("!(b:bv[2] ^ c:bv[2] = { 0 }:bv[2]).")));
+}
+
 // --- keep mode --------------------------------------------------------------------
 
 TEST_CASE("F11: keep mode emits F3's conditions as chains") {
