@@ -99,6 +99,26 @@ inline int ba_normalized_conjunction = 1;
 inline size_t tau_ba_normalized_conjunction_hits = 0;
 inline size_t tau_ba_normalized_conjunction_shaped = 0;
 inline size_t tau_ba_normalized_conjunction_mismatches = 0;
+/// Removal of one conjunct from a normal form (`normalize_tau_without`):
+/// the normal form of the always-hull over the top-level conjuncts of a
+/// normal form `normalize_tau` returned, minus the one equal to the body of
+/// a given single clause. Where the normal form has the shape the Boole
+/// normal form gives a conjunction of clauses and the removed conjunct
+/// mentions no stream another conjunct mentions, the result is assembled
+/// from that shape (see `shaped_without`); otherwise the pipeline
+/// normalizes the remaining conjuncts. 0 = off (always the pipeline),
+/// 1 = on, 2 = shadow: the pipeline runs anyway and is returned, and every
+/// result that differs from the assembled form is counted in
+/// `tau_ba_normalized_without_mismatches`. The environment variable
+/// TAU_BA_NORMALIZED_WITHOUT (0, 1 or 2; any other value selects 0)
+/// overrides the flag.
+inline int ba_normalized_without = 1;
+/// Removals that found their conjunct, of which those assembled from the
+/// shape, and results the shadow mode found to differ, for tests and
+/// diagnostics.
+inline size_t tau_ba_normalized_without_hits = 0;
+inline size_t tau_ba_normalized_without_shaped = 0;
+inline size_t tau_ba_normalized_without_mismatches = 0;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.

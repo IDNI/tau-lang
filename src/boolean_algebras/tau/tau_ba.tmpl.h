@@ -285,6 +285,23 @@ inline int ba_normalized_conjunction_mode() {
 	return env ? *env : ba_normalized_conjunction;
 }
 
+inline int ba_normalized_without_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_BA_NORMALIZED_WITHOUT");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "tau_ba normalized without shadow:"
+			" hits %zu (shaped %zu), mismatches %zu\n",
+			tau_ba_normalized_without_hits,
+			tau_ba_normalized_without_shaped,
+			tau_ba_normalized_without_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : ba_normalized_without;
+}
+
 // Mains that `normalize_tau` returned. Registered with the GC, so a main
 // that does not survive a sweep is forgotten with its tree. External
 // linkage on purpose: `normalize_tau` and the decision can be instantiated
@@ -705,6 +722,15 @@ static tref nf_chain(const trefs& v) {
 		acc = tree<node>::build_wff_and(acc, v[i]);
 	return acc;
 }
+// Whether two conjuncts are the same formula. A conjunct is a `wff` node
+// over its atom or disjunction; the tree is stored left-child-right-sibling,
+// so the same conjunct standing in a conjunction (with a sibling) and
+// standing alone are two `wff` nodes over one shared child. The child
+// identifies the conjunct.
+template <typename node>
+static bool nf_same(tref a, tref b) {
+	return a == b || tree<node>::get(a).first() == tree<node>::get(b).first();
+}
 // A body with both kinds is AND(unit chain, clause chain), whose left
 // spine ends in the clause chain as one element (a unit is never a
 // conjunction); a body with one kind is that chain itself. false when the
@@ -856,6 +882,55 @@ static tref shaped_conjunction(tref big, tref one, bool front) {
 	return out;
 }
 
+// The normal form without one of its conjuncts, from the shape
+// (ba_normalized_without): `big` is the body of a normal form with the
+// two-chain shape above, `one` a body that is one of its top-level
+// conjuncts (nf_same). Removing that conjunct from its chain leaves the chains of
+// the remaining conjuncts in their order, which is the shape the Boole
+// normal form gives the conjunction of the remaining conjuncts -- provided
+// the removed conjunct mentions no stream another conjunct mentions (the
+// syntactic passes simplify conjuncts on a shared stream against each
+// other, so the remainder could then take another form). Equivalent to
+// the conjunction of the remaining conjuncts by construction; that it is
+// the same tree the normalization returns is measured (the shadow mode).
+// nullptr when the body has another shape, when `one` is not among the
+// conjuncts, when it shares a stream with another conjunct, or when it is
+// the only conjunct (the remainder is then T, which the pipeline gives).
+template <typename node>
+static tref shaped_without(tref big, tref one) {
+	using tau = tree<node>;
+	trefs units, clauses;
+	if (!nf_split<node>(big, units, clauses)) return nullptr;
+	trefs& from = nf_is_unit<node>(one) ? units : clauses;
+	auto at = std::find_if(from.begin(), from.end(),
+		[one](tref u) { return nf_same<node>(u, one); });
+	if (at == from.end()) return nullptr;
+	if (units.size() + clauses.size() < 2) return nullptr;
+	bool other_variable = false;
+	std::vector<std::string> gone = nf_stream_names<node>(one, other_variable);
+	if (other_variable) return nullptr;
+	for (tref c : units) if (!nf_same<node>(c, one))
+		for (const auto& s : nf_stream_names<node>(c, other_variable))
+			if (std::binary_search(gone.begin(), gone.end(), s)) return nullptr;
+	for (tref c : clauses) if (!nf_same<node>(c, one))
+		for (const auto& s : nf_stream_names<node>(c, other_variable))
+			if (std::binary_search(gone.begin(), gone.end(), s)) return nullptr;
+	if (other_variable) return nullptr;
+	from.erase(at);
+	tref out = units.empty() ? nf_chain<node>(clauses)
+		: clauses.empty() ? nf_chain<node>(units)
+		: tau::build_wff_and(nf_chain<node>(units), nf_chain<node>(clauses));
+	auto& streams_of = nf_streams_of<node>();
+	if (auto it = streams_of.find(big); it != streams_of.end()) {
+		std::vector<std::string> rest;
+		std::set_difference(it->second.begin(), it->second.end(),
+			gone.begin(), gone.end(), std::back_inserter(rest));
+		streams_of.insert_or_assign(out, std::move(rest));
+	}
+	++tau_ba_normalized_without_shaped;
+	return out;
+}
+
 // The normal form of `a && b` built from the normal forms of its sides
 // (ba_normalized_conjunction): the always-hull over the Boole normal form
 // of the two bodies conjoined, in operand order. That is the tree the
@@ -978,6 +1053,77 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
 	}
 	return out;
+}
+
+// The normal form of a formula without one of its conjuncts
+// (ba_normalized_without): `km` the normal form of an always-conjunction,
+// `cm` the normal form of a single clause, both as `normalize_tau` or the
+// normalizer return them. The result is the always-hull over the top-level
+// conjuncts of `km` minus the one equal to the body of `cm`, normalized;
+// `km` itself when it is not an always-hull (T, F, or another form), when
+// `cm` is no single clause, or when no conjunct equals it; nullptr when
+// the normalization of the remainder fails, so that a caller can tell a
+// failure from a formula that was left as it is. With the switch on, a
+// normal form of the two-chain shape gives the result by its shape
+// (shaped_without) and the pipeline is skipped; otherwise, and in the
+// shadow mode, the pipeline normalizes the remaining conjunction. The
+// result is recorded as a normal form (normalized_mains).
+template <typename node>
+tref normal_form_without(tref km, tref cm) {
+	using tau = tree<node>;
+	using cache = detail::tau_decision_cache<node>;
+	auto is_hull = [](tref f) {
+		const tau& t = tau::get(f);
+		return t.has_child() && t.child_is(tau::wff_always);
+	};
+	if (!km || !cm || !is_hull(km) || !is_hull(cm)) return km;
+	tref kb = tau::trim2(km), cb = tau::trim2(cm);
+	if (nf_is_and<node>(cb)) return km;
+	trefs conjs = get_cnf_wff_clauses<node>(kb);
+	auto at = std::find_if(conjs.begin(), conjs.end(),
+		[cb](tref x) { return nf_same<node>(x, cb); });
+	if (at == conjs.end()) return km;
+	++tau_ba_normalized_without_hits;
+	conjs.erase(at);
+	// the remainder as the pipeline sees it: the conjunction of the
+	// remaining conjuncts in their order, under the hull
+	tref rest = tau::build_wff_always(
+		conjs.empty() ? tau::_T() : nf_chain<node>(conjs));
+	const int mode = ba_normalized_without_mode();
+	tref shaped = mode > 0 ? shaped_without<node>(kb, cb) : nullptr;
+	tref built = shaped ? tau::build_wff_always(shaped) : nullptr;
+	auto simplified = simp_tau_unsat_valid<node>(rest, 0, false,
+		mode == 1 ? built : nullptr);
+	if (!simplified.has_value()) return nullptr;
+	if (built && mode == 2) {
+		auto direct = simp_tau_unsat_valid<node>(rest, 0, false, built);
+		if (!direct.has_value() || direct.value() != simplified.value())
+			++tau_ba_normalized_without_mismatches;
+	}
+	// recorded as a normal form unless the bdd node table was exhausted
+	// while it was computed (then it may be incomplete)
+	if (!bdd_node_table_exhausted) {
+		std::lock_guard<std::mutex> lock(cache::mtx());
+		normalized_mains<node>().insert_or_assign(simplified.value(), true);
+	}
+	return simplified.value();
+}
+
+// The normal form of a constant without one of its conjuncts: the normal
+// forms of `k` and `c` handed to normal_form_without. A failed
+// normalization of the remainder leaves the normal form of `k` as it is
+// (the constant has no error value; api::without reports it).
+template <typename... BAs>
+requires BAsPack<BAs...>
+tau_ba<BAs...> normalize_tau_without(const tau_ba<BAs...>& k,
+	const tau_ba<BAs...>& c)
+{
+	using node = typename tau_ba<BAs...>::node;
+	tau_ba<BAs...> kn = normalize_tau(k), cn = normalize_tau(c);
+	tref out = normal_form_without<node>(kn.nso_rr.main->get(),
+		cn.nso_rr.main->get());
+	if (!out || out == kn.nso_rr.main->get()) return kn;
+	return tau_ba<BAs...>(tree<node>::geth(out));
 }
 
 // Memoized normalizer<node>(nso_rr) for the splitter's normalized-formula
