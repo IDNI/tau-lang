@@ -663,13 +663,20 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::reset_cmd() {
+	// The run goes first: its interpreter holds raw trefs the sweep in
+	// api::reset cannot see.
+	const bool was_running = (bool)running;
+	finish_running();
 	H.clear();
 	rr_defs.clear();
 	io_defs.clear();
 	type_defs.clear();
 	names = {};
-	definitions<node>::instance().clear();
-	out << "Session reset: history, definitions, and IO streams cleared.\n";
+	const size_t freed = api<node>::reset();
+	out << "Session reset: " << (was_running ? "run stopped, " : "")
+		<< "history, definitions, IO streams and caches cleared, "
+		<< freed << " tree nodes freed (live: "
+		<< api<node>::tref_count() << ").\n";
 }
 
 template <typename... BAs>
@@ -2477,7 +2484,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "History and definitions:\n"
 		<< "  history or hist         show all Tau expressions stored in the repl history\n"
 		<< "  definitions or defs     show stored IO variables and function and predicate definitions\n"
-		<< "  reset                   clear history, definitions, and IO streams\n"
+		<< "  reset                   reset the session and free unused memory\n"
 		<< "\n"
 
 		<< "Inspection commands:\n"
@@ -2677,10 +2684,14 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "type names: wff, bf, " << node::ba::types_joined() << "\n";
 		break;
 	case tau::reset_sym: out
-		<< "the reset command clears the REPL session state\n"
+		<< "the reset command starts the REPL session afresh\n"
+		<< "\n"
+		<< "it stops a run in progress, clears the history, the definitions,\n"
+		<< "the IO streams and the caches, and frees the tree nodes nothing\n"
+		<< "uses any more; options keep the values they were set to\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  reset                   clears history, definitions, and IO streams\n";
+		<< "  reset                   resets the session\n";
 		break;
 	case tau::sat_sym: out
 		<< "the sat command checks if a Tau formula is satisfiable and if so prints T and else F\n\n"

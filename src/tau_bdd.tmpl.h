@@ -4,6 +4,7 @@
 #define TAU_TAU_BDD_TMPL_H
 
 #include "tau_bdd.h"
+#include "reset_hooks.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_bdd"
@@ -184,6 +185,7 @@ void tau_term_bdd<node>::sync_order_cache(const order& o) {
 				// be freed, and would also deadlock re-locking it.
 				tau_term_bdd<node>::prune_caches(kept);
 			});
+		on_reset([] { tau_term_bdd<node>::clear_caches(); });
 		return true;
 	}();
 	(void)registered;

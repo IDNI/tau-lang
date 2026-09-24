@@ -367,7 +367,7 @@ def _build_production_docs(info: GrammarInfo):
         (["onf"], "onf_cmd", "Convert to Order Normal Form w.r.t. a variable: onf <var> <expr>"),
         (["qelim"], "qelim_cmd", "Quantifier elimination"),
         (["whatis"], "whatis_cmd", "Inspect the type of a formula (wff, bf, spec, etc.)"),
-        (["reset"], "reset_cmd", "Reset the current session (clear all definitions and history)"),
+        (["reset"], "reset_cmd", "Reset the session: stop a run, clear the history, definitions, IO streams and caches, and free unused memory"),
         (["fragment"], "fragment_cmd", "Switch grammar fragment: fragment ltl (default) or fragment ctl_star"),
         (["get"], "get_cmd", "Get the current value of an option"),
         (["set"], "set_cmd", "Set an option: set <name> <value>"),

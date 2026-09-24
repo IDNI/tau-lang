@@ -210,6 +210,8 @@ EMSCRIPTEN_BINDINGS(tau) {
 
 	emscripten::function("setCharvar", &tau_api::set_charvar);
 	emscripten::function("resetDefinitions", &tau_api::reset_definitions);
+	emscripten::function("reset", optional_override(
+		[]() { return static_cast<double>(tau_api::reset()); }));
 	emscripten::function("setBlasting", &tau_api::set_preprocessing);
 	emscripten::function("setIndenting", &tau_api::set_indenting);
 	emscripten::function("setHighlighting", &tau_api::set_highlighting);

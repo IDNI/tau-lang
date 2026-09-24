@@ -2781,7 +2781,10 @@ corresponds to the repo commit.
 
 * `whatis <tau|term|repl_history>`: shows the inferred type of an expression.
 
-* `reset`: clears the history, the definitions and the input/output streams.
+* `reset`: returns the session to the state it started in. It stops a run in
+  progress, clears the history, the definitions, the input/output streams and
+  the caches, and frees the memory nothing uses any more. Options keep their
+  values.
 
 * `fragment ltl|ctl_star`: selects the grammar fragment; `ctl_star` adds the
 `A`, `E` and `-` operators (see [CTL\* fragment](#ctl-fragment-and-semantic-negation)).

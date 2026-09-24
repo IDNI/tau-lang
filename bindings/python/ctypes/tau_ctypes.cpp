@@ -414,3 +414,12 @@ extern "C" void tau_lang_mealy_free(int64_t handle) {
 	std::lock_guard<std::mutex> lg(g_mtx);
 	g_interpreters.erase(handle);
 }
+
+extern "C" int64_t tau_lang_reset(void) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	g_last_error.clear();
+	// The machines go first: an interpreter holds raw trefs the sweep in
+	// api::reset cannot see.
+	g_interpreters.clear();
+	return static_cast<int64_t>(tau_api::reset());
+}
