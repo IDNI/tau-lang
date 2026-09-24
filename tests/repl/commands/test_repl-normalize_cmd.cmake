@@ -183,6 +183,10 @@ add_repl_test(normalize_cmd-tau_complement_valid_zero         "set charvar off. 
 add_repl_test(normalize_cmd-tau_complement_valid_one          "set charvar off. normalize { (always (o1[t] = 0 || o1[t] != 0)) && (always (o2[t] = 0 || o2[t] != 0)) }:tau' = 1" ": F")
 add_repl_test(normalize_cmd-tau_complement_unsat_one          "set charvar off. normalize { (always o1[t] = 0) && (always o1[t] != 0) }:tau' = 1" ": T")
 add_repl_test(normalize_cmd-tau_complement_unsat_zero         "set charvar off. normalize { (always o1[t] = 0) && (always o1[t] != 0) }:tau' = 0" ": F")
+# The zero test and the test for one of a constant whose formula refers to
+# absolute time are decided on the formula as a whole.
+add_repl_test(normalize_cmd-tau_absolute_time_zero            "set charvar off. normalize { (always o2[t] = 1) && (always o1[t-2] = 0) && (sometimes o2[t-1] = 0) }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_absolute_time_one             "set charvar off. normalize { sometimes ((o1[t-2] != 0 && [t < 2]) || (o3[t] = o3[1] && i1[t] = o3[t-1]) || (o4[1] = 0 && [t >= 3])) }:tau = 1" ": F")
 # The same two questions on constants that read an input stream. An input
 # stream is universally quantified: `always i1[t] = 0` has no realization, so
 # the pinned constant is unsatisfiable and its complement valid (`= 1` gives

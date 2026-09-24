@@ -209,3 +209,59 @@ set_tests_properties("test_repl-sat_cmd-components_join_shadow_agrees" PROPERTIE
 	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits [1-9][0-9]*, mismatches 0"
 	FAIL_REGULAR_EXPRESSION "Error"
 )
+# The decision of a formula takes the step from which its always part is
+# enforced from the formula as a whole, a group decided on its own from the
+# group. An `always` clause that reads its streams at the current step and at
+# steps back says the same from every step, so the components decide a
+# formula of such clauses, also where the clauses read unequally deep (the
+# first two cases are controls of that). A `sometimes`
+# clause, a fixed time point and a constraint on the time point refer to
+# absolute time: the whole formula decides, and the shadow mode counts no
+# taken factored decision. So it does for an `always` clause that holds a
+# temporal operator of its own.
+add_repl_test(sat_cmd-components_relative_depths_sat   "set charvar off. sat (always (o1[t-2] = 0 || o1[t-1] = 1)) && (always (o2[t] = 1 && o2[t-1] = 1)) && (always o3[t-3] != 0)" ": T")
+add_repl_test(sat_cmd-components_relative_depths_unsat "set charvar off. sat (always (o1[t-1] = 0 && o1[t] = 1)) && (always o2[t-2] = 0)" ": F")
+add_test(NAME "test_repl-sat_cmd-components_relative_depths_shadow_agrees"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat (always (o1[t-2] = 0 || o1[t-1] = 1)) && (always (o2[t] = 1 && o2[t-1] = 1)) && (always o3[t-3] != 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_relative_depths_shadow_agrees" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits [1-9][0-9]*, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
+add_repl_test(sat_cmd-components_absolute_sometimes            "set charvar off. sat (always o2[t] = 1) && (always o1[t-2] = 0) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-components_absolute_sometimes_reads_back "set charvar off. sat (always o2[t] = 1) && (always o1[t-1] = 0) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-components_absolute_sometimes_continuation "set charvar off. sat (always ((o1[t-2] = 0 || o1[t-1] = 0) && o1[t-1] = o1[t])) && (sometimes o1[t] != 0) && (always o3[t] = o3[t-2])" ": T")
+add_repl_test(sat_cmd-components_nested_temporal_operator      "set charvar off. sat (always ((o3[t] = 0) U (o3[t] = 1))) && (always o1[t] = 0)" ": T")
+add_repl_test(sat_cmd-components_absolute_fixed_time_point     "set charvar off. sat (always (o2[0] = 0 && o2[t] = 1)) && (always o1[t-2] = 0)" ": T")
+add_repl_test(sat_cmd-components_absolute_constraint           "set charvar off. sat (sometimes ([t < 1] && o3[t-2] = 1)) && (always ([t < 3] -> o2[t] = 0))" ": F")
+add_test(NAME "test_repl-sat_cmd-components_absolute_sometimes_shadow_declines"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat (always o2[t] = 1) && (always o1[t-2] = 0) && (sometimes o2[t-1] = 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_absolute_sometimes_shadow_declines" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
+add_test(NAME "test_repl-sat_cmd-components_nested_temporal_operator_shadow_declines"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat (always ((o3[t] = 0) U (o3[t] = 1))) && (always o1[t] = 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_nested_temporal_operator_shadow_declines" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
+add_test(NAME "test_repl-sat_cmd-components_absolute_fixed_time_point_shadow_declines"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat (always (o2[0] = 0 && o2[t] = 1)) && (always o1[t-2] = 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_absolute_fixed_time_point_shadow_declines" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
+add_test(NAME "test_repl-sat_cmd-components_absolute_constraint_shadow_declines"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat (sometimes ([t < 1] && o3[t-2] = 1)) && (always ([t < 3] -> o2[t] = 0))\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_absolute_constraint_shadow_declines" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
+# A formula that is one `sometimes` is decided through its dual; where a unit
+# of the dual holds a constraint on the time point, the whole formula decides.
+add_test(NAME "test_repl-sat_cmd-components_dual_constraint_shadow_declines"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat sometimes ((o2[t-1] = o1[t-1] && [t < 1]) || (o1[t-2] = o2[t-1] && o2[t-1] = 1 && o1[t-2] = 0) || ([t < 1] && o1[t] = 1))\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_dual_constraint_shadow_declines" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
