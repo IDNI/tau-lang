@@ -137,12 +137,18 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
 
 /**
  * @brief Check whether temporal formula @p f1 implies @p f2.
+ *
+ * The inputs of the negated implication are quantified universally, so
+ * `false` means the system can keep @p f1 true and @p f2 false whatever the
+ * inputs do. A trace validity check reads every input as an output first
+ * (`inputs_as_outputs`, as `api::valid_spec` does).
  * @tparam node Tree node type.
  * @param f1 Antecedent formula.
  * @param f2 Consequent formula.
- * @return `true` if every model of @p f1 satisfies @p f2; `false` also when
- * normalization fails on a `bv_widening` width-cap violation (a logged,
- * conservative fallback, not a proof).
+ * @return `true` if every model of @p f1 satisfies @p f2, `false` as soon
+ * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
+ * disjunct is satisfiable and one of them is undecided, or when
+ * normalization fails.
  *
  * @par Example
  * @code{.cpp}
@@ -150,9 +156,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
  * // negating the implication gives (always o1[t] = 1) && (sometimes
  * // o1[t] != 1 && ...), which contradicts the "always" part and is
  * // therefore unsatisfiable, so the implication holds. This mirrors the
- * // "is fm valid/a tautology" idiom used at src/api.tmpl.h:439
- * // (`is_tau_impl<node>(tau::_T(), normalize_formula(fm)).value_or(false)`) and
- * // src/boolean_algebras/tau/tau_ba.tmpl.h.
+ * // "is fm valid/a tautology" idiom of api::valid_spec
+ * // (`is_tau_impl<node>(tau::_T(), nfm)`) and src/boolean_algebras/tau/tau_ba.tmpl.h.
  * tref f1 = create_spec("always o1[t] = 1.");
  * tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
  * bool result = is_tau_impl<node_t>(f1, f2).value();
@@ -169,9 +174,10 @@ result<bool> is_tau_impl(tref f1, tref f2);
  * @tparam node Tree node type.
  * @param f1 First formula (closed).
  * @param f2 Second formula (closed).
- * @return `true` if @p f1 and @p f2 have identical models; `false` also
- * when normalization fails on a `bv_widening` width-cap violation (a
- * logged, conservative fallback, not a proof).
+ * @return `true` if @p f1 and @p f2 have identical models, `false` as soon
+ * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
+ * disjunct is satisfiable and one of them is undecided, or when
+ * normalization fails.
  *
  * @par Example
  * @code{.cpp}

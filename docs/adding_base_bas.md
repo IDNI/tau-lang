@@ -154,6 +154,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `zero_constant(ba_type)`, `value_constant(ba_type, v)` | the type's default zero, when it is not `bf_f`; a constant holding a plain integer | owner |
 | `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
 | `omcat_qe(var, body)` | eliminate a quantifier over your own theory; `nullopt` falls through to the atomless path | owner |
+| `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (qlt turns `ex x (a < x && x < b)` into `a < b`); `nullptr` keeps the binder | owner |
 | `omcat_solve_inequality_system(sys, opts)` | solve a pure ordering system over your theory | owner |
 | `try_propositional_synthesis(fm, atoms)` | synthesise a propositional strategy for your own atoms | the single declarer |
 | `semantic_pwr_optimal(clause, update)` | revise a clause through your winning region | first declarer that answers |

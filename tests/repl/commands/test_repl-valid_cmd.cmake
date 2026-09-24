@@ -4,8 +4,8 @@
 
 include(add_repl_test)
 
-# the valid command checks if a Tau formula is logically equivalent to T
-# and prints T or F
+# the valid command checks if no trace violates a Tau formula and prints
+# T or F
 add_repl_test(valid_cmd-t "valid T" ": T")
 add_repl_test(valid_cmd-formula "valid x = 0" ": F")
 add_repl_test(valid_cmd-excluded_middle "valid x=0 || !x=0" ": T")
