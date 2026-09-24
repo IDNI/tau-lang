@@ -223,3 +223,37 @@ add_repl_test(normalize_cmd-tau_uconst_with_stream_one      "set charvar off. no
 add_repl_test(normalize_cmd-tau_uconst_product_stream_zero  "set charvar off. normalize { (<:c> & o1[t]) != 0 }:tau = 0" ": F")
 add_repl_test(normalize_cmd-tau_uconst_product_uconst_one   "set charvar off. normalize { (<:c> & <:d>) != 0 }:tau = 1" ": F")
 
+
+# The type inference of a REPL line is seeded from the types the session has
+# recorded for the streams the line mentions (ba_types_inference.tmpl.h,
+# `seed_type_scope`), and the types it infers are merged back into that
+# record. The lines are fed one by one on standard input: the commands of
+# one input line are parsed and inferred as one tree, so only separate
+# lines exercise the session's record. Pin, across lines, that a stream
+# typed in an earlier line keeps its type when a later line mentions it
+# untyped, that a stream typed next to it takes the same type, that the
+# streams a line does not mention keep theirs, that two earlier lines
+# joined in a third keep both types, that an I/O definition types a stream
+# the same way, and that a later line contradicting the recorded type is
+# rejected, as a formula, as an I/O definition and as a redefinition.
+function(add_repl_lines_test test_name lines test_regex)
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND bash -c "printf '${lines}' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${test_regex}"
+		FAIL_REGULAR_EXPRESSION "Error")
+endfunction()
+function(add_repl_lines_test_fail test_name lines test_regex)
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND bash -c "printf '${lines}' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${test_regex}")
+endfunction()
+add_repl_lines_test(normalize_cmd-type_scope_stream_typed_from_earlier_line     "n o1[t]:sbf = 0.\\nn o1[t] = 1.\\nq\\n" "always o1\\[t\\]:sbf' = 0")
+add_repl_lines_test(normalize_cmd-type_scope_untyped_stream_next_to_typed        "n o1[t]:sbf = 0.\\nn o1[t] = i1[t].\\nq\\n" "always o1\\[t\\]:sbf = i1\\[t\\]:sbf")
+add_repl_lines_test(normalize_cmd-type_scope_unmentioned_streams_keep_types      "n o1[t]:sbf = 0.\\nn o2[t]:tau = 0.\\nn o3[t]:sbf = 0.\\nn o2[t] = 1.\\nn o1[t] = 1.\\nq\\n" "always o2\\[t\\]:tau' = 0[^#]*always o1\\[t\\]:sbf' = 0")
+add_repl_lines_test(normalize_cmd-type_scope_two_earlier_lines_joined            "n o1[t]:sbf = 0.\\nn o2[t] = 0.\\nn o2[t] = 1 && o1[t] = 1.\\nq\\n" "always (o1\\[t\\]:sbf' = 0 && o2\\[t\\]:tau' = 0|o2\\[t\\]:tau' = 0 && o1\\[t\\]:sbf' = 0)")
+add_repl_lines_test(normalize_cmd-type_scope_io_definition_types_stream          "i1:sbf := in console.\\no1:tau := out console.\\nn i1[t] = 1 && o1[t] = 1.\\nq\\n" "always (o1\\[t\\]:tau' = 0 && i1\\[t\\]:sbf' = 0|i1\\[t\\]:sbf' = 0 && o1\\[t\\]:tau' = 0)")
+add_repl_lines_test_fail(normalize_cmd-type_scope_conflict_with_earlier_line     "n o1[t]:sbf = 0.\\nn o1[t] = o2[t]:tau.\\nq\\n" "Incompatible type information in o1")
+add_repl_lines_test_fail(normalize_cmd-type_scope_definition_conflicts_with_earlier_line "n o1[t]:sbf = 0.\\no1:tau := out console.\\nq\\n" "Incompatible type information in o1")
+add_repl_lines_test_fail(normalize_cmd-type_scope_redefinition_conflicts         "i1:sbf := in console.\\ni1:tau := in console.\\nq\\n" "Incompatible type information in i1")
