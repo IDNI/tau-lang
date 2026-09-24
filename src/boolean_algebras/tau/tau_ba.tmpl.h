@@ -11,7 +11,9 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include <deque>
+#include <iterator>
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_ba"
@@ -250,8 +252,9 @@ inline int ba_normalized_conjunction_mode() {
 	}();
 	static const bool report = env && *env == 2 && std::atexit([]() {
 		std::fprintf(stderr, "tau_ba normalized conjunction shadow:"
-			" hits %zu, mismatches %zu\n",
+			" hits %zu (shaped %zu), mismatches %zu\n",
 			tau_ba_normalized_conjunction_hits,
+			tau_ba_normalized_conjunction_shaped,
 			tau_ba_normalized_conjunction_mismatches);
 	}) == 0;
 	(void) report;
@@ -619,6 +622,169 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+// The Boole normal form of a conjunction of clauses is a conjunction of two
+// left-nested chains: the unit clauses (an equality or inequality each),
+// ordered by the comparator the syntactic path simplification sorts its
+// assumptions with, applied to their positive atoms (an inequality reaches
+// that sort as the negation of its equality), and the clauses that are
+// disjunctions, in traversal order of the input. The shape comes from syntactic_formula_simplification,
+// the first and the last step of term_boole_normal_form:
+// simplify_using_equality flattens the conjunction, stable-sorts the
+// equalities to its front (simplify_using_equality_sort_atms; a disjunction
+// keeps its place among the disjunctions) and left-folds it, and
+// syntactic_path_simplification collects the unit clauses of a conjunction
+// as assumptions (disjunctions are skipped), sorts them with
+// syntactic_path_simplification_wff_comp (equalities first, then
+// subtree_less), left-folds them and conjoins them in front of the
+// remainder, whose replaced atoms the hook rules `T && $X ::= $X` and
+// `$X && T ::= $X` remove; the steps in between leave that arrangement in
+// place, and the last pass fixes it. A new clause conjoined in
+// front of such a normal form therefore lands at the inner end of the
+// clause chain (the traversal lists it first, and a left fold nests the
+// first element innermost), one conjoined behind it at the outer end, and
+// a new unit at its place in the unit chain, while every other node stays
+// as it is. `shaped_conjunction` builds that result from the two bodies
+// without running the normalization: `big` is the body of the normal form,
+// `one` the body of the single clause, `front` says whether the clause is
+// the first operand. The result is a conjunction of the same clauses in
+// another arrangement, so it is equivalent to the input by construction;
+// that it is the same tree the normalization returns is measured (the
+// shadow mode compares the two). nullptr when `big` has another shape,
+// when `one` is neither a unit nor a disjunction, when a body mentions a
+// variable that is not a stream, or when `one` mentions a stream
+// occurrence `big` already mentions (the syntactic passes simplify clauses
+// on a shared occurrence against each other, so the shape alone does not
+// give the result there).
+//
+// Forward declaration: heuristics/syntactic_path_simplification.tmpl.h,
+// which defines the comparator, is included after this header.
+template <NodeType node>
+bool syntactic_path_simplification_wff_comp(tref l, tref r);
+
+template <typename node>
+static tref shaped_conjunction(tref big, tref one, bool front) {
+	using tau = tree<node>;
+	auto is_and = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.has_child() && t.child_is(tau::wff_and); };
+	auto is_or = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.has_child() && t.child_is(tau::wff_or); };
+	auto is_unit = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.has_child()
+			&& (t.child_is(tau::bf_eq) || t.child_is(tau::bf_neq)); };
+	// elements of a left-nested chain ((a && b) && c) -> [a, b, c]
+	auto spine = [&](tref n) {
+		trefs out;
+		while (is_and(n)) {
+			out.push_back(tau::get(n)[0].second());
+			n = tau::get(n)[0].first();
+		}
+		out.push_back(n);
+		std::reverse(out.begin(), out.end());
+		return out;
+	};
+	auto chain = [](const trefs& v) {
+		tref acc = v[0];
+		for (size_t i = 1; i < v.size(); ++i)
+			acc = tau::build_wff_and(acc, v[i]);
+		return acc;
+	};
+	// A body with both kinds is AND(unit chain, clause chain), whose left
+	// spine ends in the clause chain as one element (a unit is never a
+	// conjunction); a body with one kind is that chain itself.
+	trefs units, clauses, el = spine(big);
+	if (el.size() >= 2 && is_and(el.back())) {
+		clauses = spine(el.back());
+		el.pop_back();
+		units = el;
+	} else {
+		size_t i = 0;
+		while (i < el.size() && is_unit(el[i])) units.push_back(el[i++]);
+		while (i < el.size()) clauses.push_back(el[i++]);
+	}
+	for (tref u : units) if (!is_unit(u)) return nullptr;
+	for (tref c : clauses) if (!is_or(c)) return nullptr;
+	// The stream occurrences a body mentions (`name[index]`), by printed
+	// text without the type: the same stream can occur as differently
+	// typed variable nodes, which the hash-consing keeps apart, and a
+	// different time offset is a different atom to the syntactic passes.
+	// A variable that is neither a stream occurrence nor the time index
+	// of one (a free non-stream variable, which simplify_using_equality
+	// can relate to others) leaves the body outside the shape, so it is
+	// reported as such. Kept per body in a GC-registered cache, so the body a step
+	// returns answers the next step's lookup, and the merge is one pass
+	// over two sorted lists.
+	using streams_t = std::vector<std::string>;
+	using streams_cache_t = subtree_unordered_map<node, streams_t>;
+	static streams_cache_t& streams_of =
+		tree<node>::template create_cache<streams_cache_t>();
+	bool other_variable = false;
+	auto stream_names = [&other_variable](tref f) {
+		streams_t names;
+		subtree_set<node> in_stream;
+		for (tref v : tau::get(f).select_all(is<node, tau::variable>))
+			if (is_io_var<node>(v))
+				for (tref w : tau::get(v).select_all(is<node, tau::variable>))
+					in_stream.insert(w);
+		for (tref v : tau::get(f).select_all(is<node, tau::variable>)) {
+			if (is_io_var<node>(v)) {
+				std::string s = tau::get(v).to_str();
+				names.push_back(s.substr(0, s.find(':')));
+			} else if (!in_stream.contains(v)) other_variable = true;
+		}
+		std::sort(names.begin(), names.end());
+		names.erase(std::unique(names.begin(), names.end()), names.end());
+		return names;
+	};
+	auto it = streams_of.find(big);
+	if (it == streams_of.end())
+		it = streams_of.emplace(big, stream_names(big)).first;
+	const streams_t& have = it->second;
+	streams_t add = stream_names(one);
+	if (other_variable) return nullptr;
+	// A clause on a stream the body already mentions is not assembled:
+	// the normalization simplifies such clauses against each other (a
+	// unit against a clause or another unit on the same stream, and
+	// resolvable clauses), so the shape alone does not give the result.
+	for (const auto& s : add)
+		if (std::binary_search(have.begin(), have.end(), s)) return nullptr;
+	if (is_unit(one)) {
+		// The path simplification keys an inequality by its positive
+		// atom (`l != r` reaches it as `!(l = r)` and the sort compares
+		// the trimmed keys), so a unit's place is that of the equality
+		// over the same terms; with every key an equality the comparator
+		// reduces to subtree_less over the keys. The position a stable
+		// sort by the comparator gives: ties under it are equal keys,
+		// which the stream check has already excluded.
+		auto key = [](tref u) {
+			const tau& t = tau::get(u);
+			if (!t.child_is(tau::bf_neq)) return u;
+			return tau::build_bf_eq(t[0].first(), t[0].second());
+		};
+		const tref k = key(one);
+		auto pos = std::lower_bound(units.begin(), units.end(), k,
+			[&key](tref a, tref kb) {
+				return syntactic_path_simplification_wff_comp<node>(
+					key(a), kb); });
+		units.insert(pos, one);
+	} else if (is_or(one)) {
+		if (front) clauses.insert(clauses.begin(), one);
+		else clauses.push_back(one);
+	} else return nullptr;
+	streams_t merged;
+	merged.reserve(have.size() + add.size());
+	std::merge(have.begin(), have.end(), add.begin(), add.end(),
+		std::back_inserter(merged));
+	tref out = units.empty() ? chain(clauses)
+		: clauses.empty() ? chain(units)
+		: tau::build_wff_and(chain(units), chain(clauses));
+	streams_of.insert_or_assign(out, std::move(merged));
+	++tau_ba_normalized_conjunction_shaped;
+	return out;
+}
+
 // The normal form of `a && b` built from the normal forms of its sides
 // (ba_normalized_conjunction): the always-hull over the Boole normal form
 // of the two bodies conjoined, in operand order. That is the tree the
@@ -663,6 +829,17 @@ static tref normalized_conjunction(tref main) {
 	if (!l) return nullptr;
 	tref r = body(normal_form(m[0].second()));
 	if (!r) return nullptr;
+	// one side a single clause (no conjunction at its top): the shape of
+	// the other gives the result
+	auto single = [](tref f) {
+		const tau& t = tau::get(f);
+		return !t.has_child() || !t.child_is(tau::wff_and); };
+	tref shaped = single(l) ? shaped_conjunction<node>(r, l, true)
+		: single(r) ? shaped_conjunction<node>(l, r, false) : nullptr;
+	if (shaped) {
+		++tau_ba_normalized_conjunction_hits;
+		return tau::build_wff_always(shaped);
+	}
 	auto bnf = term_boole_normal_form<node>(tau::build_wff_and(l, r));
 	if (!bnf.has_value()) return nullptr;
 	++tau_ba_normalized_conjunction_hits;

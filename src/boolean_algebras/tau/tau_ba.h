@@ -74,7 +74,11 @@ inline size_t tau_ba_normalized_memo_mismatches = 0;
 /// normalized on its own first), `normalize_tau` builds the normal form as
 /// the always-hull over the Boole normal form of the two bodies conjoined,
 /// in operand order, and hands it to the unsat/valid simplification in
-/// place of the pipeline's normalization. The pipeline (quantifier and
+/// place of the pipeline's normalization. Where the normal form of the
+/// larger side has the shape the Boole normal form gives a conjunction of
+/// clauses, and the other side is one clause, the result is assembled from
+/// that shape directly (see `shaped_conjunction`), without a normalization
+/// pass at all. The pipeline (quantifier and
 /// arithmetic elimination, temporal DNF and its reduction) otherwise runs
 /// over the whole conjunction although both sides are already its fixed
 /// points; on a run that accumulates clauses into a `:tau` constant this
@@ -86,9 +90,12 @@ inline size_t tau_ba_normalized_memo_mismatches = 0;
 /// TAU_BA_NORMALIZED_CONJUNCTION (0, 1 or 2; any other value selects 0)
 /// overrides the flag.
 inline int ba_normalized_conjunction = 1;
-/// Normal forms `ba_normalized_conjunction` built, and results the shadow
-/// mode found to differ from the built form, for tests and diagnostics.
+/// Normal forms `ba_normalized_conjunction` built, of which those built
+/// from the shape of the normal form alone (see `shaped_conjunction`), and
+/// results the shadow mode found to differ from the built form, for tests
+/// and diagnostics.
 inline size_t tau_ba_normalized_conjunction_hits = 0;
+inline size_t tau_ba_normalized_conjunction_shaped = 0;
 inline size_t tau_ba_normalized_conjunction_mismatches = 0;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on

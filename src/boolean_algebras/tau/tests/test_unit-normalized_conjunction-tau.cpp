@@ -33,6 +33,7 @@ struct conjunction_mode {
 	explicit conjunction_mode(int mode) {
 		ba_normalized_conjunction = mode;
 		tau_ba_normalized_conjunction_hits = 0;
+		tau_ba_normalized_conjunction_shaped = 0;
 		tau_ba_normalized_conjunction_mismatches = 0;
 	}
 	~conjunction_mode() { ba_normalized_conjunction = saved; }
@@ -98,6 +99,115 @@ TEST_SUITE("normalized conjunction") {
 		auto zero = kc.is_zero();
 		REQUIRE(zero.has_value());
 		CHECK(zero.value());
+	}
+
+	TEST_CASE("clauses conjoined in front are assembled from the shape") {
+		conjunction_mode shadow(2);
+		std::vector<tau_t> steps;
+		steps.push_back(normalize_tau(tau_t(wff("always o1[t] = 0"))));
+		const char* clauses[] = { "always (o3[t] = 0 || o4[t] != 0)",
+			"always o2[t] = 0", "always (o5[t] != 0 || o6[t] = 0)",
+			"always o7[t] = 0", "always (o8[t] = 0 || o9[t] = 0)" };
+		for (const char* src : clauses)
+			steps.push_back(normalize_tau(
+				normalize_tau(tau_t(wff(src))) & steps.back()));
+		CHECK(tau_ba_normalized_conjunction_shaped >= 5);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+		auto zero = steps.back().is_zero();
+		REQUIRE(zero.has_value());
+		CHECK_FALSE(zero.value());
+	}
+
+	TEST_CASE("clauses conjoined behind are assembled from the shape") {
+		conjunction_mode shadow(2);
+		std::vector<tau_t> steps;
+		steps.push_back(normalize_tau(tau_t(wff("always o1[t] = 0"))));
+		const char* clauses[] = { "always (o3[t] = 0 || o4[t] != 0)",
+			"always o2[t] = 0", "always (o5[t] != 0 || o6[t] = 0)" };
+		for (const char* src : clauses)
+			steps.push_back(normalize_tau(
+				steps.back() & normalize_tau(tau_t(wff(src)))));
+		CHECK(tau_ba_normalized_conjunction_shaped >= 3);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+	}
+
+	TEST_CASE("a clause sharing a stream with a unit takes the normalization") {
+		conjunction_mode shadow(2);
+		tau_t k = normalize_tau(tau_t(wff(
+			"(always o1[t] = 0) && (always (o3[t] = 0 || o4[t] != 0))")));
+		tau_t c = normalize_tau(tau_t(wff("always (o1[t] != 0 || o2[t] = 0)")));
+		tau_ba_normalized_conjunction_shaped = 0;
+		tau_t kc = normalize_tau(c & k);
+		CHECK(tau_ba_normalized_conjunction_shaped == 0);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+		auto zero = kc.is_zero();
+		REQUIRE(zero.has_value());
+		CHECK_FALSE(zero.value());
+	}
+
+	TEST_CASE("a clause on a stream already mentioned is not assembled") {
+		conjunction_mode shadow(2);
+		tau_t k = normalize_tau(tau_t(wff(
+			"(always o1[t] = 0) && (always (o3[t] = 0 || o4[t] != 0))")));
+		tau_t c = normalize_tau(tau_t(wff("always o1[t] = 0")));
+		tau_ba_normalized_conjunction_shaped = 0;
+		tau_t kc = normalize_tau(c & k);
+		CHECK(tau_ba_normalized_conjunction_shaped == 0);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+		CHECK(kc.nso_rr.main->get() == k.nso_rr.main->get());
+	}
+
+	TEST_CASE("inequality units and a unit against 1 are assembled in both orders") {
+		conjunction_mode shadow(2);
+		const char* clauses[] = { "always o2[t] != 0", "always o1[t] = 1",
+			"always o5[t] != 0" };
+		std::vector<tau_t> front, behind;
+		front.push_back(normalize_tau(tau_t(wff(
+			"always (o3[t] = 0 || o4[t] != 0)"))));
+		behind.push_back(front.back());
+		for (const char* src : clauses) {
+			tau_t c = normalize_tau(tau_t(wff(src)));
+			front.push_back(normalize_tau(c & front.back()));
+			behind.push_back(normalize_tau(behind.back() & c));
+		}
+		CHECK(tau_ba_normalized_conjunction_shaped >= 6);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+		CHECK(front.back().nso_rr.main->get()
+			== behind.back().nso_rr.main->get());
+	}
+
+	TEST_CASE("a mixed sequence of units and clauses is assembled in both orders") {
+		conjunction_mode shadow(2);
+		const char* clauses[] = { "always o2[t] != 0",
+			"always (o3[t] = 0 || o4[t] != 0)", "always o5[t] = 1",
+			"always o6[t] != 0", "always (o7[t] != 0 || o8[t] = 1)",
+			"always o9[t] = 0", "always o10[t] != 0", "always o11[t] = 1",
+			"always (o12[t] = 0 || o13[t] = 0)", "always o14[t] != 0" };
+		std::vector<tau_t> front, behind;
+		front.push_back(normalize_tau(tau_t(wff("always o1[t] != 0"))));
+		behind.push_back(front.back());
+		for (const char* src : clauses) {
+			tau_t c = normalize_tau(tau_t(wff(src)));
+			front.push_back(normalize_tau(c & front.back()));
+			behind.push_back(normalize_tau(behind.back() & c));
+		}
+		CHECK(tau_ba_normalized_conjunction_shaped >= 20);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+		auto zero = front.back().is_zero();
+		REQUIRE(zero.has_value());
+		CHECK_FALSE(zero.value());
+	}
+
+	TEST_CASE("a clause on an earlier time index of a mentioned stream") {
+		conjunction_mode shadow(2);
+		tau_t k = normalize_tau(tau_t(wff(
+			"(always o1[t] = 0) && (always (o3[t] = 0 || o4[t] != 0))")));
+		tau_t c = normalize_tau(tau_t(wff("always (o1[t-1] = 0 || o2[t] = 0)")));
+		tau_t kc = normalize_tau(c & k);
+		CHECK(tau_ba_normalized_conjunction_mismatches == 0);
+		auto zero = kc.is_zero();
+		REQUIRE(zero.has_value());
+		CHECK_FALSE(zero.value());
 	}
 
 	TEST_CASE("a side that is no always-hull takes the pipeline") {
