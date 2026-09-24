@@ -186,13 +186,12 @@ term representation, per component (PREPARE_TERMS):
 | `subsume_max` | threshold on a clause's negative count, above which `SUBSUME_NEGATIVES` (finite method only) skips its O3 scan. `K = 32`. Free to tune: subsumption costs no precision, so neither taint nor flush attaches (cache scope, below) |
 | `qbf_node_max` | node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of ONE sweep, checked by allocation high-water mark — past which it falls back to `ASK`. `K′ = 2²⁰` |
 | `case_max` | threshold on a case pin's branch count, above which the case witness (`TRY_CASE_WITNESS`, `TRY_WITNESS_DEEP`) declines — each branch copies the surrounding spine, repaid only by the deleted binder; past it the conjunct is left to the decomposition and `EXPAND` (§6). `K″ = 16`. Phase 2's `TRY_WITNESS_DEEP` predates any ctx and reads the constant `K″` bare |
-| `expand_max` | budget on cases built by `EXPAND` — shared by `TRY_DECOMPOSE`'s arms (§6) — counted per component (`ctx.expand_count`) — past it, the still-unexpanded members re-wrap as ONE pending block and every finished case is kept (inv. 3). `K‴ = 2¹⁴`. A hit taints its computation (cache scope, below) |
-| `expand_count` | cases built so far in this component, written by `EXPAND` and `DECOMPOSE_ARMS` and read against `expand_max`. Reset to 0 at component setup (§5) |
 | `accept_growth` | growth factor of the per-component SIZE ACCEPTANCE (§5): a component push whose result exceeds `max(γ·\|input\|, accept_floor)` is discarded for the re-wrapped input (inv. 3). `γ = 16`. Neither taint nor flush attaches (cache scope, below) |
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires — moderate growth is routine and often repaid downstream; the test exists for detonation (§5). `2²⁰` |
 | `propagate_growth` | cap on `SIMPLIFY`'s pin environment (§3): a pin whose admission would push `Σ‖witnesses‖` past this factor times `Σ‖TERM_OF(pinning conjunct)‖` is refused. `4`. Read BARE from the process-wide defaults — `SIMPLIFY` runs in every phase and has no ctx. Precision, never soundness; neither taint nor flush attaches |
 | `absorb_occ_max` | occurrence limit of the result joins' absorption pass (§3): a part occurring in more members than this is no candidate key, and a member all of whose parts exceed it stays unabsorbed. `32`. Read BARE — the joins have no ctx. Precision, never soundness |
 | `taint_count` | budget hits so far, GLOBAL, never reset: incremented by every source of taint, read by the memo wrappers, which cache only across an unchanged count (cache scope, below) |
+| `time_limit` | `ANTI_PRENEX`'s parameter, set through the API, `∞` by default: the one cutoff on a call's total work. Past it the call ABORTS WHOLE and returns `⊥` (§3). Termination does not rest on it (§8). In no key: an aborted computation writes no entry (cache scope, below) |
 | `keep_functional` | decided PER COMPONENT by the caller's callback (`ANTI_PRENEX`'s parameter): emit `∀_X`/`∃_X` symbolically instead of discharging them; in the `push_memo`/`elim_memo` keys (cache scope, below). ONE callback on a NODE, a pure function of it: per component it is handed `REWRAP(body, X)` — the `∃` wrap of the whole block, its variables outermost first, over the body as that component's setup finds it: the dualised matrix for a `∀` run, the earlier components' results already in place (§5) — and per chain the canonical chain's term node, prefix and body (`RESOLVE_FUNCTIONAL_PLAIN` at entry, `RESOLVE_FUNCTIONAL_BDD` at a component's close, §3). It reads what it needs off the node: a prefix or a variable list alone would not let a policy look at what is quantified. Two components of one block may be answered differently; every key carries its component's flag, so the tables stay exact |
 | `push_memo` | `(REWRAP(φ, X), keep_functional) → formula`, GLOBAL (cache scope, below) — the ordered `X` is carried by the wrap node, so formula and block are one key part. Also the state memo of `EXPAND`: an expansion state IS its formula, and merging is this table firing on canonically assembled children (§6) |
 | `elim_memo` | `(REWRAP(clause, X), keep_functional) → formula`, GLOBAL — the wrap node carries the ordered `X`, as in `push_memo`. The key names everything an elimination reads, so it is exact |
@@ -201,11 +200,11 @@ term representation, per component (PREPARE_TERMS):
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query built on plain (converted) terms — a BDD-backed term is a node of one order (§3 `PREPARE_TERMS`). GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
 | `qbf_memo` | canonical closed pure-Boolean query → `T`/`F`, written only by `DECIDE_FINITE`'s own sweep. GLOBAL — entries are mathematical truths, never flushed (cache scope, below) |
 
-Every constant above (`K`, `K′`, `K″`, `K‴`, `γ`, the floor, the propagation
+Every constant above (`K`, `K′`, `K″`, `γ`, the floor, the propagation
 factor and the occurrence limit) is provisional pending benchmarks.
 
-COMPONENT STATE — `type`, `order`, `prio`, the six component knobs,
-`keep_functional` and `expand_count` — is set at component setup (§5) and
+COMPONENT STATE — `type`, `order`, `prio`, the five component knobs and
+`keep_functional` — is set at component setup (§5) and
 lives for that component alone. GLOBAL — `taint_count` and the seven tables —
 outlives the call (cache scope, below). The component knobs are read from the
 process-wide defaults at setup, so a changed one applies from the next
@@ -230,9 +229,9 @@ carries its `x`; `atoms_memo` is purely structural; `solver_memo` and
 the flag switches — while `cof_memo`'s key is the term as it arrives, a kept
 chain included. Every tie-break is the content order (§1), so no entry embeds
 construction history. Five knobs sit in no key — the solver configuration,
-`qbf_node_max`, `expand_max`, `accept_growth` and `accept_floor` — and are
-handled three ways. TAINT: a computation that hit a budget — an `expand_max`
-exhaustion re-wrap, a `qbf_node_max` sweep abandoned to `ASK` that ended
+`qbf_node_max`, `accept_growth`, `accept_floor` and the call's `time_limit`
+— and are handled four ways. TAINT: a computation that hit a budget — a
+`qbf_node_max` sweep abandoned to `ASK` that ended
 `unknown` — returns its result (sound, inv. 3) but writes no
 `push_memo`/`elim_memo` entry, and taint is transitive through every result
 assembled from it; so no entry embeds budget or counter state, and raising a
@@ -251,7 +250,12 @@ outside every cache (§5) and acts only by re-wrapping a formula that later
 keys contain, so a re-tuned γ or floor re-judges the same pushes. `qbf_memo`
 is exempt from every flush: `DECIDE_FINITE` records there only verdicts its
 own BDD sweep produced — mathematical truths — while verdicts from its `ASK`
-fallback live in `solver_memo` under that table's flush rule.
+fallback live in `solver_memo` under that table's flush rule. ABORT for the
+time limit: an aborted call unwinds every computation in flight before its
+memo wrapper writes, so every entry is a completed computation's, and no
+cutoff counts work across computations — a hit costs nothing and changes
+nothing that follows it, so the tables stay caches (§10) and a result is
+the same cold or warm, with or without them.
 
 ---
 
@@ -275,8 +279,9 @@ fallback live in `solver_memo` under that table's flush rule.
    translatable for the method's engine, in which case the unit is swallowed
    whole into a query (§7), never opened.
 3. **A surviving quantifier is sound.** Callers read it as *undecided*, never as
-   false. Every graceful exit re-wraps; no method may answer `F` for "cannot
-   decide".
+   false. Every graceful exit re-wraps, and a call past its `time_limit`
+   returns `⊥`, leaving the caller its input (§3); no method may answer `F`
+   for "cannot decide".
 4. **Negation is at formula level** from phase 3 onward — `¬(f = 0)`, never
    `f ≠ 0`, and no fused negated order operator. Equations are *not*
    zero-normalised; `SQUEEZE` — shared by `ELIMINATE_ATOMLESS_CLAUSE` and
@@ -341,7 +346,9 @@ fallback live in `solver_memo` under that table's flush rule.
 ## 3. Top level
 
 ```
-ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK on a NODE, pure:
+ANTI_PRENEX(φ, keep_functional = (· ↦ false), time_limit = ∞):
+                                                  // keep_functional: a
+                                                  //   CALLBACK on a NODE, pure:
                                                   //   a block's binder node
                                                   //   (§5) or a canonical
                                                   //   chain's term node (§3)
@@ -374,6 +381,16 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false)):   // a CALLBACK on a NODE, pu
 ```
 
 Phase order is fixed as given: phase 2 runs **before** phase 3.
+
+**Time limit.** Past `time_limit` the call ABORTS WHOLE and returns `⊥`, the
+null node — the timeout, told apart from every formula; the caller still
+holds `φ`, sound as it stands (inv. 3). A partly pushed formula is of no use
+to the caller, so nothing partial is returned. The clock is read wherever work
+multiplies — each case `EXPAND` builds, each arm `DECOMPOSE_ARMS` pushes,
+each branch the case witness emits — and every solver query (`ASK`) runs
+under the time that remains. The abort writes no table entry (§1, cache
+scope). Termination does not rest on the limit: without one, every call
+ends (§8).
 
 ```
 ELIMINATE_BY_SUBSTITUTION(φ):                        // one global pass
@@ -902,10 +919,9 @@ unequal until `y := a` turns `f` into `a`.
   other occurrence and re-simplifies an argument it changed, once (§1);
   under `ref_args` every argument goes through `SIMPLIFY_TERM`, changed or
   not. Each atom the pass rewrites is re-emitted through
-  `SIMPLIFY_ATOM`. §8 leans on the depth — a case inherits `D`'s members
-  already specialised at ψ's construction — and on the CHAINED pin, which,
-  propagated or not, is the one growth channel the `EXPAND` measure cannot
-  rule out.
+  `SIMPLIFY_ATOM`. A case inherits `D`'s members already specialised at
+  ψ's construction. The rewrite enlarges terms, never a formula count: §8's
+  measure holds across every pin, a CHAINED one included.
 - **The environment is CAPPED.** A witness on its own is smaller than the
   equation it came from; what grows is the CHAINING of ranges. A pin is
   admitted only if, with it in and the ranges rewritten by it,
@@ -1045,11 +1061,9 @@ PUSH_EX_BLOCK(body, X, kf):
                                                   //   on ∃X over the body as it
                                                   //   stands (§1)
         ctx.subsume_max ← K = 32 ; ctx.qbf_node_max ← K′ = 2²⁰
-        ctx.case_max ← K″ = 16 ; ctx.expand_max ← K‴ = 2¹⁴
+        ctx.case_max ← K″ = 16
         ctx.accept_growth ← γ = 16 ; ctx.accept_floor ← 2²⁰
                                                   // constants (§1, ctx table)
-        ctx.expand_count ← 0                      // the one component-scoped
-                                                  //   counter (§1, ctx table)
         ctx.push_memo, ctx.elim_memo, ctx.cof_memo, ctx.atoms_memo,
             ctx.solver_memo, ctx.qbf_memo
             ← the global tables                   // cross-run, never reset (§1)
@@ -1123,10 +1137,9 @@ PUSH_BLOCK(φ, X, ctx):                            // memo wrapper
                    //   carries the ordered X (§1, ctx table).
                    // global: the key names all the entry depends on (§1, cache
                    //   scope), so it suffices across components and runs. No
-                   //   in-progress state: a key met mid-computation is an
-                   //   unwritten entry — a plain miss, recomputed — and an
-                   //   X-preserving cycle passes through a budgeted step
-                   //   (§8), whose shared budget caps the depth
+                   //   in-progress state: every recursion edge strictly
+                   //   decreases §8's measure, so no key recurs inside its
+                   //   own computation
     if ctx.push_memo[k] exists: return ctx.push_memo[k]
     t ← ctx.taint_count
     r ← PUSH_BLOCK_UNCACHED(φ, X, ctx)
@@ -1443,8 +1456,6 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     // occurrence and an arm keeps at most one ONE-SIGNED guard literal, so
     // the census below (both signs required) never re-selects the atom
     // (inv. 5).
-    if ctx.expand_count ≥ ctx.expand_max: return ⊥    // spent: EXPAND re-wraps
-                                                      //   and taints
 
     // CENSUS, rank order COVER: one pass over the member tops of ψ's
     // disjunctive conjuncts (equation and order atoms; a negative tree's
@@ -1464,7 +1475,7 @@ TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
     // specialise shared bulk per path — the multiplication the ladder
     // exists to avoid. First licensed candidate wins.
     // PROBE FIRST: a candidate FOLD_DECIDED proves F is folded, not
-    // decomposed — every occurrence erased, no guard, no arm, no budget —
+    // decomposed — every occurrence erased, no guard, no arm —
     // and the smaller body re-enters the ladder (inv. 8). One memoized COF
     // lookup per candidate.
     for a in cands:
@@ -1494,11 +1505,9 @@ DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
     // resolves a unit-internal copy by itself; a rebound x is left alone
     // (capture-aware substitution, §10).
     // An X-free guard hoists through PUSH_BLOCK's strip; an X-containing
-    // one rides as a dependent conjunct. Arms share EXPAND's budget (§1,
-    // cache scope); the caller exits on a spent budget, so the first arm
-    // always fits and exhaustion can only re-wrap the second (inv. 3).
+    // one rides as a dependent conjunct.
     // Smaller arm first — ∃'s T short-circuit never builds the second; an
-    // arm that folds to a constant is no case and charges nothing.
+    // arm that folds to a constant is no case and is inserted as it stands.
     f ← a is an equation ? TERM_OF(a) : ⊥
                                                   // cof_memo's key (§1), formed
                                                   //   by the caller at every
@@ -1512,12 +1521,7 @@ DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
     for (φ, Y) in ⟨arm_T, arm_F⟩, smaller |φ| first:
         b ← SIMPLIFY(φ)                                            // inv. 6
         if b ∈ {T, F}: insert b into acc
-        else if ctx.expand_count ≥ ctx.expand_max:
-            ctx.taint_count ← ctx.taint_count + 1          // §1, cache scope
-            insert REWRAP(b, Y ∩ FV(b)) into acc ; break
-        else:
-            ctx.expand_count ← ctx.expand_count + 1
-            insert PUSH_BLOCK(b, Y ∩ FV(b), ctx) into acc
+        else: insert PUSH_BLOCK(b, Y ∩ FV(b), ctx) into acc
         if acc decided T: break
     return acc's result
 ```
@@ -1569,20 +1573,6 @@ EXPAND(ψ, X, ctx):
                                                       //   deciders first — the
                                                       //   literals, then the
                                                       //   rest
-        if ctx.expand_count ≥ ctx.expand_max:
-            // Graceful exhaustion: every finished case is kept; the remainder
-            //   is ONE sound pending block (inv. 3), decided later like any
-            //   re-wrap once enclosing blocks close it (§4). It carries the
-            //   exclusions so far — under them the remaining members'
-            //   disjunction is its own exclusive decomposition. The
-            //   exhaustion TAINTS every enclosing computation (§1, cache
-            //   scope): results embedding it are returned, never cached
-            ctx.taint_count ← ctx.taint_count + 1
-            φp ← SIMPLIFIED_AND_JOIN(⋀E, excl, ⋁ of the remaining members,
-                                     ⋀(S ∖ {D}))
-            insert REWRAP(φp, X ∩ FV(φp)) into acc
-            break
-        ctx.expand_count ← ctx.expand_count + 1
         dc ← FOLD_DECIDED(the conjuncts of d, X, ctx)   // a nested tree among
                                                        //   them: literal-wise
         if dc = F: continue                  // dead case: no copy built, and
@@ -2229,15 +2219,32 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
 
 ## 8. Termination
 
+THE MEASURE of a push key `(φ, X)` is lexicographic: `|X|`, then the multiset
+of `|c|₈` over the top-level disjunctive conjuncts `c` of `φ` (`φ` itself when
+it is no conjunction), then `|φ|₈`. `|·|₈` is §1's `|·|` with negation free,
+`|¬ψ|₈ = |ψ|₈`: a literal counts 1, and a conjoinable complement `NEG(d)` has
+`d`'s own count — the dual connectives swap one for one along the spine and
+the literals flip.
+
+NO GROWTH AT AN EDGE: `SIMPLIFY` never raises the count of anything it
+rewrites. Equality propagation rewrites TERMS alone — inside atoms,
+reference arguments and units — and an atom, a reference and a temporal
+operator count 1 whatever their terms (§1); `SIMPLIFY_ATOM` hands back an
+atom or folds it to a constant, never reshaped (§3); the path sweep and the
+hooks only remove nodes, and neither pass builds a connective. So a pin —
+top-level or nested, chained or not — can enlarge terms but no count, and
+the case-edge and arm-edge `SIMPLIFY` leave every conjunct at or below the
+count its construction gave it.
+
 | edge | measure |
 |---|---|
 | `PUSH_BLOCK` key canonicalisation | the stripped remainder is a proper sub-conjunction, and the strip fires at most once per chain — the remainder holds no X-free conjunct |
 | `PUSH_OVER_DISJUNCTION`, `PUSH_OVER_CONJUNCTION` scope narrowing | strict subformula or a strictly smaller block: a disjunct or one part of the split is a proper sub-conjunction; the settle move strictly shrinks `X`; its replacement may hold one positive per component and a negative tree over the remaining variables (§7), conjuncts like any other to the smaller block |
 | `TRY_FAST_PATHS` (2a, 2b) | leaves: both go straight to `ELIMINATE_BLOCK` — 2a's as one clause `⋀P ∧ l` per negative leaf plus the one clause `⋀P` — never back into `PUSH_BLOCK` |
 | the witness and case-witness steps (§6) | `X` strictly shrinks — the pin or case pin deletes its binder before re-entry; the residual it leaves is free of that binder |
-| `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant — strictly smaller in a pin atom's T-arm, whose binder is substituted away — while both arms lose every occurrence of the atom, and a surviving guard literal is one-signed, invisible to the both-signs census; modulo the same chained channel as `EXPAND`'s caveat below (an arm-edge `SIMPLIFY` can create a pin), the shared `ctx.expand_max` bounds the arm count outright |
-| `TRY_DECOMPOSE`'s fold (§6) | a candidate `FOLD_DECIDED` proves `F` is folded, not decomposed: `|X|` constant, every occurrence of the atom erased — strictly fewer atoms, no arm, no budget |
-| `EXPAND` | lexicographic (`|X|`, multiset of top-level disjunctive-conjunct sizes), modulo ONE caveat: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `|D|` at selection time — plus CONJOINABLE exclusions — literals, whose unit elimination only shrinks, and negative trees, each the size of the member it complements and so smaller than `\|D\|`; the case-edge `SIMPLIFY` builds no disjunction node, but it can GROW an inherited one: a CHAINED pin — formed inside `d` by a construction-time substitution, whether or not that site's single pass propagated it (§3) — fires here and can push a member past `|D|`; `propagate_growth` caps the growth per `SIMPLIFY` call, and well-foundedness rests on `ctx.expand_max`, which bounds the case count outright |
+| `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant — strictly smaller in a pin atom's T-arm, whose binder is substituted away — while both arms lose every occurrence of the atom: each disjunctive conjunct carrying it strictly shrinks as the constant folds away, the others are untouched, and the guard is a literal, no disjunction — one-signed, invisible to the both-signs census; the arm-edge `SIMPLIFY` grows nothing (the measure, above) |
+| `TRY_DECOMPOSE`'s fold (§6) | a candidate `FOLD_DECIDED` proves `F` is folded, not decomposed: `|X|` constant, every occurrence of the atom erased — each disjunctive conjunct carrying it strictly shrinks, no arm |
+| `EXPAND` | the multiset, at unchanged `|X|`: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `D` — plus CONJOINABLE exclusions — literals, whose unit elimination only shrinks, and negative trees, each of the count of the member it complements and so smaller than `D`; the pending disjuncts `S ∖ {D}` are carried untouched, and the case-edge `SIMPLIFY` builds no disjunction node and grows none (the measure, above). A member proven `T` drops `D` outright |
 | `ELIMINATE_BLOCK` pre-steps | `X` shrinks, an X-free conjunct is hoisted, or the clause is decided |
 | `ELIMINATE_BITVECTOR_CLAUSE` (router) | one guarded conversion per conjunct — a rewrite, no recursion — then two variable-disjoint sub-clauses, each handed to its engine exactly once; no re-entry into the push |
 | swallowed binder units (`ELIMINATE_FINITE_CLAUSE`, `SOLVE_ARITHMETIC`) | a unit is decided wholesale or re-wrapped, never opened; each enclosing block makes exactly one attempt on it (one post-order pass, §4) — no fixpoint across blocks |
@@ -2250,16 +2257,14 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
 | `TO_NNF`, factored negation (§3) | `NEG(rests)` recurses on a NEW node, not a subformula — but every residue member lost the shared conjuncts, so `\|rests\|` is strictly below the negated disjunction's |
 
 No elimination method re-enters `ANTI_PRENEX`, so the phases of §3 run once per
-call. Every recursion edge above strictly decreases the lexicographic measure
-(`|X|`, then the disjunctive-conjunct material) except the one chained
-channel — a pin a case-edge or arm-edge `SIMPLIFY` creates — which the
-shared `ctx.expand_max` bounds. `push_memo` needs no in-progress state:
-a key met mid-computation is an unwritten entry — a plain miss, recomputed —
-and any X-preserving cycle passes through `EXPAND` or a decomposition arm
-(the strip fires once per chain; 2d and the scope split
-strictly shrink the formula; the witness step, the case witness, and the
-settle move strictly shrink `X`), so the one shared budget caps its depth
-(§6).
+call. Every recursion edge of the push strictly decreases the measure: the
+witness step, the case witness, the settle move and the pin arm shrink `|X|`;
+the decomposition arms, the fold and `EXPAND` shrink the multiset at
+unchanged `|X|`; 2d shrinks the multiset, and the strip and the scope split
+shrink `|φ|₈` under an unchanged or smaller multiset. So no key recurs
+inside its own computation, `push_memo` needs no in-progress state, and
+every call ends with no budget on the push; `time_limit` (§3) bounds only
+how long a caller waits.
 
 ---
 
@@ -2284,21 +2289,19 @@ settle move strictly shrink `X`), so the one shared budget caps its depth
   its arm neither deletes a binder nor erases an atom, so it earns no step
   on the ladder. Reopen only if a family walls with many `p = 0` candidates
   and no pin ones.
-- **The acceptance dial, and a reject-retry variant.**
+- **The acceptance dial.**
   `accept_growth`/`accept_floor` trade output boundedness against decision
   fidelity: tight settings catch every detonation but also discard pushes
   whose mid-flight size would have collapsed before the component closed —
-  a formula the looser setting still decides. Deferred: retrying a rejected
-  component under a sharply smaller `expand_max`, trading the whole-block
-  re-wrap for partial progress with bounded growth; and the one family the
+  a formula the looser setting still decides. Deferred: the one family the
   dial does not clear — matrices dominated by deep definitional binder
   units, opaque to the census and every ladder step — which needs
   a mechanism of its own, not a setting.
 - **No second decomposition on the atom cheapest to cut.** Judging an
   atom's two cofactors together in in-memory size (§10), sharing everything
   the atom does not touch, licenses one step, not the chain: each cut is
-  cheap and admits the next, so the shared budget ends up paying for the
-  chain, and its arms feed the pin arm atoms the census would not have
+  cheap and admits the next, so the chain is paid in full, cut by cut,
+  and its arms feed the pin arm atoms the census would not have
   chosen. Reopen only with a licence on the chain — a width bound on the
   diagram the steps build.
 - **A negative tree is not withheld from `EXPAND`, and a disjunct's
@@ -2326,8 +2329,8 @@ settle move strictly shrink `X`), so the one shared budget caps its depth
 ## 10. Implementation notes — porting hazards
 
 Constraints on any implementation of this document, each independent of the
-§5/§6 policy — miss one and walls reappear that no budget or acceptance
-setting can explain, because the executor's cost stops tracking the
+§5/§6 policy — miss one and walls reappear that no acceptance setting or
+time limit can explain, because the executor's cost stops tracking the
 algorithm's:
 
 - **Every pass over formulas must cache its result per node.** The formula
