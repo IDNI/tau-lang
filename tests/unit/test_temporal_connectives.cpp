@@ -350,4 +350,21 @@ TEST_SUITE("temporal connectives — valid of full LTL is trace validity") {
 		CHECK(valid_str("(o1[t] = 1) until (o2[t] = 1).")
 			== std::optional<bool>(false));
 	}
+	// the same trace validity holds for always / sometimes: a formula the
+	// inputs can violate is not valid
+	TEST_CASE("sometimes over an input is not valid: the inputs can avoid it") {
+		CHECK(valid_str("sometimes (i1[t] = 1).")
+			== std::optional<bool>(false));
+		CHECK(valid_str("(always o1[t] = i1[t]) -> (sometimes o1[t] = 1).")
+			== std::optional<bool>(false));
+	}
+
+	TEST_CASE("input tautologies stay valid under always and sometimes") {
+		CHECK(valid_str("always (i1[t] = i1[t]).")
+			== std::optional<bool>(true));
+		CHECK(valid_str("sometimes (i1[t] = i1[t]).")
+			== std::optional<bool>(true));
+		CHECK(valid_str("(always i1[t] = 1) -> (sometimes i1[t] = 1).")
+			== std::optional<bool>(true));
+	}
 }
