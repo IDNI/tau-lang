@@ -28,12 +28,13 @@
 #include "../normalisers/joins.h"
 #include "../witness/witness.h"
 #include "atomless.h"
+#include "bitvector.h"
 
 namespace idni::tau_lang::anti_prenexing {
 
 /// §7 the method a type's row names: `atomless`
-/// (`ELIMINATE_ATOMLESS_CLAUSE`), `bitvector` (the router), and `none` for
-/// the table's `⊥`, which re-wraps.
+/// (`ELIMINATE_ATOMLESS_CLAUSE`), `bitvector` (`ELIMINATE_BITVECTOR_CLAUSE`,
+/// the router), and `none` for the table's `⊥`, which re-wraps.
 enum class method_kind { none, atomless, bitvector };
 
 /**
@@ -42,8 +43,9 @@ enum class method_kind { none, atomless, bitvector };
  * THE TABLE, one row per type. `tau` and `sbf` are the ATOMLESS types — no
  * "atomless" predicate exists anywhere in `src/`, so this row is the module's
  * statement of which types are atomless, and `EX_DISTRIBUTES_OVER_NEGATIVES`
- * reads the same row. The bitvector family names §7's router, for which no
- * method is wired, so it re-wraps like the `⊥` row.
+ * reads the same row. The bitvector family's method is §7's router: the
+ * finite method for pure content, the solver for the rest, and a freeze for
+ * what neither reads.
  *
  * EVERY OTHER TYPE — the untyped id `0`, `bool`, `nat` — is OUTSIDE the
  * algorithm: not a row but a CALLER BUG, a block of such a type must never
@@ -99,8 +101,10 @@ tref eliminate_block(tref clause, const block& X, ctx<node>& c);
  *    `∃X(indep ∧ dep) = indep ∧ ∃X.dep`, and `X` is narrowed to what the
  *    dependent conjuncts still hold. After it §7's method contract holds:
  *    every remaining conjunct mentions some `x ∈ X`.
- * 3. THE DISPATCH, on `METHOD(ctx.type)`. A type with no method re-wraps the
- *    dependent part (invariant 3).
+ * 3. THE DISPATCH, on `METHOD(ctx.type)`: the atomless method, or the
+ *    bitvector router — the finite method for pure content, the solver for
+ *    the rest, a freeze for what neither reads. The table's `⊥` row re-wraps
+ *    the dependent part (invariant 3).
  *
  * Both pre-steps are pure identities and are run here, once, rather than in
  * every method.

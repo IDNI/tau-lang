@@ -3,8 +3,9 @@
 /**
  * @file parts.h
  * @brief §6 `PARTS` and `INCIDENCE`: the split of a conjunct list into the
- * connected components of its BLOCK variables, and the same split with the
- * variables that are already settled read off along the way.
+ * connected components of its BLOCK variables, the same split with the
+ * variables that are already settled read off along the way, and the parts a
+ * predicate takes whole.
  *
  * TWO CONJUNCTS ARE CONNECTED when they share a variable of the block `X`.
  * Everything else they share — a free variable outside `X`, a constant, a
@@ -59,6 +60,38 @@ struct part {
  */
 template <NodeType node>
 std::vector<part<node>> parts(const trefs& conjuncts, const block& X);
+
+/**
+ * @brief The two sides of `partition_parts`: the parts the predicate takes,
+ * and the rest.
+ *
+ * `hit` and `rest` are sublists of the input in input order, `hit_vars` and
+ * `rest_vars` sublists of the block in the block's order. No block variable
+ * of one side occurs on the other.
+ */
+template <NodeType node>
+struct parts_partition {
+	trefs hit;
+	block hit_vars;
+	trefs rest;
+	block rest_vars;
+};
+
+/**
+ * @brief §6 `PARTS` closed under a predicate: every part holding a conjunct
+ * @p hit holds of is taken WHOLE, and the conjuncts and `X` split into the
+ * taken side and the rest.
+ *
+ * Parts share no block variable, so `∃X(H ∧ R) ≡ ∃X_H.H ∧ ∃X_R.R`. Both
+ * sides keep input order and `X`'s order. A block variable lands on the side
+ * of its part; one that no conjunct holds lands on the rest's.
+ *
+ * @param hit a predicate `bool(tref conjunct)`, asked of a conjunct at most
+ *        once
+ */
+template <NodeType node, typename Hit>
+parts_partition<node> partition_parts(const trefs& conjuncts, const block& X,
+	Hit&& hit);
 
 /**
  * @brief §6 `INCIDENCE`'s result: the parts, plus `Xs`, the block variables

@@ -13,6 +13,14 @@
  * hazard), and an order atom is arithmetic. Tau writes the ring sum `^`; its
  * `+` is arithmetic.
  *
+ * THE SPLIT, `SPLIT_ARITHMETIC`, is `partition_parts` (parts.h) under
+ * impurity. PURE is `is_pure_formula`: a pure (¬)equation,
+ * functional-quantifier terms included, a negative tree of pure literals, or
+ * a binder unit with a recursively pure body. A part holding an impure
+ * conjunct goes to the solver's side `A` whole and the rest, all pure, to
+ * the finite side `B`; parts share no block variable, so
+ * `∃X(A ∧ B) ≡ ∃X_A.A ∧ ∃X_B.B`.
+ *
  * EVERY ARITHMETIC CONJUNCT IS THE SOLVER'S: the linear-arithmetic
  * conversion that would move one to the pure side (`IS_LINEAR_ARITHMETIC`,
  * `LINEAR_ARITHMETIC_TO_BA`) is §9's open item.
@@ -55,33 +63,6 @@ namespace idni::tau_lang::anti_prenexing {
  */
 template <NodeType node>
 bool bitvector_opaque(tref conjunct, ba_type_id type);
-
-/// §7 `SPLIT_ARITHMETIC`'s result: the arithmetic side `A` over `X_A` and
-/// the pure side `B` over `X_B`, variable-disjoint, each in input order.
-template <NodeType node>
-struct split_result {
-	trefs A;
-	block X_A;
-	trefs B;
-	block X_B;
-};
-
-/**
- * @brief §7 `SPLIT_ARITHMETIC(clause, X)`: the impure conjuncts, with every
- * conjunct they reach through shared block variables, on the solver's side
- * `A`; the rest, all pure, on the finite side `B` — so that
- * `∃X(A ∧ B) ≡ ∃X_A.A ∧ ∃X_B.B`.
- *
- * PURE is `is_pure_formula`: a pure (¬)equation, functional-quantifier
- * terms included, a negative tree of pure literals, or a binder unit with a
- * recursively pure body. The closure is §6 `PARTS`: a part holding an
- * impure conjunct goes to `A` whole, and parts share no block variable.
- *
- * @param type the block's type, which purity is read under
- */
-template <NodeType node>
-split_result<node> split_arithmetic(const trefs& conjuncts, const block& X,
-	ba_type_id type);
 
 /**
  * @brief §7 `ELIMINATE_BITVECTOR_CLAUSE(clause, X, ctx)`: a formula

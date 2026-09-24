@@ -1,8 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Unit tests for src/anti_prenex/eliminate/bitvector.h: §7 "Bitvector — the
-// router" — its `opaque?`, SPLIT_ARITHMETIC, and ELIMINATE_BITVECTOR_CLAUSE
-// with SOLVE_ARITHMETIC and the joint ask. Spec: anti_prenex.md §7.
+// router" — its `opaque?`, SPLIT_ARITHMETIC as `partition_parts` under
+// impurity (shared/parts.h), and ELIMINATE_BITVECTOR_CLAUSE with
+// SOLVE_ARITHMETIC and the joint ask. Spec: anti_prenex.md §7.
 //
 // Every case calls the router DIRECTLY on a `∃P.ψ` over a bitvector type,
 // split the way ELIMINATE_BLOCK hands a clause over: the block read off the
@@ -142,6 +143,13 @@ tref rewrapped(const fixture& f) {
 		f.P);
 }
 
+/// §7 SPLIT_ARITHMETIC on a fixture: the parts holding an impure conjunct,
+/// the solver's side, as `hit`; the finite side as `rest`.
+ap::parts_partition<node_t> arithmetic_split(const fixture& f) {
+	return ap::partition_parts<node_t>(f.conjuncts, f.P, [&f](tref m) {
+		return !ap::is_pure_formula<node_t>(m, f.c.type); });
+}
+
 /// What every answer the oracle can read claims: equivalent to `∃P.ψ`, no
 /// free variable escaped, invariant 4.
 void check_against_source(tref got, const fixture& f) {
@@ -260,35 +268,32 @@ TEST_CASE("V2: the split") {
 		for (tref m : f.conjuncts)
 			(ap::fv_meets<node_t>(m, Xx) ? A : B).push_back(m);
 		REQUIRE(A.size() == 2);
-		const auto sp = ap::split_arithmetic<node_t>(f.conjuncts, f.P,
-			f.c.type);
-		CHECK(same_list(sp.A, A));
-		CHECK(same_list(sp.X_A, Xx));
-		CHECK(same_list(sp.B, B));
-		CHECK(same_list(sp.X_B, Xy));
+		const auto sp = arithmetic_split(f);
+		CHECK(same_list(sp.hit, A));
+		CHECK(same_list(sp.hit_vars, Xx));
+		CHECK(same_list(sp.rest, B));
+		CHECK(same_list(sp.rest_vars, Xy));
 	}
 	SUBCASE("an all-pure clause leaves A empty") {
 		// Two pure literals: nothing for the solver.
 		fixture f = make("ex x (x:bv[2] & a:bv[2] = { 0 }:bv[2] "
 			"&& !(x:bv[2] & b:bv[2] = { 0 }:bv[2])).");
-		const auto sp = ap::split_arithmetic<node_t>(f.conjuncts, f.P,
-			f.c.type);
-		CHECK(sp.A.empty());
-		CHECK(sp.X_A.empty());
-		CHECK(same_list(sp.B, f.conjuncts));
-		CHECK(same_list(sp.X_B, f.P));
+		const auto sp = arithmetic_split(f);
+		CHECK(sp.hit.empty());
+		CHECK(sp.hit_vars.empty());
+		CHECK(same_list(sp.rest, f.conjuncts));
+		CHECK(same_list(sp.rest_vars, f.P));
 	}
 	SUBCASE("an all-impure clause leaves B empty") {
 		// An arithmetic atom and an order atom: nothing for the finite
 		// side.
 		fixture f = make("ex x (x:bv[2] + a:bv[2] = { 0 }:bv[2] "
 			"&& x:bv[2] <= b:bv[2]).");
-		const auto sp = ap::split_arithmetic<node_t>(f.conjuncts, f.P,
-			f.c.type);
-		CHECK(same_list(sp.A, f.conjuncts));
-		CHECK(same_list(sp.X_A, f.P));
-		CHECK(sp.B.empty());
-		CHECK(sp.X_B.empty());
+		const auto sp = arithmetic_split(f);
+		CHECK(same_list(sp.hit, f.conjuncts));
+		CHECK(same_list(sp.hit_vars, f.P));
+		CHECK(sp.rest.empty());
+		CHECK(sp.rest_vars.empty());
 	}
 }
 
@@ -451,10 +456,9 @@ TEST_CASE("V9: a chain the split's closure puts on the solver side") {
 	fixture f = make(tau::build_wff_ex(vx, xa, false), true);
 	f.quantified = tau::build_wff_ex(vx, tau::build_wff_and(xa, xy), false);
 	f.conjuncts.push_back(xy);
-	const auto sp = ap::split_arithmetic<node_t>(f.conjuncts, f.P,
-		f.c.type);
-	REQUIRE(sp.A.size() == 2);
-	REQUIRE(sp.B.empty());
+	const auto sp = arithmetic_split(f);
+	REQUIRE(sp.hit.size() == 2);
+	REQUIRE(sp.rest.empty());
 	const size_t before = ap::taint_count<node_t>();
 	const tref got = ap::eliminate_bitvector_clause<node_t>(
 		f.conjuncts, f.P, f.c);
@@ -470,7 +474,7 @@ TEST_CASE("V9: a chain the split's closure puts on the solver side") {
 #ifdef TAU_CACHE
 	// Neither the side's query nor its two closings reached the solver.
 	const tref q = ap::finish_terms<node_t>(ap::rewrap<node_t>(
-		ap::simplified_and_join<node_t>(sp.A), sp.X_A));
+		ap::simplified_and_join<node_t>(sp.hit), sp.hit_vars));
 	const trefs Z = get_free_vars<node_t>(q);
 	for (tref k : { q, ap::rewrap<node_t>(q, Z, tb::all),
 		ap::rewrap<node_t>(q, Z, tb::ex) })

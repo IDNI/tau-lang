@@ -33,6 +33,7 @@ set(TESTS
 	anti_prenex_blast
 	anti_prenex_finite
 	anti_prenex_bitvector
+	anti_prenex_layer7
 	adt_flatten
 	adt_parsing
 	adt_types

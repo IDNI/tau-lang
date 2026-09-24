@@ -408,15 +408,19 @@ TEST_CASE("L23: a block of three one-variable components resolves") {
 	resolved(got);
 }
 
-TEST_CASE("L24: a bitvector run under a reference waits, structurally") {
-	// test_antiprenexing.cpp:1556. The decomposition splits on the bitvector
-	// atom; the leaf, which has no method (§7), re-wraps each arm's `∃a`
-	// atom, and `q(y)` stays opaque (§4).
+TEST_CASE("L24: a bitvector run under a reference leaves its two ∀y units") {
+	// test_antiprenexing.cpp:1556. Phase 2 pins `z`. The `∀y` block's dual
+	// is a disjunction, each disjunct re-wrapping its reference literal,
+	// opaque (§4), so the `∃a` block's matrix is `(A ∨ ∀y ¬q(y)) ∧ (¬A ∨
+	// ∀y q(y))` with `A` the atom `a + 1 = 0`. The decomposition splits it
+	// on `A`, and each arm's leaf asks the solver its closed `∃a` query,
+	// `sat` both ways: the arms keep their `∀y` units alone, and the answer
+	// is `∀y q(y) ∨ ∀y ¬q(y)`, up to the joins.
 	const tref got = anti_prenexed(
 		parse("ex a all y ex z "
 			"(((a:bv[2] + { 1 }:bv[2] = { 0 }:bv[2]) <-> q(y)) "
 			"&& z = 0)."), false);
-	waits(got, 4);
+	waits(got, 2);
 	CHECK(holds(got, tau::wff_ref));
 	CHECK(!holds_var(got, "z"));
 }

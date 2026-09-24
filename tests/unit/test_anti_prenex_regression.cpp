@@ -26,7 +26,7 @@
 //  DORMANT, written and guarded: "the quantifier is actually eliminated" and
 //  the shapes that depend on it. Each carries `resolved_from_layer(N)`
 //  against the `built_layer` constant below, so an assertion switches on with
-//  the machinery it needs: 4 the block driver, 5 the cheap push steps, 8 the
+//  the machinery it needs: 4 the block driver, 5 the cheap push steps, 7 the
 //  bitvector method.
 //
 // Parsing note: a parsed quantifier's body runs to the RIGHT END and
@@ -44,7 +44,7 @@ namespace {
 
 /// The layer this module is built to. The dormant tier is keyed on it.
 /// Raising it switches on the assertions that layer makes true.
-constexpr int built_layer = 6;
+constexpr int built_layer = 7;
 
 /// A DORMANT claim's guard: true once the layer that makes it true is built.
 bool resolved_from_layer(int n) { return n <= built_layer; }
@@ -276,16 +276,17 @@ TEST_CASE("R11: no block variable escapes its scope") {
 
 TEST_CASE("R12: a pure-BA scope over bitvector variables") {
 	// PureBaBvEliminability / "pure-BA bv scope is eliminated in Tau":
-	// `∃x.(x ∪ y = 0)` is `y = 0` by Boole's expansion, in ANY BA, so the
-	// bitvector type is no reason to keep the binder. Checked
-	// STRUCTURALLY: `are_nso_equivalent` is undecidable on bitvector
-	// content and the ground-truth substitution needs a one-variable
-	// result, which this is not. The elimination itself is the bitvector
-	// method's (§7).
+	// `∃x.(x ∪ y = 0)` is `y = 0` in ANY BA, so the bitvector type is no
+	// reason to keep the binder. The pin of `x ∪ y = 0` on `x` is WEAK, its
+	// residual `y = 0`, and phase 2 takes strict pins alone; phase 4's
+	// elimination pre-step, the witness pass, takes the weak pin (`x ← 0`)
+	// and leaves `y = 0`. Checked STRUCTURALLY: `are_nso_equivalent` is
+	// undecidable on bitvector content and the ground-truth substitution
+	// needs a one-variable result, which this is not.
 	tref got = anti_prenexed(
 		parse("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2])."),
 		meaning::structural);
-	if (resolved_from_layer(8)) {
+	if (resolved_from_layer(4)) {
 		CHECK(!holds(got, tau::wff_ex));
 		CHECK(!holds_var(got, "x"));
 	}
@@ -295,11 +296,13 @@ TEST_CASE("R13: an atomic-BA counterexample is never answered T") {
 	// PureBaBvEliminability / "atomic-BA counterexample: a bv[1] negated
 	// pair is not distributed": `∃x.(x ≠ 0 ∧ x ≠ 1)` is UNSAT over a
 	// two-element BA, so anything that distributes the negated pair would
-	// wrongly answer T. A soundness claim, checked on every build.
+	// wrongly answer T. A soundness claim, checked on every build; the
+	// finite method's tier-2 query decides it `F` (§7).
 	tref got = anti_prenexed(
 		parse("ex x (x:bv[1] != { 0 }:bv[1] && x:bv[1] != { 1 }:bv[1])."),
 		meaning::structural);
 	CHECK_FALSE(tau::get(got).equals_T());
+	if (resolved_from_layer(7)) CHECK(tau::get(got).equals_F());
 }
 
 // --- references freeze only their own component ----------------------------------

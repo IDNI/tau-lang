@@ -5,11 +5,10 @@
  * @brief Template implementations for bitvector.h. bitvector.h says what the
  * router means; the comments here say how it is built.
  *
- * The freeze comes from conditions.h, the parts from parts.h, the purity
+ * The freeze comes from conditions.h, the split from parts.h, the purity
  * test from terms.h, the finite method and the query closing from finite.h,
  * and the solver's verdict from `ask` (ask.h). What is written here is the
- * router's `opaque?`, the split read off the parts, and the spec's step
- * order with the joint ask.
+ * router's `opaque?` and the spec's step order with the joint ask.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ELIMINATE__BITVECTOR_TMPL_H__
@@ -65,31 +64,6 @@ bool bitvector_opaque(tref conjunct, ba_type_id type) {
 		&& !is_pure_formula<node>(conjunct, type);
 }
 
-// --- SPLIT_ARITHMETIC -------------------------------------------------------------
-
-template <NodeType node>
-split_result<node> split_arithmetic(const trefs& conjuncts, const block& X,
-	ba_type_id type)
-{
-	using tau = tree<node>;
-	subtree_unordered_set<node> solver_conjuncts, solver_vars;
-	for (const part<node>& p : parts<node>(conjuncts, X)) {
-		if (std::ranges::all_of(p.conjuncts, [type](tref m) {
-			return is_pure_formula<node>(m, type); })) continue;
-		for (tref m : p.conjuncts) solver_conjuncts.insert(m);
-		for (tref x : p.vars) solver_vars.insert(x);
-	}
-	// Both splits keep their input's order; a part's `vars` is already
-	// `X ∩ FV`, so `X_A` is `X ∩ FV(⋀A)`.
-	split_result<node> r;
-	for (tref m : conjuncts)
-		(solver_conjuncts.contains(m) ? r.A : r.B).push_back(m);
-	for (tref x : X)
-		(solver_vars.contains(x) ? r.X_A : r.X_B).push_back(
-			tau::trim_right_sibling(x));
-	return r;
-}
-
 // --- ELIMINATE_BITVECTOR_CLAUSE ---------------------------------------------------
 
 template <NodeType node>
@@ -102,12 +76,13 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 	const freeze_result<node> fr = freeze_opaque_components<node>(conjuncts,
 		X, [&c](tref m) { return bitvector_opaque<node>(m, c.type); });
 	if (fr.X.empty()) return fr.frozen;
-	// 3. THE SPLIT.
-	const split_result<node> sp = split_arithmetic<node>(fr.conjuncts,
-		fr.X, c.type);
+	// 3. §7 SPLIT_ARITHMETIC: the parts holding an impure conjunct are the
+	// solver's side `A` over `X_A`, the rest the finite side `B` over `X_B`.
+	const parts_partition<node> sp = partition_parts<node>(fr.conjuncts,
+		fr.X, [&c](tref m) { return !is_pure_formula<node>(m, c.type); });
 	// 4. The pure side first: its `F` decides before any solver query.
-	const tref b = sp.B.empty() ? _T<node>()
-		: eliminate_finite_clause<node>(sp.B, sp.X_B, c);
+	const tref b = sp.rest.empty() ? _T<node>()
+		: eliminate_finite_clause<node>(sp.rest, sp.rest_vars, c);
 	if (tau::get(b).equals_F()) return _F<node>();
 	// 5. §7 SOLVE_ARITHMETIC: `∃X_A.A` as one query, binder units entering
 	// it as written. The solver has no term-level binder, and a chain comes
@@ -117,12 +92,13 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 		if (r == answer::unknown) return std::nullopt;
 		return r == answer::sat;
 	};
-	const bool chain = std::ranges::any_of(sp.A, [](tref m) {
+	const bool chain = std::ranges::any_of(sp.hit, [](tref m) {
 		return holds_anywhere<node>(m,
 			is_functional_quantifier<node>); });
-	const tref a = sp.A.empty() ? _T<node>()
-		: chain ? rewrap<node>(simplified_and_join<node>(sp.A), sp.X_A)
-		: query_or_rewrap<node>(sp.A, sp.X_A, solver);
+	const tref a = sp.hit.empty() ? _T<node>()
+		: chain ? rewrap<node>(simplified_and_join<node>(sp.hit),
+			sp.hit_vars)
+		: query_or_rewrap<node>(sp.hit, sp.hit_vars, solver);
 	// 6. THE JOINT ASK over two open sides that share a free variable.
 	// `frozen` stays out: a sub-conjunction's unsatisfiability decides.
 	if (is_child_quantifier<node>(a) && !tau::get(b).equals_T()
@@ -131,8 +107,8 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 		const tref ab = simplified_and_join<node>(trefs{ a, b });
 		const trefs Z = get_free_vars<node>(ab);
 		const tref j = finish_terms<node>(rewrap<node>(ab, Z));
-		// A chain the pure side keeps, or a stuck one, is out of the
-		// solver's reach.
+		// A chain on either side, kept or stuck, is out of the solver's
+		// reach.
 		if (tau::get(j).find_top(is_functional_quantifier<node>) == nullptr
 			&& ask<node>(j) == answer::unsat) return _F<node>();
 	}

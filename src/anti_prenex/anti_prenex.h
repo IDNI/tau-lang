@@ -15,9 +15,10 @@
  * function `anti_prenex` of the module in `src/antiprenexing/`, which this
  * module does not include.
  *
- * The finite and bitvector methods of §7 are not part of the module, so
- * `eliminate_block` re-wraps a block of a type without a method, undecided
- * rather than answered (invariant 3).
+ * §7's table gives the atomless types their method and the bitvector family
+ * its router — the finite method for pure content, the solver for the rest, a
+ * freeze for what neither reads; its `⊥` row re-wraps, undecided rather than
+ * answered (invariant 3).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
