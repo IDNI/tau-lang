@@ -7,6 +7,8 @@
 #include "heuristics/preprocess_placement.h"
 
 #include <cstdlib>
+#include <iostream>
+#include <optional>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -30,6 +32,66 @@ inline static bool use_debug_output_in_sat = false;
 /// unlimited. The CLI default in main.cpp must agree with this value.
 inline size_t max_fixpoint_steps = 500;
 
+/// Functional continuation. Every iterate of `find_fixpoint_phi` extends
+/// the previous one by exactly one quantified block for the newest time
+/// point, `all inputs ex outputs (step)`, conjoined in the innermost
+/// scope, where the previous time point's outputs are bound. A
+/// specification of functional shape (`functional_step_shape`: every
+/// output of a time point defined by one equation or one conditional tree
+/// over the inputs, the earlier outputs and the other outputs of the time
+/// point, without a cycle) has a block that holds for every value of what
+/// it reads from outside, so conjoining it changes nothing: `C && B == C`
+/// pointwise, the iterate equals the previous one and the implication
+/// between the two holds. The shape settles the fixpoint, the run check
+/// and the constant closure without deciding the implication, which on
+/// such a specification puts the whole telescope, with the previous
+/// outputs existentially bound in negative polarity, in front of the
+/// quantified solver.
+/// 0 = the implication only; 1 = the shape where it applies, the
+/// implication elsewhere (the default); 2 = shadow: the implication
+/// decides every check, `functional_continuation_shape_hits` counts the
+/// checks the shape would settle and `functional_continuation_mismatches`
+/// those among them whose implication does not hold. The environment
+/// variable TAU_FUNCTIONAL_CONTINUATION (0, 1 or 2; any other value
+/// selects 0) overrides the flag.
+inline int functional_continuation = 1;
+/// Fixpoint checks made with the switch at 1 or 2.
+inline size_t functional_continuation_checks = 0;
+/// Fixpoint checks the functional shape settles (at 1) or would settle
+/// (at 2).
+inline size_t functional_continuation_shape_hits = 0;
+/// Shadow mode: checks the shape would settle whose implication does not
+/// hold.
+inline size_t functional_continuation_mismatches = 0;
+/// Shadow mode: checks the shape would settle whose implication the
+/// normalizer could not decide (no verdict, counted apart from a decided
+/// contradiction).
+inline size_t functional_continuation_undecided = 0;
+/// Run and constant closures settled by the functional shape.
+inline size_t functional_continuation_closure_skips = 0;
+inline int functional_continuation_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_FUNCTIONAL_CONTINUATION");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	// When selected through the environment variable, the shadow mode
+	// reports its counts once, at exit, so a whole run can be checked.
+	static const bool report = []() {
+		if (env && *env == 2) std::atexit([]() {
+			std::cerr << "functional continuation shadow: checks "
+				<< functional_continuation_checks << ", by shape "
+				<< functional_continuation_shape_hits << ", mismatches "
+				<< functional_continuation_mismatches << ", undecided "
+				<< functional_continuation_undecided << ", closures skipped "
+				<< functional_continuation_closure_skips << std::endl;
+		});
+		return true;
+	}();
+	(void)report;
+	return env ? *env : functional_continuation;
+}
+
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
 /// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps` — and a
 /// bounded give-up here reports unsatisfiable, which is wrong but bounded and
@@ -41,7 +103,8 @@ inline size_t max_flag_search_steps = 500;
 /**
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
- * caps above, the master preprocessing switch, the options the algebras of
+ * caps above, the master preprocessing switch, the functional-continuation
+ * switch, the options the algebras of
  * the pack declare (`pack_ba_options_fingerprint`) and the LTL(ABA) knobs
  * (`ltl_verdict_budget_fingerprint`). The verdict memos in this file are
  * keyed on the formula only and drop their entries when it changes. (The
@@ -57,6 +120,9 @@ size_t verdict_budget_fingerprint() {
 	mix(max_fixpoint_steps);
 	mix(max_flag_search_steps);
 	mix(preprocessing);
+	// The switch selects the path a continuation is settled on; a memoized
+	// continuation is not reused across its settings.
+	mix(functional_continuation_mode());
 	return ltl_verdict_budget_fingerprint(
 		pack_ba_options_fingerprint<node>(seed));
 }
@@ -626,10 +692,26 @@ result<bool> is_run_satisfiable(tref fm) {
 
 // Assumption is that the provided fm is an unbound continuation
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time) {
+tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time,
+	const bool functional, const int_t spec_max_initial)
+{
 	using tau = tree<node>;
+	// A continuation of functional shape without uninterpreted constants
+	// has nothing to constrain, and its closure is T by the same
+	// argument that settles its fixpoint, unless an initial condition of
+	// the specification lies at or beyond the time point the closure
+	// examines (`spec_max_initial`, the specification's own initial
+	// conditions: the continuation also carries the run prefix at fixed
+	// time points, whose conjuncts are instances of the step).
 	// Substitute lookback as current time point
 	int_t look_back = get_max_shift<node>(io_vars);
+	if (functional
+		&& spec_max_initial < look_back + start_time
+		&& tau::get(fm).find_top(is_child<node, tau::uconst_name>) == nullptr) {
+		++functional_continuation_closure_skips;
+		// In the shadow mode the closure is computed as well.
+		if (functional_continuation_mode() == 1) return tau::_T();
+	}
 	tref uconst_ctns = fm_at_time_point<node>(fm, io_vars, look_back + start_time);
 	io_vars = tau::get(uconst_ctns).select_top(is_child<node, tau::io_var>);
 
@@ -725,9 +807,393 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
  * logical implication) after very few steps — `find_fixpoint_phi` returns
  * that stabilized formula together with the step count it took.
  */
+/// Whether the normalizer decides two formulas equivalent, closed
+/// universally over every variable and stream occurrence they mention:
+/// 1 equivalent, 0 not, -1 undecided.
+template <NodeType node>
+int closed_equivalence(tref a, tref b) {
+	using tau = tree<node>;
+	if (tau::get(a) == tau::get(b)) return 1;
+	tref eq = tau::build_wff_equiv(a, b);
+	trefs outside = get_free_vars<node>(eq);
+	subtree_set<node> seen;
+	for (tref v : outside) seen.insert(v);
+	for (tref v : tau::get(eq).select_top(is_child<node, tau::io_var>)) {
+		tref k = tau::trim_right_sibling(v);
+		if (seen.insert(k).second) outside.push_back(k);
+	}
+	auto r = normalize_non_temp<node>(tau::build_wff_all_many(outside, eq));
+	if (!r.has_value()) return -1;
+	if (tau::get(r.value()).equals_T()) return 1;
+	if (tau::get(r.value()).equals_F()) return 0;
+	return -1;
+}
+
+/// The formula with the operands of every conjunction and disjunction
+/// flattened and sorted: two formulas that differ only in the order and
+/// nesting of their conjuncts and disjuncts have one such form.
+template <NodeType node>
+tref ac_canonical(tref f) {
+	using tau = tree<node>;
+	const tau& t = tau::get(f);
+	if (!(t.is(tau::wff) && (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)))) return f;
+	const bool is_and = t.child_is(tau::wff_and);
+	std::vector<tref> ops;
+	std::function<void(tref)> flat = [&](tref m) {
+		const tau& tm = tau::get(m);
+		if (tm.is(tau::wff) && tm.child_is(is_and ? tau::wff_and : tau::wff_or)) { flat(tm[0].first()); flat(tm[0].second()); }
+		else ops.push_back(ac_canonical<node>(m)); };
+	flat(f);
+	std::sort(ops.begin(), ops.end(), tau::subtree_less);
+	tref r = ops[0];
+	for (size_t i = 1; i < ops.size(); ++i) r = is_and ? tau::build_wff_and(r, ops[i]) : tau::build_wff_or(r, ops[i]);
+	return r;
+}
+
+/// The always-part of a specification as written, for `functional_step_shape`:
+/// the bodies of the always statements standing as its top-level conjuncts
+/// (the normalizer merges them into one), or the whole formula when it has no
+/// temporal operator (an implicit always). Nullptr for anything else: a
+/// sometimes, an always below a negation, a disjunction or another always, or
+/// a constant time constraint, under which the step is not the same at every
+/// time point.
+template <NodeType node>
+tref functional_shape_body(tref fm) {
+	using tau = tree<node>;
+	if (!fm) return nullptr;
+	const tau& t = tau::get(fm);
+	if (t.find_top(is_child<node, tau::wff_sometimes>)
+		|| t.find_top(is<node, tau::constraint>)) return nullptr;
+	if (!t.find_top(is_child<node, tau::wff_always>)) return fm;
+	std::vector<tref> conjs;
+	std::function<void(tref)> conjuncts = [&](tref n) {
+		const tau& tn = tau::get(n);
+		if (tn.is(tau::wff) && tn.child_is(tau::wff_and)) { conjuncts(tn[0].first()); conjuncts(tn[0].second()); }
+		else conjs.push_back(n); };
+	conjuncts(fm);
+	tref body = nullptr;
+	for (tref c : conjs) {
+		const tau& tc = tau::get(c);
+		if (!(tc.is(tau::wff) && tc.child_is(tau::wff_always))) return nullptr;
+		tref b = tau::trim2(c);
+		if (tau::get(b).find_top(is_child<node, tau::wff_always>)) return nullptr;
+		body = body ? tau::build_wff_and(body, b) : b;
+	}
+	return body;
+}
+
+/**
+ * @brief Functional shape of a specification's always-part.
+ *
+ * The body, at its symbolic time point and before any normalization, is a
+ * conjunction whose conjuncts are of three kinds: initial conditions
+ * (every stream at a fixed time point), constraints that mention no output
+ * of the current time point and hold for every value of what they mention
+ * (decided by normalizing their universal closure), and clauses. The
+ * clauses of a conjunct are its disjuncts, a disjunction or conjunction
+ * that holds no definition standing as one literal (a guard), a
+ * conjunction that holds one distributing (a conditional's branch that
+ * holds a nested conditional; a conjunct distributing into more than 64
+ * clauses is not recognized). A definition is an equation of an output of
+ * the current time point standing as a disjunct of a clause, the output
+ * not in the other side; an equation standing as a conjunct of a
+ * conjunction reads the output, and an equation the body also negates as
+ * a disjunct is a guard. Every clause holds exactly one definition, its
+ * guard is free of the output it defines, and the cells of an output (its
+ * clauses' guards and witnesses) form one conditional tree: a guard
+ * literal occurs in every cell, in one sign on the cells of one branch and
+ * in the other sign on those of the other, and dropping it and recursing
+ * on both branches ends in single cells with no guard left. Guard literals
+ * are compared in negation normal form with sorted operands and, failing
+ * that, on the closed equivalence. The definitions read each other without
+ * a cycle.
+ *
+ * Cells forming a conditional tree are total and exclusive, so on every
+ * assignment exactly one cell forces the output to its witness; evaluated
+ * in dependency order that assignment satisfies every clause, the
+ * constraints hold on their own and the initial conditions are conjuncts
+ * of every iterate. Hence `all inputs ex outputs (body)` holds for every
+ * value of what the body reads from outside, the block a time point adds
+ * changes nothing, and the continuation reaches its fixpoint as soon as
+ * the lookback is covered (see `find_fixpoint_phi`).
+ * @return true when the body is of the shape; false otherwise, and for
+ * everything the rules above do not cover.
+ */
+template <NodeType node>
+bool functional_step_shape(tref body) {
+	using tau = tree<node>;
+	if (!body) return false;
+	auto say = [&](const char* why, tref at = nullptr) {
+		LOG_DEBUG << "functional shape: not functional, " << why
+			<< (at ? ": " : "") << (at ? tau::get(at).to_str() : std::string());
+		return false; };
+	auto key = [](tref a) { return tau::trim_right_sibling(a); };
+	// v: a variable node; an output stream of the current time point
+	auto current_output = [](tref v) {
+		if (!tau::get(v).child_is(tau::io_var)) return false;
+		return tau::get(io_var_node<node>(v)).is_output_variable()
+			&& !is_io_initial<node>(v) && get_io_var_shift<node>(v) == 0; };
+	auto outputs_in = [&](tref n, subtree_set<node>& out) {
+		for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>))
+			if (current_output(v)) out.insert(key(v)); };
+	auto mentions = [&](tref n, tref o) {
+		subtree_set<node> vs; outputs_in(n, vs);
+		return vs.contains(key(o)); };
+	// An equation `o = c` of an output is a definition unless the body also
+	// tests it, i.e. `o != c` occurs somewhere: the guards of a conditional
+	// occur in both signs, a definition never does.
+	auto eq_key = [&](tref l, tref r) { return tau::trim_right_sibling(tau::build_bf_eq(l, r)); };
+	// A test is a negated equation standing as a disjunct of a conjunct
+	// (the guard of a conditional as the parser builds it, `!(o = c)` or
+	// `o != c`); a negated equation inside a guard conjunction reads an
+	// output, it does not test its definition.
+	subtree_set<node> tested;
+	auto negated_equation = [&](tref m) -> tref {
+		const tau& t = tau::get(m);
+		if (!t.is(tau::wff)) return nullptr;
+		if (t.child_is(tau::bf_neq)) return m;
+		if (t.child_is(tau::wff_neg)) {
+			tref inner = t[0].first();
+			if (tau::get(inner).is(tau::wff) && tau::get(inner).child_is(tau::bf_eq))
+				return inner;
+		}
+		return nullptr; };
+	{
+		std::vector<tref> cs0;
+		std::function<void(tref)> conj0 = [&](tref n) {
+			const tau& t = tau::get(n);
+			if (t.is(tau::wff) && t.child_is(tau::wff_and)) { conj0(t[0].first()); conj0(t[0].second()); }
+			else cs0.push_back(n); };
+		conj0(body);
+		std::function<void(tref)> disj0 = [&](tref m) {
+			const tau& t = tau::get(m);
+			if (t.is(tau::wff) && t.child_is(tau::wff_or)) { disj0(t[0].first()); disj0(t[0].second()); return; }
+			if (tref e = negated_equation(m); e)
+				tested.insert(eq_key(tau::get(e)[0].first(), tau::get(e)[0].second())); };
+		for (tref c : cs0) disj0(c);
+	}
+	// d: a disjunct; the output it defines, if it is a definition
+	auto equation_of = [&](tref d, tref& side, tref& term) -> bool {
+		const tau& td = tau::get(d);
+		if (!(td.is(tau::wff) && td.child_is(tau::bf_eq))) return false;
+		tref l = td[0].first(), r = td[0].second();
+		if (tested.contains(eq_key(l, r))) return false;
+		if (tau::get(l).child_is(tau::variable) && current_output(tau::get(l).first())) { side = tau::get(l).first(); term = r; }
+		else if (tau::get(r).child_is(tau::variable) && current_output(tau::get(r).first())) { side = tau::get(r).first(); term = l; }
+		else return false;
+		return !mentions(term, side);
+	};
+	// A formula holds a definition when an equation of an output stands as
+	// a disjunct of one of its clauses, as the parser leaves a conditional's
+	// branch (`!g || o = c`). An equation standing as a conjunct of a
+	// conjunction is a reader of that output, as in a guard made of a
+	// conjunction, and holds no definition.
+	std::function<bool(tref)> has_definition = [&](tref n) -> bool {
+		const tau& t = tau::get(n);
+		if (!t.is(tau::wff)) return false;
+		if (t.child_is(tau::wff_and)) return has_definition(t[0].first()) || has_definition(t[0].second());
+		if (t.child_is(tau::wff_or)) {
+			std::vector<tref> ds;
+			std::function<void(tref)> flat = [&](tref m) {
+				const tau& tm = tau::get(m);
+				if (tm.is(tau::wff) && tm.child_is(tau::wff_or)) { flat(tm[0].first()); flat(tm[0].second()); }
+				else ds.push_back(m); };
+			flat(n);
+			for (tref d : ds) {
+				tref side, term;
+				if (equation_of(d, side, term)) return true;
+				if (tau::get(d).is(tau::wff) && tau::get(d).child_is(tau::wff_and) && has_definition(d)) return true;
+			}
+		}
+		return false; };
+	// The conjuncts of the body, and the clauses of a conjunct: a conjunct
+	// `G || (P && Q)` (a conditional's branch holding a nested conditional)
+	// distributes into `(G || P), (G || Q)`; capped, a conjunct beyond the
+	// cap is not recognized.
+	std::vector<tref> conjs;
+	std::function<void(tref)> conjuncts = [&](tref n) {
+		const tau& t = tau::get(n);
+		if (t.is(tau::wff) && t.child_is(tau::wff_and)) { conjuncts(t[0].first()); conjuncts(t[0].second()); }
+		else conjs.push_back(n); };
+	conjuncts(body);
+	using clause = std::vector<tref>;   // disjuncts
+	std::function<bool(tref, std::vector<clause>&)> clauses_of = [&](tref n, std::vector<clause>& out) -> bool {
+		// a conjunction: the clauses of both sides
+		if (const tau& tn = tau::get(n); tn.is(tau::wff) && tn.child_is(tau::wff_and))
+			return clauses_of(tn[0].first(), out) && clauses_of(tn[0].second(), out);
+		std::vector<tref> ds;
+		std::function<void(tref)> disjuncts = [&](tref m) {
+			const tau& t = tau::get(m);
+			// a disjunction that defines nothing is a guard and stays one
+			// literal (the complement of the guard conjunction next to it)
+			if (t.is(tau::wff) && t.child_is(tau::wff_or) && has_definition(m)) { disjuncts(t[0].first()); disjuncts(t[0].second()); }
+			else ds.push_back(m); };
+		disjuncts(n);
+		std::vector<clause> acc{ {} };
+		for (tref d : ds) {
+			const tau& t = tau::get(d);
+			// a conjunction that defines nothing is a guard and stays one
+			// literal; a branch holding a nested conditional distributes
+			if (t.is(tau::wff) && t.child_is(tau::wff_and) && has_definition(d)) {
+				std::vector<clause> inner;
+				if (!clauses_of(d, inner)) return false;
+				std::vector<clause> next;
+				for (const clause& a : acc) for (const clause& c : inner) {
+					clause m = a; m.insert(m.end(), c.begin(), c.end()); next.push_back(std::move(m));
+					if (next.size() > 64) return false;
+				}
+				acc = std::move(next);
+			} else for (clause& a : acc) a.push_back(d);
+		}
+		out.insert(out.end(), acc.begin(), acc.end());
+		return true;
+	};
+	// The clauses of every conjunct that mentions an output; a conjunct
+	// without one is an initial condition or a constraint that must hold
+	// on its own.
+	std::vector<clause> all_clauses;
+	for (tref c : conjs) {
+		const tau& tc = tau::get(c);
+		subtree_set<node> outs; outputs_in(c, outs);
+		if (outs.empty()) {
+			const trefs vs = tc.select_top(is_child<node, tau::io_var>);
+			bool all_initial = !vs.empty();
+			for (tref v : vs) if (!is_io_initial<node>(v)) { all_initial = false; break; }
+			if (all_initial) continue;
+			trefs outside = get_free_vars<node>(c);
+			subtree_set<node> seen;
+			for (tref v : outside) seen.insert(v);
+			for (tref v : vs) { tref k = key(v); if (seen.insert(k).second) outside.push_back(k); }
+			auto nres = normalize_non_temp<node>(tau::build_wff_all_many(outside, c));
+			if (!nres.has_value() || !tau::get(nres.value()).equals_T())
+				return say("a constraint without outputs is not valid", c);
+			continue;
+		}
+		if (!clauses_of(c, all_clauses)) return say("a conjunct does not flatten", c);
+	}
+	// In a clause exactly one equation is a definition; the other
+	// disjuncts are its guard.
+	struct cell { clause guard; tref witness; };
+	subtree_map<node, std::vector<cell>> cells;
+	subtree_map<node, subtree_set<node>> deps;
+	subtree_set<node> all; outputs_in(body, all);
+	// An output with a bare definition (a clause that is just its
+	// equation) is defined by it; a guarded clause equating it with
+	// another output defines that other output.
+	subtree_set<node> bare;
+	for (const clause& cl : all_clauses)
+		if (cl.size() == 1) { tref side, term; if (equation_of(cl[0], side, term)) bare.insert(key(side)); }
+	// the side of an equation between two outputs that the clause defines
+	auto equation_of_clause = [&](tref d, bool guarded, tref& side, tref& term) -> bool {
+		if (!equation_of(d, side, term)) return false;
+		if (!guarded) return true;
+		const tau& td = tau::get(d);
+		tref l = td[0].first(), r = td[0].second();
+		tref other = tau::get(l).first() == side ? r : l;
+		if (bare.contains(key(side)) && tau::get(other).child_is(tau::variable)
+			&& current_output(tau::get(other).first()) && !bare.contains(key(tau::get(other).first()))) {
+			side = tau::get(other).first(); term = tau::get(l).first() == side ? r : l;
+			return !mentions(term, side);
+		}
+		return true;
+	};
+	for (const clause& cl : all_clauses) {
+		tref o = nullptr, witness = nullptr; size_t defs = 0; clause guard;
+		for (tref d : cl) {
+			tref side, term;
+			if (equation_of_clause(d, cl.size() > 1, side, term)) {
+				++defs; o = key(side); witness = term;
+			} else guard.push_back(d);
+		}
+		if (defs != 1) return say(defs == 0 ? "a clause defines nothing"
+			: "a clause defines two outputs", cl[0]);
+		for (tref g : guard) if (mentions(g, o)) return say("a guard mentions the output it defines", o);
+		cells[o].push_back({ guard, witness });
+		outputs_in(witness, deps[o]);
+		for (tref g : guard) outputs_in(g, deps[o]);
+	}
+	// Every output's cells come from one conditional tree: a guard literal
+	// occurs in every cell, in one sign on the cells of one branch and in
+	// the other sign on the cells of the other branch; dropping it and
+	// recursing on both branches ends in single cells with no guard left.
+	// Such cells are total and exclusive by construction: on every branch
+	// exactly one cell forces the output. A literal is a disjunct of the
+	// guard in negation normal form, its complement the normal form of its
+	// negation.
+	struct lit { tref atom; bool neg; };
+	// A guard and its complement are compared in negation normal form
+	// with the operands of every conjunction and disjunction sorted, so
+	// that the order in which they were assembled does not matter.
+	auto canon = [&](tref f) { return ac_canonical<node>(f); };
+	// Two guards are the same literal, or complements, when their
+	// canonical forms are equal or, failing that, when the normalizer
+	// decides their equivalence, closed universally over everything it
+	// mentions: a guard and its complement may reach the recognizer in
+	// forms that agree only as closed formulas, e.g. with a stream
+	// replaced by one it is equated with in one of them.
+	auto equivalent = [&](tref a, tref b) -> bool {
+		return closed_equivalence<node>(a, b) == 1; };
+	auto literal_of = [&](tref g, std::vector<tref>& atoms) -> lit {
+		tref pos = canon(to_nnf<node>(g)), npos = canon(to_nnf<node>(tau::build_wff_neg(g)));
+		for (size_t i = 0; i < atoms.size(); ++i) {
+			if (equivalent(atoms[i], pos)) return { atoms[i], false };
+			if (equivalent(atoms[i], npos)) return { atoms[i], true };
+		}
+		atoms.push_back(pos);
+		return { pos, false };
+	};
+	using lcell = std::vector<lit>;
+	std::function<bool(std::vector<lcell>&)> is_tree = [&](std::vector<lcell>& cs) -> bool {
+		if (cs.size() == 1) return cs[0].empty();
+		if (cs.empty()) return false;
+		// an atom every cell mentions, exactly once
+		for (const lit& cand : cs[0]) {
+			std::vector<lcell> yes, no; bool ok = true;
+			for (const lcell& c : cs) {
+				int found = 0; bool sign = false; lcell rest;
+				for (const lit& l : c)
+					if (l.atom == cand.atom) { ++found; sign = l.neg; }
+					else rest.push_back(l);
+				if (found != 1) { ok = false; break; }
+				(sign ? yes : no).push_back(std::move(rest));
+			}
+			if (!ok) continue;
+			// the cells holding the literal negated force when the atom
+			// holds; the others when it does not
+			if (yes.empty() || no.empty()) continue;
+			return is_tree(yes) && is_tree(no);
+		}
+		return false;
+	};
+	for (tref o : all) {
+		auto it = cells.find(o);
+		if (it == cells.end()) return say("no definition of an output", o);
+		std::vector<tref> atoms; std::vector<lcell> cs;
+		for (const cell& ce : it->second) {
+			lcell c;
+			for (tref g : ce.guard) c.push_back(literal_of(g, atoms));
+			cs.push_back(std::move(c));
+		}
+		if (!is_tree(cs)) return say("the cells of an output are not one conditional tree", o);
+	}
+	subtree_map<node, int> mark;
+	std::function<bool(tref)> acyclic = [&](tref o) -> bool {
+		int& m = mark[o];
+		if (m == 2) return true;
+		if (m == 1) return false;
+		m = 1;
+		for (tref d : deps[o]) if (!acyclic(d)) return false;
+		m = 2; return true;
+	};
+	for (tref o : all) if (!acyclic(o)) return say("cyclic definitions");
+	LOG_DEBUG << "functional shape: " << all.size() << " outputs defined";
+	return true;
+}
+
 template <NodeType node>
 std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
-	const trefs& io_vars, const auto& initials, int_t time_point)
+	const trefs& io_vars, const auto& initials, int_t time_point,
+	bool functional = false)
 {
 	using tau = tree<node>;
 	tref phi_prev = fm_at_time_point<node>(base_fm, io_vars, time_point);
@@ -764,7 +1230,27 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 		auto ir = is_nso_impl<node>(a, b);
 		return ir.has_value() && ir.value();
 	};
-	while (step_num < lookback || !impl(phi_prev, phi)){
+	// A specification of functional shape (`functional`) is a fixpoint at
+	// every check: the block the step adds holds for every value of what
+	// it reads from outside, so the iterate equals the previous one.
+	auto implied = [&](tref a, tref b) -> bool {
+		const int mode = functional_continuation_mode();
+		if (mode == 0) return impl(a, b);
+		++functional_continuation_checks;
+		if (!functional) return impl(a, b);
+		++functional_continuation_shape_hits;
+		if (mode == 1) return true;
+		// Shadow: the implication decides, and one that does not hold
+		// where the shape settles is counted.
+		auto ir = is_nso_impl<node>(a, b);
+		const bool iv = ir.has_value() && ir.value();
+		if (!iv) {
+			if (ir.has_value()) ++functional_continuation_mismatches;
+			else ++functional_continuation_undecided;
+		}
+		return iv;
+	};
+	while (step_num < lookback || !implied(phi_prev, phi)){
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// A bounded give-up is not a fixpoint: the partial phi
@@ -1182,7 +1668,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
  */
 template <NodeType node>
 tref always_to_unbounded_continuation(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, const bool functional = false)
 {
 	using tau = tree<node>;
 
@@ -1227,7 +1713,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	lookback = get_max_shift<node>(io_vars);
 	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
 	auto [ubd_ctn, steps] = find_fixpoint_phi<node>(fm, flag_initials, io_vars,
-					initials, lookback + point_after_inits);
+					initials, lookback + point_after_inits, functional);
 	// A fixpoint-step give-up surfaces as nullptr: no continuation, no
 	// verdict (the caller reports an error).
 	if (!ubd_ctn) return nullptr;
@@ -1272,15 +1758,30 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 			return tau::_F();
 		}
 		run = normed_run.value();
-		auto sat = is_run_satisfiable<node>(run);
+		// A specification of functional shape has a run at every time
+		// point: its outputs are functions of the inputs and of the
+		// earlier values, the initial ones included.
+		std::optional<bool> satv;
+		// An initial condition at the run's time point or later pins an
+		// output the definitions determine as well; the run is then a
+		// question of that value, not of the shape.
+		const bool by_shape = functional
+			&& get_max_initial<node>(io_vars) < t;
+		if (by_shape) ++functional_continuation_closure_skips;
+		// In the shadow mode the check runs as well and decides.
+		if (by_shape && functional_continuation_mode() == 1) satv = true;
+		else {
+			auto sat = is_run_satisfiable<node>(run);
+			if (sat.has_value()) satv = sat.value();
+		}
 		// An undecided run is not a refutation: nullptr is this
 		// function's "no verdict".
-		if (!sat.has_value()) {
+		if (!satv.has_value()) {
 			LOG_ERROR << "always_to_unbounded_continuation: the "
 				"satisfiability of the run could not be decided";
 			return nullptr;
 		}
-		if (!sat.value()) {
+		if (!satv.value()) {
 			print_fixpoint_info(
 				"Temporal normalization of G specification reached fixpoint after "
 				+ std::to_string(steps) +
@@ -1812,7 +2313,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, const bool functional)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -1860,7 +2361,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		if (aw_fm != nullptr) {
 			// If there is an always part, replace it with its unbound continuation
 			ubd_aw_fm = always_to_unbounded_continuation<node>(
-							aw_fm, start_time, output);
+							aw_fm, start_time, output, functional);
 			// nullptr = a bounded give-up (max_fixpoint_steps) or a
 			// normalization cap: no verdict, so report an error
 			// instead of deciding on a missing continuation.

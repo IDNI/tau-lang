@@ -1624,7 +1624,7 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		// ltl_to_safety_formula_full; a backend failure must not terminate the
 		// caller.  No interpreter is the honest answer here, and
 		// make_interpreter's own result<T> error propagates through r.
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx, applied),
 			code::solver_error,
 			"the specification could not be compiled");
 		DBG(assert(r.is_well_formed());)
@@ -1672,7 +1672,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 		ctx.output_remaps = options.output_remaps;
 		// See the tref overload: make_interpreter's own result<T> error
 		// propagates through r rather than terminating the caller.
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx, applied),
 			code::solver_error,
 			"the specification could not be compiled");
 		DBG(assert(r.is_well_formed());)

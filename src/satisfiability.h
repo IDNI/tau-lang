@@ -69,7 +69,8 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point);
  * uninterpreted constants are involved at all.
  */
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time);
+tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time,
+	bool functional = false, int_t spec_max_initial = -1);
 
 /**
  * @brief Transform a normalized Tau formula into execution form.
@@ -98,7 +99,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
-					const bool output = false);
+					const bool output = false, const bool functional = false);
 
 
 /**
