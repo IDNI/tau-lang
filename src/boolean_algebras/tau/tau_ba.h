@@ -69,6 +69,27 @@ inline int ba_normalized_memo = 1;
 /// mode found changed by the normalizer, for tests and diagnostics.
 inline size_t tau_ba_normalized_memo_hits = 0;
 inline size_t tau_ba_normalized_memo_mismatches = 0;
+/// Conjunction of two normal forms. For a main `a && b` whose sides are
+/// always-hulls `normalize_tau` returned (a side that is a single clause is
+/// normalized on its own first), `normalize_tau` builds the normal form as
+/// the always-hull over the Boole normal form of the two bodies conjoined,
+/// in operand order, and hands it to the unsat/valid simplification in
+/// place of the pipeline's normalization. The pipeline (quantifier and
+/// arithmetic elimination, temporal DNF and its reduction) otherwise runs
+/// over the whole conjunction although both sides are already its fixed
+/// points; on a run that accumulates clauses into a `:tau` constant this
+/// is a renormalization of the whole constant every step. The
+/// satisfiability and validity decisions are unchanged. 0 = off, 1 = on,
+/// 2 = shadow: the pipeline runs anyway and is returned, and every result
+/// that differs from the built form is counted in
+/// `tau_ba_normalized_conjunction_mismatches`. The environment variable
+/// TAU_BA_NORMALIZED_CONJUNCTION (0, 1 or 2; any other value selects 0)
+/// overrides the flag.
+inline int ba_normalized_conjunction = 1;
+/// Normal forms `ba_normalized_conjunction` built, and results the shadow
+/// mode found to differ from the built form, for tests and diagnostics.
+inline size_t tau_ba_normalized_conjunction_hits = 0;
+inline size_t tau_ba_normalized_conjunction_mismatches = 0;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.

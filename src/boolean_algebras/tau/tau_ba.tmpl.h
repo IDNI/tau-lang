@@ -242,6 +242,22 @@ inline int ba_normalized_memo_mode() {
 	return env ? *env : ba_normalized_memo;
 }
 
+inline int ba_normalized_conjunction_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_BA_NORMALIZED_CONJUNCTION");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "tau_ba normalized conjunction shadow:"
+			" hits %zu, mismatches %zu\n",
+			tau_ba_normalized_conjunction_hits,
+			tau_ba_normalized_conjunction_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : ba_normalized_conjunction;
+}
+
 // Mains that `normalize_tau` returned. Registered with the GC, so a main
 // that does not survive a sweep is forgotten with its tree. External
 // linkage on purpose: `normalize_tau` and the decision can be instantiated
@@ -603,6 +619,56 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+// The normal form of `a && b` built from the normal forms of its sides
+// (ba_normalized_conjunction): the always-hull over the Boole normal form
+// of the two bodies conjoined, in operand order. That is the tree the
+// pipeline returns for such a main: normalize_temporal_quantifiers
+// squeezes the always-hulls into one and applies term_boole_normal_form
+// to its scope, and the passes before it (quantifier and arithmetic
+// elimination, widening) map a body that is already their output to
+// itself. A side is a normal form
+// `normalize_tau` returned or a single clause (an always-hull), which is
+// normalized on its own first; a side that is itself a conjunction is not
+// normalized here, so a constant that arrives as one large conjunction
+// keeps the pipeline.
+// nullptr when the main or a side has another shape, or when a body holds
+// a quantifier or a temporal operator (those the pipeline eliminates or
+// scopes).
+template <typename... BAs>
+requires BAsPack<BAs...>
+static tref normalized_conjunction(tref main) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	const tau& m = tau::get(main);
+	if (!m.has_child() || !m.child_is(tau::wff_and)) return nullptr;
+	auto is_hull = [](tref f) {
+		const tau& t = tau::get(f);
+		return t.has_child() && t.child_is(tau::wff_always);
+	};
+	auto normal_form = [&](tref side) -> tref {
+		if (is_normalized_main<node>(side)) return side;
+		if (!is_hull(side)) return nullptr;
+		return normalize_tau(tau_ba<BAs...>(side)).nso_rr.main->get();
+	};
+	auto body = [&](tref nf) -> tref {
+		if (!nf || !is_hull(nf)) return nullptr;
+		tref b = tau::trim2(nf);
+		if (tau::get(b).find_top([](tref n) {
+			return is_quantifier<node>(n)
+				|| is_child_temporal_quantifier<node>(n); }))
+			return nullptr;
+		return b;
+	};
+	tref l = body(normal_form(m[0].first()));
+	if (!l) return nullptr;
+	tref r = body(normal_form(m[0].second()));
+	if (!r) return nullptr;
+	auto bnf = term_boole_normal_form<node>(tau::build_wff_and(l, r));
+	if (!bnf.has_value()) return nullptr;
+	++tau_ba_normalized_conjunction_hits;
+	return tau::build_wff_always(bnf.value());
+}
+
 // Normalizes a tau_ba constant: applies its rec relations to the main
 // formula (nso_rr_apply) and simplifies unsat/valid subformulas. The
 // result carries the normalized main only — the rec relations, already
@@ -640,8 +706,21 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	// unchanged, matching splitter()'s fallback below.
 	auto applied = nso_rr_apply<node>(fm.nso_rr);
 	if (!applied.has_value()) return fm;
-	auto simplified = simp_tau_unsat_valid<node>(applied.value());
+	const int conjunction = fm.nso_rr.rec_relations.empty()
+		? ba_normalized_conjunction_mode() : 0;
+	tref built = conjunction > 0
+		? normalized_conjunction<BAs...>(applied.value()) : nullptr;
+	auto simplified = simp_tau_unsat_valid<node>(applied.value(), 0, false,
+		conjunction == 1 ? built : nullptr);
 	if (!simplified.has_value()) return fm;
+	if (built && conjunction == 2) {
+		// the shadow runs the unsat/valid simplification a second time,
+		// on the built form, so it pays the validity check twice
+		auto direct = simp_tau_unsat_valid<node>(applied.value(), 0,
+			false, built);
+		if (!direct.has_value() || direct.value() != simplified.value())
+			++tau_ba_normalized_conjunction_mismatches;
+	}
 	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
 	std::lock_guard<std::mutex> lock(cache::mtx());
 	// A normal form computed while the bdd node table was exhausted may
