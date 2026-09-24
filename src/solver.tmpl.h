@@ -1697,10 +1697,23 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 		// A failed attempt (e.g. a bf_neq in XOR-encoded rather than
 		// comparison form, which the owning BA's QE cannot read) falls
 		// through to the solve-then-verify path below.
+		// The owning BA's model is checked against every atom before it
+		// is returned, as the fallback path below does: qlt skips the
+		// disequalities it cannot read and relies on this. A model that
+		// does not verify falls through like a decline.
 		if (dlo_compatible)
 			if (auto s = pack_omcat_solve<node>(options.type_id,
 					system.second, options); s)
-				return s;
+			{
+				bool holds = true;
+				for (tref neq : system.second)
+					if (!tau::get(tt(rewriter::replace<node>(
+						neq, s.value()))
+						| bf_reduce_canonical<node>()
+						| tt::ref).equals_T())
+					{ holds = false; break; }
+				if (holds) return s;
+			}
 	}
 	// SO-1: a system that still contains an ordering atom cannot be handed
 	// to solve_system as-is: check_extreme_solution only rejects on
