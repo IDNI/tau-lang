@@ -935,6 +935,52 @@ TEST_CASE("with the cap at 0 the row is lost at the sweep") {
 
 } // TEST_SUITE decision rows survive the sweep
 
+// ============================================================================
+// A normalization that ran while a bdd node table was full computed on
+// placeholder bdds: it must not be memoized, or the next unit of work would
+// be answered from it once the table is usable again.
+TEST_SUITE("tau_ba — no memo on a full bdd node table") {
+// ============================================================================
+
+using decision_cache = detail::tau_decision_cache<typename test_ba::node>;
+
+// Unsat (v & w = 0 while both are 1), so its normal form is literally F.
+static test_ba unsat_constant(const char* v, const char* w) {
+	std::string src = std::string("(") + v + ":sbf & " + w + ":sbf = 0) && ("
+		+ v + ":sbf = 1) && (" + w + ":sbf = 1)";
+	tref fm = tau::get(src, parse_wff()).value_or(nullptr);
+	assert(fm != nullptr);
+	return test_ba(fm);
+}
+
+TEST_CASE("normalize_tau memoizes nothing while the flag is up") {
+	auto a = unsat_constant("k1", "k2");
+	auto& memo = decision_cache::normalize_memo();
+	REQUIRE( memo.find(a.nso_rr) == memo.end() );
+	bdd_node_table_exhausted = true;
+	(void) normalize_tau(a);
+	CHECK( memo.find(a.nso_rr) == memo.end() );
+	CHECK( take_bdd_node_table_exhausted<typename test_ba::node>() );
+	auto r = normalize_tau(a);
+	CHECK( is_tau_syntactic_zero(r) );
+	CHECK( memo.find(a.nso_rr) != memo.end() );
+}
+
+TEST_CASE("normalize_for_splitter memoizes nothing while the flag is up") {
+	auto a = unsat_constant("k3", "k4");
+	auto& memo = decision_cache::splitter_normalize_memo();
+	REQUIRE( memo.find(a.nso_rr) == memo.end() );
+	bdd_node_table_exhausted = true;
+	(void) normalize_for_splitter<typename test_ba::node>(a.nso_rr);
+	CHECK( memo.find(a.nso_rr) == memo.end() );
+	CHECK( take_bdd_node_table_exhausted<typename test_ba::node>() );
+	tref r = normalize_for_splitter<typename test_ba::node>(a.nso_rr);
+	CHECK( r != nullptr );
+	CHECK( memo.find(a.nso_rr) != memo.end() );
+}
+
+} // TEST_SUITE no memo on a full bdd node table
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
