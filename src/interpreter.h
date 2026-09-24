@@ -444,6 +444,15 @@ struct interpreter {
 	/// multi-state Mealy initial-output part pushed by make_interpreter
 	/// has a representative-less entry in `original_spec` too (IN-N11).
 	std::vector<htrefs> ubt_ctn;
+	/// Per part of `ubt_ctn`, whether the part is of functional shape
+	/// (`functional_step_shape`): its warm-up (`get_ubt_ctn_at`) keeps the
+	/// conjuncts of the reached coordinates and drops the rest. Empty or
+	/// false where the shape is not known.
+	std::vector<bool> functional_parts;
+	/// The greatest time point of an initial condition of the specification
+	/// as written (-1 when it has none): a part of functional shape is
+	/// warmed up by its reached conjuncts only from that time point on.
+	int_t functional_max_initial = -1;
 	// Table mode only: atoms (input guards + witness templates) a table
 	// strategy may consult, seeded by make_table_interpreter and consulted
 	// by appear_within_lookback ALONGSIDE ubt_ctn (which table mode leaves

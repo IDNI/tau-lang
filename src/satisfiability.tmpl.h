@@ -69,6 +69,59 @@ inline size_t functional_continuation_mismatches = 0;
 inline size_t functional_continuation_undecided = 0;
 /// Run and constant closures settled by the functional shape.
 inline size_t functional_continuation_closure_skips = 0;
+/// Factorized continuation. The continuation of a specification of
+/// functional shape is a conjunction of definitions; its normal form as one
+/// formula is the disjunctive normal form over every case of every
+/// definition, whose size is the product of the cases along the chains of
+/// definitions reading each other, while every conjunct on its own has a
+/// normal form of the size of its cases. With this switch at 1 (the
+/// default) such a continuation is normalized conjunct by conjunct and kept
+/// as their conjunction, which is what the interpreter grounds and solves
+/// at every step (the paths of the step formula are enumerated after the
+/// substitution of the memory and the inputs, so no product is formed); at
+/// 0 it is normalized as one formula; at 2 (shadow) both forms are
+/// computed, the one formula decides, and a conjunction that is not
+/// equivalent to it is counted in `factorized_continuation_mismatches`.
+/// The environment variable TAU_FACTORIZED_CONTINUATION (0, 1 or 2; any
+/// other value selects 0) overrides the flag. Applies where the functional
+/// shape applies (`functional_continuation`); elsewhere the continuation
+/// is normalized as one formula. The same switch governs the warm-up of
+/// such a part in the interpreter (`get_ubt_ctn_at`): the conjuncts of
+/// the reached coordinates are kept and the rest, which the quantified
+/// elimination would return as they are, is dropped.
+inline int factorized_continuation = 1;
+/// Continuations kept factorized (at 1) or that would be (at 2).
+inline size_t factorized_continuation_hits = 0;
+/// Warm-ups of a part of functional shape that keep the conjuncts of the
+/// reached coordinates (at 1) or would (at 2); the quantified rest is not
+/// eliminated for them.
+inline size_t factorized_continuation_warmups = 0;
+/// Shadow mode: factorized continuations the normalizer finds not
+/// equivalent to the one formula, and warm-ups whose kept conjuncts it
+/// finds not equivalent to the eliminated formula.
+inline size_t factorized_continuation_mismatches = 0;
+/// Shadow mode: equivalences the normalizer could not decide (no verdict,
+/// or a normal form that is neither T nor F).
+inline size_t factorized_continuation_undecided = 0;
+inline int factorized_continuation_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_FACTORIZED_CONTINUATION");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = []() {
+		if (env && *env == 2) std::atexit([]() {
+			std::cerr << "factorized continuation shadow: kept "
+				<< factorized_continuation_hits << ", warm-ups "
+				<< factorized_continuation_warmups << ", mismatches "
+				<< factorized_continuation_mismatches << ", undecided "
+				<< factorized_continuation_undecided << std::endl;
+		});
+		return true;
+	}();
+	(void)report;
+	return env ? *env : factorized_continuation;
+}
 inline int functional_continuation_mode() {
 	static const std::optional<int> env = []() -> std::optional<int> {
 		const char* v = std::getenv("TAU_FUNCTIONAL_CONTINUATION");
@@ -104,7 +157,7 @@ inline size_t max_flag_search_steps = 500;
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
  * caps above, the master preprocessing switch, the functional-continuation
- * switch, the options the algebras of
+ * and factorized-continuation switches, the options the algebras of
  * the pack declare (`pack_ba_options_fingerprint`) and the LTL(ABA) knobs
  * (`ltl_verdict_budget_fingerprint`). The verdict memos in this file are
  * keyed on the formula only and drop their entries when it changes. (The
@@ -123,6 +176,7 @@ size_t verdict_budget_fingerprint() {
 	// The switch selects the path a continuation is settled on; a memoized
 	// continuation is not reused across its settings.
 	mix(functional_continuation_mode());
+	mix(factorized_continuation_mode());
 	return ltl_verdict_budget_fingerprint(
 		pack_ba_options_fingerprint<node>(seed));
 }
@@ -1718,8 +1772,46 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	// verdict (the caller reports an error).
 	if (!ubd_ctn) return nullptr;
 
+	// The continuation of a specification of functional shape is kept
+	// as the conjunction of its conjuncts' normal forms (see
+	// `factorized_continuation`); any other continuation is normalized as
+	// one formula.
+	const int fmode = factorized_continuation_mode();
+	const bool factorized = functional && fmode != 0;
+	if (factorized) ++factorized_continuation_hits;
+	// A conjunct that is a quantified block of the iterate (a step at an
+	// earlier time point, present at a lookback above one) holds for every
+	// value of what it reads, as the fixpoint settled from the shape does,
+	// and is dropped.
+	auto normalize_conjuncts = [&](tref f) -> std::optional<tref> {
+		tref out = nullptr;
+		for (tref c : get_cnf_wff_clauses<node>(f)) {
+			const tau& tc = tau::get(c);
+			if (tc.is(tau::wff) && (tc.child_is(tau::wff_all) || tc.child_is(tau::wff_ex)))
+				continue;
+			auto n = normalize_non_temp<node>(c);
+			if (!n.has_value()) return std::nullopt;
+			out = out ? tau::build_wff_and(out, n.value()) : n.value();
+		}
+		return out ? out : tau::_T();
+	};
 	{
-		auto normed = normalize_non_temp<node>(ubd_ctn);
+		std::optional<tref> normed;
+		if (factorized) {
+			normed = normalize_conjuncts(ubd_ctn);
+			if (fmode == 2 && normed.has_value()) {
+				// Shadow: the one formula is computed as well and must
+				// be equivalent to the conjunction.
+				auto n = normalize_non_temp<node>(ubd_ctn);
+				const int v = n.has_value()
+					? closed_equivalence<node>(n.value(), normed.value()) : -1;
+				if (v == 0) ++factorized_continuation_mismatches;
+				else if (v < 0) ++factorized_continuation_undecided;
+			}
+		} else {
+			auto n = normalize_non_temp<node>(ubd_ctn);
+			if (n.has_value()) normed = n.value();
+		}
 		if (!normed.has_value()) {
 			// A normalization failure (a cap violation) is not a
 			// refutation either; it used to return F, which every
@@ -1746,18 +1838,31 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	// variable furthest back needs to pass all initial conditions
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point<node>(ubd_ctn, io_vars, t);
-		run = tau::build_wff_and(run, current_step);
 
 		DBG(LOG_TRACE << "always_to_unbounded_continuation[run]: " << LOG_FM(run) << "\n";)
 
-		// Check if run is still sat
-		auto normed_run = normalize_non_temp<node>(run);
-		if (!normed_run.has_value()) {
-			LOG_ERROR << "always_to_unbounded_continuation: "
-				"normalization of the run failed";
-			return tau::_F();
+		// Check if run is still sat. A factorized continuation keeps the
+		// run as the conjunction of its instances' normal forms, one per
+		// time point, so that a warm-up sees the instances as conjuncts.
+		if (factorized) {
+			auto normed_step = normalize_non_temp<node>(current_step);
+			if (!normed_step.has_value()) {
+				LOG_ERROR << "always_to_unbounded_continuation: "
+					"normalization of the run failed";
+				return tau::_F();
+			}
+			run = tau::get(run).equals_T() ? normed_step.value()
+				: tau::build_wff_and(run, normed_step.value());
+		} else {
+			run = tau::build_wff_and(run, current_step);
+			auto normed_run = normalize_non_temp<node>(run);
+			if (!normed_run.has_value()) {
+				LOG_ERROR << "always_to_unbounded_continuation: "
+					"normalization of the run failed";
+				return tau::_F();
+			}
+			run = normed_run.value();
 		}
-		run = normed_run.value();
 		// A specification of functional shape has a run at every time
 		// point: its outputs are functions of the inputs and of the
 		// earlier values, the initial ones included.
@@ -1790,14 +1895,19 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 			return tau::_F();
 		}
 	}
-	auto normed_result = normalize_non_temp<node>(
-		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
-	if (!normed_result.has_value()) {
-		LOG_ERROR << "always_to_unbounded_continuation: "
-			"final normalization failed";
-		return tau::_F();
+	tref result = nullptr;
+	if (factorized)
+		result = conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn;
+	else {
+		auto normed_result = normalize_non_temp<node>(
+			conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
+		if (!normed_result.has_value()) {
+			LOG_ERROR << "always_to_unbounded_continuation: "
+				"final normalization failed";
+			return tau::_F();
+		}
+		result = normed_result.value();
 	}
-	tref result = normed_result.value();
 	print_fixpoint_info(
 		"Temporal normalization of G specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",

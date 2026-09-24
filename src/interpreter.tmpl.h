@@ -837,6 +837,7 @@ post_normalization:
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
 		auto spec_partition = create_spec_partition(clause, output_partition);
 		std::vector<htrefs> ubt_ctn;
+		std::vector<bool> functional_parts;
 		bool executable = true;
 		for (auto& [spec_part, out_rep] : spec_partition) {
 			tref clause_t = spec_part->get();
@@ -860,6 +861,7 @@ post_normalization:
 				executable = false; break;
 			}
 			ubt_ctn.push_back({ tree<node>::geth(ubd_ctn_part.value()) });
+			functional_parts.push_back(functional);
 		}
 		if (!executable) continue;
 		// All parts of spec are realizable; each starts with a single
@@ -871,6 +873,8 @@ post_normalization:
 		assignment<node> memory;
 		auto i = interpreter{ ubt_ctn, spec_parts, output_partition,
 			memory, ctx_eff };
+		i.functional_parts = functional_parts;
+		i.functional_max_initial = functional_max_initial;
 
 		// Cache the LTL synthesis solution (if any) for downstream
 		// introspection of the Mealy strategy. Empty for pure-safety /
@@ -905,6 +909,7 @@ post_normalization:
 				// no representative.
 				i.ubt_ctn.push_back(htrefs{
 					tree<node>::geth(warmup) });
+				i.functional_parts.push_back(false);
 				i.original_spec.emplace_back(htrefs{
 					tree<node>::geth(warmup) }, nullptr);
 				i.compute_lookback_and_initial();
@@ -1993,11 +1998,40 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 	bool part_exhausted = false;
 	// Adjust ubt_ctn to time_point by eliminating inputs and outputs
 	// which are greater than current time_point in a time-compatible fashion
-	for (const htrefs& part : ubt_ctn) {
+	for (size_t pi = 0; pi < ubt_ctn.size(); ++pi) {
+		const htrefs& part = ubt_ctn[pi];
 		trefs part_alts;
 		part_alts.reserve(part.size());
+		// A part of functional shape, with no initial condition of the
+		// specification beyond t, keeps the conjuncts whose coordinates
+		// are all reached and drops the rest: every dropped conjunct
+		// defines an output at a later coordinate, or constrains later
+		// inputs and holds for every value of them, so the quantified
+		// rest holds for every value of the reached coordinates and the
+		// elimination would return the kept conjuncts (see
+		// `factorized_continuation`). An initial condition beyond t pins
+		// a later output the definitions determine as well, so the
+		// elimination decides that case. (`highest_initial_pos` counts
+		// the run prefix of the continuation as well, whose conjuncts
+		// are instances of the step.)
+		const int fmode = factorized_continuation_mode();
+		const bool by_shape = fmode != 0 && pi < functional_parts.size()
+			&& functional_parts[pi] && functional_max_initial <= t;
 		for (const auto& h : part) {
 		auto step_ubt_ctn = update_to_time_point(h->get(), ut);
+		tref kept = nullptr;
+		if (by_shape) {
+			for (tref c : get_cnf_wff_clauses<node>(step_ubt_ctn)) {
+				bool reached = true;
+				for (tref v : tau::get(c).select_top(is_child<node, tau::io_var>))
+					if (get_io_time_point<node>(v) > t) { reached = false; break; }
+				if (reached) kept = kept ? tau::build_wff_and(kept, c) : c;
+			}
+			if (!kept) kept = tau::_T();
+			++factorized_continuation_warmups;
+			// In the shadow mode the elimination runs as well and decides.
+			if (fmode == 1) { part_alts.push_back(kept); continue; }
+		}
 		auto io_vars = tau::get(step_ubt_ctn).select_top(
 				is_child<node, tau::io_var>);
 		std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
@@ -2021,9 +2055,16 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		// pushing an un-eliminated formula when normalization fails (e.g.
 		// a bv-widening cap violation, already logged by the pass).
 		auto normalized = normalize_non_temp<node>(step_ubt_ctn);
-		if (normalized.has_value())
+		if (normalized.has_value()) {
+			// Shadow: the kept conjuncts must be equivalent to the
+			// eliminated formula.
+			if (kept) {
+				const int v = closed_equivalence<node>(normalized.value(), kept);
+				if (v == 0) ++factorized_continuation_mismatches;
+				else if (v < 0) ++factorized_continuation_undecided;
+			}
 			part_alts.push_back(normalized.value());
-		else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
+		} else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
 		}
 		if (!part.empty() && part_alts.empty()) part_exhausted = true;
 		upd_ubt_ctn.push_back(std::move(part_alts));
@@ -2781,6 +2822,8 @@ result<bool> interpreter<node>::update(tref update) {
 	// Commit: every component was validated by plan_update, so nothing
 	// below can fail and leave the interpreter half-updated.
 	ubt_ctn = std::move(plan->ubt_ctn);
+	// A revised part is not read for its shape.
+	functional_parts.assign(ubt_ctn.size(), false);
 	original_spec = std::move(plan->spec);
 	++spec_revision_;
 	output_partition = std::move(plan->partition);
