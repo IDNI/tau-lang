@@ -15,11 +15,10 @@
  * function `anti_prenex` of the module in `src/antiprenexing/`, which this
  * module does not include.
  *
- * The licensed decomposition and the expansion — §6's multiplying steps — are
- * not part of the module: a conjunction none of the cheap steps takes comes
- * back re-wrapped, undecided rather than answered (invariant 3). Neither are
- * the finite and bitvector methods of §7, so `eliminate_block` re-wraps a
- * block of a type without a method.
+ * A spent expansion budget is what comes back re-wrapped, undecided rather
+ * than answered (invariant 3). The finite and bitvector methods of §7 are not
+ * part of the module, so `eliminate_block` re-wraps a block of a type without
+ * a method.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__

@@ -12,7 +12,7 @@
 // to the step under test, which is called DIRECTLY on the prepared clause.
 // What is claimed of a result: EQUIVALENT to `∃P.ψ` (`are_nso_equivalent` on
 // the finished formula), no free variable ESCAPED, INVARIANT 4, and per case
-// the block RESOLVED or exactly the RE-WRAP.
+// the block RESOLVED.
 //
 // EVERY RE-ENTRY of these steps goes through `push_block`, the hub
 // (`push/push_block.h`), whose `∨` and `∧` arms are these two steps: a
@@ -177,9 +177,8 @@ void check_resolved(tref got, const fixture& f) {
 	CHECK(!ap::fv_meets<node_t>(got, f.P));
 }
 
-/// `∃P.ψ` re-wrapped whole — what the floor gives back for a conjunction no
-/// step reaches (invariant 3). The formula is re-wrapped AS IT IS: no step
-/// re-assembles it.
+/// `∃P.ψ` re-wrapped whole, AS IT IS — the shape of a block left undecided
+/// (invariant 3), which a resolved one is not.
 tref rewrapped(const fixture& f) {
 	return ap::rewrap<node_t>(f.clause, f.P);
 }
@@ -393,9 +392,11 @@ TEST_CASE("C1: positives with no common zero in the block decide F") {
 
 TEST_CASE("W1: a pin at spine level substitutes its variable away") {
 	// `x = a` pins `x` strictly, so `∃x∃y.ψ` is `∃y.ψ[x ← a]`: the
-	// remaining conjunction re-enters `push_block` under `y` alone and
-	// re-wraps there. The step is called on a prepared body, so phase 2's
-	// deep pass never ran over this pin.
+	// remaining conjunction re-enters `push_block` under `y` alone, where
+	// no cheaper step takes it and the floor expands `a·y = 0 ∨ y·w = 0`
+	// into two clauses of literals, each settled and resolved by the leaf.
+	// The step is called on a prepared body, so phase 2's deep pass never
+	// ran over this pin.
 	fixture f = make("ex x ex y (x = a && (x y = 0 || y w = 0) "
 		"&& y b != 0).");
 	REQUIRE(f.P.size() == 2);
@@ -408,9 +409,7 @@ TEST_CASE("W1: a pin at spine level substitutes its variable away") {
 	REQUIRE(ap::try_witness<node_t>(f.P[0], f.clause, f.c).has_value());
 	const tref got = pushed_and(f);
 	check_against_source(got, f);
-	REQUIRE(binder_count(got) == 1);
-	CHECK(same(ap::binder_var<node_t>(got), f.P[1]));
-	CHECK(!ap::fv_meets<node_t>(got, ap::block{ f.P[0] }));
+	check_resolved(got, f);
 }
 
 // --- the case witness -------------------------------------------------------------
@@ -451,10 +450,11 @@ TEST_CASE("K2: a branch that decides T leaves the later copies unbuilt") {
 }
 
 TEST_CASE("K3: `ctx.case_max` refuses a wider case pin, and the floor "
-	"re-wraps") {
+	"expands") {
 	// The knob is read off the component's ctx, which copies it at setup,
-	// so the fixture is made under the guard. With no case pin left, no
-	// step of the ladder takes the clause.
+	// so the fixture is made under the guard. With no case pin left, the
+	// floor expands the disjunction: each case holds its branch's pin as a
+	// plain conjunct, so `x` settles and the leaf resolves it.
 	case_max_guard cap(1);
 	fixture f = make("ex x (((c = 0 && x = a) || (c' = 0 && x = b)) "
 		"&& x y = 0).");
@@ -463,17 +463,18 @@ TEST_CASE("K3: `ctx.case_max` refuses a wider case pin, and the floor "
 		f.c).has_value());
 	const tref got = pushed_and(f);
 	check_against_source(got, f);
-	CHECK(same(got, rewrapped(f)));
-	CHECK(binder_count(got) == 1);
+	check_resolved(got, f);
 }
 
-// --- the floor --------------------------------------------------------------------
+// --- the floor: the expansion -----------------------------------------------------
 
-TEST_CASE("R1: a conjunction no step takes re-wraps exactly") {
+TEST_CASE("R1: a conjunction no cheaper step takes is expanded") {
 	// `x` sits in a disjunction, so nothing settles; 2a is refuted by the
 	// positives in it and 2b by the negative; the positives are
 	// consistent; neither disjunct pins `x`, so there is no pin and no
-	// case pin. What is left is the re-wrap (invariant 3).
+	// case pin. The floor expands the disjunction into two cases, neither
+	// dead nor `T`: `x·y = 0 ∧ x·z ≠ 0`, then `x·w = 0` under `x·y ≠ 0`,
+	// each a clause of literals that settles and resolves at the leaf.
 	fixture f = make("ex x ((x y = 0 || x w = 0) && x z != 0).");
 	const ap::incidence_result<node_t> inc =
 		ap::incidence<node_t>(ap::members<node_t>(f.clause), f.P);
@@ -484,8 +485,8 @@ TEST_CASE("R1: a conjunction no step takes re-wraps exactly") {
 		f.c).has_value());
 	const tref got = pushed_and(f);
 	check_against_source(got, f);
-	CHECK(same(got, rewrapped(f)));
-	CHECK(binder_count(got) == 1);
+	check_resolved(got, f);
+	CHECK(f.c.expand_count == 2);
 }
 
 } // TEST_SUITE

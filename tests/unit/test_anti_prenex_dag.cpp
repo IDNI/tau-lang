@@ -152,6 +152,29 @@ TEST_CASE("T5: fv_intersect keeps X's order, not the FV order") {
 	CHECK(ap::fv_intersect<node_t>(tau::_T(), yx).empty());
 }
 
+TEST_CASE("T5b: without keeps X's order and drops every listed variable") {
+	const ap::block zyx{ fvar("z"), fvar("y"), fvar("x") };
+	// The block is ordered outermost first, and what is left keeps it.
+	const ap::block zx = ap::without<node_t>(zyx, { fvar("y") });
+	REQUIRE(zx.size() == 2);
+	CHECK(same(zx[0], fvar("z")));
+	CHECK(same(zx[1], fvar("x")));
+	// Every listed variable goes, whatever order the list is in.
+	const ap::block y = ap::without<node_t>(zyx, { fvar("x"), fvar("z") });
+	REQUIRE(y.size() == 1);
+	CHECK(same(y[0], fvar("y")));
+	CHECK(ap::without<node_t>(zyx, zyx).empty());
+}
+
+TEST_CASE("T5c: without ignores a variable X does not hold") {
+	const ap::block yx{ fvar("y"), fvar("x") };
+	const ap::block got = ap::without<node_t>(yx, { fvar("w") });
+	REQUIRE(got.size() == 2);
+	CHECK(same(got[0], fvar("y")));
+	CHECK(same(got[1], fvar("x")));
+	CHECK(ap::without<node_t>(ap::block{}, { fvar("x") }).empty());
+}
+
 // --- content hash and content order -------------------------------------------
 
 TEST_CASE("T6: the content order is a strict total order on content") {
