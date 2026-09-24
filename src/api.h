@@ -94,7 +94,10 @@ void tau_init();
 ///   3. **htref** — operates on shared-pointer handles (GC-safe)
 ///
 /// Every method returns a `result<T>` carrying either the value or a
-/// structured diagnostics report (see `tau_diagnostics.h`).
+/// structured diagnostics report (see `tau_diagnostics.h`). A call during
+/// which a bdd node table fills returns an error and no value
+/// (`messages::bdd_node_table_exhausted`); the next call runs normally
+/// (see `with_budget` in `tau_memory_budget.h`).
 template <NodeType node>
 struct api {
 	using tau = tree<node>;
@@ -748,9 +751,15 @@ struct api {
 	/// Check satisfiability: does some trace satisfy the formula?
 	/// realizable(fm) implies sat(fm), never the converse, so this is a
 	/// weaker question than realizable() and can answer true where
-	/// realizable() answers false. Merges top-level G-conjuncts before
-	/// checking; for genuinely full-LTL content with no realizable
-	/// program, the verdict is undecided (an error result), not false.
+	/// realizable() answers false. A spec root (what get_spec yields) is
+	/// unwrapped to its main formula with its definitions applied. Merges
+	/// top-level G-conjuncts before checking; a formula with a stream
+	/// variable and no temporal quantifier is read as its implicit
+	/// `always`, so a one-step solver answer only decides unsat. For
+	/// genuinely full-LTL content with no realizable program, the verdict
+	/// is undecided (an error result), not false. A closed formula that
+	/// normalization leaves undecided is an error whose message starts
+	/// with "UNKNOWN:" (`code::solver_error`), never false.
 	static result<bool> sat(const std::string& formula);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(tref formula);
@@ -764,15 +773,17 @@ struct api {
 	/// @copydoc unsat(const std::string&)
 	static result<bool> unsat(htref formula);
 
-	/// Check validity: true iff the formula holds for all models.
-	/// Merges top-level G-conjuncts, then checks via valid_spec().
+	/// Check validity: true iff no trace violates the formula (every
+	/// input stream read as an output). Merges top-level G-conjuncts, then
+	/// checks via valid_spec(). An undecided formula is an UNKNOWN error.
 	static result<bool> valid(const std::string& formula);
 	/// @copydoc valid(const std::string&)
 	static result<bool> valid(tref formula);
 	/// @copydoc valid(const std::string&)
 	static result<bool> valid(htref formula);
 
-	/// Check if T (tautology) implies the normalized formula.
+	/// Check if T (tautology) implies the normalized formula with every
+	/// input stream read as an output, i.e. whether no trace violates it.
 	/// This is the underlying validity check used by valid().
 	static result<bool> valid_spec(const std::string& spec);
 	/// @copydoc valid_spec(const std::string&)

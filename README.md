@@ -1022,14 +1022,31 @@ This explanation of satisfiability neglects the fact that a contradiction can, i
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
 Further resources concerning the details can be found in the [theory section](#the-theory-behind-the-tau-language).
 
+A specification without a temporal operator is read as if it were wrapped in
+`always`, and it gets the same answers as its `always` spelling: a stream
+constraint is not decided as a single step, so `o1[t]:bv[2] > o1[t-1]:bv[2]`
+(an output that must grow forever within a finite range) is unsatisfiable.
+
 For full LTL (`U`, `R`, `W`, `S`, `T`, nested temporal operators) the same
 notion is realizability: `sat` and `realizable` decide it through the LTL(ABA)
-synthesis pipeline and agree in both directions.  `valid φ` holds when no
-trace violates φ: it is `unsat ! φ` with every input stream read as an output,
-so that `valid φ` implies `sat φ` (`G (F i1[t] = 1)` is neither valid nor
-satisfiable: the inputs can stay 0, and the system cannot make them 1).
-A verdict that cannot be decided (backend failure, a resource cap that gave
-up, an `E` over inputs in the CTL\* fragment) is reported as UNKNOWN.
+synthesis pipeline and agree in both directions.
+
+Validity is not quantified over an environment but over traces: `valid φ`
+holds when no trace violates φ. It is `unsat ! φ` with every input stream read
+as an output, for `always`/`sometimes` specifications as well as for full LTL,
+so that `valid φ` implies `sat φ`. For example `valid sometimes i1[t] = 1` is
+F, since the input can stay 0 at every step, and `G (F i1[t] = 1)` is neither
+valid nor satisfiable: the inputs can stay 0, and the system cannot make them 1.
+
+A verdict that cannot be decided is reported as UNKNOWN (an error, never a T
+or F answer). This covers a backend failure, a resource cap that gave up, an
+`E` over inputs in the CTL\* fragment, and a closed formula that normalization
+leaves undecided, such as a functional quantifier over arithmetic (see
+[Boolean functions](#boolean-functions)). When one disjunct of a formula is
+satisfiable, the answer is still decided, even if another disjunct is
+undecided. A problem whose decision diagrams outgrow the node table ends with
+the error `bdd node table exhausted: a node did not fit, so the result is
+unknown and no answer is given`. The next command runs normally.
 
 ### Execution
 
@@ -1103,8 +1120,12 @@ and disjunction,
 * `fall` and `fex` are the *functional* (term-level) universal and existential
 quantifiers. Unlike `all` and `ex`, which build a formula, these build a Boolean
 function: `fall x f` denotes the meet and `fex x f` the join of `f` over all
-values of `x`. They are currently parsed and preserved through normalization as
-atomic terms, but not yet evaluated,
+values of `x`. Over a Boolean body, normalization evaluates them through Boole's
+expansion: `fex x f` becomes `f[x:=0] | f[x:=1]` and `fall x f` becomes
+`f[x:=0] & f[x:=1]`, innermost first. A body with arithmetic, a cast,
+`min`/`max`, a function reference or a quantifier that remains keeps the functional
+quantifier as an atomic term, and a closed formula over it is reported as
+UNKNOWN,
 * the conjunction operator `&` may be omitted between two operands, so `xy` is
 the same as `x & y`,
 * `function` is the non-terminal symbol used to incorporate function definitions (see the subsection
@@ -3117,11 +3138,16 @@ The Tau REPL also provides a set of logical procedures that allow you to check
 several aspects of the given specification/well-formed formulas/Boolean functions.
 The syntax of the commands is the following:
 
-* `valid <repl_memory|tau>`: checks if the given specification is valid.
+* `valid <repl_memory|tau>`: checks if the given specification is valid, that
+is, whether no trace violates it, with every input stream read as an output
+(see [Satisfiability](#satisfiability)).
 
 * `sat <repl_memory|tau>`: checks if the given specification is satisfiable.
 
 * `unsat <repl_memory|tau>`: checks if the given specification is unsatisfiable.
+
+`sat`, `unsat` and `valid` print `T` or `F`, or an UNKNOWN error when the
+formula cannot be decided.
 
 * `solve [<options>] <repl_memory|tau>`: solves the given system of equations given
 by the well-formed formula, computing a single satisfying assignment for its free
@@ -3129,6 +3155,13 @@ variables. The available options are:
 	* `--min|--minimum`: computes a minimum solution of the system,
 	* `--max|--maximum`: computes a maximum solution of the system,
 	* `--<type>`: uses the given type (`sbf`, `tau`, ...) for the solution.
+
+  Every value in the assignment is a constant: `solve x:bv[2] = y:bv[2]`
+  answers `x := { 3 }:bv[2]` and `y := { 3 }:bv[2]`, where `lgrs` gives the
+  reproductive solution `x := x|y`, `y := x|y`. An
+  ordering system over `qlt` is solved as a whole, so related variables get
+  distinct values (`solve x:qlt < y:qlt` gives `x` a smaller value than `y`),
+  and its model is checked against every atom before it is printed.
 
 * `lgrs [--<type>] <repl_memory|tau>`: computes a least general reproductive
 solution (LGRS) for the given equation.
@@ -3170,7 +3203,9 @@ Finally, you can run a given Tau specification. The syntax for the commands is:
 
 * `run N steps <repl_memory|tau>`: runs the specification for exactly `N` steps
 and keeps the session; `run N steps` continues the stored session for `N` more
-steps and a bare `run` continues it until it ends or needs input.
+steps and a bare `run` continues it until it ends or needs input. A step that
+fails, for instance on an output file that cannot be written, ends the run and
+prints the error.
 
 * `stop`: discards the stored run session.
 
@@ -3424,7 +3459,10 @@ The public C++ API is [`src/api.h`](src/api.h). All operations are exposed as
 static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
-(`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
+(`get_interpreter`, `get_inputs_for_step`, `step`). `unsat_core` returns a
+subset-minimal set of a specification's top-level conjuncts that is already
+unrealizable (or unsatisfiable), and `reset` returns the process to a fresh
+state, freeing every tree node no `htref` holds. Global switches such as
 `set_charvar`, `set_preprocessing`, `set_bv_case_split`, `set_ba_component_factoring`,
 `set_indenting`, `set_highlighting`, `set_json` and
 `set_severity` mirror the command line options, and every runtime limit has a
@@ -3444,7 +3482,15 @@ Python bindings are provided via
 [`bindings/python`](bindings/python) and built with `./dev binding python`. They
 expose the interpreter part of the API together with a set of stream
 implementations (console, file, and in-memory vector streams) so that inputs and
-outputs can be driven from Python:
+outputs can be driven from Python. The decision procedures `sat`, `unsat`,
+`valid`, `realizable` (alias `is_realizable`) and `unrealizable` take a full
+specification and return a `tau.result` whose value is the verdict, or `None`
+when the spec does not parse or gets no verdict. `unsat_core(spec,
+realizability=True)` returns a subset-minimal list of the top-level conjuncts
+(`always (A && B)` counts as `always A` and `always B`) that is already
+unrealizable, or unsatisfiable with `realizability=False`. `reset()` returns
+the engine to a fresh state, as the REPL `reset` command does. See
+[`docs/tau_result.md`](docs/tau_result.md) for the result type.
 
 ```python
 import tau   # the built module lives in <build dir>/bindings/python/nanobind

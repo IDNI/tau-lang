@@ -2640,6 +2640,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "a new `run <tau>` replaces any stored session; `run` / `run N steps`\n"
 		<< "with no formula continue the stored one. `N step` (singular) also works.\n"
+		<< "a step that fails, for instance on an output that cannot be written,\n"
+		<< "ends the run and prints the error.\n"
 		<< "\n";
 		break;
 	case tau::stop_sym: out
@@ -2681,6 +2683,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  --min, --minimum                   computes a minimum solution of the system of equations\n"
 		<< "  --max, --maximum                   computes a maximum solution of the system of equations\n"
 		<< "  --<type>                           uses the specified type for the solution (sbf or tau)\n"
+		<< "\n"
+		<< "every value of the assignment is a constant (lgrs gives the reproductive solution)\n"
 		<< "\n";
 		break;
 	case tau::lgrs_sym: out
@@ -2718,6 +2722,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the sat command checks if a Tau formula is satisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is satisfiable if there exists a variable assignment to non-temporal variables\n"
 		<< "such that for all possible inputs there exist time compatible outputs at each point in time\n"
+		<< "a formula without a temporal operator is read as if it were wrapped in always\n"
+		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  sat <rr>                checks the given tau formula with additional predicate and function definitions for satisfiability\n"
@@ -2725,7 +2731,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  sat <repl_history>      checks the Tau formula stored at the specified repl history position for satisfiability\n";
 		break;
 	case tau::valid_sym: out
-		<< "the valid command checks if a Tau formula is logically equivalent to T and if so prints T and else F\n"
+		<< "the valid command checks if a Tau formula is valid and if so prints T and else F\n\n"
+		<< "a tau formula is valid if no trace violates it: validity quantifies over traces, not over\n"
+		<< "an environment, so every input stream is read as an output (valid sometimes i1[t] = 1 is F)\n"
+		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  valid <rr>              checks the given tau formula with additional predicate and function definitions for validity\n"
@@ -2736,6 +2745,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the unsat command checks if a Tau formula is unsatisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is unsatisfiable if for every variable assignment to non-temporal variables\n"
 		<< "there exist inputs such that there are no time compatible outputs at some point in time\n"
+		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  unsat <rr>              checks the given tau formula with additional predicate and function definitions for unsatisfiability\n"

@@ -105,6 +105,9 @@ std::optional<solution<node>> solve_system(
 /**
  * @brief Solves the given set of equations.
  *
+ * A model from the owning BA's ordering solver
+ * (`omcat_solve_inequality_system`) is checked against every atom before it
+ * is returned; a model that does not hold falls through to the general path.
  * @tparam node Tree node type.
  * @param eqs The set of equations to solve.
  * @param options The solver options.
@@ -151,6 +154,10 @@ tref var, tref term);
 /**
  * @brief Solves the given tau form.
  *
+ * A pure-equality bitvector clause gets a ground zero of each equation
+ * (the least one in `solver_mode::minimum`), so every value is a constant
+ * a caller can commit as a model; `lgrs` returns the reproductive solution
+ * instead.
  * @tparam node Tree node type.
  * @param form The tau form to solve.
  * @param options The solver options.

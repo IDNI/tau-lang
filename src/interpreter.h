@@ -608,6 +608,9 @@ private:
 	result<std::pair<std::optional<assignment<node>>, bool>> read(
 		const trefs& in_vars, size_t time_step);
 	/// @brief Write output assignments to the output context.
+	/// @return An error and nothing written when a bdd node table filled
+	/// while the outputs were computed (`bdd_node_table_exhausted`), or
+	/// when a value cannot be serialized or written.
 	result<bool> write(const assignment<node>& outputs);
 	/// @brief Rebuild the input stream map from @p current_inputs.
 	/// @return false if a stream could not be found (interpretation should stop).
