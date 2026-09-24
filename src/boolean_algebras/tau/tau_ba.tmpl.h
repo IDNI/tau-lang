@@ -666,6 +666,101 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+// Helpers of the shape: a left-nested chain ((a && b) && c) and its
+// elements, the split of a normal-form body into its unit and clause
+// chains, and the stream occurrences a body mentions.
+template <typename node>
+static bool nf_is_and(tref n) {
+	const tree<node>& t = tree<node>::get(n);
+	return t.has_child() && t.child_is(tree<node>::wff_and);
+}
+template <typename node>
+static bool nf_is_or(tref n) {
+	const tree<node>& t = tree<node>::get(n);
+	return t.has_child() && t.child_is(tree<node>::wff_or);
+}
+template <typename node>
+static bool nf_is_unit(tref n) {
+	const tree<node>& t = tree<node>::get(n);
+	return t.has_child() && (t.child_is(tree<node>::bf_eq)
+		|| t.child_is(tree<node>::bf_neq));
+}
+// elements of a left-nested chain ((a && b) && c) -> [a, b, c]
+template <typename node>
+static trefs nf_spine(tref n) {
+	using tau = tree<node>;
+	trefs out;
+	while (nf_is_and<node>(n)) {
+		out.push_back(tau::get(n)[0].second());
+		n = tau::get(n)[0].first();
+	}
+	out.push_back(n);
+	std::reverse(out.begin(), out.end());
+	return out;
+}
+template <typename node>
+static tref nf_chain(const trefs& v) {
+	tref acc = v[0];
+	for (size_t i = 1; i < v.size(); ++i)
+		acc = tree<node>::build_wff_and(acc, v[i]);
+	return acc;
+}
+// A body with both kinds is AND(unit chain, clause chain), whose left
+// spine ends in the clause chain as one element (a unit is never a
+// conjunction); a body with one kind is that chain itself. false when the
+// body has another shape.
+template <typename node>
+static bool nf_split(tref body, trefs& units, trefs& clauses) {
+	trefs el = nf_spine<node>(body);
+	if (el.size() >= 2 && nf_is_and<node>(el.back())) {
+		clauses = nf_spine<node>(el.back());
+		el.pop_back();
+		units = el;
+	} else {
+		size_t i = 0;
+		while (i < el.size() && nf_is_unit<node>(el[i])) units.push_back(el[i++]);
+		while (i < el.size()) clauses.push_back(el[i++]);
+	}
+	for (tref u : units) if (!nf_is_unit<node>(u)) return false;
+	for (tref c : clauses) if (!nf_is_or<node>(c)) return false;
+	return true;
+}
+// The stream occurrences a body mentions (`name[index]`), by printed
+// text without the type: the same stream can occur as differently
+// typed variable nodes, which the hash-consing keeps apart, and a
+// different time offset is a different atom to the syntactic passes.
+// A variable that is neither a stream occurrence nor the time index
+// of one (a free non-stream variable, which simplify_using_equality
+// can relate to others) leaves the body outside the shape, so it is
+// reported through `other_variable`. Sorted, without duplicates.
+template <typename node>
+static std::vector<std::string> nf_stream_names(tref f, bool& other_variable) {
+	using tau = tree<node>;
+	std::vector<std::string> names;
+	subtree_set<node> in_stream;
+	for (tref v : tau::get(f).select_all(is<node, tau::variable>))
+		if (is_io_var<node>(v))
+			for (tref w : tau::get(v).select_all(is<node, tau::variable>))
+				in_stream.insert(w);
+	for (tref v : tau::get(f).select_all(is<node, tau::variable>)) {
+		if (is_io_var<node>(v)) {
+			std::string s = tau::get(v).to_str();
+			names.push_back(s.substr(0, s.find(':')));
+		} else if (!in_stream.contains(v)) other_variable = true;
+	}
+	std::sort(names.begin(), names.end());
+	names.erase(std::unique(names.begin(), names.end()), names.end());
+	return names;
+}
+// The stream names of a body, kept per body in a GC-registered cache, so
+// the body a step returns answers the next step's lookup.
+template <typename node>
+static subtree_unordered_map<node, std::vector<std::string>>& nf_streams_of() {
+	using streams_cache_t = subtree_unordered_map<node, std::vector<std::string>>;
+	static streams_cache_t& c = tree<node>::template create_cache<streams_cache_t>();
+	return c;
+}
+
 // The Boole normal form of a conjunction of clauses is a conjunction of two
 // left-nested chains: the unit clauses (an equality or inequality each),
 // ordered by the comparator the syntactic path simplification sorts its
@@ -708,85 +803,17 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r);
 template <typename node>
 static tref shaped_conjunction(tref big, tref one, bool front) {
 	using tau = tree<node>;
-	auto is_and = [](tref n) {
-		const tau& t = tau::get(n);
-		return t.has_child() && t.child_is(tau::wff_and); };
-	auto is_or = [](tref n) {
-		const tau& t = tau::get(n);
-		return t.has_child() && t.child_is(tau::wff_or); };
-	auto is_unit = [](tref n) {
-		const tau& t = tau::get(n);
-		return t.has_child()
-			&& (t.child_is(tau::bf_eq) || t.child_is(tau::bf_neq)); };
-	// elements of a left-nested chain ((a && b) && c) -> [a, b, c]
-	auto spine = [&](tref n) {
-		trefs out;
-		while (is_and(n)) {
-			out.push_back(tau::get(n)[0].second());
-			n = tau::get(n)[0].first();
-		}
-		out.push_back(n);
-		std::reverse(out.begin(), out.end());
-		return out;
-	};
-	auto chain = [](const trefs& v) {
-		tref acc = v[0];
-		for (size_t i = 1; i < v.size(); ++i)
-			acc = tau::build_wff_and(acc, v[i]);
-		return acc;
-	};
-	// A body with both kinds is AND(unit chain, clause chain), whose left
-	// spine ends in the clause chain as one element (a unit is never a
-	// conjunction); a body with one kind is that chain itself.
-	trefs units, clauses, el = spine(big);
-	if (el.size() >= 2 && is_and(el.back())) {
-		clauses = spine(el.back());
-		el.pop_back();
-		units = el;
-	} else {
-		size_t i = 0;
-		while (i < el.size() && is_unit(el[i])) units.push_back(el[i++]);
-		while (i < el.size()) clauses.push_back(el[i++]);
-	}
-	for (tref u : units) if (!is_unit(u)) return nullptr;
-	for (tref c : clauses) if (!is_or(c)) return nullptr;
-	// The stream occurrences a body mentions (`name[index]`), by printed
-	// text without the type: the same stream can occur as differently
-	// typed variable nodes, which the hash-consing keeps apart, and a
-	// different time offset is a different atom to the syntactic passes.
-	// A variable that is neither a stream occurrence nor the time index
-	// of one (a free non-stream variable, which simplify_using_equality
-	// can relate to others) leaves the body outside the shape, so it is
-	// reported as such. Kept per body in a GC-registered cache, so the body a step
-	// returns answers the next step's lookup, and the merge is one pass
-	// over two sorted lists.
+	trefs units, clauses;
+	if (!nf_split<node>(big, units, clauses)) return nullptr;
 	using streams_t = std::vector<std::string>;
-	using streams_cache_t = subtree_unordered_map<node, streams_t>;
-	static streams_cache_t& streams_of =
-		tree<node>::template create_cache<streams_cache_t>();
+	auto& streams_of = nf_streams_of<node>();
 	bool other_variable = false;
-	auto stream_names = [&other_variable](tref f) {
-		streams_t names;
-		subtree_set<node> in_stream;
-		for (tref v : tau::get(f).select_all(is<node, tau::variable>))
-			if (is_io_var<node>(v))
-				for (tref w : tau::get(v).select_all(is<node, tau::variable>))
-					in_stream.insert(w);
-		for (tref v : tau::get(f).select_all(is<node, tau::variable>)) {
-			if (is_io_var<node>(v)) {
-				std::string s = tau::get(v).to_str();
-				names.push_back(s.substr(0, s.find(':')));
-			} else if (!in_stream.contains(v)) other_variable = true;
-		}
-		std::sort(names.begin(), names.end());
-		names.erase(std::unique(names.begin(), names.end()), names.end());
-		return names;
-	};
 	auto it = streams_of.find(big);
 	if (it == streams_of.end())
-		it = streams_of.emplace(big, stream_names(big)).first;
+		it = streams_of.emplace(big,
+			nf_stream_names<node>(big, other_variable)).first;
 	const streams_t& have = it->second;
-	streams_t add = stream_names(one);
+	streams_t add = nf_stream_names<node>(one, other_variable);
 	if (other_variable) return nullptr;
 	// A clause on a stream the body already mentions is not assembled:
 	// the normalization simplifies such clauses against each other (a
@@ -794,7 +821,7 @@ static tref shaped_conjunction(tref big, tref one, bool front) {
 	// resolvable clauses), so the shape alone does not give the result.
 	for (const auto& s : add)
 		if (std::binary_search(have.begin(), have.end(), s)) return nullptr;
-	if (is_unit(one)) {
+	if (nf_is_unit<node>(one)) {
 		// The path simplification keys an inequality by its positive
 		// atom (`l != r` reaches it as `!(l = r)` and the sort compares
 		// the trimmed keys), so a unit's place is that of the equality
@@ -813,7 +840,7 @@ static tref shaped_conjunction(tref big, tref one, bool front) {
 				return syntactic_path_simplification_wff_comp<node>(
 					key(a), kb); });
 		units.insert(pos, one);
-	} else if (is_or(one)) {
+	} else if (nf_is_or<node>(one)) {
 		if (front) clauses.insert(clauses.begin(), one);
 		else clauses.push_back(one);
 	} else return nullptr;
@@ -821,9 +848,9 @@ static tref shaped_conjunction(tref big, tref one, bool front) {
 	merged.reserve(have.size() + add.size());
 	std::merge(have.begin(), have.end(), add.begin(), add.end(),
 		std::back_inserter(merged));
-	tref out = units.empty() ? chain(clauses)
-		: clauses.empty() ? chain(units)
-		: tau::build_wff_and(chain(units), chain(clauses));
+	tref out = units.empty() ? nf_chain<node>(clauses)
+		: clauses.empty() ? nf_chain<node>(units)
+		: tau::build_wff_and(nf_chain<node>(units), nf_chain<node>(clauses));
 	streams_of.insert_or_assign(out, std::move(merged));
 	++tau_ba_normalized_conjunction_shaped;
 	return out;
