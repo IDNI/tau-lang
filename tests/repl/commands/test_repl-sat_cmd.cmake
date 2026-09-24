@@ -265,3 +265,18 @@ set_tests_properties("test_repl-sat_cmd-components_dual_constraint_shadow_declin
 	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
 	FAIL_REGULAR_EXPRESSION "Error"
 )
+# One `sometimes` over a disjunction is decided through the validity of its
+# dual always formula where it reads output streams only; with an input
+# stream the whole formula decides.
+add_test(NAME "test_repl-sat_cmd-components_dual_shadow_agrees"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat sometimes ((o1[t] = 0 && o2[t] = 1) || o3[t-1] = 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_dual_shadow_agrees" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits [1-9][0-9]*, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)
+add_test(NAME "test_repl-sat_cmd-components_dual_input_shadow_declines"
+	COMMAND bash -c "TAU_API_SAT_FACTORED=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"set charvar off. sat sometimes ((i1[t] = 0 && o2[t] = 1) || o3[t-1] = 0)\" -S trace 2>&1")
+set_tests_properties("test_repl-sat_cmd-components_dual_input_shadow_declines" PROPERTIES
+	PASS_REGULAR_EXPRESSION "api sat factored shadow: hits 0, mismatches 0"
+	FAIL_REGULAR_EXPRESSION "Error"
+)

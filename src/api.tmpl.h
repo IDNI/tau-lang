@@ -1288,17 +1288,17 @@ result<bool> api<node>::sat_prepared(tref fm) {
 		// constants already use: it splits `always` hulls into their
 		// conjuncts, groups the conjuncts by the names of their free
 		// variables and decides each group with is_tau_formula_sat, and
-		// it decides a formula that is one `sometimes` through the
-		// validity of its dual (sometimes_dual). On any other formula
-		// it declines (-1) on fewer than two conjuncts, on a conjunct
-		// that is no `always` clause, that reads a stream at a fixed
-		// time point, that holds a constraint on the time point or a
-		// temporal operator of its own, an embedded BA constant or a
-		// nameless free variable, on fewer than two groups and on a
-		// group is_tau_formula_sat leaves undecided; the whole-formula
-		// decision below then runs. A full-LTL formula whose normal
-		// form keeps a data quantifier is routed raw (target != nf) and
-		// skips the factoring.
+		// it decides a formula that is one `sometimes` over output
+		// streams through the validity of its dual (sometimes_dual). On
+		// any other formula it declines (-1) on fewer than two
+		// conjuncts, on a conjunct that is no `always` clause, that
+		// reads a stream at a fixed time point, that holds a constraint
+		// on the time point or a temporal operator of its own, an
+		// embedded BA constant or a nameless free variable, on fewer
+		// than two groups and on a group is_tau_formula_sat leaves
+		// undecided; the whole-formula decision below then runs. A
+		// full-LTL formula whose normal form keeps a data quantifier is
+		// routed raw (target != nf) and skips the factoring.
 		const int factored = target == nf && ba_component_factoring_enabled()
 			? sat_factored_mode<node>() : 0;
 		if (factored > 0)

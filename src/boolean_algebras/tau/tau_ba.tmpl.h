@@ -488,6 +488,10 @@ size_t verdict_budget_fingerprint();
  * holds a temporal operator of its own: the dual of a nested temporal body
  * is not an always-conjunction the unit split could take apart, and pushing
  * the negation through the full-LTL operators is the LTL pipeline's job.
+ * Returns nullptr as well when the body reads an input stream: both
+ * identities need every stream of `D` quantified alike on their two sides,
+ * and for an input stream under a `sometimes` that depends on how the
+ * decision of the whole formula reads it.
  * The callers pass the normalized main, where the complement of an
  * always-conjunction is one `sometimes` over a DNF; a disjunction of
  * several `sometimes`, as `to_nnf` alone produces, is not taken apart here
@@ -499,7 +503,11 @@ static tref sometimes_dual(tref fm) {
 	const tau& t = tau::get(fm);
 	if (!t.has_child() || !t.child_is(tau::wff_sometimes)) return nullptr;
 	const tref body = tau::trim2(fm);
-	if (tau::get(body).find_top(is_temporal_quantifier<node>)) return nullptr;
+	if (tau::get(body).find_top([](tref n) {
+		return is_temporal_quantifier<node>(n)
+			|| (tree<node>::get(n).is(tau::io_var)
+				&& tree<node>::get(n).is_input_variable()); }))
+		return nullptr;
 	return to_nnf<node>(tau::build_wff_always(tau::build_wff_neg(body)));
 }
 
