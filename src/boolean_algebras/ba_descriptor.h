@@ -230,6 +230,14 @@ concept ba_has_omcat_qe = ba_has_descriptor_v<Node, BA>
 		{ ba_descriptor<BA, Node>::omcat_qe(v, b) }
 			-> std::convertible_to<std::optional<bool>>; };
 
+// A quantifier-free formula equivalent to `ex var. body` over the other
+// variables, or nullptr when the theory cannot eliminate var that way.
+template <typename Node, typename BA>
+concept ba_has_omcat_qe_residual = ba_has_descriptor_v<Node, BA>
+	&& requires(tref v, tref b) {
+		{ ba_descriptor<BA, Node>::omcat_qe_residual(v, b) }
+			-> std::convertible_to<tref>; };
+
 template <typename Node, typename BA>
 concept ba_has_semantic_pwr = ba_has_descriptor_v<Node, BA>
 	&& requires(tref c, tref u) {
