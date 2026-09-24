@@ -446,6 +446,45 @@ result<tref> normalize(tref form) {
 	return r.with_assert_check_value(result);
 }
 
+// Evaluates the functional quantifiers: for a Boolean function f, Boole's
+// expansion f(x) = x f(1) | x' f(0) makes the join of f over all x (`fex x f`)
+// f(0) | f(1) and the meet (`fall x f`) f(0) & f(1). The rewrite is exact only
+// for a Boolean body; arithmetic, casts, min/max and function references
+// (whose bodies are not visible here) keep the quantifier, and the closed
+// residue is then reported undecided. Post-order, so an inner fex/fall is gone
+// before its enclosing one is checked.
+template <NodeType node>
+tref eliminate_functional_quantifiers(tref fm) {
+	using tau = tree<node>;
+	if (!tau::get(fm).find_top(is_functional_quantifier<node>)) return fm;
+	auto is_non_boolean = [](tref n) {
+		switch (tau::get(n).get_type()) {
+		case tau::bf_ref: case tau::bf_add: case tau::bf_sub:
+		case tau::bf_mul: case tau::bf_div: case tau::bf_mod:
+		case tau::bf_shr: case tau::bf_shl: case tau::bf_min:
+		case tau::bf_max: case tau::bf_cast: case tau::bf_fex:
+		case tau::bf_fall:
+			return true;
+		default: return false;
+		}
+	};
+	auto f = [&](tref n) -> tref {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::bf) || !t.has_child()) return n;
+		const auto& q = t[0];
+		const bool ex = q.is(tau::bf_fex);
+		if (!ex && !q.is(tau::bf_fall)) return n;
+		tref var = q.first(), body = q.second();
+		if (tau::get(body).find_top(is_non_boolean)) return n;
+		const size_t type = find_ba_type<node>(var);
+		tref at1 = tau::get(body).replace(var, tau::_1_trimmed(type));
+		tref at0 = tau::get(body).replace(var, tau::_0_trimmed(type));
+		return ex ? tau::build_bf_or(at0, at1)
+			: tau::build_bf_and(at0, at1);
+	};
+	return post_order<node>(fm).apply_unique(f);
+}
+
 // Assumes that the formula passed does not have temporal quantifiers
 // This normalization will not perform the temporal normalization
 /** @internal @copydoc normalize_non_temp @endinternal */
@@ -466,6 +505,7 @@ result<tref> normalize_non_temp(tref fm) {
 		return r.with_assert_check_error(code::internal_error,
 			messages::non_temp_normalization_produced_no_formula);
 	}
+	fm = eliminate_functional_quantifiers<node>(fm);
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
 	// stay uncached).

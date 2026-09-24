@@ -3,8 +3,8 @@
 // Issue #141: sat / unsat / valid of a formula that normalization cannot
 // decide must give no verdict (an UNKNOWN error), never T or F -- a negative
 // fallback made `sat` of a satisfiable formula F and `valid` of its
-// falsifiable negation T. The qlt order chains reported there are decided
-// outright.
+// falsifiable negation T. The shapes reported there, a qlt order chain and
+// the functional quantifiers fex / fall, are decided outright.
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -51,6 +51,31 @@ TEST_SUITE("an undecided formula gives no verdict (issue #141)") {
 	}
 }
 #endif // TAU_PACK_HAS_BA_BV
+
+TEST_SUITE("functional quantifiers are evaluated (issue #141)") {
+
+	TEST_CASE("fex is the join over the bound variable") {
+		check_verdict("sat", "(fex x (y & x)) = 0", true);
+		check_verdict("valid", "(fex x (y & x)) != 0", false);
+		check_verdict("valid", "(fex x (y & x)) = y", true);
+		check_verdict("valid", "(fex x x) = 1", true);
+		check_verdict("valid", "(fex x (x & x')) = 0", true);
+		// control: y = 0 witnesses the first query
+		check_verdict("sat", "y = 0", true);
+	}
+
+	TEST_CASE("fall is the meet over the bound variable") {
+		check_verdict("sat", "(fall x (y | x)) = 0", true);
+		check_verdict("valid", "(fall x (y | x)) = y", true);
+		check_verdict("valid", "(fall x x) = 0", true);
+		check_verdict("unsat", "(fall x (y | x)) != y", true);
+	}
+
+	TEST_CASE("nested functional quantifiers") {
+		check_verdict("valid", "(fex x (fall z (x | z))) = 1", true);
+		check_verdict("valid", "(fall x (fex z (x & z))) = 0", true);
+	}
+}
 
 #ifdef TAU_PACK_HAS_BA_QLT
 TEST_SUITE("qlt order chains are decided (issue #141)") {
