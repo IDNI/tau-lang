@@ -2,9 +2,8 @@
 
 // Unit tests for src/anti_prenex/push/expand.h: §6's FOLD_DECIDED, the
 // CONJOINABLE test and EXPAND, the floor of the conjunction's ladder. Spec:
-// anti_prenex.md §6 (FOLD_DECIDED, EXPAND), §1 (`prio`, `expand_max`,
-// `expand_count`, `taint_count`, cache scope), §3 (the result joins),
-// invariants 3 and 7.
+// anti_prenex.md §6 (FOLD_DECIDED, EXPAND), §1 (`prio`), §3 (the result
+// joins), invariant 7.
 //
 // The harness is the junctions suite's: parse `∃P.ψ`, normalise `ψ` the way
 // phases 1 and 3 leave it — no SIMPLIFY, so a shape phase 1 would fold still
@@ -12,9 +11,6 @@
 // DIRECTLY on the prepared clause. What is claimed of a result: EQUIVALENT to
 // `∃P.ψ` (`are_nso_equivalent` on the finished formula), no free variable
 // ESCAPED, INVARIANT 4, and per case the block RESOLVED or the binders left.
-// The spec's own state is the only other observable: `ctx.expand_count` and
-// the rise of `taint_count`, which is global and never reset, so a case reads
-// its delta around one call.
 //
 // FOLD_DECIDED fires only in a BA with constants beyond 0 and 1: over those
 // two alone a constant residual forces a constant term, which SIMPLIFY_ATOM
@@ -106,14 +102,6 @@ bool invariant_4(tref n) {
 	return clean;
 }
 
-/// `expand_max` for the scope of one case, restored on the way out. A `ctx`
-/// copies the knob at setup, so the guard precedes the fixture.
-struct expand_max_guard {
-	const size_t saved = ap::expand_max;
-	explicit expand_max_guard(size_t v) { ap::expand_max = v; }
-	~expand_max_guard() { ap::expand_max = saved; }
-};
-
 /// A parsed `∃P.ψ` split the way the push's callers hand it over: the block
 /// OUTERMOST FIRST, the component's ctx over it — `type` read off the block,
 /// as invariant 2 allows — and the body as phase 4 meets it, put into §1's
@@ -175,18 +163,6 @@ void check_against_source(tref got, const fixture& f) {
 void check_resolved(tref got, const fixture& f) {
 	CHECK(binder_count(got) == 0);
 	CHECK(!ap::fv_meets<node_t>(got, f.P));
-}
-
-/// `∃P.φ` with `φ`'s conjunction and each of its disjunctive conjuncts
-/// assembled again by the joins: a re-wrap compared up to the member order the
-/// joins fix. A prepared clause need not be in that order — the content order
-/// of a BDD-backed atom follows its `BDD_ID`.
-tref rewrapped(tref phi, const ap::block& P) {
-	trefs ms;
-	for (tref m : ap::members<node_t>(phi))
-		ms.push_back(is_child<node_t>(m, tau::wff_or)
-			? ap::simplified_or_join<node_t>(ap::members<node_t>(m)) : m);
-	return ap::rewrap<node_t>(ap::simplified_and_join<node_t>(ms), P);
 }
 
 /// The clause's disjunctive conjuncts, in member order.
@@ -365,7 +341,6 @@ TEST_CASE("X1: L17's clause resolves through two cases") {
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
-	CHECK(f.c.expand_count == 2);
 }
 
 TEST_CASE("X2: the cases are exclusive — a later case carries the complement "
@@ -381,7 +356,6 @@ TEST_CASE("X2: the cases are exclusive — a later case carries the complement "
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
-	CHECK(f.c.expand_count == 2);
 	REQUIRE(is_child<node_t>(got, tau::wff_or));
 	const tref excluded = ap::complement_of<node_t>(ds[0]);
 	CHECK(std::ranges::any_of(ap::members<node_t>(got),
@@ -391,8 +365,8 @@ TEST_CASE("X2: the cases are exclusive — a later case carries the complement "
 TEST_CASE("X3: a dead case builds no copy and no exclusion") {
 	// Unsimplified by the fixture, `x·z = 0` sits in `D` beside the
 	// conjunct `¬(x·z = 0)`: its case meets its complement in the ∧-join
-	// and dies, charged but not built. The result is the second case's
-	// alone, `∃x(x·y = 0 ∧ x·z ≠ 0)`.
+	// and dies unbuilt. The result is the second case's alone,
+	// `∃x(x·y = 0 ∧ x·z ≠ 0)`.
 	fixture f = make("ex x ((xz = 0 || xy = 0) && xz != 0).");
 	REQUIRE(disjunctive(f).size() == 1);
 	const trefs ds = ap::members<node_t>(disjunctive(f)[0]);
@@ -401,7 +375,6 @@ TEST_CASE("X3: a dead case builds no copy and no exclusion") {
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
-	CHECK(f.c.expand_count == 2);
 	CHECK(ap::is_negated_equation<node_t>(got));
 }
 
@@ -417,20 +390,18 @@ TEST_CASE("X4: a member proven T makes D T") {
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
-	CHECK(f.c.expand_count == 2);
 	CHECK(ap::is_negated_equation<node_t>(got));
 }
 
 TEST_CASE("X5: a case that decides T leaves the later cases unbuilt") {
 	// `x = 0` is the smaller member, and `∃x(x = 0 ∧ x·z = 0)` is `T`: the
-	// ∨-join is decided and `¬(x·w = 0)` is never charged.
+	// ∨-join is decided and `¬(x·w = 0)` is never built.
 	fixture f = make("ex x ((x = 0 || xw != 0) && xz = 0).");
 	REQUIRE(disjunctive(f).size() == 1);
 	REQUIRE(ap::members<node_t>(disjunctive(f)[0]).size() == 2);
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	CHECK(tau::get(got).equals_T());
-	CHECK(f.c.expand_count == 1);
 }
 
 TEST_CASE("X5b: the inner expansion through the floor decides T at its first "
@@ -440,7 +411,7 @@ TEST_CASE("X5b: the inner expansion through the floor decides T at its first "
 	// alike), pushes `x·y = 0 ∧ (x·z = 0 ∨ ¬(x·k = 0))`, which no cheaper
 	// step takes, back to the floor; there the smaller member `x·z = 0`
 	// gives `∃x(x·y = 0 ∧ x·z = 0)`, `T` at `x := 0`, which decides the
-	// inner ∨-join and then the outer one: two of the four members charged.
+	// inner ∨-join and then the outer one: two of the four members built.
 	fixture f = make("ex x ((xy = 0 || xw = 0) && (xz = 0 || xk != 0)).");
 	const trefs S = disjunctive(f);
 	REQUIRE(S.size() == 2);
@@ -456,51 +427,17 @@ TEST_CASE("X5b: the inner expansion through the floor decides T at its first "
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	CHECK(tau::get(got).equals_T());
-	CHECK(f.c.expand_count == 2);
 }
 
-TEST_CASE("X6: a spent budget re-wraps the rest as ONE pending block, and "
-	"taints") {
-	// L17's clause under a budget of one case: the first member is
-	// expanded and resolves; the second waits under `∃x`, carrying the
-	// first member's complement (invariant 3).
-	{
-		expand_max_guard g(1);
-		fixture f = make("ex x ((xy = 0 || xw = 0) && xz != 0).");
-		REQUIRE(f.c.expand_max == 1);
-		const tref first = ap::members<node_t>(disjunctive(f)[0])[0];
-		const size_t before = ap::taint_count<node_t>();
-		const tref got = expanded(f);
-		CHECK(ap::taint_count<node_t>() - before == 1);
-		CHECK(f.c.expand_count == 1);
-		check_against_source(got, f);
-		REQUIRE(binder_count(got) == 1);
-		tref pending = nullptr;
-		for (tref m : ap::members<node_t>(got))
-			if (is_child_quantifier<node_t>(m)) pending = m;
-		REQUIRE(pending != nullptr);
-		const tref body = ap::binder_body<node_t>(pending);
-		CHECK(has_member(body, ap::complement_of<node_t>(first)));
-		CHECK(!has_member(body, first));
-	}
-	// L18's clause under a budget of none: nothing is expanded, and the
-	// whole clause waits as one block, `D`'s members joined again.
-	{
-		expand_max_guard g(0);
-		fixture f = make("ex x ((xy = 0 || xw = 0) && !(xz = 0) "
-			"&& (xz = 0 || xk = 0)).");
-		REQUIRE(f.c.expand_max == 0);
-		const size_t before = ap::taint_count<node_t>();
-		const tref got = expanded(f);
-		CHECK(ap::taint_count<node_t>() - before == 1);
-		CHECK(f.c.expand_count == 0);
-		check_against_source(got, f);
-		REQUIRE(binder_count(got) == 1);
-		REQUIRE(is_child_quantifier<node_t>(got));
-		CHECK(same(ap::binder_var<node_t>(got), f.P[0]));
-		CHECK(same(rewrapped(ap::binder_body<node_t>(got), f.P),
-			rewrapped(f.clause, f.P)));
-	}
+TEST_CASE("X6: every member of the disjunct is expanded, and the block "
+	"resolves") {
+	// L18's clause: the floor builds one case per member of the disjunct
+	// it takes, each re-entering the ladder, and every case resolves.
+	fixture f = make("ex x ((xy = 0 || xw = 0) && !(xz = 0) "
+		"&& (xz = 0 || xk = 0)).");
+	const tref got = expanded(f);
+	check_against_source(got, f);
+	check_resolved(got, f);
 }
 
 TEST_CASE("X7: a complement that is not conjoinable is no exclusion") {
@@ -522,7 +459,6 @@ TEST_CASE("X7: a complement that is not conjoinable is no exclusion") {
 	const tref got = expanded(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
-	CHECK(f.c.expand_count == 2);
 }
 
 } // TEST_SUITE

@@ -16,10 +16,6 @@
  * one-signed guard literal, so the census, which asks for both signs, never
  * selects the same atom again.
  *
- * THE BUDGET is `EXPAND`'s: every arm pushed charges `ctx.expand_count`
- * against `ctx.expand_max`, and a spent budget re-wraps and taints (§1, cache
- * scope; invariant 3).
- *
  * `push/push_block.h` is the file that includes this one: every arm goes
  * back through `push_block`.
  */
@@ -34,7 +30,6 @@
 #include "../foundations/dag.h"
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
-#include "../foundations/prims.h"
 #include "../normalisers/joins.h"
 #include "../normalisers/simplify.h"
 #include "../witness/witness.h"
@@ -46,7 +41,7 @@ namespace idni::tau_lang::anti_prenexing {
  * @brief §6 `TRY_DECOMPOSE(ψ, X, ctx)`: one LICENSED Boole decomposition on a
  * census atom whose two signs sit at member tops of different disjunctive
  * conjuncts; a candidate the probe proves `F` is folded instead. `nullopt`
- * when no candidate is licensed or the budget is spent.
+ * when no candidate is licensed.
  *
  * THE CENSUS reads MEMBER TOPS only: a literal member of an ∨-conjunct of
  * `ψ`, a negative tree's included, counts one occurrence of its atom in its
@@ -55,8 +50,8 @@ namespace idni::tau_lang::anti_prenexing {
  * by the weaker side, then content order, and the first three are tried.
  *
  * PROBE FIRST: a candidate `FOLD_DECIDED` proves `F` is folded — `ψ[a ↦ F]`
- * pushed, no guard, no arm, no charge — and the smaller body re-enters the
- * ladder (invariant 8).
+ * pushed, no guard, no arm — and the smaller body re-enters the ladder
+ * (invariant 8).
  *
  * THE LICENCE, on the BUILT cofactors of the conjuncts carrying the atom:
  * their sizes over both cofactors exceed those conjuncts' by a quarter at
@@ -77,10 +72,8 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
  * the witness `f₁′` under `a`. The T-arm is then `(a ∧ C_T)[x ← f₁′]` under
  * `X ∖ {x}`: the guard becomes its residual `p = 0`, `T` for a strict pin.
  *
- * Arms share `EXPAND`'s budget: the caller exits on a spent budget, so the
- * first arm always fits, and exhaustion re-wraps the second arm and taints
- * (invariant 3). An arm that simplifies to a constant is no case and charges
- * nothing; an arm deciding `T` leaves the other unpushed.
+ * An arm that simplifies to a constant is no case and is inserted as it
+ * stands; an arm deciding `T` leaves the other unpushed.
  */
 template <NodeType node>
 tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c);

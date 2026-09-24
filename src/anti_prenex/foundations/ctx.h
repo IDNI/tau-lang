@@ -27,9 +27,7 @@
  * could embed a solver verdict is cleared. `qbf_memo` is exempt from every
  * flush.
  *
- * Every function taking a `ctx` takes it by MUTABLE REFERENCE, because
- * `expand_count` is written during a push. Single-threaded, like every knob
- * and cache in the library.
+ * Single-threaded, like every knob and cache in the library.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
@@ -82,24 +80,20 @@ struct ctx {
 	/// §1 `prio`: variable priority, inner → HIGHER rank; §5 `P[i] ↦ i + 1`.
 	/// The two conventions are opposite and cannot be merged (§1).
 	var_order<node> prio;
-	/// The six knobs (§1 ctx table), copied from options.h at setup.
+	/// The five knobs (§1 ctx table), copied from options.h at setup.
 	size_t subsume_max   = anti_prenexing::subsume_max;
 	size_t qbf_node_max  = anti_prenexing::qbf_node_max;
 	size_t case_max      = anti_prenexing::case_max;
-	size_t expand_max    = anti_prenexing::expand_max;
 	size_t accept_growth = anti_prenexing::accept_growth;
 	size_t accept_floor  = anti_prenexing::accept_floor;
 	/// §1 `keep_functional`: emit `∀_X`/`∃_X` symbolically instead of
 	/// discharging them. Part of the `push_memo` / `elim_memo` keys.
 	bool keep_functional = false;
-	/// §1 `expand_count`: the cases `EXPAND` has built in this component —
-	/// the one COMPONENT-scoped counter, reset to 0 at setup.
-	size_t expand_count = 0;
 
 	/**
 	 * @brief §5 setup for one component: `type`, the two rank maps over `P`
-	 * (`P[0]` outermost), the knobs read from options.h AT THIS CALL,
-	 * `keep_functional`, and `expand_count = 0`.
+	 * (`P[0]` outermost), the knobs read from options.h AT THIS CALL, and
+	 * `keep_functional`.
 	 */
 	static ctx for_component(const block& P, ba_type_id type, bool keep_functional);
 };

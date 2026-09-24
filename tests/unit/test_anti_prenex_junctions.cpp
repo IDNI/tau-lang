@@ -486,7 +486,6 @@ TEST_CASE("R1: a conjunction no cheaper step takes is expanded") {
 	const tref got = pushed_and(f);
 	check_against_source(got, f);
 	check_resolved(got, f);
-	CHECK(f.c.expand_count == 2);
 }
 
 } // TEST_SUITE

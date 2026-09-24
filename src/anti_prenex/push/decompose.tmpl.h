@@ -14,9 +14,8 @@
  * its arm, `fold_decided` with `EXPAND`'s rank and list helpers
  * (push/expand.h) for the probe, the innermost-first order and the arms'
  * operands, the result joins (normalisers/joins.h) for every assembly,
- * `simplify` (normalisers/simplify.h) at the arm edge, `rewrap`
- * (foundations/prims.h) with `taint` (foundations/ctx.h) for the exhaustion,
- * and `push_block` — the hub, `push/push_block.h` — for every arm.
+ * `simplify` (normalisers/simplify.h) at the arm edge, and `push_block` — the
+ * hub, `push/push_block.h` — for every arm.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__DECOMPOSE_TMPL_H__
@@ -50,8 +49,6 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
 	DBG(assert(psi != nullptr && !X.empty());)
 	DBG(assert(is_child<node>(psi, tau::wff_and));)
-	// Spent: `EXPAND` re-wraps and taints.
-	if (c.expand_count >= c.expand_max) return std::nullopt;
 	const trefs cs = members<node>(psi);
 
 	// THE CENSUS, one pass over the member tops of the disjunctive
@@ -132,7 +129,6 @@ tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
 	DBG(assert(a != nullptr && C_T != nullptr && C_F != nullptr);)
 	DBG(assert(!X.empty() && is_atomic_fm<node>(a));)
-	DBG(assert(c.expand_count < c.expand_max);)
 	a = tau::trim_right_sibling(a);
 
 	// THE PIN, the innermost block variable first (§1 `prio`). An order
@@ -170,16 +166,10 @@ tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c) {
 	join_builder<node, false> acc;
 	for (const auto& [phi, Y] : arms) {
 		tref r = simplify<node>(phi, c.order);
-		// An arm folded to a constant is no case, and charges nothing.
-		if (!tau::get(r).equals_T() && !tau::get(r).equals_F()) {
-			if (c.expand_count >= c.expand_max) {
-				taint<node>();
-				acc.insert(rewrap<node>(r, fv_intersect<node>(r, Y)));
-				break;
-			}
-			++c.expand_count;
+		// An arm folded to a constant is no case, and is inserted as it
+		// stands.
+		if (!tau::get(r).equals_T() && !tau::get(r).equals_F())
 			r = push_block<node>(r, Y, c);
-		}
 		if (acc.insert(r)) break;
 	}
 	return acc.result();

@@ -2,10 +2,9 @@
 
 // THE WHOLE PIPELINE with the CONJUNCTION'S FLOOR in it. Spec:
 // anti_prenex.md §6 (TRY_DECOMPOSE with FOLD_DECIDED's probe,
-// DECOMPOSE_ARMS, EXPAND with its exclusive cases and its graceful
-// exhaustion), §7 (the leaves, DISCHARGE under `keep_functional`), §3 (the
-// phases around the push), §1 (`expand_max`, `taint_count`, cache scope),
-// invariants 3 and 5.
+// DECOMPOSE_ARMS, EXPAND with its exclusive cases), §7 (the leaves,
+// DISCHARGE under `keep_functional`), §3 (the phases around the push),
+// invariant 5.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no
@@ -19,10 +18,8 @@
 //  4. no free variable ESCAPED, and nothing of §1's term representation left
 //     the push: a component's close is total, so no `BDD_ID` survives.
 // Then ONE SHAPE CLAIM, the strict criterion: `binder_count == 0` and the
-// value for an input the ladder RESOLVES, the binder count for one that WAITS
-// on a spent expansion budget (invariant 3). The one other observable is the
-// rise of `taint_count`, which is global and never reset, so a case reads its
-// delta around one call. Each case's comment names the route its input takes.
+// value for an input the ladder RESOLVES. Each case's comment names the route
+// its input takes.
 //
 // FOLD_DECIDED proves an atom `F` only in a BA with constants beyond 0 and 1
 // (§6), so this suite is built over the `tau` pack of BAs, the one that
@@ -113,19 +110,6 @@ tref anti_prenexed(tref phi) {
 
 /// THE BLOCK IS RESOLVED: the pipeline left no binder at all.
 void resolved(tref got) { CHECK(binder_count(got) == 0); }
-
-/// WHAT WAITS: a spent expansion budget re-wrapped what it could not build
-/// (invariant 3), so @p n binders stand in the answer.
-void waits(tref got, size_t n) { CHECK(binder_count(got) == n); }
-
-/// `expand_max` for the scope of one case, restored on the way out. A
-/// component's ctx copies the knob at its setup, so the guard precedes the
-/// pipeline call.
-struct expand_max_guard {
-	const size_t saved = ap::expand_max;
-	explicit expand_max_guard(size_t v) { ap::expand_max = v; }
-	~expand_max_guard() { ap::expand_max = saved; }
-};
 
 constexpr const char* l17 = "ex x ((xy = 0 || xw = 0) && xz != 0).";
 
@@ -257,24 +241,6 @@ TEST_CASE("M7: keep mode on an expanding input stays binder-free") {
 	// The checker cannot decide kept chains; the default callback resolves
 	// them in phase 1 (§3 RESOLVE_FUNCTIONAL_PLAIN).
 	CHECK(are_nso_equivalent<node_t>(ap::anti_prenex<node_t>(got), phi));
-}
-
-TEST_CASE("M8: a spent budget leaves one pending block, and taints") {
-	// L17's clause under a budget of one case. TRY_DECOMPOSE finds no
-	// both-signed atom and charges nothing; EXPAND's first case resolves,
-	// and at the second the budget is spent: one taint, and the remaining
-	// member waits under `∃x` beside the first member's complement, ONE
-	// pending block (invariant 3).
-	expand_max_guard g(1);
-	// An untainted entry under this key, cached by an earlier case under the
-	// default budget, would answer it without the budget ever binding (§1
-	// cache scope); the flush makes it a miss where the tables exist.
-	ap::flush_solver_dependent<node_t>();
-	const tref phi = parse(l17);
-	const size_t before = ap::taint_count<node_t>();
-	const tref got = anti_prenexed(phi);
-	CHECK(ap::taint_count<node_t>() - before == 1);
-	waits(got, 1);
 }
 
 } // TEST_SUITE

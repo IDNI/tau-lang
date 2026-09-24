@@ -3,8 +3,8 @@
 // Unit tests for src/anti_prenex/push/decompose.h: §6's TRY_DECOMPOSE and
 // DECOMPOSE_ARMS, the licensed Boole decomposition above the conjunction's
 // floor. Spec: anti_prenex.md §6 (TRY_DECOMPOSE, DECOMPOSE_ARMS,
-// FOLD_DECIDED), §1 (`prio`, `expand_max`, `expand_count`, `taint_count`,
-// cache scope), §3 (TRY_WITNESS's pin test), invariants 3, 5 and 8.
+// FOLD_DECIDED), §1 (`prio`), §3 (TRY_WITNESS's pin test), invariants 5 and
+// 8.
 //
 // The harness is the expansion suite's: parse `∃P.ψ`, normalise `ψ` the way
 // phases 1 and 3 leave it — no SIMPLIFY, so a shape phase 1 would fold still
@@ -12,9 +12,6 @@
 // DIRECTLY on the prepared clause. What is claimed of a result: EQUIVALENT to
 // `∃P.ψ` (`are_nso_equivalent` on the finished formula), no free variable
 // ESCAPED, INVARIANT 4, and per case the block RESOLVED or the binders left.
-// The spec's own state is the only other observable: `ctx.expand_count` and
-// the rise of `taint_count`, which is global and never reset, so a case reads
-// its delta around one call.
 //
 // SIZES are §1's `|φ|`: an atom is 1, `|¬ψ| = 1 + |ψ|`, and a chain of `k`
 // members costs `k − 1` plus its members. The licence passes iff
@@ -98,14 +95,6 @@ bool invariant_4(tref n) {
 	pre_order<node_t>(n).search_unique(check, all_of_it, up);
 	return clean;
 }
-
-/// `expand_max` for the scope of one case, restored on the way out. A `ctx`
-/// copies the knob at setup, so the guard precedes the fixture.
-struct expand_max_guard {
-	const size_t saved = ap::expand_max;
-	explicit expand_max_guard(size_t v) { ap::expand_max = v; }
-	~expand_max_guard() { ap::expand_max = saved; }
-};
 
 /// A parsed `∃P.ψ` split the way the push's callers hand it over: the block
 /// OUTERMOST FIRST, the component's ctx over it — `type` read off the block,
@@ -218,7 +207,7 @@ TEST_SUITE("anti_prenex/decompose") {
 TEST_CASE("C1: the spanning atom is taken") {
 	// `a = 0` spans the two disjuncts, and its cofactors weigh 4 against 7.
 	// The arms `a = 0 ∧ x·z = 0` and `¬(a = 0) ∧ x·y = 0` push to `a = 0`
-	// and `¬(a = 0)`, whose ∨-join is `T`: two arms charged.
+	// and `¬(a = 0)`, whose ∨-join is `T`: both arms pushed.
 	fixture f = make(spanning);
 	const tref a = negated_top(f);
 	REQUIRE(member_tops(f, a) == std::pair<size_t, size_t>{ 1, 1 });
@@ -235,11 +224,8 @@ TEST_CASE("C1: the spanning atom is taken") {
 	REQUIRE(!ap::try_witness<node_t>(f.P[0], f.clause, f.c).has_value());
 	REQUIRE(!ap::try_case_witness<node_t>(f.P[0], f.clause, f.c)
 		.has_value());
-	const size_t before = ap::taint_count<node_t>();
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
-	CHECK(ap::taint_count<node_t>() == before);
-	CHECK(f.c.expand_count == 2);
 	CHECK(tau::get(*got).equals_T());
 	check_against_source(*got, f);
 }
@@ -250,7 +236,6 @@ TEST_CASE("C2: a one-signed atom is no candidate") {
 	fixture f = make("ex x ((xy = 0 || xw = 0) && xz != 0).");
 	REQUIRE(disjunctive(f).size() == 1);
 	CHECK(!decomposed(f).has_value());
-	CHECK(f.c.expand_count == 0);
 }
 
 TEST_CASE("C3: an ∧-member's conjuncts are no member tops") {
@@ -266,13 +251,12 @@ TEST_CASE("C3: an ∧-member's conjuncts are no member tops") {
 			return is_child<node_t>(m, tau::wff_and)
 				&& has_member(m, a); }); }));
 	CHECK(!decomposed(f).has_value());
-	CHECK(f.c.expand_count == 0);
 }
 
 TEST_CASE("C4: a constant-false candidate is folded, not decomposed") {
 	// FD2's atom `f = 0`, `f = x′·A ∪ x·B`: its cofactors' product `A·B` is a
 	// nonzero constant, so the probe proves it `F`. `ψ[a ↦ F]` is `x·y = 0`,
-	// `T` at `x := 0`, with no arm and no charge.
+	// `T` at `x := 0`, with no arm.
 	fixture f = make("ex x ((((x' & {A}:sbf) | (x & {B}:sbf)) = 0 "
 		"|| x & y = 0) && (((x' & {A}:sbf) | (x & {B}:sbf)) != 0 "
 		"|| x & z = 0)).");
@@ -280,11 +264,8 @@ TEST_CASE("C4: a constant-false candidate is folded, not decomposed") {
 	const tref a = negated_top(f);
 	REQUIRE(member_tops(f, a) == std::pair<size_t, size_t>{ 1, 1 });
 	REQUIRE(!ap::fold_decided<node_t>({ a }, f.P, f.c).has_value());
-	const size_t before = ap::taint_count<node_t>();
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
-	CHECK(ap::taint_count<node_t>() == before);
-	CHECK(f.c.expand_count == 0);
 	CHECK(tau::get(*got).equals_T());
 	check_against_source(*got, f);
 }
@@ -306,23 +287,19 @@ TEST_CASE("C5: the licence refuses an atom that copies bulk") {
 	std::ranges::sort(sizes);
 	REQUIRE(sizes == std::vector<size_t>{ 3, 4, 26 });
 	for (tref s : S) REQUIRE(ap::has_atom<node_t>(s, a));
-	const size_t before = ap::taint_count<node_t>();
 	CHECK(!decomposed(f).has_value());
-	CHECK(ap::taint_count<node_t>() == before);
-	CHECK(f.c.expand_count == 0);
 }
 
 TEST_CASE("C6: the pin arm deletes its binder") {
 	// `x = a` pins `x` strictly (cofactors `a`, `a′`), witness `a`: the T-arm
 	// is `z = 0` under the empty block, the F-arm `¬(x = a) ∧ y = 0` pushes
-	// to `y = 0` (`x := a′`). Two arms charged; `y = 0 ∨ z = 0`.
+	// to `y = 0` (`x := a′`). Both arms pushed; `y = 0 ∨ z = 0`.
 	fixture f = make("ex x ((x = a || y = 0) && (x != a || z = 0)).");
 	const tref a = negated_top(f);
 	REQUIRE(member_tops(f, a) == std::pair<size_t, size_t>{ 1, 1 });
 	REQUIRE(ap::cof_pin<node_t>(a, f.P[0], f.c).has_value());
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
-	CHECK(f.c.expand_count == 2);
 	check_against_source(*got, f);
 	check_resolved(*got, f);
 	CHECK(are_nso_equivalent<node_t>(finished(*got),
@@ -336,47 +313,13 @@ TEST_CASE("C6: the pin arm deletes its binder") {
 	const tref y0 = free_member(has_member(S[0], a_g) ? S[0] : S[1], g);
 	const tref z0 = free_member(has_member(S[0], a_g) ? S[1] : S[0], g);
 	const tref arms = ap::decompose_arms<node_t>(a_g, z0, y0, g.P, g.c);
-	CHECK(g.c.expand_count == 2);
 	CHECK(same(arms, *got));
 }
 
-TEST_CASE("C7: a spent budget at entry is no decomposition") {
-	fixture f = make(spanning);
-	f.c.expand_count = f.c.expand_max;
-	const size_t before = ap::taint_count<node_t>();
-	CHECK(!decomposed(f).has_value());
-	CHECK(ap::taint_count<node_t>() == before);
-	CHECK(f.c.expand_count == f.c.expand_max);
-}
-
-TEST_CASE("C8: exhaustion on the second arm re-wraps it, and taints") {
-	// C1's clause under a budget of one case: the T-arm (3 against 4) is
-	// pushed to `a = 0`; the F-arm waits as `∃x(¬(a = 0) ∧ x·y = 0)`
-	// (invariant 3).
-	expand_max_guard g(1);
-	fixture f = make(spanning);
-	REQUIRE(f.c.expand_max == 1);
-	const tref a = negated_top(f);
-	const size_t before = ap::taint_count<node_t>();
-	const std::optional<tref> got = decomposed(f);
-	REQUIRE(got.has_value());
-	CHECK(ap::taint_count<node_t>() - before == 1);
-	CHECK(f.c.expand_count == 1);
-	check_against_source(*got, f);
-	REQUIRE(binder_count(*got) == 1);
-	CHECK(has_member(*got, a));
-	tref pending = nullptr;
-	for (tref m : ap::members<node_t>(*got))
-		if (is_child_quantifier<node_t>(m)) pending = m;
-	REQUIRE(pending != nullptr);
-	CHECK(has_member(ap::binder_body<node_t>(pending),
-		ap::complement_of<node_t>(a)));
-}
-
-TEST_CASE("C9: an arm that folds to a constant charges nothing") {
+TEST_CASE("C9: an arm that folds to a constant is inserted as it stands") {
 	// C1's clause plus `a = 0`, added raw since the joins would absorb the
 	// first disjunct. Licensed 6 against 8; `C_F` holds `a = 0 ↦ F`, so the
-	// F-arm is `F`, uncharged, and the T-arm pushes to `a = 0`.
+	// F-arm is `F`, never pushed, and the T-arm pushes to `a = 0`.
 	fixture f = make(spanning);
 	const tref a = negated_top(f);
 	trefs cs = ap::members<node_t>(f.clause);
@@ -389,7 +332,6 @@ TEST_CASE("C9: an arm that folds to a constant charges nothing") {
 	REQUIRE(has_member(f.clause, a));
 	const std::optional<tref> got = decomposed(f);
 	REQUIRE(got.has_value());
-	CHECK(f.c.expand_count == 1);
 	CHECK(same(*got, a));
 	check_against_source(*got, f);
 	check_resolved(*got, f);

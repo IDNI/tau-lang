@@ -94,8 +94,8 @@ tref push_ex_block(tref body, const block& X,
 		// node, never a memo key.
 		const bool keep = kf(rewrap<node>(body, Xc));
 		// `for_component` is §5's whole ctx setup: the two rank maps
-		// over `P`, the knobs, and `expand_count = 0`. The type is the
-		// component's by invariant 2.
+		// over `P` and the knobs. The type is the component's by
+		// invariant 2.
 		ctx<node> c = ctx<node>::for_component(P,
 			find_ba_type<node>(P[0]), keep);
 		body = prepare_terms<node>(body, P, c.order);

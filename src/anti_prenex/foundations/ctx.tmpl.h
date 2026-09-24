@@ -24,14 +24,13 @@ template <NodeType node>
 ctx<node> ctx<node>::for_component(const block& P, ba_type_id type,
 	bool keep_functional)
 {
-	// The six knobs are the struct's default member initialisers, which
+	// The five knobs are the struct's default member initialisers, which
 	// read options.h HERE, when this `ctx` is constructed, so a knob changed
 	// between two components applies to the second one (§1: the constants
 	// are provisional and tunable).
 	ctx c;
 	c.type = type;
 	c.keep_functional = keep_functional;
-	c.expand_count = 0;               // §5: the one component-scoped counter
 	// §5: `ctx.order ← { P[i] ↦ |P|-i }` (inner → LOWER) and
 	// `ctx.prio ← { P[i] ↦ i+1 }` (inner → HIGHER), both over ranks
 	// 1..|P|, with `P[0]` the OUTERMOST variable. The two conventions are

@@ -64,12 +64,11 @@ TEST_CASE("for_component: the two rank maps run opposite over 1..|P|") {
 	CHECK(c.prio.size() == P.size());
 }
 
-TEST_CASE("for_component: type, keep_functional, expand_count, empty block") {
+TEST_CASE("for_component: type, keep_functional, empty block") {
 	ap::block P{ mk_var("t1") };
 	auto c = ap::ctx<node_t>::for_component(P, 7, true);
 	CHECK(c.type == 7);
 	CHECK(c.keep_functional);
-	CHECK(c.expand_count == 0);          // the one component-scoped counter
 
 	// A default ctx is "not set up": type 0 is the untyped id.
 	ap::ctx<node_t> fresh;
@@ -83,16 +82,16 @@ TEST_CASE("for_component: type, keep_functional, expand_count, empty block") {
 TEST_CASE("for_component: knobs are read at the call, not at start-up") {
 	ap::block P{ mk_var("k1") };
 	auto before = ap::ctx<node_t>::for_component(P, 1, false);
-	CHECK(before.expand_max == ap::expand_max);
+	CHECK(before.case_max == ap::case_max);
 	CHECK(before.subsume_max == ap::subsume_max);
 
-	const size_t saved = ap::expand_max;
-	ap::expand_max = saved + 5;
+	const size_t saved = ap::case_max;
+	ap::case_max = saved + 5;
 	auto after = ap::ctx<node_t>::for_component(P, 1, false);
-	ap::expand_max = saved;
+	ap::case_max = saved;
 
-	CHECK(after.expand_max == saved + 5);   // the NEXT component sees it
-	CHECK(before.expand_max == saved);      // the one already set up does not
+	CHECK(after.case_max == saved + 5);   // the NEXT component sees it
+	CHECK(before.case_max == saved);      // the one already set up does not
 }
 
 // --- taint (§1 cache scope) ------------------------------------------------------

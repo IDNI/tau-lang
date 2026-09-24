@@ -12,9 +12,8 @@
  * (foundations/subst.h) for a tree's literal-wise fold, the result joins
  * (normalisers/joins.h) for every assembly, `simplify`
  * (normalisers/simplify.h) at the case edge, `canonically_factored_neg` with
- * `normalize_operators` (normalisers/nnf.h) for a complement, `rewrap`
- * (foundations/prims.h) with `taint` (foundations/ctx.h) for the exhaustion,
- * and `push_block` — the hub, `push/push_block.h` — for every case.
+ * `normalize_operators` (normalisers/nnf.h) for a complement, and
+ * `push_block` — the hub, `push/push_block.h` — for every case.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__EXPAND_TMPL_H__
@@ -165,21 +164,9 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 		return formula_size<node>(a) < formula_size<node>(b); });
 	join_builder<node, false> acc;
 	trefs excl;
-	for (size_t i = 0; i < ds.size(); ++i) {
-		if (c.expand_count >= c.expand_max) {
-			// GRACEFUL EXHAUSTION: under the exclusions so far the
-			// remaining members' disjunction is its own exclusive
-			// decomposition, so it waits as ONE block (invariant 3).
-			taint<node>();
-			const tref p = simplified_and_join<node>(concat(*E, excl,
-				trefs{ simplified_or_join<node>(
-					trefs(ds.begin() + i, ds.end())) }, rest));
-			acc.insert(rewrap<node>(p, fv_intersect<node>(p, X)));
-			break;
-		}
-		++c.expand_count;
+	for (tref d : ds) {
 		const std::optional<trefs> dc =
-			fold_decided<node>(members<node>(ds[i]), X, c);
+			fold_decided<node>(members<node>(d), X, c);
 		// A dead case: no copy, and its complement is implied.
 		if (!dc) continue;
 		// A member proven `T` makes `D` `T`, which subsumes every case.
@@ -200,7 +187,7 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 		// would add positive case structure.
 		const tref e = normalize_operators<node>(
 			canonically_factored_neg<node>(
-				tau::trim_right_sibling(ds[i])));
+				tau::trim_right_sibling(d)));
 		if (is_conjoinable<node>(e)) excl.push_back(e);
 	}
 	// Every case dead is the empty join, `F`.

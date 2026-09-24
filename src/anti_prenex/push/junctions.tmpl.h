@@ -162,8 +162,7 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		return acc.result();
 	}
 
-	// 6. THE LICENSED DECOMPOSITION, then the expansion, the floor (§6);
-	// what the budget refuses re-wraps in there (invariant 3).
+	// 6. THE LICENSED DECOMPOSITION, then the expansion, the floor (§6).
 	if (const std::optional<tref> r = try_decompose<node>(psi, X, c))
 		return *r;
 	return expand<node>(psi, X, c);

@@ -11,11 +11,6 @@
  * narrowed to `X ∩ FV(ψ)`, every conjunct touching `X`, at least one of them
  * an ∨-node, and no cheaper step having taken it.
  *
- * THE BUDGET: every case charges `ctx.expand_count` against
- * `ctx.expand_max`. Past it the members not yet expanded re-wrap as ONE
- * pending block, and the hit taints every enclosing memo write (§1, cache
- * scope).
- *
  * `push/push_block.h` is the file that includes this one: every case goes
  * back through `push_block`.
  */
@@ -30,7 +25,6 @@
 #include "../foundations/dag.h"
 #include "../foundations/terms.h"
 #include "../foundations/subst.h"
-#include "../foundations/prims.h"
 #include "../normalisers/joins.h"
 #include "../normalisers/nnf.h"
 #include "../normalisers/simplify.h"
@@ -75,10 +69,6 @@ bool is_conjoinable(tref e);
  * and the cases after a member carry its complement when that is
  * CONJOINABLE. A dead case builds nothing and excludes nothing; a member
  * proven `T` makes `D` `T`; a case deciding `T` ends the expansion.
- *
- * GRACEFUL EXHAUSTION (invariant 3): a spent budget keeps every finished
- * case, re-wraps the remaining members as ONE pending block carrying the
- * exclusions so far, and taints.
  */
 template <NodeType node>
 tref expand(tref psi, const block& X, ctx<node>& c);
