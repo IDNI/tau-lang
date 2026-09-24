@@ -88,3 +88,15 @@ foreach(_t self_absorbing_x self_absorbing_a negated_alias sbf normalize)
 			PROPERTIES TIMEOUT 30)
 	endif()
 endforeach()
+
+# The verdict of an unsatisfiable temporal bv spec must not depend
+# on its stream names (the bv definitional elimination keeps the readers of a
+# definition it reuses from an earlier round)
+add_repl_test(sat_cmd-issue143_o1_o2 "sat always (!(((o2[t-1]:bv[2] = o2[t]) -> (o2[t-2] = o1[t-2]:bv[2]))) && ((o1[t] = o2[t-2]) <-> (o1[t-2] != o2[t])))" ": F")
+add_repl_test(sat_cmd-issue143_o2_o1 "sat always (!(((o1[t-1]:bv[2] = o1[t]) -> (o1[t-2] = o2[t-2]:bv[2]))) && ((o2[t] = o1[t-2]) <-> (o2[t-2] != o1[t])))" ": F")
+foreach(_t o1_o2 o2_o1)
+	if(TEST "test_repl-sat_cmd-issue143_${_t}")
+		set_tests_properties("test_repl-sat_cmd-issue143_${_t}"
+			PROPERTIES TIMEOUT 60)
+	endif()
+endforeach()
