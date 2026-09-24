@@ -451,9 +451,40 @@ static int factored_tau_valid(tref fm) {
 	return all ? 1 : 0;
 }
 
+
+// The solver's bad splitter of a Tau constant is a fresh uninterpreted
+// constant `<:splitN> != 0` (tau_splitter_one calls tau_bad_splitter on
+// `T`, so the element is that bare formula), and the properness checks of
+// the step solver probe the element with is_zero and is_one -- the second
+// being the zero test of its complement -- before they commit a witness.
+// Both answers follow from the shape alone: an uninterpreted constant
+// `!= 0` is satisfiable (c := 1) and not valid (c := 0), and so is `= 0`.
+// Answering them here keeps the solver's checks and saves a full temporal
+// decision per probe -- two per minted constant, and the step solver mints
+// a fresh one on every step.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static bool is_uconst_zero_test(const tau_ba<BAs...>& fm) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	if (!fm.nso_rr.rec_relations.empty() || !fm.nso_rr.main) return false;
+	const tau& w = tau::get(fm.nso_rr.main->get());
+	if (!(w.child_is(tau::bf_neq) || w.child_is(tau::bf_eq))) return false;
+	tref l = w[0].first(), r = w[0].second();
+	if (!l || !r || !tau::get(r).equals_0()) return false;
+	// l must be exactly bf(variable(uconst_name)), the shape
+	// build_bf_uconst makes: one uninterpreted constant and nothing else,
+	// checked positively so that no operator, stream or constant around it
+	// passes.
+	const tau& tl = tau::get(l);
+	return tl.is(tau::bf) && tl.child_is(tau::variable)
+		&& tl[0].child_is(tau::uconst_name);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_zero() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -470,6 +501,7 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,

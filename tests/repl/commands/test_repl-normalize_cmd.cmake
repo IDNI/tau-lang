@@ -208,3 +208,18 @@ add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_neq  "set charva
 add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_zero "set charvar off. normalize ({always o1[t] = 0}:tau & x | {always o1[t] = 0}:tau & x') = 0" ": F")
 add_repl_test(normalize_cmd-tau_coefficient_two_clause_constant     "set charvar off. normalize ({always (o1[t] = 0 || o2[t] != 0)}:tau & x | {always (o1[t] = 0 || o2[t] != 0)}:tau & x') = 0" ": F")
 add_repl_test(normalize_cmd-variable_eliminated_control              "set charvar off. normalize ((a & x | a & x') = 0) <-> (a = 0)" ": T")
+# An uninterpreted `:tau` constant tested against 0, the shape the solver's
+# bad splitter mints (`<:splitN> != 0`), is decided by its shape alone:
+# satisfiable, not valid, and so is its complement. The four controls carry
+# a stream or a second constant next to the symbol -- as a conjunct, a
+# disjunct or a product -- and take the ordinary temporal decision; their
+# verdicts are those of the unpatched binary.
+add_repl_test(normalize_cmd-tau_uconst_neq_zero_is_not_zero "set charvar off. normalize { <:c> != 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_neq_zero_is_not_one  "set charvar off. normalize { <:c> != 0 }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_uconst_eq_zero_is_not_zero  "set charvar off. normalize { <:c> = 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_eq_zero_is_not_one   "set charvar off. normalize { <:c> = 0 }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_uconst_with_stream_zero     "set charvar off. normalize { <:c> != 0 && o1[t] = 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_with_stream_one      "set charvar off. normalize { <:c> != 0 || o1[t] = 0 }:tau = 1" ": F")
+add_repl_test(normalize_cmd-tau_uconst_product_stream_zero  "set charvar off. normalize { (<:c> & o1[t]) != 0 }:tau = 0" ": F")
+add_repl_test(normalize_cmd-tau_uconst_product_uconst_one   "set charvar off. normalize { (<:c> & <:d>) != 0 }:tau = 1" ": F")
+
