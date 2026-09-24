@@ -88,3 +88,26 @@ foreach(_t self_absorbing_x self_absorbing_a negated_alias sbf normalize)
 			PROPERTIES TIMEOUT 30)
 	endif()
 endforeach()
+
+# The Boole decomposition of x1 ^ ... ^ xn is a DAG with two distinct
+# cofactors per level but 2^n paths. The decomposition, the BDD build of its
+# result, the equality substitution over it and the quantifier renaming must
+# each process a shared subterm once, or n=32 never finishes.
+add_test(NAME "test_repl-sat_cmd-xor_ladder_sat"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"sat x1 ^ x2 ^ x3 ^ x4 ^ x5 ^ x6 ^ x7 ^ x8 ^ x9 ^ x10 ^ x11 ^ x12 ^ x13 ^ x14 ^ x15 ^ x16 ^ x17 ^ x18 ^ x19 ^ x20 ^ x21 ^ x22 ^ x23 ^ x24 ^ x25 ^ x26 ^ x27 ^ x28 ^ x29 ^ x30 ^ x31 ^ x32 = 0\"")
+set_tests_properties("test_repl-sat_cmd-xor_ladder_sat" PROPERTIES
+	PASS_REGULAR_EXPRESSION ": T"
+	FAIL_REGULAR_EXPRESSION "Error"
+	TIMEOUT 60)
+add_test(NAME "test_repl-sat_cmd-xor_ladder_valid"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"valid x1 ^ x2 ^ x3 ^ x4 ^ x5 ^ x6 ^ x7 ^ x8 ^ x9 ^ x10 ^ x11 ^ x12 ^ x13 ^ x14 ^ x15 ^ x16 ^ x17 ^ x18 ^ x19 ^ x20 ^ x21 ^ x22 ^ x23 ^ x24 ^ x25 ^ x26 ^ x27 ^ x28 ^ x29 ^ x30 ^ x31 ^ x32 = 0\"")
+set_tests_properties("test_repl-sat_cmd-xor_ladder_valid" PROPERTIES
+	PASS_REGULAR_EXPRESSION ": F"
+	FAIL_REGULAR_EXPRESSION "Error"
+	TIMEOUT 60)
+add_test(NAME "test_repl-sat_cmd-xor_ladder_quantified"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"valid all x1 ex x2 (x1 ^ x2 ^ x3 ^ x4 ^ x5 ^ x6 ^ x7 ^ x8 ^ x9 ^ x10 ^ x11 ^ x12 ^ x13 ^ x14 ^ x15 ^ x16 ^ x17 ^ x18 ^ x19 ^ x20 ^ x21 ^ x22 ^ x23 ^ x24 ^ x25 ^ x26 ^ x27 ^ x28 ^ x29 ^ x30 ^ x31 ^ x32 = 0)\"")
+set_tests_properties("test_repl-sat_cmd-xor_ladder_quantified" PROPERTIES
+	PASS_REGULAR_EXPRESSION ": T"
+	FAIL_REGULAR_EXPRESSION "Error"
+	TIMEOUT 60)

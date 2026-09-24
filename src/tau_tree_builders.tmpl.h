@@ -40,6 +40,8 @@ tref canonize_quantifier_ids(tref fm) {
 		}
 	};
 	pre_order<node>(fm).visit(populate_scope, all, populate_ids);
+	// No binder: nothing to rename, and no need to walk the terms.
+	if (scope_to_id.empty()) return fm;
 	// Next update variables using the information from var_to_id
 	subtree_map<node, std::vector<size_t>> var_to_id;
 	subtree_map<node, tref> old_name;
@@ -72,7 +74,40 @@ tref canonize_quantifier_ids(tref fm) {
 		}
 		return n;
 	};
-	fm = pre_order<node>(fm).apply(update_var, all, update_var_up);
+	// A term holds no binder, so its renaming depends only on the binders in
+	// scope: each maximal term is renamed from its parent's `up` with a
+	// memoized walk, because a Boole-decomposed term is a DAG whose shared
+	// cofactors are exponentially larger as a tree (x1 ^ ... ^ xn). Bare
+	// `variable` children (a binder's own variable) are still visited by
+	// update_var, which update_var_up relies on.
+	auto rename_in_term = [&](tref n) -> tref {
+		if (is<node, tau::variable>(n))
+			if (auto it = var_to_id.find(n); it != var_to_id.end())
+				return tau::build_variable(
+					std::to_string(it->second.back()),
+					tau::get(n).get_ba_type());
+		return n;
+	};
+	auto visit_non_term = [](tref n) {
+		return !tau::get(n).is_term() || is<node, tau::variable>(n);
+	};
+	auto up = [&](tref n) -> tref {
+		if (!var_to_id.empty() && !is_quantifier<node>(n)
+			&& !tau::get(n).is_term())
+		{
+			trefs ch = tau::get(n).get_children();
+			bool changed = false;
+			for (tref& c : ch) if (tau::get(c).is_term()
+				&& !is<node, tau::variable>(c)) // renamed by update_var
+			{
+				tref r = pre_order<node>(c).apply_unique(rename_in_term);
+				if (r != c) c = r, changed = true;
+			}
+			if (changed) n = tau::get(tau::get(n).value, ch);
+		}
+		return update_var_up(n);
+	};
+	fm = pre_order<node>(fm).apply(update_var, visit_non_term, up);
 	DBG(LOG_DEBUG << "End canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
 	return fm;
 }
