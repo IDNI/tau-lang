@@ -442,6 +442,7 @@ TEST_SUITE("term Boole decomposition over function symbols") {
 // a constant, or for a BDD past its node cap.
 TEST_SUITE("syntactic_variable_simplification outcomes") {
 
+#ifdef TAU_PACK_HAS_BA_BV
 	// The BDD is built from 0, 1, variables and the Boolean operations only,
 	// so a constant in the term makes it answer unknown, and the reduced
 	// cofactors decide instead. Here both are 1: the left-hand side is 1,
@@ -504,6 +505,8 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 		CHECK( are_nso_equivalent<node_t>(res,
 			wff("z:bv[8] < { 255 }:bv[8]")) );
 	}
+
+#endif // TAU_PACK_HAS_BA_BV
 
 	// (a1 b1 | ... | an bn) has a BDD of about 2^n nodes when every a comes
 	// before every b in the variable order or every b before every a. The
