@@ -112,8 +112,27 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #endif // TAU_CACHE
 
 	if (rs.empty()) return n;
+	using tau = tree<node>;
+	// A definition head has captures only inside its offsets and
+	// arguments, so it matches only where its reference signature occurs:
+	// skip a rule whose head signature is absent instead of traversing the
+	// formula for nothing. `present` only has to be a superset of the
+	// signatures in `nn`; a hit can add only those of the rule body. A head
+	// that wraps no reference is never skipped.
+	std::unordered_set<rr_sig> present;
+	auto add_sigs = [&present](tref m) {
+		for (tref ref : tau::get(m).select_all(is<node, tau::ref>))
+			present.insert(get_rr_sig<node>(ref));
+	};
+	add_sigs(n);
 	tref nn = n;
-	for (auto& r : rs) nn = nso_rr_apply<node>(r, nn);
+	for (auto& r : rs) {
+		if (tref h = unwrap_to_ref<node>(r.first->get());
+			h && !present.contains(get_rr_sig<node>(h)))
+				continue;
+		tref next = nso_rr_apply<node>(r, nn);
+		if (next != nn) nn = next, add_sigs(r.second->get());
+	}
 
 #ifdef TAU_CACHE
 	cache[{rs, n, widening}] = nn;
