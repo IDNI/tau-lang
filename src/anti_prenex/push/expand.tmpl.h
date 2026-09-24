@@ -12,8 +12,9 @@
  * (foundations/subst.h) for a tree's literal-wise fold, the result joins
  * (normalisers/joins.h) for every assembly, `simplify`
  * (normalisers/simplify.h) at the case edge, `canonically_factored_neg` with
- * `normalize_operators` (normalisers/nnf.h) for a complement, and
- * `push_block` — the hub, `push/push_block.h` — for every case.
+ * `normalize_operators` (normalisers/nnf.h) for a complement,
+ * `check_time_limit` (foundations/ctx.h) per case, and `push_block` — the
+ * hub, `push/push_block.h` — for every case.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__EXPAND_TMPL_H__
@@ -165,6 +166,8 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 	join_builder<node, false> acc;
 	trefs excl;
 	for (tref d : ds) {
+		// Work multiplies per case, so the clock is read here (§3).
+		check_time_limit();
 		const std::optional<trefs> dc =
 			fold_decided<node>(members<node>(d), X, c);
 		// A dead case: no copy, and its complement is implied.

@@ -14,8 +14,9 @@
  * its arm, `fold_decided` with `EXPAND`'s rank and list helpers
  * (push/expand.h) for the probe, the innermost-first order and the arms'
  * operands, the result joins (normalisers/joins.h) for every assembly,
- * `simplify` (normalisers/simplify.h) at the arm edge, and `push_block` — the
- * hub, `push/push_block.h` — for every arm.
+ * `simplify` (normalisers/simplify.h) at the arm edge, `check_time_limit`
+ * (foundations/ctx.h) per arm pushed, and `push_block` — the hub,
+ * `push/push_block.h` — for every arm.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__DECOMPOSE_TMPL_H__
@@ -168,8 +169,11 @@ tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c) {
 		tref r = simplify<node>(phi, c.order);
 		// An arm folded to a constant is no case, and is inserted as it
 		// stands.
-		if (!tau::get(r).equals_T() && !tau::get(r).equals_F())
+		if (!tau::get(r).equals_T() && !tau::get(r).equals_F()) {
+			// Work multiplies per arm, so the clock is read here (§3).
+			check_time_limit();
 			r = push_block<node>(r, Y, c);
+		}
 		if (acc.insert(r)) break;
 	}
 	return acc.result();

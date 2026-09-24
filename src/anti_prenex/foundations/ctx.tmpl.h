@@ -12,6 +12,7 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_TMPL_H__
 
+#include <algorithm>
 #include <cassert>
 #include <type_traits>
 #include <utility>
@@ -75,6 +76,36 @@ size_t taint_count() { return detail::taint_counter<node>(); }
 
 template <NodeType node>
 void taint() { ++detail::taint_counter<node>(); }
+
+// --- the time limit ---------------------------------------------------------------
+
+namespace detail {
+
+/// The running call's deadline; `time_point::max()` is none.
+inline std::chrono::steady_clock::time_point deadline =
+	std::chrono::steady_clock::time_point::max();
+
+} // namespace detail
+
+inline time_limit_scope::time_limit_scope(
+	std::chrono::steady_clock::duration limit) : saved(detail::deadline)
+{
+	using clock = std::chrono::steady_clock;
+	const clock::time_point now = clock::now();
+	// `now + limit` would overflow past the clock's range.
+	detail::deadline = limit >= clock::time_point::max() - now
+		? clock::time_point::max()
+		: now + std::max(limit, clock::duration::zero());
+}
+
+inline time_limit_scope::~time_limit_scope() { detail::deadline = saved; }
+
+inline void check_time_limit() {
+	using clock = std::chrono::steady_clock;
+	if (detail::deadline != clock::time_point::max()
+		&& clock::now() >= detail::deadline)
+			throw time_limit_exceeded{};
+}
 
 // --- the tables -------------------------------------------------------------------
 

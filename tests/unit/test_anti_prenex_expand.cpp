@@ -461,4 +461,12 @@ TEST_CASE("X7: a complement that is not conjoinable is no exclusion") {
 	check_resolved(got, f);
 }
 
+TEST_CASE("X8: each case reads the clock first") {
+	// X1's clause under a limit of zero: the first case is past it (§3).
+	fixture f = make("ex x ((xy = 0 || xw = 0) && xz != 0).");
+	const ap::time_limit_scope limit(
+		std::chrono::steady_clock::duration::zero());
+	CHECK_THROWS_AS(expanded(f), ap::time_limit_exceeded);
+}
+
 } // TEST_SUITE

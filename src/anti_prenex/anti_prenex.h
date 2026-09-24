@@ -18,11 +18,13 @@
  * What the push cannot reach comes back re-wrapped, undecided rather than
  * answered (invariant 3). The finite and bitvector methods of §7 are not part
  * of the module, so `eliminate_block` re-wraps a block of a type without a
- * method.
+ * method. A call past its time limit returns `nullptr` instead (§3).
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
 #define __IDNI__TAU__ANTI_PRENEX__ANTI_PRENEX_H__
+
+#include <chrono>
 
 // foundations
 #include "foundations/fwd.h"
@@ -53,8 +55,8 @@
 namespace idni::tau_lang::anti_prenexing {
 
 /**
- * @brief §3 `ANTI_PRENEX(φ, keep_functional = (· ↦ false))` — the whole
- * pipeline.
+ * @brief §3 `ANTI_PRENEX(φ, keep_functional = (· ↦ false), time_limit = ∞)`
+ * — the whole pipeline.
  *
  * Phases, in this fixed order: 0 `CANONICALISE_BINDER_IDS`; 1
  * `RESOLVE_FUNCTIONAL_PLAIN`, `TO_NNF` then `SIMPLIFY(φ, ref_args = true)`; 2
@@ -67,11 +69,22 @@ namespace idni::tau_lang::anti_prenexing {
  * @param kf  §1 `keep_functional` (fwd.h `keep_functional_fn`): a yes keeps
  *            a functional-quantifier chain symbolic instead of resolving it.
  *            The default keeps nothing
- * @return the anti-prenexed formula, a `wff` node
+ * @param time_limit §3 `time_limit`, the one cutoff on the call's total
+ *            work, none by default. Past it the call aborts WHOLE: nothing
+ *            partial is returned, no computation it cuts short writes a
+ *            table entry, and the caller still holds @p phi, sound as it
+ *            stands (invariant 3). The clock is read at each case `EXPAND`
+ *            builds, each arm `DECOMPOSE_ARMS` pushes and each case-witness
+ *            branch, so an input that reaches none of them returns in full
+ *            whatever the limit
+ * @return the anti-prenexed formula, a `wff` node, or `nullptr` past
+ *         @p time_limit
  */
 template <NodeType node>
 tref anti_prenex(tref phi,
-	const keep_functional_fn<node>& kf = keep_no_functional<node>);
+	const keep_functional_fn<node>& kf = keep_no_functional<node>,
+	std::chrono::steady_clock::duration time_limit =
+		std::chrono::steady_clock::duration::max());
 
 } // namespace idni::tau_lang::anti_prenexing
 

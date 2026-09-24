@@ -80,7 +80,8 @@ tref push_over_disjunction(tref phi, const block& X, ctx<node>& c);
  * 4. THE WITNESS STEP, one pin scan per block variable: a pin deletes its
  *    binder, and what is left is pushed on under the smaller block.
  * 5. THE CASE WITNESS, whose rewrite is emitted branch by branch, so that a
- *    branch deciding `T` leaves every later copy unbuilt.
+ *    branch deciding `T` leaves every later copy unbuilt. Each branch reads
+ *    the clock first (§3 time limit).
  * 6. THE LICENSED DECOMPOSITION (`push/decompose.h`), one Boole split on an
  *    atom whose two signs span sibling disjunctive conjuncts, taken when its
  *    cofactors separate material rather than copy it; then THE FLOOR, the

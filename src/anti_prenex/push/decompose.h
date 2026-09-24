@@ -73,7 +73,8 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c);
  * `X ∖ {x}`: the guard becomes its residual `p = 0`, `T` for a strict pin.
  *
  * An arm that simplifies to a constant is no case and is inserted as it
- * stands; an arm deciding `T` leaves the other unpushed.
+ * stands; an arm deciding `T` leaves the other unpushed. Each arm pushed
+ * reads the clock first (§3 time limit).
  */
 template <NodeType node>
 tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c);

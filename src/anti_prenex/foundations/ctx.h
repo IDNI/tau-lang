@@ -2,10 +2,10 @@
 
 /**
  * @file ctx.h
- * @brief Anti-prenexing foundations: `ctx` (the §1 ctx table), the memo
- * tables — the five §1 result tables and the structural per-node facet
- * tables — the memo wrapper with its taint rule (§1 cache scope), and the
- * flush.
+ * @brief Anti-prenexing foundations: `ctx` (the §1 ctx table), the call's
+ * time limit (§3), the memo tables — the five §1 result tables and the
+ * structural per-node facet tables — the memo wrapper with its taint rule
+ * (§1 cache scope), and the flush.
  *
  * Every table is an entry of `enum class table` with a `table_traits`
  * specialisation and a static GC-registered `create_cache` instance. A
@@ -25,7 +25,8 @@
  * computation that hit a budget returns its result but writes no entry.
  * FLUSH: when the solver configuration changes, every table whose entries
  * could embed a solver verdict is cleared. `qbf_memo` is exempt from every
- * flush.
+ * flush. ABORT: a computation the time limit unwinds writes no entry, so
+ * every entry is a completed computation's.
  *
  * Single-threaded, like every knob and cache in the library.
  */
@@ -34,6 +35,7 @@
 #define __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
@@ -111,6 +113,32 @@ size_t taint_count();
 /// FORMULA node type here, the one whose tables the wrapper guards.
 template <NodeType node>
 void taint();
+
+// --- the time limit ---------------------------------------------------------------
+
+/// §3 `time_limit` exceeded: thrown by `check_time_limit` and caught at
+/// `anti_prenex`'s entry alone, which returns `nullptr`.
+struct time_limit_exceeded {};
+
+/**
+ * @brief §3 `time_limit`, scoped to one `anti_prenex` call: the deadline is
+ * `limit` from construction, and the enclosing one comes back at
+ * destruction, however the call ends. A limit past the clock's range, such as
+ * `anti_prenex`'s default `duration::max()`, is no limit.
+ */
+class time_limit_scope {
+public:
+	explicit time_limit_scope(std::chrono::steady_clock::duration limit);
+	~time_limit_scope();
+	time_limit_scope(const time_limit_scope&) = delete;
+	time_limit_scope& operator=(const time_limit_scope&) = delete;
+private:
+	std::chrono::steady_clock::time_point saved;
+};
+
+/// §3 a CHECK POINT: throws `time_limit_exceeded` once the running call's
+/// deadline is reached. One clock read under a limit, none without.
+inline void check_time_limit();
 
 // --- the tables -------------------------------------------------------------------
 
@@ -346,8 +374,9 @@ void store(const typename table_traits<node, T>::key_t& key,
  * unchanged across the computation; a hit inside the computation is a hit
  * inside every enclosing one, so transitivity comes for free. For every other
  * table it is recorded unconditionally. The result is always returned; a
- * tainted result is returned but never cached. When the table does not exist
- * this is a plain `compute()` and nothing else.
+ * tainted result is returned but never cached. A `compute()` that throws
+ * records nothing. When the table does not exist this is a plain `compute()`
+ * and nothing else.
  */
 template <NodeType node, table T, typename Compute>
 	requires (table_traits<node, T>::gated)

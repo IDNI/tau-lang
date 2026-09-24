@@ -466,6 +466,16 @@ TEST_CASE("K3: `ctx.case_max` refuses a wider case pin, and the floor "
 	check_resolved(got, f);
 }
 
+TEST_CASE("K4: each case-witness branch reads the clock first") {
+	// K1's clause under a limit of zero: no step above the case witness
+	// takes it, and its first branch is past the limit (§3).
+	fixture f = make("ex x (((c = 0 && x = a) || (c' = 0 && x = b)) "
+		"&& x y = 0).");
+	const ap::time_limit_scope limit(
+		std::chrono::steady_clock::duration::zero());
+	CHECK_THROWS_AS(pushed_and(f), ap::time_limit_exceeded);
+}
+
 // --- the floor: the expansion -----------------------------------------------------
 
 TEST_CASE("R1: a conjunction no cheaper step takes is expanded") {

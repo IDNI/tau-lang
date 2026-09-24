@@ -3,8 +3,8 @@
 // THE WHOLE PIPELINE with the CONJUNCTION'S FLOOR in it. Spec:
 // anti_prenex.md §6 (TRY_DECOMPOSE with FOLD_DECIDED's probe,
 // DECOMPOSE_ARMS, EXPAND with its exclusive cases), §7 (the leaves,
-// DISCHARGE under `keep_functional`), §3 (the phases around the push),
-// invariant 5.
+// DISCHARGE under `keep_functional`), §3 (the phases around the push, the
+// time limit), invariant 5.
 //
 // Every case is one whole spec through `anti_prenexing::anti_prenex`, parsed
 // with `get_nso_rr` so that the types come from inference — §7's table has no
@@ -112,6 +112,11 @@ tref anti_prenexed(tref phi) {
 void resolved(tref got) { CHECK(binder_count(got) == 0); }
 
 constexpr const char* l17 = "ex x ((xy = 0 || xw = 0) && xz != 0).";
+
+/// A limit every check point is past, whenever it is reached: no case
+/// depends on how fast it runs.
+constexpr std::chrono::steady_clock::duration no_time =
+	std::chrono::steady_clock::duration::zero();
 
 } // namespace
 
@@ -241,6 +246,60 @@ TEST_CASE("M7: keep mode on an expanding input stays binder-free") {
 	// The checker cannot decide kept chains; the default callback resolves
 	// them in phase 1 (§3 RESOLVE_FUNCTIONAL_PLAIN).
 	CHECK(are_nso_equivalent<node_t>(ap::anti_prenex<node_t>(got), phi));
+}
+
+// --- the time limit (§3) -----------------------------------------------------------
+// Each case flushes first: a push the tables answer reaches no check point.
+
+TEST_CASE("T1: past a zero limit an input that reaches the floor comes back "
+	"null") {
+	// L17 reaches EXPAND (M1) and M3's clause DECOMPOSE_ARMS: the first case
+	// or arm reads the clock past the limit, and the call aborts whole.
+	for (const char* src : { l17,
+		"ex x ((a = 0 || xy = 0) && (a != 0 || xz = 0))." })
+	{
+		CAPTURE(src);
+		ap::flush_solver_dependent<node_t>();
+		CHECK(ap::anti_prenex<node_t>(parse(src),
+			ap::keep_no_functional<node_t>, no_time) == nullptr);
+	}
+}
+
+TEST_CASE("T2: an input that reaches no check point ignores a zero limit") {
+	// `x` settles at once and the leaf eliminates it: no case, no arm and
+	// no case-witness branch is built, so the clock is never read.
+	const tref phi = parse("ex x (xy = 0 && xz != 0).");
+	ap::flush_solver_dependent<node_t>();
+	const tref got = ap::anti_prenex<node_t>(phi,
+		ap::keep_no_functional<node_t>, no_time);
+	REQUIRE(got != nullptr);
+	CHECK(got == anti_prenexed(phi));
+	resolved(got);
+}
+
+TEST_CASE("T3: an aborted call writes no entry for what it cut short") {
+	// The inner block is eliminated, its entries written, before the outer
+	// one reaches a check point and aborts. Run again without a limit, the
+	// input gives what a run on flushed tables that never aborted gives.
+	const tref phi = parse("ex x ((xy = 0 || xw = 0) && xz != 0 "
+		"&& (ex u (ux = 0 && uv != 0))).");
+	ap::flush_solver_dependent<node_t>();
+	REQUIRE(ap::anti_prenex<node_t>(phi, ap::keep_no_functional<node_t>,
+		no_time) == nullptr);
+	const tref after = anti_prenexed(phi);
+	ap::flush_solver_dependent<node_t>();
+	CHECK(after == anti_prenexed(phi));
+	resolved(after);
+}
+
+TEST_CASE("T4: a limit the call stays within changes nothing") {
+	// An hour is past any ctest timeout, so every check point reads the
+	// clock and lets the push through.
+	const tref phi = parse(l17);
+	ap::flush_solver_dependent<node_t>();
+	const tref got = ap::anti_prenex<node_t>(phi,
+		ap::keep_no_functional<node_t>, std::chrono::hours(1));
+	CHECK(got == anti_prenexed(phi));
 }
 
 } // TEST_SUITE

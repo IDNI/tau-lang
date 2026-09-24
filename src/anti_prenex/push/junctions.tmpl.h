@@ -14,9 +14,9 @@
  * question, `try_fast_paths` (push/fast_paths.h) for 2a and 2b,
  * `try_witness` and `try_case_witness` (witness/witness.h) for the two pin
  * matches, `subst_var` (foundations/subst.h) with `simplify`
- * (normalisers/simplify.h) for a branch's copy, `try_decompose`
- * (push/decompose.h) for the licensed decomposition, and `expand`
- * (push/expand.h) for the floor.
+ * (normalisers/simplify.h) for a branch's copy, `check_time_limit`
+ * (foundations/ctx.h) per branch, `try_decompose` (push/decompose.h) for the
+ * licensed decomposition, and `expand` (push/expand.h) for the floor.
  *
  * `push_block` — the hub, `push/push_block.h` — is what every re-entry goes
  * through, so each of them narrows `X` and strips the conjuncts the narrowed
@@ -150,6 +150,9 @@ tref push_over_conjunction(tref psi, const block& X, ctx<node>& c) {
 		const block rest_of_X = without<node>(X, { x });
 		join_builder<node, false> acc;
 		for (const auto& [d, t] : cw->branches) {
+			// Work multiplies per branch, so the clock is read
+			// here (§3).
+			check_time_limit();
 			// The branch stands as it is, its pin included: under
 			// `[x ← tᵢ]` the pin becomes the branch's residual
 			// (§3), and the copy is simplified where it is built.

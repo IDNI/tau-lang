@@ -68,7 +68,8 @@ bool is_conjoinable(tref e);
  * case is `SIMPLIFY`d over `E`, the exclusions so far and the member alone,
  * and the cases after a member carry its complement when that is
  * CONJOINABLE. A dead case builds nothing and excludes nothing; a member
- * proven `T` makes `D` `T`; a case deciding `T` ends the expansion.
+ * proven `T` makes `D` `T`; a case deciding `T` ends the expansion. Each
+ * case reads the clock first (§3 time limit).
  */
 template <NodeType node>
 tref expand(tref psi, const block& X, ctx<node>& c);

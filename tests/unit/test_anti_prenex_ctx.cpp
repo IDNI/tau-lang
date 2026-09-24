@@ -103,6 +103,31 @@ TEST_CASE("taint: a global counter, never reset, incremented one at a time") {
 	CHECK(ap::taint_count<node_t>() == before + 2);
 }
 
+// --- the time limit (§3) -----------------------------------------------------------
+
+TEST_CASE("time limit: a scope sets the deadline and restores the enclosing "
+	"one, on a throw too") {
+	using duration = std::chrono::steady_clock::duration;
+	CHECK_NOTHROW(ap::check_time_limit());          // no scope, no limit
+	{
+		const ap::time_limit_scope outer(duration::zero());
+		CHECK_THROWS_AS(ap::check_time_limit(), ap::time_limit_exceeded);
+		{
+			const ap::time_limit_scope inner(duration::max());
+			CHECK_NOTHROW(ap::check_time_limit());
+		}
+		CHECK_THROWS_AS(ap::check_time_limit(), ap::time_limit_exceeded);
+	}
+	CHECK_NOTHROW(ap::check_time_limit());
+	// A negative limit is a zero one, and unwinding restores the deadline.
+	try {
+		const ap::time_limit_scope past(-duration(1));
+		ap::check_time_limit();
+		FAIL("a negative limit is already past");
+	} catch (const ap::time_limit_exceeded&) {}
+	CHECK_NOTHROW(ap::check_time_limit());
+}
+
 // --- the unconditional structural tables (both build types) -----------------------
 
 TEST_CASE("find/store on an unconditional table: miss, hit, rewrite") {

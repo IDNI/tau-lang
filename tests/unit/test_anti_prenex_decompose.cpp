@@ -337,4 +337,13 @@ TEST_CASE("C9: an arm that folds to a constant is inserted as it stands") {
 	check_resolved(*got, f);
 }
 
+TEST_CASE("C10: each arm pushed reads the clock first") {
+	// C1's clause under a limit of zero: the probe folds nothing, and the
+	// first arm is past it (§3).
+	fixture f = make(spanning);
+	const ap::time_limit_scope limit(
+		std::chrono::steady_clock::duration::zero());
+	CHECK_THROWS_AS(decomposed(f), ap::time_limit_exceeded);
+}
+
 } // TEST_SUITE
