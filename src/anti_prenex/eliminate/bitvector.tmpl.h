@@ -110,16 +110,18 @@ tref eliminate_bitvector_clause(const trefs& conjuncts, const block& X,
 		: eliminate_finite_clause<node>(sp.B, sp.X_B, c);
 	if (tau::get(b).equals_F()) return _F<node>();
 	// 5. §7 SOLVE_ARITHMETIC: `∃X_A.A` as one query, binder units entering
-	// it as written. The solver has no term-level binder.
-	DBG(assert(std::ranges::none_of(sp.A, [](tref m) {
-		return holds_anywhere<node>(m,
-			is_functional_quantifier<node>); }));)
+	// it as written. The solver has no term-level binder, and a chain comes
+	// here through the split's closure alone: that side re-wraps whole.
 	auto solver = [](tref q) -> std::optional<bool> {
 		const answer r = ask<node>(q);
 		if (r == answer::unknown) return std::nullopt;
 		return r == answer::sat;
 	};
+	const bool chain = std::ranges::any_of(sp.A, [](tref m) {
+		return holds_anywhere<node>(m,
+			is_functional_quantifier<node>); });
 	const tref a = sp.A.empty() ? _T<node>()
+		: chain ? rewrap<node>(simplified_and_join<node>(sp.A), sp.X_A)
 		: query_or_rewrap<node>(sp.A, sp.X_A, solver);
 	// 6. THE JOINT ASK over two open sides that share a free variable.
 	// `frozen` stays out: a sub-conjunction's unsatisfiability decides.

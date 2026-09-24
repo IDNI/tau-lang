@@ -436,4 +436,47 @@ TEST_CASE("V8: a chain on the pure side skips the joint ask") {
 	CHECK(bv_equivalent(plain, f.quantified));
 }
 
+TEST_CASE("V9: a chain the split's closure puts on the solver side") {
+	// `∃x (x + a = 0 ∧ ∀_y (x·y) = 0)`: the pure chain equation shares `x`
+	// with the arithmetic atom, so both re-wrap as one unit over `x`.
+	const size_t bv2 = bv_type_id<node_t>(2);
+	const tref x = tau::build_bf_variable("x", bv2);
+	const tref vx = tau::build_variable("x", bv2);
+	const tref xa = build_bf_eq_0<node_t>(tau::build_bf_add(x,
+		tau::build_bf_variable("a", bv2)));
+	const tref xy = build_bf_eq_0<node_t>(fall("y", tau::build_bf_and(x,
+		tau::build_bf_variable("y", bv2))));
+	// Preparation folds this chain to `0`, so its equation joins the
+	// prepared rest as written.
+	fixture f = make(tau::build_wff_ex(vx, xa, false), true);
+	f.quantified = tau::build_wff_ex(vx, tau::build_wff_and(xa, xy), false);
+	f.conjuncts.push_back(xy);
+	const auto sp = ap::split_arithmetic<node_t>(f.conjuncts, f.P,
+		f.c.type);
+	REQUIRE(sp.A.size() == 2);
+	REQUIRE(sp.B.empty());
+	const size_t before = ap::taint_count<node_t>();
+	const tref got = ap::eliminate_bitvector_clause<node_t>(
+		f.conjuncts, f.P, f.c);
+	CHECK(ap::taint_count<node_t>() == before);
+	CHECK(same(got, rewrapped(f)));
+	REQUIRE(binder_count(got) == 1);
+	CHECK(same(tau::trim_right_sibling(ap::binder_var<node_t>(got)),
+		f.P[0]));
+	const tref body = finished(ap::binder_body<node_t>(got));
+	CHECK((holds(body, tau::bf_fall) || holds(body, tau::bf_fex)));
+	CHECK(holds(body, tau::bf_add));
+	check_structure(got, f);
+#ifdef TAU_CACHE
+	// Neither the side's query nor its two closings reached the solver.
+	const tref q = ap::finish_terms<node_t>(ap::rewrap<node_t>(
+		ap::simplified_and_join<node_t>(sp.A), sp.X_A));
+	const trefs Z = get_free_vars<node_t>(q);
+	for (tref k : { q, ap::rewrap<node_t>(q, Z, tb::all),
+		ap::rewrap<node_t>(q, Z, tb::ex) })
+		CHECK(!ap::lookup<node_t, ap::table::solver_memo>(
+			ap::canonicalise_binder_ids<node_t>(k)).has_value());
+#endif
+}
+
 } // TEST_SUITE

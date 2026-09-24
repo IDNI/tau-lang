@@ -91,12 +91,14 @@ split_result<node> split_arithmetic(const trefs& conjuncts, const block& X,
  * reads, SPLIT the rest; the pure side is `ELIMINATE_FINITE_CLAUSE`'s, and
  * its `F` decides; the arithmetic side is `SOLVE_ARITHMETIC`'s — one solver
  * query with its binder units swallowed as written, decided closed as it is
- * or open by closing its free variables both ways.
+ * or open by closing its free variables both ways. A pure conjunct carrying
+ * a functional quantifier lands there when the split's closure ties it to an
+ * impure one; the side is then re-wrapped whole, never asked.
  *
  * The per-side closings lose no validity, but UNSATISFIABILITY does not
  * distribute: the two sides may share a free variable satisfiable only
  * under incompatible assignments, and ONE JOINT ASK over both catches that.
- * It is skipped when the pure side carries a functional quantifier, which
+ * It is skipped when either side carries a functional quantifier, which
  * the solver cannot read.
  *
  * `F` comes out only where the clause is unsatisfiable; what no engine
