@@ -145,6 +145,60 @@ inline int functional_continuation_mode() {
 	return env ? *env : functional_continuation;
 }
 
+/// Functional step evaluation. A specification of functional shape
+/// (`functional_step_shape`) states, for every output of a time point, the
+/// cell that forces it: the one of its conditional tree whose guard
+/// literals all fail at the values of the inputs and of the earlier
+/// outputs, and the witness of that cell is the value. With this switch at
+/// 1 (the default) the interpreter evaluates the outputs of such a
+/// specification at every step in the dependency order of its definitions
+/// (`functional_program`): a guard literal by normalizing it at the values
+/// it reads, a witness by normalizing its equation with the output at the
+/// values it reads, and takes the values in place of the solved step
+/// formula, whose alternatives are then neither probed nor solved. A guard
+/// literal the normalizer does not decide or a witness it does not fold to
+/// a constant returns the step to the solver. At 0 every step is solved;
+/// at 2 (shadow) the values are computed as well, the solver decides, and
+/// an output whose evaluated value the normalizer finds different from the
+/// solved one is counted in `functional_step_evaluation_mismatches` (two
+/// different terms whose equality it does not decide in
+/// `functional_step_evaluation_undecided`). The environment variable
+/// TAU_FUNCTIONAL_STEP_EVALUATION (0, 1 or 2; any other value selects 0)
+/// overrides the flag. Applies while every part of the specification is of
+/// the shape and none was revised by an update, once the continuation is
+/// used verbatim and after the last initial condition of the
+/// specification.
+inline int functional_step_evaluation = 1;
+/// Steps whose outputs the evaluation produced (at 1) or would have (at 2).
+inline size_t functional_step_evaluation_hits = 0;
+/// Steps the evaluation returned to the solver.
+inline size_t functional_step_evaluation_fallbacks = 0;
+/// Shadow mode: outputs whose evaluated value the normalizer finds
+/// different from the solved one.
+inline size_t functional_step_evaluation_mismatches = 0;
+/// Shadow mode: outputs whose evaluated and solved values are different
+/// terms and whose equality the normalizer does not decide.
+inline size_t functional_step_evaluation_undecided = 0;
+inline int functional_step_evaluation_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_FUNCTIONAL_STEP_EVALUATION");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = []() {
+		if (env && *env == 2) std::atexit([]() {
+			std::cerr << "functional step evaluation shadow: steps "
+				<< functional_step_evaluation_hits << ", fallbacks "
+				<< functional_step_evaluation_fallbacks << ", mismatches "
+				<< functional_step_evaluation_mismatches << ", undecided "
+				<< functional_step_evaluation_undecided << std::endl;
+		});
+		return true;
+	}();
+	(void)report;
+	return env ? *env : functional_step_evaluation;
+}
+
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
 /// boundary; 0 = unlimited. Same SO-1 caveat as `max_fixpoint_steps` — and a
 /// bounded give-up here reports unsatisfiable, which is wrong but bounded and
@@ -936,6 +990,18 @@ tref functional_shape_body(tref fm) {
 	return body;
 }
 
+/// The definitions a specification of functional shape states, as
+/// `functional_step_shape` reads them: per output of the time point its
+/// cells, each a guard (the literals standing next to the equation in its
+/// clause) and the witness the equation gives, in an order in which every
+/// definition comes after the definitions it reads.
+template <NodeType node>
+struct functional_program {
+	struct cell { trefs guard; tref witness; };
+	struct definition { tref output; std::vector<cell> cells; };
+	std::vector<definition> definitions;
+};
+
 /**
  * @brief Functional shape of a specification's always-part.
  *
@@ -970,11 +1036,15 @@ tref functional_shape_body(tref fm) {
  * value of what the body reads from outside, the block a time point adds
  * changes nothing, and the continuation reaches its fixpoint as soon as
  * the lookback is covered (see `find_fixpoint_phi`).
+ * @param program When given, receives the definitions of a body of the
+ * shape, in dependency order (`functional_program`).
  * @return true when the body is of the shape; false otherwise, and for
  * everything the rules above do not cover.
  */
 template <NodeType node>
-bool functional_step_shape(tref body) {
+bool functional_step_shape(tref body,
+	functional_program<node>* program = nullptr)
+{
 	using tau = tree<node>;
 	if (!body) return false;
 	auto say = [&](const char* why, tref at = nullptr) {
@@ -1231,15 +1301,31 @@ bool functional_step_shape(tref body) {
 		if (!is_tree(cs)) return say("the cells of an output are not one conditional tree", o);
 	}
 	subtree_map<node, int> mark;
+	// the outputs in an order in which every one follows those it reads
+	trefs order;
 	std::function<bool(tref)> acyclic = [&](tref o) -> bool {
 		int& m = mark[o];
 		if (m == 2) return true;
 		if (m == 1) return false;
 		m = 1;
 		for (tref d : deps[o]) if (!acyclic(d)) return false;
-		m = 2; return true;
+		m = 2; order.push_back(o); return true;
 	};
 	for (tref o : all) if (!acyclic(o)) return say("cyclic definitions");
+	if (program) {
+		program->definitions.clear();
+		for (tref o : order) {
+			typename functional_program<node>::definition d{ o, {} };
+			for (const cell& ce : cells[o]) {
+				typename functional_program<node>::cell c{ {},
+					tau::trim_right_sibling(ce.witness) };
+				for (tref g : ce.guard)
+					c.guard.push_back(tau::trim_right_sibling(g));
+				d.cells.push_back(std::move(c));
+			}
+			program->definitions.push_back(std::move(d));
+		}
+	}
 	LOG_DEBUG << "functional shape: " << all.size() << " outputs defined";
 	return true;
 }

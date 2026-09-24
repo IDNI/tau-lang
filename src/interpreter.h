@@ -453,6 +453,17 @@ struct interpreter {
 	/// as written (-1 when it has none): a part of functional shape is
 	/// warmed up by its reached conjuncts only from that time point on.
 	int_t functional_max_initial = -1;
+	/// The definitions of a specification whose every part is of
+	/// functional shape (`functional_program`), evaluated at every step in
+	/// place of solving the step formula (`functional_step_evaluation`);
+	/// empty where the shape does not apply, and after an update.
+	functional_program<node> functional_program_;
+	/// @brief The outputs of the current time point evaluated from the
+	/// definitions, in their dependency order, at the memory.
+	/// @return The values, keyed like the solver's, or nothing when a
+	/// guard literal is not decided or a witness is not folded to a
+	/// constant at the values it reads.
+	std::optional<solution<node>> evaluate_functional_step();
 	// Table mode only: atoms (input guards + witness templates) a table
 	// strategy may consult, seeded by make_table_interpreter and consulted
 	// by appear_within_lookback ALONGSIDE ubt_ctn (which table mode leaves

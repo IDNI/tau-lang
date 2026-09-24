@@ -635,6 +635,7 @@ result<interpreter<node>>
 	// as written (-1 when it has none), for the closures settled from the
 	// functional shape.
 	int_t functional_max_initial = -1;
+	functional_program<node> program;
 	// The conjuncts of the normalized always-part of a specification
 	// whose form as written is of functional shape (`functional_step_shape`),
 	// each with the operands of its conjunctions and disjunctions sorted;
@@ -781,7 +782,7 @@ result<interpreter<node>>
 		bool functional = false;
 		if (functional_continuation_mode() != 0)
 			if (tref body = functional_shape_body<node>(as_written); body) {
-				functional = functional_step_shape<node>(body);
+				functional = functional_step_shape<node>(body, &program);
 				if (functional) {
 					const trefs vs = tau::get(body).select_top(is_child<node, tau::io_var>);
 					functional_max_initial = vs.empty() ? -1 : get_max_initial<node>(vs);
@@ -875,6 +876,10 @@ post_normalization:
 			memory, ctx_eff };
 		i.functional_parts = functional_parts;
 		i.functional_max_initial = functional_max_initial;
+		// The definitions are evaluated only while every part is of the
+		// shape; an LTL part added below makes the check in `step` fail.
+		if (std::ranges::all_of(functional_parts, [](bool f) { return f; }))
+			i.functional_program_ = program;
 
 		// Cache the LTL synthesis solution (if any) for downstream
 		// introspection of the Mealy strategy. Empty for pure-safety /
@@ -1508,6 +1513,32 @@ interpreter<node>::step(const assignment<node>& values)
 	solution<node> global;
 	chosen_alt_.assign(step_spec.size(), 0);
 
+	// A specification whose every part is of functional shape states the
+	// value of every output of the time point (`functional_program`): the
+	// values, evaluated in the dependency order of the definitions, stand
+	// in for the solved step formula. The evaluation applies once the
+	// continuation is used verbatim, after the last initial condition of
+	// the specification and while every part has one alternative; a step
+	// it does not decide is solved.
+	std::optional<solution<node>> produced, evaluated;
+	const int emode = functional_step_evaluation_mode();
+	if (emode != 0 && final_system && !has_this_stream
+		&& !functional_program_.definitions.empty()
+		&& (int_t)time_point > functional_max_initial
+		&& functional_parts.size() == step_spec.size()
+		&& std::ranges::all_of(functional_parts, [](bool f) { return f; })
+		&& std::ranges::all_of(step_spec,
+			[](const trefs& alts) { return alts.size() == 1; }))
+	{
+		auto sc = r.open("evaluate_functional_step");
+		evaluated = evaluate_functional_step();
+		if (!evaluated) ++functional_step_evaluation_fallbacks;
+		else if (emode == 1) {
+			++functional_step_evaluation_hits;
+			produced = evaluated;
+		}
+	}
+	if (!produced) {
 	// I1 / IN-M2: pick each part's first solvable alternative under the
 	// current memory before handing the flattened step spec to the
 	// configured step_provider. State-touching parts carry a single
@@ -1532,11 +1563,38 @@ interpreter<node>::step(const assignment<node>& values)
 		}
 	}
 
-	std::optional<solution<node>> produced;
 	{
 		auto sc = r.open("produce_step_solution");
 		produced = r.merge_take(provider_->produce(flat_step_spec, memory,
 			time_point, formula_time_point)).value_or(std::nullopt);
+	}
+	// Shadow: every evaluated value must be the solved one, as a term or,
+	// where the two terms differ, as the normalizer decides their equation.
+	if (evaluated && produced) {
+		++functional_step_evaluation_hits;
+		for (const auto& [var, value] : *evaluated) {
+			auto it = produced->find(var);
+			int same = it == produced->end() ? 0 : -1;
+			if (it != produced->end()) {
+				tref a = canonicalize_committed_value<node>(value);
+				tref b = canonicalize_committed_value<node>(it->second);
+				if (a == b) same = 1;
+				else if (auto n = normalize_non_temp<node>(
+						tau::build_bf_eq(a, b)); n.has_value()) {
+					if (tau::get(n.value()).equals_T()) same = 1;
+					else if (tau::get(n.value()).equals_F()) same = 0;
+				}
+			}
+			if (same == 1) continue;
+			if (same == 0) ++functional_step_evaluation_mismatches;
+			else ++functional_step_evaluation_undecided;
+			LOG_DEBUG << "functional step: the evaluated value of "
+				<< LOG_FM(var) << " is " << LOG_FM(value)
+				<< ", the solved one "
+				<< (it == produced->end() ? std::string("(none)")
+					: TAU_TO_STR(it->second));
+		}
+	}
 	}
 	if (!produced) {
 		return r.with_assert_check_error(code::unsat, "Step provider found no solution for "
@@ -1887,6 +1945,13 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 	// note) and the raw atom trefs of the cached Mealy solution, which
 	// nothing else anchors.
 	for (auto& [k, v] : last_outputs_) { keep.insert(k); keep.insert(v); }
+	for (const auto& d : functional_program_.definitions) {
+		keep.insert(d.output);
+		for (const auto& c : d.cells) {
+			keep.insert(c.witness);
+			keep.insert(c.guard.begin(), c.guard.end());
+		}
+	}
 	if (cached_solution)
 		for (const auto& [atom, _] : cached_solution->atoms)
 			keep.insert(atom);
@@ -2824,6 +2889,7 @@ result<bool> interpreter<node>::update(tref update) {
 	ubt_ctn = std::move(plan->ubt_ctn);
 	// A revised part is not read for its shape.
 	functional_parts.assign(ubt_ctn.size(), false);
+	functional_program_.definitions.clear();
 	original_spec = std::move(plan->spec);
 	++spec_revision_;
 	output_partition = std::move(plan->partition);
@@ -3311,6 +3377,131 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 	return r.with_assert_check_error(code::unsat,
 		"no alternative of the specification part solves under the "
 		"current memory");
+}
+
+template <NodeType node>
+std::optional<solution<node>> interpreter<node>::evaluate_functional_step() {
+	// The values read so far: the memory, extended by the outputs of the
+	// time point as they are computed, in the order of the definitions.
+	assignment<node> env = memory;
+	solution<node> values;
+	// The streams by name: whether each is an input, and its type, which
+	// keys the memory; an occurrence in the specification as written may
+	// carry no type annotation.
+	struct stream { bool input; size_t type; };
+	std::map<std::string, stream> streams;
+	for (const auto& [v, _] : inputs)
+		streams.emplace(get_var_name<node>(v), stream{ true, ctx.type_of(v) });
+	for (const auto& [v, _] : outputs)
+		streams.emplace(get_var_name<node>(v), stream{ false, ctx.type_of(v) });
+	// A formula or term of the definitions at the time point, with every
+	// stream occurrence replaced by its value: the occurrence is looked
+	// up by name, time point and the stream's type, as the memory is keyed.
+	auto is_stream = [](tref n) {
+		const tau& t = tau::get(n);
+		return t.is(tau::bf) && t.child_is(tau::variable)
+			&& tau::get(t.first()).child_is(tau::io_var); };
+	auto ground = [&](tref f) -> tref {
+		tref at = update_to_time_point(f, (int_t)time_point);
+		subtree_map<node, tref> subst;
+		for (tref occ : tau::get(at).select_top(is_stream)) {
+			auto it = streams.find(get_var_name<node>(occ));
+			if (it == streams.end()) continue;
+			tref name = get_var_name_node<node>(occ);
+			const int_t tp = get_io_time_point<node>(tau::trim(occ));
+			tref key = it->second.input
+				? build_in_var_at_n<node>(name, tp, it->second.type)
+				: build_out_var_at_n<node>(name, tp, it->second.type);
+			if (auto val = env.find(key); val != env.end())
+				subst.emplace(tau::trim_right_sibling(occ), val->second);
+		}
+		return subst.empty() ? at : rewriter::replace<node>(at, subst);
+	};
+	// A guard literal is decided once per step: 1 when it holds, 0 when
+	// it fails, -1 when the normalizer does not decide it.
+	subtree_map<node, int> decided;
+	auto holds = [&](tref literal) -> int {
+		if (auto it = decided.find(literal); it != decided.end())
+			return it->second;
+		tref g = ground(literal);
+		int v = -1;
+		if (auto n = normalize_non_temp<node>(g); n.has_value()) {
+			if (tau::get(n.value()).equals_T()) v = 1;
+			else if (tau::get(n.value()).equals_F()) v = 0;
+			else LOG_DEBUG << "functional step: a guard literal is not decided: "
+				<< LOG_FM(g) << " normalizes to " << LOG_FM(n.value());
+		} else LOG_DEBUG << "functional step: a guard literal does not normalize: "
+			<< LOG_FM(g);
+		decided.emplace(literal, v);
+		return v;
+	};
+	for (const auto& def : functional_program_.definitions) {
+		// The cell whose guard literals all fail forces the output.
+		tref witness = nullptr;
+		for (const auto& c : def.cells) {
+			bool forces = true;
+			for (tref g : c.guard) {
+				const int v = holds(g);
+				if (v < 0) return std::nullopt;
+				if (v == 1) { forces = false; break; }
+			}
+			if (forces) { witness = c.witness; break; }
+		}
+		if (!witness) return std::nullopt;
+		// The output at the time point, keyed like the solver keys it.
+		auto st = streams.find(get_var_name<node>(def.output));
+		if (st == streams.end() || st->second.input) return std::nullopt;
+		tref ot = build_out_var_at_n<node>(
+			get_var_name_node<node>(def.output), (int_t)time_point,
+			st->second.type);
+		// The witness at the values it reads, folded by normalizing its
+		// equation with the output: the normal form is the output equated
+		// with a constant.
+		tref term = ground(witness);
+		auto n = normalize_non_temp<node>(tau::build_bf_eq(ot, term));
+		if (!n.has_value()) {
+			LOG_DEBUG << "functional step: a witness does not normalize: "
+				<< LOG_FM(term);
+			return std::nullopt;
+		}
+		// A constant of the algebra, or its zero or one.
+		auto constant = [](tref b) {
+			const tau& t = tau::get(b);
+			return t[0].is_ba_constant() || t.equals_0() || t.equals_1(); };
+		const tau& tn = tau::get(n.value());
+		tref value = nullptr;
+		if (tn.is(tau::wff) && tn.child_is(tau::bf_eq)) {
+			tref l = tau::trim_right_sibling(tn[0].first()), rr = tn[0].second();
+			if (tau::get(l) == tau::get(ot) && constant(rr)) value = rr;
+			else if (tau::get(rr) == tau::get(ot) && constant(l)) value = l;
+		}
+		// A Boolean algebra writes the equation as a term equated with
+		// zero: the one equation, whose only variable is the output, is
+		// then solved on its own.
+		if (!value) {
+			bool only_ot = true;
+			for (tref v : tn.select_top(is_stream))
+				if (tau::get(tau::trim_right_sibling(v)) != tau::get(ot)) {
+					only_ot = false; break; }
+			if (only_ot) {
+				auto sol = ::idni::tau_lang::solution_with_max_update<node>(
+					n.value(), time_point);
+				if (sol.has_value())
+					if (auto it = sol.value().find(ot);
+						it != sol.value().end() && constant(it->second))
+						value = it->second;
+			}
+		}
+		if (!value) {
+			LOG_DEBUG << "functional step: a witness does not fold to a constant: "
+				<< LOG_FM(term) << " equated with " << LOG_FM(ot)
+				<< " normalizes to " << LOG_FM(n.value());
+			return std::nullopt;
+		}
+		values.emplace(ot, value);
+		env[ot] = value;
+	}
+	return values;
 }
 
 template <NodeType node>
