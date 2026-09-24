@@ -47,6 +47,12 @@ TEST_CASE("a full table raises the flag and interns nothing more") {
 	bdd_init<Bool, tiny>();
 	auto small = tiny_lit(1) & tiny_lit(2);
 	REQUIRE(small != th::hfalse);
+	// Quantifying 150 out of wide needs a node for 101 & 199, whose
+	// variable distance no other function here has, so it does not fit
+	// once the table is full.
+	auto wide = tiny_lit(101) & tiny_lit(150) & tiny_lit(199);
+	auto not_wide = ~wide;
+	REQUIRE(wide != th::hfalse);
 	REQUIRE_FALSE(bdd_node_table_exhausted);
 	uint_t n = 1;
 	for (; n <= 8 && !bdd_node_table_exhausted; ++n)
@@ -67,6 +73,34 @@ TEST_CASE("a full table raises the flag and interns nothing more") {
 
 	SUBCASE("a later overflow raises the flag again") {
 		(void) equal_pairs(n + 2);
+		CHECK(bdd_node_table_exhausted);
+		CHECK(tbdd::V.size() == capacity());
+	}
+
+	SUBCASE("a quantifier on a raised flag computes and memoizes nothing") {
+		bdd_node_table_exhausted = true;
+		auto ex_entries = tbdd::ex_memo.size();
+		auto all_entries = tbdd::all_memo.size();
+		CHECK(not_wide->all(150) == th::hfalse);
+		auto e = wide->ex(150);
+		CHECK((e == th::hfalse || e == th::htrue));
+		CHECK(tbdd::ex_memo.size() == ex_entries);
+		CHECK(tbdd::all_memo.size() == all_entries);
+		CHECK(bdd_node_table_exhausted);
+	}
+
+	SUBCASE("a quantifier that fills the table memoizes no result") {
+		(void) wide->ex(150);
+		REQUIRE(bdd_node_table_exhausted);
+		bdd_node_table_exhausted = false;
+		// not answered from a memo: the same call fills the table again
+		(void) wide->ex(150);
+		CHECK(bdd_node_table_exhausted);
+		bdd_node_table_exhausted = false;
+		(void) not_wide->all(150);
+		CHECK(bdd_node_table_exhausted);
+		bdd_node_table_exhausted = false;
+		(void) not_wide->all(150);
 		CHECK(bdd_node_table_exhausted);
 		CHECK(tbdd::V.size() == capacity());
 	}
