@@ -572,8 +572,25 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 		return it->second;
 #endif
 	tref v = get_var(x);
-	if (leaf(x)) return add(tau::trim(tau::build_bf_and(
-		get_var_term(x), tau::get(tau::bf, y))));
+	if (leaf(x)) {
+		// Leaves are compared by identity and the callers pass the two
+		// factors in either order, so the product is spelled from its
+		// members in content order.
+		trefs m;
+		get_leaves<node>(tau::get(tau::bf, v), tau::bf_and, m);
+		get_leaves<node>(tau::get(tau::bf, y), tau::bf_and, m);
+		std::sort(m.begin(), m.end(), tau::subtree_less);
+		m.erase(std::unique(m.begin(), m.end(), tau::subtree_equals),
+			m.end());
+		for (tref t : m)
+			if (tau::get(t).child_is(tau::bf_neg) && std::binary_search(
+				m.begin(), m.end(), tau::trim2(t), tau::subtree_less))
+				return F;
+		tref p = m[0];
+		for (size_t i = 1; i < m.size(); ++i)
+			p = tau::build_bf_and(p, m[i]);
+		return add(tau::trim(p));
+	}
 	ref r = add(v, bdd_and(get_high(x), y), bdd_and(get_low(x), y));
 #ifdef TAU_CACHE
 	and_memo.emplace(std::array<ref, 2>{x, add(y)}, r);

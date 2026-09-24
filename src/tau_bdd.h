@@ -237,7 +237,11 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	 */
 	static tref build_functional_quantifiers(const quants& q, tref body);
 
-	/** @brief AND of @p x and a leaf (Tau formula) @p y. */
+	/**
+	 * @brief AND of @p x and a leaf (Tau formula) @p y. At a leaf @p x the
+	 * product's `bf_and` members are sorted into content order and
+	 * deduplicated, and a member meeting its complement gives `F`.
+	 */
 	static ref bdd_and(ref x, tref y);
 	/** @brief AND of two BDD references @p x and @p y under order @p o. */
 	static ref bdd_and(ref x, ref y, const order& o);

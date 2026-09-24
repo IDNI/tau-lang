@@ -146,17 +146,10 @@ TEST_SUITE("BDD creation terms") {
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
 		auto result = tau::get(t).to_str();
-		// Any AND-commutative permutation of the same 8 literals is accepted;
-		// the order is a hash/nt-id-order-dependent tie-break that drifts
-		// with every parser regen (Debug and Release differ too).
+		// The literals are in content order (`subtree_less`), which hashes
+		// the node types, so a parser regen can move this spelling.
 		INFO("result: " << result);
-		CHECK((result == "xzrqeywt" || result == "reyxtzqw" || result == "zwtyxqre" || result == "erxwtqzy"
-			|| result == "xyzqwert"
-			|| result == "ewytrxzq"
-			|| result == "zrwyexqt"
-			|| result == "xtzqrewy"
-			|| result == "qxywrezt"
-			|| result == "qyrtxwze"));
+		CHECK(result == "wrytzqex");
 	}
 }
 
@@ -197,16 +190,10 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		// Any AND-commutative permutation of {a,b,c,d,e,f} is accepted;
-		// bdd_and_many's merge order is a hash/nt-id-order-dependent
-		// tie-break that drifts with every parser regen.
+		// The leaf's literals are in content order (`subtree_less`), which
+		// hashes the node types, so a parser regen can move this spelling.
 		INFO("result: " << result);
-		CHECK((result == "xydcefab" || result == "xydcabfe" || result == "xydcbaef" || result == "xybadcfe" || result == "xybacdfe" || result == "xycdbafe" || result == "xycdbaef"
-			|| result == "xycdabfe"
-			|| result == "xycdabef"
-			|| result == "xyfedcab"
-			|| result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab" ));
+		CHECK(result == "xydcfabe");
 	}
 
 	TEST_CASE("2") {
@@ -237,18 +224,10 @@ TEST_SUITE("BDD and many") {
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
 		auto result = tau::get(xx).to_str();
-		// Any AND-commutative permutation of {a:1, b:2, c:2, d:1, (e'f')':1}
-		// is accepted; the order is a hash/nt-id-order-dependent tie-break
-		// that drifts with every parser regen (Debug and Release differ too).
+		// Each member once, in content order (`subtree_less`), which hashes
+		// the node types, so a parser regen can move this spelling.
 		INFO("result: " << result);
-		CHECK((result == "abbd&(f'e')'cc" || result == "d&(e'f')'bbcca" || result == "dbbcc&(e'f')'a" || result == "cbb&(f'e')'da" || result == "ab&(e'f')'bccd"
-			|| result == "c&(e'f')'bbda"
-			|| result == "ab&(f'e')'bccd"
-			|| result == "cabb&(e'f')'d"
-			|| result == "adbb&(e'f')'cc"
-			|| result == "abbccd&(f'e')'"
-			|| result == "(f'e')'adbbcc"
-			|| result == "bccda&(f'e')'"));
+		CHECK(result == "dc&(f'e')'ab");
 	}
 }
 
