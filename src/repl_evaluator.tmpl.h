@@ -839,7 +839,10 @@ void repl_evaluator<BAs...>::continue_running(
 				running->interp.time_point != tp_before;
 			// Input-independent step: output already written.
 			// "continue?" prompt, mirroring C++ run(fm, ctx, N).
-			if (produced && running->steps_to_run != 0) {
+			// A write or serialization failure also leaves `produced`
+			// set; only an awaiting stop counts the step.
+			if (produced && running->steps_to_run != 0
+				&& step_awaiting_input(st.report())) {
 				++running->steps_done;
 				if (opt.print_benchmarks) {
 					st.report().print(out);

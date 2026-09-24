@@ -2121,12 +2121,21 @@ result<solution<node>> solve(tref form, solver_options options) {
 						}
 					}
 					DBG(assert(!squeezed_by_width.empty());)
+					// A ground zero of each squeezed equality: lgrs'
+					// reproductive solution still mentions the variables
+					// it solves, so a caller could not commit it as a
+					// model. solve_system answers the same way when a
+					// system has no inequalities.
 					for (const auto& [_, squeezed] : squeezed_by_width) {
 						DBG(assert(squeezed.has_value());)
-						if (auto lgrs_sol = lgrs<node>(squeezed.value()); lgrs_sol.has_value()) {
-							for (const auto& [var, value] : lgrs_sol.value())
+						auto zero = options.mode == solver_mode::minimum
+							? find_minimal_solution<node>(
+								equation_system<node>{ squeezed, {} })
+							: find_solution<node>(squeezed.value());
+						if (zero.has_value()) {
+							for (const auto& [var, value] : zero.value())
 								clause_solution[var] = value;
-						} else { // lgrs found no solution; advisory, a later route may solve
+						} else { // no zero; advisory, a later route may solve
 							theory_sat = false; skip = true; break; }
 					}
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
