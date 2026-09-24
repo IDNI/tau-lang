@@ -4329,16 +4329,15 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	}
 
 	// Same-value positional atoms at different positions: o[0]=1 and o[2]=1
-	// relativize to identical text but come from two DIFFERENT source
-	// atoms, so they stay two distinct props. The ground-equality fast
-	// path compares actual constants, not just shape, so no spurious forbid.
-	TEST_CASE("same-value positional atoms at different positions: no "
-	          "spurious forbid after the fast-path tightening") {
+	// relativize to the same o[t]=1, one prop guarded at both steps, with
+	// no forbid of its own.
+	TEST_CASE("same-value positional atoms at different positions share "
+	          "one prop and no spurious forbid") {
 		tref fm = wff("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
-		REQUIRE(sol->atoms.size() == 2); // stay separate, one prop per position
+		REQUIRE(sol->atoms.size() == 1);
 		CHECK(sol->consistency_constraints.empty());
 	}
 
@@ -4404,6 +4403,41 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		result<bool> r = is_ltl_aba_realizable<node_t>(fm, 0, false);
 		CHECK(r.has_value());
 		CHECK(r.value());
+	}
+
+	// The prop of a hoisted initial value reads its relativized atom at
+	// every step; only its own step fixes it, so o1 may stay 0 afterwards.
+	TEST_CASE("an initial value leaves its stream free at later steps") {
+		tref fm = spec("(always o1[0]:bv[2] = {0} "
+			"&& o1[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes o2[t]:bv[2] = {1}).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	TEST_CASE("initial values with a delay chain and sometimes are REALIZABLE") {
+		tref fm = spec("(always o1[0]:bv[2] = {0} && o2[0]:bv[2] = {0} "
+			"&& o2[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes o2[t]:bv[2] = {1}).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	// o1[0] = 1 and o1[1] = 1 relativize to the same o1[t] = 1: one prop,
+	// guarded at both steps.
+	TEST_CASE("equal relativized atoms of two conjuncts share one prop") {
+		tref fm = spec("(always o1[0]:bv[2] = {1} && o1[1]:bv[2] = {1} "
+			"&& o2[0]:bv[2] = {1} && o2[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes (o1[t-1]:bv[2] = o2[t]:bv[2] "
+			"&& o2[t]:bv[2] != o1[t]:bv[2])).");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		for (size_t i = 0; i < sol->atoms.size(); ++i)
+			for (size_t j = i + 1; j < sol->atoms.size(); ++j)
+				CHECK_FALSE(tau::subtree_equals(
+					sol->atoms[i].first, sol->atoms[j].first));
+		CHECK(realizable(fm));
 	}
 
 } // TEST_SUITE("Positional atoms: X-encoding")

@@ -567,7 +567,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		auto d = build_program_desc<node_t>(*sol, "pos_flag_run");
 		REQUIRE(d.has_value());
 		REQUIRE_FALSE(d->needs_tau_link);
-		REQUIRE(d->outputs.size() == 3);
+		REQUIRE(d->outputs.size() == 2);
 		std::ostringstream os;
 		emit_program(*d, os);
 
@@ -583,9 +583,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		    "    pos_flag_run::inputs in;\n"
 		    "    auto out = prog.step(in);\n"
 		    "    if (!out.ok) { ok = false; break; }\n"
-		    "    std::printf(\"%d%d%d \", (int)out." + d->outputs[0].cpp_name
-		            + ", (int)out." + d->outputs[1].cpp_name
-		            + ", (int)out." + d->outputs[2].cpp_name + ");\n"
+		    "    std::printf(\"%d%d \", (int)out." + d->outputs[0].cpp_name
+		            + ", (int)out." + d->outputs[1].cpp_name + ");\n"
 		    "    bool has_input = false;\n"
 		    "    auto_continue = has_input || (t < pos_flag_run::highest_initial_pos);\n"
 		    "    ++t;\n"
@@ -596,14 +595,13 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		    "  std::printf(\"\\n\");\n"
 		    "  return 0;\n"
 		    "}\n";
-		// One field per atom, all over the same variable o, each holding
-		// o's value as its own atom decides it: at step 1 the spec pins
-		// o = 0, so the o = 0 field reads 0 there and 1 elsewhere, the two
-		// o = 1 fields the other way round. (A field is never its prop's
-		// truth -- that would print 100 010 001 and write 1 into a stream
-		// the spec constrains to 0.)
+		// One field per atom, both over the same variable o, each holding
+		// o's value as its own atom decides it: o[0] = 1 and o[2] = 1 share
+		// the o = 1 atom, so both fields read 1, 0, 1. (A field is never its
+		// prop's truth -- that would print 10 01 10 and write 1 into a
+		// stream the spec constrains to 0.)
 		auto result = compile_and_run(os.str(), main_src, "posflag");
-		CHECK(result == "110 000 011 ");
+		CHECK(result == "11 00 11 ");
 	}
 
 	// Both positional atoms sit inside an implication -- an implication of

@@ -1719,10 +1719,9 @@ static void add_consistency_constraints(
 // conjuncts) at its own max position k_max: io_var x[j] in C becomes x[t]
 // (j==k_max) or x[t-(k_max-j)], reparsed as C', guarded by
 // G(minterm(k_max) -> C').
-// A relativized atom identical to an existing one merges into it (one prop
-// per formula); atoms from different conjuncts that coincidentally match
-// text stay separate, one prop per position, since pairwise mutual-
-// exclusion forbids rely on that.
+// A relativized atom identical to an existing one, natural or produced by
+// an earlier conjunct, merges into it: one prop per relativized atom, free
+// outside the steps whose guards name it.
 // Returns the extra skeleton conjuncts; output_props gains the counter bits.
 // counter_relativized_props gains every prop this pass resolves a hoisted
 // conjunct's atom to -- its "t" means the counter's own absolute step, not
@@ -1796,12 +1795,6 @@ static result<std::string> apply_step_counter_encoding(
 	std::vector<std::string> orig_prop(orig_pos_atoms.size());
 	std::vector<bool> orig_done(orig_pos_atoms.size(), false);
 
-	// Marks atoms[i] as hoist-derived (added by some conjunct's rewrite);
-	// never a merge target for a different original atom's rewrite.
-	std::vector<bool> hoist_derived(atoms.size(), false);
-	for (size_t i = 0; i < atoms.size(); ++i)
-		if (atom_is_positional<node>(atoms[i].first)) hoist_derived[i] = true;
-
 	// Fresh prop names come from a monotonic counter, not atoms.size(): a
 	// later conjunct's addition could land at a size vacated by an earlier
 	// drop and repeat a name.
@@ -1845,10 +1838,7 @@ static result<std::string> apply_step_counter_encoding(
 	};
 
 	// Renders C's Boolean shape into skeleton text, matching each atom leaf
-	// against `orig_pos_atoms` at its ORIGINAL, pre-rewrite level -- not via
-	// find_prop's relativized-text lookup, which can't disambiguate atoms
-	// the "stay separate" rule deliberately keeps distinct despite identical
-	// text.
+	// against `orig_pos_atoms` at its ORIGINAL, pre-rewrite level.
 	std::function<std::string(tref)> build_guard_skel = [&](tref n) -> std::string {
 		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi)
 			if (tau::subtree_equals(orig_pos_atoms[oi], n)) return orig_prop[oi];
@@ -1898,7 +1888,7 @@ static result<std::string> apply_step_counter_encoding(
 
 		// Resolve each of C's own original positional atoms to a prop:
 		// reuse a shared atom's prop already resolved by an earlier
-		// conjunct, merge into a naturally-occurring atom, or add fresh.
+		// conjunct, merge into an equal relativized atom, or add fresh.
 		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
 			tref a_orig = orig_pos_atoms[oi];
 			if (!contains<node>(C, a_orig)) continue;
@@ -1913,11 +1903,11 @@ static result<std::string> apply_step_counter_encoding(
 			// atom's other, unrelativized occurrences elsewhere in the formula.
 			size_t existing = atoms.size();
 			for (size_t k = 0; k < atoms.size(); ++k) {
-				if (hoist_derived[k]) continue;
-				tref natural_resolved = resolve_io_vars<node>(
+				if (atom_is_positional<node>(atoms[k].first)) continue;
+				tref resolved = resolve_io_vars<node>(
 					*definitions<node>::instance().get_io_context(),
 					atoms[k].first);
-				if (tau::subtree_equals(natural_resolved, rel)) {
+				if (tau::subtree_equals(resolved, rel)) {
 					existing = k; break;
 				}
 			}
@@ -1927,18 +1917,11 @@ static result<std::string> apply_step_counter_encoding(
 			} else {
 				pname = "p" + std::to_string(next_prop_idx++);
 				atoms.emplace_back(rel, pname);
-				hoist_derived.push_back(true);
-				bool pure_input = is_pure_input_atom<node>(rel);
-				if (pure_input) input_props.push_back(pname);
+				// Only the step-km guard below constrains the prop: it
+				// reads its relativized atom at every step, so fixing its
+				// value at another step would constrain the data there.
+				if (is_pure_input_atom<node>(rel)) input_props.push_back(pname);
 				else output_props.push_back(pname);
-				// A fresh OUTPUT prop is pinned false outside its own step
-				// (nothing else references it, and the generic guard alone
-				// wouldn't stop it holding on the trailing silent self-loop).
-				// An input prop is never pinned this way: its truth is the
-				// environment's choice, tying it to the counter would
-				// over-constrain.
-				if (!pure_input)
-					extra += " & G(" + minterm(km) + " | !" + pname + ")";
 			}
 			orig_prop[oi] = pname;
 			orig_done[oi] = true;
@@ -1955,7 +1938,6 @@ static result<std::string> apply_step_counter_encoding(
 				drop_prop(input_props, atoms[i].second);
 				drop_prop(output_props, atoms[i].second);
 				atoms.erase(atoms.begin() + (long)i);
-				hoist_derived.erase(hoist_derived.begin() + (long)i);
 			} else ++i;
 		}
 
