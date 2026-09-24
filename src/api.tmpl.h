@@ -1268,7 +1268,12 @@ result<bool> api<node>::valid_spec(tref fm) {
 			code::internal_error,
 			"Could not normalize the formula; "
 			"its validity cannot be decided");
-		// Valid iff T (tautology) implies the normalized formula.
+		// Valid iff T (tautology) implies the normalized formula, i.e. iff
+		// no trace violates it. is_tau_impl checks unsat of the negation
+		// with the inputs quantified universally, which only says the
+		// system cannot force the negation; every input is read as an
+		// output, as in the full-LTL branch above.
+		nfm = inputs_as_outputs<node>(nfm);
 		// Same synthesis-failure gate as realizable() -- see the note there:
 		// is_tau_impl's own result<T> error propagates through r.
 		TAU_TRY_OR(r, is_tau_impl<node>(tau::_T(), nfm),

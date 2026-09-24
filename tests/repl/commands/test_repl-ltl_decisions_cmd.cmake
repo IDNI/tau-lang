@@ -44,6 +44,13 @@ add_repl_test(ltl_decisions-valid_nested_implication_input_T
 	"valid (G (F (i1[t] = 1))) -> (F (i1[t] = 1))" ": T")
 add_repl_test(ltl_decisions-valid_until_implies_F_T
 	"valid ((o1[t] = 1) until (o2[t] = 1)) -> (F (o2[t] = 1))" ": T")
+# the same holds for always / sometimes
+add_repl_test(ltl_decisions-valid_sometimes_input_F
+	"valid sometimes (i1[t]:bv[2] = {1}:bv[2])" ": F")
+add_repl_test(ltl_decisions-valid_F_input_F
+	"valid F (i1[t] = 1)" ": F")
+add_repl_test(ltl_decisions-valid_sometimes_input_tautology_T
+	"valid sometimes (i1[t] = i1[t])" ": T")
 
 # normal forms keep U / R / W / S / T and CTL* scopes as opaque literals
 add_repl_test(ltl_decisions-dnf_keeps_until
