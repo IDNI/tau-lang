@@ -332,6 +332,21 @@ result<bool> api<node>::valid_spec(const std::string& expr) {
 }
 
 
+template <NodeType node>
+result<std::vector<std::string>> api<node>::unsat_core(
+	const std::string& spec, bool realizability)
+{
+	return with_budget<node>([&] {
+		return get_spec(spec).and_then([&](tref e) {
+			return unsat_core(e, realizability);
+		}).transform([](const trefs& core) {
+			std::vector<std::string> out;
+			for (tref c : core) out.push_back(to_str(c));
+			return out;
+		});
+	});
+}
+
 // Solving
 // ------------------------------------------------------------
 

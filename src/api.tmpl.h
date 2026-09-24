@@ -1134,6 +1134,11 @@ result<bool> api<node>::sat(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
 		TAU_TRY(auto simplified, simplify(fm));
+		// A spec root (what get_spec yields; realizable and valid take it
+		// too) is unwrapped, its definitions applied, to its main formula.
+		if (simplified && tau::get(simplified).is(tau::spec)) {
+			TAU_TRY(simplified, apply_all_defs(simplified));
+		}
 		// G(A) ∧ G(B) ≡ G(A ∧ B); merge top-level conjunctions of G so the
 		// downstream safety pipeline sees one wff_always.  Non-mergeable
 		// Boolean combinations (disjunction, negation, F-on-non-singletons,
@@ -1193,6 +1198,92 @@ result<bool> api<node>::unsat(tref fm) {
 		}
 		TAU_TRY(auto s, sat(fm));
 		return r.with_assert_check_value(!s);
+	});
+}
+
+/// The operands of fm's top-level `&&`, each `always (A && B)` split into
+/// `always A` and `always B`, parentheses peeled.
+template <NodeType node>
+void collect_core_conjuncts(tref fm, trefs& out) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) { out.push_back(fm); return; }
+	const auto nt = t[0].value.nt;
+	if (nt == tau::wff_parenthesis) {
+		collect_core_conjuncts<node>(t[0].first(), out);
+	} else if (nt == tau::wff_and) {
+		collect_core_conjuncts<node>(t[0].first(), out);
+		collect_core_conjuncts<node>(t[0].second(), out);
+	} else if (nt == tau::wff_always) {
+		trefs body;
+		collect_core_conjuncts<node>(t[0].first(), body);
+		for (tref b : body) {
+			// `always` of an `always` conjunct is the conjunct itself
+			const auto& bt = tau::get(b);
+			out.push_back(bt.has_child()
+				&& bt[0].value.nt == tau::wff_always
+				? b : tau::build_wff_always(b));
+		}
+	} else out.push_back(fm);
+}
+
+template <NodeType node>
+result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
+	return with_budget<node>([&] {
+		result<trefs> r;
+		if (!fm) return r.with_assert_check_error(
+			code::invalid_argument, messages::invalid_arguments);
+		TAU_TRY(fm, simplify(fm));
+		if (fm && tau::get(fm).is(tau::spec)) {
+			TAU_TRY(fm, apply_all_defs(fm));
+		}
+		if (!fm || !is_formula(fm)) return r.with_assert_check_error(
+			code::invalid_argument, "Invalid formula");
+		trefs cs;
+		collect_core_conjuncts<node>(fm, cs);
+		// An undecided sub-check is a losing candidate, not a failure of
+		// the core: its error is demoted to a warning in its own scope and
+		// its conjunct stays.
+		size_t checks = 0;
+		auto conflicts = [&](const trefs& part) -> std::optional<bool> {
+			auto sg = r.open("unsat_core check", code::info_count,
+				part.size());
+			++checks;
+			tref conj = tau::build_wff_and(part);
+			auto v = realizability ? realizable(conj) : sat(conj);
+			if (!v.has_value()) {
+				std::ostringstream os;
+				os << v.report();
+				r.warning("no verdict for a subset of "
+					+ std::to_string(part.size())
+					+ " conjuncts; the core may not be minimal: "
+					+ os.str());
+				return std::nullopt;
+			}
+			return !*r.merge_take(std::move(v));
+		};
+		auto whole = realizability ? realizable(fm) : sat(fm);
+		const std::optional<bool> decided = whole.has_value()
+			? std::optional<bool>(whole.value()) : std::nullopt;
+		r.merge(std::move(whole));
+		++checks;
+		if (!decided) return r.with_error(code::solver_error, "UNKNOWN: "
+			"the specification gets no verdict, so it has no core");
+		if (*decided) return r.with_assert_check_value(trefs{});
+		// Deletion: drop cs[i] when the rest still conflicts. Monotone,
+		// so what stays is subset-minimal (bar undecided sub-checks).
+		for (size_t i = 0; i < cs.size() && cs.size() > 1; ) {
+			trefs rest;
+			for (size_t j = 0; j < cs.size(); ++j)
+				if (j != i) rest.push_back(cs[j]);
+			if (auto c = conflicts(rest); c && *c) {
+				cs = std::move(rest);
+				continue;
+			}
+			++i;
+		}
+		r.report().count("unsat_core checks", checks);
+		return r.with_assert_check_value(std::move(cs));
 	});
 }
 

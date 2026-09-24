@@ -998,6 +998,33 @@ TEST_SUITE("Tau API - string - sat/valid decide plain formulas") {
 }
 #endif // TAU_PACK_HAS_BA_BV
 
+// The decision procedures over a parsed spec, what the bindings hand them.
+TEST_SUITE("Tau API - spec decisions and unsat core") {
+	TEST_CASE_FIXTURE(api_fixture, "sat takes a spec root") {
+		auto spec = tau_api::get_spec("f(x) := x'. always o1[t] = f(o1[t]).");
+		REQUIRE(spec.has_value());
+		auto s = tau_api::sat(spec.value());
+		REQUIRE(s.has_value());
+		CHECK(!s.value());
+		auto ok = tau_api::get_spec("always o2[t] = i2[t].");
+		REQUIRE(ok.has_value());
+		CHECK(tau_api::sat(ok.value()).value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "unsat_core is minimal") {
+		auto core = tau_api::unsat_core(
+			"always (o3[t] = i3[t] && o4[t] = i4[t]) && always o3[t] = 1 "
+			"&& always o4[t] = o4[t].");
+		REQUIRE(core.has_value());
+		CHECK(core.value().size() == 2);
+		auto none = tau_api::unsat_core(
+			"always o3[t] = i3[t] && always o4[t] = 1.");
+		REQUIRE(none.has_value());
+		CHECK(none.value().empty());
+		CHECK(!tau_api::unsat_core("not a spec ((").has_value());
+	}
+}
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

@@ -364,24 +364,65 @@ NB_MODULE(tau, m) {
 			"the report; the value is False when the revision was "
 			"rejected and the running spec is left unchanged.");
 
-	// REAL oracle — check realisability of a spec or LTL formula.
-	m.def("is_realizable",
-		[](const std::string& spec_str) {
-			idni::tau_lang::result<bool> r;
-			auto fm = r.merge_take(tau_api::get_spec(spec_str));
-			// A backend failure (ltlsynt missing or timed out, an
-			// undecidable shape) is not UNREALIZABLE: the result stays
-			// valueless instead of degrading to False.
-			if (fm) {
-				auto verdict = r.merge_take(tau_api::realizable(*fm));
-				if (verdict) r = *verdict;
-			}
-			return to_py_result(std::move(r));
-		}, "spec"_a,
-		"Check realisability of a tau spec / LTL formula (REAL oracle). "
-		"Returns a result carrying the verdict and the report; the "
-		"result has no value when the input does not parse or the "
-		"backend gives no verdict.");
+	// Decision procedures over a full spec, parsed as get_interpreter
+	// parses it. A backend failure (ltlsynt missing or timed out, a
+	// budget, an undecidable shape) is not a verdict: the result stays
+	// valueless instead of degrading to False, and its report says why
+	// (code_names: parse_error / invalid_argument for bad input,
+	// solver_error for UNKNOWN).
+	auto decide = [](const std::string& spec_str, auto&& procedure) {
+		idni::tau_lang::result<bool> r;
+		if (auto fm = r.merge_take(tau_api::get_spec(spec_str)))
+			if (auto v = r.merge_take(procedure(*fm))) r = *v;
+		return to_py_result(std::move(r));
+	};
+#define TAU_VERDICT_DOC " Returns a result whose value is the verdict, " \
+	"or None (with the reason in the report) when the spec does not " \
+	"parse or gets no verdict."
+
+	m.def("sat", [decide](const std::string& spec) {
+			return decide(spec, [](idni::tref fm) {
+				return tau_api::sat(fm); });
+		}, "spec"_a, "Tau satisfiability: for every input sequence "
+		"there are outputs, step by step and not depending on future "
+		"inputs, that satisfy the spec. A spec that some input makes "
+		"contradictory is unsat. unsat implies unrealizable; realizable "
+		"also decides the full-LTL operators as a game." TAU_VERDICT_DOC);
+	m.def("unsat", [decide](const std::string& spec) {
+			return decide(spec, [](idni::tref fm) {
+				return tau_api::unsat(fm); });
+		}, "spec"_a, "Negation of sat." TAU_VERDICT_DOC);
+	m.def("valid", [decide](const std::string& spec) {
+			return decide(spec, [](idni::tref fm) {
+				return tau_api::valid(fm); });
+		}, "spec"_a, "Does every trace satisfy the spec?" TAU_VERDICT_DOC);
+	m.def("realizable", [decide](const std::string& spec) {
+			return decide(spec, [](idni::tref fm) {
+				return tau_api::realizable(fm); });
+		}, "spec"_a, "Can the outputs be chosen, step by "
+		"step, so that the spec holds for every input sequence? "
+		"get_interpreter rejects an unrealizable spec." TAU_VERDICT_DOC);
+	m.def("unrealizable", [decide](const std::string& spec) {
+			return decide(spec, [](idni::tref fm) {
+				return tau_api::unrealizable(fm); });
+		}, "spec"_a, "Negation of realizable." TAU_VERDICT_DOC);
+	// The historical name of realizable.
+	m.def("is_realizable", [decide](const std::string& spec) {
+			return decide(spec, [](idni::tref fm) {
+				return tau_api::realizable(fm); });
+		}, "spec"_a, "Alias of realizable." TAU_VERDICT_DOC);
+
+	m.def("unsat_core",
+		[](const std::string& spec, bool realizability) {
+			return to_py_result(tau_api::unsat_core(spec, realizability));
+		}, "spec"_a, "realizability"_a = true,
+		"A subset-minimal list of the spec's top-level conjuncts "
+		"(always (A && B) split into always A, always B) that is "
+		"already unrealizable (realizability=True) or unsatisfiable "
+		"(False). An empty list when the spec has no conflict; None "
+		"when the spec gets no verdict. A warning in the report means "
+		"a sub-check got no verdict and the core may not be minimal.");
+#undef TAU_VERDICT_DOC
 
 	// Free function: apply_preferences.
 	m.def("apply_preferences",
