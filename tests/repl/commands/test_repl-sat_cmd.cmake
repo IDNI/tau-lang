@@ -75,6 +75,28 @@ set_tests_properties("test_repl-sat_cmd-issue72_disjoint_support_ladder" PROPERT
 	FAIL_REGULAR_EXPRESSION "Error"
 	TIMEOUT 60)
 
+# A spec without a temporal wrapper is implicitly `always`: a 2-bit stream
+# cannot increase forever and the environment owns i1, so these are unsat
+# like their explicit `always` spelling; `=` and `>=` are satisfiable
+# controls.
+add_repl_test(sat_cmd-issue137_bare_increase "sat o1[t]:bv[2] > o1[t-1]:bv[2]." ": F")
+add_repl_test(sat_cmd-issue137_always_increase "sat always o1[t]:bv[2] > o1[t-1]:bv[2]." ": F")
+add_repl_test(sat_cmd-issue137_bare_decrease "sat o1[t]:bv[3] < o1[t-1]:bv[3]." ": F")
+add_repl_test(sat_cmd-issue137_bare_input "sat o1[t]:bv[2] > i1[t]:bv[2]." ": F")
+add_repl_test(sat_cmd-issue137_bare_input_lookback "sat o1[t]:bv[2] > i1[t-1]:bv[2]." ": F")
+add_repl_test(sat_cmd-issue137_bare_const_position "sat o1[t]:bv[2] = {1}:bv[2] && o1[1]:bv[2] = {2}:bv[2]." ": F")
+add_repl_test(sat_cmd-issue137_bare_equal "sat o1[t]:bv[2] = o1[t-1]:bv[2]." ": T")
+add_repl_test(sat_cmd-issue137_bare_input_geq "sat o1[t]:bv[2] >= i1[t]:bv[2]." ": T")
+add_repl_test(sat_cmd-issue137_bare_unsat_fast "sat o1[t]:bv[2] > {3}:bv[2]." ": F")
+foreach(_t bare_increase always_increase bare_decrease bare_input
+		bare_input_lookback bare_const_position bare_equal bare_input_geq
+		bare_unsat_fast)
+	if(TEST "test_repl-sat_cmd-issue137_${_t}")
+		set_tests_properties("test_repl-sat_cmd-issue137_${_t}"
+			PROPERTIES TIMEOUT 60)
+	endif()
+endforeach()
+
 # issue #130: equality substitution looped forever on a representative that
 # contained its own class member and ended in std::bad_alloc
 add_repl_test(sat_cmd-issue130_self_absorbing_x "sat x = x & y' && x' != 0" ": T")
