@@ -80,8 +80,10 @@ inline size_t functional_continuation_closure_skips = 0;
 /// at every step (the paths of the step formula are enumerated after the
 /// substitution of the memory and the inputs, so no product is formed); at
 /// 0 it is normalized as one formula; at 2 (shadow) both forms are
-/// computed, the one formula decides, and a conjunction that is not
-/// equivalent to it is counted in `factorized_continuation_mismatches`.
+/// computed and compared, the conjunction is kept, and a conjunction that
+/// is not equivalent to the one formula is counted in
+/// `factorized_continuation_mismatches`; in the warm-up the step is
+/// normalized as one formula and the elimination from it decides.
 /// The environment variable TAU_FACTORIZED_CONTINUATION (0, 1 or 2; any
 /// other value selects 0) overrides the flag. Applies where the functional
 /// shape applies (`functional_continuation`); elsewhere the continuation
@@ -90,6 +92,57 @@ inline size_t functional_continuation_closure_skips = 0;
 /// the reached coordinates are kept and the rest, which the quantified
 /// elimination would return as they are, is dropped.
 inline int factorized_continuation = 1;
+/// Equivalence by parts. `closed_equivalence` compares two formulas by
+/// their conjuncts: it settles what it can from the writing of the two
+/// (`commutative_writing`) and puts to the normalizer the conjuncts in
+/// which they differ, each with the conjuncts it shares variables with
+/// (`conjuncts_imply`). With this switch at 1 (the default) it does so; at
+/// 0 it puts the universally closed equivalence of the two formulas to
+/// the normalizer as one question; at 2 (shadow) both run, the one
+/// question decides, and an answer by parts that differs from a decided
+/// answer of the one question is counted in
+/// `equivalence_by_parts_mismatches`. The environment variable
+/// TAU_EQUIVALENCE_BY_PARTS (0, 1 or 2; any other value selects 0)
+/// overrides the flag.
+inline int equivalence_by_parts = 1;
+/// Calls of `closed_equivalence` on two formulas that are not one tree.
+inline size_t closed_equivalence_calls = 0;
+/// Conjuncts found in the other formula as they are written, and two
+/// formulas found to have one writing.
+inline size_t closed_equivalence_by_writing = 0;
+/// Conjuncts found once the equations of the other formula are applied.
+inline size_t closed_equivalence_by_equations = 0;
+/// Implications put to the normalizer, and the most variables one of them
+/// was closed over.
+inline size_t closed_equivalence_questions = 0;
+inline size_t closed_equivalence_widest = 0;
+/// Shadow: answers by parts that differ from the answer of the one
+/// question, and calls the one question left undecided.
+inline size_t equivalence_by_parts_mismatches = 0;
+inline size_t equivalence_by_parts_undecided = 0;
+
+inline int equivalence_by_parts_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_EQUIVALENCE_BY_PARTS");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = []() {
+		if (env && *env == 2) std::atexit([]() {
+			std::cerr << "equivalence by parts shadow: calls "
+				<< closed_equivalence_calls << ", by writing "
+				<< closed_equivalence_by_writing << ", by equations "
+				<< closed_equivalence_by_equations << ", questions "
+				<< closed_equivalence_questions << ", widest "
+				<< closed_equivalence_widest << ", mismatches "
+				<< equivalence_by_parts_mismatches << ", undecided "
+				<< equivalence_by_parts_undecided << std::endl;
+		});
+		return true;
+	}();
+	(void)report;
+	return env ? *env : equivalence_by_parts;
+}
 /// Continuations kept factorized (at 1) or that would be (at 2).
 inline size_t factorized_continuation_hits = 0;
 /// Warm-ups of a part of functional shape that keep the conjuncts of the
@@ -915,26 +968,458 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
  * logical implication) after very few steps — `find_fixpoint_phi` returns
  * that stabilized formula together with the step count it took.
  */
-/// Whether the normalizer decides two formulas equivalent, closed
-/// universally over every variable and stream occurrence they mention:
-/// 1 equivalent, 0 not, -1 undecided.
+/// The variables and stream occurrences a formula mentions, each once.
 template <NodeType node>
-int closed_equivalence(tref a, tref b) {
+trefs mentioned_variables(tref f) {
 	using tau = tree<node>;
-	if (tau::get(a) == tau::get(b)) return 1;
-	tref eq = tau::build_wff_equiv(a, b);
-	trefs outside = get_free_vars<node>(eq);
+	trefs vars = get_free_vars<node>(f);
 	subtree_set<node> seen;
-	for (tref v : outside) seen.insert(v);
-	for (tref v : tau::get(eq).select_top(is_child<node, tau::io_var>)) {
+	for (tref v : vars) seen.insert(v);
+	for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>)) {
 		tref k = tau::trim_right_sibling(v);
-		if (seen.insert(k).second) outside.push_back(k);
+		if (seen.insert(k).second) vars.push_back(k);
 	}
-	auto r = normalize_non_temp<node>(tau::build_wff_all_many(outside, eq));
+	return vars;
+}
+
+/// Whether the normalizer decides a formula valid, closed universally over
+/// every variable and stream occurrence it mentions: 1 valid, 0 not,
+/// -1 undecided. The formula can hold nodes built without the construction
+/// hooks (`commutative_writing`); the question is put as the tree built
+/// with them.
+template <NodeType node>
+int closed_validity(tref f) {
+	using tau = tree<node>;
+	const tref g = tau::reget(f);
+	const trefs vars = mentioned_variables<node>(g);
+	++closed_equivalence_questions;
+	closed_equivalence_widest = std::max(closed_equivalence_widest, vars.size());
+	auto r = normalize_non_temp<node>(tau::build_wff_all_many(vars, g));
 	if (!r.has_value()) return -1;
 	if (tau::get(r.value()).equals_T()) return 1;
 	if (tau::get(r.value()).equals_F()) return 0;
 	return -1;
+}
+
+/// Whether a node binds a variable or moves in time: a logical or
+/// functional quantifier, or a temporal operator.
+template <NodeType node>
+bool binds_or_shifts(tref n) {
+	return is_logical_or_functional_quant<node>(n)
+		|| is_temporal_quantifier<node>(n);
+}
+
+/// The formula in one writing of what commutes and of what its own
+/// equations make equal: the operands of `&&` and `||` and of the term
+/// operators `&`, `|` and `^` flattened and sorted, an operand of `&&`,
+/// `||`, `&` and `|` that occurs twice kept once, the two sides of an
+/// equation and of an inequation sorted. The equations between variables
+/// and constants that stand as operands of a conjunction are applied to
+/// its other operands, and the inequations that stand as operands of a
+/// disjunction to its other operands, at every depth: `a = b && f(a)` is
+/// `a = b && f(b)`, and `a != b || f(a)` is `a != b || f(b)`. An operand
+/// that holds a quantifier, logical or functional, or a temporal operator
+/// is left as it is written. The least member of a class of
+/// such equations stands for it, a constant before a variable, and the
+/// class is written as the equations of its other members with it. An
+/// equation of a term with itself is T, such an inequation F, and an
+/// operand T or F of `&&`, `||` and `!` is folded. The writing is
+/// equivalent to the formula. The nodes are built without the construction
+/// hooks: the writing is a key, and the simplifications of the engine do
+/// not stand between a formula and its key.
+template <NodeType node>
+tref commutative_writing(tref f) {
+	using tau = tree<node>;
+	use_hooks_guard<node> hooks_off(false);
+	const tau& t = tau::get(f);
+	if (!t.has_child() || !(t.is(tau::wff) || t.is(tau::bf)))
+		return tau::trim_right_sibling(f);
+	const size_t op = t[0].value.nt;
+	const bool formula = t.is(tau::wff);
+	if ((formula && (op == tau::wff_and || op == tau::wff_or))
+		|| (!formula && (op == tau::bf_and || op == tau::bf_or
+			|| op == tau::bf_xor)))
+	{
+		std::vector<tref> raw;
+		std::function<void(tref)> flat = [&](tref m) {
+			const tau& tm = tau::get(m);
+			if (tm.is(formula ? tau::wff : tau::bf) && tm.has_child()
+				&& tm[0].value.nt == op)
+			{
+				flat(tm[0].first()); flat(tm[0].second());
+			} else raw.push_back(tau::trim_right_sibling(m));
+		};
+		flat(f);
+		std::vector<tref> ops;
+		if (formula) {
+			const bool conj = op == tau::wff_and;
+			// The equations (of a conjunction) or inequations (of a
+			// disjunction) between two sides that are a variable or a
+			// constant, as classes.
+			auto simple = [](tref side) {
+				const tau& ts = tau::get(side);
+				return ts.is(tau::bf) && ts.has_child()
+					&& (ts.child_is(tau::variable)
+						|| ts[0].is_ba_constant());
+			};
+			auto relates = [&](tref m, tref& l, tref& r) {
+				const tau& tm = tau::get(m);
+				if (!tm.is(tau::wff) || !tm.has_child()) return false;
+				const tau* e = nullptr;
+				if (conj && tm.child_is(tau::bf_eq)) e = &tm[0];
+				else if (!conj && tm.child_is(tau::bf_neq)) e = &tm[0];
+				else if (!conj && tm.child_is(tau::wff_neg)) {
+					const tau& in = tau::get(tm[0].first());
+					if (in.is(tau::wff) && in.child_is(tau::bf_eq))
+						e = &in[0];
+				}
+				if (!e) return false;
+				l = tau::trim_right_sibling(e->first());
+				r = tau::trim_right_sibling(e->second());
+				return simple(l) && simple(r);
+			};
+			subtree_map<node, tref> parent;
+			std::function<tref(tref)> find = [&](tref x) {
+				auto it = parent.find(x);
+				if (it == parent.end()
+					|| tau::get(it->second) == tau::get(x)) return x;
+				tref root = find(it->second);
+				parent.insert_or_assign(x, root);
+				return root;
+			};
+			std::vector<tref> others;
+			for (tref m : raw) {
+				tref l, r;
+				if (!relates(m, l, r)) { others.push_back(m); continue; }
+				parent.emplace(l, l); parent.emplace(r, r);
+				tref x = find(l), y = find(r);
+				if (tau::get(x) == tau::get(y)) continue;
+				const bool cx = tau::get(x)[0].is_ba_constant();
+				const bool cy = tau::get(y)[0].is_ba_constant();
+				// two constants: the operand stays as it is
+				if (cx && cy) { others.push_back(m); continue; }
+				if (cy || (!cx && tau::subtree_less(y, x))) std::swap(x, y);
+				parent.insert_or_assign(y, x);
+			}
+			subtree_map<node, tref> stands;
+			for (const auto& [member, up] : parent) {
+				(void) up;
+				tref root = find(member);
+				if (tau::get(root) == tau::get(member)) continue;
+				stands.emplace(member, root);
+				ops.push_back(conj ? tau::build_bf_eq(root, member)
+					: tau::build_bf_neq(root, member));
+			}
+			// An operand that holds a quantifier, logical or
+			// functional, or a temporal operator is left as it is
+			// written: a variable a quantifier binds is another
+			// variable, and an equation of one time point says
+			// nothing about another.
+			for (tref m : others)
+				ops.push_back(commutative_writing<node>(stands.empty()
+					|| tau::get(m).find_top(binds_or_shifts<node>)
+					? m : rewriter::replace<node>(m, stands)));
+			// an operand that is T or F: it decides the formula or
+			// leaves it
+			std::vector<tref> rest;
+			for (tref o : ops) {
+				const tau& to = tau::get(o);
+				if (conj ? to.equals_F() : to.equals_T()) return o;
+				if (!(conj ? to.equals_T() : to.equals_F()))
+					rest.push_back(o);
+			}
+			if (rest.empty()) return conj ? tau::_T() : tau::_F();
+			ops.clear();
+			// an operand that is itself of the operator, as a folded
+			// operand can be, is taken apart
+			for (tref o : rest) {
+				const tau& to = tau::get(o);
+				if (to.is(tau::wff) && to.has_child()
+					&& to[0].value.nt == op)
+				{
+					std::function<void(tref)> apart = [&](tref m) {
+						const tau& tm = tau::get(m);
+						if (tm.is(tau::wff) && tm.has_child()
+							&& tm[0].value.nt == op)
+						{
+							apart(tm[0].first());
+							apart(tm[0].second());
+						} else ops.push_back(tau::trim_right_sibling(m));
+					};
+					apart(o);
+				} else ops.push_back(o);
+			}
+		} else for (tref m : raw) ops.push_back(commutative_writing<node>(m));
+		std::sort(ops.begin(), ops.end(), tau::subtree_less);
+		if (op != tau::bf_xor)
+			ops.erase(std::unique(ops.begin(), ops.end(),
+				[](tref x, tref y) { return tau::get(x) == tau::get(y); }),
+				ops.end());
+		tref r = ops[0];
+		for (size_t i = 1; i < ops.size(); ++i)
+			r = op == tau::wff_and ? tau::build_wff_and(r, ops[i])
+			: op == tau::wff_or ? tau::build_wff_or(r, ops[i])
+			: op == tau::bf_and ? tau::build_bf_and(r, ops[i])
+			: op == tau::bf_or ? tau::build_bf_or(r, ops[i])
+			: tau::build_bf_xor(r, ops[i]);
+		return r;
+	}
+	if (formula && (op == tau::bf_eq || op == tau::bf_neq)) {
+		tref l = commutative_writing<node>(t[0].first());
+		tref r = commutative_writing<node>(t[0].second());
+		// one term on both sides: the equation holds, the inequation
+		// does not
+		if (tau::get(l) == tau::get(r))
+			return op == tau::bf_eq ? tau::_T() : tau::_F();
+		if (tau::subtree_less(r, l)) std::swap(l, r);
+		return op == tau::bf_eq ? tau::build_bf_eq(l, r)
+			: tau::build_bf_neq(l, r);
+	}
+	if (formula && op == tau::wff_neg) {
+		tref inner = commutative_writing<node>(t[0].first());
+		if (tau::get(inner).equals_T()) return tau::_F();
+		if (tau::get(inner).equals_F()) return tau::_T();
+		return tau::build_wff_neg(inner);
+	}
+	if (!formula && op == tau::bf_neg)
+		return tau::build_bf_neg(commutative_writing<node>(t[0].first()));
+	return tau::trim_right_sibling(f);
+}
+
+/// Whether the conjuncts of @p from imply every conjunct of @p to, closed
+/// universally: 1 they do, 0 one of them is not implied, -1 undecided.
+/// A conjunct of @p to is taken as implied where @p from holds it as it is
+/// written, up to the order of what commutes, or holds it once the
+/// equations between variables and constants that stand as conjuncts of
+/// @p from are applied to both. For any other conjunct the normalizer is
+/// asked whether the conjuncts of @p from that share a variable with it
+/// imply it; where they do not, the premises grow by the conjuncts that
+/// share a variable with them, until the implication holds or no conjunct
+/// is left to add. The conjuncts left out share no variable with the goal
+/// and its premises, so they imply the goal exactly where they cannot hold
+/// together, which the normalizer is asked group by group.
+template <NodeType node>
+int conjuncts_imply(const trefs& from, const trefs& to) {
+	using tau = tree<node>;
+	subtree_set<node> written;
+	for (tref c : from) written.insert(commutative_writing<node>(c));
+	trefs goals;
+	for (tref c : to)
+		if (written.contains(commutative_writing<node>(c)))
+			++closed_equivalence_by_writing;
+		else goals.push_back(c);
+	if (goals.empty()) return 1;
+	// The classes of the equations of `from`: a variable or a constant on
+	// each side. The least member of a class stands for it, a constant
+	// before a variable.
+	auto simple = [](tref side) {
+		const tau& ts = tau::get(side);
+		return ts.is(tau::bf) && ts.has_child()
+			&& (ts.child_is(tau::variable) || ts[0].is_ba_constant());
+	};
+	auto constant = [](tref side) {
+		return tau::get(side)[0].is_ba_constant(); };
+	subtree_map<node, tref> parent;
+	std::function<tref(tref)> find = [&](tref x) {
+		auto it = parent.find(x);
+		if (it == parent.end() || it->second == x) return x;
+		tref root = find(it->second);
+		parent.insert_or_assign(x, root);
+		return root;
+	};
+	for (tref c : from) {
+		const tau& tc = tau::get(c);
+		if (!(tc.is(tau::wff) && tc.child_is(tau::bf_eq))) continue;
+		tref l = tau::trim_right_sibling(tc[0].first());
+		tref r = tau::trim_right_sibling(tc[0].second());
+		if (!simple(l) || !simple(r)) continue;
+		parent.emplace(l, l); parent.emplace(r, r);
+		tref a = find(l), b = find(r);
+		if (a == b || tau::get(a) == tau::get(b)) continue;
+		const bool ca = constant(a), cb = constant(b);
+		if (ca && cb) continue; // two constants: left to the normalizer
+		// b stands for the class where it is the constant or the lesser
+		if (cb || (!ca && tau::subtree_less(b, a))) std::swap(a, b);
+		parent.insert_or_assign(b, a);
+	}
+	trefs left;
+	if (!parent.empty()) {
+		subtree_map<node, tref> stands;
+		for (const auto& [member, up] : parent) {
+			(void) up;
+			if (tref root = find(member);
+				!(tau::get(root) == tau::get(member)))
+					stands.emplace(member, root);
+		}
+		auto applied = [&](tref c) {
+			use_hooks_guard<node> hooks_off(false);
+			return commutative_writing<node>(stands.empty()
+				|| tau::get(c).find_top(binds_or_shifts<node>) ? c
+				: rewriter::replace<node>(c, stands)); };
+		subtree_set<node> rewritten;
+		for (tref c : from) rewritten.insert(applied(c));
+		for (tref g : goals) {
+			tref k = applied(g);
+			if (tau::get(k).equals_T() || rewritten.contains(k))
+				++closed_equivalence_by_equations;
+			else left.push_back(g);
+		}
+	} else left = goals;
+	if (left.empty()) return 1;
+	// What is left goes to the normalizer, goal by goal.
+	std::vector<subtree_set<node>> mentions(from.size());
+	for (size_t i = 0; i < from.size(); ++i)
+		for (tref v : mentioned_variables<node>(from[i]))
+			mentions[i].insert(tau::trim_right_sibling(v));
+	// Whether the conjuncts of `from` cannot hold together: 1 they cannot,
+	// 0 they can, -1 undecided. They cannot where the conjuncts of one
+	// group of them that share variables cannot.
+	auto holds_nowhere = [&]() {
+		std::vector<size_t> group(from.size());
+		for (size_t i = 0; i < from.size(); ++i) group[i] = i;
+		auto top = [&group](size_t a) {
+			while (group[a] != a) a = group[a] = group[group[a]];
+			return a;
+		};
+		subtree_map<node, size_t> owner;
+		for (size_t i = 0; i < from.size(); ++i)
+			for (tref m : mentions[i]) {
+				auto [it, fresh] = owner.emplace(m, i);
+				if (fresh) continue;
+				const size_t a = top(i), b = top(it->second);
+				if (a != b) group[std::max(a, b)] = std::min(a, b);
+			}
+		int answer = 0;
+		for (size_t g = 0; g < from.size(); ++g) {
+			if (top(g) != g) continue;
+			tref members = nullptr;
+			for (size_t i = g; i < from.size(); ++i)
+				if (top(i) == g) members = members
+					? tau::build_wff_and(members, from[i]) : from[i];
+			const int v = closed_validity<node>(tau::build_wff_neg(members));
+			if (v == 1) return 1;
+			if (v < 0) answer = -1;
+		}
+		return answer;
+	};
+	int contradictory = -2; // not asked
+	int all = 1;
+	for (tref g : left) {
+		subtree_set<node> reach;
+		for (tref v : mentioned_variables<node>(g))
+			reach.insert(tau::trim_right_sibling(v));
+		std::vector<bool> taken(from.size(), false);
+		size_t count = 0;
+		int v = -1;
+		// First the conjuncts that mention variables of the goal only,
+		// among them the ones that mention none: the question stays over
+		// the variables of the goal.
+		for (size_t i = 0; i < from.size(); ++i) {
+			bool inside = true;
+			for (tref m : mentions[i])
+				if (!reach.contains(m)) { inside = false; break; }
+			if (inside) taken[i] = true, ++count;
+		}
+		if (count > 0) {
+			tref premise = nullptr;
+			for (size_t i = 0; i < from.size(); ++i)
+				if (taken[i]) premise = premise
+					? tau::build_wff_and(premise, from[i]) : from[i];
+			v = closed_validity<node>(tau::build_wff_imply(premise, g));
+			if (v == 1) continue;
+		}
+		while (true) {
+			const size_t before = count;
+			for (size_t i = 0; i < from.size(); ++i) {
+				if (taken[i]) continue;
+				bool shares = false;
+				for (tref m : mentions[i])
+					if (reach.contains(m)) { shares = true; break; }
+				if (shares) taken[i] = true, ++count;
+			}
+			// no conjunct shares a variable with the goal: it is asked
+			// on its own
+			if (count == 0) { v = closed_validity<node>(g); break; }
+			// no conjunct left to add: the last answer stands
+			if (count == before) break;
+			tref premise = nullptr;
+			for (size_t i = 0; i < from.size(); ++i)
+				if (taken[i]) premise = premise
+					? tau::build_wff_and(premise, from[i]) : from[i];
+			v = closed_validity<node>(tau::build_wff_imply(premise, g));
+			if (v == 1) break;
+			for (size_t i = 0; i < from.size(); ++i)
+				if (taken[i]) for (tref m : mentions[i]) reach.insert(m);
+		}
+		if (v == 1) continue;
+		// The conjuncts that share no variable with the goal and with
+		// its premises imply it where they cannot hold together, and
+		// nowhere else.
+		if (contradictory == -2) contradictory = holds_nowhere();
+		if (contradictory == 1) return 1;
+		if (v == 0 && contradictory == 0) return 0;
+		all = -1;
+	}
+	return all;
+}
+
+/// Whether the normalizer decides two formulas equivalent as one
+/// question, their equivalence closed universally over every variable and
+/// stream occurrence they mention: 1 equivalent, 0 not, -1 undecided.
+template <NodeType node>
+int closed_equivalence_whole(tref a, tref b) {
+	using tau = tree<node>;
+	if (tau::get(a) == tau::get(b)) return 1;
+	tref eq = tau::build_wff_equiv(a, b);
+	auto r = normalize_non_temp<node>(tau::build_wff_all_many(
+		mentioned_variables<node>(eq), eq));
+	if (!r.has_value()) return -1;
+	if (tau::get(r.value()).equals_T()) return 1;
+	if (tau::get(r.value()).equals_F()) return 0;
+	return -1;
+}
+
+template <NodeType node>
+int closed_equivalence_by_parts(tref a, tref b);
+
+/// Whether two formulas are equivalent, closed universally over every
+/// variable and stream occurrence they mention: 1 equivalent, 0 not,
+/// -1 undecided (see `equivalence_by_parts`).
+template <NodeType node>
+int closed_equivalence(tref a, tref b) {
+	using tau = tree<node>;
+	if (tau::get(a) == tau::get(b)) return 1;
+	++closed_equivalence_calls;
+	const int mode = equivalence_by_parts_mode();
+	if (mode == 0) return closed_equivalence_whole<node>(a, b);
+	const int parts = closed_equivalence_by_parts<node>(a, b);
+	if (mode == 1) return parts;
+	const int whole = closed_equivalence_whole<node>(a, b);
+	if (whole < 0) ++equivalence_by_parts_undecided;
+	else if (parts >= 0 && parts != whole) ++equivalence_by_parts_mismatches;
+	return whole;
+}
+
+/// The two formulas compared by their conjuncts (`conjuncts_imply`, in
+/// both directions): the normalizer is asked about the conjuncts in which
+/// they differ and about the conjuncts these share variables with, and
+/// about the two formulas as a whole only where neither is a conjunction.
+template <NodeType node>
+int closed_equivalence_by_parts(tref a, tref b) {
+	using tau = tree<node>;
+	const tref wa = commutative_writing<node>(a);
+	const tref wb = commutative_writing<node>(b);
+	if (tau::get(wa) == tau::get(wb)) {
+		++closed_equivalence_by_writing;
+		return 1;
+	}
+	const trefs ca = get_cnf_wff_clauses<node>(wa);
+	const trefs cb = get_cnf_wff_clauses<node>(wb);
+	const int ab = conjuncts_imply<node>(ca, cb);
+	if (ab == 0) return 0;
+	const int ba = conjuncts_imply<node>(cb, ca);
+	if (ba == 0) return 0;
+	return ab == 1 && ba == 1 ? 1 : -1;
 }
 
 /// The formula with the operands of every conjunction and disjunction
@@ -1256,7 +1741,7 @@ bool functional_step_shape(tref body,
 	// forms that agree only as closed formulas, e.g. with a stream
 	// replaced by one it is equated with in one of them.
 	auto equivalent = [&](tref a, tref b) -> bool {
-		return closed_equivalence<node>(a, b) == 1; };
+		return closed_equivalence_whole<node>(a, b) == 1; };
 	auto literal_of = [&](tref g, std::vector<tref>& atoms) -> lit {
 		tref pos = canon(to_nnf<node>(g)), npos = canon(to_nnf<node>(tau::build_wff_neg(g)));
 		for (size_t i = 0; i < atoms.size(); ++i) {

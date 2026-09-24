@@ -2096,6 +2096,40 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 			++factorized_continuation_warmups;
 			// In the shadow mode the elimination runs as well and decides.
 			if (fmode == 1) { part_alts.push_back(kept); continue; }
+			// The general path holds the continuation as one formula and
+			// eliminates from it: the step is normalized as one formula
+			// first, as the continuation is with the switch at 0, and
+			// the coordinates not reached are eliminated from that.
+			auto one = normalize_non_temp<node>(step_ubt_ctn);
+			if (!one.has_value()) {
+				dropped.emplace_back(step_ubt_ctn, std::move(one).report());
+				continue;
+			}
+			tref quantified = one.value();
+			auto vars = tau::get(quantified).select_top(
+				is_child<node, tau::io_var>);
+			std::sort(vars.begin(), vars.end(), constant_io_comp<node>);
+			while (!vars.empty()) {
+				tref v = vars.back();
+				vars.pop_back();
+				if (get_io_time_point<node>(v) <= t) continue;
+				if (io_var_direction<node>(tau::get(v).child(0)) == 1)
+					quantified = build_wff_all<node>(v, quantified, false);
+				else quantified = build_wff_ex<node>(v, quantified, false);
+			}
+			auto eliminated = normalize_non_temp<node>(quantified);
+			if (!eliminated.has_value()) {
+				dropped.emplace_back(quantified,
+					std::move(eliminated).report());
+				continue;
+			}
+			// Shadow: the kept conjuncts must be equivalent to the
+			// eliminated formula.
+			const int v = closed_equivalence<node>(eliminated.value(), kept);
+			if (v == 0) ++factorized_continuation_mismatches;
+			else if (v < 0) ++factorized_continuation_undecided;
+			part_alts.push_back(eliminated.value());
+			continue;
 		}
 		auto io_vars = tau::get(step_ubt_ctn).select_top(
 				is_child<node, tau::io_var>);
@@ -2120,16 +2154,9 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		// pushing an un-eliminated formula when normalization fails (e.g.
 		// a bv-widening cap violation, already logged by the pass).
 		auto normalized = normalize_non_temp<node>(step_ubt_ctn);
-		if (normalized.has_value()) {
-			// Shadow: the kept conjuncts must be equivalent to the
-			// eliminated formula.
-			if (kept) {
-				const int v = closed_equivalence<node>(normalized.value(), kept);
-				if (v == 0) ++factorized_continuation_mismatches;
-				else if (v < 0) ++factorized_continuation_undecided;
-			}
+		if (normalized.has_value())
 			part_alts.push_back(normalized.value());
-		} else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
+		else dropped.emplace_back(step_ubt_ctn, std::move(normalized).report());
 		}
 		if (!part.empty() && part_alts.empty()) part_exhausted = true;
 		upd_ubt_ctn.push_back(std::move(part_alts));

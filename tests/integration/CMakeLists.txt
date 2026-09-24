@@ -42,6 +42,7 @@ set(TESTS
 	functional_continuation
 	factorized_continuation
 	functional_step
+	equivalence_by_parts
 )
 
 foreach(X IN LISTS TESTS)
