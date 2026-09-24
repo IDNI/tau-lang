@@ -192,3 +192,19 @@ add_repl_test(normalize_cmd-tau_complement_input_guard_zero   "set charvar off. 
 add_repl_test(normalize_cmd-tau_complement_input_guard_one    "set charvar off. normalize { (always (i1[t] = 0 || o1[t] != 0)) && (always o2[t] = 0) }:tau' = 1" ": F")
 add_repl_test(normalize_cmd-tau_complement_input_pinned_zero  "set charvar off. normalize { (always i1[t] = 0) && (always o1[t] = 0) }:tau' = 0" ": F")
 add_repl_test(normalize_cmd-tau_complement_input_pinned_one   "set charvar off. normalize { (always i1[t] = 0) && (always o1[t] = 0) }:tau' = 1" ": T")
+
+# `syntactic_variable_simplification` (normal_forms_bf.tmpl.h) eliminates a
+# variable whose two substitutions agree. The substituted terms are brought to
+# canonical form before the comparison -- but not when the term carries a tau
+# constant, since canonicalizing such a term decides the constants it holds.
+# Pin that a variable next to a tau constant is still eliminated, through the
+# later passes: the formula with the variable is equivalent to the one without
+# it (a verdict, as the printed order of a term is not pinned across
+# platforms), and not to a wrong one; the last case is the control without a
+# tau constant.
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated      "set charvar off. normalize ((({always o1[t] = 0}:tau & x & y | {always o1[t] = 0}:tau & x' & y) = 0) <-> ({always o1[t] = 0}:tau & y = 0))" ": T")
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_not  "set charvar off. normalize ((({always o1[t] = 0}:tau & x & y | {always o1[t] = 0}:tau & x' & y) = 0) <-> ({always o1[t] = 0}:tau & y != 0))" ": F")
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_neq  "set charvar off. normalize ({always o1[t] = 0}:tau & x | {always o1[t] = 0}:tau & x') != 0" ": T")
+add_repl_test(normalize_cmd-tau_coefficient_variable_eliminated_zero "set charvar off. normalize ({always o1[t] = 0}:tau & x | {always o1[t] = 0}:tau & x') = 0" ": F")
+add_repl_test(normalize_cmd-tau_coefficient_two_clause_constant     "set charvar off. normalize ({always (o1[t] = 0 || o2[t] != 0)}:tau & x | {always (o1[t] = 0 || o2[t] != 0)}:tau & x') = 0" ": F")
+add_repl_test(normalize_cmd-variable_eliminated_control              "set charvar off. normalize ((a & x | a & x') = 0) <-> (a = 0)" ": T")
