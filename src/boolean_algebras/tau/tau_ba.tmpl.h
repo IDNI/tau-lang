@@ -9,6 +9,7 @@
 #include "tau_diagnostics.h"
 #include "reset_hooks.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <deque>
 
@@ -221,6 +222,44 @@ static void pin_decided_key(tref key) {
 	while (pins.size() > ba_decision_pins) pins.pop_front();
 }
 
+// Mode of `ba_normalized_memo` (tau_ba.h): the environment variable
+// TAU_BA_NORMALIZED_MEMO, read once, overrides the flag.
+inline int ba_normalized_memo_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_BA_NORMALIZED_MEMO");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	// When selected through the environment variable, the shadow mode
+	// reports its counts once, at exit, so a whole run can be checked for
+	// mains the normalizer would have changed.
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "tau_ba normalized memo shadow: hits %zu,"
+			" mismatches %zu\n", tau_ba_normalized_memo_hits,
+			tau_ba_normalized_memo_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : ba_normalized_memo;
+}
+
+// Mains that `normalize_tau` returned. Registered with the GC, so a main
+// that does not survive a sweep is forgotten with its tree. External
+// linkage on purpose: `normalize_tau` and the decision can be instantiated
+// in different translation units, and both must see the one cache.
+template <typename node>
+subtree_unordered_map<node, bool>& normalized_mains() {
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	return cache;
+}
+
+template <typename node>
+bool is_normalized_main(tref main) {
+	return ba_normalized_memo_mode() > 0
+		&& normalized_mains<node>().find(main)
+			!= normalized_mains<node>().end();
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
@@ -239,8 +278,24 @@ static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
-	auto normalized = r.merge_take(normalizer<node>(fm.nso_rr));
-	if (!normalized) return r;
+	std::optional<tref> normalized;
+	if (is_normalized_main<node>(key)) {
+		// The main is a normal form `normalize_tau` returned, which the
+		// normalizer maps to itself; deciding it directly saves the
+		// renormalization of the whole constant. Correct regardless of
+		// tree identity: `compute` decides any well-formed formula and
+		// the main is equivalent to its renormalization; the identity is
+		// what the shadow mode checks.
+		if (ba_normalized_memo_mode() == 2) {
+			normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+			if (!normalized) return r;
+			if (*normalized != key) ++tau_ba_normalized_memo_mismatches;
+		} else normalized = key;
+		++tau_ba_normalized_memo_hits;
+	} else {
+		normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+		if (!normalized) return r;
+	}
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
 	++tau_ba_predicate_misses;
@@ -560,8 +615,26 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	{
 		std::lock_guard<std::mutex> lock(cache::mtx());
 		auto& memo = cache::normalize_memo();
-		if (auto it = memo.find(fm.nso_rr); it != memo.end())
+		if (auto it = memo.find(fm.nso_rr); it != memo.end()) {
+			normalized_mains<node>().insert_or_assign(
+				it->second.main->get(), true);
 			return tau_ba<BAs...>(it->second.rec_relations, it->second.main);
+		}
+	}
+	if (fm.nso_rr.rec_relations.empty()
+		&& is_normalized_main<node>(fm.nso_rr.main->get()))
+	{
+		// A normal form this function returned earlier: normalizing it
+		// again yields the same main.
+		++tau_ba_normalized_memo_hits;
+		if (ba_normalized_memo_mode() != 2) return fm;
+		auto applied = nso_rr_apply<node>(fm.nso_rr);
+		if (!applied.has_value()) return fm;
+		auto simplified = simp_tau_unsat_valid<node>(applied.value());
+		if (!simplified.has_value()) return fm;
+		if (simplified.value() != fm.nso_rr.main->get())
+			++tau_ba_normalized_memo_mismatches;
+		return fm;
 	}
 	// No safe normalized form exists on failure; return the element
 	// unchanged, matching splitter()'s fallback below.
@@ -571,8 +644,12 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	if (!simplified.has_value()) return fm;
 	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
 	std::lock_guard<std::mutex> lock(cache::mtx());
-	if (!bdd_node_table_exhausted)
+	// A normal form computed while the bdd node table was exhausted may
+	// be incomplete: neither memoized nor recorded as a fixed point.
+	if (!bdd_node_table_exhausted) {
+		normalized_mains<node>().insert_or_assign(simplified.value(), true);
 		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
+	}
 	return out;
 }
 
