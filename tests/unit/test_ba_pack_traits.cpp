@@ -96,6 +96,21 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 		CHECK_FALSE(pack_omcat_qe<node_t>(tid(untyped_type<node_t>()), nullptr, nullptr).has_value());
 		CHECK_FALSE(pack_omcat_qe<node_t>(size_t{0}, nullptr, nullptr).has_value());
 	}
+	TEST_CASE("pack_omcat_qe_residual is nullptr without an owner or without the capability") {
+		CHECK(pack_omcat_qe_residual<node_t>(tid(untyped_type<node_t>()), nullptr, nullptr) == nullptr);
+		CHECK(pack_omcat_qe_residual<node_t>(size_t{0}, nullptr, nullptr) == nullptr);
+		size_t without = 0;
+		pack_visit_all<node_t>([&]<typename BA>() {
+			if constexpr (!ba_has_omcat_qe_residual<node_t, BA>) {
+				using desc = ba_descriptor<BA, node_t>;
+				CHECK(pack_omcat_qe_residual<node_t>(tid(desc::type_tree()), nullptr, nullptr) == nullptr);
+				++without;
+			}
+		});
+#ifdef TAU_PACK_HAS_BA_SBF
+		CHECK(without > 0);
+#endif
+	}
 	TEST_CASE("pack_codegen_witness / pack_codegen_constant_expr are empty without an owner") {
 		CHECK_FALSE(pack_codegen_witness<node_t>(size_t{0}, nullptr, nullptr).has_value());
 		CHECK_FALSE(pack_codegen_constant_expr<node_t>(size_t{0}, nullptr).has_value());

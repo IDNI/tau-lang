@@ -308,3 +308,189 @@ TEST_SUITE("relational qlt ordering systems") {
 		CHECK( solved_and_satisfied("x : qlt > {3/4}:qlt && x : qlt < {7/8}:qlt.") );
 	}
 }
+
+// The joint ordering solver called directly on hand-built atoms, so each atom
+// reaches it in exactly the shape written: negated, in the nXX spelling,
+// oriented with > / >=, or against the typed 0 / 1 ends of the order. A
+// returned model must satisfy every atom; a declined system returns nullopt.
+TEST_SUITE("qlt joint ordering solver: atom shapes") {
+
+	tref atom(const char* src) {
+		return get_nso_rr<node_t>(tau::get(src).value_or(nullptr))
+			.value().main->get();
+	}
+	tref lhs(tref a) { return tau::get(a)[0].first(); }
+	tref rhs(tref a) { return tau::get(a)[0].second(); }
+	tref neg(tref a) { return tau::build_wff_neg(a); }
+
+	// the bf nodes of `x : qlt`, `y : qlt` and the typed 0 / 1 of qlt
+	tref x() { return lhs(atom("x : qlt < y : qlt.")); }
+	tref y() { return rhs(atom("x : qlt < y : qlt.")); }
+	tref q0() { return tau::_0(ba_types<node_t>::id(qlt_type<node_t>())); }
+	tref q1() { return tau::_1(ba_types<node_t>::id(qlt_type<node_t>())); }
+
+	std::optional<solution<node_t>> dlo(const trefs& atoms) {
+		inequality_system<node_t> sys;
+		for (tref a : atoms) sys.insert(a);
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general,
+			.type_id = ba_types<node_t>::id(qlt_type<node_t>())
+		};
+		return qlt_omcat_solve_inequality_system<node_t>(sys, options);
+	}
+
+	bool solved_and_satisfied(const trefs& atoms) {
+		auto sol = dlo(atoms);
+		if (!sol) return false;
+		for (tref a : atoms)
+			if (!check_solution<node_t>(a, sol.value())) return false;
+		return true;
+	}
+
+	TEST_CASE("negated comparisons flip over the total order") {
+		// !(x < y) is y <= x, !(x <= y) is y < x
+		CHECK( solved_and_satisfied({ neg(atom("x : qlt < y : qlt.")) }) );
+		CHECK( solved_and_satisfied({ neg(atom("x : qlt <= y : qlt.")) }) );
+		CHECK( solved_and_satisfied({ neg(atom("x : qlt = y : qlt.")) }) );
+		CHECK( solved_and_satisfied({ neg(atom("x : qlt != y : qlt.")) }) );
+		// !(x < y) && !(y <= x) has no model
+		CHECK( !dlo({ neg(atom("x : qlt < y : qlt.")),
+			neg(atom("y : qlt <= x : qlt.")) }).has_value() );
+	}
+
+	TEST_CASE("nXX spellings read as negations") {
+		CHECK( solved_and_satisfied({ atom("x : qlt !< y : qlt.") }) );
+		CHECK( solved_and_satisfied({ atom("x : qlt !> y : qlt.") }) );
+		CHECK( solved_and_satisfied({ atom("x : qlt !<= y : qlt.") }) );
+		CHECK( solved_and_satisfied({ atom("x : qlt !>= y : qlt.") }) );
+		// x !< y && x !> y forces x = y, so x != y has no model
+		CHECK( !dlo({ atom("x : qlt !< y : qlt."),
+			atom("x : qlt !> y : qlt."),
+			atom("x : qlt != y : qlt.") }).has_value() );
+	}
+
+	TEST_CASE("> and >= are oriented as < and <=") {
+		CHECK( solved_and_satisfied({ atom("x : qlt > y : qlt.") }) );
+		CHECK( solved_and_satisfied({ atom("x : qlt >= y : qlt."),
+			atom("y : qlt > {2}:qlt.") }) );
+		CHECK( !dlo({ atom("x : qlt > y : qlt."),
+			atom("y : qlt >= x : qlt.") }).has_value() );
+	}
+
+	TEST_CASE("equality between variables merges them into one class") {
+		tref eq = tau::build_bf_eq(x(), y());
+		CHECK( solved_and_satisfied({ eq, atom("y : qlt > {1}:qlt.") }) );
+		CHECK( !dlo({ eq, atom("x : qlt != y : qlt.") }).has_value() );
+	}
+
+	TEST_CASE("atoms against the typed 0 / 1 are decided for every point") {
+		// Construction folds `x <= 1`, `0 <= x`, `x > 1` and `x < 0`
+		// to T / F, so the non-strict and violated forms are reached
+		// through negations, which it keeps.
+		// holding ones add no constraint
+		CHECK( solved_and_satisfied({ tau::build_bf_lt(x(), q1()),
+			atom("x : qlt > {5}:qlt.") }) );
+		CHECK( solved_and_satisfied({ tau::build_bf_lt(q0(), x()) }) );
+		CHECK( solved_and_satisfied({ tau::build_bf_nlteq(x(), q0()) }) );
+		CHECK( solved_and_satisfied({ tau::build_bf_ngteq(x(), q1()) }) );
+		CHECK( solved_and_satisfied({ neg(tau::build_bf_lteq(q1(), x())) }) );
+		CHECK( solved_and_satisfied({ tau::build_bf_neq(x(), q1()) }) );
+		// violated ones decline: the value would be the typed end itself
+		CHECK( !dlo({ tau::build_bf_nlt(x(), q1()) }).has_value() );
+		CHECK( !dlo({ tau::build_bf_nlt(q0(), x()) }).has_value() );
+		CHECK( !dlo({ neg(tau::build_bf_lt(x(), q1())) }).has_value() );
+		CHECK( !dlo({ tau::build_bf_eq(x(), q1()) }).has_value() );
+	}
+
+	TEST_CASE("constants other than finite singletons decline") {
+		CHECK( !dlo({ atom("x : qlt < {(0, 1)}:qlt.") }).has_value() );
+		CHECK( !dlo({ atom("x : qlt < {(0, 1) | (2, 3)}:qlt.") })
+			.has_value() );
+		// a named endpoint is a singleton, but not a finite one
+		CHECK( !dlo({ atom("x : qlt < {a}:qlt.") }).has_value() );
+	}
+
+	TEST_CASE("an atom outside the ordering fragment declines") {
+		CHECK( !dlo({ atom("x : qlt < y : qlt || y : qlt < x : qlt.") })
+			.has_value() );
+	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	TEST_CASE("an unread disequality over another algebra is skipped") {
+		auto sol = dlo({ atom("x : qlt > {1}:qlt."),
+			atom("{a}:sbf w != 0.") });
+		REQUIRE( sol.has_value() );
+		CHECK( check_solution<node_t>(atom("x : qlt > {1}:qlt."),
+			sol.value()) );
+	}
+#endif
+}
+
+// Fourier-Motzkin elimination of an existential qlt variable bounded on both
+// sides by other terms: every lower bound meets every upper bound, strictly
+// iff either bound is strict. A body outside the fragment gives nullptr.
+TEST_SUITE("qlt residual elimination") {
+
+	tref wff(const char* src) {
+		return get_nso_rr<node_t>(tau::get(src).value_or(nullptr))
+			.value().main->get();
+	}
+	// the variable node of `x : qlt`
+	tref var_x() {
+		return tau::get(tau::get(wff("x : qlt < y : qlt."))[0].first())
+			.first();
+	}
+	tref residual(const char* body) {
+		return qlt_dlo_fm_residual<node_t>(var_x(), wff(body));
+	}
+	bool eliminates_to(const char* body, const char* expected) {
+		tref r = residual(body);
+		return r && tau::get(r) == tau::get(wff(expected));
+	}
+
+	TEST_CASE("bounds with the variable on the right are normalised") {
+		CHECK( eliminates_to("b : qlt > x : qlt && a : qlt < x : qlt.",
+			"a : qlt < b : qlt.") );
+		CHECK( eliminates_to("a : qlt <= x : qlt && x : qlt < b : qlt.",
+			"a : qlt < b : qlt.") );
+		CHECK( eliminates_to("b : qlt >= x : qlt && a : qlt <= x : qlt.",
+			"a : qlt <= b : qlt.") );
+	}
+
+	TEST_CASE("negated bounds are flipped") {
+		CHECK( eliminates_to(
+			"!(x : qlt <= a : qlt) && !(x : qlt >= b : qlt).",
+			"a : qlt < b : qlt.") );
+		CHECK( eliminates_to(
+			"!(x : qlt > b : qlt) && !(x : qlt < a : qlt).",
+			"a : qlt <= b : qlt.") );
+	}
+
+	TEST_CASE("nXX spellings are read as their positive forms") {
+		CHECK( eliminates_to("x : qlt !< a : qlt && x : qlt !> b : qlt.",
+			"a : qlt <= b : qlt.") );
+		CHECK( eliminates_to(
+			"x : qlt !<= a : qlt && x : qlt !>= b : qlt.",
+			"a : qlt < b : qlt.") );
+	}
+
+	TEST_CASE("bodies outside the fragment are left alone") {
+		// an equality needs no elimination, a disequality a case split
+		CHECK( residual("a : qlt < x : qlt && x : qlt = b : qlt.")
+			== nullptr );
+		CHECK( residual("a : qlt < x : qlt && x : qlt != b : qlt.")
+			== nullptr );
+		// a conjunct without the variable
+		CHECK( residual(
+			"a : qlt < x : qlt && x : qlt < b : qlt && a : qlt < c : qlt.")
+			== nullptr );
+		// the variable on both sides
+		CHECK( residual(
+			"a : qlt < x : qlt && x : qlt < x : qlt & b : qlt.")
+			== nullptr );
+		// the variable inside a compound term
+		CHECK( residual("a : qlt < x : qlt' && x : qlt < b : qlt.")
+			== nullptr );
+	}
+}
