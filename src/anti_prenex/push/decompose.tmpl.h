@@ -6,17 +6,17 @@
  * procedure means; the comments here say how it is built.
  *
  * The pieces come from the files below: `members`, `formula_size`,
- * `fv_intersect`, `without`, `complement_of` and the literal shapes
+ * `fv_intersect`, `without`, `concat`, `complement_of` and the literal shapes
  * (foundations/dag.h) for the census, the licence and the arms, `has_atom`
  * and `subst_atom` (foundations/subst.h) for the touched region and its
  * cofactors, `term_of` (foundations/terms.h) with `cof_pin`
  * (witness/witness.h) for the pin and `subst_var` (foundations/subst.h) for
- * its arm, `fold_decided` (push/expand.h) for the probe, `prio_of` and
- * `concat` (push/expand.tmpl.h) for the innermost-first order and the arms'
- * operands, the result joins (normalisers/joins.h) for every assembly,
- * `simplify` (normalisers/simplify.h) at the arm edge, `rewrap`
- * (foundations/prims.h) with `taint` (foundations/ctx.h) for the exhaustion,
- * and `push_block` — the hub, `push/push_block.h` — for every arm.
+ * its arm, `fold_decided` (push/expand.h) for the probe, `prio_of`
+ * (foundations/ctx.h) for the innermost-first order, the result joins
+ * (normalisers/joins.h) for every assembly, `simplify`
+ * (normalisers/simplify.h) at the arm edge, `rewrap` (foundations/prims.h)
+ * with `taint` (foundations/ctx.h) for the exhaustion, and `push_block` —
+ * the hub, `push/push_block.h` — for every arm.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__PUSH__DECOMPOSE_TMPL_H__
@@ -114,10 +114,8 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 		}
 		if (4 * lhs > 5 * rhs) continue;
 		return decompose_arms<node>(a,
-			simplified_and_join<node>(
-				expand_detail::concat(on_T, untouched)),
-			simplified_and_join<node>(
-				expand_detail::concat(on_F, untouched)),
+			simplified_and_join<node>(concat(on_T, untouched)),
+			simplified_and_join<node>(concat(on_F, untouched)),
 			X, c);
 	}
 	return std::nullopt;
@@ -139,8 +137,7 @@ tref decompose_arms(tref a, tref C_T, tref C_F, const block& X, ctx<node>& c) {
 	if (is_child<node>(a, tau::bf_eq)) {
 		block vs = fv_intersect<node>(term_of<node>(a, c.order), X);
 		std::ranges::sort(vs, [&c](tref l, tref r) {
-			return expand_detail::prio_of<node>(l, c)
-				> expand_detail::prio_of<node>(r, c); });
+			return prio_of<node>(l, c) > prio_of<node>(r, c); });
 		for (tref v : vs)
 			if (const std::optional<pin<node>> p =
 				cof_pin<node>(a, v, c))

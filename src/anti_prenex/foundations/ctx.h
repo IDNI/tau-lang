@@ -28,8 +28,9 @@
  * flush.
  *
  * Every function taking a `ctx` takes it by MUTABLE REFERENCE, because
- * `expand_count` is written during a push. Single-threaded, like every knob
- * and cache in the library.
+ * `expand_count` is written during a push; the two rank reads `prio_of` and
+ * `innermost` alone take it `const`. Single-threaded, like every knob and
+ * cache in the library.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__CTX_H__
@@ -104,6 +105,14 @@ struct ctx {
 	 */
 	static ctx for_component(const block& P, ba_type_id type, bool keep_functional);
 };
+
+/// `ctx.prio[x]`, inner → HIGHER (§1). Every block variable is ranked.
+template <NodeType node>
+int_t prio_of(tref x, const ctx<node>& c);
+
+/// The innermost variable of a non-empty `vs`: the highest `ctx.prio`.
+template <NodeType node>
+tref innermost(const block& vs, const ctx<node>& c);
 
 // --- taint ----------------------------------------------------------------------
 
