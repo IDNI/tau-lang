@@ -47,10 +47,11 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		if (auto cn = var_cache.find(v);
 			cn != var_cache.end())
 				return cn->second;
-		// otherwise create a new var and cache it
-		auto ref = bdd<Bool>::bit(v);
-		return var_cache.emplace(v, bdd_handle<Bool>::get(ref))
-			.first->second;
+		// otherwise create a new var and cache it, unless a full bdd
+		// node table made it F
+		auto h = bdd_handle<Bool>::get(bdd<Bool>::bit(v));
+		if (bdd_node_table_exhausted) return h;
+		return var_cache.emplace(v, h).first->second;
 	}
 	default:
 		auto o = (n | tt::children)();
@@ -101,6 +102,10 @@ result<typename node<BAs...>::constant_with_type> parse_sbf(
 	auto t = sbf_parser::tree::traverser(parsed.get_shaped_tree2())
 							| sbf_parser::sbf;
 	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
+	// a constant built on a full bdd node table is not the source's value
+	if (bdd_node_table_exhausted)
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			std::variant<BAs...>{ v }, sbf_type<node<BAs...>>() });
 	return r.with_value(typename node<BAs...>::constant_with_type{
 		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
 		sbf_type<node<BAs...>>() });

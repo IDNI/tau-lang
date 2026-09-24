@@ -386,6 +386,15 @@ size_t tree<node>::m_size() {
 }
 
 template <NodeType node>
+void tree<node>::clear_caches() {
+	std::unique_lock lock(bintree<node>::mutex());
+	std::unordered_set<tref> interned;
+	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n.get());
+	for (const auto& cb : bintree<node>::gc_callbacks) cb({});
+	for (const auto& cb : bintree<node>::gc_callbacks) cb(interned);
+}
+
+template <NodeType node>
 htref tree<node>::geth(const tree& n) {
 	return geth(n.get());
 }

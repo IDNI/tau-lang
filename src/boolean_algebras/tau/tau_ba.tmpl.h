@@ -493,7 +493,8 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	if (!simplified.has_value()) return fm;
 	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
 	std::lock_guard<std::mutex> lock(cache::mtx());
-	cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
+	if (!bdd_node_table_exhausted)
+		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
 	return out;
 }
 
@@ -515,7 +516,8 @@ tref normalize_for_splitter(const rr<node>& nso_rr) {
 	auto normalized = normalizer<node>(nso_rr);
 	tref result = normalized.has_value() ? normalized.value() : nullptr;
 	std::lock_guard<std::mutex> lock(cache::mtx());
-	cache::splitter_normalize_memo().emplace(nso_rr, result);
+	if (!bdd_node_table_exhausted)
+		cache::splitter_normalize_memo().emplace(nso_rr, result);
 	return result;
 }
 

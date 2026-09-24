@@ -35,6 +35,7 @@
 #ifndef __IDNI__TAU__TAU_MEMORY_BUDGET_H__
 #define __IDNI__TAU__TAU_MEMORY_BUDGET_H__
 
+#include "backends/bdds/babdd.h"
 #include "env_limits.h"
 #include "tau_diagnostics.h"
 #include "tau_tree.h"
@@ -167,6 +168,32 @@ private:
 	static int& depth() { static thread_local int d = 0; return d; }
 };
 
+/// Nesting depth of @ref with_budget calls on this thread.
+inline int& with_budget_depth() {
+	static thread_local int depth = 0;
+	return depth;
+}
+
+/**
+ * @brief Whether a bdd node table filled since the last boundary; if so,
+ * readies the process for the next unit of work.
+ *
+ * The work that filled the table computed with F in place of the nodes that
+ * did not fit (see @ref bdd_node_table_exhausted), and its unknown values may
+ * sit in any tree cache. The bdd memos, handle tables and constant caches took
+ * no write meanwhile, so emptying the tree caches and lowering the flag is
+ * enough: the next unit of work runs normally, and fails the same way only if
+ * it too needs a new node. Call it only where no reference into a cache is
+ * held, that is, between units of work.
+ */
+template <NodeType node>
+bool take_bdd_node_table_exhausted() {
+	if (!bdd_node_table_exhausted) return false;
+	tree<node>::clear_caches();
+	bdd_node_table_exhausted = false;
+	return true;
+}
+
 /**
  * @brief Refuses @p f when the store is already at its cap, runs it otherwise.
  *
@@ -180,16 +207,37 @@ private:
  * whose `false` means "not equivalent" and a `tref` a caller will dereference
  * are all ordinary returns, so there is no sentinel a budget failure could
  * ride on without being read as an answer.
+ *
+ * A bdd node table, in contrast, fills during a call: its value is then
+ * unknown and is replaced by an error. Only the outermost call recovers
+ * (@ref take_bdd_node_table_exhausted); a nested one leaves the flag up, so
+ * its caller cannot turn the failure into an answer either. A call that
+ * starts with the flag already up, raised by work outside any boundary, is
+ * refused, since that work may have left unknown values in the caches.
  */
 template <NodeType node, typename F>
 std::invoke_result_t<F> with_budget(F&& f) {
+	int& depth = with_budget_depth();
+	auto exhausted = [] {
+		std::invoke_result_t<F> r;
+		r.error(code::runtime_error, messages::bdd_node_table_exhausted);
+		return r;
+	};
+	if (depth == 0 && take_bdd_node_table_exhausted<node>())
+		return exhausted();
 	if (over_tref_budget<node>()) {
 		std::invoke_result_t<F> refused;
 		refused.error(code::runtime_error, tref_budget_message<node>());
 		return refused;
 	}
 	budget_scope<node> scope;
-	return f();
+	++depth;
+	auto r = f();
+	--depth;
+	if (!bdd_node_table_exhausted) return r;
+	if (depth == 0) take_bdd_node_table_exhausted<node>();
+	r.error(code::runtime_error, messages::bdd_node_table_exhausted);
+	return r;
 }
 
 } // namespace idni::tau_lang
