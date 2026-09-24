@@ -764,6 +764,32 @@ struct api {
 	/// @copydoc valid_spec(const std::string&)
 	static result<bool> valid_spec(htref spec);
 
+	/**
+	 * @brief A minimal set of the top-level conjuncts of @p spec that is
+	 * already unsatisfiable (@p realizability false) or unrealizable
+	 * (@p realizability true, the default).
+	 *
+	 * The conjuncts are the operands of the main formula's top-level `&&`,
+	 * with `always (A && B)` split into `always A` and `always B`
+	 * (G distributes over conjunction). Both properties are monotone in
+	 * the conjunct set, so a deletion pass that drops a conjunct whenever
+	 * the rest still conflicts ends on a subset-minimal core: n + 1
+	 * decisions for n conjuncts.
+	 *
+	 * The string overload parses a full specification (definitions,
+	 * trailing '.'), as get_interpreter does.
+	 *
+	 * @return The core in source order; empty when @p spec is satisfiable
+	 *         (realizable). An error when the whole spec gets no verdict.
+	 *         A sub-check that gets no verdict keeps its conjunct and adds
+	 *         a warning: the core then still conflicts but may not be
+	 *         minimal.
+	 */
+	static result<std::vector<std::string>> unsat_core(
+		const std::string& spec, bool realizability = true);
+	/// @copydoc unsat_core(const std::string&,bool)
+	static result<trefs> unsat_core(tref spec, bool realizability = true);
+
 	// -----------------------------------------------------------------------
 	// Solving
 	// -----------------------------------------------------------------------
