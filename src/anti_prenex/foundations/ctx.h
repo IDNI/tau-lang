@@ -92,8 +92,9 @@ struct ctx {
 	/// §1 `keep_functional`: emit `∀_X`/`∃_X` symbolically instead of
 	/// discharging them. Part of the `push_memo` / `elim_memo` keys.
 	bool keep_functional = false;
-	/// §1 `expand_count`: the cases `EXPAND` has built in this component —
-	/// the one COMPONENT-scoped counter, reset to 0 at setup.
+	/// §1 `expand_count`: the cases `EXPAND` and `DECOMPOSE_ARMS` have built
+	/// in this component — the one COMPONENT-scoped counter, reset to 0 at
+	/// setup.
 	size_t expand_count = 0;
 
 	/**

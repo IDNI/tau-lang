@@ -452,9 +452,10 @@ TEST_CASE("K2: a branch that decides T leaves the later copies unbuilt") {
 TEST_CASE("K3: `ctx.case_max` refuses a wider case pin, and the floor "
 	"expands") {
 	// The knob is read off the component's ctx, which copies it at setup,
-	// so the fixture is made under the guard. With no case pin left, the
-	// floor expands the disjunction: each case holds its branch's pin as a
-	// plain conjunct, so `x` settles and the leaf resolves it.
+	// so the fixture is made under the guard. With no case pin left, and no
+	// literal member for the decomposition's census, the floor expands the
+	// disjunction: each case holds its branch's pin as a plain conjunct, so
+	// `x` settles and the leaf resolves it.
 	case_max_guard cap(1);
 	fixture f = make("ex x (((c = 0 && x = a) || (c' = 0 && x = b)) "
 		"&& x y = 0).");
@@ -472,9 +473,10 @@ TEST_CASE("R1: a conjunction no cheaper step takes is expanded") {
 	// `x` sits in a disjunction, so nothing settles; 2a is refuted by the
 	// positives in it and 2b by the negative; the positives are
 	// consistent; neither disjunct pins `x`, so there is no pin and no
-	// case pin. The floor expands the disjunction into two cases, neither
-	// dead nor `T`: `x·y = 0 ∧ x·z ≠ 0`, then `x·w = 0` under `x·y ≠ 0`,
-	// each a clause of literals that settles and resolves at the leaf.
+	// case pin; no atom is both-signed, so the decomposition declines. The
+	// floor expands the disjunction into two cases, neither dead nor `T`:
+	// `x·y = 0 ∧ x·z ≠ 0`, then `x·w = 0` under `x·y ≠ 0`, each a clause of
+	// literals that settles and resolves at the leaf.
 	fixture f = make("ex x ((x y = 0 || x w = 0) && x z != 0).");
 	const ap::incidence_result<node_t> inc =
 		ap::incidence<node_t>(ap::members<node_t>(f.clause), f.P);

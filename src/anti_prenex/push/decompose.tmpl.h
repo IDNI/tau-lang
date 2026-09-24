@@ -11,8 +11,8 @@
  * and `subst_atom` (foundations/subst.h) for the touched region and its
  * cofactors, `term_of` (foundations/terms.h) with `cof_pin`
  * (witness/witness.h) for the pin and `subst_var` (foundations/subst.h) for
- * its arm, `fold_decided` with `EXPAND`'s rank and list helpers
- * (push/expand.h) for the probe, the innermost-first order and the arms'
+ * its arm, `fold_decided` (push/expand.h) for the probe, `prio_of` and
+ * `concat` (push/expand.tmpl.h) for the innermost-first order and the arms'
  * operands, the result joins (normalisers/joins.h) for every assembly,
  * `simplify` (normalisers/simplify.h) at the arm edge, `rewrap`
  * (foundations/prims.h) with `taint` (foundations/ctx.h) for the exhaustion,
@@ -89,16 +89,14 @@ std::optional<tref> try_decompose(tref psi, const block& X, ctx<node>& c) {
 	for (size_t i = 0; i < n; ++i)
 		cands.push_back(tau::trim_right_sibling(ranked[i].first));
 
-	// PROBE FIRST: a candidate proven `F` erases every occurrence without a
-	// guard or an arm, and the smaller body re-enters the ladder
-	// (invariant 8); the wrapper narrows `X` to what it holds.
+	// PROBE FIRST. The wrapper narrows `X` to what the folded body holds.
 	for (tref a : cands)
 		if (!fold_decided<node>({ a }, X, c))
 			return push_block<node>(simplify<node>(
 				subst_atom<node>(psi, a, false), c.order), X, c);
 
 	// THE LICENCE on BUILT cofactors of the touched region,
-	// `Σ|m[a ↦ T]| + |m[a ↦ F]| ≤ Σ|m| + Σ|m|/4` in integers: the
+	// `Σ|m[a ↦ T]| + |m[a ↦ F]| ≤ Σ|m| + Σ|m|/4` multiplied out by 4: the
 	// untouched conjuncts are one shared subtree in both arms.
 	for (tref a : cands) {
 		trefs on_T, on_F, untouched;

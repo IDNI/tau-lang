@@ -142,8 +142,7 @@ tref expand(tref psi, const block& X, ctx<node>& c) {
 	DBG(assert(!S.empty());)
 
 	// THE DISJUNCT whose innermost variable is outermost, then the fewest
-	// members, then content order — fixed by content, so converging states
-	// expand alike and their keys collide.
+	// members, then content order.
 	auto key = [&](tref d) {
 		const block vs = fv_intersect<node>(d, X);
 		return std::pair<int_t, size_t>{ vs.empty() ? 0

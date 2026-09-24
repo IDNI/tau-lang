@@ -252,8 +252,7 @@ std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c) {
 	const tref f = term_of<node>(m, c.order);
 	if (f == nullptr) return {};
 	// A term not mentioning `x` pins nothing, and `COF` Debug-asserts
-	// against such a vacuous entry. The binary search over the cached
-	// free-variable set (simplify.tmpl.h).
+	// against such a vacuous entry.
 	if (!detail::free_in<node>(f, x)) return {};
 	const cof_entry e = cof<node>(f, x, c);
 	if (!e.pin) return {};
