@@ -32,6 +32,13 @@ void check_verdict(const std::string& cmd, const std::string& fm,
 	CHECK(*v == expected);
 }
 
+#ifdef TAU_PACK_HAS_BA_BV
+// Two formulas normalization leaves undecided: a functional quantifier over
+// a bv arithmetic body.
+const std::string undecided_a = "(fex x (x + y:bv[4])) = 0";
+const std::string undecided_b = "(fex x (x * w:bv[4])) = 1";
+#endif // TAU_PACK_HAS_BA_BV
+
 } // namespace
 
 #ifdef TAU_PACK_HAS_BA_BV
@@ -48,6 +55,147 @@ TEST_SUITE("an undecided formula gives no verdict (issue #141)") {
 	// One satisfiable disjunct decides the disjunction.
 	TEST_CASE("a satisfiable disjunct outweighs an undecided one") {
 		check_verdict("sat", "(fex x (x + y:bv[4])) = 0 || z = 0", true);
+	}
+
+	// Two undecided disjuncts and no satisfiable one: the first no-verdict
+	// is the result, the second does not replace it.
+	TEST_CASE("two undecided disjuncts give no verdict") {
+		CHECK(!verdict("sat", undecided_a + " || " + undecided_b)
+			.has_value());
+		CHECK(!verdict("sat", "(always (o1[t]:bv[4] = 0 && "
+			+ undecided_a + ")) || (always (o2[t]:bv[4] = 0 && "
+			+ undecided_b + "))").has_value());
+	}
+
+	// valid of a conjunction asks is_tau_impl about the negation, a
+	// disjunction of two undecided disjuncts.
+	TEST_CASE("valid of two undecided conjuncts gives no verdict") {
+		auto r = tau_api::valid(undecided_a + " && " + undecided_b);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::solver_error));
+	}
+
+	// The negated equivalence splits into disjuncts that are all undecided.
+	TEST_CASE("equivalence with an undecided side gives no verdict") {
+		auto f1 = tau_api::get_formula(undecided_a);
+		auto f2 = tau_api::get_formula("z = 0");
+		REQUIRE(f1.has_value());
+		REQUIRE(f2.has_value());
+		auto r = are_tau_equivalent<node_t>(f1.value(), f2.value());
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::solver_error));
+		// control: the same formula is equivalent to itself
+		auto same = are_tau_equivalent<node_t>(f1.value(), f1.value());
+		REQUIRE(same.has_value());
+		CHECK(same.value());
+	}
+
+	// An undecided step of an always run is no verdict, not a refutation.
+	TEST_CASE("an undecided always run gives no verdict") {
+		CHECK(!verdict("sat", "always (o1[t]:bv[4] = 0 && "
+			+ undecided_a + ")").has_value());
+		// control: the decidable run
+		check_verdict("sat", "always o1[t]:bv[4] + o2[t] = 0", true);
+	}
+
+	// Lowering the log level to debug does not change the verdict of an
+	// undecided formula.
+	TEST_CASE("debug logging leaves the undecided verdict unchanged") {
+		const auto level = logging::level();
+		logging::debug();
+		auto r = tau_api::sat(undecided_a);
+		logging::set_filter(level);
+		CHECK(!r.has_value());
+	}
+}
+
+TEST_SUITE("unsat_core of undecided and edge-case inputs") {
+
+	std::string core_str(const trefs& core) {
+		std::string s;
+		for (tref c : core) s += tau_api::to_str(c) + "; ";
+		return s;
+	}
+
+	std::string core_str(const std::vector<std::string>& core) {
+		std::string s;
+		for (const auto& c : core) s += c + "; ";
+		return s;
+	}
+
+	std::string report_str(const auto& r) {
+		std::ostringstream os;
+		os << r.report();
+		return os.str();
+	}
+
+	TEST_CASE("a null or non-formula input is an invalid argument") {
+		auto n = tau_api::unsat_core(tref(nullptr), false);
+		CHECK(!n.has_value());
+		CHECK(report_has_code(n.report(), code::invalid_argument));
+		auto term = tau_api::get_formula_or_term("x & y");
+		REQUIRE(term.has_value());
+		auto t = tau_api::unsat_core(term.value(), false);
+		CHECK(!t.has_value());
+		CHECK(report_has_code(t.report(), code::invalid_argument));
+		CHECK(report_str(t).find("Invalid formula") != std::string::npos);
+	}
+
+	// A bare formula, not a spec root, is its own main formula; with
+	// realizability off the core is an unsatisfiable subset.
+	TEST_CASE("the core of a bare unsatisfiable formula") {
+		auto fm = tau_api::get_formula(
+			"x & y = 1 && w = 0 && x | y = 0");
+		REQUIRE(fm.has_value());
+		auto core = tau_api::unsat_core(fm.value(), false);
+		REQUIRE(core.has_value());
+		CAPTURE(core_str(core.value()));
+		CHECK(core.value().size() == 2);
+		auto none = tau_api::unsat_core(
+			tau_api::get_formula("x = 0 && y = 1").value(), false);
+		REQUIRE(none.has_value());
+		CHECK(none.value().empty());
+	}
+
+	// Parenthesized conjuncts and an always nested in an always split into
+	// the same conjuncts as their flat form.
+	TEST_CASE("parenthesized and nested always conjuncts") {
+		auto core = tau_api::unsat_core(
+			"(always o1[t] & o2[t] = 1 && always o3[t] = 0)"
+			" && always (always o1[t] | o2[t] = 0 && o4[t] = 0).",
+			false);
+		REQUIRE(core.has_value());
+		CAPTURE(core_str(core.value()));
+		CHECK(core.value().size() == 2);
+	}
+
+	// A sub-check without a verdict keeps its conjunct and warns; the
+	// conflicting pair is still found.
+	TEST_CASE("an undecided sub-check keeps its conjunct and warns") {
+		for (bool realizability : { false, true }) {
+			CAPTURE(realizability);
+			auto core = tau_api::unsat_core("a & b = 1 && a | b = 0"
+				" && (fex x (x * y:bv[4])) = 0.", realizability);
+			REQUIRE(core.has_value());
+			CAPTURE(core_str(core.value()));
+			CHECK(core.value() == std::vector<std::string>{
+				"ab = 1", "a|b = 0" });
+			CHECK(report_str(core).find("no verdict for a subset")
+				!= std::string::npos);
+		}
+	}
+
+	// No verdict for the whole spec is an error, not an empty core.
+	TEST_CASE("an undecided spec has no core") {
+		for (bool realizability : { false, true }) {
+			CAPTURE(realizability);
+			auto core = tau_api::unsat_core(undecided_a + ".",
+				realizability);
+			CHECK(!core.has_value());
+			CHECK(report_has_code(core.report(), code::solver_error));
+			CHECK(report_str(core).find("has no core")
+				!= std::string::npos);
+		}
 	}
 }
 #endif // TAU_PACK_HAS_BA_BV
