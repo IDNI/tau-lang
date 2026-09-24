@@ -41,6 +41,7 @@ set(TESTS
 	bv_definitional_elimination
 	functional_continuation
 	factorized_continuation
+	functional_step
 )
 
 foreach(X IN LISTS TESTS)

@@ -682,3 +682,12 @@ add_test(NAME "test_repl-run_cmd-factorized_continuation_shadow"
 set_tests_properties("test_repl-run_cmd-factorized_continuation_shadow" PROPERTIES
 	PASS_REGULAR_EXPRESSION "kept [1-9], warm-ups [1-9], mismatches 0, undecided 0"
 	FAIL_REGULAR_EXPRESSION "Error")
+
+# The step of a specification of functional shape evaluated from its
+# definitions, in the shadow mode: the solver decides, and the evaluated
+# values must be the solved ones.
+add_test(NAME "test_repl-run_cmd-functional_step_shadow"
+	COMMAND bash -c "printf 'set charvar off\\nrun 4 steps always ((o1[0]:bv[8] = { 0 }:bv[8]) && (o1[t]:bv[8] = o1[t-1]:bv[8] + { 1 }:bv[8]) && (o3[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8]) && ((o3[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8]))).\\n1\\n5\\n2\\nq\\n' | TAU_FUNCTIONAL_STEP_EVALUATION=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X 2>&1")
+set_tests_properties("test_repl-run_cmd-functional_step_shadow" PROPERTIES
+	PASS_REGULAR_EXPRESSION "steps [1-9], fallbacks 0, mismatches 0, undecided 0"
+	FAIL_REGULAR_EXPRESSION "Error")

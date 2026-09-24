@@ -803,6 +803,8 @@ opts the codegen test suite into a minutes-long real `cmake` build.
 
 **Factorized continuation.** `TAU_FACTORIZED_CONTINUATION` governs the form of the unbounded continuation of a specification of functional shape (see `TAU_FUNCTIONAL_CONTINUATION`) and its warm-up: `0` normalizes the continuation as one formula, whose disjunctive normal form multiplies the cases of the definitions along the chains of definitions reading each other, and warms every part up by quantifying the coordinates not yet reached and eliminating them, `1` (the default) normalizes the continuation conjunct by conjunct, keeps the conjunction, which is the form the interpreter grounds and solves at every step, and warms a part of the shape up by keeping the conjuncts of the reached coordinates alone, which is what the elimination returns for such a part (before the last initial condition of the specification, and after an update, every part is eliminated), `2` is the shadow mode, which computes both forms and both warm-ups, lets the one formula and the elimination decide, and counts every disagreement the normalizer finds and every equivalence it cannot decide, reported at exit together with the number of continuations and warm-ups kept when the variable is set. The line printed when the fixpoint is reached shows the form that is kept.
 
+**Functional step evaluation.** `TAU_FUNCTIONAL_STEP_EVALUATION` governs how the step of a specification of functional shape (see `TAU_FUNCTIONAL_CONTINUATION`) is computed: `0` solves the step formula, `1` (the default) evaluates the outputs of the time point from the definitions the shape reads off the specification, in the order in which the definitions read each other, where every part of the specification is of the shape, once the continuation is used verbatim and after the last initial condition (a guard literal is normalized at the values it reads, the cell whose literals all fail forces the output, and its witness is folded by normalizing its equation with the output, or, where the algebra writes that equation as a term equated with zero, by solving the one equation; a literal the normalizer does not decide or a witness that yields no constant returns the step to the solver, as does a part revised by an update; the evaluation applies while every part has one alternative and the specification does not read the `this` stream), `2` is the shadow mode, which evaluates as well, lets the solver decide every step, and counts every output whose evaluated value the normalizer finds different from the solved one, and every one whose equality it does not decide, reported at exit together with the number of steps evaluated and of steps returned to the solver when the variable is set.
+
 **Execution**: when the interpreter pipeline is given a realizable LTL formula,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
 `G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
@@ -1105,6 +1107,10 @@ check and the constant closure without deciding the implication between the two 
 (`TAU_FUNCTIONAL_CONTINUATION`, see the environment variables below). Such a
 continuation is kept as the conjunction of its conjuncts' normal forms, and its
 warm-up keeps the conjuncts of the reached coordinates (`TAU_FACTORIZED_CONTINUATION`).
+Once the continuation is used verbatim and after the last initial condition, the step of
+such a specification is not solved either: its outputs are evaluated from the definitions, in the order in which they read each other, the cell whose guard
+literals fail at the values read forcing the output to its witness
+(`TAU_FUNCTIONAL_STEP_EVALUATION`).
 
 It is not always the case that the values which can be assigned to outputs are unique.
 For this reason, a single specification can give rise to a multitude of different programs
