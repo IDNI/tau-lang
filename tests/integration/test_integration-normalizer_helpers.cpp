@@ -27,6 +27,13 @@ tref bf(const char* s) { return tau::get(s, parse_bf()).value_or(nullptr); }
 
 std::string str(tref n) { return n ? tau::get(n).to_str() : "<null>"; }
 
+// The variable node named `name` as it is spelled in `fm`, type included.
+tref var_in(tref fm, const std::string& name) {
+	return tau::get(fm).find_top([&name](tref n) {
+		return tau::get(n).is(tau::variable)
+			&& tau::get(n).to_str() == name; });
+}
+
 } // namespace
 
 // --- denorm_equation (report 4.1: no direct test) -----------------------------
@@ -420,6 +427,124 @@ TEST_SUITE("term Boole decomposition over function symbols") {
 	TEST_CASE("two function symbols in one term") {
 		tref fm = wff("g(y) h(z) = 0");
 		auto res_r = term_boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
+		REQUIRE( res != nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+}
+
+// --- bf_var_dependence and the outcomes it settles ----------------------------
+
+// syntactic_variable_simplification settles an atom's sides from a BDD of the
+// side with the variable on top when it can (bf_var_dependence), and falls
+// back to the reduced cofactors when the BDD answers unknown: for a term with
+// a constant, or for a BDD past its node cap.
+TEST_SUITE("syntactic_variable_simplification outcomes") {
+
+	// The BDD is built from 0, 1, variables and the Boolean operations only,
+	// so a constant in the term makes it answer unknown, and the reduced
+	// cofactors decide instead. Here both are 1: the left-hand side is 1,
+	// without being the constant 1, and the equation says 1 = 0.
+	TEST_CASE("a left-hand side the BDD cannot build whose cofactors are 1") {
+		tref atom = wff("x:bv[8] & y:bv[8] | x:bv[8]' | y:bv[8]' | { 3 }:bv[8] = { 0 }:bv[8]");
+		REQUIRE( atom != nullptr );
+		tref x = var_in(atom, "x");
+		REQUIRE( x != nullptr );
+		CHECK( bf_var_dependence<node_t>(tau::get(atom)[0].first(),
+			tau::get(tau::bf, x)) == bf_dependence::unknown );
+		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		REQUIRE( res != nullptr );
+		CHECK( !contains<node_t>(res, x) );
+		CHECK( are_nso_equivalent<node_t>(res, tau::_F()) );
+	}
+
+	// Over a bitvector type `<` is a linear order and stays an atom (over a
+	// Boolean algebra the parser rewrites it into equations), so these
+	// cases are the ones that reach the right-hand side.
+
+	// The right-hand side of an order atom that is 0 as a Boolean function
+	// becomes the constant 0: z < 0 has no solution.
+	TEST_CASE("a right-hand side that is a contradiction becomes 0") {
+		tref atom = wff("z:bv[8] < x:bv[8] & y:bv[8] & (x:bv[8]' | y:bv[8]')");
+		REQUIRE( atom != nullptr );
+		tref x = var_in(atom, "x");
+		REQUIRE( x != nullptr );
+		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		REQUIRE( res != nullptr );
+		CHECK( !contains<node_t>(res, x) );
+		CHECK( are_nso_equivalent<node_t>(res, tau::_F()) );
+	}
+
+	// A constant again: both reduced cofactors are 0, so the side is 0.
+	TEST_CASE("a right-hand side the BDD cannot build whose cofactors are 0") {
+		tref atom = wff("z:bv[8] < x:bv[8] & y:bv[8] & (x:bv[8]' | y:bv[8]') & { 3 }:bv[8]");
+		REQUIRE( atom != nullptr );
+		tref x = var_in(atom, "x");
+		REQUIRE( x != nullptr );
+		CHECK( bf_var_dependence<node_t>(tau::get(atom)[0].second(),
+			tau::get(tau::bf, x)) == bf_dependence::unknown );
+		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		REQUIRE( res != nullptr );
+		CHECK( !contains<node_t>(res, x) );
+		CHECK( are_nso_equivalent<node_t>(res, tau::_F()) );
+	}
+
+	// Same, with both cofactors 1: the side is 1, the largest value.
+	TEST_CASE("a right-hand side the BDD cannot build whose cofactors are 1") {
+		tref atom = wff("z:bv[8] < x:bv[8] & y:bv[8] | x:bv[8]' | y:bv[8]' | { 3 }:bv[8]");
+		REQUIRE( atom != nullptr );
+		tref x = var_in(atom, "x");
+		REQUIRE( x != nullptr );
+		CHECK( bf_var_dependence<node_t>(tau::get(atom)[0].second(),
+			tau::get(tau::bf, x)) == bf_dependence::unknown );
+		tref res = syntactic_variable_simplification<node_t>(atom, x);
+		REQUIRE( res != nullptr );
+		CHECK( !contains<node_t>(res, x) );
+		CHECK( are_nso_equivalent<node_t>(res,
+			wff("z:bv[8] < { 255 }:bv[8]")) );
+	}
+
+	// (a1 b1 | ... | an bn) has a BDD of about 2^n nodes when every a comes
+	// before every b in the variable order or every b before every a. The
+	// order follows the first visit of each variable, so the conjunction
+	// of all of them, placed at both ends, fixes one of the two whichever
+	// operand is built first. Past the node cap the answer is unknown,
+	// even though the term depends on x; a small instance of the same
+	// shape is decided.
+	TEST_CASE("a BDD past the node cap answers unknown") {
+		auto term = [](size_t n) {
+			std::string order = "x", pairs = "x";
+			for (size_t i = 1; i <= n; ++i) order += " a" + std::to_string(i);
+			for (size_t i = 1; i <= n; ++i) order += " b" + std::to_string(i);
+			for (size_t i = 1; i <= n; ++i)
+				pairs += " | a" + std::to_string(i) + " b" + std::to_string(i);
+			return bf((order + " | " + pairs + " | " + order).c_str());
+		};
+		tref small = term(3), large = term(17);
+		REQUIRE( small != nullptr );
+		REQUIRE( large != nullptr );
+		// x as the term spells it: the leftmost variable, in its bf node
+		tref x = tau::get(small).find_top([](tref n) {
+			return tau::get(n).is(tau::bf)
+				&& tau::get(n).child_is(tau::variable); });
+		REQUIRE( x != nullptr );
+		REQUIRE( tau::get(x)[0].to_str() == "x" );
+		CHECK( bf_var_dependence<node_t>(small, x) == bf_dependence::depends );
+		CHECK( bf_var_dependence<node_t>(large, x) == bf_dependence::unknown );
+	}
+}
+
+// --- Boole decomposition on an atom that is gone after a substitution ---------
+
+// Once x = 0 is decided, y = 0 no longer occurs in the (x, y) disjunct, so
+// decomposing on it later gives the same formula on both sides; the result
+// must still be the input's Boole normal form.
+TEST_SUITE("boole_normal_form with atoms removed by an earlier split") {
+
+	TEST_CASE("two disjuncts of two disequalities") {
+		tref fm = wff("(x != 0 && y != 0) || (z != 0 && w != 0)");
+		auto res_r = boole_normal_form<node_t>(fm);
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
 		REQUIRE( res != nullptr );
