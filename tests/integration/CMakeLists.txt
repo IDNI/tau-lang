@@ -40,6 +40,7 @@ set(TESTS
 	bv_case_split
 	bv_definitional_elimination
 	functional_continuation
+	factorized_continuation
 )
 
 foreach(X IN LISTS TESTS)

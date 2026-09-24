@@ -674,3 +674,11 @@ add_test(NAME "test_repl-run_cmd-functional_shape_then_normalize"
 set_tests_properties("test_repl-run_cmd-functional_shape_then_normalize" PROPERTIES
 	PASS_REGULAR_EXPRESSION "always o3\\[t\\]:bv\\[8\\] = i1\\[t\\]:bv\\[8\\]"
 	FAIL_REGULAR_EXPRESSION "Error")
+# The continuation kept as a conjunction and the warm-up kept from the
+# functional shape, in the shadow mode: the one formula and the elimination
+# decide and must agree.
+add_test(NAME "test_repl-run_cmd-factorized_continuation_shadow"
+	COMMAND bash -c "printf 'set charvar off\\nrun 3 steps always ((o1[0]:bv[8] = { 0 }:bv[8]) && (o1[t]:bv[8] = o1[t-1]:bv[8] + { 1 }:bv[8]) && (o3[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8]) && ((o3[t]:bv[8] > { 3 }:bv[8]) ? (o2[t]:bv[8] = { 1 }:bv[8]) : (o2[t]:bv[8] = { 0 }:bv[8]))).\\n1\\n5\\nq\\n' | TAU_FACTORIZED_CONTINUATION=2 $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X 2>&1")
+set_tests_properties("test_repl-run_cmd-factorized_continuation_shadow" PROPERTIES
+	PASS_REGULAR_EXPRESSION "kept [1-9], warm-ups [1-9], mismatches 0, undecided 0"
+	FAIL_REGULAR_EXPRESSION "Error")
