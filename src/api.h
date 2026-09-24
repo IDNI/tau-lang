@@ -185,8 +185,9 @@ struct api {
 	static void set_cqe_max_clauses(size_t n);
 	/**
 	 * @brief Above this many distinct variables a pure-equality bitvector
-	 * partition goes to the pack solver instead of the `lgrs` route, whose
-	 * Boole expansion is exponential in them (default 8; 0 = unlimited).
+	 * partition goes to the pack solver instead of being squeezed per width
+	 * and solved algebraically (`find_solution`), whose Boole expansion is
+	 * exponential in them (default 8; 0 = unlimited).
 	 */
 	static void set_lgrs_max_vars(size_t n);
 	/**
@@ -311,9 +312,6 @@ struct api {
 	 * environment fallback (default 60) applies again. Values above one
 	 * day clamp.
 	 */
-	/// sat() past its simplify/flatten prefix, for callers (realizable)
-	/// that already simplified and flattened `fm`.
-	static result<bool> sat_prepared(tref fm);
 	static void set_ltl_timeout_sec(long seconds);
 	/**
 	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
@@ -375,6 +373,26 @@ struct api {
 	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
 	/// interpreter's sweep (0 = no pinning; tau_ba.h). Default 4096.
 	static void set_ba_decision_pins(size_t n);
+	/**
+	 * @brief Set an option an algebra of the pack declares about itself,
+	 * named `<family>-<option>` as on the command line without its dashes
+	 * (`bv-widening`, `bv-defelim-max-atoms`, `qlt-t3-cap`) and as in the
+	 * REPL `set` command.
+	 *
+	 * A flag is switched on by a non-zero @p value; a count takes @p value.
+	 * The value is the option's value afterwards, which differs from
+	 * @p value where the option clamps or ignores it (`bv-max-width 0`).
+	 * An error, and nothing changes, when no algebra of the pack declares
+	 * @p name.
+	 */
+	static result<size_t> set_ba_option(const std::string& name,
+		size_t value);
+	/// The value of a BA-declared option (a flag reads 0 or 1); an error
+	/// when no algebra of the pack declares @p name.
+	static result<size_t> get_ba_option(const std::string& name);
+	/// The `<family>-<option>` names of every BA-declared option of the
+	/// pack.
+	static std::vector<std::string> ba_option_names();
 	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
 	/// Enable or disable ANSI colour in engine output, the same switch
@@ -754,6 +772,9 @@ struct api {
 	static result<bool> sat(const std::string& formula);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(tref formula);
+	/// sat() past its simplify/flatten prefix, for callers (realizable)
+	/// that already simplified and flattened `fm`.
+	static result<bool> sat_prepared(tref fm);
 	/// @copydoc sat(const std::string&)
 	static result<bool> sat(htref formula);
 

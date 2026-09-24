@@ -284,6 +284,61 @@ void api<node>::set_ba_decision_pins(size_t n) {
 	pack_set_ba_decision_pins<node>(n);
 }
 
+namespace api_detail {
+
+template <NodeType node>
+result<const ba_option*> find_ba_option(const std::string& name) {
+	result<const ba_option*> r;
+	const auto dash = name.find('-');
+	if (dash == std::string::npos || dash == 0 || dash + 1 == name.size())
+		return r.with_error(code::invalid_argument, "A BA option is "
+			"named <family>-<option>", {{ label::value, name }});
+	const auto found = pack_find_ba_option<node>(name.substr(0, dash),
+		name.substr(dash + 1));
+	switch (found.status) {
+	case ba_option_lookup_status::found: return r.with_value(found.option);
+	case ba_option_lookup_status::no_such_family:
+		return r.with_error(code::not_found, "No BA of this family in "
+			"the pack", {{ label::value, name }});
+	case ba_option_lookup_status::no_such_option: break;
+	}
+	return r.with_error(code::not_found, "The BA declares no such option",
+		{{ label::value, name }});
+}
+
+inline size_t ba_option_value(const ba_option& o) {
+	return o.kind == ba_option_kind::flag ? (size_t) o.get_flag()
+		: o.get_count();
+}
+
+} // namespace api_detail
+
+template <NodeType node>
+result<size_t> api<node>::set_ba_option(const std::string& name,
+	size_t value)
+{
+	result<size_t> r;
+	TAU_TRY(const ba_option* o, api_detail::find_ba_option<node>(name));
+	if (o->kind == ba_option_kind::flag) o->set_flag(value != 0);
+	else o->set_count(value);
+	return r.with_value(api_detail::ba_option_value(*o));
+}
+
+template <NodeType node>
+result<size_t> api<node>::get_ba_option(const std::string& name) {
+	result<size_t> r;
+	TAU_TRY(const ba_option* o, api_detail::find_ba_option<node>(name));
+	return r.with_value(api_detail::ba_option_value(*o));
+}
+
+template <NodeType node>
+std::vector<std::string> api<node>::ba_option_names() {
+	std::vector<std::string> names;
+	for (const auto& e : pack_ba_options<node>())
+		names.push_back(e.family + "-" + e.option.name);
+	return names;
+}
+
 template <NodeType node>
 void api<node>::set_highlighting(bool highlighting) {
 	pretty_printer_highlighting = highlighting;

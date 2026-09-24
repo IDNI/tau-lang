@@ -2407,7 +2407,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  maxsplits              anti-prenex per-block Boole splits   unlimited\n"
 		"  maxrounds              anti-prenex driver rounds            unlimited\n"
 		"  maxclauses             cqe DNF clauses per distributed scope unlimited\n"
-		"  lgrsmaxvars            pure-equality variables on lgrs route 8\n"
+		"  lgrsmaxvars            pure-equality vars solved algebraically 8\n"
 		"  decisionpins           decided tau-algebra rows kept alive  4096\n"
 		"  fixpointsteps          temporal-normalization fixpoint steps 500\n"
 		"  flagsteps              eventual-flag search steps           500\n"

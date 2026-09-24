@@ -1866,7 +1866,7 @@ bool is_negated_var_eq_zero(tref f) {
 /**
  * @brief True iff @p conjs is non-empty and every conjunct is a bf_eq
  * with no bv arithmetic or casts, so the bv partition can be squeezed
- * and solved algebraically per width (via lgrs) instead of via cvc5.
+ * and solved algebraically per width instead of via cvc5.
  */
 template <NodeType node>
 bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
@@ -1881,7 +1881,7 @@ bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 
 /**
  * @brief True iff the pure-equality partition @p conjs mentions more
- * distinct variables than `lgrs_max_vars` allows on the lgrs route.
+ * distinct variables than `lgrs_max_vars` allows on the algebraic route.
  */
 template <NodeType node>
 bool lgrs_route_too_wide(const subtree_set<node>& conjs) {
@@ -2068,8 +2068,8 @@ result<solution<node>> solve(tref form, solver_options options) {
 				// Read off every `var = constant` conjunct before choosing a
 				// route, substituting it into the rest until nothing new is
 				// read off: a normalized step formula is one such equation
-				// per output, and the Boole expansion of the lgrs route
-				// below is exponential in the variables it is handed
+				// per output, and the Boole expansion of the algebraic
+				// route below is exponential in the variables it is handed
 				// (GitHub #121). A conjunct that folds to F under the
 				// substitution refutes the clause; one folding to T is done.
 				subtree_map<node, tref> read_off;
@@ -2119,7 +2119,7 @@ result<solution<node>> solve(tref form, solver_options options) {
 						clause_solution[var] = value;
 					// Without arithmetic (a cast counts as arithmetic) no variable
 					// spans two widths, so each width is an independent Boolean
-					// algebra: squeeze and solve via lgrs per width.
+					// algebra: squeeze per width and find a ground zero.
 					std::map<size_t, std::optional<equality>> squeezed_by_width;
 					for (tref raw_eq : remaining) {
 						tref conj = norm_equation<node>(raw_eq);

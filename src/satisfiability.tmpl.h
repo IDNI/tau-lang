@@ -4,6 +4,7 @@
 #include "normalizer.h"
 #include "ltl_aba.h"
 #include "boolean_algebras/ba_pack_traits.h"
+#include "heuristics/preprocess_placement.h"
 
 #include <cstdlib>
 #include <functional>
@@ -40,20 +41,24 @@ inline size_t max_flag_search_steps = 500;
 /**
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
- * caps above and the LTL(ABA) knobs (`ltl_verdict_budget_fingerprint`).
- * The verdict memos in this file are keyed on the formula only and drop
- * their entries when it changes. (The semantic PWR fallback lives in
- * pointwise_revision.h, which includes this header; it steers the
- * revision, not these memos.)
+ * caps above, the master preprocessing switch, the options the algebras of
+ * the pack declare (`pack_ba_options_fingerprint`) and the LTL(ABA) knobs
+ * (`ltl_verdict_budget_fingerprint`). The verdict memos in this file are
+ * keyed on the formula only and drop their entries when it changes. (The
+ * semantic PWR fallback lives in pointwise_revision.h, which includes this
+ * header; it steers the revision, not these memos.)
  */
-inline size_t verdict_budget_fingerprint() {
+template <NodeType node>
+size_t verdict_budget_fingerprint() {
 	size_t seed = 0;
 	auto mix = [&seed](size_t v) {
 		seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 	};
 	mix(max_fixpoint_steps);
 	mix(max_flag_search_steps);
-	return ltl_verdict_budget_fingerprint(seed);
+	mix(preprocessing);
+	return ltl_verdict_budget_fingerprint(
+		pack_ba_options_fingerprint<node>(seed));
 }
 
 /**
@@ -1900,10 +1905,10 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 				subtree_pair_less<node, int_t>>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	// The continuation depends on the runtime budgets (fixpoint and flag
-	// search steps, the synthesis knobs); a budget change between two
-	// queries must not return the first one's result.
-	static size_t cache_budget = verdict_budget_fingerprint();
-	if (const size_t fp = verdict_budget_fingerprint(); fp != cache_budget)
+	// search steps, the synthesis knobs, the algebras' options); a change
+	// between two queries must not return the first one's result.
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
 		cache.clear();
 		cache_budget = fp;
@@ -2107,11 +2112,11 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	static cache_t& undecided = tree<node>::template create_cache<cache_t>();
 	// Both memos are keyed on (formula, start_time) only, while every
 	// runtime budget (max_fixpoint_steps, max_flag_search_steps, the
-	// LTL(ABA) caps and knobs, the semantic PWR fallback) can change the
+	// LTL(ABA) caps and knobs, the algebras' options) can change the
 	// verdict: `sat φ`, `set fixpointsteps 0`, `sat φ` must not return the
 	// first query's answer. Drop the entries whenever the budgets moved.
-	static size_t cache_budget = verdict_budget_fingerprint();
-	if (const size_t fp = verdict_budget_fingerprint(); fp != cache_budget)
+	static size_t cache_budget = verdict_budget_fingerprint<node>();
+	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
 		cache.clear();
 		undecided.clear();

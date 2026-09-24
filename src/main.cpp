@@ -110,11 +110,15 @@ cli::options tau_options() {
 			"elimination may distribute one scope into (0 = unlimited)");
 	opts["lgrs-max-vars"] = cli::option("lgrs-max-vars", 'g', "8")
 		.set_description("hand a pure-equality bitvector system with more "
-			"distinct variables than this to the solver instead of the "
-			"lgrs route (default 8, 0 = unlimited)");
-	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "0")
+			"distinct variables than this to the solver instead of "
+			"solving it algebraically per width (default 8, "
+			"0 = unlimited)");
+	// Must agree with max_fixpoint_steps in satisfiability.tmpl.h: the
+	// option is applied unconditionally, so its default is what every
+	// `tau` run gets.
+	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "500")
 		.set_description("cap temporal-normalization fixpoint steps "
-			"(0 = unlimited)");
+			"(default 500; 0 = unlimited)");
 	opts["max-flag-search-steps"] =
 		cli::option("max-flag-search-steps", 'F', "500")
 		.set_description("cap the eventual-flag search past the flag "

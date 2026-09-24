@@ -22,8 +22,9 @@ namespace idni::tau_lang {
 
 /// Above this many distinct variables, a partition of pure equalities over
 /// an arithmetic type (bitvectors) is handed to the pack solver instead of
-/// being squeezed and solved through `lgrs`, whose Boole expansion is
-/// exponential in the variables (GitHub #121). `var = constant` conjuncts
+/// being squeezed per width and given a ground solution by `find_solution` /
+/// `find_minimal_solution`, whose Boole expansion is exponential in the
+/// variables (GitHub #121). `var = constant` conjuncts
 /// are read off before the count. SIZE_MAX = unlimited (0 through the
 /// setter); set via `api::set_lgrs_max_vars`, `--lgrs-max-vars` or the REPL
 /// option `lgrsmaxvars`.
