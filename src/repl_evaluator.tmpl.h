@@ -803,7 +803,19 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 		// refused CTL* placement) used to terminate the REPL. Print the
 		// whole report -- UNKNOWN summary plus the refusal detail --
 		// exactly once here instead.
-		auto explain_r = ltl_explain<node>(value, out);
+		//
+		// ltl_explain prints its verdict itself, so it runs inside the
+		// same boundary as the api calls, writing to a buffer: a bdd
+		// node table that fills during it makes that verdict unknown,
+		// and then nothing of the buffer is shown, only the error.
+		std::stringstream explained;
+		bool table_filled = false;
+		auto explain_r = with_budget<node>([&] {
+			auto r = ltl_explain<node>(value, explained);
+			table_filled = bdd_node_table_exhausted;
+			return r;
+		});
+		if (!table_filled) out << explained.str();
 		if (!explain_r.has_value()) {
 			explain_r.print(err);
 			error = true;

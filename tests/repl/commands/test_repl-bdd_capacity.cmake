@@ -44,11 +44,24 @@ set_tests_properties("test_repl-bdd_capacity-fresh_variable_after_overflow_is_no
 	PASS_REGULAR_EXPRESSION "bdd node table exhausted"
 	FAIL_REGULAR_EXPRESSION ": T|: F")
 
-# The ltl command reaches the bdds outside the api: the table fills while
-# the two constants are conjoined, and the command ends in the error.
-add_test(NAME "test_repl-bdd_capacity-ltl_overflow_ends_in_error"
-	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl G ({${_bdd_low}}:sbf & {${_bdd_high}}:sbf != 0)\" 2>&1")
-set_tests_properties("test_repl-bdd_capacity-ltl_overflow_ends_in_error" PROPERTIES
+# The ltl command prints its own verdict: when the table fills while the
+# two constants are conjoined, it must print the error and no verdict, for
+# either polarity (the verdict computed on the full table is wrong in both).
+foreach(_rel "!=" "=")
+	string(REPLACE "!=" "neq" _rel_name "${_rel}")
+	string(REPLACE "=" "eq" _rel_name "${_rel_name}")
+	add_test(NAME "test_repl-bdd_capacity-ltl_overflow_is_no_verdict_${_rel_name}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"ltl G ({${_bdd_low}}:sbf & {${_bdd_high}}:sbf ${_rel} 0)\" 2>&1")
+	set_tests_properties("test_repl-bdd_capacity-ltl_overflow_is_no_verdict_${_rel_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "bdd node table exhausted"
+		FAIL_REGULAR_EXPRESSION "REALIZABLE")
+endforeach()
+
+# whatis calls no api function: a table filled while its argument is
+# prepared is caught after the command, which then ends in the error.
+add_test(NAME "test_repl-bdd_capacity-whatis_overflow_ends_in_error"
+	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"whatis {${_bdd_low}}:sbf & {${_bdd_high}}:sbf\" 2>&1")
+set_tests_properties("test_repl-bdd_capacity-whatis_overflow_ends_in_error" PROPERTIES
 	PASS_REGULAR_EXPRESSION "bdd node table exhausted")
 
 # A run whose step fills the table while it conjoins an input value with a
