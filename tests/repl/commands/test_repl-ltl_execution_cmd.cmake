@@ -82,3 +82,10 @@ add_ltl_run_test(data_game_strategy_bv_values
 	"run (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2]).\\n3\\n1\\n3\\n3\\n1\\n1\\nq\\nq\\n"
 	"o2\\[[0-3]\\] := 2"
 	"no strategy|not executable|unsat")
+
+# an output-only spec whose always part merges two warm-ups: the run goes
+# on past step 0, o2 alternating (\x27 is the complement mark for printf)
+add_ltl_run_test(data_game_strategy_merged_warm_up
+	"run 4 steps (always ((o2[t]:bv[1] = 1 -> o2[t]:bv[1] = 1))) && (always (o2[t]:bv[1] = o2[t-1]:bv[1]\\x27)) && (sometimes (o2[t]:bv[1] = o2[t-1]:bv[1]\\x27)) && (sometimes (o2[t-2]:bv[1] = 1)).\\nq\\n"
+	"o2\\[0\\] := 1\n(.*\n)*o2\\[1\\] := 0\n(.*\n)*o2\\[2\\] := 1\n(.*\n)*o2\\[3\\] := 0|o2\\[0\\] := 0\n(.*\n)*o2\\[1\\] := 1\n(.*\n)*o2\\[2\\] := 0\n(.*\n)*o2\\[3\\] := 1"
+	"no solution|no strategy|unsat")
