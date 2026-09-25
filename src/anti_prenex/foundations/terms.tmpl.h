@@ -18,7 +18,9 @@
  *    `map_leaves`, `bdd_cofactor`): recursive over BDD references with a
  *    per-call memo, the shape of its own workers (`bdd_ex`,
  *    `bdd_compose_impl`). Walks over the TAU tree go through `pre_order`
- *    (dag.h, tree.h) instead.
+ *    (dag.h, tree.h) instead. The cofactor refuter keeps one BDD walk of its
+ *    own: it needs a node's children first, and `visit_nodes` gives the node
+ *    first.
  *  - `build_bdd` owns the functional-quantifier SLIDE: it collects a chain
  *    whole, builds the body under the order and wraps the chain onto every
  *    leaf. A chain BINDING a key of the order does not slide -- it is one
@@ -285,61 +287,15 @@ private:
 };
 
 /// Refutes the cofactor check on 64 content-derived assignments at once: the
-/// hooks folding a cofactor are Boolean identities, so cofactors whose words
-/// differ are never one node. A skeleton node the hooks interpret is refused.
+/// hooks and the BDD reductions folding a cofactor are Boolean identities, so
+/// cofactors whose words differ are never one node. A stored BDD is read
+/// through its decision nodes down to its leaves' terms. A skeleton node the
+/// hooks interpret is refused.
 template <NodeType node>
 struct cofactor_refuter {
 	explicit cofactor_refuter(tref t) {
-		using tau = tree<node>;
-		subtree_unordered_map<node, uint32_t> at;  // `bf` node -> its step
-		auto index = [&at](tref n) { return at.find(n)->second; };
-		auto admit = [](tref n) {
-			const tau& tn = tau::get(n);
-			return tn.is(tau::bf) || tn.is(tau::bf_and)
-				|| tn.is(tau::bf_or) || tn.is(tau::bf_xor)
-				|| tn.is(tau::bf_neg);
-		};
-		auto visit = [this](tref n) {
-			const tau& tn = tau::get(n);
-			if (!tn.is(tau::bf)) return true;
-			switch (tau::get(tn.first()).get_type()) {
-			case tau::bf_and: case tau::bf_or: case tau::bf_xor:
-			case tau::bf_neg: case tau::variable: case tau::bf_ref:
-			case tau::bf_t: case tau::bf_f: return true;
-			default: return ok = false;
-			}
-		};
-		// splitmix64's finaliser: the node hash alone spreads too few of
-		// its bits to make 64 independent assignments.
-		auto word = [](tref n) {
-			uint64_t z = hash_lcrs_tref<node>{}(n);
-			z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
-			z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
-			return z ^ (z >> 31);
-		};
-		auto up = [&](tref n) {
-			const tau& tn = tau::get(n);
-			if (!tn.is(tau::bf)) return;
-			const tau& c = tau::get(tn.first());
-			step s{ op::leaf, 0, 0, 0, nullptr };
-			switch (c.get_type()) {
-			case tau::bf_and: s = { op::conj, index(c.first()),
-				index(c.second()), 0, nullptr }; break;
-			case tau::bf_or: s = { op::disj, index(c.first()),
-				index(c.second()), 0, nullptr }; break;
-			case tau::bf_xor: s = { op::sum, index(c.first()),
-				index(c.second()), 0, nullptr }; break;
-			case tau::bf_neg: s = { op::neg, index(c.first()), 0, 0,
-				nullptr }; break;
-			case tau::bf_t: s.w = ~uint64_t{0}; break;
-			case tau::bf_f: break;
-			case tau::variable: s.n = n, s.w = word(n); break;
-			default: s.w = word(n);                   // a reference
-			}
-			at.emplace(n, static_cast<uint32_t>(steps.size()));
-			steps.push_back(s);
-		};
-		pre_order<node>(t).search_unique(visit, admit, up);
+		index_t at;
+		root = walk(t, at);
 		if (ok) w0.resize(steps.size()), w1.resize(steps.size());
 	}
 
@@ -365,19 +321,124 @@ struct cofactor_refuter {
 			case op::sum: w0[i] = w0[s.a] ^ w0[s.b],
 				w1[i] = w1[s.a] ^ w1[s.b]; break;
 			case op::neg: w0[i] = ~w0[s.a], w1[i] = ~w1[s.a]; break;
+			case op::ite:
+				w0[i] = (s.w & w0[s.a]) | (~s.w & w0[s.b]);
+				w1[i] = (s.w & w1[s.a]) | (~s.w & w1[s.b]);
+				break;
 			}
 		}
-		// The root's step is the last: the walk closes it last.
-		return w0.back() != w1.back();
+		return w0[root] != w1[root];
 	}
 
 private:
-	enum class op : unsigned char { leaf, conj, disj, sum, neg };
-	// A leaf's `n` is set on a variable alone, the only leaf a key can be.
+	enum class op : unsigned char { leaf, conj, disj, sum, neg, ite };
+	// A leaf's `n` is set on a variable alone, the only leaf a key can be. An
+	// `ite` is a decision node: `w` is its variable's word, `a` and `b` its
+	// high and low children.
 	struct step { op o; uint32_t a, b; uint64_t w; tref n; };
+	// The step of each `bf` node and of each BDD reference met so far.
+	struct index_t {
+		subtree_unordered_map<node, uint32_t> tree;
+		std::unordered_map<bref<node>, uint32_t> bdd;
+	};
 	std::vector<step> steps;
 	std::vector<uint64_t> w0, w1;
+	uint32_t root = 0;
 	bool ok = true;
+
+	// splitmix64's finaliser: the node hash alone spreads too few of its bits
+	// to make 64 independent assignments. Taken from the atom under its `bf`,
+	// the form a BDD holds a decision variable in, so both get one word.
+	static uint64_t word(tref atom) {
+		uint64_t z = hash_lcrs_tref<node>{}(atom);
+		z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+		z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+		return z ^ (z >> 31);
+	}
+
+	/// Appends the steps of the term @p t and returns the step of `t`.
+	uint32_t walk(tref t, index_t& at) {
+		using tau = tree<node>;
+		auto index = [&at](tref n) { return at.tree.find(n)->second; };
+		auto admit = [](tref n) {
+			const tau& tn = tau::get(n);
+			return tn.is(tau::bf) || tn.is(tau::bf_and)
+				|| tn.is(tau::bf_or) || tn.is(tau::bf_xor)
+				|| tn.is(tau::bf_neg);
+		};
+		auto visit = [this](tref n) {
+			if (!ok) return false;
+			const tau& tn = tau::get(n);
+			if (!tn.is(tau::bf)) return true;
+			switch (tau::get(tn.first()).get_type()) {
+			case tau::bf_and: case tau::bf_or: case tau::bf_xor:
+			case tau::bf_neg: case tau::variable: case tau::bf_ref:
+			case tau::bf_t: case tau::bf_f: case tau::BDD_ID:
+				return true;
+			default: return ok = false;
+			}
+		};
+		auto up = [&](tref n) {
+			const tau& tn = tau::get(n);
+			if (!ok || !tn.is(tau::bf)) return;
+			const tref ch = tn.first();
+			const tau& c = tau::get(ch);
+			step s{ op::leaf, 0, 0, 0, nullptr };
+			switch (c.get_type()) {
+			case tau::bf_and: s = { op::conj, index(c.first()),
+				index(c.second()), 0, nullptr }; break;
+			case tau::bf_or: s = { op::disj, index(c.first()),
+				index(c.second()), 0, nullptr }; break;
+			case tau::bf_xor: s = { op::sum, index(c.first()),
+				index(c.second()), 0, nullptr }; break;
+			case tau::bf_neg: s = { op::neg, index(c.first()), 0, 0,
+				nullptr }; break;
+			case tau::bf_t: s.w = ~uint64_t{0}; break;
+			case tau::bf_f: break;
+			case tau::variable: s.n = n, s.w = word(ch); break;
+			case tau::BDD_ID: {
+				// A stored BDD has no step of its own: `n` is its root.
+				const uint32_t r = bdd_step(
+					thandle<node>::convert_to_handle(n).get(), at);
+				if (ok) at.tree.try_emplace(n, r);
+				return;
+			}
+			default: s.w = word(ch);                  // a reference
+			}
+			// A leaf's term may repeat a node an earlier walk indexed.
+			if (at.tree.try_emplace(n, static_cast<uint32_t>(
+				steps.size())).second) steps.push_back(s);
+		};
+		pre_order<node>(t).search_unique(visit, admit, up);
+		return ok ? index(t) : 0;
+	}
+
+	/// Appends the steps of the BDD reference @p x and returns its step. A
+	/// leaf is the term the BDD spells for it. A decision variable is never
+	/// forced: the substitution composes keys of the order alone, and the
+	/// check tries none.
+	uint32_t bdd_step(bref<node> x, index_t& at) {
+		if (!ok) return 0;
+		if (auto it = at.bdd.find(x); it != at.bdd.end()) return it->second;
+		step s{ op::leaf, 0, 0, 0, nullptr };
+		if (x.inv) s = { op::neg, bdd_step(tbdd<node>::bdd_not(x), at), 0,
+			0, nullptr };
+		else if (x == tbdd<node>::T) s.w = ~uint64_t{0};
+		else if (tbdd<node>::leaf(x)) {
+			const uint32_t r = walk(tbdd<node>::get_var_term(x), at);
+			if (ok) at.bdd.emplace(x, r);
+			return r;
+		} else {
+			const uint32_t h = bdd_step(tbdd<node>::get_high(x), at);
+			const uint32_t l = bdd_step(tbdd<node>::get_low(x), at);
+			s = { op::ite, h, l, word(tbdd<node>::get_var(x)), nullptr };
+		}
+		if (!ok) return 0;
+		const uint32_t r = static_cast<uint32_t>(steps.size());
+		steps.push_back(s);
+		at.bdd.emplace(x, r);
+		return r;
+	}
 };
 
 /// §3 `SIMPLIFY_TERM`'s fourth law, the COFACTOR CHECK (terms.h says what it
