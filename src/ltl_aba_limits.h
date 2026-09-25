@@ -53,8 +53,9 @@ inline long ltl_guard_max_cubes_param = -1;
 
 /**
  * @brief Cap on the ABA-oracle refinement rounds of `is_ltl_aba_realizable`:
- * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. On
- * the cap the verdict is UNKNOWN (an error), never a false answer.
+ * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. The
+ * same cap bounds the fixpoint rounds of `strategy_wins_on_data`. On the cap
+ * the verdict is UNKNOWN (an error), never a false answer.
  *
  * Runtime parameter by policy (`--ltl-refinement-rounds`, REPL
  * `set ltlrefinementrounds`, `api::set_ltl_max_refinement_rounds`);

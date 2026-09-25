@@ -710,12 +710,17 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    to the synthesizer, enabling type-aware strategies.
 4. Spot's `ltlsynt` decides realizability of the propositional formula and
    extracts a winning Mealy strategy automaton (HOA format).
-5. The **ABA oracle** (tau-lang's own quantifier-elimination engine) verifies
-   that every strategy transition is consistent with the underlying Boolean
-   algebra: for every input assignment, the system can find output values
-   satisfying the data guard (`∀i. ∃o. guard`).
+5. The **ABA oracle** (tau-lang's own quantifier-elimination engine) checks
+   the strategy against the data. Each transition, and each window of
+   consecutive transitions as deep as the deepest lookback, must have data
+   satisfying its guards; a transition or path without such data is blocked
+   and `ltlsynt` runs again. The strategy is then played against the data
+   itself: at every step the environment picks the inputs after the history
+   is fixed, and the system must pick outputs that satisfy the guard it
+   takes (`∀i. ∃o. guard`, iterated to a fixpoint over the last values of
+   every stream). A losing strategy makes the answer UNKNOWN.
 
-A formula is **realizable** iff both (4) and (5) succeed.  The external tool
+A formula is **realizable** iff (4) succeeds and the strategy wins in (5).  The external tool
 `ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
 
 #### Synthesis algorithms
@@ -755,7 +760,7 @@ TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
 | `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). Environment fallback of `--ltl-alg` / REPL `set ltlalg`; anything other than `A`, `B`, `D` or `auto` is reported once and read as `auto`. |
 | `TAU_LTL_HOA_MAX_STATES` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited); a larger count is read as a garbled header. Environment fallback of `--ltl-hoa-max-states` / REPL `set ltlhoamaxstates`. |
 | `TAU_LTL_GUARD_MAX_CUBES` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited); a guard beyond it is refused. Environment fallback of `--ltl-guard-max-cubes` / REPL `set ltlguardmaxcubes`. |
-| `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
+| `TAU_LTL_REFINEMENT_ROUNDS` | 64 | ABA-oracle refinement rounds of one realizability check, and fixpoint rounds of its check of a strategy against the data (0 = unlimited); on the cap the verdict is UNKNOWN. Environment fallback of `--ltl-refinement-rounds` / REPL `set ltlrefinementrounds`. |
 | `TAU_LTL_WINDOW_MAX_PATHS` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited); a hit cap yields UNKNOWN. Environment fallback of `--ltl-window-max-paths` / REPL `set ltlwindowmaxpaths`. |
 
 Every limit above is a runtime parameter carried by all three surfaces --
@@ -2993,7 +2998,8 @@ Algorithm D product game (`--ltl-guard-max-cubes`). 512 by default, or
 
 * `ltlrefinementrounds`: cap on the ABA-oracle refinement rounds of one
 realizability check, each round blocking an infeasible strategy edge and
-re-running `ltlsynt` (`--ltl-refinement-rounds`). 64 by default, or
+re-running `ltlsynt`, and on the fixpoint rounds of its check of a strategy
+against the data (`--ltl-refinement-rounds`). 64 by default, or
 `TAU_LTL_REFINEMENT_ROUNDS` when that is set; 0 = unlimited. On the cap the
 verdict is an error (UNKNOWN), never a false answer.
 

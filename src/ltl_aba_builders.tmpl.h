@@ -332,14 +332,30 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		} else {
 			// Single edges all pass; a relation spanning >= 3 consecutive
 			// steps is invisible to the per-edge check, so ask the window
-			// oracle before declaring victory.
+			// oracle, then play the strategy against the data.
 			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
-			if (W <= 1) return realizable_now();
-			auto wres = window_infeasible_paths<node>(sol, W,
-				ltl_window_max_paths());
-			if (wres.path_cap_reached) return undecided("window oracle path cap");
-			if (wres.blocking_clauses.empty()) return realizable_now();
-			clauses = std::move(wres.blocking_clauses);
+			if (W > 1) {
+				auto wres = window_infeasible_paths<node>(sol, W,
+					ltl_window_max_paths());
+				if (wres.path_cap_reached)
+					return undecided("window oracle path cap");
+				clauses = std::move(wres.blocking_clauses);
+			}
+			if (clauses.empty()) {
+				size_t rounds = 0;
+				switch (strategy_wins_on_data<node>(sol,
+					max_refinement_rounds, rounds))
+				{
+				case strategy_data_verdict::wins:
+					return realizable_now();
+				case strategy_data_verdict::undecided:
+					return undecided("the strategy could not be "
+						"checked against the data");
+				case strategy_data_verdict::loses:
+					return undecided("the strategy loses against the "
+						"data");
+				}
+			}
 		}
 
 		if (max_refinement_rounds && round >= max_refinement_rounds)

@@ -4442,6 +4442,35 @@ TEST_SUITE("Positional atoms: X-encoding") {
 
 } // TEST_SUITE("Positional atoms: X-encoding")
 
+// A strategy passes only if it wins against the data: every input is picked
+// after the history is fixed, and relations of any length are checked.
+TEST_SUITE("Strategy played against the data") {
+
+	TEST_CASE("an output fixed a step before the input it must meet is not REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE((r.has_value() && r.value()));
+	}
+
+	TEST_CASE("a past atom the environment already decided is not REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = 0) "
+			"&& G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1]))).");
+		REQUIRE(fm != nullptr);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE((r.has_value() && r.value()));
+	}
+
+	TEST_CASE("copying a past input is REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t-1]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+} // TEST_SUITE("Strategy played against the data")
+
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────
 
 TEST_SUITE("ltl_explain diagnostics") {

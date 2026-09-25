@@ -2177,6 +2177,163 @@ static window_oracle_result window_infeasible_paths(
 	return result;
 }
 
+// ── Strategy check against the data (exact oracle) ──────────────────────────
+//
+// The edge and window oracles ask whether a guard, or a window of guards, has
+// SOME satisfying data. That existential reading lets the system pick past
+// values and inputs, so a strategy can pass them without winning: the
+// environment picks each input after the history is fixed, and a chain of
+// relations longer than the window never gets checked as a whole.
+//
+// This check plays the strategy against the data. The state of the game is
+// the strategy state and the last L values of every stream (L = the deepest
+// lookback of the atoms). For each strategy state s, R_s is a formula over
+// those L past values: the histories from which the strategy wins from s.
+// It is the greatest fixpoint of
+//   R_s = all I[t] ex O[t] ( OR_{edge s -> d} guard(edge) && R_d(shifted) )
+// where I[t] and O[t] are the current input and output values, guard is the
+// edge's label over the data atoms, and the shift makes R_d read the history
+// one step later. Starting from R_s = T, each round eliminates the
+// quantifiers. The strategy wins when R_init is satisfiable: values before
+// step 0 are read only by clauses that are not enforced yet, so they are
+// free.
+
+enum class strategy_data_verdict { wins, loses, undecided };
+
+// `rounds` receives the number of fixpoint rounds run; max_rounds 0 is
+// unlimited.
+template <NodeType node>
+static strategy_data_verdict strategy_wins_on_data(
+    const ltl_aba_solution<node>& sol, size_t max_rounds, size_t& rounds)
+{
+	using tau = tree<node>;
+	rounds = 0;
+	const auto& aut = sol.aut;
+	const int k = aut.num_states;
+	if (k <= 0 || aut.initial_state < 0 || aut.initial_state >= k)
+		return strategy_data_verdict::undecided;
+
+	auto io_vars_of = [](tref fm) {
+		return tau::get(fm).select_top(is_child<node, tau::io_var>);
+	};
+	// A positional io_var has no place in the history window.
+	for (auto& [a, _] : sol.atoms)
+		for (tref v : io_vars_of(a))
+			if (is_io_initial<node>(v))
+				return strategy_data_verdict::undecided;
+
+	// Every io_var of `fm` moved `delta` steps later (x[t-j] -> x[t-j+delta]);
+	// a variable that would read the future is left out by the caller.
+	auto shift_vars = [&](tref fm, int_t delta) -> tref {
+		subtree_map<node, tref> m;
+		for (tref v : io_vars_of(fm)) {
+			int_t sh = get_io_var_shift<node>(v) - delta;
+			DBG(assert(sh >= 0);)
+			size_t tid = find_ba_type<node>(v);
+			const std::string& name = get_var_name<node>(v);
+			m[v] = sh == 0
+				? tau::trim(is_input_var<node>(v)
+					? tau::build_in_var_at_t(build_var_name<node>(name), tid)
+					: tau::build_out_var_at_t(build_var_name<node>(name), tid))
+				: tau::trim(is_input_var<node>(v)
+					? tau::build_in_var_at_t_minus(name, (size_t)sh, tid)
+					: tau::build_out_var_at_t_minus(name, (size_t)sh, tid));
+		}
+		return m.empty() ? fm : rewriter::replace<node>(fm, m);
+	};
+
+	// The edge guards over the atoms, in the same io_var spelling as the
+	// shifted invariants.
+	std::vector<std::vector<std::pair<tref, int>>> guards(k);
+	for (int s = 0; s < k; ++s)
+		for (const auto& e : aut.edges[s]) {
+			if (e.dst < 0 || e.dst >= k) return strategy_data_verdict::undecided;
+			tref g = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
+			if (!g) return strategy_data_verdict::undecided;
+			guards[s].emplace_back(shift_vars(g, 0), e.dst);
+		}
+
+	// A quantifier the normalizer leaves standing is not decided here.
+	auto eliminate = [](tref fm) -> tref {
+		auto n = normalize_non_temp<node>(fm);
+		if (!n.has_value() || !n.value()
+			|| tau::get(n.value()).find_top(is_quantifier<node>))
+				return nullptr;
+		return n.value();
+	};
+
+	// A variable of a two-element type is quantified by expanding it into
+	// its two values, which leaves the normalizer nothing to eliminate.
+	std::map<size_t, bool> two_element;
+	auto is_two_element = [&](tref v) {
+		size_t tid = find_ba_type<node>(v);
+		auto it = two_element.find(tid);
+		if (it != two_element.end()) return it->second;
+		tref x = tau::get(tau::bf, v);
+		bool two = !aba_existential_feasible<node>(tau::build_wff_and(
+			tau::build_wff_neg(tau::build_bf_eq(x,
+				build_bf_f_type<node>(tid))),
+			tau::build_wff_neg(tau::build_bf_eq(x,
+				build_bf_t_type<node>(tid)))));
+		two_element.emplace(tid, two);
+		return two;
+	};
+	auto quantify = [&](tref v, tref fm, bool exists) {
+		if (!is_two_element(v))
+			return exists ? tau::build_wff_ex(v, fm, false)
+				: tau::build_wff_all(v, fm, false);
+		size_t tid = find_ba_type<node>(v);
+		auto at = [&](tref c) {
+			subtree_map<node, tref> m{ { v, tau::trim(c) } };
+			return rewriter::replace<node>(fm, m);
+		};
+		tref lo = at(build_bf_f_type<node>(tid));
+		tref hi = at(build_bf_t_type<node>(tid));
+		return exists ? tau::build_wff_or(lo, hi)
+			: tau::build_wff_and(lo, hi);
+	};
+
+	std::vector<tref> R(k, tau::_T());
+	for (rounds = 0; !max_rounds || rounds < max_rounds; ) {
+		++rounds;
+		std::vector<tref> next(k);
+		bool changed = false;
+		for (int s = 0; s < k; ++s) {
+			tref body = tau::_F();
+			for (auto& [g, d] : guards[s])
+				body = tau::build_wff_or(body,
+					tau::build_wff_and(g, shift_vars(R[d], 1)));
+			// Inputs of step t outermost, then its outputs: the system
+			// answers the inputs it sees.
+			trefs ins, outs;
+			for (tref v : io_vars_of(body)) {
+				if (get_io_var_shift<node>(v) != 0) continue;
+				auto& bucket = is_input_var<node>(v) ? ins : outs;
+				if (std::none_of(bucket.begin(), bucket.end(),
+					[&](tref w) { return tau::subtree_equals(w, v); }))
+						bucket.push_back(v);
+			}
+			tref q = body;
+			for (tref v : outs) q = quantify(v, q, true);
+			for (tref v : ins) q = quantify(v, q, false);
+			tref n = eliminate(q);
+			if (!n) return strategy_data_verdict::undecided;
+			next[s] = n;
+			// next[s] implies R[s], so they differ only if R[s] admits a
+			// history next[s] rules out.
+			if (!tau::subtree_equals(n, R[s])
+				&& aba_existential_feasible<node>(tau::build_wff_and(
+					R[s], tau::build_wff_neg(n))))
+					changed = true;
+		}
+		R = std::move(next);
+		if (!aba_existential_feasible<node>(R[aut.initial_state]))
+			return strategy_data_verdict::loses;
+		if (!changed) return strategy_data_verdict::wins;
+	}
+	return strategy_data_verdict::undecided;
+}
+
 // ── S/T compile-away pass ─────────────────────────────────────────────────────
 //
 // φ S ψ  ("φ Since ψ"): introduce auxiliary output o__ltl_s{k}__ with:
