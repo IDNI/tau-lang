@@ -365,7 +365,26 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 		? (long) std::min<size_t>(state_cap, (size_t) LONG_MAX)
 		: LONG_MAX;
 
-	std::istringstream ss(hoa_text);
+	// Spot wraps a long header item (the state players of a large game)
+	// onto indented continuation lines; they are joined to their item.
+	std::string joined;
+	{
+		std::istringstream raw(hoa_text);
+		std::string l;
+		bool body = false;
+		while (std::getline(raw, l)) {
+			if (l == "--BODY--") body = true;
+			if (!body && !l.empty() && (l[0] == ' ' || l[0] == '\t')
+				&& !joined.empty())
+			{
+				joined.back() = ' ';
+				joined += l + "\n";
+				continue;
+			}
+			joined += l + "\n";
+		}
+	}
+	std::istringstream ss(joined);
 	std::string line;
 	bool in_body = false;
 	int cur_state = -1;

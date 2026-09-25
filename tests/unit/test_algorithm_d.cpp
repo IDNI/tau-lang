@@ -453,6 +453,44 @@ State: 2
 		CHECK(g.player[2] == 1);
 	}
 
+	// Spot wraps the players of a large game onto indented lines; every
+	// state past the first line would otherwise stay env-owned.
+	TEST_CASE("[ALG-D-41b] a state-player header wrapped over lines assigns "
+	          "every state") {
+		std::string hoa = R"(HOA: v1
+States: 4
+Start: 0
+AP: 2 "p0"
+      "p1"
+controllable-AP: 1
+spot-state-player: 0 0
+                   1 1
+acc-name: all
+Acceptance: 0 t
+--BODY--
+State: 0
+[0] 2
+[!0] 3
+State: 1
+[t] 2
+State: 2
+[t] 0
+State: 3
+[1] 1
+[!1] 0
+--END--
+)";
+		alg_d::synth_game g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.player.size() == 4u);
+		CHECK(g.player[0] == 0);
+		CHECK(g.player[1] == 0);
+		CHECK(g.player[2] == 1);
+		CHECK(g.player[3] == 1);
+		REQUIRE(g.aps.size() == 2u);
+		CHECK(g.aps[1] == "p1");
+		CHECK(g.controllable[1]);
+	}
+
 	// AL-11 / AL-RT2 (re-port of the pre-rebase [ALG-D-45]): an HOA whose
 	// acceptance is `Acceptance: 0 t` and that carries NO acc-name: line is
 	// trivially-all.  Without this every state got priority 0 (env-good),
