@@ -126,7 +126,8 @@ struct squeeze_result {
  * `∧`/`∨` structure left as it stands — and each rewritten atom is simplified
  * again, because the ring sum builds terms the path simplifier has not seen
  * (invariant 6). An atom that folds to `T` in the process drops out of the
- * clause and one that folds to `F` decides it. A conjunct that is no atom —
+ * clause and one that folds to `F` decides it; a tree that collapses to a
+ * conjunction on the way is read as its members. A conjunct that is no atom —
  * a binder unit, say — rides along untouched.
  *
  * The positives are grouped on their own, negatives ignored: quantifiers over

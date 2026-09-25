@@ -57,8 +57,9 @@ tref build_only(tref t, const var_order<node>& order) {
  * invariant 6 wants every atom simplified. A NEGATIVE TREE is rewritten at its
  * LITERALS, by a content map handed to the library's `replace`: the
  * replacements sit at the leaves, so the tree's own `∧`/`∨` structure is
- * rebuilt as it stands and is not re-simplified. Anything else comes back
- * untouched.
+ * rebuilt as it stands and is not re-simplified — only the construction hooks
+ * fold a literal that became a constant, which can collapse the tree to a
+ * conjunction, a literal or a constant. Anything else comes back untouched.
  */
 template <NodeType node>
 tref zero_form(tref c, const var_order<node>& order) {
@@ -137,15 +138,21 @@ squeeze_result<node> squeeze(const trefs& conjuncts, const block& X,
 	squeeze_result<node> r;
 	// STEP 1 — the zero form, conjunct by conjunct. An atom that folds to
 	// `T` says nothing and is dropped; one that folds to `F` decides the
-	// clause, and nothing after it is computed.
+	// clause, and nothing after it is computed. A tree whose literal folds
+	// can collapse to a conjunction: its members are conjuncts of their own,
+	// or step 2 would read none of them.
 	r.conjuncts.reserve(conjuncts.size());
-	for (tref c : conjuncts) {
-		const tref n = zero_form<node>(c, order);
-		if (tau::get(n).equals_T()) continue;
-		if (tau::get(n).equals_F())
-			return r.conjuncts.clear(), r.decided_false = true, r;
-		r.conjuncts.push_back(n);
-	}
+	for (tref c : conjuncts)
+		for (tref n : get_cnf_wff_clauses<node>(zero_form<node>(c, order)))
+		{
+			if (tau::get(n).equals_T()) continue;
+			if (tau::get(n).equals_F())
+				return r.conjuncts.clear(), r.decided_false = true, r;
+			DBG(assert(!is_negative_tree<node>(c)
+				|| is_negated_equation<node>(n)
+				|| is_negative_tree<node>(n));)
+			r.conjuncts.push_back(n);
+		}
 	// STEP 2 — the positives squeezed per component, the negatives read off
 	// in the clause's order.
 	trefs positives;
