@@ -237,9 +237,9 @@ TEST_CASE("subst_var: every free occurrence, and a reference argument re-simplif
 	// contradiction, which no construction hook does.
 	tref res2 = ap::subst_var<node_t>(phi, x, bf("u1 & (u1' | u2)"));
 	CHECK(ap::is_member<node_t>(res2, wff("f(u1 & u2)")));
-	// Outside a reference argument nothing is simplified: the caller's
-	// `SIMPLIFY` follows (invariant 6).
-	CHECK(!ap::is_member<node_t>(res2, wff("u1 & u2 = 0")));
+	// Every atom the rewrite changed goes through `SIMPLIFY_ATOM` (§3), so
+	// `u1·(u1′ ∪ u2)·u1 = 0` folds to `u1·u2 = 0` as well.
+	CHECK(ap::is_member<node_t>(res2, wff("u1 & u2 = 0")));
 	// A formula the variable is not free in is the same node.
 	CHECK(ap::subst_var<node_t>(wff("f(u1)"), x, bf("z")) == wff("f(u1)"));
 }

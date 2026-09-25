@@ -154,9 +154,11 @@ TEST_CASE("W1: the spelled match reads every spelling of one equation") {
 	// `ψ = (x = t) ∧ (x ∪ a = 0)`, in the three spellings the call sites
 	// straddling NORMALIZE_OPERATORS produce (§3). The witnessed body is
 	// the same formula every time: the pinning conjunct's image folds to
-	// `T` for a strict pin, and the sibling becomes `t ∪ a = 0`.
+	// `T` for a strict pin, and the sibling becomes `t ∪ a = 0`, through
+	// `SIMPLIFY_ATOM` like every atom the substitution rewrote.
 	const tref sibling = eq0(lor(x, a));
-	const tref want = ap::simplify<node_t>(eq0(lor(t, a)));
+	const tref want = ap::simplify<node_t>(
+		ap::simplify_atom<node_t>(eq0(lor(t, a))));
 	for (tref pinning : { eq(x, t), eq(t, x), eq0(lxor(x, t)) }) {
 		const tref psi = conj(pinning, sibling);
 		auto r = ap::try_witness<node_t>(fvar("x"), psi);
@@ -211,7 +213,8 @@ TEST_CASE("W3: a strict pin comes first, then the smallest witness") {
 		REQUIRE(r.has_value());
 		CHECK(!holds_var(*r, "x"));
 		CHECK(are_nso_equivalent<node_t>(ex("x", psi), *r));
-		CHECK(same(*r, ap::simplify<node_t>(eq0(lor(b, a)))));
+		CHECK(same(*r, ap::simplify<node_t>(
+			ap::simplify_atom<node_t>(eq0(lor(b, a))))));
 	}
 	// Two WEAK pins and no strict one: the smallest `‖f₁′‖` wins — `0`
 	// over `t·G′` — which is what the first conjunct's image shows.
@@ -241,17 +244,18 @@ TEST_CASE("W5: the plain pin at a spine, and its ∀ dual") {
 	const tref phi = conj(eq(x, t), eq0(lor(x, a)));
 	auto r = ap::try_witness_deep<node_t>(EX, fvar("x"), phi);
 	REQUIRE(r.has_value());
-	CHECK(same(*r, eq0(lor(t, a))));
+	CHECK(same(*r, ap::simplify_atom<node_t>(eq0(lor(t, a)))));
 	CHECK(!holds_var(*r, "x"));
 	CHECK(are_nso_equivalent<node_t>(ex("x", phi), *r));
-	// NOT simplified here: phase 2's global SIMPLIFY follows (§3).
+	// Each rewritten atom goes through SIMPLIFY_ATOM; phase 2's global
+	// SIMPLIFY follows (§3).
 	// ∀ form, under ¬∃x¬: the spine is a disjunction and the pin is a
 	// NEGATED equation, in either spelling still present at phase 2.
 	for (tref pinning : { neg(eq(x, t)), neq(x, t) }) {
 		const tref psi = disj(pinning, neg(eq0(lor(x, a))));
 		auto q = ap::try_witness_deep<node_t>(ALL, fvar("x"), psi);
 		REQUIRE(q.has_value());
-		CHECK(same(*q, neg(eq0(lor(t, a)))));
+		CHECK(same(*q, neg(ap::simplify_atom<node_t>(eq0(lor(t, a))))));
 		CHECK(!holds_var(*q, "x"));
 		CHECK(are_nso_equivalent<node_t>(all_("x", psi), *q));
 	}
@@ -470,7 +474,8 @@ TEST_CASE("W15: one pass eliminates two binders, nested or side by side") {
 	tref got = ap::eliminate_by_substitution<node_t>(two);
 	CHECK(!holds(got, tau::wff_ex));
 	CHECK(are_nso_equivalent<node_t>(got, two));
-	CHECK(same(got, conj(eq0(lor(t, a)), eq0(lor(b, d)))));
+	CHECK(same(got, conj(ap::simplify_atom<node_t>(eq0(lor(t, a))),
+		ap::simplify_atom<node_t>(eq0(lor(b, d))))));
 	// Nested: the outer rewrite substitutes INTO the inner binder's body
 	// (§4, what may touch a unit), and the walk continues into what it
 	// returned, so the inner binder is reached in the SAME pass.
@@ -479,7 +484,7 @@ TEST_CASE("W15: one pass eliminates two binders, nested or side by side") {
 	tref r = ap::eliminate_by_substitution<node_t>(nested);
 	CHECK(!holds(r, tau::wff_ex));
 	CHECK(are_nso_equivalent<node_t>(r, nested));
-	CHECK(same(r, eq0(lor(lor(t, b), a))));
+	CHECK(same(r, ap::simplify_atom<node_t>(eq0(lor(lor(t, b), a)))));
 	// A binder over a lone pin: the one-member spine leaves `T`.
 	CHECK(tau::get(ap::eliminate_by_substitution<node_t>(
 		ex("x", eq(x, t)))).equals_T());
@@ -744,6 +749,24 @@ TEST_CASE("WC12: the pin test on one conjunct answers nullopt for anything "
 	CHECK(!ap::cof_pin<node_t>(n.psi, x, n.c).has_value());
 	component f({ x }, eq(bvar("a"), bvar("t")));
 	CHECK(!ap::cof_pin<node_t>(f.psi, x, f.c).has_value());
+}
+
+TEST_CASE("WC13: every atom the witness rewrote is simplified, so a strict "
+	"pin's image folds") {
+	tref x = bvar("x"), a = bvar("a"), b = bvar("b");
+	// `x·A ∪ x′·A″ = 0` with `A = (a ∪ b′)(b ∪ a′)` and `A″ = b·a′ ∪ a·b′`:
+	// a strict pin whose image is `T` only as a function. Simplified as the
+	// squeeze builds its atoms, the leaves keep spellings that are no
+	// syntactic complements, so no hook folds the image; `SIMPLIFY_ATOM` does.
+	const tref A = land(lor(a, lneg(b)), lor(b, lneg(a)));
+	const tref A2 = lor(land(b, lneg(a)), land(a, lneg(b)));
+	const tref pin = eq0(lor(land(x, A), land(lneg(x), A2)));
+	component k({ fvar("x") }, pin);
+	const tref psi = ap::simplify_atom<node_t>(k.psi, k.c.order);
+	auto r = ap::try_witness<node_t>(fvar("x"), psi, k.c);
+	REQUIRE(r.has_value());
+	CHECK(tau::get(*r).equals_T());
+	CHECK(are_nso_equivalent<node_t>(finished(*r), ex("x", pin)));
 }
 
 } // TEST_SUITE
