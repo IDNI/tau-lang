@@ -31,6 +31,7 @@
 #ifndef __EMSCRIPTEN__
 #include <sys/wait.h>
 #endif // __EMSCRIPTEN__
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -67,7 +68,64 @@ struct synth_game {
 	std::vector<int> state_priority;
 	// Edge priorities: edge_priority[q][j] = priority of j-th trans from q
 	std::vector<std::vector<int>> edge_priority;
+	// The acceptance is one of all, Buchi, co-Buchi or parity, and whether
+	// a run that sees no colour infinitely often is accepted.
+	bool acc_known = false;
+	bool acc_accepts_uncolored = false;
+	// Some state or edge carries more than one colour; the priorities
+	// above read the first one only.
+	bool multi_colored = false;
 };
+
+/// @brief Whether an acceptance condition (`Inf(n)`, `Fin(n)`, `t`, `f`,
+/// `!`, `&`, `|`, parentheses) holds for a run that sees no colour
+/// infinitely often; nullopt when the text does not parse.
+inline std::optional<bool> acceptance_without_colors(const std::string& cond) {
+	size_t i = 0;
+	bool failed = false;
+	auto ws = [&] { while (i < cond.size() && std::isspace((unsigned char)cond[i])) ++i; };
+	std::function<bool()> disj, conj, prim;
+	prim = [&]() -> bool {
+		ws();
+		if (i >= cond.size()) { failed = true; return false; }
+		if (cond[i] == '(') {
+			++i;
+			bool v = disj();
+			ws();
+			if (i < cond.size() && cond[i] == ')') ++i; else failed = true;
+			return v;
+		}
+		if (cond[i] == '!') { ++i; return !prim(); }
+		if (cond[i] == 't') { ++i; return true; }
+		if (cond[i] == 'f') { ++i; return false; }
+		for (const char* kw : { "Inf", "Fin" })
+			if (cond.compare(i, 3, kw) == 0) {
+				i += 3;
+				size_t close = cond.find(')', i);
+				if (close == std::string::npos) { failed = true; return false; }
+				i = close + 1;
+				return kw[0] == 'F';
+			}
+		failed = true;
+		return false;
+	};
+	conj = [&]() -> bool {
+		bool v = prim();
+		for (ws(); !failed && i < cond.size() && cond[i] == '&'; ws())
+			{ ++i; v = prim() && v; }
+		return v;
+	};
+	disj = [&]() -> bool {
+		bool v = conj();
+		for (ws(); !failed && i < cond.size() && cond[i] == '|'; ws())
+			{ ++i; v = conj() || v; }
+		return v;
+	};
+	bool v = disj();
+	ws();
+	if (failed || i != cond.size()) return std::nullopt;
+	return v;
+}
 
 // ── HOA boolean formula evaluator ────────────────────────────────────────
 
@@ -500,6 +558,7 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 				std::istringstream cl(line.substr(lb+1, rb-lb-1));
 				int c; cl >> c;
 				if (cur_state < g.num_states) g.state_color[cur_state] = c;
+				if (int more; cl >> more) g.multi_colored = true;
 			}
 			continue;
 		}
@@ -518,6 +577,7 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 		if (elb != std::string::npos && erb != std::string::npos) {
 			std::istringstream cl(line.substr(elb+1, erb-elb-1));
 			cl >> edge_color;
+			if (int more; cl >> more) g.multi_colored = true;
 		}
 		if (cur_state < g.num_states)
 			g.trans[cur_state].emplace_back(guard, next, edge_color);
@@ -558,6 +618,11 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
 		auto first = acc_cond.find_first_not_of(" \t\r");
 		if (first != std::string::npos && acc_cond[first] == 't')
 			is_all = true;
+	}
+	if (is_all || is_buchi || is_cobuchi || is_parity) {
+		auto empty = acceptance_without_colors(acc_cond);
+		g.acc_known = empty.has_value();
+		g.acc_accepts_uncolored = empty.value_or(false);
 	}
 	for (int q = 0; q < g.num_states; ++q) {
 		int c = g.state_color[q];
@@ -613,12 +678,14 @@ inline synth_game parse_synth_game_hoa(const std::string& hoa_text) {
  * @param phi_prop Propositional LTL formula in Spot syntax.
  * @param ins Input proposition names.
  * @param outs Output proposition names.
+ * @param algo ltlsynt's `--algo=` value; empty keeps its default.
  * @return The parsed synthesis game, or an error result.
  */
 result<synth_game> call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs);
+	const std::vector<std::string>& outs,
+	const std::string& algo = {});
 
 // ── Product game (game × T_1) ─────────────────────────────────────────────
 //

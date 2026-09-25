@@ -42,10 +42,12 @@ result<synthesis_verdict> synthesize(const std::string& formula,
 /// Run `ltlsynt --print-game-hoa` and return the raw game-HOA text. A
 /// caller that needs a parsed game (Algorithm D) parses this text itself --
 /// the game structure is tau-lang's, not this backend's. Same
-/// no-verdict-is-an-error contract as `synthesize`.
+/// no-verdict-is-an-error contract as `synthesize`. A non-empty `algo` is
+/// passed as `--algo=`.
 result<std::string> synthesize_game(const std::string& formula,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs, int timeout_sec);
+	const std::vector<std::string>& outs, int timeout_sec,
+	const std::string& algo = {});
 
 /// Run `autfilt --dot` on HOA text and return the rendered dot text.
 result<std::string> to_dot(const std::string& hoa_text, int timeout_sec);

@@ -491,6 +491,41 @@ State: 3
 		CHECK(g.controllable[1]);
 	}
 
+	TEST_CASE("[ALG-D-61] the acceptance of a run that sees no colour") {
+		CHECK(alg_d::acceptance_without_colors("Inf(0)") == false);
+		CHECK(alg_d::acceptance_without_colors("Fin(0)") == true);
+		CHECK(alg_d::acceptance_without_colors(" t") == true);
+		CHECK(alg_d::acceptance_without_colors("f") == false);
+		CHECK(alg_d::acceptance_without_colors(
+			"Fin(2) & (Inf(1) | Fin(0))") == true);
+		CHECK(alg_d::acceptance_without_colors(
+			"Inf(0) | (Fin(1) & Inf(2))") == false);
+		CHECK(alg_d::acceptance_without_colors("!Inf(3)") == true);
+		CHECK_FALSE(alg_d::acceptance_without_colors("Inf(0) &").has_value());
+		CHECK_FALSE(alg_d::acceptance_without_colors("Rabin").has_value());
+	}
+
+	TEST_CASE("[ALG-D-62] a parity acceptance is known, a Streett one is not") {
+		auto game = [](const std::string& acc) {
+			return alg_d::parse_synth_game_hoa("HOA: v1\nStates: 1\n"
+				"Start: 0\nAP: 1 \"p0\"\n" + acc + "--BODY--\n"
+				"State: 0\n[t] 0\n--END--\n");
+		};
+		auto buchi = game("acc-name: Buchi\nAcceptance: 1 Inf(0)\n");
+		CHECK(buchi.acc_known);
+		CHECK_FALSE(buchi.acc_accepts_uncolored);
+		auto cobuchi = game("acc-name: co-Buchi\nAcceptance: 1 Fin(0)\n");
+		CHECK(cobuchi.acc_known);
+		CHECK(cobuchi.acc_accepts_uncolored);
+		auto parity = game("acc-name: parity max odd 3\n"
+			"Acceptance: 3 Fin(2) & (Inf(1) | Fin(0))\n");
+		CHECK(parity.acc_known);
+		CHECK(parity.acc_accepts_uncolored);
+		auto streett = game("acc-name: Streett 1\n"
+			"Acceptance: 2 Fin(0) | Inf(1)\n");
+		CHECK_FALSE(streett.acc_known);
+	}
+
 	// AL-11 / AL-RT2 (re-port of the pre-rebase [ALG-D-45]): an HOA whose
 	// acceptance is `Acceptance: 0 t` and that carries NO acc-name: line is
 	// trivially-all.  Without this every state got priority 0 (env-good),
