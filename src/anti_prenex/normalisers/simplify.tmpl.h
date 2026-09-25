@@ -175,6 +175,8 @@ template <NodeType node>
 std::optional<pin<node>> find_pin_for(tref atom, tref x,
 	const var_order<node>& order)
 {
+	// A term built from the atom holds no variable the atom lacks.
+	if (!detail::free_in<node>(atom, x)) return {};
 	// The block is empty here (simplify.h): phase 2 has none, and a later
 	// caller hands in an atom its own guard already found `X`-free.
 	const tref f = detail::pin_term<node>(atom, {}, order);

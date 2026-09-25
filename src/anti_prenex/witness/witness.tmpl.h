@@ -247,6 +247,8 @@ std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c) {
 	// in the ∃ sense, and an order atom is no equation.
 	m = tau::trim_right_sibling(m);
 	if (!is_child<node>(m, tau::bf_eq)) return {};
+	// `TERM_OF(m)` holds no variable `m` lacks.
+	if (!detail::free_in<node>(m, x)) return {};
 	// `TERM_OF(m)` as it arrives IS `cof_memo`'s key (§1), so this site
 	// forms it itself.
 	const tref f = term_of<node>(m, c.order);

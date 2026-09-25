@@ -50,6 +50,8 @@ tref innermost(const block& vs, const ctx<node>& c) {
 template <NodeType node>
 bool probe(tref atom, const block& X, ctx<node>& c) {
 	using tau = tree<node>;
+	// `TERM_OF(atom)` holds no variable the atom lacks.
+	if (!fv_meets<node>(atom, X)) return false;
 	const tref f = term_of<node>(atom, c.order);
 	const block vs = fv_intersect<node>(f, X);
 	if (vs.empty()) return false;
