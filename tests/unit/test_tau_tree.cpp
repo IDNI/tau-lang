@@ -1473,6 +1473,39 @@ TEST_SUITE("tree::substitute") {
 		CHECK(tau::get(ra)[0].equals_T());
 	}
 
+	TEST_CASE("a named node goes through the hook once, after its arguments") {
+		// The atom `x·r(x) = 0` twice: shared, and holding a reference
+		// argument of its own.
+		tref A = tau::build_bf_eq_0(build_bf_and<node_t>(bf("x"),
+			ref_term(trefs{ bf("x") })));
+		tref f = tau::build_wff_and(tau::build_wff_or(A, wff("v2 = 0")),
+			tau::build_wff_or(A, wff("v3 = 0")));
+		std::vector<size_t> seen;
+		auto record = [&seen](tref n) {
+			seen.push_back(tau::get(n).get_type());
+			return n;
+		};
+		tref A_z = tau::build_bf_eq_0(build_bf_and<node_t>(bf("z"),
+			ref_term(trefs{ bf("z") })));
+		tref want = tau::build_wff_and(
+			tau::build_wff_or(A_z, wff("v2 = 0")),
+			tau::build_wff_or(A_z, wff("v3 = 0")));
+		CHECK(tau::get(f).substitute(bf("x"), bf("z"), {}, record, {},
+			is_atomic_fm<node_t>) == want);
+		CHECK(seen == std::vector<size_t>{ tau::bf, tau::wff });
+		// with no named kind the argument alone reaches the hook
+		seen.clear();
+		CHECK(tau::get(f).substitute(bf("x"), bf("z"), {}, record) == want);
+		CHECK(seen == std::vector<size_t>{ tau::bf });
+	}
+
+	TEST_CASE("the hook's result IS the new named node, folded into its parent") {
+		tref f = tau::build_wff_and(wff("x & v1 = 0"), wff("v2 = 0"));
+		auto to_T = [](tref) { return tau::_T(); };
+		CHECK(tau::get(f).substitute(bf("x"), bf("z"), {}, to_T, {},
+			is_atomic_fm<node_t>) == wff("v2 = 0"));
+	}
+
 	TEST_CASE("a rebound key is left alone") {
 		tref unit = wff("ex x (x & s1 = 0)");   // the bound x is "1"
 		tref bx = tau::trim_right_sibling(
