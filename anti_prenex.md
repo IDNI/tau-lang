@@ -469,7 +469,8 @@ TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
     // at ELIMINATE_BLOCK a clause holds no disjunction but a negative tree
     // (§1), which holds no pin, and §4 licenses no conjunct deletion inside
     // a unit.
-    D ← ∅ ; flipped ← false ; n ← Φ    // D: path-bound vars barred from FV(t)
+    D ← ∅ ; flipped ← false ; crossed ← false ; n ← Φ
+                                       // D: path-bound vars barred from FV(t)
     loop:
         S ← the members of n if n is a spine, else [n]   // any other node is
                                                          //   a one-member spine
@@ -478,16 +479,16 @@ TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
             //   contains ALL free occurrences of x
             return Φ with, at n: the pin dropped, x ← t in the members
                 // on a one-member spine the join is empty: T for ∃, F for ∀
-        if some member of S is a CASE PIN for x (∨-of-branches for ∃, dualized
-                for ∀; every branch pins x, x ∉ FV(tᵢ); ≤ K″ branches —
-                the case_max constant, read bare: phase 2 predates any
-                ctx) and FV(that member) ∩ D = ∅:
-            // the WHOLE member must avoid D, not only the tᵢ: past a kind
-            //   flip the branch CHOICE may not depend on the inner
-            //   variable — ∃x∀y.((y = 0 ∧ x = 0) ∨ (y ≠ 0 ∧ x = 1)) is F,
-            //   its rewrite ∀y.(y = 0 ∨ y ≠ 0) is T, tᵢ constant. Before
-            //   the flip the binders commute above Qx, and the member may
-            //   use them, like t in the plain pin
+        if not crossed and some member of S is a CASE PIN for x
+                (∨-of-branches for ∃, dualized for ∀; every branch pins x,
+                x ∉ FV(tᵢ); ≤ K″ branches — the case_max constant, read
+                bare: phase 2 predates any ctx):
+            // In Qx's own body only. Below a binder the rewrite would copy
+            //   every inner run's material once per branch before phase 4
+            //   has pushed any of it; phase 4's case-witness step meets the
+            //   same pin at Qx's block, over what the inner runs left. With
+            //   no binder crossed, D is empty: the branch CHOICE depends on
+            //   nothing bound below Qx
             return Φ with, at n: the spine replaced by
                 ⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus the member))[x ← tᵢ]
                 // connectives and pin sense in the ∀ form under ¬∃x¬, as
@@ -497,6 +498,7 @@ TRY_WITNESS_DEEP(Q, x, Φ) → formula | ⊥:             // phase 2 only
             if x free in ≥ 2 members: return ⊥      // x-free siblings ride
             n ← the one member holding x            //   along outside Qx
         else if n = Q′v.χ:
+            crossed ← true
             if Q′ ≠ Q: flipped ← true
             if flipped: D ← D ∪ {v}    // Q-kind vars before the flip commute
             n ← χ                      //   above Qx and stay usable in t
@@ -522,7 +524,8 @@ consumes it in the case-witness step (§6's ladder):
 TRY_CASE_WITNESS(x, ψ, ctx) → (branches, R) | ⊥:      // ψ a conjunction; ∃ form —
     // Guarded assignments —                          //   phase 4 pushes ∃ only
     //   (c ∧ x = t₁) ∨ (¬c ∧ x = t₂) — are the shape a program rule takes
-    //   after TO_NNF; the pins sit under the disjunction where neither
+    //   after TO_NNF: Tau builds `c ? a : b` as (c ∧ a) ∨ (¬c ∧ b). The
+    //   pins sit under the disjunction where neither
     //   TRY_WITNESS nor a clause can see them. The rewrite distributes and
     //   witnesses:
     //       ∃x.(D ∧ R) = ⋁ᵢ ∃x.(dᵢ ∧ R) = ⋁ᵢ (dᵢ ∧ R)[x ← tᵢ]
