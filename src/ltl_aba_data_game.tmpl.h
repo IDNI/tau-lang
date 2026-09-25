@@ -299,15 +299,15 @@ struct data_bdd {
 		};
 		return go(a);
 	}
-	// Every variable v of `a` renamed v - d; false in `ok` when one is
-	// below d.
-	id lower(id a, uint32_t d, bool& ok) {
+	// Every variable v of `a` renamed v - d; false in `ok` when v modulo
+	// `block` is below d.
+	id lower(id a, uint32_t d, uint32_t block, bool& ok) {
 		std::unordered_map<id, id> seen;
 		std::function<id(id)> go = [&](id n) -> id {
 			if (n <= T) return n;
 			if (auto it = seen.find(n); it != seen.end()) return it->second;
 			const nd x = nodes[n];
-			if (x.var < d) { ok = false; return F; }
+			if (x.var % block < d) { ok = false; return F; }
 			const id r = mk(x.var - d, go(x.lo), go(x.hi));
 			seen.emplace(n, r);
 			return r;
@@ -324,23 +324,41 @@ struct data_bdd {
 // which of its values are equal (its equality type); the codes realize
 // every such type of a window, and so does the type when it has as many
 // elements as a window has values plus 0 and 1 (make_code_window checks
-// it), which makes the game on the codes the game on the data. The bits of
-// stream s at step t-k are variables k * per_step + offset[s] + b, so
-// moving a region to the next step subtracts per_step.
+// it), which makes the game on the codes the game on the data.
+//
+// A stream also compared with the complement of another (x = y') takes an
+// orbit code instead: in a Boolean algebra no value is its own complement,
+// so the values fall into pairs {v, v'}, {0, 1} among them. The code is the
+// pair (bits 0 .. width-2, pair 0 for {0, 1}) and which of the two it is
+// (the last bit, 1 for 1 and for the complement of the value first met).
+// Equalities and complements read the values only through these pairs, and
+// the type realizes every such pattern of a window when it has as many
+// values, none equal to another or to its complement, as the window holds
+// (make_code_window checks it).
+//
+// Bit b of stream s at step t-k is variable b * block() + k * S + s, S the
+// number of streams: the same bit of every value sits in one layer, so an
+// equality of two values stays small in the BDD, and moving a region to the
+// next step subtracts S.
 struct code_window {
 	struct stream {
 		std::string name;
 		bool input = false;
 		bool two = false;       // a two-element type, one bit
-		size_t width = 1, offset = 0;
+		bool orbit = false;     // an orbit code, see above
+		size_t width = 1;
 	};
 	std::vector<stream> streams;
 	std::map<std::string, size_t> index;
-	size_t per_step = 0, depth = 0;
-	uint32_t var(size_t s, size_t k, size_t b) const {
-		return (uint32_t)(k * per_step + streams[s].offset + b);
+	size_t depth = 0, max_width = 0;
+	uint32_t block() const {
+		return (uint32_t)((depth + 1) * streams.size());
 	}
-	uint32_t vars() const { return (uint32_t)((depth + 1) * per_step); }
+	uint32_t step() const { return (uint32_t)streams.size(); }
+	uint32_t var(size_t s, size_t k, size_t b) const {
+		return (uint32_t)(b * block() + k * streams.size() + s);
+	}
+	uint32_t vars() const { return (uint32_t)(max_width * block()); }
 };
 
 // One side of an equality read on codes: an io_var (its variable node) or
@@ -350,12 +368,14 @@ struct code_side { tref var = nullptr; int constant = -1; };
 
 // The sides of `cmp` when it is an equality or a disequality between io_vars
 // and the constants 0 and 1, else nullopt; `equal` tells which. A
-// complement is read off: x' = c is x = c', and x' = y' is x = y.
+// complement is read off: x' = c is x = c', and x' = y' is x = y; `flip`
+// tells an equality of one variable with the complement of the other.
 template <NodeType node>
 static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
-	bool& equal)
+	bool& equal, bool& flip)
 {
 	using tau = tree<node>;
+	flip = false;
 	const auto& t = tau::get(cmp);
 	if (!t.has_child()) return std::nullopt;
 	const auto nt = t[0].value.nt;
@@ -381,7 +401,7 @@ static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
 		complement[i] = true;
 	}
 	if (sides[0].var && sides[1].var) {
-		if (complement[0] != complement[1]) return std::nullopt;
+		flip = complement[0] != complement[1];
 		return sides;
 	}
 	for (size_t i = 0; i < 2; ++i)
@@ -389,8 +409,50 @@ static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
 	return sides;
 }
 
+// Whether a window of `n` values of type `tid` realizes every pattern its
+// codes can take: `n` values distinct from 0, 1 and one another, and with
+// `orbits` from each other's complements, none its own complement.
+template <NodeType node>
+static bool codes_realized(size_t tid, size_t n, bool orbits) {
+	using tau = tree<node>;
+	auto var = [&](size_t j) {
+		return build_out_var_at_t<node>(build_var_name<node>(
+			"o__code" + std::to_string(j)), tid);
+	};
+	auto decided_false = [](tref f) {
+		auto sat = is_non_temp_nso_satisfiable<node>(f);
+		return sat.has_value() && !sat.value();
+	};
+	if (orbits) {
+		tref x = var(0);
+		if (!decided_false(tau::build_bf_eq(x, tau::build_bf_neg(x)))
+			|| !decided_false(tau::build_bf_neq(x, tau::build_bf_neg(
+				tau::build_bf_neg(x))))
+			|| !decided_false(tau::build_bf_neq(build_bf_t_type<node>(tid),
+				tau::build_bf_neg(build_bf_f_type<node>(tid)))))
+				return false;
+	}
+	tref all = tau::_T();
+	trefs fresh;
+	for (size_t j = 0; j < n; ++j) {
+		tref x = var(j);
+		all = tau::build_wff_and(all, tau::build_wff_and(
+			tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
+			tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
+		for (tref y : fresh) {
+			all = tau::build_wff_and(all, tau::build_bf_neq(x, y));
+			if (orbits) all = tau::build_wff_and(all,
+				tau::build_bf_neq(x, tau::build_bf_neg(y)));
+		}
+		fresh.push_back(x);
+	}
+	auto sat = is_non_temp_nso_satisfiable<node>(all);
+	return sat.has_value() && sat.value();
+}
+
 // The code window of `atoms`, when every stream has a two-element type or
-// is read only through equalities; at most `max_vars` variables.
+// is read only through equalities and complements; at most `max_vars`
+// variables.
 template <NodeType node>
 static std::optional<code_window> make_code_window(
 	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars)
@@ -413,15 +475,18 @@ static std::optional<code_window> make_code_window(
 			w.streams.push_back(s);
 			type_of[it->second] = find_ba_type<node>(v);
 		}
-	// A stream of another type is read only through equalities.
+	// A stream of another type is read only through equalities, and the
+	// types some complement relates take orbit codes.
+	std::set<size_t> orbit_types;
 	for (auto& [atom, _] : atoms)
 		for (tref c : tau::get(atom).select_all(is_aba_comparison<node>)) {
 			auto vars = tau::get(c).select_top(is_child<node, tau::io_var>);
 			if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
 				return w.streams[w.index.at(get_var_name<node>(v))].two; }))
 					continue;
-			bool equal;
-			if (!code_equality<node>(c, equal)) return std::nullopt;
+			bool equal, flip;
+			if (!code_equality<node>(c, equal, flip)) return std::nullopt;
+			if (flip) orbit_types.insert(find_ba_type<node>(vars[0]));
 		}
 	// Each such type needs as many values as a window holds, plus 0 and 1.
 	std::map<size_t, size_t> slots;
@@ -429,28 +494,18 @@ static std::optional<code_window> make_code_window(
 		if (!w.streams[s].two) slots[type_of[s]] += w.depth + 1;
 	std::map<size_t, size_t> width;
 	for (auto& [tid, n] : slots) {
+		const bool orbits = orbit_types.contains(tid);
+		// codes 0 .. n+1, or pairs 0 .. n and the bit telling the value
 		size_t bits = 1;
-		while ((size_t{1} << bits) < n + 2) ++bits;
-		width[tid] = bits;
-		tref all = tau::_T();
-		trefs fresh;
-		for (size_t j = 0; j < n; ++j) {
-			tref x = build_out_var_at_t<node>(build_var_name<node>(
-				"o__code" + std::to_string(j)), tid);
-			all = tau::build_wff_and(all, tau::build_wff_and(
-				tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
-				tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
-			for (tref y : fresh)
-				all = tau::build_wff_and(all, tau::build_bf_neq(x, y));
-			fresh.push_back(x);
-		}
-		auto sat = is_non_temp_nso_satisfiable<node>(all);
-		if (!sat.has_value() || !sat.value()) return std::nullopt;
+		while ((size_t{1} << bits) < n + (orbits ? 1 : 2)) ++bits;
+		width[tid] = bits + (orbits ? 1 : 0);
+		if (!codes_realized<node>(tid, n, orbits)) return std::nullopt;
 	}
 	for (size_t s = 0; s < w.streams.size(); ++s) {
-		w.streams[s].width = w.streams[s].two ? 1 : width[type_of[s]];
-		w.streams[s].offset = w.per_step;
-		w.per_step += w.streams[s].width;
+		auto& x = w.streams[s];
+		x.orbit = !x.two && orbit_types.contains(type_of[s]);
+		x.width = x.two ? 1 : width[type_of[s]];
+		w.max_width = std::max(w.max_width, x.width);
 	}
 	if (w.vars() > max_vars) return std::nullopt;
 	return w;
@@ -495,21 +550,27 @@ struct code_regions {
 		return qs;
 	}
 
-	// The code of io_var `v` equals `c`, or the code of io_var `u`.
-	region code_eq(tref v, int c, tref u) {
+	// The value of io_var `v` equals the constant `c`, or the value of io_var
+	// `u`, or its complement with `flip`.
+	region code_eq(tref v, int c, tref u, bool flip = false) {
 		const size_t s = w.index.at(get_var_name<node>(v));
 		const size_t k = (size_t)get_io_var_shift<node>(v);
+		const auto& x = w.streams[s];
+		// the last bit of an orbit code tells the value of its pair
+		const size_t last = x.orbit ? x.width - 1 : x.width;
 		region r = data_bdd::T;
-		for (size_t b = 0; b < w.streams[s].width; ++b) {
+		for (size_t b = 0; b < x.width; ++b) {
 			region bit;
 			if (u) {
 				const size_t s2 = w.index.at(get_var_name<node>(u));
 				const size_t k2 = (size_t)get_io_var_shift<node>(u);
-				region x = bdd.var(w.var(s, k, b));
-				region y = bdd.var(w.var(s2, k2, b));
-				bit = bdd.disj(bdd.conj(x, y),
-					bdd.conj(bdd.neg(x), bdd.neg(y)));
-			} else bit = bdd.var(w.var(s, k, b), (c >> b) & 1);
+				region p = bdd.var(w.var(s, k, b));
+				region q = bdd.var(w.var(s2, k2, b), !(flip && b == last));
+				bit = bdd.disj(bdd.conj(p, q),
+					bdd.conj(bdd.neg(p), bdd.neg(q)));
+			} else if (x.orbit)
+				bit = bdd.var(w.var(s, k, b), b == last && c == 1);
+			else bit = bdd.var(w.var(s, k, b), (c >> b) & 1);
 			r = bdd.conj(r, bit);
 		}
 		return r;
@@ -586,12 +647,12 @@ struct code_regions {
 		if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
 			return w.streams[w.index.at(get_var_name<node>(v))].two; }))
 				return two_element(f);
-		bool equal;
-		auto sides = code_equality<node>(f, equal);
+		bool equal, flip;
+		auto sides = code_equality<node>(f, equal, flip);
 		if (!sides) return std::nullopt;
 		auto& [l, rr] = *sides;
 		region r;
-		if (l.var && rr.var) r = code_eq(l.var, -1, rr.var);
+		if (l.var && rr.var) r = code_eq(l.var, -1, rr.var, flip);
 		else if (l.var) r = code_eq(l.var, rr.constant, nullptr);
 		else if (rr.var) r = code_eq(rr.var, l.constant, nullptr);
 		else r = l.constant == rr.constant ? data_bdd::T : data_bdd::F;
@@ -623,7 +684,7 @@ struct code_regions {
 			region tgt = mine ? Y[e.dst] : bdd.disj(Y[e.dst], bdd.neg(G[e.dst]));
 			if (e.shift) {
 				bool ok = true;
-				tgt = bdd.lower(tgt, (uint32_t)w.per_step, ok);
+				tgt = bdd.lower(tgt, w.step(), w.block(), ok);
 				if (!ok) { failed = true; return data_bdd::F; }
 			}
 			const region l = labels[edge_base[i] + j];
@@ -641,7 +702,7 @@ struct code_regions {
 		region tgt = Y[e.dst];
 		if (e.shift) {
 			bool ok = true;
-			tgt = bdd.lower(tgt, (uint32_t)w.per_step, ok);
+			tgt = bdd.lower(tgt, w.step(), w.block(), ok);
 			if (!ok) { failed = true; return data_bdd::F; }
 		}
 		return check(bdd.conj(labels[edge_base[i] + j], tgt));
@@ -986,9 +1047,15 @@ protected:
 		return std::nullopt;
 	}
 
+	static tref complement(tref x) {
+		return normalize_ba<node>(tau::build_bf_neg(x));
+	}
+
 	// The bits of the known values of `win`, -1 for an unknown one. A
 	// value of a coded stream gets code 0 when it is 0, 1 when it is 1,
-	// and otherwise the code of the first equal value met or a new one.
+	// and otherwise the code of the first equal value met or a new one; a
+	// value of an orbit-coded stream gets the pair of the first value met
+	// it equals or complements, or a new one.
 	std::optional<std::vector<int>> encode(const window& win) {
 		std::vector<int> bits(w.vars(), -1);
 		std::map<size_t, std::vector<std::pair<tref, size_t>>> seen;
@@ -997,27 +1064,37 @@ protected:
 				tref x = win[s][k];
 				if (!x) continue;
 				const size_t tid = streams[s].tid;
+				const auto& ws = w.streams[s];
 				size_t c;
 				auto one = same(x, build_bf_t_type<node>(tid));
 				if (!one) return std::nullopt;
-				if (w.streams[s].two) c = *one ? 1 : 0;
-				else if (*one) c = 1;
+				if (ws.two) c = *one ? 1 : 0;
+				else if (*one) c = ws.orbit ? size_t{1} << (ws.width - 1) : 1;
 				else {
 					auto zero = same(x, build_bf_f_type<node>(tid));
 					if (!zero) return std::nullopt;
 					if (*zero) c = 0;
 					else {
 						auto& reps = seen[tid];
-						c = reps.size() + 2;
+						const size_t fresh = ws.orbit ? reps.size() + 1
+							: reps.size() + 2;
+						c = fresh;
 						for (auto& [y, cy] : reps) {
 							auto eq = same(x, y);
 							if (!eq) return std::nullopt;
 							if (*eq) { c = cy; break; }
+							if (!ws.orbit) continue;
+							auto neq = same(x, complement(y));
+							if (!neq) return std::nullopt;
+							if (*neq) {
+								c = cy | size_t{1} << (ws.width - 1);
+								break;
+							}
 						}
-						if (c == reps.size() + 2) reps.emplace_back(x, c);
+						if (c == fresh) reps.emplace_back(x, c);
 					}
 				}
-				for (size_t b = 0; b < w.streams[s].width; ++b)
+				for (size_t b = 0; b < ws.width; ++b)
 					bits[w.var(s, k, b)] = (int)(c >> b & 1);
 			}
 		return bits;
@@ -1071,36 +1148,64 @@ protected:
 		for (size_t i = 0; i < slots.size(); ++i) {
 			auto [s, k, x] = slots[i];
 			const size_t tid = streams[s].tid;
+			const auto& ws = w.streams[s];
 			const size_t c = code_of(bits, s, k);
-			if (w.streams[s].two || c < 2) {
-				f = tau::build_wff_and(f, tau::build_bf_eq(x, c
-					? build_bf_t_type<node>(tid)
-					: build_bf_f_type<node>(tid)));
+			// an orbit code: the pair and the value in it
+			const size_t side = ws.orbit ? c >> (ws.width - 1) : 0;
+			const size_t pair = ws.orbit
+				? c & ((size_t{1} << (ws.width - 1)) - 1) : c;
+			auto as = [&](tref y, size_t other) {
+				return ws.orbit && side != other ? complement(y) : y;
+			};
+			if (ws.two || (ws.orbit ? pair == 0 : c < 2)) {
+				f = tau::build_wff_and(f, tau::build_bf_eq(x,
+					(ws.orbit ? side : c) ? build_bf_t_type<node>(tid)
+						: build_bf_f_type<node>(tid)));
 				continue;
 			}
+			auto same_pair = [&](size_t c2) {
+				return ws.orbit ? (c2 & ((size_t{1} << (ws.width - 1)) - 1))
+					== pair : c2 == c;
+			};
+			auto side_of = [&](size_t c2) {
+				return ws.orbit ? c2 >> (ws.width - 1) : 0;
+			};
 			tref known = nullptr;
 			for (size_t s2 = 0; s2 < streams.size() && !known; ++s2)
 				if (streams[s2].tid == tid && !w.streams[s2].two)
 					for (size_t k2 = 0; k2 < win[s2].size(); ++k2)
-						if (win[s2][k2] && code_of(bits, s2, k2) == c)
-							{ known = win[s2][k2]; break; }
+						if (win[s2][k2] && same_pair(code_of(bits, s2, k2))) {
+							known = as(win[s2][k2],
+								side_of(code_of(bits, s2, k2)));
+							break;
+						}
 			if (known) {
 				f = tau::build_wff_and(f, tau::build_bf_eq(x, known));
 				continue;
 			}
-			// a value none of the window holds
+			// a value none of the window holds, nor its complement
 			f = tau::build_wff_and(f, tau::build_wff_and(
 				tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
 				tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
 			for (size_t s2 = 0; s2 < streams.size(); ++s2)
 				if (streams[s2].tid == tid)
-					for (tref y : win[s2]) if (y)
+					for (tref y : win[s2]) if (y) {
 						f = tau::build_wff_and(f, tau::build_bf_neq(x, y));
+						if (ws.orbit) f = tau::build_wff_and(f,
+							tau::build_bf_neq(x, complement(y)));
+					}
 			for (size_t i2 = 0; i2 < i; ++i2) {
 				auto [s2, k2, y] = slots[i2];
 				if (streams[s2].tid != tid || w.streams[s2].two) continue;
-				f = tau::build_wff_and(f, code_of(bits, s2, k2) == c
-					? tau::build_bf_eq(x, y) : tau::build_bf_neq(x, y));
+				const size_t c2 = code_of(bits, s2, k2);
+				if (same_pair(c2))
+					f = tau::build_wff_and(f, tau::build_bf_eq(x,
+						side_of(c2) == side ? y : tau::build_bf_neg(y)));
+				else {
+					f = tau::build_wff_and(f, tau::build_bf_neq(x, y));
+					if (ws.orbit) f = tau::build_wff_and(f,
+						tau::build_bf_neq(x, tau::build_bf_neg(y)));
+				}
 			}
 		}
 		return f;
@@ -1331,10 +1436,9 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	if (!built) return r.with_value(data_game_verdict::undecided);
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
-	bool on_codes = false;
 	if (window) {
 		code_regions<node> codes(arena, *window, size_t{1} << 21);
-		if ((on_codes = codes.init())) {
+		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
 			data_game_solver solver(codes, arena, 0, keep);
 			auto w = solver.solve_all();
@@ -1355,7 +1459,8 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			}
 		}
 	}
-	if (!on_codes && formulas) {
+	// codes the BDD cannot hold leave the game to the formulas
+	if (!wins && formulas) {
 		formula_regions<node> regions(arena);
 		data_game_solver solver(regions, arena,
 			ltl_max_refinement_rounds(), keep);

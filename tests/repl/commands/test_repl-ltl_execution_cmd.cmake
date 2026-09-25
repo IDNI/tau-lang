@@ -68,3 +68,10 @@ add_ltl_run_test(data_game_strategy_new_value
 	"run (always o2[t] = o1[t-1]) && (sometimes o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t]).\\nF.\\nT.\\nF.\\nq\\nq\\n"
 	"o2\\[0\\] := <[^\n]*\n(.*\n)*o1\\[2\\] := "
 	"no strategy|not executable|unsat")
+
+# the strategy of a game on codes of complement pairs: o1 is the complement
+# of i1 two steps before (\x27 is the complement mark for printf)
+add_ltl_run_test(data_game_strategy_complement_codes
+	"run (always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && i1[t-2] = o1[t]\\x27)) && (sometimes (o1[t] = 1 && o2[t] = o2[t-1]\\x27)) && (sometimes (o1[t-1] = i2[t-1])).\\nF.\\nT.\\nT.\\nF.\\nF.\\nF.\\nT.\\nT.\\nq\\nq\\n"
+	"o1\\[2\\] := T\n(.*\n)*o1\\[3\\] := F"
+	"no strategy|not executable|unsat")

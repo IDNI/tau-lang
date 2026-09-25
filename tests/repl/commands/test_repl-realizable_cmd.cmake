@@ -891,3 +891,10 @@ add_repl_test(realizable_cmd-data_game_sat_ltl_spelling
 # is o1 two steps back, so o3[t-1] = 1 && o2[t] = o3[t-1] never holds.
 add_repl_test(realizable_cmd-data_game_equalities_over_default_type
 	"set ltlrefinementrounds 4. realizable (always o1[0] = 1 && o3[0] = 0 && o2[t] = o1[t-2] && o3[t] = o2[t-2] && o3[t-2] = o1[t-2]) && (sometimes (o3[t-1] = 1 && o2[t] = o3[t-1]))" ": F")
+
+# A value compared with the complement of another is read on codes of the
+# pairs {v, v'}, so the game is played on the codes instead of on formulas.
+add_repl_test(realizable_cmd-data_game_complement_codes
+	"realizable (always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && i1[t-2] = o1[t]')) && (sometimes (o1[t] = 1 && o2[t] = o2[t-1]')) && (sometimes (o1[t-1] = i2[t-1]))" ": T")
+set_tests_properties("test_repl-realizable_cmd-data_game_complement_codes"
+	PROPERTIES TIMEOUT 60)
