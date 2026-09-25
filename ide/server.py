@@ -904,6 +904,7 @@ HELP_COMMANDS = """
 | `mnf phi.` | Convert to Minterm Normal Form |
 | `anf phi.` | Convert to Algebraic Normal Form |
 | `onf var phi.` | Convert to Order Normal Form w.r.t. variable |
+| `without phi clause.` | Normal form of an always-conjunction without one conjunct |
 | `qelim phi.` | Quantifier elimination |
 
 ### Execution

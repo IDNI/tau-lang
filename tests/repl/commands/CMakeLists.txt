@@ -57,6 +57,7 @@ include(test_repl-solver_cmd.cmake)
 include(test_repl-lgrs_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
+include(test_repl-without_cmd.cmake)
 include(test_repl-run_cmd.cmake)
 include(test_repl-run_cmd-crash_regression.cmake)
 

@@ -19,7 +19,7 @@ const TauSyntax = {
     'help', 'quit', 'version', 'clear', 'valid', 'sat', 'unsat',
     'solve', 'lgrs', 'run', 'ltl', 'normalize',
     'subst', 'substitute', 'inst', 'instantiate',
-    'dnf', 'cnf', 'anf', 'nnf', 'pnf', 'mnf', 'onf', 'qelim',
+    'dnf', 'cnf', 'anf', 'nnf', 'pnf', 'mnf', 'onf', 'without', 'qelim',
     'whatis', 'reset', 'fragment', 'func',
     'get', 'set', 'enable', 'disable', 'toggle',
     'defs', 'definitions', 'hist', 'history',
