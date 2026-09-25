@@ -35,6 +35,7 @@
 // normal_forms.h, which declares what its body uses before the body.
 #include "normal_forms.h"
 
+#include <cstdint>
 #include <optional>
 
 namespace idni::tau_lang::anti_prenexing {
@@ -283,6 +284,102 @@ private:
 	}
 };
 
+/// Refutes the cofactor check on 64 content-derived assignments at once: the
+/// hooks folding a cofactor are Boolean identities, so cofactors whose words
+/// differ are never one node. A skeleton node the hooks interpret is refused.
+template <NodeType node>
+struct cofactor_refuter {
+	explicit cofactor_refuter(tref t) {
+		using tau = tree<node>;
+		subtree_unordered_map<node, uint32_t> at;  // `bf` node -> its step
+		auto index = [&at](tref n) { return at.find(n)->second; };
+		auto admit = [](tref n) {
+			const tau& tn = tau::get(n);
+			return tn.is(tau::bf) || tn.is(tau::bf_and)
+				|| tn.is(tau::bf_or) || tn.is(tau::bf_xor)
+				|| tn.is(tau::bf_neg);
+		};
+		auto visit = [this](tref n) {
+			const tau& tn = tau::get(n);
+			if (!tn.is(tau::bf)) return true;
+			switch (tau::get(tn.first()).get_type()) {
+			case tau::bf_and: case tau::bf_or: case tau::bf_xor:
+			case tau::bf_neg: case tau::variable: case tau::bf_ref:
+			case tau::bf_t: case tau::bf_f: return true;
+			default: return ok = false;
+			}
+		};
+		// splitmix64's finaliser: the node hash alone spreads too few of
+		// its bits to make 64 independent assignments.
+		auto word = [](tref n) {
+			uint64_t z = hash_lcrs_tref<node>{}(n);
+			z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+			z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+			return z ^ (z >> 31);
+		};
+		auto up = [&](tref n) {
+			const tau& tn = tau::get(n);
+			if (!tn.is(tau::bf)) return;
+			const tau& c = tau::get(tn.first());
+			step s{ op::leaf, 0, 0, 0, nullptr };
+			switch (c.get_type()) {
+			case tau::bf_and: s = { op::conj, index(c.first()),
+				index(c.second()), 0, nullptr }; break;
+			case tau::bf_or: s = { op::disj, index(c.first()),
+				index(c.second()), 0, nullptr }; break;
+			case tau::bf_xor: s = { op::sum, index(c.first()),
+				index(c.second()), 0, nullptr }; break;
+			case tau::bf_neg: s = { op::neg, index(c.first()), 0, 0,
+				nullptr }; break;
+			case tau::bf_t: s.w = ~uint64_t{0}; break;
+			case tau::bf_f: break;
+			case tau::variable: s.n = n, s.w = word(n); break;
+			default: s.w = word(n);                   // a reference
+			}
+			at.emplace(n, static_cast<uint32_t>(steps.size()));
+			steps.push_back(s);
+		};
+		pre_order<node>(t).search_unique(visit, admit, up);
+		if (ok) w0.resize(steps.size()), w1.resize(steps.size());
+	}
+
+	/// Do `t[key←0]` and `t[key←1]` differ under one of the 64 assignments?
+	/// `false` decides nothing.
+	bool differ(tref key) {
+		using tau = tree<node>;
+		if (!ok) return false;
+		const tau& k = tau::get(key);
+		for (size_t i = 0; i < steps.size(); ++i) {
+			const step& s = steps[i];
+			switch (s.o) {
+			case op::leaf:
+				// The substitution's own occurrence test.
+				if (s.n != nullptr && tau::get(s.n) == k)
+					w0[i] = 0, w1[i] = ~uint64_t{0};
+				else w0[i] = w1[i] = s.w;
+				break;
+			case op::conj: w0[i] = w0[s.a] & w0[s.b],
+				w1[i] = w1[s.a] & w1[s.b]; break;
+			case op::disj: w0[i] = w0[s.a] | w0[s.b],
+				w1[i] = w1[s.a] | w1[s.b]; break;
+			case op::sum: w0[i] = w0[s.a] ^ w0[s.b],
+				w1[i] = w1[s.a] ^ w1[s.b]; break;
+			case op::neg: w0[i] = ~w0[s.a], w1[i] = ~w1[s.a]; break;
+			}
+		}
+		// The root's step is the last: the walk closes it last.
+		return w0.back() != w1.back();
+	}
+
+private:
+	enum class op : unsigned char { leaf, conj, disj, sum, neg };
+	// A leaf's `n` is set on a variable alone, the only leaf a key can be.
+	struct step { op o; uint32_t a, b; uint64_t w; tref n; };
+	std::vector<step> steps;
+	std::vector<uint64_t> w0, w1;
+	bool ok = true;
+};
+
 /// §3 `SIMPLIFY_TERM`'s fourth law, the COFACTOR CHECK (terms.h says what it
 /// means). The variables are read off the term handed in and then tried ON
 /// THE RUNNING term, so the ones after a replacement are tried on the smaller
@@ -295,15 +392,20 @@ tref cofactor_check(tref t, const var_order<node>& order) {
 	// Copied rather than held: the walks below write to the cache this
 	// list comes from.
 	const trefs vars = get_free_vars<node>(t);
+	// Built for the running term at its first candidate variable.
+	std::optional<cofactor_refuter<node>> refuter;
 	for (tref y : vars) {
 		if (order.contains(y)) continue;
 		const tref key = tau::get(tau::bf, y);
+		if (!refuter) refuter.emplace(t);
+		if (refuter->differ(key)) continue;
 		const size_t ba = find_ba_type<node>(y);
 		const tref f0 = tau::get(t).substitute(key, _0<node>(ba),
 			order, identity, while_is_boolean_operation<node>);
 		const tref f1 = tau::get(t).substitute(key, _1<node>(ba),
 			order, identity, while_is_boolean_operation<node>);
 		if (f0 != f1) continue;
+		if (f0 != t) refuter.reset();
 		t = f0;
 		if (tau::get(t).equals_0() || tau::get(t).equals_1()) break;
 	}
