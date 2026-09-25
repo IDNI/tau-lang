@@ -183,6 +183,13 @@ struct formula_regions {
 	std::optional<bool> reached(tref f) {
 		return dq.reached_before_start(f);
 	}
+	// The positions from which the chooser of vertex `i` takes edge `j`
+	// into `Y`.
+	tref move(int i, size_t j, const std::vector<tref>& Y) {
+		const auto& e = a.v[i].edges[j];
+		tref tgt = e.shift ? shift_io_vars<node>(Y[e.dst], 1) : Y[e.dst];
+		return norm(tau::build_wff_and(e.label, tgt));
+	}
 
 	tref pre(int p, int i, const std::vector<tref>& Y,
 		const std::vector<tref>& G)
@@ -629,6 +636,17 @@ struct code_regions {
 		return check(body);
 	}
 
+	region move(int i, size_t j, const std::vector<region>& Y) {
+		const auto& e = a.v[i].edges[j];
+		region tgt = Y[e.dst];
+		if (e.shift) {
+			bool ok = true;
+			tgt = bdd.lower(tgt, (uint32_t)w.per_step, ok);
+			if (!ok) { failed = true; return data_bdd::F; }
+		}
+		return check(bdd.conj(labels[edge_base[i] + j], tgt));
+	}
+
 	std::optional<bool> reached(region r) {
 		for (size_t k = 1; k <= w.depth; ++k) {
 			r = bdd.quantify(r, step_vars(k, false), true);
@@ -639,21 +657,37 @@ struct code_regions {
 	}
 };
 
-// Zielonka's algorithm over the regions of `R`.
+// Zielonka's algorithm over the regions of `R`. With `record` set, it also
+// keeps a winning strategy of the system: for each system vertex and edge,
+// the positions (history, inputs and the outputs chosen) from which the
+// system takes that edge. The strategy is positional and composed as in
+// the proof of Zielonka's algorithm: in an attractor of the system, the
+// moves into the part attracted earlier (a rank that decreases); in the
+// vertices of the top priority when it is odd and the system wins the whole
+// subgame, any move staying in the subgame; elsewhere the strategies of the
+// subgames solved recursively. The domains of these pieces are disjoint, so
+// their union is one strategy.
 template <typename R>
 struct data_game_solver {
 	using region = typename R::region;
+	using moves_t = std::vector<std::vector<region>>;
 	R& r;
 	size_t n;
 	size_t max_rounds;
+	bool record;
 	std::vector<std::vector<int>> preds;
-	std::vector<int> priority;
+	std::vector<int> priority, owner;
+	std::vector<size_t> edges;
 
-	data_game_solver(R& regions, const auto& arena, size_t rounds)
-		: r(regions), n(arena.v.size()), max_rounds(rounds), preds(n)
+	data_game_solver(R& regions, const auto& arena, size_t rounds,
+		bool keep_strategy = false)
+		: r(regions), n(arena.v.size()), max_rounds(rounds),
+		record(keep_strategy), preds(n)
 	{
 		for (size_t i = 0; i < n; ++i) {
 			priority.push_back(arena.v[i].priority);
+			owner.push_back(arena.v[i].owner);
+			edges.push_back(arena.v[i].edges.size());
 			for (const auto& e : arena.v[i].edges)
 				if (std::find(preds[e.dst].begin(), preds[e.dst].end(),
 					(int)i) == preds[e.dst].end())
@@ -661,13 +695,33 @@ struct data_game_solver {
 		}
 	}
 
+	struct won {
+		std::vector<region> env, sys;
+		moves_t moves;   // of the system, over its region
+	};
+
+	moves_t no_moves() const {
+		moves_t m(n);
+		if (record) for (size_t i = 0; i < n; ++i)
+			if (owner[i] == 1) m[i].assign(edges[i], r.bottom());
+		return m;
+	}
+	void add_moves(moves_t& to, const moves_t& from) {
+		for (size_t i = 0; i < from.size(); ++i)
+			for (size_t j = 0; j < from[i].size(); ++j)
+				to[i][j] = r.disj(to[i][j], from[i][j]);
+	}
+
 	bool empty(const std::vector<region>& X) {
 		for (const auto& x : X) if (!r.empty(x)) return false;
 		return true;
 	}
 
+	// The attractor of `Y` for player `p` in the subgame `G`; with `moves`,
+	// the system's moves of each position it adds into the part added
+	// before it.
 	std::vector<region> attractor(int p, std::vector<region> Y,
-		const std::vector<region>& G)
+		const std::vector<region>& G, moves_t* moves = nullptr)
 	{
 		std::vector<bool> dirty(n, true);
 		for (size_t round = 0; !r.failed; ++round) {
@@ -682,7 +736,12 @@ struct data_game_solver {
 				if (r.empty(G[i])) continue;
 				region grown = r.disj(Y[i],
 					r.conj(G[i], r.pre(p, (int)i, Y, G)));
-				if (r.empty(r.minus(grown, Y[i]))) continue;
+				region added = r.minus(grown, Y[i]);
+				if (r.empty(added)) continue;
+				if (moves && owner[i] == 1)
+					for (size_t j = 0; j < edges[i]; ++j)
+						(*moves)[i][j] = r.disj((*moves)[i][j],
+							r.conj(added, r.move((int)i, j, Y)));
 				Y[i] = std::move(grown);
 				changed = true;
 				for (int j : preds[i]) dirty[j] = true;
@@ -700,49 +759,552 @@ struct data_game_solver {
 		return out;
 	}
 
-	// The regions of the subgame `G` won by the environment (first) and
-	// by the system (second).
-	std::pair<std::vector<region>, std::vector<region>> solve(
-		const std::vector<region>& G)
-	{
+	// The regions of the subgame `G` won by the environment and by the
+	// system, with the system's strategy when recording.
+	won solve(const std::vector<region>& G) {
 		const std::vector<region> none(n, r.bottom());
 		int top = -1;
 		for (size_t i = 0; i < n; ++i)
 			if (!r.empty(G[i])) top = std::max(top, priority[i]);
-		if (top < 0 || r.failed) return { none, none };
+		if (top < 0 || r.failed) return { none, none, no_moves() };
 		const int p = top & 1;
 		std::vector<region> U(n, r.bottom());
 		for (size_t i = 0; i < n; ++i)
 			if (priority[i] == top) U[i] = G[i];
-		auto sub = solve(minus(G, attractor(p, U, G)));
-		if (r.failed) return { none, none };
-		auto& lost = p ? sub.first : sub.second;
-		if (empty(lost))
-			return p ? std::pair{ none, G } : std::pair{ G, none };
-		auto B = attractor(1 - p, lost, G);
+		moves_t attracted = no_moves();
+		auto A = attractor(p, U, G, record && p ? &attracted : nullptr);
+		auto sub = solve(minus(G, A));
+		if (r.failed) return { none, none, no_moves() };
+		auto& lost = p ? sub.env : sub.sys;
+		if (empty(lost)) {
+			if (!p) return { G, none, no_moves() };
+			won all{ none, G, std::move(sub.moves) };
+			if (record) {
+				add_moves(all.moves, attracted);
+				for (size_t i = 0; i < n; ++i)
+					if (owner[i] == 1 && !r.empty(U[i]))
+						for (size_t j = 0; j < edges[i]; ++j)
+							all.moves[i][j] = r.disj(all.moves[i][j],
+								r.conj(U[i], r.move((int)i, j, G)));
+			}
+			return all;
+		}
+		moves_t kept = no_moves();
+		auto B = attractor(1 - p, lost, G,
+			record && !p ? &kept : nullptr);
 		auto rest = solve(minus(G, B));
-		if (r.failed) return { none, none };
-		auto& theirs = p ? rest.first : rest.second;
+		if (r.failed) return { none, none, no_moves() };
+		auto& theirs = p ? rest.env : rest.sys;
 		for (size_t i = 0; i < n; ++i) theirs[i] = r.disj(theirs[i], B[i]);
+		if (record && !p) {
+			add_moves(rest.moves, sub.moves);
+			add_moves(rest.moves, kept);
+		}
 		return rest;
 	}
 
-	// nullopt when undecided
-	std::optional<bool> system_wins(int init) {
+	// The solution of the whole game; nullopt when undecided.
+	std::optional<won> solve_all() {
 		const std::vector<region> all(n, r.top());
-		auto won = solve(all);
+		auto w = solve(all);
 		if (r.failed) return std::nullopt;
-		return r.reached(won.second[init]);
+		return w;
 	}
 };
 
+// ── A strategy of the data game ──────────────────────────────────────────────
+//
+// data_game_solver's moves, played one step at a time. The memory is the
+// game vertex, an environment vertex when a step starts, and the last
+// `depth` values of every stream, which the caller keeps. A step follows the
+// edge the inputs take to a system vertex, asks a solver for outputs in one
+// of that vertex's moves, and follows the edge those outputs take. The
+// values of the steps before step 0 are the strategy's own: every input is 0
+// and the outputs are chosen so that the initial vertex is won, which the
+// system can do whatever the inputs of those steps are.
+template <NodeType node>
+struct data_game_strategy {
+	using tau = tree<node>;
+	using values = subtree_map<node, tref>;
+	// Solves a formula over the outputs of absolute step `t`; nullopt when
+	// it has no solution.
+	using solver_fn = std::function<std::optional<values>(tref, int_t)>;
+	// The value of a stream (name, type, input) at an absolute step >= 0,
+	// or nullptr when there is none.
+	using value_fn = std::function<tref(const std::string&, size_t, bool,
+		int_t)>;
+
+	struct stream { std::string name; size_t tid = 0; bool input = false; };
+	struct vertex { int picks = -1; std::vector<int> dst; };
+
+	std::vector<stream> streams;
+	std::map<std::string, size_t> index;
+	size_t depth = 0;
+	// picks 0: the environment chooses the inputs, 1: the system the
+	// outputs, -1: nobody (a coloured vertex or a sink)
+	std::vector<vertex> v;
+	int init = 0;
+
+	virtual ~data_game_strategy() = default;
+
+	void reset() { at = init; ready = false; }
+
+	// The outputs of absolute step `t`, keyed like the solver keys them.
+	result<values> step(const value_fn& get, int_t t, const solver_fn& solve) {
+		result<values> r;
+		if (!ready) {
+			TAU_TRY(bool chosen, choose_before(solve));
+			if (!chosen) return r.with_error(code::internal_error,
+				"the data game strategy found no values before step 0");
+			ready = true;
+		}
+		window w(streams.size(), std::vector<tref>(depth + 1, nullptr));
+		for (size_t s = 0; s < streams.size(); ++s)
+			for (size_t k = 0; k <= depth; ++k) {
+				const int_t time = t - (int_t)k;
+				if (k == 0 && !streams[s].input) continue;
+				tref x = time < 0 ? before[s][(size_t)(-time - 1)]->get()
+					: get(streams[s].name, streams[s].tid,
+						streams[s].input, time);
+				if (!x) return r.with_error(code::internal_error,
+					"the data game strategy reads the unknown value of "
+					+ streams[s].name + " at step "
+					+ std::to_string(time));
+				w[s][k] = x;
+			}
+		if (v[at].picks == 0) {
+			int next = -1;
+			for (size_t j = 0; j < v[at].dst.size() && next < 0; ++j) {
+				auto holds = holds_label(at, j, w);
+				if (!holds) return r.with_error(code::solver_error,
+					"the data game strategy cannot read an edge label");
+				if (*holds) next = follow(v[at].dst[j]);
+			}
+			if (next < 0) return r.with_error(code::internal_error,
+				"the data game strategy has no edge for the inputs");
+			at = next;
+		}
+		values out;
+		// a sink: the play is decided and no output matters
+		if (v[at].picks != 1) return r.with_value(std::move(out));
+		TAU_TRY(tref c, constraint(at, w, t));
+		auto sol = solve(c, t);
+		if (!sol) return r.with_error(code::internal_error,
+			"the data game strategy has no outputs in its move");
+		for (size_t s = 0; s < streams.size(); ++s) {
+			if (streams[s].input) continue;
+			tref key = build_out_var_at_n<node>(streams[s].name, t,
+				streams[s].tid);
+			auto it = sol->find(key);
+			tref x = it != sol->end() ? it->second
+				: build_bf_f_type<node>(streams[s].tid);
+			out.emplace(key, x);
+			w[s][0] = x;
+		}
+		for (const auto& [key, x] : *sol) out.emplace(key, x);
+		for (size_t j = 0; j < v[at].dst.size(); ++j) {
+			auto holds = holds_move(at, j, w);
+			if (!holds) return r.with_error(code::solver_error,
+				"the data game strategy cannot read a move");
+			if (*holds) {
+				at = follow(v[at].dst[j]);
+				return r.with_value(std::move(out));
+			}
+		}
+		return r.with_error(code::internal_error,
+			"the outputs take no move of the data game strategy");
+	}
+
+protected:
+	// w[s][k]: the value of stream s at step t-k, nullptr for an output of
+	// step t before it is chosen
+	using window = std::vector<std::vector<tref>>;
+	int at = 0;
+	bool ready = false;
+	// before[s][k-1]: the value of stream s at step -k
+	std::vector<std::vector<htref>> before;
+
+	// whether the label of edge `j` of environment vertex `i` holds
+	virtual std::optional<bool> holds_label(int i, size_t j,
+		const window& w) = 0;
+	// whether move `j` of system vertex `i` holds
+	virtual std::optional<bool> holds_move(int i, size_t j,
+		const window& w) = 0;
+	// a formula over the outputs of step `t` whose solutions are the
+	// moves of system vertex `i`
+	virtual result<tref> constraint(int i, const window& w, int_t t) = 0;
+	// fills `before`
+	virtual result<bool> choose_before(const solver_fn& solve) = 0;
+
+	int follow(int x) const {
+		while (v[x].picks < 0 && v[x].dst.size() == 1 && v[x].dst[0] != x)
+			x = v[x].dst[0];
+		return x;
+	}
+
+	// Fresh names for the outputs before step 0 while they are solved.
+	static tref before_var(size_t s, size_t k, size_t tid) {
+		return build_out_var_at_n<node>("o__dg_before" + std::to_string(s)
+			+ "_" + std::to_string(k), 0, tid);
+	}
+	// The value `sol` gives `var`, 0 when it gives none.
+	static tref value_of(const values& sol, tref var, size_t tid) {
+		auto it = sol.find(var);
+		return it != sol.end() ? it->second : build_bf_f_type<node>(tid);
+	}
+};
+
+// The strategy of a game played on code_regions.
+template <NodeType node>
+struct code_strategy : data_game_strategy<node> {
+	using base = data_game_strategy<node>;
+	using tau = tree<node>;
+	using typename base::window;
+	using typename base::values;
+	using typename base::solver_fn;
+	using base::streams;
+
+	code_window w;
+	data_bdd bdd;
+	std::vector<std::vector<data_bdd::id>> labels, moves;
+	data_bdd::id won_init = data_bdd::F;
+
+	code_strategy(code_window win, data_bdd b)
+		: w(std::move(win)), bdd(std::move(b)) {}
+
+protected:
+	using base::before;
+
+	// Whether two values are equal; nullopt when undecided.
+	std::optional<bool> same(tref x, tref y) {
+		if (tau::subtree_equals(x, y)) return true;
+		auto n = normalize_non_temp<node>(tau::build_bf_eq(x, y));
+		if (!n.has_value() || !n.value()) return std::nullopt;
+		const auto& t = tau::get(n.value());
+		if (t.equals_T()) return true;
+		if (t.equals_F()) return false;
+		return std::nullopt;
+	}
+
+	// The bits of the known values of `win`, -1 for an unknown one. A
+	// value of a coded stream gets code 0 when it is 0, 1 when it is 1,
+	// and otherwise the code of the first equal value met or a new one.
+	std::optional<std::vector<int>> encode(const window& win) {
+		std::vector<int> bits(w.vars(), -1);
+		std::map<size_t, std::vector<std::pair<tref, size_t>>> seen;
+		for (size_t k = 0; k < win[0].size(); ++k)
+			for (size_t s = 0; s < streams.size(); ++s) {
+				tref x = win[s][k];
+				if (!x) continue;
+				const size_t tid = streams[s].tid;
+				size_t c;
+				auto one = same(x, build_bf_t_type<node>(tid));
+				if (!one) return std::nullopt;
+				if (w.streams[s].two) c = *one ? 1 : 0;
+				else if (*one) c = 1;
+				else {
+					auto zero = same(x, build_bf_f_type<node>(tid));
+					if (!zero) return std::nullopt;
+					if (*zero) c = 0;
+					else {
+						auto& reps = seen[tid];
+						c = reps.size() + 2;
+						for (auto& [y, cy] : reps) {
+							auto eq = same(x, y);
+							if (!eq) return std::nullopt;
+							if (*eq) { c = cy; break; }
+						}
+						if (c == reps.size() + 2) reps.emplace_back(x, c);
+					}
+				}
+				for (size_t b = 0; b < w.streams[s].width; ++b)
+					bits[w.var(s, k, b)] = (int)(c >> b & 1);
+			}
+		return bits;
+	}
+
+	// nullopt when the BDD reads an unknown bit
+	std::optional<bool> eval(data_bdd::id n, const std::vector<int>& bits) {
+		while (n > data_bdd::T) {
+			const auto& x = bdd.nodes[n];
+			if (bits[x.var] < 0) return std::nullopt;
+			n = bits[x.var] ? x.hi : x.lo;
+		}
+		return n == data_bdd::T;
+	}
+
+	// Completes the unknown bits of `bits` along a path of `n` to true.
+	bool pick(data_bdd::id n, std::vector<int>& bits) {
+		std::set<data_bdd::id> dead;
+		std::function<bool(data_bdd::id)> go = [&](data_bdd::id m) {
+			if (m <= data_bdd::T) return m == data_bdd::T;
+			if (dead.contains(m)) return false;
+			const auto x = bdd.nodes[m];
+			if (bits[x.var] >= 0) return go(bits[x.var] ? x.hi : x.lo);
+			for (int b : { 0, 1 }) {
+				bits[x.var] = b;
+				if (go(b ? x.hi : x.lo)) return true;
+			}
+			bits[x.var] = -1;
+			dead.insert(m);
+			return false;
+		};
+		if (!go(n)) return false;
+		for (auto& b : bits) if (b < 0) b = 0;
+		return true;
+	}
+
+	size_t code_of(const std::vector<int>& bits, size_t s, size_t k) const {
+		size_t c = 0;
+		for (size_t b = 0; b < w.streams[s].width; ++b)
+			if (bits[w.var(s, k, b)] > 0) c |= size_t{1} << b;
+		return c;
+	}
+
+	// The formula giving each of `slots` (stream, step back, variable) the
+	// value its code in `bits` stands for, next to the known values of
+	// `win`.
+	tref decode(const std::vector<int>& bits, const window& win,
+		const std::vector<std::tuple<size_t, size_t, tref>>& slots)
+	{
+		tref f = tau::_T();
+		for (size_t i = 0; i < slots.size(); ++i) {
+			auto [s, k, x] = slots[i];
+			const size_t tid = streams[s].tid;
+			const size_t c = code_of(bits, s, k);
+			if (w.streams[s].two || c < 2) {
+				f = tau::build_wff_and(f, tau::build_bf_eq(x, c
+					? build_bf_t_type<node>(tid)
+					: build_bf_f_type<node>(tid)));
+				continue;
+			}
+			tref known = nullptr;
+			for (size_t s2 = 0; s2 < streams.size() && !known; ++s2)
+				if (streams[s2].tid == tid && !w.streams[s2].two)
+					for (size_t k2 = 0; k2 < win[s2].size(); ++k2)
+						if (win[s2][k2] && code_of(bits, s2, k2) == c)
+							{ known = win[s2][k2]; break; }
+			if (known) {
+				f = tau::build_wff_and(f, tau::build_bf_eq(x, known));
+				continue;
+			}
+			// a value none of the window holds
+			f = tau::build_wff_and(f, tau::build_wff_and(
+				tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
+				tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
+			for (size_t s2 = 0; s2 < streams.size(); ++s2)
+				if (streams[s2].tid == tid)
+					for (tref y : win[s2]) if (y)
+						f = tau::build_wff_and(f, tau::build_bf_neq(x, y));
+			for (size_t i2 = 0; i2 < i; ++i2) {
+				auto [s2, k2, y] = slots[i2];
+				if (streams[s2].tid != tid || w.streams[s2].two) continue;
+				f = tau::build_wff_and(f, code_of(bits, s2, k2) == c
+					? tau::build_bf_eq(x, y) : tau::build_bf_neq(x, y));
+			}
+		}
+		return f;
+	}
+
+	std::optional<bool> holds_label(int i, size_t j, const window& win)
+		override
+	{
+		auto bits = encode(win);
+		if (!bits) return std::nullopt;
+		return eval(labels[i][j], *bits);
+	}
+
+	std::optional<bool> holds_move(int i, size_t j, const window& win)
+		override
+	{
+		auto bits = encode(win);
+		if (!bits) return std::nullopt;
+		return eval(moves[i][j], *bits);
+	}
+
+	result<tref> constraint(int i, const window& win, int_t t) override {
+		result<tref> r;
+		auto bits = encode(win);
+		if (!bits) return r.with_error(code::solver_error,
+			"the data game strategy cannot compare the values");
+		data_bdd::id any = data_bdd::F;
+		for (auto m : moves[i]) any = bdd.disj(any, m);
+		if (bdd.full || !pick(any, *bits))
+			return r.with_error(code::internal_error,
+				"the data game strategy has no move from the history");
+		std::vector<std::tuple<size_t, size_t, tref>> slots;
+		for (size_t s = 0; s < streams.size(); ++s)
+			if (!streams[s].input)
+				slots.emplace_back(s, 0, build_out_var_at_n<node>(
+					streams[s].name, t, streams[s].tid));
+		return r.with_value(decode(*bits, win, slots));
+	}
+
+	result<bool> choose_before(const solver_fn& solve) override {
+		result<bool> r;
+		const size_t n = streams.size(), d = w.depth;
+		std::vector<int> bits(w.vars(), -1);
+		window win(n, std::vector<tref>(d + 1, nullptr));
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= d; ++k)
+				if (streams[s].input) {
+					for (size_t b = 0; b < w.streams[s].width; ++b)
+						bits[w.var(s, k, b)] = 0;
+					win[s][k] = build_bf_f_type<node>(streams[s].tid);
+				}
+		if (!pick(won_init, bits)) return r.with_value(false);
+		std::vector<std::tuple<size_t, size_t, tref>> slots;
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= d; ++k)
+				if (!streams[s].input)
+					slots.emplace_back(s, k,
+						this->before_var(s, k, streams[s].tid));
+		values sol;
+		if (!slots.empty()) {
+			auto got = solve(decode(bits, win, slots), 0);
+			if (!got) return r.with_value(false);
+			sol = std::move(*got);
+		}
+		before.assign(n, {});
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= d; ++k)
+				before[s].push_back(tau::geth(streams[s].input
+					? win[s][k] : this->value_of(sol, this->before_var(
+						s, k, streams[s].tid), streams[s].tid)));
+		return r.with_value(true);
+	}
+};
+
+// The strategy of a game played on formula_regions.
+template <NodeType node>
+struct formula_strategy : data_game_strategy<node> {
+	using base = data_game_strategy<node>;
+	using tau = tree<node>;
+	using typename base::window;
+	using typename base::values;
+	using typename base::solver_fn;
+	using base::streams;
+	using base::index;
+
+	std::vector<std::vector<htref>> labels, moves;
+	htref won_init;
+
+protected:
+	using base::before;
+
+	// `f` with each io_var replaced by its value in `win`; an output of
+	// step t with no value becomes the output variable of absolute step
+	// `t`.
+	tref at_step(tref f, const window& win, int_t t) {
+		subtree_map<node, tref> m;
+		for (tref x : tau::get(f).select_top(is_child<node, tau::io_var>)) {
+			const size_t s = index.at(get_var_name<node>(x));
+			const size_t k = (size_t)get_io_var_shift<node>(x);
+			tref val = win[s][k];
+			m.emplace(x, tau::trim(val ? val : build_out_var_at_n<node>(
+				streams[s].name, t, streams[s].tid)));
+		}
+		return rewriter::replace<node>(f, m);
+	}
+
+	std::optional<bool> truth(tref f, const window& win) {
+		auto n = normalize_non_temp<node>(at_step(f, win, 0));
+		if (!n.has_value() || !n.value()) return std::nullopt;
+		const auto& t = tau::get(n.value());
+		if (t.equals_T()) return true;
+		if (t.equals_F()) return false;
+		return std::nullopt;
+	}
+
+	std::optional<bool> holds_label(int i, size_t j, const window& win)
+		override
+	{
+		return truth(labels[i][j]->get(), win);
+	}
+
+	std::optional<bool> holds_move(int i, size_t j, const window& win)
+		override
+	{
+		return truth(moves[i][j]->get(), win);
+	}
+
+	result<tref> constraint(int i, const window& win, int_t t) override {
+		result<tref> r;
+		tref any = tau::_F();
+		for (const auto& m : moves[i])
+			any = tau::build_wff_or(any, m->get());
+		auto n = normalize_non_temp<node>(at_step(any, win, t));
+		if (!n.has_value() || !n.value()) return r.with_error(
+			code::solver_error, "the data game strategy cannot read "
+			"its move");
+		return r.with_value(n.value());
+	}
+
+	result<bool> choose_before(const solver_fn& solve) override {
+		result<bool> r;
+		const size_t n = streams.size();
+		subtree_map<node, tref> m;
+		for (tref x : tau::get(won_init->get()).select_top(
+			is_child<node, tau::io_var>))
+		{
+			const size_t s = index.at(get_var_name<node>(x));
+			const size_t k = (size_t)get_io_var_shift<node>(x);
+			const size_t tid = streams[s].tid;
+			m.emplace(x, tau::trim(streams[s].input
+				? build_bf_f_type<node>(tid)
+				: this->before_var(s, k, tid)));
+		}
+		auto sol = solve(rewriter::replace<node>(won_init->get(), m), 0);
+		if (!sol) return r.with_value(false);
+		before.assign(n, {});
+		for (size_t s = 0; s < n; ++s)
+			for (size_t k = 1; k <= this->depth; ++k) {
+				const size_t tid = streams[s].tid;
+				before[s].push_back(tau::geth(streams[s].input
+					? build_bf_f_type<node>(tid)
+					: this->value_of(*sol, this->before_var(s, k, tid),
+						tid)));
+			}
+		return r.with_value(true);
+	}
+};
+
+// The streams, depth and vertices of a strategy of `arena` over `atoms`.
+template <NodeType node>
+static void describe_strategy(data_game_strategy<node>& st,
+	const data_arena<node>& arena,
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	using tau = tree<node>;
+	using chooser = typename data_arena<node>::chooser;
+	for (auto& [atom, _] : atoms)
+		for (tref x : tau::get(atom).select_top(is_child<node, tau::io_var>)) {
+			st.depth = std::max(st.depth, (size_t)get_io_var_shift<node>(x));
+			auto [it, fresh] = st.index.emplace(get_var_name<node>(x),
+				st.streams.size());
+			if (fresh) st.streams.push_back({ it->first,
+				find_ba_type<node>(x), is_input_stream<node>(x) });
+		}
+	for (const auto& x : arena.v) {
+		typename data_game_strategy<node>::vertex y;
+		y.picks = x.picks == chooser::inputs ? 0
+			: x.picks == chooser::outputs ? 1 : -1;
+		for (const auto& e : x.edges) y.dst.push_back(e.dst);
+		st.v.push_back(std::move(y));
+	}
+	st.init = arena.init;
+	st.reset();
+}
+
 // Decides the realizability of `skeleton` over `atoms` on the data; over
-// formula regions only when `formulas` is set.
+// formula regions only when `formulas` is set. With `strategy`, a won game
+// also gives the system's strategy there.
 template <NodeType node>
 static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	const std::vector<std::pair<tref, std::string>>& atoms,
 	const std::vector<std::string>& input_props,
-	const std::vector<std::string>& output_props, bool formulas)
+	const std::vector<std::string>& output_props, bool formulas,
+	std::shared_ptr<data_game_strategy<node>>* strategy = nullptr)
 {
 	using tau = tree<node>;
 	result<data_game_verdict> r;
@@ -767,21 +1329,52 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 		arena = {};
 	}
 	if (!built) return r.with_value(data_game_verdict::undecided);
+	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	bool on_codes = false;
 	if (window) {
 		code_regions<node> codes(arena, *window, size_t{1} << 21);
 		if ((on_codes = codes.init())) {
 			// a finite lattice: every fixpoint ends without a cap
-			data_game_solver solver(codes, arena, 0);
-			wins = solver.system_wins(arena.init);
+			data_game_solver solver(codes, arena, 0, keep);
+			auto w = solver.solve_all();
+			if (w) wins = codes.reached(w->sys[arena.init]);
+			if (keep && wins && *wins && !codes.failed) {
+				auto st = std::make_shared<code_strategy<node>>(
+					*window, std::move(codes.bdd));
+				describe_strategy<node>(*st, arena, atoms);
+				for (size_t i = 0; i < arena.v.size(); ++i) {
+					st->labels.emplace_back(
+						codes.labels.begin() + codes.edge_base[i],
+						codes.labels.begin() + codes.edge_base[i]
+							+ arena.v[i].edges.size());
+					st->moves.push_back(w->moves[i]);
+				}
+				st->won_init = w->sys[arena.init];
+				*strategy = st;
+			}
 		}
 	}
 	if (!on_codes && formulas) {
 		formula_regions<node> regions(arena);
 		data_game_solver solver(regions, arena,
-			ltl_max_refinement_rounds());
-		wins = solver.system_wins(arena.init);
+			ltl_max_refinement_rounds(), keep);
+		auto w = solver.solve_all();
+		if (w) wins = regions.reached(w->sys[arena.init]);
+		if (keep && wins && *wins) {
+			auto st = std::make_shared<formula_strategy<node>>();
+			describe_strategy<node>(*st, arena, atoms);
+			for (size_t i = 0; i < arena.v.size(); ++i) {
+				st->labels.emplace_back();
+				for (const auto& e : arena.v[i].edges)
+					st->labels.back().push_back(tau::geth(e.label));
+				st->moves.emplace_back();
+				for (tref m : w->moves[i])
+					st->moves.back().push_back(tau::geth(m));
+			}
+			st->won_init = tau::geth(w->sys[arena.init]);
+			*strategy = st;
+		}
 	}
 	LOG_DEBUG << "[ltl_aba] data game: " << arena.v.size() << " vertices, "
 		<< (wins ? (*wins ? "system wins" : "environment wins")

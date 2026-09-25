@@ -774,8 +774,39 @@ post_normalization:
 		tref safety_spec;
 		std::optional<ltl_aba_solution<node>> sol_opt;
 		std::vector<std::string> unanchored_aux;
+		std::shared_ptr<data_game_strategy<node>> data_strategy;
 		std::tie(safety_spec, sol_opt, unanchored_aux) =
-			ltl_to_safety_formula_full<node>(spec);
+			ltl_to_safety_formula_full<node>(spec, &data_strategy);
+		// The data game decided the spec: its strategy chooses every
+		// step's outputs, so no spec part is solved.
+		if (data_strategy) {
+			std::vector<htrefs> no_ctn;
+			std::vector<std::pair<htrefs, htref>> no_spec;
+			union_find_with_sets<decltype(stream_comp), node>
+				no_partition(stream_comp);
+			assignment<node> memory;
+			auto i = interpreter{ no_ctn, no_spec, no_partition, memory,
+				ctx_eff };
+			i.provider_ = std::make_shared<data_game_step_provider<node>>(
+				std::move(data_strategy));
+			i.compute_lookback_and_initial();
+			subtree_map<node, size_t> output_streams, input_streams;
+			if (!i.collect_output_streams(spec, output_streams)
+				|| !i.rebuild_outputs(output_streams))
+			{
+				return r.with_assert_check_error(
+					code::invalid_output_stream,
+					"Failed to collect output streams");
+			}
+			if (!i.collect_input_streams(spec, input_streams)
+				|| !i.rebuild_inputs(input_streams))
+			{
+				return r.with_assert_check_error(
+					code::invalid_input_stream,
+					"Failed to collect input streams");
+			}
+			return r.with_assert_check_value(std::move(i));
+		}
 		// unrealizable, undecided or not encodable as a safety formula;
 		// `realizable` tells which
 		if (!safety_spec) {
@@ -1295,6 +1326,171 @@ struct solve_step_provider : step_provider<node> {
 		}
 		return r.with_assert_check_value(std::move(result));
 	}
+};
+
+/**
+ * @brief Plays a strategy of the data game: each step's outputs are the
+ * ones the strategy chooses for the history in memory and the step's
+ * inputs, found by the general solver.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+struct data_game_step_provider : step_provider<node> {
+	std::shared_ptr<data_game_strategy<node>> strategy;
+
+	explicit data_game_step_provider(
+		std::shared_ptr<data_game_strategy<node>> s)
+		: strategy(std::move(s)) {}
+
+	result<std::optional<solution<node>>> produce(const trefs&,
+		const assignment<node>& memory, size_t time_point, size_t) override
+	{
+		using tau = tree<node>;
+		result<std::optional<solution<node>>> r;
+		auto get = [&](const std::string& name, size_t tid, bool input,
+			int_t time) -> tref
+		{
+			tref key = input ? build_in_var_at_n<node>(name, time, tid)
+				: build_out_var_at_n<node>(name, time, tid);
+			auto it = memory.find(key);
+			return it == memory.end() ? nullptr : it->second;
+		};
+		auto solve = [this](tref fm, int_t t)
+			-> std::optional<solution<node>>
+		{
+			if (auto d = solve_directly(fm)) return d;
+			auto n = normalize_non_temp<node>(fm);
+			if (!n.has_value() || !n.value()) return std::nullopt;
+			for (tref path : expression_paths<node>(n.value())) {
+				auto p = normalize_non_temp<node>(path);
+				if (!p.has_value() || !p.value()
+					|| tau::get(p.value()).equals_F()) continue;
+				auto sol = solution_with_max_update<node>(p.value(),
+					(size_t)std::max<int_t>(t, 0));
+				if (sol.has_value()) return sol.value();
+			}
+			return std::nullopt;
+		};
+		TAU_TRY(auto out, strategy->step(get, (int_t)time_point, solve));
+		return r.with_value(std::optional<solution<node>>(std::move(out)));
+	}
+
+	// The solution of a conjunction of equalities and disequalities
+	// between one variable and values, over atomless types for the
+	// disequalities, solved variable by variable in the order they first
+	// appear; nullopt when `fm` has another shape. The general solver
+	// can take long to find a value distinct from a few given ones.
+	std::optional<solution<node>> solve_directly(tref fm) {
+		using tau = tree<node>;
+		trefs atoms;
+		std::function<bool(tref)> flatten = [&](tref n) {
+			const auto& x = tau::get(n);
+			if (x.equals_T()) return true;
+			if (!x.has_child()) return false;
+			const auto nt = x[0].value.nt;
+			if (nt == tau::wff_and) {
+				for (size_t i = 0; i < x[0].children_size(); ++i)
+					if (!flatten(x[0].child(i))) return false;
+				return true;
+			}
+			if (nt != tau::bf_eq && nt != tau::bf_neq) return false;
+			atoms.push_back(n);
+			return true;
+		};
+		if (!flatten(fm)) return std::nullopt;
+		trefs vars;
+		for (tref a : atoms)
+			for (tref v : get_free_vars<node>(a))
+				if (std::none_of(vars.begin(), vars.end(), [&](tref w) {
+					return tau::subtree_equals(v, w); }))
+						vars.push_back(v);
+		solution<node> sol;
+		for (tref var : vars) {
+			const size_t tid = find_ba_type<node>(var);
+			tref value = nullptr;
+			inequality_system<node> sys;
+			for (tref a : atoms) {
+				tref g = rewriter::replace<node>(a, sol);
+				trefs fv = get_free_vars<node>(g);
+				if (fv.size() != 1 || !tau::subtree_equals(fv[0], var))
+					continue;
+				const auto& x = tau::get(g);
+				if (x[0].value.nt == tau::bf_eq) {
+					tref other = tau::subtree_equals(
+						tau::trim(x[0].first()), var)
+						? x[0].second() : x[0].first();
+					if (!tau::subtree_equals(tau::trim(
+						x[0].first()), var) && !tau::subtree_equals(
+						tau::trim(x[0].second()), var))
+							return std::nullopt;
+					value = other;
+				} else sys.insert(g);
+			}
+			// first a value found at an earlier step or the complement of
+			// an excluded value, which a Boolean algebra always has
+			if (!value && !sys.empty()) {
+				tref all = tau::_T();
+				trefs candidates;
+				for (auto it = found.rbegin(); it != found.rend(); ++it)
+					if (tau::get((*it)->get()).get_ba_type() == tid)
+						candidates.push_back((*it)->get());
+				for (tref g : sys) {
+					all = tau::build_wff_and(all, g);
+					for (tref side : { tau::get(g)[0].first(),
+						tau::get(g)[0].second() })
+						if (get_free_vars<node>(side).empty())
+							candidates.push_back(normalize_ba<node>(
+								tau::build_bf_neg(side)));
+				}
+				for (tref c : candidates) {
+					auto n = normalize_non_temp<node>(rewriter::replace<node>(
+						all, tau::get(tau::bf, var), c));
+					if (n.has_value() && n.value()
+						&& tau::get(n.value()).equals_T())
+							{ value = c; break; }
+				}
+			}
+			if (!value && !sys.empty()) {
+				if (!pack_type_is_atomless<node>(tid)) return std::nullopt;
+				solver_options opts;
+				opts.type_id = tid;
+				opts.splitter_one = node::ba::splitter_one(
+					get_ba_type_tree<node>(tid));
+				opts.ledger = &ledger;
+				auto got = solve_inequality_system_atomless<node>(sys, opts);
+				if (!got) return std::nullopt;
+				for (const auto& [k, kv] : *got) {
+					tref kvar = tau::get(k).child_is(tau::variable)
+						? tau::get(k).first() : k;
+					if (tau::subtree_equals(kvar, var)) value = kv;
+				}
+			}
+			if (!value) value = build_bf_f_type<node>(tid);
+			sol.emplace(tau::get(tau::bf, var), value);
+		}
+		auto n = normalize_non_temp<node>(rewriter::replace<node>(fm, sol));
+		if (!n.has_value() || !n.value() || !tau::get(n.value()).equals_T())
+			return std::nullopt;
+		for (const auto& [_, v] : sol) {
+			ledger_commit_witness<node>(ledger, v, tau::get(v).get_ba_type());
+			if (std::none_of(found.begin(), found.end(), [&](const htref& h) {
+				return tau::subtree_equals(h->get(), v); }))
+					found.push_back(tree<node>::geth(v));
+		}
+		if (found.size() > 8) found.erase(found.begin());
+		return sol;
+	}
+
+	// values chosen at earlier steps, the latest last
+	std::vector<htref> found;
+	// keeps the fresh values of successive steps from growing
+	fresh_element_ledger ledger;
+
+	// every input is read: the strategy reads the inputs of every step
+	bool skip_lookback_filter() const override { return true; }
+	int_t lookback() const override { return (int_t)strategy->depth; }
+	void reset() override { strategy->reset(); }
+	bool revisable() const override { return false; }
 };
 
 // Prototype (minterm_solving_rework, "Lever B"): canonicalize a step's
@@ -2148,6 +2344,7 @@ void interpreter<node>::compute_lookback_and_initial() {
 			current_io_vars.begin(), current_io_vars.end());
 	}
 	lookback = get_max_shift<node>(io_vars);
+	if (provider_) lookback = std::max(lookback, provider_->lookback());
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial<node>(io_vars);
 	fixed_inputs_.clear();
@@ -2367,6 +2564,11 @@ result<typename interpreter<node>::update_plan>
 {
 	result<update_plan> r;
 	DBG(LOG_TRACE << "interpreter::plan_update(update = \"" << LOG_FM(update) << "\")";)
+	if (provider_ && !provider_->revisable()) {
+		r.warning("the running strategy cannot follow a revised "
+			"specification; no update was performed");
+		return r;
+	}
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
 				.select_top(is_child<node, tau::io_var>);
@@ -3291,6 +3493,7 @@ void interpreter<node>::reset() {
 	// Recompute lookback from ubt_ctn (unchanged) so calculate_initial_spec
 	// will rebuild step_spec on the next step().
 	compute_lookback_and_initial();
+	if (provider_) provider_->reset();
 	// LA-N3: make_interpreter pre-populated `memory` with the inner-S
 	// auxiliary anchors; a reset() that only cleared `memory` lost them.
 	seed_since_aux_bits();

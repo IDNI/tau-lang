@@ -31,6 +31,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -461,6 +462,10 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 // sites (interpreter.impl.h, cpp_codegen.tmpl.h), which include the tmpl
 // chain that defines it.
 
+// A strategy of the data game (ltl_aba_data_game.tmpl.h).
+template <NodeType node>
+struct data_game_strategy;
+
 // ── Interpreter-facing helpers (LT-29) ───────────────────────────────────────
 //
 // Defined in ltl_aba_builders.tmpl.h / ltl_aba_normalization.tmpl.h; declared
@@ -590,13 +595,17 @@ tref ltl_to_safety_formula(tref fm);
  * (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
  * other path (the ppLTLTT tester encoding anchors inside the skeleton).
  * @tparam node Tree node type.
+ * With @p data_strategy, a formula the data game decides gets that game's
+ * strategy there instead, and the first element is nullptr.
  * @param fm Normalised LTL formula.
+ * @param data_strategy Optional sink for the strategy of the data game.
  * @return {safety formula or nullptr, optional solution, unanchored
  * auxiliary output names}.
  */
 template <NodeType node>
 std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
-ltl_to_safety_formula_full(tref fm);
+ltl_to_safety_formula_full(tref fm,
+	std::shared_ptr<data_game_strategy<node>>* data_strategy = nullptr);
 
 } // namespace idni::tau_lang
 

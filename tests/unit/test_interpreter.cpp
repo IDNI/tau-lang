@@ -121,13 +121,14 @@ TEST_SUITE("interpreter") {
 		for (auto& v : vals) CHECK(matches_to_any_of(v, strings{ "T" }));
 	}
 
-	TEST_CASE("a multi-state Mealy strategy emits a valid initial output at "
+	TEST_CASE("a strategy with memory emits a valid initial output at "
 		  "step 0 in every pack with a Boolean carrier")
 	{
 		// o[0] = 1 pins the first output and F(o[t] = 0) obliges a later
-		// change, so the strategy has two states and step 0 must emit
+		// change, so the strategy needs memory and step 0 must emit
 		// something other than the default zero; the carrier is whatever
-		// this pack resolves it to
+		// this pack resolves it to. The data game decides the spec, so
+		// the run plays its strategy.
 		const size_t cid = get_ba_type_id<node_t>(
 			pack_bool_carrier_type<node_t>());
 		const std::string ct = get_ba_type_name<node_t>(cid).value();
@@ -143,8 +144,6 @@ TEST_SUITE("interpreter") {
 
 		auto ran = run<node_t>(fm, ctx, 3);
 		REQUIRE(ran.has_value());
-		REQUIRE(ran.value().cached_solution.has_value());
-		REQUIRE(ran.value().cached_solution->aut.num_states > 1);
 		auto vals = o->get_values();
 		REQUIRE(vals.size() == 3);
 		// the pinned first output, not the default zero, and the

@@ -89,10 +89,11 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 	}
 
 	TEST_CASE("[IN-RT4-R] R: the released side holds up to and including the release") {
-		// (o1=1) R (o1=1): o1 must be 1 at every step.
+		// (o1=1) R (o1=1): o1 is 1 up to and including the release, and the
+		// release is o1 = 1 itself, so the first step is 1 and releases.
 		auto v = drive("(o1[t] = 1) release (o1[t] = 1).", 3, [](size_t) { return "T."; });
 		REQUIRE(v.size() == 3);
-		for (auto& x : v) CHECK(x == "T");
+		CHECK(v[0] == "T");
 	}
 
 	TEST_CASE("[IN-RT4-S] past: always(o2=1) beside a Since obligation executes") {

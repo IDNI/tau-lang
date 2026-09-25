@@ -775,7 +775,9 @@ static tref encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 
 template <NodeType node>
 std::tuple<tref, std::optional<ltl_aba_solution<node>>, std::vector<std::string>>
-ltl_to_safety_formula_full(tref fm) {
+ltl_to_safety_formula_full(tref fm,
+	std::shared_ptr<data_game_strategy<node>>* data_strategy)
+{
 	using tau = tree<node>;
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: " << LOG_FM(fm);
 
@@ -852,7 +854,8 @@ ltl_to_safety_formula_full(tref fm) {
 	if (!realizability_has_game_operators<node>(
 		std::get<0>(compile_since_trigger<node>(fm))))
 		fm = wrap_always(fm);
-	auto maybe_r = solve_ltl_aba<node>(fm);
+	ltl_aba_solution<node> partial;
+	auto maybe_r = solve_ltl_aba<node>(fm, &partial);
 	if (!maybe_r.has_value()) {
 		// This function's tuple return has no report channel of its
 		// own, and every other internal failure below already answers
@@ -862,9 +865,32 @@ ltl_to_safety_formula_full(tref fm) {
 		return {nullptr, std::nullopt, {}};
 	}
 	auto& maybe = maybe_r.value();
+	// With `data_strategy`, execution plays the strategy of the data game
+	// whenever that game decides the formula, in the order the
+	// realizability check asks it: on codes before the abstraction, on
+	// formulas only once the abstraction gives no strategy to execute.
+	const ltl_aba_solution<node> game_source = maybe ? *maybe : partial;
+	bool data_decided = false;
+	auto on_data = [&](bool formulas) {
+		if (!data_strategy || data_decided
+			|| game_source.game_skeleton.empty()) return false;
+		auto game = solve_data_game<node>(game_source.game_skeleton,
+			game_source.atoms, game_source.input_props,
+			game_source.output_props, formulas, data_strategy);
+		data_decided = game.has_value()
+			&& game.value() != data_game_verdict::undecided;
+		return *data_strategy != nullptr;
+	};
+	using full_t = std::tuple<tref, std::optional<ltl_aba_solution<node>>,
+		std::vector<std::string>>;
+	auto none = [&]() -> full_t {
+		on_data(true);
+		return {nullptr, std::nullopt, {}};
+	};
+	if (on_data(false)) return {nullptr, std::nullopt, {}};
 	if (!maybe) {
 		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: not realizable";
-		return {nullptr, std::nullopt, {}};
+		return none();
 	}
 
 	auto& sol = *maybe;
@@ -873,10 +899,12 @@ ltl_to_safety_formula_full(tref fm) {
 	if (sol.executable) {
 		auto refined = refine_or_observe<node>(fm, sol, false);
 		if (!refined.has_value() || !refined.value()) {
-			if (!refined.has_value()) refined.print();
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "
 				"survives the ABA refinement";
-			return {nullptr, std::nullopt, {}};
+			auto r = none();
+			if (!refined.has_value() && !(data_strategy && *data_strategy))
+				refined.print();
+			return r;
 		}
 	}
 
@@ -894,6 +922,8 @@ ltl_to_safety_formula_full(tref fm) {
 	// constant-output fast path used to be refused here too; it now
 	// materialises its witness — see `const_formula` below.)
 	if (!sol.executable) {
+		if (none(); data_strategy && *data_strategy)
+			return {nullptr, std::nullopt, {}};
 		LOG_ERROR << "[ltl_aba] specification is REALIZABLE but the "
 		             "synthesised strategy cannot be encoded as a safety "
 		             "formula (Algorithm B strategy over bookkeeping "
@@ -928,6 +958,8 @@ ltl_to_safety_formula_full(tref fm) {
 	// executing it as `always T` would drop every obligation (the 1-state
 	// analogue of LT-28). Not executable.
 	if (aut.edges.empty() || aut.edges[0].empty()) {
+		if (none(); data_strategy && *data_strategy)
+			return {nullptr, std::nullopt, {}};
 		LOG_ERROR << "[ltl_aba] single-state strategy has no outgoing "
 		             "edge; the automaton is degraded and cannot be "
 		             "executed\n";
@@ -1075,9 +1107,12 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 		}
 		// what `run` executes: the refined strategy's encoding
 		if (real.value()) {
+			std::shared_ptr<data_game_strategy<node>> data;
 			auto [safety, _sol, _aux] =
-				ltl_to_safety_formula_full<node>(fm);
-			if (safety) out << "\nSafety formula: "
+				ltl_to_safety_formula_full<node>(fm, &data);
+			if (data) out << "\nExecution plays the strategy of the "
+				"data game\n";
+			else if (safety) out << "\nSafety formula: "
 				<< tau::get(safety).to_str() << "\n";
 			else out << "\nThe strategy is not executable\n";
 		}
