@@ -1529,8 +1529,17 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	// Eliminate always parts implied by other always parts.
 	eliminate_implied(aw_parts, [](tref x) { return x; });
 
-	// Clause is unsatisfiable if any always ∧ sometimes pair is unsat.
+	// Clause is unsatisfiable if any always ∧ sometimes pair is unsat. An
+	// always part reading further back than the sometimes part asks
+	// nothing during its warm-up, where the sometimes part may already
+	// hold (README "Lookback initialization"), so such a pair decides
+	// nothing here.
+	auto lookback = [](tref part) {
+		return get_max_shift<node>(tau::get(part)
+			.select_top(is_child<node, tau::io_var>));
+	};
 	for (tref aw : aw_parts) for (tref st : st_parts) {
+		if (lookback(aw) > lookback(st)) continue;
 		tref f = tau::build_wff_and(
 			get_temporally_quantified_formula<node>(aw),
 			get_temporally_quantified_formula<node>(st));

@@ -1018,6 +1018,12 @@ The following example shows the explained quantification pattern for the Tau spe
 all i1[t-2] ex o2[t-1] all i1[t] ex o1[t] o1[t] = i1[t] && ( i1[t-2] = 1 -> o2[t-1] = 1 )
 ```
 
+The inputs inside a `sometimes` are quantified in the same way: the
+specification must reach the `sometimes` whatever the inputs do. So
+`sometimes i1[t] = 1` is unsatisfiable, since the input can stay 0 at every
+step, while `sometimes o1[t] = i1[t]` is satisfiable, since the output can
+copy the input at the step it reads it.
+
 This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
 Further resources concerning the details can be found in the [theory section](#the-theory-behind-the-tau-language).

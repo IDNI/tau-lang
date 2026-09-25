@@ -624,6 +624,70 @@ result<bool> is_run_satisfiable(tref fm) {
 	return r;
 }
 
+/**
+ * @internal
+ * @brief `is_run_satisfiable` for a run given as the conjunction of
+ * @p steps, deciding the time-compatible quantification one time point at
+ * a time.
+ *
+ * From the latest time point down to the earliest, the steps whose
+ * latest variable sits at that time point are conjoined, the variables of
+ * that time point are quantified (outputs existentially inside inputs
+ * universally) and the result is normalized. Each intermediate formula
+ * therefore only speaks about the time points a step can look back to,
+ * while quantifying the whole run at once grows with its length.
+ * @tparam node Tree node type.
+ * @param steps Formulas over IO variables at constant time points only.
+ * @return `true` if the time-compatibly quantified conjunction of
+ * @p steps is satisfiable; a failed result when a normalization fails.
+ * @endinternal
+ */
+template <NodeType node>
+result<bool> is_run_satisfiable_by_steps(const trefs& steps) {
+	using tau = tree<node>;
+	result<bool> r;
+	std::map<int_t, trefs> by_time;
+	tref fm = tau::_T();
+	int_t earliest = 0, latest_all = -1;
+	for (tref step : steps) {
+		trefs vs = tau::get(step).select_top(is_child<node, tau::io_var>);
+		if (vs.empty()) {
+			fm = tau::build_wff_and(fm, step);
+			continue;
+		}
+		int_t latest = get_io_time_point<node>(vs[0]);
+		for (tref v : vs) {
+			DBG(assert(is_io_initial<node>(v));)
+			const int_t vt = get_io_time_point<node>(v);
+			latest = std::max(latest, vt);
+			earliest = latest_all < 0 ? vt : std::min(earliest, vt);
+			latest_all = std::max(latest_all, vt);
+		}
+		by_time[latest].push_back(step);
+	}
+	for (int_t tp = latest_all;
+		tp >= earliest && !tau::get(fm).equals_F(); --tp)
+	{
+		if (auto it = by_time.find(tp); it != by_time.end())
+			for (tref step : it->second)
+				fm = tau::build_wff_and(fm, step);
+		trefs inputs, outputs;
+		for (tref v : tau::get(fm).get_free_vars()) {
+			if (!tau::get(v).child_is(tau::io_var)
+				|| get_io_time_point<node>(v) != tp) continue;
+			(tau::get(v)[0].is_input_variable()
+				? inputs : outputs).push_back(v);
+		}
+		for (tref v : outputs) fm = tau::build_wff_ex(v, fm, false);
+		for (tref v : inputs) fm = tau::build_wff_all(v, fm, false);
+		TAU_TRY(fm, normalize_non_temp<node>(fm));
+	}
+	if (tau::get(fm).equals_F()) return r.with_value(false);
+	if (tau::get(fm).equals_T()) return r.with_value(true);
+	TAU_TRY(bool sat, is_non_temp_nso_satisfiable<node>(fm));
+	return r.with_value(sat);
+}
+
 // Assumption is that the provided fm is an unbound continuation
 template <NodeType node>
 tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time) {
@@ -1346,6 +1410,10 @@ tref create_guard(const trefs& io_vars, const int_t number) {
  * @param reset_ctn_stream Forwarded to `transform_ctn_to_streams` for each
  * `sometimes` clause, to reset the flag-numbering counter.
  * @param start_time Time step at which execution begins.
+ * @param inputs How the input streams of each `sometimes` clause are read.
+ * @param aw_warm_up Lookback of the always part as written, when @p fm
+ * carries its unbounded continuation instead, whose lookback can be
+ * smaller: the always part asks nothing before this step.
  * @return A pair `(res, max_st_lookback)`. If @p fm has no `sometimes`
  * sub-formula, `res` is `fm` unchanged and `max_st_lookback` is `0`.
  * Otherwise `res` is `fm` with each `sometimes` clause replaced by a flag
@@ -1372,7 +1440,9 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 // Assumes single normalized Tau DNF clause
 template <NodeType node>
 std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
-	bool reset_ctn_stream, const int_t start_time)
+	bool reset_ctn_stream, const int_t start_time,
+	const sometimes_inputs inputs = sometimes_inputs::universal,
+	const int_t aw_warm_up = 0)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
@@ -1389,7 +1459,8 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	if (aw_fm != nullptr) {
 		aw_io_vars = tau::get(aw_fm)
 				.select_top(is_child<node, tau::io_var>);
-		aw_lookback = get_max_shift<node>(aw_io_vars);
+		aw_lookback = std::max(get_max_shift<node>(aw_io_vars),
+								aw_warm_up);
 	}
 
 	LOG_TRACE << "transforming eventual variables: " << LOG_FM(fm);
@@ -1434,16 +1505,17 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 				st_io_vars, (max_st_lookback - st_lookback)
 								+ aw_lookback);
 
-		// Guard statement using uninterpreted constants to express that
-		// "if the inputs equal the uninterpreted constants, the Tau formula
-		// under sometimes is implied"
-		// This mimics an existential quantifier capturing the inputs but at the same
-		// time the inputs are not quantified
-		st_io_vars = tau::get(shifted_sometimes)
-				.select_top(is_child<node, tau::io_var>);
-		tref guard = create_guard<node>(st_io_vars, n);
-		shifted_sometimes = tau::build_wff_imply(
-						guard, shifted_sometimes);
+		// Read universally, the inputs of psi stay free here and the
+		// fixpoint searches quantify them at their time step, before the
+		// outputs of that step and the flag. The guard instead requires
+		// psi only when the inputs equal uninterpreted constants.
+		if (inputs == sometimes_inputs::guarded) {
+			st_io_vars = tau::get(shifted_sometimes)
+					.select_top(is_child<node, tau::io_var>);
+			tref guard = create_guard<node>(st_io_vars, n);
+			shifted_sometimes = tau::build_wff_imply(
+							guard, shifted_sometimes);
+		}
 
 		ev_assm = tau::build_wff_and(ev_assm, tau::build_wff_imply(
 			tau::build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
@@ -1512,8 +1584,11 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @param aw Original (pre-continuation) always-part.
  * @param max_st_lookback Greatest lookback among the original
  * `sometimes` clauses.
+ * @param aw_warm_up Lookback of the always part as written, when @p aw is
+ * its unbounded continuation.
  * @return A `result<tref>` carrying the conjunction
- * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is @p aw's lookback;
+ * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is the greater of
+ * @p aw's lookback and @p aw_warm_up;
  * an engaged value of `T` is the legitimate "no initial segment at all"
  * answer for @p max_st_lookback `0`, the identity callers conjoin in as an
  * empty conjunct rather than a failure. A failed result -- e.g. on a D4
@@ -1524,12 +1599,13 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @endinternal
  */
 template <NodeType node>
-result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
-	// get lookback of aw
+result<tref> make_initial_run(tref aw, const int_t max_st_lookback,
+	const int_t aw_warm_up = 0)
+{
 	using tau = tree<node>;
 	result<tref> r;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
-	const int_t t = get_max_shift<node>(io_vars);
+	const int_t t = std::max(get_max_shift<node>(io_vars), aw_warm_up);
 
 	tref run = nullptr;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
@@ -1548,10 +1624,11 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * @internal
  * @brief Given the unbounded continuation of an always-part combined with
  * eventual-variable flags (from `transform_to_eventual_variables`),
- * determine whether the flag guarding the original `sometimes` clause can
- * ever be raised, first by direct search over an initial time segment and,
+ * determine whether the system can force the flag guarding the original
+ * `sometimes` clause whatever the inputs do: first at the first step and,
  * failing that, by computing the flag's own unbounded continuation
- * (`find_fixpoint_chi`).
+ * (`find_fixpoint_chi`), then searching the step by which the flag is
+ * forced.
  *
  * Assumes `ubd_aw_continuation` is the result of computing the unbounded
  * always continuation of the always-part of the output of
@@ -1568,6 +1645,8 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * clauses, as returned by `transform_to_eventual_variables`.
  * @param output When `true`, print diagnostic fixpoint information via
  * `print_fixpoint_info`.
+ * @param aw_warm_up Lookback of the always part as written, as passed to
+ * `transform_to_eventual_variables`.
  * @return A `result<tref>` carrying `F` if the flag can never be raised
  * (the `sometimes` clause is unsatisfiable given the always-part), or a
  * formula describing a run in which the flag is raised, conjoined with
@@ -1593,7 +1672,8 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
 template <NodeType node>
 result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	tref ev_var_flags, tref original_aw, const int_t start_time,
-	const int_t max_st_lookback, const bool output)
+	const int_t max_st_lookback, const bool output,
+	const int_t aw_warm_up = 0)
 {
 	LOG_DEBUG << "Begin to_unbounded_continuation";
 
@@ -1636,51 +1716,60 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// guarded site below: continuing with `run = nullptr` would silently
 	// DROP the initial-run conjuncts and make the remaining search easier,
 	// i.e. answer satisfiable/realizable when it must not.
-	TAU_TRY(tref run, make_initial_run<node>(ori_aw_ctn, max_st_lookback));
-	// Check if flag can be raised up to the highest initial condition + 2
-	// which corresponds to checking the sometimes statement up to time point
-	// of the highest initial condition + 1
+	TAU_TRY(tref initial_run,
+		make_initial_run<node>(ori_aw_ctn, max_st_lookback, aw_warm_up));
 	const int_t s = start_time + time_point;
 	// TODO: flag_boundary is upper bound, improve!
 	const int_t flag_boundary =
 		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
-	for (int_t i = s; i <= flag_boundary; ++i) {
-		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
-		// `T` is the empty-run identity here, matching the old nullptr case.
-		if (!tau::get(run).equals_T())
-			run = tau::build_wff_and(run, current_aw);
-		else run = current_aw;
-		auto current_flag = fm_at_time_point<node>(st_flags, st_io_vars, i);
-		auto normed_run = normalize_non_temp<node>(
-					tau::build_wff_and(run, current_flag)).value_or(nullptr);
-		// A cap violation surfaces as nullptr; propagate it rather than
-		// dereferencing it below.
-		if (!normed_run) return r.with_value(nullptr);
-		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
-		// An undecided step is no verdict; reading it as "the flag
-		// cannot be raised here" would add a false assumption below.
-		if (!sat) return r;
-		if (*sat) {
-			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
-			LOG_DEBUG << LOG_FM(normed_run);
-			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
+	// The run, kept as the list of its steps (which
+	// is_run_satisfiable_by_steps decides one time point at a time):
+	// run[0] is the initial run and run[k] the always part at step s+k-1.
+	trefs run{ initial_run };
+	auto extend_run = [&](int_t i) {
+		while ((int_t)run.size() <= i - s + 1)
+			run.push_back(fm_at_time_point<node>(aw, io_vars,
+						s + (int_t)run.size() - 1));
+	};
+	// Check whether the system can force every flag down by step i
+	// whatever the inputs do. The value is the formula to execute, or `F`
+	// when the flags cannot be forced down by step i. No step before i is
+	// assumed to keep a flag up: on some inputs a flag may drop earlier,
+	// and a strategy whose drop step depends on the inputs is only found
+	// this way.
+	auto raise_by = [&](int_t i) -> result<tref> {
+		result<tref> rr;
+		extend_run(i);
+		trefs goal(run.begin(), run.begin() + (i - s + 2));
+		goal.push_back(fm_at_time_point<node>(st_flags, st_io_vars, i));
+		auto sat = rr.merge_take(
+			is_run_satisfiable_by_steps<node>(goal));
+		if (!sat) return rr;
+		if (!*sat) return rr.with_value(tau::_F());
+		auto normed = rr.merge_take(normalize_non_temp<node>(
+						tau::build_wff_and(goal)));
+		if (!normed) return rr;
+		LOG_DEBUG << "Flag raised by time point " << i - time_point;
+		LOG_DEBUG << LOG_FM(*normed);
+		return rr.with_value(tau::build_wff_and(*normed, ori_aw_ctn));
+	};
+	// The flags can most often be forced down at the first step; any
+	// later step is only searched once chi_inf below has shown that the
+	// flags can be forced down at all, since each later check is costlier
+	// than the previous one.
+	{
+		TAU_TRY(tref res, raise_by(s));
+		if (!tau::get(res).equals_F()) {
 			print_fixpoint_info("Temporal normalization of "
 				"Tau specification did not rely on fixpoint "
 				"finding, yielding the result: ",
 				TAU_TO_STR(res), output);
 			return r.with_value(res);
 		}
-		// Since the flag could not be raised in this step, we can add the assumption
-		// that it will never be raised at this timepoint
-		run = normalize_non_temp<node>(tau::build_wff_and(run,
-					tau::build_wff_neg(current_flag))).value_or(nullptr);
-		// A cap violation surfaces as nullptr; return it immediately --
-		// falling into the next iteration's `equals_T()` check would
-		// silently restart from `current_aw`, masking the failure.
-		if (!run) return r.with_value(nullptr);
 	}
-	// Since flag could not be raised in the initial segment, we now check if it
-	// can be raised at all. To this end we calculate chi_inf
+	extend_run(flag_boundary);
+	// Check whether the flags can be forced down at all. To this end we
+	// calculate chi_inf
 
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
@@ -1719,10 +1808,18 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 		point_after_inits, std::max(point_after_inits, time_point)
 					- (time_point + point_after_inits));
 
-	LOG_TRACE << "Fm to check sat: "
-			<< LOG_FM(tau::build_wff_and(run, chi_inf_anchored));
-	auto run_sat = r.merge_take(is_run_satisfiable<node>(
-		tau::build_wff_and(run, chi_inf_anchored)));
+	// The run up to the anchor of chi_inf: chi_inf implies the always part
+	// at its anchor, from where the unbounded continuation can always be
+	// kept, so the later steps of the run add nothing.
+	int_t anchor = -1;
+	for (tref v : tau::get(chi_inf_anchored)
+			.select_top(is_child<node, tau::io_var>))
+		anchor = std::max(anchor, get_io_time_point<node>(v));
+	trefs reach(run.begin(), run.begin() + std::clamp<int_t>(
+		anchor - s + 2, 1, (int_t)run.size()));
+	reach.push_back(chi_inf_anchored);
+	LOG_TRACE << "Fm to check sat: " << LOG_FM(tau::build_wff_and(reach));
+	auto run_sat = r.merge_take(is_run_satisfiable_by_steps<node>(reach));
 	// A real failure (as opposed to a legitimate "not satisfiable")
 	// propagates as an error instead of masquerading as the F verdict.
 	if (!run_sat) return r;
@@ -1735,23 +1832,15 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 			TAU_TO_STR(tau::_F()), output);
 		return r.with_value(tau::_F());
 	}
-	// Here we know that the formula is satisfiable at some point
-	// Since the initial segment is already checked we continue from there
-	//
-	// SO-1: the "guaranteed to be sat at some point" argument below rests on
-	// the is_run_satisfiable check *above*, made before this loop starts
-	// conjoining !current_flag into `run` on every iteration -- so the
-	// property it depends on is not preserved and the search is not
-	// guaranteed to terminate. The global max_flag_search_steps (default
-	// 500; 0 = unlimited) bounds it: a give-up reports unsatisfiable,
-	// which is wrong but bounded and loud, where an unlimited run on such
-	// a spec hangs. Deciding this properly needs a
-	// tri-state (sat/unsat/unknown) result threaded through
-	// transform_to_execution.
+	// The run reaches a state of chi_inf, the chi iterate of `steps`
+	// steps, so the flags can be forced down within `steps` steps past
+	// the anchor whatever the inputs do, and the search below ends by
+	// then. max_flag_search_steps (default 500; 0 = unlimited) stays as a
+	// bound, and a give-up is an error, not a verdict.
 	const bool flag_search_bounded = max_flag_search_steps > 0;
 	const int_t flag_search_limit = flag_boundary + 1
 					+ (int_t)max_flag_search_steps;
-	for (int_t i = flag_boundary + 1; true; ++i) {
+	for (int_t i = s + 1; true; ++i) {
 		if (flag_search_bounded && i > flag_search_limit) {
 			// A bounded give-up is no verdict: it used to report F,
 			// which callers read as a proof of unsatisfiability. Surface
@@ -1772,26 +1861,8 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				"specification.",
 				{{label::limit, max_flag_search_steps}});
 		}
-		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
-		run = tau::build_wff_and(run, current_aw);
-		auto current_flag
-			= fm_at_time_point<node>(st_flags, st_io_vars, i);
-
-		auto normed_run = normalize_non_temp<node>(
-					tau::build_wff_and(run, current_flag)).value_or(nullptr);
-		// A cap violation surfaces as nullptr; propagate it rather than
-		// dereferencing it below.
-		if (!normed_run) return r.with_value(nullptr);
-		// The formula is guaranteed to have be sat at some point
-		// Therefore, the loop will exit eventually
-		auto sat = r.merge_take(is_run_satisfiable<node>(normed_run));
-		// An undecided step is no verdict; reading it as "the flag
-		// cannot be raised here" would add a false assumption below.
-		if (!sat) return r;
-		if (*sat) {
-			LOG_DEBUG << "Flag raised at time point "<<i-time_point;
-			LOG_DEBUG << LOG_FM(normed_run);
-			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
+		TAU_TRY(tref res, raise_by(i));
+		if (!tau::get(res).equals_F()) {
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification "
 				"reached fixpoint after "+std::to_string(steps)+
@@ -1799,20 +1870,12 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				TAU_TO_STR(res), output);
 			return r.with_value(res);
 		}
-		// Since the flag could not be raised in this step, we can add the assumption
-		// that it will never be raised at this timepoint
-		run = normalize_non_temp<node>(tau::build_wff_and(run,
-					tau::build_wff_neg(current_flag))).value_or(nullptr);
-		// A cap violation surfaces as nullptr; return it immediately --
-		// this unbounded loop rebuilds `run` unconditionally next
-		// iteration, unlike the bounded loop above.
-		if (!run) return r.with_value(nullptr);
 	}
 }
 
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, const sometimes_inputs inputs)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -1830,14 +1893,22 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
 				subtree_pair_less<node, int_t>>;
-	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// The reading of the inputs under `sometimes` changes the result, so
+	// each reading keeps its own cache.
+	static cache_t& universal_cache
+		= tree<node>::template create_cache<cache_t>();
+	static cache_t& guarded_cache
+		= tree<node>::template create_cache<cache_t>();
+	cache_t& cache = inputs == sometimes_inputs::universal
+		? universal_cache : guarded_cache;
 	// The continuation depends on the runtime budgets (fixpoint and flag
 	// search steps, the synthesis knobs, the algebras' options); a change
 	// between two queries must not return the first one's result.
 	static size_t cache_budget = verdict_budget_fingerprint<node>();
 	if (const size_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
-		cache.clear();
+		universal_cache.clear();
+		guarded_cache.clear();
 		cache_budget = fp;
 	}
 	if (auto it = cache.find(std::make_pair(fm, start_time));
@@ -1852,7 +1923,35 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	};
 	LOG_DEBUG << "Start transform_to_execution: " << LOG_FM(fm);
 
+	// Several sometimes clauses are decided together, with one flag each,
+	// and that joint search grows quickly with their number. Each clause
+	// with the always part alone is a weaker formula, so one of them that
+	// is unsatisfiable decides the whole clause. A clause left undecided
+	// here only means the joint search below decides.
+	if (trefs sts = tau::get(fm).select_top(
+		is_child<node, tau::wff_sometimes>); sts.size() >= 2)
+	{
+		tref aw = tau::get(fm).find_top(is_child<node, tau::wff_always>);
+		for (tref st : sts) {
+			auto single = transform_to_execution<node>(
+				aw ? tau::build_wff_and(aw, st) : st,
+				start_time, false, inputs);
+			if (!single.has_value()
+				|| !tau::get(single.value()).equals_F()) continue;
+#ifdef TAU_CACHE
+			cache.emplace(std::make_pair(fm, start_time), tau::_F());
+#endif // TAU_CACHE
+			return r.with_value(tau::_F());
+		}
+	}
+
 	tref aw_fm = tau::get(fm).find_top(is_child<node, tau::wff_always>);
+	// The always part asks nothing before its deepest lookback as written
+	// (README "Lookback initialization"); its unbounded continuation can
+	// read less far back, so the sometimes transformation is given this
+	// lookback explicitly.
+	const int_t aw_warm_up = aw_fm ? get_max_shift<node>(tau::get(aw_fm)
+			.select_top(is_child<node, tau::io_var>)) : 0;
 	std::pair<tref, int_t> ev_t;
 	tref ubd_aw_fm = nullptr;
 	{
@@ -1873,8 +1972,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			}
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
-			ev_t = transform_to_eventual_variables<node>(
-							ubd_fm, false, start_time);
+			ev_t = transform_to_eventual_variables<node>(ubd_fm,
+					false, start_time, inputs, aw_warm_up);
 			// Check if there is a sometimes present
 			if (ev_t.first == ubd_fm) {
 				tref res = elim_aw(ubd_fm);
@@ -1891,7 +1990,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			}
 		} else {
 			ev_t = transform_to_eventual_variables<node>(
-								fm, true, start_time);
+							fm, true, start_time, inputs);
 			// Check if there is a sometimes present
 			if (ev_t.first == fm) {
 				// Here we deal with a non-temporal formula
@@ -1958,7 +2057,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			// an error here; `result<tref>` rejects `nullptr` as a value.
 			TAU_TRY(tref ctn, to_unbounded_continuation<node>(
 					aw_after_ev, st[0], ubd_aw_fm, start_time,
-					ev_t.second, output));
+					ev_t.second, output, aw_warm_up));
 			TAU_TRY_OR(res, normalize_non_temp<node>(ctn),
 				code::internal_error,
 				"Normalization of the unbounded continuation failed");
@@ -2217,7 +2316,8 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	// satisfiable, and then it is the result.
 	std::optional<result<tref>> undecided_path;
 	for (tref c : expression_paths<node>(imp_check)) {
-		auto val = transform_to_execution<node>(c);
+		auto val = transform_to_execution<node>(c, 0, false,
+			sometimes_inputs::guarded);
 		if (!val.has_value()) {
 			if (!undecided_path) undecided_path.emplace(std::move(val));
 			continue;
@@ -2259,7 +2359,8 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	// Same undecided-disjunct rule as is_tau_impl.
 	std::optional<result<tref>> undecided_path;
 	for (const auto& c : expression_paths<node>(equiv_check)) {
-		auto val = transform_to_execution<node>(c);
+		auto val = transform_to_execution<node>(c, 0, false,
+			sometimes_inputs::guarded);
 		if (!val.has_value()) {
 			if (!undecided_path) undecided_path.emplace(std::move(val));
 			continue;

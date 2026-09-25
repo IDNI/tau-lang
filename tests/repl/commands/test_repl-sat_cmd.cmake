@@ -171,3 +171,44 @@ add_repl_test(sat_cmd-delay_chain3_blocked "sat (always (${_chain3} && o1[t] = 0
 add_repl_test(sat_cmd-delay_chain5_sometimes_mid "sat (always (${_chain5})) && (sometimes o4[t] = 1)" ": T")
 add_repl_test(sat_cmd-delay_chain5_sometimes_last "sat (always (${_chain5})) && (sometimes o6[t] = 1)" ": T")
 add_repl_test(sat_cmd-delay_chain3_bv "sat (always (o1[0]:bv[8] = 0 && o2[0]:bv[8] = 0 && o3[0]:bv[8] = 0 && o4[0]:bv[8] = 0 && o2[t]:bv[8] = o1[t-1]:bv[8] && o3[t]:bv[8] = o2[t-1]:bv[8] && o4[t]:bv[8] = o3[t-1]:bv[8])) && (sometimes o4[t]:bv[8] = 1)" ": T")
+
+# The inputs inside a sometimes are quantified universally, like every other
+# input: the specification must reach the sometimes whatever the inputs do
+add_repl_test(sat_cmd-sometimes_input_atom "sat sometimes i1[t] = 1" ": F")
+add_repl_test(sat_cmd-sometimes_input_atom_unsat "unsat sometimes i1[t] = 1" ": T")
+add_repl_test(sat_cmd-sometimes_input_lookback "sat sometimes i1[t-1] = 1" ": F")
+add_repl_test(sat_cmd-always_output_sometimes_input "sat (always o1[t] = 1) && (sometimes i1[t] = 1)" ": F")
+add_repl_test(sat_cmd-sometimes_output_and_input "sat (sometimes o1[t] = 1) && (sometimes i1[t] = 1)" ": F")
+add_repl_test(sat_cmd-sometimes_output_copies_input "sat sometimes o1[t] = i1[t]" ": T")
+add_repl_test(sat_cmd-sometimes_output_differs_from_input "sat sometimes o1[t] != i1[t]" ": T")
+add_repl_test(sat_cmd-sometimes_output_reacts "sat (always o1[t] = i1[t]) && (sometimes (i1[t] = 1 -> o2[t] = 1))" ": T")
+add_repl_test(sat_cmd-sometimes_constant_output_vs_input "sat (always o1[t] = 0) && (sometimes o1[t] = i1[t])" ": F")
+# adding a conjunct never makes a specification satisfiable
+add_repl_test(sat_cmd-sometimes_follower_output "sat (always o1[t] = i1[t]) && (sometimes o1[t] = 1)" ": F")
+add_repl_test(sat_cmd-sometimes_follower_stronger "sat (always o1[t] = i1[t]) && (sometimes (i1[t] = 1 && o1[t] = 1))" ": F")
+# sat agrees with realizable and with the full-LTL spelling
+add_repl_test(sat_cmd-sometimes_input_realizable "realizable sometimes i1[t] = 1" ": F")
+add_repl_test(sat_cmd-sometimes_input_until "sat T U (i1[t] = 1)" ": F")
+# the step at which the sometimes holds may depend on the inputs: no single
+# step forces it, but every input sequence reaches it
+add_repl_test(sat_cmd-sometimes_input_dependent_step "sat sometimes (i1[t]:bv[1] = 1 || i1[t-1]:bv[1] = 0)" ": T")
+add_repl_test(sat_cmd-sometimes_input_dependent_step2 "sat sometimes (i1[t-1]:bv[1] = 1 || i1[t-2]:bv[1] = 0)" ": T")
+add_repl_test(sat_cmd-sometimes_input_constant_avoids "sat sometimes i1[t]:bv[1] != i1[t-1]:bv[1]" ": F")
+add_repl_test(sat_cmd-sometimes_inputs_two_goals "sat (always ((o2[t-1]:bv[1] = 1 -> o1[t-1]:bv[1] = 1))) && (sometimes (o1[t]:bv[1] != i2[t]:bv[1])) && (sometimes (i2[t]:bv[1] = 0 && o1[t]:bv[1] = o1[t-1]:bv[1]'))" ": F")
+foreach(_t input_dependent_step input_dependent_step2 input_constant_avoids
+		inputs_two_goals)
+	if(TEST "test_repl-sat_cmd-sometimes_${_t}")
+		set_tests_properties("test_repl-sat_cmd-sometimes_${_t}"
+			PROPERTIES TIMEOUT 60)
+	endif()
+endforeach()
+
+# Each clause is enforced from its own deepest lookback: an always part that
+# reads the past asks nothing during its warm-up, where a sometimes part that
+# reads less far back may already hold
+add_repl_test(sat_cmd-warm_up_sometimes_first_step "sat (always o1[t-1] = 1 && !(o2[t] = o1[t-1])) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_sometimes_output "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_realizable "realizable (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_continuation "sat (always (i2[t] = o1[t-2] || o1[t-1] = 0) && o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t])" ": T")
+add_repl_test(sat_cmd-warm_up_same_lookback "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes (o2[t] = 1 && o1[t-1] = 1))" ": F")
+add_repl_test(sat_cmd-warm_up_none "sat (always o2[t] = 0) && (sometimes o2[t] = 1)" ": F")

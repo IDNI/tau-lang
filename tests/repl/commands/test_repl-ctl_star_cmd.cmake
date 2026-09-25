@@ -50,7 +50,7 @@ set_tests_properties("test_repl-ctl_star-valid_tautology_not_F" PROPERTIES
 add_repl_test(ctl_star-realizable_A_F_input
 	"fragment ctl_star. realizable A (F i1[t] = 1)" ": F")
 add_repl_test(ctl_star-sat_A_F_input_like_its_body
-	"fragment ctl_star. sat A (F i1[t] = 1)" ": T")
+	"fragment ctl_star. sat A (F i1[t] = 1)" ": F")
 add_repl_test(ctl_star-sat_A_F_output "fragment ctl_star. sat A (F o1[t] = 1)" ": T")
 add_repl_test(ctl_star-realizable_A_always_output
 	"fragment ctl_star. realizable A (always o1[t] = 1)" ": T")

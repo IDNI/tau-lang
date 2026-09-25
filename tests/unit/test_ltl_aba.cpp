@@ -305,12 +305,12 @@ TEST_SUITE("LTL(ABA) realizability") {
 		CHECK(sat(fm));
 	}
 
-	TEST_CASE("F(input = 0) is satisfiable") {
-		// A trace exists where the input reaches 0, even though the
-		// system cannot force it (that is a realizability question).
+	TEST_CASE("F(input = 0) is unsatisfiable") {
+		// Satisfiability quantifies the inputs universally, inside F
+		// too: the environment can keep i1 away from 0 forever.
 		tref fm = spec("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
-		CHECK(sat(fm));
+		CHECK_FALSE(sat(fm));
 	}
 
 	TEST_CASE("F(input = 0) is unrealizable") {

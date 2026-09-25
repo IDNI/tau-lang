@@ -2734,6 +2734,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the sat command checks if a Tau formula is satisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is satisfiable if there exists a variable assignment to non-temporal variables\n"
 		<< "such that for all possible inputs there exist time compatible outputs at each point in time\n"
+		<< "inputs under sometimes are read the same way (sat sometimes i1[t] = 1 is F)\n"
 		<< "a formula without a temporal operator is read as if it were wrapped in always\n"
 		<< "an undecided formula prints an UNKNOWN error instead of T or F\n"
 		<< "\n"

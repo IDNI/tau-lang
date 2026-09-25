@@ -20,6 +20,25 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief How `transform_to_execution` reads the input streams of a
+ * `sometimes` clause.
+ */
+enum class sometimes_inputs : bool {
+	/// Universally at their time step, like the inputs of the `always`
+	/// part: the system must make the clause true at some step whatever
+	/// the inputs do (README "Satisfiability"). Satisfiability and
+	/// execution use this reading.
+	universal,
+	/// Through a guard of uninterpreted constants: the clause only has to
+	/// hold when the inputs equal constants that the check chooses. The
+	/// implication and equivalence checks decide `unsat(f1 && !f2)`, whose
+	/// negated side turns an `always` over inputs into a `sometimes`. Read
+	/// universally, `sometimes i1[t] != 0` is unsatisfiable, and
+	/// `always i1[t] = 0` would be implied by `T`.
+	guarded
+};
+
+/**
  * @brief Instantiate @p original_fm for IO variables at @p time_point.
  * @tparam node Tree node type.
  * @param original_fm Formula template to instantiate.
@@ -77,6 +96,8 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  * @param fm Normalized Tau formula.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
+ * @param inputs How the input streams of a `sometimes` clause are read
+ * (default: universally, as satisfiability defines them).
  * @return Formula ready for step-by-step execution (`F` when @p fm has no
  * satisfiable continuation), or `nullptr` when normalization fails on a
  * `bv_widening` width-cap violation (already logged by the widening pass).
@@ -98,7 +119,8 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t star
  */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
-					const bool output = false);
+	const bool output = false,
+	const sometimes_inputs inputs = sometimes_inputs::universal);
 
 
 /**
@@ -140,7 +162,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time = 0,
  *
  * The inputs of the negated implication are quantified universally, so
  * `false` means the system can keep @p f1 true and @p f2 false whatever the
- * inputs do. A trace validity check reads every input as an output first
+ * inputs do; the inputs of its `sometimes` clauses are read through a guard
+ * (`sometimes_inputs::guarded`). A trace validity check reads every input as an output first
  * (`inputs_as_outputs`, as `api::valid_spec` does).
  * @tparam node Tree node type.
  * @param f1 Antecedent formula.
@@ -170,7 +193,8 @@ result<bool> is_tau_impl(tref f1, tref f2);
 /**
  * @brief Check whether two closed temporal formulas are logically equivalent.
  *
- * The formulas must be closed (no free variables).
+ * The formulas must be closed (no free variables). The inputs of the
+ * `sometimes` clauses of the check are read like in `is_tau_impl`.
  * @tparam node Tree node type.
  * @param f1 First formula (closed).
  * @param f2 Second formula (closed).
