@@ -426,7 +426,17 @@ result<codegen_result> compile_spec(
 	// atom outside its supported scope surfaces here as a compile error,
 	// not a crash.
 	TAU_TRY(auto sol, solve_ltl_aba<Node>(fm));
-	if (!sol) return r.with_error(code::unsat, "compile: spec is UNREALIZABLE");
+	if (!sol) {
+		// The data game may decide what the abstraction does not; the
+		// emitted program carries only the abstraction's strategy.
+		std::shared_ptr<data_game_strategy<Node>> data;
+		ltl_to_safety_formula_full<Node>(fm, &data);
+		if (data) return r.with_error(code::unsupported_operation,
+			"compile: the spec is realizable, but only through the "
+			"strategy of the data game, which `run` executes and a "
+			"compiled program cannot carry");
+		return r.with_error(code::unsat, "compile: spec is UNREALIZABLE");
+	}
 
 	// 3. Build the program_desc and emit the C++ artifact via the one
 	// data-driven emit path (build_program_desc picks flag-only vs
