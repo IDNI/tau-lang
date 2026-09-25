@@ -16,6 +16,7 @@
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__JOINS_TMPL_H__
 #define __IDNI__TAU__ANTI_PRENEX__NORMALISERS__JOINS_TMPL_H__
 
+#include <algorithm>
 #include <cassert>
 #include <utility>
 #include <vector>
@@ -48,8 +49,9 @@ trefs parts_of(tref m) {
  * An occurrence index maps a part to the members holding it, built once per
  * pass. A member `d` looks for what it absorbs among the members of its
  * RAREST part alone, and absorbs `m′` — a member with strictly MORE parts —
- * iff `parts(d) ⊆ parts(m′)`, tested by marking: the parts of every member
- * are held as a set, once per member, and `d`'s parts are looked up in it.
+ * iff `parts(d) ⊆ parts(m′)`, tested against the occurrence index: `p ∈
+ * parts(m′)` iff `m′` occurs in `occ[p]`, which holds every member index in
+ * ascending order, so membership is a binary search.
  *
  * `absorb_occ_max` (options.h) is the cost guard: a part occurring in more
  * members than the limit is no candidate key, so a member all of whose parts
@@ -62,18 +64,28 @@ trefs parts_of(tref m) {
  */
 template <NodeType node, bool conj>
 trefs absorb(const trefs& ms) {
+	using tau = tree<node>;
 	if (ms.size() < 2) return ms;
+	// Only a dual-connective member has more than one part, so without one
+	// no member can hold another's parts strictly.
+	constexpr auto dual = conj ? tau::wff_or : tau::wff_and;
+	bool has_dual = false;
+	for (tref m : ms) if (is_child<node>(m, dual)) { has_dual = true; break; }
+	if (!has_dual) return ms;
 	// The parts of every member, deduplicated, as a list (to iterate, for
-	// an absorber) and as a set (to mark, for an absorbed candidate).
+	// an absorber) and as an occurrence index (to test, for an absorbed
+	// candidate).
 	std::vector<trefs> parts(ms.size());
-	std::vector<subtree_unordered_set<node>> marked(ms.size());
 	subtree_unordered_map<node, std::vector<size_t>> occ;
-	for (size_t i = 0; i < ms.size(); ++i)
+	subtree_unordered_set<node> seen;
+	for (size_t i = 0; i < ms.size(); ++i) {
+		seen.clear();
 		for (tref p : parts_of<node, conj>(ms[i]))
-			if (marked[i].insert(p).second) {
+			if (seen.insert(p).second) {
 				parts[i].push_back(p);
 				occ[p].push_back(i);
 			}
+	}
 	std::vector<bool> absorbed(ms.size(), false);
 	for (size_t d = 0; d < ms.size(); ++d) {
 		if (absorbed[d]) continue;
@@ -87,11 +99,13 @@ trefs absorb(const trefs& ms) {
 			if (m == d || absorbed[m]) continue;
 			if (parts[m].size() <= parts[d].size()) continue;
 			bool subset = true;
-			for (tref p : parts[d])
-				if (!marked[m].contains(p)) {
+			for (tref p : parts[d]) {
+				const std::vector<size_t>& o = occ.find(p)->second;
+				if (!std::binary_search(o.begin(), o.end(), m)) {
 					subset = false;
 					break;
 				}
+			}
 			if (subset) absorbed[m] = true;
 		}
 	}
