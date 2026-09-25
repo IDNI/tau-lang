@@ -1769,7 +1769,9 @@ result<tref> api<node>::pin_main(tref expr, bool negate) {
 		const bool spec = tau::get(expr).is(tau::spec);
 		tref main = spec ? (tt(expr) | tau::main | tau::wff | tt::ref)
 			: expr;
-		if (!main) return r.with_assert_check_value(expr);
+		// A term has no clause to pin; the caller's shape check rejects it.
+		if (!main || !tau::get(main).is(tau::wff))
+			return r.with_assert_check_value(expr);
 		tref decided = main;
 		if (negate) {
 			use_hooks_guard<node> hooks_off(false);
