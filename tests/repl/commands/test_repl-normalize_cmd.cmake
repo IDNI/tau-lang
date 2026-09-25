@@ -171,3 +171,24 @@ add_repl_test(normalize_cmd-cast_result_types_untyped_sibling
 # assignments by dependency).
 add_repl_test(normalize_cmd_definition_chain_forward  "n (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
 add_repl_test(normalize_cmd_definition_chain_reversed "n (d:bv[8] = (n:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8]) && (n:bv[8] = (l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) ^ ((l:bv[8] ^ (l:bv[8] << { 3 }:bv[8])) >> { 5 }:bv[8])) && (l:bv[8] = { 0 }:bv[8] + s:bv[8]) && (s:bv[8] = { 215 }:bv[8] ^ { 24 }:bv[8] ^ { 53 }:bv[8] ^ { 55 }:bv[8]) && (({ 53 }:bv[8] + d:bv[8] > { 42 }:bv[8]) || (w:bv[8] = { 42 }:bv[8])) && (({ 53 }:bv[8] + d:bv[8] !> { 42 }:bv[8]) || (w:bv[8] = { 53 }:bv[8] + d:bv[8]))" "w = { 58 }:bv")
+
+# A complemented `:tau` constant `{K}'` normalizes to a `sometimes` over the
+# DNF of `!K`; the factored predicates decide it through the always dual
+# `F(D) == !G(!D)` (tau_ba.tmpl.h, sometimes_dual). Pin both questions on a
+# satisfiable-but-not-valid, a valid and an unsatisfiable two-clause
+# constant.
+add_repl_test(normalize_cmd-tau_complement_sat_not_valid_zero "set charvar off. normalize { (always (o1[t] != 0 || o2[t] = 0)) && (always o3[t] = 0) }:tau' = 0" ": F")
+add_repl_test(normalize_cmd-tau_complement_sat_not_valid_one  "set charvar off. normalize { (always (o1[t] != 0 || o2[t] = 0)) && (always o3[t] = 0) }:tau' = 1" ": F")
+add_repl_test(normalize_cmd-tau_complement_valid_zero         "set charvar off. normalize { (always (o1[t] = 0 || o1[t] != 0)) && (always (o2[t] = 0 || o2[t] != 0)) }:tau' = 0" ": T")
+add_repl_test(normalize_cmd-tau_complement_valid_one          "set charvar off. normalize { (always (o1[t] = 0 || o1[t] != 0)) && (always (o2[t] = 0 || o2[t] != 0)) }:tau' = 1" ": F")
+add_repl_test(normalize_cmd-tau_complement_unsat_one          "set charvar off. normalize { (always o1[t] = 0) && (always o1[t] != 0) }:tau' = 1" ": T")
+add_repl_test(normalize_cmd-tau_complement_unsat_zero         "set charvar off. normalize { (always o1[t] = 0) && (always o1[t] != 0) }:tau' = 0" ": F")
+# The same two questions on constants that read an input stream. An input
+# stream is universally quantified: `always i1[t] = 0` has no realization, so
+# the pinned constant is unsatisfiable and its complement valid (`= 1` gives
+# T); the guarded one is realizable with `o1[t] = 1` and not valid (both F).
+# The verdicts are those of the monolithic path on the unpatched binary.
+add_repl_test(normalize_cmd-tau_complement_input_guard_zero   "set charvar off. normalize { (always (i1[t] = 0 || o1[t] != 0)) && (always o2[t] = 0) }:tau' = 0" ": F")
+add_repl_test(normalize_cmd-tau_complement_input_guard_one    "set charvar off. normalize { (always (i1[t] = 0 || o1[t] != 0)) && (always o2[t] = 0) }:tau' = 1" ": F")
+add_repl_test(normalize_cmd-tau_complement_input_pinned_zero  "set charvar off. normalize { (always i1[t] = 0) && (always o1[t] = 0) }:tau' = 0" ": F")
+add_repl_test(normalize_cmd-tau_complement_input_pinned_one   "set charvar off. normalize { (always i1[t] = 0) && (always o1[t] = 0) }:tau' = 1" ": T")
