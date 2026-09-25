@@ -181,7 +181,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// no-op (returns "") when the formula has no positional atoms.
 	TAU_TRY(std::string step_counter_extra, apply_step_counter_encoding<node>(
 		hoist_conjuncts, sol.atoms, sol.input_props, sol.output_props,
-		sol.counter_highest_initial_pos, sol.counter_relativized_props));
+		sol.counter_highest_initial_pos, sol.counter_relativized_props,
+		sol.counter_gated_props, sol.counter_bits));
 
 	// Erase each hoisted conjunct's own occurrence site to a literal T.
 	// before the main skeleton walk, rather than relying on an individual
@@ -247,6 +248,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	}
 
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
+	gate_counter_props<node>(sol);
 	return r.with_value(std::move(sol));
 }
 
@@ -395,6 +397,7 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		auto aut_opt = r.merge_take(parse_hoa(hoa));
 		if (!aut_opt) return backend_failed();
 		sol.aut = std::move(*aut_opt);
+		gate_counter_props<node>(sol);
 	}
 }
 

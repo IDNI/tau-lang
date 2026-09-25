@@ -1734,7 +1734,9 @@ static result<std::string> apply_step_counter_encoding(
     std::vector<std::string>& input_props,
     std::vector<std::string>& output_props,
     int_t& out_max_pos,
-    std::set<std::string>& counter_relativized_props)
+    std::set<std::string>& counter_relativized_props,
+    std::map<std::string, std::set<int_t>>& counter_gated_props,
+    std::vector<std::string>& counter_bits)
 {
 	using tau = tree<node>;
 	result<std::string> r;
@@ -1761,6 +1763,7 @@ static result<std::string> apply_step_counter_encoding(
 	for (int b = 0; b < w; ++b)
 		bits[b] = "o__ltl_ctr" + std::to_string(b) + "__";
 	for (auto& b : bits) output_props.push_back(b);
+	counter_bits = bits;
 
 	auto minterm = [&](int_t value) {
 		std::string body;
@@ -1892,7 +1895,11 @@ static result<std::string> apply_step_counter_encoding(
 		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
 			tref a_orig = orig_pos_atoms[oi];
 			if (!contains<node>(C, a_orig)) continue;
-			if (orig_done[oi]) continue; // already resolved via a shared conjunct
+			if (orig_done[oi]) { // already resolved via a shared conjunct
+				if (auto g = counter_gated_props.find(orig_prop[oi]);
+					g != counter_gated_props.end()) g->second.insert(km);
+				continue;
+			}
 
 			tref rel = relativize_text(a_orig, km);
 			assert(rel != nullptr
@@ -1914,14 +1921,17 @@ static result<std::string> apply_step_counter_encoding(
 			std::string pname;
 			if (existing != atoms.size()) {
 				pname = atoms[existing].second;
+				if (auto g = counter_gated_props.find(pname);
+					g != counter_gated_props.end()) g->second.insert(km);
 			} else {
 				pname = "p" + std::to_string(next_prop_idx++);
 				atoms.emplace_back(rel, pname);
-				// Only the step-km guard below constrains the prop: it
-				// reads its relativized atom at every step, so fixing its
-				// value at another step would constrain the data there.
+				// Only the step-km guard below reads the prop, so it is
+				// gated to that step (gate_counter_props): elsewhere a
+				// strategy's value for it claims nothing about the data.
 				if (is_pure_input_atom<node>(rel)) input_props.push_back(pname);
 				else output_props.push_back(pname);
+				counter_gated_props[pname] = { km };
 			}
 			orig_prop[oi] = pname;
 			orig_done[oi] = true;
@@ -1978,6 +1988,11 @@ struct ltl_aba_solution {
 	// absolute step (time_point) instead of the lookback-shifted
 	// formula_time_point every other template atom uses.
 	std::set<std::string> counter_relativized_props;
+	// Props apply_step_counter_encoding created for a hoisted atom and no
+	// other occurrence, with the counter steps whose guard reads each, and
+	// the counter's bits (gate_counter_props).
+	std::map<std::string, std::set<int_t>> counter_gated_props;
+	std::vector<std::string> counter_bits;
 
 	// False when realizability was decided by a route whose strategy CANNOT
 	// be re-expressed as a safety formula over the user's data atoms:
@@ -2002,6 +2017,105 @@ struct ltl_aba_solution {
 	std::vector<std::pair<std::string, std::string>> const_outputs;
 	tref const_formula = nullptr;
 };
+
+// A gated prop (counter_gated_props) is read by the skeleton only at its own
+// counter steps, so a strategy's value for it elsewhere is a free choice
+// that claims nothing about the data. Each edge label is rewritten so that,
+// in every cube whose counter bits rule out all of the prop's steps, the
+// prop's literal goes unless the rest of the cube forces it; the oracles
+// and the executed strategy then read the labels alike. A label with
+// parentheses, or a cube leaving the step open, keeps its literals.
+template <NodeType node>
+static void gate_counter_props(ltl_aba_solution<node>& sol) {
+	if (sol.counter_gated_props.empty() || sol.counter_bits.empty()) return;
+	const auto& aps = sol.aut.aps;
+	std::map<int, int> bit_of; // ap index -> counter bit
+	std::map<int, const std::set<int_t>*> gated; // ap index -> its steps
+	for (int i = 0; i < (int)aps.size(); ++i) {
+		for (size_t b = 0; b < sol.counter_bits.size(); ++b)
+			if (aps[i] == sol.counter_bits[b]) bit_of[i] = (int)b;
+		if (auto g = sol.counter_gated_props.find(aps[i]);
+			g != sol.counter_gated_props.end()) gated[i] = &g->second;
+	}
+	if (gated.empty()) return;
+	const size_t w = sol.counter_bits.size();
+	auto strip = [](std::string x) {
+		size_t a = x.find_first_not_of(" \t"), b = x.find_last_not_of(" \t");
+		return a == std::string::npos ? std::string() : x.substr(a, b - a + 1);
+	};
+	auto split = [](const std::string& x, char sep) {
+		std::vector<std::string> out;
+		size_t start = 0;
+		for (size_t i = 0; i <= x.size(); ++i)
+			if (i == x.size() || x[i] == sep)
+				out.push_back(x.substr(start, i - start)), start = i + 1;
+		return out;
+	};
+	for (auto& edges : sol.aut.edges)
+		for (auto& e : edges) {
+			if (e.guard_label.find('(') != std::string::npos) continue;
+			std::string out;
+			for (auto& cube_txt : split(e.guard_label, '|')) {
+				std::vector<std::pair<int, bool>> lits;
+				std::vector<std::string> keep;
+				bool ok = true;
+				for (auto& l : split(cube_txt, '&')) {
+					std::string t = strip(l);
+					bool pos = !(t.size() && t[0] == '!');
+					std::string num = strip(pos ? t : t.substr(1));
+					if (num.empty() || !std::all_of(num.begin(), num.end(),
+						[](unsigned char c) { return std::isdigit(c); }))
+							{ if (num != "t" && num != "f") ok = false;
+							  lits.emplace_back(-1, pos); keep.push_back(t);
+							  continue; }
+					lits.emplace_back(std::stoi(num), pos);
+					keep.push_back(t);
+				}
+				if (!ok) { out.clear(); break; }
+				// counter values the cube allows
+				std::vector<int_t> values;
+				for (size_t v = 0; v < (size_t{1} << w); ++v) {
+					bool fits = true;
+					for (auto& [idx, pos] : lits)
+						if (auto b = bit_of.find(idx); b != bit_of.end()
+							&& (bool)(v >> b->second & 1) != pos)
+								{ fits = false; break; }
+					if (fits) values.push_back((int_t)v);
+				}
+				std::vector<bool> free_here(lits.size(), false);
+				std::string rest;
+				for (size_t i = 0; i < lits.size(); ++i) {
+					auto g = gated.find(lits[i].first);
+					free_here[i] = g != gated.end()
+						&& std::none_of(values.begin(), values.end(),
+							[&](int_t v) { return g->second->count(v); });
+					if (!free_here[i])
+						rest += (rest.empty() ? "" : "&") + keep[i];
+				}
+				tref rest_fm = rest.empty() ? tree<node>::_T()
+					: guard_to_aba<node>(rest, aps, sol.atoms);
+				std::string cube;
+				for (size_t i = 0; i < lits.size(); ++i) {
+					if (free_here[i]) {
+						tref a = nullptr;
+						for (auto& [fm, name] : sol.atoms)
+							if (name == aps[lits[i].first]) { a = fm; break; }
+						if (!a || !rest_fm) continue;
+						tref other = lits[i].second
+							? tree<node>::build_wff_neg(a) : a;
+						// kept only when the rest of the cube forces it
+						if (aba_existential_feasible<node>(
+							tree<node>::build_wff_and(rest_fm, other)))
+								continue;
+					}
+					cube += (cube.empty() ? "" : "&") + keep[i];
+				}
+				if (cube.empty()) cube = "t";
+				out += (out.empty() ? "" : " | ") + cube;
+			}
+			if (!out.empty()) e.guard_label = out;
+		}
+}
 
 // ── Window oracle (cross-step ABA feasibility) ───────────────────────────────
 //
