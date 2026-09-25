@@ -879,7 +879,12 @@ clause a two-step warm-up, so
 `(always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)` is
 satisfiable, with `o2[0] = 0`, and so is
 `(always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)`.
-`sat`, `realizable` and `run` apply the same warm-ups.  The LTL synthesis
+`sat`, `realizable`, `valid`, `run` and `tau compile` apply the same
+warm-ups.  A clause read under a negation keeps its warm-up too: `valid φ`
+asks whether some trace violates a clause of `φ` after its warm-up, so
+`valid !φ` is `T` exactly when no trace satisfies `φ`, and
+`valid (always o2[t] = 1 && o1[t-2] = o1[t-2]) -> (always o2[t] = 1)` is
+`F`.  The LTL synthesis
 pipeline follows the same rule, so `G(p U q)` with `q` reading the past
 agrees with `G q` when `p` is contradictory.
 
