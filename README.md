@@ -793,6 +793,8 @@ constant tests through the full path and reports disagreements, and
 Φ_Δ of the atomless algebra on matching shapes. `TAU_CODEGEN_RUN_SDK_LINK_TEST`
 opts the codegen test suite into a minutes-long real `cmake` build.
 
+**Normal-form reuse switches.** Four three-way switches (`0` off, `1` on, the default, `2` shadow: both paths run, every disagreement is counted and reported at exit when the variable is set) govern the reuse of the normal forms of tau constants: `TAU_BA_NORMALIZED_MEMO` (a normal form `normalize_tau` returned is decided and renormalized without a further normalization pass and, as an operand of the constant operators, taken as it is), `TAU_BA_NORMALIZED_CONJUNCTION` (the normal form of a conjunction of normal forms is built from their bodies, or assembled from their shape), `TAU_API_SAT_FACTORED` (`api::sat` decides an always-conjunction over streams by its stream-disjoint components) and `TAU_BA_NORMALIZED_WITHOUT` (the normal form of an always-conjunction without one of its conjuncts is assembled from its shape).
+
 **Execution**: when the interpreter pipeline is given a realizable LTL formula,
 `ltl_to_safety_formula` converts the winning Mealy strategy to an executable
 `G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
@@ -3208,6 +3210,11 @@ expression.
 
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
+
+* `without <repl_memory|tau> <repl_memory|tau>`: computes the normal form of
+the given always-conjunction without the conjunct equal to the given single
+clause; the normalized formula itself when it is no always-conjunction or no
+conjunct equals the clause.
 
 ## **Specification execution**
 

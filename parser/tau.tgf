@@ -240,6 +240,8 @@ cli_command            =>
         | ("nnf":nnf_sym __ nf_cmd_arg)                       :nnf_cmd
         | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
+# the normal form of an always-conjunction without one of its conjuncts
+        | ("without":without_sym __ nf_cmd_arg __ nf_cmd_arg) :without_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # type inspection
@@ -333,7 +335,8 @@ help_arg               => help_sym | version_sym | quit_sym
                         | dnf_sym | cnf_sym
 # Commented out, not implemented yet
 #                        | anf_sym | pnf_sym
-                        | snf_sym | nnf_sym  | mnf_sym | onf_sym | qelim_sym
+                        | snf_sym | nnf_sym  | mnf_sym | onf_sym | without_sym
+                        | qelim_sym
                         | whatis_sym | reset_sym | fragment_sym
                         | ("example" 's'?):examples_sym.
 
