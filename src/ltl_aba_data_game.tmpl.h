@@ -232,7 +232,7 @@ static std::optional<bit_window> make_bit_window(
 				return std::nullopt;
 			depth = std::max(depth, get_io_var_shift<node>(v));
 			if (w.index.emplace(get_var_name<node>(v), w.index.size()).second)
-				w.is_input.push_back(is_input_var<node>(v));
+				w.is_input.push_back(is_input_stream<node>(v));
 		}
 	w.streams = w.index.size();
 	w.bits = w.streams * (size_t)(depth + 1);
@@ -544,10 +544,12 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 {
 	using tau = tree<node>;
 	result<data_game_verdict> r;
+	// every stream is an input or an output, and read at a relative step
 	for (auto& [atom, _] : atoms)
 		for (tref var : tau::get(atom).select_top(is_child<node, tau::io_var>))
-			if (is_io_initial<node>(var))
-				return r.with_value(data_game_verdict::undecided);
+			if (is_io_initial<node>(var)
+				|| io_var_direction<node>(tau::trim(var)) == 0)
+					return r.with_value(data_game_verdict::undecided);
 	const auto window = make_bit_window<node>(atoms, 22);
 	if (!window && !formulas)
 		return r.with_value(data_game_verdict::undecided);

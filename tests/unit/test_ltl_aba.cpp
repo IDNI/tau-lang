@@ -4551,6 +4551,17 @@ TEST_SUITE("Data game") {
 		CHECK(decided(fm) == std::optional<bool>(true));
 	}
 
+	// A bare formula carries no stream declarations: i1 is an input by its
+	// name, as for the atoms, so the environment keeps it at 0.
+	TEST_CASE("the input of a bare formula is the environment's") {
+		tref fm = wff("G (F (i1[t]:bv[1] = 1))");
+		REQUIRE(fm != nullptr);
+		CHECK(decided(fm) == std::optional<bool>(false));
+		tref sbf = wff("G (F (i1[t]:sbf = 1))");
+		REQUIRE(sbf != nullptr);
+		CHECK(decided(sbf) != std::optional<bool>(true));
+	}
+
 } // TEST_SUITE("Data game")
 
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────

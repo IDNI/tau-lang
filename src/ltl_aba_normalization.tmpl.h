@@ -1964,6 +1964,13 @@ static result<std::string> apply_step_counter_encoding(
 	return r.with_value(std::move(extra));
 }
 
+// An io_var of an input stream: marked as one, or, where no direction was
+// set (a bare formula), named like one, as is_pure_input_atom reads it.
+template <NodeType node>
+static bool is_input_stream(tref v) {
+	return io_var_direction<node>(tree<node>::trim(v)) == 1;
+}
+
 // Every relative io_var of `fm` moved `delta` steps later (x[t-j] becomes
 // x[t-j+delta]), rebuilt in one spelling so that equal formulas compare
 // equal; each variable keeps its input or output side. The caller keeps
@@ -1979,10 +1986,10 @@ static tref shift_io_vars(tref fm, int_t delta) {
 		size_t tid = find_ba_type<node>(v);
 		const std::string& name = get_var_name<node>(v);
 		m[v] = sh == 0
-			? tau::trim(is_input_var<node>(v)
+			? tau::trim(is_input_stream<node>(v)
 				? tau::build_in_var_at_t(build_var_name<node>(name), tid)
 				: tau::build_out_var_at_t(build_var_name<node>(name), tid))
-			: tau::trim(is_input_var<node>(v)
+			: tau::trim(is_input_stream<node>(v)
 				? tau::build_in_var_at_t_minus(name, (size_t)sh, tid)
 				: tau::build_out_var_at_t_minus(name, (size_t)sh, tid));
 	}
@@ -2432,7 +2439,7 @@ struct data_quantifier {
 		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
 			if (is_io_initial<node>(v)) return std::nullopt;
 			auto& [ins, outs] = steps[get_io_var_shift<node>(v)];
-			auto& bucket = is_input_var<node>(v) ? ins : outs;
+			auto& bucket = is_input_stream<node>(v) ? ins : outs;
 			if (std::none_of(bucket.begin(), bucket.end(),
 				[&](tref w) { return tau::subtree_equals(w, v); }))
 					bucket.push_back(v);
@@ -2457,7 +2464,7 @@ struct data_quantifier {
 		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
 			if (is_io_initial<node>(v) || get_io_var_shift<node>(v) != 0)
 				continue;
-			auto& bucket = is_input_var<node>(v) ? ins : outs;
+			auto& bucket = is_input_stream<node>(v) ? ins : outs;
 			if (std::none_of(bucket.begin(), bucket.end(),
 				[&](tref w) { return tau::subtree_equals(w, v); }))
 					bucket.push_back(v);
