@@ -1031,7 +1031,9 @@ tref ltl_to_safety_formula(tref fm) {
 // ── ltl_explain ───────────────────────────────────────────────────────────────
 
 template <NodeType node>
-result<bool> ltl_explain(tref fm, std::ostream& out) {
+result<bool> ltl_explain(tref fm, std::ostream& out,
+	const std::function<result<bool>()>& decide)
+{
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	result<bool> r;
@@ -1063,6 +1065,9 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 	// The verdict below comes from the same procedure `realizable` runs,
 	// which decides the normalized formula and reduces after it: do both in
 	// that order here, or the two commands answer from different atoms.
+	// The always statements form one always part with one warm-up, as in
+	// every other decision procedure.
+	fm = flatten_always_conjuncts<node>(fm);
 	if (auto nf = normalize<node>(fm); nf.has_value() && nf.value())
 		fm = nf.value();
 	if (has_ctl_star_operators<node>(fm)) {
@@ -1084,7 +1089,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 		// Fall through to the existing safety pipeline. An error here
 		// (e.g. transform_to_execution's multiple-sometimes refusal) is
 		// undecided, not a decided UNREALIZABLE.
-		auto sat_r = is_tau_formula_sat<node>(fm, 0, false);
+		auto sat_r = decide ? decide()
+			: is_tau_formula_sat<node>(fm, 0, false);
 		if (!sat_r.has_value()) {
 			r.merge(std::move(sat_r));
 			return r.with_error(code::solver_error,
@@ -1119,18 +1125,19 @@ result<bool> ltl_explain(tref fm, std::ostream& out) {
 	if (maybe) sol = std::move(*maybe);
 
 	// The trace below is the first ltlsynt round and its per-edge oracle
-	// checks; the verdict comes from is_ltl_aba_realizable, the procedure
-	// `realizable` runs (window oracle, refinement rounds), so the two
-	// commands cannot disagree.
+	// checks; the verdict comes from `decide` when given, otherwise from
+	// is_ltl_aba_realizable, the procedure `realizable` runs (window
+	// oracle, refinement rounds).
 	auto verdict = [&]() -> result<bool> {
-		auto real = is_ltl_aba_realizable<node>(fm, 0, false);
+		auto real = decide ? decide()
+			: is_ltl_aba_realizable<node>(fm, 0, false);
 		if (!real.has_value()) {
 			r.merge(std::move(real));
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the synthesis backend failed or produced no "
 				"verdict; realizability could not be decided");
 		}
-		if (!real.value() && !exact_reduction) {
+		if (!decide && !real.value() && !exact_reduction) {
 			return r.with_error(code::solver_error,
 				"UNKNOWN: the CTL* reduction is unrealizable, but an E "
 				"witness over a past operator ranges over every input "

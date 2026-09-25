@@ -1113,18 +1113,61 @@ std::optional<bool> ba_fast_path_valid(tref fm) {
 }
 
 template <NodeType node>
-result<bool> api<node>::realizable(tref fm) {
+result<tref> api<node>::prepare_realizability(tref fm) {
 	return with_budget<node>([&] {
-		result<bool> r;
+		result<tref> r;
 		TAU_TRY(auto simplified, simplify_keeping_warm_ups(fm));
 		// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
-		// normalization so the downstream pipeline sees a single wff_always.
+		// normalization so the downstream pipeline sees a single wff_always,
+		// whose warm-up is the deepest lookback of the merged statements.
 		fm = flatten_always_conjuncts<node>(simplified);
 		// get_spec_or_term yields a spec for any formula, and normalize_formula
 		// unwraps it, so a spec root is as decidable as the formula it wraps.
 		if (!is_formula_or_spec_root<node>(fm)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
+		return r.with_assert_check_value(fm);
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::realizability_target_of(tref fm) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		// normalize_formula() fails on failures that are reachable from user
+		// input: a non-well-founded recurrence, a definition set whose
+		// expansion never settles, a fallback type mismatch, or a get_nso_rr
+		// failure. is_tau_formula_sat() dereferences its argument immediately,
+		// so the failure has to be caught here.
+		TAU_TRY_OR(tref nf, normalize_formula(fm),
+			code::internal_error,
+			"Could not normalize the formula; "
+			"its satisfiability cannot be decided");
+		// A data quantifier under a full-LTL operator survives normalization;
+		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
+		// invariant, so route the RAW formula to the LTL-ABA solver instead.
+		return r.with_assert_check_value(
+			(realizability_has_game_operators<node>(fm)
+				&& tau::get(nf).find_top(is_quantifier<node>))
+			? fm : nf);
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::realizability_target(tref fm) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		TAU_TRY(fm, prepare_realizability(fm));
+		TAU_TRY(tref target, realizability_target_of(fm));
+		return r.with_assert_check_value(target);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::realizable(tref fm) {
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(fm, prepare_realizability(fm));
 		// Whole-query BA fast path; falls through when undecided. It decides
 		// SATISFIABILITY (every stream chosen existentially), which equals
 		// realizability only when no input stream is involved: over inputs it
@@ -1134,26 +1177,10 @@ result<bool> api<node>::realizable(tref fm) {
 			if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value()) {
 				return r.with_assert_check_value(fast.value());
 			}
-		// normalize_formula() fails on failures that are reachable from user
-		// input: a non-well-founded recurrence, a definition set whose
-		// expansion never settles, a fallback type mismatch, or a get_nso_rr
-		// failure. is_tau_formula_sat() dereferences its argument immediately,
-		// so the failure has to be caught here; it decides unsatisfiable
-		// rather than propagating an error, matching the definite answer
-		// every other undecidable-shape gate in this function returns.
-		TAU_TRY_OR(tref nf, normalize_formula(fm),
-			code::internal_error,
-			"Could not normalize the formula; "
-			"its satisfiability cannot be decided");
 		// LT-7: the synthesis backend reports "no verdict" as a result<T>
 		// error, not an UNREALIZABLE answer; is_ltl_aba_realizable propagates
 		// it through r below, same as any other error.
-		// A data quantifier under a full-LTL operator survives normalization;
-		// feeding that residue to is_tau_formula_sat breaks its no-quantifier
-		// invariant, so route the RAW formula to the LTL-ABA solver instead.
-		tref target = (realizability_has_game_operators<node>(fm)
-			&& tau::get(nf).find_top(is_quantifier<node>))
-			? fm : nf;
+		TAU_TRY(tref target, realizability_target_of(fm));
 		if (has_ctl_star_operators<node>(fm)) {
 			r = is_ctl_star_realizable<node>(target, 0, true);
 		} else if (realizability_has_game_operators<node>(fm)) {
