@@ -75,3 +75,10 @@ add_ltl_run_test(data_game_strategy_complement_codes
 	"run (always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && i1[t-2] = o1[t]\\x27)) && (sometimes (o1[t] = 1 && o2[t] = o2[t-1]\\x27)) && (sometimes (o1[t-1] = i2[t-1])).\\nF.\\nT.\\nT.\\nF.\\nF.\\nF.\\nT.\\nT.\\nq\\nq\\n"
 	"o1\\[2\\] := T\n(.*\n)*o1\\[3\\] := F"
 	"no strategy|not executable|unsat")
+
+# the strategy of a game on the values of bv[2]: against odd inputs o2 takes
+# the value 2
+add_ltl_run_test(data_game_strategy_bv_values
+	"run (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2]).\\n3\\n1\\n3\\n3\\n1\\n1\\nq\\nq\\n"
+	"o2\\[[0-3]\\] := 2"
+	"no strategy|not executable|unsat")

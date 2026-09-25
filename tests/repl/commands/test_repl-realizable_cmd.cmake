@@ -898,3 +898,12 @@ add_repl_test(realizable_cmd-data_game_complement_codes
 	"realizable (always (o2[0] = 0 && (o1[t-1] = 1 -> o2[t] = 1) && i1[t-2] = o1[t]')) && (sometimes (o1[t] = 1 && o2[t] = o2[t-1]')) && (sometimes (o1[t-1] = i2[t-1]))" ": T")
 set_tests_properties("test_repl-realizable_cmd-data_game_complement_codes"
 	PROPERTIES TIMEOUT 60)
+
+# A type with few elements read by arithmetic or by constants other than 0
+# and 1 is played on its values: with o1 = 0 every input matches an atom a
+# step later.
+add_repl_test(realizable_cmd-data_game_small_bv_values
+	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
+# the environment keeps i1 odd, and o2 = 2 then meets o2 * i1 = 2
+add_repl_test(realizable_cmd-data_game_bv_arithmetic_values
+	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])" ": T")
