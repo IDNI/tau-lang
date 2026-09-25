@@ -2280,7 +2280,7 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 
 template <NodeType node>
 result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, tref normalized)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -2310,8 +2310,11 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 			return r.with_assert_check_value(tau::_T());
 		}
 	}
-	TAU_TRY_OR(tref normalized_fm, normalize_with_temp_simp<node>(fm),
-		code::internal_error, "Normalization failed");
+	tref normalized_fm = normalized;
+	if (!normalized_fm) {
+		TAU_TRY_OR(normalized_fm, normalize_with_temp_simp<node>(fm),
+			code::internal_error, "Normalization failed");
+	}
 	trefs clauses = {tau::_F()};
 	// Check satisfiability of each clause -- unit-wise where exact
 	{
