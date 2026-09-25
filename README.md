@@ -718,7 +718,9 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    itself: at every step the environment picks the inputs after the history
    is fixed, and the system must pick outputs that satisfy the guard it
    takes (`∀i. ∃o. guard`, iterated to a fixpoint over the last values of
-   every stream). A losing strategy makes the answer UNKNOWN.
+   every stream). A losing strategy that takes a path no data realizes,
+   however long, gets that path blocked; any other loss makes the answer
+   UNKNOWN.
 
 A formula is **realizable** iff (4) succeeds and the strategy wins in (5).  The external tool
 `ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.

@@ -850,3 +850,8 @@ add_repl_test_fail(realizable_cmd-data_check_past_atom_against_input
 # o1 copies i1 one step later, so the same relation one step back is won.
 add_repl_test(realizable_cmd-data_check_copy_of_past_input
 	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t-1]:bv[1]))" ": T")
+# The relations make o1 repeat every six steps and flip every two, which no
+# stream does; only a chain longer than the lookback window shows it, and
+# the chain is blocked once the strategy loses against the data.
+add_repl_test(realizable_cmd-data_check_chain_longer_than_window
+	"realizable (always o2[t]:bv[1] = o1[t-2]:bv[1] && o3[t]:bv[1] = o2[t-2]:bv[1] && !(o1[t]:bv[1] = o3[t]:bv[1]) && o3[t-2]:bv[1] = o1[t]:bv[1]) && (sometimes o1[t-1]:bv[1] = 1)" ": F")

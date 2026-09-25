@@ -352,9 +352,24 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 					return undecided("the strategy could not be "
 						"checked against the data");
 				case strategy_data_verdict::loses:
-					return undecided("the strategy loses against the "
-						"data");
+					break;
 				}
+				// A losing strategy may take a path no data realizes
+				// that is longer than W; such a path is blocked like
+				// any other. A path the data realizes only when the
+				// system picks what the environment picks gives no
+				// clause, and the verdict stays open.
+				for (int_t w = W + 1; clauses.empty()
+					&& w <= W + (int_t)rounds + 1; ++w)
+				{
+					auto wres = window_infeasible_paths<node>(sol, w,
+						ltl_window_max_paths());
+					if (wres.path_cap_reached) break;
+					clauses = std::move(wres.blocking_clauses);
+				}
+				if (clauses.empty())
+					return undecided("the strategy loses against the "
+						"data and no blocking clause was found");
 			}
 		}
 

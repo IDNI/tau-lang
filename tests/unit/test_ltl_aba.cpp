@@ -4469,6 +4469,16 @@ TEST_SUITE("Strategy played against the data") {
 		CHECK(realizable(fm));
 	}
 
+	TEST_CASE("a contradiction chain longer than the lookback window is UNREALIZABLE") {
+		tref fm = spec("(always o2[t]:bv[1] = o1[t-2]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-2]:bv[1] "
+			"&& !(o1[t]:bv[1] = o3[t]:bv[1]) "
+			"&& o3[t-2]:bv[1] = o1[t]:bv[1]) "
+			"&& (sometimes o1[t-1]:bv[1] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(realizable(fm));
+	}
+
 } // TEST_SUITE("Strategy played against the data")
 
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────
