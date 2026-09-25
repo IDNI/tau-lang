@@ -70,13 +70,13 @@ add_repl_test(ltl_decisions-print_until_operand
 add_repl_test(ltl_decisions-normalize_until_false_target
 	"normalize (o1[t] = 1) until (o2[t] = 1 && o2[t] = 0)" ": F")
 
-# a lookback guard binds each literal, not the whole operand: the
-# lookback-free conjunct of the G body holds from step 0, so the F cannot
-# witness there, and sat and realizable agree
+# the G body is enforced from its deepest lookback, for its lookback-free
+# conjunct too: o1[0] is free, so the F can witness at step 0, and sat and
+# realizable agree
 add_repl_test(ltl_decisions-per_literal_guard_sat
-	"sat (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": F")
+	"sat (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": T")
 add_repl_test(ltl_decisions-per_literal_guard_realizable
-	"realizable (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": F")
+	"realizable (F (o1[t] = 0)) && (G (o2[t] = o2[t-1] && o1[t] = 1))" ": T")
 
 # a consistency cap that gave up cannot decide UNREALIZABLE
 add_repl_test_fail(ltl_decisions-consistency_cap_is_unknown

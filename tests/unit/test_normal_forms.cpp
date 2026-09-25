@@ -1031,6 +1031,15 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 		CHECK( *res != nullptr );
 	}
 
+	// The always part reads one step back, so it asks nothing at step 0,
+	// where the sometimes part can hold (README "Lookback initialization").
+	TEST_CASE("an always part with a deeper lookback keeps the clause") {
+		tref clause = get_nso_rr("(always o2[t] = 0 && o1[t-1] = 1) "
+			"&& (sometimes o2[t] = 1).").value().main->get();
+		REQUIRE( clause != nullptr );
+		CHECK( simplify_temporal_clause<node_t>(clause).has_value() );
+	}
+
 	// A sometimes part implied by an always part is replaced by T rather than
 	// dropping the clause (normalizer.tmpl.h:781-782).
 	TEST_CASE("a sometimes part implied by an always part is eliminated") {

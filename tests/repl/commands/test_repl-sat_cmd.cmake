@@ -202,3 +202,13 @@ foreach(_t input_dependent_step input_dependent_step2 input_constant_avoids
 			PROPERTIES TIMEOUT 60)
 	endif()
 endforeach()
+
+# Each clause is enforced from its own deepest lookback: an always part that
+# reads the past asks nothing during its warm-up, where a sometimes part that
+# reads less far back may already hold
+add_repl_test(sat_cmd-warm_up_sometimes_first_step "sat (always o1[t-1] = 1 && !(o2[t] = o1[t-1])) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_sometimes_output "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_realizable "realizable (always o2[t] = 0 && o1[t-1] = 1) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(sat_cmd-warm_up_continuation "sat (always (i2[t] = o1[t-2] || o1[t-1] = 0) && o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t])" ": T")
+add_repl_test(sat_cmd-warm_up_same_lookback "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes (o2[t] = 1 && o1[t-1] = 1))" ": F")
+add_repl_test(sat_cmd-warm_up_none "sat (always o2[t] = 0) && (sometimes o2[t] = 1)" ": F")

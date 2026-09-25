@@ -1411,6 +1411,9 @@ tref create_guard(const trefs& io_vars, const int_t number) {
  * `sometimes` clause, to reset the flag-numbering counter.
  * @param start_time Time step at which execution begins.
  * @param inputs How the input streams of each `sometimes` clause are read.
+ * @param aw_warm_up Lookback of the always part as written, when @p fm
+ * carries its unbounded continuation instead, whose lookback can be
+ * smaller: the always part asks nothing before this step.
  * @return A pair `(res, max_st_lookback)`. If @p fm has no `sometimes`
  * sub-formula, `res` is `fm` unchanged and `max_st_lookback` is `0`.
  * Otherwise `res` is `fm` with each `sometimes` clause replaced by a flag
@@ -1438,7 +1441,8 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 template <NodeType node>
 std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	bool reset_ctn_stream, const int_t start_time,
-	const sometimes_inputs inputs = sometimes_inputs::universal)
+	const sometimes_inputs inputs = sometimes_inputs::universal,
+	const int_t aw_warm_up = 0)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
@@ -1455,7 +1459,8 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	if (aw_fm != nullptr) {
 		aw_io_vars = tau::get(aw_fm)
 				.select_top(is_child<node, tau::io_var>);
-		aw_lookback = get_max_shift<node>(aw_io_vars);
+		aw_lookback = std::max(get_max_shift<node>(aw_io_vars),
+								aw_warm_up);
 	}
 
 	LOG_TRACE << "transforming eventual variables: " << LOG_FM(fm);
@@ -1579,8 +1584,11 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @param aw Original (pre-continuation) always-part.
  * @param max_st_lookback Greatest lookback among the original
  * `sometimes` clauses.
+ * @param aw_warm_up Lookback of the always part as written, when @p aw is
+ * its unbounded continuation.
  * @return A `result<tref>` carrying the conjunction
- * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is @p aw's lookback;
+ * `aw@l && ... && aw@(l+max_st_lookback-1)`, where `l` is the greater of
+ * @p aw's lookback and @p aw_warm_up;
  * an engaged value of `T` is the legitimate "no initial segment at all"
  * answer for @p max_st_lookback `0`, the identity callers conjoin in as an
  * empty conjunct rather than a failure. A failed result -- e.g. on a D4
@@ -1591,12 +1599,13 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
  * @endinternal
  */
 template <NodeType node>
-result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
-	// get lookback of aw
+result<tref> make_initial_run(tref aw, const int_t max_st_lookback,
+	const int_t aw_warm_up = 0)
+{
 	using tau = tree<node>;
 	result<tref> r;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
-	const int_t t = get_max_shift<node>(io_vars);
+	const int_t t = std::max(get_max_shift<node>(io_vars), aw_warm_up);
 
 	tref run = nullptr;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
@@ -1636,6 +1645,8 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
  * clauses, as returned by `transform_to_eventual_variables`.
  * @param output When `true`, print diagnostic fixpoint information via
  * `print_fixpoint_info`.
+ * @param aw_warm_up Lookback of the always part as written, as passed to
+ * `transform_to_eventual_variables`.
  * @return A `result<tref>` carrying `F` if the flag can never be raised
  * (the `sometimes` clause is unsatisfiable given the always-part), or a
  * formula describing a run in which the flag is raised, conjoined with
@@ -1661,7 +1672,8 @@ result<tref> make_initial_run(tref aw, const int_t max_st_lookback) {
 template <NodeType node>
 result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	tref ev_var_flags, tref original_aw, const int_t start_time,
-	const int_t max_st_lookback, const bool output)
+	const int_t max_st_lookback, const bool output,
+	const int_t aw_warm_up = 0)
 {
 	LOG_DEBUG << "Begin to_unbounded_continuation";
 
@@ -1705,7 +1717,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// DROP the initial-run conjuncts and make the remaining search easier,
 	// i.e. answer satisfiable/realizable when it must not.
 	TAU_TRY(tref initial_run,
-		make_initial_run<node>(ori_aw_ctn, max_st_lookback));
+		make_initial_run<node>(ori_aw_ctn, max_st_lookback, aw_warm_up));
 	const int_t s = start_time + time_point;
 	// TODO: flag_boundary is upper bound, improve!
 	const int_t flag_boundary =
@@ -1934,6 +1946,12 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	}
 
 	tref aw_fm = tau::get(fm).find_top(is_child<node, tau::wff_always>);
+	// The always part asks nothing before its deepest lookback as written
+	// (README "Lookback initialization"); its unbounded continuation can
+	// read less far back, so the sometimes transformation is given this
+	// lookback explicitly.
+	const int_t aw_warm_up = aw_fm ? get_max_shift<node>(tau::get(aw_fm)
+			.select_top(is_child<node, tau::io_var>)) : 0;
 	std::pair<tref, int_t> ev_t;
 	tref ubd_aw_fm = nullptr;
 	{
@@ -1954,8 +1972,8 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			}
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
-			ev_t = transform_to_eventual_variables<node>(
-						ubd_fm, false, start_time, inputs);
+			ev_t = transform_to_eventual_variables<node>(ubd_fm,
+					false, start_time, inputs, aw_warm_up);
 			// Check if there is a sometimes present
 			if (ev_t.first == ubd_fm) {
 				tref res = elim_aw(ubd_fm);
@@ -2039,7 +2057,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			// an error here; `result<tref>` rejects `nullptr` as a value.
 			TAU_TRY(tref ctn, to_unbounded_continuation<node>(
 					aw_after_ev, st[0], ubd_aw_fm, start_time,
-					ev_t.second, output));
+					ev_t.second, output, aw_warm_up));
 			TAU_TRY_OR(res, normalize_non_temp<node>(ctn),
 				code::internal_error,
 				"Normalization of the unbounded continuation failed");

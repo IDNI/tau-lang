@@ -144,6 +144,27 @@ TEST_SUITE("satisfiability public API") {
 			"(sometimes (i1[t] = 1 -> o2[t] = 1)).") );
 	}
 
+	// Each clause is enforced from its own deepest lookback (README
+	// "Lookback initialization"): an always part reading the past asks
+	// nothing at the first steps, where a sometimes part may hold.
+	TEST_CASE("is_tau_formula_sat: a sometimes may hold during the always warm-up") {
+		auto sat = [](const char* spec) {
+			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( sat("(always o2[t] = 0 && o1[t-1] = 1) && "
+			"(sometimes o2[t] = 1).") );
+		// the unbounded continuation of this always part reads only one
+		// step back, the always part as written two
+		CHECK( sat("(always (i2[t] = o1[t-2] || o1[t-1] = 0) && "
+			"o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t]).") );
+		// no warm-up left once the sometimes part reads as far back
+		CHECK( !sat("(always o2[t] = 0 && o1[t-1] = 1) && "
+			"(sometimes (o2[t] = 1 && o1[t-1] = 1)).") );
+		CHECK( !sat("(always o2[t] = 0) && (sometimes o2[t] = 1).") );
+	}
+
 	// The negated side of an implication turns an `always` over inputs
 	// into a `sometimes`, which the check reads through a guard: read
 	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would
