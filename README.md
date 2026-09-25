@@ -734,8 +734,10 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    then picks the outputs, and each atom of a move is read on those
    values. The winning regions are sets of histories (the last values of
    every stream) computed with Zielonka's algorithm. When every stream has
-   a two-valued type (`bv[1]`) a region is a bit set and the game runs
-   before (4) and (5); over any other type a region is a formula whose
+   a two-valued type (`bv[1]`) or is read only through equalities with
+   streams of its type, `0` and `1` (in a type with enough elements, such
+   as the default type), a region is a BDD over codes of those values and
+   the game runs before (4) and (5); otherwise a region is a formula whose
    quantifiers the normalizer eliminates, and the game settles an
    UNREALIZABLE or UNKNOWN answer of (4) and (5). The steps before step 0
    are played like any other step, their inputs by the environment and

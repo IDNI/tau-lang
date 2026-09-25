@@ -59,6 +59,10 @@ add_repl_test(ctl_star-realizable_E_F_output
 # direction outputs pin the witness path, so E over inputs is decided
 add_repl_test(ctl_star-realizable_E_F_input
 	"fragment ctl_star. realizable E (F i1[t] = 1)" ": T")
+# the witness state has read its input: no branch from it keeps i1 at both
+# 1 and 0; decided on codes within the round cap of a game over formulas
+add_repl_test(ctl_star-realizable_E_always_input_both_values
+	"fragment ctl_star. set ltlrefinementrounds 4. realizable (E (always i1[t] = 1)) && (E (always i1[t] = 0))" ": F")
 # a past operator under E keeps the all-paths encoding: undecided, not F
 add_repl_test_fail(ctl_star-realizable_E_since_undecided
 	"fragment ctl_star. realizable E ((i1[t] = 1) since (i1[t] = 0))"

@@ -27,13 +27,14 @@ namespace idni::tau_lang {
 // before step 0, each played like any other step, can reach the initial
 // vertex's region (data_quantifier::reached_before_start).
 //
-// When every stream has a two-element type and the window is small, a
-// region is a bit set over the values of the window (bit_regions);
-// otherwise it is a formula whose quantifiers the normalizer eliminates
-// (formula_regions), and one it leaves standing makes the game undecided.
-// The formulas over a fixed set of variables and constants are finitely
-// many up to equivalence, so each fixpoint ends; the rounds of a formula
-// fixpoint are still capped by ltl_max_refinement_rounds().
+// When every stream has a two-element type or is read only through
+// equalities, a region is a BDD over codes of the window's values
+// (code_window, code_regions); otherwise it is a formula whose quantifiers
+// the normalizer eliminates (formula_regions), and one it leaves standing
+// makes the game undecided. The formulas over a fixed set of variables and
+// constants are finitely many up to equivalence, so each fixpoint ends; the
+// rounds of a formula fixpoint are still capped by
+// ltl_max_refinement_rounds().
 
 enum class data_game_verdict { realizable, unrealizable, undecided };
 
@@ -207,233 +208,434 @@ struct formula_regions {
 	}
 };
 
-// The window of bit_regions: an index per stream, and whether it is an
-// input. Bit (k * streams + s) of an index is the value of stream s at step
-// t-k, k = 0 the current step.
-struct bit_window {
-	std::map<std::string, size_t> index;
-	std::vector<bool> is_input;
-	size_t streams = 0, bits = 0;
+// A reduced ordered BDD without complement edges for the regions over the
+// codes of a code_window; node 0 is false and node 1 true. A table grown
+// past `max_nodes` sets `full`, and the game is then undecided.
+struct data_bdd {
+	using id = uint32_t;
+	static constexpr id F = 0, T = 1;
+	static constexpr uint32_t leaf = UINT32_MAX;
+	struct nd { uint32_t var; id lo, hi; };
+	struct key_hash {
+		size_t operator()(const std::array<uint32_t, 3>& k) const {
+			uint64_t h = k[0];
+			h = h * 0x9E3779B97F4A7C15ull + k[1];
+			h = h * 0x9E3779B97F4A7C15ull + k[2];
+			return (size_t)(h ^ (h >> 29));
+		}
+	};
+	std::vector<nd> nodes{ { leaf, F, F }, { leaf, T, T } };
+	std::unordered_map<std::array<uint32_t, 3>, id, key_hash> unique, memo;
+	size_t max_nodes;
+	bool full = false;
+
+	explicit data_bdd(size_t cap) : max_nodes(cap) {}
+
+	id mk(uint32_t v, id lo, id hi) {
+		if (lo == hi) return lo;
+		std::array<uint32_t, 3> k{ v, lo, hi };
+		if (auto it = unique.find(k); it != unique.end()) return it->second;
+		if (nodes.size() >= max_nodes) { full = true; return F; }
+		nodes.push_back({ v, lo, hi });
+		const id n = (id)(nodes.size() - 1);
+		unique.emplace(k, n);
+		return n;
+	}
+	id var(uint32_t v, bool pos = true) {
+		return pos ? mk(v, F, T) : mk(v, T, F);
+	}
+	// op 0 conjunction, 1 disjunction
+	id apply(uint32_t op, id a, id b) {
+		if (op == 0) {
+			if (a == F || b == F) return F;
+			if (a == T) return b;
+			if (b == T || a == b) return a;
+		} else {
+			if (a == T || b == T) return T;
+			if (a == F) return b;
+			if (b == F || a == b) return a;
+		}
+		if (a > b) std::swap(a, b);
+		std::array<uint32_t, 3> k{ op, a, b };
+		if (auto it = memo.find(k); it != memo.end()) return it->second;
+		const nd x = nodes[a], y = nodes[b];
+		const uint32_t v = std::min(x.var, y.var);
+		const id lo = apply(op, x.var == v ? x.lo : a, y.var == v ? y.lo : b);
+		const id hi = apply(op, x.var == v ? x.hi : a, y.var == v ? y.hi : b);
+		const id r = mk(v, lo, hi);
+		memo.emplace(k, r);
+		return r;
+	}
+	id conj(id a, id b) { return apply(0, a, b); }
+	id disj(id a, id b) { return apply(1, a, b); }
+	id neg(id a) {
+		if (a <= T) return a == T ? F : T;
+		std::array<uint32_t, 3> k{ 2, a, 0 };
+		if (auto it = memo.find(k); it != memo.end()) return it->second;
+		const nd x = nodes[a];
+		const id r = mk(x.var, neg(x.lo), neg(x.hi));
+		memo.emplace(k, r);
+		return r;
+	}
+	// Quantifies the variables flagged in `qs`.
+	id quantify(id a, const std::vector<bool>& qs, bool exists) {
+		std::unordered_map<id, id> seen;
+		std::function<id(id)> go = [&](id n) -> id {
+			if (n <= T) return n;
+			if (auto it = seen.find(n); it != seen.end()) return it->second;
+			const nd x = nodes[n];
+			const id lo = go(x.lo), hi = go(x.hi);
+			const id r = x.var < qs.size() && qs[x.var]
+				? apply(exists ? 1 : 0, lo, hi) : mk(x.var, lo, hi);
+			seen.emplace(n, r);
+			return r;
+		};
+		return go(a);
+	}
+	// Every variable v of `a` renamed v - d; false in `ok` when one is
+	// below d.
+	id lower(id a, uint32_t d, bool& ok) {
+		std::unordered_map<id, id> seen;
+		std::function<id(id)> go = [&](id n) -> id {
+			if (n <= T) return n;
+			if (auto it = seen.find(n); it != seen.end()) return it->second;
+			const nd x = nodes[n];
+			if (x.var < d) { ok = false; return F; }
+			const id r = mk(x.var - d, go(x.lo), go(x.hi));
+			seen.emplace(n, r);
+			return r;
+		};
+		return go(a);
+	}
 };
 
-// The window of `atoms` when every stream has a two-element type and the
-// window has at most `max_bits` bits.
+// The window of code_regions. A stream of a two-element type takes one bit;
+// a stream of another type read only through equalities with its own type,
+// 0 and 1 takes a code of `width` bits, code 0 standing for 0, code 1 for
+// 1 and every other code for a value distinct from both and from the other
+// codes. Only equalities read the values, so a history counts only through
+// which of its values are equal (its equality type); the codes realize
+// every such type of a window, and so does the type when it has as many
+// elements as a window has values plus 0 and 1 (make_code_window checks
+// it), which makes the game on the codes the game on the data. The bits of
+// stream s at step t-k are variables k * per_step + offset[s] + b, so
+// moving a region to the next step subtracts per_step.
+struct code_window {
+	struct stream {
+		std::string name;
+		bool input = false;
+		bool two = false;       // a two-element type, one bit
+		size_t width = 1, offset = 0;
+	};
+	std::vector<stream> streams;
+	std::map<std::string, size_t> index;
+	size_t per_step = 0, depth = 0;
+	uint32_t var(size_t s, size_t k, size_t b) const {
+		return (uint32_t)(k * per_step + streams[s].offset + b);
+	}
+	uint32_t vars() const { return (uint32_t)((depth + 1) * per_step); }
+};
+
+// One side of an equality read on codes: an io_var (its variable node) or
+// the constant 0 or 1.
 template <NodeType node>
-static std::optional<bit_window> make_bit_window(
-	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_bits)
+struct code_side { tref var = nullptr; int constant = -1; };
+
+// The sides of `cmp` when it is an equality or a disequality between io_vars
+// and the constants 0 and 1, else nullopt; `equal` tells which. A
+// complement is read off: x' = c is x = c', and x' = y' is x = y.
+template <NodeType node>
+static std::optional<std::array<code_side<node>, 2>> code_equality(tref cmp,
+	bool& equal)
+{
+	using tau = tree<node>;
+	const auto& t = tau::get(cmp);
+	if (!t.has_child()) return std::nullopt;
+	const auto nt = t[0].value.nt;
+	if ((nt != tau::bf_eq && nt != tau::bf_neq) || t[0].children_size() != 2)
+		return std::nullopt;
+	equal = nt == tau::bf_eq;
+	std::array<code_side<node>, 2> sides;
+	bool complement[2] = { false, false };
+	auto var_of = [](const tree<node>& b) -> tref {
+		return b.children_size() == 1 && is_child<node, tau::io_var>(b.first())
+			? b.first() : nullptr;
+	};
+	for (size_t i = 0; i < 2; ++i) {
+		const auto& x = tau::get(t[0].child(i));
+		if (x.equals_0()) { sides[i].constant = 0; continue; }
+		if (x.equals_1()) { sides[i].constant = 1; continue; }
+		if ((sides[i].var = var_of(x))) continue;
+		if (x.children_size() != 1) return std::nullopt;
+		const auto& n = tau::get(x.first());
+		if (!n.is(tau::bf_neg) || n.children_size() != 1
+			|| !(sides[i].var = var_of(tau::get(n.first()))))
+				return std::nullopt;
+		complement[i] = true;
+	}
+	if (sides[0].var && sides[1].var) {
+		if (complement[0] != complement[1]) return std::nullopt;
+		return sides;
+	}
+	for (size_t i = 0; i < 2; ++i)
+		if (complement[i]) sides[1 - i].constant = 1 - sides[1 - i].constant;
+	return sides;
+}
+
+// The code window of `atoms`, when every stream has a two-element type or
+// is read only through equalities; at most `max_vars` variables.
+template <NodeType node>
+static std::optional<code_window> make_code_window(
+	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars)
 {
 	using tau = tree<node>;
 	data_quantifier<node> dq;
-	bit_window w;
-	int_t depth = 0;
+	code_window w;
+	std::map<size_t, size_t> type_of;   // stream -> type id
 	for (auto& [atom, _] : atoms)
 		for (tref v : tau::get(atom).select_top(is_child<node, tau::io_var>)) {
-			if (is_io_initial<node>(v) || !dq.is_two_element(v))
-				return std::nullopt;
-			depth = std::max(depth, get_io_var_shift<node>(v));
-			if (w.index.emplace(get_var_name<node>(v), w.index.size()).second)
-				w.is_input.push_back(is_input_stream<node>(v));
+			if (is_io_initial<node>(v)) return std::nullopt;
+			w.depth = std::max(w.depth, (size_t)get_io_var_shift<node>(v));
+			auto [it, fresh] = w.index.emplace(get_var_name<node>(v),
+				w.streams.size());
+			if (!fresh) continue;
+			code_window::stream s;
+			s.name = it->first;
+			s.input = is_input_stream<node>(v);
+			s.two = dq.is_two_element(v);
+			w.streams.push_back(s);
+			type_of[it->second] = find_ba_type<node>(v);
 		}
-	w.streams = w.index.size();
-	w.bits = w.streams * (size_t)(depth + 1);
-	if (w.bits > max_bits) return std::nullopt;
+	// A stream of another type is read only through equalities.
+	for (auto& [atom, _] : atoms)
+		for (tref c : tau::get(atom).select_all(is_aba_comparison<node>)) {
+			auto vars = tau::get(c).select_top(is_child<node, tau::io_var>);
+			if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
+				return w.streams[w.index.at(get_var_name<node>(v))].two; }))
+					continue;
+			bool equal;
+			if (!code_equality<node>(c, equal)) return std::nullopt;
+		}
+	// Each such type needs as many values as a window holds, plus 0 and 1.
+	std::map<size_t, size_t> slots;
+	for (size_t s = 0; s < w.streams.size(); ++s)
+		if (!w.streams[s].two) slots[type_of[s]] += w.depth + 1;
+	std::map<size_t, size_t> width;
+	for (auto& [tid, n] : slots) {
+		size_t bits = 1;
+		while ((size_t{1} << bits) < n + 2) ++bits;
+		width[tid] = bits;
+		tref all = tau::_T();
+		trefs fresh;
+		for (size_t j = 0; j < n; ++j) {
+			tref x = build_out_var_at_t<node>(build_var_name<node>(
+				"o__code" + std::to_string(j)), tid);
+			all = tau::build_wff_and(all, tau::build_wff_and(
+				tau::build_bf_neq(x, build_bf_f_type<node>(tid)),
+				tau::build_bf_neq(x, build_bf_t_type<node>(tid))));
+			for (tref y : fresh)
+				all = tau::build_wff_and(all, tau::build_bf_neq(x, y));
+			fresh.push_back(x);
+		}
+		auto sat = is_non_temp_nso_satisfiable<node>(all);
+		if (!sat.has_value() || !sat.value()) return std::nullopt;
+	}
+	for (size_t s = 0; s < w.streams.size(); ++s) {
+		w.streams[s].width = w.streams[s].two ? 1 : width[type_of[s]];
+		w.streams[s].offset = w.per_step;
+		w.per_step += w.streams[s].width;
+	}
+	if (w.vars() > max_vars) return std::nullopt;
 	return w;
 }
 
-// Regions as bit sets over every value of a bit_window.
+// Regions as BDDs over the codes of a code_window.
 template <NodeType node>
-struct bit_regions {
+struct code_regions {
 	using tau = tree<node>;
-	using region = std::vector<uint64_t>;
+	using region = data_bdd::id;
 	using arena = data_arena<node>;
 	const arena& a;
+	const code_window& w;
+	data_bdd bdd;
 	bool failed = false;
-	const std::map<std::string, size_t>& index;
-	const std::vector<bool>& is_input;
-	size_t streams, bits, size;
 	std::vector<region> labels;           // per vertex, per edge
 	std::vector<size_t> edge_base;
 
-	bit_regions(const arena& ar, const bit_window& w) : a(ar),
-		index(w.index), is_input(w.is_input), streams(w.streams),
-		bits(w.bits), size(size_t{1} << w.bits) {}
+	code_regions(const arena& ar, const code_window& win, size_t max_nodes)
+		: a(ar), w(win), bdd(max_nodes) {}
 
-	region top() {
-		region r(words(), ~uint64_t{0});
-		trim(r);
-		return r;
+	region top() { return data_bdd::T; }
+	region bottom() { return data_bdd::F; }
+	region conj(region x, region y) { return check(bdd.conj(x, y)); }
+	region disj(region x, region y) { return check(bdd.disj(x, y)); }
+	region minus(region x, region y) {
+		return check(bdd.conj(x, bdd.neg(y)));
 	}
-	region bottom() { return region(words(), 0); }
-	size_t words() const { return (size + 63) / 64; }
-	void trim(region& r) const {
-		if (size % 64) r.back() &= (uint64_t{1} << (size % 64)) - 1;
-	}
-	static bool get(const region& r, size_t x) { return r[x >> 6] >> (x & 63) & 1; }
-	static void set(region& r, size_t x) { r[x >> 6] |= uint64_t{1} << (x & 63); }
-	region conj(const region& x, const region& y) {
-		region r(x);
-		for (size_t i = 0; i < r.size(); ++i) r[i] &= y[i];
-		return r;
-	}
-	region disj(const region& x, const region& y) {
-		region r(x);
-		for (size_t i = 0; i < r.size(); ++i) r[i] |= y[i];
-		return r;
-	}
-	region minus(const region& x, const region& y) {
-		region r(x);
-		for (size_t i = 0; i < r.size(); ++i) r[i] &= ~y[i];
+	bool empty(region r) { return r == data_bdd::F; }
+	region check(region r) {
+		if (bdd.full) failed = true;
 		return r;
 	}
 
-	bool empty(const region& r) {
-		for (uint64_t w : r) if (w) return false;
-		return true;
+	// The variables of the chooser's streams at step t-k.
+	std::vector<bool> step_vars(size_t k, bool inputs) const {
+		std::vector<bool> qs(w.vars(), false);
+		for (size_t s = 0; s < w.streams.size(); ++s)
+			if (w.streams[s].input == inputs)
+				for (size_t b = 0; b < w.streams[s].width; ++b)
+					qs[w.var(s, k, b)] = true;
+		return qs;
 	}
 
-	// Evaluates the label of every edge; false when a comparison does not
-	// evaluate to a truth value.
+	// The code of io_var `v` equals `c`, or the code of io_var `u`.
+	region code_eq(tref v, int c, tref u) {
+		const size_t s = w.index.at(get_var_name<node>(v));
+		const size_t k = (size_t)get_io_var_shift<node>(v);
+		region r = data_bdd::T;
+		for (size_t b = 0; b < w.streams[s].width; ++b) {
+			region bit;
+			if (u) {
+				const size_t s2 = w.index.at(get_var_name<node>(u));
+				const size_t k2 = (size_t)get_io_var_shift<node>(u);
+				region x = bdd.var(w.var(s, k, b));
+				region y = bdd.var(w.var(s2, k2, b));
+				bit = bdd.disj(bdd.conj(x, y),
+					bdd.conj(bdd.neg(x), bdd.neg(y)));
+			} else bit = bdd.var(w.var(s, k, b), (c >> b) & 1);
+			r = bdd.conj(r, bit);
+		}
+		return r;
+	}
+
+	// A subformula over two-element streams, tabulated by substituting 0
+	// and 1 and normalizing.
+	std::optional<region> two_element(tref cmp) {
+		std::vector<std::pair<tref, uint32_t>> vars;
+		for (tref v : tau::get(cmp).select_top(is_child<node, tau::io_var>))
+			if (std::none_of(vars.begin(), vars.end(),
+				[&](auto& p) { return tau::subtree_equals(p.first, v); }))
+					vars.emplace_back(v, w.var(
+						w.index.at(get_var_name<node>(v)),
+						(size_t)get_io_var_shift<node>(v), 0));
+		region r = data_bdd::F;
+		for (size_t val = 0; val < (size_t{1} << vars.size()); ++val) {
+			subtree_map<node, tref> m;
+			region cube = data_bdd::T;
+			for (size_t j = 0; j < vars.size(); ++j) {
+				const bool one = val >> j & 1;
+				const size_t tid = find_ba_type<node>(vars[j].first);
+				m.emplace(vars[j].first, tau::trim(one
+					? build_bf_t_type<node>(tid)
+					: build_bf_f_type<node>(tid)));
+				cube = bdd.conj(cube, bdd.var(vars[j].second, one));
+			}
+			auto n = normalize_non_temp<node>(rewriter::replace<node>(cmp, m));
+			if (!n.has_value() || !n.value()) return std::nullopt;
+			const auto& t = tau::get(n.value());
+			if (!t.equals_T() && !t.equals_F()) return std::nullopt;
+			if (t.equals_T()) r = bdd.disj(r, cube);
+		}
+		return r;
+	}
+
+	// A label: a Boolean combination of comparisons.
+	std::optional<region> eval(tref f) {
+		const auto& t = tau::get(f);
+		if (t.equals_T()) return data_bdd::T;
+		if (t.equals_F()) return data_bdd::F;
+		if (!t.has_child()) return std::nullopt;
+		const auto nt = t[0].value.nt;
+		const auto& op = t[0];
+		auto sub = [&](size_t i) { return eval(op.child(i)); };
+		if (nt == tau::wff_neg) {
+			auto x = sub(0);
+			if (!x) return std::nullopt;
+			return bdd.neg(*x);
+		}
+		if (nt == tau::wff_and || nt == tau::wff_or) {
+			region acc = nt == tau::wff_and ? data_bdd::T : data_bdd::F;
+			for (size_t i = 0; i < op.children_size(); ++i) {
+				auto x = sub(i);
+				if (!x) return std::nullopt;
+				acc = nt == tau::wff_and ? bdd.conj(acc, *x)
+					: bdd.disj(acc, *x);
+			}
+			return acc;
+		}
+		if (nt == tau::wff_imply || nt == tau::wff_rimply
+			|| nt == tau::wff_equiv || nt == tau::wff_xor)
+		{
+			if (op.children_size() != 2) return std::nullopt;
+			auto x = sub(0), y = sub(1);
+			if (!x || !y) return std::nullopt;
+			if (nt == tau::wff_imply) return bdd.disj(bdd.neg(*x), *y);
+			if (nt == tau::wff_rimply) return bdd.disj(*x, bdd.neg(*y));
+			region same = bdd.disj(bdd.conj(*x, *y),
+				bdd.conj(bdd.neg(*x), bdd.neg(*y)));
+			return nt == tau::wff_equiv ? same : bdd.neg(same);
+		}
+		auto vars = t.select_top(is_child<node, tau::io_var>);
+		if (std::all_of(vars.begin(), vars.end(), [&](tref v) {
+			return w.streams[w.index.at(get_var_name<node>(v))].two; }))
+				return two_element(f);
+		bool equal;
+		auto sides = code_equality<node>(f, equal);
+		if (!sides) return std::nullopt;
+		auto& [l, rr] = *sides;
+		region r;
+		if (l.var && rr.var) r = code_eq(l.var, -1, rr.var);
+		else if (l.var) r = code_eq(l.var, rr.constant, nullptr);
+		else if (rr.var) r = code_eq(rr.var, l.constant, nullptr);
+		else r = l.constant == rr.constant ? data_bdd::T : data_bdd::F;
+		return equal ? r : bdd.neg(r);
+	}
+
+	// Evaluates the label of every edge; false when one is not a Boolean
+	// combination of comparisons the window reads.
 	bool init() {
-		std::map<tref, region> truth;
-		auto table = [&](tref atom) -> const region* {
-			if (auto it = truth.find(atom); it != truth.end())
-				return &it->second;
-			std::vector<std::pair<tref, size_t>> vars;
-			for (tref v : tau::get(atom).select_top(
-				is_child<node, tau::io_var>))
-			{
-				size_t bit = (size_t)get_io_var_shift<node>(v) * streams
-					+ index.at(get_var_name<node>(v));
-				if (std::none_of(vars.begin(), vars.end(),
-					[&](auto& p) { return tau::subtree_equals(p.first, v); }))
-						vars.emplace_back(v, bit);
-			}
-			std::vector<bool> holds(size_t{1} << vars.size());
-			for (size_t val = 0; val < holds.size(); ++val) {
-				subtree_map<node, tref> m;
-				for (size_t j = 0; j < vars.size(); ++j) {
-					size_t tid = find_ba_type<node>(vars[j].first);
-					m.emplace(vars[j].first, tau::trim(val >> j & 1
-						? build_bf_t_type<node>(tid)
-						: build_bf_f_type<node>(tid)));
-				}
-				auto n = normalize_non_temp<node>(
-					rewriter::replace<node>(atom, m));
-				if (!n.has_value() || !n.value()) return nullptr;
-				const auto& t = tau::get(n.value());
-				if (!t.equals_T() && !t.equals_F()) return nullptr;
-				holds[val] = t.equals_T();
-			}
-			region r = bottom();
-			for (size_t x = 0; x < size; ++x) {
-				size_t val = 0;
-				for (size_t j = 0; j < vars.size(); ++j)
-					if (x >> vars[j].second & 1) val |= size_t{1} << j;
-				if (holds[val]) set(r, x);
-			}
-			return &truth.emplace(atom, std::move(r)).first->second;
-		};
-		// A label is a Boolean combination of comparisons, each
-		// evaluated on its own values.
-		std::function<std::optional<region>(tref)> eval =
-			[&](tref f) -> std::optional<region> {
-			const auto& t = tau::get(f);
-			if (t.equals_T()) return top();
-			if (t.equals_F()) return bottom();
-			if (t.has_child()) {
-				auto nt = t[0].value.nt;
-				if (nt == tau::wff_neg) {
-					auto x = eval(t[0].first());
-					if (!x) return std::nullopt;
-					return minus(top(), *x);
-				}
-				if (nt == tau::wff_and || nt == tau::wff_or) {
-					std::optional<region> acc;
-					const auto& op = t[0];
-					for (size_t c = 0; c < op.children_size(); ++c) {
-						auto x = eval(op.child(c));
-						if (!x) return std::nullopt;
-						acc = !acc ? *x : nt == tau::wff_and
-							? conj(*acc, *x) : disj(*acc, *x);
-					}
-					if (acc) return acc;
-				}
-			}
-			const region* r = table(f);
-			if (!r) return std::nullopt;
-			return *r;
-		};
 		for (const auto& x : a.v) {
 			edge_base.push_back(labels.size());
 			for (const auto& e : x.edges) {
 				auto r = eval(e.label);
-				if (!r) return false;
-				labels.push_back(std::move(*r));
+				if (!r || bdd.full) return false;
+				labels.push_back(*r);
 			}
 		}
 		return true;
-	}
-
-	// The index of the next step's window: every value one step older,
-	// the oldest dropped, the current step left open (zero).
-	size_t shifted(size_t x) const {
-		return (x << streams) & (size - 1);
 	}
 
 	region pre(int p, int i, const std::vector<region>& Y,
 		const std::vector<region>& G)
 	{
-		const auto& xv = a.v[i];
-		const bool mine = xv.owner == p;
-		region body = bottom();
-		for (size_t x = 0; x < size; ++x) {
-			bool acc = !mine;
-			for (size_t j = 0; j < xv.edges.size(); ++j) {
-				const auto& e = xv.edges[j];
-				if (!get(labels[edge_base[i] + j], x)) continue;
-				size_t y = e.shift ? shifted(x) : x;
-				bool in = get(Y[e.dst], y);
-				if (mine) { if (in) { acc = true; break; } }
-				else if (!in && get(G[e.dst], y)) { acc = false; break; }
+		const auto& x = a.v[i];
+		const bool mine = x.owner == p;
+		region body = mine ? data_bdd::F : data_bdd::T;
+		for (size_t j = 0; j < x.edges.size(); ++j) {
+			const auto& e = x.edges[j];
+			region tgt = mine ? Y[e.dst] : bdd.disj(Y[e.dst], bdd.neg(G[e.dst]));
+			if (e.shift) {
+				bool ok = true;
+				tgt = bdd.lower(tgt, (uint32_t)w.per_step, ok);
+				if (!ok) { failed = true; return data_bdd::F; }
 			}
-			if (acc) set(body, x);
+			const region l = labels[edge_base[i] + j];
+			body = mine ? bdd.disj(body, bdd.conj(l, tgt))
+				: bdd.conj(body, bdd.disj(bdd.neg(l), tgt));
 		}
-		if (xv.picks == arena::chooser::none) return body;
-		return quantify(body, 0,
-			xv.picks == arena::chooser::inputs, mine);
+		if (x.picks != arena::chooser::none)
+			body = bdd.quantify(body,
+				step_vars(0, x.picks == arena::chooser::inputs), mine);
+		return check(body);
 	}
 
-	// Quantifies the values at step t-k of the inputs (or the outputs).
-	region quantify(const region& r, size_t k, bool inputs, bool exists) {
-		size_t qmask = 0;
-		for (size_t s = 0; s < streams; ++s)
-			if (is_input[s] == inputs) qmask |= size_t{1} << (k * streams + s);
-		if (!qmask) return r;
-		region out = bottom();
-		for (size_t x = 0; x < size; ++x) {
-			if (x & qmask) continue;
-			bool acc = !exists;
-			for (size_t sub = qmask; ; sub = (sub - 1) & qmask) {
-				bool b = get(r, x | sub);
-				if (exists ? b : !b) { acc = exists; break; }
-				if (!sub) break;
-			}
-			if (!acc) continue;
-			for (size_t sub = qmask; ; sub = (sub - 1) & qmask) {
-				set(out, x | sub);
-				if (!sub) break;
-			}
+	std::optional<bool> reached(region r) {
+		for (size_t k = 1; k <= w.depth; ++k) {
+			r = bdd.quantify(r, step_vars(k, false), true);
+			r = bdd.quantify(r, step_vars(k, true), false);
 		}
-		return out;
-	}
-
-	std::optional<bool> reached(const region& r) {
-		region q = r;
-		for (size_t k = 1; k * streams < bits; ++k) {
-			q = quantify(q, k, false, true);
-			q = quantify(q, k, true, false);
-		}
-		return !empty(q);
+		if (bdd.full) return std::nullopt;
+		return r != data_bdd::F;
 	}
 };
 
@@ -550,7 +752,7 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			if (is_io_initial<node>(var)
 				|| io_var_direction<node>(tau::trim(var)) == 0)
 					return r.with_value(data_game_verdict::undecided);
-	const auto window = make_bit_window<node>(atoms, 22);
+	const auto window = make_code_window<node>(atoms, 256);
 	if (!window && !formulas)
 		return r.with_value(data_game_verdict::undecided);
 	// ACD usually gives the smallest game and a parity condition, but may
@@ -566,16 +768,16 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	}
 	if (!built) return r.with_value(data_game_verdict::undecided);
 	std::optional<bool> wins;
-	bool on_bits = false;
+	bool on_codes = false;
 	if (window) {
-		bit_regions<node> bits(arena, *window);
-		if ((on_bits = bits.init())) {
+		code_regions<node> codes(arena, *window, size_t{1} << 21);
+		if ((on_codes = codes.init())) {
 			// a finite lattice: every fixpoint ends without a cap
-			data_game_solver solver(bits, arena, 0);
+			data_game_solver solver(codes, arena, 0);
 			wins = solver.system_wins(arena.init);
 		}
 	}
-	if (!on_bits && formulas) {
+	if (!on_codes && formulas) {
 		formula_regions<node> regions(arena);
 		data_game_solver solver(regions, arena,
 			ltl_max_refinement_rounds());
