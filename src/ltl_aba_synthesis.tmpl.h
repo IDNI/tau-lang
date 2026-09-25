@@ -258,7 +258,8 @@ namespace alg_d {
 inline result<synth_game> call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs)
+	const std::vector<std::string>& outs,
+	const std::string& algo)
 {
 	result<synth_game> r;
 
@@ -278,7 +279,8 @@ inline result<synth_game> call_ltlsynt_game(
 		for (size_t i = 0; i < v.size(); ++i) { if (i) s += ","; s += v[i]; }
 		return s;
 	};
-	const std::string key = phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs);
+	const std::string key = phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs)
+		+ '\x1e' + algo;
 	if (auto it = cache.find(key); it != cache.end()) { return r.with_value(it->second); }
 
 	int timeout_sec = ltl_timeout_sec();
@@ -286,7 +288,8 @@ inline result<synth_game> call_ltlsynt_game(
 	// SY-R1: a timeout, a missing binary or a usage error is a backend
 	// error, not the EMPTY game every caller used to read as a definitive
 	// UNREALIZABLE. Nothing transient is cached.
-	TAU_TRY(auto hoa, synthesize_game(phi_prop, ins, outs, timeout_sec));
+	TAU_TRY(auto hoa, synthesize_game(phi_prop, ins, outs, timeout_sec,
+		algo));
 
 	// Insert-then-copy: the freshly inserted entry is the newest in FIFO
 	// order, so an eviction triggered by this insert can only remove

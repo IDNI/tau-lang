@@ -1964,6 +1964,13 @@ static result<std::string> apply_step_counter_encoding(
 	return r.with_value(std::move(extra));
 }
 
+// An io_var of an input stream: marked as one, or, where no direction was
+// set (a bare formula), named like one, as is_pure_input_atom reads it.
+template <NodeType node>
+static bool is_input_stream(tref v) {
+	return io_var_direction<node>(tree<node>::trim(v)) == 1;
+}
+
 // Every relative io_var of `fm` moved `delta` steps later (x[t-j] becomes
 // x[t-j+delta]), rebuilt in one spelling so that equal formulas compare
 // equal; each variable keeps its input or output side. The caller keeps
@@ -1979,10 +1986,10 @@ static tref shift_io_vars(tref fm, int_t delta) {
 		size_t tid = find_ba_type<node>(v);
 		const std::string& name = get_var_name<node>(v);
 		m[v] = sh == 0
-			? tau::trim(is_input_var<node>(v)
+			? tau::trim(is_input_stream<node>(v)
 				? tau::build_in_var_at_t(build_var_name<node>(name), tid)
 				: tau::build_out_var_at_t(build_var_name<node>(name), tid))
-			: tau::trim(is_input_var<node>(v)
+			: tau::trim(is_input_stream<node>(v)
 				? tau::build_in_var_at_t_minus(name, (size_t)sh, tid)
 				: tau::build_out_var_at_t_minus(name, (size_t)sh, tid));
 	}
@@ -2051,6 +2058,10 @@ struct ltl_aba_solution {
 	std::vector<std::string> output_props;
 	std::vector<int_t> step_guard_ks; // thresholds append_step_guard_drivers drove, ascending k
 	std::string skeleton;         // skeleton sent to ltlsynt
+	// The skeleton without the consistency constraints and the shift
+	// chains, which the data game reads off the data itself; empty when
+	// the solution came from another route.
+	std::string game_skeleton;
 	std::vector<std::string> shift_chain_constraints;
 	std::vector<std::string> consistency_constraints;
 	hoa_automaton aut;
@@ -2387,11 +2398,16 @@ struct data_quantifier {
 		auto it = two_element.find(tid);
 		if (it != two_element.end()) return it->second;
 		tref x = tau::get(tau::bf, v);
-		bool two = !aba_existential_feasible<node>(tau::build_wff_and(
+		// Only a decided "no third value" makes a type two-element: an
+		// undecided check, or an algebra that assumes its elements
+		// non-empty without checking, keeps its quantifiers.
+		auto third = is_non_temp_nso_satisfiable<node>(tau::build_wff_and(
 			tau::build_wff_neg(tau::build_bf_eq(x,
 				build_bf_f_type<node>(tid))),
 			tau::build_wff_neg(tau::build_bf_eq(x,
 				build_bf_t_type<node>(tid)))));
+		bool two = third.has_value() && !third.value()
+			&& !pack_type_output_always_satisfiable<node>(tid);
 		two_element.emplace(tid, two);
 		return two;
 	}
@@ -2419,13 +2435,41 @@ struct data_quantifier {
 		return n.value();
 	}
 
+	// Whether some play of the steps before step 0 reaches `fm`, a formula
+	// over the history: each such step is played like any other, its
+	// inputs by the environment and then its outputs, the earliest step
+	// outermost. nullopt when a quantifier is left standing.
+	std::optional<bool> reached_before_start(tref fm) {
+		std::map<int_t, std::pair<trefs, trefs>> steps;
+		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+			if (is_io_initial<node>(v)) return std::nullopt;
+			auto& [ins, outs] = steps[get_io_var_shift<node>(v)];
+			auto& bucket = is_input_stream<node>(v) ? ins : outs;
+			if (std::none_of(bucket.begin(), bucket.end(),
+				[&](tref w) { return tau::subtree_equals(w, v); }))
+					bucket.push_back(v);
+		}
+		tref q = fm;
+		for (auto& [_, step] : steps) {
+			for (tref v : step.second) q = quantify(v, q, true);
+			for (tref v : step.first) q = quantify(v, q, false);
+		}
+		tref n = eliminate(q);
+		if (!n) return std::nullopt;
+		if (tau::get(n).equals_T()) return true;
+		if (tau::get(n).equals_F()) return false;
+		auto sat = is_non_temp_nso_satisfiable<node>(n);
+		if (!sat.has_value()) return std::nullopt;
+		return sat.value();
+	}
+
 	// The io_vars of `fm` read at the current step, inputs and outputs.
 	static std::pair<trefs, trefs> current_vars(tref fm) {
 		trefs ins, outs;
 		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
 			if (is_io_initial<node>(v) || get_io_var_shift<node>(v) != 0)
 				continue;
-			auto& bucket = is_input_var<node>(v) ? ins : outs;
+			auto& bucket = is_input_stream<node>(v) ? ins : outs;
 			if (std::none_of(bucket.begin(), bucket.end(),
 				[&](tref w) { return tau::subtree_equals(w, v); }))
 					bucket.push_back(v);
@@ -2451,9 +2495,8 @@ struct data_quantifier {
 // where I[t] and O[t] are the current input and output values, guard is the
 // edge's label over the data atoms, and the shift makes R_d read the history
 // one step later. Starting from R_s = T, each round eliminates the
-// quantifiers. The strategy wins when R_init is satisfiable: values before
-// step 0 are read only by clauses that are not enforced yet, so they are
-// free.
+// quantifiers. The strategy wins when the steps before step 0, each played
+// like any other step (reached_before_start), can reach R_init.
 
 enum class strategy_data_verdict { wins, loses, undecided };
 
@@ -2523,8 +2566,9 @@ static strategy_data_verdict strategy_wins_on_data(
 					changed = true;
 		}
 		R = std::move(next);
-		if (!aba_existential_feasible<node>(R[aut.initial_state]))
-			return strategy_data_verdict::loses;
+		auto reached = dq.reached_before_start(R[aut.initial_state]);
+		if (!reached) return strategy_data_verdict::undecided;
+		if (!*reached) return strategy_data_verdict::loses;
 		if (!changed) return strategy_data_verdict::wins;
 	}
 	return strategy_data_verdict::undecided;

@@ -209,6 +209,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	TAU_TRY(auto skel_and_testers, ltl_skeleton_with_testers<node>(fm_for_skeleton, sol.atoms));
 	auto& [skel, testers] = skel_and_testers;
 	sol.skeleton = std::move(skel) + step_counter_extra;
+	std::string game_skeleton = sol.skeleton;
 
 	// Cross-step shift-chain constraints: tie shifted instances of the same
 	// signal together (e.g. o1[t]=1 and o1[t-1]!=1) before the consistency
@@ -223,6 +224,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		std::move(shift_chain_input_assumptions));
 	if (ltl_observed_abstraction)
 		add_present_twins<node>(sol.atoms, sol.output_props, sol.skeleton);
+	const size_t constraints_end = sol.skeleton.size();
 
 	// Append DFA tester constraints and register state variables as outputs.
 	append_tester_constraints(sol.skeleton, testers);
@@ -234,6 +236,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		          << " negate=" << t.negate_output;
 	}
 	append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm_for_skeleton));
+	if (!ltl_observed_abstraction)
+		sol.game_skeleton = game_skeleton
+			+ sol.skeleton.substr(constraints_end);
 
 	LOG_DEBUG << "[ltl_aba] LTL skeleton: " << sol.skeleton;
 	LOG_DEBUG << "[ltl_aba] inputs:  " << [&]{
@@ -458,6 +463,7 @@ static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
 
 template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+	using tau = tree<node>;
 	result<bool> r;
 	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
 
@@ -533,17 +539,69 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return r.with_value(false);
 	};
 
-	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm));
+	ltl_aba_solution<node> partial;
+	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm, &partial));
 	if (!maybe_opt) return backend_failed();
 	auto maybe = std::move(*maybe_opt);
 	LOG_DEBUG << "[ltl_aba] solve_ltl_aba returned: " << maybe.has_value();
 
-	if (!maybe) return unrealizable("propositional");
+	// The data game decides exactly. Over bit sets it runs first; over
+	// formulas, whose quantifier elimination can be slow, it settles an
+	// UNREALIZABLE or undecided abstraction, whose attempt is then a
+	// rejected candidate.
+	auto on_data = [&](const ltl_aba_solution<node>& s, bool formulas,
+		result<bool>* attempt) -> std::optional<bool>
+	{
+		if (s.game_skeleton.empty()) return std::nullopt;
+		auto game = solve_data_game<node>(s.game_skeleton, s.atoms,
+			s.input_props, s.output_props, formulas);
+		if (!game.has_value()) {
+			auto sc = r.open("rejected candidate");
+			r.info("the data game could not be built",
+				{{label::value, truncate_for_message(
+					tau::get(fm).to_str())}});
+			report rep = std::move(game).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+			return std::nullopt;
+		}
+		if (game.value() == data_game_verdict::undecided) {
+			r.merge(std::move(game));
+			return std::nullopt;
+		}
+		if (attempt) {
+			auto sc = r.open("rejected candidate");
+			r.info("the abstraction gave no verdict the data confirms",
+				{{label::value, truncate_for_message(
+					tau::get(fm).to_str())}});
+			report rep = std::move(*attempt).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		const bool wins = game.value() == data_game_verdict::realizable;
+		r.merge(std::move(game));
+		if (output) LOG_INFO << "[ltl_aba] " << (wins
+			? "REALIZABLE" : "UNREALIZABLE") << " (data game)";
+		return wins;
+	};
 
-	auto refined = r.merge_take(
-		refine_or_observe<node>(fm, *maybe, output));
-	if (!refined) return r;
-	if (!*refined) return unrealizable("ABA-refined");
+	if (!maybe) {
+		if (auto v = on_data(partial, true, nullptr)) return r.with_value(*v);
+		return unrealizable("propositional");
+	}
+	if (auto v = on_data(*maybe, false, nullptr)) return r.with_value(*v);
+
+	const ltl_aba_solution<node> abstraction = *maybe;
+	auto refined = refine_or_observe<node>(fm, *maybe, output);
+	if (refined.has_value() && refined.value()) {
+		r.merge(std::move(refined));
+		return r.with_value(true);
+	}
+	if (auto v = on_data(abstraction, true, &refined))
+		return r.with_value(*v);
+	auto verdict = r.merge_take(std::move(refined));
+	if (!verdict) return r;
+	if (!*verdict) return unrealizable("ABA-refined");
 	return r.with_value(true);
 }
 

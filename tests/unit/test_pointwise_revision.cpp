@@ -998,9 +998,10 @@ TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
 		// The revision makes 6 temporal queries of which 2 are
 		// hash-consed repeats (Step 2's clause ∧ update and the
 		// outer revise() early exit); the memo answers those, so at
-		// most 4 subprocesses run. Without the memo this was 6.
+		// most 4 queries run, each with one synthesis and at most one
+		// data game.
 		CHECK(n1 >= 1);
-		CHECK(n1 <= 4);
+		CHECK(n1 <= 8);
 #ifdef TAU_CACHE
 		// Cross-revision result cache: the identical revision answers
 		// every query from the cache — zero subprocesses.
