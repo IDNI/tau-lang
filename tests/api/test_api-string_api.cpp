@@ -253,6 +253,33 @@ TEST_SUITE("Tau API - string - execution") {
 #endif // TAU_PACK_HAS_BA_SBF
 
 
+	// A tautological literal still carries its lookback (README "Lookback
+	// initialization"): o2 is free at steps 0 and 1.
+	TEST_CASE("each clause keeps the warm-up it is written with") {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		CHECK( tau_api::sat(spec).value() );
+		CHECK( tau_api::realizable(spec).value() );
+		CHECK( !tau_api::unsat(spec).value() );
+
+		auto maybe_i = tau_api::get_interpreter(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value()) {
+				CHECK( output_at.name == "o2" );
+				collected.push_back(value);
+			}
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
+
 	TEST_CASE("using get_inputs_for_step") {
 
 		// Make the interpreter for a given specification as a string

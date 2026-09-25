@@ -1105,7 +1105,7 @@ template <NodeType node>
 result<bool> api<node>::realizable(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(auto simplified, simplify(fm));
+		TAU_TRY(auto simplified, simplify_keeping_warm_ups(fm));
 		// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 		// normalization so the downstream pipeline sees a single wff_always.
 		fm = flatten_always_conjuncts<node>(simplified);
@@ -1188,7 +1188,7 @@ template <NodeType node>
 result<bool> api<node>::sat(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		TAU_TRY(auto simplified, simplify(fm));
+		TAU_TRY(auto simplified, simplify_keeping_warm_ups(fm));
 		// A spec root (what get_spec yields; realizable and valid take it
 		// too) is unwrapped, its definitions applied, to its main formula.
 		if (simplified && tau::get(simplified).is(tau::spec)) {
@@ -1582,6 +1582,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 		// See the tref overload above: remaps are assigned into the global
 		// io_context only once every validation step has succeeded.
 		auto& ctx = *definitions<node>::instance().get_io_context();
+		spec.keep_warm_ups();
 		auto maybe_nso_rr = spec.get_nso_rr();
 		if (!maybe_nso_rr) {
 			for (const auto& error : spec.errors())
@@ -1715,6 +1716,35 @@ result<tref> api<node>::simplify(tref expr, bool use_defaults) {
 			DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(e);)
 			r = e;
 		}
+		DBG(assert(r.is_well_formed());)
+		return r;
+	});
+}
+
+template <NodeType node>
+result<tref> api<node>::simplify_keeping_warm_ups(tref expr) {
+	return with_budget<node>([&] {
+		result<tref> r;
+		if (!expr) {
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		// The warm-ups are read before reget: no construction hook may fold
+		// a tautological atom and the lookback it is written with.
+		std::optional<use_hooks_guard<node>> hooks_off(std::in_place, false);
+		TAU_TRY(tref inferred, infer(expr));
+		hooks_off.reset();
+		using tt = typename tau::traverser;
+		tref main = tau::get(inferred).is(tau::spec)
+			? (tt(inferred) | tau::main | tau::wff | tt::ref)
+			: inferred;
+		if (main) {
+			TAU_TRY(tref pinned, pin_written_warm_ups<node>(main));
+			if (pinned != main) inferred = main == inferred ? pinned
+				: rewriter::replace<node>(inferred, main, pinned);
+		}
+		tref e = canonize_quantifier_ids<node>(tau::reget(inferred));
+		if (!e) r.error(code::internal_error, "Simplification failed");
+		else r = e;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});

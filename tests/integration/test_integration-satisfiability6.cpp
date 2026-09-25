@@ -77,6 +77,20 @@ static tref make_ctn(node_t::type kind, bool num_first, size_t n) {
 		: tau::get(kind, { cv, nm }));
 }
 
+// A spec as written: no construction hook has folded any of its literals.
+static tref spec_as_written(const char* spec) {
+	use_hooks_guard<node_t> hooks_off(false);
+	return create_spec(spec);
+}
+
+// The lookback of the warm-up stream pin_written_warm_ups adds, -1 without it.
+static int_t warm_up_pin(tref fm) {
+	for (tref v : io_vars_of(fm))
+		if (get_var_name<node_t>(v) == "o__warmup")
+			return get_io_var_shift<node_t>(v);
+	return -1;
+}
+
 static bool str_has(const std::string& hay, const char* needle) {
 	return hay.find(needle) != std::string::npos;
 }
@@ -163,6 +177,38 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( !sat("(always o2[t] = 0 && o1[t-1] = 1) && "
 			"(sometimes (o2[t] = 1 && o1[t-1] = 1)).") );
 		CHECK( !sat("(always o2[t] = 0) && (sometimes o2[t] = 1).") );
+	}
+
+	// A clause is enforced from the deepest lookback it is written with,
+	// also when normalization drops the literal that reads it.
+	TEST_CASE("pin_written_warm_ups: a clause keeps the lookback it is written with") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref taut = pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0).");
+		CHECK( warm_up_pin(taut) == 2 );
+		auto sat = is_tau_formula_sat<node_t>(taut);
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+		// a semantic tautology, and a literal another always statement
+		// absorbs
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && "
+			"(o1[t-2] = 0 || o1[t-2] != 0)) && (sometimes o2[t-1] = 0).")) == 2 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(always (o2[t] = 1 || o1[t-2] = 0)) && "
+			"(sometimes o2[t-1] = 0).")) == 2 );
+		// a sometimes clause, and a formula without temporal operator
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o3[t-1] = 0) && "
+			"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).")) == 1 );
+		CHECK( warm_up_pin(pinned("o2[t] = 1 && i1[t-1] = i1[t-1].")) == 1 );
+		// a lookback that normalization keeps needs no pin
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = 0) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
 	}
 
 	// The negated side of an implication turns an `always` over inputs

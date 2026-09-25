@@ -2076,6 +2076,105 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 	return r;
 }
 
+/** @internal @copydoc pin_written_warm_ups @endinternal */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	if (!fm) {
+		return r.with_assert_check_error(code::invalid_argument,
+			messages::invalid_arguments);
+	}
+	auto peel = [](tref n) {
+		while (tau::get(n).child_is(tau::wff_parenthesis))
+			n = tau::get(n)[0].first();
+		return n;
+	};
+	trefs conjuncts;
+	std::function<void(tref)> split = [&](tref n) {
+		n = peel(n);
+		if (const auto& t = tau::get(n); t.child_is(tau::wff_and)) {
+			split(t[0].first());
+			split(t[0].second());
+		} else conjuncts.push_back(n);
+	};
+	split(fm);
+	auto is_temporal = [](tref n) {
+		return tau::get(n).find_top(is_temporal_quantifier<node>)
+			!= nullptr;
+	};
+	auto shifted_vars = [](tref n) {
+		return tau::get(n).select_top(is_child<node, tau::io_var>);
+	};
+	// Deepest lookback left once the non-temporal parts of @p n are
+	// normalized, each on its own; nullopt when a normalization failed,
+	// its report merged into r.
+	auto kept_lookback = [&](tref n) -> std::optional<int_t> {
+		int_t kept = 0;
+		trefs parts = tau::get(n).select_top([&](tref x) {
+			return tau::get(x).is(tau::wff) && !is_temporal(x); });
+		for (tref part : parts) {
+			auto nf = r.merge_take(normalize_non_temp<node>(part));
+			if (!nf) return std::nullopt;
+			if (*nf) kept = std::max(kept, get_max_shift<node>(
+				shifted_vars(*nf)));
+		}
+		return kept;
+	};
+	// A clause whose written lookback the normalization would shrink gets
+	// `o__warmup[t-k] = 0` conjoined at @p place inside the conjunct @p c,
+	// `k` its written lookback: a fresh output keeps the warm-up and holds
+	// at every step. False when a normalization failed.
+	subtree_map<node, tref> changes;
+	auto pin = [&](tref clause, tref c, tref place) -> bool {
+		if (tau::get(clause).find_top(is<node, tau::ref>)) return true;
+		tref deepest = nullptr;
+		int_t written = 0;
+		for (tref v : shifted_vars(clause))
+			if (int_t s = get_io_var_shift<node>(v); s > written)
+				written = s, deepest = v;
+		if (written == 0) return true;
+		auto kept = kept_lookback(clause);
+		if (!kept) return false;
+		if (*kept >= written) return true;
+		const auto& io = tau::get(deepest).is(tau::io_var)
+			? tau::get(deepest) : tau::get(deepest)[0];
+		tref marker = tau::build_bf_eq_0(build_out_var<node>(
+			tau::build_var_name("o__warmup"), io.child(1),
+			get_ba_type_id<node>(pack_bool_carrier_type<node>())));
+		tref pinned = tau::build_wff_and(place, marker);
+		changes[c] = c == place ? pinned
+			: rewriter::replace<node>(c, place, pinned);
+		return true;
+	};
+	if (!is_temporal(fm)) {
+		if (!pin(fm, fm, fm)) return r;
+		return r.with_value(changes.empty() ? fm : changes.at(fm));
+	}
+	// Every always statement whose body has no temporal operator joins the
+	// one always part (README "Lookback initialization").
+	trefs aw_conjuncts, aw_bodies;
+	for (tref c : conjuncts) {
+		const auto& t = tau::get(c);
+		if (!t.has_child()) continue;
+		const auto nt = t[0].value.nt;
+		bool ok = true;
+		if (nt == tau::wff_always && !is_temporal(t[0].first())) {
+			aw_conjuncts.push_back(c);
+			aw_bodies.push_back(t[0].first());
+		} else if (nt == tau::wff_always || nt == tau::wff_sometimes)
+			ok = pin(c, c, t[0].first());
+		else if (nt == tau::wff_until || nt == tau::wff_release
+			|| nt == tau::wff_weak_until)
+			ok = pin(c, c, t[0].second());
+		if (!ok) return r;
+	}
+	if (!aw_bodies.empty() && !pin(tau::build_wff_and(aw_bodies),
+		aw_conjuncts[0], aw_bodies[0])) return r;
+	if (changes.empty()) return r.with_value(fm);
+	return r.with_value(rewriter::replace<node>(fm, changes));
+}
+
 // This is the cross-revision satisfiability result cache. Any U/R/W/S/T
 // content routes a query through the full LTL(ABA) pipeline -- one ltlsynt
 // subprocess per call -- and the pointwise revision asks the same (formula,

@@ -1014,6 +1014,13 @@ private:
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
+	/// simplify() that first keeps the warm-up of each clause of @p expr
+	/// (a formula or a spec root) at its lookback as written, see
+	/// pin_written_warm_ups.
+	static result<tref> simplify_keeping_warm_ups(tref expr);
+	/// get_formula_or_term() without the construction hooks, for sat()
+	/// and realizable(), which keep the warm-ups as written.
+	static result<tref> parse_as_written(const std::string& expr);
 };
 
 

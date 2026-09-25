@@ -872,7 +872,14 @@ A clause that reads no past starts at step 0 even beside one that does.
 one clause the deepest lookback counts for every literal:
 `G(o1[t] = 1 && o2[t] = o2[t-1])` leaves `o1[0]` unconstrained, and
 `G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` leaves both outputs unconstrained
-for steps 0 and 1, whatever their individual shifts.  The LTL synthesis
+for steps 0 and 1, whatever their individual shifts.  The lookback is the
+one the clause is written with, also where a literal carrying it is a
+tautology or is absorbed by another one: `o1[t-2] = o1[t-2]` still gives its
+clause a two-step warm-up, so
+`(always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)` is
+satisfiable, with `o2[0] = 0`, and so is
+`(always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)`.
+`sat`, `realizable` and `run` apply the same warm-ups.  The LTL synthesis
 pipeline follows the same rule, so `G(p U q)` with `q` reading the past
 agrees with `G q` when `p` is contradictory.
 

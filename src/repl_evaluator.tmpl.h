@@ -212,9 +212,18 @@ tref repl_evaluator<BAs...>::get_any(tref arg) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::get_applied(tref arg) const {
+tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
+	if (auto check = get_type_and_arg(arg, true); check)
+		return check.value().second;
+	return nullptr;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::get_applied(tref arg, bool keep_warm_ups) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
+	if (keep_warm_ups) spec.keep_warm_ups();
 	spec.add(arg);
 	auto& defs = definitions<node>::instance();
 	// type_defs is spliced first only for parallel structure with rr_defs/
@@ -316,7 +325,8 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<std::pair<size_t, tref>>
-	repl_evaluator<BAs...>::get_type_and_arg(const tt& n) const
+	repl_evaluator<BAs...>::get_type_and_arg(const tt& n,
+		bool keep_warm_ups) const
 {
 	auto nt = n | tt::nt;
 	tref r = nullptr;
@@ -332,7 +342,7 @@ std::optional<std::pair<size_t, tref>>
 			} else return {};
 		default: r = n | tt::ref;
 	}
-	r = get_applied(r);
+	r = get_applied(r, keep_warm_ups);
 	if (!r) return {};
 	return { { tau::get(r).get_type(), r } };
 }
@@ -719,7 +729,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// Formula is the 3rd child when a count was given, else the 2nd.
 	tref value = nullptr;
 	if (auto fc = bounded ? (n | tt::third) : (n | tt::second))
-		value = get_any(fc | tt::ref);
+		value = get_spec_as_written(fc | tt::ref);
 
 	if (value) {
 		if (reject_ctl_star_if_disabled(value)) return;
@@ -1185,7 +1195,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get());
+	if (tref value = get_spec_as_written(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
 	{
 		auto res = tau_api::sat(value);
@@ -1200,7 +1210,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get());
+	if (tref value = get_spec_as_written(n[1].get());
 		value && !reject_ctl_star_if_disabled(value))
 	{
 		auto res = tau_api::unsat(value);
@@ -1215,7 +1225,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value) {
+	if (tref value = get_spec_as_written(n[1].get()); value) {
 		auto res = tau_api::realizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
@@ -1228,7 +1238,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value) {
+	if (tref value = get_spec_as_written(n[1].get()); value) {
 		auto res = tau_api::unrealizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }

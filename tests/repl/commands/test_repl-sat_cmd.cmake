@@ -212,3 +212,21 @@ add_repl_test(sat_cmd-warm_up_realizable "realizable (always o2[t] = 0 && o1[t-1
 add_repl_test(sat_cmd-warm_up_continuation "sat (always (i2[t] = o1[t-2] || o1[t-1] = 0) && o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t])" ": T")
 add_repl_test(sat_cmd-warm_up_same_lookback "sat (always o2[t] = 0 && o1[t-1] = 1) && (sometimes (o2[t] = 1 && o1[t-1] = 1))" ": F")
 add_repl_test(sat_cmd-warm_up_none "sat (always o2[t] = 0) && (sometimes o2[t] = 1)" ": F")
+# The warm-up is the lookback a clause is written with, a literal that
+# normalization drops included: the always parts below leave o2 free at steps
+# 0 and 1
+add_repl_test(sat_cmd-warm_up_tautology "sat (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_unsat "unsat (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)" ": F")
+add_repl_test(sat_cmd-warm_up_tautology_complement "sat (always o2[t] = 1 && (o1[t-2] | o1[t-2]') = 1) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_disjunction "sat (always o2[t] = 1 && (o1[t-2] = 0 || o1[t-2] != 0)) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_own_always "sat (always o2[t] = 1) && (always o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_absorbed "sat (always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_input "sat (always o2[t] = 1 && i1[t-1] = i1[t-1]) && (sometimes o2[t] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_bv "sat (always o2[t]:bv[1] = 1 && o1[t-2]:bv[1] = o1[t-2]:bv[1]) && (sometimes o2[t-1]:bv[1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_realizable "realizable (always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_until "sat (G (o2[t] = 1 && o1[t-2] = o1[t-2])) && (T U (o2[t-1] = 0))" ": T")
+# in a sometimes clause it delays the first step the clause may hold at
+add_repl_test(sat_cmd-warm_up_tautology_sometimes "sat (always o2[t] = 1 && o3[t-1] = 0) && (sometimes (o2[t] = 0 && o1[t-1] = o1[t-1]))" ": F")
+# a sometimes part implied by another one is still asked from its own warm-up
+add_repl_test(sat_cmd-warm_up_implied_sometimes "sat (always o1[0] = 0 && o1[t] = 0 && o2[t] = 1 && o3[t-1] = 0) && (sometimes o2[t] = 0) && (sometimes (o2[t] = 0 || o1[t-1] = 1))" ": F")
+add_repl_test(sat_cmd-warm_up_tautology_sometimes_realizable "realizable (always o2[t] = 1 && o3[t-1] = 0) && (sometimes (o2[t] = 0 && o1[t-1] = o1[t-1]))" ": F")

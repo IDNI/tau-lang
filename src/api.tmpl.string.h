@@ -283,9 +283,17 @@ result<std::string> api<node>::eliminate_quantifiers(
 }
 
 template <NodeType node>
+result<tref> api<node>::parse_as_written(const std::string& expr) {
+	// sat(tref) and realizable(tref) read the warm-up of each clause before
+	// the construction hooks run (pin_written_warm_ups).
+	use_hooks_guard<node> hooks_off(false);
+	return get_formula_or_term(expr);
+}
+
+template <NodeType node>
 result<bool> api<node>::realizable(const std::string& expr) {
 	return with_budget<node>([&] {
-		return get_formula_or_term(expr).and_then(
+		return parse_as_written(expr).and_then(
 			[](tref e) { return realizable(e); });
 	});
 }
@@ -293,7 +301,7 @@ result<bool> api<node>::realizable(const std::string& expr) {
 template <NodeType node>
 result<bool> api<node>::unrealizable(const std::string& expr) {
 	return with_budget<node>([&] {
-		return get_formula_or_term(expr).and_then(
+		return parse_as_written(expr).and_then(
 			[](tref e) { return unrealizable(e); });
 	});
 }
@@ -301,7 +309,7 @@ result<bool> api<node>::unrealizable(const std::string& expr) {
 template <NodeType node>
 result<bool> api<node>::sat(const std::string& expr) {
 	return with_budget<node>([&] {
-		return get_formula_or_term(expr).and_then(
+		return parse_as_written(expr).and_then(
 			[](tref e) { return sat(e); });
 	});
 }
@@ -310,7 +318,7 @@ template <NodeType node>
 result<bool> api<node>::unsat(const std::string& expr) {
 	return with_budget<node>([&] {
 		// Parsed as a bare formula, not a spec, so it is not wrapped and rejected.
-		return get_formula_or_term(expr).and_then(
+		return parse_as_written(expr).and_then(
 			[](tref e) { return unsat(e); });
 	});
 }

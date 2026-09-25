@@ -59,6 +59,10 @@ result<tref> tau_spec<node>::get() {
 
 	TAU_TRY(tref ptree, build_parse_tree());
 
+	// Kept warm-ups are read before reget: until then no construction hook
+	// may fold a tautological atom and the lookback it is written with.
+	std::optional<use_hooks_guard<node>> hooks_off;
+	if (keep_warm_ups_) hooks_off.emplace(false);
 	auto opts = get_options(); // transform to tau tree
 	auto parsed = r.merge_take(tau::get(tau_parser::tree::get(ptree), opts));
 	if (!parsed) {
@@ -100,6 +104,18 @@ result<tref> tau_spec<node>::get() {
 	defs.get_io_context()->update_types(result.second);
 	defs.set_global_scope(std::move(result.second));
 	DBG(TAU_LOG_TRACE << "inferred spec: " << TAU_LOG_FM_DUMP(spec);)
+	hooks_off.reset();
+	if (tref fm = tt(spec) | tau::main | tau::wff | tt::ref;
+		keep_warm_ups_ && fm)
+	{
+		auto pinned = r.merge_take(pin_written_warm_ups<node>(fm));
+		if (!pinned) {
+			errors_.push_back("warm-up pinning failed");
+			return r;
+		}
+		if (*pinned != fm)
+			spec = rewriter::replace<node>(spec, fm, *pinned);
+	}
 	spec = canonize_quantifier_ids<node>(tau::reget(spec));
 	if (!spec) {
 		errors_.push_back("simplification failed (reget)");

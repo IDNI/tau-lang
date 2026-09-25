@@ -55,6 +55,13 @@ struct tau_spec {
 	 * @return `rr<node>` if parsing succeeded, or `std::nullopt`.
 	 */
 	std::optional<rr<node>> get_nso_rr();
+	/**
+	 * @brief Keep the warm-up of each clause of the main formula at its
+	 * lookback as written (pin_written_warm_ups) in what get() builds.
+	 * Set for execution and for the REPL's sat and realizable; the other
+	 * commands print what get() builds.
+	 */
+	void keep_warm_ups() { keep_warm_ups_ = true; }
 
 private:
 	/// @brief Build tree-get options from current parser state.
@@ -83,6 +90,7 @@ private:
 	std::vector<std::string> errors_{};
 	trefs defs_{};
 	tref main_ = nullptr;
+	bool keep_warm_ups_ = false;
 	// span a spec's parts, since a type declared in one part must stay
 	// live for the parts parsed after it; mutable so the const
 	// get_options() can hand out their addresses

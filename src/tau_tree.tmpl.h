@@ -53,6 +53,10 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref ref);
 
+/** @brief Declared for tau_spec; documented in satisfiability.h. */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm);
+
 /**
  * @brief Append to @p leaves the maximal subtrees of @p n that are not
  * themselves headed by @p branch, flattening the (arbitrarily deep)
