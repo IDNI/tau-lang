@@ -1593,7 +1593,9 @@ static void add_consistency_constraints(
 	// with !pj must therefore also be globally false (add G(!pi)).
 	// This catches cases like F(o=i) && G(!(o=0)): o=i cannot hold while o!=0
 	// when the adversarial environment sends i=0.
-	for (size_t j = 0; j < atoms.size(); ++j) {
+	// The observed abstraction skips it: G(!pj) may sit under a
+	// disjunction, and that abstraction forbids only what no data satisfies.
+	for (size_t j = 0; !ltl_observed_abstraction && j < atoms.size(); ++j) {
 		std::string g_not_pj = "G(!" + atoms[j].second + ")";
 		if (original_skeleton.find(g_not_pj) == std::string::npos) continue;
 
@@ -2038,6 +2040,44 @@ static void add_present_twins(
 		for (int_t s = 0; s < *k; ++s) later = "X(" + later + ")";
 		std::string c = "G(" + pname + " <-> " + later + ")";
 		if (skeleton.find(c) == std::string::npos) skeleton += " && " + c;
+	}
+}
+
+// An input atom whose io_vars all read t-k (k >= 1) is decided by the
+// environment k steps before the step that reads it, but ltlsynt lets the
+// environment choose its prop at that later step, after the system's
+// outputs in between. Under ltl_input_twins, its present-time twin joins
+// the atoms as an input, so the shift chains tie the two by an
+// assumption and the consistency constraints cover the twin.
+template <NodeType node>
+static void add_input_twins(
+    std::vector<std::pair<tref, std::string>>& atoms,
+    std::vector<std::string>& input_props)
+{
+	using tau = tree<node>;
+	size_t next = 0;
+	for (auto& [_, name] : atoms)
+		if (name.size() > 1 && name[0] == 'p'
+			&& std::all_of(name.begin() + 1, name.end(),
+				[](unsigned char c) { return std::isdigit(c); }))
+				next = std::max(next, (size_t)std::stoul(name.substr(1)) + 1);
+	const size_t n = atoms.size();
+	for (size_t i = 0; i < n; ++i) {
+		tref a = atoms[i].first;
+		if (atom_is_positional<node>(a) || !is_pure_input_atom<node>(a))
+			continue;
+		auto k = atom_uniform_shift<node>(a);
+		if (!k || *k < 1) continue;
+		tref twin = shift_io_vars<node>(a, *k);
+		if (std::none_of(atoms.begin(), atoms.end(), [&](auto& b) {
+			return !atom_is_positional<node>(b.first)
+				&& tau::subtree_equals(
+					shift_io_vars<node>(b.first, 0), twin); }))
+		{
+			std::string pname = "p" + std::to_string(next++);
+			atoms.emplace_back(twin, pname);
+			input_props.push_back(pname);
+		}
 	}
 }
 
