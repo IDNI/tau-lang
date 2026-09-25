@@ -878,12 +878,12 @@ equivalent and tau-lang automatically merges the latter form into a single
 When a specification uses lookback stream variables (e.g. `i1[t-k]` or
 `o1[t-k]`), the values they read do not exist for the first `k` steps.  The
 interpreter handles this per *clause*: the `always` part of a specification
-(every `always` statement merged into one) and each `sometimes` statement, or
-each top-level conjunct of a full-LTL formula, is enforced from the deepest
-lookback that clause reads, and asks nothing before that.  During a clause's
-warm-up its outputs are unconstrained by it, lookback-free ones included; the
-interpreter picks the bottom element (`0`/`"F"` for tau, `0`/`"F"` for sbf,
-etc.) unless a later step of the run needs another value, so
+(every `always` or `G` statement merged into one) and each `sometimes`
+statement or other top-level conjunct of a full-LTL formula is enforced from
+the deepest lookback that clause reads, and asks nothing before that.  During
+a clause's warm-up its outputs are unconstrained by it, lookback-free ones
+included; the interpreter picks the bottom element (`0`/`"F"` for tau,
+`0`/`"F"` for sbf, etc.) unless a later step of the run needs another value, so
 `G(o1[t-1] = 1)` starts with `o1[0] = 1`.
 
 A clause that reads no past starts at step 0 even beside one that does.
@@ -899,10 +899,12 @@ clause a two-step warm-up, so
 `(always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)` is
 satisfiable, with `o2[0] = 0`, and so is
 `(always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)`.
-`sat`, `realizable`, `valid`, `run` and `tau compile` apply the same
-warm-ups.  A clause read under a negation keeps its warm-up too: `valid φ`
-asks whether some trace violates a clause of `φ` after its warm-up, so
-`valid !φ` is `T` exactly when no trace satisfies `φ`, and
+`sat`, `realizable`, `valid`, `run`, `ltl` and `tau compile` apply the same
+warm-ups: `(G o2[t-1] = 1) && (G o1[t] = 1) && (F o1[t] = 0)` is realizable,
+because its always part reads `o2[t-1]`, so `o1[0]` is free.  A clause read
+under a negation keeps its warm-up too: `valid φ` asks whether some trace
+violates a clause of `φ` after its warm-up, so `valid !φ` is `T` exactly
+when no trace satisfies `φ`, and
 `valid (always o2[t] = 1 && o1[t-2] = o1[t-2]) -> (always o2[t] = 1)` is
 `F`.  The LTL synthesis
 pipeline follows the same rule, so `G(p U q)` with `q` reading the past
@@ -3287,6 +3289,8 @@ prints the error.
   atom extraction, propositional skeleton, ltlsynt result, HOA strategy
   automaton, ABA oracle feasibility checks, and the synthesized safety formula.
   Useful for understanding how a full-LTL formula is handled step by step.
+  It explains the formula `realizable` decides, with the same always part and
+  warm-ups, and prints the verdict `realizable` gives.
 
 # **Web IDE**
 

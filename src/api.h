@@ -763,6 +763,10 @@ struct api {
 	static result<bool> realizable(tref spec);
 	/// @copydoc realizable(const std::string&)
 	static result<bool> realizable(htref spec);
+	/// The formula realizable(spec) decides: the spec simplified with the
+	/// warm-ups it is written with, its always statements merged into one
+	/// always part, then normalized. The REPL's `ltl` explains this one.
+	static result<tref> realizability_target(tref spec);
 
 	/// Check if a specification is unrealizable.  Equivalent to
 	/// negating realizable(spec).
@@ -1035,6 +1039,12 @@ private:
 	/// get_formula_or_term() without the construction hooks, for the
 	/// decision procedures, which keep the warm-ups as written.
 	static result<tref> parse_as_written(const std::string& expr);
+	/// realizable()'s prefix: simplify_keeping_warm_ups() and the merge
+	/// of the top-level always statements, checked to be a formula or a
+	/// spec root.
+	static result<tref> prepare_realizability(tref spec);
+	/// The formula the decision procedures get from a prepared spec.
+	static result<tref> realizability_target_of(tref prepared);
 };
 
 

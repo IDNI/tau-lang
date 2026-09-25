@@ -801,7 +801,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	DBG(TAU_LOG_TRACE << "ltl_cmd: " << TAU_LOG_FM(n.value());)
 
-	tref value = get_any(n[1].get());
+	tref value = get_spec_as_written(n[1].get());
 	if (!value) return;
 	// IN-N5: `ltl` was the one formula command with no fragment gate.
 	if (reject_ctl_star_if_disabled(value)) return;
@@ -824,9 +824,18 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 		// and then nothing of the buffer is shown, only the error.
 		std::stringstream explained;
 		bool table_filled = false;
+		// The trace explains the formula `realizable` decides, and the
+		// verdict is `realizable`'s own, so both commands read the same
+		// warm-ups and always part.
 		auto explain_r = with_budget<node>([&] {
-			auto r = ltl_explain<node>(value, explained);
+			result<bool> r;
+			TAU_TRY(tref target,
+				tau_api::realizability_target(value));
+			auto e = r.merge_take(ltl_explain<node>(target,
+				explained, [&] {
+					return tau_api::realizable(value); }));
 			table_filled = bdd_node_table_exhausted;
+			if (e) r = *e;
 			return r;
 		});
 		if (!table_filled) out << explained.str();
