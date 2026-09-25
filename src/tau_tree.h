@@ -515,12 +515,16 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	// Substitution (tau_tree_substitute.tmpl.h)
 	// -----------------------------------------------------------------------
 
-	/// Applied to every reference argument the substitution changed, once
-	/// per argument. The identity by default.
+	/// Applied once to every reference argument the substitution changed,
+	/// and to every changed node a `hook_target` names. The identity by
+	/// default.
 	using argument_hook = std::function<tref(tref)>;
 	/// Asked of every node before the walk enters it. An empty one is no
 	/// guard at all: the walk then enters everything and asks nothing.
 	using descent_guard = std::function<bool(tref)>;
+	/// Names the nodes that go through the argument hook as well once the
+	/// substitution changed them. An empty one names none.
+	using hook_target = std::function<bool(tref)>;
 
 	/**
 	 * @brief This subtree with every occurrence of @p that replaced by
@@ -559,6 +563,11 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 * however many places reach it. A reference nested inside an argument
 	 * is finished first.
 	 *
+	 * A node @p hooked names is rewritten whole the same way and, if that
+	 * changed it, passed through @p on_argument once per call however many
+	 * places reach it; its parent is rebuilt around the hook's result. The
+	 * default names no node.
+	 *
 	 * @p descend, when one is given, is asked of every node before the
 	 * walk enters it: the root, the nodes of a BDD leaf and the nodes of a
 	 * reference argument alike. A node it turns away is left as it stands,
@@ -569,18 +578,21 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	 * and is never visited. The default is no guard, and no node is asked.
 	 *
 	 * Every rebuilt node goes through the hooked `tree::get`, so the
-	 * construction hooks apply on the way up. Nothing else is re-shaped: a
-	 * chain keeps its nesting minus the rewritten members.
+	 * construction hooks apply on the way up. Nothing else is re-shaped
+	 * beyond what @p on_argument returns: a chain keeps its nesting minus
+	 * the rewritten members.
 	 */
 	tref substitute(tref that, tref with,
 		const subtree_unordered_map<node, int_t>& o = {},
 		const argument_hook& on_argument = identity,
-		const descent_guard& descend = {}) const;
+		const descent_guard& descend = {},
+		const hook_target& hooked = {}) const;
 	/** @brief This subtree with every key of @p changes replaced by its value, all at once. */
 	tref substitute(const subtree_map<node, tref>& changes,
 		const subtree_unordered_map<node, int_t>& o = {},
 		const argument_hook& on_argument = identity,
-		const descent_guard& descend = {}) const;
+		const descent_guard& descend = {},
+		const hook_target& hooked = {}) const;
 
 	/// The bound variables of @p t, from formula binders and functional
 	/// quantifiers alike, trimmed and sorted by `subtree_less`.
@@ -1099,9 +1111,9 @@ private:
 		/// The free variables of the replacements, for Debug's capture
 		/// check; empty in Release.
 		trefs free_in_with;
-		/// Reference argument → its result after the hook, so a shared
-		/// argument is rewritten once per call.
-		mutable subtree_unordered_map<node, tref> argument_memo;
+		/// Reference argument or named node → its result after the
+		/// hook, so a shared one is rewritten once per call.
+		mutable subtree_unordered_map<node, tref> hook_memo;
 		/// The caller's guard, asked before entering a node at every
 		/// depth the call reaches, so the leaves of a BDD and the
 		/// arguments of a reference see the one the top saw. Null
@@ -1109,6 +1121,10 @@ private:
 		/// substitution a call per node. It points at the caller's
 		/// argument, which outlives the walk.
 		const descent_guard* descend = nullptr;
+		/// The caller's `hook_target`, null where there is none, which
+		/// spares a plain substitution a call per node. It points at the
+		/// caller's argument, which outlives the walk.
+		const hook_target* hooked = nullptr;
 		/// The key variables that are decision variables of the order,
 		/// with their replacements as BDDs, in the order a compose
 		/// wants them. Built at the first BDD-backed node the call
@@ -1127,10 +1143,14 @@ private:
 	static void prepare(substitution& s, tref formula, tref key, tref value);
 	/** @brief Put @p s in the shape the walk reads it in, once every pair is prepared. */
 	static void finish(substitution& s);
-	/** @brief The walk of `substitute`, over a prepared @p s. */
+	/**
+	 * @brief The walk of `substitute`, over a prepared @p s. @p hook_root
+	 * false exempts @p formula itself from the named kind: it is a node a
+	 * caller rewrites whole and hooks.
+	 */
 	static tref substitute(tref formula, const substitution& s,
 		const subtree_unordered_map<node, int_t>& o,
-		const argument_hook& on_argument);
+		const argument_hook& on_argument, bool hook_root = true);
 
 };
 
@@ -1143,14 +1163,16 @@ template <NodeType node>
 tref substitute(tref formula, tref that, tref with,
 	const subtree_unordered_map<node, int_t>& o = {},
 	const typename tree<node>::argument_hook& on_argument = identity,
-	const typename tree<node>::descent_guard& descend = {});
+	const typename tree<node>::descent_guard& descend = {},
+	const typename tree<node>::hook_target& hooked = {});
 
 /** @brief @p formula with every key of @p changes replaced by its value; see `tree<node>::substitute`. */
 template <NodeType node>
 tref substitute(tref formula, const subtree_map<node, tref>& changes,
 	const subtree_unordered_map<node, int_t>& o = {},
 	const typename tree<node>::argument_hook& on_argument = identity,
-	const typename tree<node>::descent_guard& descend = {});
+	const typename tree<node>::descent_guard& descend = {},
+	const typename tree<node>::hook_target& hooked = {});
 
 // ---------------------------------------------------------------------------
 // Printer free functions (tau_tree_printers.tmpl.h)

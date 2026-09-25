@@ -131,11 +131,12 @@ void tree<node>::finish(substitution& s) {
 #endif
 }
 
-/** @internal @copydoc tree::substitute(tref, tref, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&) const @endinternal */
+/** @internal @copydoc tree::substitute(tref, tref, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&, const hook_target&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(tref that, tref with,
 	const subtree_unordered_map<node, int_t>& o,
-	const argument_hook& on_argument, const descent_guard& descend) const
+	const argument_hook& on_argument, const descent_guard& descend,
+	const hook_target& hooked) const
 {
 	using tau = tree<node>;
 	const tref formula = this->get();
@@ -144,16 +145,18 @@ tref tree<node>::substitute(tref that, tref with,
 	// overload takes would be built only to be read back.
 	substitution s;
 	if (descend) s.descend = &descend;
+	if (hooked) s.hooked = &hooked;
 	prepare(s, formula, that, with);
 	finish(s);
 	return tau::substitute(formula, s, o, on_argument);
 }
 
-/** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&) const @endinternal */
+/** @internal @copydoc tree::substitute(const subtree_map<node, tref>&, const subtree_unordered_map<node, int_t>&, const argument_hook&, const descent_guard&, const hook_target&) const @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	const subtree_unordered_map<node, int_t>& o,
-	const argument_hook& on_argument, const descent_guard& descend) const
+	const argument_hook& on_argument, const descent_guard& descend,
+	const hook_target& hooked) const
 {
 	using tau = tree<node>;
 	const tref formula = this->get();
@@ -164,17 +167,18 @@ tref tree<node>::substitute(const subtree_map<node, tref>& changes,
 	// arguments of a reference included — reuses the result.
 	substitution s;
 	if (descend) s.descend = &descend;
+	if (hooked) s.hooked = &hooked;
 	for (const auto& [key, value] : changes)
 		prepare(s, formula, key, value);
 	finish(s);
 	return tau::substitute(formula, s, o, on_argument);
 }
 
-/** @internal @copydoc tree::substitute(tref, const substitution&, const subtree_unordered_map<node, int_t>&, const argument_hook&) @endinternal */
+/** @internal @copydoc tree::substitute(tref, const substitution&, const subtree_unordered_map<node, int_t>&, const argument_hook&, bool) @endinternal */
 template<NodeType node>
 tref tree<node>::substitute(tref formula, const substitution& s,
 	const subtree_unordered_map<node, int_t>& o,
-	const argument_hook& on_argument)
+	const argument_hook& on_argument, bool hook_root)
 {
 	using tau   = tree<node>;
 	using tbdd  = tau_term_bdd<node>;
@@ -275,6 +279,19 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		}
 		return s.compose_subs;
 	};
+	// A reference argument or a named node is rewritten whole by a walk of
+	// its own, which leaves its root to this step, and passed through the
+	// hook once per call: a node the walk changes never enters the
+	// traversal's cache, so the memo is what spares a shared one.
+	auto rewrite_whole = [&](tref a) -> tref {
+		auto it = s.hook_memo.find(a);
+		if (it == s.hook_memo.end()) {
+			tref r = tau::substitute(a, s, o, on_argument, false);
+			if (r != a) r = on_argument(r);
+			it = s.hook_memo.emplace(a, r).first;
+		}
+		return it->second;
+	};
 	auto f = [&](tref n) -> tref {
 		const tau& t = tau::get(n);
 		// An occurrence, compared by content. The walk stops here, so
@@ -286,6 +303,15 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 		if (s.key_types.test(static_cast<size_t>(t.get_type())))
 			if (const tref r = get_cached<node>(n, s.changes);
 				r != n) return r;
+		// A named node is finished here, so its parent is rebuilt
+		// around the hook's result.
+		if (s.hooked != nullptr && (hook_root || n != formula)
+			&& (*s.hooked)(n))
+		{
+			const tref a = tau::trim_right_sibling(n);
+			const tref r = rewrite_whole(a);
+			return r == a ? n : r;
+		}
 		// A BDD-backed term holds its variables in the BDD store, not
 		// as tree nodes. Its leaves are rewritten first, on the
 		// original leaves, so a key inside a replacement is not
@@ -313,21 +339,13 @@ tref tree<node>::substitute(tref formula, const substitution& s,
 			return handle::convert_to_tau_node_or_term(handle(r),
 				find_ba_type<node>(n));
 		}
-		// A reference argument is rewritten whole and passed through
-		// the hook once per call: the memo holds its result, so a
-		// shared argument is not rewritten again. A reference nested
-		// inside the argument is finished by the recursive call
-		// first.
+		// A reference nested inside the argument is finished by the
+		// argument's own walk first.
 		if (t.is(tau::ref_arg)) {
 			const tref a = tau::trim_right_sibling(t.first());
-			auto it = s.argument_memo.find(a);
-			if (it == s.argument_memo.end()) {
-				tref r = tau::substitute(a, s, o, on_argument);
-				if (r != a) r = on_argument(r);
-				it = s.argument_memo.emplace(a, r).first;
-			}
-			if (it->second == a) return n;
-			return tau::get(t.value, it->second);
+			const tref r = rewrite_whole(a);
+			if (r == a) return n;
+			return tau::get(t.value, r);
 		}
 		// A binder is where capture would happen. The replacements are
 		// renamed apart and their free variables are free at the site,
@@ -352,20 +370,22 @@ template <NodeType node>
 tref substitute(tref formula, tref that, tref with,
 	const subtree_unordered_map<node, int_t>& o,
 	const typename tree<node>::argument_hook& on_argument,
-	const typename tree<node>::descent_guard& descend)
+	const typename tree<node>::descent_guard& descend,
+	const typename tree<node>::hook_target& hooked)
 {
 	return tree<node>::get(formula).substitute(that, with, o, on_argument,
-		descend);
+		descend, hooked);
 }
 
 template <NodeType node>
 tref substitute(tref formula, const subtree_map<node, tref>& changes,
 	const subtree_unordered_map<node, int_t>& o,
 	const typename tree<node>::argument_hook& on_argument,
-	const typename tree<node>::descent_guard& descend)
+	const typename tree<node>::descent_guard& descend,
+	const typename tree<node>::hook_target& hooked)
 {
 	return tree<node>::get(formula).substitute(changes, o, on_argument,
-		descend);
+		descend, hooked);
 }
 
 } // namespace idni::tau_lang
