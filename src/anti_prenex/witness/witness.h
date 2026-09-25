@@ -117,7 +117,8 @@ std::optional<pin<node>> cof_pin(tref m, tref x, ctx<node>& c);
  *    is `T` for `∃` and `F` for `∀`.
  *  - a CASE PIN: a member `M` that is an ∨-of-branches (`Q = ∀`: an
  *    ∧-of-branches) every branch of which pins `x` strictly, at most
- *    `case_max` branches, and whose WHOLE node avoids `D`. The spine becomes
+ *    `case_max` branches, and only while the descent has crossed no binder:
+ *    in `Qx`'s own body, where `D` is empty. The spine becomes
  *    `⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus M))[x ← tᵢ]`, dualised for `∀`.
  *
  * `D` collects the variables bound on the path PAST the first kind flip:

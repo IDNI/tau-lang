@@ -309,6 +309,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 	const size_t other_nt = ex ? tau::wff_or : tau::wff_and;
 	block D;               // bound past the first kind flip, barred from FV(t)
 	bool flipped = false;
+	bool crossed = false;  // a binder lies between `Qx` and `n`
 	// The rewrite is a replacement inside this node, so a right sibling it
 	// may carry as a chain member is not part of it.
 	const tref root = tau::trim_right_sibling(phi);
@@ -340,14 +341,14 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 			return rewriter::replace<node>(root, n,
 				join_of<node>(rest, ex));
 		}
-		// A CASE PIN: the WHOLE member must avoid `D`, not only the
-		// witnesses — past a kind flip the branch CHOICE may not depend
-		// on the inner variable (§3). The spine becomes
+		// A CASE PIN, in `Qx`'s own body only: below a binder the
+		// rewrite would copy every inner run's unpushed material once
+		// per branch, while phase 4's case-witness step meets the same
+		// pin over what those runs leave (§3). The spine becomes
 		// `⋁ᵢ ((dᵢ minus its pin) ∧ (spine minus M))[x ← tᵢ]`, dualised
 		// for `∀`; on a one-member spine there is nothing to carry and
 		// it is `⋁ᵢ (dᵢ minus its pin)[x ← tᵢ]`.
-		for (size_t i = 0; i < ms.size(); ++i) {
-			if (fv_meets<node>(ms[i], D)) continue;
+		if (!crossed) for (size_t i = 0; i < ms.size(); ++i) {
 			auto bs = case_pin_of<node>(ms[i], x, Q);
 			if (!bs) continue;
 			trefs cases;
@@ -386,6 +387,7 @@ std::optional<tref> try_witness_deep(quantifier<node> Q, tref x, tref phi) {
 			// (c) `Q`-kind variables bound BEFORE the first flip
 			// commute above `Qx` and stay usable in `t`; everything
 			// bound after it joins `D`.
+			crossed = true;
 			if (binder_kind<node>(n) != Q) flipped = true;
 			if (flipped) D.push_back(binder_var<node>(n));
 			n = binder_body<node>(n);

@@ -325,7 +325,7 @@ TEST_CASE("W9: the case pin at a spine, and its ∀ dual") {
 	CHECK(are_nso_equivalent<node_t>(all_("x", psi), *q));
 }
 
-TEST_CASE("W10: the case-pin counterexample — the WHOLE member must avoid D") {
+TEST_CASE("W10: a case pin fires only in the binder's own body") {
 	tref x = bvar("x"), a = bvar("a"), y = bvar("y");
 	// `∃x ∀y.((y = 0 ∧ x = 0) ∨ (y ≠ 0 ∧ x = 1))` is F while its rewrite
 	// `∀y.(y = 0 ∨ y ≠ 0)` is T: past a kind flip the branch CHOICE may
@@ -334,18 +334,18 @@ TEST_CASE("W10: the case-pin counterexample — the WHOLE member must avoid D") 
 		conj(neg(eq0(y)), eq0(lneg(x))));
 	CHECK(!ap::try_witness_deep<node_t>(EX, fvar("x"),
 		all_("y", guard)).has_value());
-	// The same guard inside a spine, so that the case pin is really the
-	// step being refused: the member holds `y`, which is barred, and `x`
-	// is free in two members, so the descent stops.
 	CHECK(!ap::try_witness_deep<node_t>(EX, fvar("x"),
 		all_("y", conj(guard, eq0(lor(x, a))))).has_value());
-	// THE TEST IS REACHED, and `D` is the only thing refusing it: the same
-	// shape under a binder of `Q`'s OWN kind — nothing flips, so `D` stays
-	// empty and `y` is usable — IS rewritten, to `∃y.(y = 0 ∨ y ≠ 0)`.
-	auto r = ap::try_witness_deep<node_t>(EX, fvar("x"), ex("y", guard));
+	// Below a binder of `Q`'s OWN kind as well: nothing flips, yet the
+	// case pin is left to phase 4's case-witness step (§3).
+	CHECK(!ap::try_witness_deep<node_t>(EX, fvar("x"),
+		ex("y", guard)).has_value());
+	// THE TEST IS REACHED: the same guard in `Qx`'s own body, `y` free,
+	// IS rewritten, to `y = 0 ∨ y ≠ 0`.
+	auto r = ap::try_witness_deep<node_t>(EX, fvar("x"), guard);
 	REQUIRE(r.has_value());
 	CHECK(!holds_var(*r, "x"));
-	CHECK(are_nso_equivalent<node_t>(ex("x", ex("y", guard)), *r));
+	CHECK(are_nso_equivalent<node_t>(ex("x", guard), *r));
 }
 
 TEST_CASE("W10b: a node that is no junction is a ONE-MEMBER spine") {
