@@ -895,18 +895,18 @@ add_repl_test(realizable_cmd-data_game_equalities_over_default_type
 # An abstraction over the atoms without a winning strategy is no proof: its
 # consistency constraints quantify the inputs universally, so they forbid
 # i1[t] = o1[t-1], which the environment's i1 can make true. With o1 = 0
-# every i1 meets one of the four atoms a step later, so the answer is T or,
-# where the game on the data is not decided, UNKNOWN; never F.
+# every i1 meets one of the four atoms a step later; the game on the values
+# of bv[2] decides it.
 add_repl_test(realizable_cmd-abstraction_without_strategy_input_after_output
-	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" "UNKNOWN|: T")
+	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
 add_repl_test(realizable_cmd-abstraction_without_strategy_sat_ltl_spelling
-	"sat T U (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" "UNKNOWN|: T")
+	"sat T U (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
 add_repl_test(realizable_cmd-abstraction_without_strategy_sat_sometimes_spelling
 	"sat sometimes (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]' || i1[t]:bv[2] = { 1 }:bv[2] || i1[t]:bv[2] = { 2 }:bv[2])" ": T")
 # the same once the abstraction's strategy is blocked for edges no data
 # realizes and no strategy is left
 add_repl_test(realizable_cmd-abstraction_refined_without_strategy
-	"realizable (G (F (o1[t-2]:bv[2] = { 2 }:bv[2]))) && (G (F ((((o1[t-1]:bv[2] != i1[t-2]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]') && (o1[t-2]:bv[2] = i1[t-2]:bv[2] || o1[t]:bv[2] = 0))) W (o1[t-2]:bv[2] != i1[t]:bv[2]))))" "UNKNOWN|: T")
+	"realizable (G (F (o1[t-2]:bv[2] = { 2 }:bv[2]))) && (G (F ((((o1[t-1]:bv[2] != i1[t-2]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]') && (o1[t-2]:bv[2] = i1[t-2]:bv[2] || o1[t]:bv[2] = 0))) W (o1[t-2]:bv[2] != i1[t]:bv[2]))))" ": T")
 # without the constants the environment picks an i1 outside both atoms
 add_repl_test(realizable_cmd-abstraction_without_strategy_unrealizable
 	"realizable F (i1[t]:bv[2] = o1[t-1]:bv[2] || i1[t]:bv[2] = o1[t-1]:bv[2]')" ": F")

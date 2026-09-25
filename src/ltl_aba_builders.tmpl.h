@@ -1176,7 +1176,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				"branch, which is stricter than E; realizability could "
 				"not be decided");
 		}
-		// what `run` executes: the refined strategy's encoding
+		// what `run` executes
 		if (real.value()) {
 			std::shared_ptr<data_game_strategy<node>> data;
 			auto [safety, _sol, _aux] =
