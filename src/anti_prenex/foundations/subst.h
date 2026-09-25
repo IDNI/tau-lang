@@ -7,10 +7,11 @@
  * `atoms_memo` behind it, and the variable substitution `φ[x ← t]`.
  *
  * `φ[x ← t]` IS the library's `tree<node>::substitute` (tau_tree.h) under the
- * live order, wrapped here with the re-simplifying ARGUMENT HOOK invariant 6
- * asks for: that hook is what makes the library call the spec's primitive.
- * `SIMPLIFY`'s propagation substitutes with the same hook and takes it from
- * here.
+ * live order, wrapped here with the re-simplifying hook §3 and invariant 6
+ * ask for: every atom the rewrite changed goes through `SIMPLIFY_ATOM`, every
+ * reference argument through `SIMPLIFY_TERM`. That hook is what makes the
+ * library call the spec's primitive. `SIMPLIFY`'s propagation takes the
+ * argument half from here and re-simplifies its atoms itself.
  */
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__FOUNDATIONS__SUBST_H__
@@ -65,7 +66,10 @@ bool has_atom(tref n, tref atm);
 /**
  * @brief §3 `φ[x ← t]`: the library's substitution under the live @p order —
  * empty in the plain regime — with the argument hook of invariant 6, which
- * re-simplifies once every reference argument the rewrite changed.
+ * re-simplifies once every reference argument the rewrite changed. Every
+ * atom the rewrite changed goes through `SIMPLIFY_ATOM` under @p order once,
+ * in the same walk, and a constant that yields folds out through the
+ * construction hooks.
  *
  * @p x is the VARIABLE node; the key the library matches is its `bf` term,
  * the form every occurrence takes inside a term, and it is formed here so
