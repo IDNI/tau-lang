@@ -9,6 +9,7 @@
 #include "tau_diagnostics.h"
 #include "reset_hooks.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <deque>
 
@@ -221,6 +222,44 @@ static void pin_decided_key(tref key) {
 	while (pins.size() > ba_decision_pins) pins.pop_front();
 }
 
+// Mode of `ba_normalized_memo` (tau_ba.h): the environment variable
+// TAU_BA_NORMALIZED_MEMO, read once, overrides the flag.
+inline int ba_normalized_memo_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_BA_NORMALIZED_MEMO");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	// When selected through the environment variable, the shadow mode
+	// reports its counts once, at exit, so a whole run can be checked for
+	// mains the normalizer would have changed.
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "tau_ba normalized memo shadow: hits %zu,"
+			" mismatches %zu\n", tau_ba_normalized_memo_hits,
+			tau_ba_normalized_memo_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : ba_normalized_memo;
+}
+
+// Mains that `normalize_tau` returned. Registered with the GC, so a main
+// that does not survive a sweep is forgotten with its tree. External
+// linkage on purpose: `normalize_tau` and the decision can be instantiated
+// in different translation units, and both must see the one cache.
+template <typename node>
+subtree_unordered_map<node, bool>& normalized_mains() {
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	return cache;
+}
+
+template <typename node>
+bool is_normalized_main(tref main) {
+	return ba_normalized_memo_mode() > 0
+		&& normalized_mains<node>().find(main)
+			!= normalized_mains<node>().end();
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
@@ -239,8 +278,24 @@ static result<bool> cached_tau_ba_predicate(const tau_ba<BAs...>& fm,
 	tref key = fm.nso_rr.main->get();
 	if (auto it = cache.find(key); it != cache.end())
 		return r.with_value(it->second);
-	auto normalized = r.merge_take(normalizer<node>(fm.nso_rr));
-	if (!normalized) return r;
+	std::optional<tref> normalized;
+	if (is_normalized_main<node>(key)) {
+		// The main is a normal form `normalize_tau` returned, which the
+		// normalizer maps to itself; deciding it directly saves the
+		// renormalization of the whole constant. Correct regardless of
+		// tree identity: `compute` decides any well-formed formula and
+		// the main is equivalent to its renormalization; the identity is
+		// what the shadow mode checks.
+		if (ba_normalized_memo_mode() == 2) {
+			normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+			if (!normalized) return r;
+			if (*normalized != key) ++tau_ba_normalized_memo_mismatches;
+		} else normalized = key;
+		++tau_ba_normalized_memo_hits;
+	} else {
+		normalized = r.merge_take(normalizer<node>(fm.nso_rr));
+		if (!normalized) return r;
+	}
 	// compute() before emplace: it can create new trees, and a rehash of
 	// `cache` must not happen with a half-built entry in it.
 	++tau_ba_predicate_misses;
@@ -313,11 +368,49 @@ inline bool ba_component_factoring_enabled() {
 	return env ? *env : ba_component_factoring;
 }
 
+template <typename node>
+static int factored_tau_valid(tref fm);
+
+/**
+ * @brief The dual of a `sometimes` formula: `G(!D)` for `F(D)`, in NNF.
+ *
+ * A complemented `:tau` constant `{K}'` whose body is an always-conjunction
+ * normalizes to a `sometimes` over the DNF of `!K`. Neither factored path
+ * can split that shape (the units are always-clauses); `F(D) == !G(!D)`
+ * maps both questions back to the always/CNF units of `K`, which the
+ * per-unit caches already hold: `sat(F(D)) == !valid(G(!D))` and
+ * `valid(F(D)) == !sat(G(!D))`. Both identities are the engine's own
+ * definitions of the two predicates (`valid(X)` is decided as `!sat(!X)`),
+ * so the dual adds no assumption beyond the per-unit factoring.
+ *
+ * Returns nullptr when @p fm is not a `sometimes` formula, or when its body
+ * holds a temporal operator of its own: the dual of a nested temporal body
+ * is not an always-conjunction the unit split could take apart, and pushing
+ * the negation through the full-LTL operators is the LTL pipeline's job.
+ * The callers pass the normalized main, where the complement of an
+ * always-conjunction is one `sometimes` over a DNF; a disjunction of
+ * several `sometimes`, as `to_nnf` alone produces, is not taken apart here
+ * and goes to the units path.
+ */
+template <typename node>
+static tref sometimes_dual(tref fm) {
+	using tau = tree<node>;
+	const tau& t = tau::get(fm);
+	if (!t.has_child() || !t.child_is(tau::wff_sometimes)) return nullptr;
+	const tref body = tau::trim2(fm);
+	if (tau::get(body).find_top(is_temporal_quantifier<node>)) return nullptr;
+	return to_nnf<node>(tau::build_wff_always(tau::build_wff_neg(body)));
+}
+
 // Component-wise satisfiability; -1 = not applicable (fall back), 0 = unsat,
 // 1 = sat.
 template <typename node>
 static int factored_tau_sat(tref fm) {
 	using tau = tree<node>;
+	// sat(F(D)) == !valid(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_valid<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	for (tref u : units)
@@ -390,6 +483,10 @@ static int factored_tau_sat(tref fm) {
 template <typename node>
 static int factored_tau_valid(tref fm) {
 	using tau = tree<node>;
+	// valid(F(D)) == !sat(G(!D)); see sometimes_dual
+	if (tref dual = sometimes_dual<node>(fm); dual)
+		if (int r = factored_tau_sat<node>(dual); r >= 0)
+			return r == 1 ? 0 : 1;
 	trefs units;
 	if (factored_tau_units<node>(fm, units) < 0) return -1;
 	using cache_t = subtree_unordered_map<node, bool>;
@@ -409,9 +506,40 @@ static int factored_tau_valid(tref fm) {
 	return all ? 1 : 0;
 }
 
+
+// The solver's bad splitter of a Tau constant is a fresh uninterpreted
+// constant `<:splitN> != 0` (tau_splitter_one calls tau_bad_splitter on
+// `T`, so the element is that bare formula), and the properness checks of
+// the step solver probe the element with is_zero and is_one -- the second
+// being the zero test of its complement -- before they commit a witness.
+// Both answers follow from the shape alone: an uninterpreted constant
+// `!= 0` is satisfiable (c := 1) and not valid (c := 0), and so is `= 0`.
+// Answering them here keeps the solver's checks and saves a full temporal
+// decision per probe -- two per minted constant, and the step solver mints
+// a fresh one on every step.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static bool is_uconst_zero_test(const tau_ba<BAs...>& fm) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	if (!fm.nso_rr.rec_relations.empty() || !fm.nso_rr.main) return false;
+	const tau& w = tau::get(fm.nso_rr.main->get());
+	if (!(w.child_is(tau::bf_neq) || w.child_is(tau::bf_eq))) return false;
+	tref l = w[0].first(), r = w[0].second();
+	if (!l || !r || !tau::get(r).equals_0()) return false;
+	// l must be exactly bf(variable(uconst_name)), the shape
+	// build_bf_uconst makes: one uninterpreted constant and nothing else,
+	// checked positively so that no operator, stream or constant around it
+	// passes.
+	const tau& tl = tau::get(l);
+	return tl.is(tau::bf) && tl.child_is(tau::variable)
+		&& tl[0].child_is(tau::uconst_name);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_zero() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -428,6 +556,7 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
+	if (is_uconst_zero_test(*this)) return result<bool>{false};
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -486,8 +615,26 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	{
 		std::lock_guard<std::mutex> lock(cache::mtx());
 		auto& memo = cache::normalize_memo();
-		if (auto it = memo.find(fm.nso_rr); it != memo.end())
+		if (auto it = memo.find(fm.nso_rr); it != memo.end()) {
+			normalized_mains<node>().insert_or_assign(
+				it->second.main->get(), true);
 			return tau_ba<BAs...>(it->second.rec_relations, it->second.main);
+		}
+	}
+	if (fm.nso_rr.rec_relations.empty()
+		&& is_normalized_main<node>(fm.nso_rr.main->get()))
+	{
+		// A normal form this function returned earlier: normalizing it
+		// again yields the same main.
+		++tau_ba_normalized_memo_hits;
+		if (ba_normalized_memo_mode() != 2) return fm;
+		auto applied = nso_rr_apply<node>(fm.nso_rr);
+		if (!applied.has_value()) return fm;
+		auto simplified = simp_tau_unsat_valid<node>(applied.value());
+		if (!simplified.has_value()) return fm;
+		if (simplified.value() != fm.nso_rr.main->get())
+			++tau_ba_normalized_memo_mismatches;
+		return fm;
 	}
 	// No safe normalized form exists on failure; return the element
 	// unchanged, matching splitter()'s fallback below.
@@ -497,8 +644,12 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	if (!simplified.has_value()) return fm;
 	tau_ba<BAs...> out(tree<node>::geth(simplified.value()));
 	std::lock_guard<std::mutex> lock(cache::mtx());
-	if (!bdd_node_table_exhausted)
+	// A normal form computed while the bdd node table was exhausted may
+	// be incomplete: neither memoized nor recorded as a fixed point.
+	if (!bdd_node_table_exhausted) {
+		normalized_mains<node>().insert_or_assign(simplified.value(), true);
 		cache::normalize_memo().emplace(fm.nso_rr, out.nso_rr);
+	}
 	return out;
 }
 

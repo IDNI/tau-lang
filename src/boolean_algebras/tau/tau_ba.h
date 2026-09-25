@@ -50,6 +50,25 @@ inline size_t ba_decision_pins = 4096;
 /// Misses of the cached is_zero/is_one predicate (decisions computed rather
 /// than found), for tests and diagnostics.
 inline size_t tau_ba_predicate_misses = 0;
+/// Reuse of a Tau-BA constant's own normal form. `normalize_tau` records
+/// every main it returns; the cached `is_zero`/`is_one` decision of such a
+/// main, and a second `normalize_tau` of it, skip the renormalization the
+/// decision procedure would otherwise run over the whole constant again
+/// (the normal form is a fixed point of the normalizer). The decision is
+/// sound on the recorded main regardless of tree identity: the main and
+/// its renormalization are equivalent, and the decision procedure accepts
+/// any well-formed formula; that the two coincide is what makes the skip
+/// exact, and what the shadow mode measures. 0 = off, 1 = on, 2 = shadow:
+/// the normalization runs anyway and every main it changes is counted in
+/// `tau_ba_normalized_memo_mismatches`. The environment variable
+/// TAU_BA_NORMALIZED_MEMO (0, 1 or 2; any other value selects 0) overrides
+/// the flag. Mains are recorded in every mode, so a mode switched during a
+/// run finds the record complete.
+inline int ba_normalized_memo = 1;
+/// Renormalizations skipped by `ba_normalized_memo`, and mains the shadow
+/// mode found changed by the normalizer, for tests and diagnostics.
+inline size_t tau_ba_normalized_memo_hits = 0;
+inline size_t tau_ba_normalized_memo_mismatches = 0;
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.

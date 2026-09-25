@@ -4,4 +4,5 @@ set(TAU_BA_ID tau)
 set(TAU_BA_HEADER boolean_algebras/tau/tau_ba.h)
 set(TAU_BA_TESTS
 	tests/test_integration-solver-tau.cpp
+	tests/test_unit-normalized_memo-tau.cpp
 )
