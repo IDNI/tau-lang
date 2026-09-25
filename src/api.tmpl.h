@@ -2,6 +2,10 @@
 
 #include "api.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <optional>
+
 #include "tau_tree_builders.h"
 
 #undef LOG_CHANNEL_NAME
@@ -1208,6 +1212,24 @@ result<bool> api<node>::sat(tref fm) {
 	});
 }
 
+// Mode of api::sat_factored, the environment variable taking precedence;
+// selected through the environment, the shadow mode reports at exit.
+template <NodeType node>
+static int sat_factored_mode() {
+	static const std::optional<int> env = []() -> std::optional<int> {
+		const char* v = std::getenv("TAU_API_SAT_FACTORED");
+		if (!v || !*v) return std::nullopt;
+		return v[0] == '2' ? 2 : v[0] == '1' ? 1 : 0;
+	}();
+	static const bool report = env && *env == 2 && std::atexit([]() {
+		std::fprintf(stderr, "api sat factored shadow: hits %zu,"
+			" mismatches %zu\n", api<node>::sat_factored_hits,
+			api<node>::sat_factored_mismatches);
+	}) == 0;
+	(void) report;
+	return env ? *env : api<node>::sat_factored;
+}
+
 // sat() after its simplify/flatten prefix. realizable() has already paid
 // that prefix (simplify is a full type-inference traversal with no memo)
 // when it asks for the unsat shortcut, so it enters here directly.
@@ -1233,6 +1255,38 @@ result<bool> api<node>::sat_prepared(tref fm) {
 		tref target = (sat_has_ltl_operators<node>(fm)
 			&& tau::get(nf).find_top(is_quantifier<node>))
 			? fm : nf;
+		// A conjunction is satisfiable exactly when each of its
+		// variable-disjoint components is (a trace for the whole is the
+		// traces of the components side by side), and the components are
+		// the same across queries that share their conjuncts: a query
+		// that conjoins one clause to a held formula decides that
+		// clause's component and finds the others remembered.
+		// factored_tau_sat is the per-component decision the Tau-BA
+		// constants already use: it splits `always` hulls into their
+		// conjuncts, groups the conjuncts by the names of their free
+		// variables and decides each group with is_tau_formula_sat. It
+		// declines (-1) unless the formula is a conjunction of at least
+		// two conjuncts, on a conjunct holding an embedded BA constant or
+		// a nameless free variable, on fewer than two groups and on a
+		// group is_tau_formula_sat leaves undecided; the whole-formula
+		// decision below then runs as before. A full-LTL formula whose
+		// normal form keeps a data quantifier is routed raw (target != nf)
+		// and skips the factoring.
+		const int factored = target == nf && ba_component_factoring_enabled()
+			? sat_factored_mode<node>() : 0;
+		if (factored > 0)
+			if (int f = factored_tau_sat<node>(target); f >= 0) {
+				++sat_factored_hits;
+				if (factored == 1)
+					return r.with_assert_check_value(f == 1);
+				TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
+					code::internal_error,
+					"is_tau_formula_sat returned neither a value "
+					"nor an error while checking satisfiability");
+				if (!r.has_value() || r.value() != (f == 1))
+					++sat_factored_mismatches;
+				return r;
+			}
 		TAU_TRY_OR(r, is_tau_formula_sat<node>(target, 0, true),
 			code::internal_error,
 			"is_tau_formula_sat returned neither a value nor an "
