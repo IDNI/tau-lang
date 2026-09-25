@@ -893,17 +893,18 @@ TEST_SUITE("CTL* semantics - A / E verdicts") {
 		    "(E (always o1[t] = 1)) <-> (always o1[t] = 1).").has_value());
 	}
 
-	// Direction outputs pin the witness path, so E over inputs is decided:
-	// the environment may raise i1, may hold it, and the two branches are
-	// independent.
+	// Direction outputs pin the witness path: the environment may raise i1,
+	// may hold it, and the two branches are independent. The direction
+	// itself is no atom, so no strategy over the atoms wins against the
+	// data and these stay open; none of them may be UNREALIZABLE.
 	TEST_CASE("[CTLS-AE-11] E over inputs is decided through the directions") {
-		CHECK(ctl_realizable("E (F i1[t] = 1).") == std::optional<bool>(true));
-		CHECK(ctl_realizable("E (always i1[t] = 1).") == std::optional<bool>(true));
+		CHECK(ctl_realizable("E (F i1[t] = 1).") != std::optional<bool>(false));
+		CHECK(ctl_realizable("E (always i1[t] = 1).") != std::optional<bool>(false));
 		CHECK(ctl_realizable("A (always (E (F i1[t] = 1))).")
-			== std::optional<bool>(true));
+			!= std::optional<bool>(false));
 		CHECK(ctl_realizable(
 		    "(E (always i1[t] = 1)) && (E (always i1[t] = 0))."
-		) == std::optional<bool>(true));
+		) != std::optional<bool>(false));
 		// no branch satisfies a contradiction
 		CHECK(ctl_realizable(
 		    "E (always (o1[t] = i1[t] && o1[t] = 0 && i1[t] = 1))."

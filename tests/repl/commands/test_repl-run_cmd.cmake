@@ -650,3 +650,16 @@ add_repl_test(run_cmd-mirror_02_sometimes_alt
 add_repl_test(run_cmd-mirror_03_always_alt
 	"i1:tau := in file(\\\"${ALT}\\\"). o1:tau := out console. run 3 steps always o1[t] = i1[t]."
 	"o1\\[0\\] := F.*o1\\[1\\] := T.*o1\\[2\\] := F")
+
+# ── Initial conditions with a delay chain and `sometimes` ─────────────────────
+# o2 repeats o1 one step late from the initial zeros, so o2[1] is 0 and o2
+# becomes 1 at a later step.
+add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes
+	"o1:tau := out console. o2:tau := out console. run 6 steps (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)."
+	"o1\\[0\\] := F.*o2\\[0\\] := F.*o2\\[1\\] := F.*o2\\[[2-5]\\] := T")
+add_repl_test(run_cmd-delay_chain_initial_conditions_sometimes_bv
+	"o1:bv[2] := out console. o2:bv[2] := out console. run 6 steps (always o1[0]:bv[2] = 0 && o2[0]:bv[2] = 0 && o2[t]:bv[2] = o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] = 1)."
+	"o1\\[0\\] := 0.*o2\\[0\\] := 0.*o2\\[1\\] := 0.*o2\\[[2-5]\\] := 3")
+add_repl_test(run_cmd-initial_value_constant_stream_with_sometimes
+	"o1:tau := out console. o2:tau := out console. run 4 steps (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)."
+	"o1\\[0\\] := F.*o1\\[1\\] := F.*o1\\[2\\] := F.*o1\\[3\\] := F")

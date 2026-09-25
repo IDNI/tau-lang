@@ -181,7 +181,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// no-op (returns "") when the formula has no positional atoms.
 	TAU_TRY(std::string step_counter_extra, apply_step_counter_encoding<node>(
 		hoist_conjuncts, sol.atoms, sol.input_props, sol.output_props,
-		sol.counter_highest_initial_pos, sol.counter_relativized_props));
+		sol.counter_highest_initial_pos, sol.counter_relativized_props,
+		sol.counter_gated_props, sol.counter_bits));
 
 	// Erase each hoisted conjunct's own occurrence site to a literal T.
 	// before the main skeleton walk, rather than relying on an individual
@@ -220,6 +221,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	add_consistency_constraints<node>(sol.atoms, sol.skeleton,
 		&sol.consistency_constraints, has_past /*polarity_complete*/,
 		std::move(shift_chain_input_assumptions));
+	if (ltl_observed_abstraction)
+		add_present_twins<node>(sol.atoms, sol.output_props, sol.skeleton);
 
 	// Append DFA tester constraints and register state variables as outputs.
 	append_tester_constraints(sol.skeleton, testers);
@@ -247,6 +250,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	}
 
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
+	gate_counter_props<node>(sol);
 	return r.with_value(std::move(sol));
 }
 
@@ -257,7 +261,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 // finds none (false). An error is undecided.
 template <NodeType node>
 static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
-	bool output)
+	bool output, bool* lost = nullptr)
 {
 	result<bool> r;
 	auto backend_failed = [&]() -> result<bool> {
@@ -332,14 +336,49 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		} else {
 			// Single edges all pass; a relation spanning >= 3 consecutive
 			// steps is invisible to the per-edge check, so ask the window
-			// oracle before declaring victory.
+			// oracle, then play the strategy against the data.
 			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
-			if (W <= 1) return realizable_now();
-			auto wres = window_infeasible_paths<node>(sol, W,
-				ltl_window_max_paths());
-			if (wres.path_cap_reached) return undecided("window oracle path cap");
-			if (wres.blocking_clauses.empty()) return realizable_now();
-			clauses = std::move(wres.blocking_clauses);
+			if (W > 1) {
+				auto wres = window_infeasible_paths<node>(sol, W,
+					ltl_window_max_paths());
+				if (wres.path_cap_reached)
+					return undecided("window oracle path cap");
+				clauses = std::move(wres.blocking_clauses);
+			}
+			if (clauses.empty()) {
+				size_t rounds = 0;
+				switch (strategy_wins_on_data<node>(sol,
+					max_refinement_rounds, rounds))
+				{
+				case strategy_data_verdict::wins:
+					return realizable_now();
+				case strategy_data_verdict::undecided:
+					return undecided("the strategy could not be "
+						"checked against the data");
+				case strategy_data_verdict::loses:
+					break;
+				}
+				// A losing strategy may take a path no data realizes
+				// that is longer than W; such a path is blocked like
+				// any other. A path the data realizes only when the
+				// system picks what the environment picks gives no
+				// clause, and the verdict stays open.
+				for (int_t w = W + 1; clauses.empty()
+					&& w <= W + (int_t)rounds + 1; ++w)
+				{
+					auto wres = window_infeasible_paths<node>(sol, w,
+						ltl_window_max_paths());
+					if (wres.path_cap_reached) break;
+					clauses = std::move(wres.blocking_clauses);
+				}
+				if (clauses.empty() && sol.observed)
+					clauses = add_forceability_observations<node>(sol);
+				if (clauses.empty()) {
+					if (lost) *lost = true;
+					return undecided("the strategy loses against the "
+						"data and no blocking clause was found");
+				}
+			}
 		}
 
 		if (max_refinement_rounds && round >= max_refinement_rounds)
@@ -360,11 +399,59 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
 		if (!ltlsynt_opt) return backend_failed();
 		auto& [ok, hoa] = *ltlsynt_opt;
-		if (!ok) return r.with_value(false);
+		if (!ok) {
+			if (sol.observation_props.empty()) return r.with_value(false);
+			return undecided("no strategy wins once the claims the "
+				"data cannot force are observed, but the observations "
+				"give the environment choices the data may not allow");
+		}
 		auto aut_opt = r.merge_take(parse_hoa(hoa));
 		if (!aut_opt) return backend_failed();
 		sol.aut = std::move(*aut_opt);
+		gate_counter_props<node>(sol);
 	}
+}
+
+// Refines `sol`. When its strategy loses against the data and no path can
+// be blocked, the formula is solved again as the observed abstraction and
+// that strategy is refined, observations added as it loses; `sol` then
+// holds the observed solution. The first attempt is a rejected candidate.
+template <NodeType node>
+static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
+	bool output)
+{
+	using tau = tree<node>;
+	result<bool> r;
+	bool lost = false;
+	auto first = refine_ltl_aba_solution<node>(sol, output, &lost);
+	if (first.has_value() || !lost) return first;
+	{
+		auto sc = r.open("rejected candidate");
+		r.info("the strategy loses against the data; the formula is "
+			"solved again with observations",
+			{{label::value, truncate_for_message(tau::get(fm).to_str())}});
+		report rep = std::move(first).report();
+		rep.demote_errors_to_warnings();
+		r.append(std::move(rep));
+	}
+	std::optional<std::optional<ltl_aba_solution<node>>> second;
+	{
+		const bool outer = ltl_observed_abstraction;
+		ltl_observed_abstraction = true;
+		second = r.merge_take(solve_ltl_aba<node>(fm));
+		ltl_observed_abstraction = outer;
+	}
+	if (!second) return r;
+	if (!*second) return r.with_error(code::solver_error,
+		"UNKNOWN: the strategy loses against the data and the observed "
+		"abstraction has none; realizability could not be decided");
+	auto& observed = **second;
+	observed.observed = true;
+	auto refined = r.merge_take(
+		refine_ltl_aba_solution<node>(observed, output));
+	if (!refined) return r;
+	if (*refined) sol = std::move(observed);
+	return r.with_value(*refined);
 }
 
 // ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
@@ -454,7 +541,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	if (!maybe) return unrealizable("propositional");
 
 	auto refined = r.merge_take(
-		refine_ltl_aba_solution<node>(*maybe, output));
+		refine_or_observe<node>(fm, *maybe, output));
 	if (!refined) return r;
 	if (!*refined) return unrealizable("ABA-refined");
 	return r.with_value(true);
@@ -726,7 +813,7 @@ ltl_to_safety_formula_full(tref fm) {
 	// Execute the strategy the realizability check accepts, not ltlsynt's
 	// first one, which may take an edge the ABA rules out.
 	if (sol.executable) {
-		auto refined = refine_ltl_aba_solution<node>(sol, false);
+		auto refined = refine_or_observe<node>(fm, sol, false);
 		if (!refined.has_value() || !refined.value()) {
 			if (!refined.has_value()) refined.print();
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: no strategy "

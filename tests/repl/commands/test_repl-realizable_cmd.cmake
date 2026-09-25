@@ -804,3 +804,60 @@ add_repl_test(realizable_cmd-ltl_qlt_bv-gf_10_s_nested_multi_output_qlt "realiza
 # A spec without a temporal wrapper is implicitly `always`, and a 2-bit
 # stream cannot increase forever.
 add_repl_test(realizable_cmd-bv-bare_strict_increase_unrealizable "realizable o1[t]:bv[2] > o1[t-1]:bv[2]." ": F")
+
+# Initial conditions of an outputs-only spec are hoisted to a step counter;
+# the stream they fix stays free at every later step. The system owns every
+# stream, so each of these is realizable exactly when it is satisfiable.
+add_repl_test(realizable_cmd-initial_value_constant_stream_with_sometimes
+	"realizable (always o1[0] = 0 && o1[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_neq
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] != 0)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_first_stage
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o1[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_at_step_1
+	"realizable (always o1[1] = 0 && o2[1] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_lookback_2
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-2]) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_3_stages_initial_conditions_sometimes
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1]) && (sometimes o3[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_5_stages_initial_conditions_sometimes
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o3[0] = 0 && o4[0] = 0 && o5[0] = 0 && o2[t] = o1[t-1] && o3[t] = o2[t-1] && o4[t] = o3[t-1] && o5[t] = o4[t-1]) && (sometimes o5[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_input_tautology
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1] && (i1[t] = 0 || i1[t] != 0)) && (sometimes o2[t] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_bv
+	"realizable (always o1[0]:bv[8] = 0 && o2[0]:bv[8] = 0 && o2[t]:bv[8] = o1[t-1]:bv[8]) && (sometimes o2[t]:bv[8] = 1)" ": T")
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_sbf
+	"realizable (always o1[0]:sbf = 0 && o2[0]:sbf = 0 && o2[t]:sbf = o1[t-1]:sbf) && (sometimes o2[t]:sbf = 1)" ": T")
+# the chain still carries the initial zero forward when o1 is pinned to it
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_pinned_source_unrealizable
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1] && o1[t] = 0) && (sometimes o2[t] = 1)" ": F")
+# the environment keeps i1 away from 0
+add_repl_test(realizable_cmd-delay_chain_initial_conditions_sometimes_input_unrealizable
+	"realizable (always o1[0] = 0 && o2[0] = 0 && o2[t] = o1[t-1]) && (sometimes o2[t] = 1 && i1[t] = 0)" ": F")
+
+# The strategy is played against the data before a REALIZABLE verdict: the
+# environment picks each input after the history is fixed. o2[t] is o1[t-1],
+# fixed a step before i1[t], so o2 cannot be made to meet i1; no strategy
+# over the atoms shows that as a path without data, so the verdict is open.
+add_repl_test_fail(realizable_cmd-data_check_history_fixed_before_input
+	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t]:bv[1]))"
+	"loses against the data")
+add_repl_test_fail(realizable_cmd-data_check_past_atom_against_input
+	"realizable G (o2[t]:bv[1] = 0) && G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1])))"
+	"loses against the data")
+# o1 copies i1 one step later, so the same relation one step back is won.
+add_repl_test(realizable_cmd-data_check_copy_of_past_input
+	"realizable G (o2[t]:bv[1] = o1[t-1]:bv[1]) && G (F (o2[t]:bv[1] = i1[t-1]:bv[1]))" ": T")
+# The relations make o1 repeat every six steps and flip every two, which no
+# stream does; only a chain longer than the lookback window shows it, and
+# the chain is blocked once the strategy loses against the data.
+add_repl_test(realizable_cmd-data_check_chain_longer_than_window
+	"realizable (always o2[t]:bv[1] = o1[t-2]:bv[1] && o3[t]:bv[1] = o2[t-2]:bv[1] && !(o1[t]:bv[1] = o3[t]:bv[1]) && o3[t-2]:bv[1] = o1[t]:bv[1]) && (sometimes o1[t-1]:bv[1] = 1)" ": F")
+# A claim over an input the strategy cannot see is observed: set o1 to the
+# input seen at the step before, or output the terminal constant at once.
+add_repl_test(realizable_cmd-data_check_observed_copy_then_check
+	"realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])" ": T")
+add_repl_test(realizable_cmd-data_check_observed_until_past_input
+	"realizable (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X&Y}:sbf)" ": T")

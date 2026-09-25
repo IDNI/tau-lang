@@ -85,6 +85,13 @@ static bool sat(tref fm) {
 	return r.has_value() && r.value();
 }
 
+// True when is_tau_formula_sat decides the formula unsatisfiable; an
+// undecided verdict is not a decision.
+static bool decided_unsat(tref fm) {
+	auto r = is_tau_formula_sat<node_t>(fm);
+	return r.has_value() && !r.value();
+}
+
 // Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
 // rather than reading as unrealizable.
 static bool realizable(tref fm) {
@@ -2833,9 +2840,12 @@ TEST_CASE("Right-nested U/R mix: o1=1 release (o1=i1[t] until o1=3) is REALIZABL
 }
 
 TEST_CASE("Right-nested until with past output: (o1[t-1]=0) until (o1=1 until o1=i1[t]) is REALIZABLE") {
+    // Realizable, but no strategy over these atoms wins against the data
+    // once the environment picks each input after the history is fixed, so
+    // the verdict stays open; it must not be UNREALIZABLE.
     tref fm = spec("(o1[t-1]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = i1[t]:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(decided_unsat(fm));
 }
 
 TEST_CASE("Deep right-nested U: o1=0 U (o1=1 U (o1=2 U o1=3)) is REALIZABLE") {
@@ -3095,9 +3105,12 @@ TEST_CASE("[SU-01] ((o1:sbf={X&Y}) until (o2:sbf={X|Z})) since (o2[t-1]:sbf=i1[t
 }
 
 TEST_CASE("[SU-02] (o1:qlt={3}) until ((o2:qlt={1/2}) since (o1[t-1]:qlt=i1[t-1]:qlt)) is REALIZABLE") {
+    // Realizable, but no strategy over these atoms wins against the data
+    // once the environment picks each input after the history is fixed, so
+    // the verdict stays open; it must not be UNREALIZABLE.
     tref fm = spec("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = {1/2}:qlt) since (o1[t-1]:qlt = i1[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(decided_unsat(fm));
 }
 
 TEST_CASE("[SU-03] F((o1[t]:sbf & i1[t]:sbf) = 1) is UNREALIZABLE") {
@@ -3700,9 +3713,12 @@ TEST_CASE("[SU-89] G(((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (
 
 TEST_CASE("[SU-90] (((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)) is REALIZABLE") {
     // Outer ψ=o1[t-2]<1; at t=0 o1[-2]=0<1. True. REALIZABLE.
+    // Realizable, but no strategy over these atoms wins against the data
+    // once the environment picks each input after the history is fixed, so
+    // the verdict stays open; it must not be UNREALIZABLE.
     tref fm = spec("(((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
-    CHECK(sat(fm));
+    CHECK_FALSE(decided_unsat(fm));
 }
 
 // ── Group I: S with U inside, mixed I/O, Q-specific ──────────────────────────
@@ -4329,16 +4345,15 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	}
 
 	// Same-value positional atoms at different positions: o[0]=1 and o[2]=1
-	// relativize to identical text but come from two DIFFERENT source
-	// atoms, so they stay two distinct props. The ground-equality fast
-	// path compares actual constants, not just shape, so no spurious forbid.
-	TEST_CASE("same-value positional atoms at different positions: no "
-	          "spurious forbid after the fast-path tightening") {
+	// relativize to the same o[t]=1, one prop guarded at both steps, with
+	// no forbid of its own.
+	TEST_CASE("same-value positional atoms at different positions share "
+	          "one prop and no spurious forbid") {
 		tref fm = wff("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
-		REQUIRE(sol->atoms.size() == 2); // stay separate, one prop per position
+		REQUIRE(sol->atoms.size() == 1);
 		CHECK(sol->consistency_constraints.empty());
 	}
 
@@ -4406,7 +4421,81 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		CHECK(r.value());
 	}
 
+	// The prop of a hoisted initial value reads its relativized atom at
+	// every step; only its own step fixes it, so o1 may stay 0 afterwards.
+	TEST_CASE("an initial value leaves its stream free at later steps") {
+		tref fm = spec("(always o1[0]:bv[2] = {0} "
+			"&& o1[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes o2[t]:bv[2] = {1}).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	TEST_CASE("initial values with a delay chain and sometimes are REALIZABLE") {
+		tref fm = spec("(always o1[0]:bv[2] = {0} && o2[0]:bv[2] = {0} "
+			"&& o2[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes o2[t]:bv[2] = {1}).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	// o1[0] = 1 and o1[1] = 1 relativize to the same o1[t] = 1: one prop,
+	// guarded at both steps.
+	TEST_CASE("equal relativized atoms of two conjuncts share one prop") {
+		tref fm = spec("(always o1[0]:bv[2] = {1} && o1[1]:bv[2] = {1} "
+			"&& o2[0]:bv[2] = {1} && o2[t]:bv[2] = o1[t-1]:bv[2]) "
+			"&& (sometimes (o1[t-1]:bv[2] = o2[t]:bv[2] "
+			"&& o2[t]:bv[2] != o1[t]:bv[2])).");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		for (size_t i = 0; i < sol->atoms.size(); ++i)
+			for (size_t j = i + 1; j < sol->atoms.size(); ++j)
+				CHECK_FALSE(tau::subtree_equals(
+					sol->atoms[i].first, sol->atoms[j].first));
+		CHECK(realizable(fm));
+	}
+
 } // TEST_SUITE("Positional atoms: X-encoding")
+
+// A strategy passes only if it wins against the data: every input is picked
+// after the history is fixed, and relations of any length are checked.
+TEST_SUITE("Strategy played against the data") {
+
+	TEST_CASE("an output fixed a step before the input it must meet is not REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE((r.has_value() && r.value()));
+	}
+
+	TEST_CASE("a past atom the environment already decided is not REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = 0) "
+			"&& G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1]))).");
+		REQUIRE(fm != nullptr);
+		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+		CHECK_FALSE((r.has_value() && r.value()));
+	}
+
+	TEST_CASE("copying a past input is REALIZABLE") {
+		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+			"&& G (F (o2[t]:bv[1] = i1[t-1]:bv[1])).");
+		REQUIRE(fm != nullptr);
+		CHECK(realizable(fm));
+	}
+
+	TEST_CASE("a contradiction chain longer than the lookback window is UNREALIZABLE") {
+		tref fm = spec("(always o2[t]:bv[1] = o1[t-2]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-2]:bv[1] "
+			"&& !(o1[t]:bv[1] = o3[t]:bv[1]) "
+			"&& o3[t-2]:bv[1] = o1[t]:bv[1]) "
+			"&& (sometimes o1[t-1]:bv[1] = 1).");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(realizable(fm));
+	}
+
+} // TEST_SUITE("Strategy played against the data")
 
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────
 
