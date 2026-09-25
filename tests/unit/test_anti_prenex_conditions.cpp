@@ -386,6 +386,33 @@ TEST_CASE("S5: a positive whose zero form loses its last block variable") {
 		ex("x", finished(k.psi))));
 }
 
+TEST_CASE("S6: a tree that collapses while it is rewritten keeps its members") {
+	tref b = vr("b");
+	// `(a ∪ p)·p′·a′` is 0, so its literal folds to `F` and the tree collapses
+	// to the conjunction `¬(a = 0) ∧ ¬(b = 0)`, whose members are negatives.
+	prepared_clause k({ b }, conj(neg(eq0(bf("b"))),
+		disj(conj(neg(eq0(bf("a"))), neg(eq0(bf("b")))),
+			neg(eq0(bf("(a|p)&p'&a'"))))));
+	REQUIRE(k.conjuncts.size() == 2);
+	REQUIRE(std::any_of(k.conjuncts.begin(), k.conjuncts.end(),
+		ap::is_negative_tree<node_t>));
+
+	auto s = ap::squeeze<node_t>(k.conjuncts, k.P, k.c.order);
+	REQUIRE(!s.decided_false);
+	CHECK(s.comps.empty());
+	CHECK(s.negatives.size() == s.conjuncts.size());
+	trefs conds{ ap::positive_condition<node_t>(s.comps, k.c) };
+	for (tref n : s.negatives)
+		conds.push_back(ap::is_negative_tree<node_t>(n)
+			? ap::tree_condition<node_t>(n, s.comps, k.P, k.c)
+			: ap::negative_condition<node_t>(
+				ap::term_of<node_t>(n, k.c.order), s.comps, k.P,
+				k.c));
+	CHECK(are_nso_equivalent<node_t>(
+		finished(ap::simplified_and_join<node_t>(conds)),
+		neg(eq0(bf("a")))));
+}
+
 // --- POSITIVE_CONDITION -------------------------------------------------------------
 
 TEST_CASE("PC1: one atom per component, each over its own variables") {

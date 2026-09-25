@@ -1718,10 +1718,15 @@ atomless method's licence alone (inv. 1).
 ```
 SQUEEZE(clause, X) → (f, comps, negatives, clause):
  1. clause ← NORM_EQUATION applied to every (¬)equation, the literals of a
-    negative tree included
+    negative tree included, the result re-read into conjuncts
     //   zero form for the squeeze; "positives"/"negatives" mean f = 0 / ¬(f = 0).
     //   A swallowed binder unit or a conversion emission (finite method) is
     //   not an atom — it rides along untouched
+    //   A tree can collapse once its literals are rewritten: a literal
+    //   that folds to F leaves (a ∧ b) ∨ F = a ∧ b, a conjunction whose
+    //   members join the clause's conjuncts; one that folds to T turns
+    //   the tree into T, which drops. So every conjunct is a literal, a
+    //   tree, or one of the untouched kinds above.
  2. f ← ⋃ { positives of clause }                        // squeeze; ⋃{} = 0
     comps ← [(F_k, X_k)]: PARTS (§6) over the POSITIVES alone, negatives
             ignored — F_k the union of part k's terms, X_k = X ∩ FV(F_k),
